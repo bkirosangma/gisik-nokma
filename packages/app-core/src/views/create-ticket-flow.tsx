@@ -285,6 +285,20 @@ export function CreateTicketFlow({
     if (outcome.kind === 'parent-refused') {
       // Stays open, in the dialog, verbatim: the parent's own rules refused the
       // reopen, and another target on the same list may still be allowed.
+      if (outcome.parentReopened) {
+        // Ruling 39 (fix round 1, 2026-09-17): the batch's `ticket.reopened`
+        // half already COMMITTED before its transition half was refused — the
+        // server processes a batch per-event, never atomically
+        // (`guarded-child-event.ts`'s own docblock cites the real
+        // `IngestService`), so this is reachable, not hypothetical. The
+        // parent is no longer closed, permanently, and a retry that resent
+        // `ticket.reopened` would itself be refused `not-closed` — masking
+        // whatever the next target's own transition would have answered.
+        // Flipping `parentClosed` to `false` here is what makes the retry
+        // build `[transition]` alone, the same batch `openReopenPrompt` would
+        // have built had it re-read the ticket after this commit.
+        setReopenPrompt((prev) => (prev === null ? prev : { ...prev, parentClosed: false }));
+      }
       setParentRefusal(outcome.refusal);
       return;
     }

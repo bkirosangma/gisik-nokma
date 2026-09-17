@@ -293,6 +293,9 @@ describe('3.78 · T13.3 reopenAndProceed — parent first, cause attached, refus
     expect(outcome).toEqual({
       kind: 'parent-refused',
       refusal: { rule: REFUSAL_RULES.restrictTo, reason: 'Only Anselma Marak may move this out of Done.' },
+      // Ruling 39: `plan` here is `parentClosed: false` — no reopen in the
+      // batch at all — so there is nothing for `parentReopened` to report.
+      parentReopened: false,
     });
     expect(source.ingested).toHaveLength(1); // the child claim was never submitted
     expect(source.ingested[0]?.[0]?.type).toBe('ticket.transitioned');
@@ -407,6 +410,9 @@ describe('13.593 · T13.5 reopenAndProceed on a CLOSED parent — reopened befor
     expect(outcome).toEqual({
       kind: 'parent-refused',
       refusal: { rule: 'not-closed', reason: 'This ticket is not closed.' },
+      // Ruling 39 · 13.593c: the refused event IS the reopen itself (index
+      // 0) — nothing committed before it, so there is nothing to preserve.
+      parentReopened: false,
     });
     // ONE batch went out, carrying both parent events together, and no third
     // (child) claim — the whole point of surfacing the refusal here.
@@ -429,6 +435,12 @@ describe('13.593 · T13.5 reopenAndProceed on a CLOSED parent — reopened befor
         rule: REFUSAL_RULES.restrictTo,
         reason: 'Only Anselma Marak may move this out of Done.',
       },
+      // Ruling 39: the reopen (index 0) COMMITTED before the transition
+      // (index 1) was refused — the parent is permanently no longer closed,
+      // and a caller retrying with a different target MUST know that so it
+      // does not resend `ticket.reopened` into a `not-closed` refusal that
+      // would mask this same transition rule on the next attempt.
+      parentReopened: true,
     });
     expect(source.ingested).toHaveLength(1);
     expect(source.ingested[0]).toHaveLength(2);

@@ -96,20 +96,13 @@ export function NewTicketDialog({
   const [title, setTitle] = useState('');
   const [typeId, setTypeId] = useState(typeOptions[0]?.id ?? '');
   const [parentId, setParentId] = useState('');
-  // Checked by default (spec §5.4): the one state this control needs, since it
-  // is read only at the moment it MATTERS — when a chosen parent is in focus.
-  // It is NOT reset on every parent re-pick, and the reachable case that
-  // matters is the SAME parent, not a different one: untick the box, switch
-  // the picker to "None (project root)" (or a backlog/closed candidate, which
-  // hides the box the same way), then switch BACK to the same in-focus
-  // parent — the box returns UNCHECKED, not to its "checked by default"
-  // starting state. That is deliberate: "checked by default" describes the
-  // box's FIRST appearance for a given render of this dialog, not a promise
-  // that it forgets a person's own un-ticking every time its visibility
-  // toggles off and back on. Persisting `startInFocus` across that toggle is
-  // the same choice `parentId` itself already makes (3.157's own invariant:
-  // state outlives a control's visibility) — inventing a reset here would be
-  // a second, unwitnessed rule this control does not otherwise follow.
+  // Checked by default (spec §5.4), PER CHOSEN PARENT — Ruling 40 (coordinator,
+  // fix round 1, 2026-09-17): the Parent picker's own `onChange` below resets
+  // this to `true` on every selection, so switching to a DIFFERENT in-focus
+  // parent always renders THAT parent's checkbox at its spec-mandated
+  // starting state, rather than inheriting whatever a previously-chosen
+  // parent's box was left at. See that `onChange` for the full reasoning;
+  // this state's own job is only to hold whatever the box currently shows.
   const [startInFocus, setStartInFocus] = useState(true);
 
   // The SAME "no usable parent" test the submit boundary below already makes
@@ -183,7 +176,31 @@ export function NewTicketDialog({
               })),
             ]}
             value={parentId}
-            onChange={setParentId}
+            onChange={(value) => {
+              setParentId(value);
+              // Ruling 40 (coordinator, fix round 1, 2026-09-17): "checked by
+              // default" (spec §5.4) is a promise PER CHOSEN PARENT, not a
+              // one-time initial value for the whole dialog session. Before
+              // this reset, unticking the box for in-focus parent A and then
+              // picking a DIFFERENT in-focus parent B rendered B's checkbox
+              // UNTICKED on its very first appearance — a starting state B's
+              // own "checked by default" spec line never asked for; nothing
+              // about parent B's checkbox should remember what a person did
+              // to parent A's.
+              //
+              // Fires on EVERY selection from this picker — including
+              // switching AWAY from an in-focus parent (to "None", or to a
+              // backlog/closed one, which hides the box) and including
+              // re-selecting the SAME parent the box is already showing —
+              // not only when the newly chosen candidate differs from the
+              // last. That is the simpler, uniform rule: "reset whenever this
+              // control fires" needs no second test for "did the value
+              // actually change", and it costs nothing while the box is
+              // hidden, since `start` is only ever read as
+              // `startCheckboxVisible && startInFocus` — a reset nobody can
+              // see never reaches the payload.
+              setStartInFocus(true);
+            }}
             searchable
             aria-label="Parent"
           />

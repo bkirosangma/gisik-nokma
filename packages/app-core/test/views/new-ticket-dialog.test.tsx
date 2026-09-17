@@ -341,6 +341,9 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
   const CANDIDATES = [
     { id: 'parent_focus', title: 'In-focus parent', inFocus: true },
     { id: 'parent_backlog', title: 'Backlog parent', inFocus: false },
+    // A SECOND in-focus candidate, for 13.591g's switch-between-two-in-focus-
+    // parents case (Ruling 40) — every other case in this block ignores it.
+    { id: 'parent_focus_2', title: 'Another in-focus parent', inFocus: true },
   ];
 
   const renderDialog = () => {
@@ -435,6 +438,49 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
       typeId: 'task',
       parentId: 'parent_backlog',
       start: 'backlog',
+    });
+  });
+
+  /**
+   * 13.591g (Ruling 40, coordinator, fix round 1, 2026-09-17) — "checked by
+   * default" (spec §5.4) is a promise PER CHOSEN PARENT. Untick the box for
+   * in-focus parent A, then pick a DIFFERENT in-focus parent B: B's own box
+   * must render checked on ITS first appearance, not inherit A's untick.
+   * Named `g` rather than reusing `a` — the coordinator's fix-round message
+   * named this case 13.591a, but that id already covers this file's own
+   * "states the note unconditionally" case (a distinct, already-cited
+   * behaviour); reusing one id for two unrelated assertions in the same file
+   * would violate the "never let one checkmark cover two different things"
+   * convention this catalogue otherwise holds to, so this continues the
+   * block's own lettering instead — `f` is `apps/web/test/project-create-
+   * gate.test.tsx`'s case, a different file's next free letter, not this
+   * one's.
+   */
+  it('13.591g unticking the checkbox for one in-focus parent, then switching to a DIFFERENT in-focus parent, renders the new parent\'s box CHECKED', async () => {
+    const user = userEvent.setup();
+    const onCreate = renderDialog();
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
+    await user.click(
+      within(await openPicker(user, 'Parent')).getByRole('option', { name: 'In-focus parent' }),
+    );
+    const checkboxA = screen.getByRole('checkbox', { name: 'Start in focus' });
+    expect(checkboxA).toBeChecked();
+    await user.click(checkboxA);
+    expect(checkboxA).not.toBeChecked();
+
+    await user.click(
+      within(await openPicker(user, 'Parent')).getByRole('option', { name: 'Another in-focus parent' }),
+    );
+    const checkboxB = screen.getByRole('checkbox', { name: 'Start in focus' });
+    expect(checkboxB).toBeChecked();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    expect(onCreate).toHaveBeenCalledWith({
+      title: 'Renew the trade licence',
+      typeId: 'task',
+      parentId: 'parent_focus_2',
+      start: 'focus',
     });
   });
 });

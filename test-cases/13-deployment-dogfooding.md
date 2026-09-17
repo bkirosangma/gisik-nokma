@@ -6543,8 +6543,13 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   ticket.transitioned]` in that order, both on the parent, and the child rides only the SECOND call; a
   committed outcome's `parentResult` names the TRANSITION's own result (the LAST element of the batch),
   never the reopen's; a refusal of EITHER event in that batch — the reopen itself, or the transition after
-  a committed reopen — yields `parent-refused` and the child is never sent. With `parentClosed: false` the
-  batch stays the single-element array T13.3a–g already pinned, unchanged. `views/reopen-flow.test.tsx`
+  a committed reopen — yields `parent-refused` and the child is never sent. **Fix round 1 (Ruling 39,
+  coordinator, 2026-09-17): `parent-refused` now carries `parentReopened: boolean`** — `true` exactly
+  when the reopen (batch index 0) committed before the transition (index 1) was refused, `false` for a
+  refusal AT index 0 or a plan with no reopen at all — pinned by extending 13.593b (refused at index 0 →
+  `false`) and 13.593c (refused at index 1, reopen committed → `true`) in place, plus T13.3d
+  (`parentClosed: false` → `false`). With `parentClosed: false` the batch stays the single-element array
+  T13.3a–g already pinned, unchanged. `views/reopen-flow.test.tsx`
   proves the same shape end to end: a CLOSED `PARENT_READ` (`ticket.closed` set) drives the reopen offer
   through the dialog, and the confirm click's recorded `source.ingested` batches show the same
   `[reopened, transitioned]` pair ahead of the child, exactly as the unit test pins. `CreateTicketFlow`
@@ -6559,3 +6564,30 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   TRANSITION — the event actually left unanswered, not `batch[0]` (the reopen, which DID answer) —
   discriminating a correct implementation from one that always blames the first element —
   (`packages/app-core/test/flows/guarded-child-event.test.ts`)
+- **13.593e** ✅ Fix round 1, Ruling 39 (coordinator, 2026-09-17; review Finding 1) — retrying with a
+  DIFFERENT target after a closed parent's reopen half already committed no longer resends
+  `ticket.reopened`. Confirmed against the REAL server, not a fake's assumption: `IngestService`
+  (`apps/server/src/ingest/ingest-service.ts`) commits each batch event independently, in its own
+  transaction, so `[reopened, transition→A]` can commit the reopen while a rule on that specific edge
+  (`restrict-to`, say) refuses transition→A — reachable, not hypothetical, and exactly what a stale
+  `ReopenPrompt.parentClosed: true` would have resent into a `not-closed` refusal on the next attempt,
+  MASKING whatever transition→B actually answers. `CreateTicketFlow.acceptReopen` now flips
+  `reopenPrompt.parentClosed` to `false` (`outcome.parentReopened`) before the parent's own refusal
+  renders, so a retry's plan builds `[transition]` alone. Proven end to end: first "Reopen and proceed"
+  gets `[committed, refused]` (reopen commits, transition→Doing refused); the dialog stays open exactly
+  as the ordinary (non-closed) shape already does; picking "To do" and confirming again sends a SECOND
+  parent batch of exactly ONE event, `ticket.transitioned` — no `ticket.reopened` — which then commits,
+  followed by the (retried) child. Mutation (dropping the `setReopenPrompt` update in `acceptReopen`,
+  `cp`/`sha256sum` restore): kills exactly this case, on the "exactly one event" assertion (`PASS (18)
+  FAIL (1)`, the retry batch resending both events) —
+  (`packages/app-core/test/views/reopen-flow.test.tsx`)
+- **13.591g** ✅ Fix round 1, Ruling 40 (coordinator, 2026-09-17; review Finding 3) — "checked by default"
+  (spec §5.4) is a promise PER CHOSEN PARENT, not a one-time initial value for the whole dialog session.
+  Unticking "Start in focus" for one in-focus parent, then switching to a DIFFERENT in-focus parent,
+  renders the new parent's checkbox CHECKED (not inheriting the previous parent's untick) — the Parent
+  picker's own `onChange` now resets `startInFocus` to `true` on every selection. Mutation (dropping that
+  reset, `cp`/`sha256sum` restore): kills exactly this case, on the "checkbox B is checked" assertion
+  (`PASS (11) FAIL (1)`). Named `g` rather than the coordinator's literal `13.591a` — that id already
+  covers this file's own "states the note unconditionally" case, a different, already-cited behaviour;
+  continuing the block's own lettering avoids one checkmark covering two unrelated assertions —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)

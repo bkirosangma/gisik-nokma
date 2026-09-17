@@ -139,7 +139,20 @@ export type ReopenPlan = {
 
 export type ReopenOutcome =
   | { kind: 'committed'; parentResult: IngestResult; childResult: IngestResult }
-  | { kind: 'parent-refused'; refusal: Refusal }
+  | {
+      kind: 'parent-refused';
+      refusal: Refusal;
+      /**
+       * Ruling 39 (coordinator, 2026-09-17, fix round 1): `true` exactly when
+       * this refusal is the TRANSITION's, immediately after the `ticket.reopened`
+       * ahead of it (batch index 0) already COMMITTED — never when the refused
+       * event IS the reopen itself, and never for a plan with no reopen in its
+       * batch at all (`plan.parentClosed: false`). See this function's own
+       * docblock, "A partial commit is still a commit," for why a caller MUST
+       * read this before retrying with a different target.
+       */
+      parentReopened: boolean;
+    }
   | { kind: 'child-refused-after-reopen'; parentResult: IngestResult; refusal: Refusal }
   | { kind: 'invalid'; result: InvalidResult };
 
@@ -201,6 +214,31 @@ export type ReopenOutcome =
  * nothing is hidden: the ledger is append-only, and a compensating transition
  * invented by this client would be a claim nobody made.
  *
+ * ## A partial commit is still a commit — Ruling 39 (fix round 1, 2026-09-17)
+ *
+ * The batch above is ONE `source.ingest` CALL, but the server does not treat
+ * it as one atomic unit: confirmed against the real `IngestService`
+ * (`apps/server/src/ingest/ingest-service.ts`), which processes a batch
+ * in order, `result[i]` answering `rawEvents[i]`, each event committing or
+ * failing INDEPENDENTLY inside its own transaction — "one bad event never
+ * rolls back its neighbours." So `[reopened, transition]` can commit the
+ * reopen and refuse the transition (a `require-comment`/`restrict-to` rule on
+ * the reopening edge, say) — the SAME truth `child-refused-after-reopen`
+ * already names for the batch AFTER this one ("the reopen STANDS", two
+ * paragraphs up), now reachable one batch earlier, inside the parent's own.
+ *
+ * `ReopenOutcome.parent-refused` therefore carries `parentReopened`, set true
+ * exactly when the loop below has already recorded a committed reopen (batch
+ * index 0) by the time a LATER index refuses — never when the reopen itself
+ * is the refused event, and never when the batch never carried one. A caller
+ * that retries with a different target after `parent-refused` — this is a
+ * deliberately supported path, `ReopenDialog` stays open for exactly this —
+ * MUST read this flag: resending `ticket.reopened` against an already-open
+ * parent is refused `not-closed`, which would then MASK whatever the new
+ * target's own transition actually answers, behind a message that makes no
+ * sense to someone who just successfully reopened the ticket. `create-ticket-
+ * flow.tsx`'s `acceptReopen` is the caller that acts on it.
+ *
  * ## The wire spelling is `to`
  *
  * `ticketTransitionedPayloadSchema` (`packages/domain/src/workflow.ts`) names
@@ -246,13 +284,26 @@ export async function reopenAndProceed(
   // `batch` is never empty (it always carries at least `parentTransition`),
   // so at least one assignment always happens before this is read.
   let parentResult!: IngestResult;
+  // Ruling 39: tracks whether the batch's `ticket.reopened` (index 0, only
+  // present when `plan.parentClosed`) has ALREADY committed by the time a
+  // later index refuses — the fact `parent-refused.parentReopened` reports.
+  // It can only ever become `true` via the `index === 0` branch below, so a
+  // refusal AT index 0 (the reopen itself) always reports it `false`, and a
+  // plan with no reopen in its batch (`parentClosed: false`) can never set it
+  // at all — both exactly the cases Ruling 39 says must read `false`.
+  let reopenCommitted = false;
   for (const [index, sent] of batch.entries()) {
     const result = results[index];
     if (result === undefined) throw new UnansweredClaimError(sent);
     if (result.status === 'refused') {
-      return { kind: 'parent-refused', refusal: { rule: result.rule, reason: result.reason } };
+      return {
+        kind: 'parent-refused',
+        refusal: { rule: result.rule, reason: result.reason },
+        parentReopened: reopenCommitted,
+      };
     }
     if (result.status === 'invalid') return { kind: 'invalid', result };
+    if (plan.parentClosed && index === 0) reopenCommitted = true;
     parentResult = result;
   }
 
