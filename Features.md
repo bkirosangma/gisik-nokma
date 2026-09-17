@@ -2477,8 +2477,10 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   Cost, settled in one session: CPU **6.05–6.47 % polling on versus 2.39–3.73 % off**, memory unchanged.
   `docker-compose.hot.yml`, `apps/server/Dockerfile`, `apps/web/Dockerfile`, `package.json`,
   `docs/runbook.md`,
-  `test-cases/13-deployment-dogfooding.md` (cases 13.650–13.653, the witness record — re-minted from
-  13.613–13.616, which a plan had reserved first; see that block's note),
+  `test-cases/13-deployment-dogfooding.md` (Step 1's witness record is **13.650–13.653**, re-minted from
+  13.613–13.616, which a plan had reserved first; **this step's block is 13.654–13.657** — the web coming up
+  hot and taking :3001 over, both save shapes at the web, a package edit reaching the served HTML through
+  `dist`, and the un-hot path proven unchanged by checksum; see each block's note),
   `docs/lanes/executor-state.md`
 - ✅ **Deployed-stack E2E — Playwright against the running compose stack, and the sign-in defect it
   found** — three specs drive the REAL stack (a Next container proxying to a real API server, real

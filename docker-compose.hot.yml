@@ -55,7 +55,13 @@ services:
     # `rootDir: src`), and consumers import workspace packages BY NAME
     # (`@gisik-nokma/domain` resolves through `./dist`), so a source edit here
     # reaches the server by way of `dist` — which is exactly what witness W3
-    # measures. Polling is NOT enabled: if inotify events were provably not
+    # measures.
+    #
+    # [SUPERSEDED 2026-09-18 by the note below — polling IS enabled now. This
+    # paragraph is kept, not deleted, because its BAR is the right one and the
+    # note below clears it: the fix was applied only after the missing event was
+    # named and measured, not on suspicion. Read the two together.]
+    # Polling is NOT enabled: if inotify events were provably not
     # crossing the Docker Desktop mount, the fix would be stated with the
     # measurement that showed the missing event, not applied on suspicion.
     #

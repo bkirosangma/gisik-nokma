@@ -401,15 +401,24 @@ else looks healthy — the app serves, the containers are Up, only /v1/* fails.
 
     docker logs --since 5m gisik-nokma-dev-web-1 2>&1 | grep 'Compiled'
 
-**`docker logs` WITHOUT `--since` under-reports — measured here: 6 lines bare vs 9 compile lines with
-`--since 30m`.** An edit that looks ignored may just be one you asked about the wrong way.
+**A first version of this paragraph said `docker logs` WITHOUT `--since` under-reports. That was WRONG, and
+the way it was wrong is worth keeping.** The reading behind it — 6 lines bare against 9 compile lines with
+`--since 30m` — compared a **summarised** read against a pass-through one: this machine's Bash hook routes
+commands through `rtk`, which can replace a bare `docker logs` result with its own summary. The tell was in
+the output and went unread — a trailing `[warn] 0 warnings (0 unique)` / `[info] 0 info messages`, which is
+rtk's footer, not the container's stdout. Re-run as a control, bare and `rtk proxy` agree exactly (**658
+lines each**), so docker's default is the complete log and `--since` only narrows it. **If a log read looks
+suspiciously short, suspect a summariser** — the footer is the evidence, and the container did not write it.
 
-**Both save shapes reach Next's watcher, unlike the server's.** Measured on this stack: in-place edits
-compiled in **1.2 s / 1.5 s / 1.5 s**, and a **rename-over** (`mv` a modified copy onto the path) compiled in
-**1.6 s** — the shape the `server`'s tsx watcher does not merely miss but permanently loses its watch over.
-That asymmetry is the reason this paragraph exists rather than a pointer to the server's. One outlier was
-measured at **59.4 s**: it landed, but a 30-second wait reads it as lost, so wait for the compile line rather
-than a stopwatch. Polling stays OFF here as there.
+**Both save shapes reach Next's watcher, unlike the server's — and the in-place half was measured late.**
+A true in-place write (host inode preserved, verified) compiled in **2.6 s**; a **rename-over** (`mv` a
+modified copy onto the path) compiled in **1.6 s**. An earlier version of this paragraph attributed
+"1.2 s / 1.5 s / 1.5 s" to in-place edits. **They were not in-place**: every write to that page in that pass
+was either the assistant's Edit tool or an `mv`, and both change the inode — which is what the paragraph
+above says the tool does. The numbers were right and the LABEL was wrong, and a reader would have taken it as
+licence not to care about save shape on the web. The shape that matters is the one the `server`'s tsx watcher
+permanently loses; Next's watcher takes it. One outlier was measured at **59.4 s**: it landed, but a
+30-second wait reads it as lost, so wait for the compile line rather than a stopwatch. Polling stays OFF here.
 
 **Package watchers.** The `web` container runs its own seven `tsc -p tsconfig.json --watch` processes — each
 container writes its OWN `dist`, because two writers on one path is the failure, not two readers on one source.

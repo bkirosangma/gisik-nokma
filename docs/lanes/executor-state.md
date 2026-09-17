@@ -20,8 +20,11 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~02:0x IST. **STEP 1b: THE COMPOSE `web` IS HOT TOO, AND THE
-> # SERVER'S WATCHER NOW POLLS. ONE PR IN FLIGHT, base `owner/workspace-edits`.**
+> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~02:1x IST. **STEP 1b: THE COMPOSE `web` IS HOT TOO, AND THE
+> # SERVER'S WATCHER NOW POLLS. Branch PUSHED (`origin/exec/step1b-web-hot-reload`); the PR against base
+> # `owner/workspace-edits` opens immediately after this commit — it did NOT exist when this block was
+> # first written, and a restart surface that names an event which has not happened sends its reader to
+> # `gh pr list --state open` expecting to find it.**
 >
 > ## Branch and the invariant that replaces a tip sha
 >

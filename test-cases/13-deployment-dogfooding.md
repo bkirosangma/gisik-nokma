@@ -7360,17 +7360,27 @@ on this machine, at the head of this change's PR — readings, not guarantees.
   (`docker-compose.hot.yml`, `apps/web/Dockerfile`, `package.json`)
 - 🧪 **13.655 — a web-source edit is live in seconds, in BOTH save shapes, with the executor's own tool.** A
   `data-hot-witness` marker added to `apps/web/app/sign-in/page.tsx` via the Edit tool was served by
-  `curl :3001/sign-in` (and gone again after the revert), with Next compiling **1.2 s / 1.5 s / 1.5 s** after
-  the respective writes. A **rename-over** (`mv` a modified copy onto the path) compiled in **1.6 s** — the
-  shape 13.651 records the SERVER's watcher losing its watch over, seen here by Next's webpack watcher without
-  complaint. **One outlier is recorded rather than smoothed: 59.4 s** between a write and its compile; it
-  landed, but a 30-second wait reads it as lost, which is how the first pass mis-read it.
-  **The instrument matters:** the Edit tool writes by rename-over (host inode changed on every edit —
-  `204060486 → 204060616 → 204060679`), and because the tool round-trip precedes any curl poll, a
-  curl-based stopwatch starts ~17 s late. The write's own mtime against the compile line is the measurement.
-  A second, harder negative: after a `.next`-bearing container was recreated, `docker logs` WITHOUT `--since`
-  returned **6 lines** where `--since 30m` returned the real history including **9** compile lines — an
-  under-reporting query that looks exactly like "nothing happened".
+  `curl :3001/sign-in` (and gone again after the revert), restarting the compile in **1.2 s / 1.5 s / 1.5 s**;
+  a **rename-over** (`mv` a modified copy onto the path) compiled in **1.6 s**; and a **true in-place write**
+  (host inode verified UNCHANGED, `204060733 → 204060733`) compiled in **2.6 s** and was served within 4 s.
+  That last one was measured on a SECOND pass, and the correction matters: the first pass labelled the three
+  Edit-tool timings "in-place edits", and **they were not** — the Edit tool writes by rename-over (host inode
+  changed on every edit: `204060486 → 204060616 → 204060679`), so the entire first pass was the rename-over
+  shape, which is what the case four sentences later says. The numbers were right and the label was wrong, and
+  a reader would have taken "both shapes" as licence not to care which one a save uses. The rename-over half
+  is the load-bearing one either way: it is the shape 13.651 records the SERVER's watcher permanently losing
+  its watch over, and Next's webpack watcher takes it without complaint.
+  **One outlier is recorded rather than smoothed: 59.4 s** between a write and its compile; it landed, but a
+  30-second wait reads it as lost, which is how the first pass mis-read it. **The instrument matters:** the
+  Edit tool's round-trip precedes any curl poll, so a curl-based stopwatch starts ~17 s late; the write's own
+  mtime against the compile line is the measurement.
+  **A claim in this case was retracted, and the retraction is the more useful half.** The first version said
+  `docker logs` WITHOUT `--since` under-reports (6 lines against 9). It does not: that reading compared a
+  **summarised** result against a pass-through one — this machine's Bash hook routes commands through `rtk`,
+  which can replace a bare `docker logs` output with its own summary, and the tell was a trailing
+  `[warn] 0 warnings (0 unique)` / `[info] 0 info messages` footer that is rtk's and not the container's.
+  As a control, bare and `rtk proxy` agree exactly (**658 lines each**). The surviving rule is the inverse one:
+  a suspiciously short log read is evidence about the READER, not about the container.
   (`docker-compose.hot.yml`, `docs/runbook.md`)
 - 🧪 **13.656 — a PACKAGE edit reaches the web through `dist`, and the package watcher can silently stop.**
   `packages/ui/src/tokens.ts`: `blue600` `#3a6db0` → `#abcdef`. The web container's own
