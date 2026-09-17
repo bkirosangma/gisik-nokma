@@ -6346,7 +6346,7 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   definition cached at all, mirroring the engine's own order (`transition.ts:72`, ahead of `getWorkflowDef`
   at `:76`): the refusal reads only the flag this client already holds. A `ticket.reopened` on a ticket that
   is not closed previews `not-closed`; on a closed ticket it passes. The transition branch's own
-  `acceptRestsOnUnseenChildren` (`~:351`) and `needsMembership` (`~:377-378`) now resolve states/edges over
+  `acceptRestsOnUnseenChildren` (`precheck.ts:425/436`) and `needsMembership` (`precheck.ts:460/467-472`) now resolve states/edges over
   `statesWithBacklog`/`transitionsWithBacklog`, with the same backlog-only Start rule `transitionOptions`
   takes — a destination or a ticket sitting in backlog is not the raw-`def` miss it used to be —
   (`packages/app-core/test/precheck.test.ts`)

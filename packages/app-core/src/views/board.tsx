@@ -7,7 +7,7 @@ import {
   type MutableRefObject,
   type ReactNode,
 } from 'react';
-import { statesWithBacklog, type WorkflowDef } from '@gisik-nokma/domain';
+import { BACKLOG_STATE_ID, statesWithBacklog, type WorkflowDef } from '@gisik-nokma/domain';
 import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
@@ -794,10 +794,20 @@ function stateNameOf(workflow: WorkflowDef, stateId: string): string {
  * exercise the real refusal pipeline end to end without contriving an
  * impossible click: feed `moveOutcome`'s own `available` output straight
  * into this, the exact same call `MoveRefusalNotice` below makes.
+ *
+ * **Backlog is never named here (controller ruling, Task 6 fix round 1).**
+ * `available` is `moveOutcome`'s shared `refused.available`, and since
+ * 13.582 `transitionOptions` offers Send-to-backlog from every non-terminal
+ * state — a real move, just not one a BOARD drop can make: Backlog is never
+ * a board column (spec §1.1), so a card dropped there has no column to land
+ * in, and the only door for it is the dialog/sheet's own "Move to Backlog"
+ * (spec §4). Filtering it out is a BOARD-surface decision and belongs here,
+ * not in `moveOutcome`, which stays the one shared gate every surface reads.
  */
 export function refusalCopy(workflow: WorkflowDef, available: string[]): string {
-  if (available.length === 0) return "This ticket can't move from here.";
-  const names = available.map((stateId) => stateNameOf(workflow, stateId));
+  const onBoard = available.filter((stateId) => stateId !== BACKLOG_STATE_ID);
+  if (onBoard.length === 0) return "This ticket can't move from here.";
+  const names = onBoard.map((stateId) => stateNameOf(workflow, stateId));
   return `Can't move there — try ${names.join(' or ')}.`;
 }
 

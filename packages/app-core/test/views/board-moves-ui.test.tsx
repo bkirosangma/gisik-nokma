@@ -357,18 +357,42 @@ describe('Board move arrows — the refusal path names the real alternatives', (
     const outcome = moveOutcome(WF_ERRAND, 'todo', 'waiting', {});
     expect(outcome.kind).toBe('refused');
     if (outcome.kind !== 'refused') throw new Error('expected a refusal');
-    // The two real alternatives from `todo` in WF_ERRAND are `doing` and,
-    // since 2026-09-17 (backlog/closed spec §4), the universal `backlog`
-    // Send-to-backlog edge (`todo` is non-terminal) — proven by
-    // `moveOutcome`'s own test suite; this test's job is only the copy.
+    // The SHARED gate's answer still names both: `doing` and, since
+    // 2026-09-17 (backlog/closed spec §4), the universal `backlog`
+    // Send-to-backlog edge (`todo` is non-terminal) — `moveOutcome` is read
+    // by the dialog/sheet too, where Backlog is a real, submittable move.
     expect(outcome.available).toEqual(['doing', 'backlog']);
 
+    // The BOARD's own copy never names it (controller ruling, Task 6 fix
+    // round 1): Backlog is never a board column, so a drop can never reach
+    // it, and `refusalCopy`/`MoveRefusalNotice` filter it out of the
+    // alternatives THIS surface offers — `moveOutcome` itself is untouched.
     render(<MoveRefusalNotice workflow={WF_ERRAND} available={outcome.available} />);
     const notice = screen.getByRole('alert');
     expect(notice).toHaveTextContent('Doing');
-    expect(notice).toHaveTextContent('Backlog');
+    expect(notice).not.toHaveTextContent('Backlog');
     expect(notice).not.toHaveTextContent('doing,'); // no raw, untranslated id leaking through
-    expect(refusalCopy(WF_ERRAND, outcome.available)).toBe("Can't move there — try Doing or Backlog.");
+    expect(refusalCopy(WF_ERRAND, outcome.available)).toBe("Can't move there — try Doing.");
+  });
+
+  /**
+   * The filter's own edge: when Backlog is the ONLY alternative `moveOutcome`
+   * names, filtering it leaves nothing — the pre-existing zero-alternatives
+   * sentence applies, not "try ." with a dangling word.
+   */
+  it('says the ticket cannot move at all when Backlog is the ONLY alternative', () => {
+    const onlyBacklog: WorkflowDef = {
+      id: 'wf-mini',
+      version: 1,
+      name: 'Mini',
+      initialStateId: 'todo',
+      states: [
+        { id: 'todo', name: 'To do', category: 'open' },
+        { id: 'done', name: 'Done', category: 'terminal' },
+      ],
+      transitions: [],
+    };
+    expect(refusalCopy(onlyBacklog, ['backlog'])).toBe("This ticket can't move from here.");
   });
 
   /** 13.503 — the zero-alternatives sentence is still an honest one, not "try ." */

@@ -67,10 +67,11 @@ function notEvaluated(): PrecheckResult {
  * The line the whole module is built to hold is between the last two: a
  * pre-check may never manufacture a `passed` out of ABSENCE. Four gates keep
  * it for `ticket.transitioned`'s accept path, and each names the absence it
- * closes — the `ticket.closed` short-circuit ahead of them (backlog/closed
- * spec §2, 2026-09-17) is a REFUSAL, decided from the flag alone, and is not
- * one of the four for that reason: it never manufactures the `passed` the
- * gates exist to guard:
+ * closes — the `closed-ticket` refusal ahead of them (fired on a
+ * `ticket.transitioned` whose ticket is closed, backlog/closed spec §2,
+ * 2026-09-17) is a REFUSAL, decided from the flag alone, and is not one of
+ * the four for that reason: it never manufactures the `passed` the gates
+ * exist to guard:
  *
  *  1. the moving ticket and its workflow definition must be cached at all;
  *  2. every workflow version the forward fold could consult must be cached, at

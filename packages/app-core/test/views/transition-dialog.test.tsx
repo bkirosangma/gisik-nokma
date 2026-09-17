@@ -9,7 +9,7 @@ import {
 } from '../../src/views/transition-dialog.js';
 import { WF_ERRAND } from '../helpers/seed.js';
 
-describe('3.71 transitionOptions — only transitions the definition declares', () => {
+describe('3.71 transitionOptions — what the definition declares plus the universal Backlog edges, never an invented move', () => {
   /**
    * Since 2026-09-17 (backlog/closed spec §4) every non-terminal state also
    * offers the universal Send-to-backlog edge, LAST — see 13.582 below for
@@ -101,8 +101,8 @@ describe('3.71 transitionOptions — only transitions the definition declares', 
  * Ruling P27. `transitionOptions` exists to predict the engine, so where a
  * wildcard and an exact edge both reach one target it must resolve them the way
  * the engine does: `find(exact) ?? find('*')`
- * (`packages/rule-engine/src/transition.ts:91-93`), which `precheck.ts`'s
- * `needsMembership` already mirrors at :375-378.
+ * (`packages/rule-engine/src/transition.ts:120-121`), which `precheck.ts`'s
+ * `needsMembership` already mirrors at :467-472.
  *
  * It did not. It kept the first matching edge in DECLARATION ORDER, so a
  * definition that happened to declare its wildcard first made the dialog

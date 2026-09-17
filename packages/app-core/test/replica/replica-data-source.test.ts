@@ -959,6 +959,10 @@ describe('13.584 ticket.closed / ticket.reopened fold through the shared reducer
     expect(row?.closed).toBeNull();
   });
 
+  function cardIdsOn(board: Awaited<ReturnType<ReplicaDataSource['query']['getBoard']>>): string[] {
+    return board.groups.flatMap((group) => group.columns.flatMap((column) => column.cards.map((c) => c.ticketId)));
+  }
+
   it('after ticket.closed, getTicket AND getTickets both report closed — and getBoard drops the card', async () => {
     const { ds, replica } = await fixture();
     const bornId = newUlid();
@@ -970,6 +974,12 @@ describe('13.584 ticket.closed / ticket.reopened fold through the shared reducer
         title: 'Filed, then closed',
       }),
     );
+
+    // POSITIVE CONTROL, before the fold: the ticket IS on the board while it
+    // is open, so the exclusion asserted below is a genuine drop and not an
+    // empty board that would have said "not there" regardless.
+    expect(cardIdsOn(await ds.query.getBoard(PROJECT))).toContain(bornId);
+
     // `applyServerItem` replays a fact the server already accepted (this
     // file's own idiom throughout) — it does not re-derive legality, so it is
     // not asserting that closing from `todo` would pass the real engine's
@@ -984,12 +994,21 @@ describe('13.584 ticket.closed / ticket.reopened fold through the shared reducer
     const row = (await ds.query.getTickets(PROJECT, {}, 'flat')).rows.find((r) => r.ticketId === bornId);
     expect(row?.closed).toEqual({ actorId: USER_B, at: SERVER_TIME });
 
+    // The `closed` FILTER TERM pinned at this seam, not merely the field:
+    // `getTickets` runs every row through `matchesFilter`, so `{ closed: true }`
+    // must actually narrow to this ticket and `{ closed: false }` must drop it —
+    // the mechanism 13.575's server-side parity relies on this replica having too.
+    expect(
+      (await ds.query.getTickets(PROJECT, { closed: true }, 'flat')).rows.map((r) => r.ticketId),
+    ).toContain(bornId);
+    expect(
+      (await ds.query.getTickets(PROJECT, { closed: false }, 'flat')).rows.map((r) => r.ticketId),
+    ).not.toContain(bornId);
+
     // getBoard EXCLUDES it — the replica's own mirror of 13.574's two bound
     // conjuncts (`state.stateId !== BACKLOG_STATE_ID`, `(closed ?? null) ===
     // null`), unlike getTickets above, which carries it.
-    const board = await ds.query.getBoard(PROJECT);
-    const cardIds = board.groups.flatMap((group) => group.columns.flatMap((column) => column.cards.map((c) => c.ticketId)));
-    expect(cardIds).not.toContain(bornId);
+    expect(cardIdsOn(await ds.query.getBoard(PROJECT))).not.toContain(bornId);
   });
 
   it('getBoard also excludes a confirmed backlog ticket, straggler path included — a backlog ticket never becomes a board column', async () => {

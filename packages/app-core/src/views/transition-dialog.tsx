@@ -15,7 +15,8 @@ type TransitionRules = WorkflowDef['transitions'][number]['rules'];
 export type TransitionOption = { toStateId: string; name: string; rules: TransitionRules };
 
 /**
- * Only what the definition declares — never an invented move (spec §7).
+ * What the definition declares, plus the universal Backlog edges — never an
+ * invented move (spec §7; the Backlog half is spec §4, see below).
  *
  * `from: '*'` means "from any state", so a wildcard edge is offered from
  * everywhere except the state it points at: offering `doing → doing` would put
@@ -25,9 +26,9 @@ export type TransitionOption = { toStateId: string; name: string; rules: Transit
  *
  * **The exact edge supplies the rules, and declaration order does not matter.**
  * That is not a preference — it is what the engine does, and this function's
- * whole purpose is to predict the engine. `packages/rule-engine/src/transition.ts:91-93`
+ * whole purpose is to predict the engine. `packages/rule-engine/src/transition.ts:120-121`
  * resolves `find(exact) ?? find('*')`, and `precheck.ts`'s `needsMembership`
- * already mirrors it at :375-378. This is the third copy of one rule.
+ * already mirrors it at :467-472. This is the third copy of one rule.
  *
  * This paragraph used to say the target *"keeps the FIRST edge's rules, in
  * declaration order, rather than merging two rule sets into one that no
@@ -64,8 +65,16 @@ export type TransitionOption = { toStateId: string; name: string; rules: Transit
  */
 export function transitionOptions(def: WorkflowDef, fromStateId: string): TransitionOption[] {
   if (fromStateId === BACKLOG_STATE_ID) {
-    const start = statesWithBacklog(def).find((state) => state.id === def.initialStateId);
-    return start === undefined ? [] : [{ toStateId: start.id, name: start.name, rules: [] }];
+    // Read off `transitionsWithBacklog(def)` itself, not re-derived by hand
+    // (fix round 1, review Important 1): the paragraph above claims the
+    // universal set comes from "the SAME helpers … rather than a second,
+    // driftable copy", and a literal `def.initialStateId`/`rules: []` here
+    // was exactly that second copy — correct only because
+    // `universalTransitions` happens to build Start the same way today.
+    const start = transitionsWithBacklog(def).find((t) => t.from === BACKLOG_STATE_ID);
+    if (start === undefined) return [];
+    const state = statesWithBacklog(def).find((candidate) => candidate.id === start.to);
+    return state === undefined ? [] : [{ toStateId: start.to, name: state.name, rules: start.rules }];
   }
 
   const allTransitions = transitionsWithBacklog(def);
