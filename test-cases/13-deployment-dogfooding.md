@@ -6346,7 +6346,7 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   definition cached at all, mirroring the engine's own order (`transition.ts:72`, ahead of `getWorkflowDef`
   at `:76`): the refusal reads only the flag this client already holds. A `ticket.reopened` on a ticket that
   is not closed previews `not-closed`; on a closed ticket it passes. The transition branch's own
-  `acceptRestsOnUnseenChildren` (`precheck.ts:425/437`) and `needsMembership` (`precheck.ts:460/467-473`) now resolve states/edges over
+  `acceptRestsOnUnseenChildren` (`precheck.ts:426/437`) and `needsMembership` (`precheck.ts:461/468-473`) now resolve states/edges over
   `statesWithBacklog`/`transitionsWithBacklog`, with the same backlog-only Start rule `transitionOptions`
   takes — a destination or a ticket sitting in backlog is not the raw-`def` miss it used to be —
   (`packages/app-core/test/precheck.test.ts`)
@@ -6621,7 +6621,7 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   CALL-COUNT-DRIVEN `getTickets` stub answers, on its second read, that the ticket's state moved — a
   fixed answer could not have falsified `list.reload()` firing. A refused Start renders the reason and
   re-enables the button; the transport wording never appears for a refusal. **Ruling 42's target
-  resolution**: `ListRow` carries no `workflowId` (`view-types.ts:188-220` — `typeId`/`stateId` only), so
+  resolution**: `ListRow` carries no `workflowId` (`view-types.ts:187-231` — `typeId`/`stateId` only), so
   `startTargetFor(row, types, defs)` (`apps/web/src/backlog-start.ts`) joins `row.typeId` through the
   workspace's own `TicketTypeDef[]` to a `workflowId`, then reads that `WorkflowDef`'s `initialStateId`
   from a `Map` the page fetches ONE `getWorkflowDef` per DISTINCT workflow among the backlog rows on
@@ -6759,3 +6759,175 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   "add one assertion" instruction to `board-narrowing.test.tsx` conditionally, and that file has no such
   sibling to add it to —
   (`apps/web/test/board-search-scope.test.ts`)
+
+## Task 12 — closing paragraph: final gate, catalogue checks, citation sweep
+
+**Gate (Node v22.23.2, all six packages, whole-suite `vitest run` plus
+`typecheck`):**
+
+| Package | Tests | Typecheck |
+|---|---|---|
+| `packages/domain` | PASS 486 / FAIL 0 | EXIT=0 |
+| `packages/rule-engine` | PASS 298 / FAIL 0 | EXIT=0 |
+| `packages/app-core` | PASS 1418 / FAIL 0 | EXIT=0 |
+| `packages/ui` (incl. token-discipline scan) | PASS 315 / FAIL 0 | EXIT=0 |
+| `apps/web` | PASS 430 / FAIL 0 | EXIT=0 |
+| `apps/server` (Postgres) | PASS 1531 / FAIL 0 / SKIP 5 | EXIT=0 |
+
+`node scripts/check-case-ids.mjs`: EXIT=1 (expected -- the only two duplicates are the pre-existing, explicitly-allowed `13.387`/`13.413`; "check-case-ids: real sweep -- bare 1136, bold 977, marker-first 43, sum 2156, union 2153, 12 files scanned").
+`node scripts/check-case-citations.mjs`: EXIT=1 overall, but file 13's own uncited set is exactly `13.401`/`13.476`/`13.477` as required -- "13-deployment-dogfooding.md: 485 cited / 3 uncited / 488 total". The script's 5 ratchet violations are ALL pre-existing at `3222b908` (verified in a disposable worktree at that commit, identical output) and touch files this plan never opened (`03-foundation-ledger.md`, `10-workflow-builder.md`, `11-calendar-notifications.md`, `15-in-app-help.md`); not this task's doing and out of its scope.
+
+**Per-task mutation summary** (one line per task, quoting each task's own
+report, `.superpowers/sdd/2026-09-17-backlog-and-closed-core/task-N-report.md`):
+
+- **Task 1** — two mutations, each killing exactly one predicted case:
+  dropping the terminal-state filter from `universalTransitions`'s
+  Send-to-backlog computation kills 13.562 alone ("no edge from `done`");
+  removing `foldStateIdForward`'s backlog early-return kills 13.563 alone.
+- **Task 2** — mutating `p.start === 'backlog'` to `p.start !== 'focus'`
+  kills 13.565 alone (plus one knock-on assertion sharing the same cause);
+  "the mutation is caught exactly where the additive-field rule's own guard
+  lives, and only there among tests that don't happen to also omit `start`."
+- **Task 3** — three mutations against the brief's own predictions, plus one
+  in the fix round: deleting the closed check kills 13.570 alone; reverting
+  `toState` to `latest.states` kills both 13.571 Send-to-backlog cases;
+  collapsing the backlog-only ternary back to a plain wildcard lookup kills
+  "the new wildcard case `13.571 … a wildcard edge does not apply from
+  backlog — only Start does`" alone; reverting `checkTicketClosed`'s split
+  guard (fix round) kills 13.568 alone, "every other case, including the
+  unrelated `13.569`/`13.570` cases, stayed green."
+- **Task 4** — the `rowToTicketState`-to-unconditional-`closed:null`
+  mutation kills "exactly 13.572's second case."
+- **Task 5** — removing `AND t.closed_at IS NULL` from `readBoard` reddens
+  13.574 alone; removing the `closed` clause from `compile-filter.ts`
+  reddens 13.578 (plus the pre-existing axis-enumeration test, expected
+  fallout); fix round 2's three `def.states.find ?? stateId` →
+  `statesWithBacklog` fixes are pinned by the new case 13.575b (RED/GREEN).
+- **Task 6** — three mutations: reverting `transitionOptions`'s general
+  loop to `def.transitions`/`def.states` "killed 9 tests, including the
+  named 13.582 case"; removing the `fromStateId === BACKLOG_STATE_ID`
+  special case "killed exactly one test — the wildcard-to-`done`-never-
+  resolves-from-backlog assertion — and *not* the plain 'from backlog:
+  exactly the Start edge' case," as predicted, since only a definition
+  whose wildcard reaches a target different from Start can discriminate the
+  two implementations; dropping the `closed` clause in `matchesListRow`
+  "killed 3 tests."
+- **Task 7** — five mutations across three fix rounds, each killing exactly
+  one case: removing `disabled={closed !== null}` from Move… kills 13.586
+  alone; reverting the non-terminal check on Close's render guard kills
+  13.587 alone; removing the `finally` block (submitting never resets)
+  kills 13.588a alone; moving `setSubmitting(false)` to the committed
+  branch only kills 13.588b alone; dropping the new
+  `setServerRefusal(null)` on the silence branch kills 13.588c alone, "on
+  the 'server notice gone' assertion."
+- **Task 8** — the Close-renders-regardless-of-category mutation "killed
+  exactly `renders no Close button on a non-terminal column` and nothing
+  else"; the ruling's predicted `submitDirect` silence-clear mutation was
+  MEASURED, not assumed, to be redundant on the arrow path (the call
+  site's own unconditional clear already covers it) — recorded honestly in
+  13.590a's catalogue entry rather than claimed as a live discriminator.
+- **Task 9** — dropping `start: draft.start` from the create payload kills
+  exactly the two 13.592 cases; dropping the `setReopenPrompt` update on
+  retry kills "exactly 13.593e, on the 'exactly one event' assertion (the
+  retry resent both)"; dropping the reset on parent-selection change kills
+  "exactly 13.591g."
+- **Task 10** — mutating the ingest payload from `toStateId` to
+  `row.stateId` kills "the ONE failure is 13.595's ingest-payload
+  assertion; no other case moved" (`PASS (3) FAIL (1)` of `backlog-tab.test.tsx`'s 4).
+- **Task 11** — the `datesNarrowing` closed-clause mutation "killed exactly
+  the three 13.601 assertions"; dropping
+  `names.set(BACKLOG_STATE_ID, BACKLOG_STATE.name)` from `boardStateNames`
+  "killed exactly the Backlog-chip case in 13.600"; dropping the new
+  `axes.push('closed')` line "kills exactly 13.602's two closed-sensitive
+  assertions, nothing else."
+
+**Citation sweep** (Ruling 30's method — open the file at `3222b908` and at
+HEAD, never by offset — over every source file the diff
+`git diff --numstat 3222b908..HEAD -- '*.ts' '*.tsx' '*.css' '*.sql'`
+(excluding `.superpowers/`) shows this plan grew, 87 files;
+every `test-cases/*.md` file grepped, not only this one):
+
+- 115 candidate citations found across
+  `03-foundation-ledger.md`, `05-tickets-hierarchy.md`,
+  `06-auth-visibility.md`, `07-api-realtime-search.md`,
+  `12-offline-sync-apps.md`, `13-deployment-dogfooding.md` (including this
+  section's own citations) and `14-mcp-server.md`. Two of the 87 files this
+  plan grew (`page.tsx`, `precheck.ts`) account for most candidates; most of
+  the 87 (every pure-insertion file among `view-types.ts`, `ticket-events.ts`,
+  `filter-spec.ts`, `read-models.ts`, `entity-state.ts`, `matches-filter.ts`,
+  `evaluate.ts`, `refusal-rules.ts`, `compile-filter.ts`, and every file this
+  plan itself created new — `close.ts`, `backlog-start.ts`,
+  `backlog-start-button.tsx`, `filter-cycle.ts`) drew zero pre-existing
+  citations from outside this plan's own section.
+- **12 re-pointed**, verified correct at `3222b908` and at the fixed line by
+  direct read (never by offset arithmetic): `06-auth-visibility.md:248`
+  `precheck.ts:154-157`→`:180-183`; `07-api-realtime-search.md:485,494`
+  `precheck.ts:268`→`:294` (both occurrences); `07-api-realtime-search.md:501`
+  `ticket-state.ts:56-63`→`:59-66`; `05-tickets-hierarchy.md:54,60`
+  `ticket-state.ts:94`→`:99` and `:211`→`:221`; `12-offline-sync-apps.md:2395`
+  `list.ts:143`→`:144`, `:103-112`→`:104-113`, `:205`→`:206`;
+  `12-offline-sync-apps.md:140` `sync-routes.ts:59`→`:71`;
+  `12-offline-sync-apps.md:1432` `ticket-sheet.tsx:276`→`:299`;
+  `12-offline-sync-apps.md:152` `precheck.test.ts:165–180`→`:173–188`;
+  `12-offline-sync-apps.md:1618` `workflow.ts:138`→`:184`;
+  `12-offline-sync-apps.md:127` `harness.ts:567–577`→`:571–581`; plus, within
+  this section's OWN prose (never checked against `3222b908` — it postdates
+  it — checked directly against HEAD instead): `precheck.ts:425/437`→`:426/437`
+  and `:460/467-473`→`:461/468-473` (13.583's paragraph), and
+  `view-types.ts:188-220`→`:187-231` (Ruling 42's paragraph).
+- **Already-stale before this plan, left alone (not this plan's doing):**
+  the majority of the DATA-GAP citations `07-api-realtime-search.md`'s
+  §7.187–7.196 make into `view-types.ts`/`board.tsx` — these predate even
+  the `board-prototype-port`/`filter-exclude-all-tabs` plans and no longer
+  point at the content their own sentences quote, unrelated to anything
+  this plan touched; `03-foundation-ledger.md:85`'s `workflow.ts:144`
+  (points at an unrelated `cause` field, not the `to` spelling it cites);
+  `ui.css:1321` (cited twice in `13-deployment-dogfooding.md`, already
+  found stale by the `board-prototype-port` plan's own sweep, "found
+  ALREADY stale before this change").
+- **Historical narrative, left as written, per the precedent this file's
+  own prior sweep set** (`13-deployment-dogfooding.md`'s "Historical
+  narrative, left as written" bullet, itself pre-existing at `3222b908`):
+  every citation embedded in a dated, closed retrospective section —
+  `03-foundation-ledger.md`'s "Planted defect"/"RECONCILED 2026-09-02"
+  notes; the `board-prototype-port` plan's own dated sections ("Task 3"
+  through "Ruling 29", 2026-09-16, lines 4157–5673) and its own "Final
+  whole-branch review, fix wave" and "Finding 2 — 34 stale line-number
+  citations swept" paragraphs; the `filter-exclude-all-tabs` plan's own
+  "citation sweep" closing paragraph (lines 6097–6165) and its "Prose
+  citations of pre-Task-6 names" paragraph — left untouched even where this
+  plan's own edits shifted the line numbers those paragraphs quote, because
+  re-pointing a number a retrospective reports AS ITS OWN FINDING would
+  misrepresent what that past investigation actually found, exactly the
+  reasoning the prior sweep itself recorded. A borderline case decided the
+  same way: `07-api-realtime-search.md:501`'s "METHOD NOTE" records that
+  `sync-routes.ts:32` once read "ten of them" — Task 2 of this plan changed
+  that line's own wording to "twelve of them" (the line NUMBER is
+  unaffected, 32 both before and after), so the note's quoted fragment is
+  now stale prose, left as written since the note is itself a permanent
+  lesson inside a still-tracked case (7.259), not a live claim about the
+  docblock's current wording.
+
+**§9's named-not-built additions** (this plan's own follow-ons, found
+during execution — full list and file:line in the spec's "Follow-ons named
+during execution" appendix, cross-referenced from §9): `check-case-citations.mjs`
+letter-suffix support; `submitFromDialog`'s empty-results-as-committed gap;
+the refused (not redirected) rebind into backlog; the parked fixture-suite
+entries for the four new refusals; the untested signed-out `moves`/`rowAction`
+gates; the sheet's `submitTransition` rejected-ingest path; the board strip's
+untested-end-to-end "Not applied on the board: closed." sentence; and
+13.588a's committed-path-only mutation witness.
+
+**Suffixed-id hand check** (`scripts/check-case-citations.mjs` folds a
+letter-suffixed id into its base id before computing the uncited set, so it
+cannot see a suffixed case with no citation of its own — Task 12's own
+follow-on above): every `13\.[0-9]+[a-z]` id in this file —
+`13.520a`/`13.520b`/`13.528b`/`13.556a`/`13.556b`/`13.575b`/`13.588a`/`13.588b`/
+`13.588c`/`13.590a`/`13.591a`–`g`/`13.593a`–`e` (`13.591b`–`e` appear only as
+the range "13.591a–e" in prose, not as individual tokens; checked directly
+against test files regardless) — appears in at least one file under
+`packages/*/test` or `apps/*/test`. None missing; no fix needed.
+
+**Second-wave plan**: `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md`
+does not exist yet — §8 (ranking, auto-close, bulk close) is designed and
+approved in the spec but has no plan document as of this task.

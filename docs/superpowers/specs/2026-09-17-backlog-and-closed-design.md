@@ -179,6 +179,19 @@ on a CLOSED parent submits `ticket.reopened` for the parent followed by the
 reopening transition, in one ordered batch, so the person is asked once.
 `precheck.ts` mirrors the four refusals for the instant preview.
 
+**§2.3 addition (2026-09-17, see Amendments — Ruling 39):** the server
+commits each event of that batch independently, so `[ticket.reopened,
+transition]` can commit the reopen and still refuse the transition — a
+PARTIAL commit the flow must disclose rather than mask. The `parent-refused`
+outcome therefore carries `parentReopened: boolean`, true exactly when the
+batch's `ticket.reopened` committed before the transition it was paired with
+was refused (also carried on `invalid`, for completeness, though that
+outcome exits the dialog and cannot be retried). When `parentReopened` is
+true, a retry with a different target sends the transition ALONE — resending
+`ticket.reopened` against an already-reopened parent would itself refuse
+`not-closed` and mask the real answer. The reopen stands either way; only
+the transition is retried.
+
 ## 3. Server
 
 ### 3.1 Projection
@@ -248,9 +261,15 @@ Fifth tab, `view: 'backlog'`, label "Backlog". `TicketList` over
 page filter applied like every other tab, the strip per tab as today
 (`TAB_NOUN.backlog = 'backlog'`). Each row gets a **Start** button (right of
 the title; `aria-label` "Start <title>") that submits `ticket.transitioned {to: def.initialStateId}`
-through the same `moveOutcome`/`TransitionDialog` path the arrows use — a
-gated initial edge still asks. Empty state: "Nothing in the backlog — new
-tickets land here." No ranking, no drag-ordering (§8).
+directly through `dataSource.ingest` (amended 2026-09-17, see Amendments —
+Ruling 41: the sentence this replaces, "through the same
+`moveOutcome`/`TransitionDialog` path the arrows use — a gated initial edge
+still asks", described a branch §1.2 makes unreachable by construction; a
+gated initial edge can never exist). Start's answer renders per row: a real
+refusal in `gn-refusal--server` with the reason verbatim, a rejection or
+silence in `gn-refusal--transport`, a `submitting` latch reset in `finally`,
+and `list.reload()` on `committed`. Empty state: "Nothing in the backlog —
+new tickets land here." No ranking, no drag-ordering (§8).
 
 ### 5.2 Board
 
@@ -267,9 +286,23 @@ show a closed badge — they are never closed.
   the name; the id otherwise, per the provenance rule).
 - **Close** button: rendered only when `stateCategory === 'terminal'` and not
   closed. **Reopen** button: only when closed. Both submit one event and
-  show the server's answer in the sheet's existing refusal slot.
+  show the server's answer in the sheet's existing refusal slot; both carry
+  a `submitting` latch (disabled while the ingest is pending, re-enabled in
+  `finally`) mirroring the board's own idiom (added 2026-09-17, see
+  Amendments — Rulings 31–34).
+- A real refusal renders in the sheet's existing `gn-refusal--server` slot,
+  verbatim. A rejected or silent answer renders separately, in its own
+  `gn-refusal--transport` slot ("We could not reach the server for this
+  change — <message>" / "The server did not answer this change."), never
+  worded as the server's verdict; either slot clears on the next real answer
+  and Close/Reopen re-enable (added 2026-09-17, see Amendments — Rulings
+  31–34).
 - **Move…** disabled while closed, with the sentence "Closed — reopen it
   first" beside it (not a tooltip).
+- The sheet's dismiss control is named `aria-label="Close sheet"`, distinct
+  from the business **Close** button above — the two are not
+  indistinguishable dialog buttons of the same name (added 2026-09-17, see
+  Amendments — Ruling 31).
 
 ### 5.4 New ticket
 
@@ -281,6 +314,11 @@ PARENT CHOSEN IN THE DIALOG: when the selected parent is in focus
 checked by default, and sets `start: 'focus'`; with no parent, or a backlog
 or closed parent, there is no checkbox — backlog, always.
 `parentCandidates` therefore carry `inFocus: boolean` beside `id`/`title`.
+**"Checked by default" is per CHOSEN parent, not per dialog session**
+(amended 2026-09-17, see Amendments — Ruling 40): choosing a parent — any
+change of `parentId`, including a switch from one in-focus parent to
+another — resets the checkbox to checked. Unticking it under one parent
+does not carry forward to a different parent picked afterward.
 
 ### 5.5 Filters sheet and the other tabs
 
@@ -289,11 +327,20 @@ or closed parent, there is no checkbox — backlog, always.
   "Closed: only" / "Closed: hidden".
 - State chips include "Backlog".
 - List: closed rows carry a "Closed" chip in the state column. Calendar and
-  Timeline: the page passes `closed: false` into their narrowing unless the
-  filter sets `closed` explicitly — "hidden by default, filter overrides".
-  The strip's count on those two tabs treats the default hide as a narrowing
-  (`shown !== total` opens it, with the "Closed: hidden" chip present so the
-  person sees why).
+  Timeline (amended 2026-09-17, see Amendments — Ruling 44: the original
+  "the page passes `closed: false` unless the filter sets `closed`
+  explicitly" made the sheet's own "All" setting unable to ever show a
+  closed ticket on these two tabs, since an explicit `closed: undefined`
+  is indistinguishable from an unset one — the "Closed: hidden" chip it
+  mandates could then never be removed): a page-level `showClosedOnDates`
+  boolean, default `false`. The effective closed clause on these two tabs is
+  `filter.closed ?? (showClosedOnDates ? undefined : false)`. The strip
+  carries the "Closed: hidden" chip on these tabs whenever the default is in
+  force (`filter.closed === undefined && !showClosedOnDates`), with
+  `onRemove: () => setShowClosedOnDates(true)`; an explicit `closed` set
+  from the sheet overrides the default in both directions and clears through
+  its own chip as usual, after which the default resumes (its own chip
+  returns). The List tab is unaffected — it always shows everything, badged.
 
 ## 6. Offline replica
 
@@ -390,6 +437,18 @@ what the read models carry — they gain `closed`/`rank` for free but no new
 tools); a "Closed" column option in the list's per-user columns; a
 cross-project backlog.
 
+**Named during this plan's own execution (2026-09-17) — see the "Follow-ons
+named during execution" list under Amendments below for each item's
+file:line:** `check-case-citations.mjs` letter-suffix support;
+`submitFromDialog` treating an empty results array as committed
+(`board.tsx`); a rebind INTO backlog refused rather than redirected
+(`workflow-rebind.ts`); fixture-suite entries for the four new refusal ids;
+the untested signed-out gates on the board's `moves` and the Backlog tab's
+`rowAction`; the sheet's `submitTransition` rejected-ingest path, now that a
+transport slot exists for it; the board strip's "Not applied on the board:
+closed." sentence untested end-to-end; and the note that 13.588a's mutation
+witness discriminates only the committed path, not the rejected one.
+
 ## 10. Testing
 
 Domain: reducer (born in backlog; `focus`; close/reopen fold; fold-on-republish
@@ -442,3 +501,302 @@ enabled-only-when-all-terminal rule. Every guard by mutation;
   `views/board.tsx` (Close all on terminal column headers),
   `views/ticket-list.tsx` (row checkboxes, Close selected); `apps/web` —
   the Settings page's auto-close control.
+
+## Amendments during execution (2026-09-17)
+
+Rulings 1–30 belong to earlier, unrelated plans (`board-prototype-port`,
+`filter-exclude-all-tabs`) and are recorded in their own specs. This
+section starts from this plan's own controller rulings — the unnumbered
+Task 1/3/4/6 ones, then the numbered series a same-day coordinator picked
+up starting at 31 (30 was the prior plan's own last number). Five body
+sentences are rewritten above, each marked "(amended 2026-09-17, see
+Amendments)": §2's hierarchy-reopen-offer paragraph (Ruling 39), §5.1's
+Start description (Ruling 41 — the brief's own dispatch text called this
+"§5.4", but the sentence it struck actually lives in §5.1, verified by
+re-reading the spec rather than trusting the section number), §5.3's
+Close/Reopen bullets and dismiss-control bullet (Rulings 31–34), §5.4's
+"checked by default" sentence (Ruling 40), and §5.5's Calendar/Timeline
+bullet (Ruling 44). Every other ruling here is additive and did not
+require a body rewrite.
+
+1. **Wildcard edges never resolve FROM backlog (Task 1 ruling).** §1.1's
+   `universalTransitions` gives every workflow `backlog → def.initialStateId`
+   (Start) with no rules — but a bare `* → X` wildcard, if allowed to
+   resolve from backlog too, would let a parked ticket jump past Start
+   straight to any wildcard-reachable state (e.g. Done), which is not what
+   "parking" is supposed to mean. Resolution: backlog's only legal exit is
+   the universal Start edge; a wildcard edge is skipped when the resolved
+   `fromStateId` is `'backlog'`. Why: an author who wants "from anywhere
+   including backlog" cannot express it under this rule — accepted, because
+   that is what Start exists for. Where it lives: the engine's own
+   resolution (`packages/rule-engine/src/transition.ts:117-121`, a ternary
+   that special-cases backlog before falling through to the ordinary
+   `find(exact) ?? find('*')`) and the client's mirror
+   (`packages/app-core/src/views/transition-dialog.tsx:66-76`,
+   `transitionOptions`'s `fromStateId === BACKLOG_STATE_ID` branch).
+
+2. **The Closed control's tri-state labels read oddly in English, kept for
+   consistency (pre-flight ruling, before Task 11).** `TriStateChoice`'s
+   three states are always spelled "<label>" / "<label>, included" /
+   "<label>, excluded", which makes the Closed control's accessible names
+   "Closed" / "Closed, included" / "Closed, excluded" — an odd way to say
+   "closed only" / "closed hidden". Resolution: accept the odd phrasing for
+   consistency with every other control in the sheet; the strip's chips
+   carry the plain words instead (`Closed: only` / `Closed: hidden`). Why:
+   inventing a one-off wording convention for a single control is a larger
+   cost than one screen-reader phrase. Cost if wrong: a follow-on label
+   tweak. Where it lives: `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`'s
+   `TriStateChoice` call for the Closed control; the chip text in
+   `apps/web/src/board-search-scope.ts`.
+
+3. **A rebind into backlog is refused, and stays refused (Task 3 ruling).**
+   `workflow-rebind.ts:106`'s `target.states.some(...)` does not know about
+   the universal backlog state, so rebinding a ticket onto a target
+   workflow with `toStateId: 'backlog'` refuses `reboundUnknownStateRefusal`
+   like any other undeclared state. Resolution: leave it refused — a rebind
+   is defined as landing a ticket in a DECLARED state of the target
+   workflow; parking it is a separate Send-to-backlog move afterward, not
+   something a rebind should do in one step. Cost if wrong: one extra move
+   for a rare operation. Where it lives:
+   `packages/rule-engine/src/checks/workflow-rebind.ts:106` (unchanged by
+   this plan; named as a follow-on in §9).
+
+4. **Fixture-suite entries for the four new refusals are a follow-on, not
+   this plan's scope (Task 3 ruling).** `Features.md`'s "Planted-defect
+   fixture suite" bullet claimed "one per refusal path"; the four new
+   refusal ids (`close-requires-terminal`, `already-closed`, `not-closed`,
+   `closed-ticket`) have no such fixture. Resolution: park it as a named
+   follow-on rather than build it inside this plan; the bullet is hedged in
+   the same commit as this appendix. Cost if wrong: the conformance suite
+   under-describes four refusals until the follow-on lands. Where it lives:
+   `Features.md`'s fixture-suite bullet (hedged this task);
+   `packages/rule-engine/fixtures/` (unchanged).
+
+5. **`BOOTSTRAP_BACKFILL_TYPES` is NOT extended with the two closed-flag
+   events (Task 4 ruling).** §1.2 folds `ticket.closed`/`ticket.reopened`
+   into `TicketState.closed` the same way every other head-state event
+   folds; unlike `comment.added`/`attachment.added`, they carry no content a
+   replica needs verbatim beyond the fold, so backfilling them a second time
+   would be redundant. `ADMIN_ONLY_TYPES` is likewise unchanged — closing a
+   ticket is a member's business, not an admin-gated one. Where it lives:
+   `apps/server/src/sync/sync-routes.ts:69` (`BOOTSTRAP_BACKFILL_TYPES`,
+   unchanged by this task); the docblock's fold-count arithmetic corrected
+   from "TEN of the THIRTEEN" to "twelve of fifteen"
+   (`apps/server/src/sync/sync-routes.ts:31-32`).
+
+6. **The board's drop-refusal copy never names Backlog as an alternative
+   (Task 6 ruling).** `transitionOptions` now offers the universal Start and
+   Send-to-backlog edges alongside declared ones, so a naive refusal message
+   built off `moveOutcome.refused.available` could suggest "try Doing or
+   Backlog" for a board drop — but Backlog is not a board column a drop can
+   land on. Resolution: the board's own refusal copy filters `backlog` out
+   of the alternatives it names before rendering; `moveOutcome` itself is
+   unchanged (shared with the sheet and dialog, where Backlog IS a valid
+   alternative). Cost if wrong: none functional, only a confusing sentence.
+   Where it lives: `packages/app-core/src/views/board.tsx:813`
+   (`const onBoard = available.filter((stateId) => stateId !== BACKLOG_STATE_ID)`).
+
+7. **Ruling 31 — the sheet's dismiss control gets its own accessible
+   name.** Finding 1 of Task 7's review: the sheet's dismiss glyph shared
+   `aria-label="Close"` with the business **Close** button, two
+   same-named buttons in one dialog. Fixed in the shared component:
+   `aria-label="Close sheet"`, keeping the "Close" verb HIG expects for a
+   dismiss glyph while making the two distinguishable by ear and by
+   exact-name query. Blast radius measured: only the one component and its
+   own test name it; no catalogue citation landed on the old line. Cost if
+   wrong: one string. Now in the spec body (§5.3). Where it lives:
+   `packages/ui/src/components/sheet.tsx:28`.
+
+8. **Ruling 32 — Close/Reopen get a double-submit latch.** Finding 2:
+   neither button disabled itself while its own ingest was in flight,
+   unlike the board's arrows. Fixed by mirroring the board's `submitting`
+   idiom, reset in `finally`. Move… was left alone — it opens a dialog with
+   its own submit, not a direct-fire button. Now in the spec body (§5.3).
+   Where it lives: `packages/app-core/src/views/ticket-sheet.tsx:195`
+   (`submitting` state), `:370`/`:411` (set/reset), `:468`/`:473`
+   (`disabled={submitting}` on Close/Reopen).
+
+9. **Ruling 33 — a rejected or silent ingest gets its own transport slot,
+   never worded as the server's verdict.** A transport failure (a rejected
+   promise, or an ingest that answered `[]`) was, before this ruling,
+   uncaught by `closeOrReopen` and would have rendered (if rendered at all)
+   as `Refused by the server — ingest-rejected: <message>` — a transport
+   problem captioned as the server's own answer, which Ruling 27 (an
+   earlier plan's board ruling, case 13.504) already forbade doing on the
+   board. Fixed with a `transportError` slot, the board's copy shape ("We
+   could not reach the server for this change — <message>" /
+   "The server did not answer this change."), cleared on any real answer.
+   Now in the spec body (§5.3). Where it lives:
+   `packages/app-core/src/views/ticket-sheet.tsx:184` (state),
+   `:381`, `:405` (routing), `:529-531` (render).
+
+10. **Ruling 34 — the silence branch also clears the server-refusal
+    slot.** A gap in Ruling 33's own text: a refused answer followed by a
+    silent one left BOTH notices showing. Fixed so the silence branch
+    clears `serverRefusal` too, not only sets `transportError`. Now in the
+    spec body (§5.3, "either slot clears on the next real answer"). Where
+    it lives: `packages/app-core/src/views/ticket-sheet.tsx` (the silence
+    branch of `closeOrReopen`, beside `:381`).
+
+11. **Ruling 35 — a brief-anchor correction, not a design change.** The
+    Task 8 brief's anchor ("`BoardGroupSection` passes `column.category`")
+    was wrong: `MoveArrows` derives the category itself, via
+    `stateCategoryOf(workflow, fromStateId)` from `@gisik-nokma/domain`, off
+    props (`workflow`, `fromStateId`) `Board`'s own `arrows` render-prop
+    already supplies. No prop threading needed. Cost if wrong: one helper
+    call. Where it lives: `packages/app-core/src/views/board.tsx:574-582`
+    (the `arrows` render-prop call site, unchanged in shape by this
+    correction).
+
+12. **Ruling 36 — `submitDirect`'s silence branch mirrors the sheet's
+    Ruling 34 clear, and the redundancy is stated honestly rather than
+    claimed as a live discriminator.** The implementer measured, with
+    `cp`/`sha256sum`-restored mutations, that the arrow path's OWN call
+    site (`attemptMove`) already clears `serverRefusal` unconditionally
+    before every attempt, so this added clear is REDUNDANT there — kept
+    anyway for parity with `closeCard`, where the identical line IS
+    load-bearing. Case 13.590a's catalogue entry states the measured
+    redundancy rather than a mutation-witness claim it would not survive.
+    Where it lives: `packages/app-core/src/views/board.tsx:1090` (the
+    `submitDirect` silence-branch clear).
+
+13. **Ruling 37 — the parent event and the reopening transition are ONE
+    ingest call, the child is a SEPARATE second call.** The brief's "all
+    three events in one batch" conflicted with both §2.3's own wording and
+    `reopenAndProceed`'s two-call shape (whose `child-refused-after-reopen`
+    outcome depends on the child being separate). Resolution follows the
+    spec: when the parent is closed, the parent call is ONE
+    `source.ingest([ticket.reopened, ticket.transitioned])`; the child stays
+    a second, separate call. Cost if wrong: one array. Where it lives:
+    `packages/app-core/src/flows/guarded-child-event.ts:268` (`const batch
+    = plan.parentClosed ? [...] : [...]`).
+
+14. **Ruling 38 — a test-file-location correction, not a design change.**
+    The brief named a `create-ticket-flow.test.tsx` that does not exist;
+    `CreateTicketFlow` is tested in `reopen-flow.test.tsx` and
+    `reopenAndProceed` in `guarded-child-event.test.ts`. Where it lives:
+    `packages/app-core/test/views/reopen-flow.test.tsx`,
+    `packages/app-core/test/flows/guarded-child-event.test.ts`.
+
+15. **Ruling 39 — `parentReopened` discloses a partial commit.** Now in
+    the spec body (§2.3). Where it lives:
+    `packages/app-core/src/flows/guarded-child-event.ts:154` (the field),
+    `:288-306` (set from the batch's first result),
+    `packages/app-core/src/views/create-ticket-flow.tsx:288` (the retry
+    branch that sends the transition alone when true).
+
+16. **Ruling 40 — choosing a parent resets "Start in focus" to checked.**
+    "Checked by default" is per CHOSEN parent, not per dialog session: if
+    the person unticks it under parent A, then picks a different in-focus
+    parent B, the box is checked again for B. §5.4's bare "checked by
+    default" would otherwise read as a one-time default for the whole
+    dialog session, which is not the shipped behaviour — now amended in
+    the body too. Cost if wrong: one setter call. Where it lives:
+    `packages/app-core/src/views/new-ticket-dialog.tsx:202`
+    (`setStartInFocus(true)` on parent change).
+
+17. **Ruling 41 — Start submits directly; no dialog exists for it.**
+    Now in the spec body (§5.1) — this is the ruling the brief's own
+    dispatch mislabeled as amending "§5.4"; the sentence it struck ("a
+    gated initial edge still asks") actually lived in §5.1 (the Backlog
+    tab), not §5.4 (New ticket), and is corrected there rather than
+    perpetuating the wrong section number. Where it lives:
+    `apps/web/src/backlog-start-button.tsx` (the whole component — no
+    `TransitionDialog` mount, no `MoveArrows` extraction).
+
+18. **Ruling 42 (and its amendment) — how `startTargetFor` actually
+    resolves a row's Start destination.** `ListRow` carries no `workflowId`
+    (`view-types.ts:187-231` — `typeId`/`stateId` only), so
+    `startTargetFor(row, types, defs)` joins `row.typeId` through the
+    workspace's `TicketTypeDef[]` to a `workflowId`, then reads that
+    workflow's `initialStateId` from a `Map<string, WorkflowDef>` the page
+    fetches ONE `getWorkflowDef` per DISTINCT workflow among the backlog
+    rows on screen — never one fetch per row. A row whose target is not yet
+    known renders Start disabled. Where it lives:
+    `apps/web/src/backlog-start.ts:34` (`startTargetFor`).
+
+19. **Ruling 43 — the signed-out gates on the board's `moves` and the
+    Backlog tab's `rowAction` are untested, on both sides of this plan.**
+    Parked as a single follow-on (one case can cover both) rather than two.
+    Named in §9. Where it lives: `packages/app-core/src/views/board.tsx:94`
+    (`moves?: BoardMoveCapability`), `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1810`
+    (`rowAction` supplied only when `session.kind === 'signed-in'`).
+
+20. **Ruling 44 — Calendar/Timeline's closed-hide default gets a
+    page-level override, closing a real spec gap.** Now in the spec body
+    (§5.5) — the original text made the sheet's "All" setting unable to
+    ever show a closed ticket on these two tabs. Where it lives:
+    `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` (`showClosedOnDates`
+    state and the `filter.closed ?? (showClosedOnDates ? undefined : false)`
+    clause feeding `dateInputs`).
+
+21. **Ruling 45 — State options add ONE constant entry, not a second def
+    fetch.** The brief's "via `getWorkflowDef`" was dropped as
+    equivalent-but-larger: the board's own columns already are the defs'
+    declared states, so the Filters sheet's State options are those columns
+    PLUS the universal `BACKLOG_STATE` (`{id: BACKLOG_STATE_ID, name:
+    'Backlog'}`) — a constant, not a fetch. Cost if wrong: one entry. Where
+    it lives: `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:832`
+    (`names.set(BACKLOG_STATE_ID, BACKLOG_STATE.name)`, `boardStateNames`).
+
+22. **Ruling 46 — an explicit "Closed only" filter on the Board tab gets
+    a disclosure, matching the propagation argument already accepted for
+    `FILTERS_SHEET_CLEARABLE_AXES`.** The board silently excludes closed
+    rows regardless of the filter, so an explicit `closed: true` narrowed
+    to nothing with no on-screen explanation. Fixed by pushing `'closed'`
+    onto `describeUnappliedBoardAxes`'s result when `filter.closed ===
+    true` (only `true` is unapplied; `false` is vacuous on a board that
+    already excludes closed rows). Cost if wrong: one string. Where it
+    lives: `apps/web/src/board-search-scope.ts:66`
+    (`if (filter.closed === true) axes.push('closed');`).
+
+### Follow-ons named during execution
+
+Named here and cross-referenced from §9 rather than duplicated into its
+list: each is a real, scoped gap this plan found and chose not to close,
+with the file:line it would touch.
+
+- **`scripts/check-case-citations.mjs` needs letter-suffix support.** It
+  folds a suffixed id (`13.556a`, `13.588a/b/c`, `13.591a-g`, `13.593a-e`,
+  …) into its base id before computing the uncited set, so a suffixed case
+  with no citation of its own is invisible to the ratchet. `check-case-ids.mjs`
+  already handles suffixes; this script does not. Task 12's own hand check
+  (grepping every suffixed id in file 13 against `packages/*/test`/`apps/*/test`)
+  substitutes for the automated ratchet until this lands.
+- **`submitFromDialog` treats an empty results array as committed.**
+  `results.find((result) => result.status !== 'committed') === undefined`
+  is also true for `results.length === 0` (an ingest that answered `[]`,
+  i.e. silence) — silence-as-success on the dialog path, the 13.505-shaped
+  gap the board's own `submitDirect`/`attemptMove` paths and the sheet's
+  `closeOrReopen` already close. Where it lives:
+  `packages/app-core/src/views/board.tsx:1390`.
+- **Rebind INTO backlog is refused, not redirected** — Amendment 3 above.
+  `packages/rule-engine/src/checks/workflow-rebind.ts:106`.
+- **Fixture-suite entries for the four new refusal ids** — Amendment 4
+  above. `packages/rule-engine/fixtures/`.
+- **The signed-out gates on the board's `moves` and the Backlog tab's
+  `rowAction` are both untested** — Amendment 19 (Ruling 43) above. One
+  case can cover both once the page's session fixture grows a signed-out
+  branch. `packages/app-core/src/views/board.tsx:94`,
+  `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1810`.
+- **The sheet's `submitTransition` has an unhandled rejected-ingest
+  path, now that a transport slot exists to catch it.** Ruling 33 gave
+  `closeOrReopen` a `transportError` slot for a rejected or silent
+  promise; `submitTransition` (the Move… dialog's own submit path) has the
+  identical shape of gap, pre-existing and noted in its own docblock, but
+  was out of this plan's scope. Where it lives:
+  `packages/app-core/src/views/ticket-sheet.tsx:279` (`submitTransition`).
+- **"Not applied on the board: closed." is not tested end-to-end.** The
+  board strip's sentence for an explicit Closed-only filter (Ruling 46)
+  is unit-tested at `describeUnappliedBoardAxes`
+  (`apps/web/test/board-search-scope.test.ts`, case 13.602) but has no
+  page-level sibling the way `13.440`/`13.451` cover the search-box and
+  collaborator axes — `board-narrowing.test.tsx` has no such sibling
+  today; the real one, if built, belongs in `filters-sheet.test.tsx`
+  beside 13.451's shape.
+- **13.588a's mutation witness discriminates only the COMMITTED path.**
+  The re-reviewer measured that a reset placed after the `await` on
+  success alone would also pass 13.588a; the REJECTED-ingest path is what
+  13.588b/c actually discriminate, added in the same task's later fix
+  rounds. Recorded so a future reader does not treat 13.588a alone as
+  proof of the `finally` placement. `packages/app-core/test/views/ticket-sheet.test.tsx`.
