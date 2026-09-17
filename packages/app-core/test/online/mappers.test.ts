@@ -1521,9 +1521,67 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     );
   });
 
+  /**
+   * 13.603 — Finding 1 (final whole-branch review, BLOCKER, 2026-09-17):
+   * `mapTicketState` enumerated every `TicketState` field BY HAND and never
+   * read `record['closed']`, so `mapTicketRead` — the sole producer of
+   * `TicketRead.ticket` for the shipped web shell (`onlineDataSource.getTicket`
+   * → `mapTicketRead` → `mapTicketState`) — silently dropped the flag. Every
+   * reader of the field spells `state.closed ?? null`, so the wrong answer was
+   * indistinguishable from the right one for a ticket that had never been
+   * closed, which is exactly why four surfaces (`ticket-sheet.tsx`'s
+   * Close/Reopen/badge, `precheck.ts`'s `closed-ticket`/`already-closed`
+   * gates, `create-ticket-flow.tsx`'s `parentClosed`) were dead in production
+   * while every one of THEIR OWN tests stayed green — each seeds a fake
+   * `DataSource` or `ticketStateSeed` directly and never crosses this mapper.
+   * `mapClosed` (`:1247`, already proven by 13.580's `ListRow.closed` case)
+   * is the exact `{actorId, at} | null` shape `TicketState.closed` also wants,
+   * required on the wire per spec §1.2 ("the wire types … carry it REQUIRED"),
+   * so it throws rather than defaulting when the key is absent — which is why
+   * `ticketReadBody`'s own `ticketState` fixture below now states `closed`
+   * explicitly instead of leaving the key out and relying on this mapper's
+   * old silence.
+   */
+  it("13.603 mapTicketRead carries the wire ticketState's closed flag onto TicketState.closed, present and null", () => {
+    const closedRead = mapTicketRead(
+      ticketReadBody(
+        { kind: 'ticket', id: 'parent-1', title: 'The epic' },
+        null,
+        { actorId: ANSELMA, at: '2026-09-17T00:00:00.000Z' },
+      ),
+    );
+    expect(closedRead.ticket.closed).toEqual({ actorId: ANSELMA, at: '2026-09-17T00:00:00.000Z' });
+
+    const openRead = mapTicketRead(
+      ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' }, null, null),
+    );
+    expect(openRead.ticket.closed).toBeNull();
+  });
+
+  it('13.603 refuses a ticketState whose closed key is missing rather than reading it as never-closed', () => {
+    // Backs up this case's own docblock claim that `mapClosed` "throws on an
+    // absent key rather than defaulting" — the same shape this file already
+    // proves for `ListRow.hasRestrictedParent` above. Without this, a mutant
+    // reading `record['closed'] === undefined ? null : mapClosed(record
+    // ['closed'], path)` would satisfy both assertions above (a present claim
+    // still validates through `mapClosed`, and an EXPLICIT `null` still maps)
+    // while silently reintroducing exactly Finding 1's defect for any wire
+    // body that omits the key outright — which `mapClosed`'s own docblock
+    // (`:1247`) already argues is a different claim than an explicit `null`,
+    // and which this case is what actually holds it to. Planted and
+    // confirmed: that exact mutant reddens ONLY this `it`, `PASS (62)
+    // FAIL (1)` of the file's 63 (`cp`/`sha256sum` restore).
+    const body = ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' }) as {
+      ticketState: Record<string, unknown>;
+    };
+    delete body.ticketState['closed'];
+    expect(() => mapTicketRead(body)).toThrow(MappingError);
+  });
+
   function ticketReadBody(
     parent: Record<string, unknown>,
     rollup: unknown = null,
+    closed: unknown = null,
   ): Record<string, unknown> {
     return {
       // The `proj_visibility` row the route still serves. The client reads
@@ -1559,6 +1617,10 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
             workflowVersion: 2,
           },
         ],
+        // 13.603: REQUIRED on the wire (spec §1.2) — defaults to `null` so
+        // every pre-existing call site in this file, none of which is ABOUT
+        // this flag, keeps exercising the "never closed" arm unchanged.
+        closed,
       },
       title: 'File the GST return',
       stateProvenance: {

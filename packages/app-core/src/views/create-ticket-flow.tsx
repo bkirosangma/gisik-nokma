@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { newUlid, statesWithBacklog, type SubmittedEvent, type WorkflowDef } from '@gisik-nokma/domain';
+import { REFUSAL_RULES } from '@gisik-nokma/rule-engine';
 import { Button } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
@@ -285,7 +286,7 @@ export function CreateTicketFlow({
     if (outcome.kind === 'parent-refused') {
       // Stays open, in the dialog, verbatim: the parent's own rules refused the
       // reopen, and another target on the same list may still be allowed.
-      if (outcome.parentReopened) {
+      if (outcome.parentReopened || outcome.refusal.rule === REFUSAL_RULES.notClosed) {
         // Ruling 39 (fix round 1, 2026-09-17): the batch's `ticket.reopened`
         // half already COMMITTED before its transition half was refused — the
         // server processes a batch per-event, never atomically
@@ -297,6 +298,18 @@ export function CreateTicketFlow({
         // Flipping `parentClosed` to `false` here is what makes the retry
         // build `[transition]` alone, the same batch `openReopenPrompt` would
         // have built had it re-read the ticket after this commit.
+        //
+        // Ruling 50 (final whole-branch review fix wave A, 2026-09-17,
+        // Finding 3): `outcome.parentReopened` is `false` for EVERY index-0
+        // refusal (13.593b), including the one this OR-arm now catches — the
+        // reopen half ITSELF refused `not-closed`, because someone else
+        // reopened the parent a second before this confirm. That refusal is
+        // the identical fact `parentReopened` reports, learned from a
+        // different sentence: the server is saying "this parent is not
+        // closed" either way, and a retry that still believes `parentClosed`
+        // would resend `ticket.reopened` into the SAME refusal again,
+        // masking the next target's transition — Ruling 39's masking,
+        // reached from the other side. Case 13.593f.
         setReopenPrompt((prev) => (prev === null ? prev : { ...prev, parentClosed: false }));
       }
       setParentRefusal(outcome.refusal);

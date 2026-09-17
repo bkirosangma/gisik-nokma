@@ -6581,6 +6581,23 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   `cp`/`sha256sum` restore): kills exactly this case, on the "exactly one event" assertion (`PASS (18)
   FAIL (1)`, the retry batch resending both events) —
   (`packages/app-core/test/views/reopen-flow.test.tsx`)
+- **13.593f** ✅ Final whole-branch review, fix wave A, Ruling 50 (2026-09-17; review Finding 3) — the
+  OTHER order of failure from 13.593e's: the batch's `ticket.reopened` HALF is the one refused, at index
+  0, with `not-closed` — someone else reopened the parent a second before the person confirmed.
+  `reopenAndProceed` reports `parentReopened: false` for an index-0 refusal (13.593b), so 13.593e's own
+  fix condition does not fire here on its own; without this ruling, `acceptReopen` would leave
+  `reopenPrompt.parentClosed` at `true`, and a retry with a different target would rebuild
+  `[ticket.reopened, transition]` again, refuse `not-closed` a second time, and mask whatever the new
+  transition would have answered — Ruling 39's exact masking, reached from the other side. Fix: also flip
+  `parentClosed` to `false` when `outcome.refusal.rule === REFUSAL_RULES.notClosed` — the server saying
+  "this parent is not closed" is the same fact `parentReopened` conveys, learned from a different
+  sentence. Proven end to end: the first "Reopen and proceed" is refused `not-closed` at index 0 (the
+  reopen itself); the dialog stays open with the refusal rendered; picking "To do" and confirming again
+  sends a SECOND parent batch of exactly ONE event, `ticket.transitioned` — no `ticket.reopened` — which
+  then commits, followed by the (retried) child. Mutation (dropping the new `|| outcome.refusal.rule ===
+  REFUSAL_RULES.notClosed` arm, `cp`/`sha256sum` restore): kills exactly this case, on the "exactly one
+  event" assertion (`PASS (19) FAIL (1)` of the file's 20) —
+  (`packages/app-core/test/views/reopen-flow.test.tsx`)
 - **13.591g** ✅ Fix round 1, Ruling 40 (coordinator, 2026-09-17; review Finding 3) — "checked by default"
   (spec §5.4) is a promise PER CHOSEN PARENT, not a one-time initial value for the whole dialog session.
   Unticking "Start in focus" for one in-focus parent, then switching to a DIFFERENT in-focus parent,
@@ -6923,11 +6940,61 @@ letter-suffixed id into its base id before computing the uncited set, so it
 cannot see a suffixed case with no citation of its own — Task 12's own
 follow-on above): every `13\.[0-9]+[a-z]` id in this file —
 `13.520a`/`13.520b`/`13.528b`/`13.556a`/`13.556b`/`13.575b`/`13.588a`/`13.588b`/
-`13.588c`/`13.590a`/`13.591a`–`g`/`13.593a`–`e` (`13.591b`–`e` appear only as
+`13.588c`/`13.590a`/`13.591a`–`g`/`13.593a`–`f` (`13.591b`–`e` appear only as
 the range "13.591a–e" in prose, not as individual tokens; checked directly
 against test files regardless) — appears in at least one file under
-`packages/*/test` or `apps/*/test`. None missing; no fix needed.
+`packages/*/test` or `apps/*/test`. None missing; no fix needed. (13.593f
+itself post-dates this Task 12 sweep — added by the final whole-branch
+review's fix wave A, Ruling 50 — and is included here because leaving the
+range at "a–e" would misstate this file's own current contents the moment
+it was read.)
 
 **Second-wave plan**: `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md`
 does not exist yet — §8 (ranking, auto-close, bulk close) is designed and
 approved in the spec but has no plan document as of this task.
+
+## Final whole-branch review, fix wave A (2026-09-17)
+
+Range `3222b908..5181af11` (31 commits) reviewed at HEAD `5181af11`; full
+findings in `.superpowers/sdd/2026-09-17-backlog-and-closed-core/final-review.md`
+(git-ignored, not in this repo's history). This entry covers Rulings 49 and
+50 — the client-side BLOCKER and one should-fix, from Findings 1 and 3.
+13.593f (Ruling 50) is filed above, beside the 13.593 series it extends,
+rather than down here; 13.603 (Ruling 49) has no series of its own and
+stands alone below.
+
+- **13.603** ✅ Ruling 49, Finding 1 — THE BLOCKER (2026-09-17) — `mapTicketState`
+  (`packages/app-core/src/online/mappers.ts`) enumerated every `TicketState`
+  field by hand and never read `record['closed']`, so `mapTicketRead` — the
+  sole producer of `TicketRead.ticket` for the shipped web shell
+  (`createOnlineDataSource`'s `getTicket` → `mapTicketRead` → `mapTicketState`,
+  wrapped in `withCacheFeed` for the `ClientStateCache` too) — silently
+  discarded the flag. Every reader spells `state.closed ?? null`, so the
+  wrong answer (`undefined`) was indistinguishable from the right one
+  (`null`) for a ticket that had never been closed, which is exactly why the
+  sheet's badge/Reopen/Move-disabled, `precheck.ts`'s `closed-ticket`/
+  `already-closed` gates, and `create-ticket-flow.tsx`'s `parentClosed` were
+  all dead in production while every one of their OWN tests stayed green —
+  each seeds a fake `DataSource` or `ticketStateSeed` directly and none
+  crosses this mapper; found only because the review read the producer
+  every scoped task's tests bypassed. Fix: one line,
+  `closed: mapClosed(record['closed'], \`${path}.closed\`)`, reusing the
+  helper `mapListRow` already calls for the identical wire shape (13.580).
+  `mapClosed` throws on an absent key rather than defaulting, so
+  `mappers.test.ts`'s shared `ticketReadBody` fixture now states its
+  `ticketState.closed` explicitly (defaulting to `null`, so every
+  pre-existing call site keeps exercising the "never closed" arm
+  unchanged) instead of relying on this mapper's old silence. Proven THREE
+  ways in this case: a wire `ticketState.closed` of `{actorId, at}`
+  round-trips onto `TicketRead.ticket.closed` unchanged; `null` maps to
+  `null`; and an ABSENT `closed` key is REFUSED (`MappingError`), not
+  defaulted — pinned separately because a mutant reading
+  `record['closed'] === undefined ? null : mapClosed(record['closed'], …)`
+  satisfies the first two assertions (still validating a PRESENT claim
+  through `mapClosed`) while silently reintroducing this exact defect for
+  any body omitting the key outright (planted and confirmed: reddens ONLY
+  the third assertion, `PASS (62) FAIL (1)` of 63, `cp`/`sha256sum`
+  restore). Mutation (dropping the new `closed:` line entirely instead,
+  same restore method): reddens BOTH `it`s this case is split across
+  (`PASS (61) FAIL (2)` of the file's 63) —
+  (`packages/app-core/test/online/mappers.test.ts`)

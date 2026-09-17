@@ -1466,6 +1466,15 @@ function mapTicketState(raw: unknown, path: string): TicketState {
         workflowVersion: asNumber(transition['workflowVersion'], `${at}.workflowVersion`),
       };
     }),
+    // Case 13.603 (final whole-branch review Finding 1, BLOCKER, 2026-09-17):
+    // this member was missing entirely — every OTHER field above was hand
+    // enumerated when `closed` did not exist yet, and it was never added when
+    // it did. REQUIRED on the wire (backlog/closed spec §1.2 — the server
+    // always sends it, `rowToTicketState` sets it on every row), so `mapClosed`
+    // (`:1247`, the same shape `mapListRow` already reads it through) is the
+    // right helper: it throws on an absent key rather than defaulting to
+    // `null`, which is what would have hidden this exact defect a second time.
+    closed: mapClosed(record['closed'], `${path}.closed`),
   };
 }
 

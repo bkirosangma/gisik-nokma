@@ -694,6 +694,90 @@ describe('13.593e retrying a different target after a closed parent\'s reopen ha
 });
 
 /**
+ * 13.593f (Ruling 50, final whole-branch review fix wave A, 2026-09-17,
+ * Finding 3) — the OTHER order of failure from 13.593e's, reached the moment
+ * Finding 1 lands: this time the batch's `ticket.reopened` HALF is the one
+ * refused, at index 0, with `not-closed` — someone else reopened the parent a
+ * second before the person confirmed. `reopenAndProceed` reports
+ * `parentReopened: false` for an index-0 refusal (13.593b already pins that;
+ * the reopen never committed, so there is nothing to report as reopened), so
+ * the fix for 13.593e's own case does not fire here on its own condition.
+ * Without Ruling 50, `acceptReopen` would leave `reopenPrompt.parentClosed`
+ * at `true`, and picking a different target would rebuild
+ * `[ticket.reopened, transition]` again — resending a reopen against a parent
+ * the server just said is NOT closed, refused `not-closed` a second time, and
+ * masking whatever the new transition would have answered: Ruling 39's exact
+ * masking, reached from the other side. The fix reads the SAME fact off a
+ * different sentence: `outcome.refusal.rule === REFUSAL_RULES.notClosed` is
+ * the server saying "this parent is already open" exactly as `parentReopened`
+ * does, so `acceptReopen` flips `parentClosed` to `false` on that condition
+ * too, and the retry's batch is `[transition]` alone — proven below.
+ */
+describe('13.593f a not-closed refusal of the reopen itself also unsticks the retry', () => {
+  it('13.593f the retry sends [transition] ALONE after the reopen itself was refused not-closed', async () => {
+    const user = userEvent.setup();
+    const source = flowSource(
+      (call, events) => {
+        if (call === 1) return events.map((event) => parentTerminal(event.id));
+        if (call === 2) {
+          // First "Reopen and proceed": batch [reopened, transition→Doing].
+          // The REOPEN ITSELF is refused `not-closed` — the mirror of
+          // 13.593e, which refused the transition half instead.
+          return events.map((event, index) =>
+            index === 0
+              ? refused(event.id, 'not-closed', 'This ticket is not closed.')
+              : committed(event.id),
+          );
+        }
+        // call 3 (the retry's parent batch) and call 4 (the child): commit.
+        return events.map((event) => committed(event.id));
+      },
+      { getTicket: async () => CLOSED_PARENT_READ },
+    );
+    const onCreated = renderFlow(source, {
+      parentCandidates: [{ id: PARENT, title: 'Registrations', inFocus: false }],
+    });
+    await createTicketUnderParent(user);
+
+    await screen.findByRole('dialog', { name: 'Reopen parent?' });
+    await user.click(screen.getByRole('button', { name: /Reopen to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
+    await user.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
+
+    // Refused at index 0 (the reopen) — the offer stays on screen, same as
+    // 13.593e's index-1 refusal.
+    await waitFor(() => expect(source.ingested).toHaveLength(2));
+    expect(screen.getByRole('dialog', { name: 'Reopen parent?' })).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Refused by the server — not-closed: This ticket is not closed.',
+    );
+
+    // Pick a DIFFERENT target and retry, in the SAME dialog session.
+    await user.click(screen.getByRole('button', { name: /Reopen to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'To do' }));
+    await user.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
+
+    await waitFor(() => expect(source.ingested).toHaveLength(4));
+    const [refusedCreate, firstParentBatch, retryParentBatch, childBatch] = source.ingested;
+    const childTicketId = refusedCreate?.[0]?.entity.id;
+    // The FIRST attempt really did carry both events (the positive control).
+    expect(firstParentBatch).toHaveLength(2);
+    expect(firstParentBatch?.[0]?.type).toBe('ticket.reopened');
+    // The RETRY: exactly one event, the transition — no `ticket.reopened`.
+    expect(retryParentBatch).toHaveLength(1);
+    expect(retryParentBatch?.[0]?.type).toBe('ticket.transitioned');
+    expect(retryParentBatch?.[0]?.entity).toEqual({ kind: 'ticket', id: PARENT });
+    expect(retryParentBatch?.[0]?.payload).toEqual({
+      to: 'todo',
+      cause: { kind: 'reopened-for-child', childTicketId },
+    });
+    expect(childBatch?.[0]).toBe(refusedCreate?.[0]);
+    expect(onCreated).toHaveBeenCalledWith(childTicketId);
+    expect(screen.queryByRole('dialog', { name: 'Reopen parent?' })).not.toBeInTheDocument();
+  });
+});
+
+/**
  * **RULING P43: a literal ALONGSIDE the import, never instead.** The literals above
  * are the pins; the case below is what makes them pins rather than decoration.
  *
