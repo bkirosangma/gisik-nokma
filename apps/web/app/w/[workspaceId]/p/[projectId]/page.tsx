@@ -1571,9 +1571,10 @@ function ProjectBoard() {
                      * and flagged in that task's own report for
                      * re-verification once it landed. It is not re-pointed at
                      * the Filters sheet: on the BOARD, `unapplied` (there,
-                     * `boardUnappliedAxes`) can join UP TO THREE axis names in
-                     * one sentence (collaborator, due date, custom field), and
-                     * after Task 5 only ONE of those three — collaborator —
+                     * `boardUnappliedAxes`) can join UP TO FOUR axis names in
+                     * one sentence (collaborator, due date, custom field,
+                     * closed — the last added Task 11 fix round 2, Ruling 46),
+                     * and after Task 5 only ONE of those — collaborator —
                      * has a control anywhere in the product, and it lives in
                      * the Filters sheet, not the list tab. `dueBefore`/
                      * `dueAfter`/`fields` remain unsettable anywhere today (see
@@ -1587,15 +1588,26 @@ function ProjectBoard() {
                      * not applied here) outlives whichever surface next grows a
                      * control for the other two.
                      *
+                     * UPDATED Task 11 fix round 2 (Ruling 46): `closed` joined
+                     * `describeUnappliedBoardAxes` as a FOURTH board-blind
+                     * axis — see that function's own docblock for why it is a
+                     * different REASON (the board excludes closed tickets
+                     * entirely, rather than lacking a field for them) and why
+                     * only `filter.closed === true` triggers it. `closed` DOES
+                     * have a control (this task's own Filters-sheet toggle),
+                     * so two of these four axes — collaborator and closed —
+                     * now have one; `dueBefore`/`dueAfter`/`fields` still have
+                     * none.
+                     *
                      * On the OTHER three tabs, `unapplied` is
                      * `describeUnappliedListAxes`'s result — collaborator, and
                      * nothing else, is the only axis that function can ever
                      * return (its own docblock in `board-search-scope.ts`:
-                     * `matchesListRow` answers the due bounds and field
-                     * clauses itself) — so the "UP TO THREE" reasoning above
-                     * is Board-specific; List/Calendar/Timeline can only ever
-                     * join a ONE-entry list. `tabNoun` (computed above) is
-                     * what keeps the WHERE half of the sentence honest per
+                     * `matchesListRow` answers the due bounds, field clauses
+                     * AND `closed` itself) — so the "UP TO FOUR" reasoning
+                     * above is Board-specific; List/Calendar/Timeline can only
+                     * ever join a ONE-entry list. `tabNoun` (computed above)
+                     * is what keeps the WHERE half of the sentence honest per
                      * tab, the same way `unapplied` keeps the WHAT half
                      * honest per tab.
                      */

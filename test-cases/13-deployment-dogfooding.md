@@ -6733,3 +6733,29 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   (`filter.closed ?? (...)` → `filter.closed` on `datesNarrowing`'s own clause, `cp`/`cmp` restore): kills
   exactly this case's three assertions and no other (`PASS (17) FAIL (3)` of the file's 20) —
   (`apps/web/test/board-narrowing.test.tsx`)
+- **13.602** ✅ Task 11 fix round 2 (Ruling 46, review Finding 1) — `describeUnappliedBoardAxes` gains a
+  FOURTH board-blind axis, `closed`, for a reason distinct from the original three: `matchesBoardCard`
+  does not merely lack a field to compare `closed` against, the board EXCLUDES closed tickets from every
+  column entirely (spec §3.2), before a card can ever reach it. That asymmetry is why only
+  `filter.closed === true` ("Closed only") is disclosed — `false` ("Not closed") is already vacuously
+  true of the board by construction, so naming it would describe a real axis doing nothing, the opposite
+  of this function's own purpose. **The gap this closes**: `buildFilterChips` grew a `closed` branch in
+  this same task (13.599), making `closed` chip-representable and therefore filter-settable — but
+  `boardFilter` never carries it (Board is "unchanged" per spec §5.2), so an explicit "Closed only" was
+  silently unenforced on the Board tab: ordinary cards kept showing, with no chip (correct — a chip would
+  lie) and, before this fix, no disclosure either. Pushed LAST, after `custom field` (the three original
+  axes were already ordered before this one existed) — pinned by a case that sets both `dueBefore` and
+  `closed: true` and asserts `['due date', 'closed']` exactly. Mutation (dropping the new
+  `if (filter.closed === true) axes.push('closed')`, `cp`/`cmp` restore): kills exactly the "names closed"
+  and "joins last" assertions and no other (`PASS (34) FAIL (2)` of the file's 36). **The page-level
+  sibling question (Ruling 46 point 2)**: `board-narrowing.test.tsx` has no page-level sibling of 13.440
+  (a real-UI Board-tab unapplied-axis disclosure) — its one `board-scope-note` reference (13.556b) is
+  List-tab-specific, proving the note names "the list", not "the board". The actual sibling is
+  `filters-sheet.test.tsx`'s 13.451 ("the deferred Task 4 test: collaborator is unapplied on the board"),
+  which drives the real Filters-sheet UI and asserts `note.toHaveTextContent(/not applied on the board/i)`
+  for the collaborator axis — the same render template (`page.tsx`'s `Not applied on the {tabNoun}:
+  {unapplied.join(', ')}.`) would read `Not applied on the board: closed.` for an explicit Closed-only
+  filter with no other unapplied axis, but no new assertion was added there: Ruling 46 point 2 scoped the
+  "add one assertion" instruction to `board-narrowing.test.tsx` conditionally, and that file has no such
+  sibling to add it to —
+  (`apps/web/test/board-search-scope.test.ts`)

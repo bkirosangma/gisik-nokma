@@ -29,10 +29,28 @@ export function describeUnappliedListAxes(filter: FilterSpec): string[] {
  * rather than shipping unexecuted until Task 5's Filters sheet gives it its
  * first real caller.
  *
+ * A FOURTH axis, `closed`, joined in Task 11 fix round 2 (Ruling 46) — for a
+ * DIFFERENT reason than the first three, said explicitly rather than folded
+ * into their one "no field for it" sentence: the board does not lack a
+ * `closed` field to compare against so much as it EXCLUDES closed tickets
+ * from every column entirely (spec §3.2), server-side, before a card can
+ * ever reach `matchesBoardCard`. That asymmetry is also why only
+ * `filter.closed === true` is disclosed here, never `false` — an explicit
+ * "Not closed" is already true of the board by construction (nothing closed
+ * is ever there to hide), so naming it would describe a real axis doing
+ * nothing, the opposite failure from the one this function exists to catch.
+ * `filter.closed === true` ("Closed only") is the one shape that actually
+ * betrays the person: the board keeps showing its ordinary cards — exactly
+ * what they asked NOT to see — with neither a chip (a chip would lie: the
+ * board never applies it) nor, before this fix, any disclosure at all.
+ *
  * Order is FIXED and hand-written, never derived from object key order or a
  * `Set`/`Map` iteration — a note whose wording reshuffled between renders
- * would read as flicker. Always called with the FULL `FilterSpec`, never with
- * `BoardFilterSpec` (which cannot carry any of these three axes at all by
+ * would read as flicker. `closed` is pushed LAST, after `custom field`: the
+ * three original axes were already ordered before it existed, and appending
+ * rather than inserting is what keeps their own relative order a non-event
+ * for this change. Always called with the FULL `FilterSpec`, never with
+ * `BoardFilterSpec` (which cannot carry any of these four axes at all by
  * construction) — see `page.tsx`'s own comment on why its `filter` state is
  * typed `FilterSpec`.
  */
@@ -45,6 +63,7 @@ export function describeUnappliedBoardAxes(filter: FilterSpec): string[] {
   if (filter.fields !== undefined && Object.keys(filter.fields).length > 0) {
     axes.push('custom field');
   }
+  if (filter.closed === true) axes.push('closed');
   return axes;
 }
 

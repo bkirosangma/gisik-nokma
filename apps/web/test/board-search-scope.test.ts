@@ -90,6 +90,33 @@ describe('13.441 the combined case names all active axes, in a stable order', ()
 });
 
 /**
+ * 13.602 — Task 11 fix round 2 (Ruling 46, review Finding 1): `closed`
+ * joins `describeUnappliedBoardAxes` as a FOURTH board-blind axis, for a
+ * different reason than the first three (the board excludes closed tickets
+ * entirely, rather than lacking a field for them — see the function's own
+ * docblock). Only `filter.closed === true` ("Closed only") is disclosed:
+ * `false` ("Not closed") is already vacuously true of every board column
+ * (spec §3.2), so naming it would describe a real axis doing nothing, the
+ * opposite of what this function exists to catch. Pushed LAST, after
+ * `custom field` — the three original axes were already ordered before this
+ * one existed.
+ */
+describe('13.602 describeUnappliedBoardAxes discloses an explicit "Closed only", never "Not closed"', () => {
+  it('names "closed" when filter.closed is true', () => {
+    expect(describeUnappliedBoardAxes({ closed: true })).toEqual(['closed']);
+  });
+
+  it('names nothing when filter.closed is false — the board already excludes closed tickets', () => {
+    expect(describeUnappliedBoardAxes({ closed: false })).toEqual([]);
+  });
+
+  it('joins LAST, after the other three, in a stable order', () => {
+    const filter: FilterSpec = { closed: true, dueBefore: '2026-09-30' };
+    expect(describeUnappliedBoardAxes(filter)).toEqual(['due date', 'closed']);
+  });
+});
+
+/**
  * ## `buildFilterChips` (renamed 2026-09-17; was `buildBoardFilterChips`)
  * (Task 4 review, Important finding, remedy 1)
  *
