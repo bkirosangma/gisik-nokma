@@ -5,7 +5,7 @@ import type {
   PublishedWorkflowDef,
   TicketCard,
 } from '@gisik-nokma/domain';
-import { istDayBounds, istDayOf } from '@gisik-nokma/domain';
+import { istDayBounds, istDayOf, statesWithBacklog } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
 import { getWorkspaceSettings } from '../projections/workspace-settings.js';
@@ -287,6 +287,17 @@ export async function readAttention(
  * it silently started firing. It is reachable only if `blockedStateKeys` and
  * this walk are ever fed different definition maps.
  *
+ * `statesWithBacklog(def)`, not `def.states` (backlog/closed spec §1.4/§3.2,
+ * 2026-09-17; fix round 2): a genuinely validated definition never declares
+ * `backlog` and can therefore never flag it blocked, so `blockedStateKeys`
+ * (built the same way, from `def.states` alone) can never admit a
+ * `${workflowId}:backlog` key and this function is UNREACHABLE with a backlog
+ * card today — recorded honestly rather than left implied by the fix. It is
+ * changed anyway for the reason the other two `?? stateId` sites were: a
+ * `TicketCard.stateId === 'backlog'` reaching this lookup by any future path
+ * (a looser `blockedStateKeys`, a reused helper) must not print the bare id
+ * where every other reader in this codebase prints the name.
+ *
  * `defs` is typed `Map<string, PublishedWorkflowDef>` and NOT the structural
  * shape this function happens to read. A narrower structural parameter compiles
  * today and keeps compiling against a shape nothing produces — the day `states`
@@ -295,8 +306,9 @@ export async function readAttention(
  * than indexed, so nothing here is an object keyed by stored data.
  */
 function stateNameOf(defs: Map<string, PublishedWorkflowDef>, card: TicketCard): string {
-  return defs.get(card.workflowId)?.states.find((state) => state.id === card.stateId)?.name ??
-    card.stateId;
+  const def = defs.get(card.workflowId);
+  const state = def === undefined ? undefined : statesWithBacklog(def).find((candidate) => candidate.id === card.stateId);
+  return state?.name ?? card.stateId;
 }
 
 /**

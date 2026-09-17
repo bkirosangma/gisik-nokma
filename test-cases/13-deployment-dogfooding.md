@@ -6269,6 +6269,16 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   closed row; `filter: { closed: false }` answers only the backlog row, which is the positive control that
   the narrowing is about the flag and not an empty project (backlog/closed spec §3.2/§3.3, 2026-09-17) —
   (`apps/server/test/routes/list.test.ts`)
+- **13.575b** ✅ Fix round 2: `groupBy=status`'s own label lookup (`groupCards`'s `case 'status'`,
+  distinct from 13.575's per-row `stateName`) resolves through `statesWithBacklog(def)`, not
+  `def.states`, so a backlog group's `label` is `Backlog` rather than the bare id `backlog` its
+  `?? stateId` fallback used to fall through to. RED was exactly that: `expected 'backlog' to be
+  'Backlog'`. The same fix was applied to `attention.ts`'s `stateNameOf` and
+  `notifications/sweep.ts`'s stale-ticket state-name read, both UNREACHABLE with a backlog row today
+  (recorded honestly rather than claimed covered: `attention.ts`'s blocked bucket can never key on
+  `backlog` because no validated definition ever declares it, and `sweep.ts`'s own query filters
+  `state_category = 'active'`, which backlog's `'open'` category never satisfies) and neither gained a
+  test for that reason (backlog/closed spec §1.4/§3.2, 2026-09-17) — (`apps/server/test/routes/list.test.ts`)
 - **13.576** ✅ `GET /v1/me/work`: a closed ticket assigned to the caller is in no group (`t.closed_at IS
   NULL` bound beside the assignee clause AND beside `sharedWithMeRows`'s audience clause); a backlog
   ticket assigned to them is in `open`, exactly where `bucketFor`'s existing switch already sends every

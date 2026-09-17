@@ -1204,4 +1204,21 @@ describe('GET /v1/projects/:projectId/tickets — backlog and closed (owner requ
       backlogTicketId,
     ]);
   });
+
+  /**
+   * 13.575b (backlog/closed spec §1.4/§3.2, 2026-09-17; fix round 2) — the
+   * `status` grouping's own label lookup (`case 'status'` in `groupCards`,
+   * distinct from 13.575's per-row `stateName` which `list-cards.ts` already
+   * fixed) resolves through `statesWithBacklog(def)`, not `def.states`, so a
+   * backlog group's label is the name `'Backlog'` rather than the bare id
+   * `'backlog'` its `?? stateId` fallback used to fall through to.
+   */
+  it('13.575b `groupBy=status` labels the backlog group `Backlog`, not the bare id it falls back to (fix round 2)', async () => {
+    const grouped = await listOf('member', backlogClosedProjectId, { groupBy: 'status', limit: 200 });
+    const groups = byKey(grouped);
+    const backlogKey = `${read.world.workflowId}:backlog`;
+    expect(groups[backlogKey], 'a backlog-keyed status group exists').toBeDefined();
+    expect(groups[backlogKey]?.cards).toEqual([backlogTicketId]);
+    expect(groups[backlogKey]?.label).toBe('Backlog');
+  });
 });
