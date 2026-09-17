@@ -297,14 +297,89 @@ Never shows the universal state or edges. `validateWorkflowDef` refuses the
 reserved id (§1.1); the builder surfaces that issue like any other. The
 template gallery and `SIMPLE_KANBAN_TEMPLATE` are untouched.
 
-## 8. Named, not built
+## 8. Second wave: ranking, auto-close, bulk close (owner: "these things are actually useful")
 
-Backlog ranking / drag-ordering; auto-close after N days in a terminal state;
-bulk close; MCP surface changes (the MCP routes expose what the read models
-carry — they gain `closed` for free but no new tools); a "Closed" column
-option in the list's per-user columns.
+Three features that depend on §1–§7 and ship as a SECOND plan after the core
+lands. Designed and approved 2026-09-17 in the same brainstorm.
 
-## 9. Testing
+### 8.1 Backlog ranking (drag to reorder)
+
+A per-project manual order of backlog tickets, persisted as a ledger fact —
+everyone sees the same order.
+
+- **Model.** `TicketState.rank: string | null` (`null` = never ranked); one
+  event `ticket.ranked { rank }`. Ranks are order-preserving fractional
+  string keys (LexoRank-style): the domain exports
+  `rankBetween(before: string | null, after: string | null): string`, which
+  yields a key strictly between its neighbours without renumbering anyone
+  else, so a reorder is exactly ONE `ticket.ranked` for the moved ticket.
+  Unranked tickets sort after ranked ones, by creation (`ticketId`, a ULID),
+  so nothing needs a rank to be listed. A rank is meaningful only within the
+  ticket's project. Starting a ticket keeps its rank (it leaves the tab;
+  harmless).
+- **Engine.** `ticket.ranked` refused unless the ticket is in backlog
+  (`rank-requires-backlog`: "Only a backlog ticket can be ranked; this one is
+  in \"${stateName}\"."); the schema refuses a key that is not a valid rank
+  string.
+- **Server.** `proj_tickets.rank text NULL`; the list route orders rows with
+  `rank ASC NULLS LAST, ticket_id ASC`; `ListRow.rank`.
+- **UI.** The Backlog tab's rows are draggable with the board's own native
+  DnD idiom (`dragstart` on the row, `drop` on a row = "place before this
+  row", drop on the list's tail zone = "place last"; the dragged id in
+  `dataTransfer`; `useLayoutEffect` registration, as `13.534` taught). A
+  keyboard alternative on every row — "Move up" / "Move down" buttons
+  (`aria-label` "Move <title> up") — so ordering is never pointer-only. The
+  row moves optimistically; a refusal snaps it back with the notice. The tab
+  sorts by `rank`, then creation.
+
+### 8.2 Auto-close after N days in a terminal state
+
+- **Setting.** `autoCloseAfterDays: number | null` on WORKSPACE settings
+  (`workspace.settings_set`, beside `staleDays`/`dueSoonDays`; the same
+  Settings surface; range 1–365; `null` = off; default OFF). Per-project
+  override is a follow-on (§9).
+- **Sweep.** A job in the existing daemon (`ops/schedule.ts`,
+  `AUTO_CLOSE_SWEEP_INTERVAL_MS`, default 1 h, validated by
+  `requirePositiveIntervalMs`). For each workspace with the setting on, it
+  selects tickets that are terminal, not closed, not reopened-and-untouched
+  (below), and whose entry into the current state — the last `transitions[]`
+  entry's server time, the same instant `stateProvenanceFor` already reads —
+  is ≥ N days ago (IST day arithmetic, the product's one clock), and ingests
+  one `ticket.closed` per ticket THROUGH THE INGEST DOOR (`ingestAll`), never
+  by writing the projection: the engine's own refusals still apply and the
+  ledger records who closed what.
+- **Actor.** A reserved system actor, `SYSTEM_ACTOR_AUTO_CLOSE` (a fixed ULID
+  constant in the domain), `origin: 'server'`. The roster resolves it to the
+  name "Auto-close"; the sheet reads "Closed by Auto-close on <date>".
+- **Reopen wins.** `TicketState.reopenedAt: string | null` — set by
+  `ticket.reopened`, cleared by any `ticket.transitioned`. The sweep skips
+  rows with it set, so an explicit reopen is not undone an hour later; the
+  next transition (even back into the same terminal state) re-arms the
+  clock. Projection column `reopened_at timestamptz NULL`.
+
+### 8.3 Bulk close
+
+- **Board.** A TERMINAL column's header gains **Close all (N)** (N = cards in
+  the column). It opens one confirm dialog listing the N titles; confirming
+  submits N `ticket.closed` in ONE ingest batch. Per-ticket refusals (the
+  engine decides — none expected, since a terminal ticket with open children
+  cannot exist, but the dialog reports each by title) stay listed; the rest
+  close and the board reloads.
+- **List.** Row checkboxes and a "Close selected (N)" action in the list's
+  control row, enabled only when every selected row is terminal and not
+  closed — the cross-column case. Same dialog, same batch.
+- **One path.** Auto-close and both bulk surfaces emit plain `ticket.closed`
+  events, one per ticket; there is no "bulk" event type and no server-side
+  bulk endpoint.
+
+## 9. Named, not built
+
+Per-project auto-close override; MCP surface changes (the MCP routes expose
+what the read models carry — they gain `closed`/`rank` for free but no new
+tools); a "Closed" column option in the list's per-user columns; a
+cross-project backlog.
+
+## 10. Testing
 
 Domain: reducer (born in backlog; `focus`; close/reopen fold; fold-on-republish
 keeps backlog), validator (reserved id), `statesWithBacklog`/`transitionsWithBacklog`.
@@ -317,10 +392,16 @@ up/down; board excludes both and produces no straggler; list includes with
 `toServerFilterSpec` sends it. UI: Backlog tab renders only backlog rows and
 Start submits the right event; Close on a terminal card; sheet Close/Reopen
 and the disabled Move; New ticket's start rules; Filters sheet's Closed
-control; Calendar/Timeline default hide with the chip. Every guard by
-mutation; `Features.md`/`test-cases/` per task; Node 22.
+control; Calendar/Timeline default hide with the chip. Second wave:
+`rankBetween` (between, before-first, after-last, dense neighbours), the
+`rank-requires-backlog` refusal, list ordering with NULLS LAST, row drag and
+the keyboard buttons, the sweep's selection query (terminal ≥ N days, not
+closed, `reopened_at` skip) against a seeded clock, the system actor's
+name, the confirm dialog's per-ticket refusal list, the List's
+enabled-only-when-all-terminal rule. Every guard by mutation;
+`Features.md`/`test-cases/` per task; Node 22.
 
-## 10. Files (by package)
+## 11. Files (by package)
 
 - `packages/domain`: `workflow.ts`, `validate-workflow.ts`, `entity-state.ts`,
   `events/ticket-events.ts`, `vocabulary.ts`, `ticket-state.ts`, `filter-spec.ts`,
