@@ -62,7 +62,10 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > - **W1** cold build **94 s**; healthy **~24 s**; `{"google":true,"apple":false,"phone":false}`;
 >   source read through the MOUNT gives `closed_at` **4** against the same-file control
 >   `collaborator_ids` **3** — where the stale image measured **0** with control 2 (a valid
->   measurement). Idle **1.602 GiB / 7.667 GiB, 2.30 % CPU**. All nine mounts resolve under this
+>   measurement). Cost at two moments: **1.602 GiB / 7.667 GiB, 2.30 % CPU** just after `up` (the
+>   watchers still emitting their first `dist`) and **1.194 GiB, 2.24 % CPU** settled — the second is
+>   the steady state. The override declares nine mounts; the container reports eleven, the extra two
+>   being the base file's own `./reference` mount surviving the merge. All eleven resolve under this
 >   worktree.
 > - **W2** server-source round-trip **1.62 s** — **with a measured negative half that matters more
 >   than the positive one**: a RENAME-OVER save (`mv`, the atomic-save shape) delivers **no inotify

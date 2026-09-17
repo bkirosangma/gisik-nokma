@@ -7224,8 +7224,14 @@ this change's PR; they are readings, not guarantees. (The branch's high-water ma
   /repo/apps/server/src/read/ticket-cards.ts` → **4**, with the same-file control `collaborator_ids` →
   **3**. Read through the mount, so it is the branch's source rather than a compiled-in value — against
   the stale image it was **0** (control 2, i.e. a valid measurement), and the owner's Backlog tab was
-  failing at exactly that. Idle cost once the watchers settle: **1.602 GiB / 7.667 GiB, 2.30 % CPU**.
-  All nine declared mounts resolve under the worktree (`docker inspect --format '{{range .Mounts}}…'`).
+  failing at exactly that. Cost, two readings at two moments rather than the flattering one:
+  **1.602 GiB / 7.667 GiB, 2.30 % CPU** immediately after W1, while the seven `tsc --watch` processes
+  were still emitting their initial `dist`, and **1.194 GiB, 2.24 % CPU** once settled. The second is
+  the steady state. Mounts: the override declares **nine**, and the container reports **eleven** —
+  the extra two are the base file's own `./reference` mount surviving the merge, as designed, one at
+  `/app/reference` (inert: `/app` does not exist in the dev stage) and the one that matters at
+  `/repo/reference`, which is what `seed:cc` resolves against. All eleven resolve under the worktree
+  (`docker inspect --format '{{range .Mounts}}{{.Source}}{{"\n"}}{{end}}'`).
   (`docker-compose.hot.yml`, `apps/server/Dockerfile`)
 - 🧪 **13.614 — a server-source edit is live in seconds, with no rebuild and no `restart`.** A
   `console.log("HOT-WITNESS-SERVER")` added at the top of `apps/server/src/index.ts` appeared in
