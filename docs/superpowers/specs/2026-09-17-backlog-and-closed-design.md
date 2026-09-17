@@ -750,6 +750,30 @@ require a body rewrite.
     lives: `apps/web/src/board-search-scope.ts:66`
     (`if (filter.closed === true) axes.push('closed');`).
 
+23. **No separate worktree (pre-flight ledger ruling, before Task 1).**
+    "No separate worktree — same as the previous plan": the plan's Global
+    Constraints name this branch and checkout specifically because the
+    owner reviews live on port 3001, and subagents never start their own
+    `next dev`. Every task in this plan ran in the primary checkout,
+    `owner/workspace-edits`, rather than an isolated worktree. Cost if
+    wrong: an edit collision — recoverable, since nothing here is
+    destructive, but not free. Where it lives: this is a process decision,
+    not a code one — no file:line; recorded in
+    `.superpowers/sdd/2026-09-17-backlog-and-closed-core/progress.md:6`.
+
+24. **Every commit carries exactly one correct trailer (recurring ledger
+    check, Tasks 1–5).** Each implementer/reviewer dispatch's commits were
+    checked by the controller for a single, correct `Co-Authored-By` line
+    naming the subagent's own model — never a missing trailer, a stray
+    duplicate, or one naming the wrong model — via `git log -1
+    --format=%B` on the commit in question. Recorded in the ledger as "⚠️
+    trailer present (controller checked: 1 Co-Authored-By line)" (Tasks 1,
+    2, 4) and "⚠️ trailers present (2/2, controller checked)" (Task 5's two
+    commits); Task 3 the same. Later tasks continued the same check without
+    re-stating it every time. Not a design ruling; recorded here because
+    the brief asks for every ledger item, and this is one of the two
+    recurring non-numbered ones with no natural home elsewhere.
+
 ### Follow-ons named during execution
 
 Named here and cross-referenced from §9 rather than duplicated into its
