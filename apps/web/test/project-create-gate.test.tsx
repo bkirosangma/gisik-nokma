@@ -481,3 +481,83 @@ describe('3.144 the write door is never offered an empty actor', () => {
     await waitFor(() => expect(ingested.map((event) => event.actorId)).toEqual([ANSELMA]));
   });
 });
+
+/**
+ * 13.591f (backlog/closed spec §5.4, Task 9) — `parentCandidates`'s own
+ * `inFocus` derivation, at the ONE site that computes it from real row data:
+ * `page.tsx`'s `inFocus: row.stateId !== BACKLOG_STATE_ID && row.closed ===
+ * null`. Nothing in `packages/app-core` can witness this — its own tests pass
+ * `inFocus` in as a literal on the fixture, never derive it — so a wrong `!==`
+ * or a dropped `row.closed === null` half here would ship with every gate
+ * this task ran reporting green. Three rows, told apart only by the two facts
+ * the formula reads: a BACKLOG row (`stateId: 'backlog'`, the reserved id —
+ * dispatch context's own binding ruling — never closed), a plain ACTIVE row
+ * (neither backlog nor closed — the one case that should show the checkbox),
+ * and a CLOSED terminal row (not backlog, but closed). `typeRank`/`typeId`
+ * copy `LIST.rows[0]`'s shape; only the three fields the formula reads differ
+ * between rows.
+ */
+describe('13.591f the New-ticket dialog\'s "Start in focus" checkbox tracks a REAL row\'s state', () => {
+  const BACKLOG_ROW = {
+    ...LIST.rows[0]!,
+    ticketId: '01J9TICKET0000000BACKLOG01',
+    title: 'Sits in the backlog',
+    stateId: 'backlog',
+    stateName: 'Backlog',
+    stateCategory: 'open' as const,
+    closed: null,
+  };
+  const ACTIVE_ROW = {
+    ...LIST.rows[0]!,
+    ticketId: '01J9TICKET0000000ACTIVE001',
+    title: 'Actively worked, never closed',
+    stateId: 'doing',
+    stateName: 'Doing',
+    stateCategory: 'active' as const,
+    closed: null,
+  };
+  const CLOSED_ROW = {
+    ...LIST.rows[0]!,
+    ticketId: '01J9TICKET0000000CLOSED001',
+    title: 'Done, and closed',
+    stateId: 'done',
+    stateName: 'Done',
+    stateCategory: 'terminal' as const,
+    closed: { actorId: ANSELMA, at: '2026-09-17T09:00:00.000Z' },
+  };
+  const LIST_THREE: TicketListView = {
+    projectId: PROJECT,
+    rows: [BACKLOG_ROW, ACTIVE_ROW, CLOSED_ROW],
+  };
+
+  async function pickParent(user: ReturnType<typeof userEvent.setup>, title: string): Promise<void> {
+    await user.click(screen.getByRole('combobox', { name: 'Parent' }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: title }));
+  }
+
+  it('13.591f a backlog row and a closed row both compute inFocus: false — only the plain active row shows the checkbox', async () => {
+    render(
+      <Providers
+        services={stubServices({
+          getBoard: async () => BOARD,
+          getTickets: async () => LIST_THREE,
+          getTicketTypes: async () => WORKSPACE_TYPES,
+          getPreferences: async () => EMPTY_PREFERENCES,
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'New ticket' }));
+
+    await pickParent(user, 'Sits in the backlog');
+    expect(screen.queryByRole('checkbox', { name: 'Start in focus' })).not.toBeInTheDocument();
+
+    await pickParent(user, 'Done, and closed');
+    expect(screen.queryByRole('checkbox', { name: 'Start in focus' })).not.toBeInTheDocument();
+
+    await pickParent(user, 'Actively worked, never closed');
+    expect(screen.getByRole('checkbox', { name: 'Start in focus' })).toBeInTheDocument();
+  });
+});

@@ -98,11 +98,18 @@ export function NewTicketDialog({
   const [parentId, setParentId] = useState('');
   // Checked by default (spec §5.4): the one state this control needs, since it
   // is read only at the moment it MATTERS — when a chosen parent is in focus.
-  // It is not reset on every parent re-pick; nothing in this rollout's cases
-  // exercises picking an in-focus parent, changing the box, then picking a
-  // DIFFERENT in-focus parent in the same dialog session, and inventing a
-  // reset rule for a scenario nobody specified would be a second, unwitnessed
-  // claim about what this control does.
+  // It is NOT reset on every parent re-pick, and the reachable case that
+  // matters is the SAME parent, not a different one: untick the box, switch
+  // the picker to "None (project root)" (or a backlog/closed candidate, which
+  // hides the box the same way), then switch BACK to the same in-focus
+  // parent — the box returns UNCHECKED, not to its "checked by default"
+  // starting state. That is deliberate: "checked by default" describes the
+  // box's FIRST appearance for a given render of this dialog, not a promise
+  // that it forgets a person's own un-ticking every time its visibility
+  // toggles off and back on. Persisting `startInFocus` across that toggle is
+  // the same choice `parentId` itself already makes (3.157's own invariant:
+  // state outlives a control's visibility) — inventing a reset here would be
+  // a second, unwitnessed rule this control does not otherwise follow.
   const [startInFocus, setStartInFocus] = useState(true);
 
   // The SAME "no usable parent" test the submit boundary below already makes

@@ -433,6 +433,24 @@ describe('13.593 · T13.5 reopenAndProceed on a CLOSED parent — reopened befor
     expect(source.ingested).toHaveLength(1);
     expect(source.ingested[0]).toHaveLength(2);
   });
+
+  it('13.593d a batch answered with FEWER results than events sent is UNKNOWN — the error names the TRANSITION, the one actually left unanswered', async () => {
+    // The reopen (batch index 0) gets an answer; the transition (index 1)
+    // does not — `results.length === 1 < batch.length === 2`. Naming the
+    // WRONG event here (the reopen, which DID answer) would pass just as
+    // easily against a version that always blames `batch[0]`.
+    const source = createFakeDataSource({}, (events) => [committed(events[0]?.id ?? '')]);
+    let caught: unknown;
+    try {
+      await reopenAndProceed(source, closedPlan, make);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(UnansweredClaimError);
+    expect((caught as InstanceType<typeof UnansweredClaimError>).sent.type).toBe(
+      'ticket.transitioned',
+    );
+  });
 });
 
 /**

@@ -6510,6 +6510,19 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   payload it claims to set is about to leave as `'backlog'` anyway, or absent while a `'focus'` claim
   leaves with nothing on screen to explain it —
   (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.591f** ✅ The `inFocus` derivation itself, at its ONE real-data call site (`page.tsx`'s
+  `inFocus: row.stateId !== BACKLOG_STATE_ID && row.closed === null`) — nothing in `packages/app-core`
+  can witness this, since every case there PASSES `inFocus` in as a literal fixture value; a wrong `!==`
+  or a dropped `row.closed === null` half would ship with 13.591a–e and every other gate reporting green.
+  Three list rows differing only in the two facts the formula reads: a BACKLOG row (`stateId: 'backlog'`,
+  never closed), a plain ACTIVE row (neither backlog nor closed), and a CLOSED terminal row (not backlog,
+  but closed). Only the ACTIVE row's pick renders the "Start in focus" checkbox; the BACKLOG and CLOSED
+  picks both render none. Mutation 1 (`row.closed === null` → `row.closed !== null`, `cp`/`sha256sum`
+  restore): kills exactly this case, on the CLOSED-row assertion (`PASS (9) FAIL (1)`). Mutation 2
+  (`row.stateId !== BACKLOG_STATE_ID` → `===`, same restore method): kills exactly this case again, on the
+  BACKLOG-row assertion — the two mutations redden the SAME case at two DIFFERENT assertions, proving both
+  halves of the formula are load-bearing and neither alone would catch the other's defect —
+  (`apps/web/test/project-create-gate.test.tsx`)
 - **13.592** ✅ `CreateTicketFlow.create` never leaves `start` off the `ticket.created` payload it builds
   (backlog/closed spec §1.3), whatever the draft's own value: a create with no parent sends
   `payload.start: 'backlog'`, and choosing an in-focus parent with the checkbox left checked sends
@@ -6538,3 +6551,11 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   reads `parentClosed` off `parentRead.ticket.closed ?? null` — never `!== null` alone, which would
   misread an unflagged legacy ticket (441 fixtures predate the flag) as closed —
   (`packages/app-core/test/flows/guarded-child-event.test.ts`, `packages/app-core/test/views/reopen-flow.test.tsx`)
+- **13.593d** ✅ Ruling 37's own silence clause — "if the array is shorter than the batch, throw
+  `UnansweredClaimError` naming the unanswered event" — pinned directly, since 13.593a–c all exercise
+  FULL-length results arrays and T13.2f exercises `submitChildEvent`, not `reopenAndProceed`. A batch of
+  two (`[ticket.reopened, ticket.transitioned]`, `parentClosed: true`) answered with only ONE result (the
+  reopen commits; the transition gets nothing back) throws `UnansweredClaimError` whose `.sent` is the
+  TRANSITION — the event actually left unanswered, not `batch[0]` (the reopen, which DID answer) —
+  discriminating a correct implementation from one that always blames the first element —
+  (`packages/app-core/test/flows/guarded-child-event.test.ts`)
