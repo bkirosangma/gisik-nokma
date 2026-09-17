@@ -234,6 +234,52 @@ worth stating because the mistake is easy to repeat:
   `reference/` *is* present in the DEV container — via a host mount App Platform has no equivalent of.
   Checking inside a running dev container answers a different question than checking the image.
 
+## Dev stack — hot-reload mode
+
+The dev `server` normally runs the image built by `apps/server/Dockerfile`, which bakes `dist` at
+build time. **Hot mode replaces that with the branch's SOURCE**: the container bind-mounts the source
+directories and restarts itself on save, so what is live on the API origin is what is in the checkout
+— no rebuild, no `restart`, no waiting.
+
+    pnpm dev:stack
+
+That is the whole command. It composes `docker-compose.dev.yml` with `docker-compose.hot.yml`, and
+**run it from the checkout whose code should be live** — the mounts are resolved relative to the
+directory the command runs in, so the worktree you run it from is the worktree the container serves.
+`docker-compose.dev.yml` itself is untouched by hot mode: the production image path and the compose
+contract suite read exactly what they read before.
+
+**`.env` must exist in the checkout you run this from** — copy it from wherever the owner keeps it.
+It is gitignored (`.gitignore:11`) and per-checkout by design, so a fresh worktree has none. The
+script passes `--env-file .env`, and without that file compose does not silently fall back — it stops
+with *"Couldn't find env file"*. That failure is the good one. The dangerous shape is dropping
+`--env-file`, which lets `${GOOGLE_CLIENT_ID:-}` substitute to EMPTY and brings the server up with
+**Google sign-in OFF** while looking healthy; this happened once on 2026-09-09 and the owner noticed
+only by asking why the button was gone. To point at a checkout other than the one you are standing in:
+
+    docker compose --env-file /Users/kiro/my_projects/gisik-nokma/.env \
+      -f docker-compose.dev.yml -f docker-compose.hot.yml up -d server
+
+**Rebuild rule — the one case that needs `--build`.** The image carries the installed dependencies and
+the workspace packages' `dist`; hot mode refreshes source, not the lockfile. So:
+
+- source edits — **nothing to do**, the watchers pick them up;
+- `pnpm-lock.yaml` or any `package.json` changed — re-run `pnpm dev:stack` **with `--build`**;
+- a NEW workspace package added — also needs a line in the `dev` stage's manifest `COPY` block in
+  `apps/server/Dockerfile`, or the install fails on the missing importer.
+
+**What is deliberately not mounted.** Two things, and mounting either breaks the container rather than
+merely stale-ing it. `node_modules`: the host's are macOS-native and the container's are Linux, so
+`tsx` loses `@esbuild/linux-*` and the server stops booting. `dist`: the watchers write it *inside* the
+container, and a host `tsc --watch` writes the host's copy — sharing the path puts two writers on it.
+
+**Verify it is actually serving the branch** (the check that the 2026-09-09 stale-image incident was):
+
+    docker exec gisik-nokma-dev-server-1 grep -c closed_at /repo/apps/server/src/read/ticket-cards.ts
+
+A `0` there means the container is running an old image, not the branch. `collaborator_ids`, in the
+same file, is the control — if it is also `0` the measurement is void rather than negative.
+
 ## MCP server
 
 The assistant-facing door. It runs on the PERSON'S machine, not on ours — there is nothing to deploy —

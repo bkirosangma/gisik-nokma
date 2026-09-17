@@ -2440,6 +2440,24 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   travelling through the web container's proxy and being answered by the server, live — nothing
   automated brings the stack up and makes that round trip; it is a hand-run case. `docker-compose.dev.yml`,
   `apps/server/test/deploy/compose-dev-contract.test.ts`
+- ⚙️ **Hot-reload dev mode for the compose `server` (`docker-compose.hot.yml`)** — the dev `server`
+  container runs the checkout's SOURCE instead of the baked `dist`, bind-mounted and watched, so an
+  edit on the host is live on the API origin without a rebuild or a restart. It exists because the
+  alternative was measured failing: the running `server` image was built **2026-09-09T12:32Z** and the
+  first `closed` fold reached `apps/server/src/read/ticket-cards.ts` on **2026-09-17**, so the owner's
+  Backlog tab read cards with no `closed` key from a server eight days behind the client, and the
+  mapper refused it (`list.groups[0].cards[0].closed: expected an object`). The mapper's refusal stays
+  strict — a `closed` that defaults to `null` when absent is what hid case 13.603 the first time.
+  **`docker-compose.dev.yml` is UNCHANGED** and the prod image path is untouched: hot mode is an
+  override composed on top of it, and the Dockerfile's new `dev` stage sits **before** `runtime`
+  because Docker builds the LAST stage when no target is named, so an appended stage would have
+  silently become the production image. The image is rebuilt only when the lockfile changes (the
+  manifest-then-`pnpm fetch` pair keys that layer on the lockfile alone); source edits need no rebuild.
+  Runs from the checkout whose code should be live — for the serial executor, its own worktree — via
+  the root `pnpm dev:stack` script, which passes `--env-file .env` because without it the OAuth pair
+  substitutes empty and the server comes up with Google sign-in silently OFF. `node_modules` and
+  `dist` are deliberately NOT mounted (host/container platform mismatch; two writers on one path).
+  `docker-compose.hot.yml`, `apps/server/Dockerfile`, `package.json`, `docs/runbook.md`
 - ✅ **Deployed-stack E2E — Playwright against the running compose stack, and the sign-in defect it
   found** — three specs drive the REAL stack (a Next container proxying to a real API server, real
   Postgres, real Mailpit, real MinIO): sign-in through the shipped form with the magic link fetched out of
