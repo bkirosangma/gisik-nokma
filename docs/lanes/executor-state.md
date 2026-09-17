@@ -20,8 +20,55 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~04:1x IST. **STEP 2a IS DONE AND COMMITTED; ONE PR OPEN
-> # AGAINST `owner/workspace-edits`, AWAITING THE CONTROLLER'S MERGE. QUEUE EMPTY — HOLD.**
+> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~05:0x IST. **STEP 2c-0 (THE PROTOTYPE DELTA AUDIT) IS
+> # IN FLIGHT. DOCS-ONLY. NO PR YET, SO `main` AND `owner/workspace-edits` CARRY NOTHING OF THIS.**
+>
+> Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-step2c0-prototype-delta-audit.md`.
+> Deliverable: `docs/design/prototype-delta-2026-09-18.md` (new, untracked at this writing).
+>
+> | | |
+> |---|---|
+> | branch | `exec/step2c0-prototype-delta-audit`, cut from `origin/owner/workspace-edits` at `3831bb49` |
+> | HEAD at cut | `3831bb49` — the audit doc is the only change so far, and it is not yet committed |
+> | PR base | `owner/workspace-edits` — NEVER `main` |
+> | gate | NOT RUN. Docs-only: the dispatch's stated bar is `pnpm turbo run check:*` raw 0 + `typecheck --force`; the controller runs the full forced gate at the tip |
+>
+> ## What is established, and how — do not re-derive any of this
+>
+> **1. The refresh changed SIX blocks, not sixteen.** `Part 0b`'s "sixteen CHANGED at equal size" is
+> *bundler spelling*, not design. Method: extract each `sc-if` block whole from both exports (the two
+> files are blobs `6d7b67c0a52c…` new and `c9f852a2c243…` old), undo the four form rewrites — `sc-raw-*`
+> prefixes, `sc-camel-*` attributes, named entities, the dropped self-closing slash — **on both sides**,
+> then diff. Controls: the five blocks Part 0b calls unchanged diff empty; and under the *least* tolerant
+> normalisation the four largest "changed" blocks show 22 / 4 / 4 / 12 changed lines, **every one of them
+> an entity or a self-closing slash**. The six that moved: `isSignIn`, `isWork`, `isMembers`
+> (+ `isInviteAdmin`, new), `isAccount`, `isHelp`.
+>
+> **2. The largest change is in no block at all — the token layer moved.** Light accent
+> `#3A6DB0` → `#33629F`; all five light tints halved (`--tintDanger` 0.13 → 0.07, `--tintWarning`
+> 0.20 → 0.10, …); dark tints 0.14 → 0.10; `--tintAccent` became a `color-mix(...)` **derived** from
+> `--accent`; and the neo-light selector became `body[data-theme="light"][data-style="neo"]`, which
+> matches only if `data-theme="light"` is stamped explicitly. The export's own accent picker was
+> rewritten into a WCAG solver that uses those 0.07/0.10 alphas as inputs, so this is one scheme, not
+> three coincidences. **The product still holds the old values** — `packages/ui/src/tokens.ts:95`
+> (`blue600: '#3a6db0'`), `:151` (`neoPaper: '#ede4db'`), pinned by a test at
+> `apps/web/e2e-viewport/responsive.spec.ts:1939`. It touches every screen, which is exactly why a
+> per-screen audit cannot see it, and its port target is a derivation engine, not a stylesheet.
+>
+> ## Two things learned the hard way this session, both machine-local
+>
+> - **`grep -n` output on this machine is stripped of leading whitespace.** The 25 screen blocks are at
+>   **indent 2**, not column 0 — the proxy made them *look* top-level and a column-0 extractor silently
+>   returned zero blocks. An empty result that is well-formed is the failure mode; the fix is to read the
+>   bytes (`python3`), never the grepped line.
+> - **`git log` is rewritten here and omits merge commits.** `git log -1 3831bb49` printed `76432f4a`.
+>   Use `git rev-parse` / `--is-ancestor` for refs. Under this trap I briefly believed #421 had dropped
+>   its handoff commit; the merge's parents are `63ffe930` + `76432f4a`, so **it landed** — the
+>   hypothesis was mine and was wrong.
+
+
+> # ▢ SUPERSEDED POSITION — THURSDAY 2026-09-18 ~04:1x IST. **STEP 2a WAS DONE AND COMMITTED; ONE PR OPENED
+> # AGAINST `owner/workspace-edits`, AND THE CONTROLLER MERGED IT AS `3831bb49` — THE MERGE'S PARENTS ARE `63ffe930` + `76432f4a`, SO THE HANDOFF COMMIT IS IN IT.**
 >
 > Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-step2a-catalogue-green.md`. All four Parts are
 > in one commit. **Nothing is in flight; the next task is the controller's to name.**
