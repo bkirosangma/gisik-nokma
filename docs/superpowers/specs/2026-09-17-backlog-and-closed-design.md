@@ -108,8 +108,16 @@ declaring it").
 
 ### 1.2 The closed flag
 
-`TicketState` gains `closed: { actorId: string; at: string } | null`
+`TicketState` gains `closed?: { actorId: string; at: string } | null`
 (`at` = the event's server time, the same clock every other claim uses).
+OPTIONAL on the domain type, and only there, for one measured reason: 441
+`TicketState` literals in tests across five packages predate the field, and
+a required field would touch every one for no behavioural gain. Every
+PRODUCER sets it — the reducer (creation → `null`), `rowToTicketState`,
+the replica's row mapping — and each is pinned by a test; every READER
+spells `state.closed ?? null`. The wire types (`TicketCard`, `ListRow`,
+`TicketRead` via the domain type) carry it REQUIRED — their fixture sites
+are few and go through helpers.
 
 Two event types registered against `entityKind: 'ticket'` in
 `packages/domain/src/vocabulary.ts` with schemas in `events/ticket-events.ts`:
@@ -265,11 +273,14 @@ show a closed badge — they are never closed.
 
 ### 5.4 New ticket
 
-The dialog states "Starts in the backlog" under the title field. When opened
-from an in-focus parent's sheet (`parentId` set AND the parent's
-`stateId !== 'backlog'` AND not closed), a checkbox "Start in focus" appears,
-checked by default; it sets `start: 'focus'`. From the project page's own New
-ticket button there is no checkbox — backlog, always.
+The dialog states "Starts in the backlog" under the title field. The only
+creation path in the product is this dialog (there is no create-from-sheet
+affordance — checked, not assumed), so the in-focus exception keys on the
+PARENT CHOSEN IN THE DIALOG: when the selected parent is in focus
+(`stateId !== 'backlog'` AND not closed), a checkbox "Start in focus" appears,
+checked by default, and sets `start: 'focus'`; with no parent, or a backlog
+or closed parent, there is no checkbox — backlog, always.
+`parentCandidates` therefore carry `inFocus: boolean` beside `id`/`title`.
 
 ### 5.5 Filters sheet and the other tabs
 
