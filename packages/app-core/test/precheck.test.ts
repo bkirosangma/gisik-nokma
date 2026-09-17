@@ -366,6 +366,95 @@ describe('13.583 precheckEvent mirrors checks/close.ts for ticket.closed / ticke
 });
 
 /**
+ * 13.604 — Finding 7 (final whole-branch review, 2026-09-17): the four
+ * refusal REASON strings above (`close-requires-terminal`, `already-closed`,
+ * `not-closed`, `closed-ticket`) are typed out twice — once in
+ * `checks/close.ts`/`transition.ts`, once in `precheck.ts` — and every case
+ * in 13.583 above checks `precheckEvent`'s own copy against a literal THIS
+ * FILE wrote, never against the engine's. `7.249`'s lesson applies a second
+ * time: a fixture sentence pinned to the producer it claims proves nothing
+ * about a SECOND, independent producer of the identical claim — nothing
+ * here would have caught a copy-edit landing in only one of the two files.
+ *
+ * The RULE ID is not at risk — `precheck.ts` already imports `REFUSAL_RULES`
+ * from `@gisik-nokma/rule-engine` (this file's own import line does too), so
+ * that half is one constant on both sides. Only the REASON TEXT has no
+ * shared source, which is what this case closes: it drives each of the four
+ * refusals through BOTH real producers — `evaluateEvent` (the engine
+ * dispatch that calls `checkTicketClosed`/`checkTicketReopened`/
+ * `evaluateTicketTransitioned` directly; `checks/close.ts` and
+ * `transition.ts` are not exported for a test to call standalone, so the
+ * engine's own public entry point is the producer under test, exactly as
+ * `CANARY, re-aimed` below already calls it) and `precheckEvent` — over the
+ * SAME ticket/event pair, and asserts the `reason` neither side hard-codes:
+ * byte-identical, not merely each equal to a string either file could drift
+ * out from under.
+ */
+describe('13.604 the four close/reopen refusal reasons agree, engine and precheck', () => {
+  /**
+   * Runs `event` through the real engine (`evaluateEvent` + `contextFromCache`,
+   * the same adapter `precheckEvent` itself is mirrored from) and through
+   * `precheckEvent`, over the identical `cache`. Throws loudly rather than
+   * returning `undefined` if either producer answers anything but a refusal
+   * — a "passing" agreement case built on a side that never refused would
+   * prove nothing about the two REASON strings this case exists to compare.
+   */
+  async function bothRefusalReasons(
+    event: ReturnType<typeof closeTicket>,
+    cache: ClientStateCache,
+  ): Promise<{ engineReason: string; clientReason: string }> {
+    const engineVerdict = await evaluateEvent(completeForPrecheck(event), contextFromCache(cache));
+    const clientVerdict = await precheckEvent(event, cache);
+    if (!engineVerdict.refused) {
+      throw new Error('expected the real engine to refuse this event; it accepted');
+    }
+    if (clientVerdict.kind !== 'refused') {
+      throw new Error(`expected precheckEvent to refuse this event; it answered "${clientVerdict.kind}"`);
+    }
+    // The cheap half, already one shared constant on both sides — asserted
+    // here so a failure of THIS line, rather than the reason comparison
+    // below, is what points straight at a rule-id drift instead.
+    expect(clientVerdict.rule).toBe(engineVerdict.rule);
+    return { engineReason: engineVerdict.reason, clientReason: clientVerdict.reason };
+  }
+
+  it('close-requires-terminal: closing a doing (non-terminal) ticket', async () => {
+    const { engineReason, clientReason } = await bothRefusalReasons(closeTicket(), readyCache());
+    expect(clientReason).toBe(engineReason);
+  });
+
+  it('already-closed: closing a ticket that is already closed', async () => {
+    const cache = readyCache({
+      stateId: 'done',
+      stateCategory: 'terminal',
+      closed: { actorId: OTHER_ACTOR, at: '2026-08-20T00:00:00.000Z' },
+    });
+    const { engineReason, clientReason } = await bothRefusalReasons(closeTicket(), cache);
+    expect(clientReason).toBe(engineReason);
+  });
+
+  it('not-closed: reopening a ticket that is not closed', async () => {
+    const cache = readyCache({ stateId: 'done', stateCategory: 'terminal' });
+    const { engineReason, clientReason } = await bothRefusalReasons(reopenTicket(), cache);
+    expect(clientReason).toBe(engineReason);
+  });
+
+  it('closed-ticket: transitioning a closed ticket, decided before any def/version gate', async () => {
+    const cache = createClientStateCache();
+    cache.upsertTicket(
+      ticketStateSeed({
+        id: TICKET,
+        stateId: 'done',
+        stateCategory: 'terminal',
+        closed: { actorId: ACTOR, at: '2026-08-20T00:00:00.000Z' },
+      }),
+    );
+    const { engineReason, clientReason } = await bothRefusalReasons(transitionTo('doing'), cache);
+    expect(clientReason).toBe(engineReason);
+  });
+});
+
+/**
  * THE SAFE DIRECTION, PROVED AS A CLOSED SET.
  *
  * `passed` means: no rule the shared engine can evaluate refuses this claim,

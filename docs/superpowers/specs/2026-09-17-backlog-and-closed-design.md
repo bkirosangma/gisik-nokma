@@ -128,9 +128,11 @@ Two event types registered against `entityKind: 'ticket'` in
 `applyTicketEvent` folds both: `closed` set from the envelope on `ticket.closed`,
 `null` on `ticket.reopened`. Neither touches `stateId`, `stateCategory` or
 `transitions`. The reducer's own "TEN of the THIRTEEN" docblock becomes
-twelve of fifteen, restated, and the replica backfill list (`sync-routes.ts`)
-gains both types — the docblock names that list as the live example of a
-reader that must be complete.
+twelve of fifteen, restated. The replica backfill list (`sync-routes.ts`)
+does NOT gain either type (amended 2026-09-17, see Amendments — Ruling 5):
+unlike `comment.added`/`attachment.added`, neither event carries content a
+replica needs verbatim beyond the fold every other head-state event already
+gets, so backfilling them a second time would be redundant.
 
 ### 1.3 Creation
 
@@ -196,7 +198,7 @@ the transition is retried.
 
 ### 3.1 Projection
 
-Migration `1789000000000_proj-tickets-closed.sql`: `closed_at timestamptz NULL`,
+Migration `1789100000000_proj-tickets-closed.sql`: `closed_at timestamptz NULL`,
 `closed_by text NULL` on `proj_tickets`; partial index
 `proj_tickets_open_idx ON proj_tickets (workspace_id, project_id) WHERE closed_at IS NULL`
 (the board's and attention's hot path). The projection writer maps
@@ -347,7 +349,8 @@ does not carry forward to a different parent picked afterward.
 `replica-data-source.ts` applies events through the shared reducer, so the
 flag folds for free. Its `getBoard` mirrors §3.2's exclusion; its `getTickets`
 rows carry `closed`; its outbox accepts `ticket.closed`/`ticket.reopened`.
-The bootstrap backfill list gains the two types (§1.2).
+The bootstrap backfill list does NOT gain the two types (§1.2; amended
+2026-09-17, see Amendments — Ruling 5).
 
 ## 7. Workflow builder
 
@@ -508,16 +511,20 @@ Rulings 1–30 belong to earlier, unrelated plans (`board-prototype-port`,
 `filter-exclude-all-tabs`) and are recorded in their own specs. This
 section starts from this plan's own controller rulings — the unnumbered
 Task 1/3/4/6 ones, then the numbered series a same-day coordinator picked
-up starting at 31 (30 was the prior plan's own last number). Five body
+up starting at 31 (30 was the prior plan's own last number). Six body
 sentences are rewritten above, each marked "(amended 2026-09-17, see
 Amendments)": §2's hierarchy-reopen-offer paragraph (Ruling 39), §5.1's
 Start description (Ruling 41 — the brief's own dispatch text called this
 "§5.4", but the sentence it struck actually lives in §5.1, verified by
 re-reading the spec rather than trusting the section number), §5.3's
 Close/Reopen bullets and dismiss-control bullet (Rulings 31–34), §5.4's
-"checked by default" sentence (Ruling 40), and §5.5's Calendar/Timeline
-bullet (Ruling 44). Every other ruling here is additive and did not
-require a body rewrite.
+"checked by default" sentence (Ruling 40), §5.5's Calendar/Timeline bullet
+(Ruling 44), and §1.2/§6's replica-backfill-list sentences (Ruling 5 itself
+— found stale by the final whole-branch review's Finding 6, 2026-09-17: the
+appendix's own "five rewritten" count had missed that its OWN Ruling 5 was
+one of the sentences requiring a body rewrite, not only an additive
+amendment). Every other ruling here is additive and did not require a body
+rewrite.
 
 1. **Wildcard edges never resolve FROM backlog (Task 1 ruling).** §1.1's
    `universalTransitions` gives every workflow `backlog → def.initialStateId`

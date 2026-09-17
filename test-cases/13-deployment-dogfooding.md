@@ -6998,3 +6998,63 @@ stands alone below.
   same restore method): reddens BOTH `it`s this case is split across
   (`PASS (61) FAIL (2)` of the file's 63) —
   (`packages/app-core/test/online/mappers.test.ts`)
+
+**Second commit of this wave — Rulings 53(iv) and 54, and the spec/`Features.md`
+nits (Findings 5's docblock, 7, 6 and 9):**
+
+- **Ruling 53(iv), Finding 5's docblock (no new case — a comment-only
+  correction).** `ticket-sheet.tsx`'s Close/Reopen comment claimed "`closed`
+  never survives a fold that also changes `stateId` … so a closed ticket
+  stays terminal" — false: a rebind or republish fold CAN move a closed
+  ticket's `stateId` into a non-terminal state (`foldTicketToWorkflowVersion`
+  spreads `...state`; neither `ticket.closed`/`ticket.reopened` touches
+  `stateId`). Rewritten to the true, smaller claim: the two buttons never
+  both show because their render conditions are mutually exclusive on
+  `closed` alone, not because closed implies terminal forever — that
+  invariant is the rule engine's to hold (fix wave B, Ruling 53, at the
+  rebind check and the republish validator). No behaviour change, no test.
+- **13.604** ✅ Ruling 54, Finding 7 (2026-09-17) — the four close/reopen
+  refusal REASON strings (`close-requires-terminal`, `already-closed`,
+  `not-closed`, `closed-ticket`) are typed out twice, once in
+  `checks/close.ts`/`transition.ts`, once in `precheck.ts`, and 13.583's own
+  cases check `precheckEvent`'s copy against a literal THIS FILE wrote,
+  never against the engine's — the RULE ID is already one shared constant
+  (`REFUSAL_RULES`, imported from `@gisik-nokma/rule-engine` on both sides),
+  but the reason TEXT has no shared source. **Option taken**: rather than
+  export new reason constants from the rule engine (the ruling's
+  alternative, and the larger of the two changes), this case drives each of
+  the four refusals through the engine's own already-exported entry point,
+  `evaluateEvent` (dispatching to `checkTicketClosed`/`checkTicketReopened`/
+  `evaluateTicketTransitioned`, none of which is itself exported for a test
+  to call standalone), and through `precheckEvent`, over the identical
+  ticket/event pair, and asserts `reason` byte-identical — proving the
+  agreement rather than assuming it, with zero changes to
+  `packages/rule-engine`. **Verified as load-bearing, not merely
+  non-vacuous, by two planted drifts** (`cp`/`sha256sum` restore both times):
+  drifting `precheck.ts`'s own `already-closed` text reddens BOTH this case
+  and 13.583 (both hardcode/derive the same string); drifting the ENGINE's
+  `checks/close.ts` text instead — the gap this case exists to close —
+  reddens ONLY 13.604 (`PASS (36) FAIL (1)` of the file's 37); 13.583 stays
+  green throughout, because it never reads the engine's own answer —
+  (`packages/app-core/test/precheck.test.ts`)
+
+**Spec nits swept in the same wave** (Findings 6 and 9,
+`docs/superpowers/specs/2026-09-17-backlog-and-closed-design.md`): §1.2 and
+§6 both said the replica backfill list (`sync-routes.ts`'s
+`BOOTSTRAP_BACKFILL_TYPES`) "gains" or is "gained" by the two closed-flag
+event types — Amendment 5 already says the opposite (unchanged, on purpose:
+neither event carries content beyond the fold a replica needs backfilled
+verbatim) — a sixth body sentence the Amendments appendix's "five
+rewritten" count had missed; both sentences now carry the
+"(amended 2026-09-17, see Amendments — Ruling 5)" marker the other five
+do, and the appendix's own count is corrected to six. §3.1's migration
+filename, `1789000000000_proj-tickets-closed.sql`, never matched the
+shipped file, `1789100000000_proj-tickets-closed.sql`
+(`apps/server/migrations/`) — corrected at its one occurrence.
+**`Features.md` checked, nothing to change**: no bullet claims the closed
+flag reaches the sheet specifically "online" (as opposed to through the
+replica, or as a data-source-agnostic fact) — the "Close / Reopen from the
+ticket sheet" bullet describes `TicketSheet` reading `state.closed ?? null`
+"off the read it already holds," true of either data source and never
+false at the mapper layer 13.603 fixes, so it needed no hedge and needs no
+un-hedge now.

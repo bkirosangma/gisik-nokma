@@ -460,9 +460,22 @@ export function TicketSheet({
             ) : null}
             {/*
               Spec §5.3: Close only from a terminal, not-yet-closed state;
-              Reopen only once closed. `closed` never survives a fold that
-              also changes `stateId` (closing never touches it), so a closed
-              ticket stays terminal and the two buttons never both show.
+              Reopen only once closed. The two buttons never both show, but
+              NOT because "closed implies terminal forever" — that claim is
+              false (final whole-branch review Finding 5, 2026-09-17: a
+              rebind or a republish fold can move a closed ticket's `stateId`
+              into a non-terminal state while `closed` rides along, since
+              `foldTicketToWorkflowVersion` spreads `...state` and neither
+              event touches `stateId`). What actually holds is smaller and
+              true today: Close's own condition
+              (`stateCategory === 'terminal' && closed === null`) and
+              Reopen's (`closed !== null`) are mutually exclusive on `closed`
+              alone, so exactly one — or neither, on a still-open,
+              non-terminal ticket — can ever be true at once. The closed ⇒
+              terminal invariant this comment used to (wrongly) lean on is
+              the RULE ENGINE's to hold, not this component's: fix wave B,
+              Ruling 53, adds it at the rebind check and the republish
+              validator.
             */}
             {state.stateCategory === 'terminal' && closed === null ? (
               <Button onClick={() => void closeOrReopen('ticket.closed')} disabled={submitting}>
