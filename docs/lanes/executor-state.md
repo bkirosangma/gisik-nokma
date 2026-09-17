@@ -140,7 +140,8 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >    through a shell — it shell-word-splits it. Measured before the build: the first version rendered
 >    `set`, `-e`, `echo`, … as nine separate argv entries and would have died exec'ing `set`.
 >
-> ## Witnesses — measured, not carried (all four are cases 13.613–13.616)
+> ## Witnesses — measured, not carried (all four are cases 13.650–13.653, RE-MINTED from 13.613–13.616;
+> ## the block's note in `test-cases/13` carries why, and the ids below this line were written before it)
 >
 > - **W1** cold build **94 s**; healthy **~24 s**; `{"google":true,"apple":false,"phone":false}`;
 >   source read through the MOUNT gives `closed_at` **4** against the same-file control
