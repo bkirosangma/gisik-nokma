@@ -1,0 +1,100 @@
+# Hot-reload dev mode for the compose `server` service.
+#
+# NOT usable on its own. It is an OVERRIDE, always composed with the base file:
+#
+#   docker compose --env-file .env \
+#     -f docker-compose.dev.yml -f docker-compose.hot.yml up -d server
+#
+# `docker-compose.dev.yml` is deliberately UNCHANGED by this file's introduction
+# — the prod-parity image path and the compose contract suite keep reading it
+# exactly as before, and the prod `server` image is still the un-targeted build.
+# `pnpm dev:stack` (root package.json) is that command.
+#
+# What changes here: the `server` container runs the branch's SOURCE from bind
+# mounts instead of the baked `dist`, with watchers that restart it on save. So
+# the code the owner sees live on :3001 is the code in the checkout this file is
+# invoked from — for the serial executor, `/Users/kiro/my_projects/gisik-nokma-exec`,
+# on whatever branch that worktree is on.
+#
+# Compose MERGES the `volumes` list with the base file's, so the base's
+# `./reference:/app/reference:ro` survives alongside the mounts below. That is
+# harmless and is left in place rather than shadowed with `!override`: `/app`
+# does not exist in the dev stage, so Docker materialises an empty directory
+# there and nothing reads it. The `./reference` mount that DOES matter is the
+# one at `/repo/reference` below, because `seed:cc` resolves
+# `reference/convenience-corner-tracker/board.data.js` relative to the working
+# directory, which in this stage is `/repo`.
+#
+# The compose project `name: gisik-nokma-dev` is declared in the base file and
+# is NOT re-declared here — that is what makes this a REPLACEMENT of
+# `gisik-nokma-dev-server-1` rather than a second stack.
+
+services:
+  server:
+    build:
+      # `context` and `dockerfile` are inherited from docker-compose.dev.yml;
+      # only the stage is added. The stage MUST be named here, because the
+      # Dockerfile's un-targeted default is the production `runtime` stage.
+      target: dev
+    # Migrations first (the same thing the prod entrypoint does), then the
+    # package watchers in parallel with the server's own source watcher.
+    #
+    # The watcher shape mirrors the owner's proven host workflow
+    # (`.vscode/tasks.json`, not in git):
+    #   pnpm -r --parallel --filter './packages/*' exec tsc -p tsconfig.json --watch
+    # beside `next dev`. Each package's tsconfig emits `dist` (`outDir: dist`,
+    # `rootDir: src`), and consumers import workspace packages BY NAME
+    # (`@gisik-nokma/domain` resolves through `./dist`), so a source edit here
+    # reaches the server by way of `dist` — which is exactly what witness W3
+    # measures. Polling is NOT enabled: if inotify events were provably not
+    # crossing the Docker Desktop mount, the fix would be stated with the
+    # measurement that showed the missing event, not applied on suspicion.
+    # `sh -c` IS LOAD-BEARING, not decoration. Compose v2 does NOT run a
+    # string-form `command` through a shell: it shell-word-SPLITS it and execs
+    # the result. Measured on this file before this fix — `config` rendered
+    # `set`, `-e`, `echo`, … as nine separate argv entries, so the container
+    # would have died trying to exec a program named `set`, and the `&` that
+    # backgrounds the watchers and every `;` would have been lost with it. The
+    # explicit `sh -c` is the only form that keeps the sequencing.
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        echo 'hot-dev: applying migrations...'
+        pnpm --filter @gisik-nokma/server migrate
+        echo 'hot-dev: migrations current; starting watchers'
+        pnpm -r --parallel --filter './packages/*' exec tsc -p tsconfig.json --watch --preserveWatchOutput &
+        pnpm --filter @gisik-nokma/server exec tsx watch src/index.ts
+    # NO SUPERVISOR HERE, AND IT WAS TRIED RATHER THAN OMITTED. `set -e` does not
+    # cover a backgrounded job, so if the package watcher dies the container
+    # stays up and /healthz keeps answering while package edits silently stop
+    # reaching `dist`. A supervisor that watches it was written, shipped to a
+    # running container, and MEASURED NOT TO FIRE: `pkill` on the tsc processes
+    # left the container healthy and `restarts=0`. Two reasons it cannot work in
+    # this shell, both measured -- busybox ash has no `wait -n` (a job exiting 7
+    # reported status 0), and `kill -0` on a backgrounded child that has exited
+    # but not been reaped still SUCCEEDS, so the liveness test never turns false.
+    # It is removed rather than left in: a guard that cannot fire is worse than
+    # none, because it is trusted. The failure is therefore DOCUMENTED as an
+    # operator check instead (`docs/runbook.md`, "watchers still alive"), which
+    # is the honest form -- a check someone runs beats a guard that lies.
+    volumes:
+      # SOURCE ONLY. Two things are deliberately absent and both would break the
+      # container if mounted:
+      #   node_modules — the host's are macOS-native, the container's are Linux;
+      #                  `tsx` needs `@esbuild/linux-*`, which the host tree
+      #                  does not have. Mount it and the server stops booting.
+      #   dist         — written IN the container by the watchers. The owner's
+      #                  host `tsc --watch` writes the host's copy; sharing the
+      #                  directory would put two writers on one path.
+      - ./apps/server/src:/repo/apps/server/src
+      - ./apps/server/migrations:/repo/apps/server/migrations
+      - ./packages/app-core/src:/repo/packages/app-core/src
+      - ./packages/domain/src:/repo/packages/domain/src
+      - ./packages/editor/src:/repo/packages/editor/src
+      - ./packages/mcp-server/src:/repo/packages/mcp-server/src
+      - ./packages/rule-engine/src:/repo/packages/rule-engine/src
+      - ./packages/sync-client/src:/repo/packages/sync-client/src
+      - ./packages/ui/src:/repo/packages/ui/src
+      - ./reference:/repo/reference:ro
