@@ -6193,3 +6193,17 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   transition endpoint even when no state declares it — with the message "`backlog` is reserved — every
   workflow has it without declaring it."; a clean def carries no such issue —
   (`packages/domain/test/validate-workflow.test.ts`)
+- **13.565** ✅ `ticket.created`'s `start` decides where a ticket is born: `'backlog'` lands it in the
+  universal state (category open, `closed` null); `'focus'` and an absent `start` (a v1 event) both land
+  it at the workflow's own initial state — absence must mean focus, not a new default, or an additive
+  field would rewrite what every event before it meant. Mutation (`p.start === 'backlog'` →
+  `p.start !== 'focus'`) kills the "no start → focus" case, and only that case —
+  (`packages/domain/test/ticket-state.test.ts`)
+- **13.566** ✅ `ticket.closed` records `{ actorId, at }` from the envelope into `TicketState.closed`;
+  `ticket.reopened` clears it back to `null`; neither ever touches `stateId`. `TICKET_EVENT_TYPES` names
+  both, so every replay reader that iterates it folds them —
+  (`packages/domain/test/ticket-state.test.ts`)
+- **13.567** ✅ `ticketCreatedPayload` accepts `start: 'backlog' | 'focus'` and its absence, refuses any
+  other value; `ticketClosedPayload` and `ticketReopenedPayload` are `z.object({}).strict()` — an empty
+  claim accepted, an extra key refused; both event types are registered on the ticket entity at version 1
+  — (`packages/domain/test/ticket-events.test.ts`)

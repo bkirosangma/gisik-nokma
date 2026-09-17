@@ -45,6 +45,14 @@ export const ticketCreatedPayload = z.object({
     .string()
     .min(1)
     .refine((value) => value.trim() !== '', 'must not be blank — a title of only spaces names nothing'),
+  /**
+   * Where the ticket is born (spec §1.3): `'backlog'` — the universal state —
+   * or `'focus'` — the workflow's initial state. OPTIONAL, and ABSENT MEANS
+   * FOCUS: that is what every v1 event meant, and an additive field must not
+   * change the meaning of events written before it existed. The product's own
+   * client always sends it.
+   */
+  start: z.enum(['backlog', 'focus']).optional(),
 });
 
 export const ticketAssignedPayload = z.object({ assigneeId: z.string().min(1).nullable() });
@@ -159,4 +167,9 @@ export const ticketWorkflowReboundPayload = z.object({
   toWorkflowId: z.string().min(1),
   toStateId: z.string().min(1),
 });
+
+/** `ticket.closed` (spec §1.2) — the envelope carries actor and time; the payload says nothing. */
+export const ticketClosedPayload = z.object({}).strict();
+/** `ticket.reopened` (spec §1.2) — the explicit reopen; same empty payload. */
+export const ticketReopenedPayload = z.object({}).strict();
 

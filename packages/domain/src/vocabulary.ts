@@ -17,9 +17,11 @@ import {
   attachmentAddedPayload,
   commentAddedPayload,
   ticketAssignedPayload,
+  ticketClosedPayload,
   ticketCollaboratorPayload,
   ticketCreatedPayload,
   ticketFieldSetPayload,
+  ticketReopenedPayload,
   ticketReparentedPayload,
   ticketWorkflowReboundPayload,
 } from './events/ticket-events.js';
@@ -151,6 +153,26 @@ domainRegistry.register({
   version: 1,
   entityKind: 'ticket',
   payloadSchema: ticketWorkflowReboundPayload,
+});
+
+/**
+ * The closed flag's two events (backlog/closed spec §1.2, 2026-09-17). Neither
+ * moves `stateId` — `ticket-state.ts` folds them into `TicketState.closed`
+ * alone — but both are filed against the ticket whose flag they set, exactly
+ * as every other ticket claim is.
+ */
+domainRegistry.register({
+  type: 'ticket.closed',
+  version: 1,
+  entityKind: 'ticket',
+  payloadSchema: ticketClosedPayload,
+});
+
+domainRegistry.register({
+  type: 'ticket.reopened',
+  version: 1,
+  entityKind: 'ticket',
+  payloadSchema: ticketReopenedPayload,
 });
 
 domainRegistry.register({

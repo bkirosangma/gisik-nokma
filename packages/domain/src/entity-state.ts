@@ -36,6 +36,15 @@ export type TicketState = {
   collaboratorIds: string[];
   fields: Record<string, FieldClaim>;
   transitions: { toStateId: string; actorId: string; seq: number; workflowId: string; workflowVersion: number }[];
+  /**
+   * The closed flag (backlog/closed spec §1.2, 2026-09-17): set by
+   * `ticket.closed`, cleared by `ticket.reopened`, never touching `stateId`.
+   * OPTIONAL here, and only here, because 441 `TicketState` literals in tests
+   * across five packages predate it; every producer sets it (the reducer,
+   * `rowToTicketState`, the replica) and every reader spells
+   * `state.closed ?? null`. The wire types carry it required.
+   */
+  closed?: { actorId: string; at: string } | null;
 };
 
 export type MembershipState = {

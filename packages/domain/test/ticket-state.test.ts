@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { EventEnvelope } from '../src/envelope.js';
 import type { TicketState } from '../src/entity-state.js';
 import { makeEnvelope } from '../src/testing.js';
 import {
@@ -101,6 +102,59 @@ function createdState(): TicketState {
   );
 }
 
+/**
+ * The four building blocks 13.565/13.566 fold together, modelled on
+ * `createdState()` above: each builds one envelope rather than a folded
+ * state, so a test can chain several through `fold` without redoing the
+ * `applyTicketEvent` plumbing itself.
+ */
+function createdWith(payloadExtra: Record<string, unknown>): EventEnvelope {
+  return makeEnvelope({
+    type: 'ticket.created',
+    entity: { kind: 'ticket', id: TICKET },
+    payload: {
+      typeId: 'task',
+      projectId: PROJECT,
+      parentId: PARENT,
+      title: 'File the GST return',
+      ...payloadExtra,
+    },
+  });
+}
+
+function transitioned(to: string): EventEnvelope {
+  return makeEnvelope({
+    type: 'ticket.transitioned',
+    entity: { kind: 'ticket', id: TICKET },
+    payload: { to },
+  });
+}
+
+function closedEvent(): EventEnvelope {
+  return makeEnvelope({
+    type: 'ticket.closed',
+    entity: { kind: 'ticket', id: TICKET },
+    payload: {},
+  });
+}
+
+function reopenedEvent(): EventEnvelope {
+  return makeEnvelope({
+    type: 'ticket.reopened',
+    entity: { kind: 'ticket', id: TICKET },
+    payload: {},
+  });
+}
+
+/** Replays a list of envelopes through `applyTicketEvent` with this file's `deps`, oldest first. */
+function fold(events: EventEnvelope[]): TicketState {
+  let state: TicketState | undefined;
+  for (const env of events) {
+    state = applyTicketEvent(state, env, deps);
+  }
+  return state as TicketState;
+}
+
 describe('applyTicketEvent', () => {
   it('creation enters the workflow initial state and records the title as an attributed claim', () => {
     expect(createdState()).toEqual({
@@ -117,6 +171,7 @@ describe('applyTicketEvent', () => {
       assigneeId: null,
       collaboratorIds: [],
       transitions: [],
+      closed: null,
       fields: {
         title: {
           value: 'File the GST return',
@@ -509,7 +564,50 @@ describe('TICKET_EVENT_TYPES', () => {
     // ticket: a type's workflow binding changes what NEW tickets get, never
     // where an existing one sits.
     expect((TICKET_EVENT_TYPES as readonly string[]).includes('ticket-type.defined')).toBe(false);
-    expect(TICKET_EVENT_TYPES).toHaveLength(10);
+    // TWELVE of the FIFTEEN registered against entityKind 'ticket' (backlog/closed
+    // spec, 2026-09-17: 'ticket.closed' and 'ticket.reopened' joined the list —
+    // both move `closed`, so both belong here even though neither moves stateId).
+    expect(TICKET_EVENT_TYPES).toHaveLength(12);
+  });
+});
+
+/** 13.565 — born in the backlog, unless the client says focus; absence means focus (spec §1.3). */
+describe('13.565 ticket.created lands in backlog when start says so', () => {
+  it('start: "backlog" → the universal state, category open, closed null', () => {
+    const state = fold([createdWith({ start: 'backlog' })]);
+    expect(state.stateId).toBe('backlog');
+    expect(state.stateCategory).toBe('open');
+    expect(state.closed).toBeNull();
+    expect(state.transitions).toEqual([]);
+  });
+  it('start: "focus" → the workflow\'s initial state, as before', () => {
+    expect(fold([createdWith({ start: 'focus' })]).stateId).toBe('todo');
+  });
+  it('no start at all (a v1 event) → focus — the additive-field rule', () => {
+    expect(fold([createdWith({})]).stateId).toBe('todo');
+  });
+});
+
+/** 13.566 — the flag folds and unfolds; the state is untouched (spec §1.2). */
+describe('13.566 ticket.closed / ticket.reopened', () => {
+  it('closed records the actor and the server time; reopened clears it; stateId never moves', () => {
+    const closeEnv = closedEvent();
+    const closed = fold([createdWith({ start: 'focus' }), transitioned('doing'), transitioned('done'), closeEnv]);
+    expect(closed.closed).toEqual({ actorId: DEFAULT_ACTOR, at: closeEnv.serverTime });
+    expect(closed.stateId).toBe('done');
+    const reopened = fold([
+      createdWith({ start: 'focus' }),
+      transitioned('doing'),
+      transitioned('done'),
+      closeEnv,
+      reopenedEvent(),
+    ]);
+    expect(reopened.closed).toBeNull();
+    expect(reopened.stateId).toBe('done');
+  });
+  it('TICKET_EVENT_TYPES names both, so every replay reader that iterates it sees them', () => {
+    expect(TICKET_EVENT_TYPES).toContain('ticket.closed');
+    expect(TICKET_EVENT_TYPES).toContain('ticket.reopened');
   });
 });
 
