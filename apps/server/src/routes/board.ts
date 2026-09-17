@@ -1,9 +1,10 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
-import type {
-  BoardColumn,
-  BoardResponse,
-  PublishedWorkflowDef,
-  TicketCard,
+import {
+  BACKLOG_STATE_ID,
+  type BoardColumn,
+  type BoardResponse,
+  type PublishedWorkflowDef,
+  type TicketCard,
 } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
@@ -76,6 +77,21 @@ export const BOARD_NOT_FOUND_BODY = READ_NOT_FOUND_BODY;
  * workflow id read off a ticket row must not resolve out of a neighbouring
  * tenancy. Ids it does not know are ABSENT from the map, which is what sends
  * their tickets to the straggler pass below rather than dropping them.
+ *
+ * ## Backlog and closed tickets never reach this query (spec §3.2, 2026-09-17)
+ *
+ * `t.state_id <> BACKLOG_STATE_ID` (bound, not interpolated) and
+ * `t.closed_at IS NULL` are conjuncts beside the tenancy clause, not a filter
+ * applied to the assembled cards afterwards: a backlog or closed ticket is
+ * absent from `rows`
+ * before `assembleTicketCards` ever runs, so neither can be placed into a
+ * column, straggler or otherwise. The universal state has no place on a board
+ * that shows the states of workflows IN USE — `backlog` names no workflow's
+ * own state and `latestWorkflowDefs` never returns a definition that contains
+ * it — and a closed ticket is finished business the board's job is not to
+ * keep showing. See `appendStragglerColumns`'s own docblock for why the
+ * exclusion happening HERE is what makes a `stateId === 'backlog'` column
+ * provably impossible rather than merely unobserved.
  */
 export async function readBoard(
   db: Queryable,
@@ -87,12 +103,15 @@ export async function readBoard(
   const params = new SqlParams();
   const workspaceParam = params.add(workspaceId);
   const projectParam = params.add(projectId);
+  const backlogParam = params.add(BACKLOG_STATE_ID);
   const { rows } = await db.query<ProjTicketRow>(
     `SELECT ${PROJ_TICKET_COLUMNS}
        FROM proj_tickets t
        JOIN proj_visibility v ON v.ticket_id = t.ticket_id
       WHERE t.workspace_id = ${workspaceParam}
         AND t.project_id = ${projectParam}
+        AND t.state_id <> ${backlogParam}
+        AND t.closed_at IS NULL
         AND ${visibleTicketsWhere(eff, viewerId, params)}
       ORDER BY t.ticket_id`,
     params.toArray(),
@@ -148,6 +167,12 @@ export async function readBoard(
 /**
  * Cards whose `(workflow, state)` no published definition names, shown under a
  * column of their own rather than dropped.
+ *
+ * A `backlog` row can never reach here — `readBoard`'s WHERE excludes the
+ * universal state and closed rows before any bucketing (spec §3.2,
+ * 2026-09-17); this function's job is unchanged for every OTHER undeclared
+ * state, which is the whole reason the exclusion belongs in the SELECT rather
+ * than as a special case inside this loop.
  *
  * ## MEASURED: no test constrains this pass, and no seed at any layer can
  *

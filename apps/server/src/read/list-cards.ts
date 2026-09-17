@@ -1,4 +1,4 @@
-import type { ListCard, TicketCard } from '@gisik-nokma/domain';
+import { statesWithBacklog, type ListCard, type TicketCard } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { assignedProvenanceFor } from './assigned-provenance.js';
 import { restrictedParentsFor } from './restricted-parents.js';
@@ -89,7 +89,15 @@ export async function assembleListCards(
         `assembleListCards: no published definition of workflow ${row.workflow_id} at version ${row.workflow_version}, which ticket ${card.ticketId} is folded to — the ticket names a definition proj_workflows does not hold`,
       );
     }
-    const state = def.states.find((candidate) => candidate.id === card.stateId);
+    // `statesWithBacklog`, not `def.states`: `backlog` (backlog/closed spec
+    // §1.4/§3.2, 2026-09-17) is the universal state every workflow carries
+    // WITHOUT declaring it (`validate-workflow.ts` refuses a definition that
+    // tries to), so a list row sitting in it would find nothing in `def.states`
+    // and this would throw a false "ledger disagreement" for a perfectly
+    // ordinary backlog ticket. `statesWithBacklog` appends the one synthetic
+    // state (`id: 'backlog', name: 'Backlog', category: 'open'`) so the lookup
+    // succeeds the same way it does for a declared state.
+    const state = statesWithBacklog(def).find((candidate) => candidate.id === card.stateId);
     if (state === undefined) {
       throw new Error(
         `assembleListCards: workflow ${row.workflow_id}@${row.workflow_version} has no state ${card.stateId}, which ticket ${card.ticketId} is in — applyTicketEvent refuses a transition to a state its workflow does not carry, so this row did not come through it`,

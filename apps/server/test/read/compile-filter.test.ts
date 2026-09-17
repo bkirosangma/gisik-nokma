@@ -68,6 +68,28 @@ describe('compileFilterSpec — emitted SQL', () => {
     ]);
   });
 
+  it('13.578 compiles `closed: true` to IS NOT NULL, `closed: false` to IS NULL, and absent to no clause (backlog/closed spec §3.2, 2026-09-17)', () => {
+    const closedTrue = compileFilterSpec({ closed: true }, new SqlParams());
+    expect(closedTrue.clauses).toEqual(['t.closed_at IS NOT NULL']);
+    // No other table is reached, so unlike `blocked` this never needs the CTE.
+    expect(closedTrue.needsBlockedCte).toBe(false);
+
+    const closedFalse = compileFilterSpec({ closed: false }, new SqlParams());
+    expect(closedFalse.clauses).toEqual(['t.closed_at IS NULL']);
+    expect(closedFalse.needsBlockedCte).toBe(false);
+
+    // Absent means "every ticket, closed or not" — no clause at all, not a
+    // clause that happens to match everything.
+    const absent = compileFilterSpec({}, new SqlParams());
+    expect(absent.clauses).toEqual([]);
+
+    // No parameter is bound for either boolean: both compile to a literal
+    // column comparison, unlike every other term this file tests.
+    const params = new SqlParams();
+    compileFilterSpec({ closed: true }, params);
+    expect(params.toArray()).toEqual([]);
+  });
+
   it('joins the text term through proj_search FTS', () => {
     const params = new SqlParams();
     const { clauses } = compileFilterSpec({ text: 'GST portal' }, params);
@@ -113,6 +135,12 @@ describe('compileFilterSpec — emitted SQL', () => {
       { stateCategory: 'open' },
       { blocked: true },
       { blocked: false },
+      // `closed` (backlog/closed spec §3.2) reaches no other table — it is a
+      // plain comparison over `t` itself — so it belongs in this enumeration
+      // as a NON-reaching term, keeping this test's "enumerates every term"
+      // claim true rather than one clause short of it.
+      { closed: true },
+      { closed: false },
       { text: 'q' },
       { due: { before: '2026-08-31' } },
       { due: { after: '2026-08-01' } },

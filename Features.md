@@ -676,7 +676,9 @@ reason on record, not an oversight:*
   settled before one is written rather than after. Cards are `TicketCard`s, so each unfolds to
   who claimed its state and when by both clocks, and a parent carries its four-field rollup. The
   visibility filter is `visibleTicketsWhere` — the one SQL expression of the decision table, consumed
-  and not restated. `apps/server/src/routes/board.ts`
+  and not restated. **Never shows backlog or closed tickets (backlog/closed spec §3.2, 2026-09-17)** —
+  `t.state_id <> BACKLOG_STATE_ID` and `t.closed_at IS NULL` are bound conjuncts in the SELECT itself,
+  so neither can ever surface as a straggler column either. `apps/server/src/routes/board.ts`
 - ✅ **The board's door: 401, 404, 404, 200** — no session is `401 {error:'unauthenticated'}`; an
   unknown project id and a caller who is not a member of the project's workspace are both
   `404 {error:'not_found'}`, indistinguishable down to `content-length`, because a 403 would confirm
@@ -719,7 +721,11 @@ reason on record, not an oversight:*
   refused is a mirror an attacker can aim — **and they are answered AFTER the door**, reversing the
   plan's order so an unauthorised caller cannot exercise the parser at all. The 404 body is now the
   shared `READ_NOT_FOUND_BODY` beside `requireMember`, so the board's and the list's refusals are one
-  object rather than two literals identical by coincidence.
+  object rather than two literals identical by coincidence. **Unlike the board, the list CARRIES both
+  backlog and closed tickets and filters on it (backlog/closed spec §3.2/§3.3, 2026-09-17)** — a
+  backlog row's `stateName`/`stateCategory` resolve through `statesWithBacklog`, its `closed` is
+  `null`; `filterSpecSchema.closed` compiles through `compileFilterSpec` to `t.closed_at IS [NOT]
+  NULL`.
   `apps/server/src/routes/list.ts`, `apps/server/src/read/membership.ts`, `apps/server/src/app.ts`
 - ✅ **The builder read surface — `GET /v1/workspaces/:id/workflows`, `/workflows/:id`,
   `/ticket-types`, `/members`, `/workflows/:id/state-occupancy`, `/ticket-types/:id/population`** —

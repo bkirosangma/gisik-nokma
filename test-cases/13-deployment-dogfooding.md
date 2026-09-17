@@ -6252,3 +6252,44 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   from an open row `closed: null` — both assertions in the same call, so a reader that answered `null`
   unconditionally cannot pass the closed half (backlog/closed spec §3.1/§3.3, 2026-09-17) —
   (`apps/server/test/read/ticket-cards.test.ts`)
+- **13.574** ✅ The board excludes a backlog ticket AND a closed one — bound conjuncts in `readBoard`'s
+  own WHERE (`t.state_id <> BACKLOG_STATE_ID`, `t.closed_at IS NULL`), not a filter over the assembled
+  cards — so no column is ever `stateId: 'backlog'` and neither ticket is placed by any bucketing pass,
+  straggler included; a third, done-but-NOT-closed ticket is the positive control that the exclusion is
+  about `closed_at`, not about every terminal card. RED was a wrong straggler column
+  (`['todo','doing','waiting','done','backlog']`), not a missing assertion. Mutation (removing `AND
+  t.closed_at IS NULL`) reddens only the closed half, leaving the backlog exclusion intact — proving the
+  two conjuncts are independently load-bearing (backlog/closed spec §3.2, 2026-09-17) —
+  (`apps/server/test/routes/board.test.ts`)
+- **13.575** ✅ Unlike the board, the list CARRIES both a backlog and a closed ticket: the backlog row's
+  `stateName`/`stateCategory` resolve through `statesWithBacklog(def)` (`read/list-cards.ts`, previously
+  `def.states.find`, which throws "has no state 'backlog'" for a ticket that is not malformed at all —
+  RED was exactly that throw, a 500, before either filter term was even exercised) and its `closed` field
+  is `null`; the closed row's `closed` is `{ actorId, at }`. `filter: { closed: true }` answers only the
+  closed row; `filter: { closed: false }` answers only the backlog row, which is the positive control that
+  the narrowing is about the flag and not an empty project (backlog/closed spec §3.2/§3.3, 2026-09-17) —
+  (`apps/server/test/routes/list.test.ts`)
+- **13.576** ✅ `GET /v1/me/work`: a closed ticket assigned to the caller is in no group (`t.closed_at IS
+  NULL` bound beside the assignee clause AND beside `sharedWithMeRows`'s audience clause); a backlog
+  ticket assigned to them is in `open`, exactly where `bucketFor`'s existing switch already sends every
+  other open-category ticket — no new branch, no change to its "refuses a fourth value" contract.
+  DISCOVERED beyond the brief's named edits: `stateNamesFor`'s `def.states.find` throws "has no state
+  'backlog'" for the same reason 13.575's did, and RED was that throw (a 500) reached simply by seeding a
+  backlog ticket assigned to the caller — fixed the same way, `statesWithBacklog(def).find` —
+  (backlog/closed spec §1.4/§3.2, 2026-09-17) — (`apps/server/test/routes/my-work.test.ts`)
+- **13.577** ✅ `GET /v1/workspaces/:id/attention`: a closed ticket produces no item in any bucket, proven
+  against the one bucket that does not already exclude it by CATEGORY — `blocked` reads its flag "whatever
+  the category" (this route's own docblock), so the fixture is a workflow whose TERMINAL state is ALSO
+  flagged blocked; a ticket that reaches it and stays open is the positive control, still warning in the
+  same run as the one that reaches it and is closed. RED was the closed ticket's id present in the blocked
+  bucket (backlog/closed spec §3.2, 2026-09-17) — (`apps/server/test/routes/attention.test.ts`)
+- **13.578** ✅ `compileFilterSpec`: `{ closed: true }` compiles to `t.closed_at IS NOT NULL`, `{ closed:
+  false }` to `t.closed_at IS NULL`, absent to no clause — a plain conjunct over `t`, binding no parameter
+  and reaching no other table, so it is added to (not exempted from) "every clause that reaches another
+  table correlates on t.workspace_id"'s own enumeration as a non-reaching term, keeping that test's
+  "enumerates every term" claim true (backlog/closed spec §3.2, 2026-09-17) —
+  (`apps/server/test/read/compile-filter.test.ts`)
+- **13.579** ✅ `filterSpecSchema.closed` accepts a boolean and refuses a string; the NUL-slot count test's
+  own docblock is corrected from "the other four slots" to "the other five", naming `closed` beside
+  `blocked` as the boolean that needs no NUL guard (backlog/closed spec §3.2, 2026-09-17) —
+  (`packages/domain/test/filter-spec.test.ts`)

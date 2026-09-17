@@ -60,13 +60,21 @@ describe('filterSpecSchema', () => {
     expect(() => filterSpecSchema.parse({ blocked: 'true' })).toThrow();
   });
 
+  it('13.579 accepts `closed` as a boolean and refuses it as a string (backlog/closed spec §3.2, 2026-09-17)', () => {
+    expect(filterSpecSchema.parse({ closed: true })).toEqual({ closed: true });
+    expect(filterSpecSchema.parse({ closed: false })).toEqual({ closed: false });
+    expect(() => filterSpecSchema.parse({ closed: 'true' })).toThrow();
+    expect(() => filterSpecSchema.parse({ closed: 1 })).toThrow();
+  });
+
   /**
    * The NUL door. Seven slots take a free-form string; every one of them ends
    * up bound into a query, and Postgres text cannot carry U+0000. The other
-   * four slots need no guard and this test says why, so the count is defensible
-   * rather than inherited: `stateCategory` is an enum, `blocked` is a boolean,
-   * and `due.before`/`due.after` are `\d`-class regexes that no NUL can satisfy
-   * — asserted below rather than asserted about.
+   * five slots need no guard and this test says why, so the count is defensible
+   * rather than inherited: `stateCategory` is an enum, `blocked` and `closed`
+   * (backlog/closed spec §3.2, 2026-09-17) are booleans, and `due.before`/
+   * `due.after` are `\d`-class regexes that no NUL can satisfy — asserted below
+   * rather than asserted about.
    */
   const NUL = String.fromCharCode(0);
 

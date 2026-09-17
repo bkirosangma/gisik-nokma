@@ -120,6 +120,18 @@ function istDaysBetween(fromDay: string, toDay: string): number {
  * itself, CONSUMED rather than re-expressed; every card in every bucket comes
  * from it, so no bucket can be lengthened by a ticket the viewer cannot see.
  *
+ * ## Closed tickets need no attention (spec §3.2, 2026-09-17)
+ *
+ * `t.closed_at IS NULL` sits beside `visibleTicketsWhere` in the same query, so
+ * a closed ticket is absent from `cards` before any of the three buckets below
+ * run — not a fourth category the loops learn to skip. It is the one exclusion
+ * this route needed to add on purpose: **stale** and **due-soon** already
+ * exclude a closed ticket's usual resting state by CATEGORY (stale requires
+ * `active`, due-soon excludes `terminal`), but **blocked** reads the flag
+ * "whatever the category" — so a ticket closed while sitting in a
+ * blocked-flagged TERMINAL state is the one shape that would otherwise still
+ * warn about business that is finished.
+ *
  * ## What this deliberately costs
  *
  * It assembles a full card for every visible ticket in the workspace — including
@@ -167,6 +179,12 @@ export async function readAttention(
   const where = [
     `t.workspace_id = ${params.add(workspaceId)}`,
     visibleTicketsWhere(eff, viewerId, params),
+    // backlog/closed spec §3.2, 2026-09-17: a closed ticket needs no attention,
+    // whatever state it is closed in — including a BLOCKED-flagged one, which
+    // is the one bucket here that is not already excluded by category (stale
+    // and due-soon already skip non-active / terminal tickets below; blocked
+    // does not, "whatever the category", per this function's own docblock).
+    't.closed_at IS NULL',
   ];
   const { rows } = await db.query<ProjTicketRow>(
     `SELECT ${PROJ_TICKET_COLUMNS}

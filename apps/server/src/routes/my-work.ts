@@ -1,11 +1,12 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import { visibleProjects } from '../read/visible-projects.js';
-import type {
-  ContestedClaimView,
-  FieldClaim,
-  MyWorkResponse,
-  StateCategory,
-  TicketCard,
+import {
+  statesWithBacklog,
+  type ContestedClaimView,
+  type FieldClaim,
+  type MyWorkResponse,
+  type StateCategory,
+  type TicketCard,
 } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
@@ -97,6 +98,16 @@ import { canSee } from '../visibility/can-see.js';
  * `TZ`-varying test of this route could fail. Task 12's attention strip is where
  * that binds.
  *
+ * ## Closed tickets are gone from every group, and from `shared` (spec §3.2, 2026-09-17)
+ *
+ * `t.closed_at IS NULL` is bound beside the assignee clause in this query and
+ * beside the audience clause in `sharedWithMeRows`'s — a plain conjunct over
+ * `t`, not a category `bucketFor` learns to skip. A ticket somebody closed is
+ * finished business, and "my work" answers what is still open on it, whatever
+ * `state_category` it is folded to: `bucketFor`'s own "refuses a fourth value"
+ * contract is unchanged by this — `backlog` still buckets to `open` exactly as
+ * before, closed tickets simply never reach the bucketing at all.
+ *
  * ## EXTENSION POINT (Plan 10): what deliberately is NOT served here
  *
  * The spec's My Work also lists "my claims in transit" and "my contested
@@ -119,6 +130,11 @@ export async function readMyWork(
     `t.workspace_id = ${params.add(workspaceId)}`,
     `t.assignee_id = ${params.add(viewerId)}`,
     visibleTicketsWhere(eff, viewerId, params),
+    // backlog/closed spec §3.2, 2026-09-17: closed business is not "my work"
+    // any more, whatever category it is folded to. A plain conjunct over `t`,
+    // not a bucket this viewer's groups filter afterwards — a closed ticket
+    // never reaches `rows` at all.
+    't.closed_at IS NULL',
   ];
   const { rows } = await db.query<ProjTicketRow>(
     `SELECT ${PROJ_TICKET_COLUMNS}
@@ -225,6 +241,9 @@ async function sharedWithMeRows(
   const where = [
     `t.workspace_id = ${params.add(workspaceId)}`,
     explicitAudienceWhere(viewerId, params),
+    // Same rule as the assigned half (backlog/closed spec §3.2): a closed
+    // ticket handed to this viewer is not "shared with me" any more either.
+    't.closed_at IS NULL',
   ];
   const { rows } = await db.query<ProjTicketRow>(
     `SELECT ${PROJ_TICKET_COLUMNS}
@@ -395,6 +414,17 @@ function titleOf(fields: Record<string, FieldClaim> | null, ticketId: string): s
  *   transition to a state its workflow does not carry, so a row in one did not
  *   come through the door.
  *
+ * The lookup is `statesWithBacklog(def).find(...)`, not `def.states.find(...)`
+ * (backlog/closed spec §1.4, 2026-09-17; DISCOVERED beyond this task's brief,
+ * not one of its named edits): `backlog` is the universal state every workflow
+ * carries WITHOUT declaring it, so a ticket born `start: 'backlog'` and never
+ * moved has `row.state_id === 'backlog'` while `def.states` — the workflow's
+ * OWN authored list — never contains it (`validate-workflow.ts` refuses a
+ * definition that tries to declare it). Left as `def.states.find`, this throws
+ * "has no state 'backlog'" for a ticket that is not malformed at all; the
+ * throw above is for a REAL ledger disagreement and must not fire on an
+ * ordinary backlog ticket assigned to the caller.
+ *
  * Falling back to the state id would put a slug where a name goes, and omitting
  * the entry would be worse still: `WorkItem.stateName` is REQUIRED on the
  * client, so an absent key becomes a mapping failure one layer away from the
@@ -421,7 +451,7 @@ async function stateNamesFor(
         `readMyWork: no published definition of workflow ${row.workflow_id} at version ${row.workflow_version}, which ticket ${row.ticket_id} is folded to — the ticket names a definition proj_workflows does not hold`,
       );
     }
-    const state = def.states.find((candidate) => candidate.id === row.state_id);
+    const state = statesWithBacklog(def).find((candidate) => candidate.id === row.state_id);
     if (state === undefined) {
       throw new Error(
         `readMyWork: workflow ${row.workflow_id}@${row.workflow_version} has no state ${row.state_id}, which ticket ${row.ticket_id} is in — applyTicketEvent refuses a transition to a state its workflow does not carry, so this row did not come through it`,

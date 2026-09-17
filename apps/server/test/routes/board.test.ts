@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { newUlid, type BoardResponse } from '@gisik-nokma/domain';
+import { newUlid, type BoardResponse, type LedgerEvent } from '@gisik-nokma/domain';
 import { UNAUTHENTICATED_BODY } from '../../src/auth/require-session.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -405,5 +405,103 @@ describe('GET /v1/projects/:projectId/board — the door', () => {
     });
     expect(forged.statusCode).toBe(401);
     expect(forged.json()).toEqual(UNAUTHENTICATED_BODY);
+  });
+});
+
+/**
+ * 13.574 (backlog/closed spec §3.2, 2026-09-17) — the board excludes both a
+ * backlog ticket and a closed one, at the SELECT rather than at the bucketing
+ * pass below it.
+ *
+ * A PROJECT OF ITS OWN, exactly for the reason `SiblingProject`'s docblock
+ * gives for existing at all: `read.world.projectId`'s four exact-array
+ * assertions above ("cards sit under their own state" et al.) are a fixture
+ * this file already spends its own docblock arguing for, and a ticket added to
+ * that project would change what those cases measure. This project reuses the
+ * workspace's own `wf-errands` workflow and `task` type rather than defining
+ * new ones — nothing about backlog/closed exclusion depends on a second
+ * workflow, which is `SiblingProject`'s reason to exist, not this one's.
+ */
+describe('GET /v1/projects/:projectId/board — backlog and closed (owner request, 2026-09-17)', () => {
+  let backlogClosedProjectId: string;
+  let backlogTicketId: string;
+  let closedTicketId: string;
+  let openDoneTicketId: string;
+
+  beforeAll(async () => {
+    backlogClosedProjectId = newUlid();
+    backlogTicketId = newUlid();
+    closedTicketId = newUlid();
+    openDoneTicketId = newUlid();
+    const ws = { workspaceId: read.world.workspaceId, actorId: read.world.owner };
+
+    const events: LedgerEvent[] = [
+      makeCommitted({ ...ws, entity: { kind: 'project', id: backlogClosedProjectId }, type: 'project.created', payload: { name: 'Backlog and closed' } }),
+      makeCommitted({ ...ws, entity: { kind: 'project', id: backlogClosedProjectId }, type: 'project.member_added', payload: { userId: read.world.owner, projectAdmin: true } }),
+      makeCommitted({ ...ws, entity: { kind: 'project', id: backlogClosedProjectId }, type: 'project.member_added', payload: { userId: read.world.member, projectAdmin: false } }),
+
+      // Born in the universal state, never moved. `start: 'backlog'` is the
+      // spec's own wire shape (§1.3) — this is not a ticket ANY transition put
+      // here, it is what "born parked" means.
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: backlogTicketId },
+        type: 'ticket.created',
+        payload: { typeId: 'task', projectId: backlogClosedProjectId, parentId: null, title: 'Born in backlog', start: 'backlog' },
+      }),
+
+      // Reaches a terminal state, THEN closed — the realistic path a real
+      // close follows (the engine's own precondition, bypassed by
+      // `applyCommitted` but seeded anyway so this fixture is a fact about the
+      // product rather than an artifact of the shortcut).
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: closedTicketId },
+        type: 'ticket.created',
+        payload: { typeId: 'task', projectId: backlogClosedProjectId, parentId: null, title: 'Finished and closed' },
+      }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: closedTicketId }, type: 'ticket.transitioned', payload: { to: 'done' } }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: closedTicketId }, type: 'ticket.closed', payload: {} }),
+
+      // The POSITIVE CONTROL: terminal, like the ticket above, but never
+      // closed. Without it, an implementation that excluded every `done` card
+      // (not only closed ones) would still pass every assertion below.
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: openDoneTicketId },
+        type: 'ticket.created',
+        payload: { typeId: 'task', projectId: backlogClosedProjectId, parentId: null, title: 'Finished, still open' },
+      }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: openDoneTicketId }, type: 'ticket.transitioned', payload: { to: 'done' } }),
+    ];
+    await applyCommitted(db.pool, events);
+  }, 60_000);
+
+  it('13.574 neither the backlog ticket nor the closed one appears in any column, no column is stateId `backlog`, and a done-but-not-closed ticket still sits in `done`', async () => {
+    // The positive controls the row itself carries, read back before the board
+    // is asked anything: a board that answered correctly by accident (an
+    // empty board, say) must not be mistaken for one that excluded these rows
+    // on purpose.
+    const rows = await db.pool.query<{ ticket_id: string; state_id: string; state_category: string; closed_at: Date | null }>(
+      'SELECT ticket_id, state_id, state_category, closed_at FROM proj_tickets WHERE ticket_id = ANY ($1::text[])',
+      [[backlogTicketId, closedTicketId, openDoneTicketId]],
+    );
+    const byId = new Map(rows.rows.map((row) => [row.ticket_id, row]));
+    expect(byId.get(backlogTicketId)).toMatchObject({ state_id: 'backlog', state_category: 'open' });
+    expect(byId.get(closedTicketId)?.closed_at).not.toBeNull();
+    expect(byId.get(openDoneTicketId)).toMatchObject({ state_id: 'done', state_category: 'terminal' });
+    expect(byId.get(openDoneTicketId)?.closed_at).toBeNull();
+
+    const board = await boardOf('owner', backlogClosedProjectId);
+    expect(board.columns.map((c) => c.stateId)).toEqual(['todo', 'doing', 'waiting', 'done']);
+    expect(board.columns.some((c) => c.stateId === 'backlog')).toBe(false);
+
+    expect(cardIds(board)).not.toContain(backlogTicketId);
+    expect(cardIds(board)).not.toContain(closedTicketId);
+    // The done-but-not-closed ticket is the reason the two absences above mean
+    // "backlog/closed excluded" rather than "this board shows nothing".
+    expect(cardIds(board)).toContain(openDoneTicketId);
+    const done = board.columns.find((c) => c.stateId === 'done');
+    expect(done?.cards.map((card) => card.ticketId)).toEqual([openDoneTicketId]);
   });
 });
