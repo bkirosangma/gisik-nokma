@@ -6379,11 +6379,18 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   (`disabled={closed !== null}`), and shows the sentence "Closed — reopen it first" beside it as a
   `<span className="gn-sheet__closed-note">` — TEXT, never a `title=` tooltip (spec §5.3). Clicking Reopen
   ingests exactly one `ticket.reopened` with `payload {}`. The badge reuses `Chip` tone `terminal`
-  (`packages/ui/src/components/chip.tsx`) rather than a bespoke swatch — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+  (`packages/ui/src/components/chip.tsx`) rather than a bespoke swatch. The fixture's `closed.at` is
+  `19:00 UTC` — a DISCRIMINATING instant (same technique as the history-tab battery's `18:30 UTC` → `17
+  Aug`): it crosses midnight under `+05:30` to `21 Aug`, one day past its own UTC date, so the assertion
+  can tell `formatDate`/`formatIstInstant` apart from a same-day UTC slice that would print the wrong date
+  identically to the right one on a non-discriminating instant — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
 - **13.587** ✅ A non-terminal ticket shows neither **Close** nor **Reopen** — the two buttons' gates
   (`stateCategory === 'terminal' && closed === null`, and `closed !== null`) both read false for an active
   or open ticket, so this sheet offers no closing affordance at all outside a terminal state
-  (backlog/closed spec §5.3, 2026-09-17) — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+  (backlog/closed spec §5.3, 2026-09-17). Mutation (dropping `state.stateCategory === 'terminal' &&` from
+  the Close gate, `cp`/`sha256sum` restore): kills exactly this case (**Close** now renders on the
+  non-terminal fixture) and no other in the file — 13.585/13.586/13.588 stay green — proving the negative
+  assertion is not vacuous — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
 - **13.588** ✅ A refused `ticket.closed` (answered `refused` with rule `close-requires-terminal`, the
   rule-engine id from spec §2's table) renders its rule and reason VERBATIM in the sheet's refusal slot —
   carried without paraphrase, the same invariant `submitTransition`'s own refusal handling holds. The slot

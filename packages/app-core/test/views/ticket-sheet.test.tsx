@@ -873,7 +873,13 @@ describe('TicketSheet — Close, Reopen and the badge (backlog/closed spec §5.3
       ticket: ticketStateSeed({
         stateId: 'done',
         stateCategory: 'terminal',
-        closed: { actorId: 'user_anselma', at: '2026-08-20T10:00:00.000Z' },
+        // 19:00 UTC crosses midnight under +05:30 (00:30 IST, 21 Aug) — a
+        // DISCRIMINATING instant, the same technique the history-tab battery
+        // above uses (`clientTime: '2026-08-16T18:30:00.000Z'` → '17 Aug
+        // 2026'). A same-day UTC instant would print the same date through a
+        // naive UTC slice as through the real `formatDate`/`formatIstInstant`
+        // path, so it would prove nothing about WHICH renderer ran.
+        closed: { actorId: 'user_anselma', at: '2026-08-20T19:00:00.000Z' },
       }),
     });
     const source = sheetSource(read);
@@ -884,8 +890,10 @@ describe('TicketSheet — Close, Reopen and the badge (backlog/closed spec §5.3
     expect(within(stateRow()).queryByRole('button', { name: 'Close' })).toBeNull();
     // The roster resolves the name through the SAME `actorLabel` join every
     // other claim in this sheet goes through; the date is the one IST
-    // formatter (`formatDate`), never a raw ISO slice.
-    expect(screen.getByText('Closed by Anselma Marak on 20 Aug 2026')).toBeInTheDocument();
+    // formatter (`formatDate`), never a raw ISO slice — the 21 Aug date below
+    // is one calendar day past the event's own UTC date for exactly that
+    // reason.
+    expect(screen.getByText('Closed by Anselma Marak on 21 Aug 2026')).toBeInTheDocument();
     expect(within(stateRow()).getByRole('button', { name: 'Move…' })).toBeDisabled();
     const note = screen.getByText('Closed — reopen it first');
     expect(note.className).toBe('gn-sheet__closed-note');
