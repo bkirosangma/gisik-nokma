@@ -1143,6 +1143,21 @@ function MoveArrows({
    * server did not answer this close." and "We could not reach the server
    * for this close — …", the same word substitution `ticket-sheet.tsx` made
    * for its own "this change."
+   *
+   * **Deliberately does NOT `setRefusal(null)`.** `refusal` is `attemptMove`'s
+   * own client-side `MoveRefusalNotice` state (an undeclared arrow/drop
+   * target), and there IS one live path that could leave it stale under a
+   * successful close: a drop onto an undeclared column (drops stay live on a
+   * terminal card — `draggable` is gated on `arrows !== null`, not on
+   * category) sets `refusal`, and a Close click straight after it never
+   * touches that state on its way to `committed`. Left alone on purpose,
+   * matching `submitDirect` itself — which clears `serverRefusal`/
+   * `transportError` on success but never `refusal` either, for cross-arrow
+   * clicks today — rather than giving `closeCard` alone a clearing Ruling 34
+   * never asked for. The reload `moves.onMoved()` triggers removes the whole
+   * card as soon as it lands, which is what actually resolves the stale
+   * notice; a `setRefusal(null)` here would only shorten a window that is
+   * already closed by the refetch, not fix a persisting one.
    */
   const closeCard = async (): Promise<void> => {
     setSubmitting(true);
