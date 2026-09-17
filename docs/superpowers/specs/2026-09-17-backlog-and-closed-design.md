@@ -148,6 +148,15 @@ exception applies — pinned by a test that fails if the field is ever
 omitted. The reducer: `start === 'backlog'` → `BACKLOG_STATE`; otherwise
 `wf.initialStateId` as today. No state migration (§3.4).
 
+MCP's `create_ticket` tool is a SECOND production producer of `ticket.created`
+(amended 2026-09-17, see Amendments — Ruling 51): it carries the identical
+optional `start` argument under the identical additive-field rule, but its
+own default is `'backlog'` rather than the schema's silent focus — an
+assistant-created ticket lands where every other creation path's default
+lands unless the caller names `'focus'` explicitly, and the argument's
+absence still sends an explicit `start: 'backlog'` on the wire, never an
+absent key.
+
 ### 1.4 The fold on republish
 
 `foldTicketToWorkflowVersion` treats `BACKLOG_STATE_ID` as never dropped: a
@@ -309,9 +318,11 @@ show a closed badge — they are never closed.
 ### 5.4 New ticket
 
 The dialog states "Starts in the backlog" under the title field. The only
-creation path in the product is this dialog (there is no create-from-sheet
-affordance — checked, not assumed), so the in-focus exception keys on the
-PARENT CHOSEN IN THE DIALOG: when the selected parent is in focus
+creation path in the WEB CLIENT is this dialog (there is no create-from-sheet
+affordance — checked, not assumed); MCP's `create_ticket` tool is a second,
+independent creation path with its own default (§1.3) (amended 2026-09-17,
+see Amendments — Ruling 51). Within the dialog, the in-focus exception keys
+on the PARENT CHOSEN IN THE DIALOG: when the selected parent is in focus
 (`stateId !== 'backlog'` AND not closed), a checkbox "Start in focus" appears,
 checked by default, and sets `start: 'focus'`; with no parent, or a backlog
 or closed parent, there is no checkbox — backlog, always.
@@ -511,7 +522,7 @@ Rulings 1–30 belong to earlier, unrelated plans (`board-prototype-port`,
 `filter-exclude-all-tabs`) and are recorded in their own specs. This
 section starts from this plan's own controller rulings — the unnumbered
 Task 1/3/4/6 ones, then the numbered series a same-day coordinator picked
-up starting at 31 (30 was the prior plan's own last number). Six body
+up starting at 31 (30 was the prior plan's own last number). Seven body
 sentences are rewritten above, each marked "(amended 2026-09-17, see
 Amendments)": §2's hierarchy-reopen-offer paragraph (Ruling 39), §5.1's
 Start description (Ruling 41 — the brief's own dispatch text called this
@@ -519,11 +530,13 @@ Start description (Ruling 41 — the brief's own dispatch text called this
 re-reading the spec rather than trusting the section number), §5.3's
 Close/Reopen bullets and dismiss-control bullet (Rulings 31–34), §5.4's
 "checked by default" sentence (Ruling 40), §5.5's Calendar/Timeline bullet
-(Ruling 44), and §1.2/§6's replica-backfill-list sentences (Ruling 5 itself
+(Ruling 44), §1.2/§6's replica-backfill-list sentences (Ruling 5 itself
 — found stale by the final whole-branch review's Finding 6, 2026-09-17: the
 appendix's own "five rewritten" count had missed that its OWN Ruling 5 was
 one of the sentences requiring a body rewrite, not only an additive
-amendment). Every other ruling here is additive and did not require a body
+amendment), and §1.3/§5.4's creation-path sentences naming MCP as a second
+producer (Ruling 51, Finding 4, final whole-branch review fix wave B,
+2026-09-17). Every other ruling here is additive and did not require a body
 rewrite.
 
 1. **Wildcard edges never resolve FROM backlog (Task 1 ruling).** §1.1's
@@ -780,6 +793,54 @@ rewrite.
     re-stating it every time. Not a design ruling; recorded here because
     the brief asks for every ledger item, and this is one of the two
     recurring non-numbered ones with no natural home elsewhere.
+
+25. **Amendment — Ruling 51 (Finding 4, final whole-branch review, fix wave
+    B, 2026-09-17): MCP names a second creation path, and defaults it to
+    backlog.** `create_ticket` (`packages/mcp-server/src/tools/write-tools.ts`)
+    is a second production producer of `ticket.created` beside the web
+    dialog (§5.4's own list), and it sent no `start` at all — the additive-
+    field rule then read that silence as focus, so an assistant-created
+    ticket landed on the board instead of the backlog every other creation
+    path defaults to. Resolution: the tool's input schema gains an optional
+    `start: 'backlog' | 'focus'`, and the payload it sends is `start: a.start
+    ?? 'backlog'` — an explicit key on the wire either way, never an absent
+    one. §1.3 and §5.4 are amended in place to name MCP as this second path.
+    Cost if wrong: a client that relied on the old silent-focus behaviour
+    would need to pass `start: 'focus'` explicitly — none exists (checked:
+    the dev seeds under `apps/server/src/seed/*` are not a production path
+    and are deliberately left unchanged; they populate boards on purpose).
+    Where it lives: `packages/mcp-server/src/tools/write-tools.ts`, case
+    13.607.
+
+26. **Amendment — Ruling 52 (Finding 2, same review, same wave): a parked
+    ticket carries as parked through a bulk migration; Amendment 3 still
+    stands for everything else.** Two half-fixes, one owner ruling: (a) the
+    bulk rebind route's occupied-state check
+    (`apps/server/src/routes/builder-reads.ts`) treats a `backlog` row as
+    implicitly mapped to the universal Backlog state regardless of the
+    caller's `stateMap` — which cannot express a backlog destination at all,
+    since it is built from the source workflow's own DECLARED states (spec
+    §1.1) — so a type holding even one parked ticket is no longer an
+    unconditional `migration.unmapped-state` with no map able to answer it.
+    (b) `checkTicketWorkflowRebound`
+    (`packages/rule-engine/src/checks/workflow-rebind.ts:106`) accepts
+    `toStateId: 'backlog'` when, and only when, the ticket's OWN current
+    `stateId` is already `'backlog'` — parked-to-parked, never a declared
+    state rebinding INTO backlog. Amendment 3's rule — "a rebind is defined
+    as landing a ticket in a DECLARED state of the target workflow; parking
+    it is a separate Send-to-backlog move afterward" — is UNCHANGED for a
+    ticket that is not already parked; this is a narrow carve-out for the one
+    case Amendment 3 could not have anticipated (that this same plan makes
+    backlog the birth state of nearly every ticket, so "a type in use" and "a
+    type with a parked ticket" became close to the same set). `stateCategoryOf`
+    is backlog-aware (`statesWithBacklog`), so the reducer's existing
+    `ticket.workflow_rebound` fold needed no change to hand a backlog target
+    the category `open` it already gives every other backlog-resident ticket.
+    Cost if wrong: none identified — the dialog itself is unchanged, so this
+    only ever fires through the route or a hand-built event. Where it lives:
+    `apps/server/src/routes/builder-reads.ts`,
+    `packages/rule-engine/src/checks/workflow-rebind.ts:106`, cases 13.605
+    (engine), 13.606 (server).
 
 ### Follow-ons named during execution
 

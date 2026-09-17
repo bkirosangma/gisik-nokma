@@ -7058,3 +7058,57 @@ ticket sheet" bullet describes `TicketSheet` reading `state.closed ?? null`
 "off the read it already holds," true of either data source and never
 false at the mapper layer 13.603 fixes, so it needed no hedge and needs no
 un-hedge now.
+
+
+**Final whole-branch review, fix wave B (2026-09-17) — Findings 2 and 4
+(the engine/server half of the review's Finding 2 and 4; Finding 5's
+engine/server/validator fixes land in this wave's second commit).**
+
+- **13.605** ✅ Ruling 52(b), Finding 2 (2026-09-17) — `checkTicketWorkflowRebound`
+  (`packages/rule-engine/src/checks/workflow-rebind.ts:106`) refused
+  `toStateId: 'backlog'` unconditionally, because `target.states` never
+  contains backlog (universal, never declared — spec §1.1) — for a ticket
+  ALREADY parked as much as for one that was not, which is what made the
+  bulk migration route (13.606) a dead end for any type holding a parked
+  ticket. Fix: accept `toStateId === 'backlog'` iff the ticket's CURRENT
+  `stateId` is also `'backlog'` — parked-to-parked, never a declared state
+  mapped INTO backlog. Two cases pin both halves: a ticket already parked
+  (folded onto `stateId: 'backlog'` by a prior `ticket.transitioned {to:
+  'backlog'}`, the universal Send-to-backlog edge) rebinding onto
+  `wf-ops`'s backlog commits; a ticket on `wf-basic`'s own `todo` (not
+  parked) rebinding onto the identical `toStateId: 'backlog'` still refuses
+  `ticket.rebound-unknown-state`, proving Amendment 3 stands for the case it
+  was written for and this is a narrow carve-out, not a general loosening —
+  (`packages/rule-engine/test/workflow-rebind.test.ts`)
+- **13.606** ✅ Ruling 52(a), Finding 2 (2026-09-17) — the bulk rebind route's
+  occupied-state check (`apps/server/src/routes/builder-reads.ts`) filtered
+  `unmapped` states with `!stateMap.has(stateId)` alone, so a `backlog` row
+  — a state the dialog's own `stateMap` is built from `fromWorkflow.states`
+  only and therefore can NEVER name — was an unconditional
+  `migration.unmapped-state` for any type holding one, with no map the
+  caller could ever have sent to answer it. Fix: the occupied-state check
+  now skips `BACKLOG_STATE_ID`, and the emit loop sends `toStateId:
+  BACKLOG_STATE_ID` for a parked row regardless of what (if anything)
+  `stateMap` names for it. Own workflow pair, type and two tickets seeded
+  (one on a declared state, one parked via `ticket.transitioned {to:
+  'backlog'}`) in the 7.88/7.89 shape: a COMPLETE map of the source
+  workflow's own declared states does not refuse `migration.unmapped-state`,
+  both tickets commit (`count: 2`), and `proj_tickets` shows the parked
+  ticket on the NEW workflow with `state_id = 'backlog'` while the other
+  lands on its mapped declared state —
+  (`apps/server/test/routes/builder-reads.test.ts`)
+- **13.607** ✅ Ruling 51, Finding 4 (2026-09-17) — MCP's `create_ticket`
+  (`packages/mcp-server/src/tools/write-tools.ts`) sent no `start` at all, so
+  the domain's additive-field rule read that silence as focus and an
+  assistant-created ticket landed on the board instead of the backlog every
+  other creation path defaults to (spec §1.3/§5.4, amended to name MCP as a
+  second creation path). Fix: the tool's input schema gains an optional
+  `start: 'backlog' | 'focus'`, and the payload always sends `start: a.start
+  ?? 'backlog'` — an explicit key either way, never an absent one, mirroring
+  the discipline `parentId` (13.593a's neighbour, 14.71) already gets. Two
+  assertions in one case: the argument's absence still emits `start:
+  'backlog'` as an OWN property (`Object.hasOwn`, not merely
+  `!== undefined`); naming `'focus'` gets exactly that back, unchanged. Dev
+  seeds under `apps/server/src/seed/*` are unaffected — deliberately: they
+  populate boards on purpose and are not a production creation path —
+  (`packages/mcp-server/test/write-tools.test.ts`)

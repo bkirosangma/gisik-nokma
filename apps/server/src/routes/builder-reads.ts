@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandler } from 'fastify';
 import { z } from 'zod';
-import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
+import { BACKLOG_STATE_ID, newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import type {
   MemberListResponse,
   MigrationOutcome,
@@ -755,13 +755,23 @@ export function registerBuilderReadRoutes(
         [workspaceId, typeId, fromWorkflowId],
       );
 
-      // Every OCCUPIED state needs a target. Occupancy is read from the tickets
-      // actually being moved rather than from the source definition, so a state
-      // the definition still carries but nobody is in does not have to be
-      // mapped, and a state the definition no longer carries but somebody IS in
-      // still does. The dialog's contract is about work, not about shapes.
+      // Every OCCUPIED state needs a target — EXCEPT `backlog`, which the
+      // dialog can never map: `stateMap` is built from `fromWorkflow.states`
+      // only (spec §1.1, backlog is never one of those), so a type holding
+      // even one parked ticket was an unconditional `unmappedState` before
+      // this exception existed, and there was no map the caller could have
+      // sent to answer it (Amendment 3 forbids mapping anything INTO backlog,
+      // so it is not merely unshowable — it is unmappable). Ruling 52(a),
+      // Finding 2 (final whole-branch review, 2026-09-17): parked means
+      // parked, so a `backlog` row is implicitly mapped to `BACKLOG_STATE_ID`
+      // on every migration, the dialog unchanged. Every OTHER occupied state
+      // is read from the tickets actually being moved rather than from the
+      // source definition, so a state the definition still carries but nobody
+      // is in does not have to be mapped, and a state the definition no
+      // longer carries but somebody IS in still does. The dialog's contract
+      // is about work, not about shapes.
       const unmapped = [...new Set(tickets.map((row) => row.state_id))]
-        .filter((stateId) => !stateMap.has(stateId))
+        .filter((stateId) => stateId !== BACKLOG_STATE_ID && !stateMap.has(stateId))
         .sort();
       if (unmapped[0] !== undefined) {
         return refuse(
@@ -771,16 +781,28 @@ export function registerBuilderReadRoutes(
         );
       }
 
+      /**
+       * `stateMap.get(row.state_id)` for every row EXCEPT a parked one, which
+       * always lands on `BACKLOG_STATE_ID` regardless of what (if anything)
+       * `stateMap` names for it — the caller's map cannot express a backlog
+       * destination at all (it is built from declared states only), so
+       * reading it here would be asking a question the map was never able to
+       * answer.
+       */
+      function toStateIdFor(row: { state_id: string }): string {
+        return row.state_id === BACKLOG_STATE_ID ? BACKLOG_STATE_ID : (stateMap.get(row.state_id) as string);
+      }
+
       const events: SubmittedEvent[] = tickets.map((row) => ({
         id: newUlid(),
         workspaceId,
         entity: { kind: 'ticket', id: row.ticket_id },
         type: 'ticket.workflow_rebound',
         version: 1,
-        // `stateMap.get(row.state_id)` is defined for every row — the unmapped
-        // check above is what makes that true, and it is asked over these exact
-        // rows with the same own-key lookup this line uses.
-        payload: { toWorkflowId, toStateId: stateMap.get(row.state_id) },
+        // `toStateIdFor(row)` is defined for every row — the unmapped check
+        // above is what makes that true for a declared state, and the
+        // backlog exception makes it true for a parked one.
+        payload: { toWorkflowId, toStateId: toStateIdFor(row) },
         actorId: request.currentUserId,
         // envelope-origin `'web'`: a person's claim that they migrated this
         // type, not the server's own record. The gate refuses a client-submitted

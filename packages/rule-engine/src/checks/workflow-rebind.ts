@@ -1,5 +1,5 @@
 import type { EventEnvelope } from '@gisik-nokma/domain';
-import { ticketWorkflowReboundPayload } from '@gisik-nokma/domain';
+import { BACKLOG_STATE_ID, ticketWorkflowReboundPayload } from '@gisik-nokma/domain';
 import type { Accept, EngineContext, Refusal } from '../engine.js';
 import { REFUSAL_RULES, malformedPayloadDetail } from '../refusal-rules.js';
 import { getTicketState } from './context-helpers.js';
@@ -103,7 +103,30 @@ export async function checkTicketWorkflowRebound(
   // "The ledger accepts only what it can later replay" (spec §3): the reducer
   // throws on a rebound whose destination state the target workflow does not
   // have (`ticket-state.ts:229-232`), so an accepted one would be unprojectable.
-  if (!target.states.some((state) => state.id === p.toStateId)) {
+  //
+  // Ruling 52(b), Finding 2 (final whole-branch review, 2026-09-17): ONE
+  // exception, and it is narrower than it looks. `target.states` never
+  // contains backlog (it is universal, never declared — spec §1.1), so a
+  // bare `.some()` here refuses `toStateId: 'backlog'` unconditionally,
+  // which is Amendment 3's own rule: "a rebind is defined as landing a
+  // ticket in a DECLARED state of the target workflow; parking it is a
+  // separate Send-to-backlog move afterward". That rule still stands for a
+  // ticket that is NOT already parked — accepting it there would let a
+  // rebind do the one thing Amendment 3 was written to keep a two-step
+  // operation. What it cannot answer is the bulk migration route's own
+  // case (Finding 2): a ticket ALREADY sitting in backlog has nowhere legal
+  // to go under Amendment 3's rule at all, because backlog is not a
+  // "declared state of the target workflow" for ANY target — every
+  // migration of a type with a parked ticket was an unconditional dead end.
+  // Parked means parked: backlog → backlog is accepted, on the ticket's own
+  // CURRENT state, never on the payload alone — a declared active or open
+  // state mapped INTO backlog is still refused below, exactly as Amendment
+  // 3 says.
+  if (p.toStateId === BACKLOG_STATE_ID) {
+    if (ticket.stateId !== BACKLOG_STATE_ID) {
+      return refuse('ticket.rebound-unknown-state', reboundUnknownStateRefusal(target.name, p.toStateId, ticket.id));
+    }
+  } else if (!target.states.some((state) => state.id === p.toStateId)) {
     return refuse('ticket.rebound-unknown-state', reboundUnknownStateRefusal(target.name, p.toStateId, ticket.id));
   }
 

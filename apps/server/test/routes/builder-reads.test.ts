@@ -1181,3 +1181,158 @@ describe('GET …/state-occupancy — a state id that is an ACCESSOR on Object.p
     expect(await ledgerRows()).toBe(before);
   });
 });
+
+/**
+ * Ruling 52(a), Finding 2 (final whole-branch review, 2026-09-17): the
+ * occupied-state check used to demand a target for EVERY occupied state,
+ * `backlog` included — but the dialog builds `stateMap` from
+ * `fromWorkflow.states` only (spec §1.1: backlog is never one of those), so a
+ * type holding even one parked ticket was an unconditional
+ * `migration.unmapped-state` with no map the caller could ever have sent to
+ * answer it (Amendment 3 forbids mapping anything INTO backlog). Since this
+ * plan makes backlog the birth state of every new ticket, that made the bulk
+ * rebind a dead end for almost any type actually in use.
+ *
+ * Own workflow pair and type, in the 7.88/7.89 shape, so this case does not
+ * depend on `chore`/`task`'s existing populations and can seed a ticket that
+ * is genuinely parked (`ticket.created` then `ticket.transitioned {to:
+ * 'backlog'}`, the universal Send-to-backlog edge from a non-terminal
+ * declared state).
+ */
+describe('POST …/migrate — a parked (backlog) row carries across as parked (Ruling 52a)', () => {
+  it('13.606 a complete DECLARED-state map does not refuse migration.unmapped-state over a backlog row, and the parked ticket lands in backlog on the new workflow', async () => {
+    const workflowId = 'wf-park-src';
+    const targetWorkflowId = 'wf-park-dst';
+    const typeId = 'park-type';
+    const activeTicketId = newUlid();
+    const parkedTicketId = newUlid();
+    const { rows: seqRows } = await db.pool.query<{ ws_seq: number | null }>(
+      'SELECT max(workspace_seq) AS ws_seq FROM events WHERE workspace_id = $1',
+      [read.world.workspaceId],
+    );
+    let workspaceSeq = (seqRows[0]?.ws_seq ?? 0) + 1;
+    const ws = { workspaceId: read.world.workspaceId, actorId: read.userIds.owner };
+    const next = (): number => workspaceSeq++;
+
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'workflow', id: workflowId },
+        type: 'workflow.defined',
+        workspaceSeq: next(),
+        payload: {
+          id: workflowId,
+          version: 1,
+          name: 'Park source',
+          initialStateId: 'todo',
+          states: [
+            { id: 'todo', name: 'To do', category: 'open' },
+            { id: 'doing', name: 'Doing', category: 'active' },
+            { id: 'done', name: 'Done', category: 'terminal' },
+          ],
+          transitions: [
+            { from: '*', to: 'todo', rules: [] },
+            { from: '*', to: 'doing', rules: [] },
+            { from: '*', to: 'done', rules: [] },
+          ],
+        },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'workflow', id: targetWorkflowId },
+        type: 'workflow.defined',
+        workspaceSeq: next(),
+        payload: {
+          id: targetWorkflowId,
+          version: 1,
+          name: 'Park destination',
+          initialStateId: 'todo2',
+          states: [
+            { id: 'todo2', name: 'To do', category: 'open' },
+            { id: 'doing2', name: 'Doing', category: 'active' },
+            { id: 'done2', name: 'Done', category: 'terminal' },
+          ],
+          transitions: [
+            { from: '*', to: 'todo2', rules: [] },
+            { from: '*', to: 'doing2', rules: [] },
+            { from: '*', to: 'done2', rules: [] },
+          ],
+        },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket-type', id: typeId },
+        type: 'ticket-type.defined',
+        workspaceSeq: next(),
+        payload: { id: typeId, name: 'Park type', icon: 'inbox', rank: 5, workflowId, fields: [] },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: activeTicketId },
+        type: 'ticket.created',
+        workspaceSeq: next(),
+        payload: { typeId, projectId: read.world.projectId, parentId: null, title: 'Stays on a declared state' },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: parkedTicketId },
+        type: 'ticket.created',
+        workspaceSeq: next(),
+        payload: { typeId, projectId: read.world.projectId, parentId: null, title: 'Sent to backlog' },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: parkedTicketId },
+        type: 'ticket.transitioned',
+        workspaceSeq: next(),
+        payload: { to: 'backlog' },
+      }),
+    ]);
+
+    // The world is as described — read from the table, not assumed from the
+    // seed: one ticket in `todo`, one parked in `backlog`.
+    const { rows: seeded } = await db.pool.query<{ ticket_id: string; state_id: string }>(
+      'SELECT ticket_id, state_id FROM proj_tickets WHERE ticket_id = ANY ($1::text[])',
+      [[activeTicketId, parkedTicketId]],
+    );
+    expect(seeded.find((row) => row.ticket_id === activeTicketId)?.state_id).toBe('todo');
+    expect(seeded.find((row) => row.ticket_id === parkedTicketId)?.state_id).toBe('backlog');
+
+    const before = await ledgerRows();
+    // A COMPLETE map of `workflowId`'s own DECLARED states — exactly what the
+    // dialog builds (spec §1.1: backlog is never in `def.states`, so the
+    // dialog cannot ask about it and never does).
+    const response = await read.app.inject({
+      method: 'POST',
+      url: `/v1/workspaces/${read.world.workspaceId}/ticket-types/${typeId}/migrate`,
+      headers: read.authOf('owner'),
+      payload: {
+        fromWorkflowId: workflowId,
+        toWorkflowId: targetWorkflowId,
+        stateMap: { todo: 'todo2', doing: 'doing2', done: 'done2' },
+      },
+    });
+    // Before this fix: 422, `migration.unmapped-state`, naming `backlog` — a
+    // state the dialog cannot show a row for and cannot map either way.
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: 'migrated', count: 2 });
+    expect(await ledgerRows()).toBe(before + 2);
+
+    const { rows: after } = await db.pool.query<{ ticket_id: string; workflow_id: string; state_id: string }>(
+      'SELECT ticket_id, workflow_id, state_id FROM proj_tickets WHERE ticket_id = ANY ($1::text[])',
+      [[activeTicketId, parkedTicketId]],
+    );
+    expect(after.find((row) => row.ticket_id === activeTicketId)).toEqual({
+      ticket_id: activeTicketId,
+      workflow_id: targetWorkflowId,
+      state_id: 'todo2',
+    });
+    // THE ASSERTION: the parked ticket's state_id is `backlog` — the
+    // universal id, not a mapped declared state and not stranded.
+    expect(after.find((row) => row.ticket_id === parkedTicketId)).toEqual({
+      ticket_id: parkedTicketId,
+      workflow_id: targetWorkflowId,
+      state_id: 'backlog',
+    });
+  });
+});

@@ -58,6 +58,10 @@ function rebind(ticketId: string, toWorkflowId: string, toStateId: string): Even
 /** One task on `wf-basic`, with `wf-ops` defined and available to migrate onto. */
 const ctx = () => buildMemoryContext([WF, WF_OPS], [typeDefined(TASK), created(T, 'task', null)]);
 
+/** `ticket.transitioned`, in the domain's own dialect — `close.test.ts`'s pattern, needed here too for Ruling 52(b): parking a ticket via the universal Send-to-backlog edge. */
+const move = (to: string): EventEnvelope =>
+  makeEnvelope({ type: 'ticket.transitioned', entity: { kind: 'ticket', id: T }, workspaceId: WS, payload: { to } });
+
 /**
  * Literal rule ids and literal, fully-interpolated reasons — never the builder
  * that produced them. A test that asserts the constant it is testing certifies a
@@ -289,5 +293,43 @@ describe('the scope threaded into the target-workflow lookup', () => {
     // assertion is which one reached the store.
     expect(asked).toEqual([WS]);
     expect(asked).not.toContain(OTHER_WS);
+  });
+});
+
+/**
+ * 13.605 — Ruling 52(b), Finding 2 (final whole-branch review, 2026-09-17):
+ * parked means parked. `target.states` never contains backlog (it is
+ * universal, never declared — spec §1.1), so a bare
+ * `target.states.some((state) => state.id === p.toStateId)` refused
+ * `toStateId: 'backlog'` UNCONDITIONALLY — for a ticket already parked as
+ * much as for one that was not, which is what made the bulk migration route
+ * a dead end for any type holding a parked ticket (13.606, the server case).
+ * Amendment 3's own rule — "a rebind is defined as landing a ticket in a
+ * DECLARED state of the target workflow; parking it is a separate
+ * Send-to-backlog move afterward" — is still correct for a ticket that is
+ * NOT already parked, which the second case here pins: `Amendment 3 stands`
+ * for exactly the case it was written for.
+ */
+describe('checkTicketWorkflowRebound — Ruling 52(b): a parked ticket rebinds onto backlog; a declared-state ticket still cannot', () => {
+  it('13.605 accepts backlog -> backlog: a ticket already parked carries across as parked', async () => {
+    // `move('backlog')` as a PRIOR event: `buildMemoryContext` folds it
+    // unconditionally (no evaluation happens on a prior event — the same
+    // reason 7.88/7.89 could plant an Object.prototype-named state), and the
+    // universal Send-to-backlog edge makes `todo -> backlog` a real move a
+    // live ticket could make, so this is not a state the reducer would ever
+    // refuse to fold.
+    const parkedCtx = buildMemoryContext([WF, WF_OPS], [typeDefined(TASK), created(T, 'task', null), move('backlog')]);
+    expect(await checkTicketWorkflowRebound(rebind(T, 'wf-ops', 'backlog'), parkedCtx)).toEqual({ refused: false });
+  });
+
+  it('13.605 still refuses a DECLARED-state ticket rebinding onto backlog (Amendment 3 stands)', async () => {
+    // `ctx()` puts the ticket on `todo`, `wf-basic`'s own initial state — not
+    // parked. The only thing that changed is the parked case above; this one
+    // proves it did not become "any ticket may rebind onto backlog".
+    expect(await checkTicketWorkflowRebound(rebind(T, 'wf-ops', 'backlog'), ctx())).toEqual({
+      refused: true,
+      rule: 'ticket.rebound-unknown-state',
+      reason: 'The workflow "Operations" has no state "backlog", so ticket 01J9GTKT000000000000000000 cannot be placed there.',
+    });
   });
 });

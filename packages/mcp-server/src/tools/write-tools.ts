@@ -69,13 +69,15 @@ export function writeTools(session: Session): ToolDefinition[] {
       description:
         'Create a ticket in a project. `typeId` names a ticket type that already exists in the ' +
         'workspace; `parentId` is the epic or parent ticket, or null for a top-level ticket. The ' +
-        'workflow, the initial state and every rule are the product\'s, not this tool\'s.',
+        'workflow, the initial state and every rule are the product\'s, not this tool\'s. `start` ' +
+        'chooses where it is born: `\'backlog\'` (the default) or `\'focus\'`.',
       inputSchema: {
         workspaceId: z.string().min(1),
         projectId: z.string().min(1),
         typeId: z.string().min(1),
         title: z.string().min(1),
         parentId: z.string().min(1).nullable().optional(),
+        start: z.enum(['backlog', 'focus']).optional(),
       },
       handler: async (args) => {
         const a = z
@@ -85,6 +87,7 @@ export function writeTools(session: Session): ToolDefinition[] {
             typeId: z.string().min(1),
             title: z.string().min(1),
             parentId: z.string().min(1).nullable().optional(),
+            start: z.enum(['backlog', 'focus']).optional(),
           })
           .parse(args);
         const ticketId = newUlid();
@@ -95,6 +98,20 @@ export function writeTools(session: Session): ToolDefinition[] {
           // `.nullable()`, not `.optional()`.
           parentId: a.parentId ?? null,
           title: a.title,
+          // Backlog/closed spec §1.3 (amended 2026-09-17, see Amendments —
+          // Ruling 51): `ticket.created`'s own field is OPTIONAL, absence
+          // meaning focus — that is what every v1 event meant, and this is
+          // the additive-field rule the domain schema already enforces. But
+          // this tool is the SECOND production producer of the event (Finding
+          // 4, final whole-branch review), and its own default must not be
+          // the domain schema's: MCP creates land in the backlog exactly like
+          // the dialog's own default (spec §1.3, "backlog by default is the
+          // CLIENT's rule"), unless the caller names `'focus'` explicitly. An
+          // absent `a.start` here therefore still sends an explicit
+          // `'backlog'` on the wire — never an absent key — so a reader of
+          // the ledger cannot mistake "no argument was given" for "this
+          // event predates the field".
+          start: a.start ?? 'backlog',
         });
         const committed = await submitOne(session, event);
         return { ticketId, ...(committed as object) };
