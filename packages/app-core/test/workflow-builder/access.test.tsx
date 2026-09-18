@@ -564,7 +564,7 @@ describe('no authoring action is reachable by any path the TICKET-TYPE EDITOR of
     return gateway;
   }
 
-  it('shows the member every control the admin gets, disables every one of them, and every button on the screen is an icon choice or a gated Field-type control', async () => {
+  it('shows the member every control the admin gets, disables every one of them, and every button on the screen is an icon choice or a gated field-definition control', async () => {
     renderTypeEditor(memberSession);
     await screen.findByRole('textbox', { name: 'Type name' });
     const memberControls = valueControls();
@@ -580,20 +580,48 @@ describe('no authoring action is reachable by any path the TICKET-TYPE EDITOR of
     expect(screen.getByRole('spinbutton', { name: 'Hierarchy rank' })).toBeDisabled();
 
     // The button analogue of the builder screen's `everyButtonIsAJump`: every
-    // button a member is offered here is either an icon choice or one of the
-    // two Field-type Select triggers — a value control already covered by the
-    // sweep above, not an authoring affordance — and every one of them is
-    // disabled. FieldsEditor's Add/Remove and the Save button are the ones
-    // that would appear if a gate came down.
+    // button a member is offered here is either an icon choice, one of the two
+    // Field-type Select triggers, or one of the two `required` toggles — value
+    // controls on the DEFINITION, not authoring affordances — and every one of
+    // them is disabled. FieldsEditor's Add/Remove and the Save button are the
+    // ones that would appear if a gate came down.
+    //
+    // The `required` toggle was added to this list deliberately on 2026-09-18,
+    // and the taxonomy is what says it belongs: it sets a VALUE on the field
+    // definition exactly as the Field-type trigger and the icon choices do, and
+    // unlike `Remove field` it mutates no collection. The property this block
+    // exists for is unchanged — the member authors nothing, and every button in
+    // the list is still asserted disabled one line down. What the widening must
+    // NOT do is let a control through unseen, so the toggle is enumerated by
+    // name with its own count rather than folded into a catch-all.
+    //
+    // CORRECTION, 2026-09-18, from the independent review: an earlier draft of
+    // this comment said the toggle was "already covered by the sweep above".
+    // That is FALSE and was removed — `valueControls()` returns the same eight
+    // members with the toggle present as without it, because it queries
+    // textbox/combobox/checkbox/spinbutton plus two named buttons and a
+    // `required` toggle is none of those. The toggle's coverage comes from THIS
+    // loop's unconditional `toBeDisabled`, which does hold. The verdict the
+    // comment supports was right; its stated reason was not, and a wrong cause
+    // is how a real hole gets read as covered later.
     const iconGroup = screen.getByRole('group', { name: 'Icon' });
     const fieldTypeTriggers = screen.getAllByRole('button', { name: /Field type/ });
     expect(fieldTypeTriggers).toHaveLength(2);
+    const requiredToggles = screen.getAllByRole('button', { name: /^(Required|Optional)$/ });
+    // One per field on the fixture, and the fixture has two — so a toggle that
+    // silently stopped rendering reddens here rather than shrinking the
+    // predicate's coverage to nothing.
+    expect(requiredToggles).toHaveLength(2);
     const buttons = screen.queryAllByRole('button');
     // Non-vacuity: sixteen icon choices ship at this sha, so an empty list here
     // would mean the picker never rendered rather than that nothing escaped.
     expect(buttons.length).toBeGreaterThan(8);
     for (const button of buttons) {
-      expect(iconGroup.contains(button) || fieldTypeTriggers.includes(button)).toBe(true);
+      expect(
+        iconGroup.contains(button) ||
+          fieldTypeTriggers.includes(button) ||
+          requiredToggles.includes(button),
+      ).toBe(true);
       expect(button).toBeDisabled();
     }
     // The named half, whose control is the next test — without it a typo in any
@@ -620,5 +648,11 @@ describe('no authoring action is reachable by any path the TICKET-TYPE EDITOR of
     expect(screen.getByRole('button', { name: 'Add field' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Remove field' })).toHaveLength(2);
     expect(screen.getByRole('button', { name: 'Save ticket type' })).toBeInTheDocument();
+    // The admin offers the same two `required` toggles the member sees, and can
+    // press them — the third term of the predicate above is a real control on
+    // this render, not a term that only ever matches nothing.
+    const toggles = screen.getAllByRole('button', { name: /^(Required|Optional)$/ });
+    expect(toggles).toHaveLength(2);
+    for (const toggle of toggles) expect(toggle).toBeEnabled();
   });
 });

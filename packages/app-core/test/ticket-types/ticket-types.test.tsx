@@ -319,6 +319,162 @@ describe('TicketTypeEditorScreen — built-ins and refusals', () => {
   });
 });
 
+/**
+ * The field `required` toggle — owner ruling 2026-09-18, decision-list item 1
+ * (*"1 - yes"*), unblocking the delta audit's `isTypeEditor` row
+ * (`docs/design/prototype-delta-2026-09-18.md:69`), which recorded the flag as a
+ * SCHEMA gap rather than a design one.
+ *
+ * A note on what these cases can and cannot witness. The product does not yet
+ * READ the flag — `packages/domain/src/ticket-types.ts`'s `required` docblock
+ * names that absence, why it is a capability rather than a wiring job, and its
+ * owner — so no case here could assert a refusal, and none pretends to. What is
+ * pinned is the part that IS this change: the flag survives a definition being
+ * authored, saved, parsed and read back, and never appears as a value nobody
+ * chose. The E2E half of that claim lives in `mapTicketTypes`'s own case and in
+ * `apps/server`'s projection suite, not here.
+ *
+ * **The three states are distinct and each case below is one of them**, which is
+ * the whole point of `required` being optional rather than `default(false)`:
+ * never-said (13.776), said-required (13.777), said-optional (13.778). A schema
+ * that defaulted would collapse the first into the third and 13.776's assertion
+ * would pass for the wrong reason.
+ */
+describe('TicketTypeEditorScreen — the `required` field flag', () => {
+  /** Fill the two controls the form needs before a field row is meaningful. */
+  async function authorForm(user: ReturnType<typeof userEvent.setup>) {
+    await user.type(await screen.findByRole('textbox', { name: 'Type name' }), 'Invoice');
+    await pickFromSearchableSelect(
+      user,
+      screen.getByRole('combobox', { name: 'Workflow' }),
+      kanbanPublished.name,
+    );
+    await user.click(screen.getByRole('button', { name: 'Add field' }));
+  }
+
+  /**
+   * 13.776 — a field nobody has decided about carries NO `required` key, and its toggle reads "Optional". Absence is not a claim: the recorded definition must not say `false` on the author's behalf.
+   */
+  it('a newly added field carries no `required` at all, and reads Optional', async () => {
+    const user = userEvent.setup();
+    const { gateway } = renderEditor(null);
+    await authorForm(user);
+
+    // The label is the accessible name AND the state — no `aria-pressed` beside
+    // it, per the docblock in `fields-editor.tsx`. Asserted as an exact string
+    // rather than by regex, because a regex would pass on "Optional" inside a
+    // longer name and the name's exactness is the property under test.
+    expect(screen.getByRole('button', { name: 'Optional' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Required' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
+    expect(await screen.findByText('Ticket type saved.')).toBeInTheDocument();
+    const payload = gateway.submitted[0]!.payload as TicketTypeDef;
+    const authored = payload.fields[0]!;
+    // ABSENCE, with its control one case down: 13.777 and 13.778 both prove the
+    // key DOES appear once the toggle is pressed, so a green here is a
+    // measurement rather than a probe that cannot fire.
+    expect('required' in authored).toBe(false);
+    expect(authored).toMatchObject({ name: 'New field', type: 'text' });
+  });
+
+  /**
+   * 13.777 — pressing the toggle writes an explicit `true`, flips the label to "Required", and the flag reaches the submitted `ticket-type.defined` payload.
+   */
+  it('pressing writes an explicit true, flips the label, and reaches the submitted payload', async () => {
+    const user = userEvent.setup();
+    const { gateway } = renderEditor(null);
+    await authorForm(user);
+
+    await user.click(screen.getByRole('button', { name: 'Optional' }));
+    expect(screen.getByRole('button', { name: 'Required' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
+    expect(await screen.findByText('Ticket type saved.')).toBeInTheDocument();
+    const payload = gateway.submitted[0]!.payload as TicketTypeDef;
+
+    // The schema's own vocabulary, not the editor's: parsing the authored def is
+    // what proves the flag survives `customFieldDefSchema`, whose zod object
+    // STRIPS an undeclared key. Without the schema member this assertion fails
+    // while the editor still renders "Required" — which is exactly the
+    // silent-strip defect class a surface-only test would miss.
+    expect(ticketTypeDefSchema.parse(payload).fields[0]!.required).toBe(true);
+  });
+
+  /**
+   * 13.778 — pressing twice writes an explicit `false`. Never-said and said-optional are DIFFERENT recorded states, which is the reason the schema member is optional rather than defaulted.
+   */
+  it('pressing twice records an explicit false — never-said and said-optional stay distinct', async () => {
+    const user = userEvent.setup();
+    const { gateway } = renderEditor(null);
+    await authorForm(user);
+
+    await user.click(screen.getByRole('button', { name: 'Optional' }));
+    await user.click(screen.getByRole('button', { name: 'Required' }));
+    expect(screen.getByRole('button', { name: 'Optional' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
+    expect(await screen.findByText('Ticket type saved.')).toBeInTheDocument();
+    const payload = gateway.submitted[0]!.payload as TicketTypeDef;
+    const authored = payload.fields[0]!;
+
+    expect('required' in authored).toBe(true);
+    expect(authored.required).toBe(false);
+  });
+
+  /**
+   * 13.779 — the toggle is disabled for a non-author, like every other control in the row.
+   *
+   * Owner decision, 2026-08-26: a non-author may read the form but not author it.
+   * The toggle is a WRITE, so it takes the same gate as the name input and
+   * `Remove field` — a disabled-looking control that still accepted a click
+   * would be the "looks exactly like static text" defect inverted.
+   */
+  it('the toggle is disabled for a non-author, like every other control in the row', async () => {
+    const taskDef = builtins.find((builtin) => builtin.id === 'task')!;
+    // The field rides `initialDef`, which is what the SCREEN edits — the
+    // gateway seed only backs the list. Passing the seed alone renders a
+    // built-in with `fields: []` and the row never exists to be asserted on.
+    renderEditor(
+      { ...taskDef, fields: [{ id: newUlid(), name: 'Amount', type: 'number' }] },
+      { ticketTypes: [taskDef] },
+      { userId: newUlid(), role: 'member' },
+    );
+    expect(await screen.findByRole('button', { name: 'Optional' })).toBeDisabled();
+  });
+
+  /**
+   * 13.780 — the toggle is a real `.gn-button`, and its two states are the shared `primary`/`ghost` variants rather than a private colour of its own.
+   */
+  it('the toggle is a real gn-button whose states are the shared variants', async () => {
+    const user = userEvent.setup();
+    renderEditor(null);
+    await authorForm(user);
+
+    const off = screen.getByRole('button', { name: 'Optional' });
+    expect(off).toHaveClass('gn-button');
+    expect(off).toHaveClass('gn-button--ghost');
+    // The layout class too. It carries no colour (ui.css is sizing only), so
+    // nothing else would notice if the component stopped applying it — and the
+    // CSS rule itself is pinned by NO test (`.fields-editor__add` and `__row`
+    // are in the same position), which `ui.css`'s own docblock now states
+    // outright rather than implying coverage.
+    expect(off).toHaveClass('fields-editor__required');
+    // Colour is NOT this change's to declare: `ui.css`'s `.fields-editor__required`
+    // is sizing only, so both states resolve through the variant classes and
+    // both grounds are pairs the contrast audit already carries. A `--on` rule
+    // restating `--gn-accent` would have passed the assertions above and failed
+    // this one.
+    expect(off).not.toHaveClass('gn-button--primary');
+
+    await user.click(off);
+    const on = screen.getByRole('button', { name: 'Required' });
+    expect(on).toHaveClass('gn-button');
+    expect(on).toHaveClass('gn-button--primary');
+    expect(on).not.toHaveClass('gn-button--ghost');
+  });
+});
+
 describe('TicketTypeEditorScreen — re-binding a type to a different workflow (owner decision 2026-08-26)', () => {
   const task = builtins.find((builtin) => builtin.id === 'task')!;
   const bothWorkflows = { workflows: [kanbanPublished, errandPublished] };

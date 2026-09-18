@@ -120,6 +120,56 @@ describe('proj_ticket_types', () => {
     expect(await getTicketTypeFromDb(db.pool, HOME, 'expense')).toBeNull();
   });
 
+  /**
+   * 13.785 — a field's `required` flag survives a real Postgres round trip, and
+   * a field that never decided crosses as ABSENT.
+   *
+   * The strongest available witness for the failure mode the dispatch for this
+   * flag named: the core plan's final review once found a flag dead in
+   * PRODUCTION while every view test drove a fake data source. The client-side
+   * cases (`online-data-source.test.ts` 13.784, `ticket-types.test.tsx`
+   * 13.776–13.778) all run against a recording fetch or a fake gateway; this one
+   * writes through the real projector into a real `jsonb` column and reads back
+   * through the real reader, which is the only place the column's own
+   * round-tripping is exercised at all.
+   *
+   * `fields` is `jsonb`, so the first assertion is also what says the member
+   * arrives as a boolean rather than a string — the same property the case above
+   * pins for a select field's `options`.
+   *
+   * The fixture is deliberately ONE decided field and ONE never-decided. An
+   * assertion on the first alone would pass for a projection (or a reader) that
+   * defaulted every field to required; asserting the second as key ABSENCE rather
+   * than as a falsy value is what makes never-said and said-optional stay
+   * distinguishable in the stored row — the reason `customFieldDefSchema.required`
+   * is `.optional()` and not `.default(false)` (`packages/domain/src/ticket-types.ts`).
+   */
+  it('carries a field’s `required` flag through jsonb, and leaves an undecided one absent', async () => {
+    const DECIDED: TicketTypeDef = {
+      id: 'fleet',
+      name: 'Fleet',
+      icon: 'truck',
+      rank: 3,
+      workflowId: 'wf-basic',
+      fields: [
+        { id: 'plate', name: 'Plate', type: 'text', required: true },
+        { id: 'notes', name: 'Notes', type: 'text' },
+      ],
+    };
+    await apply(typeDefined(HOME, DECIDED, 11));
+
+    const readBack = await getTicketTypeFromDb(db.pool, HOME, 'fleet');
+    expect(readBack).toEqual(DECIDED);
+
+    // Named individually as well as through the `toEqual` above, so the failure
+    // says WHICH half broke: a projection that dropped the member reddens here
+    // with the field in hand rather than as a two-object diff a reader has to
+    // scan. The absence half is a key check, not a falsiness check — `undefined`
+    // would also satisfy `toBe(undefined)` while the key existed.
+    expect(readBack?.fields[0]?.required).toBe(true);
+    expect('required' in (readBack?.fields[1] ?? {})).toBe(false);
+  });
+
   it('last definition wins — a type is its newest definition, not its first', async () => {
     await apply(
       typeDefined(HOME, INVOICE, 10),

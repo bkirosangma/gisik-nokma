@@ -672,6 +672,63 @@ describe('3.140 getTicketTypes reads the route that shipped', () => {
       'response mapping failed at ticketTypes.ticketTypes[0].rank: expected a number',
     );
   });
+
+  /**
+   * 13.784 — a field's `required` flag crosses the route and reaches the client
+   * definition, and a field that never set it crosses as ABSENT.
+   *
+   * This is the case the dispatch for the `required` flag exists to require: the
+   * core plan's final review found a flag dead in production while every view
+   * test drove a fake data source, and `mapTicketTypes` is exactly where such a
+   * flag would go to die — it validates `fields` as far as ARRAY and casts the
+   * rest (`mappers.ts`, its own docblock says so), so a member the server sends
+   * and this mapper does not carry would vanish with nothing red anywhere.
+   *
+   * It drives the REAL `mapTicketTypes` through the REAL data source over a
+   * recording fetch — not a hand-built response object handed straight to the
+   * mapper, and not a fake data source, either of which would test the
+   * assertion rather than the route. The two fields are deliberately ONE decided
+   * and ONE never-decided: an assertion on the first alone would pass for a
+   * mapper that defaults every field to `required: true`.
+   */
+  it('carries a field’s `required` flag through the route, and leaves an undecided one absent', async () => {
+    const { fetchImpl } = recordingFetch({
+      [`/v1/workspaces/${WORKSPACE}/ticket-types`]: {
+        workspaceId: WORKSPACE,
+        ticketTypes: [
+          {
+            id: 'invoice',
+            name: 'Invoice',
+            icon: 'receipt',
+            rank: 3,
+            workflowId: 'wf-errands',
+            fields: [
+              { id: 'amount', name: 'Amount', type: 'number', required: true },
+              { id: 'notes', name: 'Notes', type: 'text' },
+            ],
+          },
+        ],
+      },
+    });
+    const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
+    const [invoice] = await source.query.getTicketTypes(WORKSPACE);
+
+    // The fixture's shape asserted BEFORE its contents. Without this the
+    // absence half below is VACUOUS when the response is truncated: `?? {}`
+    // would hand `'required' in {}` a fresh empty object and answer `false`
+    // whatever the wire said. An independent reviewer found this on 2026-09-18
+    // — a hole one field wide, and exactly the shape this repo keeps recording,
+    // where an assertion passes for a reason unrelated to the property it
+    // names. The positive half does pin `fields[0]`, so the list could not
+    // shrink to zero; it is the SECOND field that needed the guard.
+    expect(invoice?.fields).toHaveLength(2);
+    expect(invoice?.fields[0]).toMatchObject({ id: 'amount', name: 'Amount', type: 'number', required: true });
+    // Absence, not falsiness — `undefined` would also satisfy
+    // `toBe(undefined)` while the key existed, and the difference between
+    // never-said and said-optional is the whole reason the schema member is
+    // optional (`packages/domain/src/ticket-types.ts`, the `required` docblock).
+    expect('required' in (invoice?.fields[1] ?? {})).toBe(false);
+  });
 });
 
 /**

@@ -56,9 +56,30 @@ function refusalMessage(type: string, payload: unknown): string {
  */
 describe('ticket event vocabulary', () => {
   it('accepts every event in the vocabulary', () => {
+    // 13.786 — the `required` flag (owner ruling 2026-09-18) is on this fixture
+    // because the INGEST DOOR is the first and most consequential parse site for
+    // it, and it is the one this change's own docblock originally got wrong by
+    // naming only the three READ sites. `parseEvent` stores the schema's OUTPUT
+    // (`parse-event.ts:177`, `payload.data`), not the raw payload, so a member
+    // `ticketTypeDefSchema` does not declare is stripped BEFORE the event is
+    // ever recorded — every later reader then sees an event that never carried
+    // it, and no care at the projection, the replica or the memory context can
+    // recover a key that never reached the ledger. `roundTrips` asserts
+    // `result.event.payload).toEqual(payload)`, so a stripped member reddens
+    // HERE rather than three hops downstream.
+    //
+    // Two fields, deliberately: one claims `required: true` and one says
+    // nothing. The `toEqual` is what proves BOTH survive — one decided and one
+    // never-decided — so this cannot pass for a door that defaulted every field.
+    // Raised by the independent review of 2026-09-18, which measured that the
+    // projection, replica and memory-context parses are all READS and named the
+    // door as the case worth spending.
     roundTrips('ticket-type.defined', 'ticket-type', {
       id: 'invoice', name: 'Invoice', icon: 'receipt', rank: 3, workflowId: 'wf-basic',
-      fields: [{ id: 'amount', name: 'Invoice amount', type: 'number' }],
+      fields: [
+        { id: 'amount', name: 'Invoice amount', type: 'number', required: true },
+        { id: 'notes', name: 'Notes', type: 'text' },
+      ],
     });
     roundTrips('ticket.created', 'ticket', { typeId: 'task', projectId: PROJECT, parentId: PARENT, title: 'File the GST return' });
     roundTrips('ticket.created', 'ticket', { typeId: 'task', projectId: PROJECT, parentId: null, title: 'Root task' });

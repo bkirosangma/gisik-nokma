@@ -33,6 +33,56 @@ describe('customFieldDefSchema', () => {
       customFieldDefSchema.parse({ id: 'notes', name: 'Notes', type: 'text', options: ['a'] }),
     ).toThrow();
   });
+
+  /**
+   * 13.781 — `required: true` survives the parse.
+   *
+   * The witness for the schema member being LOAD-BEARING rather than
+   * decorative. A zod object STRIPS a key it does not declare, so before this
+   * member existed a `required: true` authored in the type editor would have
+   * been dropped here — silently, at the projection, the offline replica and the
+   * engine's memory context alike, all of which parse through this schema
+   * (`apps/server/src/projections/ticket-types.ts:56`,
+   * `sync-client/src/replica/replica.ts:295`,
+   * `rule-engine/src/memory-context.ts:136`). The editor would still have shown
+   * "Required"; the recorded definition would not have said so. This case is
+   * what makes that discrepancy impossible rather than merely unlikely.
+   */
+  it('carries `required: true` through the parse — the member is declared, not stripped', () => {
+    expect(customFieldDefSchema.parse({ id: 'amount', name: 'Amount', type: 'number', required: true })).toEqual({
+      id: 'amount',
+      name: 'Amount',
+      type: 'number',
+      required: true,
+    });
+  });
+
+  /**
+   * 13.782 — a field that never decided carries NO `required` key.
+   *
+   * The no-migration witness AND the never-said witness at once. Every
+   * `ticket-type.defined` recorded before 2026-09-18 has no such key, so if this
+   * member were `z.boolean().default(false)` those events would come back
+   * claiming `required: false` — a claim their author never made, and the same
+   * defect class as the `p.value ?? null` that folded an absent value into a
+   * clearing nobody made (`rule-engine/src/checks/fields.ts:77-83`). Asserted as
+   * key ABSENCE, not as a falsy value: `toEqual` would pass on `undefined` while
+   * `'required' in` is the property that actually matters — and 13.781 above is
+   * its positive control, proving the key does appear when it is authored.
+   */
+  it('leaves `required` absent when the definition never said — absent is not false', () => {
+    const parsed = customFieldDefSchema.parse({ id: 'notes', name: 'Notes', type: 'text' });
+    expect('required' in parsed).toBe(false);
+  });
+
+  /**
+   * 13.783 — a non-boolean `required` is refused rather than coerced.
+   */
+  it('refuses a `required` that is not a boolean', () => {
+    expect(() =>
+      customFieldDefSchema.parse({ id: 'notes', name: 'Notes', type: 'text', required: 'yes' }),
+    ).toThrow();
+  });
 });
 
 describe('ticketTypeDefSchema', () => {

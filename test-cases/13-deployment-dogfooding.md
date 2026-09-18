@@ -8702,6 +8702,7 @@ only, never by substring: the highest `13.*` marker in this file at this tip is 
 FREE before minting — the only hits were prose *mentions* of the block's own bounds, which is exactly the
 trap this file records: a substring sweep over a document that discusses the ids cannot separate a
 MINTED id from a MENTIONED one.
+
 **Task 4 (`Table`/`TicketList` row drag and the tail drop zone) — `13.705`–`13.706`.** Ids recounted at this
 tip (branch `exec/second-wave-t4-rowdrag`, cut from `origin/main` `fb346a9f`) over case MARKERS and test
 NAMES only, never a substring sweep: the highest case MARKER minted inside this executor's block
@@ -8902,3 +8903,191 @@ choice of fix for the stale tail marker is the TESTABLE one: a container `dragle
 against firing on every child boundary *and* is unverifiable in this harness, because jsdom never synthesises
 `dragenter`/`dragleave` from pointer movement — whereas the tail's `onDragOver` clear is driven by the same
 `fireEvent.dragOver` the cases already use.
+
+## The `required` field flag, ported from the prototype (executor 2, 2026-09-18) — block `13.776`–`13.784`
+
+The `isTypeEditor` row of the delta audit (`docs/design/prototype-delta-2026-09-18.md:69`) recorded
+`ticket-type-editor-screen.tsx` as **port**, *blocked* on one thing: the prototype draws a per-field
+`Required` / `Optional` pill (`desktop.dc.html:904` in the template, `:3207-3208` for its label and
+style) and the field schema had no such member. That is a gap in the data model, not in the drawing, so
+it needed a ruling rather than an implementation — the owner gave one on 2026-09-18 (decision-list item
+1: *"1 - yes"*), and this block is the port that ruling authorised.
+
+**What this block can and cannot witness, stated first because it decides every case below.** The
+product does not yet READ the flag: no code path refuses a ticket that omits a field marked required.
+The engine's only `require-field` is EDGE-SCOPED — a workflow rule evaluated when a ticket crosses one
+transition (`packages/rule-engine/src/rules/require-field.ts:5`, surfaced by
+`packages/app-core/src/views/transition-dialog.tsx:216`), which answers *may this move happen?* and not
+*does this type expect a value?*. `checkTicketFieldSet` refuses a field that does not exist on the type
+and a value that does not fit its kind, and accepts a clear of any custom field unconditionally
+(`packages/rule-engine/src/checks/fields.ts:148-155`); `ticket.created` reads no fields at all. So
+**no case here asserts a refusal, and none pretends to.** Enforcement is a capability rather than a
+wiring job, and the reason is structural rather than budgetary: a type definition is last-writer-wins
+with no superseded row kept (`apps/server/src/projections/ticket-types.ts:39-46`, which states that
+omission as deliberate), so the engine cannot answer *what did this type require when this ticket was
+created?* — and an admin toggling a field to Required would place every existing ticket of that type out
+of compliance with no way to retroactively refuse a claim already recorded. **Named absence, owner: the
+plan that takes up type-level field enforcement.** It is recorded in `Features.md` in the same commit as
+the code, and in the PR body.
+
+What the cases DO pin is the part that is this change: the flag survives a definition being authored,
+saved, parsed, projected and carried back to the client, and it never appears as a value nobody chose.
+
+**The three states are distinct, and each of the first three cases is one of them**, which is the whole
+point of the schema member being optional rather than `z.boolean().default(false)`: never-said (13.776),
+said-required (13.777), said-optional (13.778). A defaulted schema collapses the first into the third,
+and 13.776's assertion would then pass for the wrong reason — so 13.782 is the schema-level witness of
+the same distinction and 13.776's control is one case down.
+
+- ✅ **13.776 — a field nobody has decided about carries NO `required` key, and its toggle reads
+  "Optional".** Absence is not a claim: the recorded definition must not say `false` on the author's
+  behalf, which is the same defect class as the `p.value ?? null` that folded an absent value into "a
+  clearing nobody made" (`packages/rule-engine/src/checks/fields.ts:77-83`, corrected earlier in this
+  series). Asserted as key ABSENCE rather than as a falsy value — `toEqual` would pass on `undefined`
+  while the key existed — with its positive control one case down.
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx:356`)
+
+- ✅ **13.777 — pressing the toggle writes an explicit `true`, flips the label to "Required", and the
+  flag reaches the submitted `ticket-type.defined` payload.** The assertion runs the submitted payload
+  back through `ticketTypeDefSchema.parse` rather than reading the object the editor built, because a
+  zod object STRIPS a member it does not declare: without the schema change the editor would still have
+  rendered "Required" while the recorded definition said nothing, and a surface-only test would have
+  been green through exactly that. **This case is what the schema member being load-bearing means.**
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx:382`, mutation-killed by removing
+  `required` from `customFieldDefSchema` — `expected undefined to be true`)
+
+- ✅ **13.778 — pressing twice records an explicit `false`.** Never-said and said-optional are
+  different recorded states, and preserving that difference is why the schema member is `.optional()`
+  and not `.default(false)`. The toggle writes `field.required !== true`, so an untouched field reads
+  false only because nothing has been claimed and the first press always writes `true`.
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx:405`)
+
+- ✅ **13.779 — the toggle is disabled for a non-author, like every other control in the row.** The
+  toggle is a WRITE, so it takes the gate the name input and `Remove field` take (owner decision
+  2026-08-26).
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx:426`)
+
+- ✅ **13.780 — the toggle is a real `.gn-button`, and its two states are the shared `primary`/`ghost`
+  variants rather than a private colour of its own.** The colour half is the point: `ui.css`'s
+  `.fields-editor__required` is SIZING ONLY, so both states resolve through variant classes and both
+  grounds are pairs the contrast audit already carries. The prototype's tinted pill is **not** ported —
+  its `--tintAccent` wash has no product role (`tokens.ts:342-344`: `tintWarning` is the only tint
+  role), which is the same refusal `isBuilder` recorded for `--tintDanger`/`--tintSuccess`. A `--on`
+  rule restating `--gn-accent` would have passed the two `toHaveClass('gn-button')` assertions and
+  failed this one. **Second deviation, also stated:** the prototype's pill is 32px, this sits at
+  `.gn-button`'s own 2.75rem, matching the name input and the Remove button it stands beside.
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx:447`, `packages/ui/src/ui.css`)
+
+- ✅ **13.781 — `required: true` survives `customFieldDefSchema.parse`.** The schema-level witness that
+  the member is declared rather than stripped. Every parse site in the product routes through this
+  schema — the projection, the offline replica and the engine's memory context alike
+  (`apps/server/src/projections/ticket-types.ts:56`, `packages/sync-client/src/replica/replica.ts:295`,
+  `packages/rule-engine/src/memory-context.ts:136`) — so a strip here would have been silent in
+  production while the editor still showed the state. (`packages/domain/test/ticket-types.test.ts:38`)
+
+- ✅ **13.782 — a field that never decided carries NO `required` key after a parse.** The no-migration
+  witness AND the never-said witness at once: every `ticket-type.defined` recorded before 2026-09-18
+  has no such key, so a defaulted member would make all of them come back claiming `required: false`.
+  Asserted as key absence, and 13.781 is its positive control — the key does appear when authored.
+  (`packages/domain/test/ticket-types.test.ts:61`, mutation-killed by switching the member to
+  `.default(false)` — `expected true to be false`)
+
+- ✅ **13.783 — a non-boolean `required` is refused rather than coerced.**
+  (`packages/domain/test/ticket-types.test.ts:79`)
+
+- ✅ **13.784 — a field's `required` flag crosses the route and reaches the client definition, and a
+  field that never set it crosses as ABSENT.** The dispatch for this flag named the risk it exists to
+  close: the core plan's final review found a flag dead in production while every view test drove a
+  fake data source, and `mapTicketTypes` is exactly where such a flag would go to die — it validates
+  `fields` as far as ARRAY and casts the rest, so a member the server sends and the mapper does not
+  carry vanishes with nothing red anywhere. The case drives the REAL mapper through the REAL data
+  source over a recording fetch, not a hand-built object handed to the mapper and not a fake source,
+  either of which would test the assertion rather than the route. The fixture is deliberately ONE
+  decided field and ONE never-decided: an assertion on the first alone would pass for a mapper that
+  defaulted every field to required. **Mutation-killed by making `mapTicketTypes` drop the member —
+  `expected { id: 'amount', … } to match object`, which is the silent-drop this case exists for.**
+  (`packages/app-core/test/online/online-data-source.test.ts:677`)
+
+**One case was adjusted rather than added, and the adjustment is recorded because widening an
+enumeration is how a check goes quiet.** `packages/app-core/test/workflow-builder/access.test.tsx:567`
+asserts that every button a MEMBER is offered on the ticket-type editor is an icon choice or a gated
+Field-type control, and that every one of them is disabled — a gate-coming-down check. The new toggle is
+a **twentieth** button on that screen (16 icon choices — `Object.keys(TYPE_ICONS)`,
+`ticket-types/icons.tsx:102`, counted by measurement and NOT by eye, because `'file-text'` is a QUOTED
+key a naive key-sweep misses — plus 2 Field-type Select triggers plus the 2 toggles), so the predicate
+had to name it or the suite would have reddened for the right reason and been "fixed" the wrong way.
+*(An earlier draft of this paragraph said "a ninth button". That figure was invented and matched no
+count reproducible from the fixture; the independent review caught it. The reviewer's own first count of
+the icon set was 15, wrong for the quoted-key reason — the same instrument-blindness shape this file
+catalogues, caught by the party who wrote it.)* **It is a value control on the DEFINITION — the same
+taxonomy that admits the Field-type trigger and the icon choices — not a collection action like
+`Remove field`**, which is why showing it disabled is correct rather than hiding it: a member reading a
+type still learns which of its fields are required. The widening was proved not to have opened a hole by
+mutation: rendering `Remove field` for a member again **still** reddens the predicate
+(`access.test.tsx:610-615`, `expected false to be true`, reported at `:615`), and dropping the toggle's
+`disabled` reddens the per-button assertion beneath it.
+
+- ✅ **13.785 — a field's `required` flag survives a real Postgres round trip, and a field that never
+  decided crosses as ABSENT.** The strongest available witness for the failure mode the dispatch for
+  this flag named — *the core plan's final review once found a flag dead in PRODUCTION while every view
+  test drove a fake data source* — and the reason it is not redundant with 13.784 above. The
+  client-side cases run against a recording fetch or a fake gateway; **this one writes through the real
+  projector into a real `jsonb` column and reads back through the real reader**, which is the only
+  place the column's own round-tripping is exercised at all. `fields` is `jsonb`, so the `toEqual`
+  assertion is also what says the member arrives as a boolean rather than a string — the property the
+  case above it pins for a select field's `options`. The fixture is deliberately ONE decided field and
+  ONE never-decided, because an assertion on the first alone would pass for a projection that defaulted
+  every field to required; the second is asserted as key ABSENCE, not falsiness.
+  (`apps/server/test/proj-ticket-types.test.ts:124`)
+
+- ✅ **13.786 — the `required` flag survives the INGEST DOOR.** The first and most consequential parse
+  site, and the one an earlier draft of this change's own docblock got wrong by listing only the three
+  READ sites. `parseEvent` stores the schema's **output**, not the raw payload
+  (`packages/domain/src/parse-event.ts:177`, `payload: payload.data`), so a member `ticketTypeDefSchema`
+  does not declare is stripped **before the event is ever recorded** — every later reader then sees an
+  event that never carried it, and no amount of care at the projection, the replica or the memory
+  context can recover a key that never reached the ledger. The witness is the EXISTING
+  `roundTrips('ticket-type.defined', …)` call, which asserts `result.event.payload).toEqual(payload)`:
+  a stripped member reddens there rather than three hops downstream. Its fixture carries two fields
+  deliberately, one claiming `required: true` and one never-decided, so the `toEqual` cannot pass for a
+  door that defaulted every field. **Mutation-killed by removing the schema member — the door's own
+  `toEqual` reddens.** Raised by the independent review of 2026-09-18, which measured that the three
+  parse sites this change originally named are all reads and named the door as the case worth spending;
+  it was added at near-zero cost because the assertion already existed.
+  (`packages/domain/test/ticket-events.test.ts:59`)
+
+**The independent review round (2026-09-18): no Critical, no Important, six Minor — and four of the six
+were defects in THIS CHANGE'S OWN documentation rather than in its code.** Recorded because the pattern
+is the one this repo keeps paying for: an instrument or a sentence that is wrong in a direction nobody
+audits.
+
+1. **A fabricated figure.** "The new toggle is a ninth button on that screen" matched no reproducible
+   count. The real figure is **twenty** (16 icon choices + 2 Field-type triggers + 2 toggles), and the
+   review's own first count of the icon set was 15 because `'file-text'` is a QUOTED key a naive key-sweep
+   cannot see — the instrument-blindness shape this file catalogues elsewhere, self-caught by the party
+   who wrote it. The figure is corrected in both places it appeared; this paragraph is the record.
+2. **A wrong CAUSE attached to a right verdict.** The widened access predicate's comment said the toggle
+   was "already covered by the sweep above". Measured false — `valueControls()` returns the same eight
+   members with the toggle present as without it, because a `required` toggle is not a
+   textbox/combobox/checkbox/spinbutton. The verdict (it belongs in the allowed set) stands; the stated
+   reason did not, and a wrong cause is how a real hole gets read as covered later. Corrected in place.
+3. **A vacuity hole one field wide.** 13.784's absence half was `'required' in (fields[1] ?? {})`, which
+   answers `false` for a response TRUNCATED to one field — the `?? {}` hands it a fresh empty object. A
+   `toHaveLength(2)` guard now precedes it, **mutation-proved** by shrinking the fixture (reddens:
+   `expected [ { id: 'amount', … } ] to have a length of 2 but got 1`).
+4. **An incomplete list that led with the wrong site.** The schema docblock named the projection, the
+   replica and the memory context as the parses a strip would hit — all three are READS. The door is
+   `parseEvent`, and it came first. Corrected in the docblock; 13.786 is the resulting witness.
+
+The remaining two were: the new `ui.css` rule `flex: none` is pinned by no test (true, and now stated
+outright in that rule's own docblock rather than implied away — its `.fields-editor__add`/`__row`
+siblings are in the same position, so it is not a regression, and 13.780 now pins that the component
+applies the class at all), and the note that no server-side case witnessed the door — which 13.786 now
+does. **Seven mutations were killed before the review; two more were added for the review's findings
+(the truncated fixture, the removed layout class), and the door mutation makes ten.**
+
+**Recount, at this tip.** Eleven ids are minted here (`13.776`–`13.786`), all inside the reserved block
+`13.760`–`13.819`; **the next free id inside this executor's block is `13.787`**. Measured by case MARKER
+only: the highest `13.*` marker in this file at this tip was `13.775` before this section, and the
+block's own upper bound `13.819` appears only as prose *mentioning* it — the trap this file records
+twice above.

@@ -1484,6 +1484,34 @@
 }
 .fields-editor__add { align-self: flex-start; }
 
+/* The `required` toggle. SIZING ONLY — deliberately no colour, no radius and
+   no shadow of its own: the two states are `.gn-button--primary` ("Required")
+   and `.gn-button--ghost` ("Optional"), chosen by the component
+   (`fields-editor.tsx`), so both grounds and both text colours are pairs this
+   file already declares and both have been through the contrast audit. A
+   dedicated `--on` rule restating `--gn-accent`/`--gn-accent-text` would be a
+   second statement of `--primary`'s own declaration, free to drift from it.
+
+   The prototype draws this as a 32px tinted pill
+   (`desktop.dc.html:3207-3208`, `--tintAccent` wash). Two deviations, both
+   stated rather than silent: the tint role does not exist in this product
+   (`tokens.ts:342-344` — `tintWarning` is the only tint role), and the pill
+   sits at `.gn-button`'s own 2.75rem rather than 32px, matching the Remove
+   button and the name input it stands beside in the same row.
+
+   NO TEST PINS THIS RULE, and that is stated rather than left to be assumed
+   (independent review, 2026-09-18 — an earlier version of this docblock implied
+   coverage it does not have). The css-binding scanner's prefix list covers
+   `workflow-builder-screen`/`state-inspector`/`inspector-panel`/
+   `transition-inspector` only, and case 13.780 asserts the `gn-button` VARIANT
+   classes, not this one — so deleting `flex: none` reddens nothing. It is not a
+   regression: `.fields-editor__add` and `.fields-editor__row` sit in exactly the
+   same position. What IS pinned is that the component applies the class at all
+   (13.780), which is the half a scanner would be able to see. Recorded so the
+   next reader does not read this rule's plainness as proof of its being
+   checked. */
+.fields-editor__required { flex: none; }
+
 .gn-select__trigger {
   display: flex;
   align-items: center;
