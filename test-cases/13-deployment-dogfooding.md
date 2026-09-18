@@ -10514,11 +10514,18 @@ here rather than fixed silently, per the coordination doc's rule about what is o
   absence cases above would pass on a hook that never reads storage at all.
   **Citations:** `apps/web/src/use-last-project.ts:145`, `apps/web/test/use-last-project.test.tsx:162`
 
-- ✅ **13.853 — the PROJECT record does not leak across WORKSPACES, which the sibling workspace hook has no
-  analogue for.** A project id is unique inside its workspace and meaningless outside it, so a record keyed
-  by user alone would resolve `p_1` inside whichever workspace the viewer happened to be standing in — and
-  if another workspace has a project with that id, it would silently name the WRONG project. The control
-  reads the same record from the workspace it was written for.
+- ✅ **13.853 — the PROJECT record does not leak across WORKSPACES.**
+  **This bullet's rationale was CORRECTED on 2026-09-18 after the review round, and the correction is the
+  point of leaving it visible.** It first said a record keyed by user alone would resolve `p_1` inside
+  whichever workspace the viewer was standing in, "and if another workspace has a project with that id, it
+  would silently name the WRONG project". **That arm cannot happen:** `proj_projects.project_id` is the
+  PRIMARY KEY and the migration's own comment records why an entity id belongs to exactly one workspace, so
+  there is no id to collide and no collision that could be silent. The reviewer could not construct it and
+  neither could the author. What the workspace half actually buys: it is part of the QUESTION the record
+  answers ("the last project you opened in THIS workspace"); it refuses a foreign record at the record
+  rather than depending on a later `find` to not notice it; and it stays correct if ids ever cease to be
+  global. The full replacement is in the file's own docblock at `apps/web/src/use-last-project.ts:35`.
+  The control reads the same record from the workspace it was written for.
   **Citations:** `apps/web/src/use-last-project.ts:69` (the key), `:256` and `:258` (the two guards), `apps/web/test/use-last-project.test.tsx:183`
 
 - ✅ **13.854 — a browser with site data blocked does not throw, and answers `none`.** The accessor is what
@@ -10558,28 +10565,28 @@ here rather than fixed silently, per the coordination doc's rule about what is o
   hook's decision: `/workspaces` renders `workspace.projects` with the archived filtered and does NOT sort,
   and the nav's fallback is that same order — so a hook that sorted, or that dropped archived rows on the
   way out, would put the two on different answers to one question. The filtering belongs to the caller.
-  **Citations:** `apps/web/src/use-workspace-projects.ts:83`, `apps/web/app/workspaces/page.tsx:248`, `apps/web/test/use-workspace-projects.test.tsx:105`
+  **Citations:** `apps/web/src/use-workspace-projects.ts:103`, `apps/web/app/workspaces/page.tsx:248`, `apps/web/test/use-workspace-projects.test.tsx:105`
 
 - ✅ **13.861 — a workspace the read SUCCEEDS without is `null`, and the cache is EVICTED.** `null` and `[]`
   are different claims: `[]` says "this workspace exists and has no projects", which is the one thing the
   nav's fallback would act on. The case warms the cache for the same id FIRST, so an eviction that never had
   anything to evict cannot pass it, and asserts the third mount's FIRST frame is still null.
-  **Citations:** `apps/web/src/use-workspace-projects.ts:128` (the eviction), `apps/web/test/use-workspace-projects.test.tsx:134`
+  **Citations:** `apps/web/src/use-workspace-projects.ts:148` (the eviction), `apps/web/test/use-workspace-projects.test.tsx:134`
 
 - ✅ **13.862 — a REFUSED read is `null`, never an invented empty list.** `[]` would be this hook asserting
   that a workspace exists and contains no projects, and the nav would render its "no reachable project"
   branch — making a refusal indistinguishable from an empty project list.
-  **Citations:** `apps/web/src/use-workspace-projects.ts:83`, `apps/web/test/use-workspace-projects.test.tsx:157`
+  **Citations:** `apps/web/src/use-workspace-projects.ts:103`, `apps/web/test/use-workspace-projects.test.tsx:157`
 
 - ✅ **13.863 — no session, or no workspace in scope, fires NOTHING.** The spy is what makes this about the
   REQUEST rather than its answer: a `null` alone would also be produced by a read that fired and failed.
-  **Citations:** `apps/web/src/use-workspace-projects.ts:108` (the gate), `apps/web/test/use-workspace-projects.test.tsx:176`
+  **Citations:** `apps/web/src/use-workspace-projects.ts:128` (the gate), `apps/web/test/use-workspace-projects.test.tsx:176`
 
 - ✅ **13.864 — THE JITTER, one level down.** `AppNav` is rendered by each PAGE, so every client-side
   navigation remounts it; without the module cache the project item would vanish for the tick it takes to
   read storage and come back. The assertion is on the FIRST frame of the SECOND mount, and the first mount
   in the same case is the control that the cache was warm.
-  **Citations:** `apps/web/src/use-workspace-projects.ts:76` (the cache), `apps/web/test/use-workspace-projects.test.tsx:208`
+  **Citations:** `apps/web/src/use-workspace-projects.ts:96` (the cache), `apps/web/test/use-workspace-projects.test.tsx:253`
 
 - ✅ **13.865 — the item names the remembered project and links to its page.** Name AND href, because a
   rename of that string is the same orphaning by another route: the nav would say "Gamma" and point at
@@ -10628,18 +10635,18 @@ here rather than fixed silently, per the coordination doc's rule about what is o
 - ✅ **13.873 — a row chosen from the DROPDOWN is what gets remembered, not the project the item showed.**
   Separated from 13.872 because a single-armed case cannot tell the two apart: with only the item's own click
   asserted, an implementation that ignored the row clicked and re-remembered the shown project would pass.
-  **Citations:** `apps/web/src/last-project-nav.tsx:259` (the row's own `openProject` call, `:244` is the item's), `apps/web/test/last-project-nav.test.tsx:340`
+  **Citations:** `apps/web/src/last-project-nav.tsx:259` (the row's own `openProject` call, `:244` is the item's), `apps/web/test/last-project-nav.test.tsx:348`
 
 - ✅ **13.874 — the project page OPENS at the remembered tab.** `waitFor` rather than a bare read, and that
   is the honest shape: the seed is applied by an EFFECT, because a `useState` initialiser reading storage
   would answer `null` on the server and disagree with the client at hydration. Without the seed the case
   never settles on Timeline and times out.
-  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:222` (the seed), `apps/web/test/project-calendar-timeline.test.tsx:684`
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:251` (the seed effect; `:257` is the read inside it), `apps/web/test/project-calendar-timeline.test.tsx:693`
 
 - ✅ **13.875 — switching a tab WRITES it, and a fresh mount opens on it.** Neither half implies the other: a
   page that seeded but never wrote would forget on navigation, and one that wrote but never seeded would
   store a tab it never used. The remount is a real second mount against the same storage.
-  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:275` (`setView`), `apps/web/test/project-calendar-timeline.test.tsx:707`
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:275` (`setView`), `apps/web/test/project-calendar-timeline.test.tsx:716`
 
 - ✅ **13.876 — another project's remembered tab does not decide this one's, and writing this one's does not
   disturb it.** Discriminating in both directions: a page that read the map without looking up the id would
@@ -10648,22 +10655,22 @@ here rather than fixed silently, per the coordination doc's rule about what is o
   implementation existed the page ignored storage entirely, so its first arm passed on the existing default.
   It was strengthened — the merge assertion added — precisely because a case that cannot fail is not
   evidence, and the strengthened form is what makes it red before the change.
-  **Citations:** `apps/web/src/use-last-project.ts:314` (the merge, inside the writer at `:296`), `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:195`, `apps/web/test/project-calendar-timeline.test.tsx:747`
+  **Citations:** `apps/web/src/use-last-project.ts:314` (the merge, inside the writer at `:296`), `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:195`, `apps/web/test/project-calendar-timeline.test.tsx:756`
 
 - ✅ **13.877 — opening a project REMEMBERS it, keyed by user AND workspace.** The counterpart of 13.427 one
   level up, and the write the nav's READ depends on: without it the nav would only update when you arrived
   through the nav item, which is the one route that does not need it. The workspace half is asserted because
   a record missing it would resolve `p_1` inside whichever workspace the viewer happened to be standing in.
-  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:268`, `apps/web/test/project-calendar-timeline.test.tsx:837`
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:268`, `apps/web/test/project-calendar-timeline.test.tsx:846`
 
 - ✅ **13.878 — the projects cache is keyed by USER as well as workspace, because this list is viewer-filtered.** The Critical a reviewer found: the first version copied `use-workspace-name.ts`'s cache KEY (workspace id alone) onto a list that is not a name. `apps/server/src/read/visible-projects.ts` serves an owner the whole row set and everybody else only the projects they hold a membership in, so one `workspaceId` is a different list per viewer. Sign-out is `account-menu.tsx`'s `router.push('/sign-in')` — a CLIENT-side navigation — so module state survives it  and the next person's first paint names projects they cannot open, until the fresh read lands and indefinitely if it is slow. The FIRST FRAME is the assertion: the settled value is Bob's either way, so only a warm cache can make the second mount paint someone else's list.
-  **Citations:** `apps/web/src/use-workspace-projects.ts:72` (the key), `:90` (the user it is read from), `:104` (the initialiser), `apps/web/test/use-workspace-projects.test.tsx:230`
+  **Citations:** `apps/web/src/use-workspace-projects.ts:92` (the key), `:110` (the user it is read from), `:124` (the initialiser), `apps/web/test/use-workspace-projects.test.tsx:230`
 
 - ✅ **13.879 — the nav names the project in the ROUTE, not the one storage still holds.** The Important a reviewer found, and the mechanism was MEASURED rather than taken from documentation: React commits passive effects CHILD-FIRST (a probe rendering a parent with one child logged `["child","parent"]`), and `AppNav` is rendered inside the project page's own JSX — so the nav's reader effect ran BEFORE the page's writer effect and named the project you had just left. It self-healed one navigation later, which is exactly what would let it survive a casual look. The fixture makes the fallback unable to produce the passing answer: `p_other` is served FIRST, so only reading the route names Alpha.
   **Citations:** `apps/web/src/last-project-nav.tsx:114` (the route read), `:117` (the hook call it feeds), `apps/web/test/project-calendar-timeline.test.tsx:605`
 
 - ✅ **13.880 — a tab chosen while the session is still LOADING is not reverted when it lands.** The Minor a reviewer found. The rail is not gated on the session — the page's main return at `:1403` is unconditional and nothing between it and the tablist reads `session.kind` — so the tabs are clickable during the session read. `tabUserId` is `null` then, so the click's write goes nowhere, and because `tabUserId` is the seed effect's dependency the landing session RE-RAN it and put the stored tab back over the choice. The case stores `calendar` and clicks List, so the visible half is unambiguous.
-  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:249` and `:250` (the two refs), `:256` (the guard), `:278` (what a click sets), `apps/web/test/project-calendar-timeline.test.tsx:796`
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:249` and `:250` (the two refs), `:256` (the guard), `:278` (what a click sets), `apps/web/test/project-calendar-timeline.test.tsx:805`
 
 ### The mount witness, and why 11.185's arms did NOT change
 

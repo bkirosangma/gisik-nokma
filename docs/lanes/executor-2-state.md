@@ -37,7 +37,7 @@ controller's merge and nothing below needs redoing. Then verify the anchors — 
 | branch | `exec2/nav-last-project` |
 | cut from | **`94866264`** = the base the dispatch named |
 | frozen head | **`verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit that carries it; whatever is here is one MORE than the last commit below |
-| commits | `53f2cadb` (the change set) · `aac83da3` (FIX ROUND — the reviewer's five findings) · the handoff commit |
+| commits | `53f2cadb` (the change set) · `aac83da3` (FIX ROUND — the reviewer's five findings) · `b00a643b` (handoff) · the CORRECTION commit (the scoped re-review's four prose/citation findings, plus this row) |
 | reviewed head | **`53f2cadb`** by the one reviewer, against the named brief (storage-keying and the fallback) |
 | `origin/main` | **`13e74c0b`** — it has MOVED since the dispatch (`94866264` → `13e74c0b`) |
 | ahead / behind | **recount, do not quote** — `git rev-list --left-right --count origin/main...HEAD` |
@@ -89,6 +89,32 @@ were reproduced by a failing case BEFORE the fix**, and those red runs are quote
   own comment says an entity id is a ULID belonging to exactly one workspace. Neither the reviewer nor I
   could construct it. The keying stands; the reason is replaced with three that survive inspection.
 - **M4 → 13.872 strengthened.** Its first assertion could not fail: the fixture wrote the bytes it checked.
+
+### THE SCOPED RE-REVIEW — 0 Critical, 0 Important, 4 Minor, ALL FOUR PROSE OR CITATIONS
+
+A second reviewer ran over `53f2cadb..aac83da3` ONLY (the fix round), because the first pass could not have
+seen it. It **could not construct a failing sequence for any of the five fixes** — it attacked the cache
+keying, the nav's new route read, the tab-seed guard, the four repaired mocks and the global
+`localStorage.clear()`, and confirmed each. Its four findings were all text:
+
+1. **13.853's catalogue rationale still asserted the collision arm the fix round had just proved
+   impossible** — the file's docblock was corrected and the BULLET was not, so within one diff the
+   catalogue both cited and contradicted the corrected file. That is the same "a fix is a change like any
+   other" failure, one layer out.
+2. **13.864's TEST citation was carried forward unmeasured** while the source half of the same line was
+   rewritten — a fix moved the `it(` and the citation did not follow.
+3. **13.874's source citation was semantically wrong and had been from the start**: it said "the seed" and
+   pointed at `tabUserId`, one line above the effect.
+4. **A sentence THIS BRANCH wrote about `use-workspace-name.ts` over-claimed** — it licensed that file's
+   cache keying as "right", when what is viewer-independent is the VALUE and the cache is never dropped on
+   a user change. Replaced with the true claim plus the residual named, owned by whoever next touches that
+   file. It is a first-frame window on a value both people may see, which is NOT the defect this branch
+   fixed.
+
+It also caught a **false sentence in `project-calendar-timeline.test.tsx`** — this branch's own prose said
+`test/setup.ts` "clears storage and the module caches before every case", and it clears storage only
+(because it must import nothing from `src/`). Corrected, with the distinction spelled out, since that is
+the one sentence that would stop a reader asking whether a first frame can come from a previous case.
 
 ### Mutations — the change set's SIX, then the fix round's FOUR, each re-run
 
@@ -153,8 +179,19 @@ Every `path:line` in the new catalogue section was re-measured **at the tree tha
 first read-back instrument was WRONG in a way worth recording: its pattern matched only the full
 `path:line` form and **silently skipped the 15 BARE `:NNN` citations**, printing a clean sheet over them.
 Rebuilt to resolve bare tokens against the preceding full path in the same line, it found **17 drifted
-citations** — every one introduced by this fix round, because a fix moves the lines below it. All 79
-tokens (72 distinct) now land on content lines.
+citations** — every one introduced by this fix round, because a fix moves the lines below it.
+
+**And it had a SECOND gap, which the scoped re-review found by reading rather than by measuring:** its
+"is this line structural" test allowed `/**`, so a citation that had drifted onto a DOCBLOCK OPENER
+printed as clean. Widened to reject any line starting with `*`, `/`, `)`, `}`, `>`, `|` or nothing, it
+immediately flagged the two the reviewer had named. **Two independent instruments, two independent holes,
+both found by a party who did not write them — and both would have printed a green sheet.**
+
+**The lesson for the next restart, because it cost three rounds here: measure citations LAST.** Every one
+of the three correction rounds moved the lines that the previous round's citations pointed at. A fix is a
+change like any other, and the citation sweep has to be the final act before the freeze, not an
+intermediate one. All 73 distinct tokens now land on content lines at this tree, verified by the widened
+instrument.
 
 ## ▼ PREVIOUS BLOCK — membership Task 2: the roster's role control, with `Owner` omitted (2026-09-18)
 

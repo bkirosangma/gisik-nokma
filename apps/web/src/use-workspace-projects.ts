@@ -40,12 +40,32 @@ import { useAppServices, useSessionStatus } from './providers.js';
  * KEYED BY USER **AND** WORKSPACE, and the user half is not symmetry — it is
  * the whole of case 13.878.
  *
- * `use-workspace-name.ts` keys its cache by workspace id alone and is right to:
- * a workspace's NAME is the same for everyone who can see the workspace. A
- * project LIST is not. The server serves a non-owner only the projects they
- * hold a membership in (`apps/server/src/read/visible-projects.ts`: the owner
- * gets the row set, everybody else gets it filtered by `eff.projects`), so one
- * `workspaceId` is a DIFFERENT LIST for every viewer.
+ * `use-workspace-name.ts` keys its cache by workspace id alone. **What that
+ * file caches is a NAME, and a workspace's name is the same for everyone who
+ * can see the workspace** — the value is not viewer-dependent, so its key needs
+ * no user in it. A project LIST is not that. The server serves a non-owner only
+ * the projects they hold a membership in (`apps/server/src/read/visible-projects.ts`:
+ * the owner gets the row set, everybody else gets it filtered by
+ * `eff.projects`), so one `workspaceId` is a DIFFERENT LIST for every viewer.
+ *
+ * **That is a claim about the VALUE, not a clean bill for that file's cache,
+ * and an earlier draft of this paragraph gave it one** ("keys its cache by
+ * workspace id alone and is right to"). A reviewer checked it and the
+ * endorsement was too broad: `nameCache` is not dropped on a user change by the
+ * hook that owns it, and the only thing that clears it is
+ * `use-last-workspace.ts`'s viewer-change branch — which runs only when its own
+ * cache is non-empty. So a viewer who signs out and back in as someone else and
+ * lands directly on a workspace route can see the previous person's workspace
+ * NAME for one frame, which is the very survival-of-module-state the paragraph
+ * above leans on.
+ *
+ * **Recorded, not fixed: it is outside this change and it is not the same
+ * defect as the one above** — a first-frame window on a value both people are
+ * entitled to see, against a window on a list one of them is not. **Owner:
+ * whoever next touches `apps/web/src/use-workspace-name.ts`**, whose own
+ * docblock justifies its key by id PROVENANCE ("the only way a caller obtains
+ * an id is the route or `useLastWorkspace`") rather than by the value being
+ * viewer-independent — a reason that is true and does not cover this.
  *
  * Copying the name cache's key onto a viewer-filtered list serves one person's
  * project names to the next. The sequence is ordinary rather than exotic: sign

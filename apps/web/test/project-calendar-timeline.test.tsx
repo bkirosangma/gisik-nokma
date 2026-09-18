@@ -660,10 +660,19 @@ describe('the nav item follows the route it is on', () => {
  *
  * The page now WRITES to `localStorage` on every tab change, so every earlier
  * case in this file (and in the eight other files that mount this page) leaves
- * a record behind for the next one. `test/setup.ts` clears storage and the
- * module caches before every case for exactly that reason; without it, whether
- * `11.160` above sees Board selected would depend on which tab an earlier case
- * happened to click.
+ * a record behind for the next one. `test/setup.ts` clears STORAGE before every
+ * case for exactly that reason; without it, whether `11.160` above sees Board
+ * selected would depend on which tab an earlier case happened to click.
+ *
+ * **Storage only — it does NOT clear the module caches, and an earlier draft of
+ * this very comment said it did.** `setup.ts` imports nothing from `src/` (its
+ * own docblock records the measured reason: doing so silently defeated
+ * `vi.mock` in every file that mocks the auth client), so the `clear*Cache`
+ * functions are out of its reach and each case's own file calls them. The
+ * distinction matters here because this file's cases vary the SESSION as well
+ * as storage, and a reader who believed the caches were cleared between cases
+ * would stop asking whether a first frame can come from a previous case. Case
+ * 13.880 is the one that would notice.
  */
 describe('the remembered tab', () => {
   /** The label of the one tab carrying `aria-selected="true"`. */
