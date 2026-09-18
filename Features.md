@@ -2484,6 +2484,10 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   rename-over Edit of a marker reached both `dist` copies in **~1 s**, an in-place append that followed
   (host inode verified unchanged) also reached both in **~1 s**, and the revert returned both to zero.
   Cost of the settled pair: `server` **3.99–6.69 %** CPU / 1.266 GiB, `web` **1.55–1.69 %** / 1.332 GiB.
+  **The deployed-stack E2E suite runs against THIS stack** (Step 5b, 2026-09-18): the hot pair holds
+  :3000 and :3001 permanently from the worktree, so the "wait for a stack window" constraint the Task 12
+  pause recorded no longer exists. Its seed step is now shape-aware for exactly that reason — see the
+  Deployed-stack E2E bullet below.
   `docker-compose.hot.yml`, `apps/server/Dockerfile`, `apps/web/Dockerfile`, `package.json`,
   `docs/runbook.md`,
   `test-cases/13-deployment-dogfooding.md` (Step 1's witness record is **13.650–13.653**, re-minted from
@@ -2512,7 +2516,18 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   container healthy in both states. The Mailpit helper purges the inbox immediately before each send and
   then requires **exactly one** message, because `messages[0]` under an unknown sort order can return an
   already-spent link and following one does not fail loudly — the earlier session cookie is still in the
-  context. `apps/web/e2e-stack/*`, `apps/web/playwright.stack.config.ts`, the `e2e` job in
+  context. **Its seed step is SHAPE-AWARE and has to be — there are two images this suite runs against
+  and only one of them has a `dist`** (Step 5b, 2026-09-18). The prod-parity image carries `/app/dist`
+  and no `src`, so `node dist/seed/cli-seed-convenience-corner.js` is right there; the hot image
+  bind-mounts `apps/server/src` at `/repo/apps/server/src`, has WORKDIR `/repo`, and has **no `dist`
+  anywhere**, so the old unconditional command died with `MODULE_NOT_FOUND` before a single spec ran.
+  The source shape then needed a **second** fix that only running it could find: `pnpm --filter … run
+  <script>` sets the cwd to the PACKAGE directory, so the seed's relative default for `board.data.js`
+  resolved to `/repo/apps/server/reference/…` and the first live run died on `ENOENT`. Both halves live
+  in `apps/web/e2e-stack/helpers/seed-shape.ts`, which is pure so the prod half — whose container is
+  deliberately not started here — has a witness in `apps/web/test/seed-shape.test.ts` rather than
+  shipping unmeasured. `apps/web/e2e-stack/*`, `apps/web/test/seed-shape.test.ts`,
+  `apps/web/playwright.stack.config.ts`, the `e2e` job in
   `.github/workflows/ci.yml`
 - ⚙️ **`WEB_ORIGIN` is a trusted auth origin — the product no longer refuses its own client** —
   better-auth's `trustedOrigins` was left at its default, the origin of `BETTER_AUTH_URL`, which is the

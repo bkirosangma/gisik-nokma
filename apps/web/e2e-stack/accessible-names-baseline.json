@@ -1,1 +1,51 @@
-{}
+{
+  "stack-phone-390|/my-work": {
+    "ariaLabel": 8,
+    "role": 4,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 155
+  },
+  "stack-phone-390|/p/:projectId": {
+    "ariaLabel": 66,
+    "role": 14,
+    "ariaSelected": 5,
+    "ariaDescribedby": 0,
+    "rawMatches": 452
+  },
+  "stack-phone-390|/members": {
+    "ariaLabel": 5,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 88
+  },
+  "stack-phone-390|/settings/ticket-types": {
+    "ariaLabel": 8,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 140
+  },
+  "stack-phone-390|/settings/workflows": {
+    "ariaLabel": 5,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 71
+  },
+  "stack-phone-390|/workspaces": {
+    "ariaLabel": 5,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 86
+  },
+  "stack-phone-390|/w/:workspaceId": {
+    "ariaLabel": 12,
+    "role": 0,
+    "ariaSelected": 0,
+    "ariaDescribedby": 4,
+    "rawMatches": 93
+  }
+}
