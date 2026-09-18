@@ -42,6 +42,7 @@ the controller's merge and nothing below needs redoing. Then verify the anchors 
 | frozen head | **`verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit that carries it; whatever is here is one MORE than the last commit below |
 | ahead / behind | recount, do not quote |
 | tree | clean |
+| bare `:NNN` below | Every bare `:NNN` citation in THIS block refers to `apps/web/app/w/[workspaceId]/members/page.tsx`, and every line number here was re-measured **at the tree that carries this file** — not at an earlier commit. That distinction is the whole of the scoped re-review's first finding: fix round 1 wrote citations measured at the reviewed head into a commit whose own insertions moved every line below them, so a reader verifying them landed on prose. **If you edit any file on this branch, re-measure these before committing.** |
 
 ### THE REVIEW ROUND — no Critical, two Important, five Minor; ALL SEVEN ADDRESSED at `526c9fbf`
 

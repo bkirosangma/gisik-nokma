@@ -10166,7 +10166,7 @@ on — or worse, believed.
   first version of this sentence, which named the two rules plan-internally and was wrong about both.**
   `grant-owner-requires-owner` fires only when the payload grants `owner`
   (`apps/server/src/permissions/check-permission.ts:589`), and this control's options
-  (`page.tsx:518-522`) cannot build that payload, so **it can never fire from here**. `last-owner` fires
+  (`apps/web/app/w/[workspaceId]/members/page.tsx:518-522`) cannot build that payload, so **it can never fire from here**. `last-owner` fires
   only when the SERVER's row for that user holds `owner`
   (`packages/rule-engine/src/checks/membership.ts:139-146`) while the rendered row is editable — and
   `isEditableRole` suppresses the control on an owner's row, both halves reading `proj_memberships`
@@ -10274,7 +10274,7 @@ piece of work.
 3. **Capitalised labels were NOT adopted, and this is a deviation from the plan's sample rather than an
    oversight.** The plan expects `['Admin', 'Member', 'Guest']`; the shipped control offers
    `['admin', 'member', 'guest']`. Two reasons, and the second is decisive: the mint form on this same page
-   already ships the lowercase labels (`page.tsx:688-690`, pinned by case 3.132), and the roster's chip
+   already ships the lowercase labels (`apps/web/app/w/[workspaceId]/members/page.tsx:688-690`, pinned by case 3.132), and the roster's chip
    prints the wire's own token — case 13.761 pins that with the reasoning that a case expecting `'Owner'`
    "would be asserting a mapping nobody wrote". A capitalised label here would be a display mapping living
    in exactly one control; the mixed presentation it produces on one screen (a lower-case `owner` chip
@@ -10323,7 +10323,7 @@ So "the role control wires the event to the client ingest path" is true, and "th
 replica's outbox" is not — `apps/web` does not construct a replica data source at all. **The follow-on
 stays open with a corrected trigger: it goes live when a REPLICA-BACKED client gains a screen that emits
 `membership.granted` or `membership.revoked`.** Measured: the only client in the repo that emits either
-today is this task's control (`page.tsx:321`); `apps/desktop` is a `TicketList` shell and `apps/mobile` has
+today is this task's control (`apps/web/app/w/[workspaceId]/members/page.tsx:321`); `apps/desktop` is a `TicketList` shell and `apps/mobile` has
 `editor/`, `push/`, `screens/`, `storage/` and no members surface, so the throw remains latent on both. The
 finding itself (`outbox.ts:315` calls `evaluateEvent` with no `try`/`catch`) is **narrower than its first
 record and no less real**; the repair is still where a throwing evaluation is caught, and still not a
