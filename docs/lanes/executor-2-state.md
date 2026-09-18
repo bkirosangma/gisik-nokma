@@ -20,9 +20,89 @@
 
 ---
 
-## ▲ TOP BLOCK — second wave Task 10: `Close all (N)` on a terminal board column (2026-09-18)
+## ▲ TOP BLOCK — second wave Task 11: List row checkboxes and `Close selected (N)` (2026-09-18)
 
-**Position: the change set is COMPLETE, the review round is CLOSED and fully discharged, and the PR
+**Position: the change set is COMPLETE and committed at `8f6dde42`, the reviewer has run over that sha
+and its outcome is recorded below, and the PR is open awaiting the controller's merge.** Dispatch:
+`CTL-DISPATCH-2026-09-18-exec2-secondwave-t11.md`. One PR, `--base main`, branch
+**`exec2/secondwave-t11-list-selection`**, cut from `origin/main` = `43885e26` (which is also the `#452`
+merge — Task 10's).
+
+**CHECK `gh pr list --state open` BEFORE ACTING ON THE POSITION LINE ABOVE.** The Task 10 block this one
+replaced said "the PR is open awaiting the controller's merge" and PR #452 had already merged at
+`43885e26`; the block BELOW it says the same thing about Task 9's PR #449, which merged at `08bdd791`.
+Both were stale in the conservative direction, which is the direction nobody audits. A restart surface
+that says "open" about a merged PR is this lane's most-repeated failure; the check is one command.
+
+### Anchors — verify these; do not trust the row
+
+| | |
+|---|---|
+| branch | `exec2/secondwave-t11-list-selection` |
+| base | **`43885e26`** = `origin/main` at cut time = the `#452` merge (Task 10) |
+| change commit | **`8f6dde42`** — the commit the reviewer ran against |
+| frozen head | **verify with `/usr/bin/git rev-parse HEAD`.** A block cannot name the commit carrying it |
+| ahead | recount at the tip; the handoff commit itself is one of them |
+| behind | **recount.** `main` moves without telling you, and this lane merges into it |
+| PR | opens from this branch, `--base main`, reviewer recorded in the body BEFORE it opens |
+
+### What shipped
+
+`packages/app-core/src/views/ticket-list.tsx` (the `selection` and `controls` props + the leading
+checkbox column in `ListTable`) · `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` (the List arm:
+`selectedIds`, `pendingClose`, `canBulkClose`, `reloadListClearingSelection`, the opener's swap guard,
+the one `BulkCloseDialog` mount) · `packages/ui/src/ui.css` (`.gn-list__select`; `.gn-list__bulk-close`
+as a FOURTH selector in the existing `.gn-board-card__close`/`.gn-row-action`/`.gn-board__column-action`
+rule body, not a copy) · tests `packages/app-core/test/views/ticket-list.test.tsx`,
+`apps/web/test/list-bulk-close.test.tsx` (new), `packages/app-core/test/views/ticket-list-css-binding.test.tsx`
+(the 13.671 maximal fixture gained a FIFTH render) · `Features.md` · `test-cases/13`.
+**`task-ledger.tsv` untouched. `packages/app-core/src/index.ts` untouched** — `BulkCloseDialog` and
+`BulkCloseTicket` were already exported by Task 9.
+
+### ★ THE CORRECTION THIS TASK CARRIES — the same gap as Task 10, on the second surface
+
+The plan wires `onClosed` → `list.reload()` with the selection cleared on reload. §8.3's Board bullet is
+ONE sentence carrying both halves — *"Per-ticket refusals … **stay listed**; the rest close and the board
+reloads"* — and the List bullet inherits it through "same dialog, same batch". `onClosed` fires on a
+PARTIAL close too, so an `open` derived from the selection unmounts the dialog in the same tick its
+`Could not close` rows are written.
+
+**The fix is the Board's, stated for this consumer: `pendingClose` is the click-time SNAPSHOT and the
+dialog's own open flag at once**, `onClosed` reloads UNCONDITIONALLY, and the snapshot is released only on
+a COMPLETE close. **13.794 is the witness; the mutation that reinstates the plan's literal reading
+reddens 13.794 and nothing else.** The same review-found path Task 10 closed is closed here too
+(`setPendingClose((current) => current ?? snapshot)`), with 13.795 as its witness — and 13.795's CONTROL
+half (dismiss, press again, see the CURRENT selection) is what stops "the titles did not change" passing
+on a click that never reached the handler.
+
+### Case ids — measured, not taken
+
+**Cases 13.647–13.649** (the plan's own ids, from its `13.613`–`13.649` reservation) **and 13.794–13.795**
+(this lane's block `13.760`–`13.819`, continuing it). Measured with the sanctioned extractor before
+minting: the highest case MARKER in `test-cases/` at this tip was `13.793`, and `13.647`/`13.648`/`13.649`
+were free. **Positive control in the same run**: `13.640` resolved as taken, and `13.644`–`13.646`
+resolved as absent — confirming the controller's correction of its own earlier claim. **The next free id
+in this lane's block is `13.796`.**
+
+### What a restart must NOT redo
+
+- The plan's Task 11 text is **not** to be implemented literally — see the correction above. If a
+  dispatch ever quotes it again, the correction wins.
+- `packages/app-core/test/views/ticket-list-css-binding.test.tsx` (13.671) is a bidirectional
+  class↔CSS equality. It REDDENED when this task's two classes were added and was extended, which is
+  the check working as designed: a new class in either package must be reflected in that fixture.
+
+---
+
+## ▼ PREVIOUS BLOCK — second wave Task 10: `Close all (N)` on a terminal board column (2026-09-18)
+
+> **CORRECTED 2026-09-18 when Task 11 opened this file.** The Position line below said *"the PR is open
+> awaiting the controller's merge"*. **IT WAS ALREADY MERGED — PR #452, merge commit `43885e26`, which
+> was `origin/main` when Task 11 cut its branch.** The line is kept rather than rewritten so the shape of
+> the failure stays readable; the Task 11 block above opens with the check that settles it
+> (`gh pr list --state open`).
+
+**Position (as written, and stale): the change set is COMPLETE, the review round is CLOSED and fully discharged, and the PR
 is open awaiting the controller's merge.** Dispatch:
 `CTL-DISPATCH-2026-09-18-exec2-secondwave-t10.md`. One PR, `--base main`, branch
 **`exec2/secondwave-t10-board-closeall`**, cut from `origin/main` = `8aff8843`.

@@ -628,11 +628,21 @@ function ProjectBoard() {
    *
    * A selection is a claim about a list, and it stops being true when the list
    * is re-asked. The clear lives in `reloadListClearingSelection` — the wrapper
-   * this page's own reload sites call — and not on `list.rows`' identity, for
-   * the reason `rankOverrides` above gives in the other direction: a background
-   * stream refetch also changes what `list.rows` holds, and clearing there
-   * would wipe a selection out from under someone who never asked for a read.
-   * Keyed on the CALL, a re-ask this client makes is what resets the claim.
+   * the bulk close's own `onClosed` calls, its only caller today — and not on
+   * `list.rows`' identity, for the reason `rankOverrides` above gives in the
+   * other direction: a background stream refetch also changes what `list.rows`
+   * holds, and clearing there would wipe a selection out from under someone who
+   * never asked for a read.
+   *
+   * **Its ONE caller is deliberate and worth stating, because the Backlog tab's
+   * three other reload sites do not go through it.** `list.reload` is called
+   * directly by `BacklogStartButton`'s `onStarted`, by the rank controls'
+   * `onRanked`, and by `submitRank`'s own partial-application reload — all of
+   * them BACKLOG writes, none of which changes what the List tab is showing or
+   * has anything to say about a selection made there. Routing them through this
+   * wrapper would clear a List selection because somebody started a backlog
+   * ticket on another tab. Keyed on the CALL, a re-ask this client makes for
+   * the reason the selection exists is what resets the claim.
    *
    * The wrapper is not used by the dialog's `onClose`: dismissing an opening
    * changes nothing about the list, and a Cancel that also threw the selection
