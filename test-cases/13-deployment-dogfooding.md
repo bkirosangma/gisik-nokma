@@ -9452,3 +9452,76 @@ about the code, and both were unwitnessed decisions rather than unconstrained pa
    anchor turned out to be non-unique (it appears at two sites, in the happy path and the `catch`), and
    the harness reported `replacement count 2 (expected 1)` rather than half-applying it.
 10. **Control re-run** (the plan's own: batch → N calls) → still RED, so round 2's harness is measuring.
+
+## `Close all (N)` on a terminal board column (executor 2, 2026-09-18) — block `13.760`–`13.819`, ids `13.789`–`13.792`
+
+**Second-wave Task 10.** Four ids drawn from this executor's own block `13.760`–`13.819`, continuing the
+allocation the 2026-09-18 two-executor override set up so two writers never mint into one tip. The plan's
+own step text names `13.644`–`13.646`, from its `13.613`–`13.649` reservation; those ids are NOT taken —
+a marker sweep over `test-cases/` and a repo-wide sweep over `*.ts`/`*.tsx`/`*.md` both find `13.644`,
+`13.645` and `13.646` **only inside the plan file itself**, never as a catalogue marker and never in a
+test. The task dispatch's parenthetical "(13.644–13.646 are taken)" is therefore wrong as written and is
+recorded here rather than repeated; the block allocation is what binds regardless, so the ids below are
+this lane's.
+
+Recount at the tip this block was written against: the highest catalogue marker in this file is `13.788`,
+and `13.789`–`13.792` appear nowhere in the repo except this executor's own handoff prose saying they were
+free. Sweep run with quoted globs — the unquoted form is silently eaten by zsh and returns a well-formed
+empty answer.
+
+- ✅ **13.789 — a terminal column holding cards shows `Close all (N)`, a non-terminal column holding a card
+  shows none, and confirming ingests ONE batch and reloads.** The negative is the load-bearing half and it
+  is deliberately paired with a column that HOLDS a card: `Doing` has one and still offers no action, so
+  the assertion discriminates on the column's `category` rather than passing because the column was
+  empty. `Close all (2)` is asserted as visible TEXT and `Close all 2 in Done` as the accessible name —
+  the column is in the name because a board draws several columns at once and a duplicate page-level name
+  would make the control unaddressable by role and name. The confirm asserts `source.ingested` has length
+  **1** with two `ticket.closed` envelopes in the listed order, `origin: 'web'`, and `onMoved` called once:
+  the one-batch assertion is the same one 13.640 makes for the dialog, made here at the SURFACE, because a
+  surface that looped N single-element calls would satisfy every other assertion in this file. Then the
+  dismissal: **everything committed, so the dialog LEAVES** — the board clearing its own `bulkClose` in
+  `onClosed`, which is the defect the task was written to fix and which 13.792 pins from the other side.
+  The last third renders the `moves`-less board and asserts no such button anywhere, after an explicit
+  `cleanup()` — React Testing Library unmounts between TESTS, not within one, so a bare second `render()`
+  would leave both trees mounted and the query answering about either.
+  **Citations:** `packages/app-core/src/views/board.tsx:540` (the three-term gate), `:256` (the snapshot at
+  click time), `:427` (the single mount), `packages/app-core/test/views/board-close.test.tsx:286`.
+- ✅ **13.790 — an empty terminal column shows no `Close all` button.** Spec §8.3 words the action as
+  "N = cards in the column", so `Close all (0)` is not a control this surface has to offer. This case is a
+  NEGATIVE and cannot fail before the button exists, which is why it is not the pair that carries the
+  gate: its discriminating power is against the removal of the `cards.length > 0` term specifically, and
+  the mutation that drops that single term reddens **this case and nothing else in the file**.
+  **Citations:** `packages/app-core/src/views/board.tsx:294` (the conditional clear), `:427` (the dialog),
+  `packages/app-core/test/views/board-close.test.tsx:411`.
+  **Citations:** `packages/app-core/src/views/board.tsx:540` (the `cards.length > 0` term),
+  `packages/app-core/test/views/board-close.test.tsx:354`.
+- ✅ **13.791 — a click on `Close all` never opens a ticket, paired with a positive control.** The action
+  lives in the column `<header>`, OUTSIDE `BoardCardSlot`, so the card-click bail
+  (`CARD_CLICK_BAIL_SELECTOR`) never comes into play here — the assertion is made directly rather than
+  inherited from the per-card Close cases. The control is in the same test: a click on the card's own
+  title button calls `onOpenTicket` once, then the clear, then the column action does not call it at all
+  and the dialog opens. Without the control the negative could not tell "correctly inert" from "the
+  handler is dead".
+  **Citations:** `packages/app-core/test/views/board-close.test.tsx:376` (both halves in one test).
+- ✅ **13.792 — a PARTIAL close reloads the board and KEEPS the dialog, with the refusal still listed.**
+  **This is the case the task's own dispatch asked for and it is the reason the board's clear is
+  conditional.** Spec §8.3's Board bullet is one sentence carrying both halves — *"Per-ticket refusals …
+  stay listed; the rest close and the board reloads."* `onClosed` fires on a partial too (the dialog calls
+  it whenever at least one ticket committed), so an unconditional `setBulkClose(null)` — which is what the
+  plan's text plus the dispatch's wording produce — unmounts the dialog and destroys the `Could not close`
+  rows the same sentence requires it to keep on screen. The case drives a two-ticket column where the
+  second is refused: it asserts `onMoved` called once ("the rest close and the board reloads" holds on
+  this outcome too), the dialog still present, `Could not close` present, `Beta — Not in a terminal state.`
+  present, the committed `Alpha` no longer pending, and the confirm control gone because nothing is left to
+  try. The mutation that reinstates the dispatch's literal reading reddens **this case and nothing else in
+  the file**.
+
+**Mutations run against `packages/app-core/test/views/board-close.test.tsx`, each restored from a byte copy
+verified by sha256 (not `git checkout`), each guarded by a replacement count of exactly 1.**
+
+1. **The plan's own — the button rendered regardless of category** → reddens **13.789** (the non-terminal
+   negative) and 13.790. The plan predicted 13.644's negative; that id is now 13.789's.
+2. **The `cards.length > 0` term dropped** → reddens **13.790 and nothing else**.
+3. **`bulkClose` cleared UNCONDITIONALLY in `onClosed`** — the task dispatch's literal wording, and the
+   control for this task's correction → reddens **13.792 and nothing else**. This is the mutation that
+   proves the conditional clear is load-bearing rather than decorative, and that 13.792 is aimed at it.

@@ -21,11 +21,13 @@ import { actorLabel, formatStateProvenance } from '../provenance.js';
 import { makeSubmittedFactory } from '../submit.js';
 import type {
   BoardCard as BoardCardData,
+  BoardColumn,
   BoardGroup,
   BoardView as BoardViewData,
 } from '../view-types.js';
 import { arrowTargets } from './board-arrows.js';
 import { moveOutcome } from './board-moves.js';
+import { BulkCloseDialog, type BulkCloseTicket } from './bulk-close-dialog.js';
 import { formatRollup } from './rollup-text.js';
 import { TransitionDialog, type TransitionSubmission } from './transition-dialog.js';
 import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
@@ -238,6 +240,62 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, moves }
   const moveRegistryRef = useRef<MoveRegistry>(new Map());
 
   /**
+   * THE COLUMN-LEVEL BULK CLOSE (`Close all (N)`, spec §8.3's Board bullet,
+   * second wave Task 10). `null` = no opening; otherwise the tickets THAT
+   * OPENING is about, snapshotted at click time so a later board reload cannot
+   * rewrite a dialog already on screen.
+   *
+   * Declared HERE, above the `board.groups.length === 0` early return below,
+   * for the Rule of Hooks reason `moveRegistryRef`'s own docblock gives: the
+   * hook must run on every render, including the zero-groups one that returns
+   * before the main JSX.
+   */
+  const [bulkClose, setBulkClose] = useState<BulkCloseTicket[] | null>(null);
+
+  /** Opens the dialog on ONE column's cards, in the column's own render order. */
+  const openBulkClose = (column: BoardColumn): void => {
+    setBulkClose(column.cards.map((card) => ({ ticketId: card.ticketId, title: card.title })));
+  };
+
+  /**
+   * WHAT A CLOSE DOES TO `bulkClose` — AND WHY THE CLEAR IS CONDITIONAL.
+   *
+   * `BulkCloseDialog` never dismisses itself (its own docblock: the consumer
+   * owns the dismissal), so the board has to decide, and the decision has two
+   * halves that pull in opposite directions:
+   *
+   *   - ON A FULL SUCCESS the dialog must LEAVE. `moves.onMoved()` alone
+   *     reloads the board and leaves the dialog mounted and empty — every
+   *     ticket closed, `pending` empty, nothing but a Cancel left to press.
+   *     Clearing `bulkClose` is what turns `open` false.
+   *   - ON A PARTIAL CLOSE it must STAY. Spec §8.3's Board bullet is one
+   *     sentence carrying both halves: *"Per-ticket refusals … stay listed;
+   *     the rest close and the board reloads."* Clearing here would unmount the
+   *     dialog and destroy the `Could not close` rows the same sentence
+   *     requires it to keep on screen.
+   *
+   * `onClosed` fires for BOTH (it is called whenever at least one ticket
+   * committed, so a partial always reaches this handler), which is exactly why
+   * the test cannot be "was `onClosed` called". It is `closedIds.length ===
+   * tickets.length`: every ticket this opening listed came back committed.
+   *
+   * The reload is UNCONDITIONAL — "the rest close and the board reloads" holds
+   * on both outcomes, and the committed tickets are gone from the server's
+   * board whether or not their siblings refused.
+   *
+   * Recorded at this length because the plan's text says only `onClosed` →
+   * `moves.onMoved()`, and the task's own dispatch said to clear `bulkClose`
+   * unconditionally: an unconditional clear satisfies both and silently deletes
+   * half of §8.3 from this surface. Case 13.792 is the witness that holds it.
+   */
+  const handleBulkClosed = (closedIds: string[]): void => {
+    moves?.onMoved();
+    setBulkClose((current) =>
+      current !== null && closedIds.length === current.length ? null : current,
+    );
+  };
+
+  /**
    * THE WHOLE-BOARD SENTENCE IS GATED ON ZERO CARDS, NOT ZERO GROUPS — AND NOT
    * ON A NARROWED VIEW (board-prototype-port Task 7, Ruling R6, 2026-09-16,
    * widening Plan 6 Task 15b item 4's original `board.groups.length === 0`
@@ -337,6 +395,7 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, moves }
             onCreateTicket={onCreateTicket}
             moves={moves}
             moveRegistry={moveRegistryRef}
+            bulkCloseFor={openBulkClose}
           />
         ) : (
           <BoardGroupSection
@@ -347,9 +406,33 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, moves }
             onCreateTicket={onCreateTicket}
             arrows={null}
             onDropCard={null}
+            bulkCloseFor={null}
           />
         );
       })}
+      {/*
+       * ONE dialog for the whole board, not one per column — the plan's own
+       * "renders `BulkCloseDialog` once", and the shape `BulkCloseDialog`'s
+       * attempt-token docblock assumes (it survives a dismissal and is toggled
+       * by `open`, rather than being unmounted and remounted).
+       *
+       * NOT rendered at all on the `moves`-less path: the dialog needs a
+       * `dataSource`, a `workspaceId` and a `currentUserId`, and `moves` is the
+       * only thing `Board` carries that knows them. That path has no
+       * `Close all` button either (`bulkCloseFor` is `null` below), so the two
+       * absences are the same absence.
+       */}
+      {moves !== undefined ? (
+        <BulkCloseDialog
+          open={bulkClose !== null}
+          tickets={bulkClose ?? []}
+          dataSource={moves.dataSource}
+          workspaceId={moves.workspaceId}
+          currentUserId={moves.currentUserId}
+          onClose={() => setBulkClose(null)}
+          onClosed={handleBulkClosed}
+        />
+      ) : null}
     </div>
   );
 }
@@ -370,6 +453,7 @@ function BoardGroupSection({
   onCreateTicket,
   arrows,
   onDropCard,
+  bulkCloseFor,
 }: {
   group: BoardGroup;
   groupCount: number;
@@ -386,6 +470,19 @@ function BoardGroupSection({
    * and a `toStateId`, mirroring exactly how it already treats `arrows`.
    */
   onDropCard: ((event: DragEvent<HTMLElement>, toStateId: string) => void) | null;
+  /**
+   * The column-level bulk close (spec §8.3's Board bullet, second wave Task
+   * 10). `null` on the plain, `moves`-less path — the SAME "capability absent,
+   * not a dead stub" precedent `arrows` and `onDropCard` set above, and the
+   * same absence: the dialog `Board` opens needs a `dataSource`/`workspaceId`/
+   * `currentUserId` that only `moves` carries, so a board with no move
+   * capability has nothing to open a bulk close WITH. Non-null, every TERMINAL
+   * column holding at least one card gains one `Close all (N)` button, and
+   * `BoardGroupSection` still knows nothing about the dialog itself: it hands
+   * back the whole column and lets the caller decide, exactly as `onDropCard`
+   * hands back an event and a `stateId`.
+   */
+  bulkCloseFor: ((column: BoardColumn) => void) | null;
 }) {
   return (
     <section className="gn-board__group">
@@ -414,6 +511,42 @@ function BoardGroupSection({
             <header className="gn-board__column-header">
               <Chip tone={column.blocked ? 'blocked' : column.category}>{column.name}</Chip>
               <span className="gn-board__count">{column.cards.length}</span>
+              {/*
+               * `Close all (N)` — spec §8.3's Board bullet: "A TERMINAL
+               * column's header gains Close all (N) (N = cards in the
+               * column)."
+               *
+               * THREE terms, and each excludes a different way of rendering a
+               * control that cannot work:
+               *   - `bulkCloseFor !== null` — no `moves`, no dialog to open
+               *     (see the prop's own docblock). Not merely "disabled": there
+               *     is no handler to call.
+               *   - `category === 'terminal'` — spec §8.3 says a TERMINAL
+               *     column, and `ticket.closed` is refused from anywhere else
+               *     (`close-requires-terminal`), so offering it elsewhere would
+               *     be offering a write the engine rejects. A column holding
+               *     cards is still not a candidate on this axis — the negative
+               *     case 13.789 asserts holds a card for exactly that reason.
+               *   - `cards.length > 0` — "N = cards in the column", so N = 0
+               *     is not a thing this action has to say. Nothing to close,
+               *     no button; case 13.790.
+               *
+               * The accessible name carries the COLUMN as well as the count
+               * (`Close all 2 in Done`): a board shows several columns at once
+               * and a page-level duplicate name would make the control
+               * unaddressable by role and name. The visible text stays exactly
+               * the spec's `Close all (N)`.
+               */}
+              {bulkCloseFor !== null && column.category === 'terminal' && column.cards.length > 0 ? (
+                <button
+                  type="button"
+                  className="gn-board__column-action"
+                  aria-label={`Close all ${column.cards.length} in ${column.name}`}
+                  onClick={() => bulkCloseFor(column)}
+                >
+                  Close all ({column.cards.length})
+                </button>
+              ) : null}
             </header>
             <ul className="gn-board__cards">
               {column.cards.map((card) => (
@@ -507,6 +640,7 @@ function BoardGroupWithMoves({
   onCreateTicket,
   moves,
   moveRegistry,
+  bulkCloseFor,
 }: {
   group: BoardGroup;
   groupCount: number;
@@ -515,6 +649,8 @@ function BoardGroupWithMoves({
   moves: BoardMoveCapability;
   /** Board-prototype-port Task 14 — see `MoveRegistry`'s own docblock. Owned by `Board`, threaded through unchanged. */
   moveRegistry: MutableRefObject<MoveRegistry>;
+  /** Second wave Task 10 — `Board`'s own opener, threaded through unchanged; see `BoardGroupSection`'s prop. */
+  bulkCloseFor: (column: BoardColumn) => void;
 }) {
   const workflowKey = `${group.workflowId}@${group.workflowVersion}`;
   const workflow = useLiveQuery(moves.dataSource, moves.workspaceId, workflowKey, () =>
@@ -587,6 +723,7 @@ function BoardGroupWithMoves({
             )
       }
       onDropCard={handleDrop}
+      bulkCloseFor={bulkCloseFor}
     />
   );
 }
