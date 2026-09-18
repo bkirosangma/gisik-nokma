@@ -107,8 +107,15 @@ export default async function globalSetup(): Promise<void> {
    * right there. The hot image (`-f docker-compose.hot.yml`, `target: dev`) bind-mounts
    * `apps/server/src` at `/repo/apps/server/src`, has WORKDIR `/repo`, and has NO `dist` anywhere —
    * measured in this worktree's own container, 2026-09-18 — so the previous unconditional command
-   * died with MODULE_NOT_FOUND before a single spec ran. Both shapes, and why the probe is a
-   * separate exec rather than one `sh -c` with `a && b || c`, are in `helpers/seed-shape.ts`.
+   * died with MODULE_NOT_FOUND before a single spec ran.
+   *
+   * AND THE SHAPE IS TWO DECISIONS, NOT ONE — the second found only by RUNNING the fix. `pnpm
+   * --filter … run seed:cc` sets the cwd to the package directory, not the container's `/repo`, so
+   * the seed's relative default for `board.data.js` resolved to `/repo/apps/server/reference/…` and
+   * the first live run died on `ENOENT … open 'reference/convenience-corner-tracker/board.data.js'`.
+   * The source shape therefore states `--board-path` outright. Both shapes, both halves, and why
+   * the probe is a separate exec rather than one `sh -c` with `a && b || c`, are in
+   * `helpers/seed-shape.ts`.
    */
   const probe = execFileSync('docker', [...composeExec, 'sh', '-c', probeShellCommand()], {
     cwd: REPO_ROOT,

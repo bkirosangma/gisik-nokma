@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DIST_SEED_ENTRY,
+  HOT_BOARD_PATH,
   probeShellCommand,
   seedArgv,
   seedShape,
@@ -40,10 +41,34 @@ describe('seed shape — the two container images, and the command each needs', 
   });
 
   it('the hot image seeds from source, through the workspace filter', () => {
-    // `/repo` is the hot container's WORKDIR and no `dist` exists in it, so a
-    // relative path cannot work; `seed:cc` is `tsx src/seed/cli-seed-convenience-corner.ts`
-    // in apps/server/package.json, and the filter resolves it from the root.
-    expect(seedArgv('source')).toEqual(['pnpm', '--filter', '@gisik-nokma/server', 'seed:cc']);
+    // No `dist` exists in the hot stage, so there is no compiled entry point to
+    // name; `seed:cc` is `tsx src/seed/cli-seed-convenience-corner.ts` in
+    // apps/server/package.json, and the workspace filter resolves it.
+    expect(seedArgv('source')).toEqual([
+      'pnpm',
+      '--filter',
+      '@gisik-nokma/server',
+      'run',
+      'seed:cc',
+      '--board-path',
+      HOT_BOARD_PATH,
+    ]);
+  });
+
+  it('the source shape states the board path, because pnpm moves the cwd', () => {
+    // THE SECOND HALF OF THE SAME DEFECT, and the half that only a RUN found.
+    // `pnpm --filter … run <script>` sets the cwd to the PACKAGE directory
+    // (`/repo/apps/server`), so the seed's relative default
+    // `reference/convenience-corner-tracker/board.data.js` resolves to
+    // `/repo/apps/server/reference/…`, which does not exist — measured live:
+    // `ENOENT … open 'reference/convenience-corner-tracker/board.data.js'`.
+    // With this flag the same command reported `guest configured`.
+    expect(seedArgv('source')).toContain(HOT_BOARD_PATH);
+    expect(HOT_BOARD_PATH).toBe('/repo/reference/convenience-corner-tracker/board.data.js');
+    // And the asymmetry is deliberate rather than an oversight: the dist shape
+    // runs with cwd = the image's WORKDIR, where the relative default is
+    // correct and has never been observed failing.
+    expect(seedArgv('dist')).not.toContain(HOT_BOARD_PATH);
   });
 
   it('the two shapes do NOT collapse into one command', () => {

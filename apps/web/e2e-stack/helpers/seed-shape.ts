@@ -48,6 +48,32 @@
 /** The path `node` is handed in the prod-parity image, relative to `/app`. */
 export const DIST_SEED_ENTRY = 'dist/seed/cli-seed-convenience-corner.js';
 
+/**
+ * WHERE THE SNAPSHOT ACTUALLY IS IN THE HOT STAGE — and the second half of the
+ * same defect, found only because the first half was fixed and the suite was
+ * then run rather than reasoned about.
+ *
+ * `seed:cc` reads `board.data.js` from `--board-path`, defaulting to
+ * `reference/convenience-corner-tracker/board.data.js` **relative to the
+ * process's working directory** (`cli-seed-convenience-corner.ts:72`). In the
+ * prod-parity shape the cwd is `/app` and `docker-compose.dev.yml` mounts
+ * `./reference` at `/app/reference`, so the default resolves.
+ *
+ * `pnpm --filter … run seed:cc` does NOT inherit the container's `/repo`: pnpm
+ * runs a script with the cwd set to the PACKAGE directory. Measured here on
+ * 2026-09-18, the first live run of the shape-aware setup:
+ *
+ *     > @gisik-nokma/server@0.1.0 seed:cc /repo/apps/server
+ *     ENOENT: no such file or directory, open 'reference/convenience-corner-tracker/board.data.js'
+ *
+ * `/repo/apps/server/reference` does not exist. The mount that does is
+ * `./reference:/repo/reference:ro` from `docker-compose.hot.yml`, and the seed
+ * run that followed this change reported `guest configured` against the
+ * absolute path below. So the source shape states the path outright rather than
+ * depending on a cwd that pnpm has already changed.
+ */
+export const HOT_BOARD_PATH = '/repo/reference/convenience-corner-tracker/board.data.js';
+
 export type SeedShape = 'dist' | 'source';
 
 /**
@@ -84,12 +110,26 @@ export function seedShape(probeStdout: string): SeedShape {
  *
  * `seed:cc` is `tsx src/seed/cli-seed-convenience-corner.ts`
  * (`apps/server/package.json`), which is why the source shape needs pnpm's
- * filter rather than a path: in the hot container the working directory is the
- * repo root `/repo`, so the workspace filter resolves and a bare relative
- * `src/…` path would not.
+ * filter rather than a path: there is no compiled entry point to name, and the
+ * workspace filter resolves the package by name from `/repo`.
+ *
+ * **The two shapes differ in MORE than the entry point, and the extra part is
+ * not decoration.** The source shape also states `--board-path`, because pnpm
+ * moves the cwd to the package directory before the script runs and the seed's
+ * relative default therefore misses `/repo/reference` — see `HOT_BOARD_PATH`.
+ * The dist shape passes no such flag: its cwd is the image's own WORKDIR, where
+ * the relative default is correct, and this half has never been observed
+ * failing. Stating the asymmetry here rather than letting it be discovered in a
+ * diff is the point; `seed-shape.test.ts` asserts it rather than describing it.
+ *
+ * No `--` before `--board-path`: measured in the hot container, `pnpm run … --
+ * …` passes the `--` through as a literal argv entry (`"--" "--board-path" …`),
+ * and while `argValue`'s `indexOf` still finds the flag, shipping an argument
+ * list that carries a spare `--` is a fact about pnpm's argv handling that
+ * nobody should have to rediscover.
  */
 export function seedArgv(shape: SeedShape): string[] {
   return shape === 'dist'
     ? ['node', DIST_SEED_ENTRY]
-    : ['pnpm', '--filter', '@gisik-nokma/server', 'seed:cc'];
+    : ['pnpm', '--filter', '@gisik-nokma/server', 'run', 'seed:cc', '--board-path', HOT_BOARD_PATH];
 }
