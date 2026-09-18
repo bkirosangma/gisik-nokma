@@ -41,10 +41,171 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~07:4x IST. **STEP 5b (THE `e2e-stack` SUITE LEARNS
-> # THE HOT STACK · 13.330'S PASSKEY WITNESS · THE 7a/8a SWEEP) IS DONE. PR OPENED FROM THE HEAD
-> # BELOW; NOT YET MERGED.** This block is the position. **Everything below it is RECORD** — the
-> # Step 5a block immediately following says its PR is open; it has since MERGED as `0d011791`.
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~09:0x IST. **SECOND WAVE, TASK 1 (DOMAIN: RANK KEYS,
+> # `ticket.ranked`, `TicketState.rank`) IS DONE — COMMITTED, CHECKED, MUTATION-TESTED AND
+> # INDEPENDENTLY REVIEWED. ONE PR, BASE `main`.** This block is the position; everything below it is
+> # RECORD. **The queue after this task is NOT empty** — Task 2 of
+> # `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md` (engine + precheck,
+> # `rank-requires-backlog`) is next, and it is dispatched by the controller rather than started by
+> # reflex. HOLD for that dispatch once this PR is open.
+>
+> **⚠ THE BASE MOVED MID-TASK — `owner/workspace-edits` NO LONGER EXISTS.** The controller landed it
+> onto `main` (landing 4, `f970d48e`) and deleted the branch, which **auto-CLOSED PR #439** (its base
+> was gone; GitHub reports it `CLOSED`/`CONFLICTING`). **Task 1's work was NOT on `main`** — verified
+> with `git merge-base --is-ancestor` (false) and `git cat-file -e origin/main:packages/domain/src/rank.ts`
+> (absent), the two checks that distinguish "closed" from "landed". The fix was a **cherry-pick, not a
+> rebase**: `main` never held these commits in squashed form, so re-applying them cannot manufacture
+> the phantom conflicts a rebase creates. Both commits replayed onto `origin/main` with **zero
+> conflicts**, and every file was re-checksummed against the gated content afterwards — `Features.md`
+> and `test-cases/13` byte-identical, the domain sources identical, so the gate below is a gate on
+> THIS content and not a transferred one. A restart reading `exec/second-wave-t1-rank` should cut from
+> the `-onto-main` branch instead.
+>
+> | | |
+> |---|---|
+> | branch | `exec/second-wave-t1-rank-onto-main`, cut from `origin/main` = `afbd361d` |
+> | predecessor | `exec/second-wave-t1-rank` (base `84cad818`), whose PR #439 was closed by the branch deletion — kept as the record, not deleted |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha printed here names an ANCESTOR, never the tip. At the time of writing the tip was `0b97a141`, 2 commits ahead of `main`, tree clean |
+> | base | `afbd361d` = `origin/main`, 23 commits past the old base; it carries landing 4 (`f970d48e`) and the `ctl/anchor-holds` merge |
+> | PR base | **`main`** — the integration line moved; `owner/workspace-edits` is gone |
+> | commit | **ONE commit, 10 files** — the domain source, both test files, `Features.md` and `test-cases/13` TOGETHER, because the plan requires the docs in the same commit as the code |
+> | six checks | all **EXIT 0** at the new base, re-run rather than transferred: `tasks` · `citations` (ratchet holds on every file) · `case-ids` **2228** · `env` · `runbook` · `help` |
+> | ledger | **untouched**, as the dispatch requires — `task-ledger.tsv` is `main`'s and the controller flips rows |
+> | gate | `docs/lanes/gate-lock/gate.sh` at the FROZEN head on the new base → see the PR body for the verbatim `Tasks:` line and the Node probed from inside the run. It runs `--concurrency=1`, NOT the `=2` the plan text says — the script is the authority, and on a 16 GB machine that is also the safe choice. **The gate log's `/node/v24.11.1/bin/pnpm` is the LAUNCHER path, not the interpreter** (see method note 3); quote the probe, never the path. **The first gate run on the old base was 28/33 and is recorded above as the ruling's evidence, not hidden.** |
+>
+> ## ▣ WHAT TASK 1 SHIPS
+>
+> `packages/domain/src/rank.ts` (new): `rankBetween`, `isRankKey`, `compareByRank`, `RANK_KEY_REGEX`.
+> `ticket.ranked` v1 (`{rank}`) registered against `entityKind: 'ticket'`; the reducer folds it onto
+> `TicketState.rank` and moves nothing else — `stateId` untouched, for the same reason it is on the
+> closed pair. **`ticket.created` does NOT write `rank`** — see the ruling below; a created ticket is
+> unranked and carries no key until a `ticket.ranked` names one. `TICKET_EVENT_TYPES` gains it
+> (12 → 13), and its docblock's "TWELVE of the FIFTEEN" became "THIRTEEN of the SIXTEEN" — a stale
+> count in a docblock that says "this is not the ticket-entity set" is exactly the kind of drift the
+> next reader trusts.
+>
+> ## ▣ THE CASE-ID RECOUNT, AND A CORRECTION CARRIED OVER FROM STEP 5b
+>
+> **Measured, not taken from the plan.** The plan says new ids start at `13.613`; that block was
+> consumed by Steps 1/1b/2 (`13.613`–`13.620`, `13.650`–`13.671`). Measured at this tip per style
+> (bare / bold / marker-first): the highest case MARKER in `test-cases/13` is **`13.693`**, so the
+> next free id is **`13.694`** — which is what this task minted, through `13.696`.
+> **`packages/domain/test/rank.test.ts`'s describe names would have said `13.613`–`13.615`.**
+>
+> **Step 5b's handoff carries an off-by-one, corrected here.** It says the `13.694` pointer sentence
+> means "the next block starts at `13.695`". It does not: `13.694` appears in this file ONLY as the
+> pointer prose, never as a case marker, so `13.694` was free and is what was minted. The same
+> off-by-one produced the "extras block `13.695`–`13.699`" in Step 5a's dispatch; that reserve was
+> never drawn on either. **The next free id is now `13.697`.**
+>
+> ## ▣ TWO DEVIATIONS FROM THE PLAN'S LITERAL TEXT — both in scope, both measured
+>
+> **DEVIATION 1 (a RULING, conservative default): creation does NOT write `rank`.** The plan's step
+> text says "creation sets `rank: null`", and following it makes the gate RED — the first run came
+> back 28/33 with thirteen `test/dual-client/` cases failing on `+ "rank": null`. The client's replica
+> folds with the shared reducer; the server's `rowToTicketState`
+> (`apps/server/src/projections/tickets.ts:128`) builds a `TicketState` FROM COLUMNS, and **there is
+> no `rank` column until Task 3** (`apps/server/migrations/1789200000000_proj-tickets-rank.sql`). The
+> plan is internally inconsistent and it was invisible until the gate ran: Task 1's `Files:` block
+> lists ONLY domain files, its Global Constraint says a new wire field is carried end to end in ONE
+> task, and **its own Task 7 does exactly that for `reopenedAt`** — creation's null AND `reopened_at`
+> AND the mapper, same task. For `rank` the plan split them across Tasks 1 and 3. Ruled: omit it, so
+> the field is absent on BOTH sides until the task owning the column can move them together. Every
+> reader spells `state.rank ?? null` (the contract `entity-state.ts` states), so absent and null are
+> the same fact to every consumer — only `toEqual` across the client/server boundary can tell them
+> apart. **Rejected alternative, recorded so it is not re-tried:** hardcoding `rank: null` in
+> `rowToTicketState` would be the "closed flag dead in production" failure this plan was written to
+> prevent — from Task 2 on, a real rank could be ingested while the read model kept answering null.
+> **Task 3 inherits one decision: whether creation writes the null once the column exists.**
+>
+> **DEVIATION 2: the payload door refuses keys the plan's schema admits.** The plan's docblock
+> declares the key space excludes keys ending in `0`; `RANK_KEY_REGEX` is `/^[0-9a-z]+$/` and admits
+> them. Not cosmetic: nothing sorts below `'0'`, so no key is strictly between `'a'` and `'a0'`, and
+> `rankBetween` does not refuse one. **The reviewer ran the real function in a heap-capped child
+> process: it never returned** — it grew the string until `SIGABRT`, while its positive control
+> `rankBetween('a','a1')` returned `"a0i"` in 0 ms. `ticketRankedPayload` now refines with `isRankKey`
+> (`packages/domain/src/events/ticket-events.ts:191`). **No signature in the Interfaces block
+> changed**; `RANK_KEY_REGEX` is still exported and still the first check. Two prose corrections the
+> review forced, kept because a right rule with a wrong reason reads as verified: the docblock's
+> stated REASON was false (`'a0' > 'a'`; the real reason is that nothing sorts below `'0'`), and the
+> MECHANISM is narrower than "a trailing zero" — it needs `before` a STRICT PREFIX of `after` with
+> every remaining digit `0`, which is why `rankBetween(null, 'a0')` terminates fine. The rule is
+> broader than the mechanism, which is the safe direction for a door.
+> **Task 2 should decide whether `checkTicketRanked` also refuses it** — the door is closed; a second
+> check there is defence in depth, not a second door.
+>
+> ## ▣ MUTATION EVIDENCE (8 mutations, each reddening its own site, all restored by sha256)
+>
+> M1 `rankBetween` returns the lower neighbour → 13.694 ×5 · M2 `isRankKey` drops the trailing-zero
+> rule → 13.694 + 13.696 door · M3 unranked-first → 13.695 · M4 `compareByRank` returns 0 on equal
+> keys → 13.695 ×2 · M5 `ticket.ranked` folds as a no-op → 13.696 ×2 · **M6 the door drops the
+> `isRankKey` refine → 13.696 door, i.e. deviation 2 is load-bearing, not decoration** · **M7
+> descending stops once `lo` is exhausted → 13.694's new "every key RETURNS is valid". M7 is the
+> INDEPENDENT REVIEWER'S SURVIVOR: it left this whole file green (reproduced here: exit 0, zero
+> failures) while returning `'0010'` for `('001','0011')` — strictly between its neighbours and
+> ending in `0`, the exact unorderable shape the door exists to refuse. The case was added in
+> response and M7 now dies.** M8 `TICKET_EVENT_TYPES` omits `ticket.ranked` → the list case + 13.696.
+>
+> ## ▣ THE INDEPENDENT REVIEW (recorded in the PR body BEFORE the PR opened)
+>
+> One agent, told to re-derive the ordering property against `rankBetween` itself rather than re-read
+> the author's tests. It reported **HELD** on all four: 4,000-insertion fuzz (strict betweenness,
+> ascending order and `isRankKey` checked after every step); an **exhaustive** 522,753 ordered pairs
+> of valid keys with zero non-terminating and zero invalid results; **no-renumbering asserted
+> directly** (250 middle insertions, 41,375 pre-existing keys compared byte-for-byte, zero mutated) —
+> which the shipped file did NOT do; and both refusals throwing. It **confirmed deviation 2** and
+> corrected its mechanism. Its material finding is M7 above. Its own stated limits are kept rather
+> than smoothed: the non-termination result is a bounded non-return plus a faithful model, not a
+> formal proof, and it disclosed one of its own mutants as a no-op and excluded it.
+> Four properties it listed as claimed-but-not-pinned (no-renumbering, key-length growth,
+> determinism, and the descent corridor sampled by one 200-iteration run) are **recorded in
+> `test-cases/13` rather than silently fixed** — none is a defect in the shipped code.
+>
+> **One check this task found in itself.** The "a malformed rank throws" test PASSED during RED,
+> before `rank.ts` existed, because an unknown event TYPE throws too — a check that could not fail
+> for the property it named. It now asserts the cause (`must be a rank key over 0-9a-z`, and NOT
+> `not a ticket event`), and the trailing-zero case carries a positive control through the same call
+> so a schema rejecting every rank could not pass it. The `?? null` spelling in the plan's own
+> creation assertion was replaced with `toBeNull` for the same reason: `?? null` passes whether the
+> field is null or ABSENT.
+>
+> ## ▣ WHAT TASK 2 CONSUMES FROM THIS TASK
+>
+> `ticketRankedPayload`, `isRankKey`/`RANK_KEY_REGEX`, `rankBetween`, `compareByRank`, and
+> `TicketState.rank` — all exported from `packages/domain`'s index (`src/index.ts` gained
+> `./rank.js`). `RANK_KEY_REGEX` is exported for the schema's message; **`isRankKey` is the predicate
+> that defines the space**, so a door that validates a key should use `isRankKey`, not the regex.
+> Nothing in this task's interfaces was renamed.
+>
+> ## ▣ METHOD NOTES THIS TASK EARNED
+>
+> 1. **The stale-`dist` trap cost a full extra diagnosis round.** After the ruling above, the rig
+>    file STILL failed with the same `+ "rank": null` — because `apps/server` imports
+>    `@gisik-nokma/domain` **by package name**, which resolves through `packages/domain/dist`, and the
+>    gate's earlier `build` had compiled the pre-revert source. The source was correct and the test
+>    was reading a stale artifact. **`pnpm --dir <pkg> run build` after any source fix, before
+>    believing a cross-package test result.** The recorded rule (import style, not package boundary,
+>    decides whether a mutation is seen) applies to *reading* too, not only to mutating.
+> 2. **A grep for a property hits PROSE.** After the rebuild, `grep -c "rank: null"
+>    packages/domain/dist/ticket-state.js` still printed `1` — the surviving match was the word
+>    `rank: null` inside the new explanatory COMMENT, not a live assignment. Counting tokens that
+>    can appear in a comment is not counting code; read the line.
+> 3. **The gate's "node v24" line is the LAUNCHER, not the interpreter.** `which pnpm` resolves to
+>    `~/.nvm/versions/node/v24.11.1/bin/pnpm` even with v22 first on PATH, because `pnpm` exists only
+>    in v24's bin — but it is `#!/usr/bin/env node`, and `node` IS v22. Probed from inside:
+>    `pnpm exec node -e 'process.version'` → **v22.22.2**. Do not "fix" this; quote the probe.
+> 4. **A test that HANGS is not a test that fails, and it reads as a timeout.** The first version of
+>    the new prefix-adjacent case included `('1','10')`; `'10'` ends in `0`, so the pair is outside
+>    the key space and `rankBetween` loops on it. Verify a neighbour pair is IN the space before
+>    naming it in a case.
+>
+> ---
+>
+> # ▣ RECORD — STEP 5b (the `e2e-stack` suite learns the hot stack · 13.330's passkey witness · the
+> # 7a/8a sweep). **DONE and MERGED**: PR #436 → `84cad818` on `owner/workspace-edits`, verified
+> # rather than adopted from the merge notice. Kept verbatim below — read it for the FOUR REDS with
+> # their named owners and the two seed-shape halves, not for position. **Everything below it is
+> # RECORD**; the Step 5a block following says its PR is open and it has since MERGED as `0d011791`.
 >
 > | | |
 > |---|---|
