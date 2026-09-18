@@ -12261,22 +12261,24 @@ branch's gate.** The shape chosen is the one that does not depend on the answer,
 whichever way the spec question lands. What IS asserted is the rendered `<li>` order and text, which is
 independent of it.
 
-**NOT in this slice, and each one is a product decision the port brief does not contain:**
+**The five items this slice did NOT port, and what Task 5b did with each.** The list is kept because it
+is this slice's scope contract, not because anything on it is outstanding — three of the five are now
+built or ruled, and the two that remain are rules with owners rather than unfinished work.
 
-- **The header row.** The prototype puts Cancel + Save together in the h2 row at 22px (`:874-880`); the
-  product's Save is at the form's foot and its header lives in `apps/web/src/ticket-type-editor-pane.tsx:108-113`,
-  a different package. Moving it is plumbing plus a visible change to where saving happens.
-- **The right-hand `--tintWarning` placement of the divergence card.** `--gn-tint-warning` is an ALPHA role
-  that `packages/ui/src/ui.css:1203-1211` documents as measured as a **composite over its ground**, correct
-  only when the consumer sits at page level. The divergence card sits on a raised card, so that condition
-  would have to be re-established and re-measured rather than inherited — a measurement, not a move.
-- **The "Choose again" reopen control** (`:944`). The product's migrated branch is terminal and no reopen
-  door exists; a button with no door behind it is the defect this repo keeps re-finding.
-- **The prototype's state-naming.** It draws *"Move them to Scheduled"* — a **state**; the product names the
-  **workflow** (`ticket-type-editor-screen.tsx:312`), deliberately.
-- **The field-kind vocabulary.** Prototype `Text / Date / Number / Attachment` (`:919`) vs the product's
-  `['text','number','date','select','person']` (`packages/domain/src/ticket-types.ts:4`). Vocabulary **and**
-  casing differ, and `Attachment` is a data-model question rather than a label question.
+| # | item | Task 5b outcome |
+|---|---|---|
+| 1 | **the header row** — prototype Cancel + Save in the h2 row at 22px (`:874-880`) | **BUILT.** The row is the SCREEN's (`packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx:124`, `EditorHeader` at `:112`), because the screen owns `parsed`, `save` and the `canAuthor` gate and two components' subtrees cannot be one flex row. The pane hands its Cancel in as a node (`apps/web/src/ticket-type-editor-pane.tsx:114-125`). **The Save MOVED; it did not multiply** — one control, every gate it had. Case **13.924**. |
+| 2 | **the right-hand `--tintWarning` placement** of the divergence card | **BUILT, and the composite was re-measured on BOTH candidate grounds** before the move: over `surface`, `text` 10.51–11.94 and `textMuted` 8.23–12.08; over `surfaceRaised`, 9.79–11.91 and 9.33–9.91. Both clear the 4.5 floor, so **the placement does not depend on the measurement**. The notice is now `ticket-type-editor-screen.tsx:463`, in the aside, and its 3px marker is gone (`packages/ui/src/ui.css`, § DIVERGENCE at EOF). Case **13.925**. |
+| 3 | **the "Choose again" reopen control** (`:944`) | **NOT BUILT — a rule, not an omission.** No reopen door exists on `WorkflowAuthoringGateway`, and a button with no door behind it is the defect this repo keeps re-finding. Recorded as an ABSENCE with an owner (whoever first adds a reopen route), not as an empty slot. Case **13.926** asserts the migrated branch stays terminal. |
+| 4 | **the prototype's state-naming** — *"Move them to Scheduled"*, a **state** | **NO CHANGE.** The product names the **workflow** (`ticket-type-editor-screen.tsx:514`), deliberately: a re-binding moves tickets between workflows and the state mapping is the dialog's own, per ticket. Now recorded at the button itself, so a reader comparing the two screens does not read it as a transcription slip. |
+| 5 | **the field-kind vocabulary** — prototype `Text / Date / Number / Attachment` (`:919`) vs the product's `['text','number','date','select','person']` (`packages/domain/src/ticket-types.ts:4`) | **THE VOCABULARY IS UNCHANGED; the LABEL was fixed.** The value stays the lowercase wire member; the label is the prototype's (`packages/app-core/src/workflow-builder/ticket-types/fields-editor.tsx:80`). Adding `Attachment` is a **data-model** decision (it decides whether a custom field can hold a file) and is with the owner — **not in this PR**. Case **13.927** pins both halves in one test, so a future rename cannot pass by satisfying the label half alone. |
+
+**Two citations in this list had no successor line and were re-resolved by CONTENT, not by arithmetic:**
+the header row's old home (`apps/web/src/ticket-type-editor-pane.tsx:108-113`) and the form-foot Save
+(`ticket-type-editor-screen.tsx:382-389`) both describe code that **moved** rather than shifted, so each is
+given its new home above instead of being silently renumbered. The other citations this change moved were
+repaired against an explicit shift map, one file at a time.
+
 ---
 
 ## Second wave Task 12 — closing paragraph: final gate, catalogue checks, citation sweep

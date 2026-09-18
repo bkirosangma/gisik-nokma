@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { render, screen, within } from '@testing-library/react';
 // Named import, not the default: `@testing-library/user-event` ships no
 // default export that survives `verbatimModuleSyntax` — the same fix already
@@ -8,6 +11,7 @@ import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import {
   builtinTicketTypeDefs,
+  CUSTOM_FIELD_KINDS,
   newUlid,
   ticketTypeDefSchema,
   type TicketTypeDef,
@@ -38,6 +42,8 @@ async function pickFromSearchableSelect(user: ReturnType<typeof userEvent.setup>
   const listbox = await screen.findByRole('listbox');
   await user.click(within(listbox).getByRole('option', { name: optionName }));
 }
+
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 
 const adminSession: BuilderSession = { userId: newUlid(), role: 'admin' };
 const kanbanPublished = cloneTemplate(WORKFLOW_TEMPLATES[0]!);
@@ -259,7 +265,7 @@ describe('TicketTypeEditorScreen — creating a custom type', () => {
     const fieldName = within(row).getByRole('textbox', { name: 'Field name' });
     await user.clear(fieldName);
     await user.type(fieldName, 'Amount');
-    await pickFromSelect(user, within(row).getByRole('button', { name: /Field type/ }), 'number');
+    await pickFromSelect(user, within(row).getByRole('button', { name: /Field type/ }), 'Number');
     await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
 
     expect(await screen.findByText('Ticket type saved.')).toBeInTheDocument();
@@ -313,7 +319,7 @@ describe('TicketTypeEditorScreen — creating a custom type', () => {
     await pickFromSearchableSelect(user, screen.getByRole('combobox', { name: 'Workflow' }), kanbanPublished.name);
     await user.click(screen.getByRole('button', { name: 'Add field' }));
     const row = screen.getByTestId('field-row-0');
-    await pickFromSelect(user, within(row).getByRole('button', { name: /Field type/ }), 'select');
+    await pickFromSelect(user, within(row).getByRole('button', { name: /Field type/ }), 'Select');
 
     // assert against the schema's own words — the editor never rephrases zod
     const draftDef: TicketTypeDef = {
@@ -878,5 +884,191 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     // Plan 3 owns the rule id and the wording; this screen owns neither and
     // rephrases neither — it asserts on what came back, not on a literal it chose.
     expect(screen.getByText('rule: ticket.workflow-rebound-unknown-state')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Task 5b — the five items `docs/design/prototype-delta-2026-09-18.md` recorded
+ * as NOT ported. Three of the five are rules rather than builds (recorded in the
+ * source and the catalogue, pinned where a test can pin them); the two builds are
+ * 13.924 and 13.925.
+ */
+describe('TicketTypeEditorScreen — the five NOT-ported items (Task 5b)', () => {
+  const task = builtins.find((builtin) => builtin.id === 'task')!;
+  const bothWorkflows = { workflows: [kanbanPublished, errandPublished] };
+  const UI_CSS = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
+
+  /** One rule's body, comments stripped — the selector must match a real block. */
+  function ruleBody(selector: string): string {
+    const withoutComments = UI_CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    const match = new RegExp(`(?:^|\\})\\s*${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(
+      withoutComments,
+    );
+    if (match === null) throw new Error(`no rule for ${selector}`);
+    return match[1]!;
+  }
+
+  function renderWithCancel(initialDef: TicketTypeDef | null, seed: FakeGatewaySeed = {}) {
+    const gateway = createFakeGateway({
+      workflows: [kanbanPublished, errandPublished],
+      ticketTypes: builtins,
+      ...seed,
+    });
+    const onSaved = vi.fn();
+    render(
+      <TicketTypeEditorScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={gateway}
+        initialDef={initialDef}
+        onSaved={onSaved}
+        cancel={<a href="/w/1/settings/ticket-types">Cancel</a>}
+      />,
+    );
+    return { gateway, onSaved };
+  }
+
+  /**
+   * 13.924 — the prototype puts `Cancel` and `Save type` in the SAME ROW as the
+   * type's name (`desktop.dc.html@6d7b67c0a52c:874-880`); the product rendered
+   * the name + Cancel in a row at `2.125rem` and the Save at the form's foot.
+   *
+   * The assertion is on the ROW, not on three elements existing: the defect this
+   * replaces is precisely that all three existed and the Save was in a different
+   * place. `toHaveLength(1)` is the other half — a port that ADDS a header Save
+   * without moving the foot one would satisfy a naive presence check and leave
+   * two controls for one action.
+   */
+  it('13.924: the name, Cancel and Save are one row, and Save moved rather than multiplied', async () => {
+    renderWithCancel(task);
+    const row = await screen.findByTestId('type-editor-header');
+    expect(within(row).getByRole('heading', { name: task.name })).toBeInTheDocument();
+    expect(within(row).getByRole('link', { name: 'Cancel' })).toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: 'Save ticket type' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Save ticket type' })).toHaveLength(1);
+  });
+
+  /**
+   * The other half of 13.924, and the half a placement test cannot see: the
+   * header Save is the FORM'S control, not a second button that looks like one.
+   * A save button that is always enabled would report a def the schema refuses.
+   */
+  it('13.924: the header Save is the form’s own control — disabled exactly when the def is invalid', async () => {
+    const user = userEvent.setup();
+    renderWithCancel(task);
+    const name = await screen.findByRole('textbox', { name: 'Type name' });
+    await user.clear(name);
+    expect(within(await screen.findByTestId('type-editor-header')).getByRole('button', { name: 'Save ticket type' })).toBeDisabled();
+    await user.type(name, 'Site inspection');
+    expect(within(screen.getByTestId('type-editor-header')).getByRole('button', { name: 'Save ticket type' })).toBeEnabled();
+  });
+
+  /**
+   * 13.925 — the divergence notice moves OUT of the Workflow card and into the
+   * right-hand column, above Implications, as a `--tintWarning` card: the
+   * prototype's own annotation for this block reads *"the bordered + left-ruled
+   * box becomes a warning-tinted fill"* (`desktop.dc.html@6d7b67c0a52c:924`).
+   *
+   * Asserted as DOCUMENT ORDER inside the aside, not as a distance — "above
+   * Implications" is a fact about the tree, and a DOM-order assertion is the one
+   * that survives every styling change.
+   */
+  it('13.925: the divergence notice renders in the right column, above the Implications card', async () => {
+    const user = userEvent.setup();
+    renderWithCancel(task, { typePopulation: { task: { [kanbanPublished.id]: 14 } } });
+    await pickFromSearchableSelect(user, await screen.findByRole('combobox', { name: 'Workflow' }), errandPublished.name);
+    const notice = await screen.findByTestId('workflow-divergence');
+    const aside = notice.closest('.ticket-type-editor__aside');
+    expect(aside, 'the notice is not inside the right-hand column').not.toBeNull();
+    const titles = within(aside as HTMLElement)
+      .getAllByRole('heading')
+      .map((heading) => heading.textContent);
+    expect(titles).toEqual(['Existing tickets stay where they are', 'Implications']);
+  });
+
+  /**
+   * 13.925's measured half. `--gn-tint-warning` is an ALPHA role whose
+   * documented correctness is a condition on its GROUND, so the fill and the
+   * ground are one fact and the ground is re-established, never inherited:
+   * the aside sets no background, so the composite here is over `--gn-surface`,
+   * the same ground `packages/ui/test/tokens.test.ts` already asserts
+   * `text`/`textMuted` against (measured minimum 8.23 across all six
+   * style×theme combinations).
+   *
+   * The border assertion is the prototype's own recorded transition. It is NOT a
+   * contrast change: no ledger row covers this element (`hig-per-screen/7a`/`8a`
+   * rule on `.gn-attention` and `.gn-state-node`), and the 3px marker is replaced
+   * by the wash that says the same thing — the treatment `.gn-invitations` and
+   * `.gn-attention` already took.
+   */
+  it('13.925: the notice is the tintWarning wash, not the raised surface, and its 3px marker is gone', () => {
+    const body = ruleBody('.ticket-type-editor__divergence');
+    expect(body).toContain('background: var(--gn-tint-warning)');
+    expect(body).not.toContain('--gn-surface-raised');
+    expect(body).not.toMatch(/border-left\s*:/);
+    // The negative control: the rule was FOUND, so an empty body would have
+    // thrown above rather than passing quietly.
+    expect(body).toContain('border-radius');
+  });
+
+  /**
+   * 13.926 — the prototype's `Choose again` control re-opens a completed move
+   * (`desktop.dc.html@6d7b67c0a52c:930`, the `strandedDone` card). The rule is
+   * NOT BUILT: no reopen door exists on the gateway, and a button with no door
+   * is the defect this repo keeps re-finding. What is asserted is that the
+   * migrated branch stays TERMINAL — the sentence stands and offers no way back
+   * it cannot honour.
+   */
+  it('13.926: a completed move is terminal — no reopening control is offered', async () => {
+    const user = userEvent.setup();
+    renderWithCancel(task, { typePopulation: { task: { [kanbanPublished.id]: 14 } } });
+    await pickFromSearchableSelect(user, await screen.findByRole('combobox', { name: 'Workflow' }), errandPublished.name);
+    await user.click(await screen.findByRole('button', { name: 'Save ticket type' }));
+    await user.click(await screen.findByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
+    const dialog = await screen.findByRole('dialog');
+    for (const state of kanbanPublished.states) {
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'In progress' }));
+    }
+    await user.click(within(dialog).getByRole('button', { name: 'Move these tickets' }));
+    expect(await screen.findByText(`14 tickets moved to "${errandPublished.name}".`)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /choose again/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /reopen/i })).not.toBeInTheDocument();
+    // …and it offers no SECOND move either: the notice is retired, not re-armed.
+    expect(screen.queryByRole('button', { name: `Move them to "${errandPublished.name}"…` })).not.toBeInTheDocument();
+  });
+
+  /**
+   * 13.927 — the field kinds. The prototype offers `Text/Date/Number/Attachment`
+   * and shows them CAPITALISED; the product rendered the wire values as raw
+   * lowercase labels.
+   *
+   * The rule is "do not change the VOCABULARY", and this asserts both halves at
+   * once: the LABEL is the prototype's, and the VALUE a pick produces is still
+   * `CUSTOM_FIELD_KINDS`' lowercase member. A rename would pass the first
+   * assertion and fail the second — which is why they are one test and not two.
+   */
+  it('13.927: the kind labels are the prototype’s, and the value picked is still the wire vocabulary', async () => {
+    const user = userEvent.setup();
+    const { onSaved } = renderWithCancel(task);
+    // The built-in seeds carry no fields, so the row under test is a fresh one.
+    await user.click(await screen.findByRole('button', { name: 'Add field' }));
+    const row = await screen.findByTestId('field-row-0');
+    const trigger = within(row).getByRole('button', { name: /Field type/ });
+    await user.click(trigger);
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Text',
+      'Number',
+      'Date',
+      'Select',
+      'Person',
+    ]);
+    await user.click(within(listbox).getByRole('option', { name: 'Number' }));
+    await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
+    await screen.findByText('Ticket type saved.');
+    const saved = onSaved.mock.calls[0]?.[0] as TicketTypeDef;
+    expect(saved.fields[0]?.type).toBe('number');
+    expect(CUSTOM_FIELD_KINDS).toContain(saved.fields[0]?.type);
   });
 });

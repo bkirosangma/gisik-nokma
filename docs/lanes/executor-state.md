@@ -12198,7 +12198,7 @@ nothing about it looks broken. Corrected in the Batch C brief; `batch-d` never c
 
 ### T11's Critical: the move gate asked the wrong question, and the wrong question is answerable
 
-`ticket-type-editor-screen.tsx:249` gated an irreversible bulk migration on
+`ticket-type-editor-screen.tsx:355` gated an irreversible bulk migration on
 **`save.phase !== 'saved'`** — *"has this form ever been saved?"* — rather than on whether the
 **selected binding matches the saved one**. Both questions return "yes, allowed" in the common case,
 which is why it read as correct. **After saving a re-bind, an admin can re-point the combobox again

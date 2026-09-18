@@ -341,12 +341,12 @@ export const primitives = {
    * all five to one value in dark (`0.07/0.10/0.07/0.07/0.07` light, `0.10`
    * dark). The other four (`--tintDanger`, `--tintPink`, `--tintPurple`,
    * `--tintSuccess`) have **no product role to move**: `tintWarning` is the only
-   * tint role this product has. **It has TWO consumers since 2026-09-18**, the
-   * invitations banner (`apps/web/app/globals.css:1314`) and the attention strip
-   * (`packages/ui/src/ui.css`, `.gn-attention`), and BOTH sit at page level on
-   * `--gn-surface`. That is the condition the composite measurement depends on,
-   * so it is re-established per consumer rather than inherited — the strip's own
-   * mount is `.gn-shell__main` on `/w/<id>/my-work`, whose ground is `surface`.
+   * tint role this product has. **It has THREE consumers since 2026-09-18**: the
+   * invitations banner (`.gn-invitations`), the attention strip (`.gn-attention`)
+   * and the ticket-type editor's divergence notice
+   * (`.ticket-type-editor__divergence`). **All three sit at page level on
+   * `--gn-surface`, re-established per consumer rather than inherited** — the
+   * full measurement for the third is recorded at its own consumer, in `ui.css`.
    * The export's
    * four unported washes are not an oversight here — the product declined a
    * purple wash on measurement (`ui.css:2088`: "no `--gn-tint-purple` role
