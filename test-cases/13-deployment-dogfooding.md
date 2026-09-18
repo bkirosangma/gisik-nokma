@@ -7937,7 +7937,7 @@ in a follow-up.** `13.315` was first minted ✅ on a "structural warrant" — th
 and `ticket-list.tsx:676` both read `stateCategory`, so the List's tone was the Board's by construction.
 The reviewer read line 415: it is the **column header's** chip, reading `column.category`, and a Board
 **card** renders no state chip at all. The warrant was invented, the verdict is ❌, and the false
-sentence is quoted and refuted in the row. **The count is therefore 10 ✅ / 5 ❌, not 11 / 4.** The
+sentence is quoted and refuted in the row. **The count was therefore 10 ✅ / 5 ❌, not 11 / 4 — and it is 11 ✅ / 4 ❌ as of 2026-09-18, because `13.309` was witnessed by `hig-per-screen/7b` and is marked ✅ IN PLACE in the list below rather than moved out of it.** The
 reviewer also read `13.307` and `13.309` against their primary sources; 13.309's ❌ was upheld, and
 13.307 kept its ✅ with an absence now enumerated in the row. *A verdict is only as good as the line it
 cites, and the first draft cited a line it had not read.*
@@ -8041,6 +8041,10 @@ cites, and the first draft cited a line it had not read.*
 
 ### Verdict (c) — unwitnessed. Minted ❌ with the deliverable named.
 
+> **One row in this list is no longer ❌.** `13.309` was witnessed on 2026-09-18 (`hig-per-screen/7b`)
+> and is marked ✅ in place below, so the audit's verdict and its outcome stay side by side. The other
+> four are unwitnessed exactly as minted.
+
 - ❌ **13.304 — the `Only tickets in progress` checkbox "exists and toggles the rendered count": the
   plan's sentence is UNSATISFIABLE as written, and the half that is true is unwitnessed.** The checkbox
   exists and is clicked in three suites. It cannot toggle the count the plan means, and the reason is
@@ -8066,15 +8070,31 @@ cites, and the first draft cited a line it had not read.*
   property of what nobody has written yet, which is exactly the state a guard exists to change.
   (`packages/app-core/test/contests.test.tsx`)
 
-- ❌ **13.309 — the withheld-project-name fallback's TITLE text is unwitnessed.** The plan's sentence
-  has two halves; the first is pinned and the second is not. `projectName === null` rendering the
-  **id** is asserted (`getByText('prj_withheld')`, in a case that also proves the withheld row is still
-  openable — a correction recorded at the site). The **exact title text**,
-  `You have not been told this project's name.` (`my-work.tsx:220`), is asserted by no test anywhere.
-  Searched with **both apostrophe forms** — the source uses U+2019, so a straight-quote grep could not
-  have found it even if a test did use it — and with a positive control on the source string, which
-  matched. **Deliverable:** assert the title on the withheld row. Until then the fallback's reason for
-  existing is carried by a string nothing checks.
+- ✅ **13.309 — the withheld-project-name fallback's TITLE text, witnessed — this is the row this
+  audit minted ❌, and it is upgraded IN PLACE so its verdict and its outcome stay readable together.**
+  The plan's sentence has two halves; the first was already pinned and the second was not.
+  `projectName === null` rendering the **id** is asserted (`getByText('prj_withheld')`, in a case that
+  also proves the withheld row is still openable — a correction recorded at the site). The **exact title
+  text** was asserted nowhere; the witness now carries it as the RENDERED attribute rather than as a
+  source string — `13.309 the withheld-name fallback carries its exact title text` reads the withheld
+  row's own `title` and compares the whole string. **The apostrophe is the case, so it is pinned from
+  both sides:** the positive assertion spells the string with the source's U+2019, and a second lookup
+  with a straight U+0027 must MISS — without it the assertion would be about "some apostrophe" rather
+  than about this string, and would pass on a test and a source that had quietly agreed on the WRONG
+  character. A third assertion counts the titled nodes at exactly one, so the title belongs to the
+  FALLBACK and not to every project line. **All three were measured against planted mutations rather
+  than assumed:** replacing the title text and straightening the source's apostrophe each killed the
+  case, and the straight-quote lookup — re-run FIRST and unmasked, because the earlier assertion stops
+  the test before it — was measured failing alone against the straightened source. This audit's original
+  search is what makes the codepoint worth pinning: it looked with both forms and recorded that a
+  straight-quote grep could not have found the string even if a test had used it.
+  **The dispatch's "the same gap exists on three other surfaces" is refuted, and measured rather than
+  assumed:** `You have not been told this project’s name.` appears in exactly ONE SOURCE file repo-wide —
+  every `.ts`/`.tsx` searched, with a positive control matched in the same sweep — at `my-work.tsx:220`, and `/workspaces`, `/w/<id>`
+  and the members page carry a DIFFERENT withheld-name treatment — `nameRestrictedProjectCount` and its
+  `N projects · name restricted` line, which IS asserted (`apps/web/test/workspaces-cards.test.tsx:257`,
+  `:363`). The dispatch's three line citations (`workspaces/page.tsx:170`, `w/[workspaceId]/page.tsx:147`,
+  `members/page.tsx:41`) each resolve to prose ABOUT withholding rather than to a duplicated fallback.
   (`packages/app-core/test/views/my-work.test.tsx`)
 
 - ❌ **13.314 — "List renders the same tickets Board does, by count" is unwitnessed, and the product
