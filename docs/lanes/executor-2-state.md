@@ -22,10 +22,20 @@
 
 ## ▲ TOP BLOCK — the attention strip leaves the project page; the prototype restyle is measured and HELD (2026-09-18)
 
-**Position: BOTH REVIEW ROUNDS ARE DISCHARGED AND THE PR IS THE ONLY THING LEFT.** Dispatch:
-`CTL-DISPATCH-2026-09-18-attention-project-page.md` **plus its AMENDMENT 1** (read the amendment first — it
-corrects `main`'s sha and the id list). One PR, `--base main`, branch
-**`exec2/attention-leaves-project-page`**.
+**Position: THE PHASE IS CLOSED. `#471` is rebased, green, pushed, and at the controller's merge. Do NOT
+start anything else** — the dispatch says `members-styling` is queued behind an amendment and will be
+dispatched by the controller.
+
+Dispatches: `CTL-DISPATCH-2026-09-18-attention-project-page.md` **plus its AMENDMENT 1**, then
+**`CTL-DISPATCH-2026-09-18-exec2-rebase-471.md`** (the rulings and the rebase). One PR, `--base main`,
+branch **`exec2/attention-leaves-project-page`**.
+
+**Both items are RULED, and neither needs anything further from this session:**
+- **The ratchet — HOLD, do not hand-lower the floor.** My instinct was right and the reviewer was wrong.
+  The baseline is untouched; the derivation stands with its named owner. **This does not block `#471`** — a
+  known-red spec with a named owner is an accepted state.
+- **Part 2 — deferred to its own task, my recommendation accepted.** The heading question went to the owner;
+  its answer belongs in that task's brief. **Do not add Part 2 to `#471`.**
 
 **FIRST ACTION ON A RESTART: `gh pr list --state open`.** If a PR for this branch exists it is at the
 controller's merge and nothing below needs redoing. Then verify the anchors — do not trust the rows.
@@ -36,10 +46,9 @@ controller's merge and nothing below needs redoing. Then verify the anchors — 
 |---|---|
 | branch | `exec2/attention-leaves-project-page` |
 | cut from | **`438b956c`** = `origin/main` after `#466` merged — the amendment's sha |
-| commit 1 | **`0da73557`** — "The attention strip leaves the project page" (6 files, +235/−41) |
-| commit 2 | **`4205f172`** — the first handoff. **The reviewer round ran against THIS head.** |
-| commit 3 | **`bb7ba7f7`** — the fix round. **The scoped re-review ran against THIS head.** |
-| commit 4 | the corrections commit that carries this handoff, so it is one MORE than `bb7ba7f7` |
+| base | `origin/main` **`cb1f3d16`** — rebased onto it after `#469` merged into the same catalogue file |
+| sha mapping | `0da73557`→`8576752f` · `4205f172`→`50db2300` · `bb7ba7f7`→`606ba48d` · `e1917421`→**`1dc041e9`** · then the handoff commit on top. **The pre-rebase shas are ORPHANED from `main`'s history and will still `cat-file` clean.** |
+| reviewed heads | round 1 reviewed `4205f172` (= `50db2300`) · round 2 reviewed `bb7ba7f7` (= `606ba48d`) |
 | frozen head | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit that carries it |
 | files | 11: `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` · `apps/web/test/page-refusals.test.tsx` · `apps/web/test/board-narrowing.test.tsx` · `apps/web/test/backlog-tab.test.tsx` · `apps/web/test/filters-sheet.test.tsx` · `apps/web/test/list-bulk-close.test.tsx` · `apps/web/test/project-calendar-timeline.test.tsx` · `apps/web/e2e-stack/non-text-contrast-roster.json` · `test-cases/13-deployment-dogfooding.md` · `Features.md` · this file |
 | ids minted | **`13.881`, `13.882`** — recounted at my tip BY MARKER; next free overall is `13.883` |
@@ -112,6 +121,23 @@ the enumeration left as the claim.
 **Round 1's Important finding was NOT fixed, deliberately** — see the ratchet section above. The reviewer
 proposed hand-correcting the floor; this held, because lowering a floor is the direction that hides a
 loss. The disagreement is stated in the PR body and in `test-cases/13`, and it is the controller's call.
+
+### The rebase onto `cb1f3d16` — pure union replay, and what proves it
+
+`#469` wrote a 126-line section for case **`13.732`** to `test-cases/13` — the same file this branch
+appends to — so the head conflicted there; `Features.md` auto-merged. **One hunk, resolved as a UNION with
+both sections kept** (mine after #469's, in landing order), and no part of it needed a decision rather than
+a union. The old `13.733`-style question does not arise: their ids are in `13.700`–`13.759`, mine are
+`13.881`/`13.882` — no collision at all.
+
+**The evidence a restart should re-derive rather than trust:** `diff main's test-cases/13 → the resolved
+file` gives **0 lines removed** — not merely zero carrying #469's markers, ZERO at all — against **123
+added**, and the arithmetic closes exactly (10,972 + 123 − 0 = 11,095). Nine of the eleven files are
+**byte-identical** across the replay, verified by sha256 of each blob at the old and the new head, so **no
+source file changed** and this is not a fix round. `Features.md` shows 2 removed / 2 added, and both
+removals are the pre-edit text of the two bullets this change rewrites — a one-bullet-per-line file makes
+any edit read as a replacement. **The id instruments corroborate both sides surviving:** `check-case-ids`
+2345 → **2346** and file 13 655 → **656** checked cases, exactly one each, which is #469's `13.732`.
 
 ### What a restart must NOT redo
 
