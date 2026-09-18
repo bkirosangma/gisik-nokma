@@ -39,7 +39,7 @@ controller's next dispatch is the position.
 |---|---|
 | branch | `exec2/attention-part2` |
 | cut from / base | **`1d131a68`** (`origin/main`, the tip the controller's paste named) |
-| frozen head | **`ede1a1c1`** — verify with `/usr/bin/git rev-parse HEAD`; a block cannot name the commit that carries it |
+| frozen head | **`0ac3d1d4`** — the code head. **A block cannot name the commit that carries it**: `rev-parse HEAD` at the tip is the HANDOFF commit, one above this. `ede1a1c1` is the pre-review code head; the review's three fixes are `0ac3d1d4`. Verify both with `/usr/bin/git rev-parse` / `git show --stat`. |
 | files | 13: `packages/app-core/src/views/attention-strip.tsx` · `packages/ui/src/ui.css` · `packages/ui/src/tokens.ts` · `packages/ui/test/tokens.test.ts` · **`packages/ui/test/attention-styling.test.ts` (new)** · `packages/app-core/test/views/attention-strip.test.tsx` · `apps/web/test/page-refusals.test.tsx` · `test-cases/13-deployment-dogfooding.md` · `test-cases/03-foundation-ledger.md` · `Features.md` · `docs/manual.md` · `docs/faq.md` · `packages/app-core/src/help/content.generated.ts` |
 | ids minted | **`13.890`–`13.893`** — from the controller's block, not a tip reading |
 | tree | clean; `docker compose` NOT run; :3001 and :3021 NOT bound |
@@ -120,13 +120,55 @@ In `attention-strip.tsx`, appended to refusal 3's docblock:
 > heading this component draws names the WHOLE strip, not a kind, and it can never outlive its rows —
 > `items.length === 0` returns `null` above, before any of this is reached."
 
-### Checks at `ede1a1c1`
+### Review — ONE reviewer, at `ede1a1c1`, verdict discharged and recorded here and in the PR body
 
-Six raw, all 0: `check:env` · `check:tasks` · `check:runbook` · `check:citations` · `check:help` ·
-`check:db-tz` → `database timezone: Asia/Kolkata` (with the documented `DATABASE_URL`). Seventh instrument:
-`check-case-ids` **0** → **`2355 unique ids`**, up 4 from `2351` — exactly the four minted here.
-`typecheck` 0 on `ui`, `app-core` and `web`. Tests: `ui` **334**, `app-core` **1552**, `web` **530**, no
-orphaned workers. **Forced gate NOT run** — the controller runs it.
+**No Critical. Two Important/Minor findings that were REAL and are fixed in `0ac3d1d4`**, plus two
+catalogue entries corrected. The reviewer planted every mutation in a **disposable clone**
+(`git clone --shared … /tmp/rev-attention`), confirmed byte-identical sha256s against this worktree first,
+and never touched this tree.
+
+- **I1 — the "no `border-left`" claim read `ui.css` only**, while the docblock above it had already named
+  `globals.css` as the second stylesheet a rule could hide in. It measured the hole: appending
+  `.gn-attention__items { border-left: 4px solid var(--gn-pending); }` to `globals.css` left the suite
+  **6/6 GREEN**, and `layout.tsx` loads `ui.css` **before** `globals.css` so the later rule wins in a real
+  browser. Fixed: both stylesheets scanned, both witnessed (**1 failed / 6**, row 1 alone).
+- **M1 — the container scan is a list of SPELLINGS, not a parser.**
+  `[class~="gn-attention"] { background: transparent; }` — same class, same specificity, later in source
+  order — evaded both helpers. Now caught (**1 failed / 6**, the uniqueness case); the helper's docblock
+  names the residual it still does not cover rather than implying the set is closed.
+- **M2 — my own over-count.** The line above said manual/faq "quoted the OLD heading in six places, and
+  **three of them** also still placed the strip on project pages". Re-measured:
+  `/usr/bin/git grep -i "project pages" 1d131a68` returns exactly **TWO** tracked lines. Corrected.
+- **M3 — two stale catalogue entries**, both `#471`'s residue: `test-cases/03-foundation-ledger.md`'s case
+  3.86 asserted a project-page strip that has not existed since that removal, and Part 1's ratchet chain
+  cited a component line whose value and number this change moved. Both corrected, in place, with the
+  correction recorded at the clause. **Scope taken, not scope given** — flagged in the PR body.
+- **M4 — a sentence in `tokens.test.ts` under-listed its own role.** It said the strip's text is
+  `--gn-text` "(heading, title)" and omitted the `Chip`, which is also `--gn-text` in every style and tone
+  (the tone modifiers set only `.gn-chip__dot`'s background). The claim was right; the parenthetical now
+  names all three. No assertion changed.
+
+**Both PRIMARY questions answered YES.** (1) The accessible name equals the visible heading character for
+character, and the assertion reads the RENDERED node rather than a source string. (2) No `aria-label`
+count moved — the reviewer's argument is stronger than mine: `sweepAccessibleNames` counts attribute
+PRESENCE over `document.querySelectorAll('*')`, and this change adds one `<p>` and one `<svg>` and sets no
+new `aria-label`, so the count *cannot* move regardless of whether the strip is one of `/my-work`'s 8.
+
+**The reviewer's least-confident claim, quoted because it is a real boundary:** that the strip's `<aside>`
+is literally one of the 8 `aria-label` attributes in `stack-phone-390|/my-work`. Its evidence is two
+records written by the same run (`5aab0a90`) plus a same-environment inference, not one run that printed
+both. **It is deliberately non-load-bearing** — the invariance argument holds either way — but it means the
+*stated* reason for choosing `aria-label` over `aria-labelledby` rests on the weaker of the two links.
+
+### Checks at `0ac3d1d4`
+
+**All measured at `0ac3d1d4`**, the code head the handoff commit sits on. Six raw, all 0: `check:env` ·
+`check:tasks` · `check:runbook` · `check:citations` · `check:help` · `check:db-tz` → `database timezone:
+Asia/Kolkata` (with the documented `DATABASE_URL`). Seventh instrument: `check-case-ids` **0** →
+**`2355 unique ids`**, up 4 from `2351` — exactly the four minted here. `typecheck` **0** on `ui`,
+`app-core` and `web`. Tests: `ui` **334 / 6 files**, `app-core` **1552 / 94 files**, `web` **530 / 49
+files** — all three re-run AFTER the review fixes, not carried over from the pre-fix head — no orphaned
+workers. **Forced gate NOT run** — the controller runs it.
 
 **STALE-BUILD TRAP HIT AND RECORDED.** `apps/web` resolves `@gisik-nokma/app-core` through `./dist`, so the
 first `page-refusals` run reddened against a STALE BUILD while `app-core`'s own tests (relative `../src/*.js`
