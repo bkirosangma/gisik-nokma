@@ -12111,3 +12111,66 @@ button focuses it first, so React ran `onFocus` (open) and then `onClick`, which
 just been given and closed the panel. The click appeared to do nothing. `13.897` and `13.900` now pin
 the click path explicitly; the handler opens idempotently, which is also the honest spelling of the
 owner's request that hover, focus and click all OPEN it.
+
+## Migration ordering (owner ruling 2026-09-18 — `scripts/check-migration-order.mjs`)
+
+**The incident these cases exist for, measured rather than reconstructed.** PR #459 added
+`1789300000000_proj-tickets-reopened-at.sql` to a branch cut from main after
+`1789400000000_workspace-settings-auto-close.sql` had already landed. There is no database on which
+that migration could ever have run: `node-pg-migrate`'s `checkOrder` compares the applied list against
+the sorted file list position by position and throws *"Not run migration … is preceding already run
+migration …"*. **The full server suite — 1,548 tests — was green on that tree**, because a fresh test
+database applies every migration cleanly in numerical order, and the hot stack went down instead
+(migrations run only at container start and its entrypoint aborts on failure). Commit `73c40ea3`
+renamed the file to `1789500000000` and its own subject records the reason. **The gate proves the
+repo; it cannot prove a database that has already run something.** This is the one place that can.
+
+**The real check was run against both real revisions, not just the fixtures** — and this is the
+falsifiability the whole file rests on, so it is recorded with its command:
+`checkMigrationOrder` over the migrations directory at PR #459's fork point (`36ec6ae3`, highest
+prefix `1789400000000`) against the branch tip (`dc7be7d3`) exits **1**, naming
+`1789300000000_proj-tickets-reopened-at.sql`; the same comparison against `73c40ea3` exits **0**.
+Red before the fix, green after, on the real trees.
+
+- ✅ **13.902 — a migration numbered below the base ref's highest prefix is refused, and the refusal
+  names the offender and the ceiling.** `apps/server/test/tooling/check-migration-order.test.ts`,
+  which imports the script's own exported rule. Both directions are pinned on one pair, because
+  asserting only the refusal would pass under a mutation that refused everything: the real incident's
+  filename is refused against a base holding `1789400000000`, and the same file renumbered to
+  `1789500000000` is accepted with `newFiles` exactly `['1789500000000_reopened-at.sql']`.
+- ✅ **13.903 — every planted defect shape is caught, and the known-good control stays clean.**
+  Six planted defects, each asserting its **exact** problem count *and* that the refusal names its own
+  site — a count alone cannot tell a check that fired for the right reason from one that fired
+  broadly. One of the six legitimately produces **two** problems (a prefix equal to the base's highest
+  is both a duplicate and not-strictly-above) and the count is written down per case rather than fixed
+  at one; an earlier draft asserted one and the run refused the fixture, so the fixture was corrected
+  and not the check. Five known-good cases, including a hidden dotfile and a migration **removed** from
+  the current directory — removal is explicitly not this rule, since a rename of a not-yet-applied
+  migration is legitimate and indistinguishable from this side.
+- ✅ **13.904 — the reader is under test, not only the comparison.** The fixtures are real
+  **directories** read by the same `readdirSync` reader the real sweep uses, so the filter and the sort
+  are witnessed rather than assumed. Dropping the `^\..*` ignore pattern reddens this case and 13.903
+  and nothing else: `.DS_Store` carries no numeric prefix, the runner reads that as `0`, and it would
+  otherwise be refused as the lowest migration in the tree. The case also pins the sort as numeric
+  rather than lexicographic, which is the one direction where the two disagree — `'1789400000000_a.sql'
+  < '900000000000_b.sql'` as strings while `900000000000 < 1789400000000` as numbers.
+- ✅ **13.905 — the prefix parser mirrors `node-pg-migrate`'s, including its 17-digit `utc` form.**
+  This is the divergence that produces a well-formed WRONG answer instead of a failure:
+  `Number('20260101000000000')` is `2.026e16`, larger than any 13-digit epoch, so a check that compared
+  `Number()` would **accept** a migration dated 2026-01-01 that in fact sorts below everything. The
+  case asserts the 17-digit prefix resolves to its instant (`1767225600000`) rather than its digits,
+  and that a file carrying it below the floor is refused naming that instant.
+
+**Disabling the 17-digit branch, dropping the hidden-file filter, and weakening `>` to `>=` each
+redden a different, named case** (13.905 + 13.903 · 13.904 + 13.903 · 13.903 alone), verified by
+mutation against the real file with the original restored byte-identically at sha256
+`0543ba334e4223b4d627739d4f5d52f9e4d851d8cf863dae41927342d348f055`.
+
+**Today's directory passes as-is, and that is a measurement rather than an assumption.** All 27 files
+carry a unique 13-digit prefix, sorted order equals numeric order, and the highest is `1789500000000`;
+the check reports `0 new against origin/main`. **No pre-existing violation was found, and none was
+waived** — the check has no skip list and skips nothing.
+
+**Two honest non-coverage notes.** It does not refuse a migration *removed or renamed* from the base
+set (13.903 records a removal as accepted, deliberately). And it cannot see a lower-numbered migration
+that reached the base ref before the branch existed — that is the base ref's own run of this check.

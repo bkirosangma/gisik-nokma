@@ -2802,6 +2802,29 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   `test-cases/README.md`, cases 13.204–13.208
 - ⚙️ **Responsive and contrast measured in real viewports, not read off the source** — two suites, deliberately separate because the interesting pages sit on opposite sides of a sign-in. `apps/web/e2e-viewport/` runs the five signed-out routes across three real device viewports (390 / 768 / 1512) under its own `next dev` on a dedicated port with `reuseExistingServer: false`, so it can never silently adopt whatever is listening on 3001 and report coverage of a container it did not start. `apps/web/e2e-stack/viewport.spec.ts` covers the signed-in shell, because the defect that motivated all this — `.gn-nav` running 10px past a 390px viewport — was on the authenticated pages and on none of the signed-out ones. **Every case asserts the viewport actually took effect by reading `window.innerWidth` back inside the page**, since this repo has a recorded failure where a resize reported success while the page stayed 1512px wide. The load-bearing case is the cross-width one: a suite passing identically at 390 and 1512 has proven nothing about responsiveness. Tap targets ratchet against a committed baseline rather than asserting a floor — the count may fall, never rise — because that reading does not move with the viewport and is recorded as an owner decision in `docs/pre-launch-checklist.md`. `apps/web/playwright.viewport.config.ts`, `apps/web/e2e-viewport/`, `apps/web/e2e-stack/viewport.spec.ts`, cases 13.254–13.255
 
+- ⚙️ **Migration-order gate — no migration may be numbered below one already on the base ref** —
+  `pnpm check:migrations` compares `apps/server/migrations` against the base ref's (`origin/main`, with a
+  local-`main` fallback and `--base <ref>` to override) and fails naming any migration present now and
+  absent from the base whose numeric prefix is not strictly above the base's highest. **It is the one
+  gate that can see this class at all**, which is why it is separate: a migration numbered below one
+  already applied can never run — `node-pg-migrate`'s `checkOrder` refuses it as *"preceding already run
+  migration"* — but a FRESH database applies every migration cleanly in numerical order, so the whole
+  server suite is green on the broken tree by construction, and the hot stack (which migrates only at
+  container start and aborts on failure) goes down instead. Measured on the real incident rather than
+  reasoned about: PR #459's branch tip is **refused** against its fork point (`1789300000000` vs the
+  already-present `1789400000000`) and commit `73c40ea3`, which renamed it to `1789500000000`, is
+  **accepted**. The baseline is the base ref's TIP and not the merge base, deliberately: the merge base
+  cannot see the case that actually broke the stack, where `main` gains a higher-numbered migration while
+  a branch is open. The comparison runs over two real DIRECTORIES through one reader, so the self-test
+  plants fixture directories rather than arrays — `6 planted defects caught, 5 known-good accepted`,
+  including a duplicate prefix, a non-numeric prefix the runner reads as `0`, an empty baseline that must
+  refuse rather than conclude, and a **17-digit `utc`-format prefix whose instant is below the highest
+  present**, which a bare `Number()` would read as `2.026e16` and wrongly accept. Two honest
+  non-coverage notes: it does not refuse a migration removed or renamed from the base set (a rename of a
+  not-yet-applied migration is legitimate and indistinguishable from this side), and it cannot see a
+  lower-numbered migration that reached the base ref before the branch existed. `scripts/check-migration-order.mjs`,
+  `package.json`, `.github/workflows/ci.yml`, cases 13.902–13.904
+
 ## 14. MCP server
 
 *The assistant-facing door. An MCP server a person runs on their own machine, signed in as
