@@ -19,6 +19,7 @@ import {
   type FontRole,
   type StyleName,
   type ThemeName,
+  type TokenRole,
 } from '../src/tokens.js';
 
 const THEME_NAMES: ThemeName[] = ['light', 'dark'];
@@ -747,6 +748,235 @@ describe('the chip label composites legibly on fillTertiary, over every ground i
       });
     }
   }
+});
+
+/**
+ * `.gn-avatar`'s NEUTRAL fill — the one state of that element that had no
+ * boundary at all. Case **13.732** (`test-cases/13-deployment-dogfooding.md`).
+ *
+ * THE BUG (owner report, 2026-09-18: *"in neomorphic style, the gn-avatar
+ * background is not visible. check the bg colour applied here"*), measured
+ * here rather than inferred from the report: the base rule declared
+ * `background: var(--gn-surface-sunken)` — the rule is `ui.css:202`, and it
+ * now declares `fill-tertiary` — and under `neo` — the
+ * SHIPPED DEFAULT — `surface`, `surfaceRaised` and `surfaceSunken` are the same
+ * hex, `neoPaper #F1EAE3`. An untinted avatar on a card was therefore
+ * `#F1EAE3` on `#F1EAE3`: a boundary ratio of exactly **1.0000**, which is to
+ * say no boundary. It read as intermittent rather than always-broken because
+ * the tint is OPT-IN (`components/avatar.tsx:63` sets the class only when
+ * `tint !== undefined`) and all four `--gn-avatar--tint-*` rules set their own
+ * fill — so only an avatar with no `tint` prop fell through to the invisible
+ * base.
+ *
+ * THE REPO HAD ALREADY PREDICTED IT, ONE ELEMENT OVER.
+ * `apps/web/app/globals.css:1516-1522` records rejecting `surface-sunken` for
+ * the members monogram *"although it is the role `.gn-avatar` declares,
+ * because under `neo` … a disc filled with it disappears into the card it sits
+ * in; a boundary that is not drawn is not a disc."* The monogram was moved to
+ * `--gn-fill-tertiary`; `.gn-avatar` was left behind, so the comment named the
+ * bug, the element, and the fix. This case is the gate that sentence lacked.
+ *
+ * WHY IT READS THE STYLESHEET **AND** THE ROLE TABLE. `CONTRAST_PAIRS` cannot
+ * carry this obligation: `fillTertiary` is an ALPHA primitive (`#b0988429`)
+ * and `tokens.ts:284`'s fill-hierarchy docblock forbids naming an alpha role in
+ * that array, because `relativeLuminance` ignores alpha and the pair would
+ * then be measured against a ground the fill is actually blended INTO — a
+ * false green. The obligation is against the COMPOSITE, so this case derives
+ * the declared role FROM `ui.css` and measures THAT — the shape case **11.214**
+ * (`in-transit.test.ts`) established, and for its reason: a case that
+ * hard-coded `fillTertiary` would stay green if `.gn-avatar` were repointed at
+ * a role that vanishes, which is the exact regression it exists to catch.
+ * (11.213 is the tombstone for getting this wrong the other way — two
+ * `colorOf` lookups, never a read of the stylesheet, green through the very
+ * deletion it was written to guard.)
+ *
+ * WHAT IT ASSERTS, AND WHAT IT DELIBERATELY DOES NOT. The boundary is asserted
+ * to EXIST — the composited fill is not the colour of the ground it sits on —
+ * and NOT to clear 3:1, which no neutral avatar fill does in any style
+ * (measured: 1.12–1.35) and which WCAG 1.4.11 does not owe here: the disc
+ * carries no state and identifies no control, while the initials carry the
+ * content and `aria-label` carries the identity. Inventing a floor the product
+ * has never met would be a number with no principle behind it. The initials
+ * ARE held to the floor they really owe — 4.5, as read text — on the composite,
+ * in every style and theme, over both grounds the element can sit on.
+ *
+ * THE LIMIT OF THAT ASSERTION, measured rather than left implicit. `!==` is an
+ * EXISTENCE test, not a perceptibility test: a fill at alpha 2/255 of the
+ * shipped hue composites to `#f0e9e2` over `neoPaper` — a boundary ratio of
+ * **1.0091**, which no reader can see — and would satisfy it. Alpha 1/255 does
+ * fail (it composites back to the ground exactly), so the assertion is not
+ * vacuous, but the gap between "differs" and "visible" is real and this case
+ * does not close it. It deliberately does not invent a perceptibility floor to
+ * close it either: the product has never declared one, and 1.1228 is simply
+ * what its own chosen role measures under `neo`. A green here means a boundary
+ * is DRAWN; it is not a guarantee that one is SEEN. Recorded so the next reader
+ * does not misread it. Owner: whoever next changes the avatar's fill.
+ *
+ * THE GROUND IS DERIVED, NOT ASSUMED — see `cardGround` below. An earlier
+ * version hard-coded `surfaceRaised` where the claim is "the avatar is not the
+ * colour of the thing it sits on", which measures an assumed card rather than
+ * the one `ui.css` draws. Reading `.gn-card`'s declared role out of the same
+ * stylesheet is a correctness fix to the MEASUREMENT. An independent reviewer
+ * raised it, and one half of what it predicted did NOT reproduce, which is
+ * recorded rather than tidied away: repointing `.gn-card` to `surface-sunken`
+ * does not resurrect the bug, because the avatar no longer fills with that role
+ * — measured, PASS(2) FAIL(1), the single red being the witness's `hig` control
+ * and the primary boundary assertion staying green. So the derivation buys a
+ * case that measures the ground it names; it does not close a live hole.
+ *
+ * `over()` is a local copy, matching the two blocks above, because
+ * `relativeLuminance` is documented as ignoring alpha by design and the
+ * compositing it lacks is what this case is about.
+ */
+describe('13.732 — an untinted avatar draws its own boundary in every style, not only where the surface roles differ', () => {
+  /** `src` over `dst` — the compositing `relativeLuminance` deliberately lacks. */
+  const over = (src: string, dst: string): string => {
+    const hex = (h: string, i: number): number => Number.parseInt(h.slice(i, i + 2), 16);
+    const alpha = src.length === 9 ? hex(src, 7) / 255 : 1;
+    const channel = (i: number): number =>
+      Math.round(hex(src, i) * alpha + hex(dst, i) * (1 - alpha));
+    return `#${[1, 3, 5].map((i) => channel(i).toString(16).padStart(2, '0')).join('')}`;
+  };
+
+  /** The declarations of the FIRST rule whose selector is exactly `selector`. */
+  const declarationsFor = (css: string, selector: string): string | null => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`^${escaped}\\s*\\{([^}]*)\\}`, 'm').exec(css)?.[1] ?? null;
+  };
+
+  const UI_CSS_TEXT = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
+
+  /**
+   * The role `.gn-avatar` actually names for `property`, resolved back to its
+   * `TokenRole` entry. Throws rather than returning a sentinel — the
+   * `expect(x).not.toBeNull()` shape does not narrow for TypeScript here (the
+   * same trap 13.464's mutation witness documents in `components.test.tsx`),
+   * and a case that silently measured `undefined` would be the failure mode
+   * this whole file exists to prevent.
+   */
+  const declaredRole = (selector: string, declarations: string, property: 'background' | 'color'): TokenRole => {
+    const named = new RegExp(`(?:^|[\\s;])${property}:\\s*var\\(--gn-([a-z-]+)\\)`).exec(declarations)?.[1];
+    if (named === undefined) {
+      throw new Error(`${selector} declares no \`${property}: var(--gn-…)\`; it reads: ${declarations.trim()}`);
+    }
+    const role = TOKEN_ROLES.find((candidate) => cssVariableName(candidate) === `--gn-${named}`);
+    if (role === undefined) {
+      throw new Error(`${selector}'s ${property} names --gn-${named}, which is not a role in TOKEN_ROLES`);
+    }
+    return role;
+  };
+
+  const bodyOf = (selector: string): string => {
+    const body = declarationsFor(UI_CSS_TEXT, selector);
+    if (body === null) throw new Error(`${selector} rule not found in ui.css`);
+    return body;
+  };
+
+  const avatarBody = bodyOf('.gn-avatar');
+  /**
+   * THE GROUND IS READ FROM `.gn-card` TOO, not assumed to be `surfaceRaised`.
+   * Half of this case's claim is "the avatar is not the colour of the thing it
+   * sits on", so the ground is part of the measurement — hard-coding it would
+   * leave the case green through exactly the kind of repoint the avatar's own
+   * role is derived to survive, one level over. `.gn-card` declares
+   * `var(--gn-surface-raised)` (`ui.css:161`).
+   */
+  const cardGround = declaredRole('.gn-card', bodyOf('.gn-card'), 'background');
+
+  it('the neutral avatar is not filled with the same colour as the ground it sits on', () => {
+    const bg = declaredRole('.gn-avatar', avatarBody, 'background');
+
+    for (const style of STYLE_NAMES) {
+      for (const theme of THEME_NAMES) {
+        const raised = colorOf(theme, cardGround, style);
+        const filled = over(colorOf(theme, bg, style), raised);
+
+        // THE ASSERTION THE BUG FAILS. Under `neo`, `surfaceRaised` and the
+        // old `surfaceSunken` are one hex, so `filled === raised` and this
+        // reddens in both themes — naming the style rather than the role,
+        // because the ROLE is a legitimate implementation choice and the
+        // same-colour-as-its-ground is the defect.
+        expect(
+          filled,
+          `${style}/${theme}: an untinted avatar composites to the card's own colour (${raised}) — no boundary is drawn`,
+        ).not.toBe(raised);
+      }
+    }
+  });
+
+  it('and its initials still clear 4.5 on that composite, over every ground it can reach', () => {
+    const bg = declaredRole('.gn-avatar', avatarBody, 'background');
+    const fg = declaredRole('.gn-avatar', avatarBody, 'color');
+
+    for (const style of STYLE_NAMES) {
+      for (const theme of THEME_NAMES) {
+        const raised = colorOf(theme, cardGround, style);
+        const surface = colorOf(theme, 'surface', style);
+        const overRaised = over(colorOf(theme, bg, style), raised);
+        const overSurface = over(colorOf(theme, bg, style), surface);
+
+        // Anti-vacuous, same reason as the two blocks above: a fully
+        // transparent fill composites to the bare ground, and both
+        // assertions would then pass by measuring initials on a plain surface.
+        // `hig`/`minimal` DARK is the arm that earns this — there the fill
+        // composites to #2d3141/#383e59, lighter than its own grounds.
+        expect(overRaised, `${style}/${theme}: the avatar fill composites to nothing over surfaceRaised`).not.toBe(raised);
+        expect(overSurface, `${style}/${theme}: the avatar fill composites to nothing over surface`).not.toBe(surface);
+
+        expect(
+          contrastRatio(colorOf(theme, fg, style), overRaised),
+          `${style}/${theme}: the avatar's initials no longer clear 4.5 on the card-composited fill`,
+        ).toBeGreaterThanOrEqual(4.5);
+        expect(
+          contrastRatio(colorOf(theme, fg, style), overSurface),
+          `${style}/${theme}: the avatar's initials no longer clear 4.5 on the page-composited fill`,
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  /*
+   * MUTATION WITNESS. The assertion above is only worth its line count if it
+   * fires on the regression it names, so the regression is PLANTED here: the
+   * shipped `surface-sunken` fill is put back into the real stylesheet text,
+   * the role is re-derived by the same helper the case uses, and the composite
+   * is asserted to collapse onto the card's colour under `neo` in both themes.
+   *
+   * A NEAR-MISS PROVES THE PROBE IS AIMED: under `hig`/`minimal` the two roles
+   * genuinely differ, so the SAME planted fill does NOT collapse there. The
+   * control at the end states that, so a reader can see the witness is
+   * measuring `neo`'s one-hex surface roles and not a general property of the
+   * helper. This is also why the assertion above reddens in exactly two of the
+   * six combinations when reverted — narrow enough to identify its own cause,
+   * which is the standard this repo holds every mutation to.
+   */
+  it('a planted `surface-sunken` fill is caught, and the near-miss under hig/minimal says why', () => {
+    const plantedBody = avatarBody.replace(
+      /background:\s*var\(--gn-[a-z-]+\)/,
+      'background: var(--gn-surface-sunken)',
+    );
+    expect(
+      plantedBody,
+      'planting `surface-sunken` changed nothing in .gn-avatar — either the background declaration moved, or the rule ALREADY declares surface-sunken, which is the defect this case exists to catch',
+    ).not.toBe(avatarBody);
+
+    expect(declaredRole('.gn-avatar (planted)', plantedBody, 'background')).toBe('surfaceSunken');
+
+    const neoRaised = colorOf('light', cardGround, 'neo');
+    expect(
+      over(colorOf('light', 'surfaceSunken', 'neo'), neoRaised),
+      `neo/light no longer collapses surface-sunken onto ${cardGround} — the roles have diverged, so this witness no longer demonstrates the bug`,
+    ).toBe(neoRaised);
+
+    // THE CONTROL: the same planted fill under `hig`, where the roles differ,
+    // does not collapse. Without this line a green witness would also be
+    // consistent with `over()` returning its `dst` unconditionally.
+    const higRaised = colorOf('light', cardGround, 'hig');
+    expect(
+      over(colorOf('light', 'surfaceSunken', 'hig'), higRaised),
+      'hig/light now collapses too — the witness is no longer isolating neo',
+    ).not.toBe(higRaised);
+  });
 });
 
 /**

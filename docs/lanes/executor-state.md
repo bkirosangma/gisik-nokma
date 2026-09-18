@@ -41,6 +41,103 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~16:3x IST. **SECOND WAVE TASK 8 IS MERGED (#465 → `c2daa5b5`)
+> # AND THE AVATAR BUG DISPATCH IS BUILT, REVIEWED, FIXED, REBASED AND **OPEN AS PR #469 — MERGEABLE,
+> # AWAITING THE CONTROLLER'S MERGE.** NOTHING IS LEFT FOR THIS LANE TO DO ON IT.** The dispatch was
+> # `CTL-DISPATCH-2026-09-18-avatar-neo-invisible.md` + its amendment 1 — an owner bug report, not a plan
+> # task. **The queue after this is NOT empty** (second-wave Tasks 9/10, bulk close, then Task 12
+> # close-out) and those are DISPATCHED BY THE CONTROLLER rather than started by reflex. **HOLD for that
+> # dispatch.** This block is the position; everything below it is RECORD.
+>
+> | | |
+> |---|---|
+> | PR | **#469**, `--base main`, head **`fe366a57`**, `MERGEABLE` (its `UNSTABLE` check state is the billing-blocked CI shape, not a conflict). Reviewer recorded in the body BEFORE it opened, per the freeze-line rule. |
+> | rebase | `main` moved to `efc23e67` (exec 2's #466) under this branch. **One conflict, in `test-cases/13` — exactly the file amendment 1 named — resolved as a UNION**: 0 ids overlap, three markers removed and nothing else (diff-proof + control), all of exec 2's `13.850`–`13.879` present at the new head. `Features.md` auto-merged on a different line. **`ui.css` and `tokens.test.ts` are blob-identical to the reviewed commit** (`a06c731f`, `0518ca79`), so the review and both mutation proofs carry over untouched. |
+>
+> | | |
+> |---|---|
+> | branch | `exec/avatar-neo-invisible`, cut from `origin/main` = **`c2daa5b5`** (per amendment 1) |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it. The tip is THE COMMIT THAT CARRIES THIS BLOCK; its ancestors are the task commit and this branch has NOT been rebased since. |
+> | the change | 5 files: `packages/ui/src/ui.css` (`.gn-avatar` base fill `surface-sunken` → `fill-tertiary`, + docblock), `packages/ui/test/tokens.test.ts` (+case **13.732**, 3 tests), `test-cases/13-deployment-dogfooding.md`, `Features.md`, this file |
+> | case ids | **`13.732`**, recounted at this branch's tip by case MARKER with `check-case-ids.mjs`'s own `ID_LINE`: block high-water was `13.731`, `13.732` returning **false**. NOTE the recount trap hit here: a NUMERIC filter conflates `13.7` with `13.700` and reported a false high-water of `13.75`; use `/^13\.7[0-5]\d$/` on STRINGS. |
+> | migration | **NONE.** No schema change. **Do not restart the server container for this.** |
+> | seven checks | **all EXIT 0**: `tasks` · `env` · `runbook` · `help` · `citations` (file 13 = **623** cited / 0 uncited, +1) · `db-tz` · `check-case-ids` (**2313**, union == sum) |
+> | suites | **ui 328** (was 325, +3) · **web 487** (unchanged) · ui **typecheck EXIT 0** — Node v22.22.2 |
+> | gate | **NOT RUN BY THIS LANE** (standing rule — the controller runs it). |
+> | tree | the 5 files above; **no `dist`, no `task-ledger.tsv`, no `.superpowers/`**. |
+>
+> ## ▣ WHAT THIS TASK SHIPS
+>
+> `.gn-avatar`'s neutral fill was **the same hex as the card it sits on** under `neo` — measured, a
+> boundary ratio of exactly **1.0000**, both themes — because `surface`/`surfaceRaised`/`surfaceSunken`
+> are one `neoPaper #F1EAE3` under that style and the rule declared no shadow. Only UNTINTED avatars
+> were affected (`tint` is opt-in, `components/avatar.tsx:63`), which is why it read as intermittent.
+> The fix is `var(--gn-fill-tertiary)` — one role for one boundary in every style, rather than a `neo`
+> shadow beside a fill for the other two. `globals.css:1516-1522` had already recorded the same
+> reasoning for the members monogram and named `.gn-avatar` in the sentence.
+>
+> **The case DERIVES the role out of `ui.css`** rather than naming `fillTertiary`: a case that
+> hard-coded the role would stay green through a repoint, which is the 11.213 tombstone's lesson, and
+> `CONTRAST_PAIRS` cannot carry the obligation at all (`tokens.ts:284` forbids naming an alpha role —
+> `relativeLuminance` ignores alpha, so the pair would be a false green). It measures the COMPOSITE.
+> Initials clear 4.5 in all six style/theme combinations (min **8.7528**); the boundary exists in all
+> six (min **1.1228**, `neo`/light).
+>
+> **GUARD PROVED, not asserted, and by TWO mutations.** Reverting `.gn-avatar`'s declaration:
+> **PASS(0) FAIL(3)**, each naming `neo`; restore → ui.css SHA-256 back to
+> `15aa5077928945411ac0e096bacac95382805f786f8e2b0b10e1798b5c6db79f` byte for byte and green.
+> Repointing `.gn-card` to `surface-sunken`: **PASS(2) FAIL(1)** — and that second mutation is the
+> interesting one, because the primary assertion did NOT fail and the reviewer's prediction that it
+> would did not reproduce. Recorded rather than tidied (see the case docblock).
+>
+> ## ▣ THE REVIEW ROUND — one independent reviewer, and it found TWO FALSE CLAIMS IN MY PROSE
+>
+> Both were in the paragraph about other elements, both were **mine**, and both are now corrected from a
+> re-measurement rather than from the reviewer's word:
+> 1. **"only 5 carry the shadow remedy" was bound to the wrong universe.** Of the **38** rules that fill
+>    with `surface-sunken`, **12 declare their own `box-shadow`** (11 literally `--gn-shadow-sunken`,
+>    one `-compact`); **5** is the count of `[data-style="neo"]` shadow OVERRIDES and is not a fact about
+>    the 38. Three universes were conflated in one sentence.
+> 2. **The "8 further rules" list was over-inclusive by 4.** `.gn-list__section-title`,
+>    `.gn-timeline__weeks`, `.gn-timeline__side` and `[data-style="neo"] .ticket-type-list__badge`
+>    declare their shadow **in the rule body**, not in a `[data-style="neo"]` block, and the audit only
+>    looked for the latter. **The real count is 4**, not 8.
+>
+> The reviewer also measured a limit the case does NOT close, now recorded in its docblock: `!==` is an
+> EXISTENCE test, so an alpha-2/255 fill (composites to `#f0e9e2`, ratio **1.0091** — invisible) would
+> satisfy it. Reproduced here exactly.
+>
+> **This is the third time in ONE task that an instrument's UNIVERSE was wrong while its answer was
+> well-formed** — the first was my own `grep -r … | head -20` printing 20 `graphify-out` hits as though
+> that were the whole list; the second was a citation count of 106 taken over a universe that included
+> `.next/cache` and `dist` (the defensible figure is **104 occurrences / 68 distinct** over
+> `*.md`/`*.ts`/`*.tsx`/`*.mjs`/`*.css`). **A count is only a fact once its universe is named.**
+>
+> ## ▣ STILL OPEN, RECORDED AND NOT FIXED
+>
+> - **4 rules** in `ui.css` whose `surface-sunken` fill is their only boundary under `neo`:
+>   `.gn-list__table-header` (`:1071`), `.gn-calendar__weekday-head` (`:2357`), `.gn-help__table th`
+>   (`:3710`), `[data-style="neo"] .gn-segmented__item--on` (`:3807`). Plus
+>   **`.gn-table__row--clickable:hover` (`:350`)**, whose hover fill is its whole affordance and draws
+>   nothing under `neo` — the worst of them, excluded from the four only by a `:hover` filter.
+>   **Owner: whoever next touches the `neo` surface roles or the non-text-contrast sweep.**
+> - **`ui.css` line citations are already drifted at `origin/main`**, independent of the ~35 lines this
+>   fix adds: `.gn-board__rail` is cited at `:315`, which is `.gn-table__row--clickable:hover`;
+>   `.gn-timeline__weeks` at `1939-1942`, a docblock; `.gn-table`'s rules at `284-288`, also a docblock.
+>   Nothing enforces line accuracy. **Owner: the controller, as a priced decision.**
+> - **A reviewer's line citation was wrong and mine is not:** the reviewer cited the hover rule at
+>   `ui.css:349`; it is at **`:350`** at this tip (`:315` at `origin/main`). Caught by reading the line.
+>
+> ## ▣ METHOD NOTES THIS TASK EARNED
+>
+> - **Vitest does not typecheck.** My first pass at the case ran green under `vitest run` and failed
+>   `tsc` with 5 × TS2345 — the helper returned `string` where `colorOf` needs `TokenRole`. **Run the
+>   package's own `typecheck` script, not just its tests**; `tsconfig.json` does not include `test/`,
+>   so a bare `tsc -p tsconfig.json` passes while the real one (which includes `test/`) does not.
+> - **`cd ..` from `packages/ui` is `packages`, not the repo root.** A mutation script that used `cd ..`
+>   to restore silently failed to restore; the file happened to be restored by a later step. Use
+>   ABSOLUTE paths in any script that mutates and restores.
+
 > # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~15:4x IST. **SECOND WAVE TASK 8 (the auto-close sweep and
 > # its daemon job) IS BUILT, REVIEWED, FIXED AND FULLY GREEN. ONE THING IS NOT DONE: THE PR.** The
 > # independent reviewer returned **NOT CLEAN** — two Important, both reproduced and both closed — and
