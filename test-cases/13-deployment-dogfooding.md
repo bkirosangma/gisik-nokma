@@ -8838,7 +8838,7 @@ relative-path one, and the by-package-name one tests a stale `dist`. `pnpm --fil
 --filter @gisik-nokma/app-core build` ran BEFORE any suite was trusted.
 
 - ✅ **13.707 — the three pure rank helpers: order, the `rankBetween` neighbour pair, and where a Move up /
-  Move down button points.** Nineteen cases, and every assertion is about ORDER or ABOUT WHICH ROW'S KEY,
+  Move down button points.** Twenty cases, and every assertion is about ORDER or ABOUT WHICH ROW'S KEY,
   never about a key's spelling — because `rankBetween` only refuses an *inverted* pair (`before >= after`),
   so a pair that is merely off by one row produces a perfectly valid key in the wrong place and the tab
   renders it happily. `sortByRank`'s cases separate "sorts by rank" from "sorts by id" with a fixture whose
@@ -8846,13 +8846,17 @@ relative-path one, and the by-package-name one tests a stale `dist`. `pnpm --fil
   entirely cannot pass. `neighboursFor` pins the rule the plan asked to be written down — when the row is
   placed last and the last row is UNRANKED, `before` is the last **ranked** row's key, because an unranked
   row has no key to sit after; reading `.rank` off the immediately preceding row answers `null`, and
-  `rankBetween(null, null)` is the midpoint, i.e. the row is teleported to the TOP of the backlog while the
-  pointer sat on the tail zone. The moved row is excluded from its own neighbour search (a case that fails
-  with A's own key if it is not), and an unknown id is a non-crash. `moveTarget` pins the boundary BETWEEN
+  `rankBetween(null, null)` is the midpoint, so the row lands wherever the midpoint sorts rather than
+  where the pointer was. **The moved row is excluded from its own neighbour search, and the case that pins
+  it is the SECOND one, not the first** — an independent review measured that the first fixture cannot
+  tell: there, the last ranked row among the others and the last ranked row overall are the same row, so
+  deleting the filter leaves the answer identical and the suite fully green. The kill lives on a two-row
+  fixture where the moved row IS the last ranked one (`{before:'g'}` correct, `{before:'n'}` — the row's
+  own key — without the filter). An unknown id is a non-crash. `moveTarget` pins the boundary BETWEEN
   its two edge cases at a two-row list, and that `down` points two rows below rather than one — pointing at
   the row directly below is a NO-OP that would spend a server round trip to move nothing.
-  `packages/app-core/src/views/backlog-rank.ts:55`, `:82`, `:113`,
-  `packages/app-core/test/views/backlog-rank.test.ts:30`, `:74`, `:134`
+  `packages/app-core/src/views/backlog-rank.ts:73`, `:110`, `:141`,
+  `packages/app-core/test/views/backlog-rank.test.ts:30`, `:74`, `:154`
 
 - ✅ **13.708 — the Backlog tab draws rows in rank order, `Move down` ingests exactly one `ticket.ranked`
   whose key is strictly BETWEEN its neighbours, the row moves before the server answers, and a refusal
@@ -8866,7 +8870,7 @@ relative-path one, and the by-package-name one tests a stale `dist`. `pnpm --fil
   from "the row moved". The refusal case asserts the optimistic position FIRST and then the snap-back, so a
   component that never moved at all cannot satisfy it, and it asserts the Ruling-27 sentence shape
   (`Refused by the server — <rule>: <reason>`) rather than merely that something was rendered.
-  `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:631`, `:242`,
+  `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:650`, `:242`,
   `apps/web/src/backlog-rank-controls.tsx:78`, `apps/web/test/backlog-tab.test.tsx:335`
 
 - ✅ **13.709 — a drag of the last row onto the first ingests a key BELOW the first row's, and a drop on
@@ -8878,8 +8882,8 @@ relative-path one, and the by-package-name one tests a stale `dist`. `pnpm --fil
   re-invented so both suites exercise the component through an identical transfer shape; and because the
   tail drop is genuinely a DIFFERENT target from a row drop, the two cases cannot both pass by way of one
   handler.
-  `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:651`, `:1949`,
-  `apps/web/src/backlog-rank-controls.tsx:78`, `apps/web/test/backlog-tab.test.tsx:469`
+  `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:670`, `:1968`,
+  `apps/web/src/backlog-rank-controls.tsx:78`, `apps/web/test/backlog-tab.test.tsx:572`
 
 - ✅ **13.710 — only the top row's `Move up` and the bottom row's `Move down` are disabled.** The two
   disabled assertions plus four enabled ones, and the enabled half is the point: `Move Second down` must
@@ -8887,8 +8891,51 @@ relative-path one, and the by-package-name one tests a stale `dist`. `pnpm --fil
   component that disabled the button whenever `index + 2` ran past the end would pass the two disabled
   lines and silently strand the second-to-last row, which is the exact off-by-one `moveTarget`'s docblock
   exists to prevent.
-  `packages/app-core/src/views/backlog-rank.ts:113`, `apps/web/src/backlog-rank-controls.tsx:163`,
-  `apps/web/test/backlog-tab.test.tsx:540`
+  `packages/app-core/src/views/backlog-rank.ts:141`, `apps/web/src/backlog-rank-controls.tsx:163`,
+  `apps/web/test/backlog-tab.test.tsx:643`
+
+**The review round found FOUR MUTANTS THAT SURVIVED THE WHOLE SUITE, and all four now die. Three of the
+four survived because the fixtures were tidy** — supplied in the order the assertion wanted, with a rank on
+every row — which is the generalisable half of this record: **a fixture that agrees with the answer cannot
+distinguish an implementation from a coincidence.**
+
+- **M8, dropping the moved-row exclusion from `neighboursFor`, passed both suites (19/19 and 10/10)** and
+  the case claiming to kill it could not (the first fixture's last-ranked-among-the-others and
+  last-ranked-overall are the same row). Replaced by a two-row fixture where the moved row IS the last
+  ranked one: correct `{before:'g'}`, mutant `{before:'n'}`. **Now killed.**
+- **M3, clearing the optimistic override on the `committed` path as well as the failures, passed the whole
+  web suite.** That is the "two moves for one gesture" flicker `page.tsx` argues the `if (!committed)` flag
+  prevents. The new case holds the RELOAD open and asserts the optimistic position is still drawn while the
+  server's own rows contradict it. **Now killed.**
+- **M4, emptying the clear-on-answer effect's deps to `[]`, passed the whole web suite** — an override free
+  to outlive its answer and show a position the server never agreed to. Pinned by the same case, which
+  resolves the reload with a CONTRADICTING rank and asserts the tab follows the server. **Now killed.**
+- **M5, handing the handlers the server's arrival order instead of the drawn order, passed the whole web
+  suite** — because in every other fixture rank order and arrival order coincide. Pinned by a fixture whose
+  arrival order is the REVERSE of rank order. **Now killed.**
+  M5's survival is its own lesson: **when two candidate implementations both satisfy a case, the case is
+  not pinning the one you named.**
+
+**Three Minor findings were fixed in the same change set**: `rank()`'s docblock claimed a re-check its body
+did not perform (it forwarded `up ?? null`, turning the edge's `undefined` into "place last"); the drag's
+notice wore `gn-refusal--server` for transport failures and silence, which `ui.css:1216` states the rule
+against; and `rankNotice` was cleared by nothing, surviving reloads and tab switches. **One Minor is
+recorded, not fixed:** with a non-flat grouping the drawn neighbours are not the rank neighbours — the
+reviewer's own least-certain finding, not reproduced here either.
+
+- ⚠️ **OPEN FINDING, NOT A CASE — in a backlog where NOTHING is ranked, "place last" moves the row to the
+  TOP.** `rank` starts `NULL` for every ticket (13.702), so this is the default state of every project.
+  Measured against the built module: with `[t1,t2,t3,t4]` all unranked, dragging `t4` to the tail computes
+  `{before:null, after:null}` → `rankBetween` = `'i'` → and because `compareByRank` sorts EVERY ranked row
+  above EVERY unranked one, the drawn order becomes **`t4 t1 t2 t3`**. The same root cause makes an enabled
+  `Move down` a no-op (`[A('g'),B('n'),C(null)]`, `Move B down` → key `'q'` → order unchanged `A B C`).
+  **This is the plan's §8 rule implemented faithfully** — the plan says `before` is "the last RANKED row's
+  key", and with no ranked row that is `null` — so it is recorded rather than repaired here. The docblock's
+  claim that a missing ranked neighbour is harmless ("after the last row and after the last key are the same
+  position") was **false** and is corrected in the source. Owner: the controller ruling requested in
+  `gisik-nokma-lanes/EXEC-2026-09-18-t5-unranked-tail.md`, where the remedy is priced three ways. **The PR
+  is HELD until that ruling lands**, on the controller's instruction (2026-09-18) that a short hold is
+  cheaper than shipping the defect and correcting it in a second PR.
 
 **Two plan-text deviations, both named rather than silently taken.** (1) The plan puts the tail zone "after
 the table" and cites `ticket-list.tsx`'s `ListTable` mount; it is rendered ONCE in `TicketList`, after the

@@ -163,7 +163,16 @@ export function BacklogRankControls({
   const up = moveTarget(sorted, row.ticketId, 'up');
   const down = moveTarget(sorted, row.ticketId, 'down');
 
-  const rank = async (beforeId: string | null): Promise<void> => {
+  const rank = async (beforeId: string | null | undefined): Promise<void> => {
+    // A GUARD, not a comment. The `disabled` attribute stops a click at the
+    // edge, but this function's docblock used to claim it "re-checks the
+    // target ... the same way `BacklogStartButton` guards its `null` target"
+    // while the body forwarded `up ?? null` — turning the edge's `undefined`
+    // into "place last" and teleporting the top row to the bottom on any
+    // programmatic call. `BacklogStartButton` really does guard (its
+    // `if (toStateId === null) return`), so this is that shape rather than a
+    // sentence about it.
+    if (beforeId === undefined) return;
     setSubmitting(true);
     try {
       const outcome = await submitRank(row.ticketId, beforeId, {
@@ -199,7 +208,7 @@ export function BacklogRankControls({
         className="gn-row-action"
         aria-label={`Move ${row.title} up`}
         disabled={up === undefined || submitting}
-        onClick={() => void rank(up ?? null)}
+        onClick={() => void rank(up)}
       >
         Move up
       </button>
@@ -208,7 +217,7 @@ export function BacklogRankControls({
         className="gn-row-action"
         aria-label={`Move ${row.title} down`}
         disabled={down === undefined || submitting}
-        onClick={() => void rank(down ?? null)}
+        onClick={() => void rank(down)}
       >
         Move down
       </button>

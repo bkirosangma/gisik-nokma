@@ -97,13 +97,33 @@ describe('13.707 neighboursFor — the pair `rankBetween` is handed', () => {
     expect(neighboursFor(SORTED, 'C', null)).toEqual({ before: 'n', after: null });
   });
 
-  it('PLANTED DEFECT: the moved row is never its own neighbour', () => {
-    // KILLS: filtering the moved row out of the wrong end, or not at all.
-    // Moving A last: if A is still counted among "the ranked rows", the last
-    // ranked row is A itself ('g') and the answer is { before: 'g', after:
-    // null } — a key built from A's own key, which is both wrong and exactly
-    // the sort of plausible-but-wrong key this file exists to refuse.
+  it('the moved row is excluded from the search when it is not the last ranked row', () => {
+    // NOT a kill of the exclusion — see the case below, which is. Measured:
+    // with `SORTED`'s A moved last, the last RANKED row among the OTHERS is B
+    // ('n') and the last ranked row INCLUDING the moved row is also B, so the
+    // expected value is identical with the filter and without it. This case
+    // pins the answer; it cannot pin the exclusion.
     expect(neighboursFor(SORTED, 'A', null)).toEqual({ before: 'n', after: null });
+  });
+
+  it('PLANTED DEFECT: the moved row is never its own neighbour — on the ONLY fixture that can tell', () => {
+    // KILLS: dropping the `filter(row => row.ticketId !== movedId)`, and
+    // filtering from the wrong end. The fixture above CANNOT do this job and
+    // its comment claimed it could until an independent review ran the mutant
+    // and watched every case stay green: with `SORTED`, the last ranked row
+    // among the others (B, 'n') and the last ranked row overall (also B) are
+    // the same row, so the mutant's answer is indistinguishable.
+    //
+    // Here they differ. Moving B last in a two-row list: B is the last ranked
+    // row, so a search that includes it answers `before: 'n'` — B's OWN key,
+    // which `rankBetween('n', null)` would then turn into a key built from the
+    // row's own old key. Excluding it gives A's 'g'.
+    const two = [r('A', 'g'), r('B', 'n')];
+    expect(neighboursFor(two, 'B', null)).toEqual({ before: 'g', after: null });
+    // The control in the same run: the SAME list with A moved last, where the
+    // two searches agree — so the case above is a fact about the exclusion and
+    // not about this fixture being special.
+    expect(neighboursFor(two, 'A', null)).toEqual({ before: 'n', after: null });
   });
 
   it('a `beforeId` whose row is unranked falls back to "after the last ranked row"', () => {

@@ -240,7 +240,19 @@ function ProjectBoard() {
    * rather than clearing the optimistic one.
    */
   const [rankOverrides, setRankOverrides] = useState<ReadonlyMap<string, string>>(() => new Map());
-  const [rankNotice, setRankNotice] = useState<string | null>(null);
+  /**
+   * The drag's notice, carrying its CHANNEL with it.
+   *
+   * Ruling 27 splits a real refusal from a transport failure or silence, and
+   * `ui.css` states the rule in as many words: "a dropped connection or an
+   * empty ingest response is not a verdict, so it never wears `--server`". A
+   * bare string here painted all three with `gn-refusal--server`, which made
+   * the drag the one path on this page that called a dropped connection a
+   * verdict. The two per-row buttons get this right by keeping two separate
+   * pieces of state; the page has one notice slot, so the channel travels
+   * with the text instead.
+   */
+  const [rankNotice, setRankNotice] = useState<{ channel: 'server' | 'transport'; text: string } | null>(null);
   const applyRankOverride = useCallback((ticketId: string, rank: string | null) => {
     setRankOverrides((current) => {
       const next = new Map(current);
@@ -251,6 +263,13 @@ function ProjectBoard() {
   }, []);
   useEffect(() => {
     setRankOverrides((current) => (current.size === 0 ? current : new Map()));
+    // The drag's notice is cleared by the same answer, and for the same
+    // reason: it describes a gesture against the order the server had just
+    // sent, and a fresh answer is a new order for it to be wrong about. Left
+    // alone it outlived the reload AND every tab switch. A REFUSAL does not
+    // reload, so a refusal's notice stays until the next answer — which is
+    // what the person who just watched their row snap back needs.
+    setRankNotice(null);
   }, [list.rows]);
 
   /**
@@ -660,9 +679,9 @@ function ProjectBoard() {
           onRanked: list.reload,
         });
         if (outcome.status === 'refused') {
-          setRankNotice(`Refused by the server — ${outcome.rule}: ${outcome.reason}`);
+          setRankNotice({ channel: 'server', text: `Refused by the server — ${outcome.rule}: ${outcome.reason}` });
         } else if (outcome.status === 'unreachable') {
-          setRankNotice(outcome.message);
+          setRankNotice({ channel: 'transport', text: outcome.message });
         } else {
           setRankNotice(null);
         }
@@ -1949,8 +1968,15 @@ function ProjectBoard() {
                     {...(session.kind === 'signed-in' ? { rowDrag: { onReorder: onReorderBacklogRow } } : {})}
                   />
                   {rankNotice !== null ? (
-                    <p role="alert" className="gn-refusal gn-refusal--server">
-                      {rankNotice}
+                    <p
+                      role="alert"
+                      className={
+                        rankNotice.channel === 'server'
+                          ? 'gn-refusal gn-refusal--server'
+                          : 'gn-refusal gn-refusal--transport'
+                      }
+                    >
+                      {rankNotice.text}
                     </p>
                   ) : null}
                 </>

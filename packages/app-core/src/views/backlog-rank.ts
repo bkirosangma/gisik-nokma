@@ -25,11 +25,29 @@ export type RankRow = { ticketId: string; rank: string | null };
  * THIS IS THE WHOLE REASON UNRANKED ROWS ARE A PROBLEM. An unranked row has
  * no key to sit after, so "the row above the target" is not the same question
  * as "the last row before the target" — it is the last row before the target
- * THAT HAS A KEY. Reading `.rank` off the immediately preceding row instead
- * returns `null`, and `rankBetween(null, null)` is the midpoint — i.e. the
- * row is dropped at the FRONT of the backlog while the pointer sat at the
- * back. Skipping backwards to the last real key is what makes the tail case
- * correct.
+ * THAT HAS A KEY. Skipping backwards to the last real key is what makes the
+ * tail case correct: reading `.rank` off the immediately preceding row instead
+ * answers `null`, and `rankBetween(null, null)` is the midpoint, so the moved
+ * row lands wherever the midpoint happens to sort — with `[A('g'), B('n'),
+ * C(null)]` and C moved last, the midpoint `'i'` draws `A C B`, one row from
+ * where the pointer was, and with nothing ranked at all it draws the row
+ * FIRST (see the OPEN DEFECT below).
+ *
+ * ## OPEN DEFECT THIS FUNCTION CANNOT FIX (measured 2026-09-18, needs a ruling)
+ *
+ * `compareByRank` sorts EVERY ranked row above EVERY unranked one, so a rank
+ * key can never place a row AFTER an unranked row. When `rows` holds no key at
+ * all — the state of every backlog before its first move, since `rank` starts
+ * `NULL` — this function answers `null`, `rankBetween(null, null)` answers the
+ * midpoint, and "place last" therefore moves the moved row to the **front**:
+ * `[t1,t2,t3,t4]` all unranked, `t4` dragged to the tail, draws `t4 t1 t2 t3`.
+ * The same fact makes an enabled `Move down` a no-op whenever it would have to
+ * step over an unranked row. Neither is a bug in this file — it is the plan's
+ * §8 rule (the plan says `before` is "the last RANKED row's key") meeting a
+ * case the plan does not contemplate. Recorded rather than fixed here because
+ * the remedy is a product decision (refuse the inexpressible move, or rank the
+ * unranked rows first), not a local repair. Owner: the controller ruling
+ * requested in `gisik-nokma-lanes/EXEC-2026-09-18-t5-unranked-tail.md`.
  */
 function lastRankedKey(rows: readonly RankRow[]): string | null {
   for (let i = rows.length - 1; i >= 0; i -= 1) {
@@ -64,10 +82,20 @@ export function sortByRank<T extends RankRow>(rows: readonly T[]): T[] {
  * THE UNRANKED-LAST-ROW RULE, stated once here because it is the case nobody
  * guesses: when the row being moved is placed last and the last row is
  * UNRANKED, `before` is the last RANKED row's key, not the last row's. An
- * unranked row has no key to sit after, so "after the last row" and "after
- * the last key" are the same position in the rendered order, and only the
- * second one can be expressed as a rank key. The same fallback covers a
- * `beforeId` whose row is itself unranked — there is no key to sit before.
+ * unranked row has no key to sit after, and only a key can express "after".
+ * The same fallback covers a `beforeId` whose row is itself unranked — there
+ * is no key to sit before.
+ *
+ * THAT ANSWER IS THE CLOSEST EXPRESSIBLE POSITION, NOT ALWAYS THE REQUESTED
+ * ONE, and an earlier draft of this docblock said the opposite ("after the
+ * last row and after the last key are the same position in the rendered
+ * order"). **They are not**, and an independent review measured it: because
+ * `compareByRank` sorts ranked rows above unranked ones, a new key above the
+ * last ranked key still renders ABOVE every unranked row. So a move that has
+ * to step over an unranked row does not land where the pointer was — it lands
+ * after the last ranked row, which may be several rows higher. See the OPEN
+ * DEFECT note on `lastRankedKey`: when no row is ranked at all, this returns
+ * `null` and the caller's "place last" inverts to "place first".
  *
  * `movedId` is excluded from the neighbour search throughout. Without that,
  * moving a row to the end reads "the last ranked row" as the row being moved

@@ -422,6 +422,109 @@ describe('13.708 the Backlog tab in rank order, and Move down', () => {
     await waitFor(() => expect(reloads).toBeGreaterThan(before));
   });
 
+  it('the optimistic position SURVIVES the committed answer until the reload\'s own rows land', async () => {
+    // KILLS: clearing the override on the `committed` path instead of only on
+    // the failures — `if (!committed)` → unconditional. An independent review
+    // measured that mutant surviving this whole file, and the behaviour it
+    // breaks is the "two moves for one gesture" flicker `page.tsx`'s docblock
+    // argues the flag exists to prevent: the row snaps back to its old key the
+    // moment the answer lands, then jumps forward again when the reload
+    // arrives.
+    //
+    // The reload is held open, which is the only way to see it: while the new
+    // rows are in flight the page is still drawing the OLD server rows, so the
+    // override is the only thing holding the row in its new position. If the
+    // override is gone, the old rows put it straight back.
+    let calls = 0;
+    const reloads: Array<(v: TicketListView) => void> = [];
+    const services = servedWorld([FIRST, SECOND, THIRD], {
+      getTickets: async (): Promise<TicketListView> => {
+        calls += 1;
+        if (calls === 1) return { projectId: PROJECT, rows: [FIRST, SECOND, THIRD] };
+        return await new Promise<TicketListView>((resolve) => {
+          reloads.push(resolve);
+        });
+      },
+    });
+    const answers: Array<(results: unknown[]) => void> = [];
+    services.dataSource.ingest = async () =>
+      await new Promise((resolve) => {
+        answers.push(resolve as (results: unknown[]) => void);
+      });
+
+    render(
+      <Providers services={services}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
+    await screen.findByText('First');
+    await userEvent.click(screen.getByRole('button', { name: 'Move First down' }));
+    await waitFor(() => expect(backlogOrder()).toEqual(['br_2', 'br_1', 'br_3']));
+
+    answers[0]?.([{ status: 'committed', eventId: 'e1', seq: 1, serverTime: '2026-09-17T09:05:00.000Z' }]);
+    await waitFor(() => expect(reloads).toHaveLength(1));
+    // Still second, with the server's own rows still saying otherwise.
+    expect(backlogOrder()).toEqual(['br_2', 'br_1', 'br_3']);
+
+    // ...and the answer, when it lands, is what the tab follows — even though
+    // it CONTRADICTS the optimistic key. This second half is the leak
+    // direction: an override that outlived its answer would keep `br_1` in
+    // second place for the rest of the session, showing a position the server
+    // never agreed to. An independent review measured the effect's `[]` deps
+    // surviving this file, and this is the case that kills it.
+    reloads[0]?.({ projectId: PROJECT, rows: [{ ...FIRST, rank: 'z' }, SECOND, THIRD] });
+    await waitFor(() => expect(backlogOrder()).toEqual(['br_2', 'br_3', 'br_1']));
+  });
+
+  it('the drawn order, not the server\'s arrival order, decides which rows are neighbours', async () => {
+    // KILLS: handing the handlers the server's rows (`backlogNarrowing.rows`)
+    // while the table draws the SORTED ones — an independent review measured
+    // that mutant surviving this file, because every other fixture is supplied
+    // in rank order and rank order happens to equal ticket-id order there.
+    //
+    // Here they disagree: the stub's rows arrive in REVERSE rank order, so the
+    // drawn list is First, Second, Third while the arrival list is Third,
+    // Second, First. In the arrival list, First is LAST — its `Move down`
+    // would be disabled and its drop target would be the tail, producing a key
+    // above 't' rather than between 'n' and 't'. The assertion is the two
+    // comparisons, so neither answer passes by accident.
+    const services = servedWorld([THIRD, SECOND, FIRST]);
+    const captured: CapturedRank[] = [];
+    services.dataSource.ingest = async (events) => {
+      for (const event of events) {
+        captured.push({
+          entityId: event.entity.id,
+          type: event.type,
+          rank: (event.payload as { rank?: unknown }).rank,
+        });
+      }
+      return events.map((event) => ({
+        status: 'committed' as const,
+        eventId: event.id,
+        seq: 1,
+        serverTime: '2026-09-17T09:05:00.000Z',
+      }));
+    };
+
+    render(
+      <Providers services={services}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
+    await screen.findByText('First');
+    // The tab drew them in rank order, not arrival order.
+    expect(backlogOrder()).toEqual(['br_1', 'br_2', 'br_3']);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Move First down' }));
+
+    await waitFor(() => expect(captured).toHaveLength(1));
+    const rank = captured[0]?.rank as string;
+    expect(rank > 'n').toBe(true);
+    expect(rank < 't').toBe(true);
+  });
+
   it('a refused move snaps the order back to the server\'s, and says why', async () => {
     const services = servedWorld([FIRST, SECOND, THIRD]);
     const answers: Array<(results: unknown[]) => void> = [];
