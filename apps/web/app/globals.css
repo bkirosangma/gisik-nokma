@@ -2595,3 +2595,31 @@ input, textarea, select { font-family: inherit; }
   background: var(--gn-surface-sunken);
   color: var(--gn-text);
 }
+
+/* ── The workflow builder's breadcrumb (`isBuilder`,
+   `desktop.dc.html@6d7b67c0a52c:1015`). ───────────────────────────────────────
+
+   It lives in THIS file and not in `packages/ui/src/ui.css` because `apps/web`
+   renders it — the builder screen in app-core takes no route knowledge, so the
+   element belongs to the route that owns the link. Same split `.gn-settings*`
+   and `.gn-members*` already have.
+
+   Metrics are the prototype's own: `font-size:13px; line-height:18px;
+   color:var(--label2)` — 0.8125rem/1.125rem, and `label2` is this product's
+   `text-muted`, which measures 8.94 (hig light) / 14.57 (hig dark) / 9.18 (neo
+   light) / 13.03 (neo dark) against `surface`. The hover colour is `textAccent`,
+   the role that carries this product's 4.5 guarantee on `surface` (5.45-7.83),
+   rather than `accent`, which stopped being text-safe when the neo accent hexes
+   shipped (`.gn-button`'s docblock in ui.css records that measurement).
+
+   `margin-top` matches `.gn-page-title`'s own: the crumb sits where a page
+   title would, and the title it precedes is the builder's name field. */
+.gn-builder-crumb { margin: 1.2rem 0 0; }
+.gn-builder-crumb a {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  color: var(--gn-text-muted);
+  text-decoration: none;
+}
+.gn-builder-crumb a:hover,
+.gn-builder-crumb a:focus-visible { color: var(--gn-text-accent); text-decoration: underline; }

@@ -8524,3 +8524,122 @@ test at all). The shape was written from scratch here rather than cited, and the
 read as evidence that the older migration is covered. (2) The plan's Interfaces line names `RANK_KEY_REGEX`
 for `mapRank`; `isRankKey` is used instead, for the reason above — this is the second time in this plan that
 a text-level "use the loose predicate" instruction was overtaken by the domain's own tighter one.
+
+## The workflow builder, fitted to the backend that exists (executor 2, 2026-09-18) — block `13.767`–`13.773`
+
+The owner's instruction for `isBuilder` was *"workflow-builder is there for design reference only. if the
+backend is already built, then make the design just fit for it."* That is a constraint in two halves, and
+the first was a measurement: **the backend is built.** The builder is `WorkflowBuilderScreen`
+(`packages/app-core/src/workflow-builder/ui/workflow-builder-screen.tsx:52`) at
+`/w/[workspaceId]/settings/workflows/[workflowId]`, ten plan-08 tasks deep, with a live validator, a
+publish path and its own role gate. What was NOT built is the design: `workflow-builder-screen*`,
+`state-inspector*`, `inspector-panel*` and `transition-inspector*` shipped with **zero CSS** — every
+element under all four rendering with user-agent defaults. Measured with a control, because "unstyled" is
+a claim about an instrument: the same sweep returns 7 rules for `.issues-panel`, 11 for
+`.publish-controls`, 15 for `.gn-state-node` and 40 for `.ticket-type-editor`.
+
+The second half is a refusal that was already recorded before this task:
+`docs/hig-reconciliation-audit.md:690-712` rules `SystemRulesPanel` and the whole rule-authoring
+subsystem — neither of which the prototype draws at all — as *"EXISTS AND THE PROTOTYPE OMITS IT. Keep
+and restyle; never delete"*, closing *"both must be treated as requirements to preserve, not redesign
+away."* So the prototype's two-column layout is not adopted; three rails, preserving the left column.
+
+- ✅ **13.767 — the builder screen's four BEM families and the rules that style them are one fact spelled
+  in two packages, and nothing else ties the spellings.** The instrument is `saved-filters`' —
+  harvest the classes the stylesheet names and the classes the component renders, and compare the SETS —
+  applied across the `ui`/`app-core` boundary, where a rename on one side is invisible to both packages'
+  own gates and the failure it produces is the quiet kind: a screen that renders, and is unstyled. Six
+  arms are rendered into one union (loading, loaded, load-refused, and the inspector's no-selection,
+  state and transition selections), because a fixture that rendered only the loaded screen would leave
+  `__loading` and `__load-error` styled and unrendered, and the tempting repair is to weaken the equality
+  to a subset. **The exemption is a RULE, not a list:** `.workflow-builder-screen__add-state` carries no
+  rule of its own and should not — it sits on the shared `<Button>` — so an element is exempt exactly
+  when it ALSO carries a class from the shared component layer, and a separate case pins that the
+  exemption is exactly that one class, so it cannot grow by accident.
+  (`packages/app-core/test/workflow-builder/builder-css-binding.test.tsx:230`, `:277`)
+
+- ✅ **13.768 — the new block names no colour of its own and adds no role.** Every `var(--gn-*)` the block
+  references must already be referenced elsewhere in `ui.css`, harvested by SELECTOR rather than by
+  slicing from an offset to EOF (the positional read `saved-filters-css-binding.test.tsx` had to replace,
+  because a block that happens to be last works until the next task appends CSS after it). Eleven
+  distinct roles, all pre-existing: `surface-raised`/`shadow-raised`/`radius-card` are `.gn-card`'s three,
+  `fill-tertiary`/`text-accent` are `.gn-button`'s, `surface-sunken`/`shadow-sunken`/`fill-quaternary`/
+  `border` are `.gn-field__input`'s. `packages/ui/test/token-discipline.test.ts` refuses a hex anywhere
+  in client source; this case refuses the other half — a role invented for one screen.
+  (`packages/app-core/test/workflow-builder/builder-css-binding.test.tsx:328`)
+
+- ✅ **13.769 — the prototype's unbacked controls are absent, and the real ones keep their homes.** The
+  header's `wfStatus` line ("Draft · last saved 11:58") and its `Cancel` button are asserted absent
+  because neither has any backing state — `wfStatus`, `lastSaved` and `last saved` are 0 hits repo-wide —
+  with the control that the header really mounted and carries the two actions that ARE real. The
+  inspector's consolidated card — Category select, "Blocks the ticket" toggle, "Initial state" switch —
+  is the shape `hig-reconciliation-audit.md:703-708` already ruled *"SHOWN BUT DOES NOT EXIST. Do not
+  build"*, and the case's second half is what makes the first half mean something: the same two controls
+  are still rendered **by the canvas node**, one Category picker per state, so the absence is a
+  placement refusal and not a deletion.
+  (`packages/app-core/test/workflow-builder/builder-css-binding.test.tsx:392`)
+
+- ✅ **13.770 — the workflow name is the title, and stays a control.** The prototype draws an `h1`
+  (`desktop.dc.html@6d7b67c0a52c:1016`); the product's name is editable, so the design fit is the
+  prototype's TYPOGRAPHY on an `<input>` rather than a heading with a copy of the same string beside it —
+  two elements carrying one name would also make `getByText(name)` ambiguous for every later test, and
+  the case asserts the screen owns no `h1` at all rather than papering over that with a duplicate. The
+  four metrics are asserted **against `.gn-page-title`'s own declarations**, read from
+  `apps/web/app/globals.css:127`, not restated from the prototype: that rule already carries the
+  `34px/41px/700/-0.4px` conversion, including the `-0.0118em` its docblock derives from -0.4px ÷ 34px,
+  and a second reading of the same four numbers is how two titles drift apart. The field BOUNDARY is
+  kept (`gn-field__input`'s fill/border/radius and the same `neo` override) because a control that looks
+  exactly like static text is not editable-looking — a deliberate deviation from the drawing, flagged in
+  the PR body.
+  (`packages/app-core/test/workflow-builder/builder-css-binding.test.tsx:443`, `:460`)
+
+- ✅ **13.771 — the declarations, which the name equality cannot see.** This case exists because the
+  equality above was **measured failing to catch a real deletion**: renaming
+  `.workflow-builder-screen__canvas` to `…__canvasRenamed` — which removes the card treatment and leaves
+  the class rendering unstyled — left every test in the file GREEN, because the `@media (max-width: 64rem)`
+  rule below still names `__canvas` in `{ order: -1 }`, so `styledClasses` went on harvesting the name. A
+  name-only equality cannot distinguish "the rule is there" from "the name is mentioned somewhere". The
+  table names one load-bearing declaration per top-level rule instead of restating the stylesheet, which
+  would be a copy that has to be updated twice; the same rename now reddens, as does removing the `neo`
+  override.
+  (`packages/app-core/test/workflow-builder/builder-css-binding.test.tsx:318`)
+
+- ✅ **13.772 — the breadcrumb is on every arm of the builder route.** Not an addition to the design: it
+  is the element `apps/web/app/settings/page.tsx:94-96` already names as the reason the builder is the
+  only settings sub-screen NOT inlined into that shell — *"it carries its own breadcrumb back ('Settings ›
+  Workflows') instead"*. That sentence was true of the prototype and false of the product until this
+  change. It renders ABOVE the load states, not inside them, which is why all four arms are asserted
+  rather than the loaded one alone: "the way back" is exactly what a person needs when the read failed.
+  The loaded arm mounts the React Flow canvas under jsdom, which `apps/web`'s setup cannot do —
+  `ReferenceError: ResizeObserver is not defined` inside React Flow's own `<ZoomPane>`, measured, which
+  unmounts the root so the container comes back EMPTY rather than reporting anything. Shimmed LOCALLY in
+  this one file rather than in `apps/web/test/setup.ts`, so no other suite's jsdom changes and app-core's
+  measured 170-line block is not duplicated.
+  (`apps/web/test/builder-route.test.tsx:170`, `:203`)
+
+- ✅ **13.773 — the crumb is one link to the list, not two.** The prototype makes the whole crumb a single
+  `goWorkflows` target (`:1015`); rendering "Settings" and "Workflows" as two links would be a design
+  invented here, since both would land in the same place. The count is pinned, the href is asserted
+  against the real list route, and `aria-current` is asserted ABSENT because the crumb points at the
+  list and this page is the builder — with the control that the screen really mounted, so "one anchor"
+  cannot be satisfied by a page that rendered nothing.
+  (`apps/web/test/builder-route.test.tsx:222`, `:234`)
+
+**Mutation evidence, and the two that did not count.** The name equality was mutation-tested rather than
+assumed: renaming the base `__canvas` and `__layout` rules, deleting the `__name:focus-visible` rule,
+removing the `neo` override and planting a hex literal in the block all redden — the last one against
+`packages/ui`'s own token-discipline suite. The route assertions were tested the same way: deleting the
+crumb, splitting it into two links, and pointing its href at the wrong route all redden. **Two mutations
+were run and correctly did NOT redden, and the distinction matters** — rewording the link text to the
+`&rsaquo;` ENTITY, and a first attempt aimed at `Settings › Workflows` that hit the docblock's copy of
+the string instead of the JSX, both leave the rendered output identical. A survivor with no explanation
+is either an unconstrained path or a mutation that never ran, and these were the second; re-aimed as a
+genuine text change, the same assertion reddens.
+
+**Recount, at this tip.** Seven ids are minted here (`13.767`–`13.773`), all inside the reserved block
+`13.760`–`13.819`; **the next free id inside this executor's block is `13.774`**. Measured by case MARKER
+only, never by substring: the highest `13.*` marker in this file at this tip is `13.766` (the members
+roster, immediately above), and the highest `13.*` id anywhere in `packages/` + `apps/` is `13.765`. The
+whole block `13.767`–`13.819` was measured FREE before minting — the only hits were prose *mentions* of
+the block's own bounds, which is exactly the trap this file records: a substring sweep over a document
+that discusses the ids cannot separate a MINTED id from a MENTIONED one.

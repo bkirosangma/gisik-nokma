@@ -18,260 +18,197 @@
 > **TOOL HAZARD — `rtk git log` IGNORES its revision argument and logs HEAD instead**, intermittently,
 > and both outputs are well-formed. **Use `/usr/bin/git` for every git command whose output is evidence.**
 
-## Anchors — verify these; do not trust the row
+---
+
+## ▲ TOP BLOCK — `isBuilder`: fit the design to the backend that exists (2026-09-18)
+
+**Position: the change set is COMPLETE and green; the PR is the next act.** Dispatch:
+`CTL-DISPATCH-2026-09-18-exec2-isbuilder`. One PR, `--base main`, branch `exec2/isbuilder`.
+
+### Anchors — verify these; do not trust the row
 
 | | |
 |---|---|
-| branch | `exec2/members-inviteadmin` |
-| base | **`43650f15`** = `origin/main` = the `#441` merge (executor 1's second-wave Task 1) |
-| `origin/main` | `43650f15` at the last count — **recount; main moves without telling you** |
-| merge-base | `43650f15` |
-| ahead | **3** commits — a reading, not a fact; `git rev-list --count origin/main..HEAD` |
+| branch | `exec2/isbuilder` |
+| base | **`ba96a8d2`** = `origin/main` = the `#443` merge (executor 2's Members work) |
+| `origin/main` | `ba96a8d2` at the last count — **recount; main moves without telling you** |
+| merge-base | `ba96a8d2` |
+| ahead | 1 commit (this one) — a reading, not a fact; `git rev-list --count origin/main..HEAD` |
 | tree | clean at the last check |
 | HEAD | **verify with `/usr/bin/git rev-parse HEAD`.** A block cannot contain the commit that carries it, so any number here names an ANCESTOR, never the tip |
-| PR | `--base main`; the branch was **rebased onto `43650f15`**, so the remote copy is force-pushed |
+| PR | `--base main`, not yet opened |
 
-> **The branch was REBASED onto main and the earlier shas are gone.** `afbd361d` was the base when this
-> work began; executor 1's Task 1 landed as `43650f15` **while this branch was in review**, and the
-> rebase was done then — not earlier, so it did not move the head under a running reviewer. The reviewed
-> shas (`2ec10228` the port, `54895f36` the fix round) are preserved on
-> `origin/exec2/members-inviteadmin`'s reflog and in the remote's history before the force-push; the
-> rebased equivalents are the first two commits on this branch.
-> **Every other sha in this file's prose is a fact about the moment it was written.**
+### What shipped, and the measurement it rests on
 
-## The mission
+The owner's instruction was *"workflow-builder is there for design reference only. if the backend is
+already built, then make the design just fit for it."* **The backend is built** —
+`WorkflowBuilderScreen` at `/w/[workspaceId]/settings/workflows/[workflowId]`, ten plan-08 tasks deep.
+What was missing is the **design**: `workflow-builder-screen*`, `state-inspector*`, `inspector-panel*`
+and `transition-inspector*` had **ZERO CSS** and rendered with user-agent defaults. Measured with a
+control: the same sweep finds 7 rules for `.issues-panel`, 11 for `.publish-controls`, 15 for
+`.gn-state-node`, 40 for `.ticket-type-editor`.
 
-`CTL-DISPATCH-2026-09-18-exec2-members-inviteadmin` — **Members + InviteAdmin at the refreshed
-prototype.** ONE PR, `--base main`, one branch per task. The owner lifted the sign-in hold on
-2026-09-18 (*"4 - yes"*), which is what had both rows at verdict `held`.
+**Files:** `packages/ui/src/ui.css` (new block), `apps/web/app/globals.css` (the crumb),
+`packages/app-core/src/workflow-builder/ui/{workflow-builder-screen,state-inspector,transition-inspector}.tsx`,
+`apps/web/app/w/[workspaceId]/settings/workflows/[workflowId]/page.tsx`, plus `Features.md`,
+`test-cases/13-…` and two new test files.
 
-Makes the ledger's `hig-per-screen/3a` and `/3b` true — **except see the scope caveat below.**
+### § 1 — THE SETTINGS-PAGE CONTENTION DID NOT MATERIALISE.
 
-## § 1 — THE ROLE QUESTION: ANSWERED. Case 1, on the wire, dropped by the mapper.
+`apps/web/app/settings/page.tsx` is **untouched** — verified by `git status --porcelain`, not by
+reading the diff summary. The builder's screen is `WorkflowBuilderScreen` in `packages/app-core` plus
+its own route page; the `/settings` shell only *links* to that route (`WorkspaceWorkflows`'s `onOpen`),
+and the docblock there says in its own words why the builder is the one sub-screen not inlined into it.
+**`apps/web/app/globals.css` IS shared and I did append to it** — the crumb block, at EOF, which is the
+lowest-collision shape available.
 
-- **On the wire:** `apps/server/src/routes/builder-reads.ts:247` selects `m.role`; `:256-260` returns
-  `{ userId, displayName, role }`; typed at `packages/domain/src/read-models.ts:547`. The route
-  registers no response `schema`, so nothing strips it.
-- **Dropped in the client:** `packages/app-core/src/online/mappers.ts:395-410` — `mapActors` maps
-  `{id, name}` only.
-- **Independently corroborated in-repo:** `apps/web/src/authoring/data-source-gateway.ts:70-87`
-  records the identical finding.
-- **Consequence:** the ordinary case — carried end to end with a mapper test.
+### § 2 — FOUR REFUSALS, EACH WITH A PRIOR RULING OR A MEASUREMENT BEHIND IT.
 
-## § 2 — RULED 2026-09-18 (controller, cross-session message). No longer open.
+1. **The prototype's two-column layout — NOT adopted.** It has no left column at all; adopting its grid
+   would delete `SystemRulesPanel` and the whole rule-authoring subsystem.
+   `docs/hig-reconciliation-audit.md:690-712` already rules those *"EXISTS AND THE PROTOTYPE OMITS IT.
+   Keep and restyle; never delete"*, closing *"both must be treated as requirements to preserve, not
+   redesign away."* Three rails.
+2. **`wfStatus` ("Draft · last saved 11:58") and the header `Cancel` — NOT built.** `wfStatus`,
+   `lastSaved` and `last saved` are 0 hits repo-wide; there is no state to render.
+3. **The inspector's consolidated card — NOT built** (Category select, "Blocks the ticket" toggle,
+   "Initial state" switch). Category and Blocked live on the STATE NODE; `hig-reconciliation-audit.md:703-708`
+   already ruled that card *"SHOWN BUT DOES NOT EXIST. Do not build."*
+4. **The prototype's `--tintDanger`/`--tintSuccess` washes — NOT adopted.** `tokens.ts:201-202`/`:342-344`:
+   `tintWarning` is the only tint role this product has.
 
-The controller answered all four points and **every answer confirmed the proposal**, so nothing was
-reworked:
+**The workflow name is the title and stays an editable `<input>`.** The prototype draws an `h1`. The
+product's name is editable; a heading carrying the same string would put one name in two elements and
+make `getByText(name)` ambiguous for every later test. So the prototype's `34px/41px/700/-0.4px` is
+applied to the field — **via `.gn-page-title`'s own four declarations, read from
+`apps/web/app/globals.css:127`, never re-derived** — and the field KEEPS its boundary, because a control
+that looks exactly like static text is not editable-looking. **Flagged in the PR body as a deviation.**
 
-1. **`role` carry — proceed.** On the wire, dropped by the mapper, so the ordinary case.
-2. **The four unbacked columns — do NOT build, do NOT fake, name them as absences.** *"A prototype
-   drawing is not a requirement."*
-3. **The role `<select>` — DO NOT BUILD. Render the read-only chip.** Two reasons, the second
-   deciding: it is new product capability beyond an audited screen port (a scope question that is the
-   **owner's**, and the controller is putting it to them); and the missing last-owner guard means it
-   would let an admin demote the sole owner — *"a security-relevant default like that should not be
-   shipped by the same step that notices it."* **The controller is reporting the missing
-   last-owner guard to the owner as a finding in its own right.** If it is ever built it gets its own
-   task and ships **with** the guard. *"The wire could back it" is not a reason to build it.*
-4. **`hig-per-screen/3a` stays `todo`.** Claim in the PR body exactly what ships, name the four
-   columns as unbacked, do not claim them. *"True only for the backed surface" is not the task's
-   sentence.*
+### § 3 — TWO MEASUREMENTS THAT CHANGED THE CODE.
 
-The detail below is kept because it is the measurement the ruling rests on.
+1. **`danger`-as-text measured 4.40 on `surface` under `hig`/`minimal` light — below 4.5.** The load-error
+   paragraph therefore uses `--gn-text`, not `--gn-danger`. Four rules upstream already ship that pairing
+   and it has no `CONTRAST_PAIRS` row at all (recorded pre-existing); this is not a fifth. Measured with
+   the repo's own `colorOf` at `/tmp/contrast.mjs`, not estimated.
+2. **apps/web's jsdom setup cannot mount the React Flow canvas.** `ReferenceError: ResizeObserver is not
+   defined` inside React Flow's own `<ZoomPane>` — the root unmounts and the container comes back **EMPTY**,
+   which reads as "the page rendered nothing" rather than as a missing global. Shimmed LOCALLY in
+   `apps/web/test/builder-route.test.tsx`, deliberately **not** in `apps/web/test/setup.ts`: copying
+   app-core's measured 170-line block would put a second copy in the tree to keep in sync, and changing
+   shared setup would alter jsdom for every apps/web suite to serve one assertion. If a later apps/web
+   suite needs the canvas, **promote this block into `setup.ts` rather than copy it a third time.**
 
-Full detail in `gisik-nokma-lanes/EXEC2-2026-09-18-members-wire-gaps.md`. The prototype's roster has
-**five columns; the `/members` wire backs two** (name, role). `readMembers` (`builder-reads.ts:247`)
-selects only `user_id`, `u."name"`, `m.role`, so these have **no field to port from** and are named
-absences rather than fakes:
+### § 4 — MUTATION EVIDENCE (and the two that correctly did not count).
 
-- **email** (`{{ m.email }}`), **Project access** (`{{ m.scopeLabel }}`), **Assigned**
-  (`{{ m.assigned }}`), **Last seen** (`{{ m.seen }}`) — no such fields on this route.
-- **Ticket-only access panel** + "Add to workspace" (`hasTicketOnly`, prototype `:700-718`) — no read.
-- **The role `<select>`** (`canEditRole`, prototype `:679-685`) — CLOSE CALL, detailed below.
+Killed: renaming the base `__canvas` and `__layout` rules · deleting the `__name:focus-visible` rule ·
+removing the `neo` override · planting a hex literal (against `packages/ui`'s token-discipline suite) ·
+deleting the crumb · splitting it into two links · pointing its href at the wrong route · a genuine
+reword of the link text.
 
-### The role select, so a restart does not re-derive it
-It is **more backable than the audit implies**: `membership.granted` carries `role`
-(`packages/domain/src/events/membership.ts:96`), the projection **upserts** it
-(`apps/server/src/projections/proj-memberships.ts:75-76` — `ON CONFLICT … DO UPDATE SET role =
-excluded.role`), and it is admin-gated (`apps/server/src/permissions/check-permission.ts:548-551`).
-**Not built**, for two design reasons rather than wire reasons:
-1. the select offers `Owner` (prototype `:680`) and **no ownership-transfer door exists** — the invite
-   form refuses to offer `owner` for exactly that reason;
-2. **no last-owner guard** on `membership.granted` exists, so it would let an admin demote the sole
-   owner. The one owner-related guard found (`check-permission.ts:160-180`) is about the founding
-   bypass, not demotion.
+**Two mutations were run and did NOT redden, and the distinction is the point:** rewording the link text
+to the `&rsaquo;` ENTITY (same glyph, identical rendered output), and a first attempt aimed at
+`Settings › Workflows` that hit **the docblock's copy of the string instead of the JSX** — perl `s///`
+without `/g` replaces the first occurrence in the slurped file, and the docblock quotes the same sentence.
+A survivor with no explanation is either an unconstrained path or a mutation that never ran; both were the
+second, and each was re-aimed until it was a real change.
 
-If the controller wants it, it ships **with** the owner-demotion guard. Until then the role renders as
-the read-only chip.
+**The name-equality test had a REAL hole and the mutation found it.** Renaming
+`.workflow-builder-screen__canvas` to `…__canvasRenamed` left the whole file GREEN, because the
+`@media (max-width: 64rem)` rule below still names `__canvas` in `{ order: -1 }`, so the class-name sweep
+went on harvesting the name while the card treatment was gone. That is case **13.771**'s entire reason to
+exist — a declaration-level table, in the shape `saved-filters-css-binding.test.tsx`'s 11.119 already
+established.
 
-## § 3 — SCOPE CAVEAT on the ledger rows
-Four unbuildable columns mean **3a "Members — surface" is true only for the backed surface.** The
-claim must say what shipped and must not assert the columns that were not drawn. Do not flip those
-rows on the strength of this branch without reading § 2.
+### § 5 — CASE IDS: MY BLOCK IS `13.760`–`13.819`. USED `13.767`–`13.773`.
 
-## § 4 — What is built
-- `role` carried end to end: `mapActors` → the client type → `getMembers`, **with a mapper test**.
-- The `Members` heading, summary line, roster table with the two backable columns (Person, Role chip).
-  **The summary line's workspace name can be genuinely unavailable** — the prototype renders `ws.name`
-  (data `:3032`) but that comes from `getMyWorkspaces()`, which refuses whole. The repo's handler is
-  `apps/web/src/use-workspace-name.ts`, which fails silently to `null` (omission, never the id); the
-  sentence must be adapted truthfully for the null case rather than printing a placeholder. The people
-  and admin counts ARE derivable from the roster, and are viewer-dependent by design (an admin caller
-  sees guests, a non-guest member does not — `ROSTER_VISIBLE_CLAUSE`).
-- The four screen states: loading, roster-read refused, member-vs-admin split, empty.
-- The `gn-members` CSS family **written from scratch** on the existing shared tokens. It is genuinely
-  unstyled: 3 occurrences, all in the page, ZERO CSS rules — swept with a control (the same sweep finds
-  17 `.gn-page-title` rules, so the instrument reaches CSS).
-- The invite panel and its **403-derived gate are kept exactly as they are.** No second gate is added:
-  `members/page.tsx:33-35` argues the door's own answer cannot drift from the door, and that argument
-  holds.
+**The next free id inside my block is `13.774`.** Recount by case MARKER only, never by substring — the
+block `13.767`–`13.819` was measured free before minting, and every hit in that measurement was prose
+*mentioning* the block's own bounds, which is exactly the trap this file records.
 
-## § 5 — Case ids: MY BLOCK IS `13.760`–`13.819`. NOT 13.700.
+Members used `13.760`–`13.766`. **The highest `13.*` marker in `test-cases/13` at the frozen tip is
+`13.766`**; the highest `13.*` id anywhere in `packages/` + `apps/` is `13.765`. If more than 60 ids are
+needed, **stop and ask** — do not run past the block.
 
-> **Corrected 2026-09-18 by controller ruling.** I had first written `13.700` here and told the
-> implementer to use it. **That was wrong** — a second executor is live on the second wave and mints
-> ids on its own branch, so the controller blocked the ranges to prevent a collision:
-> - **`13.700`–`13.759` — executor 1's. Do NOT use.**
-> - **`13.760`–`13.819` — MINE.**
->
-> Anyone restarting from an older copy of this file must take the block above, not 13.700.
+### § 6 — WHAT IS *NOT* COVERED, NAMED RATHER THAN IMPLIED.
 
-**Recount the next free id at your own tip before minting** — the block floor is not automatically
-free. At `afbd361d` the whole block `13.760`–`13.819` measured free. If more than 60 ids are needed,
-**stop and ask** — do not run past the block.
+- **The viewport suite does not cover this screen.** `apps/web/e2e-viewport/responsive.spec.ts` covers
+  `/help`, `/privacy`, `/terms`, `/sign-in` and a 404 probe; the builder route is not in it and neither is
+  the accessible-names baseline. **No viewport run was attempted** — running it would prove nothing about
+  this screen, and the hot stack on `:3001` is executor 1's.
+- **The builder screen renders no `<h1>` at all.** The prototype's h1 is the product's editable name
+  field. Asserted as an absence (13.770) and **flagged in the PR body** rather than papered over with a
+  duplicate string. A heading-structure gap on this one route; the owner is whoever next owns a11y
+  heading work.
+- **The prototype's `--tintDanger` washes mean `.issues-panel`'s existing `danger` left rule stays.** A
+  real, visible divergence from the drawing, recorded in ui.css's own docblock.
 
-> **CORRECTION to a figure this file once carried, and to the method that produced it — and a second
-> correction to the correction.** This section used to say "the max id in use is `13.699`". **That was
-> WRONG.** A peer session then supplied `13.696` as the true high-water; **I measured that as wrong
-> too, and am recording only what I measured myself.**
->
-> **Measured 2026-09-18 at `afbd361d` (the base, before this branch minted anything):**
-> - Highest case **MARKER** across every file in `test-cases/`: **`13.693`**.
-> - Highest `13.*` id in `packages/` + `apps/`: **`13.689`**.
-> - `13.696`–`13.699` **do not appear at all** in `test-cases/13` at base — neither as markers nor as
->   prose. **So my `13.699` was simply wrong.** A peer's `13.696` is NOT an error, and an earlier
->   version of this block was unfair to call it one: that figure describes the peer's OWN tree AFTER
->   their Task 1 landed, where they measured the same `13.693` high-water I did and minted
->   `13.694`–`13.696` ("the next free id is `13.697`"). **Both figures were correct about different
->   moments** — which is the entire point, and the reason a bare number cannot travel without the tree
->   it was read from. Their landed section now sits immediately above mine in `test-cases/13`.
->
-> **Two method traps, both of which bit during this measurement:**
-> 1. **A substring sweep over a document that DISCUSSES the ids cannot separate a MINTED id from a
->    MENTIONED one.** `13.694` is prose in that file ("the next free id is `13.694`") while `13.693` is
->    a real marker — the sweep cannot tell them apart, and it fails silently in the over-estimating
->    direction. `scripts/check-case-ids.mjs` already self-tests this exact trap ("prose citation
->    excluded"); the tool knew and the hand sweep did not. **Count case MARKERS only**
->    (`^- ✅ **13.…`), never a raw substring.
-> 2. **`git grep` with a pathspec of `'packages/*/test' 'apps/*/test'` returned EMPTY on a tree that
->    has hundreds of matches** — an eaten glob, the silent-empty mode. It only showed up because an
->    un-pathspec'd control fired on the same input (finding `13.686`–`13.689`). **Every sweep needs its
->    positive control through the same invocation.**
->
-> Consequence for the block rule: gaps below a stale high-water are free and belong to **neither**
-> block, so a wrong figure can leave a hole the next minter walks into. My own ids (`13.760`–`13.766`)
-> were in-block; nothing renumbered.
+### § 7 — OUT OF SCOPE, RECORDED WITH A NAMED OWNER (not fixed).
 
-**`13.999` is a documented truncation trap in file 13, not an id**
-(`test-cases/13-deployment-dogfooding.md:23,2406,4680,7273`).
+- **`.workflow-list__*` has NO CSS either** — swept with a control (one hit repo-wide, and it is a
+  *comment* in `apps/web/app/globals.css:44` listing `.workflow-list__new` among "unclassed-control
+  offenders"). It belongs to the delta audit's `isWorkflows` row
+  (`docs/design/prototype-delta-2026-09-18.md:627`), **not** `isBuilder`, and the workflow LIST screen is
+  a different route. **Owner: whoever next picks up `isWorkflows`.**
 
-The existing `3.129`–`3.139` ids in `apps/web/test/members-page.test.tsx` are a **different numbering
-line** — leave them exactly as they are, never renumber them.
-
-## § 6a — MEASURED: the viewport suite does NOT cover the members screen
-
-Worth knowing before anyone spends a served web on it. The dispatch names `:3021` for viewport work, but
-the suite cannot gate this change:
-
-- `apps/web/e2e-viewport/responsive.spec.ts` mentions `members` **0 times**.
-- `apps/web/e2e-viewport/accessible-names-baseline.json` has entries only for `/help`, `/privacy`,
-  `/terms`, `/sign-in` and a 404 probe (`/no-such-page-e2e-viewport-probe`) — **no members entry**.
-- The suite is designed for port `3021` with `reuseExistingServer: false` and **no `webServer`** block:
-  it refuses the run unless something already serves there, and it *fails* rather than adopting a
-  stranger if the port is occupied (`e2e-viewport/viewports.ts:30-57`).
-
-So running it proves nothing about this screen; its only value here would be confirming I did not break
-the five pages it does cover, and those are untouched (the new CSS classes are `gn-members*`, which
-appear only in the members page). **Recorded as a coverage gap, not run.** The dispatch's "Report back"
-list does not ask for a viewport result.
-
-## § 6 — Rules that bind this branch
-- **Never `docker compose`** (any subcommand) and **never bind `:3001`** — a peer's hot stack is there,
-  mounted from executor 1's worktree. Viewport work uses **`:3021`**.
-- Test runs at low concurrency — **but note `--concurrency` is NOT a vitest flag** (measured
-  2026-09-18: it exits 1 with `CACError: Unknown option`). The working flag is **`--maxWorkers=1`**.
+### Rules that bind this branch
+- **Never `docker compose`** (any subcommand) and **never bind `:3001`** — a peer's hot stack is there.
+  Viewport work would use `:3021`.
+- Test runs at low concurrency — **`--maxWorkers=1`**, not `--concurrency` (that is not a vitest flag).
   **Do not run the forced gate** — the controller does.
 - **Do not edit `task-ledger.tsv`** — it is `main`'s; the controller flips rows after each merge.
 - `Features.md` and `test-cases/13-deployment-dogfooding.md` change in the **same commit** as the code.
 - **Never `AskUserQuestion`** in this topology. A question for the owner is a file plus a one-line
   pointer, then a hold.
 
-## § 7 — REVIEW PASS AND FIX ROUND (2026-09-18)
+---
 
-An independent reviewer ran at the first frozen head `2ec10228` and **agreed with the commit** on both
-assigned questions. It answered **Q1 (the role question) independently from the wire** and produced
-better corroboration than my own: case **7.39** (`apps/server/test/routes/builder-reads.test.ts:283`)
-had asserted `role` on the members response **on `main` all along**, and the column is
-`NOT NULL CHECK (role IN ('owner','admin','member','guest'))` — so the field was never absent, only
-unread. It confirmed Q2 string-by-string, verified the four absences are real (every hit is a docblock
-comment, no fabricated markup), confirmed the CSS is token-only with no leakage, and re-measured the
-suites: app-core 91/1455, web 43/451, ui 5/322, all passing.
+## ▼ PREVIOUS BLOCK — Members + InviteAdmin. MERGED as PR #443 (`ba96a8d2`).
 
-**Two Important findings, both documentation drift this change set owns — both FIXED:**
-1. **The in-app help contradicted the screen.** `docs/manual.md` and `docs/faq.md` both said the People
-   page shows "no role next to each person". That is now false — there IS a Role column. Corrected in
-   both sources and **regenerated** (`node scripts/help-content.mjs`; `--check` passes, 224 entries).
-2. **`docs/hig-reconciliation-audit.md:186` was FALSE** and is where the wrong belief came from: it
-   listed the role pill under "SHOWN BUT DOES NOT EXIST. Do not build", claiming the roster "carries no
-   role field at all" — the same client-type/wire conflation the old mapper docblock made. Corrected in
-   place with a dated note, and the sibling initials-circle bullet was marked partly superseded (the
-   monogram is derived from `name`, which the wire does carry).
+Kept because § 5's id arithmetic and the two method traps below are still the ones that bite.
 
-**One Minor fixed:** `initialOf` used `name.slice(0, 1)`, which **splits a surrogate pair** — measured
-`'🐧 Penguin Team'` → the lone high surrogate `'\ud83d'`, which renders as U+FFFD beside a real
-person's name; and `'  Kiro'` → `' '`, a blank disc. Now `Array.from(name.trimStart())[0]?.toUpperCase()
-?? ''`. Case **13.762** gained two `it`s covering both, asserted against the whole character so a
-"some text is there" case could not pass on the broken helper.
+**Makes the ledger's `hig-per-screen/3a` and `/3b` true — except see the scope caveat.** The owner lifted
+the sign-in hold on 2026-09-18 (*"4 - yes"*).
 
-**One finding ESCALATED, not fixed (Minor, judgement):** the reviewer notes the `<h1>` change
-`People` → `Members` cites no owner ruling, and `docs/hig-reconciliation-audit.md:194` explicitly ruled
-*"Flag, never silently reword."* It was **not** silent — recorded in the commit message, the page
-docblock, `Features.md` and a test docblock — and it removes a real inconsistency (`app-nav.tsx` already
-said "Members"). **Flagged in the PR body for the controller/owner; the flag is the ruling's ask.**
+### § 1 — THE ROLE QUESTION: ANSWERED. Case 1, on the wire, dropped by the mapper.
 
-Plus **two Minors from the scoped re-review of the fix round**, both fixed and both worth keeping:
-- **I fixed an under-claim and introduced an OVER-claim.** My replacement help text said the People page
-  "lists everyone in the workspace". False for a non-admin — `ROSTER_VISIBLE_CLAUSE`
-  (`$2::boolean OR m.role <> 'guest'`, `apps/server/src/read/membership-roster.ts:43`) is bound to
-  `isWorkspaceAdmin`, so a member's roster withholds guest rows. Both passages now say "the people you
-  can see", true of every viewer.
-- **A check that could not fail, written by me and REMOVED.** `expect(...).not.toContain('�')`
-  cannot fire for the mutation it names: the broken helper's `textContent` is the lone surrogate
-  `"\ud83d"`, and U+FFFD is what a BROWSER paints for an unpaired surrogate, not what the string holds.
+- **On the wire:** `apps/server/src/routes/builder-reads.ts:247` selects `m.role`; `:256-260` returns
+  `{ userId, displayName, role }`; typed at `packages/domain/src/read-models.ts:547`.
+- **Dropped in the client:** `packages/app-core/src/online/mappers.ts:395-410` — `mapActors` mapped
+  `{id, name}` only.
+- **Independently corroborated in-repo:** `apps/web/src/authoring/data-source-gateway.ts:70-87`.
 
-## § 8 — THE REBASE, THE CONFLICT, AND THE STALE-`dist` TRAP THAT COST A FALSE RED
+### § 2 — RULED 2026-09-18 (controller). Every answer confirmed the proposal; nothing was reworked.
 
-**Rebase onto `43650f15`.** ONE conflict, in `test-cases/13-deployment-dogfooding.md`, and it was purely
-additive: executor 1's Task 1 section and mine both append at EOF. Resolved by **keeping both**, and
-verified rather than assumed — no marker residue, both headings present, and every id on both sides
-intact (`13.694`–`13.696` theirs, `13.760`–`13.766` mine, one occurrence each). `Features.md` auto-merged.
-My section's prose said *"`13.694` is still unwritten"*, which their landing made FALSE, so that clause
-was corrected in place at the rebase and the correction is kept visible rather than overwritten.
+1. **`role` carry — proceed.**
+2. **The four unbacked columns — do NOT build, do NOT fake, name them as absences.** *"A prototype
+   drawing is not a requirement."*
+3. **The role `<select>` — DO NOT BUILD.** Render the read-only chip; the missing last-owner guard means
+   it would let an admin demote the sole owner.
+4. **`hig-per-screen/3a` stays `todo`.** Claim in the PR body exactly what ships.
 
-**⛔ THE TRAP — read this before reporting ANY red on a rebased tree.** After the rebase, `app-core` went
-RED: 5 failures, `TypeError: Cannot read properties of undefined (reading 'safeParse')` at
-`packages/app-core/src/precheck.ts:373`. **It was not a defect, in main or here. It was a STALE `dist`.**
-`precheck.ts` imports `ticketRankedPayload` from `@gisik-nokma/domain` **by package name**, which resolves
-through `packages/domain/dist` — and `dist` was built at 08:35, before the rebase pulled executor 1's
-domain source in at 09:24. The symbol was in `src/` and absent from `dist/`.
-- **Fix:** `pnpm --filter @gisik-nokma/domain build`. 5 failures → 2.
-- **The SAME trap in a second package:** the remaining 2 were `expected the real engine to refuse this
-  event; it accepted` (`test/precheck.test.ts:487`) — `@gisik-nokma/rule-engine` resolves by package name
-  too, and its `dist` was equally stale (no `rank-requires-backlog`). Rebuilt it: **all green**.
-- **After the rebuilds: app-core 91 files / 1460 tests passing, web 43 / 453, both typechecks 0, six
-  checks all 0, Node v22.22.2.** `dist` is untracked, so there is nothing to commit from this.
-- **This is the documented rule biting for real:** *a cross-package mutation under bare `vitest` tests
-  the stale `dist`; the resolving property is IMPORT STYLE, not package boundary.* Any red on a
-  freshly-rebased tree should be re-measured **after rebuilding the workspace packages** before it is
-  reported as a defect. I nearly reported main as broken.
+### § 3 — SCOPE CAVEAT
+Four unbuildable columns mean **3a is true only for the backed surface.**
 
+### § 4 — TWO METHOD TRAPS THIS BLOCK PAID FOR, STILL LIVE.
+
+1. **A substring sweep over a document that DISCUSSES the ids cannot separate a MINTED id from a
+   MENTIONED one.** Count case MARKERS only (`^- ✅ **13.…`). `scripts/check-case-ids.mjs` self-tests
+   this trap ("prose citation excluded"); the hand sweep did not. It fails silently in the
+   over-estimating direction.
+2. **`git grep` with a pathspec of `'packages/*/test' 'apps/*/test'` returned EMPTY on a tree that has
+   hundreds of matches** — an eaten glob, the silent-empty mode. It only showed up because an
+   un-pathspec'd control fired on the same input. **Every sweep needs its positive control through the
+   same invocation.**
+
+`13.999` is a documented truncation trap in file 13, not an id
+(`test-cases/13-deployment-dogfooding.md:23,2406,4680,7273`). The `3.129`–`3.139` ids in
+`apps/web/test/members-page.test.tsx` are a **different numbering line** — never renumber them.
+
+### § 5 — THE STALE-`dist` TRAP (a false RED on a rebased tree).
+
+After the Members rebase, `app-core` went RED with `TypeError: Cannot read properties of undefined
+(reading 'safeParse')` at `packages/app-core/src/precheck.ts:373`. **Not a defect — a STALE `dist`.**
+`precheck.ts` imports by package name, which resolves through `packages/domain/dist`, built before the
+rebase pulled the new domain source in. `pnpm --filter @gisik-nokma/domain build` fixed it; the same trap
+bit `@gisik-nokma/rule-engine`. **Any red on a freshly-rebased tree should be re-measured after rebuilding
+the workspace packages before it is reported as a defect.**

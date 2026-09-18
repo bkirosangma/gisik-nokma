@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { WorkflowBuilderScreen, draftFromPublished, type WorkflowDraft } from '@gisik-nokma/app-core';
 import { AppNav } from '../../../../../../src/app-nav.js';
@@ -55,6 +56,30 @@ export default function EditWorkflowPage() {
   return (
     <main className="gn-shell">
       <AppNav workspaceId={workspaceId} />
+      {/* The breadcrumb back to the workflow list. Two things make this the
+          route's job rather than `WorkflowBuilderScreen`'s: routing is the one
+          thing app-core cannot know (`.../workflows/page.tsx`'s own docblock
+          records the same line for its two jumps), and a plain `<a>` inside
+          app-core would be a full document load where every other link in this
+          product is a client-side navigation.
+
+          This element is not an addition to the design — it is the one
+          `apps/web/app/settings/page.tsx:94-96` already names as the reason the
+          builder is the only settings sub-screen NOT inlined into that shell:
+          "it carries its own breadcrumb back ('Settings › Workflows')". That
+          sentence described an element that did not exist until now; the fix is
+          to build it, not to delete the sentence.
+
+          It renders ABOVE the load states, not inside them. The way back is
+          available whether the read is loading, missing, refused or loaded —
+          which is exactly the case a person needs it in. The text is the
+          prototype's, character for character (`isBuilder`,
+          `desktop.dc.html@6d7b67c0a52c:1015`), as a single link: the prototype
+          makes the whole crumb one `goWorkflows` target, not a "Settings" link
+          and a "Workflows" link that would both land in the same place. */}
+      <nav className="gn-builder-crumb" aria-label="Breadcrumb">
+        <Link href={`/w/${workspaceId}/settings/workflows`}>Settings › Workflows</Link>
+      </nav>
       {wiring.kind !== 'ready' ? (
         <WiringNotReady wiring={wiring} />
       ) : draft.kind === 'loading' ? (

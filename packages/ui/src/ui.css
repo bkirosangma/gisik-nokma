@@ -1806,6 +1806,180 @@
   font-size: 0.8rem;
 }
 
+/* ── The workflow builder SCREEN (`isBuilder`,
+   `desktop.dc.html@6d7b67c0a52c:1013-1093`) — the frame the canvas, panels and
+   inspectors above sit inside, and the four families that had NO CSS AT ALL
+   until this block.
+
+   MEASURED 2026-09-18, with a control, because "unstyled" is a claim about an
+   instrument and not about the file: `workflow-builder-screen`, `state-inspector`,
+   `inspector-panel` and `transition-inspector` each return **0** rules by
+   `grep -rn --include='*.css' -F .<family>`, while the SAME command shape
+   returns 7 for `.issues-panel`, 11 for `.publish-controls`, 15 for
+   `.gn-state-node` and 40 for `.ticket-type-editor` — so the sweep does reach
+   CSS rules and these four are genuinely absent from them. Every declaration
+   below therefore replaces a user-agent default rather than restyling
+   something that already existed.
+
+   NO NEW TOKEN ROLES, the same discipline the canvas and panel blocks above
+   record. `surface-raised`/`shadow-raised`/`radius-card` are `.gn-card`'s own
+   three, so a builder card and every other card in the product are one
+   treatment under all three styles; `fill-tertiary`/`text-accent` are
+   `.gn-button`'s; `surface-sunken`/`shadow-sunken`/`fill-quaternary`/`border`
+   are `.gn-field__input`'s. Under `minimal` the two shadow roles are `[]`
+   (`tokens.ts`), which is that style's flat design and not a regression here —
+   `.gn-card` carries exactly the same property.
+
+   THE PROTOTYPE'S `--tintDanger`/`--tintSuccess` WASHES ARE NOT ADOPTED. Its
+   issues card is a red wash and its all-clear a green one; this product has no
+   tint role for either (`tokens.ts:201-202` and `:342-344` — `tintWarning` is
+   the only tint role that exists, consumed by the invitation banner), and
+   minting two to match a drawing is the "new token roles" line this repo has
+   already refused. `.issues-panel`'s existing `danger` left rule and
+   `.issues-panel--clean`'s `success` one are this product's own spelling of the
+   same distinction, and `hig-per-screen/8a` measured them and ruled they stay.
+
+   THE PROTOTYPE'S TWO-COLUMN LAYOUT IS NOT ADOPTED EITHER, and that one is a
+   refusal recorded before this task: `docs/hig-reconciliation-audit.md:690-712`
+   rules `SystemRulesPanel` and the whole rule-authoring subsystem as "EXISTS AND
+   THE PROTOTYPE OMITS IT. Keep and restyle; never delete", closing with "both
+   must be treated as requirements to preserve, not redesign away". The drawing
+   has no left column at all, so adopting its grid would delete a shipped
+   capability. Three rails below, preserving it. */
+
+.workflow-builder-screen { display: flex; flex-direction: column; gap: 1rem; }
+.workflow-builder-screen__loading { margin: 0; color: var(--gn-text-muted); }
+/* `--gn-text`, NOT `--gn-danger`, and this is a measurement rather than a
+   preference. `danger` used as TEXT on `surface` measures **4.40** under
+   `hig`/`minimal` light (`neo` light 6.28, both darks 5.47-6.12) — below the
+   4.5 that text owes — and `danger`-as-text is a combination with no
+   `CONTRAST_PAIRS` row at all (recorded pre-existing, 2026-09-18). Four rules
+   already ship that way; this is not a fifth. The paragraph replaces the whole
+   builder when it fires, so the sentence is the signal and it does not need a
+   colour to be unmistakable. */
+.workflow-builder-screen__load-error { margin: 0; color: var(--gn-text); }
+
+/* A column, not a row: the look-not-touch banner is a full-width sentence, and
+   a row would set it beside the title field rather than above it. */
+.workflow-builder-screen__header { display: flex; flex-direction: column; gap: 0.75rem; }
+.workflow-builder-screen__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.workflow-builder-screen__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+
+/* The workflow name IS this screen's title: the prototype draws an `h1` here
+   (`:1016`) and the product's is an editable `<input>`, so the design element
+   and the backend's capability are the same thing at different types.
+
+   The four metrics are `.gn-page-title`'s, not a second derivation of the
+   prototype's `34px/41px/700/-0.4px` — that rule already carries the conversion,
+   including the `-0.0118em` its own docblock derives from -0.4px ÷ 34px, and a
+   second reading of the same four numbers is how two titles drift apart.
+
+   The FIELD treatment around it is kept deliberately: `gn-field__input`'s
+   fill, border and radius, and the same `neo` override. A control that looks
+   exactly like static text is not editable-looking, and this is the one title
+   in the product a person can type into — so the prototype's h1 appearance is
+   adopted for the type and refused for the boundary. Flagged in the PR body. */
+.workflow-builder-screen__name {
+  min-height: 2.5625rem;
+  padding: 0 0.875rem;
+  border: 1px solid var(--gn-border);
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-quaternary);
+  color: var(--gn-text);
+  font: inherit;
+  font-size: 2.125rem;
+  line-height: 2.5625rem;
+  font-weight: 700;
+  letter-spacing: -0.0118em;
+}
+.workflow-builder-screen__name:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 1px; }
+.workflow-builder-screen__name:disabled {
+  background: var(--gn-surface-sunken);
+  color: var(--gn-text-muted);
+  cursor: not-allowed;
+}
+[data-style="neo"] .workflow-builder-screen__name {
+  border: none;
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken);
+}
+
+/* Three rails. The drawing has two; the rail it drops is the one the ruling
+   above protects. The right rail keeps the prototype's own 320px = 20rem, the
+   left takes the 18rem `.ticket-type-editor__layout` already gives its aside,
+   and the gap is the prototype's 22px. */
+.workflow-builder-screen__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 18rem) minmax(0, 1fr) minmax(0, 20rem);
+  gap: 1.375rem;
+  align-items: start;
+}
+.workflow-builder-screen__left,
+.workflow-builder-screen__right { display: flex; flex-direction: column; gap: 0.875rem; min-width: 0; }
+/* The canvas is the card (`:1019`): cardBg + cardShadow + cardR. */
+.workflow-builder-screen__canvas {
+  background: var(--gn-surface-raised);
+  border-radius: var(--gn-radius-card);
+  box-shadow: var(--gn-shadow-raised);
+  padding: 0.75rem;
+  overflow: auto;
+  min-width: 0;
+}
+/* One column below the shell's own reading width, and the CANVAS goes first:
+   on a narrow screen the thing the screen exists for should not sit below two
+   rails of commentary. */
+@media (max-width: 64rem) {
+  .workflow-builder-screen__layout { grid-template-columns: minmax(0, 1fr); }
+  .workflow-builder-screen__canvas { order: -1; }
+}
+
+/* The inspector card, shared by both inspectors (`:1080`: cardBg + cardShadow +
+   cardR + 18px padding). `transition-inspector` is the fourth unstyled family
+   and is here rather than in a task of its own because it renders into this
+   same rail — styling one of the two would make the rail change shape by
+   selection. */
+.state-inspector,
+.transition-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: var(--gn-surface-raised);
+  border-radius: var(--gn-radius-card);
+  box-shadow: var(--gn-shadow-raised);
+  padding: 1.125rem;
+}
+.state-inspector__title,
+.transition-inspector__title { margin: 0; font-size: 0.9rem; }
+.state-inspector__actions,
+.transition-inspector__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.transition-inspector__rules { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.6rem; }
+.transition-inspector__rule {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-left: 2px solid var(--gn-border);
+  padding-left: 0.6rem;
+}
+.transition-inspector__rule-summary { font-size: 0.85rem; }
+
+/* The empty selection. A sentence where a card will be, so the rail does not
+   jump in height the moment something is selected. */
+.inspector-panel__hint {
+  margin: 0;
+  padding: 1.125rem;
+  background: var(--gn-surface-raised);
+  border-radius: var(--gn-radius-card);
+  box-shadow: var(--gn-shadow-raised);
+  color: var(--gn-text-muted);
+  font-size: 0.85rem;
+}
+
 /* --- The calendar month grid (Plan 9 Task 9) ------------------------------
    The first surface in the product that renders a calendar colour, and every
    one of them is a role: the today ring and a bar are `accent`, an in-transit

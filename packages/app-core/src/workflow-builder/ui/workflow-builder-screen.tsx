@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Button } from '@gisik-nokma/ui';
 import type { PublishedWorkflowDef, TicketTypeDef } from '@gisik-nokma/domain';
 import { createDraftStore, type WorkflowDraft } from '../draft-store.js';
 import type { WorkflowAuthoringGateway, WorkspaceMember } from '../gateway.js';
@@ -38,14 +39,15 @@ function AddStateButton() {
   const store = useBuilderStore();
   const { canAuthor } = useBuilderEnv();
   if (!canAuthor) return null;
+  // The shared `Button`, not a bare `<button>`: the prototype's "Add state" is
+  // `ctlBg` + accent + weight 600 with no border (`:1016`), which is exactly the
+  // idiom `.gn-button` already carries (fill-tertiary + text-accent + 600, no
+  // border), and `.ticket-type-list__new` is the sibling precedent for a
+  // builder action reaching for the component rather than a bespoke rule.
   return (
-    <button
-      type="button"
-      className="workflow-builder-screen__add-state"
-      onClick={() => store.actions.addState()}
-    >
+    <Button className="workflow-builder-screen__add-state" onClick={() => store.actions.addState()}>
       Add state
-    </button>
+    </Button>
   );
 }
 
@@ -106,9 +108,20 @@ export function WorkflowBuilderScreen(props: {
       <div className="workflow-builder-screen">
         <header className="workflow-builder-screen__header">
           {env.canAuthor ? null : <ReadOnlyBanner />}
-          <WorkflowNameField />
-          <AddStateButton />
-          <PublishControls onPublished={props.onPublished} />
+          {/* The prototype's header is one row carrying the title on the left
+              and the actions on the right (`:1015-1022`); the banner sits above
+              it rather than inside it, which is why this is a wrapper and not
+              four more children of `__header`. The prototype's third piece —
+              a `wfStatus` line ("Draft · last saved 11:58") — is NOT here:
+              `last saved`/`lastSaved`/`wfStatus` are 0 hits repo-wide, so there
+              is no state to render. Named as an absence, not built. */}
+          <div className="workflow-builder-screen__title-row">
+            <WorkflowNameField />
+            <div className="workflow-builder-screen__actions">
+              <AddStateButton />
+              <PublishControls onPublished={props.onPublished} />
+            </div>
+          </div>
         </header>
         <div className="workflow-builder-screen__layout">
           <aside className="workflow-builder-screen__left">

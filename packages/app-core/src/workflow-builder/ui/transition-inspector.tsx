@@ -1,3 +1,4 @@
+import { Button } from '@gisik-nokma/ui';
 import { useBuilderEnv, useBuilderStore, useDraft, useSummaryCtx } from './builder-context.js';
 import { summarizeRule } from '../summaries.js';
 import { AddRuleMenu } from './rule-editors/add-rule-menu.js';
@@ -20,13 +21,13 @@ export function TransitionInspector(props: { index: number }) {
           <li className="transition-inspector__rule" key={ruleIndex}>
             <span className="transition-inspector__rule-summary">{summarizeRule(rule, summaryCtx)}</span>
             {canAuthor ? (
-              <button
-                type="button"
+              <Button
+                variant="danger"
                 aria-label="Remove rule"
                 onClick={() => store.actions.removeRule(props.index, ruleIndex)}
               >
                 Remove rule
-              </button>
+              </Button>
             ) : null}
             {canAuthor ? (
               <RuleEditor transitionIndex={props.index} ruleIndex={ruleIndex} rule={rule} />
@@ -37,9 +38,9 @@ export function TransitionInspector(props: { index: number }) {
       {canAuthor ? (
         <div className="transition-inspector__actions">
           <AddRuleMenu transitionIndex={props.index} />
-          <button type="button" onClick={() => store.actions.removeTransition(props.index)}>
+          <Button variant="danger" onClick={() => store.actions.removeTransition(props.index)}>
             Delete transition
-          </button>
+          </Button>
         </div>
       ) : null}
     </section>
