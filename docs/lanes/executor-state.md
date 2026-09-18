@@ -41,10 +41,10 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~19:1x IST. **SETTINGS → WORKFLOWS: REBASED ONTO #476,
-> # RENUMBERED TO `13.920`, ALL GREEN, VERIFIED MERGEABLE. PR OPENING ON THE COMMIT THAT CARRIES THIS
-> # BLOCK.** `exec/settings-workflows`, ONE PR `--base main`. **One Important finding is RAISED TO THE
-> # CONTROLLER and is not fixed here — see below.**
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~19:4x IST. **SETTINGS → WORKFLOWS: REBASED ONTO #476,
+> # RENUMBERED TO `13.920`, AND F1 RULED AND FIXED IN THE SAME CHANGE SET (the sweep's control is now
+> # PLANTED, case `13.921`). ALL GREEN, VERIFIED MERGEABLE, PR #478 OPEN — AWAITING THE CONTROLLER'S
+> # MERGE.** `exec/settings-workflows`, ONE PR `--base main`.
 >
 > | | |
 > |---|---|
@@ -56,6 +56,34 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | suites | **app-core 1550/0** (94 files) · **ui 330/0** (5 files) · **web 530/0** · **four typechecks EXIT 0, all logs 0 bytes**. Node v22.22.2. Run with `rtk proxy pnpm exec vitest run` (see the method note below). Web is 520 **+10** — exec2's members tests arrived with the rebase. |
 > | seven checks | **all EXIT 0 at the rebased head**: `tasks` · `env` · `runbook` · `help` · `citations` (file 13 = **662** cited / 0 uncited) · `db-tz` (**`DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma`** → `Asia/Kolkata`) · `check-case-ids` (**2352**, union == sum). Citations 658→662 and ids 2348→2352 are exec2's four new cases, not drift. |
 > | gate | **NOT RUN BY THIS LANE** (the controller runs it). `pnpm turbo run build` **11/11** for the post-rebase dist rebuild. |
+>
+> ## ▣ F1 IS RULED AND FIXED — the sweep's positive control is now PLANTED (case `13.921`)
+>
+> The controller confirmed F1 at the roster and ruled **#478 goes back, re-base the control in the SAME
+> change set**. Both readings above 15 were `rgba(0,0,0,1)` — Chrome's own default border on two BARE
+> `<button>`s — so the control **was resting on an unstyled button**, the defect class this whole day
+> removed. Putting them on `.gn-button` (`border: none`) dropped the maximum to **3.81**.
+>
+> **The `15` is NOT lowered and the assertion is NOT deleted.** What changed is what it stands on: the sweep
+> is handed an element whose ratio is known to the decimal — black on opaque white, **21.0** — and must read
+> it through the **same `sweepBorders` path**. A planted fixture survives every styling change, and asserts a
+> property of the INSTRUMENT rather than of the product.
+>
+> **VERIFIED END TO END IN CHROMIUM, not by arithmetic:** on a bare page the sweep reads **nothing**
+> (`examined=0`); after the plant it reads `div.non-text-contrast-control` at `ratio 21`,
+> `border rgba(0,0,0,1)`, `backdrop rgb(255,255,255)`. The empty BEFORE state is the control that the
+> reading came from the plant. **The white ground is a real ANCESTOR, not the control's own background** —
+> `backdropOf` walks to the PARENT, so painting the control itself would leave the ratio at the mercy of
+> whatever the page's body happens to be painted. `bestSeen` is still the PRODUCT's maximum and the roster's
+> `highestReading`; it is just no longer load-bearing for a threshold it can never durably hold.
+>
+> **`aside.gn-attention`'s 4.36 leaves by the same door in the same week** (owner adopted the prototype's
+> `--tintWarning` fill; exec 2 is implementing it), which is why the repair could not lean on it either.
+> **NOT run by this lane: the `test:e2e:stack` suite itself** — it needs the live stack and `docker compose`
+> is out of bounds here. The mechanism is verified through the real instrument; the full suite is the
+> controller's to confirm.
+>
+> ---
 >
 > ## ▣ THE REVIEWER'S PASS — recorded before the PR opened, per the freeze-line rule
 >
