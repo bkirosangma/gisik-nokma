@@ -20,7 +20,143 @@
 
 ---
 
-## ▲ TOP BLOCK — membership Task 2: the roster's role control, with `Owner` omitted (2026-09-18)
+## ▲ TOP BLOCK — the nav's last-open project item, and the global tab memory (2026-09-18)
+
+**Position: THE CHANGE SET IS COMPLETE, THE REVIEWER ROUND AND ITS FIX ROUND ARE BOTH DISCHARGED, and the
+PR is opening against `main` with the reviewer recorded in its body.** Dispatch:
+`CTL-DISPATCH-2026-09-18-exec2-nav-last-project.md`. One PR, `--base main`, branch
+**`exec2/nav-last-project`**.
+
+**FIRST ACTION ON A RESTART: `gh pr list --state open`.** If a PR for this branch exists, the task is at the
+controller's merge and nothing below needs redoing. Then verify the anchors — do not trust the rows.
+
+### Anchors — verify these; do not trust the row
+
+| | |
+|---|---|
+| branch | `exec2/nav-last-project` |
+| cut from | **`94866264`** = the base the dispatch named |
+| frozen head | **`verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit that carries it; whatever is here is one MORE than the last commit below |
+| commits | `53f2cadb` (the change set) · `aac83da3` (FIX ROUND — the reviewer's five findings) · the handoff commit |
+| reviewed head | **`53f2cadb`** by the one reviewer, against the named brief (storage-keying and the fallback) |
+| `origin/main` | **`13e74c0b`** — it has MOVED since the dispatch (`94866264` → `13e74c0b`) |
+| ahead / behind | **recount, do not quote** — `git rev-list --left-right --count origin/main...HEAD` |
+| **conflict** | **NONE, measured**: the only thing that landed on main is `docs/lanes/task-ledger.tsv` (`#463`), which this branch does not touch. **Do NOT rebase** — it would move the head after the reviewer's pass for a tidier graph. |
+| tree | clean |
+| files | 18 against `94866264` |
+| failures on render | none known |
+
+### What shipped
+
+`apps/web/src/last-project-nav.tsx` (NEW) — the item and its dropdown, mounted by `app-nav.tsx:269`
+immediately right of the workspace name. · `apps/web/src/use-last-project.ts` (NEW) — `gn-last-project`
+keyed by user AND workspace, plus the `projectId → tab` map keyed by user. ·
+`apps/web/src/use-workspace-projects.ts` (NEW) — the served project LIST, cache keyed by user AND
+workspace. · `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` — seeds `view` from the tab map in an
+effect and writes on every `setView`; `view`'s union moved here as `ProjectTab`. · `apps/web/test/setup.ts`
+— clears `localStorage` before every case, and **imports nothing from `src/`** (see the hazard below). ·
+`Features.md`, `test-cases/13` — Round 27 paragraph and cases **13.850–13.880**.
+
+**`task-ledger.tsv` untouched** — not a plan-file task, so it has no ledger row and none was added.
+
+### Cases 13.850–13.880 — and `13.880` is ONE ID OUTSIDE the dispatch's block
+
+The block is `13.850`–`13.879` (30 ids); the work needed 31. `13.880` was **measured free at this tip
+before it was used** (boundary-anchored, with the instrument's own positive control finding `13.878` and
+`13.879` in the files that carry them), no id was taken from any other block, no existing case was
+renumbered, and `13.850`–`13.879` are used contiguously with none spare — so the overrun was avoidable
+only by dropping coverage of a fix the reviewer required. **Next free in this block: none; `13.881` and up
+are unclaimed by me.** Recounted at the frozen head **by case MARKER only**: `test-cases/13` went
+`612 → 648` cited and the id union `2335 → 2338`, both deltas exactly `+3` for the three fix-round cases,
+which is a consistency check on the instrument rather than a coincidence.
+
+### THE REVIEW ROUND — 1 Critical, 1 Important, 3 Minor; ALL FIVE CLOSED AND THREE REPRODUCED FIRST
+
+The reviewer's brief was the storage-keying and the fallback, and it found real defects in both. **Three
+were reproduced by a failing case BEFORE the fix**, and those red runs are quoted in the PR body:
+
+- **C1 → 13.878.** The projects cache was keyed by workspace id alone, copying `useWorkspaceName`'s key
+  onto a list that is not the same for everyone — `apps/server/src/read/visible-projects.ts:51-74` returns
+  `visible.filter((project) => eff.projects.has(project.projectId))` for every non-owner. Reproduced as
+  `expected [ { name: 'Alice Only', …(4) } ] to be null`.
+- **I1 → 13.879.** The nav read storage before the page wrote it. Its mechanism is a claim about React, and
+  **I measured it rather than taking the reviewer's reading**: a throwaway probe logged
+  `["child","parent"]`, so passive effects do commit child-first.
+- **M2 → 13.880.** The tab seed re-ran on loading → signed-in. Reproduced as `expected 'Calendar' to be
+  'List'`.
+- **M3 → prose, corrected.** The docblock justified the user+workspace key by a cross-workspace id
+  COLLISION. That arm is **impossible** — `proj_projects.project_id` is the PRIMARY KEY and the migration's
+  own comment says an entity id is a ULID belonging to exactly one workspace. Neither the reviewer nor I
+  could construct it. The keying stands; the reason is replaced with three that survive inspection.
+- **M4 → 13.872 strengthened.** Its first assertion could not fail: the fixture wrote the bytes it checked.
+
+### Mutations — the change set's SIX, then the fix round's FOUR, each re-run
+
+**The change set's six are recorded with MEASURED kill sets, and the prediction was wrong in three
+places** — M2 reddens three cases where two were predicted, M4 reddens one where two were predicted
+(`13.857`'s guard is a DIFFERENT site), and M5 was absent from the prediction entirely. The catalogue
+carries the measured sets.
+
+**The fix round's four each remove exactly what one fix added, and each kills exactly one case:** the
+cache keyed by workspace alone → **13.878** · the nav not reading the route → **13.879** · the chosen-here
+guard removed → **13.880** · the trigger's `onClick` removed → **13.872**. That last one is the point of
+the M4 repair: **before it, the same mutation SURVIVED.** All ten restored to the backup's sha exactly.
+
+### ★ THE HAZARD THAT COST THE MOST, AND IT WAS MINE — in `test/setup.ts`
+
+Clearing the remembered-state module caches from `test/setup.ts` required importing from `src/`, and a
+`setupFiles` entry **runs before the test file's own module** — so `providers.tsx` and then
+`auth-client.ts` were instantiated before any test file's hoisted `vi.mock` could register a factory.
+`useSessionStatus()` answered the REAL client's `{ isPending: true }` — `{ kind: 'loading' }` — **in every
+test file that mocks that module**. Nothing threw. Four cases simply stopped writing anything, because a
+loading session has no user id to key a record by, and every failure pointed at the page.
+
+**The rule, for whoever edits that file next: `test/setup.ts` imports NOTHING from `src/`.** It clears
+`localStorage` alone; module caches are cleared by each case's own file. The reasoning is in the file's
+own docblock because the failure is invisible from a green run.
+
+**And its sequel, which the fix round then found:** adding `useParams` to the nav took **all fourteen
+cases in `test/settings-page.test.tsx` down at once in 43 ms** — an import-time throw, because that file's
+`next/navigation` mock is PARTIAL. A mock is a module, not a subset. Four files were missing `useParams`;
+only one rendered the nav, so three were latent, and all four are repaired.
+
+### Two more defects found and fixed inside this work, both recorded
+
+1. **`--concurrency=1` is a jest flag.** The dispatch names it as the machine-load guard; vitest 3.2.7
+   rejects it before collecting a single test (`CACError: Unknown option`). `--maxWorkers=1` is the
+   equivalent and every run here used it.
+2. **`cacheKey`'s first spelling used a NUL byte**, which made `grep` report its own file as BINARY and
+   refuse to search it — a source file the repo's own inspection tools silently skip. It is
+   `JSON.stringify([userId, workspaceId])` now.
+
+### Known limitation, recorded rather than closed
+
+**A tab clicked during the session-read window is not REMEMBERED.** 13.880 stops the resolving session from
+reverting the choice, but the click's write is still dropped — `rememberProjectTab` takes a `userId` and
+there is not one yet, and inventing a key would be worse. The choice stands for the page and is lost on the
+next visit; the window is one network round trip. **Owner: whoever next touches the session gating on the
+project page.** Two candidate repairs are named in the catalogue.
+
+### Checks — SEVEN, all raw 0 at the fix-round tree
+
+`check:env` · `check:tasks` · `check:db-tz` (needs
+`DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma` → `database timezone: Asia/Kolkata`) ·
+`check:runbook` · `check:citations` (`test-cases/13`: **648 cited / 0 uncited**, a per-file ceiling of 0) ·
+`check:help` · `check-case-ids` (**2338 unique ids, no duplicates**, self-test passed). **The forced gate
+is the controller's and I did not run it.** Suites: web package **519/519** across 48 files; `tsc --noEmit`
+exit 0 for `@gisik-nokma/web` (both tsconfigs). **No other package is touched** — nothing imports
+`apps/web`.
+
+### Citation discipline, and the instrument that had to be fixed first
+
+Every `path:line` in the new catalogue section was re-measured **at the tree that carries it** — and the
+first read-back instrument was WRONG in a way worth recording: its pattern matched only the full
+`path:line` form and **silently skipped the 15 BARE `:NNN` citations**, printing a clean sheet over them.
+Rebuilt to resolve bare tokens against the preceding full path in the same line, it found **17 drifted
+citations** — every one introduced by this fix round, because a fix moves the lines below it. All 79
+tokens (72 distinct) now land on content lines.
+
+## ▼ PREVIOUS BLOCK — membership Task 2: the roster's role control, with `Owner` omitted (2026-09-18)
 
 **Position: the change set is COMPLETE, the review round and its scoped re-review have both returned and
 are fully discharged, and the PR is opening against `main` with the reviewer recorded in its body.**
