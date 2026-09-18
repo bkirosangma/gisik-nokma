@@ -41,10 +41,181 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~11:5x IST. **SECOND WAVE, TASK 4 (`Table`/`TicketList`
-> # row drag plumbing and the tail drop zone) IS DONE, REVIEWED, FIXED (TWICE) AND COMMITTED. PR OPEN,
-> # BASE `main`, AWAITING THE CONTROLLER'S MERGE.** This block is the position; everything below it is
-> # RECORD. **The queue after this task is NOT empty** — Task 5 of
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~12:5x IST. **SECOND WAVE, TASK 5 (the Backlog tab's
+> # rank order, drag reorder, and Move up / Move down) IS DONE, REVIEWED, FIXED, AND THEN FIXED AGAIN
+> # UNDER AN OWNER RULING. **PR #450 OPEN ON BASE `main`, REBASED ONTO `origin/main` = `08bdd791`
+# (executor 2's Task 9, PR #449, merged while this was open), AWAITING THE CONTROLLER'S
+> # MERGE.** An independent
+> # review's four surviving mutants are all killed (below); the unranked-tail defect that same review
+> # found was HELD rather than shipped — the controller ruled a short hold cheaper than shipping it and
+> # correcting it in a second PR — and the OWNER THEN RULED **OPTION B**: rank the rows that have no key
+> # first, in their drawn order, then apply the move, in ONE ingest. It is implemented in the ruling
+> # commit, with the partial-batch cost the owner accepted handled explicitly rather than left implicit.
+> # This block is the position; everything below it is
+> # RECORD. **The queue after this task is NOT empty** — Task 6 of
+> # `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md` (`autoCloseAfterDays`: the
+> # setting, the projection, the wire, and the Workspace settings tab) is next, and it is **dispatched
+> # by the controller rather than started by reflex. HOLD for that dispatch.** A SECOND EXECUTOR IS LIVE
+> # on a disjoint workstream in `gisik-nokma-exec2`; branches are one-per-task and every PR is
+> # `--base main`.
+>
+> | | |
+> |---|---|
+> | branch | `exec/second-wave-t5-backlog-rank`, cut from `origin/main` = **`488bfb2d`** (Task 4, PR #446). Not rebased since; no peer landed under it while it was open |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha printed here names an ANCESTOR. SIX commits, ALL REWRITTEN BY THE REBASE: **`27ed717b`** (the task, 8 files, +1145/−67), **`22fd0608`** (the review fix round: four surviving mutants killed, three Minor fixes), **`baeb4b52`** (the grouping finding recorded as a measurement), **`3c237b15`** (option B, the owner’s ruling), **`7fabf8da`** (the PR number), **`9ac3dabe`** (the docblock’s ruling record). Plus the **handoff commit that carries this very block**, which cannot name itself. **THE PRE-REBASE SHAS `204cf374` / `8ec6d18b` / `7663ea4f` / `7621ea86` / `2987b95d` / `5747ff9b` ARE ORPHANED** — `git merge-base --is-ancestor` is false for each while `git cat-file` still answers `commit`, which is this file’s opening trap for the fifth task running |
+> | base | **`488bfb2d`** = `origin/main`, carrying second-wave Tasks 1 (#441), 2 (#442), 3 (#444), 4 (#446) and executor 2's Members+InviteAdmin (#443) |
+> | PR base | **`main`** — `owner/workspace-edits` is retired and deleted |
+> | case ids | **`13.707`–`13.712`** — four from the task and two from the ruling fix — inside this executor's allocated block `13.700`–`13.759`; **`13.713`–`13.759` remain unminted**. **Recounted two independent ways at this tip and they agree:** over case MARKERS using `scripts/check-case-ids.mjs`'s own `ID_LINE` regex, the highest marker minted in the block was `13.706` (Task 4's); and `grep -rnE '13\.70[7-9]\|13\.710'` over `packages/`, `apps/` and `test-cases/` returned **no hits at all**, against a positive control over `13\.70[0-6]` (found in both) and a null control over `13\.999` (absent). The plan's own `13.622`–`13.625` were NOT used — the dispatch records them as taken |
+> | six checks | **all EXIT 0 at the ruling commit**, run through `pnpm run check:*` so no filename is guessed: `tasks` · `env` · `runbook` · `help` · `citations` (**ratchet holds exactly on every file**; file 13 = **584** cited / 0 uncited, up from Task 4's 561 by exactly this task's six ✅ cases) · `db-tz` **0 with `DATABASE_URL=postgres://gisik:gisik@localhost:54330/gisik_nokma`** (exits 2 without it, by design; note 54330, not the shared cross-lane test Postgres on 54329). Also `node scripts/check-case-ids.mjs` **EXIT 0** — **2274** unique ids (was 2251; +6 this task's, +17 executor 2's Task 9), union == sum so no duplicates, self-test passed |
+> | suites | **app-core 1528 · apps/web 470, zero failures**, both `--no-file-parallelism`, Node **v22.22.2**, re-run after the fix round and after the dist rebuild. Both figures reconcile against Task 4's, which is what makes them a positive control that the new cases are COLLECTED rather than merely written: app-core **1486 + 42 = 1528** (26 of this task’s, 16 of executor 2’s Task 9 which the rebase brought in) (20 cases in `backlog-rank.test.ts`, one added by the fix round) and apps/web **465 + 5 = 470** (the Task 5 describe blocks grew from 6 to 8 cases in the fix round; the file's pre-existing four are included in both numbers) |
+> | typechecks | **domain, app-core, ui and apps/web all EXIT 0** — run after rebuilding `packages/domain` and `packages/app-core` dist, which `apps/web` resolves through by package name |
+> | tree | clean at the frozen head; no `dist`, no `task-ledger.tsv`, no `.superpowers/` in the diff (checked by `git diff --name-only`) |
+> | dev stack | **no compose action was run at any point.** `curl -s localhost:3000/v1/auth/methods` still answers `{"google":true,"apple":false,"phone":false}` — the sign-in the 2026-09-09 env rule protects is intact |
+>
+> ## ▣ WHAT TASK 5 SHIPS
+>
+> The Backlog tab draws its rows in RANK ORDER and a row can be moved by dragging it or by two buttons,
+> with ONE submit path behind both:
+>
+> - `packages/app-core/src/views/backlog-rank.ts` (**new, pure, headless**) — `sortByRank` (delegates to the domain's `compareByRank`; ranked first by key, unranked last by ticket id), `neighboursFor(sorted, movedId, beforeId)` → the `{before, after}` pair `rankBetween` is handed, and `moveTarget(sorted, movedId, 'up'|'down')` → the `beforeId` a button should use (`undefined` = at the edge, `null` = place last). **Two rules in there are the ones nobody guesses:** the moved row is excluded from its own neighbour search, and when the row is placed last behind an UNRANKED tail, `before` is the last **ranked** row's key — reading `.rank` off the preceding row answers `null`, and `rankBetween(null, null)` is the midpoint, so the row would land at the TOP of the backlog while the pointer sat on the tail zone. `moveTarget`'s `down` points TWO rows below, not one: the target is a `beforeId`, and pointing at the row directly below is a NO-OP that spends a round trip to move nothing.
+> - `apps/web/src/backlog-rank-controls.tsx` (**new**) — `submitRank(movedId, beforeId, deps)`, **the single exported path the buttons and the drag both call**, plus `BacklogRankControls` (two `gn-row-action` buttons labelled `Move <title> up` / `Move <title> down`, disabled only at the genuine edges, and that row's own notice in `backlog-start-button.tsx`'s Ruling-27 split). `submitRank` computes the key, applies the optimistic override, ingests one `ticket.ranked`, and clears the override in a `finally` that deliberately does NOT fire on `committed`.
+> - `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` — `rankOverrides: Map<ticketId, rank>` read by `sortByRank` over the server's rows (the optimistic move), `backlogRows` passed to the table AND to both handlers (one array, so a drag cannot compute neighbours off a stale order), `onReorderBacklogRow`, and the arm's `rowDrag` **gated on the same `session.kind === 'signed-in'` check as Start** — a drag ends in an event carrying an `actorId`, so the two affordances appear and disappear together.
+> - `packages/app-core/src/index.ts` — barrel export for the three helpers + `RankRow`.
+>
+> ## ▣ THE REVIEW — one independent pass, recorded BEFORE the PR opened. NOT CLEAN.
+>
+> One reviewer, dispatched through compound-dispatch, read the diff and attacked the tests by mutation.
+> **No Critical. Five Important (I1–I5). Five Minor (M-a–M-e). Four of the Important findings were
+> mutants that SURVIVED the entire suite, and the single most valuable one was a check of MINE that could
+> not fail** — the exact class this series keeps recording. Every finding below was reproduced here
+> before anything was changed; a peer's finding is a claim.
+>
+> **I1 — "the moved row is excluded from its own neighbour search" was pinned by NOTHING.** Dropping
+> `filter(row => row.ticketId !== movedId)` passed **both** suites (19/19 and 10/10), and the case whose
+> comment claimed to kill it could not: in that fixture the last ranked row among the others and the last
+> ranked row overall are the SAME row (B, `'n'`), so the mutant's answer is identical. **Reproduced
+> here before fixing:** `neighboursFor([A('g'), B('n')], 'B', null)` is `{before:'g'}` while the mutant
+> answers `{before:'n'}` — a key built from the moved row's own old key. A case on THAT fixture was
+> added, the old case kept and honestly re-labelled as a non-kill, and **M8 now dies.**
+>
+> **I2 — the committed path's survival of the optimistic override was unpinned.** Making the `finally`
+> clear unconditionally (dropping `if (!committed)`) passed the whole web suite. That is precisely the
+> "two moves for one gesture" flicker `page.tsx`'s docblock argues the flag exists to prevent: the row
+> snaps back the moment the answer lands, then jumps forward when the reload arrives. A case now holds
+> the **reload** open and asserts the optimistic position is still drawn while the server's own rows say
+> otherwise; **M3 dies.**
+>
+> **I3 — the clear-on-answer effect was unpinned in the leak direction.** Changing its deps from
+> `[list.rows]` to `[]` passed the whole web suite, leaving an override free to outlive its answer and
+> display a position the server never agreed to for the rest of the session. The same new case pins it:
+> the reload is resolved with a rank that **contradicts** the optimistic key, and the tab must follow the
+> server; **M4 dies.**
+>
+> **I4 — "the handlers read the array the table draws" was unpinned.** Handing the controls
+> `backlogNarrowing.rows` (the server's arrival order) while the table drew `backlogRows` passed the
+> whole web suite, because every fixture was supplied in rank order and rank order happens to equal
+> ticket-id order there. A fixture whose arrival order is the REVERSE of rank order now pins it — in
+> that arrival list the row is last, so its `Move down` would be disabled and the key unbounded above;
+> **M5 dies.** The identity half was confirmed by reading: `rows={backlogRows}` (`:1877`),
+> `sorted={backlogRows}` (`:1927`) and `sorted: backlogRows` (`:655`) are one memo (`:631`).
+>
+> **I5 — OPEN, AND IT NEEDS A RULING (the one item NOT fixed): in a backlog where NOTHING is ranked,
+> "place last" moves the row to the TOP.** Measured here against the built module, not taken from the
+> review: with `[t1,t2,t3,t4]` all `rank: null`, dragging `t4` to the tail computes
+> `{before:null, after:null}` → `rankBetween` = `'i'` → and because `compareByRank` sorts EVERY ranked
+> row above EVERY unranked one, the drawn order becomes **`t4 t1 t2 t3`**. The same root cause makes an
+> enabled button a no-op: `[A('g'),B('n'),C(null)]`, `Move B down` → key `'q'` → drawn order unchanged
+> `A B C`, one ingest spent to move nothing. **This is the plan's own §8 rule implemented faithfully**
+> (the plan says `before` is "the last RANKED row's key"; with no ranked row that is `null`), and it is
+> the DEFAULT state of every project, since `rank` starts NULL (Task 3's 13.702). The module's docblock
+> claimed the opposite — "after the last row and after the last key are the same position in the
+> rendered order" — and **that sentence was FALSE**; it is corrected in the fix commit, with the defect
+> named in the source. **RESOLVED — the controller held the PR (a short hold being cheaper than shipping it and correcting it
+> in a second PR), escalated with its own independent verification, and the OWNER RULED OPTION B on
+> 2026-09-18: rank the rows that have no key first, in their drawn order, then apply the move, in ONE
+> `dataSource.ingest` carrying N+1 events. Implemented in the ruling commit as `planRankMove` (pure,
+> cases 13.711) plus `submitRank` publishing the backfilled keys optimistically too (13.712) — without
+> which the moved row would be the only ranked row on screen and would draw ABOVE the rows it was
+> dragged past, i.e. the same defect on the client. THE ACCEPTED COST IS HANDLED EXPLICITLY, not left
+> implicit: results are read BY INDEX, a partly-committed batch reports its own `partial` outcome on the
+> transport channel (part of it committed, so it is not a verdict), drops every optimistic key and
+> RELOADS so the tab shows the server's state rather than the requested one. Three mutants were run
+> against the fix and all three die: no-backfill (both new web cases red), no-optimistic-keys-for-
+> backfilled-rows (both red), and a `partial` reported as `committed` (the partial case red).
+>
+> **Minor — all three FIXED in this change set.** M-a: `rank()`'s docblock claimed a re-check the body
+> did not perform (it forwarded `up ?? null`, turning the edge's `undefined` into "place last" — a
+> teleport on any programmatic call); the guard is now real, matching `BacklogStartButton`'s shape. M-c:
+> the drag's notice wore `gn-refusal--server` for transport failures and silence, which `ui.css:1216`
+> states the rule against; the channel now travels with the text. M-d: `rankNotice` was cleared by
+> nothing, surviving reloads and tab switches; it is now cleared by the same server answer that clears
+> the overrides, while a REFUSAL (which does not reload) keeps its notice — which is what the person who
+> just watched their row snap back needs.
+>
+> **Minor — RECORDED, NOT FIXED, AND UPGRADED TO MEASURED.** M-b: with a non-flat grouping on the
+> Backlog tab the drawn neighbours are not the rank neighbours, so a move lands where rank order says
+> rather than where the screen says. The reviewer offered this as its own **least-certain** claim and did
+> not reproduce it; **I reproduced it, and it is not rare — it is the DEFAULT**: `DEFAULT_GROUPING` is
+> `'epic'` (`packages/app-core/src/view-types.ts:495`), not `'flat'`, and the "Group by" control renders
+> on the Backlog tab. Measured against the built module — rank order `A('e1') B('e2') C('e1')` draws
+> `A C B` under `epic` (sections `epic:e1[A C]`, `epic:e2[B]`) and `A B C` under `flat`, so A's DRAWN
+> neighbour is C while its RANK neighbour is B. Invisible to every case in `backlog-tab.test.tsx` only
+> because each fixture's rows carry `epicId: null` and fall in one section. **Same class as I5 and NOT
+> covered by I5's remedy** — rescuing I5 by ranking the unranked rows leaves this one untouched. Priced
+> with it in `EXEC-2026-09-18-t5-unranked-tail.md`; owner: the same ruling. M-e: no signed-out fixture
+> pins the `session.kind` gate on the rank controls or the drag.
+>
+> **Method note this task earns.** Four of the five Important findings were *surviving mutants*, and
+> three of those four were survivable **because the fixtures were tidy** — supplied in the order the
+> assertion wanted, with a rank on every row. A fixture that agrees with the answer cannot distinguish an
+> implementation from a coincidence. The cheapest defence is to make at least one fixture in every
+> gesture suite disagree with the natural order (reversed arrival, an unranked row in the middle, a row
+> that is both the first and the last ranked one). **And a fourth mutant — M5 — survived because the
+> assertions were true of BOTH orders; when two candidate implementations both satisfy your case, the
+> case is not pinning the one you named.**
+>
+> ## ▣ THE REBASE — 2026-09-18, onto `origin/main` = `08bdd791`
+>
+> Executor 2's Task 9 (#449, `BulkCloseDialog`) merged while #450 was open and both wrote the same two
+> shared files. One conflict in six commits, in `Features.md`; `test-cases/13` and
+> `packages/app-core/src/index.ts` auto-merged. Resolution was a UNION, and the two places where a union
+> was NOT the right answer are named rather than smoothed:
+>
+> - **`Features.md`, 1 conflict, 2 lines vs 2.** Both sides appended bullets after the same anchor. The
+>   union is executor 2's `BulkCloseDialog` bullet **and** this task's "Backlog ranking" bullet — and the
+>   naive union produced FOUR lines because the Task 4 `rowDrag` bullet exists in two versions: main has
+>   the original ("no surface passes it yet") and this branch has the Task 5 correction of it. **Those are
+>   the same bullet, not two, so the superseded copy was DROPPED** — keeping both would have been a
+>   duplicate, i.e. drift. Distinguished mechanically, not by eye: the live original contains
+>   "ships here and **no surface passes it yet**", while the corrected copy carries that phrase only
+>   inside quotation marks. Verified after: `rowDrag` bullet ×1, `BulkCloseDialog` bullet ×1, Backlog
+>   ranking bullet ×1.
+> - **`packages/app-core/src/index.ts`** — add/add in the same region, auto-merged to a true union; the
+>   `HEAD`-to-`origin/main` diff is **additions only** (this task's seven-symbol block), with executor 2's
+>   `BulkCloseDialog`/`BulkCloseTicket` exports intact.
+> - **`test-cases/13`** auto-merged with no conflict, so it was verified by MARKER rather than trusted:
+>   **every one of this task's ids `13.707`–`13.712` is present exactly once, and every one of executor 2's
+>   `13.640`–`13.643`, `13.787`, `13.788` is present exactly once.**
+> - **The R4 warning did not bite:** this task's files never name the Dialog dismiss control, so the
+>   `Close` → `Close dialog` rename is not a coupling for this branch. Checked, not assumed —
+>   `grep -n "Close dialog\|Dismiss" ` over the three files returns nothing.
+>
+> **NOTHING OF THIS TASK WAS LOST, and the evidence is blobs rather than an argument.** Five of the six
+> files this task owns are **byte-identical before and after** the rebase (`git rev-parse HEAD:<path>`):
+> `backlog-rank.ts` `a2924bf2`, `backlog-rank.test.ts` `d351902a`, `backlog-rank-controls.tsx`
+> `d02d16c9`, `page.tsx` `95b1eb09`, `backlog-tab.test.tsx` `d13b3756` — so the code that was reviewed and
+> gated is the code now on the branch. The sixth, `index.ts`, differs by design (the union above). The two
+> shared catalogue files differ by design too. **The pre-rebase shas are ORPHANED and `cat-file` will still
+> resolve them.**
+>
+> Re-verified at the rebased head: **app-core 1528 · apps/web 470, zero failures**; four typechecks EXIT 0;
+> six checks + case-ids all EXIT 0 (**2274** unique ids; citations **584**/0).
+>
+> # ▣ CURRENT POSITION — SUPERSEDED. **HISTORY — Task 4 (`Table`/`TicketList`
+> # row drag plumbing and the tail drop zone) — MERGED as PR #446 at `488bfb2d`; it opened and merged
+> # while this was the live position, which is why the block's own "PR OPEN, AWAITING MERGE" line was
+> # stale within the hour. Kept because everything below it is RECORD.** **The queue after this task
+> # was NOT empty** — Task 5 of
 > # `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md` (Backlog tab: rank order, drag
 > # reorder, Move up / Move down) is next, and it is **dispatched by the controller rather than started by
 > # reflex. HOLD for that dispatch.** Task 5 is the FIRST caller of `rowDrag` — nothing passes it yet.

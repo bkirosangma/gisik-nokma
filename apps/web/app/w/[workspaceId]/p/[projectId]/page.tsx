@@ -19,6 +19,7 @@ import {
   TimelineView,
   matchesBoardCard,
   matchesListRow,
+  sortByRank,
   useAttention,
   useBoard,
   useLiveQuery,
@@ -35,6 +36,7 @@ import { Avatar } from '@gisik-nokma/ui';
 import { AppNav } from '../../../../../src/app-nav.js';
 import { startTargetFor } from '../../../../../src/backlog-start.js';
 import { BacklogStartButton } from '../../../../../src/backlog-start-button.js';
+import { BacklogRankControls, submitRank } from '../../../../../src/backlog-rank-controls.js';
 import {
   buildFilterChips,
   describeUnappliedBoardAxes,
@@ -215,6 +217,53 @@ function ProjectBoard() {
   const board = useBoard(dataSource, workspaceId, projectId);
   const list = useTicketList(dataSource, workspaceId, projectId, currentUserId, listFilter);
   const attention = useAttention(dataSource, workspaceId);
+
+  /**
+   * THE BACKLOG'S OPTIMISTIC RANK OVERRIDES (second wave Task 5).
+   *
+   * A rank move is a round trip, and the row must move under the pointer
+   * rather than a second later — so a move writes the key it just computed
+   * here, `sortByRank` below reads this map over the server's rows, and the
+   * map is what makes the reorder visible before the answer lands.
+   *
+   * CLEARED WHENEVER THE SERVER'S ANSWER CHANGES, which is the plan's "cleared
+   * on `list.reload()`" made precise. Keying the clear on the reload CALL
+   * would be wrong in a way that shows: it would drop the override at the
+   * moment the request goes out, so the row would snap back to its old
+   * position and then jump forward again when the answer arrived — two moves
+   * for one gesture. Keyed on the answer's identity instead, the row holds its
+   * optimistic position until the server's own key arrives to take over. It
+   * also means EVERY reload clears, not only the ones this task calls.
+   *
+   * `Map.delete` on `null` is why an override can never be a `null` value: a
+   * `null` entry would mean "unranked", which would shadow a row's real key
+   * rather than clearing the optimistic one.
+   */
+  const [rankOverrides, setRankOverrides] = useState<ReadonlyMap<string, string>>(() => new Map());
+  /**
+   * The drag's notice, carrying its CHANNEL with it.
+   *
+   * Ruling 27 splits a real refusal from a transport failure or silence, and
+   * `ui.css` states the rule in as many words: "a dropped connection or an
+   * empty ingest response is not a verdict, so it never wears `--server`". A
+   * bare string here painted all three with `gn-refusal--server`, which made
+   * the drag the one path on this page that called a dropped connection a
+   * verdict. The two per-row buttons get this right by keeping two separate
+   * pieces of state; the page has one notice slot, so the channel travels
+   * with the text instead.
+   */
+  const [rankNotice, setRankNotice] = useState<{ channel: 'server' | 'transport'; text: string } | null>(null);
+  const applyRankOverride = useCallback((ticketId: string, rank: string | null) => {
+    setRankOverrides((current) => {
+      const next = new Map(current);
+      if (rank === null) next.delete(ticketId);
+      else next.set(ticketId, rank);
+      return next;
+    });
+  }, []);
+  useEffect(() => {
+    setRankOverrides((current) => (current.size === 0 ? current : new Map()));
+  }, [list.rows]);
 
   /**
    * THE CLIENT NARROWING (board-prototype-port Task 4): one `FilterSpec`-shaped
@@ -575,6 +624,77 @@ function ProjectBoard() {
     const total = list.rows.filter((row) => row.stateId === BACKLOG_STATE_ID).length;
     return { rows, shown: rows.length, total };
   }, [list.rows, listNarrowing]);
+
+  /**
+   * THE BACKLOG TAB'S ROWS, IN RANK ORDER (second wave Task 5).
+   *
+   * Ranked rows first by key, unranked rows last — the whole of `sortByRank`,
+   * which is `compareByRank`'s rule and is imported rather than restated. The
+   * optimistic overrides are folded in BEFORE the sort, which is what makes a
+   * move visible without a round trip: the row's `rank` is what the sort
+   * reads, so overriding it is the move.
+   *
+   * This is the array the tab draws AND the array the drag/button handlers
+   * read their neighbours out of. Those must be the same array — neighbours
+   * computed against a stale order are exactly how a drag lands one row from
+   * where the pointer was — so it is passed to `TicketList` and to
+   * `BacklogRankControls` as one value.
+   */
+  const backlogRows = useMemo(() => {
+    if (backlogNarrowing === null) return [];
+    const withOverrides =
+      rankOverrides.size === 0
+        ? backlogNarrowing.rows
+        : backlogNarrowing.rows.map((row) =>
+            rankOverrides.has(row.ticketId) ? { ...row, rank: rankOverrides.get(row.ticketId) ?? null } : row,
+          );
+    return sortByRank(withOverrides);
+  }, [backlogNarrowing, rankOverrides]);
+
+  /**
+   * A DRAG'S MOVE — the same `submitRank` the two buttons call.
+   *
+   * The drag has no per-row component of its own to own a notice, so its
+   * refusal lands in `rankNotice` beside the list instead of in the row. That
+   * is the only difference between the two paths; the key arithmetic, the
+   * optimistic override, the reload and the failure split are the shared
+   * function's, not this callback's.
+   */
+  const onReorderBacklogRow = useCallback(
+    (movedId: string, beforeId: string | null) => {
+      // Cleared as a NEW move begins, which is where it goes stale — and NOT
+      // when the list reloads. The review's M-d was right that nothing cleared
+      // it, but the reload is the wrong moment and measurably so: a PARTIAL
+      // application reports its outcome and then reloads to show the server's
+      // state, so clearing on the answer ate the very message explaining what
+      // the person was looking at. The next gesture replaces it, a success
+      // clears it, and a failure keeps it — which is what someone who just
+      // watched their row snap back needs.
+      setRankNotice(null);
+      void (async () => {
+        const outcome = await submitRank(movedId, beforeId, {
+          sorted: backlogRows,
+          dataSource,
+          workspaceId,
+          currentUserId,
+          onOptimistic: applyRankOverride,
+          onRanked: list.reload,
+        });
+        if (outcome.status === 'refused') {
+          setRankNotice({ channel: 'server', text: `Refused by the server — ${outcome.rule}: ${outcome.reason}` });
+        } else if (outcome.status === 'unreachable' || outcome.status === 'partial') {
+          // `partial` rides the transport channel on purpose: part of the
+          // batch DID commit, so it is not a verdict, and the refusal class is
+          // for verdicts. Its message says what happened; `submitRank` has
+          // already reloaded the list to match the server.
+          setRankNotice({ channel: 'transport', text: outcome.message });
+        } else {
+          setRankNotice(null);
+        }
+      })();
+    },
+    [backlogRows, dataSource, workspaceId, currentUserId, applyRankOverride, list.reload],
+  );
 
   /**
    * The workspace's own ticket types, through the seam amendment 10 requires.
@@ -1755,71 +1875,117 @@ function ProjectBoard() {
               list.error !== null ? (
                 <ShellRefusal what="The backlog" message={list.error} />
               ) : backlogNarrowing !== null ? (
-                <TicketList
-                  // THE SAME NARROWING WORD THE LIST TAB PASSES — not a
-                  // Backlog-specific vocabulary. The brief's own words
-                  // ("narrowing word as the List's"): the Backlog tab shares
-                  // the List tab's `FilterSpec` and its `matchesListRow`-driven
-                  // axes exactly, so whether "your filters" is in force is one
-                  // fact, not two — this is the identical expression the List
-                  // arm below computes, read against `listNarrowing` (not
-                  // `backlogNarrowing`) on purpose, so the word names what the
-                  // FILTER did, the same word on both tabs, while `rows` still
-                  // narrows each tab to its own subset.
-                  {...(() => {
-                    const word = listNarrowingWord(
-                      activeOnly,
-                      shouldRenderNarrowingStrip({
-                        chipCount: activeFilterChips.length,
-                        unappliedAxisCount: listUnappliedAxes.length,
-                        shown: listNarrowing?.shown ?? 0,
-                        total: listNarrowing?.total ?? 0,
-                      }),
-                    );
-                    return word === undefined ? {} : { narrowing: word };
-                  })()}
-                  rows={backlogNarrowing.rows}
-                  currentUserId={currentUserId}
-                  prefs={list.prefs}
-                  onPrefsChange={list.setPrefs}
-                  prefsEditable={list.canSetPrefs}
-                  labels={labels}
-                  onOpenTicket={openTicket}
-                  emptyCopy="Nothing in the backlog — new tickets land here."
-                  /*
-                    THE START CAPABILITY, gated on `session.kind ===
-                    'signed-in'` — the same precedent `createRegion` and the
-                    board's own `moves` prop already set (`currentUserId`'s
-                    own declaration, above): a click landing before the
-                    session resolves, or from a signed-out viewer, would
-                    build an event with an empty `actorId`
-                    (`BacklogStartButton`'s own docblock on why it takes
-                    `currentUserId` at all). Omitted entirely rather than
-                    passed with a blank actor — no trailing column renders
-                    for a signed-out viewer, matching `TicketList`'s own
-                    `rowAction`-absent default.
+                <>
+                  <TicketList
+                    // THE SAME NARROWING WORD THE LIST TAB PASSES — not a
+                    // Backlog-specific vocabulary. The brief's own words
+                    // ("narrowing word as the List's"): the Backlog tab shares
+                    // the List tab's `FilterSpec` and its `matchesListRow`-driven
+                    // axes exactly, so whether "your filters" is in force is one
+                    // fact, not two — this is the identical expression the List
+                    // arm below computes, read against `listNarrowing` (not
+                    // `backlogNarrowing`) on purpose, so the word names what the
+                    // FILTER did, the same word on both tabs, while `rows` still
+                    // narrows each tab to its own subset.
+                    {...(() => {
+                      const word = listNarrowingWord(
+                        activeOnly,
+                        shouldRenderNarrowingStrip({
+                          chipCount: activeFilterChips.length,
+                          unappliedAxisCount: listUnappliedAxes.length,
+                          shown: listNarrowing?.shown ?? 0,
+                          total: listNarrowing?.total ?? 0,
+                        }),
+                      );
+                      return word === undefined ? {} : { narrowing: word };
+                    })()}
+                    rows={backlogRows}
+                    currentUserId={currentUserId}
+                    prefs={list.prefs}
+                    onPrefsChange={list.setPrefs}
+                    prefsEditable={list.canSetPrefs}
+                    labels={labels}
+                    onOpenTicket={openTicket}
+                    emptyCopy="Nothing in the backlog — new tickets land here."
+                    /*
+                      THE START CAPABILITY, gated on `session.kind ===
+                      'signed-in'` — the same precedent `createRegion` and the
+                      board's own `moves` prop already set (`currentUserId`'s
+                      own declaration, above): a click landing before the
+                      session resolves, or from a signed-out viewer, would
+                      build an event with an empty `actorId`
+                      (`BacklogStartButton`'s own docblock on why it takes
+                      `currentUserId` at all). Omitted entirely rather than
+                      passed with a blank actor — no trailing column renders
+                      for a signed-out viewer, matching `TicketList`'s own
+                      `rowAction`-absent default.
 
-                    `startTargetFor` resolves the target PER ROW (Ruling 42);
-                    `backlogWorkflowDefs.data ?? new Map()` is the empty
-                    answer while that fetch is in flight, which
-                    `startTargetFor` reads as `null` — Start renders
-                    disabled, never as licence to submit `{to: null}`.
-                  */
-                  {...(session.kind === 'signed-in'
-                    ? {
-                        rowAction: (row: ListRow) => (
-                          <BacklogStartButton
-                            row={row}
-                            toStateId={startTargetFor(row, ticketTypes.data ?? [], backlogWorkflowDefs.data ?? new Map())}
-                            dataSource={dataSource}
-                            workspaceId={workspaceId}
-                            currentUserId={currentUserId}
-                            onStarted={list.reload}
-                          />
-                        ),
+                      `startTargetFor` resolves the target PER ROW (Ruling 42);
+                      `backlogWorkflowDefs.data ?? new Map()` is the empty
+                      answer while that fetch is in flight, which
+                      `startTargetFor` reads as `null` — Start renders
+                      disabled, never as licence to submit `{to: null}`.
+                    */
+                    {...(session.kind === 'signed-in'
+                      ? {
+                          rowAction: (row: ListRow) => (
+                            <>
+                              <BacklogStartButton
+                                row={row}
+                                toStateId={startTargetFor(row, ticketTypes.data ?? [], backlogWorkflowDefs.data ?? new Map())}
+                                dataSource={dataSource}
+                                workspaceId={workspaceId}
+                                currentUserId={currentUserId}
+                                onStarted={list.reload}
+                              />
+                              {/*
+                                The rank controls sit in the SAME row action as
+                                Start, and are gated by the same `session.kind`
+                                check for the same reason: a rank event carries an
+                                `actorId`, so a signed-out viewer must not be
+                                offered the button. `sorted` is `backlogRows` — the
+                                array the table is drawing — so the neighbours a
+                                move computes are read off the order on screen.
+                              */}
+                              <BacklogRankControls
+                                row={row}
+                                sorted={backlogRows}
+                                dataSource={dataSource}
+                                workspaceId={workspaceId}
+                                currentUserId={currentUserId}
+                                onRanked={list.reload}
+                                onOptimistic={applyRankOverride}
+                              />
+                            </>
+                          ),
+                        }
+                      : {})}
+                    /*
+                      THE DRAG IS GATED ON THE SAME SESSION CHECK AS THE BUTTONS,
+                      and for the identical reason: a drag ends in
+                      `ticket.ranked`, whose envelope carries an `actorId` built
+                      from `currentUserId`. Wiring it for a signed-out viewer
+                      would offer the write door with an empty actor — the hazard
+                      `BacklogStartButton`'s own docblock names (case 3.144), and
+                      the buttons above are unreachable for that viewer for
+                      exactly this cause. So the two affordances appear and
+                      disappear together.
+                    */
+                    {...(session.kind === 'signed-in' ? { rowDrag: { onReorder: onReorderBacklogRow } } : {})}
+                  />
+                  {rankNotice !== null ? (
+                    <p
+                      role="alert"
+                      className={
+                        rankNotice.channel === 'server'
+                          ? 'gn-refusal gn-refusal--server'
+                          : 'gn-refusal gn-refusal--transport'
                       }
-                    : {})}
-                />
+                    >
+                      {rankNotice.text}
+                    </p>
+                  ) : null}
+                </>
               ) : (
                 <p>Loading…</p>
               )
