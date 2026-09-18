@@ -41,7 +41,69 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~19:4x IST. **SETTINGS → WORKFLOWS: REBASED ONTO #476,
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~21:3x IST. **TASK 5b: THE FIVE
+> # NOT-PORTED ITEMS OF `isTypeEditor`, EACH GIVEN A RULE. ALL GREEN, ONE PR OPEN
+> # — AWAITING THE CONTROLLER'S MERGE.** `exec/task5b-not-ported-items`, ONE PR `--base main`.
+>
+> ## LIVE ANCHORS — every one MEASURED with `/usr/bin/git` at the sha below, not inherited
+>
+> | | |
+> |---|---|
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it. At the time of writing: `9ea1ddbd0117ce96eb711a0db62f1d933e60ca7b` (the code commit; the handoff commit you are reading is its CHILD, and after any fix round it is not the tip). |
+> | branch | `exec/task5b-not-ported-items` |
+> | `origin/main` | `c473c78108d0e54ba7478b79eafb2e2a66ccfb92` — **the merge of PR #488, which is THIS lane's Task 5 partial.** |
+> | merge-base | `5ca51d8f68b5824ac36cb40d2e8203f08fcf59af` — that is #488's own tip, and `origin/main`'s tree is byte-equal to it (the merge added nothing). **So `git diff origin/main <tip>` with no path filter is the honest drop check here**: it prints exactly this branch's 19 files and nothing else. |
+> | ahead / behind | `1 / 1` at the code commit. **The `behind 1` is `c473c781` itself, an empty-of-content merge of this lane's previous branch** — not 275 peer commits, and not a stale branch. |
+> | tree | clean at the code commit. |
+> | the change | **19 files.** 3 components (`ticket-type-editor-screen.tsx`, `fields-editor.tsx`, `ticket-type-editor-pane.tsx`), 2 stylesheets (`packages/ui/src/ui.css`, `apps/web/app/globals.css`), `tokens.ts`, 2 test files, `Features.md`, `test-cases/13`, the delta audit, 3 plans, and 2 other lanes' handoffs (citation repairs only). |
+>
+> ## WHAT THE TASK WAS, AND WHAT EACH OF THE FIVE BECAME
+>
+> The dispatch (`gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-settings-wf-task5b.md`) gave each of the five a RULE. **Three were not mine to build.**
+>
+> | # | item | outcome |
+> |---|---|---|
+> | 1 | the header row (Cancel + Save in the h2 row at 22px) | **BUILT.** The row is the SCREEN's (`ticket-type-editor-screen.tsx:124`, `EditorHeader` at `:112`) because the screen owns `parsed`/`save`/`canAuthor`. The Save MOVED — `toHaveLength(1)` pins that. Case **13.924**. |
+> | 2 | the right-hand `--tintWarning` placement | **BUILT, measured first.** Case **13.925**. |
+> | 3 | the "Choose again" reopen control | **NOT BUILT.** No reopen door exists; recorded as an absence with an owner. Case **13.926**. |
+> | 4 | the prototype's state-naming | **NO CHANGE**, recorded at the button. |
+> | 5 | the field-kind vocabulary | **VOCABULARY UNCHANGED; the LABEL fixed.** Case **13.927**. |
+>
+> **`Attachment` is NOT in this PR** — it is a data-model question the controller is putting to the owner by name.
+>
+> ## THE MEASUREMENT THE DISPATCH ASKED FOR, AND WHICH WAY IT WENT
+>
+> `--gn-tint-warning` is an ALPHA role whose documented correctness is a condition on its GROUND. Measured over BOTH candidate grounds, all six style×theme combinations, BEFORE the move: over `surface` (where the notice now sits) `text` 10.51–11.94 and `textMuted` 8.23–12.08; over `surfaceRaised` (the ground the card it left sat on) `text` 9.79–11.91 and `textMuted` 9.33–9.91. **BOTH clear the 4.5 floor, so the placement does not depend on the measurement.** The controller believed the card sat on a raised surface; it does not, and saying so is part of the answer. Its 3px `--gn-warning` marker goes with the fill — a design choice, not a contrast change, and **no ledger row covers this element** (`hig-per-screen/7a`/`8a` rule on `.gn-attention` and `.gn-state-node`, both re-measured).
+>
+> ## THE FINDING THAT COST THE MOST, AND THE METHOD THAT AVOIDED IT
+>
+> **Swept before repairing: 147 citations into the changed files had drifted, across 28 files** — including other lanes' handoffs, the plans, `Features.md` and the delta audit. A stale citation still RESOLVES, so the reader is misled rather than corrected.
+>
+> **102 of them were pure SHIFT and were designed away rather than paid.** The CSS and token edits were rewritten LINE-COUNT-NEUTRAL — nine lines replacing nine, one replacing one — with the prose appended at EOF. That is this repo's own recorded rule (`ui.css`, the `workflow-list__*` family): *an append at EOF needs no census; a mid-file hunk needs one against an explicit shift map.* Verified after the rewrite by comparing the committed file to its parent line by line: **`ui.css` differs only at lines 1978–1981; `globals.css` only at 153; `tokens.ts` only at 344–349.** Copy that method; it is worth more than the 102 repairs it saved.
+>
+> The remaining 27 are in the three restructured components and were repaired against an explicit shift map, one file at a time, **each repaired citation asserted byte-identical to the line it replaced.** Four had NO successor line because the code genuinely moved; those are given their new homes by CONTENT rather than renumbered, and say so where they live.
+>
+> ## A DEFECT THE SWEEP FOUND THAT WAS NOT THIS LANE'S
+>
+> **Four citations (`fields-editor.tsx:99`, formerly `:64`, in `Features.md`, `test-cases/13`, `builder-css-binding.test.tsx` and `state-inspector.tsx`) mean the danger-variant Button precedent but pointed at a BLANK COMMENT LINE** — collateral from exec 2's `required` docblock landing after the delta audit was written. A content-preserving repair would have laundered them into looking maintained, so they were corrected to the real target (`:151`) and **the pre-existing staleness is recorded rather than absorbed.** *Owner: whoever next edits `fields-editor.tsx`'s docblock — the same shift will recur.*
+>
+> ## GATE COMPOSITION — RECOUNTED AT THIS SHA, NOT CARRIED
+>
+> `pnpm turbo run build test typecheck` → **32 of 33 tasks successful.** The one failure is `@gisik-nokma/server#test`, **4 timeouts at 30034 / 30402 / 30051 / 3554 ms**, and **this diff has ZERO `apps/server` files** (measured: `git status --porcelain | grep -c apps/server` → 0). Re-run in isolation at the same tree: **`PASS (1563) FAIL (0) skipped (5)`, exit 0.** This is the recorded load-induced-timeout class, not a regression. Node `v22.22.2`.
+>
+> **All seven repo checks raw 0 at the code commit:** `tasks` · `env` · `runbook` · `help` · `citations` · `db-tz` · `migrations`. `check:case-ids` was NOT re-run by this lane; the case block is the controller's `13.920`–`13.949` and this change mints **13.924–13.927** (13.922/13.923 were spent by the merged Task 5 partial).
+>
+> **The forced gate is the controller's, not this lane's.** No `docker compose` was run; nothing bound :3001 or :3021.
+>
+> ## WHAT IS IN FLIGHT, AND WHAT A RESTARTED EXECUTOR SHOULD DO
+>
+> **Nothing is half-done.** One PR, one commit plus this handoff. If the reviewer's fix round is not yet recorded in the PR body, **that is the next action** — read the PR, not this file, for its outcome.
+>
+> Opening rulings from this task, all recorded where they belong rather than here: (a) the heading's element LEVEL is the caller's, not the prototype's tag; (b) `Attachment` is the owner's; (c) "Choose again" is a rule with an owner.
+>
+> ---
+>
+> # ▣ CURRENT POSITION — SUPERSEDED 2026-09-18 ~21:3x IST. **HISTORY — settings→workflows Task 1 (`exec/settings-workflows`, PR #478). Kept as record.** **SETTINGS → WORKFLOWS: REBASED ONTO #476,
 > # RENUMBERED TO `13.920`, AND F1 RULED AND FIXED IN THE SAME CHANGE SET (the sweep's control is now
 > # PLANTED, case `13.921`). ALL GREEN, VERIFIED MERGEABLE, PR #478 OPEN — AWAITING THE CONTROLLER'S
 > # MERGE.** `exec/settings-workflows`, ONE PR `--base main`.

@@ -12271,7 +12271,7 @@ built or ruled, and the two that remain are rules with owners rather than unfini
 | 2 | **the right-hand `--tintWarning` placement** of the divergence card | **BUILT, and the composite was re-measured on BOTH candidate grounds** before the move: over `surface`, `text` 10.51–11.94 and `textMuted` 8.23–12.08; over `surfaceRaised`, 9.79–11.91 and 9.33–9.91. Both clear the 4.5 floor, so **the placement does not depend on the measurement**. The notice is now `ticket-type-editor-screen.tsx:463`, in the aside, and its 3px marker is gone (`packages/ui/src/ui.css`, § DIVERGENCE at EOF). Case **13.925**. |
 | 3 | **the "Choose again" reopen control** (`:944`) | **NOT BUILT — a rule, not an omission.** No reopen door exists on `WorkflowAuthoringGateway`, and a button with no door behind it is the defect this repo keeps re-finding. Recorded as an ABSENCE with an owner (whoever first adds a reopen route), not as an empty slot. Case **13.926** asserts the migrated branch stays terminal. |
 | 4 | **the prototype's state-naming** — *"Move them to Scheduled"*, a **state** | **NO CHANGE.** The product names the **workflow** (`ticket-type-editor-screen.tsx:514`), deliberately: a re-binding moves tickets between workflows and the state mapping is the dialog's own, per ticket. Now recorded at the button itself, so a reader comparing the two screens does not read it as a transcription slip. |
-| 5 | **the field-kind vocabulary** — prototype `Text / Date / Number / Attachment` (`:919`) vs the product's `['text','number','date','select','person']` (`packages/domain/src/ticket-types.ts:4`) | **THE VOCABULARY IS UNCHANGED; the LABEL was fixed.** The value stays the lowercase wire member; the label is the prototype's (`packages/app-core/src/workflow-builder/ticket-types/fields-editor.tsx:80`). Adding `Attachment` is a **data-model** decision (it decides whether a custom field can hold a file) and is with the owner — **not in this PR**. Case **13.927** pins both halves in one test, so a future rename cannot pass by satisfying the label half alone. |
+| 5 | **the field-kind vocabulary** — prototype `Text / Date / Number / Attachment` (`:919`) vs the product's `['text','number','date','select','person']` (`packages/domain/src/ticket-types.ts:4`) | **THE VOCABULARY IS UNCHANGED; the LABEL was fixed.** The value stays the lowercase wire member; the label is the prototype's (`packages/app-core/src/workflow-builder/ticket-types/fields-editor.tsx:121-124`). Adding `Attachment` is a **data-model** decision (it decides whether a custom field can hold a file) and is with the owner — **not in this PR**. Case **13.927** pins both halves in one test, so a future rename cannot pass by satisfying the label half alone. |
 
 **Two citations in this list had no successor line and were re-resolved by CONTENT, not by arithmetic:**
 the header row's old home (`apps/web/src/ticket-type-editor-pane.tsx:108-113`) and the form-foot Save
@@ -12449,3 +12449,96 @@ duplicated:
   no membership, so any reader joining the roster for a name renders it blank.
 - **`isTypes` (reorder, per-type counts) and `isWorkflows` (a badge, a second action) are HELD, not
   outstanding** — `docs/lanes/owner-holds.md` §1. A hold is a decision, not a debt.
+
+## settings → workflows: the ticket-type editor's five NOT-ported items, each given a rule (executor 1, 2026-09-18) — cases `13.924`–`13.927`
+
+Task 5b. The five items the section above left open, and **the point of this section is that three of the
+five are RULES rather than builds.** A partial port that reads as a finished one is the failure this
+catalogue exists to stop; so is a *rule* that reads as unfinished work, which is why the table above names
+each item's outcome rather than only its status. The prototype block is
+`design-system/interactive/desktop.dc.html@6d7b67c0a52c:871-957`.
+
+- ✅ **13.924 — the type's name, Cancel and Save are ONE ROW, and the Save moved rather than multiplied**
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx:942` and `:956`, rendered at
+  `packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx:124`).
+
+  The prototype puts all three on one line at 22px (`:874-880`); the product had the name and Cancel in a
+  row at `2.125rem` and the Save at the form's foot. The assertion is on the ROW
+  (`[data-testid="type-editor-header"]`), not on three elements existing — the defect it replaces is
+  precisely that all three existed and one was elsewhere — and `toHaveLength(1)` is the other half: a port
+  that ADDS a header Save without removing the foot one would satisfy a naive presence check and leave two
+  controls for one action.
+
+  The second case is the half a placement test cannot see: the header Save is the FORM's control, so it is
+  still `disabled` exactly when `ticketTypeDefSchema` refuses the def, and still absent for a non-author
+  (`packages/app-core/test/workflow-builder/access.test.tsx:631`, unchanged and still green). A header Save
+  that was always enabled would report a definition the server will reject.
+
+- ✅ **13.925 — the divergence notice is the prototype's `--tintWarning` card in the RIGHT column, above
+  Implications, with its 3px marker gone** (`packages/app-core/test/ticket-types/ticket-types.test.tsx:976`
+  and `:1004`, rendered at
+  `packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx:463`).
+
+  Asserted as DOCUMENT ORDER inside the aside, not as a distance: *above Implications* is a fact about the
+  tree, and a DOM-order assertion survives every styling change. The second case reads the rule out of
+  `packages/ui/src/ui.css` and pins three things at once — the fill is `var(--gn-tint-warning)`, the rule no
+  longer names `--gn-surface-raised`, and no `border-left` declaration remains — with the rule's
+  `border-radius` as the control that the block was FOUND rather than the regex silently matching nothing.
+
+  **The composite was re-measured on BOTH candidate grounds before the move**, because
+  `--gn-tint-warning` is an ALPHA role whose documented correctness is a condition on its ground: over
+  `surface`, `text` 10.51–11.94 and `textMuted` 8.23–12.08; over `surfaceRaised` — the ground the card it
+  left sat on — 9.79–11.91 and 9.33–9.91. **Both clear the 4.5 floor, so the placement does not depend on
+  the measurement**, and no new assertion was added for it: the ground is `surface`, which
+  `packages/ui/test/tokens.test.ts`'s `tintWarning` block already asserts both roles against in all six
+  style×theme combinations. A third block measuring the same two pairs over the same ground would be a
+  check that cannot fail for a reason of its own — the shape case 11.213 was retracted for.
+
+  **The marker is not a contrast change.** No ledger row covers this element: `hig-per-screen/7a`/`8a` rule
+  on `.gn-attention` and `.gn-state-node`, and both were re-measured for this change rather than assumed.
+  The treatment matches `.gn-invitations` and `.gn-attention`, which each took the wash and dropped their
+  inline-start rule.
+
+- ✅ **13.926 — a completed move is TERMINAL: the prototype's `Choose again` control is deliberately not
+  built** (`packages/app-core/test/ticket-types/ticket-types.test.tsx:1022`).
+
+  The prototype's `strandedDone` card offers a control that re-opens a finished move (`:930`). **No reopen
+  door exists on `WorkflowAuthoringGateway`, and a button with no door behind it is the defect this repo
+  keeps re-finding**, so the migrated branch states what moved and offers no way back it cannot honour. The
+  case pins the absence AND that the notice is retired rather than re-armed — no `Choose again`, no
+  `reopen`, and no second move offered on the same screen. **Owner: whoever first adds a reopen route.**
+
+- ✅ **13.927 — the field-kind labels are the prototype's while the VALUE picked is still the wire
+  vocabulary** (`packages/app-core/test/ticket-types/ticket-types.test.tsx:1051`, labels at
+  `packages/app-core/src/workflow-builder/ticket-types/fields-editor.tsx:121-124`, `FIELD_TYPE_LABELS` at
+  `:33`).
+
+  The prototype offers `Text / Date / Number / Attachment` as capitalised pills (`:919`) and the product
+  rendered the wire values as raw lowercase labels — the audit recorded *"vocabulary AND casing differ"*,
+  and they are not the same question. **The CASING is fixed; the VOCABULARY is not.** The label map is
+  `Record<kind, string>` over `CUSTOM_FIELD_KINDS`, so it is TOTAL by construction: a sixth kind added to
+  `packages/domain/src/ticket-types.ts:4` fails `turbo run typecheck` here rather than rendering `undefined`
+  in the picker.
+
+  **Both halves are asserted in ONE test on purpose.** The listbox's option texts are the prototype's
+  capitalised five, AND picking `Number` still yields `type: 'number'` on the saved definition. A rename
+  would pass the first assertion and fail the second, which is exactly why they are not two cases.
+  **Adding `Attachment` is NOT here** — it is a data-model decision (does a custom field hold a file?) with
+  the owner.
+
+**THE CITATIONS THIS CHANGE MOVED WERE PAID, NOT IGNORED.** A mid-file hunk in a file cited by line from
+across the repo is a hazard this repo has recorded repeatedly, and the sweep before repair found **147
+drifted citations across 28 files** — including other lanes' handoffs, the plans, `Features.md` and the
+delta audit. **102 of them were pure shift and were designed away:** the `ui.css`, `globals.css` and
+`tokens.ts` edits were rewritten LINE-COUNT-NEUTRAL (nine lines replacing nine, one replacing one) with the
+prose appended at EOF, so that comparing each committed file to its parent line by line shows differences
+at ONLY `ui.css:1978-1981`, `globals.css:153` and `tokens.ts:344-349`. The remaining 27, in the three
+restructured components, were repaired against an explicit shift map, one file at a time, each repaired
+citation asserted byte-identical to the line it replaced. Four had no successor line because the code
+genuinely moved and are given their new homes by content rather than silently renumbered.
+
+**And the sweep surfaced a defect that was not this change's:** four citations
+(`fields-editor.tsx:151`, formerly `:99` and before that `:64`) mean the danger-variant Button precedent but
+pointed at a BLANK COMMENT LINE — collateral from the `required` docblock landing after the delta audit was
+written. A content-preserving repair would have laundered them into looking maintained, so they were
+corrected to the real target and the pre-existing staleness is recorded rather than absorbed.
