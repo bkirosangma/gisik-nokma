@@ -12558,6 +12558,7 @@ pointed at a BLANK COMMENT LINE — collateral from the `required` docblock land
 written. A content-preserving repair would have laundered them into looking maintained, so they were
 corrected to the real target and the pre-existing staleness is recorded rather than absorbed.
 ## settings → workflows Task 9: the settings shell's two token nits, and the one prototype value that is NOT a port (executor 2, 2026-09-18) — cases `13.907`–`13.909`
+## settings → workflows Task 9: the settings shell's two token nits, and the one prototype value that is NOT a port (executor 2, 2026-09-18) — cases `13.907`–`13.910`
 
 The `isSettingsShell` block is `design-system/interactive/desktop.dc.html:800-1011`, read from `main`; its
 `<nav>` is `:808`, its nav item is `:3145`. The audit's row is
@@ -12603,14 +12604,26 @@ freeze outranks a prototype delta, and this task does not touch it.
   `font-weight` **alone** reddens (c) and leaves (a) and (b) green.
 
 - ✅ **13.909 — the item's radius stays `--gn-radius-control`, and that is a measured deviation**
-  (`apps/web/app/globals.css:1235`). `:3145` hard-codes `border-radius:10px`. **It is the only control in
-  that file that does**: its own neo block sets `--ctlR:14px` (`:59`), and `tokens.ts`'s `radii` table
-  carries `hig`/`minimal` `8px` and `neo` `14px` (`packages/ui/src/tokens.ts:935-938`) — the product's
-  token IS the prototype's `--ctlR`, exactly, in both styles. A literal port would therefore leave this
-  one item at 10px while every other control under `neo` is 14px. **The token expresses the style axis the
-  prototype's literal cannot**, and the rule is where that is declared rather than left to look like an
-  oversight. This case pins an existing state rather than changing one, which is why it was green before
-  the fix.
+  (`apps/web/app/globals.css:1235`). `:3145` hard-codes `border-radius:10px`. **It is the one NAV ITEM in
+  that file that does**: the top nav composes `NAV_BASE`, whose own radius is `var(--ctlR)`
+  (`design-system/interactive/desktop.dc.html:2011`, used at `:2598`), so `:3145` departs from the
+  prototype's own control-radius token where its sibling does not.
+
+  **That sentence was WRONG in the first version of this entry, and the correction is the point of
+  recording it.** It read *"it is the only control in that file that does"* — and a plain count returns
+  **nine** `border-radius:10px` occurrences, among them an `<input type="search">` at `:1676` and three
+  `<a>` doors at `:1855-1857`. Found by the task's independent review, not by its author, which is the
+  pattern this repo keeps recording. The *decision* survives the correction unchanged; only the stated
+  reason was false, and a false reason in a load-bearing sentence is the kind of thing a later reader
+  builds on.
+
+  The reason the decision survives: the prototype's neo block sets `--ctlR:14px` (`:59`), and `tokens.ts`'s
+  `radii` table carries `hig`/`minimal` `8px` and `neo` `14px` (`packages/ui/src/tokens.ts:935-938`) — the
+  product's token IS the prototype's `--ctlR`, exactly, in both styles. A literal port would therefore
+  leave this one item at 10px while every other control under `neo` is 14px. **The token expresses the
+  style axis the prototype's literal cannot**, and the rule is where that is declared rather than left to
+  look like an oversight. This case pins an existing state rather than changing one, which is why it was
+  green before the fix.
 
   **Its second claim is the substantive one, and its two plants are aimed to prove they are separable:**
   "a token is used" and "no literal competes" are different properties, and only the second is the port's
@@ -12618,3 +12631,41 @@ freeze outranks a prototype delta, and this task does not touch it.
   trivially false too; planting `var(--gn-radius-card)` — a **wrong token of the right shape** — reddens
   the token claim alone and is **invisible** to the literal claim. A single claim would have missed one of
   the two.
+
+- ✅ **13.910 — exactly ONE rule carries the current item, across both stylesheets.** 13.907–13.909 read
+  `apps/web/app/globals.css` alone, and that was **the gap the task's independent review found in their
+  first version**: a competing rule — equal specificity and later in source order, or higher specificity
+  anywhere — defeats the change invisibly. The review measured it, appending two such rules to a copy and
+  getting ten passes with the active item dead in a browser. 13.908's NAME is a claim about what gets
+  painted, so the instrument has to be able to see what else paints it. The check is the shape
+  `members-styling.test.ts`'s 13.887 established for the same reason, reading
+  `packages/ui/src/ui.css` alongside `globals.css` — `apps/web/app/layout.tsx:3-4` loads the former
+  first, so a tie also goes `globals.css`'s way.
+
+  **The claim is about the PATTERN, not the one literal selector**, because the competing rules that
+  matter are not the same string: `[data-style='neo'] .gn-settings__sidebar a[aria-current='page']` and
+  `.gn-settings a[aria-current='page']` both qualify and neither is the rule under test. The parser
+  splits on `}` and takes each chunk's text before its `{`, which reads a selector written across lines
+  correctly; comments are stripped by CONTEXT first, because this file's prose names its own selectors.
+
+  **Proved end-to-end, not only in-process.** The review's own plant was appended to the real
+  `globals.css` — `MUTATED_EXIT=1`, reddening 13.910's first and third `it`s **by name** — and the file
+  was then restored from a byte copy and verified `sha256 517404944da99f83…`, not by `git checkout`. The
+  case also carries its own in-process plants at equal and at higher specificity, plus a positive control
+  (a rule that does not name both tokens is not counted) so the count is not simply "number of rules".
+
+  The review also measured the change EFFECTIVE, which is the other half and is why the guard now exists
+  rather than the CSS having changed: the built chunk carries exactly three `aria-current` selectors in
+  source order — this one and two `.gn-nav` ones that require a `.gn-nav` ancestor the sidebar does not
+  have.
+
+**One consequence the review measured and this entry records rather than leaves implicit: the
+sidebar/content WRAP THRESHOLD moves.** `.gn-settings` is `flex-wrap: wrap`, the sidebar is
+`flex: 0 0 15.5rem` and therefore cannot shrink, and `.gn-settings__content` is `flex: 1 1 20rem`. The
+sidebar grew by exactly 56px, so the viewport at which the pair stops sharing a line moves right by
+exactly that 56px, and a window in that band now stacks — the content takes the full width instead of
+sitting beside the sidebar. Not a break at any width (the review swept 320–640px and found no overflow at
+either value, and at the `stack-phone-390` baseline the content pane is 366px before and after, because
+248 + 320 already exceeded the shell's inner width at `12rem` too). But a reader comparing screenshots
+just under that boundary should expect a difference, and `globals.css:1227` now carries the note inline
+so it is visible from the declaration that causes it.

@@ -1224,7 +1224,7 @@ input, textarea, select { font-family: inherit; }
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  flex: 0 0 15.5rem;
+  flex: 0 0 15.5rem; /* not shrinkable, so the 56px this added also moves the sidebar/content wrap threshold right by 56px */
   background: var(--gn-surface-raised);
   box-shadow: var(--gn-shadow-raised);
   border-radius: var(--gn-radius-card);

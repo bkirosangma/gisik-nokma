@@ -34,6 +34,14 @@ import { describe, expect, it } from 'vitest';
  */
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const GLOBALS_CSS_PATH = resolve(TEST_DIR, '../app/globals.css');
+/**
+ * The OTHER stylesheet a rule for this screen could hide in — `apps/web/app/
+ * layout.tsx:3-4` loads it first, so a tie also goes `globals.css`'s way. Read
+ * by 13.910, which is the case that catches a competing rule the
+ * `.gn-settings` family's own file would never show. Same pairing, and the same
+ * reason, as `members-styling.test.ts:45-49`.
+ */
+const UI_CSS_PATH = resolve(TEST_DIR, '../../../packages/ui/src/ui.css');
 
 /**
  * Full rule body, selector line through its matching closing brace — the shape
@@ -100,7 +108,7 @@ function withRule(css: string, selectorPattern: RegExp, replacement: string): st
 
 const css = readFileSync(GLOBALS_CSS_PATH, 'utf8');
 
-const SIDEBAR = /(?<!__)\.gn-settings__sidebar\s*\{/;
+const SIDEBAR = /\.gn-settings__sidebar\s*\{/;
 const SIDEBAR_ITEM = /^\.gn-settings__sidebar a,$/;
 const SIDEBAR_ACTIVE = /\.gn-settings__sidebar a\[aria-current='page'\]\s*\{/;
 
@@ -128,8 +136,15 @@ describe("13.907 — the settings sidebar is the prototype's 248px, not the 192p
       withRule(css, SIDEBAR, `.gn-settings__sidebar {\n  flex: 0 0 ${value};\n}`);
     expect(basisPx(ruleFor(plant('9rem'), SIDEBAR)!)).toBe(144);
     expect(basisPx(ruleFor(plant('12rem'), SIDEBAR)!)).toBe(192);
-    // The property that matters: neither planted reading equals the prototype's.
-    expect([144, 192]).not.toContain(248);
+    // The property that matters, and it is a real one: a tree carrying any of
+    // these planted bases would REDDEN the case above, because the extraction
+    // reads the planted value back and none of them is the prototype's. Written
+    // as a loop over the extraction rather than as `expect([144, 192]).not
+    // .toContain(248)` — that shape is a check that cannot fail, since the array
+    // is a literal written on the same line as the assertion.
+    for (const planted of ['9rem', '12rem', '14rem']) {
+      expect(basisPx(ruleFor(plant(planted), SIDEBAR)!), `planted ${planted}`).not.toBe(248);
+    }
   });
 });
 
@@ -203,12 +218,22 @@ describe('13.909 — the item radius stays `--gn-radius-control`, and that is a 
     expect(rule, 'no rule for .gn-settings__sidebar a').toBeDefined();
     const decls = declarations(rule!);
     expect(decls.get('border-radius'), `from: ${String(rule)}`).toBe('var(--gn-radius-control)');
-    // The prototype hard-codes `border-radius:10px` here (`:3145`) — and it is
-    // the only control in that file that does: its own neo block sets
-    // `--ctlR:14px` at `:59`, so a literal port would leave this one item at
-    // 10px while every other control under `neo` is 14px. The token expresses
-    // the style axis the prototype's literal cannot, and this rule is where the
-    // deviation is declared rather than left to look like an oversight.
+    // The prototype hard-codes `border-radius:10px` here (`:3145`). It is NOT
+    // the only control in that file that hard-codes a radius — a plain count
+    // finds nine, including an `<input type="search">` at `:1676` and three
+    // `<a>` doors at `:1855-1857` — and the first version of this docblock said
+    // it was. The true and narrower claim is about NAV ITEMS, and it is the
+    // stronger one: the top nav composes `NAV_BASE`, whose own radius is
+    // `var(--ctlR)` (`:2011`, used at `:2598`), so `:3145` is the one nav item
+    // that departs from the prototype's own control-radius token.
+    //
+    // Why that matters for the port: the prototype's neo block sets
+    // `--ctlR:14px` at `:59`, and `tokens.ts`'s `radii` table mirrors it exactly
+    // (`hig`/`minimal` 8px, `neo` 14px). A literal port would therefore leave
+    // this one item at 10px while every other control under `neo` is 14px. The
+    // token expresses the style axis the prototype's literal cannot, and this
+    // rule is where the deviation is declared rather than left to look like an
+    // oversight.
     expect(/border-radius:\s*[\d.]+\s*(px|rem)/.test(rule!)).toBe(false);
   });
 
@@ -240,5 +265,75 @@ describe('13.909 — the item radius stays `--gn-radius-control`, and that is a 
     // No literal appears — this plant is invisible to the second claim, which is
     // why both claims exist.
     expect(/border-radius:\s*[\d.]+\s*(px|rem)/.test(ruleFor(wrongToken, SIDEBAR_ITEM)!)).toBe(false);
+  });
+});
+
+/**
+ * Every selector in one stylesheet, one entry per rule. Splits on `}` so each
+ * chunk's text before its `{` IS the selector, which handles a selector written
+ * across lines (`.a,` / `.b {`) without a line-prefix heuristic — and comments
+ * are stripped by CONTEXT first, because `globals.css` documents these rules in
+ * prose that names their own selectors, so a line test both misses real rules
+ * and eats sentences. Same reasoning as `members-styling.test.ts`'s own helper,
+ * which an independent review defeated twice before it reached this shape.
+ */
+function selectorsIn(sheet: string): string[] {
+  const stripped = sheet.replace(/\/\*[\s\S]*?\*\//g, '');
+  const out: string[] = [];
+  for (const block of stripped.split('}')) {
+    const at = block.indexOf('{');
+    if (at === -1) continue;
+    out.push(block.slice(0, at).trim().replace(/\s+/g, ' '));
+  }
+  return out;
+}
+
+describe('13.910 — exactly ONE rule carries the current item, across both stylesheets', () => {
+  /*
+   * WHY THIS CASE EXISTS, and it is the gap an independent review found in the
+   * first version of this file: 13.907–13.909 read `globals.css` alone, so a
+   * competing rule — equal specificity and later in source order, or higher
+   * specificity anywhere — defeats the change INVISIBLY. The review measured
+   * exactly that: two such rules appended to a copy left this file green with
+   * the active item dead in a browser. 13.908's NAME is a claim about what gets
+   * painted, so the instrument has to be able to see what else paints it.
+   *
+   * The claim is deliberately about the PATTERN, not the one literal selector:
+   * `[data-style="neo"] .gn-settings__sidebar a[aria-current='page']` and
+   * `.gn-settings a[aria-current='page']` both compete and neither is the same
+   * string as the rule under test.
+   */
+  const matches = (sheet: string) =>
+    selectorsIn(sheet).filter((s) => s.includes('gn-settings') && s.includes('aria-current'));
+
+  const inGlobals = matches(css);
+  const inUi = matches(readFileSync(UI_CSS_PATH, 'utf8'));
+
+  it('one rule in globals.css names an `aria-current` state inside `.gn-settings`', () => {
+    expect(inGlobals, `matching selectors: ${inGlobals.join(' | ')}`).toEqual([
+      ".gn-settings__sidebar a[aria-current='page']",
+    ]);
+  });
+
+  it('no rule in ui.css competes for the same state', () => {
+    expect(inUi, `matching selectors: ${inUi.join(' | ')}`).toEqual([]);
+  });
+
+  /*
+   * MUTATION WITNESS. Plant the exact override the review used — a later,
+   * equal-specificity rule restoring the tint — and confirm the count moves.
+   * Both plants go through `selectorsIn`, the same path the assertions read.
+   */
+  it('a planted competing rule is caught, at equal AND at higher specificity', () => {
+    const equal = `${css}\n.gn-settings__sidebar a[aria-current='page'] { background: var(--gn-fill-tertiary); }\n`;
+    expect(matches(equal)).toHaveLength(2);
+
+    const higher = `${css}\n[data-style='neo'] .gn-settings__sidebar a[aria-current='page'] { background: var(--gn-fill-tertiary); }\n`;
+    expect(matches(higher)).toHaveLength(2);
+
+    // Positive control through the SAME path: a rule that does not name both
+    // tokens is not counted, so the count above is not simply "number of rules".
+    const unrelated = `${css}\n.gn-elsewhere a[aria-current='page'] { background: var(--gn-fill-tertiary); }\n`;
+    expect(matches(unrelated)).toHaveLength(1);
   });
 });
