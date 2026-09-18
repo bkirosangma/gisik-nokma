@@ -304,15 +304,23 @@ describe('13.649 a signed-out viewer is offered neither the row checkboxes nor t
  * §8.3's Board bullet is one sentence carrying both halves — *"Per-ticket
  * refusals … stay listed; the rest close and the board reloads."* — and the
  * List bullet says "same dialog, same batch". The plan wires the List's
- * `onClosed` to `list.reload()` with the selection cleared on reload, and
- * `open` derived from the selection: on a partial that clears the selection,
- * so the dialog unmounts and the `Could not close` rows the spec requires it
- * to keep on screen are destroyed in the same tick they were written.
+ * `onClosed` to `list.reload()` with the selection cleared on reload, and names
+ * **neither a snapshot nor an `open` expression**. So it does not produce the
+ * unmount, it fails to forbid it: under the reading that makes `open` follow
+ * the selection, the clear unmounts the dialog and the `Could not close` rows
+ * the spec requires it to keep on screen are destroyed in the same tick they
+ * were written. (Under the plan's other literal reading — live `tickets`, its
+ * own open flag — the refusal list would still render, because `failures` is
+ * the dialog's own state, but the report would describe a selection that has
+ * since been emptied: `Close 0 tickets` over an opening that was two. Both
+ * readings fall short; an earlier draft of this docblock claimed the plan
+ * "produces" the unmount and an independent review corrected it.)
  *
  * The fix is the one Task 10's arm already carries, stated for this consumer:
  * **the dialog's tickets are SNAPSHOTTED at click time** (so the reload cannot
- * change what it is a report about) and **the dialog keeps its own open flag**
- * (so clearing the selection cannot unmount it). `onClosed` reloads
+ * change what it is a report about — this is what keeps the report coherent)
+ * and **the dialog keeps its own open flag** (so clearing the selection cannot
+ * unmount it — this is what keeps it readable). `onClosed` reloads
  * UNCONDITIONALLY — "the rest close and the list reloads" holds on both
  * outcomes — and the snapshot is released only on a COMPLETE close.
  *
@@ -408,8 +416,17 @@ describe('13.794 a PARTIAL close reloads the list and keeps the dialog with its 
  *
  * THE CONTROL IS IN THIS CASE, and it is the second half: after dismissing the
  * dialog, the same click on the same control DOES open a fresh dialog with the
- * new selection. Without it, "the titles did not change" would pass on a click
- * that never reached the handler at all.
+ * new selection — so the element is live, the selection really did change, and
+ * the titles above are the SAME only because the guard refused.
+ *
+ * **What the control does NOT prove, stated because an independent review
+ * measured the gap and an earlier draft of this docblock overshot it.** It is a
+ * THIRD click, not the refused second one, so it cannot distinguish the shipped
+ * guard from a handler that swallows a click only while `pendingClose !== null`
+ * — the two are observationally identical, because a correctly refused click is
+ * by definition a no-op. No assertion can separate them; the mutation that
+ * removes the guard is what proves the guard is load-bearing (it reddens this
+ * case and nothing else), and the control proves the CLICK is not dead.
  */
 describe('13.795 an open dialog’s tickets cannot be swapped under it', () => {
   it('refuses the swap, and a fresh open after dismissal carries the new selection', async () => {

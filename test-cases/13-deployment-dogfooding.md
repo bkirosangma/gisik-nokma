@@ -9600,8 +9600,8 @@ that expires; a block is the only form that stays true.
   `onClosed`'s reload follows, the selection is empty afterwards, and the dialog has left (a COMPLETE
   close, which is the half 13.794 shows the other side of). The read is call-count-driven, so "the list
   reloaded" is falsifiable rather than satisfied by a fixed answer.
-  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:652` (the selection),
-  `:655` (the gate), `apps/web/test/list-bulk-close.test.tsx:166`
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:681` (the selection),
+  `:684` (the gate), `apps/web/test/list-bulk-close.test.tsx:166`
 
 - ✅ **13.649 — a signed-out viewer is offered neither the checkboxes nor the control.** Its first
   assertion is the positive control, and it is the reason the case means anything: the List's rows ARE on
@@ -9609,7 +9609,7 @@ that expires; a block is the only form that stays true.
   before the session resolves and while signed out, and a `ticket.closed` built from an empty actor is
   refused by `checkRolePermission` for a reason (`env.actorId !== ctx.sessionUserId`) that names the
   person's permissions rather than the truth — case 3.144's defect, one surface over.
-  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2127` (the signed-in gate),
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2156` (the signed-in gate),
   `apps/web/test/list-bulk-close.test.tsx:283`
 
 - ✅ **13.794 — a PARTIAL close reloads the list and KEEPS the dialog, with the refusal listed.** **This
@@ -9617,17 +9617,22 @@ that expires; a block is the only form that stays true.
   two pieces rather than one.** §8.3's Board bullet is one sentence carrying both halves — *"Per-ticket
   refusals … stay listed; the rest close and the board reloads"* — and the List bullet inherits it through
   "same dialog, same batch". The plan wires `onClosed` → `list.reload()` with the selection cleared on
-  reload; `onClosed` fires on a partial too, so an `open` derived from the selection would unmount the
-  dialog in the same tick its `Could not close` rows were written and the person would never read the
-  reason their ticket was refused. The fix: the tickets are **snapshotted at click time** and the dialog
+  reload and names NEITHER a snapshot NOR an `open` expression — so it does not produce the unmount, it
+  fails to forbid it. `onClosed` fires on a partial too, so under the reading that makes `open` follow the
+  selection the clear unmounts the dialog in the same tick its `Could not close` rows were written and the
+  person never reads the reason their ticket was refused; under the plan's other literal reading (live
+  `tickets`, its own open flag) the refusal list still renders — `failures` is the dialog's own state — but
+  the report describes a selection that has since been emptied (`Close 0 tickets` over an opening that was
+  two). **Both readings fall short of §8.3; an earlier draft of this entry said the plan "produces" the
+  unmount, and an independent review measured that as stronger than the document supports.** The fix: the tickets are **snapshotted at click time** and the dialog
   keeps its **own open flag** (they are `pendingClose`, one piece of state serving both), while `onClosed`
   reloads UNCONDITIONALLY and releases the snapshot only on a complete close. The case drives a two-ticket
   selection where the second is refused and asserts the refusal listed verbatim, the committed ticket no
   longer pending, the reads incremented — "the rest close and the list reloads", on this outcome too — the
   dialog still mounted, and the selection cleared by the reload. **That last assertion is what makes the
   survival above a fact about the dialog's own flag rather than about the selection never having moved.**
-  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:653` (the snapshot and the flag),
-  `:2256` (the conditional release), `apps/web/test/list-bulk-close.test.tsx:324`
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:682` (the snapshot and the flag),
+  `:2289` (the conditional release), `apps/web/test/list-bulk-close.test.tsx:332`
 
 - ✅ **13.795 — an OPEN dialog's tickets cannot be swapped under it.** `BulkCloseDialog` states its own
   precondition: a parent swapping `tickets` while the dialog stays OPEN is *not covered by its reset*,
@@ -9642,10 +9647,14 @@ that expires; a block is the only form that stays true.
   from two surfaces, rather than repaired from either); jsdom does not hit-test the scrim, so an ordinary
   click drives exactly the state transition an escaped focus produces. **The CONTROL is inside the case
   and is half of it:** after dismissing, the same click on the same control opens a fresh dialog carrying
-  the CURRENT selection — so "the titles did not change" cannot pass on a click that never reached the
-  handler.
-  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2165` (the guard),
-  `:2246` (the one dialog mount), `apps/web/test/list-bulk-close.test.tsx:414`
+  the CURRENT selection — so the element is live, the selection really did change, and the titles above are
+  the same only because the guard refused. **What the control does NOT prove, measured by an independent
+  review against an earlier draft of this entry: it is a THIRD click, not the refused second one, so it
+  cannot distinguish the shipped guard from a handler that swallows a click only while `pendingClose !==
+  null` — the two are observationally identical, because a correctly refused click is a no-op.** The
+  guard-removal mutation is what proves the guard; the control proves the click is not dead.
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2194` (the guard),
+  `:2279` (the one dialog mount), `apps/web/test/list-bulk-close.test.tsx:431`
 
 **Mutations, each restored from a byte copy verified by sha256 (not `git checkout`, which errors on an
 untracked path), each guarded by a replacement count of exactly 1.**

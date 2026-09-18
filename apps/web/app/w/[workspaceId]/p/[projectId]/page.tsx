@@ -603,18 +603,27 @@ function ProjectBoard() {
    * SNAPSHOT of the tickets one opening of `BulkCloseDialog` is about, and it
    * is `null` exactly when no dialog is up.
    *
-   * **The obvious design — `open` derived from the selection — is the one the
-   * plan's own text produces, and it deletes half of §8.3.** The plan wires
-   * `onClosed` → `list.reload()` with the selection cleared on reload. §8.3's
+   * **The plan's text is INSUFFICIENT here rather than wrong, and an independent
+   * review corrected an earlier draft of this very paragraph for overstating
+   * it.** The plan names `selectedIds` "cleared on `list.reload`", `onClosed` →
+   * `list.reload()`, and clicking opening the dialog "with the selected rows" —
+   * and it names **neither a snapshot nor an `open` expression at all**. So it
+   * does not *produce* the unmount; it fails to forbid it. Under the reading
+   * that makes `open` follow the selection (which "clicking opens … with the
+   * selected rows" plus a selection cleared on reload invites), the clear
+   * unmounts the dialog in the same tick its `Could not close` rows are
+   * written, and the person never reads the reason their ticket was refused.
+   * Under the plan's other literal reading — live `tickets`, a separate open
+   * flag — the refusal list would still render, because `failures` is the
+   * dialog's own state, but the report would be about a selection that has
+   * since been emptied (`Close 0 tickets` over an opening that was two). §8.3's
    * Board bullet is one sentence carrying both halves — *"Per-ticket refusals …
    * stay listed; the rest close and the board reloads"* — and the List bullet
-   * says "same dialog, same batch". `onClosed` fires on a PARTIAL close too
-   * (the dialog calls it whenever at least one ticket committed), so a clear
-   * on reload unmounts the dialog in the same tick the `Could not close` rows
-   * are written, and the person never reads the reason their ticket was
-   * refused. Task 10's arm carries the same correction, with 13.792 as its
-   * witness; this is that correction applied to its second consumer, and
-   * 13.794 is the witness here.
+   * says "same dialog, same batch"; **both readings fall short of it, and the
+   * snapshot is what makes the report coherent while the own flag is what makes
+   * it survive.** Task 10's arm carries the same correction, with 13.792 as its
+   * witness; this is that correction applied to its second consumer, and 13.794
+   * is the witness here.
    *
    * So: **the tickets are snapshotted at CLICK time** (the reload cannot change
    * what an open report is a report about — the dialog's own docblock states
@@ -654,10 +663,20 @@ function ProjectBoard() {
    * the cross-column case."* Both terms are read off the rows this list is
    * SHOWING, not off a stored copy of them, so a row a peer moved or closed
    * mid-selection disables the control on the next render rather than being
-   * closed on the strength of a stale reading. The label keeps the FULL
-   * selection count while disabled; the disabled state is what says "not
-   * these", and a number that shrank as rows were added would answer "how many
-   * will close" with a count nobody can check against the boxes they ticked.
+   * closed on the strength of a stale reading.
+   *
+   * **`listSelectedRows` is that filter, and it is the count the label prints
+   * and the list the snapshot is built from — so N is always the number of
+   * ticked checkboxes on screen, and the batch can never contain an id with no
+   * row.** The label therefore counts the selection AS SHOWN: an id whose row
+   * has left the visible set (a narrowing, or a peer's close under
+   * `filter.closed === false`) contributes nothing, and the box re-ticks if the
+   * row returns because `selectedIds` still holds it. Inflating is impossible;
+   * deflating-with-the-box-hidden is the behaviour, and it is deliberate — the
+   * alternative is a label that names a ticket the person cannot see. An
+   * earlier draft of this paragraph said the label "keeps the FULL selection
+   * count", which is stronger than the code holds and was corrected in the
+   * review round.
    */
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(() => new Set());
   const [pendingClose, setPendingClose] = useState<BulkCloseTicket[] | null>(null);
@@ -2236,8 +2255,12 @@ function ProjectBoard() {
 
       {/*
         THE LIST'S BULK CLOSE (second wave Task 11, spec §8.3). One dialog, the
-        same one the Board's `Close all (N)` mounts (`BulkCloseDialog`'s own
-        docblock: "one dialog, two surfaces, one batch"), and it lives HERE
+        same one the Board's `Close all (N)` mounts — `BulkCloseDialog`'s own
+        docblock says so in its own words ("The two bulk surfaces that consume
+        it — Task 10's … Task 11's …"); the phrase "one dialog, two surfaces,
+        one batch" is the PLAN's seams-list wording, and an earlier draft of
+        this comment put it in quotation marks as the docblock's, which an
+        independent review measured false — and it lives HERE
         rather than inside `TicketList` for the reason the whole arm's state
         does: the snapshot must outlive a reload of the list, and a dialog owned
         by the component whose rows are being reloaded could not.
