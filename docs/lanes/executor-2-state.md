@@ -38,8 +38,9 @@ controller's next dispatch is the position.
 | | |
 |---|---|
 | branch | `exec2/attention-part2` |
-| cut from / base | **`1d131a68`** (`origin/main`, the tip the controller's paste named) |
-| frozen head | **`0ac3d1d4`** — the code head. **A block cannot name the commit that carries it**: `rev-parse HEAD` at the tip is the HANDOFF commit, one above this. `ede1a1c1` is the pre-review code head; the review's three fixes are `0ac3d1d4`. Verify both with `/usr/bin/git rev-parse` / `git show --stat`. |
+| cut from / base | **`1d131a68`** (`origin/main`, the tip the controller's paste named), then **REBASED onto `72e649ab`** — `#479` (`ctl/cycle5`, controller docs) landed while this ran. **That rebase renumbered every sha this branch had**: `ede1a1c1`→**`c1c4ccb1`**, `0ac3d1d4`→**`6a6c638c`**, tip→**`6780f9fa`**. **The pre-rebase shas are ORPHANED and will still `cat-file` clean** — measured: `git branch --contains` returns **0** for both. Anything citing them (the PR body's first draft, the controller report) is stale. |
+| rebase collision | **none** — the only file `main` moved was `docs/lanes/controller-state.md`, which this branch does not touch. `check:case-ids` re-run after the rebase: **2355 unique, union == sum**, so no id collision with anything that landed. |
+| frozen head | **`6a6c638c`** — the code head. **A block cannot name the commit that carries it**: `rev-parse HEAD` at the tip is the HANDOFF commit, one above this. `c1c4ccb1` is the pre-review code head; the review's three fixes are `6a6c638c`. Verify both with `/usr/bin/git rev-parse` / `git show --stat`. |
 | files | 13: `packages/app-core/src/views/attention-strip.tsx` · `packages/ui/src/ui.css` · `packages/ui/src/tokens.ts` · `packages/ui/test/tokens.test.ts` · **`packages/ui/test/attention-styling.test.ts` (new)** · `packages/app-core/test/views/attention-strip.test.tsx` · `apps/web/test/page-refusals.test.tsx` · `test-cases/13-deployment-dogfooding.md` · `test-cases/03-foundation-ledger.md` · `Features.md` · `docs/manual.md` · `docs/faq.md` · `packages/app-core/src/help/content.generated.ts` |
 | ids minted | **`13.890`–`13.893`** — from the controller's block, not a tip reading |
 | tree | clean; `docker compose` NOT run; :3001 and :3021 NOT bound |
@@ -95,7 +96,7 @@ reason of its own.
   Sampled at `HEAD`'s base: `.gn-help__title` is cited at `ui.css:1697` and is at **`:3091`**;
   `.ticket-type-list__title` cited at `:1590`, actually **`:1745`**. **69 tracked lines** (80 occurrences)
   carry a `ui.css:<line>` citation pointing below the family, counted by `/usr/bin/git grep` at both
-  `1d131a68` and `ede1a1c1` — the count is invariant across this change, as it must be, because this change
+  `1d131a68` and `c1c4ccb1` — the count is invariant across this change, as it must be, because this change
   only SHIFTS those numbers by ~46. **That is why they were NOT blanket-renumbered**: a +46 sweep would
   leave them still wrong by hundreds of lines while making them LOOK current, which is worse than an
   obviously stale number and is this repo's recorded "blanket renumber corrupts historical prose" hazard. Only the citation this change actually invalidated was
@@ -120,9 +121,9 @@ In `attention-strip.tsx`, appended to refusal 3's docblock:
 > heading this component draws names the WHOLE strip, not a kind, and it can never outlive its rows —
 > `items.length === 0` returns `null` above, before any of this is reached."
 
-### Review — ONE reviewer, at `ede1a1c1`, verdict discharged and recorded here and in the PR body
+### Review — ONE reviewer, at `c1c4ccb1`, verdict discharged and recorded here and in the PR body
 
-**No Critical. Two Important/Minor findings that were REAL and are fixed in `0ac3d1d4`**, plus two
+**No Critical. Two Important/Minor findings that were REAL and are fixed in `6a6c638c`**, plus two
 catalogue entries corrected. The reviewer planted every mutation in a **disposable clone**
 (`git clone --shared … /tmp/rev-attention`), confirmed byte-identical sha256s against this worktree first,
 and never touched this tree.
@@ -160,9 +161,9 @@ records written by the same run (`5aab0a90`) plus a same-environment inference, 
 both. **It is deliberately non-load-bearing** — the invariance argument holds either way — but it means the
 *stated* reason for choosing `aria-label` over `aria-labelledby` rests on the weaker of the two links.
 
-### Checks at `0ac3d1d4`
+### Checks at `6a6c638c`
 
-**All measured at `0ac3d1d4`**, the code head the handoff commit sits on. Six raw, all 0: `check:env` ·
+**All measured at `6a6c638c`**, the code head the handoff commit sits on. Six raw, all 0: `check:env` ·
 `check:tasks` · `check:runbook` · `check:citations` · `check:help` · `check:db-tz` → `database timezone:
 Asia/Kolkata` (with the documented `DATABASE_URL`). Seventh instrument: `check-case-ids` **0** →
 **`2355 unique ids`**, up 4 from `2351` — exactly the four minted here. `typecheck` **0** on `ui`,
