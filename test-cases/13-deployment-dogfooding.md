@@ -9958,5 +9958,9 @@ all twenty ids already in `REFUSAL_RULES` are emitted somewhere (measured), so a
 emitter would be the catalogue's only dead entry. The alternative reading costs only a different string in
 a rendered refusal; this one costs a dead constant. **Flagged to the controller with both readings priced
 rather than settled unilaterally; the controller ruled on 2026-09-18: carry on with `refuseWith` and the
-new id.** The ruling is recorded here because the plan's two steps still disagree and a reader hitting
-Step 7 first would otherwise have to rediscover it.
+new id — and then FIXED THE PLAN rather than leaving the conflict standing.** Step 7 of
+`docs/superpowers/plans/2026-09-18-membership-role-guard.md` now reads
+`refuseWith(REFUSAL_RULES.grantOwnerRequiresOwner, WORKSPACE_OWNER_GRANT_REASON)` (PR #456,
+`fff365bd`), matching this implementation. **So the plan and the code agree as of that commit, and an
+earlier draft of this paragraph — which said the two steps still disagreed — is struck rather than
+left standing**, since it was true only until the plan was corrected.

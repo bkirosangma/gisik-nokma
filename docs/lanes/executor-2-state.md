@@ -22,8 +22,8 @@
 
 ## ▲ TOP BLOCK — membership Task 1: the last-owner guard, in both layers (2026-09-18)
 
-**Position: the change set is COMPLETE and verified; the reviewer was dispatched over `a6877594` and
-HAS NOT RETURNED as this was written. No PR is open yet.** Dispatch:
+**Position: the change set is COMPLETE, the review round is CLOSED and fully discharged, and the PR is
+opening against `main` with the reviewer recorded in its body.** Dispatch:
 `CTL-DISPATCH-2026-09-18-exec2-membership-t1.md`. Plan of record:
 `docs/superpowers/plans/2026-09-18-membership-role-guard.md` (Task 1). One PR, `--base main`, branch
 **`exec2/membership-t1-last-owner`**.
@@ -38,12 +38,12 @@ the direction nobody audits. One command settles it.
 | | |
 |---|---|
 | branch | `exec2/membership-t1-last-owner` |
-| base | **`b71bc0d3`** = `origin/main` = the `#453` merge (executor 1's Task 6) |
-| reviewed head | **`a6877594`** — the commit the reviewer ran against, *before* the rebase |
-| frozen head | **verify with `/usr/bin/git rev-parse HEAD`.** A block cannot name the commit carrying it; at the last count it was **`a5a824c3`**, the rebase of `a6877594` onto `b71bc0d3`, and the handoff commit that carries this line is one MORE than whatever is here |
-| ahead / behind | **1 / 0** at `a5a824c3`, before the handoff commit — **recount, do not quote** |
-| the rebase | `a6877594` → `a5a824c3`. It resolved ONE conflict, in `test-cases/13` (Task 6 appended a section where this task appended one), and auto-merged `Features.md` |
-| **the code did not move** | **`/usr/bin/git diff a6877594 a5a824c3 -- <the ten code files>` is 0 lines.** The two doc files differ (173 and 104 lines), which is the live control. So the review applies verbatim to the rebased tree, and the reviewed sha `a6877594` still resolves |
+| base | **`61a105dd`** = `origin/main` = the `#456` merge (the controller's plan fix) |
+| reviewed head | **`a6877594`** — the commit the reviewer ran against |
+| frozen head | **verify with `/usr/bin/git rev-parse HEAD`.** A block cannot name the commit carrying it. At the last count it was **`763b762f`** after the rebase onto `61a105dd`, and the handoff commit carrying this line is one MORE than whatever is here |
+| ahead / behind | **5 / 0** at `763b762f`, before the handoff commit — **recount, do not quote** |
+| the two rebases | `a6877594` → `a5a824c3` (onto `b71bc0d3`, resolving ONE conflict in `test-cases/13` where Task 6 appended a section) → `763b762f` (onto `61a105dd`, clean) |
+| **what moved under the review** | **`/usr/bin/git diff a6877594 HEAD -- <the six reviewed code files>` touches ONLY `membership.ts`, and every changed line is a ` * ` comment** — 29 insertions / 3 deletions, verified line by line. No executable line moved, so the reviewed logic is intact; the review round's other edits are prose and tests |
 | PR | opens from this branch, `--base main`, reviewer recorded in the body BEFORE it opens |
 
 ### What shipped
@@ -80,8 +80,10 @@ controller flips them.
    `REFUSAL_RULES` are emitted somewhere (measured 20/20)**, so a twenty-first with no emitter would be the
    catalogue's only dead entry. Filed as `EXEC2-RULING-2026-09-18-grant-owner-rule-id.md` with **both
    readings priced**; **RULED 2026-09-18 by the controller: carry on with `refuseWith` and the new id.**
-   **CLOSED — do not reopen.** The plan's two steps still disagree, so the ruling is also recorded in
-   `test-cases/13` where a reader hitting Step 7 first will see it.
+   **CLOSED — do not reopen. The controller then FIXED THE PLAN rather than leaving the conflict
+   standing**: Step 7 now reads `refuseWith(REFUSAL_RULES.grantOwnerRequiresOwner, …)` (PR #456,
+   `fff365bd`), so **the plan and this code agree** — a sentence in the first draft of the handoff saying
+   they still disagreed was true only until that commit.
 4. **The plan's Step 7 line `return refuse(WORKSPACE_OWNER_GRANT_REASON)` is correct only against
    `check-permission.ts`'s LOCAL one-argument `refuse`** (`:213`, which injects `PERMISSION_ROLE_RULE`),
    not the rule-engine's two-argument one. A first cut of this work used the two-arg form, which would not
