@@ -10845,3 +10845,128 @@ existing case was renumbered, and `13.850`–`13.879` are used contiguously with
 was not avoidable by renumbering within the block, only by dropping coverage of a fix a reviewer required.
 Renumbering it is a one-line change plus its three citations if the controller prefers; asking first would
 have held the whole PR on an id.
+# An untinted `.gn-avatar` had no boundary at all under `neo` (owner report, 2026-09-18) — case `13.732`
+
+The owner's report, verbatim: *"in neomorphic style, the gn-avatar background is not visible. check the bg
+colour applied here."* **Measured before it was believed, and the measurement is the case.** Under `neo` —
+the shipped default — `surface`, `surfaceRaised` and `surfaceSunken` are the SAME hex, `neoPaper
+#F1EAE3`, and `neo`'s whole depth language is shadow-only. The base rule declared `background:
+var(--gn-surface-sunken)` (`ui.css:202`), so an untinted avatar on a `.gn-card` (itself `surface-raised`,
+the same hex) composited to a boundary ratio of **exactly 1.0000** — not a faint boundary, the same
+colour. `hig`/`minimal` were never affected: their two roles genuinely differ (1.3140 and 1.2025 light,
+1.2025 and 1.1688 dark), which is why the report read as a `neo`-only bug and why the fix had to be one
+that holds in all three styles rather than a `neo` override.
+
+**`neo` ships a `surface-sunken` remedy already, and this element was not given it.** Case `10.80`
+(`packages/ui/test/components.test.tsx`) pins `.ticket-type-list__row`, `.fields-editor__row` and
+`.workflow-builder-screen__name` to a `[data-style="neo"] … box-shadow: var(--gn-shadow-sunken)`
+override, for exactly this reason — "a 'sunken' element with no shadow of its own is indistinguishable
+from the raised surface around it". A shadow was REJECTED here: it would draw the disc under `neo` while
+leaving `hig`/`minimal` relying on a faint fill difference, two mechanisms for one boundary.
+
+**Fixed by declaring `fill-tertiary` (`ui.css:207`)**, and the fix was already written down one element
+over — `apps/web/app/globals.css:1516-1522` records rejecting `surface-sunken` for the members monogram
+*"although it is the role `.gn-avatar` declares, because under `neo` … a disc filled with it disappears
+into the card it sits in; a boundary that is not drawn is not a disc."* That comment named this bug, on
+this element, and the monogram was moved to `fill-tertiary` while `.gn-avatar` was left behind. The
+composite is `#E7DDD4` over `neoPaper`, the value `tokens.ts`'s own fills comment names.
+
+**Why the case reads the STYLESHEET rather than naming `fillTertiary`.** `CONTRAST_PAIRS` cannot carry
+this obligation: `fillTertiary` is an ALPHA primitive (`#b0988429`) and `tokens.ts:284` forbids naming an
+alpha role in that array, because `relativeLuminance` ignores alpha by documented design and the pair
+would be measured against a ground the fill is blended INTO — a false green. The obligation is against
+the COMPOSITE. So the case parses `.gn-avatar`'s declared `background` role out of `ui.css`, resolves it
+back through `TOKEN_ROLES`, and measures that role — the shape case `11.214`
+(`packages/ui/test/in-transit.test.ts`) established, and for its reason: a case that hard-coded
+`fillTertiary` would stay green if the rule were repointed at a role that vanishes, which is the exact
+regression it exists to catch. `11.213` is the tombstone for getting this wrong the other way.
+
+- ✅ **13.732 — an untinted avatar draws its own boundary in every style, not only where the surface
+  roles differ.** Three tests in `packages/ui/test/tokens.test.ts`. **(1)** For every style × theme, the
+  avatar's declared fill composited over `surfaceRaised` is asserted NOT to equal `surfaceRaised` — the
+  assertion the bug fails, reddening on `neo` in both themes and naming the style rather than the role,
+  because the role is a legitimate implementation choice and "the same colour as its own ground" is the
+  defect. **(2)** The initials are held to the floor they actually owe — **4.5, as read text** — on the
+  composite over BOTH grounds the element can sit on (`surfaceRaised` as a card, `surface` as a page),
+  each with the anti-vacuous control that the fill composites to something rather than to the bare
+  ground. **Measured on the shipped fill: 10.4386 `neo` light, 10.7908 `neo` dark, 10.8348 `hig`/`minimal`
+  light, 8.7528 `hig`/`minimal` dark** — comfortable, and asserted anyway, because the neutral base was
+  the one avatar state with no declared pair and therefore no gate at all. **(3)** A mutation witness
+  plants `surface-sunken` back into the real stylesheet text, re-derives the role with the same helper,
+  and asserts the composite collapses onto the card's colour under `neo`/light — with a CONTROL that the
+  same planted fill does NOT collapse under `hig`/light, so the witness is provably measuring `neo`'s
+  one-hex surface roles and not a general property of the helper.
+
+  **ASSERTED TO EXIST, deliberately NOT asserted to clear 3:1.** No neutral avatar fill does in any style
+  (measured 1.1228/1.1928 `neo` light/dark, 1.2096/1.3546 `hig`/`minimal` light, 1.3546 `hig` dark) and
+  WCAG 1.4.11 does not owe it here: the disc carries no state and identifies no control, while the
+  initials carry the content and `aria-label` carries the identity. Inventing a floor the product has
+  never met would be a number with no principle behind it.
+
+  **PROVEN TO GUARD, not written and trusted.** With `ui.css:207` reverted to `var(--gn-surface-sunken)`
+  and nothing else touched, all three tests redden — each naming `neo`, and the first reading `neo/light:
+  an untinted avatar composites to the card's own colour (#f1eae3) — no boundary is drawn`. Restored, the
+  file's SHA-256 returns to `15aa5077928945411ac0e096bacac95382805f786f8e2b0b10e1798b5c6db79f` byte for
+  byte and the suite returns to green. The case is also the first sight the neutral avatar state has had:
+  the four `--gn-avatar--tint-*` rules are covered by `CONTRAST_PAIRS` (each reuses a declared fill/ink
+  pair), so only the UNTINTED variant — which is the default, since `tint` is opt-in
+  (`components/avatar.tsx:63`) — fell through to an ungated rule. That is why it read as intermittent.
+
+  **THE TRADE, measured rather than glossed:** in `hig`/`minimal` LIGHT the boundary ratio moves 1.3140 →
+  1.2096, marginally weaker, because the old role was not invisible there. `neo` moves 1.0000 → 1.1228
+  light and 1.0000 → 1.1928 dark, which is the whole bug. One role for one boundary in every style beats
+  a shadow for `neo` and a fill for the other two. (`packages/ui/src/ui.css`, `packages/ui/test/tokens.test.ts`)
+
+## The same defect one element over — measured, and NOT fixed here
+
+**38** rules in `ui.css` fill with `var(--gn-surface-sunken)`. Of those, **12 declare a `box-shadow` of
+their own** — 11 of them literally `var(--gn-shadow-sunken)`, one (`[data-style="neo"]
+.ticket-type-list__badge`, `ui.css:1824-1827`) `var(--gn-shadow-sunken-compact)` — and a further **8
+selectors** receive one from a `[data-style="neo"]` override. `--gn-shadow-sunken` is `none` under
+`hig`/`minimal` and an inset shadow under `neo`, so a rule carrying it is drawing a boundary in exactly
+the style this defect is about. Those numbers are three different universes and are stated as such
+because the first pass at this audit printed "only 5 carry the remedy" — a figure that is exactly right
+about the 8-selector neo-override universe and wrong about the binding the sentence gave it ("of the 38").
+
+**Four rules remain whose fill is their ONLY boundary under `neo`** — static, borderless, and with no
+shadow from either source. Each verified by reading the rule: `.gn-list__table-header` (`ui.css:1071`),
+`.gn-calendar__weekday-head` (`:2357`), `.gn-help__table th` (`:3710`) and `[data-style="neo"]
+.gn-segmented__item--on` (`:3807`, which records in its own docblock that its shadow was deliberately
+removed to match the reference). Under `neo` each is filled with the same hex as the ground around it.
+`.gn-avatar` was a fifth.
+
+**Four more are NOT in that list and the first pass wrongly included them**, which is worth recording
+because the error was an instrument's, not a reading's: `.gn-list__section-title` (`ui.css:947-956`),
+`.gn-timeline__weeks` (`:2600-2602`), `.gn-timeline__side` (`:2692-2695`) and `[data-style="neo"]
+.ticket-type-list__badge` (`:1824-1827`) each declare their own `box-shadow` **inside the rule body**
+rather than in a `[data-style="neo"]` block, and the audit only looked for the latter. A shadow declared
+in the rule's own body is drawn under `neo` just the same. The corrected count is **4, not 8**.
+
+**Recorded rather than fixed, and the measurement has a stated limit:** this audit establishes that these
+fills are identical to their ground, NOT that each is load-bearing — a table header's fill may be doing
+less work than an avatar's disc, and `.gn-segmented__item--on`'s selected state carries other cues.
+Assessing each is its own task with its own owner, and sweeping four shared surfaces into a one-element
+bug fix is how a contrast change becomes a product-wide restyle. **Owner: whoever next touches the `neo`
+surface roles or the non-text-contrast sweep.**
+
+**One survivor is named because it is the worst of them.** `.gn-table__row--clickable:hover`
+(`ui.css:350`) sets `background: var(--gn-surface-sunken)` with no shadow, no border and no `neo`
+override, so under `neo` the hovered row composites to **exactly 1.0000** against both `surface` and
+`surfaceRaised` — hovering draws nothing at all. It is not in the four above only because it is a
+`:hover` state rather than a static rule, and that exclusion is about my filter, not about its severity:
+for a clickable row the hover fill is the element's entire affordance. **Owner: same.**
+
+**A pre-existing condition this change did NOT create, recorded because it was measured:** line-number
+citations of `ui.css` are already drifted at `origin/main`, independent of the ~35 lines this fix adds
+above line 167. Sampled: `.gn-board__rail` is cited at `ui.css:315`, which is
+`.gn-table__row--clickable:hover`; `.gn-timeline__weeks` is cited at `1939-1942`, which is a docblock;
+`.gn-table`'s four rules are cited at `284-288`, also a docblock. Only `.gn-chip__dot` (`:155`) checked
+out. Nothing enforces line accuracy — `check-case-citations` ratchets on UNCITED case ids, not on where a
+citation points — so this drifted silently and is not a gate failure. Left alone rather than repaired:
+**104 occurrences across 68 distinct values** of `ui.css:NNN` name a line above 167, counted over
+`*.md`/`*.ts`/`*.tsx`/`*.mjs`/`*.css` excluding `node_modules` — a universe worth stating, because the
+same sweep run over every file in the worktree reports 150 and that larger number is wrong: it counts
+`.next/cache` webpack blobs, `dist` output and graphify's own cache, which are build artefacts rather
+than repo files. The shift would be unverifiable by any gate, and rewriting citations whose original
+intent cannot be reconstructed is a worse artefact than a stale one a reader can measure.
+**Owner: the controller, as a priced decision.**

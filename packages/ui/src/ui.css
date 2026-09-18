@@ -164,12 +164,47 @@
   box-shadow: var(--gn-shadow-raised);
 }
 
+/* The fill is `fill-tertiary`, NOT the `surface-sunken` this shipped with, and
+   the reason was already written down one element over.
+
+   Under `neo` — the shipped default — `surface`, `surface-raised` and
+   `surface-sunken` are the SAME hex, `neoPaper` (`tokens.ts`), and this
+   style's whole depth language is shadow-only. So an avatar on a card
+   (`.gn-card` is `surface-raised`, the same `#f1eae3`) was the same colour as
+   its parent with nothing to draw its boundary: measured, a boundary contrast
+   of exactly 1.0000. It read as intermittent because the tint is OPT-IN
+   (`components/avatar.tsx:63`) — only an avatar with no `tint` prop fell
+   through to this rule, and every `--gn-avatar--tint-*` sets its own fill.
+
+   `apps/web/app/globals.css:1516-1522` records rejecting `surface-sunken` for the
+   members monogram *"although it is the role `.gn-avatar` declares, because
+   under `neo` … a disc filled with it disappears into the card it sits in; a
+   boundary that is not drawn is not a disc."* The monogram moved to
+   `fill-tertiary` and this rule did not — the comment named this bug, on this
+   element. `fill-tertiary` is the role the product's own chip and badge fills
+   already use for the same job (a soft surface raised off paper), and it stays
+   visible under all three styles; it composites to `#E7DDD4` over `neoPaper`,
+   the value `tokens.ts`'s fills comment names.
+
+   NOT held to 3:1, deliberately. No neutral avatar fill clears it in any style
+   (measured 1.12–1.35) and WCAG 1.4.11 does not owe it here: the disc carries
+   no state and identifies no control — the initials carry the content and
+   `aria-label` carries the identity. What IS owed and IS asserted is that a
+   boundary exists at all and that the initials clear 4.5 as read text: case
+   **13.732** (`packages/ui/test/tokens.test.ts`), which derives this rule's
+   declared role and measures it, rather than pinning a role name.
+
+   The trade, measured rather than glossed: in `hig`/`minimal` LIGHT the
+   boundary ratio moves 1.3140 → 1.2096, marginally weaker, because the old
+   role was not invisible there. `neo` moves 1.0000 → 1.1228 in light and
+   1.0000 → 1.1928 in dark, which is the bug. One role for one boundary, in
+   every style, rather than a shadow for `neo` and a fill for the other two. */
 .gn-avatar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--gn-surface-sunken);
+  background: var(--gn-fill-tertiary);
   color: var(--gn-text);
   font-weight: 600;
 }
