@@ -34,6 +34,17 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  * carries the two instants that straddle an IST midnight so a local-clock read
  * is a red rather than a coincidence.
  *
+ * ## What the zone pin does NOT reach, and the case that does
+ *
+ * `process.env.TZ` moves the PROCESS's calendar. It cannot touch a
+ * `clientTime.slice(0, 10)`, because a UTC slice never consults the process
+ * zone — so a whole class of IST-vs-UTC regression is invisible to the zone
+ * axis, and the file's non-India `TZ` gives it no protection at all. Measured:
+ * substituting that slice for `istDayOf(clientTime)` **survived every case in
+ * this file** until 13.727's rollover arm supplied a `now` inside 18:30Z–24:00Z,
+ * where the UTC date and the IST date differ. That arm — not the `TZ` pin — is
+ * what kills it.
+ *
  * **Its limit, stated rather than implied:** `process.env.TZ` moves Node, not
  * Postgres. `createTestDatabase` pins the database and `createPool` pins every
  * session to `Asia/Kolkata`. A `now()`, `CURRENT_DATE` or `AT TIME ZONE` in the
@@ -93,16 +104,27 @@ afterEach(async () => {
   await db.drop();
 });
 
-/** Publish the workflow and the type every ticket in this file is created under. */
-async function seedWorkflowAndType(workspaceId: string): Promise<void> {
+/**
+ * Publish the workflow and the type every ticket in this file is created under.
+ *
+ * `suffix` exists because a case that seeds TWO workspaces needs two DISTINCT
+ * workflow ids: `proj_workflows` is keyed by the workflow's own id, so a second
+ * workspace publishing `wf-ac` collides with the first and the ticket projection
+ * refuses with "holds no version at workspace_seq 1". One workspace per case
+ * never noticed; the two-window case does, which is the case earning its keep
+ * before it even ran green.
+ */
+async function seedWorkflowAndType(workspaceId: string, suffix = ''): Promise<void> {
+  const wfId = `${WF}${suffix}`;
+  const typeId = `${TYPE_ID}${suffix}`;
   await applyCommitted(db.pool, [
     makeCommitted({
       workspaceId,
       actorId: HUMAN,
-      entity: { kind: 'workflow', id: WF },
+      entity: { kind: 'workflow', id: wfId },
       type: 'workflow.defined',
       payload: {
-        id: WF,
+        id: wfId,
         version: 1,
         name: 'Auto-close flow',
         initialStateId: 'todo',
@@ -121,9 +143,9 @@ async function seedWorkflowAndType(workspaceId: string): Promise<void> {
     makeCommitted({
       workspaceId,
       actorId: HUMAN,
-      entity: { kind: 'ticket-type', id: TYPE_ID },
+      entity: { kind: 'ticket-type', id: typeId },
       type: 'ticket-type.defined',
-      payload: { id: TYPE_ID, name: 'Sweep task', icon: 'check', rank: 1, workflowId: WF, fields: [] },
+      payload: { id: typeId, name: 'Sweep task', icon: 'check', rank: 1, workflowId: wfId, fields: [] },
     }),
   ]);
 }
@@ -143,6 +165,13 @@ async function seedAutoClose(workspaceId: string, days: number | null): Promise<
 
 type SeedTicket = {
   workspaceId: string;
+  /**
+   * Defaults to this file's one type. A case that seeds TWO workspaces must pass
+   * the suffix it gave `seedWorkflowAndType`, because `proj_ticket_types` is
+   * keyed by the type's own id: creating a ticket under a type nothing defined
+   * makes `applyTicketEvent` throw "unknown ticket type" inside the projection.
+   */
+  typeSuffix?: string;
   /** The `server_time` of the LAST state-entering event — what the sweep's LATERAL reads. */
   enteredAt: string;
   /** `'active'` for a ticket that never reached a terminal column. */
@@ -174,7 +203,7 @@ async function seedTicket(opts: SeedTicket): Promise<string> {
       entity: { kind: 'ticket', id: ticketId },
       type: 'ticket.created',
       payload: {
-        typeId: TYPE_ID,
+        typeId: `${TYPE_ID}${opts.typeSuffix ?? ''}`,
         projectId: PROJECT,
         parentId: null,
         title: `Sweep target ${ticketId.slice(-4)}`,
@@ -378,6 +407,17 @@ describe('13.727 the auto-close sweep closes only terminal, long-sitting, never-
     // its close is still the human's, and it is still OPEN — which is what
     // "an explicit reopen wins" means in the columns.
     expect(await closedAt(e)).toBeNull();
+
+    // IDEMPOTENCE, asserted rather than asserted-about. The module docblock says
+    // the sweep is "idempotent by the ledger, not by a cursor", and until this
+    // arm existed that sentence was pinned by nothing: a second run in the same
+    // hour must select NOTHING, because the ticket it closed no longer satisfies
+    // `closed_at IS NULL`. A cursor would have had to be remembered; this needs
+    // no memory, and that is the claim.
+    expect(await sweep()).toEqual({ workspacesOn: 1, candidates: 0, closed: 0, refused: 0 });
+    // And A is still closed exactly once — a second run neither re-closed it nor
+    // cleared it.
+    expect(await closedEvents(a)).toHaveLength(1);
   });
 
   it('the cutoff is an IST-day boundary: one millisecond either side decides', async () => {
@@ -399,6 +439,92 @@ describe('13.727 the auto-close sweep closes only terminal, long-sitting, never-
     // `<= CUTOFF`. Under the file's non-India TZ, a cutoff derived from the
     // machine's calendar reads both of these as the same day and closes both.
     expect(await closedAt(onBoundary)).toBeNull();
+  });
+
+  /**
+   * **The IST rollover — the arm that kills a mutant every other case in this
+   * file lets through.**
+   *
+   * Between 18:30Z and midnight the UTC date and the IST date are DIFFERENT:
+   * `2026-09-18T19:00:00.000Z` is IST 19 Sep 00:30. `istDayOf` says the 19th; a
+   * naive `clientTime.slice(0, 10)` says the 18th. So the two agree at midday —
+   * where every other case in this file runs — and disagree for 5.5 hours of
+   * every day, during which the cut-off walks one day further back and every
+   * eligible ticket waits until 05:30 IST to close.
+   *
+   * **Measured: replacing `istDayOf(clientTime)` with `clientTime.slice(0, 10)`
+   * SURVIVED all five cases before this arm existed.** The file-wide non-India
+   * `TZ` cannot catch it, and that is the point — a UTC slice never consults the
+   * process zone, so the zone pin gives this mutant no protection at all. The
+   * only lever that reaches it is a `now` inside the 18:30Z–24:00Z window, which
+   * is what this case supplies. `notifications/sweep.ts:128` already carries the
+   * same warning one file over.
+   */
+  it('reads the IST day, not the UTC date, in the 5.5 hours where they differ', async () => {
+    const ws = newUlid();
+    await seedWorkflowAndType(ws);
+    await seedAutoClose(ws, DAYS);
+
+    // 19:00Z = IST 19 Sep 00:30. `todayIst` is therefore 2026-09-19 and the
+    // 7-day cut-off is IST 12 Sep, whose endUtc is 2026-09-12T18:30:00.000Z.
+    const ROLLED = '2026-09-18T19:00:00.000Z';
+    // Entered IST 12 Sep, mid-morning — inside the correct window, outside the
+    // one a UTC slice would compute (IST 11 Sep).
+    const inside = await seedTicket({ workspaceId: ws, enteredAt: '2026-09-12T06:00:00.000Z' });
+
+    const report = await sweep({ now: ROLLED });
+
+    expect(report.closed).toBe(1);
+    expect(await closedAt(inside)).not.toBeNull();
+  });
+
+  /**
+   * Each workspace is measured by its OWN window, and the cut-off is computed
+   * inside the loop that reads it.
+   *
+   * Every other case in this file seeds exactly ONE workspace, so hoisting the
+   * cut-off out of the loop — using one workspace's `days` for all of them —
+   * would survive the whole suite. Two workspaces with different windows make
+   * that mutant red: the same 10-day-old ticket must close under a 7-day window
+   * and stay open under a 30-day one, and `workspacesOn: 2` is witnessed for the
+   * first time.
+   */
+  it('measures each workspace against its own window', async () => {
+    const short = newUlid();
+    const long = newUlid();
+    await seedWorkflowAndType(short, '-short');
+    await seedWorkflowAndType(long, '-long');
+    await seedAutoClose(short, 7);
+    await seedAutoClose(long, 30);
+
+    // Ten days old: past the 7-day window, inside the 30-day one.
+    const tenDaysOld = '2026-09-08T06:00:00.000Z';
+    const inShort = await seedTicket({
+      workspaceId: short,
+      typeSuffix: '-short',
+      enteredAt: tenDaysOld,
+    });
+    const inLong = await seedTicket({
+      workspaceId: long,
+      typeSuffix: '-long',
+      enteredAt: tenDaysOld,
+    });
+    // And one that is older than BOTH windows, so the long workspace is not
+    // simply inert.
+    const ancient = await seedTicket({
+      workspaceId: long,
+      typeSuffix: '-long',
+      enteredAt: '2026-07-01T06:00:00.000Z',
+    });
+
+    const report = await sweep();
+
+    expect(report).toEqual({ workspacesOn: 2, candidates: 2, closed: 2, refused: 0 });
+    expect(await closedAt(inShort)).not.toBeNull();
+    expect(await closedAt(ancient)).not.toBeNull();
+    // The 30-day workspace's ten-day-old ticket is the discriminator: one
+    // hoisted cut-off closes it, and the per-workspace one does not.
+    expect(await closedAt(inLong)).toBeNull();
   });
 });
 
@@ -546,5 +672,45 @@ describe('13.730 a refused close is counted and leaves the ticket open', () => {
     // derived from the ledger and a hand-written one could have hidden it.
     expect(await closedAt(ticket)).toBeNull();
     expect(await closedEvents(ticket)).toHaveLength(0);
+  });
+
+  /**
+   * **The `invalid` arm — the count shape the docblock argues for and, until
+   * this case, nothing exercised.**
+   *
+   * Mutating the counter to include only `status === 'refused'` SURVIVED the
+   * whole file, because no case ever fed the sweep an `invalid` result: the
+   * sweep builds its own envelopes, so an `invalid` can only come from a bug in
+   * this function, and a suite that never simulates one cannot see the
+   * difference between counting both and counting one. The docblock's argument
+   * (`closed + refused < candidates` should be a signal, not a puzzle) was prose.
+   *
+   * **The `ingest` here is a deliberate hand-written answer, and it is honest to
+   * say so.** It is not standing in for the engine — the arm above proves the
+   * engine path with the real service. This one tests the sweep's OWN counting
+   * against the contract `ingestBatch` publishes, which is the thing under test.
+   * A future reader should not mistake it for a second proof that the door works.
+   */
+  it('counts an invalid answer in refused rather than letting it vanish', async () => {
+    const ws = newUlid();
+    await seedWorkflowAndType(ws);
+    await seedAutoClose(ws, DAYS);
+    await seedTicket({ workspaceId: ws, enteredAt: '2026-08-01T06:00:00.000Z' });
+
+    const invalidAnswer = {
+      ingestBatch: async (events: unknown[]) =>
+        events.map(() => ({
+          status: 'invalid' as const,
+          eventId: null,
+          code: 'malformed-envelope' as const,
+          message: 'the door could not read this envelope',
+        })),
+    };
+
+    const report = await sweep({ ingest: invalidAnswer as never });
+
+    // Counted, not dropped: `closed + refused === candidates` still holds, which
+    // is the property the docblock claims and a `=== 'refused'` filter breaks.
+    expect(report).toEqual({ workspacesOn: 1, candidates: 1, closed: 0, refused: 1 });
   });
 });

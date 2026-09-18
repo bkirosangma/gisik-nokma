@@ -91,8 +91,21 @@ const BATCH_SIZE = 100;
 
 type CandidateRow = { ticket_id: string; workspace_id: string };
 
+/**
+ * The default is `console.error`, matching `notifications/sweep.ts:126` — and
+ * the first cut of this file defaulted to a NO-OP instead, which is worth
+ * keeping as a note because it was wrong in a way that read as harmless.
+ *
+ * The daemon calls `runAutoCloseSweep({ pool, ingest })` and passes no `log`, so
+ * a no-op default meant a refused or invalid close left **no per-ticket trace
+ * anywhere in the process**: the reason was discarded while the aggregate count
+ * went into the daemon's structured log line. The numbers survived and the
+ * *why* did not, which is the worse half to lose. A container's stdout/stderr is
+ * where the sibling sweep's per-item problems already go, so this is parity
+ * rather than a new channel.
+ */
 function logOf(deps: AutoCloseDeps): (message: string, error?: unknown) => void {
-  return deps.log ?? ((): void => undefined);
+  return deps.log ?? ((message: string, error?: unknown) => console.error(message, error));
 }
 
 /**
@@ -108,6 +121,11 @@ function logOf(deps: AutoCloseDeps): (message: string, error?: unknown) => void 
  * (`bootstrap-workspace.ts:137`, `invites/acceptance.ts:210`); the alternative,
  * counting only `'refused'`, would leave an invalid event uncounted and make
  * `closed + refused < candidates` a puzzle instead of a signal.
+ *
+ * That argument was PROSE until case 13.730's second arm existed: mutating the
+ * branch to count only `'refused'` survived every other case, because no case
+ * ever fed the sweep an `invalid` result. The arm now does, so the claim has a
+ * witness rather than a rationale.
  */
 export async function runAutoCloseSweep(deps: AutoCloseDeps): Promise<AutoCloseReport> {
   const log = logOf(deps);
@@ -115,6 +133,19 @@ export async function runAutoCloseSweep(deps: AutoCloseDeps): Promise<AutoCloseR
 
   const now = deps.now === undefined ? new Date() : deps.now();
   const clientTime = now.toISOString();
+  // The sweep's "today" is an IST day (owner decision: time is Asia/Kolkata).
+  // NOT `clientTime.slice(0, 10)`, for the reason `notifications/sweep.ts:128`
+  // already spells out one file over: a UTC slice does not roll over until 05:30
+  // IST, so between 18:30Z and midnight every night it names YESTERDAY'S IST day,
+  // the cut-off walks one day further back, and every eligible ticket waits
+  // until 05:30 to close.
+  //
+  // **The zone pin in the test file does not protect this**, which is why the
+  // warning is here rather than only there: `slice(0, 10)` never consults the
+  // process zone, so a file-wide non-India `TZ` gives that mutant no protection
+  // at all. The discriminating case is a `now` inside 18:30Z–24:00Z — case
+  // 13.727's third arm — because at midday both spellings agree and the case
+  // would pass for a reason unrelated to the property it names.
   const todayIst = istDayOf(clientTime);
 
   // Every workspace that has ever claimed a setting, asked through the canonical
