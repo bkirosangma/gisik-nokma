@@ -9836,18 +9836,27 @@ break unrelated suites for a consistency that buys nothing here.
   consulted), re-stating the sole owner as an owner is accepted, and demoting one of **two** owners is
   accepted because the workspace is not emptied. **The accept arms are the assertions that make the
   refusal mean something** — a guard that refused every owner-touching grant would satisfy the refusal
-  alone. The demotion is driven by an **admin** on the real door, which is the point: the permission gate
-  admits an admin to roster management on purpose, so a refusal there can only have come from the engine's
-  world-half. The count excludes the subject of the change, and that exclusion is load-bearing in the
+  alone. The count excludes the subject of the change, and that exclusion is load-bearing in the
   opposite direction from the obvious one: without it a sole owner counts **himself** and the guard never
   fires at all — pinned by mutation, which reddens the sole-owner case and leaves the accept arms green.
   **Batching is not a way around it, and that is asserted rather than assumed.** Two events in ONE
   submission are judged one at a time and the context reads through the ingest transaction's own client,
-  so the count for the second event sees the first's effect: an admin demoting **both** owners in a single
-  batch commits the first and is refused `last-owner` on the second. The actor is deliberately an ADMIN
-  and not an owner — an owner demoting himself is refused on the second event by the ROLE gate (he is no
-  longer an admin by then), which would let the case pass while the count was blind. **This assertion is
-  the one that pins the property; the per-event arm above it does not.**
+  so the count for the second event sees the first's effect: demoting one owner and then the last in a
+  single batch commits the first and is refused `last-owner` on the second. **This assertion is the one
+  that pins the property; the per-event arm above it does not.**
+
+  **AMENDED 2026-09-18 (second sitting) — the ACTOR of the real-door arms changed, and two sentences above
+  are superseded rather than deleted.** The owner ruled that an admin may not demote a *non-last* owner
+  either, so the actor that reaches the engine's world-half is no longer an admin: an admin acting on ANY
+  owner is now refused by the GATE, before the engine runs. The real-door arms therefore moved to an
+  **owner** actor, and the count-proof they exist for is now an owner demoting **themselves** out of the
+  last ownership — the one act the gate admits and the count alone decides. The two superseded claims:
+  *"the demotion is driven by an admin … so a refusal there can only have come from the engine's
+  world-half"* — an admin's demotion now never reaches the engine at all — and *"an admin demoting both
+  owners in a single batch"*, which is now refused on the FIRST event. **The batch arm keeps its actor
+  reasoning in inverted form:** the actor must now be an owner, and an owner stays an owner for both
+  events because the second is the one refused. Measured by mutation: disabling the new gate check makes
+  the batch arm's first event commit again and returns this case to `last-owner`. See **13.883**.
   **Citations:** `packages/rule-engine/src/checks/membership.ts:87` (the check), `:103` (the move-out-of-owner
   test), `:82` (the target's current role), `packages/rule-engine/test/membership.test.ts:106`,
   `apps/server/test/permissions/check-role-permission.test.ts:1256` (the real-door half, where the `SELECT`
@@ -9856,9 +9865,14 @@ break unrelated suites for a consistency that buys nothing here.
 - ✅ **13.821 — a `membership.revoked` of the only owner is refused by the same rule.** The second door to
   the same state, and it must answer identically: there is no role in a `membership.revoked` payload, so a
   revocation is a move out of owner by construction and the only question is whether the target held it.
-  Revoking one of two owners is accepted; revoking somebody who is not an owner is accepted. **This case is
-  why the guard lives in the engine rather than in the permission gate alone** — the gate never sees the
-  ledger, so a rule written there could not tell a sole owner from a second one.
+  Revoking one of two owners is accepted **by the ENGINE**; revoking somebody who is not an owner is
+  accepted. **This case is why the guard lives in the engine rather than in the permission gate alone** —
+  the gate never sees the ledger, so a rule written there could not tell a sole owner from a second one.
+  **AMENDED 2026-09-18 (second sitting): "revoking one of two owners is accepted" is now true of the ENGINE
+  and FALSE of the client door, and the sentence above did not say which it meant.** The owner ruled that
+  an admin may not remove owner status from ANY owner, so on the client door an admin revoking one of two
+  owners is refused `remove-owner-requires-owner` before the engine is consulted; an OWNER revoking one of
+  two still commits. Measured on the real door, both ways. See **13.883**.
   **Citations:** `packages/rule-engine/src/checks/membership.ts:114` (the check), `:130` (its refusal),
   `packages/rule-engine/test/membership.test.ts:168`
 
@@ -9893,9 +9907,81 @@ break unrelated suites for a consistency that buys nothing here.
   stopped them. A malformed owner grant is deliberately **not** refused here — it falls through to the
   engine's `malformed-payload`, which names the field — and that is asserted too, so the two layers cannot
   start answering for each other.
-  **Citations:** `apps/server/src/permissions/check-permission.ts:602` (the clause), `:85` (the sentence),
+  **Citations:** `apps/server/src/permissions/check-permission.ts:619` (the clause), `:86` (the sentence),
   `apps/server/test/permissions/check-role-permission.test.ts:290` (the pure case),
   `:1355` (the real-door case, through the client door because the internal one does not run the gate)
+
+## An admin may not remove owner status from ANY owner (executor 1, 2026-09-18, second sitting) — case `13.883`
+
+> **THE ID WAS `13.881`, AND IT COLLIDED — recorded because the collision is the lesson, not the fix.**
+> Both executors measured "next free is `13.881`" at their own tips, minutes apart, and **both were right
+> at the moment they measured**; exec 2's attention-strip entry (`13.881`–`13.882`) merged first, so this
+> case renumbered to `13.883` before its PR opened. The bare number was the defect: **a reading that is
+> correct in one tree expires in another**, which is exactly why the case-id protocol is written in
+> BLOCKS (`13.700`–`13.759` and so on) rather than as a tip. `check-case-ids` caught it — the duplicate
+> was reported as two files-and-lines for one id, and it FAILS rather than warning — so the gate did its
+> job here and the cost was one renumber. Recorded at this length because the next executor handed a
+> "next free" number will otherwise take it, and the number is only true until someone else takes it.
+
+**The owner's ruling, verbatim:** *"may an admin demote a non-last owner: **no**."*
+
+**The hole, and why two already-shipped rules left it open.** `grant-owner-requires-owner` refuses a
+payload that **grants** `owner` (13.823); `last-owner` refuses a change that would leave the workspace with
+**zero** owners (13.820). Neither has anything to say about an admin demoting an owner **while another
+owner remains** — so an admin could do it, and the projection's `ON CONFLICT … DO UPDATE SET role =
+excluded.role` would write it. **Measured on the real door before the fix: the event COMMITTED.** Ownership
+is a transfer of the workspace itself, which is the whole reason the grant half is owner-only; the removal
+half is the same act read backwards, and it was open.
+
+- ✅ **13.883 — an admin removing owner status from ANY owner is refused, and every other admin act keeps
+  working.** One case in `apps/server/test/permissions/check-role-permission.test.ts`, through
+  **`ingestClientBatch`** — the client door, the only one that runs both halves; `ingestBatch` is the
+  internal append path and does not apply the permission gate, so a permission assertion driven through it
+  is vacuous (the block above records a first cut that made exactly that mistake). The workspace holds
+  **two owners throughout**, so none of the refusals below can be the world-half — `last-owner` would allow
+  every one of them, and that is what isolates the new rule.
+
+  **FOUR attempts, and three of them are controls**, because each refusal alone is consistent with a wrong
+  implementation: **(1)** an admin demotes a non-last owner → refused
+  `remove-owner-requires-owner`; the same act through `membership.revoked`, which names no role and
+  therefore reaches the rule by a different read, answers identically. **(2)** the ADMIN promotes a plain
+  member to **admin** → **committed** — a blanket "refuse everything an admin does to a member" would have
+  satisfied (1), and this arm forbids it; the ruling narrows owner transitions only. **(3)** an admin
+  GRANTS owner → still refused by the **sibling** id `grant-owner-requires-owner`, so this change did not
+  swallow the rule that already shipped. **(4)** the **OWNER** performs the same demotion the admin was
+  refused → **committed** — the arm that proves the rule reads the actor's role rather than refusing the
+  act outright, and the only path by which ownership is transferred. The last assertion reads
+  `proj_memberships` directly: the refused event must leave the target's row untouched, because a gate
+  that refused the event and a projection that wrote it anyway look identical from the verdict alone.
+
+  **GUARD PROVED BY MUTATION, and it reproduces the hole as the "before" half:** with the new refusal's one
+  `return` statement replaced by `return null` — the check still running, still reading nothing — attempt
+  (1) comes back **`committed`**, which IS the defect the ruling closes, and the 13.820 real-door arms
+  revert to `last-owner`. Restored, `check-permission.ts` returns to SHA-256
+  `974313512fa0c0a6acd0c20f93f9b03e4f17d6b1a43aa57c7b30f66f62149fa5` byte for byte and the suite to 48/48.
+
+  **THE UI HALF, DECIDED BY READING THE CODE RATHER THAN REPEATING A CLAIM:** an admin is **not** offered a
+  role change that removes `owner`, and no narrowing was needed. `EDITABLE_ROLE_OPTIONS`
+  (`apps/web/app/w/[workspaceId]/members/page.tsx:518-522`) is `admin`/`member`/`guest` — `owner` is absent
+  — and line `:447` renders the `<Select>` only when `isEditableRole(member.role)`, so **an owner's row
+  renders the `.gn-chip` instead of a control**. The control therefore cannot build such a payload from
+  either side. Recorded as measured, because the same file's prose claims the prototype's version *does*
+  list `Owner` and that "the two halves do not compose" — the claim was worth re-deriving, and it holds.
+
+  **ACTOR-AUTHORITY LAYER, and the alternative that was rejected.** The check lives in
+  `check-permission.ts` (`checkMembershipOwnerAuthority`, `:963`), not in the rule engine beside
+  `last-owner`. The ruling is about the ACTOR — the plan's own split puts actor questions in that module —
+  and the placement is forced rather than merely consistent: the check needs **who the actor is** (already
+  resolved in `ctx.eff.workspaceRole`) and **who the target currently is** (a `proj_memberships` read,
+  since neither payload carries a previous role). An engine-side version would have to ask the first
+  question, which the engine must not, and on the doors where it is asked most could not answer the second
+  — `membership.ts` records that the fixture context answers `null` for every membership and the offline
+  replica holds the ACTOR's row alone. The target read reuses `resolveEffectiveRole`, the module's one safe
+  reader of that table, rather than a bare `SELECT`.
+  **Citations:** `apps/server/src/permissions/check-permission.ts:963` (the check), `:1011` (its refusal),
+  `:101` (the sentence), `:1060` (the pass, and why it is second),
+  `packages/rule-engine/src/refusal-rules.ts:32` (the id),
+  `apps/server/test/permissions/check-role-permission.test.ts:1462` (the case)
 
 **Mutations, each applied to a backed-up file, confirmed to have CHANGED it, run, then restored by `cp`
 with a matching sha256.**

@@ -1304,12 +1304,16 @@ describe('the last-owner guard on the real door — the SELECT, not just the rul
     const { workspaceId, owner } = await foundedWorkspace(ingest);
     const admin = await grantMember(ingest, workspaceId, owner, 'admin');
 
-    // The attack: an ADMIN demotes the SOLE OWNER. The permission gate admits
-    // the admin on purpose — roster management is theirs — so the refusal here
-    // can only have come from the engine's world-half, which means it can only
-    // have come from a correct count.
+    // The attack: an ADMIN demotes the SOLE OWNER. **SUPERSEDED — the rule that
+    // refuses this is no longer `last-owner`.** The owner ruled on 2026-09-18
+    // (second sitting) that an admin may not demote a non-last owner either, so
+    // the act is refused for a reason that does not depend on the count at all:
+    // changing who is an owner is owner-only, in both directions. The gate now
+    // refuses it BEFORE the engine runs, which is why this arm asserts the gate's
+    // id — and why this arm no longer proves anything about the count. The arm
+    // that does is below, and it had to move to an OWNER actor to survive.
     expect((await ingest.ingestClientBatch([setRole(workspaceId, admin, owner, 'member')], admin))[0]).toMatchObject(
-      { status: 'refused', rule: 'last-owner' },
+      { status: 'refused', rule: 'remove-owner-requires-owner' },
     );
 
     // The other door to the same state, and it must answer the same.
@@ -1328,27 +1332,37 @@ describe('the last-owner guard on the real door — the SELECT, not just the rul
           admin,
         )
       )[0],
-    ).toMatchObject({ status: 'refused', rule: 'last-owner' });
+    ).toMatchObject({ status: 'refused', rule: 'remove-owner-requires-owner' });
+
+    // THE COUNT-PROOF, RE-ESTABLISHED ON THE ONLY PATH THE NEW RULE LEAVES OPEN.
+    //
+    // The arm that used to live here — "mint a second owner, then the SAME admin
+    // demotion commits" — is no longer true and no longer SHOULD be: the owner
+    // ruled that an admin may not demote a NON-LAST owner either, so an admin
+    // never reaches the engine's world-half at all. Deleting the arm would take
+    // the count's only real-door witness with it, so it moves to the one act the
+    // gate still admits and the count alone decides: **an OWNER demoting
+    // THEMSELVES out of the last ownership.** An owner may change an owner's
+    // role; only the workspace going empty makes it a refusal. A query that
+    // always answered 1, or one that ignored `excludingUserId` and counted the
+    // target, would let this through.
+    expect((await ingest.ingestClientBatch([setRole(workspaceId, owner, owner, 'member')], owner))[0]).toMatchObject(
+      { status: 'refused', rule: 'last-owner' },
+    );
 
     // CONTROL. A second owner is minted by the owner (who may), and the SAME
-    // demotion by the SAME admin then commits. This is the case that forces
-    // `countWorkspaceOwners` to actually read the projection: a query that
-    // always answered 1, or one that ignored `excludingUserId` and counted the
-    // target, would keep the refusal above green and redden here.
+    // self-demotion then COMMITS — the guard follows the table rather than
+    // reusing its first answer. Without this arm the refusal above is equally
+    // consistent with a guard that refused every self-demotion.
     await grantMember(ingest, workspaceId, owner, 'owner');
-    expectCommitted(await ingest.ingestClientBatch([setRole(workspaceId, admin, owner, 'member')], admin));
+    expectCommitted(await ingest.ingestClientBatch([setRole(workspaceId, owner, owner, 'member')], owner));
 
-    // And the count is now ONE, so the remaining owner can no longer be demoted
-    // — the guard follows the table rather than reusing its first answer.
     const { rows } = await db.pool.query<{ user_id: string }>(
       `SELECT user_id FROM proj_memberships
         WHERE workspace_id = $1 AND scope_kind = 'workspace' AND role = 'owner'`,
       [workspaceId],
     );
     expect(rows).toHaveLength(1);
-    expect(
-      (await ingest.ingestClientBatch([setRole(workspaceId, admin, rows[0]!.user_id, 'member')], admin))[0],
-    ).toMatchObject({ status: 'refused', rule: 'last-owner' });
 
     // BATCHING must not be a way around the guard, and this is measured rather
     // than assumed. Two events in ONE submission are judged one at a time, and
@@ -1364,15 +1378,21 @@ describe('the last-owner guard on the real door — the SELECT, not just the rul
     // himself to member is refused on the SECOND event by the role gate (he is
     // no longer an admin by then), which would make the case pass while the
     // count was blind. An admin who is never demoted isolates the count.
-    const second = rows[0]!.user_id; // the one owner left after the demotion above
+    const second = rows[0]!.user_id; // the one owner left after the self-demotion above
     // `grantMember` MINTS its target, so this is a THIRD person, not `owner`
     // restored — an earlier cut of this case demoted `owner` (a plain member by
     // now) and `second` (one of two owners) and both committed, which is the
     // assertion doing its job on the test rather than on the code.
+    //
+    // THE ACTOR IS AN OWNER, and it has to be: an admin can no longer reach the
+    // engine's world-half for ANY owner-targeted change, so a batch driven by an
+    // admin would be refused at the first event by the gate and this arm would
+    // pin nothing. `second` is an owner for BOTH events — the second is the one
+    // that gets refused, so its role never changes mid-batch.
     const third = await grantMember(ingest, workspaceId, second, 'owner'); // owners: second + third
     const batch = await ingest.ingestClientBatch(
-      [setRole(workspaceId, admin, second, 'member'), setRole(workspaceId, admin, third, 'member')],
-      admin,
+      [setRole(workspaceId, second, third, 'member'), setRole(workspaceId, second, second, 'member')],
+      second,
     );
     expect(batch).toMatchObject([
       { status: 'committed' },
@@ -1407,5 +1427,102 @@ describe('the last-owner guard on the real door — the SELECT, not just the rul
     expectCommitted(
       await ingest.ingestClientBatch([setRole(workspaceId, owner, newUlid(), 'owner')], owner),
     );
+  });
+
+  /**
+   * 13.883 — an admin may not demote a NON-LAST owner (owner ruling 2026-09-18,
+   * second sitting: *"may an admin demote a non-last owner: **no**."*).
+   *
+   * ## The door, the four attempts, and why each control is here
+   *
+   * Every event below goes through `ingestClientBatch` — the CLIENT door, which
+   * is the only one that runs both halves. `ingestBatch` is the internal append
+   * path and does NOT apply the permission gate, so a case asserting a
+   * PERMISSION refusal through it is vacuous; the block above records a first
+   * cut that made exactly that mistake and only noticed because the assertion
+   * failed.
+   *
+   * The ruling is a single sentence and it needs FOUR measurements, because
+   * three of them are refusals-or-admissions that a WRONG implementation would
+   * also produce:
+   *
+   *  - `remove-owner-requires-owner` fires for an admin on ANY owner, not just
+   *    the last one. This is the whole of the new rule, and the state it needs
+   *    is the TARGET's row — the two owners are the control on each other.
+   *  - A blanket "refuse everything an admin does to an owner" would satisfy
+   *    attempt 1. **The OWNER's own demotion is what forces it to be a
+   *    comparison** rather than a refusal of the act.
+   *  - A blanket "refuse every `membership.granted`" would satisfy attempts 1
+   *    and 4. **The admin promoting a plain member to admin is what forces it to
+   *    be about OWNER status** and not about the event at all — and it is the
+   *    behaviour the ruling explicitly preserves.
+   *  - Attempt 4 pins that the GRANT half still answers with its own id, so this
+   *    change did not swallow the rule that already shipped.
+   */
+  it('13.883 refuses an admin removing owner status from ANY owner, and leaves every other admin act working', async () => {
+    const ingest = ingestService();
+    const { workspaceId, owner } = await foundedWorkspace(ingest);
+    const admin = await grantMember(ingest, workspaceId, owner, 'admin');
+    // A second owner, so NO refusal below can be the world-half: the workspace
+    // holds two owners throughout attempts 1, 3 and 4, and `last-owner` would
+    // allow every one of them.
+    const secondOwner = await grantMember(ingest, workspaceId, owner, 'owner');
+    const member = await grantMember(ingest, workspaceId, owner, 'member');
+
+    // ATTEMPT 1 — admin demotes a NON-LAST owner. The attack the ruling closes.
+    expect(
+      (await ingest.ingestClientBatch([setRole(workspaceId, admin, secondOwner, 'member')], admin))[0],
+    ).toMatchObject({ status: 'refused', rule: 'remove-owner-requires-owner' });
+
+    // The same act through the OTHER membership event, which names no role and
+    // therefore reaches the rule by a different read. Both must answer alike.
+    expect(
+      (
+        await ingest.ingestClientBatch(
+          [
+            submitted({
+              workspaceId,
+              entity: { kind: 'membership', id: membershipId(workspaceId, secondOwner) },
+              type: 'membership.revoked',
+              payload: { userId: secondOwner },
+              actorId: admin,
+            }),
+          ],
+          admin,
+        )
+      )[0],
+    ).toMatchObject({ status: 'refused', rule: 'remove-owner-requires-owner' });
+
+    // ATTEMPT 3 — admin moves a plain MEMBER to admin. MUST COMMIT: the ruling
+    // narrows owner transitions only, and a rule that refused this would have
+    // taken away the roster management admins are for.
+    expectCommitted(
+      await ingest.ingestClientBatch([setRole(workspaceId, admin, member, 'admin')], admin),
+    );
+
+    // ATTEMPT 4 — admin GRANTS owner. Still the sibling rule, by its own id, so
+    // this change did not absorb it.
+    expect(
+      (await ingest.ingestClientBatch([setRole(workspaceId, admin, member, 'owner')], admin))[0],
+    ).toMatchObject({ status: 'refused', rule: 'grant-owner-requires-owner' });
+
+    // ATTEMPT 2 — the OWNER performs the same demotion the admin was refused.
+    // MUST COMMIT — this is how ownership is actually transferred, and it is the
+    // arm that proves the rule reads the actor's role rather than refusing the
+    // act outright.
+    expectCommitted(
+      await ingest.ingestClientBatch([setRole(workspaceId, owner, secondOwner, 'member')], owner),
+    );
+
+    // The refusal above left the target's row UNTOUCHED — read from the
+    // projection rather than inferred from the refusal, because a gate that
+    // refused the event and a projection that wrote it anyway would look
+    // identical from the verdict alone.
+    const { rows } = await db.pool.query<{ role: string }>(
+      `SELECT role FROM proj_memberships
+        WHERE workspace_id = $1 AND scope_kind = 'workspace' AND user_id = $2`,
+      [workspaceId, secondOwner],
+    );
+    expect(rows[0]!.role).toBe('member'); // by the OWNER's event, not the admin's
   });
 });
