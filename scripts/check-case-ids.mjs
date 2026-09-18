@@ -43,7 +43,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 // truncated `14.27b` to `14.27` and `14.88b` to `14.88`, so two pairs of
 // genuinely distinct, separately-cited cases were reported as DUPLICATE case
 // ids and this script exited 1 on `main`. The limitation was even documented
-// in prose (`test-cases/13-deployment-dogfooding.md:274`) without being fixed.
+// in prose (`test-cases/13-deploy-and-ops.md:196`) without being fixed.
 // A letter suffix is the same shape the plans' own task ids use (`4a`, `12c`,
 // read by `check-task-ledger.mjs` as `\d+[a-z]?`), so this makes the two
 // readers agree rather than inventing a convention.

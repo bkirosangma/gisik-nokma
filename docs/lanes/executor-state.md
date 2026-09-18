@@ -291,10 +291,12 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > sha256 `5a93a9cd…`). It is **same-length**, so no line moved and no citation shifted.
 >
 > **Recorded, NOT fixed — three, each with an owner:**
-> 1. **The identical stale string at `test-cases/13-deployment-dogfooding.md:8638` — FIXED, and re-pointed
->    THREE times the same day.** It was `:8587` when this item was written; `#494` inserted +29 lines above
->    it (`:8616`); `6b` grew the `13.306` row by +13 (`:8629`); and the same row's rewrite grew it again by
->    +9 (`:8638`). **Four values in one day, every move caused by this lane's own insertions** — so treat
+> 1. **The identical stale string at `test-cases/13-second-wave-board-actions.md:245` — FIXED, and re-pointed
+>    FOUR times now.** It was `:8587` when this item was written; `#494` inserted +29 lines above
+>    it (`:8616`); `6b` grew the `13.306` row by +13 (`:8629`); the same row's rewrite grew it again by
+>    +9 (`:8638`); and the 2026-09-19 catalogue split moved it into a part-file, which is the path above.
+>    **The first four values are lines of the pre-split `13-deployment-dogfooding.md`** — that file is now
+>    an index, so they are historical. **Five values, every move caused by this lane's own insertions** — so treat
 >    no number in this file as stable: **re-derive the mapping with `difflib` opcode-mapping against
 >    `origin/main` before relying on it.** The owner this item named was *"whoever next edits that
 >    catalogue section"*, and `hig-per-screen/7b` is that executor, so the clause fired rather than
@@ -6137,7 +6139,7 @@ Gate **33/33 EXIT 0, `Cached: 0`** (forced), Node **v22.22.2**; seven checks EXI
 1. **`scripts/check-case-ids.mjs` was exiting 1 on `main`.** `ID_LINE` captured `(\d+\.\d+)`, so
    `14.27b` read as `14.27` and `14.88b` as `14.88` — two pairs of distinct, separately-cited cases
    called duplicates. The limitation was written down in prose
-   (`test-cases/13-deployment-dogfooding.md:274`) and never fixed. Ids now take an optional letter,
+   (`test-cases/13-deploy-and-ops.md:196`) and never fixed. Ids now take an optional letter,
    matching what `check-task-ledger.mjs` already reads for task ids. Union 1746 < sum 1748 → 1748 ==
    1748.
 2. **The task-ledger gate could not see this plan at all** — its discovery matched only

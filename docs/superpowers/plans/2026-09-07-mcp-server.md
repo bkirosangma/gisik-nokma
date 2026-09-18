@@ -3183,7 +3183,7 @@ git commit -m "Features.md §14, the MCP test-case bucket, and a task-ledger gat
 > **`scripts/check-case-ids.mjs` was already exiting 1 on `main`.** `ID_LINE` captured `(\d+\.\d+)`,
 > truncating `14.27b` to `14.27` and `14.88b` to `14.88` — two pairs of distinct, separately-cited
 > cases reported as duplicate ids. The limitation was documented in prose at
-> `test-cases/13-deployment-dogfooding.md:274` without being fixed. The id now takes an optional
+> `test-cases/13-deploy-and-ops.md:196` without being fixed. The id now takes an optional
 > letter, the same shape `check-task-ledger.mjs` already reads for task ids, and the fixture gained a
 > `13.91b` line so the SELF-TEST fails before the real sweep if the suffix is ever dropped again
 > (union 4 against sum 5, naming `13.91b`). Before: union 1746 < sum 1748, EXIT 1. After: 1748 ==
