@@ -20,7 +20,153 @@
 
 ---
 
-## ▲ TOP BLOCK — settings → workflows, plan Tasks 2 + 3: two RULED absences, and one of them ESCALATED as a departure (2026-09-18, night)
+## ▲ TOP BLOCK — settings → workflows, plan Tasks 7 + 8: the zebra + three strings SHIPPED, and the two items the dispatch ordered are HELD against the register (2026-09-18, late night)
+
+**Position: the un-held half is committed, pushed, and at review. The PR is NOT open yet — the reviewer
+records first.** Dispatch `CTL-DISPATCH-2026-09-18-settings-wf-task78.md`. One branch,
+**`exec2/settings-wf-t7-t8`**, **`--base main`**, cut from **`origin/main` = `99884bc9`**.
+
+**FIRST ACTION ON A RESTART: `gh pr list --state open`.** If this branch has a PR, read its body; if it has
+MERGED, this block is history and the controller's next dispatch is the position.
+
+### ⛔ THE DISPATCH ORDERED TWO ITEMS THE HOLD REGISTER SAYS ARE HELD — NOT BUILT, ESCALATED
+
+`docs/lanes/owner-holds.md` §1 lists **`isTypes` | reorder and per-type counts** as **HELD (owner,
+2026-09-18)**, and that register's own rule is that an item leaves it only when the owner names it — *"not
+lifted by an entry in some other document"*, and a session that believes a hold is stale must *"ask once,
+by name, in a report — never to act on the belief."* The dispatch says both are *"ruled"*. **I could not
+find that ruling**, and three documents agree with the register instead: the plan's own ruled table lists
+only the `"Draft"` badge and the Edit button for this screen
+(`docs/superpowers/plans/2026-09-18-settings-workflows-port.md:154-157`); `controller-state.md:324` says the
+wire-gap screens *"are NOT dispatched by default; the owner picks which are wanted"*; and `:57` puts them
+**last** in the queue. **Filed as `EXEC2-QUESTION-2026-09-18-isTypes-held-items.md` and HELD.**
+
+**One measurement bears on the reorder's hold and does NOT lift it.** §1 scopes itself to screens *"whose
+prototype controls have no server behind them"*, and for the reorder that premise is **false**: the gateway
+declares no update op, but the editor already writes `rank` through the ONE existing door — `onSave`
+authors a `ticket-type.defined` carrying the whole definition and calls `gateway.submit`
+(`ticket-type-editor-screen.tsx:178-204`), with `rank: z.number().int().min(1)` on the schema
+(`packages/domain/src/ticket-types.ts:98`). **If the hold lifts it is a render task, not the wire task the
+audit scoped it as** — which is what the plan's own Task 6 text anticipated. The **count is the opposite**
+and genuinely needs server surface: the only population read is pinned to one workflow and the route counts
+`WHERE workflow_id = $n` (`apps/server/src/routes/builder-reads.ts:408-414`).
+
+### Anchors — verify these; do not trust the row
+
+| | |
+|---|---|
+| branch | `exec2/settings-wf-t7-t8` |
+| cut from / base | **`99884bc9`** (`origin/main`) |
+| code head | **`1955eae1d4966dfbeefd1be7cd81029f907cb4c8`** — the FIX round. The reviewed head was `0fd14cd8b031f67a6baf9d9c430db7dbc6dcb109`; the review's findings were fixed in `1955eae1`, so **`0fd14cd8` is what the reviewer read and `1955eae1` is what ships.** A block cannot name the commit that carries it — the HANDOFF commit sits above and `rev-parse HEAD` at the tip is NOT the code head |
+| files | **10** — count with `/usr/bin/git diff --name-only origin/main...HEAD`, **three dots** |
+| case id | **`13.894`** — recounted AT THE TIP **by marker only**; the dispatch's "next free `13.894`" is right, and a bare `grep` for the id counts **prose** mentions of the block range, which is why the recount must be by marker |
+| tree | clean; pushed; `docker compose` NOT run; :3001 and :3021 NOT bound |
+
+### What shipped
+
+- **The zebra**, at the **prototype's** parity: `(i % 2 ? …)` over a **0-based** `i`, so the tint lands on
+  the **1-indexed EVEN** rows. `.ticket-type-list__rows li:nth-child(even) .ticket-type-list__row` over
+  `--gn-fill-quaternary`. The hover rule was raised to the same specificity `(0,3,1)` and placed **after**
+  it, or hover would have silently died on the even rows.
+- **Three strings**: `"New type"` (the prototype's), the h2 at `20px/25px`, the prototype's summary
+  sentence — keeping this screen's singular handling.
+- **Two RULED absences recorded in the docblock**: the Edit button (row-as-door supersedes it) and the
+  `"Draft"` badge.
+- **Two HELD items recorded as held in the docblock**, beside the ruled ones.
+
+**THE RENAME DISARMED A CONTROL.** `"hides New ticket type from non-authors"` is a
+`queryByRole(...).not.toBeInTheDocument()`; left on the old string it would have gone on passing while
+being **unable to fail**. Moved with it: e2e case 10.72, the catalogue entry, and `docs/manual.md` with
+`content.generated.ts` regenerated.
+
+**A STALE DIST COST ONE ROUND, exactly as the brief says.** `apps/web` imports `@gisik-nokma/app-core` **by
+package name**, so it resolves through `dist`; the first targeted run failed with *"Unable to find
+role=button and name 'New type'"* because `dist` still held the old string. **The component tests in
+app-core pass either way (import style `../src/*.js`), which is what makes this trap quiet.** Rebuilt with
+`pnpm turbo run build --filter=@gisik-nokma/app-core`; re-run green.
+
+### Checks — six raw, at the code head
+
+`check:env` **0** · `check:tasks` **0** · `check:runbook` **0** · `check:citations` **0** · `check:help` **0**
+· `check:db-tz` **0** → `database timezone: Asia/Kolkata`. `check-case-ids` **0** → **2358 unique ids**
+(2357 before; this change mints one).
+
+**`check:db-tz` NEEDS ITS URL NAMED, or it looks like a failure.** Run bare in this worktree it exits **1**
+with `DATABASE_URL is required` — **this worktree has no `.env`**, and the primary checkout's does not
+declare `DATABASE_URL` either. It is **0** when pointed at the workspace's shared TEST Postgres:
+`DATABASE_URL="postgres://gisik:gisik@localhost:54329/postgres" node scripts/check-db-timezone.mjs`.
+**A stale log nearly hid this:** I `cat`ed `/tmp/chk-db-tz.log` — a leftover from an earlier session that
+said the check passed — while my loop had written `/tmp/chk-check_db-tz.log`. **Read the file you wrote.**
+
+`typecheck` **0** (17/17) · `turbo run build` **0** (11/11). **The forced gate was NOT run** — the
+controller runs it.
+
+### Mutation witnesses — six, each killed, all restored sha256-verified in the same invocation
+
+| mutation | killed |
+|---|---|
+| zebra parity `even`→`odd` | 3 (its own site + the two that locate the rule by selector) |
+| hover left at the bare selector | **1 — its own site** |
+| stripe repointed to the ground token | **1 — its own site** |
+| row stops being an `<li>` | 3 (two pre-existing tests also use `.closest('li')`) |
+| action label reverted | **1 — its own site** |
+| summary sentence reverted | **1 — its own site** |
+
+**ONE MUTATION FOUND A DEFECT IN THIS CHANGE'S OWN TEST.** The first draft of the measured half
+**hard-coded** the palette roles, so repointing the stripe at its own ground left it **GREEN** — a
+palette assertion no CSS edit could falsify, which is the check-that-cannot-fail shape this repo keeps
+re-finding. The role is now **read out of the rule**, as 13.920 does, and the same mutation reddens it.
+
+### Review — ONE reviewer at `0fd14cd8`, and the fix round is `1955eae1`
+
+Verdict recorded **in the PR body**, written before the PR opened. **No Critical.** The port itself held —
+parity, specificity, source order, the DOM precondition and the rename all verified. All **three
+Important** findings were defects in **what the new evidence claimed about itself**, one of them inside
+this change's own test:
+
+| id | finding | disposition |
+|---|---|---|
+| I1 | the stripe-visibility pin composited over `surfaceSunken`, the fill the zebra rule **replaces** — the real backdrop is `.gn-card`'s `surfaceRaised` | **fixed**; re-measured **1.1026 / 1.2727 / 1.0757 / 1.1727**, all six combinations pinned |
+| I2 | the hover case's name claimed *"not by `!important`"* and nothing read the stylesheet for it — a mutation adding `!important` stayed green | **fixed**; now read, and the mutation reddens it |
+| I3 | five citations did not resolve, two of them moved by this change's own +83-line docblock | **fixed** — `ui.css:2671`→`:2703`, `:1603-1611`→`:1811-1812`, `desktop.dc.html:3150`→`:3155`, `:65-70`→`:149-177`, `:17-23`→`:100-107` |
+
+Also fixed: the parity case's two tautologies (with the reason they are not), an **overstated** control (now
+reads parity and token, and states the two limits it cannot cover), a **fake control** in the component half
+that was arithmetic off the assertion beside it (**removed, not padded**), and the h2 metrics — the third of
+the three ported strings — which were pinned by **nothing** (now their own case).
+
+**ONE FINDING IS REPORTED, NOT FIXED, WITH A NAMED OWNER** (the controller, at the next settings-cluster
+sweep): this change shortens the useful life of citations to the screen file in documents it does not touch
+(`docs/design/prototype-delta-2026-09-18.md:622`, the plan's `:17-23`). `check:citations` does not cover
+prose citations. Rewriting another writer's dated audit snapshot is not this change's call.
+
+**MUTATION BATTERY AFTER THE FIX ROUND — EIGHT, each killed, all restored sha256-verified in the same
+invocation, the last two SURGICAL (one rule, not the twelve the earlier `sed` matched — the first pass's
+breadth was a property of the instrument, not of the test, and it was re-run to make the attribution
+clean).** Parity `even`→`odd`: 3. Hover at the bare selector: **1, its own site.** Stripe repointed to the
+ground: **1, its own site.** `!important` on the stripe: **1, its own site** — the reviewer's gap, closed.
+Title metrics reverted: **1, its own site.** Row stops being an `<li>`: 3. Action label and summary
+reverted: **1 each.**
+
+**A SUBAGENT CONTAMINATED THE SHARED WORKTREE AND REPAIRED IT — verified, not taken on trust.** The
+reviewer's first mutation harness copied `packages/ui` to `/tmp` with `node_modules` symlinked; running
+`pnpm exec vitest` there triggered `pnpm install` through the symlink and wrote a **136 MB `.pnpm` store**
+plus `.modules.yaml` and `.package-map.json` into the LIVE worktree. **I re-measured the repair myself:**
+`packages/ui/node_modules` is **20 K**, against siblings at 24 K and 16 K; no `.pnpm` residue; no `/tmp`
+symlinks under the repo; `/tmp/probe13` gone; HEAD never moved. **The lesson for any future dispatch: an
+isolated copy with a symlinked `node_modules` is not isolated — `pnpm` will follow the link.**
+
+### Open items
+
+| item | owner |
+|---|---|
+| Does the owner want the `isTypes` reorder / per-type count? | **the controller, by name** — `EXEC2-QUESTION-2026-09-18-isTypes-held-items.md` |
+| The prototype's leading **34px rank tile** is a delta this change does NOT close | reported here and in the catalogue; **not** ruled and **not** held |
+| `View history` — the previous branch's escalation | ruled 2026-09-18: not built, question with the owner |
+
+---
+
+## ▼ SUPERSEDED TOP BLOCK — settings → workflows, plan Tasks 2 + 3: two RULED absences, and one of them ESCALATED as a departure (2026-09-18, night)
 
 **Position: the change is committed and reviewed; the PR is open at the controller's merge.** Dispatch:
 `CTL-DISPATCH-2026-09-18-settings-wf-task3.md`. One branch, **`exec2/settings-wf-t2-t3`**,
