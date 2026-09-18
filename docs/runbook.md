@@ -253,6 +253,11 @@ of the **first `-f` file**, which for `pnpm dev:stack` is the checkout you run i
 worktree is the worktree the container serves. `docker-compose.dev.yml` itself is untouched by hot
 mode: the production image path and the compose contract suite read exactly what they read before.
 
+**The deployed-stack E2E suite runs against this stack** — `pnpm test:e2e:stack`, with the hot pair as
+the stack it drives. Its seed step reads which image shape the `server` container is (the hot stage
+has no `dist`, the prod-parity one has no `src`) and picks the matching command, so a hot stack is a
+valid target rather than the `MODULE_NOT_FOUND` it used to be.
+
 **`.env` must exist in that checkout** — copy it from wherever the owner keeps it. It is gitignored
 (`.gitignore:11`) and per-checkout by design, so a fresh worktree has none.
 
