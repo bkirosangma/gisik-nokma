@@ -41,6 +41,58 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~17:3x IST. **THREE ITEMS FROM THIS LANE, TWO OPEN PRs AND ONE
+> # AT REVIEW.** (1) **#469** the `.gn-avatar` under `neo` — **MERGED** as `cb1f3d16`. (2) **#473** the
+> # owner-demotion guard — **OPEN, MERGEABLE**, awaiting the controller's merge. (3) **The settings →
+> # workflows card grid** — `exec/settings-workflows`, cut from `origin/main` = **`b14d3b9b`**, commit
+> # **`dceec034`**, ONE PR `--base main`, BUILT AND GREEN and at the reviewer when this block was written.
+> # **The queue after this is NOT empty** (order: `…-attention-part2-heading.md` — exec 2's own
+> # continuation — then `…-settings-workspace-tab.md`, then `…-migration-order-check.md`; the controller
+> # dispatches to whichever executor frees first). **HOLD for that dispatch.**
+>
+> | | |
+> |---|---|
+> | branch | `exec/settings-workflows`, cut from `origin/main` = `b14d3b9b`; **not rebased since**, and `main` had not moved at the time of writing. Re-measure before the PR. |
+> | the change | 6 files: `workflow-list-screen.tsx` (the card grid), `ui.css` (the new `workflow-list__*` family, **appended at EOF**), `screens.test.tsx` (10.62 updated + case **13.884**), `tokens.test.ts` (13.884's measured half), `test-cases/13`, `Features.md` |
+> | case ids | **`13.884`**. The dispatch said "next free `13.883`" — **that expired**: this lane took `13.883` in **#473** an hour later, so 13.884 was taken and the collision the previous task recorded was avoided by one. |
+> | migration | **NONE.** Do not restart the server container. |
+> | suites | **app-core 1550/0** (+1) · **ui 330/0** (+2) · **web 520/0** · app-core, ui and web typechecks 0. Node v22.22.2. |
+> | seven checks | **all EXIT 0**: `tasks` · `env` · `runbook` · `help` · `citations` (file 13 = **657** cited / 0 uncited) · `db-tz` · `check-case-ids` (**2347**, union == sum) |
+> | gate | **NOT RUN BY THIS LANE.** |
+>
+> ## ▣ WHAT THIS TASK SHIPS
+>
+> The settings → workflows screen moves from a flat `<ul>` of rows to the prototype's card grid. **The real
+> defect was not the layout: `workflow-list__*` had NO CSS AT ALL** — its only prior occurrence anywhere was
+> a comment naming `.workflow-list__new` among unclassed-control offenders — and the primary action rendered
+> as a bare `<button>`. The whole family is new, and the action moved onto the shared `Button
+> variant="primary"`. The badge and the second action are **named absences** with missing FIELDS behind
+> them, and the test asserts their absence rather than the docblock asserting itself.
+>
+> **The chip is the avatar's defect one screen over.** The prototype fills it with `--trayBg`
+> (`--gn-surface-sunken`), which under `neo` is the SAME hex as the card — so the chip composites to the
+> card's own colour and needs the `[data-style="neo"]` compact shadow `.ticket-type-list__badge` already
+> ships. Measured and asserted as a palette fact with a control.
+>
+> **GUARD PROVED BY MUTATION, twice:** dropping the neo shadow reddens the token-layer assertion by name;
+> repointing a category bar to `--gn-surface-sunken` reddens the ratio arm at **1.000** — the bar going
+> invisible. Restored, `ui.css` is byte-identical at `99676339e7f3ae68498f82fd1fcc189454976b25ba5ea6871c89cd64a74c9e80`.
+>
+> ## ▣ METHOD NOTES THIS TASK EARNED
+>
+> - **PLACEMENT IS A PRICED DECISION, and the price is measurable.** The new CSS family was **appended at
+>   the end of `ui.css`** rather than beside `.ticket-type-list__*` where a reader would look: inserting
+>   there stales **46** of the repo's 135 `ui.css:NNN` citations, appending stales **0**. Measured both
+>   ways BEFORE choosing. The previous task staled 24 citations by not asking the question.
+> - **The dispatch's "next free" id had already expired — by this lane.** `13.883` was named free at 16:53
+>   and this lane took `13.883` in #473 minutes later. The previous task's own recorded lesson, applied:
+>   recount at your own tip, and treat a dispatch's number as a reading with a shelf life.
+> - **A prototype line number is only valid against the revision it was measured on.** The dispatch warns
+>   that the primary checkout's copy is 15 lines short (`isWorkflows` at `826` there, `841` at `main`), so
+>   every prototype read here went through `/usr/bin/git show origin/main:…` into a temp file.
+> - **`/usr/bin/cat` does not exist on this machine.** The shell-function proxy covers `cat` too; reading a
+>   file needs the Read tool or `/bin/cat`.
+
 > # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~17:1x IST. **THE AVATAR PR IS MERGED (#469 → `cb1f3d16`) AND
 > # THE OWNER-DEMOTION GUARD IS BUILT, GREEN, REBASED AND AWAITING ITS PR.** `exec/owner-demotion-guard`,
 > # ONE PR, `--base main`, rebased onto `origin/main` (the union of my avatar work, exec 2's attention
@@ -100,6 +152,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > - **A registry-pin test is a real gate, not an obstacle.** Adding the id reddened
 >   `engine.test.ts`'s `REFUSAL_RULES` equality — 22 entries against 23 — which is exactly what that
 >   test exists for. The id was added there; nothing was loosened.
+
 > # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~16:3x IST. **SECOND WAVE TASK 8 IS MERGED (#465 → `c2daa5b5`)
 > # AND THE AVATAR BUG DISPATCH IS BUILT, REVIEWED, FIXED, REBASED AND **OPEN AS PR #469 — MERGEABLE,
 > # AWAITING THE CONTROLLER'S MERGE.** NOTHING IS LEFT FOR THIS LANE TO DO ON IT.** The dispatch was
