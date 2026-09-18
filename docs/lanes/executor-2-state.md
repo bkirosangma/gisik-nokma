@@ -22,8 +22,9 @@
 
 ## ▲ TOP BLOCK — `isBuilder`: fit the design to the backend that exists (2026-09-18)
 
-**Position: the change set is COMPLETE, the review round is CLOSED, and the PR is open and awaiting the
-controller's merge.** Dispatch: `CTL-DISPATCH-2026-09-18-exec2-isbuilder`. One PR, `--base main`,
+**Position: the change set is COMPLETE, the review round is CLOSED, the branch is REBASED onto `main`,
+and the PR is open and awaiting the controller's merge.** Dispatch:
+`CTL-DISPATCH-2026-09-18-exec2-isbuilder`, then `CTL-EXEC2-2026-09-18-rebase-445`. One PR, `--base main`,
 branch `exec2/isbuilder`.
 
 ### Anchors — verify these; do not trust the row
@@ -31,21 +32,71 @@ branch `exec2/isbuilder`.
 | | |
 |---|---|
 | branch | `exec2/isbuilder` |
-| base | **`ba96a8d2`** = `origin/main` = the `#443` merge (executor 2's Members work) |
-| `origin/main` | `ba96a8d2` at the last count — **recount; main moves without telling you** |
-| merge-base | `ba96a8d2` |
-| ahead | 2 commits — a reading, not a fact; `git rev-list --count origin/main..HEAD` |
+| base | **`fb346a9f`** = `origin/main` = the `#444` merge (executor 1's Task 3, the rank column) |
+| `origin/main` | `fb346a9f` at the last count — **recount; main moves without telling you** |
+| merge-base | `fb346a9f` |
+| ahead | 3 commits — a reading, not a fact; `git rev-list --count origin/main..HEAD` |
 | tree | clean at the last check |
 | HEAD | **verify with `/usr/bin/git rev-parse HEAD`.** A block cannot contain the commit that carries it, so any number here names an ANCESTOR, never the tip |
-| PR | `--base main`; **the reviewer pass is recorded in the body BEFORE the PR opened** |
+| PR | **#445**, `--base main`; reviewer pass recorded in the body BEFORE it opened |
 
-### The two commits
+### ⛔ THE PRE-REBASE SHAS ARE ORPHANED. DO NOT CITE THEM.
 
-1. **`de6d2fa8`** — the change set (the reviewed head).
-2. **`7fb68f3b`** — the review fix round. **No production code and no CSS rule changed between them**,
-   verified by hashing both stylesheets with comments stripped (`2daa369d…` and `bc83037a…` identical at
-   both heads, positive control: the test file that did change hashes differently). Tests, docs and CSS
-   *comments* only. That is what decided no second full review was owed.
+`de6d2fa8` (the change set, and the head the reviewer ran against), `7fb68f3b` (the fix round) and
+`b3a7bdef` (the previous freeze) were orphaned by the rebase onto `fb346a9f`. **`git cat-file` still
+resolves all three — it passes on reflog-only commits — and `git branch --contains` returns nothing.**
+That asymmetry is the reason this warning is here rather than left to a reader to discover.
+
+**The ONE command that confirms the reviewed code survived the rebase — expect EMPTY output:**
+
+```
+git diff b3a7bdef HEAD -- \
+  packages/app-core/src/workflow-builder packages/app-core/test/workflow-builder \
+  apps/web/test/builder-route.test.tsx apps/web/app/globals.css apps/web/app/w \
+  packages/ui/src/ui.css
+```
+
+Positive control: the same command with `de6d2fa8` in place of `HEAD` returns 86 diff lines, so an empty
+result is a measurement rather than a probe that cannot fire. The two shared narrative files are excluded
+on purpose; they differ by exactly the peer's content.
+
+### The three rebased commits
+
+1. **`6e7132b1`** — the change set (the rebased equivalent of the reviewed head).
+2. **`ee7ee37a`** — the review fix round. **No production code and no CSS rule changed between commits 1
+   and 2 in the pre-rebase series**, verified by hashing both stylesheets with comments stripped
+   (`2daa369d…` and `bc83037a…` identical, positive control: the test file that did change hashes
+   differently). Tests, docs and CSS *comments* only. That is what decided no second full review was owed.
+3. **`f9013392`** (or its successor) — this handoff.
+
+### § 0 — THE REBASE (2026-09-18), AND THE TWO THINGS IT TAUGHT
+
+One conflict, `test-cases/13-deployment-dogfooding.md`, both sides appending at EOF. **Resolved by
+union**: executor 1's reconciliation note + Task 3 section (`13.702`–`13.704`) first, then this change's
+section (`13.767`–`13.775`). A second conflict on the same file, over ONE line — this change's own fix
+round correcting its section header — resolved by taking the later commit, which is intra-stream
+supersession and not a union.
+
+**(a) MY FIRST UNION AUDIT WAS BROKEN AND ITS CONTROL STILL FIRED.** It compared every added line from
+both diffs against a SINGLE file and reported 708 and 1144 "missing". The control fired correctly — the
+probe was fine, the **universe was wrong**. Per-file, the numbers are 0 of 868 and 0 of 1729.
+
+**(b) A GENERIC "TAKE THEIRS" RESOLVER NEARLY DESTROYED THE PEER'S WORK.** At the second conflict, `ours`
+held executor 1's **entire 99-line section**, not the single conflicting line; a script that kept the
+incoming side discarded all of it. Caught immediately, `git checkout --merge` restored the conflicted
+state, and the corrected resolver **asserted both sides' content before writing**.
+**"Take theirs" is only safe when `ours` is known to be the single conflicting line — and the way to know
+that is to look at the block, not to infer it from the marker count.**
+
+**(c) A STALE `dist` MADE `apps/web`'s TYPECHECK FAIL AT THE REBASED HEAD — for six errors, all in
+executor 1's files.** `domain/dist` was built 09:27 and `app-core/dist` 08:44, both before the rebase
+pulled main's `rank` source in, so `tsc` resolved the OLD types and reported `TS2353: Object literal may
+only specify known properties` on `backlog-start`, `backlog-tab`, `board-narrowing`, `filters-sheet`,
+`project-calendar-timeline` and `project-create-gate`. **The suites passed with that same stale `dist`**
+— which is the asymmetry worth remembering: `vitest` and `tsc` resolve a workspace package differently.
+`pnpm -r --filter './packages/*' run build` fixed it; the typecheck then exits 0. **This is the second
+recurrence of the trap this file documents above; any red on a freshly-rebased tree is re-measured after
+rebuilding the workspace packages BEFORE it is reported as a defect.**
 
 ### What shipped, and the measurement it rests on
 
