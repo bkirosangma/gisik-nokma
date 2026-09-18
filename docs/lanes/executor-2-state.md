@@ -20,7 +20,85 @@
 
 ---
 
-## ▲ TOP BLOCK — Settings → Workspace restyle: the switch HOISTED, the info icons, the Save row (2026-09-18, night). PR OPEN, base `main`, awaiting the controller's merge.
+## ▲ TOP BLOCK — the builder-unstyled-families dispatch is REFUTED at its base. **HOLDING for a ruling; no product code written.** (2026-09-18, night)
+
+**Position: branch `exec2/builder-families-stale-premise`, cut from `origin/main` `4505cb6d`, one docs commit,
+no PR opened as a task.** Dispatch `CTL-DISPATCH-2026-09-18-builder-unstyled-families.md`. Full report:
+`gisik-nokma-lanes/EXEC2-QUESTION-2026-09-18-builder-unstyled-families.md`.
+
+**WHAT HAPPENED.** The dispatch says `workflow-builder-screen*`, `state-inspector*` and `inspector-panel*` "have NO
+CSS AT ALL" and orders rules for them. **They all have CSS, at my tip, and the rules are the ones the dispatch asks
+for** — token-layer, declaration-pinned, layout untouched. The dispatch's step 1 told me to re-derive the zero with
+a control before writing any rule, and to write no rule for a family that turns out to be styled. It turned out to
+be styled, so **no rule was written.**
+
+**WHY: the dispatch quotes a reading that had been dead for nine and a half hours.**
+
+| when (IST) | what | sha |
+|---|---|---|
+| 2026-09-18 04:43:27 | `prototype-delta-2026-09-18.md:666` lands — *"A third unstyled class family"* | `952ae4b7` |
+| 2026-09-18 04:53:09 | the audit doc lands (its citations are "at the branch tip", i.e. this moment) | `b784326b` |
+| 2026-09-18 **10:29:53** | **PR #445 `exec2/isbuilder` merges — styles all four families** | `d069fd94` |
+
+The audit was **correct about the tree it measured**. The dispatch inherited it without re-measuring. **This is the
+same failure the brief names: a stale "known gap" is pre-authorised work that no longer needs doing.**
+
+### The measurement, both controls in the same invocation
+
+| selector swept | rules | expected |
+|---|---|---|
+| `\.workflow-builder-screen` | **17** | dispatch says **0** |
+| `\.state-inspector` | **3** | dispatch says **0** |
+| `\.inspector-panel` | **1** | dispatch says **0** |
+| `\.gn-legal__title` (positive control) | 3 | non-zero ✅ |
+| `\.gn-workflow-canvas` (positive control) | 1 | non-zero ✅ |
+| `\.zzq-nonexistent-family` (**negative control** — the dispatch had none) | **0** | zero ✅ |
+
+**The fix was this lane's own**: PR #445 (`6e7132b1`) + `builder-css-binding.test.tsx` (**16 tests, cases
+`13.767`–`13.775`**) + `Features.md` + `test-cases/13-deployment-dogfooding.md`. All four of the dispatch's
+requirements are already met there — `13.768` refuses a new token role, `13.771` pins a load-bearing declaration per
+rule, `13.771` also pins the three-column grid.
+
+### Requirement 4 re-run here, not quoted
+
+Deleted `box-shadow: var(--gn-shadow-raised)` from `.workflow-builder-screen__canvas` in the real `ui.css`:
+baseline **16 passed** → mutated **`1 failed | 15 passed`**, message *"`__canvas lost "box-shadow:
+var(--gn-shadow-raised)"`"* (**names its own site**) → restored to sha256
+`ae1896adeaaf61a71078d315eea6f7c8c80eda5474f14bda39cfc4ed1a7fdb34`, **byte-identical**, suite green again.
+No instrument defect.
+
+### The live part — four OTHER families in the same cluster are genuinely at 0
+
+`restrict-to-editor*` · `require-field-editor*` · `require-different-user-editor*` · `template-gallery*` — **0 rules
+each, all four render**, same controls as the rows above. `ui.css:2120-2125` already records them with an owner, and
+records the reason they were left: the prototype **draws no rule-authoring UI at all**, so styling them means
+**inventing a design**. I did not do it unilaterally.
+
+### Checks at this tip (docs-only branch; no product file differs from `origin/main`)
+
+`check:env` **0** · `check:tasks` **0** · `check:runbook` **0** · `check:citations` **0** · `check:help` **0** ·
+`check:db-tz` **0** → `database timezone: Asia/Kolkata` (needs its URL named —
+`DATABASE_URL="postgres://gisik:gisik@localhost:54329/postgres" node scripts/check-db-timezone.mjs`; bare it exits 1
+with `DATABASE_URL is required` and looks like a failure). Case ids: **`node scripts/check-case-ids.mjs` → 0**, 2365
+unique ids. **`turbo run test` / the forced gate NOT run** — the controller runs the gate, and this branch changes no
+product file.
+
+**⛔ `pnpm run check:case-ids` EXITS 1 — "Missing script", not a failing check.** There is no such alias; the script
+is `scripts/check-case-ids.mjs` and must be run with `node`. A quoted *"check:case-ids EXIT=1"* is a FALSE RED that
+reads exactly like a real one. Recording, not fixing. **Owner: the controller.**
+
+### Open items
+
+| item | owner |
+|---|---|
+| Ruling: close this dispatch as already-delivered, and re-scope to the four families above (which needs its own ruling on inventing a treatment) | **the controller** |
+| `docs/design/prototype-delta-2026-09-18.md:666` is now FALSE and keeps spawning dispatches for finished work | **the controller** — deliberately NOT edited by me |
+| `check:case-ids` has no `package.json` alias, so `pnpm run check:case-ids` is a false red; one-line fix | **the controller** — deliberately NOT fixed by me |
+| Next free case id at this tip: **`13.902`** (`13.890`–`13.893`, `13.894`, `13.895`–`13.901`, `13.920`, `13.921` are spent; block `13.890`–`13.919` is NOT free from `13.894` on, as `ui.css`'s neighbour note claims) | whoever mints next |
+
+---
+
+## ▼ SUPERSEDED TOP BLOCK — Settings → Workspace restyle: the switch HOISTED, the info icons, the Save row. **PR #485 MERGED as `4505cb6d`.** (2026-09-18, night)
 
 **Position: one branch, `exec2/settings-workspace-tab`, `--base main`.** Dispatch
 `CTL-DISPATCH-2026-09-18-settings-workspace-tab.md` + `-amendment-1.md`. The amendment said to cut from
