@@ -36,8 +36,16 @@ import { describe, expect, it } from 'vitest';
  * override killed a zebra that a check of this same shape was pinning. The
  * mitigation is the uniqueness claim at the end: exactly ONE rule in either
  * stylesheet may name the `.gn-attention` container, and its witnesses append
- * precisely such an override. It is still not a rendered measurement;
+ * precisely such an override. **It is a scan over a fixed list of SPELLINGS, not
+ * a parser** — `containerSelectorLines` says which two forms it covers and names
+ * the residual it does not. It is still not a rendered measurement;
  * `e2e-viewport` is where one would live, and it does not visit this route.
+ *
+ * **A second gap, found by the same review and now closed: the "no border-left"
+ * claim below scanned `ui.css` only.** This docblock had already named
+ * `globals.css` as the second stylesheet a rule could hide in, and `layout.tsx`
+ * loads `ui.css` before `globals.css`, so a marker appended there wins. Both
+ * stylesheets are now scanned and both are witnessed.
  */
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const UI_CSS_PATH = resolve(TEST_DIR, '../src/ui.css');
@@ -134,12 +142,28 @@ function familyRules(css: string): { selector: string; body: string }[] {
  * `.gn-attention` as a PREFIX and are different classes entirely. Counting them
  * would make the uniqueness claim below either vacuous (raise the expected count
  * to whatever the family happens to have) or permanently red.
+ *
+ * ## The `[class~="gn-attention"]` spelling, and what is still not covered
+ *
+ * An independent review defeated the first version with
+ * `[class~="gn-attention"] { background: transparent; }` — the same class, the
+ * same specificity (0,1,0), later in source order, and neither this helper nor
+ * `familyRules` saw it: one requires a literal `.` before the name, the other
+ * requires the line to START with it. That spelling is now caught by the second
+ * alternative below. **It is a fixed list of spellings, not a parser**, and the
+ * residual is stated rather than implied: a selector reaching the container
+ * without writing the class name in either of these two literal forms — an
+ * escaped `\\2e`, a `:is()` alias built from another token — would still evade
+ * both helpers. Two neighbouring spellings were probed by the same review and DO
+ * redden (`:where(.gn-attention)` and a selector list split across two lines),
+ * so the survivor class is narrow and contrived. A rendered measurement is the
+ * only thing that closes it, and `e2e-viewport` does not visit this route.
  */
 function containerSelectorLines(css: string): string[] {
   return css
     .split('\n')
     .map((line) => line.trim())
-    .filter((line) => /\.gn-attention(?![\w-])/.test(line));
+    .filter((line) => /\.gn-attention(?![\w-])/.test(line) || /"gn-attention"/.test(line));
 }
 
 describe('13.893 — the attention strip is the prototype’s tint card, adopted whole', () => {
@@ -171,9 +195,26 @@ describe('13.893 — the attention strip is the prototype’s tint card, adopted
     // check that read only the container would not see it. `--gn-pending` is
     // the marker's colour, so its reappearance in any family body is the same
     // defect wearing a different selector.
-    const bordered = familyRules(cleanUiCss).filter(({ body }) => /border-left\s*:/.test(body));
-    expect(bordered, `a family rule declares border-left: ${JSON.stringify(bordered)}`).toEqual([]);
-    expect(familyRules(cleanUiCss).some(({ body }) => body.includes('--gn-pending'))).toBe(false);
+    //
+    // **BOTH STYLESHEETS, and the first version scanned only `ui.css`.** This
+    // file's own docblock names `globals.css` as the second stylesheet a rule
+    // could hide in, and an independent review measured the gap it left: a
+    // `.gn-attention__items { border-left: … }` appended to `apps/web/app/globals.css`
+    // left the suite 6/6 GREEN, while `layout.tsx` loads `ui.css` before
+    // `globals.css` so the later rule draws the line in a real browser. The
+    // half-applied row 1 this case exists to forbid was one line away, in the
+    // file the docblock had already identified and the scan had not read.
+    for (const [name, css] of [
+      ['ui.css', cleanUiCss],
+      ['globals.css', cleanGlobalsCss],
+    ] as const) {
+      const bordered = familyRules(css).filter(({ body }) => /border-left\s*:/.test(body));
+      expect(bordered, `${name} declares border-left in a family rule: ${JSON.stringify(bordered)}`).toEqual([]);
+      expect(
+        familyRules(css).some(({ body }) => body.includes('--gn-pending')),
+        `${name} paints a family rule with the removed marker's colour`,
+      ).toBe(false);
+    }
     expect(rule).not.toContain('--gn-surface-raised');
   });
 
@@ -261,9 +302,16 @@ describe('13.893 — the attention strip is the prototype’s tint card, adopted
     expect(detinted, 'plant did not land').not.toBe(container);
     expect(ruleFor(detinted, '.gn-attention')).not.toContain('background: var(--gn-tint-warning)');
 
-    const synthetic = `${cleanUiCss}\n.gn-attention__items {\n  border-left: 4px solid var(--gn-pending);\n}\n`;
-    const plantedBorders = familyRules(synthetic).filter(({ body }) => /border-left\s*:/.test(body));
-    expect(plantedBorders, 'the family scan cannot see a planted border-left').not.toEqual([]);
+    // BOTH stylesheets, because the first version of this witness planted into
+    // `ui.css` only and so could not have shown the gap the review found.
+    for (const [name, css] of [
+      ['ui.css', cleanUiCss],
+      ['globals.css', cleanGlobalsCss],
+    ] as const) {
+      const synthetic = `${css}\n.gn-attention__items {\n  border-left: 4px solid var(--gn-pending);\n}\n`;
+      const plantedBorders = familyRules(synthetic).filter(({ body }) => /border-left\s*:/.test(body));
+      expect(plantedBorders, `the family scan cannot see a border-left planted in ${name}`).not.toEqual([]);
+    }
 
     // The cascade defect this uniquely-named rule exists for, planted exactly
     // as an independent review planted it against the members zebra: a LATER
@@ -277,6 +325,14 @@ describe('13.893 — the attention strip is the prototype’s tint card, adopted
     // visible: `*` adds no specificity, so that rule ties and wins on order.
     const universal = `${cleanUiCss}\n*.gn-attention {\n  background: transparent;\n}\n`;
     expect(containerSelectorLines(universal)).toHaveLength(baseCount + 1);
+
+    // The attribute-selector spelling an independent review used to defeat the
+    // first version: same class, same specificity, later in source order.
+    const attributeForm = `${cleanUiCss}\n[class~="gn-attention"] {\n  background: transparent;\n}\n`;
+    expect(
+      containerSelectorLines(attributeForm),
+      'the [class~="…"] spelling evades the container scan',
+    ).toHaveLength(baseCount + 1);
 
     // A duplicate of a NON-container family selector — the case that defeated
     // this file's own first `familyRules`, which resolved by name and therefore

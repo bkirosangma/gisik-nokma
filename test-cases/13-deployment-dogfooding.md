@@ -11142,6 +11142,9 @@ each link checkable, and the first three found independently by the reviewer and
    (`apps/web/e2e-stack/viewport.spec.ts:673`). A DECREASE is the failure this instrument exists to catch.
 2. `AttentionStrip` carries exactly one named attribute, `aria-label="Needs attention"`
    (`packages/app-core/src/views/attention-strip.tsx:74`) — no `role` — so only `ariaLabel` can move.
+   *(The attribute's VALUE and its line are as-they-stood in that run: the 2026-09-18 Part 2 change moved it
+   to `:94` and set it to `"Needs your attention"`, keeping the attribute itself — which is the whole of
+   what this link rests on. The count did not move either way.)*
 3. The strip verifiably rendered on `/p/:projectId` in that session: `AttentionStrip` returns `null` for an
    empty list (`:72`), and the non-text-contrast roster written by the same suite records
    `aside.gn-attention` **on `/p/:projectId`**, which it can only do for a selector it found rendered there.
@@ -11355,6 +11358,20 @@ written beside the code.
   `.gn-attention__items` was invisible to it — the cascade blind spot the file's own docblock claims a
   source scan cannot see, reproduced inside the scan written to look for it. The scan now walks
   sequentially and the uniqueness claim is generalised to every selector in the family.
+
+  **A round of review found two more gaps in that same case, both now closed and both witnessed.**
+  **(i)** The "no `border-left` anywhere in the family" claim scanned `ui.css` only — while the file's own
+  docblock had already named `globals.css` as the second stylesheet a rule could hide in. Measured:
+  appending `.gn-attention__items { border-left: 4px solid var(--gn-pending); }` to
+  `apps/web/app/globals.css` left the suite **6/6 green**, and `layout.tsx` loads `ui.css` before
+  `globals.css`, so the later rule draws the line in a real browser — the half-applied row 1 this case
+  exists to forbid, one line away in the file the docblock had identified and the scan had not read. Both
+  stylesheets are now scanned and both are witnessed (**1 failed / 6**, row 1 alone). **(ii)** The
+  container scan is a fixed list of SPELLINGS, not a parser: `[class~="gn-attention"] { background:
+  transparent; }` — the same class, the same specificity, later in source order — evaded both helpers
+  (one requires a literal `.`, the other requires the line to start with the name). That form is now
+  caught (**1 failed / 6**, the uniqueness case), and the helper's docblock names the residual it still
+  does not cover rather than implying the set is closed.
 
 ## The members screen's styling, measured against the prototype (executor 2, 2026-09-18) — ids `13.886`–`13.889`
 

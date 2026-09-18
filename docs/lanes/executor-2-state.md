@@ -20,9 +20,125 @@
 
 ---
 
-## ▲ TOP BLOCK — the members screen's styling, measured against the prototype (2026-09-18, later the same day)
+## ▲ TOP BLOCK — the attention strip's Part 2, adopted WHOLE (2026-09-18, evening)
 
-**Position: the members-styling task is DONE and its PR is at the controller's merge.** Dispatches:
+**Position: the change is committed, reviewed, and its PR is at the controller's merge.** Dispatch:
+`CTL-DISPATCH-2026-09-18-attention-part2-heading.md` **plus AMENDMENT 1**, which WIDENS it — the owner
+answered *"yes to the prototype's tint fill too"*, so rows 1–6 all land together and the 4px left-border
+ruling is superseded **as a design choice, not by a measurement**. One branch, **`exec2/attention-part2`**,
+**`--base main`**, cut from **`1d131a68`**. Ids **`13.890`–`13.893`**, taken from the controller's
+allocation (**exec 2's block is `13.890`–`13.919`**, `CTL-ID-BLOCKS-2026-09-18.md`).
+
+**FIRST ACTION ON A RESTART: `gh pr list --state open`.** If this branch's PR is open it is at the
+controller's merge and nothing below needs redoing; if it has MERGED, this block is history and the
+controller's next dispatch is the position.
+
+### Anchors — verify these; do not trust the row
+
+| | |
+|---|---|
+| branch | `exec2/attention-part2` |
+| cut from / base | **`1d131a68`** (`origin/main`, the tip the controller's paste named) |
+| frozen head | **`ede1a1c1`** — verify with `/usr/bin/git rev-parse HEAD`; a block cannot name the commit that carries it |
+| files | 13: `packages/app-core/src/views/attention-strip.tsx` · `packages/ui/src/ui.css` · `packages/ui/src/tokens.ts` · `packages/ui/test/tokens.test.ts` · **`packages/ui/test/attention-styling.test.ts` (new)** · `packages/app-core/test/views/attention-strip.test.tsx` · `apps/web/test/page-refusals.test.tsx` · `test-cases/13-deployment-dogfooding.md` · `test-cases/03-foundation-ledger.md` · `Features.md` · `docs/manual.md` · `docs/faq.md` · `packages/app-core/src/help/content.generated.ts` |
+| ids minted | **`13.890`–`13.893`** — from the controller's block, not a tip reading |
+| tree | clean; `docker compose` NOT run; :3001 and :3021 NOT bound |
+
+### What shipped
+
+The prototype's treatment whole (`desktop.dc.html:561-575`): `--gn-tint-warning` card at
+`--gn-radius-card` / `1.125rem 1.25rem`; a VISIBLE heading *"Needs your attention"* (`1.0625rem/1.375rem/600`)
+with a decorative 20px warning triangle; rows `title → chip → reason → claim` (the claim is a product
+addition and stays LAST — 13.892 pins its position, not just the first three); rows `gap: 0.25rem`,
+`padding: 0.4375rem 0`, `min-height: 1.5rem`; the whole row is the click target via the title button's
+stretched `::after`; the reason in `--gn-text-muted`. **The 4px `--gn-pending` left marker is gone.**
+
+**The accessible name took option (i): keep `aria-label`, set it to the visible string.** Not
+`aria-labelledby`, because that REMOVES an `aria-label` attribute from every route the strip renders on and
+`e2e-stack/viewport.spec.ts` ratchets that attribute's COUNT with `toBeGreaterThanOrEqual` — `/my-work` is
+floored at **8** (`e2e-stack/accessible-names-baseline.json`). **The ratchet was NOT re-run and nothing in
+this change claims it was**: that suite needs the compose stack, which is executor 1's and mounted from
+executor 1's tree, so a run here would measure a tree without this change. 13.890 pins the attribute's
+presence, which is the half a unit test holds.
+
+### Mutation witnesses — six, each killing exactly ONE case, tree restored sha256-identical
+
+Component (`attention-strip.tsx`, before `eda543874f51f4bf49d1e1d0033d3f7f14583aa8f93681f52b08cf37993803d8`,
+after the same): `aria-label` reverted to `Needs attention` → **1 failed / 20**, 13.890 alone · `aria-hidden`
+dropped from the icon → **1 failed / 20**, 13.891 alone · the `<Chip>` moved before the button →
+**1 failed / 20**, 13.892 alone.
+
+Stylesheet (`ui.css`, before/after `371f7cece4c1eb3dc4afb2f4dac8fe177640d3174c39fd26cc45f2b2d8244a96`): the
+tint reverted to `--gn-surface-raised` → **1 failed / 6**, row 1 alone · a duplicate `.gn-attention` rule
+appended → **2 failed / 6** (the uniqueness claim AND the witness case) · the reason colour reverted to
+`--gn-text` → **1 failed / 6**, rows 3–6 alone.
+
+**One witness earned its keep immediately.** The first `familyRules` resolved rules BY NAME, so a planted
+duplicate of `.gn-attention__items` was invisible to it — the cascade blind spot the file's own docblock
+claims a source scan cannot see, reproduced inside the scan written to look for it. The scan now walks
+sequentially and the uniqueness claim is generalised to every selector in the family. **The witness case
+also no longer hard-codes the clean count** (it asserted `toHaveLength(2)`), so it cannot redden for a
+reason of its own.
+
+### Measured findings recorded rather than fixed — each with an owner
+
+- **The non-text-contrast roster's `aside.gn-attention` entry is NOT re-measured and NOT hand-edited.**
+  The amendment asked for it; the sweep needs the compose stack, and **a hand-edited generated record is
+  PARTIAL** (recorded lesson). Its header counts (`examined: 9`, `totalClasses: 5`) describe the
+  PRE-change sweep, and its `/members` `input`/`select` entries were already stale the same way — one
+  task, not two. **Owner: whoever next runs that sweep.**
+- **`docs/design/prototype-delta-2026-09-18.md:583-586` owes a correction** — it gives `isMyWork` the
+  verdict `none` and cites `attention-strip.tsx`'s refusal 3, which argues the WEAKER claim (flat rather
+  than sectioned PER KIND). Read-only delta record; correction RECORDED, not made. **Owner: the next
+  rewrite of that document.**
+- **Prose citations into `packages/ui/src/ui.css` are broadly stale, and were BEFORE this change.**
+  Sampled at `HEAD`'s base: `.gn-help__title` is cited at `ui.css:1697` and is at **`:3091`**;
+  `.ticket-type-list__title` cited at `:1590`, actually **`:1745`**. **69 tracked lines** (80 occurrences)
+  carry a `ui.css:<line>` citation pointing below the family, counted by `/usr/bin/git grep` at both
+  `1d131a68` and `ede1a1c1` — the count is invariant across this change, as it must be, because this change
+  only SHIFTS those numbers by ~46. **That is why they were NOT blanket-renumbered**: a +46 sweep would
+  leave them still wrong by hundreds of lines while making them LOOK current, which is worse than an
+  obviously stale number and is this repo's recorded "blanket renumber corrupts historical prose" hazard. Only the citation this change actually invalidated was
+  updated (`ui.css`'s two `tokens.ts:342-344` → `:343-349`). **Owner: a dedicated citation-repair task,
+  measured against the file rather than offset.**
+- **`docs/manual.md` and `docs/faq.md` quoted the OLD heading in six places, and ONE of them also still
+  placed the strip on project pages** — stale since `#471` removed it, and not caught then. All six
+  corrected and `content.generated.ts` regenerated; `check:help` is the gate that proves the regeneration.
+  **The "three of them" in this line's first draft was an over-count, caught by the reviewer and
+  re-measured: `/usr/bin/git grep -i "project pages" 1d131a68` returns exactly TWO tracked lines —
+  `docs/manual.md:693` and its generated copy at `content.generated.ts:3291` — and neither `docs/faq.md`
+  nor any other file carries one.** The corrected text in both docs is accurate; only the narrative count
+  was wrong.
+
+### Docblock reconciliation shipped (dispatch asked for this text verbatim)
+
+In `attention-strip.tsx`, appended to refusal 3's docblock:
+
+> "**"Do not draw the heading" is about a PER-KIND SUB-heading, and the single banner-level heading below
+> is a different thing.** The two sentences read as if they disagree, so, plainly: a sectioned strip needs
+> one heading per kind, and a kind with no rows has nothing honest to put under its own heading. The
+> heading this component draws names the WHOLE strip, not a kind, and it can never outlive its rows —
+> `items.length === 0` returns `null` above, before any of this is reached."
+
+### Checks at `ede1a1c1`
+
+Six raw, all 0: `check:env` · `check:tasks` · `check:runbook` · `check:citations` · `check:help` ·
+`check:db-tz` → `database timezone: Asia/Kolkata` (with the documented `DATABASE_URL`). Seventh instrument:
+`check-case-ids` **0** → **`2355 unique ids`**, up 4 from `2351` — exactly the four minted here.
+`typecheck` 0 on `ui`, `app-core` and `web`. Tests: `ui` **334**, `app-core` **1552**, `web` **530**, no
+orphaned workers. **Forced gate NOT run** — the controller runs it.
+
+**STALE-BUILD TRAP HIT AND RECORDED.** `apps/web` resolves `@gisik-nokma/app-core` through `./dist`, so the
+first `page-refusals` run reddened against a STALE BUILD while `app-core`'s own tests (relative `../src/*.js`
+imports) were green. `pnpm --filter @gisik-nokma/app-core build` fixed it. **Vitest green in the package is
+not vitest green in its consumer.**
+
+---
+
+## ▼ SUPERSEDED TOP BLOCK — the members screen's styling (2026-09-18). **`#476` MERGED** at `2026-09-18T12:16:49Z`; nothing below needs redoing.
+
+**Position: the members-styling task is DONE — `#476` MERGED** (`2026-09-18T12:16:49Z`, base `main`).
+**This block is history; the live position is the block above.** Dispatches:
 `CTL-DISPATCH-2026-09-18-members-styling.md` **plus its AMENDMENT 1** (the `.gn-field` deliverable, and
 the id list). One branch, `exec2/members-styling`, **`--base main`**, cut from **`0e0dbff9`** — the tip
 the controller's own dispatch named, with the amendment's `7735b6ef` superseded by `#471`'s merge minutes

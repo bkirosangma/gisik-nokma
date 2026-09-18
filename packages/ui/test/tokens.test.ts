@@ -632,10 +632,12 @@ describe('a control without a boundary — which signal identifies it', () => {
  * element records exactly that backdrop (`e2e-stack/non-text-contrast-roster.json`'s
  * `aside.gn-attention` entry: `rgb(241,234,227)`).
  *
- * **No assertion was added, deliberately.** The strip's text is `--gn-text`
- * (heading, title) and `--gn-text-muted` (reason, claim) — precisely the two
- * roles the two assertions below already cover, in all six style×theme
- * combinations. A third block asserting the same two pairs against the same
+ * **No assertion was added, deliberately.** The strip's text is `--gn-text` —
+ * the heading (which inherits, since nothing between `body` and `.gn-attention`
+ * sets a colour), `.gn-attention__title`, and the `Chip` itself, whose tone
+ * modifiers all set only `.gn-chip__dot`'s background — and `--gn-text-muted`
+ * for the reason and the claim. Those are precisely the two roles the two
+ * assertions below already cover, in all six style×theme combinations. A third block asserting the same two pairs against the same
  * wash would be a check that cannot fail for a reason of its own, which is the
  * shape case 11.213 was RETRACTED for (see its entry above).
  */
