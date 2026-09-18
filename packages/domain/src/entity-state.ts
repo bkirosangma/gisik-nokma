@@ -46,14 +46,19 @@ export type TicketState = {
    */
   closed?: { actorId: string; at: string } | null;
   /**
-   * The backlog rank key (spec §8.1): set by `ticket.ranked`, and ABSENT on a
-   * ticket nobody has ranked — including one just created, which does not write
-   * it (see `ticket-state.ts`'s creation branch for why the field starts
-   * absent rather than null). Meaningful only within the ticket's project.
+   * The backlog rank key (spec §8.1): set by `ticket.ranked`, and `null` on a
+   * ticket nobody has ranked — including one just created, which writes the
+   * null (Task 3, 2026-09-18; `ticket-state.ts`'s creation branch records the
+   * decision and the `toEqual`-across-the-rig measurement behind it). Meaningful
+   * only within the ticket's project.
+   *
    * OPTIONAL here, and only here, because the same hundreds of `TicketState`
-   * literals in tests that predate `closed` predate this too; every reader
-   * spells `state.rank ?? null`, so absent and null mean the same thing and no
-   * reader can tell them apart. The wire types carry it required.
+   * literals in tests that predate `closed` predate this too. That optionality
+   * is a statement about those LEGACY LITERALS, never about the producers: every
+   * producer sets the field — the reducer writes the null at creation, the
+   * server reads the column unconditionally, the replica reads the fold — and
+   * every reader spells `state.rank ?? null` for the literals' sake. The wire
+   * types (`TicketCard.rank`, `ListRow.rank`) carry it REQUIRED.
    */
   rank?: string | null;
 };

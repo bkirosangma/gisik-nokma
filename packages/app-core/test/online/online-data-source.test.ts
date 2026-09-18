@@ -128,6 +128,12 @@ function listCard(ticketId: string) {
     assignedProvenance: null,
     hasRestrictedParent: false,
     closed: null,
+    // REQUIRED on the wire (spec §8.1, second wave 2026-09-18). The same
+    // fixture churn `closed` caused here in the core plan's Task 4 fix round,
+    // and for the same reason: the server always sends the key, so a fixture
+    // that omits it is not a body the product can produce — and `mapRank`
+    // refusing it is the property case 13.703 pins.
+    rank: null,
   };
 }
 
@@ -171,6 +177,9 @@ const BOARD: BoardResponse = {
           },
           rollup: null,
           closed: null,
+          // `BoardResponse.columns[].cards` is the domain's `TicketCard[]`, so
+          // this fixture carries the same REQUIRED key the list fixture does.
+          rank: null,
         },
       ],
     },

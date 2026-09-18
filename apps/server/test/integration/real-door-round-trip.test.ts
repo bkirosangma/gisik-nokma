@@ -351,6 +351,10 @@ function expectedCard(over: {
     // None of this file's tickets are ever closed (Task 4, backlog/closed
     // spec §3.1/§3.3) — `TicketCard.closed` is required, never an absent key.
     closed: null,
+    // Same rule, same reason (spec §8.1, Task 3 of the second wave): nobody in
+    // this file has ranked anything, and `TicketCard.rank` is required, so the
+    // wire says `null` rather than dropping the key.
+    rank: null,
   };
 }
 
@@ -767,6 +771,7 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — the single read'
         // backlog/closed spec §3.1) — this ticket was never closed, so `null`
         // rather than an absent key.
         closed: null,
+        rank: null,
       },
       title: 'Count the crates',
       stateProvenance: {

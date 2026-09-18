@@ -1031,3 +1031,48 @@ describe('13.584 ticket.closed / ticket.reopened fold through the shared reducer
     expect(board.groups.flatMap((group) => group.columns.map((c) => c.stateId))).not.toContain('backlog');
   });
 });
+
+/**
+ * 13.704 — the REPLICA's half of the rank wire. `ticket.ranked` folds through
+ * the same shared reducer every other ticket event does (13.696 pins the fold
+ * itself), so nothing here re-derives the key: what this case measures is that
+ * `getTickets` — the replica's list door, the one the Backlog tab reads — puts
+ * the folded value on the row, and puts `null` there for a ticket nobody has
+ * ranked rather than omitting the field. `ListRow.rank` is REQUIRED (spec §8.1)
+ * and `compareByRank` reads the two apart, so an omitted key and a `null` are
+ * not interchangeable at this seam even though they are at the `TicketState`
+ * one.
+ */
+describe('13.704 the replica list row carries the folded rank', () => {
+  it('an unranked row reads null; after ticket.ranked the SAME row reads the key', async () => {
+    const { ds, replica } = await fixture();
+    const bornId = newUlid();
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: bornId }, 'ticket.created', {
+        typeId: TYPE_TASK,
+        projectId: PROJECT,
+        parentId: null,
+        title: 'Order me',
+        start: 'backlog',
+      }),
+    );
+
+    const rowOf = async () => {
+      const rows = (await ds.query.getTickets(PROJECT, {}, 'flat')).rows;
+      return rows.find((r) => r.ticketId === bornId);
+    };
+    // Positive control: the row exists and is reachable, so the assertions
+    // below are about the field and not about a row that was never served.
+    expect(await rowOf()).toBeDefined();
+    expect((await rowOf())?.rank).toBeNull();
+
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: bornId }, 'ticket.ranked', { rank: 'i' }),
+    );
+
+    // `toBe('i')` and not `toBeTruthy`: the key is read off the FOLDED state,
+    // so a row builder that hardcoded `null` — or read `rank` off the wrong
+    // source — fails here rather than passing on "some string was present".
+    expect((await rowOf())?.rank).toBe('i');
+  });
+});

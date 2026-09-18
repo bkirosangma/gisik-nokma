@@ -1,3 +1,4 @@
+import { isRankKey } from '@gisik-nokma/domain';
 import type {
   FieldClaim,
   IngestResult,
@@ -1284,6 +1285,34 @@ function mapClosed(raw: unknown, path: string): { actorId: string; at: string } 
   };
 }
 
+/**
+ * The wire's `rank` → `string | null` (spec §8.1, second wave 2026-09-18).
+ * `null` survives as the truth — "nobody has ranked this ticket", which is a
+ * different claim from a key and is the whole reason `compareByRank` can order
+ * a project — and an ABSENT key is a different claim again, left to this
+ * function to refuse for `mapClosed`'s own reason: `rank` is REQUIRED on the
+ * wire (`TicketCard.rank`), the server reads the column unconditionally, so a
+ * body that omits the key is a mapper that stopped reading it — the shape case
+ * 13.603's second `it` exists to catch.
+ *
+ * **The predicate is `isRankKey`, not `RANK_KEY_REGEX`, and the plan's own
+ * Interfaces line names the regex.** That line is the looser one on purpose and
+ * the difference is load-bearing, in `rank.ts`'s words: the regex admits `'a0'`,
+ * and a key ending in `0` has NO key below it, so `rankBetween` cannot order it
+ * (measured non-terminating at i=20001). The DOMAIN door already uses
+ * `isRankKey` for exactly that reason (`ticketRankedPayload`), and a client-side
+ * predicate that were looser than the door's would admit into the Backlog tab's
+ * sort a key the domain refuses to place — a second copy of a rule is how two
+ * copies drift, so this borrows the rule instead of restating it.
+ */
+function mapRank(raw: unknown, path: string): string | null {
+  if (raw === null) return null;
+  if (!isRankKey(raw)) {
+    throw new MappingError(path, "a rank key over 0-9a-z not ending in '0', or null");
+  }
+  return raw;
+}
+
 function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, string>): ListRow {
   const record = asRecord(raw, path);
   return {
@@ -1335,6 +1364,10 @@ function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, stri
     // server asserting something only the client can know.
     pending: false,
     closed: mapClosed(record['closed'], `${path}.closed`),
+    // The Global Constraint's field for this task, carried end to end: the
+    // server assembler reads `proj_tickets.rank` (`read/ticket-cards.ts`), the
+    // card's `rank` rides the JSON, and this is the client half — case 13.703.
+    rank: mapRank(record['rank'], `${path}.rank`),
   };
 }
 
@@ -1506,6 +1539,14 @@ function mapTicketState(raw: unknown, path: string): TicketState {
     // right helper: it throws on an absent key rather than defaulting to
     // `null`, which is what would have hidden this exact defect a second time.
     closed: mapClosed(record['closed'], `${path}.closed`),
+    // The SAME lesson, applied before it can cost anything: `rank` reaches a
+    // client on this body too (`GET /v1/workspaces/:w/tickets/:id` →
+    // `mapTicketRead` → here), so enumerating it in `mapListRow` alone would
+    // reproduce 13.603 exactly — one route's consumers green against a fake,
+    // the other route's field dead. `TicketState.rank?` is optional on the
+    // DOMAIN type (legacy literals only); the wire always sends it, because
+    // `rowToTicketState` reads the column unconditionally.
+    rank: mapRank(record['rank'], `${path}.rank`),
   };
 }
 

@@ -91,6 +91,8 @@ type TicketRow = {
   transitions: TicketState['transitions'];
   closed_at: Date | null;
   closed_by: string | null;
+  /** `TicketState.rank`'s column (spec §8.1, 2026-09-18) — NULL for a ticket nobody has ranked. */
+  rank: string | null;
 };
 
 /**
@@ -152,6 +154,14 @@ export function rowToTicketState(row: TicketRow): TicketState {
       row.closed_at === null || row.closed_by === null
         ? null
         : { actorId: row.closed_by, at: row.closed_at.toISOString() },
+    // Read UNCONDITIONALLY, and the absent-versus-null distinction is the point
+    // rather than a detail: `rank` is one column with one meaning (`NULL` = never
+    // ranked), so there is no second field to disagree with and no fold to make.
+    // `rank: row.rank` therefore emits the key on EVERY row, which is what keeps
+    // this read model the same SHAPE as the reducer's output — the property the
+    // dual-client rig compares with `toEqual` — and what lets the client's
+    // `mapRank` refuse an absent key instead of defaulting it (case 13.703).
+    rank: row.rank,
   };
 }
 
@@ -200,8 +210,8 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
     `INSERT INTO proj_tickets
        (ticket_id, workspace_id, project_id, type_id, parent_id, workflow_id, workflow_version,
         state_id, state_category, assignee_id, collaborator_ids, fields, transitions,
-        closed_at, closed_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        closed_at, closed_by, rank)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
      ON CONFLICT (ticket_id) DO UPDATE SET
        project_id = EXCLUDED.project_id,
        type_id = EXCLUDED.type_id,
@@ -215,7 +225,8 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
        fields = EXCLUDED.fields,
        transitions = EXCLUDED.transitions,
        closed_at = EXCLUDED.closed_at,
-       closed_by = EXCLUDED.closed_by`,
+       closed_by = EXCLUDED.closed_by,
+       rank = EXCLUDED.rank`,
     [
       next.id,
       next.workspaceId,
@@ -237,6 +248,13 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
       // holding a stale close forever.
       next.closed?.at ?? null,
       next.closed?.actorId ?? null,
+      // One column, read straight off the state — and the `?? null` here is for
+      // the same reason as the readers': `TicketState.rank?` is optional on the
+      // TYPE, because hundreds of test literals predate the field. Every
+      // producer sets it (the reducer writes `rank: null` at creation), so this
+      // fallback is a reachability guard for hand-built states in tests, not a
+      // second meaning for the column.
+      next.rank ?? null,
     ],
   );
 }

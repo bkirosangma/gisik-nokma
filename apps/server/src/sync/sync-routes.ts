@@ -28,24 +28,32 @@ import { registerReconcileRoute } from './reconcile-route.js';
  * **This list plus `TICKET_EVENT_TYPES` must equal the registry's whole
  * `entityKind: 'ticket'` set**, or "snapshot + tail ≡ full replay" is false for
  * any ticket whose stream carries the missing type below its snapshot seq. The
- * registry binds FIFTEEN types to that kind (`vocabulary.ts`);
- * `TICKET_EVENT_TYPES` is twelve of them, and the three it omits —
+ * registry binds SIXTEEN types to that kind (`vocabulary.ts`);
+ * `TICKET_EVENT_TYPES` is thirteen of them, and the three it omits —
  * `visibility.set`, `claim.contested`, `claim.contested_resolved` — are exactly
  * the three below that are not also folded. `comment.added` and
  * `attachment.added` appear in both lists on purpose: they fold into state AND
  * are content a replica needs verbatim.
  *
+ * **FIFTEEN and twelve until Task 3 of the second wave (2026-09-18)**, and the
+ * arithmetic is restated here rather than left to be re-derived, because BOTH
+ * numbers moved together when Task 1 registered `ticket.ranked`: a reader who
+ * trusted the old pair would compute the wrong total for the list below and
+ * conclude a type was missing.
+ *
  * The closed flag's two events (backlog/closed spec §1.2, 2026-09-17) —
  * `ticket.closed` and `ticket.reopened` — are the other side of this same
- * arithmetic and are deliberately ABSENT from this list. They are unlike
+ * arithmetic and are deliberately ABSENT from this list, and `ticket.ranked`
+ * (spec §8.1) joins them on exactly the same two counts. They are unlike
  * `visibility.set` and the two contest types in the one way that matters
- * here: both fold into `TicketState.closed` (`ticket-state.ts`), so
- * `TICKET_EVENT_TYPES` already names them and a snapshot at or above either
- * one's seq already carries its effect. They are unlike `comment.added` and
- * `attachment.added` in the other way that matters: neither carries content
- * beyond the fold, so there is nothing verbatim for a replica to need on top
- * of what the fold already gave it. Named here on the general rule this
- * comment states, not the general rule everywhere else in the file.
+ * here: all three fold into `TicketState` (`ticket-state.ts` — `closed` for the
+ * pair, `rank` for the third), so `TICKET_EVENT_TYPES` already names them and a
+ * snapshot at or above any of their seqs already carries its effect. They are
+ * unlike `comment.added` and `attachment.added` in the other way that matters:
+ * none carries content beyond the fold, so there is nothing verbatim for a
+ * replica to need on top of what the fold already gave it. Named here on the
+ * general rule this comment states, not the general rule everywhere else in
+ * the file.
  *
  * `visibility.set` was the one that got missed, and the miss was silent and
  * ASYMMETRIC: filed above a ticket's snapshot seq it travelled, filed at or

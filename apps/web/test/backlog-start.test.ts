@@ -29,6 +29,7 @@ function row(overrides: Partial<ListRow> = {}): ListRow {
     hasRestrictedParent: false,
     pending: false,
     closed: null,
+    rank: null,
     ...overrides,
   };
 }

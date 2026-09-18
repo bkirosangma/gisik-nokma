@@ -20,6 +20,12 @@ const row: ListRow = {
   dueDate: { date: '2026-09-20', claim: provenance },
   fields: { title: claim('Ship the board'), amount: claim(4200), priority: claim('high') },
   rollup: null, hasRestrictedParent: false, pending: false, closed: null,
+  // REQUIRED on the row (spec §8.1, second wave 2026-09-18). `null` and not a
+  // key: this fixture is the "every axis populated" row, and rank is the one
+  // axis the list FILTER does not narrow on (nothing in `ListFilterSpec`
+  // mentions it — order is not a filter), so it carries the wire's own
+  // never-ranked default rather than a value no case here examines.
+  rank: null,
 };
 
 /** The same row, closed — for the `closed` axis pair below (backlog/closed spec §4, 2026-09-17). */

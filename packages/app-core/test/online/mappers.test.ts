@@ -72,6 +72,10 @@ function serverCard(overrides: Partial<TicketCard> = {}): TicketCard {
     },
     rollup: null,
     closed: null,
+    // REQUIRED on the wire (spec §8.1) and read unconditionally by
+    // `mapListRow`; `null` here is the wire's word for "never ranked", which is
+    // the default for every `3.4x` case in this file that is not about rank.
+    rank: null,
     ...overrides,
   };
 }
@@ -1405,6 +1409,82 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     expect(mapListPage(bodyOpen).rows[0]?.closed).toBeNull();
   });
 
+  /**
+   * **13.703 — the Global Constraint's case, and it is named for exactly that.**
+   *
+   * `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md`
+   * states the rule this case exists for: *"Every new wire field is carried end
+   * to end in ONE task — server assembler → JSON → `mappers.ts` — with a mapper
+   * test. The core plan's final review found the closed flag dead in production
+   * because every view test drove a fake data source; that must not recur."*
+   * `rank` is that field for Task 3, and this is the mapper half of it: the
+   * server side is `apps/server/test/projections/tickets-rank.test.ts` (13.702,
+   * the column and `rowToTicketState`) and the replica side is 13.704.
+   *
+   * **Both routes, because there are two.** `rank` reaches a client on the list
+   * body (`mapListPage` → `mapListRow`) AND on the single-ticket body
+   * (`mapTicketRead` → `mapTicketState`), and those two mappers enumerate their
+   * fields by hand — which is the mechanism by which 13.603's blocker happened:
+   * `mapTicketState` was missing `closed` for a whole task while every one of
+   * its own consumers' tests stayed green against a fake. A case that proved
+   * only `mapListRow` would leave the other half of the same wire unwatched.
+   */
+  it("13.703 mapListPage and mapTicketRead both carry the wire's rank onto the read model, present and null", () => {
+    const ranked = (): ListResponse => ({
+      projectId: 'p',
+      groupBy: 'flat',
+      groups: [{ key: 'all', label: 'All', cards: [serverListCard({ ticketId: 't-ranked', rank: 'i' })] }],
+      nextCursor: null,
+    });
+    expect(mapListPage(ranked()).rows[0]?.rank).toBe('i');
+
+    // `null` is the wire's own word for "never ranked" and it must survive as
+    // `null` rather than become `undefined`: `ListRow.rank` is REQUIRED, and
+    // the Backlog tab's order (`compareByRank`) separates "ranked" from
+    // "unranked" by exactly this distinction.
+    const unranked = (): ListResponse => ({
+      projectId: 'p',
+      groupBy: 'flat',
+      groups: [{ key: 'all', label: 'All', cards: [serverListCard({ ticketId: 't-unranked', rank: null })] }],
+      nextCursor: null,
+    });
+    expect(mapListPage(unranked()).rows[0]?.rank).toBeNull();
+
+    // The single-ticket route, through its own mapper pair. `ticketReadBody`'s
+    // `ticketState.rank` default is `null`, so the value assertion needs the
+    // override; the pair is asserted together so a `mapTicketState` that read
+    // the key but dropped it cannot pass on the "present and null" arm alone.
+    expect(
+      mapTicketRead(
+        ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' }, null, null, 'n'),
+      ).ticket.rank,
+    ).toBe('n');
+    expect(
+      mapTicketRead(ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' })).ticket.rank,
+    ).toBeNull();
+  });
+
+  it('13.703 refuses a wire rank that is not a rank key, rather than passing it through', () => {
+    // `mapRank` is not a `typeof raw === 'string'` check. A space is outside
+    // the alphabet, so `''`-or-anything would let a key reach `compareByRank`,
+    // whose `<` on strings still "works" — silently ordering the Backlog tab
+    // by a key the domain would have refused at the door. The mapper is the
+    // last place this can be caught, and it is caught by the SAME predicate the
+    // domain door uses (`isRankKey`) rather than a second copy of the rule.
+    const body: ListResponse = {
+      projectId: 'p',
+      groupBy: 'flat',
+      groups: [{ key: 'all', label: 'All', cards: [serverListCard({ ticketId: 't-bad', rank: 'a b' })] }],
+      nextCursor: null,
+    };
+    expect(() => mapListPage(body)).toThrow(MappingError);
+    // The error NAMES the field, which is what makes this assertion about
+    // `.rank` rather than about "something threw" — `mapListPage` has many
+    // reasons to throw and a bare `toThrow(MappingError)` would accept any of
+    // them.
+    expect(() => mapListPage(body)).toThrow(/\.rank/);
+  });
+
   it('flattens groups in order and loses no card', () => {
     const body: ListResponse = {
       projectId: 'p',
@@ -1625,6 +1705,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     parent: Record<string, unknown>,
     rollup: unknown = null,
     closed: unknown = null,
+    rank: unknown = null,
   ): Record<string, unknown> {
     return {
       // The `proj_visibility` row the route still serves. The client reads
@@ -1664,6 +1745,9 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
         // every pre-existing call site in this file, none of which is ABOUT
         // this flag, keeps exercising the "never closed" arm unchanged.
         closed,
+        // 13.703, on the same rule: `rank` is REQUIRED on the wire (spec §8.1)
+        // and this default is the same "never ranked" arm.
+        rank,
       },
       title: 'File the GST return',
       stateProvenance: {

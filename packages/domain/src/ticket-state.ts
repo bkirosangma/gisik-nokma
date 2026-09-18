@@ -149,21 +149,31 @@ export function applyTicketEvent(
       fields: { title: claim(p.title, env) },
       transitions: [],
       closed: null,
-      // `rank` is deliberately NOT written here, and that is a departure from
-      // Task 1's step text (spec §8.1, plan `2026-09-17-backlog-and-closed-second-wave.md`).
-      // The step says "creation sets `rank: null`", but `rowToTicketState`
-      // builds a TicketState from COLUMNS and there is no `rank` column yet —
-      // Task 3 creates it. Writing the field here makes the reducer's output
-      // and the server's read model disagree, and thirteen dual-client rig
-      // cases assert exactly `replica.fold ≡ server.read`; they go red. That is
-      // the right answer from them: an absent key and an explicit null are
-      // indistinguishable to every reader (`state.rank ?? null`, the contract
-      // `entity-state.ts` states) but NOT to `toEqual` across that boundary.
-      // The plan's own Task 7 shows the shape this field should have followed —
-      // `reopenedAt` sets creation's null AND adds `reopened_at` in the SAME
-      // task. Task 3 owns the column, `rowToTicketState` and the replica read;
-      // whoever lands it should decide whether creation writes the null then,
-      // when both sides can move together.
+      // `rank: null` — creation writes it, and this is the decision Task 1
+      // deliberately deferred (its note here said so, because
+      // `rowToTicketState` builds a `TicketState` from COLUMNS and there was no
+      // `rank` column yet). Task 3 adds the column
+      // (`migrations/1789200000000_proj-tickets-rank.sql`) and both sides move
+      // together, which is what makes the write safe now and made it a red rig
+      // before.
+      //
+      // The other option — leaving the key ABSENT until `ticket.ranked` — was
+      // measured, not merely weighed, and it is unavailable: the dual-client
+      // rig compares whole `TicketState`s with `toEqual`
+      // (`apps/server/test/dual-client/scenarios.test.ts:203`,
+      // `rig.test.ts:92`/`:315`), so a reducer that omits forces
+      // `rowToTicketState` to omit too; an omitting `rowToTicketState` then puts
+      // an ABSENT key on the ticket-detail wire for every unranked ticket, and
+      // `mapRank` would have to tolerate that — which is precisely the shape
+      // case 13.603's second `it` exists to forbid, and how the `closed` flag
+      // stayed dead in production for a whole task.
+      //
+      // Spec §8.1 states the same thing in the domain's own words ("`null` =
+      // never ranked"), and the plan's Global Constraints spell out the rule:
+      // `TicketState.rank?` is optional on the DOMAIN type only, because
+      // hundreds of test literals predate it, while "every producer sets them".
+      // This is that producer.
+      rank: null,
     };
   }
 
