@@ -41,11 +41,12 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~13:0x IST. **SECOND WAVE, TASK 6
-> # (`autoCloseAfterDays` end to end, plus the Workspace settings tab) IS COMMITTED, GATE-GREEN, AND
-> # UNDER INDEPENDENT REVIEW. ONE COMMIT `e76efb7c`; NO PR OPENED YET** — a reviewer was dispatched
-> # FIRST, because the controller made "reviewer recorded in the PR body before it opens" a standing
-> # requirement rather than a reminder. **This block is the position; everything below it is RECORD.**
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~13:1x IST. **SECOND WAVE, TASK 6
+> # (`autoCloseAfterDays` end to end, plus the Workspace settings tab) IS COMMITTED, REVIEWED, FIXED,
+> # AND GATE-GREEN. THREE COMMITS, TIP `fc43942c`; PR OPENED FROM IT** — the reviewer ran FIRST and is
+> # recorded in the PR body, because the controller made "reviewer recorded in the PR body before it
+> # opens" a standing requirement rather than a reminder. **This block is the position; everything
+> # below it is RECORD.**
 > # **The queue after this task is NOT empty** — Tasks 7, 8 (`reopenedAt` + the auto-close sweep) and
 > # 9/10 (bulk close) remain in `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md`,
 > # and they are **dispatched by the controller rather than started by reflex. HOLD for that dispatch.**
@@ -55,14 +56,14 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | | |
 > |---|---|
 > | branch | `exec/second-wave-t6-autoclose`, cut from `origin/main` = **`8aff8843`** (Task 5, PR #450, MERGED) |
-> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha printed here names an ANCESTOR. Currently **`e76efb7c`** (the task: 20 files changed, +1428/−26, one new migration and one new component). No rebase has happened; if the PR is rebased, every sha here is superseded and the pre-rebase one is ORPHANED — check with `git merge-base --is-ancestor`, never `git cat-file`, which resolves reflog-only commits and hands you pre-rebase content while looking like it worked |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha printed here names an ANCESTOR. Currently **`fc43942c`**, on top of **`7a191405`** (handoff) and **`e76efb7c`** (the task). **Measured, not recalled:** `git diff --shortstat 8aff8843 HEAD` = **23 files, +2031/−52**; the task commit alone is 22 files, +1575/−26, and the fix round 7 files, +458/−28. *(An earlier version of this row said "20 files changed, +1428/−26" for `e76efb7c`. That was an UNMEASURED number and it was wrong — the reviewer caught it. Count from the tree; a delta is a fact about a commit and nobody holds it in their head.)* No rebase has happened; if the PR is rebased, every sha here is superseded and the pre-rebase ones are ORPHANED — check with `git merge-base --is-ancestor`, never `git cat-file`, which resolves reflog-only commits and hands you pre-rebase content while looking like it worked |
 > | base | **`8aff8843`** = `origin/main`, carrying second-wave Tasks 1–5 (#441, #442, #444, #446, #450) and executor 2's Task 9 (#449) |
 > | PR base | **`main`** — `owner/workspace-edits` is retired and deleted |
-> | case ids | **`13.713`–`13.717`**, five ids, inside this executor's block `13.700`–`13.759`; **`13.718`–`13.759` remain unminted**; executor 2's `13.760`–`13.819` untouched. **Recounted by case MARKER at this tip**, using `scripts/check-case-ids.mjs`'s own `ID_LINE` regex over `packages/` + `apps/` + `test-cases/`: the block's high-water was `13.712` (Task 5's) and `13.713` returned **false**, with `13.711`/`13.712` present as the positive control. **A plain substring sweep reported `13.713` as PRESENT and had to be discounted** — the only hit was this catalogue's own prose *saying* `13.713`–`13.759` were free. The mentioned-versus-minted trap, sixth occurrence |
+> | case ids | **`13.713`–`13.721`**, NINE ids — five from the task and four from the fix round — inside this executor's block `13.700`–`13.759`; **`13.722`–`13.759` remain unminted**; executor 2's `13.760`–`13.819` untouched. **Recounted by case MARKER at this tip**, using `scripts/check-case-ids.mjs`'s own `ID_LINE` regex over `packages/` + `apps/` + `test-cases/`, before each mint: the block's high-water was `13.712` (Task 5's) and `13.713` returned **false**, with `13.711`/`13.712` present as the positive control; and `13.718`–`13.722` all returned **false** before the fix round minted four of them. **A plain substring sweep reported `13.713` as PRESENT and had to be discounted** — the only hit was this catalogue's own prose *saying* `13.713`–`13.759` were free. The mentioned-versus-minted trap, sixth occurrence. `check-case-ids` at the tip: **2283** unique ids, union == sum |
 > | migration | **`apps/server/migrations/1789400000000_workspace-settings-auto-close.sql`** — the FIRST migration of the second wave. `ADD COLUMN auto_close_after_days integer NULL` + COMMENT; **Down drops it**. **The hot dev stack migrates ONLY at container start**, so after this merges the server container must be restarted or every route touching the column 500s — the failure already seen once today with `proj_tickets.rank`. The controller said it will do that restart; this lane ran **no compose action at all** |
-> | six checks | **all EXIT 0 at `e76efb7c`**, run through `pnpm run check:*` so no filename is guessed: `tasks` · `env` · `runbook` · `help` · `citations` (**ratchet holds exactly**: file 13 = **589** cited / 0 uncited, up from Task 5's 584 by exactly this task's five ✅ cases) · `db-tz` **0 with `DATABASE_URL=postgres://gisik:gisik@localhost:54330/gisik_nokma`** (**exits 2 without it, by design** — and that pair is the control that the check reads the env at all). Also `node scripts/check-case-ids.mjs` **EXIT 0** — **2279** unique ids (was 2274; +5, exactly this task's), union == sum so no duplicates, self-test passed. **A false RED was caught here**: `pnpm run check:citations` first returned EXIT 1 with `ERR_PNPM_UNSUPPORTED_ENGINE … Got: v24.11.1` because that one invocation had dropped the Node-22 PATH — the failure was the ENVIRONMENT, not the ratchet. **A check result is not evidence unless it names its Node** |
-> | suites | **app-core 1535 · apps/web 474 · server 1541 (5 skipped), zero failures**, `--no-file-parallelism`, Node **v22.22.2**, re-run after the dist rebuild. Both figures a reader can audit RECONCILE exactly against Task 5's, which is what makes them a control that the new cases are COLLECTED rather than merely written: app-core **1528 + 7 = 1535** (4 mapper cases at 13.715 + 3 read-door cases at 13.717) and apps/web **470 + 4 = 474** (the four 13.716 tab cases). The domain suite is 30 files / all green; the server's 151 files include the projection, route and integration suites |
-> | gate | **`pnpm turbo run build test typecheck` — 33/33 tasks successful, EXIT 0.** The first two runs were RED and both were diagnosed rather than re-rolled: run 1 failed app-core's workflow-builder/ticket-types files and run 2 failed `server/seed/seed-dev` and `server/attention 7.114`. **The app-core and seed-dev failures pass standalone (71/71, 8/8) and the failing set MOVED between runs — contention, not the change.** The attention failure was REAL and MINE: a THIRD whole-object `toEqual` on the settings body sat at `attention.test.ts:672` in multiline form, which a single-line grep could not see. Fixed, and a **multiline-aware re-sweep** (python, over `packages/` + `apps/`, matching any `{...}` naming both knobs) confirmed it was the only one — the sweep was the defect, not the edits |
+> | six checks | **all EXIT 0 at `e76efb7c`**, run through `pnpm run check:*` so no filename is guessed: `tasks` · `env` · `runbook` · `help` · `citations` (**ratchet holds exactly**: file 13 = **593** cited / 0 uncited, up from Task 5's 584 by exactly this task's nine ✅ cases — 589 at `e76efb7c`, +4 in the fix round) · `db-tz` **0 with `DATABASE_URL=postgres://gisik:gisik@localhost:54330/gisik_nokma`** (**exits 2 without it, by design** — and that pair is the control that the check reads the env at all). Also `node scripts/check-case-ids.mjs` **EXIT 0** — **2279** unique ids (was 2274; +5, exactly this task's), union == sum so no duplicates, self-test passed. **A false RED was caught here**: `pnpm run check:citations` first returned EXIT 1 with `ERR_PNPM_UNSUPPORTED_ENGINE … Got: v24.11.1` because that one invocation had dropped the Node-22 PATH — the failure was the ENVIRONMENT, not the ratchet. **A check result is not evidence unless it names its Node** |
+> | suites | **app-core 1536 · apps/web 477 · server 1541 (5 skipped), zero failures**, `--no-file-parallelism`, Node **v22.22.2**, re-run after the dist rebuild. Both figures a reader can audit RECONCILE exactly against Task 5's, which is what makes them a control that the new cases are COLLECTED rather than merely written: app-core **1528 + 7 = 1535** then **+1 fix round = 1536** (4 mapper cases at 13.715 + 3 read-door cases at 13.717 + the guard case at 13.721) and apps/web **470 + 4 = 474** then **+3 fix round = 477** (the four 13.716 tab cases + 13.718/13.719/13.720). The domain suite is 30 files / all green; the server's 151 files include the projection, route and integration suites |
+> | gate | **`pnpm turbo run build test typecheck` — 33/33 tasks successful, EXIT 0**, at BOTH `e76efb7c` and the fixed tip `fc43942c`. **FIVE runs across the task have been RED and every one was diagnosed rather than re-rolled.** Four were contention, proved the same way each time — the failing file passes STANDALONE and the failing SET MOVES between runs: gate1 (app-core workflow-builder/ticket-types), gate2 (`server/seed/seed-dev`), gate-fix1 (`web/filters-sheet 13.445`, a focus-timing case). **One was REAL and MINE**: `server/attention 7.114`, where a THIRD whole-object `toEqual` on the settings body sat at `attention.test.ts:672` in multiline form, invisible to a single-line grep. Fixed, and a **multiline-aware re-sweep** (python, over `packages/` + `apps/`, matching any `{...}` naming both knobs) confirmed it was the only one — the sweep was the defect, not the edits. **This machine's gate is genuinely flaky under parallel load; say which run was green and re-run before believing a red** |
 > | typechecks | **domain, app-core, web and everything the gate covers all EXIT 0**, run after rebuilding `packages/domain` and `packages/app-core` dist, which `apps/web` resolves through by package name |
 > | tree | clean at `e76efb7c`; **no `dist`, no `task-ledger.tsv`, no `.superpowers/`** in the diff (checked by `git diff --name-only origin/main...HEAD`) |
 > | dev stack | **no compose action was run at any point.** `curl -s localhost:3000/v1/auth/methods` still answers `{"google":true,"apple":false,"phone":false}` — the sign-in the 2026-09-09 env rule protects is intact |
@@ -84,6 +85,51 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > file stay green.** An earlier, cruder mutant (CASE removed but `$7` still bound) reddened 9 cases
 > with `could not determine data type of parameter $7`: a plumbing error, not the semantics, so it was
 > **discarded rather than reported as a kill**.
+>
+> ## ▣ THE REVIEW — one independent pass, dispatched BEFORE the PR opened. NOT CLEAN, AND THE
+> ## IMPORTANT FINDING WAS REAL.
+>
+> One reviewer, mutation-attacking every new test. **The headline was reproduced independently on both
+> sides and is the strongest evidence in this task:** the reviewer's self-consistent `COALESCE` mutant
+> (placeholders renumbered, presence boolean dropped, `grep -c '^ *error:'` = 0) reddens **exactly one
+> case — 13.714's clear-to-null, `expected 30 to be null`** — with the file's other 11 green. The
+> reviewer also ran the COMPLEMENTARY direction (dropping the `ELSE <existing>` so an absent key
+> RESETS the column) and got a different single red, `13.714 is partial in BOTH directions`. Both
+> directions are pinned by their own case.
+>
+> **Findings, all closed:**
+>
+> - **F1 — Important — REAL, not a false comment: the form did not show the server's values.**
+>   `onSaved`'s `settings.reload` gave the page new data, but the draft and `Off` box are `useState`
+>   INITIALISERS, so the form kept rendering the SUBMITTED values and the page's promise that a
+>   clamped claim "becomes visible on this screen" was false. **Reproduced here before fixing** (case
+>   13.718 failed showing the submitted `14` against a server answer of `30`), fixed by
+>   `adoptOnNextLoad`, which adopts only across a save THIS form made — not on every stream-driven
+>   reload, which would clobber a draft mid-typing.
+> - **F2 / M9 — the `Off`-comparison was pinned by NOTHING.** Making the `Off` branch claim `null`
+>   unconditionally left all 11 cases green, and the reviewer proved the mutant LIVE rather than
+>   assuming it harmless. Every fixture started at `autoCloseAfterDays: 30` with the box unchecked, so
+>   the already-off state — the default for most workspaces — was never exercised. **Now dies on
+>   13.719, and nothing else.**
+> - **F3 / M12 — the `invalid` gate was pinned by NOTHING**, surviving removal from both the `save()`
+>   guard and the button. **Now dies on 13.720.** The same finding measured that the gate's promised
+>   signal does not exist — the user sees a greyed-out button and no message — so that docblock was
+>   REWRITTEN and the better signal recorded as a follow-on.
+> - **F4 / M7 — the read door's non-object guard was pinned by NOTHING** (returning the domain
+>   defaults left all 29 cases green). **Now dies on 13.721.** Reachability is stated as a GUARD, not a
+>   witnessed behaviour: neither party found a production path to it.
+> - **F5 — my own handoff carried an UNMEASURED statistic** ("20 files, +1428/−26" for `e76efb7c`; the
+>   real figure is 22 files, +1575/−26). Corrected in place, with the correction named rather than
+>   silently overwritten.
+>
+> **Two method notes worth carrying.** The reviewer's first mutant of the headline case silently
+> measured a BIND-COUNT error instead of the CASE (`\Q...\E` does not stop `$1`/`$7` interpolating in
+> a perl replacement), and the tell was an anomalously BROAD red set — `reset empties the table`
+> failing under a column-scoped mutation. **Treat "many unrelated tests red" as a plumbing smell
+> before it is a finding.** And my own first versions of 13.718/13.720 referenced a `const` scoped
+> inside an EARLIER describe callback; they failed with `Unable to find a label`, a ReferenceError
+> surfacing as a missing form — cases failing for a reason unrelated to what they named, caught before
+> anything was concluded from them.
 >
 > ## ▣ THE RECORDED DEVIATION — read this before touching the settings read
 >
