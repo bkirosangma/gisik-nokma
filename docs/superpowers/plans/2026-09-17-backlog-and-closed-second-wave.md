@@ -35,7 +35,16 @@
 |---|---|---|
 | `packages/domain` | `src/rank.ts` (`rankBetween`, `isRankKey`, `compareByRank`), `src/system-actors.ts` | `src/entity-state.ts` (`rank?`, `reopenedAt?`), `src/events/ticket-events.ts` (`ticketRankedPayload`), `src/ticket-state.ts` (reducer cases; `TICKET_EVENT_TYPES`), `src/events/workspace-settings.ts` (`autoCloseAfterDays`), `src/read-models.ts` (`TicketCard.rank`), `src/index.ts` |
 | `packages/rule-engine` | `src/checks/rank.ts` | `src/refusal-rules.ts` (`rankRequiresBacklog`), `src/evaluate.ts` |
-| `apps/server` | `migrations/1789200000000_proj-tickets-rank.sql`, `migrations/1789300000000_proj-tickets-reopened-at.sql`, `migrations/1789400000000_workspace-settings-auto-close.sql`, `src/auto-close/sweep.ts` | `src/projections/tickets.ts`, `src/read/ticket-cards.ts`, `src/projections/workspace-settings.ts`, `src/ops/backup-daemon-main.ts` |
+> **CORRECTED 2026-09-18, after Task 7 merged.** This table originally numbered Task 7's migration
+> `1789300000000` and Task 6's `1789400000000` — an ordering that contradicts the plan's own task order,
+> since Task 6 executes first. `node-pg-migrate`'s `checkOrder` refuses a migration whose prefix is lower
+> than one already applied, so on the owner's dev stack Task 7's column could never be added:
+> *"Not run migration 1789300000000_proj-tickets-reopened-at is preceding already run migration
+> 1789400000000_workspace-settings-auto-close."* A fresh database was unaffected — it applies both in
+> ascending order — which is why the forced gate, migrating fresh test databases, stayed green while the
+> live stack broke. Renamed above `1789400000000`; both references above are updated to the delivered name.
+
+| `apps/server` | `migrations/1789200000000_proj-tickets-rank.sql`, `migrations/1789500000000_proj-tickets-reopened-at.sql`, `migrations/1789400000000_workspace-settings-auto-close.sql`, `src/auto-close/sweep.ts` | `src/projections/tickets.ts`, `src/read/ticket-cards.ts`, `src/projections/workspace-settings.ts`, `src/ops/backup-daemon-main.ts` |
 | `packages/app-core` | `src/views/bulk-close-dialog.tsx`, `src/views/backlog-rank.ts` (pure order helpers) | `src/view-types.ts` (`ListRow.rank`, `WorkspaceSettings`), `src/online/mappers.ts`, `src/replica/replica-data-source.ts`, `src/precheck.ts` (`precheckTicketRanked`), `src/provenance.ts` (`actorLabel` knows system actors), `src/views/ticket-list.tsx` (`rowDrag`, `selection`), `src/views/board.tsx` (`Close all (N)`), `src/index.ts` |
 | `packages/ui` | — | `src/components/table.tsx` (`rowProps`), `src/components/dialog.tsx` (R4), `src/ui.css` |
 | `apps/web` | `src/backlog-rank-controls.tsx`, `src/workspace-settings-form.tsx` | `app/w/[workspaceId]/p/[projectId]/page.tsx` (Backlog sort + rank controls; List selection + bulk close), `app/settings/page.tsx` (Workspace tab) |
@@ -342,7 +351,7 @@ describe('13.616 ticket.ranked is accepted only for a backlog ticket', () => {
 ### Task 7: `reopenedAt`, the reserved auto-close actor, and its name
 
 **Files:**
-- Create: `packages/domain/src/system-actors.ts`, `apps/server/migrations/1789300000000_proj-tickets-reopened-at.sql`
+- Create: `packages/domain/src/system-actors.ts`, `apps/server/migrations/1789500000000_proj-tickets-reopened-at.sql`
 - Modify: `packages/domain/src/entity-state.ts` (`reopenedAt?: string | null`), `packages/domain/src/ticket-state.ts` (`ticket.reopened` sets `reopenedAt: env.serverTime`; `ticket.transitioned` sets `reopenedAt: null`; `ticket.created` sets `null`), `apps/server/src/projections/tickets.ts` (`reopened_at`, `$17`), `apps/server/src/read/ticket-cards.ts` (`t.reopened_at` in `PROJ_TICKET_COLUMNS`; `rowToTicketState` carries it — the assembler's `TicketCard` does NOT: it is a sweep input, not a card field), `packages/app-core/src/online/mappers.ts` (`mapTicketState` reads `reopenedAt ?? null`), `packages/app-core/src/replica/replica-data-source.ts` (the folded state already carries it via the shared reducer — confirm, no change expected), `packages/app-core/src/provenance.ts:9-12` (`actorLabel` consults `SYSTEM_ACTOR_NAMES` before the roster), `packages/domain/src/index.ts`
 - Test: `packages/domain/test/ticket-state.test.ts`, `apps/server/test/projections/tickets-closed.test.ts` (sibling describe), `packages/app-core/test/online/mappers.test.ts`, `packages/app-core/test/provenance.test.ts` (grep `actorLabel`), `packages/app-core/test/views/ticket-sheet.test.tsx` (13.585's neighbour)
 
