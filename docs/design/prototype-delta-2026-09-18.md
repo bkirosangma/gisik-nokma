@@ -1,5 +1,37 @@
 # Prototype delta — the 2026-09-18 export against the product
 
+> ## ⛔ EVERY GAP BELOW IS A READING TAKEN AT ~04:43–04:53 IST, AND AT LEAST TWO HAD CLOSED BY 10:43 THE SAME MORNING
+>
+> **This document is a measurement, not a plan. Re-measure a row before you act on it.**
+>
+> This is not a caution in the abstract. **Two controller dispatches were written from rows below and both
+> were void**, because the row still read as OPEN while the work had already shipped:
+>
+> | row | this document says | the PR that closed it, hours after the reading | what it cost |
+> |---|---|---|---|
+> | `isBuilder` — the unstyled class families | *"NO CSS AT ALL"* (`:666`) | **`#445` `d069fd94`, landed 10:29:53** — styles all four families | a whole dispatch; caught by the lane's own step 1, which ordered a re-derivation before any rule |
+> | `isTypeEditor` — the field `required` toggle (`:638-649`) | the schema has no `required` | **`#447` `caf1edec`, landed 10:43** — carries it end to end | a whole dispatch; caught by the lane measuring before it built |
+>
+> **Both are `merge-base --is-ancestor <sha> origin/main` = true.** The rows were **correct about the tree
+> they measured**; they simply stopped being true. *A count is a reading, and a reading expires* — and a
+> GAP is a reading of the same kind.
+>
+> **What to do instead of trusting a row.** Every claim here is checkable with one command against today's
+> tree, and the disciplines are already written into the rows themselves:
+> - **Re-derive it, with a control that can return the OTHER answer.** A sweep that finds zero rules proves
+>   nothing unless the same command shape finds a known-styled family. **The builder-families row lacked
+>   that negative control** — it had two positive controls and no proof the instrument could report a
+>   genuine zero for the right reason.
+> - **Check whether a later PR already closed it** — `git log --oneline --since=<the reading's date> -- <the
+>   path the row names>`.
+> - **A path that does not resolve is a signal, not a typo.** If a row's citation names a file that is not
+>   in the tree, the row is older than the tree it is being read against.
+>
+> **Two of the seven `owner-holds.md` §1 wire-gap screens are in this cluster** (`isTypes`,
+> `isWorkflows`) and **are HELD** — see that register before acting on any row for them. Nothing in this
+> document lifts a hold.
+
+
 **What this is.** The owner's 2026-09-18 prototype export was unpacked over the committed prototype in
 PR #419. That refresh changed the *design target* for every screen the product has, so this document
 answers, screen by screen: which product screen corresponds to which prototype block, what the refresh
