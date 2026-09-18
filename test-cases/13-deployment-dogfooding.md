@@ -10337,3 +10337,70 @@ guard makes REACHABLE) would be unwitnessed, and without 13.828 the owner-row na
 implementation detail with nothing pinning it — M3 above shows 13.824 does not cover it. Both are within
 `13.820`–`13.849`; neither takes an id from any other block; the count is stated so that a later reader
 comparing this section against the plan's Step 6 sees five and does not read the difference as drift.
+
+---
+
+# Second wave, Task 8 — the auto-close sweep and its daemon job
+
+Plan ids `13.635`–`13.639` were **taken** (recorded as taken in the dispatch), so this task's cases are
+**`13.727`–`13.731`**, recounted by case MARKER at the tip before the first mint: the block's high-water
+was `13.726` (Task 7), with `13.725`/`13.726` present as the positive control, and `13.727` returning
+**false**.
+
+**The case that decides the task is `AND t.reopened_at IS NULL`, and it is the assertion that proves
+Task 7's column earns its existence.** A ticket reopened yesterday and one nobody has touched for a month
+are identical on every column this sweep otherwise reads — both terminal, both `closed_at IS NULL`, both
+old — so without that clause the sweep re-closes a ticket an hour after a person deliberately reopened
+it, undoing an act they cannot make stick. **Mutation: drop the clause** → **13.727 reddens on its own
+report arithmetic (`candidates` 1→2, `closed` 1→2) and 13.729 reddens too**, and nothing else in the file
+moves. Both cases are about that clause, so the pair is a specific kill rather than a broad red.
+
+- ✅ **13.727 — the sweep closes only the ticket that is terminal, long-sitting and never reopened.** Two
+  cases in `apps/server/test/auto-close/sweep.test.ts`, each on its own database. Five tickets in one
+  workspace with `autoCloseAfterDays: 7`: A closes; B is inside the window; C is `active`, not terminal;
+  D is already closed; **E was reopened 30 days ago and untouched, and is skipped**. The report is
+  asserted whole (`{workspacesOn: 1, candidates: 1, closed: 1, refused: 0}`) and the close is proved in
+  the columns the product reads — `closed_at` set, exactly ONE `ticket.closed` in the ledger with
+  `actor_id = SYSTEM_ACTOR_AUTO_CLOSE` and `origin = 'server'`. The other four are each asserted
+  untouched FOR THEIR OWN REASON rather than by symmetry, and each against **the count the seeder left**
+  rather than zero: D and E already own one `ticket.closed` before the sweep runs, so a `toHaveLength(0)`
+  there failed for a reason unrelated to what it named — which is how the assertion was written on the
+  first pass and what caught it. The second case asserts the cutoff from BOTH sides: a ticket entered at
+  `2026-09-11T18:29:59.999Z` closes and one at exactly `2026-09-11T18:30:00.000Z` does not, which is the
+  half-open interval and, run under this file's non-India `TZ`, a red for any cutoff computed from the
+  machine's calendar rather than from IST.
+- ✅ **13.728 — a workspace without auto-close contributes nothing.** One case. An explicit
+  `autoCloseAfterDays: null` claim gives `workspacesOn: 0` with an old terminal ticket left open, and
+  **the control sits in the same test**: the SAME world then claims a 7-day window and the same sweep
+  answers `workspacesOn: 1` and closes it. Without that third arm a sweep that never counted any
+  workspace would pass this case perfectly.
+- ✅ **13.729 — a transition back into the terminal state re-arms the clock.** One case. A ticket
+  reopened and untouched is left alone (`candidates: 0` — the clause is in the SELECT, so the row is
+  never selected and there is no downstream "skip" to assert); it is then transitioned back into `done`
+  ten days before `now`, and the next sweep closes it. The fold's clearing of `reopened_at` is asserted
+  BEFORE the sweep, so a failure there names the reducer rather than the sweep.
+- ✅ **13.730 — the sweep closes THROUGH THE DOOR, proved by making the door say no.** One case, and the
+  plan offered two shapes: (a) construct a candidate the engine refuses, or (b) count ledger rows rather
+  than projection writes. **(a) was chosen and the reasoning is part of the case.** (b) is weaker than it
+  looks — a sweep that wrote `proj_tickets` directly AND appended a ledger row by hand would satisfy it,
+  and the whole question is whether an engine decision stands between the SELECT and the write. (a) is
+  decisive: a REFUSED close leaves the ticket open and the ledger empty, which no direct writer can
+  produce. **The race has to be injected, and saying why matters:** a statically-seeded candidate the
+  engine refuses is impossible, because the sweep's SELECT and `checkTicketClosed` read the SAME two
+  projection columns — so any ticket the SELECT returns is one the engine would accept. The window is
+  therefore temporal, and the only honest place to open it is the `ingest` dependency, which is exactly
+  the seam the real window sits on. The wrapper commits a real transition and then hands the batch to the
+  REAL service, so the refusal is the engine's own `close-requires-terminal`; the case then asserts
+  `refused: 1` AND `closed_at IS NULL` AND **zero** `ticket.closed` events — the second and third
+  together being what a direct writer cannot fake.
+- ✅ **13.731 — the auto-close job's interval is validated by `requirePositiveIntervalMs`, on the same
+  scheduler as the other four.** One case in `apps/server/test/ops/backup-daemon-main.test.ts`, which is
+  a **recorded placement deviation**: the plan named `test/auto-close/sweep.test.ts` as this task's test
+  file, but the mechanism is the DAEMON's env handling and the 40-line child-process harness that proves
+  it was built there by 13.203. Re-deriving it in the sweep file would be a second copy of a fixture with
+  its own failure modes. `AUTO_CLOSE_SWEEP_INTERVAL_MS=0` aborts the whole scheduler and the stderr names
+  the variable; 13.203 is its positive control, since it announces with only the OTHER sweep's interval
+  set — leaving this one on its `'3600000'` default — so the daemon really does arm all five jobs here.
+  **The describe heading in that file was corrected from "four jobs" to "five"**: the plan's Files block
+  calls `auto-close` "a fourth `ScheduledJob`", which was true when three existed, and the code is the
+  primary source.
