@@ -20,6 +20,28 @@ the one already taken rather than making a new one.
 
 ---
 
+## Ruled 2026-09-18 — every stop-and-ask in the first draft of this plan is now CLOSED
+
+The plan was written with three explicit stop-and-asks and one held screen. **The owner answered all of
+them**, approving the controller's recommendation in each case. **No task below now waits on a product
+decision** — each carries its ruling inline, and the ones that would have been guesses are now absences.
+
+| what was open | ruling | effect |
+|---|---|---|
+| `isWorkflows` status badge | **drop it** | no status field, no event; a named absence (Task 2) |
+| `isWorkflows` second action | **`View history` if the data is already readable, else no button** | `Duplicate` / `Discard draft` are **not** built (Task 3) |
+| `isTypes` `"Draft"` badge | **not a state this product has** | named absence; Task 8 shrinks to the count (Task 8) |
+| `isTypes` Edit button | **not built — row-as-door stands** | the absence is recorded, not left as an oversight (Task 7) |
+| `isSettingsShell` subtitle | **leave the deliberate freeze** | a freeze outranks a prototype delta (Task 9) |
+| `isBuilder` layout | **not ported** | its unstyled CSS families ship separately (last section) |
+
+**The discipline these follow, and it is the point:** a ruling that a thing is **absent** is recorded **in
+the file and in the catalogue**, never left as an empty slot. A reader comparing this product to the
+prototype will find the difference either way; what they must not find is a silence that reads as an
+oversight.
+
+---
+
 ## The cluster, measured
 
 | screen | prototype | verdict | the gap in one line |
@@ -76,17 +98,28 @@ not exist at all** — `workflow-list__*` has zero rules, established by a contr
 lies by omission. **Acceptance:** the card renders for everything derivable; the two absences are named in
 the file's docblock; the three arms (empty/loading/failure) still render.
 
-### Task 2 — `isWorkflows`: the status badge  *(wire gap 1)*
-`PublishedWorkflowDef` gains a status. The list serves only published defs, so `"Published"` is derivable
-today — **the task is to decide and implement what `"Superseded"` MEANS and where it is read from**, not to
-add a field that can hold one value. **Stop and ask if the answer needs a new event or projection**; a
-derived flag over existing version data may be enough, and that difference is a day of work.
+### Task 2 — `isWorkflows`: the status badge  *(wire gap 1)* — **RULED: DROP IT**
+**The owner ruled on 2026-09-18, approving the controller's recommendation: the badge is NOT built.**
+`PublishedWorkflowDef` gains no status field and no event is added. The list serves only published defs, so
+a field that can hold exactly one value would be a badge that lies by omission the moment a second state
+exists.
+**Deliverable:** nothing is rendered, and the absence is **named in the file's docblock** as a deliberate
+scope decision — not left as an empty slot for a later reader to fill in. `Features.md` and
+`test-cases/13` record it the same way.
+**Depends on:** nothing. Folds into Task 1's PR if that has not yet opened.
 
-### Task 3 — `isWorkflows`: the second action  *(wire gap 2)*
-The prototype draws **one** second button per card; the data block names three candidates
-(`"Duplicate"` / `"Discard draft"` / `"View history"`, `:3174-3188`). **Decide which one, per card state,
-and only then build the gateway method.** A button with no door behind it is the exact defect this repo
-keeps re-finding — **if the operation does not exist, the honest outcome is no button.**
+### Task 3 — `isWorkflows`: the second action  *(wire gap 2)* — **RULED: `View history` IF the data is already there; otherwise no button**
+**The owner ruled on 2026-09-18, approving the controller's recommendation.**
+Of the three candidates (`"Duplicate"` / `"Discard draft"` / `"View history"`, `:3174-3188`), only
+**`View history`** has a plausible door: version history is what `PublishedWorkflowDef.version` and
+`stateMapping` already imply.
+**The task is therefore a MEASUREMENT first:** establish whether the version chain is readable from an
+existing read. **If it is — build the button and its gateway method. If it is not — build no button**, and
+record the absence in the docblock beside Task 2's. `"Duplicate"` and `"Discard draft"` are **not** built
+under any reading: neither has a door, and a button with no door behind it is the exact defect this repo
+keeps re-finding.
+**Acceptance:** either a working `View history` with a case asserting the rendered history, or a named
+absence with the measurement that established it.
 
 ### Task 4 — `isTypeEditor`: field `required`, end to end  *(wire gap 6 — ALREADY RULED YES)*
 `customFieldDefSchema` (`packages/domain/src/ticket-types.ts:11-16`) gains `required`; it travels the wire
@@ -110,36 +143,47 @@ The gateway op and the server route. `rank` already exists on `TicketTypeDef` an
 `packages/app-core/src/workflow-builder/ticket-types/rank.ts` already computes hierarchy implications, so
 **this may be a route over existing data rather than a new concept** — measure before designing.
 
-### Task 7 — `isTypes`: the port
-The ↑/↓ buttons (disabled at the ends), the explicit **Edit** button, the zebra row surface, and three
-strings (`"New type"` vs `"New ticket type"`; the h2 at `1rem` vs `20px/25px`; the summary sentence).
-**Row-as-door is a pre-existing owner ruling** (`ui.css:1603-1611`) — adding an Edit button is not a licence
-to undo it; **stop and ask** if the two cannot coexist.
+### Task 7 — `isTypes`: the port — **RULED: no Edit button; row-as-door stands**
+The ↑/↓ buttons (disabled at the ends), the zebra row surface, and three strings (`"New type"` vs
+`"New ticket type"`; the h2 at `1rem` vs `20px/25px`; the summary sentence).
+**The owner ruled on 2026-09-18, approving the controller's recommendation: the explicit Edit button is NOT
+built.** Row-as-door is a pre-existing owner ruling (`ui.css:1603-1611`) and an Edit button beside it would
+be a second door to the same place. **Record the absence in the file's docblock and say why** — the
+prototype draws one, and a reader comparing the two will otherwise read its absence as an oversight.
 
-### Task 8 — `isTypes`: the `"N tickets"` count and the `"Draft"` badge  *(wire gaps 4 and 5)*
-`countTicketsOfType` does not exist, and `TicketTypeDef` has no draft flag. **Both need a product answer
-before they need code** — what does a draft TYPE mean in a product where a type is saved or not? **Stop and
-ask.** If the answer is "there is no such state", the badge is a named absence and this task shrinks to the
-count alone.
+### Task 8 — `isTypes`: the `"N tickets"` count — **RULED: no `"Draft"` badge**
+**The owner ruled on 2026-09-18, approving the controller's recommendation: a draft ticket type is not a
+state this product has**, so the badge is not built and `TicketTypeDef` gains no draft flag. Record it as a
+**named absence**.
+**The task therefore shrinks to the count alone:** `countTicketsOfType` does not exist and the only
+population call (`getTypeWorkflowPopulation`) is **pinned to one workflow**, which
+`ticket-type-list-screen.tsx:17-23` already records would be the wrong number here. Build the count op and
+the `"N tickets"` segment. **If the count turns out to need a new projection rather than a query, stop and
+ask** — that is a different size of task.
 
-### Task 9 — `isSettingsShell`: three token nits  *(verdict `none`)*
+### Task 9 — `isSettingsShell`: three token nits  *(verdict `none`)* — **RULED: the frozen subtitle STAYS**
 Sidebar `248px` vs `flex: 0 0 12rem` = 192px (`globals.css:1226`); active item `--accent`/`--onColor` at
-radius 10px vs `--gn-fill-tertiary`/`--gn-text-accent` (`:1241-1245`); subtitle `17px/22px` vs a size that
-is **deliberately frozen** (`:333`, with its own comment at `:286-294`). **The third is a standing freeze —
-read the comment and leave it unless you can show it is wrong.** Small enough to fold into any task above
-that already touches `globals.css`.
+radius 10px vs `--gn-fill-tertiary`/`--gn-text-accent` (`:1241-1245`).
+**The third nit — the subtitle at `17px/22px` vs the frozen `0.8rem` — is RULED: leave it.** The owner
+approved the controller's recommendation on 2026-09-18. `globals.css:333` is deliberately frozen with its
+own comment at `:286-294`, and a deliberate freeze outranks a prototype delta. **Do not touch it.** Small
+enough to fold into any task above that already touches `globals.css`.
 
 ---
 
 ## NOT in this plan
 
-**`isBuilder` is HELD and must not be ported as drawn.** The prototype's right column **invents controls the
-product puts on the node** (Category and Blocked live on `state-node.tsx:29-57`, not in the inspector) and
-it **omits the product's entire left column** — adopting it as drawn would **delete `SystemRulesPanel`**,
-the two unauthorable invariants. That mapping needs a ruling. **One piece is independently actionable and
-is a real defect:** `workflow-builder-screen*`, `state-inspector*` and `inspector-panel*` have **no CSS at
-all** — a controlled sweep returns 0 hits for each while sibling selectors **inside the same components**
-resolve. That is a bounded **M** restyle, ruling-independent, and can be dispatched on its own.
+**`isBuilder`'s LAYOUT is RULED — not ported.** The owner ruled on 2026-09-18, approving the controller's
+recommendation. The prototype's right column **invents controls the product puts on the node** (Category and
+Blocked live on `state-node.tsx:29-57`, not in the inspector) and it **omits the product's entire left
+column** — adopting it as drawn would **delete `SystemRulesPanel`**, the two unauthorable invariants. **The
+three-column layout, the node-hosted controls and every panel stay exactly as they are.**
+
+**But its unstyled class families ARE being fixed now, in their own task** — dispatched as
+`CTL-DISPATCH-2026-09-18-builder-unstyled-families.md`. `workflow-builder-screen*`, `state-inspector*` and
+`inspector-panel*` have **no CSS at all**, established by a controlled sweep (0 hits for each, while the
+same command shape finds `gn-legal__title`, `gn-workflow-canvas` and the siblings **inside the same
+components**). That is a bounded **M** restyle, ruling-independent, and it does not touch the layout.
 
 **The MCP-tokens tab is not missing.** The prototype's `settingsNav` has three entries; the product carries
 two because the owner moved MCP tokens to `/account` — a ruled relocation, not an omission.
