@@ -2823,7 +2823,7 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   non-coverage notes: it does not refuse a migration removed or renamed from the base set (a rename of a
   not-yet-applied migration is legitimate and indistinguishable from this side), and it cannot see a
   lower-numbered migration that reached the base ref before the branch existed. `scripts/check-migration-order.mjs`,
-  `package.json`, `.github/workflows/ci.yml`, cases 13.902–13.904
+  `package.json`, `.github/workflows/ci.yml`, cases 13.902–13.905
 
 ## 14. MCP server
 
