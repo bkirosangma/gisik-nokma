@@ -20,8 +20,238 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~04:1x IST. **STEP 2a IS DONE AND COMMITTED; ONE PR OPEN
-> # AGAINST `owner/workspace-edits`, AWAITING THE CONTROLLER'S MERGE. QUEUE EMPTY — HOLD.**
+> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~06:1x IST. **STEP 2c-2 (THE LEGAL PAIR AND THE 404) IS
+> # DONE, GATED, REVIEWED, AND ITS PR IS OPEN AGAINST `owner/workspace-edits`.** This block is the
+> # position; everything below it is RECORD.
+>
+> Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-step2c2-legal-notfound.md`. **The Step 2c-1 and
+> 2c-0 blocks further down are RECORDS of merged PRs (#426, #424), NOT the position.** Nothing in them
+> is outstanding; do not start work from them.
+>
+> **The frozen head is the commit that ADDS this block** — the handoff is committed BEFORE the freeze
+> line, not after it, which is the discipline the controller recorded after PR #426's head moved three
+> times. Nothing is pushed after it. The gate was re-run at this head and its result is in the PR body,
+> because a file cannot name the sha of the commit that contains it.
+>
+> **This block has been RE-COMMITTED once, and the reason matters.** It first landed as `251c0521` as
+> the freeze line; the independent review then ran against that head and found two false statements in
+> comments this step had written, and the fix round (`a5a58a4c`) moved the head. Rather than leave this
+> block claiming to be the freeze line while sitting two commits behind it — the exact shape of the
+> defect the controller recorded — the block is updated to describe the fix round and becomes the
+> freeze line again.
+>
+> | | |
+> |---|---|
+> | branch | `exec/step2c2-legal-notfound`, cut from `origin/owner/workspace-edits` at `ed225690` |
+> | **PR** | base **`owner/workspace-edits`** — verified via `gh pr view --json baseRefName`, not assumed |
+> | merge-base | `ed225690` (= `origin/owner/workspace-edits` when the branch was cut; it is PR #426's merge commit) |
+> | tree | clean |
+> | gate | `corepack pnpm turbo run build test typecheck --force --concurrency=2` → **33/33 successful, 0 cached, EXIT 0**, three times (at `a0f6d172`, at `251c0521`, and again at this block's own commit); `grep -c 'FAIL\|failed'` over each log = **0**; interpreter probed from inside the toolchain — **node v22.22.2**, **pnpm 9.15.0** (NOT the v24 corepack that a bare `pnpm` on PATH resolves to). Per package: domain 486 · ui 322 · rule-engine 306 · editor 178 · sync-client 90 · app-core 1454 · desktop 9 · mobile 29 · **web 438** · mcp-server 44 · server 1534 / 5 skipped |
+> | six checks | all **EXIT 0**: `env` · `tasks` · `runbook` · `citations` · `help` (via pnpm) and `case-ids` via **`node scripts/check-case-ids.mjs`**. `case-ids` reads **2204 unique ids**, +8 for this block (2196 before) |
+> | viewport suite | `pnpm run test:e2e:viewport`, its own `next dev` on **3021** → **28 passed, 2 skipped, 3 failed**. All three failures are `/help`'s **pre-existing** tap-target ratchet — identical in count, baseline and viewports to the base control the 2c-1 session ran. **No failure names `/privacy`, `/terms` or the 404 probe**: the accessible-names, tap-target and type-scale ratchets all pass on the routes this step touched |
+>
+> ## ▣ WHAT LANDED, AND THE FOUR THINGS IT DELIBERATELY DID NOT
+>
+> The export's `isLegal` (`:1720-1755`) and `isNotFound` (`:1844-1862`), three items each and no more:
+> a `.gn-nav` top bar with the brand tile, wordmark and a `Sign in` link; a segmented Privacy/Terms pair
+> on the shared `.gn-segmented` control; an anchor row built from each page's own headings; and, on the
+> 404, a 72px `aria-hidden` tile, a third action link to `/help`, and the export's heading scale in a
+> centred 520px column.
+>
+> 1. **`BackButton` is REPLACED, and the file is DELETED.** The export draws no back affordance in
+>    `:1720-1755`; that absence was the dispatch's own condition on the replacement. `back-button.tsx`
+>    had no consumer left, so it and its `.gn-legal__back` rule left together. **The loss is real and is
+>    written down in three places**: the no-history branch went to `/sign-in` and the bar's `Sign in`
+>    link goes to the same route, so a reader who landed with no history still has a destination — the
+>    one-press return for a reader who HAS history does not. Cases 13.322/13.323 SUPERSEDED.
+> 2. **The 404's copy is NOT ported.** "This page isn't here" / "Nothing was deleted" would answer the
+>    question that page exists to refuse. The export is thinner than this page, not ahead of it.
+> 3. **The export's compact anchor row is NOT ported either** — its links take the 44px tap floor
+>    instead, because a wrapped row of anchors is not a sentence and must not borrow the
+>    inline-in-prose exemption. Both routes hold a zero-offender tap baseline that this keeps.
+> 4. **The phone's title downscale is NOT touched.** The export's heading scale replaced the base
+>    rule's `1.6rem`; the product's own `(max-width: 40rem)` rule still drops the title to `1.35rem`.
+>    The export is a desktop mockup and says nothing about 390px.
+>
+> ## ▣ THE DEFECT THIS STEP FOUND IN ITSELF — the fixed line-height
+>
+> The export pairs `34px` with a FIXED `41px`. Ported literally, that meant the phone's 21.6px title
+> inherited 41px of leading — a ratio of 1.9 — on the two pages a locked-out reader is most likely to
+> open. **The viewport suite caught it on all three viewports and nothing else would have**: no unit
+> test measures a cascade. The media block now restates `line-height: 1.25`, which is exactly what the
+> phone had before the port, and case 13.688 asserts the pair so deleting it is a red (mutation run:
+> reddens 13.688 alone, 1 failed / 16 passed).
+>
+> ## ▣ THE MUTATION TABLE (12 mutations, each reddening its own case)
+>
+> 13.685 ← label rename · 13.684 ← both tabs current · 13.684 ← no tab current · 13.683 ← hand-typed
+> anchor row · 13.683+13.685 ← row removed · 13.687 ← third link removed · 13.686 ← tile removed ·
+> 13.689 ← copy replaced · 13.688 ← heading size reverted · 13.688 ← 520px column removed ·
+> 13.682 ← bar removed · 13.682+13.685 ← `Back` control re-added · 13.688 ← phone line-height removed.
+> **The harness reported a mutation CLEAN on its first run and was wrong** — the mutation broke the
+> JSX, vitest printed `Tests  no tests`, and a parser that only looks for `FAIL` lines cannot tell
+> "nothing failed" from "nothing ran". It now requires the run's own summary line before it reports.
+>
+> ## ▣ WITNESSED LIVE (the owner's proof)
+>
+> The hot web container mounts **this worktree** (`docker inspect` on the mounts, not assumed), so
+> `http://localhost:3001/privacy`, `/terms` and any unknown path serve these changes. Read back by curl
+> at the frozen head: on both legal routes `gn-legal__toc` 1 · `gn-nav__signin` 1 · `gn-legal__tabs` 1 ·
+> `On this page` 1; on the 404 `gn-notfound__tile` 1 · `Search the manual` 1; and
+> `Back to the previous page` 0 everywhere. Six screenshots, one per route per style, taken with
+> `localStorage['gn-style']` set BEFORE the pre-paint script so each shows the real path (every run
+> asserted `data-style` matched what was asked, or it exits 1):
+>
+> - `gisik-nokma-lanes/refs/2026-09-18-legal-{hig,minimal,neo}.png`
+> - `gisik-nokma-lanes/refs/2026-09-18-notfound-{hig,minimal,neo}.png`
+>
+> **Both were LOOKED AT, not merely produced.** The legal shots show the bar, the tabs with Privacy
+> raised, the 8-link row and the prose unchanged; the 404 shots show the tile, the larger heading and
+> all three links with "Search the manual" between workspaces and inbox.
+>
+> ## ▣ THE INDEPENDENT REVIEW — run at `251c0521`, and it found things
+>
+> One reviewer, two jobs only (the accessible names; the copy rule). **Both verdicts CONFIRMED**, and
+> it earned them: it measured the four accessible-name counts on the LIVE pages at 390/768/1512 with
+> the suite's own stub rather than reading the baseline, and it AST-diffed the prose of both revisions
+> including whitespace-bearing `{' '}` chunks — 65/65 chunks identical on each legal page, and on the
+> 404 the ONLY difference in the whole stream is the inserted `Search the manual`.
+>
+> **Its two Important/Minor comment findings were real, and both were my own false statements:**
+>
+> - `globals.css` defended the 44px anchor floor with "the export draws a compact 15px row". The
+>   export's toc item is `font-size:17px` (`:3978`); 15px is the META line (`:1740`). Fixed, and the
+>   reason beside it strengthened — the inline exemption could not have been borrowed anyway, because
+>   a flex item computes to `block` (blockification), so the row's `display: flex` would have to go
+>   first. **The reviewer's own citation for this was two lines off** (`:3976` is a JS data line): a
+>   finding is not adopted until its primary source is read.
+> - `not-found.tsx` said the export has no counterpart for the page's closing aside. The export DOES
+>   draw one (`:1859`). Fixed.
+>
+> **Two Minor findings are RECORDED, not fixed, with the reason:**
+>
+> - `accessible-names-baseline.json`'s `rawMatches` is stale for these routes (98/96/56 recorded,
+>   129/128/64 measured live). `rawMatches` is deliberately not ratcheted and the file's writer only
+>   ever adds ABSENT keys — existing keys are never rewritten, by design, so that a branch which
+>   lowered a count cannot re-baseline over it. Hand-editing it here would be that same act wearing a
+>   tidy-up's clothes. **Owner: whoever next changes these routes' element count for a reason other
+>   than a port.**
+> - The signed-in render of the legal bar GAINS `aria-label`/`role` counts (`AccountMenu` +
+>   `InboxNavLink`, absent at base), and **nothing measures it** — the viewport suite has no
+>   `storageState` and runs anonymous. A gain is not a regression, but the claim "nothing else gained
+>   or lost a name" is true only of the signed-out surface. Stated in the PR body; the new cases cover
+>   the signed-out render, which is the one the sweeps see.
+>
+> ## ▣ THE NEXT STEP IS NOT NAMED HERE
+>
+> `docs/design/prototype-delta-2026-09-18.md`'s queue is the authority, and guessing the next row is not
+> this file's job. 2c-2 consumed rows `isLegal` (2) and `isNotFound` (3). What the queue still owed at
+> this head was **not** recounted here — recount it from the audit at the tip rather than trusting this
+> sentence.
+
+> ---
+>
+> # ↓ THE STEP 2c-0 RECORD — **MERGED. NOT THE POSITION. DO NOT START WORK FROM IT.** (#424, `3b8b8e5e`)
+>
+> ## All 25 screens were decided. Final counts (26 rows = 25 blocks + the global TOKENS row)
+>
+> | verdict | n | screens |
+> |---|---|---|
+> | **port** | **3** | `isTypeEditor` (M, blocked on a ruling), `isLegal` (M), `isNotFound` (S) |
+> | **wire-gap** | **8** | **TOKENS (global)**, `isInbox`, `isTypes`, `isWorkflows`, `isMcpTokens`, `isInvite`, `isMcpAuth`, `isWorkspace` |
+> | **held** | **5** | `isMembers`, `isInviteAdmin` (owner hold), `isBuilder`, `isWorkspaces`, `isWork` |
+> | **none** | **9** | `isAccount`, `isHelp`, `isTimelineView`, `isMyWork`, `isSettingsShell`, `isMobileDevice`, `isSignIn`, `isBoardView`, `isCalendarView` |
+> | **done** | **1** | `isListView` (#419) |
+>
+> **Recommended order lives in the queue table's first column**, not in block order. Row 1 is the token
+> layer (not a screen); rows 2–5 are `isLegal`, `isNotFound`, `isWorkflows`, `isTypeEditor`.
+>
+> **Three class families have NO CSS**, each swept with a control: `gn-members*`, `workflow-list__*`, and
+> the `workflow-builder-screen*` / `state-inspector*` / `inspector-panel*` group. Two sit on held screens;
+> the third is a ruling-independent M restyle.
+>
+> ## Reviewer: DONE. It confirmed the central result and found three real defects, all fixed
+>
+> It re-derived every block from the raw blobs with its own tooling and reproduced the six-block result,
+> the 16 → 14 → six arithmetic, and the whole-file partition, with a mutation control proving its
+> normaliser was not blanket-collapsing. Verdict: **the central claim is safe to act on.** It then found:
+>
+> 1. **The doc's rewrite table stated a rule the export never emits** — `<input … />` → `<input … >`,
+>    keeping a space the new export does not emit (` />` appears **0** times in it, 18 in the old). The
+>    doc's *results* were right because its code used the correct rule; its *instructions* were wrong, and
+>    **a reader re-running them gets eleven blocks, not six.** Fixed, and the trap is now written down.
+> 2. **"The four largest" was not the four largest** (`isWork` 20 and `isSignIn` 6 outrank two of them).
+> 3. **Prototype-side bare `:NNN` citations had drifted ~45%** (16 of ~35 sampled, 1–10 lines). Every
+>    drifted citation's *claim* was true, so no verdict changed. All 16 corrected to verified lines.
+>
+> **The gap this exposed in the document's own checking, now stated in it:** the product-side resolver
+> covers 222 citations and all resolve, but it **never covered prototype-side citations**, and an attempt
+> to add one produced **240 false positives** (a bare `:NNN` is ambiguous between "the prototype" and "the
+> product file named earlier in the sentence"). The doc now says so and rules that **quoted fragments are
+> authoritative, line numbers a search starting point.** **Fixing the citation style is the first thing the
+> next pass on this document should do.**
+>
+> ## The second finding, and it reframes the queue
+>
+> **On at least two screens the export is catching up to the product, not ahead of it.** `/account` was
+> ported 2026-09-15 (`3bb823dc`) and `/help` 2026-09-15 (`7cce93e2`) — **three days before the export's
+> own date.** Their refreshed blocks match what the product already renders (verified: commit dates read
+> with `git log -1 --format=%cI` and ancestry with `--is-ancestor`). So **a "CHANGED" verdict in the delta
+> table is not by itself evidence of outstanding work** — it is evidence the two artefacts differ, and the
+> direction must be established per screen. The dispatch's premise ("every screen the product has is to be
+> brought to the refreshed prototype") holds for some screens and is inverted for others.
+>
+> ## And one portable-check finding worth keeping
+>
+> A citation resolver (`path:line` → open the file → fail on missing file, out-of-range line, or blank
+> line) runs over the deliverable: **104 citations, 104 resolve, 0 problems**. It caught
+> `packages/ui/src/style-toggle.tsx` as FILE NOT FOUND — the toggles live at `apps/web/src/` — and 40
+> short-form citations (`page.tsx:1202`) that are ambiguous in a repo with 24 `page.tsx` files. **Build
+> this for any doc of this size; a wrong path reads exactly like a right one.**
+>
+> ## What is established, and how — do not re-derive any of this
+>
+> **1. The refresh changed SIX blocks, and Part 0b flagged sixteen — fourteen of them were a fourth
+> mechanical rewrite Part 0b had not mapped.** That table (this file, `:216`, "Prototype delta
+> 2026-09-18") normalised the three rewrites it knew and closed with the caveat that a residual
+> "CHANGED" on a size-identical block *"could be a fourth mechanical rewrite I did not map rather than a
+> design change"*, calling itself *"a porting seed, not a changelog."* **The fourth rewrite is named
+> entities + the dropped self-closing slash.** Undo it too and 14 of the 16 collapse to identical. The
+> table named five of the remaining six (the `isSignIn` mark, the `isMembers` split, the new
+> `isInviteAdmin`, `isAccount` +22, `isHelp` +28); the one it missed is **`isWork`** — the exact case its
+> caveat anticipated. Method: extract each `sc-if` block whole from both exports (the two
+> files are blobs `6d7b67c0a52c…` new and `c9f852a2c243…` old), undo the four form rewrites — `sc-raw-*`
+> prefixes, `sc-camel-*` attributes, named entities, the dropped self-closing slash — **on both sides**,
+> then diff. Controls: the five blocks Part 0b calls unchanged diff empty; and under the *least* tolerant
+> normalisation the four largest "changed" blocks show 22 / 4 / 4 / 12 changed lines, **every one of them
+> an entity or a self-closing slash**. The six that moved: `isSignIn`, `isWork`, `isMembers`
+> (+ `isInviteAdmin`, new), `isAccount`, `isHelp`.
+>
+> **2. The largest change is in no block at all — the token layer moved.** Light accent
+> `#3A6DB0` → `#33629F`; all five light tints halved (`--tintDanger` 0.13 → 0.07, `--tintWarning`
+> 0.20 → 0.10, …); dark tints 0.14 → 0.10; `--tintAccent` became a `color-mix(...)` **derived** from
+> `--accent`; and the neo-light selector became `body[data-theme="light"][data-style="neo"]`, which
+> matches only if `data-theme="light"` is stamped explicitly. The export's own accent picker was
+> rewritten into a WCAG solver that uses those 0.07/0.10 alphas as inputs, so this is one scheme, not
+> three coincidences. **The product still holds the old values** — `packages/ui/src/tokens.ts:95`
+> (`blue600: '#3a6db0'`), `:151` (`neoPaper: '#ede4db'`), pinned by a test at
+> `apps/web/e2e-viewport/responsive.spec.ts:1939`. It touches every screen, which is exactly why a
+> per-screen audit cannot see it, and its port target is a derivation engine, not a stylesheet.
+>
+> ## Two things learned the hard way this session, both machine-local
+>
+> - **`grep -n` output on this machine is stripped of leading whitespace.** The 25 screen blocks are at
+>   **indent 2**, not column 0 — the proxy made them *look* top-level and a column-0 extractor silently
+>   returned zero blocks. An empty result that is well-formed is the failure mode; the fix is to read the
+>   bytes (`python3`), never the grepped line.
+> - **`git log` is rewritten here and omits merge commits.** `git log -1 3831bb49` printed `76432f4a`.
+>   Use `git rev-parse` / `--is-ancestor` for refs. Under this trap I briefly believed #421 had dropped
+>   its handoff commit; the merge's parents are `63ffe930` + `76432f4a`, so **it landed** — the
+>   hypothesis was mine and was wrong.
+
+
+> # ▢ SUPERSEDED POSITION — THURSDAY 2026-09-18 ~04:1x IST. **STEP 2a WAS DONE AND COMMITTED; ONE PR OPENED
+> # AGAINST `owner/workspace-edits`, AND THE CONTROLLER MERGED IT AS `3831bb49` — THE MERGE'S PARENTS ARE `63ffe930` + `76432f4a`, SO THE HANDOFF COMMIT IS IN IT.**
 >
 > Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-step2a-catalogue-green.md`. All four Parts are
 > in one commit. **Nothing is in flight; the next task is the controller's to name.**

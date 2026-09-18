@@ -23,29 +23,37 @@
  * to be minimised.
  */
 import Link from 'next/link';
-import { BackButton } from '../../src/back-button.js';
+import { LegalTabs, LegalToc, sectionId, type LegalSection } from '../../src/legal-chrome.js';
+import { LegalNav } from '../../src/legal-nav.js';
 
-export default function Terms() {
-  return (
-    <main className="gn-shell gn-legal">
-      <BackButton />
-      <h1 className="gn-legal__title">Terms &amp; Conditions</h1>
-      <p className="gn-legal__meta">
-        Last updated <strong>[DATE]</strong> · An agreement between you and{' '}
-        <strong>[ENTITY NAME]</strong> · Governed by the laws of <strong>[JURISDICTION]</strong>
-      </p>
-
-      <section className="gn-legal__section">
-        <h2>Agreeing to these terms</h2>
+/**
+ * The page's sections, declared ONCE — the same shape as `privacy/page.tsx`,
+ * and for the same reason: the `<h2>`s and the anchor row both render from this
+ * array, so the row cannot describe a page other than the one beneath it. See
+ * `legal-chrome.tsx`.
+ *
+ * **The prose in `body` is unchanged from the pre-port file, text for text.**
+ * Re-indented by this refactor and nothing else; case 13.251's placeholder
+ * counts and 13.253's four "does not promise" statements are the machine-checked
+ * half of that claim.
+ */
+const SECTIONS: readonly LegalSection[] = [
+  {
+    title: 'Agreeing to these terms',
+    body: (
+      <>
         <p>
           By using Gisik Nokma you agree to these terms. If you are using it on behalf of a
           business, you confirm you may agree on its behalf. If you do not agree, do not use the
           product.
         </p>
-      </section>
-
-      <section className="gn-legal__section">
-        <h2>Your account</h2>
+      </>
+    ),
+  },
+  {
+    title: 'Your account',
+    body: (
+      <>
         <p>
           You are responsible for what happens under your account. The product has no passwords —
           access comes from your email, your Google account or a passkey on your device — so
@@ -55,19 +63,25 @@ export default function Terms() {
         <p>
           You must be at least <strong>[MINIMUM AGE]</strong> to use Gisik Nokma.
         </p>
-      </section>
-
-      <section className="gn-legal__section">
-        <h2>Your content is yours</h2>
+      </>
+    ),
+  },
+  {
+    title: 'Your content is yours',
+    body: (
+      <>
         <p>
           The work you record stays yours. You grant <strong>[ENTITY NAME]</strong> only the
           permission needed to store it, show it to the colleagues you have shared it with, and back
           it up. We claim no ownership and we will not use your content to train anything.
         </p>
-      </section>
-
-      <section className="gn-legal__section">
-        <h2>What you must not do</h2>
+      </>
+    ),
+  },
+  {
+    title: 'What you must not do',
+    body: (
+      <>
         <ul>
           <li>Break the law with it, or use it to harm or harass anyone.</li>
           <li>Try to reach data belonging to workspaces you have not been invited to.</li>
@@ -77,10 +91,13 @@ export default function Terms() {
           </li>
           <li>Upload malware, or content you have no right to upload.</li>
         </ul>
-      </section>
-
-      <section className="gn-legal__section">
-        <h2>What this product does not promise</h2>
+      </>
+    ),
+  },
+  {
+    title: 'What this product does not promise',
+    body: (
+      <>
         <p>
           These are true of the current build, and they are stated here rather than left for you to
           discover:
@@ -105,19 +122,25 @@ export default function Terms() {
             anything.
           </li>
         </ul>
-      </section>
-
-      <section className="gn-legal__section">
-        <h2>Availability</h2>
+      </>
+    ),
+  },
+  {
+    title: 'Availability',
+    body: (
+      <>
         <p>
           We aim to keep Gisik Nokma running but do not guarantee it will be uninterrupted or
           error-free, and we may change or withdraw features. Where a change removes something you
           rely on, we will give notice in the product where we reasonably can.
         </p>
-      </section>
-
-      <section className="gn-legal__section">
-        <h2>Liability</h2>
+      </>
+    ),
+  },
+  {
+    title: 'Liability',
+    body: (
+      <>
         <p>
           To the extent the law allows, <strong>[ENTITY NAME]</strong> is not liable for indirect or
           consequential loss, or for lost profits or lost data, arising from your use of Gisik
@@ -125,10 +148,13 @@ export default function Terms() {
           or personal injury caused by negligence, or for fraud.{' '}
           <strong>[LIABILITY CAP]</strong>
         </p>
-      </section>
-
-      <section className="gn-legal__section">
-        <h2>Ending it</h2>
+      </>
+    ),
+  },
+  {
+    title: 'Ending it',
+    body: (
+      <>
         <p>
           You may stop using Gisik Nokma at any time. We may suspend or end access if these terms
           are broken, and we will tell you why unless the law prevents us. What happens to your
@@ -136,19 +162,48 @@ export default function Terms() {
           <Link href="/privacy">Privacy Policy</Link>, including the honest complication about an
           append-only history.
         </p>
-      </section>
-
-      <section className="gn-legal__section">
-        <h2>Disputes</h2>
+      </>
+    ),
+  },
+  {
+    title: 'Disputes',
+    body: (
+      <>
         <p>
           These terms are governed by the laws of <strong>[JURISDICTION]</strong>, and disputes go
           to the courts of <strong>[COURTS/VENUE]</strong>.
         </p>
-      </section>
+      </>
+    ),
+  },
+];
 
-      <p className="gn-legal__footer">
-        See also the <Link href="/privacy">Privacy Policy</Link>.
-      </p>
+export default function Terms() {
+  return (
+    <main className="gn-shell gn-legal">
+      <LegalNav />
+      <div className="gn-legal__column">
+        <div className="gn-legal__head">
+          <h1 className="gn-legal__title">Terms &amp; Conditions</h1>
+          <LegalTabs active="terms" />
+        </div>
+        <p className="gn-legal__meta">
+          Last updated <strong>[DATE]</strong> · An agreement between you and{' '}
+          <strong>[ENTITY NAME]</strong> · Governed by the laws of <strong>[JURISDICTION]</strong>
+        </p>
+        <LegalToc sections={SECTIONS} />
+
+        {SECTIONS.map((section) => (
+          <section key={section.title} className="gn-legal__section">
+            <h2 id={sectionId(section.title)}>{section.title}</h2>
+            {section.body}
+          </section>
+        ))}
+
+        <p className="gn-legal__footer">
+          See also the <Link href="/privacy">Privacy Policy</Link>.
+        </p>
+      </div>
     </main>
   );
 }

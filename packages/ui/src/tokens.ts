@@ -91,8 +91,21 @@ export const primitives = {
    * re-verified at their own (3:1, non-text) minimum against the new hue in
    * `packages/ui/test/tokens.test.ts` — both clear it with margin (light
    * 3.75–4.93, dark 4.11–7.15 across every surface any style ships).
+   *
+   * **MOVED 2026-09-18 (Step 2c-1), T1 of the prototype-delta audit:** the
+   * 2026-09-18 export (`@6d7b67c0a52c`) changed `--accentPick` from `#3A6DB0`
+   * to `#33629F`, and the product was still on the old hex — it had adopted the
+   * PREVIOUS export's value. Re-derived rather than re-typed: `focusRing`,
+   * `accent` and `categoryActive` all resolve through this primitive in LIGHT
+   * theme, and `textAccentLight` is derived from it, so this one line moves
+   * four roles and re-clears their floors. The new hue is DARKER, which moves
+   * every one of those floors the favourable way — measured, `accent` on the
+   * light `surface` goes 4.30 → 5.07 and on `surfaceRaised` 4.93 → 5.81 (see
+   * `docs/neo-token-report.md`, regenerated with the tint layer this change
+   * added). The dark accent `blue300` is NOT changed: the export's
+   * `--accentDark` is untouched by this refresh.
    */
-  blue600: '#3a6db0',
+  blue600: '#33629f',
   blue300: '#7fa9e4',
   navy900: '#101625',
   red600: '#d70015',
@@ -147,8 +160,53 @@ export const primitives = {
   navyBase: '#141a2e',
   navyRaised: '#20294a',
   navySunken: '#2a3560',
-  /** `neo` light: rule (c) (dark-only fill separation) leaves light alone — the export's neo surface, raised and sunken are one hex, relying on shadow for elevation. */
-  neoPaper: '#ede4db',
+  /**
+   * `neo` light: rule (c) (dark-only fill separation) leaves light alone — the
+   * export's neo surface, raised and sunken are one hex, relying on shadow for
+   * elevation.
+   *
+   * **MOVED 2026-09-18 (Step 2c-1), T5:** `#EDE4DB` → `#F1EAE3`, the refreshed
+   * export's one-hex neo light surface. Every role that resolves to it
+   * (`surface`, `surfaceRaised`, `surfaceSunken` in `neo`/light) moved with it,
+   * and the neo light shadow-edge reading in `docs/neo-token-report.md` shifted
+   * 1.24 → 1.18 as a consequence — a softer edge, reported rather than silent.
+   * The neo-DARK surface `neoNavy` below is untouched: the refresh did not move
+   * the dark-neo arm.
+   */
+  neoPaper: '#f1eae3',
+  /**
+   * ## The five `neo`-LIGHT semantic colours (T5, 2026-09-18)
+   *
+   * The refreshed export's light-neo arm declares semantic colours the base
+   * `:root` does not: `--danger:#9E2A20`, `--warning:#8C4708`,
+   * `--pink:#9A3054`, `--success:#25644A`, `--purple:#413F7C`. Until this
+   * change the product's light-neo inherited the `:root` values, so every
+   * danger/warning/success/contested/restricted surface in `neo` light was
+   * drawn in a hue the export had already replaced.
+   *
+   * **These are primitives rather than role literals because `primitives` is
+   * the palette and roles are the meaning** — the same reason every other hex
+   * here lives at this level. They are named `neoLight*` rather than reusing
+   * `red600`/`amber700`/`green700`/`magenta600`/`violet600` because they are
+   * NOT those colours: the export deliberately darkens and desaturates each one
+   * for a surface it also made lighter, and collapsing them back onto the
+   * shared primitives would silently move `hig` and `minimal` too.
+   *
+   * Two of the five are named for the export's variable, not the product's
+   * role, and the mapping is the interesting part — see
+   * `STYLE_COLOR_OVERRIDES` below, which is where the pairing is declared:
+   * the export's `--pink` is the product's `contested` (the contested chip
+   * draws `var(--pink)`/`var(--tintPink)`) and its `--purple` is the product's
+   * `restricted` (`var(--purple)`/`var(--tintPurple)` on the Restricted chip).
+   * The export's `--tintDanger`/`--tintPink`/`--tintPurple`/`--tintSuccess`
+   * washes are NOT ported: this product has no tint role for them, a refusal
+   * already recorded at `ui.css:2088` and in `Features.md`.
+   */
+  neoLightDanger: '#9e2a20',
+  neoLightWarning: '#8c4708',
+  neoLightSuccess: '#25644a',
+  neoLightContested: '#9a3054',
+  neoLightRestricted: '#413f7c',
   /** `neo` dark surface — the export's own value, matching `neoPaper`'s light-mode role: ONE hex for surface/raised/sunken, depth from shadow alone. */
   neoNavy: '#1b2340',
   /**
@@ -277,9 +335,29 @@ export const primitives = {
    *
    * All three styles share one value per theme: the prototype's `neo` block
    * (`desktop.dc.html:53-67`) overrides many tokens and this is not one of them.
+   *
+   * **HALVED 2026-09-18 (Step 2c-1), T3 — and this is the WHOLE of T3's product
+   * footprint.** The export halved all five of its base tints in light and set
+   * all five to one value in dark (`0.07/0.10/0.07/0.07/0.07` light, `0.10`
+   * dark). The other four (`--tintDanger`, `--tintPink`, `--tintPurple`,
+   * `--tintSuccess`) have **no product role to move**: `tintWarning` is the only
+   * tint role this product has, consumed at exactly one place
+   * (`apps/web/app/globals.css:1314`, the invitations banner). The export's
+   * four unported washes are not an oversight here — the product declined a
+   * purple wash on measurement (`ui.css:2088`: "no `--gn-tint-purple` role
+   * exists or is added here", and `Features.md` records it as a declared
+   * divergence). The audit's claim that these washes reach "chips, pills,
+   * banners" was true of the EXPORT and false of the product; the product's
+   * chips draw the fill ladder, not tints.
+   *
+   * Light `0.20 → 0.10`, dark `0.141 → 0.10`. Hue unchanged in both. Alpha
+   * 0.10 is `0x1a`: the file's convention is round-half-up of `alpha * 255`,
+   * the same arithmetic that produced the old `0.141 → 0x24` and `0.115 → 0x1d`.
+   * The light theme's ratio IMPROVES (a lighter wash under dark warning text),
+   * which is why no floor moved.
    */
-  tintWarmWarning: '#f07c3433',
-  tintNavyWarning: '#f7a96124',
+  tintWarmWarning: '#f07c341a',
+  tintNavyWarning: '#f7a9611a',
 
   /**
    * **NUDGED — the same regression as `fillNavyHig3`, worse here** because
@@ -343,8 +421,20 @@ export const primitives = {
    * `neoNavyRaised` above.** `textAccent` (see `TOKEN_ROLES`) needs a colour
    * that is legible as READ TEXT — 4.5:1 — against every background it
    * actually renders on, in its own theme. The export's own accent hexes
-   * (`#3A6DB0`/`#7FA9E4`, now `blue600`/`blue300`) do NOT clear that bar as
-   * text (see `blue600`'s docblock); they were only ever measured as a FILL.
+   * as originally adopted (`#3A6DB0`/`#7FA9E4`, now `blue600`/`blue300`) did
+   * NOT clear that bar as text at the time this was derived — see `blue600`'s
+   * docblock for where T1 later moved the light one, and the re-verification
+   * note below — and they were only ever measured as a FILL.
+   *
+   * **Re-verified 2026-09-18 (Step 2c-1, T1), when `blue600` moved to
+   * `#33629f`.** The derivation below started from the PREVIOUS light accent
+   * and produced `#325d97`, which is darker than either, so the result still
+   * clears every background it was derived against. Re-measured after the
+   * accent moved rather than assumed: **5.45** on `warmPaper`, **6.26** on
+   * `warmRaised`, **4.76** on `warmSunken`, **5.60** in `neo` light. The start
+   * point moved; the answer did not need to. Recorded because a derivation
+   * whose premise changes and whose output is never re-checked is how a derived
+   * value quietly becomes an inherited one.
    *
    * Derivation method (a throwaway script mirroring
    * `packages/ui/test/tokens.test.ts`'s own `contrastRatio`/
@@ -364,16 +454,24 @@ export const primitives = {
    * on `fillTertiary` COMPOSITED over `surface` — a translucent, blue-tinted
    * fill that reads measurably DARKER than the bare surface underneath it
    * (`fillWarmHig3` over `warmPaper` composites to `#D9D4D1`, `fillWarmNeo3`
-   * over `neoPaper` to `#E3D8CD`). Deriving against the four surfaces alone
+   * over `neoPaper` to `#E7DDD4`). Deriving against the four surfaces alone
    * (an earlier pass here landed on `#33619C`) passed every declared row and
    * then FAILED at 4.29 against exactly this composite — caught by
    * `test/tokens.test.ts`'s own 13.284 case, which is why the composite is
    * folded into this derivation rather than left for that test to surface.
    *
+   * **The two `neo` figures below moved on 2026-09-18 with T5, and the pair is
+   * kept visible so the move is legible: `neoPaper` `#EDE4DB` → `#F1EAE3`
+   * lightened the ground, so `neoPaper` goes 5.311 → **5.596** and the `neo`
+   * ghost composite 4.755 → **4.984**, the composite hex `#E3D8CD` →
+   * `#E7DDD4`.** Both still clear 4.5, and re-measured rather than assumed.
+   * The BINDING constraint is untouched by the move, which is the point: it is
+   * the `hig`/`minimal` composite, and T5 does not reach `hig`/`minimal`.**
+   *
    * Measured at `#325D97` (L≈0.3928, stepped from L≈0.4991): `warmPaper`
-   * 5.453, `warmRaised` 6.258, `warmSunken` 4.762, `neoPaper` 5.311, the
+   * 5.453, `warmRaised` 6.258, `warmSunken` 4.762, `neoPaper` 5.596, the
    * `hig`/`minimal` ghost-button composite 4.539 (the binding constraint),
-   * the `neo` ghost-button composite 4.755. All six ≥4.5.
+   * the `neo` ghost-button composite 4.984. All six ≥4.5.
    */
   textAccentLight: '#325d97',
 
@@ -575,7 +673,12 @@ export const TOKEN_ROLES = [
    * `CONTRAST_PAIRS` rows below exist to state. The Round 2d accent hexes
    * (`#3A6DB0`/`#7FA9E4`, adopted from the owner's neo prototype) measure
    * 4.19–4.30 as TEXT on light surfaces — below 4.5 — while clearing 5.25+ as
-   * a FILL. One role asked to do both jobs would have to pick the WORSE
+   * a FILL. **T1 (2026-09-18) moved the light hex to `#33629f`, which now
+   * clears 4.5 on the plain (5.07) and raised (5.81) light surfaces but still
+   * FAILS `surfaceSunken` (4.42)** — so the split below is kept with a narrower
+   * reason rather than retired: a fill colour that clears two backgrounds and
+   * fails the third is still not one to rely on for text. One role asked to do
+   * both jobs would have to pick the WORSE
    * number for the job it isn't doing, which is why `accent` keeps its own
    * (duller, fill-safe) hex and `textAccent` gets its own, separately
    * derived one (`textAccentLight`/`textAccentDark` in `primitives`, below).
@@ -766,9 +869,32 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
 };
 
 /**
- * `neo`'s divergence from the `themes` map above — only the 8 roles the
- * ruling actually varies by style. `minimal` needs no entry: its colours are
+ * `neo`'s divergence from the `themes` map above — the roles the ruling
+ * actually varies by style. `minimal` needs no entry: its colours are
  * byte-identical to `hig`'s (it differs only in `radii`/`shadows`).
+ *
+ * **The count in this sentence used to read "the 8 roles", and it was wrong.**
+ * The light arm declared 6, the dark arm 6 — so the sentence was false on its
+ * face, in the one place a reader would check the claim. Corrected 2026-09-18
+ * rather than left, because this change adds five more and a wrong count now
+ * would be wrong by eleven.
+ *
+ * **T5 (2026-09-18): the light arm gains the five semantic colours the
+ * refreshed export's light-neo block declares.** The mapping is by MEANING,
+ * not by variable name — the export names two of them after hues (`--pink`,
+ * `--purple`) where this product names roles:
+ *
+ * | export variable | `TokenRole` | why |
+ * |---|---|---|
+ * | `--danger`  | `danger`        | name match |
+ * | `--warning` | `warning`       | name match |
+ * | `--success` | `success`       | name match |
+ * | `--pink`    | `contested`     | the export's contested chip draws `var(--pink)`/`var(--tintPink)` |
+ * | `--purple`  | `restricted` **and** `customMarker` | the export's Restricted chip draws `var(--purple)`; `customMarker` shares `restricted`'s primitive deliberately (see its own docblock), so it must follow or the stated sharing becomes false |
+ *
+ * `customMarker` is the one entry here that is a CONSEQUENCE rather than a
+ * port: it moves because it is documented as sharing `restricted`'s primitive,
+ * and moving one without the other would break that in `neo` light only.
  */
 const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial<Record<TokenRole, PrimitiveName>>>>> = {
   neo: {
@@ -779,6 +905,12 @@ const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial
       surfaceOverlay: 'overlayWarmNeo',
       fillTertiary: 'fillWarmNeo3',
       fillQuaternary: 'fillWarmNeo4',
+      danger: 'neoLightDanger',
+      warning: 'neoLightWarning',
+      success: 'neoLightSuccess',
+      contested: 'neoLightContested',
+      restricted: 'neoLightRestricted',
+      customMarker: 'neoLightRestricted',
     },
     dark: {
       surface: 'neoNavy',
@@ -1131,15 +1263,22 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
    * `accent` itself no longer carries a text-contrast guarantee at all: the
    * owner's neo-round accent hexes (`#3A6DB0`/`#7FA9E4`) were only ever
    * measured as a FILL (5.25+ against `accentText`), and measure 4.19–4.30 as
-   * TEXT on these same backgrounds — below what these rows require. Asking one
+   * TEXT on these same backgrounds — below what these rows require. **T1
+   * (2026-09-18) later moved the light hex to `#33629f`, which clears these two
+   * backgrounds (5.07 / 5.81) while still failing `surfaceSunken` (4.42), so
+   * the sentence above remains true about the rows it names and the guarantee
+   * stays with `textAccent` regardless — see `blue600`'s docblock.** Asking one
    * role to clear both jobs would have meant keeping the worse of the two
    * numbers on the fill; splitting the role is what let `accent` become the
    * owner's own, duller-as-text hue while `textAccent` gets its own, darker
    * (light) / lighter (dark) derived value (`primitives.textAccentLight`/
-   * `textAccentDark` — see their docblocks for the exact derivation). Smallest
-   * margin in the RENAMED set is `textAccent` on `neo`'s `surface`/
-   * `surfaceRaised` (one shared hex, `neoPaper`) at **5.311** against 4.5 —
-   * `hig`/`minimal`'s own `warmPaper`/`warmRaised` clear at 5.45/6.26. (The
+   * `textAccentDark` — see their docblocks for the exact derivation). **The
+   * smallest margin in the RENAMED set moved on 2026-09-18 (T5) and the
+   * sentence that used to name `neo` here is superseded rather than edited
+   * away:** T5 lightened `neoPaper`, so `textAccent` on `neo`'s
+   * `surface`/`surfaceRaised` went **5.311 → 5.596** — which makes it no
+   * longer the smallest. The smallest is now `hig`/`minimal`'s own
+   * `warmPaper` at **5.453**, with `warmRaised` at 6.26. (The
    * primitive's own binding constraint is tighter still — 4.539, against
    * `.gn-button--ghost`'s fillTertiary-composited background — but that pair
    * is not one of these two declared rows; see `textAccentLight`'s docblock.)
@@ -1277,6 +1416,40 @@ function declarationsFor(style: StyleName, theme: ThemeName): string {
  * `[data-style="minimal"|"neo"]` are independent runtime overrides, set on
  * `document.documentElement` by `ThemeToggle`/`StyleToggle` respectively —
  * never `<body>`. All four ship — switching either axis never reloads.
+ *
+ * ## Three movements in the 2026-09-18 refresh are deliberately NOT ported here
+ *
+ * Recorded at the emitter because this is where the mechanism lives and where
+ * someone porting "the rest of T2–T5" would otherwise look.
+ *
+ * 1. **T5's SELECTOR — do not port this, ever.** The export moved its light-neo
+ *    block from `body[data-style="neo"]` to
+ *    `body[data-theme="light"][data-style="neo"]`, which matches only when
+ *    `data-theme` is exactly `"light"`. **This product runs the opposite
+ *    convention: light is the ABSENCE of the attribute.** The theme stamp sets
+ *    `dataset.theme` only when a stored value is present
+ *    (`apps/web/app/layout.tsx`), so the default user has no `data-theme` at
+ *    all. Adopting the export's selector VERBATIM would therefore drop the
+ *    entire light-neo token set for every user who has never chosen a theme —
+ *    which is the default state. The export's intent (make the light-neo arm
+ *    explicit) is already served here by the different, documented mechanism
+ *    below: `[data-style="X"]` plus the `:not([data-theme="light"])` OS-dark
+ *    arm. **The movement is in the selector, and only the selector: the VALUES
+ *    it carries (the surface and the five semantic colours) ARE ported, above.**
+ * 2. **T2 — `--accent` moved from `:root` onto `body`.** No product action.
+ *    This file's `--gn-accent` is emitted per style AND theme by
+ *    `declarationsFor`, so the alias relationship the export is expressing (one
+ *    accent picked, every style sharing it) is already structural here rather
+ *    than a `var()` indirection. There is nothing to move.
+ * 3. **T4 — `--tintAccent` became DERIVED (`color-mix(in srgb, var(--accent)
+ *    7%, transparent)`) instead of a stored literal.** No product action, and
+ *    this one is a refusal rather than an absence: **this product has no
+ *    `tintAccent` role at all**, and no consumer for one. The export's four
+ *    other accent-family tint washes are likewise unported, for the reason
+ *    already recorded at `ui.css:2088` (a purple wash fails contrast on every
+ *    ground it would sit on). Inventing a role with no consumer would put a
+ *    value in `TOKEN_ROLES` that nothing renders and no `CONTRAST_PAIRS` row
+ *    can hold to a floor.
  *
  * **Emission order is load-bearing, not cosmetic.** `[data-style="X"]:not([data-theme="light"])`
  * (the OS-dark arm for a non-hig style) and `:root:not([data-theme="light"])`

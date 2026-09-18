@@ -23,29 +23,40 @@
  * storage `blr1`, and the app's Asia/Kolkata clock are all set there.
  */
 import Link from 'next/link';
-import { BackButton } from '../../src/back-button.js';
+import { LegalTabs, LegalToc, sectionId, type LegalSection } from '../../src/legal-chrome.js';
+import { LegalNav } from '../../src/legal-nav.js';
 
-export default function PrivacyPolicy() {
-  return (
-    <main className="gn-shell gn-legal">
-      <BackButton />
-      <h1 className="gn-legal__title">Privacy Policy</h1>
-      <p className="gn-legal__meta">
-        Last updated <strong>[DATE]</strong> · Operated by <strong>[ENTITY NAME]</strong> ·
-        Governed by the laws of <strong>[JURISDICTION]</strong>
-      </p>
-
-      <section className="gn-legal__section">
-        <h2>Who we are</h2>
+/**
+ * The page's sections, declared ONCE.
+ *
+ * Both the `<h2>`s and the anchor row are rendered from this array, so the
+ * navigation cannot describe a page other than the one below it. `sectionId`
+ * derives the anchor from the heading, so a renamed heading moves its own
+ * anchor with it. See `legal-chrome.tsx` for why that is a property rather than
+ * a style choice.
+ *
+ * **The prose in `body` is unchanged from the pre-port file, text for text.**
+ * It is re-indented by this refactor and nothing else; the placeholders, the
+ * entity references and the deliberate line breaks are all as they were, and
+ * case 13.251's placeholder counts are the machine-checked half of that claim.
+ */
+const SECTIONS: readonly LegalSection[] = [
+  {
+    title: 'Who we are',
+    body: (
+      <>
         <p>
           Gisik Nokma is a work tracker operated by <strong>[ENTITY NAME]</strong>,
           <strong> [REGISTERED ADDRESS]</strong>. For anything in this policy, write to{' '}
           <strong>[CONTACT EMAIL]</strong>.
         </p>
-      </section>
-
-      <section className="gn-legal__section">
-        <h2>What we collect</h2>
+      </>
+    ),
+  },
+  {
+    title: 'What we collect',
+    body: (
+      <>
         <p>Only what running the product requires.</p>
         <ul>
           <li>
@@ -67,20 +78,26 @@ export default function PrivacyPolicy() {
             link we store the link, never a copy of the file, and we do not read the file.
           </li>
         </ul>
-      </section>
-
-      <section className="gn-legal__section">
-        <h2>Where it is stored</h2>
+      </>
+    ),
+  },
+  {
+    title: 'Where it is stored',
+    body: (
+      <>
         <p>
           On servers in <strong>India</strong>, with attachments in object storage in the same
           region. The product&rsquo;s clock is India Standard Time for every user in every country
           — a day boundary means India&rsquo;s day. That is a product decision with a privacy
           consequence worth stating: timestamps we show you are in IST, not your local time.
         </p>
-      </section>
-
-      <section className="gn-legal__section">
-        <h2>How long we keep it, and the honest complication</h2>
+      </>
+    ),
+  },
+  {
+    title: 'How long we keep it, and the honest complication',
+    body: (
+      <>
         <p>
           Gisik Nokma records work as an <strong>append-only history</strong>. Changes are added;
           they are not overwritten. That is the whole point of the product — it is what lets it
@@ -95,10 +112,13 @@ export default function PrivacyPolicy() {
           reconcile this before handling real user data</strong> — for example by replacing an
           identity with an anonymous marker while keeping the sequence of events intact.
         </p>
-      </section>
-
-      <section className="gn-legal__section">
-        <h2>Who we share it with</h2>
+      </>
+    ),
+  },
+  {
+    title: 'Who we share it with',
+    body: (
+      <>
         <p>
           We do not sell your data and we do not use it for advertising. It reaches only the
           providers required to run the service: our hosting and database provider, our object
@@ -110,38 +130,73 @@ export default function PrivacyPolicy() {
           those settings allow. The product will tell somebody that a job is restricted; it will not
           tell them what is in it.
         </p>
-      </section>
-
-      <section className="gn-legal__section">
-        <h2>What we send you</h2>
+      </>
+    ),
+  },
+  {
+    title: 'What we send you',
+    body: (
+      <>
         <p>
           One thing: your sign-in link. Gisik Nokma sends no notification emails, no text messages
           and no push notifications — notifications appear only inside the product. We do not send
           marketing.
         </p>
-      </section>
-
-      <section className="gn-legal__section">
-        <h2>Your rights</h2>
+      </>
+    ),
+  },
+  {
+    title: 'Your rights',
+    body: (
+      <>
         <p>
           Depending on where you live you may have rights to access, correct, export or erase your
           personal data, and to object to processing. Write to <strong>[CONTACT EMAIL]</strong> and
           we will respond within <strong>[RESPONSE PERIOD]</strong>. If you are not satisfied you
           may complain to <strong>[SUPERVISORY AUTHORITY]</strong>.
         </p>
-      </section>
-
-      <section className="gn-legal__section">
-        <h2>Changes to this policy</h2>
+      </>
+    ),
+  },
+  {
+    title: 'Changes to this policy',
+    body: (
+      <>
         <p>
           If we change it materially we will say so in the product before the change takes effect.
           The date at the top is when this version was published.
         </p>
-      </section>
+      </>
+    ),
+  },
+];
 
-      <p className="gn-legal__footer">
-        See also the <Link href="/terms">Terms &amp; Conditions</Link>.
-      </p>
+export default function PrivacyPolicy() {
+  return (
+    <main className="gn-shell gn-legal">
+      <LegalNav />
+      <div className="gn-legal__column">
+        <div className="gn-legal__head">
+          <h1 className="gn-legal__title">Privacy Policy</h1>
+          <LegalTabs active="privacy" />
+        </div>
+        <p className="gn-legal__meta">
+          Last updated <strong>[DATE]</strong> · Operated by <strong>[ENTITY NAME]</strong> ·
+          Governed by the laws of <strong>[JURISDICTION]</strong>
+        </p>
+        <LegalToc sections={SECTIONS} />
+
+        {SECTIONS.map((section) => (
+          <section key={section.title} className="gn-legal__section">
+            <h2 id={sectionId(section.title)}>{section.title}</h2>
+            {section.body}
+          </section>
+        ))}
+
+        <p className="gn-legal__footer">
+          See also the <Link href="/terms">Terms &amp; Conditions</Link>.
+        </p>
+      </div>
     </main>
   );
 }

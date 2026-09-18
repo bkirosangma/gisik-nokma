@@ -1,33 +1,29 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { readFileSync } from 'node:fs';
+import { render, screen, within } from '@testing-library/react';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 /**
- * The legal pages are server components, but the Back control they now carry is
- * a client one, so the module graph reaches `next/navigation` and needs it
- * stubbed. `back` and `push` are captured rather than merely mocked because
- * 13.322/13.323 assert WHICH of the two was called, and a shared `vi.fn()` that
- * both branches could satisfy would make the fallback branch untestable.
+ * The legal pages are server components, but the top bar they now carry is a
+ * client one — `legal-nav.tsx` imports `AccountMenu`, which reads
+ * `usePathname` and `useRouter` — so the module graph still reaches
+ * `next/navigation` and still needs it stubbed.
+ *
+ * The stub is deliberately inert. It used to capture `back` and `push` because
+ * 13.322/13.323 asserted WHICH of the two a `BackButton` called; those cases
+ * are SUPERSEDED (see the note below) and nothing here branches on navigation
+ * any more. It stays because the import is real, not because a case reads it —
+ * and if it were removed the module graph would fail to load rather than fail
+ * an assertion, which is the louder of the two failures and the reason it is
+ * left in its plain form rather than deleted with its old comment.
  */
 const nav = { back: vi.fn(), push: vi.fn() };
-vi.mock('next/navigation', () => ({ useRouter: () => nav }));
+vi.mock('next/navigation', () => ({ usePathname: () => '/', useRouter: () => nav }));
 
 import NotFound from '../app/not-found.js';
 import PrivacyPolicy from '../app/privacy/page.js';
 import Terms from '../app/terms/page.js';
-
-/**
- * jsdom's `window.history.length` is 1 and read-only through the normal API, so
- * the two branches are driven by redefining the property. `configurable: true`
- * is what lets the next test redefine it again; without it the second call
- * throws and every case after the first would fail for a reason that has
- * nothing to do with what it asserts.
- */
-function setHistoryLength(length: number): void {
-  Object.defineProperty(window.history, 'length', { value: length, configurable: true });
-}
 
 /**
  * Pre-launch checklist items 1–3: the custom 404, the privacy policy and the
@@ -189,58 +185,323 @@ describe('the legal pages', () => {
 });
 
 /**
- * 13.322 / 13.323 — a way back off each legal page.
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 13.682–13.689 — the refreshed export's port to the legal pair and the 404
+ * (2026-09-18).
  *
- * Both pages linked only to EACH OTHER: from the sign-in card a reader could
- * open Terms, cross to Privacy, cross back to Terms, and never reach sign-in
- * again without the browser's own chrome. Owner feedback, 2026-09-08.
+ * ## 13.322 / 13.323 ARE SUPERSEDED, AND THE REASON IS NOT THAT THEY WERE WRONG
  *
- * BOTH BRANCHES ARE ASSERTED, and the second is the one that matters. A control
- * that calls `router.back()` unconditionally is INDISTINGUISHABLE from a correct
- * one on any page opened with history behind it — which is every page a test
- * navigates to and most pages a developer clicks through. It only fails for the
- * reader who opened the link in a new tab, where `back()` is a silent no-op and
- * the page appears frozen. So the fallback case drives `history.length` to 1 and
- * demands `push('/sign-in')`; deleting the guard reddens it and nothing else.
+ * They asserted a `Back` control on each legal page, because both pages linked
+ * only to EACH OTHER and a reader arriving from the sign-in card could cross
+ * between them forever and never get back (owner feedback, 2026-09-08). The
+ * control worked and the two cases witnessed both of its branches.
+ *
+ * The refreshed export's `isLegal` block draws a top bar with a brand tile, the
+ * wordmark and a `Sign in` link (`desktop.dc.html@6d7b67c0a52c:1722-1729`) —
+ * **and no back affordance anywhere in `:1720-1755`**, which is the condition
+ * the dispatch put on replacing the control rather than keeping both. So the
+ * control is gone and its two cases have no subject. They are recorded as
+ * SUPERSEDED in `test-cases/13-deployment-dogfooding.md` rather than deleted,
+ * because the ruling they pinned was real and the reason it stopped applying is
+ * the part worth keeping.
+ *
+ * **What survives, and what does not, stated so the trade is on the record.**
+ * `BackButton`'s fallback for a reader with no history was `/sign-in` (see
+ * `back-button.tsx`'s docblock: these pages are reached from the sign-in card).
+ * The bar's `Sign in` link points at the same route, so a reader who landed
+ * with no history still has a real destination. What is genuinely LOST is the
+ * one-press return for a reader who does have history — the export leaves them
+ * the browser's chrome and nothing more. 13.682 witnesses the replacement
+ * (the link exists and the old control does not); no case claims the press
+ * count is the same, because it is not.
  */
-describe('the way back off a legal page', () => {
-  beforeEach(() => {
-    nav.back.mockClear();
-    nav.push.mockClear();
-  });
 
-  for (const { id, label, node } of [
-    { id: '13.322', label: 'privacy', node: <PrivacyPolicy /> },
-    { id: '13.323', label: 'terms', node: <Terms /> },
-  ]) {
-    it(`${id} ${label} carries a Back control whose accessible name says back to WHERE`, () => {
-      setHistoryLength(4);
+/** Both legal pages, with the labels the cases below are parameterised on. */
+const LEGAL_PAGES = [
+  { id: '13.682', label: 'privacy', slug: 'privacy', node: <PrivacyPolicy />, path: '/privacy' },
+  { id: '13.682', label: 'terms', slug: 'terms', node: <Terms />, path: '/terms' },
+] as const;
+
+describe('the legal pages’ top bar', () => {
+  /**
+   * 13.682 — the export's bar replaced the Back control.
+   *
+   * Two halves, and the SECOND is the load-bearing one: asserting the `Sign in`
+   * link exists would pass just as well against a page that kept `BackButton`
+   * beside it, which is the shape the dispatch explicitly rejected. So the
+   * absence of the old control is asserted by its accessible name — the same
+   * string 13.322 and 13.323 queried — and deleting the bar reddens the first
+   * half while re-adding the button reddens the second.
+   */
+  for (const { label, node } of LEGAL_PAGES) {
+    it(`13.682 ${label} carries the export's bar, and the Back control it replaced is gone`, () => {
       render(node);
 
-      // The accessible name, not the visible text: `aria-label` is what a screen
-      // reader announces, and "Back" on its own does not say back to where.
-      const back = screen.getByRole('button', { name: 'Back to the previous page' });
+      expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/sign-in');
+      expect(screen.getByText('Gisik Nokma')).toBeInTheDocument();
 
-      // WCAG 2.5.3 Label in Name — the visible word must be CONTAINED in the
-      // accessible name, or voice control ("click Back") stops matching it.
-      expect(back).toHaveTextContent('Back');
-      expect(back.getAttribute('aria-label')).toContain(back.textContent ?? '');
-
-      fireEvent.click(back);
-      expect(nav.back).toHaveBeenCalledTimes(1);
-      expect(nav.push).not.toHaveBeenCalled();
-    });
-
-    it(`${id} ${label}'s Back goes to sign-in when there is no history to go back to`, () => {
-      setHistoryLength(1);
-      render(node);
-
-      fireEvent.click(screen.getByRole('button', { name: 'Back to the previous page' }));
-
-      // `back()` here would be a silent no-op — the failure mode this branch
-      // exists to prevent — so it must NOT have been the call that was made.
-      expect(nav.back).not.toHaveBeenCalled();
-      expect(nav.push).toHaveBeenCalledWith('/sign-in');
+      // The old control, by the name 13.322/13.323 used to find it.
+      expect(
+        screen.queryByRole('button', { name: 'Back to the previous page' }),
+      ).not.toBeInTheDocument();
     });
   }
+
+  /**
+   * 13.683 — **the anchor row is built from the page's own headings.**
+   *
+   * This is the property the dispatch asked for in those words ("built from the
+   * pages' existing headings — not a hand-typed list"), and the two assertions
+   * below are what makes it checkable rather than merely intended: every anchor
+   * label equals its heading's text, in order, and every anchor's `href` equals
+   * that heading's own `id` with a `#` in front. A second, independently typed
+   * list of section names can satisfy neither the moment a heading is added,
+   * renamed or reordered — which is the only way this drifts in practice.
+   *
+   * **Its boundary, stated rather than implied:** the equality is against the
+   * RENDERED headings, not against the section array, so a hand-typed row that
+   * happens to match today's headings passes. What it cannot do is keep passing
+   * after the next edit to either side, and that is the failure it is here for.
+   * The count assertion is the positive control — the mutation that deletes the
+   * mapping and hardcodes two anchors leaves 8 and 9 headings respectively.
+   */
+  for (const { label, node } of LEGAL_PAGES) {
+    it(`13.683 ${label}'s anchor row IS its headings, label for label and anchor for anchor`, () => {
+      const { container } = render(node);
+
+      // Found by CLASS, not by `getByRole('navigation', { name: 'On this
+      // page' })`. The role query would work, and it made this case fail for a
+      // reason that is not its own: renaming the label reddened 13.683 as well
+      // as 13.685, so one mutation pointed at two sites and neither case named
+      // its own. The property here is the row's CONTENT, and the row is
+      // identified by the class that content lives under.
+      const toc = container.querySelector('.gn-legal__toc');
+      expect(toc, `${label} has no anchor row`).not.toBeNull();
+      const anchors = within(toc as HTMLElement).getAllByRole('link');
+      const headings = Array.from(container.querySelectorAll('section.gn-legal__section > h2'));
+
+      expect(headings.length, `${label} rendered no headings to build a row from`).toBeGreaterThan(
+        2,
+      );
+      expect(anchors.map((a) => a.textContent)).toEqual(headings.map((h) => h.textContent));
+      expect(anchors.map((a) => a.getAttribute('href'))).toEqual(
+        headings.map((h) => `#${h.id}`),
+      );
+    });
+  }
+
+  /**
+   * 13.684 — the tab pair.
+   *
+   * Exactly two, pointing at the two legal routes, with `aria-current="page"`
+   * on the page's OWN route and absent from the other. The "exactly one" half
+   * is a real mutation target: a control that marks both current, or the wrong
+   * one, is the failure a current-page indicator exists to prevent, and
+   * `aria-current` on an `<a>` is what a screen reader announces as "current
+   * page" rather than as an ordinary link.
+   *
+   * The class assertion is not cosmetic either: these segments ride the SHARED
+   * `.gn-segmented` control, and that inheritance is what brings the 2.75rem
+   * tap-target floor and `--gn-text`'s contrast pair with them. A bespoke class
+   * would look identical and hold neither.
+   */
+  for (const { label, node, path } of LEGAL_PAGES) {
+    it(`13.684 ${label}'s tab pair links the two legal routes and marks only its own current`, () => {
+      render(node);
+
+      const tabs = screen.getAllByRole('link', { name: /^(Privacy|Terms)$/ });
+      expect(tabs.map((t) => t.getAttribute('href'))).toEqual(['/privacy', '/terms']);
+      expect(tabs.every((t) => t.className.includes('gn-segmented__item'))).toBe(true);
+
+      const current = tabs.filter((t) => t.getAttribute('aria-current') === 'page');
+      expect(current).toHaveLength(1);
+      expect(current[0]).toHaveAttribute('href', path);
+    });
+  }
+
+  /**
+   * 13.685 — **the anchor row's accessible name, by string.**
+   *
+   * The dispatch asked for the new accessible names to be asserted as strings
+   * and not only through the sweep, because `accessible-names.ts` counts
+   * ATTRIBUTES — it cannot tell "On this page" from any other label, and a
+   * rename would keep its count at 1 while the name a screen reader announces
+   * changed under it.
+   *
+   * The label is load-bearing twice. It distinguishes this page's two `<nav>`
+   * landmarks (the bar and this row) from each other, which ARIA requires; and
+   * it is what holds these two routes at `ariaLabel: 1` in
+   * `accessible-names-baseline.json` after `BackButton`'s label left with the
+   * control. **That swap is exactly what the ratchet cannot judge** — its own
+   * docblock says a swap of equal count "is not this gate's business ... that is
+   * the copy rule, reviewed by a person" — so it is pinned here instead of
+   * being absorbed by a number that happened not to move.
+   *
+   * `toBe(1)` rather than "at least 1": a second label appearing on this page
+   * silently would make the live sweep's number rise, and a rise is the
+   * direction nothing checks.
+   */
+  for (const { label, node } of LEGAL_PAGES) {
+    it(`13.685 ${label}'s anchor row is named "On this page" and it is the page's only label`, () => {
+      const { container } = render(node);
+
+      expect(screen.getByRole('navigation', { name: 'On this page' })).toBeInTheDocument();
+      const labelled = container.querySelectorAll('[aria-label]');
+      expect(Array.from(labelled).map((el) => el.getAttribute('aria-label'))).toEqual([
+        'On this page',
+      ]);
+    });
+  }
+});
+
+/**
+ * 13.686–13.689 — the 404.
+ *
+ * The audit's verdict governs every case here: **the export is THINNER than
+ * this page, not ahead of it** (`docs/design/prototype-delta-2026-09-18.md`).
+ * Three things are portable — a 72px icon tile, a third action link, and the
+ * heading's scale and measure — and the COPY IS NOT ONE OF THEM. The cases
+ * below are split along exactly that line, so a future round that "finishes the
+ * port" by adopting the export's wording reddens 13.689 rather than shipping.
+ */
+describe('the 404, ported from the export without taking its copy', () => {
+  /**
+   * 13.686 — the icon tile.
+   *
+   * Three properties, each with its own reason. `aria-hidden` because the tile
+   * repeats what the `h1` says and a screen reader reading it twice is a
+   * regression, not a decoration; the 72px and the glyph paths because the
+   * export draws exactly those (`:1847`) and the tile is otherwise the kind of
+   * element that gets quietly resized by the next spacing pass.
+   *
+   * The paths are asserted by COUNT and by their distinguishing commands rather
+   * than by a full string compare: the folder outline is shared with the bar's
+   * 30px tile in `legal-nav.tsx`, and the two cross strokes are what make this
+   * glyph the 404's rather than the brand's.
+   */
+  it('13.686 the 404 leads with the export’s 72px tile, and it is hidden from assistive tech', () => {
+    const { container } = render(<NotFound />);
+
+    const tile = container.querySelector('.gn-notfound__tile');
+    expect(tile, 'the icon tile is gone').not.toBeNull();
+    expect(tile).toHaveAttribute('aria-hidden', 'true');
+
+    const paths = tile?.querySelectorAll('svg path') ?? [];
+    expect(paths).toHaveLength(3);
+    // The two cross strokes, which are this glyph's own.
+    expect(Array.from(paths).map((p) => p.getAttribute('d'))).toEqual(
+      expect.arrayContaining(['m9.5 11.5 5 5', 'm14.5 11.5-5 5']),
+    );
+    // The svg is the export's 34px box inside the 72px tile — the geometry
+    // lives in CSS, so assert the attribute the markup owns rather than the
+    // computed size a jsdom render cannot resolve.
+    expect(tile?.querySelector('svg')?.getAttribute('width')).toBe('34');
+  });
+
+  /**
+   * 13.687 — the third action link, and the ORDER.
+   *
+   * The order is asserted, not just the set, because it is the export's
+   * (`:1855-1857`: workspaces, manual, inbox) and this page's two existing
+   * links already agreed with it — inserting the manual anywhere else would
+   * have looked arbitrary against both. "Search the manual" is the export's own
+   * label and is asserted BY STRING: it is one of the two new accessible names
+   * the dispatch requires, and the sweep next door counts attributes only.
+   *
+   * A positive control on the target: `/help` is asserted to be a real route on
+   * disk, because "the route exists" was the audit's own reason for calling
+   * this a bounded addition rather than a wire gap. If that page is ever
+   * removed, this case reddens here rather than shipping a link into a 404.
+   */
+  it('13.687 the 404 offers the manual as a third action, in the export’s order, into a real route', () => {
+    render(<NotFound />);
+
+    const links = screen.getAllByRole('link');
+    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/workspaces', '/help', '/inbox']);
+    expect(screen.getByRole('link', { name: 'Search the manual' })).toHaveAttribute(
+      'href',
+      '/help',
+    );
+
+    expect(
+      existsSync(join(WEB_ROOT, 'app/help/page.tsx')),
+      'the third link points at /help, which no longer exists',
+    ).toBe(true);
+  });
+
+  /**
+   * 13.688 — the heading's scale and measure, and the 404's column.
+   *
+   * Read from the CSS SOURCE, which is where these four numbers live; jsdom
+   * resolves neither an external stylesheet nor `ch`, so a computed-style
+   * assertion here would measure nothing and pass. The positive control is the
+   * old value: `.gn-legal__title`'s retired `1.6rem` must be gone from the
+   * rule, or the assertions above are describing a declaration that is still
+   * being overridden further down the file.
+   */
+  it('13.688 both headings take the export’s 34/41/700/-0.4px at 72ch, and the 404 is a centred 520px column', () => {
+    const css = readFileSync(join(WEB_ROOT, 'app/globals.css'), 'utf8');
+
+    const heading = /\.gn-notfound__title,\s*\.gn-legal__title \{([^}]*)\}/.exec(css);
+    expect(heading, 'the shared heading rule is gone').not.toBeNull();
+    const block = heading?.[1] ?? '';
+    for (const decl of [
+      'max-width: 72ch',
+      'font-size: 34px',
+      'line-height: 41px',
+      'font-weight: 700',
+      'letter-spacing: -0.4px',
+    ]) {
+      expect(block.replace(/\s+/g, ' '), `heading rule lost "${decl}"`).toContain(decl);
+    }
+    expect(block).not.toContain('1.6rem');
+
+    expect(css.replace(/\s+/g, ' ')).toContain('.gn-notfound { max-width: 520px; margin-inline: auto; }');
+
+    // The phone rule, which the export's fixed 41px leading would otherwise have
+    // broken: a FIXED line-height does not scale, so the 21.6px title this
+    // block sets at ≤40rem would have inherited 41px of leading — a ratio of
+    // 1.9 — had the block not restated it. Asserted here so that deleting the
+    // restatement is a red rather than something only a phone screenshot would
+    // show, and asserted as the PAIR so a bare `font-size` edit cannot satisfy
+    // it by accident.
+    expect(css.replace(/\s+/g, ' ')).toContain(
+      '.gn-notfound__title, .gn-legal__title { font-size: 1.35rem; line-height: 1.25; }',
+    );
+  });
+
+  /**
+   * 13.689 — **the copy rule: nothing the product said was replaced.**
+   *
+   * The one case here that is about what did NOT change, and the reason the
+   * reviewer's brief names it. The export's 404 says "This page isn't here" and
+   * "Nothing was deleted."; adopting either would answer a question this page
+   * exists to refuse — the API returns the same 404 for a thing that is absent
+   * and a thing that is not yours, so a lead asserting nothing was deleted is
+   * false in one of the two cases and quietly so.
+   *
+   * Both directions are asserted, because either alone has a way to pass while
+   * being wrong: only the absences would pass against a page somebody emptied,
+   * and only the presences would pass against one that added the export's
+   * wording underneath. The `Last updated 8 September 2026` line is the third
+   * absent string — the export's illustrative date, which the audit measured at
+   * zero product hits and which must not replace the `[DATE]` placeholder the
+   * legal pair carries and 13.251 counts.
+   */
+  it('13.689 the export’s 404 wording is absent, and the product’s own three causes are intact', () => {
+    const { container } = render(<NotFound />);
+    const text = container.textContent ?? '';
+
+    for (const exportCopy of [
+      'This page isn’t here',
+      'This page isn\'t here',
+      'Nothing was deleted',
+      'Last updated 8 September 2026',
+    ]) {
+      expect(text, `the export's copy "${exportCopy}" reached the page`).not.toContain(exportCopy);
+    }
+
+    expect(text).toContain('This address does not match a page.');
+    expect(text).toContain('will not tell you which of the three');
+  });
 });

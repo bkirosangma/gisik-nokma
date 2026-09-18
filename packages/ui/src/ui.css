@@ -3437,7 +3437,7 @@
 [data-style="neo"] .gn-segmented__item--on {
   /* `surfaceSunken`, not the base rule's `surfaceRaised` — CONFIRMED against
      the reference rather than reasoned from the word "sunken". Its own
-     `--segOnBg` under `neo` is `#EDE4DB` light and `#1B2340` dark, and those
+     `--segOnBg` under `neo` is `#F1EAE3` light and `#1B2340` dark, and those
      are byte-for-byte this product's `surfaceSunken` in the same two arms
      (`colorOf('light'|'dark', 'surfaceSunken', 'neo')`). The base rule's
      `surfaceRaised` differs from it in LIGHT (`#fbf7f3`), so keeping it would

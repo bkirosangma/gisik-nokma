@@ -164,8 +164,13 @@ type Signature = {
  *     this is the one discriminator that works everywhere.
  *
  *   `.gn-legal__title` / `.gn-notfound__title` font-size
- *     25.6px (`1.6rem`)  — apps/web/app/globals.css:69-74
- *     21.6px (`1.35rem`) — apps/web/app/globals.css:219-220, under (max-width: 40rem)
+ *     34px   (`34px`)    — apps/web/app/globals.css:1913-1923 (Step 2c-2,
+ *                          2026-09-18 — the refreshed export's heading scale,
+ *                          replacing `1.6rem`. Was 25.6px before this change.)
+ *     21.6px (`1.35rem`) — apps/web/app/globals.css:2241, under (max-width: 40rem)
+ *                          — UNCHANGED by that port, deliberately: the export is
+ *                          a desktop mockup and says nothing about 390px, so
+ *                          the product's own downscale stands.
  *
  *   `.gn-notfound__actions` flex-direction
  *     row    — apps/web/app/globals.css:116-121
@@ -763,14 +768,22 @@ for (const route of UNAUTHED_ROUTES) {
       .toBe(spec.narrow60rem ? 12 : 20);
 
     if (sig.titleFontSize !== null) {
-      // globals.css:73 (1.6rem) vs globals.css:219-220 (1.35rem)
+      // globals.css (34px, the export's scale) vs the (max-width: 40rem)
+      // override (1.35rem). The WIDE value moved 25.6 → 34 in Step 2c-2
+      // (2026-09-18): the base rule took the refreshed export's heading scale,
+      // and the phone override deliberately did NOT follow it — the export is a
+      // desktop mockup and says nothing about a 390px viewport, so the
+      // product's own downscale stands. That is also why this discriminator
+      // still exists at all: had the phone rule been dropped with it, the title
+      // would have been 34px at every width and this field could no longer tell
+      // 768 from 1512.
       expect
         .soft(
           sig.titleFontSize,
           `title font-size at ${spec.width}px: (max-width:40rem)=${String(spec.narrow40rem)} ` +
-            `implies ${spec.narrow40rem ? 21.6 : 25.6}px (globals.css:73 / :219-220)`,
+            `implies ${spec.narrow40rem ? 21.6 : 34}px (globals.css 34px / its 40rem override)`,
         )
-        .toBeCloseTo(spec.narrow40rem ? 21.6 : 25.6, 1);
+        .toBeCloseTo(spec.narrow40rem ? 21.6 : 34, 1);
     }
     if (sig.helpH2FontSize !== null) {
       // ui.css `.gn-help__h2` (1.375rem) vs its (max-width: 40rem) override (1.15rem)
@@ -1491,7 +1504,7 @@ test('layouts at 390, 768 and 1512 are measurably DIFFERENT, not just each self-
     phone.sig.titleFontSize,
     `.gn-notfound__title font-size is IDENTICAL at 390px and 768px ` +
       `(${String(phone.sig.titleFontSize)}px both). The (max-width: 40rem) query at ` +
-      `globals.css:219-220 did not apply.`,
+      `globals.css:2241 did not apply.`,
   ).not.toBe(tablet.sig.titleFontSize);
   expect(
     phone.sig.notFoundActionsDirection,
@@ -1924,19 +1937,26 @@ test('13.362 — the segmented control, driven to phone:true, renders under neo\
   // shadow composes against, so it is the token this control actually depends
   // on now.
   // The LIGHT arm's value: this project sets no `colorScheme`, so the run is
-  // light and `#ede4db` is `colorOf('light', 'surfaceSunken', 'neo')`. Written
+  // light and `#f1eae3` is `colorOf('light', 'surfaceSunken', 'neo')`. Written
   // as the literal the way the `fillTertiary` assertion it replaces was — and
   // worth naming, because the first draft asserted the DARK hex (`#141a2e`)
   // from memory and reddened on all three viewports. It is also exactly the
   // reference's own `--segOnBg` for neo light, which is the cross-check that
   // this is the right token rather than merely a passing one.
+  //
+  // 2026-09-18 (Step 2c-1, T5): this literal moved `#ede4db` -> `#f1eae3` with
+  // `neoPaper`. The cross-check it rests on is what makes the move safe to
+  // make here: the refreshed export's own `--segOnBg` for neo light is
+  // `#F1EAE3` too, so the two are still byte-for-byte equal and the assertion
+  // still names the same property. Had only one side moved, this would be a
+  // real regression rather than a re-pin.
   const surfaceSunken = await page.evaluate(() =>
     getComputedStyle(document.documentElement).getPropertyValue('--gn-surface-sunken').trim(),
   );
   expect(
     surfaceSunken,
     'the page should have resolved neo\'s own surfaceSunken, not hig/minimal\'s',
-  ).toBe('#ede4db');
+  ).toBe('#f1eae3');
 
   // ── And the track really carries no fill of its own, which is the owner's
   // change rather than an absence that was always there.

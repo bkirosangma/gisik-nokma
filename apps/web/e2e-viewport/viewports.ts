@@ -80,7 +80,10 @@ export type ViewportSpec = {
  *        390 │  yes   │  yes   │ shell padding 12px, help tabs stacked,
  *            │        │        │ 404 actions stacked, titles 21.6px
  *        768 │  no    │  yes   │ shell padding 12px, tabs in a row,
- *            │        │        │ 404 actions in a row, titles 25.6px
+ *            │        │        │ 404 actions in a row, titles 34px
+ *            │        │        │ (25.6px before Step 2c-2, 2026-09-18 — the
+ *            │        │        │ export's heading scale; the 390 row's 21.6px
+ *            │        │        │ is the product's own 40rem rule, untouched)
  *       1512 │  no    │  no    │ shell padding 20px, everything wide
  *
  * Every pair differs. 390↔768 is separated by the 40rem queries; 768↔1512 by
