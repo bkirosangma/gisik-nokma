@@ -86,6 +86,16 @@ export {
   type ReopenPlan,
 } from './flows/guarded-child-event.js';
 export { ReopenDialog, type ReopenDialogProps, type RefusalOrigin } from './views/reopen-dialog.js';
+// Second wave Task 9 — the shared bulk-close confirm. Its two consumers
+// (Task 10's board column action, Task 11's list selection) live in this
+// package; it is exported for `apps/web` and for the same reason every other
+// view here is: the consumer's own test should render the SHIPPED component,
+// not a re-typed stand-in for it.
+export {
+  BulkCloseDialog,
+  type BulkCloseDialogProps,
+  type BulkCloseTicket,
+} from './views/bulk-close-dialog.js';
 export {
   NewTicketDialog,
   type NewTicketDialogProps,

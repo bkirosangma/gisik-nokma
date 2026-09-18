@@ -20,7 +20,131 @@
 
 ---
 
-## ▲ TOP BLOCK — `isTypeEditor`: fields gain `required` (2026-09-18)
+## ▲ TOP BLOCK — second wave Task 9: `BulkCloseDialog` (2026-09-18)
+
+**Position: the change set is COMPLETE, the review round is CLOSED, its one Critical is FIXED and
+witnessed, and the PR is open awaiting the controller's merge.** Dispatch:
+`CTL-DISPATCH-2026-09-18-exec2-secondwave-t9.md`. One PR, `--base main`, branch
+`exec2/secondwave-t9-bulkclose`. Reassigned to executor 2 because the owner asked for two executors and
+this lane's own queue was empty; the controller checked file-disjointness against executor 1's Task 5
+before dispatching, and **no file overlapped** — still true at this sha.
+
+**Two commits, and the split is the review round's boundary:** `ef6da16b` is the change, `e7f9ce5a` is
+everything the independent review produced. The **reviewer ran against `ef6da16b`**, so a reader asking
+"was what I am looking at reviewed?" must read the PR body's review section, which states what moved after
+it and gives the one command that proves the reviewed content survived.
+
+### Anchors — verify these; do not trust the row
+
+| | |
+|---|---|
+| branch | `exec2/secondwave-t9-bulkclose` |
+| base | **`5910742e`** = `origin/main` = the `#447` merge (this lane's `isTypeEditor`) |
+| `origin/main` | `5910742e` at the last count — **recount; main moves without telling you** |
+| merge-base | `5910742e` |
+| ahead | **2** commits at `e7f9ce5a`; **3** once this handoff's own commit lands (it carries this block, so it cannot be named here) |
+| behind | 0 |
+| tree | clean (`git status --porcelain` empty) |
+| HEAD | **verify with `/usr/bin/git rev-parse HEAD`.** A block cannot contain the commit carrying it, so `e7f9ce5a` names the TIP'S PARENT, never the tip |
+| PR | opened from this branch, `--base main`; reviewer pass recorded in the body BEFORE it opened |
+
+### What shipped
+
+`packages/app-core/src/views/bulk-close-dialog.tsx` (new) + its export in `packages/app-core/src/index.ts`
++ `packages/ui/src/components/dialog.tsx` (R4) + `packages/ui/test/components.test.tsx` (13.643),
+`Features.md` and `test-cases/13-deployment-dogfooding.md` in the same commits. **The produced prop shape
+is unchanged from the plan's `Interfaces:` block** — Tasks 10 and 11 consume it as written.
+
+Cases: **13.640–13.643** (the plan's own ids, from its `13.613`–`13.649` reservation — verified free with
+the sanctioned recount before minting) and **13.787–13.788**, minted in the review round from THIS lane's
+block `13.760`–`13.819`. **The next free id inside that block is `13.789`** (before this task it was
+`13.787`, and note that `13.787` appeared in the catalogue only as PROSE saying it was free — a marker
+sweep that counts a mention is how a free id reads as taken, and the reverse).
+
+### ★ THE REVIEW ROUND — one Critical, two surviving mutations, four wrong causes
+
+One reviewer, deepseek tier, over `ef6da16b`. It could not falsify the ONE-call assertion or the R4 blast
+radius (it re-ran both), and it earned its keep on the rest:
+
+1. **CRITICAL — a dismissed attempt's answer landed on the NEXT opening.** Cancel/Escape/scrim/`×` stay
+   live during a submit (deliberately), and the plan's own consumer mounts this dialog once and toggles
+   `open`, so the instance survives a dismissal and the in-flight closure wrote a phantom `Could not
+   close` (the PREVIOUS batch's refusal) plus an `onClosed` for tickets nobody had just asked to close
+   into an opening it knew nothing about. **Fixed by an attempt token** every post-`await` write is gated
+   on — including the `finally`, because an ungated reset would release a LIVE attempt's latch. Witness:
+   **13.787**, which was RED first (`expected "spy" to not be called at all`, with the stale `['a','c']`).
+2. **A FRESH MOUNT DOES NOT COVER IT** — the single most portable lesson here. The house mechanism for a
+   reopened dialog starting clean is a fresh mount (case `13.532`, `board.tsx`'s `MoveArrows`); it fixes
+   stale STATE across opens and **cannot fix a late PROP CALLBACK**, because the old closure still holds
+   the old `onClosed`. This lane's docblock had cited `13.532` as a *ruling* (it is a case id) and named
+   the consumers' close-and-reopen as the reason no guard was needed — **inverted**, since
+   close-and-reopen is the TRIGGER.
+3. **Two mutations SURVIVED round 1's suite** — deleting the holed half of the silence guard, and making
+   `onClosed` fire unconditionally, both left 7/7 green. Both were **unwitnessed decisions**, not
+   unconstrained paths; both now have witnesses (the holed arm, and 13.788 for the all-refused outcome)
+   and both mutations now redden their own site. Round 2 also mutated the fix itself (the token made
+   inert), reddening 13.787 and nothing else.
+4. **Four wrong causes corrected** — including `dialog.tsx`'s own comment, which claimed spec §5.3's
+   ticket-sheet Close was the first collision with `Dialog`'s dismiss. Measured false: `TicketSheet`
+   renders `Sheet`, not `Dialog`, and Ruling 31 fixed that collision by renaming **Sheet's** dismiss.
+   **Every `path:line` citation in the catalogue block was re-measured after the edits shifted them** —
+   eleven of them had gone stale, and a stale citation is this project's own recorded defect class.
+
+### Verification at `e7f9ce5a`
+
+Suites: **domain 506/0 · ui 325/0 · app-core 1502/0 · web 459/0**. Typechecks **0** (ui, app-core, web).
+Builds **0** (ui, app-core). **Seven checks raw 0** (`check:env`, `check:tasks`, `check:db-tz` — which
+needs `DATABASE_URL`; with the documented `postgres://gisik:gisik@localhost:54329/gisik_nokma` it prints
+`database timezone: Asia/Kolkata` — `check:runbook`, `check:citations`, `check:help`, `check-case-ids`).
+**Ten mutations killed** (six + four), each reddening its own site and each restored from a byte copy
+verified by sha256 — **not** `git checkout`, which ERRORS on an untracked path and would have left a
+mutated tree behind.
+
+### The traps that cost time here, so the next lane does not pay again
+
+- **`rtk` swallows vitest output.** A redirected run can come back as three lines with the detail in
+  `~/Library/Application Support/rtk/tee/<ts>_vitest_run.log` — the summary line names the path. Read that
+  file, or the failure detail is invisible while the exit code still looks right.
+- **A mutation anchor that is not unique is refused, not half-applied** — the attempt-token gate appears at
+  TWO sites (happy path and `catch`), and the harness reported `replacement count 2 (expected 1)`. **Guard
+  every mutation with a replacement count of exactly 1**; a mutation applied to one of two sites reads as
+  a survivor and condemns a test that is fine.
+- **`--concurrency` is not a vitest flag** (`--no-file-parallelism` is), and the failure looks like a
+  harness problem rather than a bad argument.
+- **Quoting the previous handoff's suite figures is not measuring them.** This lane's first commit quoted
+  `domain 506` from the block above before running it; it happened to be correct, and it was verified
+  afterwards — but a quoted number that happens to hold is indistinguishable from one that does not until
+  someone runs it.
+- **The `PreToolUse` hook refuses any test command containing `head`**, even when the `head` reads a FILE
+  rather than the pipe. Use `grep ... | tail -N`.
+
+### What Tasks 10 and 11 must do — read this before starting either
+
+The dialog **never dismisses itself**; `onClose` fires from Cancel, Escape and the scrim only, matching
+`NewTicketDialog` and `TransitionDialog`. So the consumer owns the dismissal, and the partial outcome is
+what makes it delicate:
+
+- **Task 10** must clear its own `bulkClose` state inside `onClosed` (or after it). `moves.onMoved()`
+  alone reloads the board and leaves the dialog mounted and empty.
+- **Task 11** must **snapshot the tickets at click time and keep its own open flag**. Its plan text wires
+  `onClosed` → `list.reload()` with the selection cleared on reload — which sets `open` false and unmounts
+  the dialog the moment a PARTIAL close reports, destroying the `Could not close` rows spec §8.3 requires
+  it to keep on screen.
+
+### Recorded, not fixed (out of scope, named owners)
+
+- A results array of the right LENGTH carrying the WRONG tickets' answers is undetectable here; the core's
+  own reader has the same limitation (`flows/guarded-child-event.ts:294-296`), so it belongs with that
+  contract. Owner: whoever next touches the ingest contract.
+- An `OfflineAcceptError` (thrown AFTER every event is enqueued, `replica-data-source.ts:1192`) renders as
+  a transport failure and invites a retry that queues N more — identical in `board.tsx`'s `closeCard` and
+  `ticket-sheet.tsx`'s `closeOrReopen`, and the sentence is the plan's. Owner: the offline-accept follow-on.
+- `packages/app-core/test/views/ticket-sheet.test.tsx:820` still says `Sheet`'s dismiss carries
+  `aria-label="Close"`; it says `Close sheet`. Owner: whoever next opens that file.
+
+---
+
+## ▼ PREVIOUS BLOCK — `isTypeEditor`: fields gain `required` (2026-09-18)
 
 **Position: the change set is COMPLETE, the review round is CLOSED, the branch is
 REBASED onto `main`, and PR #447 is open and awaiting the controller's merge.**

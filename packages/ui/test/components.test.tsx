@@ -82,6 +82,41 @@ describe('Dialog', () => {
     );
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
+
+  /**
+   * 13.643 — the dismiss control is named `Close dialog`, so a body button that
+   * says "Close" stays the only thing that name finds.
+   *
+   * The control's VISIBLE text is `×`, so its accessible name is whatever the
+   * `aria-label` says and nothing in a screenshot or a `getByText` can tell the
+   * two spellings apart — which is exactly how the collision survived until a
+   * feature put a plain "Close" button (spec §5.3, the ticket sheet's Close) in
+   * a dialog's body. Both the exact-name assertion and the unscoped
+   * `getByRole('button', { name: 'Close' })` are load-bearing: the first pins
+   * the new spelling, and the second is the one that threw "found multiple
+   * elements" under the old one, so it is the assertion that FAILS for the
+   * defect rather than merely describing the fix.
+   */
+  it('13.643 the dismiss control is named "Close dialog", leaving a body "Close" unambiguous', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onBodyClose = vi.fn();
+    render(
+      <Dialog open title="Close 2 tickets" onClose={onClose}>
+        <button type="button" onClick={onBodyClose}>
+          Close
+        </button>
+      </Dialog>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Close dialog' })).toBeInTheDocument();
+    // Exactly one — the body's own.
+    expect(screen.getByRole('button', { name: 'Close' })).toHaveTextContent('Close');
+
+    await user.click(screen.getByRole('button', { name: 'Close dialog' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onBodyClose).not.toHaveBeenCalled();
+  });
 });
 
 describe('Sheet', () => {
