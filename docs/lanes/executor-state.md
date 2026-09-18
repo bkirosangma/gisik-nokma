@@ -41,13 +41,230 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~09:0x IST. **SECOND WAVE, TASK 1 (DOMAIN: RANK KEYS,
-> # `ticket.ranked`, `TicketState.rank`) IS DONE — COMMITTED, CHECKED, MUTATION-TESTED AND
-> # INDEPENDENTLY REVIEWED. ONE PR, BASE `main`.** This block is the position; everything below it is
-> # RECORD. **The queue after this task is NOT empty** — Task 2 of
-> # `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md` (engine + precheck,
-> # `rank-requires-backlog`) is next, and it is dispatched by the controller rather than started by
-> # reflex. HOLD for that dispatch once this PR is open.
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~09:0x IST. **SECOND WAVE, TASK 2 (ENGINE + PRECHECK:
+> # `rank-requires-backlog`) IS DONE AND COMMITTED. ONE PR, BASE `main`.** This block is the position;
+> # everything below it is RECORD. **The queue after this task is NOT empty** — Task 3 of
+> # `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md` (server + wire:
+> # `proj_tickets.rank`, `ListRow.rank`/`TicketCard.rank`, the mapper, the replica) is next, and it is
+> # dispatched by the controller rather than started by reflex. HOLD for that dispatch once this PR is
+> # open. **A SECOND EXECUTOR IS LIVE** on a disjoint workstream (Members + InviteAdmin) in
+> # `gisik-nokma-exec2`; branches are one-per-task and every PR is `--base main`.
+>
+> | | |
+> |---|---|
+> | branch | `exec/second-wave-t2-engine`, cut from `origin/main` = `43650f15` |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha printed here names an ANCESTOR. At the time of writing the work commit is `857515f2` (Task 2) and the fix-round commit is `9994a543`, with this handoff on top of both |
+> | base | `43650f15` = `origin/main`, which already carries Task 1 (#441) and the topology anchor (#440) |
+> | PR base | **`main`** — `owner/workspace-edits` is retired and deleted; cutting from it auto-closes the PR (it closed #439) |
+> | commit | **THREE commits — the task's 9 files, then fix round 1's 3 files, then this handoff.** Task: `checks/rank.ts` (new), `refusal-rules.ts`, `evaluate.ts`, `test/rank.test.ts` (new), `test/engine.test.ts`, `app-core/src/precheck.ts`, `app-core/test/precheck.test.ts`, `Features.md`, `test-cases/13`. **The task commit was AMENDED** (its message carried a false claim about the mutation — see below), so an earlier draft of this block named `a2c69449`, which is now **ORPHANED**: `git merge-base --is-ancestor a2c69449 HEAD` is false while `git cat-file -t a2c69449` still answers `commit`. That is the trap this file opens with, hit here by its own author — **use `--is-ancestor`, never `cat-file`.** |
+> | six checks | all **EXIT 0** at the task commit: `tasks` · `env` · `runbook` · `help` · `citations` (**ratchet holds on every file**; file 13 = 540 cited / 0 uncited) · `db-tz` **0 with `DATABASE_URL` set** — it exits **2** without it, by design ("DATABASE_URL is required"), which is a missing precondition and not a red. Also `node scripts/check-case-ids.mjs` EXIT 0 (2230 unique ids, highest 15.34) |
+> | ledger | **untouched**, as the dispatch requires — `task-ledger.tsv` is `main`'s and the controller flips rows |
+> | gate | **NOT run by the executor** — the controller runs it (dispatch 2026-09-18: two executors contend for one lock and one 16 GB machine, so the executor quotes the six checks and leaves the gate to the controller). Do **not** read a green here as a gate. |
+> | tree | clean at the frozen head; no `dist` or `task-ledger.tsv` in the diff |
+>
+> ## ▣ WHAT TASK 2 SHIPS
+>
+> One refusal id, `rank-requires-backlog`, and its two independent producers:
+>
+> - `packages/rule-engine/src/checks/rank.ts` (new) — `checkTicketRanked` accepts a `ticket.ranked`
+>   only for a ticket whose `stateId` **is** `BACKLOG_STATE_ID`; refuses every other ticket naming the
+>   state over `statesWithBacklog(def)`, falling back to the bare id when the def will not resolve.
+> - `packages/rule-engine/src/refusal-rules.ts` — `rankRequiresBacklog`.
+> - `packages/rule-engine/src/evaluate.ts:48` — the dispatch arm.
+> - `packages/app-core/src/precheck.ts:372` — `precheckTicketRanked`, mirroring the verdict AND the
+>   sentence, for the reason 13.604's table exists.
+> - Cases `13.700` (engine, in `test/rank.test.ts`) and `13.701` (precheck), plus **two rows** in
+>   13.604's agreement table — the fifth reason, and (added by fix round 1) the same reason with the
+>   definition withheld, which is the branch the first row could not reach.
+>
+> **WHY THE TEST IS `stateId` AND NOT `stateCategory`.** The universal `BACKLOG_STATE` carries
+> `category: 'open'` (`packages/domain/src/workflow.ts:56`), so a category test would admit **every
+> open ticket in the workspace** — `"To do"` among them — while the backlog is one reserved id no
+> workflow may declare. Corroborated independently by the server's own reasoning at
+> `apps/server/src/routes/builder-reads.ts:848-858` ("A parked row's destination (`BACKLOG_STATE_ID`)
+> is category `open`, never terminal"). A **closed** ticket is refused by this same test rather than
+> by a flag test, because closing does not clear `stateId` (spec §2 keeps the final state visible), so
+> a closed ticket is terminal and not backlog.
+>
+> **NO `env.type` GUARD, measured rather than assumed.** `checks/rank.ts` opens with the entity-kind
+> guard and nothing else. A grep for `env.type !== ` across `packages/rule-engine/src/checks/*.ts`
+> returns **only `close.ts:26` and `:50`** — and close.ts's own docblock says that check exists
+> *because two handlers share that file*. Every one-handler check in the package omits it, so adding
+> one here would open a branch no product path reaches.
+>
+> ## ▣ THE OPEN RULING TASK 1 LEFT FOR TASK 2 — ANSWERED, WITH A REASON
+>
+> Task 1's block asked: *"Task 2 should decide whether `checkTicketRanked` also refuses it"* — `it`
+> being a rank key ending in `0`, which the door refuses but which `rankBetween` cannot order.
+>
+> **DECIDED: NO second check, because there is no second door.** `checkTicketRanked` calls
+> `ticketRankedPayload.safeParse`, and that schema already refines with `isRankKey`
+> (`packages/domain/src/events/ticket-events.ts:191`). So a trailing-zero key is refused
+> `malformed-payload` by the check's own parse — **measured**, not reasoned: case 13.700 includes
+> *"a key ending in 0 is malformed-payload: nothing sorts below it"*, which passes at the committed
+> head. An explicit re-check after the parse would be **unreachable code** — a check that cannot fail
+> — which is this project's signature defect class. Defence in depth belongs where the door is a
+> different door; here it would be a second lock on a door that already shut.
+>
+> ## ▣ THE CASE-ID RECOUNT, AND A FALSE FIGURE IN THE DISPATCH
+>
+> The dispatch allocated this executor the block **`13.700`–`13.759`** (a second executor mints ids in
+> parallel, so a bare "next free" number expires the moment a peer writes) and instructed a fresh
+> recount at the tip before minting. The recount changed the *reason* while leaving the ids safe:
+>
+> **The dispatch's sentence "Measured on `main` at `43650f15`: the highest id in this region is
+> `13.699`" is FALSE.** `13.697`, `13.698` and `13.699` occur in `test-cases/13` **only inside
+> prose** — the sentence "The next free id is `13.697`" and an earlier note about an "extras block
+> `13.695`–`13.699`" — and never as a case marker. A substring sweep over a file that *discusses*
+> case ids cannot separate a minted id from a mentioned one, so the sweep reported a high-water mark
+> four above the real one. **Measured over case markers (`^- ✅ **13.…`) and test names
+> (`describe/it('13.…`) only, the highest marker on `main` is `13.696`** — so `13.697`–`13.699` are
+> genuinely free, and, less comfortably, **unallocated**: they sit in the core plan's wake, inside
+> neither executor's block. **This wants a controller ruling before anyone recounts and mints
+> there.** The `check-case-ids.mjs` script already self-tests exactly this trap ("prose citation
+> excluded"); the dispatch's figure was produced by a hand sweep that did not.
+>
+> Neither the stale figure nor the gap touches `13.700`/`13.701`, which are inside this task's block.
+>
+> ## ▣ MUTATION EVIDENCE — and a mutation that had to be repaired before it measured anything
+>
+> **A FAILED BUILD STILL WRITES OUTPUT — and this handoff first recorded the opposite.** The plan's
+> mutation ("drop the backlog check") was first written as `if (false)`, which fails `tsc` because it
+> orphans the `BACKLOG_STATE_ID` import: `pnpm --filter @gisik-nokma/rule-engine build` exits **2**.
+> This block originally drew the inference "*so `dist` was never mutated, and the client suite would
+> have measured the correct build*". **That was false, and the correction matters more than the
+> mutation.** `noEmitOnError` is **absent from every tsconfig in the repo**
+> (`grep -rn noEmitOnError --include='tsconfig*.json' .` → empty), and `tsc`'s default is `false`, so
+> **tsc emitted the mutant `dist` despite exiting 2.** An independent reviewer caught it by
+> inspecting the emitted file; the config fact above was re-verified here, so the correction does not
+> rest on a peer's word alone.
+>
+> **The observation that misled the first reading** was `grep -c "stateId !== BACKLOG_STATE_ID"
+> dist/checks/rank.js` → `0`. That `0` is consistent with **both** hypotheses — "dist not rebuilt"
+> (stale, the correct build) and "dist rebuilt as the mutant" (fresh, the broken build) — because the
+> mutant removes the comparison entirely. A zero that cannot separate the two hypotheses it is being
+> asked to separate is not evidence for either, and the reassuring one was chosen.
+>
+> **The reported measurement was not affected**, because the client-side kill ran only after the
+> mutation was re-aimed AND rebuilt with exit **0** — so the row died against a genuinely mutant
+> `dist`. But the window between the failed build and the rebuild held a mutant `dist` that the client
+> suite would have measured as though it were the product. **The rule: never infer "nothing was
+> written" from a build's exit code; rebuild and re-verify.**
+>
+> Re-aimed as an empty branch — compiles, check gone — the mutation reddens **four cases, each at its
+> own site**: the `"To do"` refusal, the unknown-def fallback, the closed-ticket case, and the
+> `evaluateEvent` reachability half. Five survivors are exactly the cases independent of the dropped
+> check (accept-on-backlog, malformed key, trailing-zero key, unknown ticket, misfiled kind) — a
+> survivor set with a reason, not an unexplained one.
+>
+> **The agreement property, both halves.** The same mutation on the client side kills 13.604's rank
+> row while **both 13.701 cases stay green**, which is the point: the agreement case catches a drift
+> the two literals cannot, and the pre-check's own cases hold their ground independently of the
+> engine's copy. The precheck-side half was measured earlier and for free — during RED, with the
+> dispatch arm absent, both 13.701 cases failed `not-evaluated`, which is precisely the
+> precheck-side mutation. Restored by `cp` from a checksummed backup (sha256 `488a9bece…`), verified
+> by sha, then **rebuilt again** so no mutated `dist` was left behind.
+>
+> ## ▣ STALE-`dist` HAZARD, MEASURED THE HARD WAY
+>
+> The first GREEN run of this task was a **false red**: `app-core`'s suite imports
+> `@gisik-nokma/rule-engine` **by package name**, which resolves through `packages/rule-engine/dist`,
+> so a rule-engine source change is invisible to it until it is rebuilt. Anyone running
+> `packages/app-core` alone after touching `rule-engine` will read a stale engine — **in the
+> dangerous direction this makes a wrong green possible**, because a stale dist that happens to
+> accept is indistinguishable from a fix. Use `pnpm turbo run test` or rebuild explicitly.
+>
+> ## ▣ THE INDEPENDENT REVIEW (recorded BEFORE the PR opened)
+>
+> One reviewer subagent, on the `deepseek-flash` backend, dispatched read-only with the agreement
+> property as its headline question. **Verdict: no Critical, ONE Important — fixed — and three
+> Minor.** It ran **six mutations of its own** (A–F), restored every one by `cp` + `sha256`, and
+> confirmed the restores against a from-scratch build; no orphaned `vitest` workers.
+>
+> **I1 (Important) — the DEGRADED-NAME branch of the rank refusal was pinned by nothing on the
+> precheck side, and 13.604 could not see it.** Every row of the agreement table — and both 13.701
+> cases — built its cache through `readyCache()`, which ALWAYS caches the definition. So every one of
+> them exercised the cached-def expression only, and the `def === undefined ? ticket.stateId`
+> fallback (`precheck.ts:384`) stood beside it unpinned. **Proved, not argued:** the reviewer
+> replaced that fallback with `'SOMEWHERE-ELSE'` and all **forty** cases in the file stayed GREEN
+> (mutation E), while the same mutation in the engine's mirror (`checks/rank.ts:58`) killed its own
+> case (mutation F) — the engine's copy was pinned by `rank.test.ts:70`, the precheck's by nothing.
+> **Reachable in the product**, which is what makes it Important rather than theoretical:
+> `cache.ts:93` drops a workflow's whole version map on a `workflow.defined` while ticket rows
+> survive, and `cache-feed.ts:22` caches tickets on ticket reads while `:27` caches defs only on def
+> reads — so "ticket cached, definition not" is an ordinary state, and in it `precheckTicketRanked`
+> REFUSES (with the degraded name) rather than deferring. A user-visible sentence with nothing
+> holding it is precisely the defect the agreement table exists to prevent.
+>
+> **FIXED — and the fix was verified by re-running the reviewer's own mutation rather than by
+> inspection.** Added `cacheWithoutDef()` (a cache with the ticket and no definition), one 13.701
+> case pinning the degraded name, and one 13.604 row driving **both** producers through it.
+> `precheck.test.ts` goes 40 → **42 passed**; mutation E re-run → **reddens exactly those two new
+> cases** (it survived before). The table now covers both branches the sentence can be produced on.
+>
+> **Two sentences were FALSE as written and are now true.** `Features.md` said the two copies are
+> "held together by case 13.604's agreement table, which drives both producers and asserts
+> byte-identical reasons", and the catalogue entry said the engine and the pre-check "cannot drift
+> into two different reasons for one refusal". Mutation E falsifies both **for the degraded branch**
+> as they stood, because the table drove only the cached-def path. The claim is a claim about
+> coverage, and coverage is what the fix changed.
+>
+> **Minor, left as they are, each with its reason.**
+> **M1 — the rule-id assertion cannot fail** (`precheck.test.ts:458`): both sides read the same
+> imported constant and `precheckTicketRanked` has one refusal exit, so the drift it names is
+> unrepresentable. It is **disclosed in its own docblock**, which is why it stays: deleting a
+> disclosed-vacuous line is churn, silently keeping an undisclosed one is the project's signature
+> defect. **M2 — the precheck arm has no product caller yet**: no source in `apps/` or `packages/`
+> emits a `ticket.ranked`; the three `precheckEvent` callers precheck other types. The arm is
+> forward-looking for Tasks 4/5, so the drift I1 describes is currently **latent rather than live** —
+> recorded here so Tasks 4/5 wire it deliberately instead of inheriting it. **M3 — no fixture and no
+> server-level test** for `rank-requires-backlog`; disclosed and hedged at `Features.md:362`.
+>
+> **A PRE-EXISTING gap, RECORDED with a named owner and deliberately NOT fixed.** The identical
+> degraded-name branch for the four close/reopen reasons (`precheck.ts:333`) is unpinned in exactly
+> the same way, and was before this task touched anything — so it is a faithful extension, not a new
+> class. **Owner: whoever next touches the precheck's closed/reopened reason strings.** Fixing it
+> here would be scope creep into four reasons the dispatch did not name; recording it is what keeps
+> it findable.
+>
+> ## ▣ WHAT TASK 3 INHERITS
+>
+> 1. **The `rank: null` question, still open and still untouched.** Task 1 ruled creation does NOT
+>    write `rank`, because the server builds state from columns and there is no `rank` column until
+>    Task 3. **Task 3 creates that column — it must decide whether the reducer's creation now writes
+>    the null on BOTH sides in the same task**, as Task 7 does for `reopenedAt`. Do not hardcode a
+>    null in the mapper instead: that is the "closed flag dead in production" failure the plan's
+>    Global Constraint was written to prevent.
+> 2. The engine door is closed for keys ending in `0`; do not add a second check for it (above).
+> 3. `ListRow.rank`/`TicketCard.rank` are REQUIRED on the wire type and every test literal that
+>    builds one will need `rank: null` — `tsc` finds them; that set is the same one Task 4 of the core
+>    plan touched for `closed`.
+>
+> ## ▣ METHOD NOTES THIS TASK EARNED
+>
+> - **The plan's `Files:` block was stale a third time.** It names three source files; a fourth,
+>   `packages/rule-engine/test/engine.test.ts`, went red the moment a twentieth rule id existed,
+>   because `REFUSAL_RULES spells every canonical rule name` is an exact map. That test is doing its
+>   job — it forces a deliberate acknowledgement of every new id — but it is not in the task's file
+>   list. Steps 2a/4b corrected the plan's *expected reds* for the catalogue checks; this is a
+>   different stale spot.
+> - **`Features.md` placement deviates from the plan's literal text, deliberately.** The plan says to
+>   put the entry "in the refusals bullet", which is the core plan's bullet — titled for the closed
+>   flag, scoped "backlog/closed spec §1.1/§2, 2026-09-17", and counting "Four new refusals".
+>   Inserting a second-wave refusal there would falsify that bullet's scope, date and count, so the
+>   entry is a **sibling bullet directly after it**, carrying its own wave and date. The fixture-suite
+>   hedge is extended in place as instructed (`four` → `five`).
+> - **No consumer outside the engine enumerates refusal ids.** A sweep for `close-requires-terminal`
+>   across `.ts/.tsx/.md/.json` (excluding `node_modules`/`dist`) finds it only in tests, docs and the
+>   engine — the client renders whatever rule id the server sends (`ticket-sheet.tsx:493` is a
+>   comment). So a new refusal id needs **no** UI, help-content or allowlist change. Recorded because
+>   the plan does not say so and the next reader should not have to re-derive it.
+> - **`rtk git` hazard re-confirmed in passing** (`rtk git log` ignoring its revision argument): every
+>   sha-bearing command in this task used `/usr/bin/git`.
+>
+> # ▣ RECORD — SECOND WAVE TASK 1 (DOMAIN: RANK KEYS, `ticket.ranked`, `TicketState.rank`).
+> # DONE and MERGED as #441 at `43650f15`. Kept verbatim below for its two deviations, its 8-mutation
+> # evidence and its case-id recount — **not for position**. **Everything below it is RECORD.**
 >
 > **⚠ THE BASE MOVED MID-TASK — `owner/workspace-edits` NO LONGER EXISTS.** The controller landed it
 > onto `main` (landing 4, `f970d48e`) and deleted the branch, which **auto-CLOSED PR #439** (its base
