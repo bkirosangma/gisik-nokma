@@ -24,8 +24,8 @@ import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
  * attached over CDP is the only way to run that without a fingerprint sensor,
  * and it is why this spec exists.
  *
- * ## NOT EXECUTED AT THE TIME IT WAS WRITTEN — said here so nobody reads a
- * ## committed spec as a passing one
+ * ## IT WAS NOT EXECUTED FOR A WEEK, AND HAS NOW RUN — the history is kept
+ * ## because the first half is why nobody could see it
  *
  * This suite needs the real compose stack listening on `:3001`
  * (`playwright.stack.config.ts` has no `webServer`; `global-setup.ts` refuses
@@ -34,14 +34,27 @@ import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
  * own docblock names the hazard precisely: adopting a stray dev server makes
  * the suite "report deployment coverage of a deployment it never touched".
  * Standing up a second stack on that port was not an option available to the
- * session that wrote it.
+ * session that wrote it. So the file was COMPILED and never RUN, and the
+ * catalogue said so in as many words.
  *
- * So this file is COMPILED (it is inside `tsconfig.e2e.json`'s `include`, so
- * `pnpm --filter @gisik-nokma/web typecheck` covers it and it cannot rot
- * silently) but was never RUN. Its first green is owed to CI, whose `gate` job
- * runs this suite against a real compose stack — or to the next person with
- * the stack up locally. Treat a failure here as unexplored ground, not as a
- * regression.
+ * **FIRST LIVE GREEN: 2026-09-18, case 13.330, Step 5b.** Not owed to CI after
+ * all — the hot stack (`docker-compose.dev.yml` + `docker-compose.hot.yml`)
+ * holds `:3001` permanently from the executor's worktree, so the window this
+ * was waiting for is not a schedule item. The run line, verbatim:
+ *
+ *     ✓  1 e2e-stack/passkey-registration.spec.ts:75:1 › register a passkey on
+ *        /account, then sign in with it — no magic link in the second half (19.6s)
+ *
+ * It reached that state only because two seed defects were fixed first
+ * (`helpers/seed-shape.ts`): the suite died at `globalSetup` before any spec
+ * ran, first on `MODULE_NOT_FOUND` for a `dist` the hot image does not have,
+ * then on `ENOENT` for a `board.data.js` path that pnpm's cwd move broke.
+ *
+ * What the green does and does not establish: the WebAuthn ceremony really runs
+ * end to end — `addPasskey` produces a credential the server stores, and
+ * `signIn.passkey` really authenticates with it, with no magic link in the
+ * second half. It does NOT re-measure the rate-limit property (that is 13.333's
+ * separate case, unchanged by this run).
  *
  * ## Why the CDP result is cast
  *
@@ -72,6 +85,16 @@ async function attachVirtualAuthenticator(client: CDPSession): Promise<string> {
   return result.authenticatorId;
 }
 
+/**
+ * 13.330 — a passkey is registered on `/account` over a CDP virtual
+ * authenticator, the session is signed out, and sign-in completes by passkey
+ * alone: no magic link is requested, no inbox is purged and no email field is
+ * filled in the second half, so arriving off `/sign-in` is reachable only by a
+ * completed WebAuthn authentication. **First live witness 2026-09-18 (Step 5b);
+ * the run line is in the header docblock.** The row's absence-of-residue
+ * design — a per-run-unique label rather than an empty-list precondition — is
+ * explained at `passkeyName` below.
+ */
 test('register a passkey on /account, then sign in with it — no magic link in the second half', async ({
   page,
   context,
