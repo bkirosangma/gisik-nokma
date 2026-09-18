@@ -41,6 +41,71 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~18:4x IST. **SETTINGS → WORKFLOWS: REVIEW ROUND APPLIED, ALL
+> # GREEN, PR OPENING ON THE COMMIT THAT CARRIES THIS BLOCK.** `exec/settings-workflows`, ONE PR
+> # `--base main`. **One Important finding is RAISED TO THE CONTROLLER and is not fixed here — see below.**
+>
+> | | |
+> |---|---|
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it. Chain: `d8ccbf2e` (code) → 3 handoff commits → `00e8e3d8` (fix round) → `1fbc133b` (handoff) → **`e911a8f3` (review round)** → this commit. |
+> | base | merge-base with `origin/main` = **`a12c4018`**. **`main` has since moved to `21cdaa81` (#477), whose two commits touch only `docs/superpowers/plans/2026-09-18-settings-workflows-port.md` — a file this branch does not touch, so 0 overlap and no rebase was needed.** No rebase was done deliberately: it would move the frozen head away from the one the checks and the reviewer pass cover. |
+> | the change | 7 files. `workflow-list-screen.tsx` (the card grid), `ui.css` (the new `workflow-list__*` family, appended at EOF), `screens.test.tsx` (10.62 + case **13.884**), `tokens.test.ts` (13.884's measured half), `test-cases/13`, `Features.md`, this file. |
+> | case ids | **`13.884`**; `13.883` verified TAKEN on `main` (5 mentions). |
+> | migration | **NONE.** Do not restart the server container. |
+> | suites | **app-core 1550/0** (94 files) · **ui 330/0** (5 files) · **web 520/0** (48 files) · **four typechecks EXIT 0, all logs 0 bytes**. Node v22.22.2. Run with `rtk proxy pnpm exec vitest run` (see the method note below). |
+> | seven checks | **all EXIT 0**: `tasks` · `env` · `runbook` · `help` · `citations` (file 13 = **658** cited / 0 uncited) · `db-tz` (**`DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma`** → `Asia/Kolkata`) · `check-case-ids` (**2348**, union == sum). |
+> | gate | **NOT RUN BY THIS LANE** (the controller runs it). `pnpm turbo run build` **11/11** for the post-rebase dist rebuild. |
+>
+> ## ▣ THE REVIEWER'S PASS — recorded before the PR opened, per the freeze-line rule
+>
+> One per-task reviewer ran against `92c99406`, re-measured at `1fbc133b`. It hit both mandated jobs:
+> **the three arms still render** (by source identity — the diff hunks stop before the arm region, base
+> `:33-45` byte-equal to HEAD `:86-100`), and **no dead rule** (all 20 added rules map to a class the
+> component or its shared children emit). Findings, all addressed unless stated:
+>
+> | # | sev | finding | outcome |
+> |---|---|---|---|
+> | F2 | Important | the stale "**46** of the repo's 135" and "300 lines apart" survived in the catalogue **and in this file's own record blocks** | **fixed** — with a method lesson, below |
+> | F3 | Important | **my own fix round's one-line insert shifted the three `ui.css` citations it had just corrected**, plus its own range | **fixed** — 4384 / 4394 / 4406-4408 / 4356-4410 |
+> | F1 | Important | **this change removes the non-text-contrast sweep's only reading above 15** | **recorded, RAISED, NOT fixed** |
+> | F4 | Minor | the mutation-restore SHA-256 is a fact about the revision it was measured at | **fixed** — the sentence now says so and gives the tip's hash |
+> | F5 | Minor | 13.884's title claims "a card per workflow" but nothing counted cards | **fixed** — the case now counts them |
+> | F6 | Minor | both absence guards were class-shaped, so a badge renamed `.gn-chip` or a second action as `<a className="gn-button">` would pass | **fixed** — both now checked by CONTENT and TAG as well |
+> | F7 | Minor | `.workflow-list__title` is 1rem where the prototype is 20px/25px — an unrecorded divergence | **recorded** in the catalogue as a named divergence, not changed |
+>
+> ## ⛔ F1 — RAISED TO THE CONTROLLER. THE E2E-STACK SWEEP IS EXPECTED TO GO RED.
+>
+> The committed roster (`apps/web/e2e-stack/non-text-contrast-roster.json`, `totalClasses: 5`) has exactly
+> **two readings above 15**: `button.workflow-list__new` and the generic `button`, both **17.62**, both on
+> `/settings/workflows`, both carrying the **UA default black border**. Both were bare `<button>`s and are
+> now `Button`/`.gn-button`, which sets `border: none` (`ui.css:60`), and the sweep scores only elements with
+> a painted border (`helpers/non-text-contrast.ts:132-137`). So the maximum falls to **4.36** and
+> `viewport.spec.ts:1020`'s `expect(bestSeen).toBeGreaterThan(15)` — **the control proving the sweep can
+> still tell red from green** — fails; the roster is then rewritten unconditionally (`:946-968`) and both
+> entries vanish untraced.
+>
+> **Predicted from committed numbers and read CSS, NOT from a red run** — the suite needs the live stack and
+> `docker compose` is out of bounds for this lane. `apps/web/e2e-stack/` is untouched by this branch (0
+> files). The repair is a decision about the control's premise, which **this change deliberately removes**,
+> so it is not mine to make. **Owner: whoever next regenerates the viewport roster.**
+>
+> ## ▣ THE METHOD LESSON THAT COST THE MOST HERE
+>
+> **I swept the repo for the stale figures, got an EMPTY result, and reported "fully corrected" — a clean
+> bill read off a silent empty.** Two independent causes, one sweep: the string is wrapped in markdown
+> emphasis (`**46** of the repo's 135`), which my pattern could not match, and the other phrase is
+> **line-wrapped** ("300 lines" / "apart"), which a line-based `grep` cannot see at all. **An empty result is
+> a claim that needs its own control** — and the control that would have caught it is the one the fix round
+> then needed anyway: search for the CORRECTED value and confirm the OLD one is gone *from the same run*.
+>
+> The second lesson is F3, and it is the docblock's own thesis turned on its author: **inserting one line
+> into a file whose line numbers are cited shifts every citation below it.** I corrected three `ui.css`
+> citations and broke them in the same commit. If you edit `ui.css`, re-measure the citations to it before
+> you commit — the price is paid either way, and paying it knowingly is the whole point of the placement note.
+>
+> ---
+>
+> # ▣ RECORD — superseded by the block above.
 > # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~18:1x IST. **SETTINGS → WORKFLOWS: FIX ROUND APPLIED, ALL GREEN
 > # AT THE NEW HEAD, AWAITING THE REVIEWER'S REPORT, THEN THE PR OPENS.** Supersedes the block below.
 > # `exec/settings-workflows`, rebased onto `origin/main` = `a12c4018`, ONE PR `--base main`.
