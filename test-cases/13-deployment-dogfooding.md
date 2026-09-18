@@ -9874,7 +9874,8 @@ break unrelated suites for a consistency that buys nothing here.
   `userId: 'u1'`, and `membershipGrantedPayload`'s `userId` is `ulidString` — measured, `'u1'` fails with
   `userId: must be a ULID`, so a test transcribed from the plan would be red for a reason unrelated to this
   guard and the tempting repair would be to loosen the assertion, which deletes the witness.
-  **Citations:** `packages/rule-engine/src/checks/membership.ts:63` (the throw), `:91` (the kind refusal),
+  **Citations:** `packages/rule-engine/src/checks/membership.ts:69` (the throw — `:63` is the helper's
+  signature, and an earlier draft cited that as "the throw"), `:91` (the kind refusal),
   `packages/rule-engine/test/membership.test.ts:196`
 
 - ✅ **13.823 — only a workspace OWNER may grant the owner role, which is what stops an admin promoting
@@ -9896,22 +9897,31 @@ break unrelated suites for a consistency that buys nothing here.
 **Mutations, each applied to a backed-up file, confirmed to have CHANGED it, run, then restored by `cp`
 with a matching sha256.**
 
-1. **The `wasOwner` guard removed** (`isCurrentlyOwner` returns false) → reddens **13.820's and 13.821's
-   refusal arms and both `evaluateEvent` reachability arms, five in all, with the eleven accept arms still
-   green.** The asymmetry is the evidence: the mutation kills refusals and nothing else, so it identifies
-   its own site rather than reddening the file.
-2. **The stub's count ignores `excludingUserId`** → reddens the four refusal arms, accept arms green.
-3. **The server's SQL drops the `excludingUserId` clause** → reddens **exactly one case, the real-door
-   sole-owner refusal, 46 green.** This is the mutation that justifies the database suite's existence: no
-   stub and no pure test can see it.
-   **A first attempt at this mutation is recorded because it was invalid evidence and looked like a kill.**
-   The perl substitution dropped `$2` from the string and produced `AND (::text IS NOT NULL)` — a SQL
-   **syntax error**. The case reddened, but it would have reddened identically for a missing bind
-   parameter, for a typo in any column name, or for the table being absent; it proved the engine fails
-   loudly, not that the assertion can tell a wrong predicate from a right one. Re-run with the clause
-   deleted whole (valid SQL, `$2` still bound), it killed the same single case — which is the kill that
-   counts. **A mutation that reddens for a reason unrelated to the property it names is not a kill**, and
-   the two attempts are indistinguishable from the exit code alone.
+1. **The `wasOwner` guard removed** (`isCurrentlyOwner` returns false) → reddens **five**: 13.820's and
+   13.821's refusal arms, both `evaluateEvent` reachability arms, **and 13.822's THROWS arm** — 11 green.
+   An earlier draft called this "kills refusals and nothing else", which is wrong twice: it also kills the
+   throw, and of the eleven green only **eight** are accept arms (the other three are
+   `malformed-payload` refusals, which this mutation correctly leaves alone).
+2. **The stub's count ignores `excludingUserId`** → reddens the same four refusal/reachability arms, the
+   rest green.
+3. **The server's SQL ignores `excludingUserId`** → reddens **exactly one case, the real-door sole-owner
+   refusal, 46 green** — with a genuine `AssertionError`, which took three attempts to obtain and the two
+   failures are the point of this entry.
+   **★ TWO SUCCESSIVE ATTEMPTS AT THIS MUTATION WERE INVALID EVIDENCE AND BOTH LOOKED LIKE KILLS.**
+   *(a)* A perl substitution dropped `$2` and produced `AND (::text IS NOT NULL)` — a SQL **syntax
+   error**. *(b)* The "corrected" re-run deleted the clause whole; that removed the query's **only** `$2`,
+   leaving one placeholder against a two-element parameter array, and the case reddened with
+   `bind message supplies 2 parameters, but prepared statement "" requires 1` — **a bind error, the same
+   failure class as (a)**, and it was recorded here as "the kill that counts" until an independent review
+   measured it false. Neither run could have distinguished a wrong predicate from a mistyped column, a
+   missing parameter, or an absent table.
+   *(c)* The kill that counts keeps **both placeholders** and makes the clause a tautology —
+   `AND ($2::text IS NULL OR $2::text IS NOT NULL)` — verified by reading the mutated line back, with the
+   failure text confirmed to be `AssertionError: expected { status: 'committed' } to match object
+   { status: 'refused' }` and **not** a bind or syntax error.
+   **A mutation that reddens for a reason unrelated to the property it names is not a kill — and the exit
+   code cannot tell you which you have.** The first two attempts exit 1 exactly like the third, and both
+   were more convincing-looking than the real one.
 4. **The owner-grant clause replaced with `if (false)`** → reddens the pure permission case **and** the
    real-door self-promotion case, both halves, so neither is decorative.
 5. **The `env.entity.kind !== 'membership'` guard removed** → reddens exactly the misfiled-kind case.
@@ -9919,6 +9929,26 @@ with a matching sha256.**
    it** ("type guard, **kind guard**, `safeParse`…"), and that `evaluate.ts`'s own docblock makes it
    mandatory — the fixture suite and the offline replica enter through `evaluateEvent` and never pass
    through ingest's door, so no check may trust that dispatch.
+
+**★ A NAMED FOLLOW-ON this task creates and does not fix: the throw is reachable on the offline replica.**
+
+Found by the independent review, and it is a real consequence of the throw decision rather than a
+theoretical one. The chain, each link read: `packages/sync-client/src/precheck/local-context.ts:217` serves
+the ACTOR's own membership **with a role**, from bootstrap `me`; none of the four in-memory contexts
+implements `countWorkspaceOwners` (the server's is the only implementation), so `ownersOrThrow` throws
+there; and `packages/sync-client/src/outbox/outbox.ts:315` calls `evaluateEvent` with **no `try`/`catch`**,
+so the throw escapes `enqueue` — which its own contract describes as returning an `IngestResult`, and
+whose docblock claims the local verdict is *"identical to the answer the server will give on the same
+facts"*. For this guard it is not: the server **refuses**, the replica **throws**.
+
+**Latent today, not live** — no shipped client emits `membership.granted` or `membership.revoked`
+(measured: zero hits across `apps/web/src`, `packages/app-core/src`, `packages/sync-client/src`). **It goes
+live with the roster's role control**, which wires exactly that event to the client ingest path.
+*Owner: that task — the one that makes it reachable.* **The repair is not in this file and must not be a
+second membership reader:** the replica genuinely holds one row and cannot count owners, so what needs
+changing is where a throwing evaluation is caught, not a context inventing an answer it does not have.
+Recorded rather than repaired here because the trigger does not exist yet and because fixing it means
+editing a file this task has no other reason to touch.
 
 **One plan-text defect is recorded rather than silently repaired, and it has since been RULED ON.** The
 plan's Step 3 declares `REFUSAL_RULES.grantOwnerRequiresOwner` under **"Produces"**, while its Step 7 emits

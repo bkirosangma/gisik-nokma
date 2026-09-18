@@ -25,10 +25,36 @@ import { ACCEPT, refuse } from './refusals.js';
  *    and it belongs in the rule engine, whose whole job is refusing claims
  *    about the world. It is here.
  *
- * Answering the second in the permission layer would also have made it
- * unreachable from the fixture suite and the offline replica, which never pass
- * through the server's gate — and an invariant only one door enforces is an
+ * Answering the second in the permission layer would also have put it out of
+ * reach of every door that does not pass through that gate — the fixture suite
+ * and the offline replica — and an invariant only one door enforces is an
  * invariant every other door is free to break.
+ *
+ * ## What the other doors actually do — stated, because an earlier draft of
+ * ## this docblock claimed they ENFORCE it and they do not
+ *
+ * Only the SERVER context can answer `countWorkspaceOwners`: it is the only one
+ * backed by a table holding every member. The two in-memory contexts hold no
+ * memberships at all (`buildMemoryContext`) or only a fixture's roster, and the
+ * offline replica holds the ACTOR's membership alone. None of the three
+ * implements the method, so on those doors the guard does not enforce anything
+ * — it reaches `ownersOrThrow` and throws.
+ *
+ * Throwing is the honest answer to a question a context cannot answer, and it
+ * is what keeps `last-owner` from being asserted by something that never
+ * counted. But it is NOT enforcement, and the distinction has a live
+ * consequence rather than a theoretical one: an owner changing their OWN role
+ * through a replica-backed client aborts the enqueue instead of getting a
+ * refusal, because `outbox.enqueue` evaluates unguarded and has no verdict to
+ * return. Measured 2026-09-18; latent today only because no shipped client
+ * emits `membership.granted` yet. It goes live with the roster's role control,
+ * which is the change that wires that event to the client ingest path.
+ *
+ * The follow-on is recorded against that task in `test-cases/13` rather than
+ * repaired here, and the reason is that the repair is not in this file: the
+ * replica genuinely cannot count owners, so the fix is where a throwing
+ * evaluation is caught, not a second membership reader invented in a context
+ * that holds one row.
  *
  * ## The shape, and the one place it departs from `close.ts`
  *

@@ -87,6 +87,50 @@ controller flips them.
    not the rule-engine's two-argument one. A first cut of this work used the two-arg form, which would not
    compile. Recorded because the plan's line looks wrong and is not.
 
+### ★ THE REVIEW ROUND — no Critical, the escalation closed, and TWO of my own records measured FALSE
+
+One reviewer over `a6877594`. **It could not perform the escalation**, and it independently confirmed the
+count's agreement with `resolveEffectiveRole`, `excludingUserId` at both call sites, and that no case stays
+green under the mutation it claims to pin. What it found is mostly **my prose claiming more than the runs
+witnessed** — this repo's signature defect — plus one real consequence of the throw.
+
+1. **[Important] The throw is reachable as a crash on the offline replica, and my docblock claimed that
+   door ENFORCES the guard. It does not.** Chain, each link read: `local-context.ts:217` serves the actor's
+   own membership **with a role**; no in-memory context implements `countWorkspaceOwners`; and
+   `outbox.ts:315` calls `evaluateEvent` with **no try/catch**, so the throw escapes `enqueue` — which
+   contracts to return an `IngestResult` and whose docblock claims its verdict is *"identical to the answer
+   the server will give on the same facts"*. For this guard the server **refuses** and the replica
+   **throws**. **Latent today** (no shipped client emits these events; measured, zero hits). **Named
+   follow-on on the roster's role control**, recorded in `test-cases/13`, NOT fixed here — the replica
+   genuinely holds one row, so the repair is where a throwing evaluation is caught, not a counter invented
+   in a context that cannot answer. **The docblock is corrected**; it previously said placing the guard in
+   the engine meant the replica enforced it.
+2. **[Important] My recorded mutation #3 was invalid evidence, and the record asserted otherwise.**
+   `test-cases/13` said the "corrected" re-run — clause deleted whole, *"valid SQL, `$2` still bound"* —
+   killed the case. **Measured false:** that deletion removes the query's ONLY `$2`, leaving one placeholder
+   against a two-element parameter array, and the case reddened with
+   `bind message supplies 2 parameters, but prepared statement "" requires 1` — **the identical failure
+   class the same paragraph calls "not a kill"**. So there were **two** invalid attempts, not one, and the
+   second was recorded as the good one. **The kill that counts keeps both placeholders**
+   (`AND ($2::text IS NULL OR $2::text IS NOT NULL)`), verified by reading the mutated line back, with a
+   true `AssertionError` and no bind or syntax error. Recorded in full in `test-cases/13`, because the
+   lesson is that **all three attempts exit 1** and the two wrong ones look *better*.
+3. **[Minor]** `test-cases/13` cited `membership.ts:63` as "(the throw)"; `:69` is the throw, `:63` the
+   helper's signature. Corrected.
+4. **[Minor]** Mutation #1's numbers were right and their description was not: the five reds **include
+   13.822's THROWS arm**, so "kills refusals and nothing else" is false, and of the eleven green only
+   **eight** are accept arms (three are `malformed-payload` refusals). Corrected.
+5. **[Minor]** The world-half `Features.md` bullet sat under §5 (*Tickets, hierarchy & rollups*) though a
+   membership guard is not a ticket feature; **moved into §6 beside its actor half** so the guard reads as
+   one feature. Its *"cannot have one through the shared fixture suite"* also named the wrong reason —
+   corrected to: the harness DOES serve a roster with roles but has no `countWorkspaceOwners`, so a fixture
+   case would **THROW** rather than exercise the rule. "Cannot" was a claim about the harness's current
+   shape stated as an impossibility.
+
+**The pattern worth carrying: every finding was a sentence stronger than the measurement under it, and the
+reviewer found them by RUNNING the thing rather than reading it.** Two were in records I had written to
+document exactly this defect class.
+
 ### Bypasses I ruled OUT by measurement, so a restart need not redo them
 
 - **Invite acceptance does not bypass the actor half.** `apps/server/src/invites/acceptance.ts:166` does

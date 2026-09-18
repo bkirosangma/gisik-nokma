@@ -16,15 +16,20 @@ import { WS } from '../src/checks/test-support.js';
  * use the shared fixture suite.
  *
  * Measured before writing, and it is the reason the context below is
- * hand-rolled rather than imported: of the four `EngineContext`
- * implementations, only the SERVER and the FIXTURE HARNESS can serve a
- * membership with a role at all. `buildMemoryContext` answers `null` for every
- * membership by design (its own suite pins that), and the offline replica
- * serves only the ACTOR's own membership from bootstrap `me`. A guard whose
- * entire input is "what role does this OTHER person hold" can therefore not be
- * driven by either of the two in-memory contexts the fixture suite uses — and
- * the harness, which does serve roles, is reached only through fixture JSON,
- * none of which carries a `membership.granted` candidate.
+ * hand-rolled rather than imported: **no context but the server's can serve a
+ * membership belonging to anyone OTHER than the actor.** `buildMemoryContext`
+ * answers `null` for every membership by design (its own suite pins that); the
+ * offline replica serves exactly one membership, the actor's own, resolved from
+ * bootstrap `me`; and the fixture harness does serve a roster with roles, but is
+ * reached only through fixture JSON, none of which carries a `membership.granted`
+ * candidate. A guard whose entire input is "what role does this OTHER person
+ * hold" therefore cannot be driven by any of them.
+ *
+ * An earlier draft of this paragraph said only the server and the harness could
+ * serve a membership "at all", which the replica falsifies — and the correction
+ * is not pedantry: the replica's single-membership shape is exactly what makes
+ * this guard THROW there rather than refuse, which is the difference between an
+ * invariant that holds on a door and one that merely fails loudly on it.
  *
  * So the guard's witness is here. That is a real limit and it is recorded in
  * `Features.md` as a hedge rather than left for a reader to infer, because a
