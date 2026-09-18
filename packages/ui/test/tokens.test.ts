@@ -1762,3 +1762,179 @@ describe('13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and t
     expect(declarationsFor(UI_CSS_TEXT, ZEBRA_HOVER), 'nor may hover').not.toMatch(/!\s*important/);
   });
 });
+
+/**
+ * 13.899 — the switch is ONE rule set, in `ui.css`, and its two states are
+ * distinguishable.
+ *
+ * The 2026-09-18 extraction moved `/account`'s notification switch into
+ * `@gisik-nokma/ui` so the Settings → Workspace tab could use it without a
+ * second copy — the ruling was *"extract it into a shared component and use it
+ * in both places rather than copying its CSS; two toggles that drift is the
+ * divergence this repo keeps paying for."*
+ *
+ * **What this case can and cannot see, named rather than implied.** It reads
+ * DECLARATIONS out of `ui.css` and resolves their roles through `colorOf`. It
+ * does NOT measure a rendered pixel: the track is an alpha fill, so its true
+ * contrast against the knob's ring is a COMPOSITING question this instrument is
+ * blind to by construction — the same limit `13.894` states for its stripe. What
+ * it proves is the two things drift would actually break: that there is exactly
+ * one switch rule set, and that the two states are not painted alike.
+ */
+describe('13.899 — the switch is one rule set in ui.css, and its states differ', () => {
+  const UI_CSS_TEXT = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
+  const GLOBALS_CSS_TEXT = readFileSync(join(REPO_ROOT, 'apps/web/app/globals.css'), 'utf8');
+
+  /**
+   * EVERY rule body that names `selector`, not just the first.
+   *
+   * This exists because the first-match instrument was WRONG here, in the way
+   * that costs the most: it made a case fail for a reason unrelated to what it
+   * named. `.gn-account__notification-row` is also the TRAILING member of a
+   * four-selector list in `globals.css`
+   * (`.gn-account__session-row, .gn-account__workspace-row,
+   * .gn-account__passkey-row, .gn-account__notification-row { … }`), and that
+   * block comes FIRST in the file. A `^`-anchored first-match read therefore
+   * returned the SHARED ROW base rule — width, `flex-wrap`, `min-height` — and
+   * the edge-alignment assertion reported a declaration missing that is present
+   * eighty lines below it.
+   */
+  const allDeclarationsFor = (css: string, selector: string): string[] => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return [...css.matchAll(new RegExp(`^${escaped}\\s*\\{([^}]*)\\}`, 'gm'))].map((m) => m[1] ?? '');
+  };
+
+  const declarationsFor = (css: string, selector: string): string | null => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`^${escaped}\\s*\\{([^}]*)\\}`, 'm').exec(css)?.[1] ?? null;
+  };
+  const declaredRole = (selector: string, declarations: string, property: string): TokenRole => {
+    // `[^;]*?` rather than nothing between the colon and the var: the knob's
+    // ring is written `border: 1px solid var(--gn-border-strong)`, and a strict
+    // `property:\s*var(` would have silently declared the rule unreadable — the
+    // instrument refusing the input it was built to read is at least loud, but
+    // it is still an instrument that did not measure what it named.
+    const named = new RegExp(`(?:^|[\\s;])${property}:\\s*[^;]*?var\\(--gn-([a-z-]+)\\)`).exec(declarations)?.[1];
+    if (named === undefined) {
+      throw new Error(`${selector} declares no \`${property}: var(--gn-…)\`; it reads: ${declarations.trim()}`);
+    }
+    const role = TOKEN_ROLES.find((candidate) => cssVariableName(candidate) === `--gn-${named}`);
+    if (role === undefined) {
+      throw new Error(`${selector}'s ${property} names --gn-${named}, which is not a role in TOKEN_ROLES`);
+    }
+    return role;
+  };
+
+  it('the switch is declared here, and the account-scoped rule it replaced is gone — the control', () => {
+    // The not-null reads are what make everything below a fact about `ui.css`
+    // rather than about a literal in this file.
+    expect(declarationsFor(UI_CSS_TEXT, '.gn-switch'), '.gn-switch not found in ui.css').not.toBeNull();
+    expect(
+      declarationsFor(UI_CSS_TEXT, '.gn-switch::after'),
+      '.gn-switch::after not found in ui.css',
+    ).not.toBeNull();
+
+    // THE CONTROL, through the SAME instrument on the file the rules moved OUT
+    // of. Asserting only that ui.css has them would pass just as well if the
+    // originals had been left behind — which is precisely the "two toggles that
+    // drift" state the extraction exists to prevent.
+    expect(
+      declarationsFor(GLOBALS_CSS_TEXT, ".gn-account__notification-row input[type='checkbox']"),
+      'the pre-extraction switch rule is still in globals.css — there are now two switch rule sets',
+    ).toBeNull();
+  });
+
+  it('the trailing-edge alignment stays on the ACCOUNT row, not on the shared switch', () => {
+    // The split this extraction had to get right, and the one a careless hoist
+    // gets wrong: `/account`'s rows are full-width and want their switch at the
+    // trailing edge, while a switch in a form field wants its control beside its
+    // own label. Carrying `justify-content: space-between` into the shared
+    // `.gn-switch-row` would have made the Settings → Workspace switch jump to
+    // the far edge of its card — a visual defect no case above can see, because
+    // both rules would still exist and both states would still differ.
+    const sharedRow = allDeclarationsFor(UI_CSS_TEXT, '.gn-switch-row');
+    const accountRow = allDeclarationsFor(GLOBALS_CSS_TEXT, '.gn-account__notification-row');
+    expect(sharedRow.length, '.gn-switch-row not found in ui.css').toBeGreaterThan(0);
+    expect(accountRow.length, '.gn-account__notification-row not found in globals.css').toBeGreaterThan(0);
+    // EVERY body, in both directions: the shared row must edge-align in none of
+    // its rules, and the account row must edge-align in at least one of its own.
+    for (const body of sharedRow) {
+      expect(body, 'the shared row must NOT edge-align its control').not.toMatch(/justify-content/);
+    }
+    expect(
+      accountRow.some((body) => /justify-content:\s*space-between/.test(body)),
+      'no rule on the account row edge-aligns its switch',
+    ).toBe(true);
+  });
+
+  it('the checked track is painted with a different role from the unchecked one, in every style and theme', () => {
+    const base = declarationsFor(UI_CSS_TEXT, '.gn-switch');
+    const checked = declarationsFor(UI_CSS_TEXT, '.gn-switch:checked');
+    if (base === null || checked === null) throw new Error('.gn-switch rules not found in ui.css');
+    const offRole = declaredRole('.gn-switch', base, 'background');
+    const onRole = declaredRole('.gn-switch:checked', checked, 'background');
+
+    // A SET DIFFERENCE, not a count: the two states must name different roles
+    // AND resolve to different values in every style×theme. Naming different
+    // roles but resolving to one hex is exactly the `neo`-collapses-the-fills
+    // failure this suite has already recorded for `surface`/`surfaceRaised`/
+    // `surfaceSunken` — and it would look correct in the source.
+    expect(onRole).not.toBe(offRole);
+    for (const style of STYLE_NAMES) {
+      for (const theme of THEME_NAMES) {
+        expect(
+          colorOf(theme, onRole, style),
+          `${style}/${theme}: the ON and OFF tracks resolve to the same colour — the switch shows no state`,
+        ).not.toBe(colorOf(theme, offRole, style));
+      }
+    }
+  });
+
+  it('the knob keeps a ring that is a different role from the knob fill it sits on', () => {
+    const knob = declarationsFor(UI_CSS_TEXT, '.gn-switch::after');
+    if (knob === null) throw new Error('.gn-switch::after not found in ui.css');
+    const knobFill = declaredRole('.gn-switch::after', knob, 'background');
+    const knobRing = declaredRole('.gn-switch::after', knob, 'border');
+
+    // The claim the original rule was written for: the ring is what guarantees
+    // the knob has a visible edge where a bare raised fill would vanish into
+    // the unchecked track. A ring resolving to the knob's OWN fill is a
+    // boundary that is not drawn.
+    expect(knobRing).not.toBe(knobFill);
+    for (const style of STYLE_NAMES) {
+      for (const theme of THEME_NAMES) {
+        expect(
+          colorOf(theme, knobRing, style),
+          `${style}/${theme}: the knob's ring resolves to its own fill — no boundary is drawn`,
+        ).not.toBe(colorOf(theme, knobFill, style));
+      }
+    }
+  });
+
+  it('BOTH call sites reach the one component — the account rows and the workspace form', () => {
+    // The extraction is only worth anything if both callers actually use it, so
+    // this reads the two SOURCES rather than trusting the component's docblock.
+    const account = readFileSync(
+      join(REPO_ROOT, 'packages/app-core/src/account/notifications-section.tsx'),
+      'utf8',
+    );
+    const workspaceForm = readFileSync(
+      join(REPO_ROOT, 'apps/web/src/workspace-settings-form.tsx'),
+      'utf8',
+    );
+    for (const [label, source] of [
+      ['notifications-section.tsx', account],
+      ['workspace-settings-form.tsx', workspaceForm],
+    ] as const) {
+      expect(source, `${label} no longer imports the shared Switch`).toMatch(
+        /import \{[^}]*\bSwitch\b[^}]*\} from '@gisik-nokma\/ui'/,
+      );
+      expect(source, `${label} renders <Switch`).toMatch(/<Switch\b/);
+      // …and neither has grown its own `<input type="checkbox">` back, which is
+      // the shape a re-fork takes.
+      expect(source, `${label} has a hand-rolled checkbox again`).not.toMatch(
+        /<input[^>]*type=['"]checkbox['"]/,
+      );
+    }
+  });
+});

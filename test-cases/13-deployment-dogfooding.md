@@ -12027,3 +12027,69 @@ prose citations and it does not cover them. **They are recorded rather than rewr
 doc is a dated audit snapshot whose line numbers describe the tree at audit time, and because two other
 writers hold conflicting claims on those files. **Owner: the controller, at the next settings-cluster
 sweep.**
+
+## Settings → Workspace restyle: the switch, the info icons, the Save row (executor 2, 2026-09-18) — cases `13.895`–`13.900`
+
+The owner: *"the settings -> workspace tab, needs to be a better UI. also have an info icon near the
+fiends to give a brief explanation (hover/focus/click - same witht the projects nav item). save button
+on a new row. auto close on/off -> make it a radio rather than checkbox (check the account page on the
+styling of the radio.) and be mindful of the spacings."* The control question was settled by the owner
+after two wrong guesses: what `/account` draws is a **switch**, not a radio group. The `Off` checkbox on
+the auto-close field therefore became a switch, and **its polarity INVERTED** — `checked` now means ON,
+where the box's tick meant off. That inversion is the whole hazard of the swap and is why the cases
+below pin both directions separately.
+
+`13.890`–`13.894` were already spent (`#480`, `#482`); these six continue the block. Recounted at this
+branch's tip by case MARKER only — `13.895`–`13.918` are free repo-wide, and every hit in a body-text
+sweep for the block's own bounds is prose *mentioning* the range, which is exactly the trap
+`scripts/check-case-ids.mjs` exists to tell apart.
+
+- ✅ **13.895 — the switch's CHECKED state means ON, which is the inverse of the `Off` box it replaced,
+  and turning it off is what claims `null`.** `apps/web/test/settings-page.test.tsx`. The fixture is a
+  workspace at `autoCloseAfterDays: 30`, so the control must mount CHECKED; a binding carried across
+  unchanged (`checked={autoCloseOff}`) mounts it unchecked and fails on that line. Both directions are
+  asserted — mounted-checked, then clicked to unchecked with the window disabled and the payload
+  `{autoCloseAfterDays: null}` — because a single "click then read the payload" case passes against the
+  inverted mutant half the time.
+- ✅ **13.896 — a blank window is a THIRD state, and turning the switch ON over it is not a claim.**
+  `apps/web/test/settings-page.test.tsx`. From `autoCloseAfterDays: null`, switching ON enables the
+  number input while leaving it EMPTY, sends nothing, and keeps Save disabled. Empty is not a window and
+  must not be read as one; nor may it be read as "off" — the switch is demonstrably ON at the moment
+  Save is still refused. This is the distinction the original `Off` control existed to protect, asserted
+  after the control changed.
+- ✅ **13.897 — each field's info icon opens on hover, on focus AND on click, and closes on Escape.**
+  `apps/web/test/settings-page.test.tsx`. All three paths are asserted separately because the owner
+  named all three, and the CLICK path is the one a plausible implementation gets wrong: a click focuses
+  the button first, so a toggling `onClick` reads the state `onFocus` has just set and closes the panel
+  immediately. The case also pins that the three buttons carry three DIFFERENT accessible names
+  (`About Stale after` / `About Due soon within` / `About Auto-close after`) — three buttons named
+  "About" would be one name for three different disclosures.
+- ✅ **13.898 — Save sits on its own row, outside the field column.** `apps/web/test/settings-page.test.tsx`.
+  Asserted as a RELATIONSHIP rather than by class name: the button's row must not be inside
+  `.gn-workspace-settings__fields`, and must be a sibling of it under the same card. A wrapper added
+  around each field would still satisfy `closest('.gn-workspace-settings__actions')`, which is why the
+  discriminating assertion is the `closest(...__fields)` returning null.
+- ✅ **13.899 — the switch is ONE rule set in `ui.css`, and its two states differ.**
+  `packages/ui/test/tokens.test.ts`. Reads declarations out of `ui.css` and resolves their roles through
+  `colorOf`, in every style×theme: the checked track and the unchecked track must name different roles
+  AND resolve to different colours (the `neo`-collapses-the-fills failure would name two roles and paint
+  one hex), and the knob's ring must differ from the knob's own fill both by role and by resolved value —
+  a ring that resolves to the fill is a boundary that is not drawn. The CONTROL is the file the rules
+  moved OUT of: the pre-extraction selector `.gn-account__notification-row input[type='checkbox']` must
+  be absent from `apps/web/app/globals.css`, which is what makes "there is one switch rule set" a
+  measurement rather than a claim. It also reads both SOURCES and asserts each imports the shared
+  `Switch` and neither has grown a hand-rolled `<input type="checkbox">` back. **What it cannot see,
+  stated rather than implied:** the track is an alpha fill, so the knob ring's true contrast against it
+  is a COMPOSITING question this instrument is blind to — the same limit `13.894` records for its stripe.
+- ✅ **13.900 — `Switch` and `InfoTip`, the component halves.** `packages/ui/test/components.test.tsx`.
+  `Switch` is a real checkbox named by the label it wraps (`getByLabelText` resolves to it), hands the
+  caller the NEXT boolean rather than the event, keeps the caller's `className` alongside its own row
+  class, and passes `disabled` through. `InfoTip` is closed to begin with and names its button for what
+  it explains.
+
+**A defect the tests caught before the PR, recorded because it is the kind a screenshot would not
+show.** `InfoTip`'s first `onClick` was a TOGGLE, and a toggle loses a race it cannot see: clicking a
+button focuses it first, so React ran `onFocus` (open) and then `onClick`, which read the state it had
+just been given and closed the panel. The click appeared to do nothing. `13.897` and `13.900` now pin
+the click path explicitly; the handler opens idempotently, which is also the honest spelling of the
+owner's request that hover, focus and click all OPEN it.
