@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type HTMLAttributes, type ReactNode } from 'react';
 import { Avatar, Chip, Select, Table, type TableColumn } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatDate } from '../provenance.js';
@@ -24,6 +24,13 @@ import {
   type GroupLabels,
   type ListRowNode,
 } from './list-model.js';
+// The drag payload's ONE spelling (second wave Task 4). `board.tsx` exports it
+// and this file IMPORTS it rather than re-typing `'text/plain'`: two spellings
+// of the same format drift apart silently, and the failure mode of a drifted
+// format is a drop that reads `''` — a reorder that does nothing and says
+// nothing, which is exactly the class of defect this series keeps recording.
+// No import cycle: `board.tsx` imports nothing from this module.
+import { DRAG_TICKET_FORMAT } from './board.js';
 import { formatRollup } from './rollup-text.js';
 import { useLiveQuery } from './use-live-query.js';
 import { usePreferences } from './use-preferences.js';
@@ -148,6 +155,40 @@ export type TicketListProps = {
    * generic one this component would have had to invent.
    */
   emptyCopy?: string;
+  /**
+   * Row drag, for a surface with a manual order (second wave, spec §8.1).
+   *
+   * OPTIONAL, and absence is the entire pre-Task-4 behaviour: no row is
+   * `draggable`, no handler is attached, and no tail zone renders. Every
+   * other tab passes nothing and renders byte-identical markup to before
+   * this prop existed (13.705's negative arm is what measures that).
+   *
+   * When present, each `<tr>` carries `draggable` plus the four drag
+   * handlers, and a tail zone follows the tables for "place last":
+   *
+   * - `onReorder(movedTicketId, beforeTicketId)` — `beforeTicketId` is the row
+   *   the drop LANDED ON, meaning *put `moved` immediately before it*. The
+   *   tail zone reports `null`, meaning *put `moved` last*.
+   * - A drop on the dragged row itself is refused here, not passed on: it is
+   *   a gesture the user began and ended on the same row, and a caller told
+   *   about it would compute a no-op move and put a claim on the wire for it.
+   * - A payload carrying NO ticket id (a drag that began outside this list)
+   *   is refused for the same reason — `onReorder('')` would name a ticket
+   *   that does not exist in the caller's order.
+   *
+   * **These are React props on the row, not a registry.** 13.534 recorded the
+   * flake a passive `useEffect`-registered attempt map produced on the Board:
+   * a callback registered by one render answering a drop that belongs to
+   * another. Props are attached during the render that draws the row, so the
+   * row a drop lands on is the row whose handler fires. The Board's registry
+   * exists because a drop there must reach the DRAGGED card's `attemptMove`
+   * closure; here the dragged id travels in the `dataTransfer` payload — the
+   * thing the browser itself carries across the gesture — so there is nothing
+   * to look up.
+   */
+  rowDrag?: {
+    onReorder: (movedTicketId: string, beforeTicketId: string | null) => void;
+  };
 };
 
 /**
@@ -189,8 +230,81 @@ export function TicketList({
   narrowing,
   rowAction,
   emptyCopy,
+  rowDrag,
 }: TicketListProps) {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  /*
+    The gesture's two live facts (second wave Task 4). Both are view state, not
+    preferences: which row is under the pointer right now is a fact about this
+    moment on this screen, and persisting it would put a document on the wire
+    every time somebody dragged a row.
+
+    Held HERE rather than in `ListTable` because the tail zone is rendered once
+    for the whole list (below), not once per section — a grouped list mounts
+    `ListTable` per section, and the marker has to survive crossing between
+    them mid-gesture.
+  */
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropBeforeId, setDropBeforeId] = useState<string | null>(null);
+
+  /*
+    Every row's drag props, or `undefined` when no caller wired `rowDrag` — in
+    which case `Table` spreads nothing and the rows render exactly as they did
+    before this task.
+  */
+  const dragRowProps =
+    rowDrag === undefined
+      ? undefined
+      : (node: ListRowNode): HTMLAttributes<HTMLTableRowElement> => {
+          const id = node.row.ticketId;
+          return {
+            draggable: true,
+            onDragStart: (event) => {
+              // The payload the DROP side reads. Written under the format
+              // `board.tsx` exports, so a list drag and a board drag cannot
+              // disagree about where the id lives.
+              event.dataTransfer.setData(DRAG_TICKET_FORMAT, id);
+              event.dataTransfer.effectAllowed = 'move';
+              setDraggingId(id);
+            },
+            /*
+              `dragend` fires on the SOURCE whatever the gesture's outcome —
+              a drop on another row, a drop on the tail zone, or a release
+              over nothing at all. Clearing both facts here is what keeps the
+              marker honest for the one case no handler of ours runs for: an
+              abandoned drag would otherwise leave a row marked `--dragging`
+              and a stale `--drop-before` line on screen.
+            */
+            onDragEnd: () => {
+              setDraggingId(null);
+              setDropBeforeId(null);
+            },
+            onDragOver: (event) => {
+              // A browser fires `drop` only over a target that cancelled
+              // `dragover`; without this the row is not a drop target at all.
+              event.preventDefault();
+              setDropBeforeId(id);
+            },
+            onDrop: (event) => {
+              event.preventDefault();
+              const moved = event.dataTransfer.getData(DRAG_TICKET_FORMAT);
+              setDraggingId(null);
+              setDropBeforeId(null);
+              // Nothing to reorder: a gesture that began outside this list
+              // carries no id, and one that began and ended on this row asks
+              // for a move to where it already is. Both are refused HERE
+              // rather than handed to a caller that would have to guess.
+              if (moved === '' || moved === id) return;
+              rowDrag.onReorder(moved, id);
+            },
+            className: [
+              draggingId === id ? 'gn-list__row--dragging' : null,
+              dropBeforeId === id ? 'gn-list__row--drop-before' : null,
+            ]
+              .filter(Boolean)
+              .join(' '),
+          };
+        };
   /**
    * The column tray's own open/closed state — component-local and deliberately
    * NOT a preference. `prefs` is the arrangement (which columns, in what
@@ -411,6 +525,7 @@ export function TicketList({
             onToggleCollapse={toggleCollapse}
             onOpenTicket={onOpenTicket}
             rowAction={rowAction}
+            {...(dragRowProps === undefined ? {} : { rowProps: dragRowProps })}
           />
         </section>
       ) : null}
@@ -465,6 +580,7 @@ export function TicketList({
               onToggleCollapse={toggleCollapse}
               onOpenTicket={onOpenTicket}
               rowAction={rowAction}
+              {...(dragRowProps === undefined ? {} : { rowProps: dragRowProps })}
             />
           </section>
         );
@@ -485,6 +601,41 @@ export function TicketList({
           {emptyCopy}
         </p>
       ) : null}
+
+      {/*
+        The tail drop zone — "place last" (second wave Task 4, spec §8.1).
+
+        Rendered ONCE for the whole list and only when a caller wired row
+        dragging: an empty drop target is a promise no other surface makes, and
+        a sectioned list mounts one `ListTable` per section — a zone per
+        section would put N targets on screen to say the one thing, and a drop
+        on any of them means the same order, so N of them would be N claims
+        that a part is the whole. `onReorder(moved, null)` is the one thing a
+        drop here can mean: last, in the caller's own order.
+
+        `aria-hidden` because this is a mouse gesture's affordance and nothing
+        else — no text, no role, no keyboard path of its own. The keyboard
+        route to the same order is `Move up` / `Move down`, which the Backlog
+        tab composes beside each row (Task 5).
+      */}
+      {rowDrag === undefined ? null : (
+        <div
+          className="gn-list__tail-drop"
+          aria-hidden="true"
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            event.preventDefault();
+            const moved = event.dataTransfer.getData(DRAG_TICKET_FORMAT);
+            setDraggingId(null);
+            setDropBeforeId(null);
+            // Same refusal as a row drop: a gesture that began outside this
+            // list carries no id, and `onReorder('')` would name a ticket that
+            // does not exist in the caller's order.
+            if (moved === '') return;
+            rowDrag.onReorder(moved, null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -544,6 +695,7 @@ function ListTable({
   onToggleCollapse,
   onOpenTicket,
   rowAction,
+  rowProps,
 }: {
   nodes: ListRowNode[];
   columns: ListColumnId[];
@@ -551,6 +703,8 @@ function ListTable({
   onToggleCollapse: (ticketId: string) => void;
   onOpenTicket: (ticketId: string) => void;
   rowAction?: (row: ListRow) => ReactNode;
+  /** Second wave Task 4 — see `TicketListProps.rowDrag`. Absent on every surface that does not reorder. */
+  rowProps?: (node: ListRowNode) => HTMLAttributes<HTMLTableRowElement>;
 }) {
   const tableColumns: TableColumn<ListRowNode>[] = [
     {
@@ -663,6 +817,7 @@ function ListTable({
         rowKey={(node) => node.row.ticketId}
         className="gn-list__table"
         rowClassName="gn-list__table-row"
+        {...(rowProps === undefined ? {} : { rowProps })}
       />
     </div>
   );

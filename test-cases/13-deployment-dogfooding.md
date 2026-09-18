@@ -8702,3 +8702,94 @@ only, never by substring: the highest `13.*` marker in this file at this tip is 
 FREE before minting — the only hits were prose *mentions* of the block's own bounds, which is exactly the
 trap this file records: a substring sweep over a document that discusses the ids cannot separate a
 MINTED id from a MENTIONED one.
+**Task 4 (`Table`/`TicketList` row drag and the tail drop zone) — `13.705`–`13.706`.** Ids recounted at this
+tip (branch `exec/second-wave-t4-rowdrag`, cut from `origin/main` `fb346a9f`) over case MARKERS and test
+NAMES only, never a substring sweep: the highest case MARKER minted inside this executor's block
+(`13.700`–`13.759`) is **`13.704`** (Task 3's third), and `13.705`–`13.759` are minted by nobody —
+`/usr/bin/git grep -nE '13\.70[56]' fb346a9f` returns **no hits at all**, against a positive control of the
+same command shape over `13\.70[0-4]` (14 files) and a null-control over the three lines that mention the
+block as a RANGE in prose (`:8241`, `:8313`, `:8427` — the controller's allocation sentence, not a minted
+id). **The plan's own ids `13.621`/`13.621a` were NOT used**: the dispatch records them as taken, and the
+letter-suffixed half is invisible to `check-case-citations.mjs` by its own Global Constraint note, so the
+pair becomes two plain ids the citation script can see. The file's overall high-water mark is `13.766`, which
+is executor 2's parallel block (`13.760`–`13.819`) and collides with nothing here. `13.697`–`13.699` remain
+unallocated; this task did not touch them.
+
+**The task's whole surface is a wire that crosses a package boundary, and one measurement is why the plan's
+own mutation target could not be trusted as written.** The plan's Step 5 asks for `preventDefault()` to be
+dropped from `dragover` and expects "the drop case in 13.621" to fail, "exactly as a browser does". **It does
+not, and that was measured rather than assumed.** A real browser fires a `drop` only over a target whose
+`dragover` cancelled the event; jsdom does not model that, and `fireEvent.drop` dispatches unconditionally.
+Run directly: with `event.preventDefault()` deleted from `onDragOver`, **every `fireEvent`-driven case in
+13.705 stayed GREEN** (mutation M1 survived). The plan anticipated exactly this and named the fallback — so
+the drop read was mutated instead (**M2**, `getData(DRAG_TICKET_FORMAT)` → `''`, which reddens both drop
+cases), and the cancelled-event property is pinned separately, at the DISPATCH level, by reading
+`defaultPrevented` off a real `Event` with a control that the same dispatch against a list with no `rowDrag`
+is NOT cancelled. With that case added, **M1 dies** (re-run: exit 1). This is the same class the series keeps
+recording: a check that cannot fail for the property it names is worse than no check, because it reads as
+coverage.
+
+**The mutation battery — eight, each restored by `cp` and verified by sha256, each verified to have CHANGED
+the file before its result was read.** M1 `onDragOver` loses `preventDefault()` → **killed** by the
+dispatch-level case (survived the `fireEvent` cases, as above). M2 the drop reads no ticket id → killed.
+M3 the self-drop guard (`moved === id`) is removed → killed. M4 the tail zone renders regardless of `rowDrag`
+→ killed. M5 `onReorder`'s arguments are swapped → killed. M6 `Table` REPLACES `className` instead of
+appending it → killed. M7 `Table` drops the per-row spread → killed. M8 the dragged row never gets
+`gn-list__row--dragging` → **SURVIVED on the first run, and the survivor was the finding**: 13.705 pinned
+`--drop-before` but never `--dragging`, so the marker the component paints on the SOURCE had no witness at
+all. Two cases were added (the source is marked and only the source; an ABANDONED drag clears both markers on
+`dragend`, the one path no handler of ours runs for), after which **M8, M8b (`--drop-before` never applied)
+and M8c (`dragend` does not clear) all die**. Per the standing rule, a survivor is evidence about the TEST
+before it is evidence about the code, and this one was.
+
+**The cross-package resolution trap fired on the first GREEN run.** `app-core` imports `Table` as
+`'@gisik-nokma/ui'`, which resolves through `packages/ui/dist`, so a correct implementation still failed
+13.705 until `packages/ui` was rebuilt — the ui package's own suite, which imports `../src/components/table.js`
+by relative path, had already gone green. Recorded because the asymmetry is the documented one: the
+relative-path suite is the one that catches the change, and the by-package-name suite is the one that tests
+a stale `dist`.
+
+- ✅ **13.705 — with `rowDrag` every row drags and reports the row it landed on as the before-neighbour; the
+  tail zone means "last"; a drop on itself and a payload with no ticket id are both refused; and without
+  `rowDrag` nothing is draggable and no tail zone renders.** Rendered by `TicketList`, the drag mechanism is
+  four React props on each `<tr>` — the registry's absence is asserted rather than described: 13.534 recorded
+  the flake a passive `useEffect`-registered attempt map produced on the Board, and these handlers are
+  attached during the render that draws the row. The two controls are the point of the negative arm: the SAME
+  query that finds `draggable="true"` and `.gn-list__tail-drop` on a wired list finds neither on an unwired
+  one, and the gesture that calls back once on a wired list calls back never on an unwired one. The
+  `dataTransfer` stand-in answers only the format that was actually `setData`-populated, so the case can fail
+  for a format mismatch instead of papering over one, and one instance is passed to every event of a gesture
+  because a real browser hands the identical object to each. `preventDefault()` on `dragover` is pinned at
+  the dispatch level for the reason above.
+  `packages/app-core/src/views/ticket-list.tsx:189`, `:255`, `:298`, `:623`, `:635`,
+  `packages/app-core/test/views/ticket-list.test.tsx:1538`
+
+- ✅ **13.706 — `Table` spreads a row's own attributes onto its `<tr>` and APPENDS the caller's `className`
+  to the built-ins rather than replacing them.** `rowClassName` (Ruling 21) can say only one class for every
+  row, and the List's drag needs a fact about a ROW, so `rowProps?: (row) => HTMLAttributes<HTMLTableRowElement>`
+  is spread after the built-ins; `className` is the one key the built-ins keep, joined in the same
+  `[own, extra].filter(Boolean).join(' ')` shape `card.tsx:7` established and Ruling 21 applied to this
+  component's other three hooks. **Both halves are asserted because either alone passes against a hook that
+  is half-wrong**: presence kills the "replaced, not appended" mutant (M6), and the ORDER assertion — the
+  caller's class is last — is what makes "appended" a claim this case can fail on rather than a synonym for
+  "present". The control renders the same table with no `rowProps` and asserts no caller attribute appears,
+  while `rowClassName` still applies.
+  `packages/ui/src/components/table.tsx:66`, `:102`, `:114`,
+  `packages/ui/test/components.test.tsx:143`
+
+**The maximal fixture in 13.671's CSS-binding equality check had to grow, and it reddened first.** That case
+asserts, in both directions, that every class the List renders is a class `ui.css` styles and that no rule
+styles a class nothing renders. Adding three classes that only exist while a caller wired `rowDrag` — two of
+them only MID-GESTURE — left them styled and unrendered, which is precisely the defect the second direction
+exists to catch, so it failed and was right to. The fix is a fourth, DRIVEN render in `renderEverything()`
+(`dragstart` on the first row, `dragover` on the last, so the two markers land on two different rows and a
+component painting the wrong one would not pass a class-union scan) rather than a subtraction from the
+equality. `packages/app-core/test/views/ticket-list-css-binding.test.tsx:229`, `:267`
+
+**Two plan-text deviations, both named rather than silently taken.** (1) The plan puts the tail zone "after
+the table" and cites `ticket-list.tsx`'s `ListTable` mount; it is rendered ONCE in `TicketList`, after the
+sections, because a grouped list mounts one `ListTable` per SECTION and a zone per section would put N drop
+targets on screen each claiming a part is the whole, when a drop on any of them means the same order — and
+because `rowDrag` is `undefined` for every surface that does not reorder, the single zone is the whole of the
+change for them. (2) The plan's `13.621a` letter-suffixed id was not minted; see the id note above. Neither
+deviation changes an assertion.

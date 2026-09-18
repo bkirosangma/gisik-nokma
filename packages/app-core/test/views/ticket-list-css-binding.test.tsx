@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TicketList } from '../../src/views/ticket-list.js';
@@ -162,6 +162,15 @@ const ALL_COLUMNS: ListColumnId[] = ['status', 'assignee', 'dueDate', 'progress'
  *   a project whose halves were both chosen draws no note at all.
  * - `__narrowing` / `__empty` — the third render, which is narrowed and has no
  *   rows and a caller-supplied sentence.
+ * - `__row--dragging` / `__row--drop-before` / `__tail-drop` — the FOURTH
+ *   render (second wave Task 4), which passes `rowDrag` and is then DRIVEN.
+ *   Two of the three exist only mid-gesture — `dragstart` paints
+ *   `--dragging` on the source, `dragover` paints `--drop-before` on the row
+ *   under the pointer — so a render that merely passed the prop would leave
+ *   two styled classes unrendered and the equality check below would be
+ *   RIGHT to redden. That is not a hypothetical: this file reddened exactly
+ *   that way when the three classes were first added, which is the check
+ *   working as designed rather than an inconvenience of it.
  */
 const ROWS: ListRow[] = [
   listRowSeed({ ticketId: 'epicA', title: 'Registrations', typeId: 'epic', typeRank: 1 }),
@@ -208,6 +217,40 @@ function listOf(props: Partial<Parameters<typeof TicketList>[0]>) {
   );
 }
 
+/**
+ * The fourth render, DRIVEN (second wave Task 4). Two of the three classes the
+ * drag adds exist only while a gesture is in flight, so this one is not enough
+ * to pass the prop — it has to start a drag on one row and move it over
+ * another. The source is the first row and the target the last, so the two
+ * markers land on two DIFFERENT rows in the same tree: a `--dragging` and a
+ * `--drop-before` on one element would let a component that painted the wrong
+ * one of the two still pass a class-union scan.
+ */
+function dragGestureRender(): HTMLElement {
+  const host = document.createElement('div');
+  const { container } = render(listOf({ rowDrag: { onReorder: vi.fn() } }));
+  host.append(container);
+
+  const rowFor = (ticketId: string): Element => {
+    const row = container.querySelector(`[data-testid="ticket-card-${ticketId}"]`)?.closest('tr');
+    if (row === null || row === undefined) throw new Error(`no <tr> for ${ticketId}`);
+    return row;
+  };
+
+  // jsdom implements neither `DataTransfer` nor `DragEvent`; testing-library
+  // attaches whatever is passed straight onto the fired event. Same stand-in
+  // shape `ticket-list.test.tsx` (13.705) and `board-drag-drop.test.tsx` use.
+  const dataTransfer = {
+    setData: () => {},
+    getData: () => '',
+    effectAllowed: 'uninitialized',
+  } as unknown as DataTransfer;
+
+  fireEvent.dragStart(rowFor('epicA'), { dataTransfer });
+  fireEvent.dragOver(rowFor('t5'), { dataTransfer });
+  return host;
+}
+
 /** Every class this component can put on screen, unioned across the conditions. */
 function renderEverything(): HTMLElement {
   const host = document.createElement('div');
@@ -221,6 +264,7 @@ function renderEverything(): HTMLElement {
   ]) {
     host.append(render(element).container);
   }
+  host.append(dragGestureRender());
   return host;
 }
 

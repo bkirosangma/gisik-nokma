@@ -1058,6 +1058,33 @@
   padding: 0.75rem 1rem 0.75rem 0;
   min-width: 16.25rem;
 }
+/* Second wave Task 4 (2026-09-18), spec §8.1 — the List's row drag. ONE
+   contiguous block of three classes, all three added by this task and no
+   other rule in this file touched; the file holding them is contended with a
+   peer workstream, so the block is kept together and its location named in
+   the PR body rather than scattered next to the nearest related selector.
+
+   Every colour is a token. The drop marker reuses the `inset` shadow shape
+   `.gn-refusal--*` (`:1176` above) already established for a coloured edge on
+   an element that has no border of its own, and the dragged row's ground is
+   `--gn-fill-quaternary`, the same token the zebra rule (`:1034` above)
+   already paints odd rows with — so a dragged row is a row that has gone
+   quiet, not a new colour. `--gn-accent` is the one accent on the screen
+   during a gesture; the tail zone's resting edge is `--gn-border`, the
+   ordinary line token, and it takes the accent only while the gesture is over
+   it. */
+/* The row being dragged. `opacity` and not a colour: the row keeps its own
+   ground and only recedes, which is also what keeps this rule from having to
+   know whether the row is odd (zebra) or hovered. */
+.gn-list__row--dragging { opacity: 0.5; }
+/* WHERE a drop would land, drawn on the row it would land BEFORE. An `inset`
+   shadow, so marking a row never changes its box and the list cannot reflow
+   mid-gesture — the failure mode a `border-top` here would have. */
+.gn-list__row--drop-before { box-shadow: inset 0 3px 0 0 var(--gn-accent); }
+/* The tail zone: "place last". An empty target with no text and no role (it is
+   `aria-hidden` in the markup), sized so it is reachable with a pointer rather
+   than a hairline. */
+.gn-list__tail-drop { height: 2.25rem; border-top: 2px solid var(--gn-border); }
 .gn-attention {
   border-left: 4px solid var(--gn-pending);
   border-radius: 8px;

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 // Named import, not the default: `@testing-library/user-event` ships no default
 // export that survives `verbatimModuleSyntax` — settled at
 // packages/ui/test/components.test.tsx and again in board.test.tsx.
@@ -103,6 +103,11 @@ function ControlledList({
   // no-trailing-column default, and defaulting it here would leave that
   // default untested.
   rowAction,
+  // Second wave Task 4 — undefaulted for the SAME reason twice over: every
+  // existing case exercises `TicketList`'s own no-drag default (no
+  // `draggable` rows, no tail zone), and 13.705's negative arm is the one
+  // case that measures it.
+  rowDrag,
 }: {
   rows?: ListRow[];
   initial?: ProjectViewPrefs;
@@ -111,6 +116,7 @@ function ControlledList({
   onChange?: (prefs: ProjectViewPrefs) => void;
   narrowing?: string;
   rowAction?: (row: ListRow) => ReactNode;
+  rowDrag?: { onReorder: (movedTicketId: string, beforeTicketId: string | null) => void };
 }) {
   const [prefs, setPrefs] = useState(initial);
   return (
@@ -127,6 +133,7 @@ function ControlledList({
       onOpenTicket={onOpenTicket}
       {...(narrowing === undefined ? {} : { narrowing })}
       {...(rowAction === undefined ? {} : { rowAction })}
+      {...(rowDrag === undefined ? {} : { rowDrag })}
     />
   );
 }
@@ -1475,5 +1482,210 @@ describe('13.670 the title’s weight is a fact about the row, not about the cla
     expect(weight('t3')).toBe('400');
     expect(weight('t5')).toBe('500');
     expect(new Set([weight('epicA'), weight('t3'), weight('t5')]).size).toBe(3);
+  });
+});
+
+/**
+ * A hand-rolled `DataTransfer` stand-in — jsdom 25 implements neither
+ * `DataTransfer` nor `DragEvent`, confirmed empirically before writing this
+ * (`board-drag-drop.test.tsx`'s own helper records the measurement and
+ * `@testing-library/dom`'s `events.js` documents the same gap, working around
+ * it by attaching whatever object is passed as `dataTransfer` straight onto
+ * the fired event with no `DataTransfer` validation).
+ *
+ * Local rather than imported for the same reason that file keeps its own:
+ * `board-card-click.test.tsx` does too, and there is no shared helper to
+ * import. `getData` answers only the format that was actually `setData`-d
+ * (never the same value for every format) — a sloppier fake would paper over
+ * the exact bug this plumbing could have. ONE instance is passed to every
+ * event of a gesture, never one per event: a real browser hands the identical
+ * object to every event in a drag, and two objects would prove nothing about
+ * whether the DROP side reads what the DRAG side wrote.
+ */
+function fakeDataTransfer(): DataTransfer {
+  const store = new Map<string, string>();
+  return {
+    setData: (format: string, data: string) => {
+      store.set(format, data);
+    },
+    getData: (format: string) => store.get(format) ?? '',
+    effectAllowed: 'uninitialized',
+  } as unknown as DataTransfer;
+}
+
+/**
+ * 13.705 — the `rowDrag` slot (second wave, spec §8.1 drag plumbing).
+ *
+ * `TicketList` is the surface; the drag MECHANISM is four React props on each
+ * `<tr>` (`draggable`, `onDragStart`, `onDragOver`, `onDrop`) plus one tail
+ * zone, and the point of this case is that all five are wired to the row the
+ * user actually touched.
+ *
+ * **Row props, not a registry.** 13.534 recorded the flake that a passive
+ * `useEffect`-registered attempt map produced on the Board; these handlers are
+ * attached during render, so the row a `drop` lands on is the row whose
+ * handler fires — there is no window in which a registered callback belongs to
+ * a previous render. The Board's own registry exists because a drop there must
+ * reach the DRAGGED card's `attemptMove` closure; here the dragged id travels
+ * in the `dataTransfer` payload, which is the thing the browser carries across
+ * the gesture, so nothing needs registering at all.
+ *
+ * **`DRAG_TICKET_FORMAT` is imported, never re-spelled.** Two formats that
+ * drift apart make every drop a silent no-op, which is why the assertion below
+ * drives the real constant through `board.tsx`'s own exported value rather
+ * than a hand-typed `'text/plain'`.
+ */
+describe('13.705 the rowDrag slot: rows drag, the row reports itself as the before-neighbour, and the tail zone means last', () => {
+  const ROW_A: ListRow = listRowSeed({ ticketId: 'rd_a', title: 'Rank one' });
+  const ROW_B: ListRow = listRowSeed({ ticketId: 'rd_b', title: 'Rank two' });
+
+  /** The `<tr>` a row renders as. `ticket-list.tsx` puts the testid on the inner title span, so the row element is its closest ancestor `tr`. */
+  function rowTr(ticketId: string): HTMLTableRowElement {
+    const tr = screen.getByTestId(`ticket-card-${ticketId}`).closest('tr');
+    if (tr === null) throw new Error(`no <tr> for ${ticketId}`);
+    return tr;
+  }
+
+  function tailZone(): Element {
+    const tail = document.querySelector('.gn-list__tail-drop');
+    if (tail === null) throw new Error('no .gn-list__tail-drop rendered');
+    return tail;
+  }
+
+  it('with rowDrag every row is draggable, dragover marks the hovered row, and a drop reports it as the before-neighbour', () => {
+    const onReorder = vi.fn();
+    render(<ControlledList rows={[ROW_A, ROW_B]} initial={chose([], 'flat')} rowDrag={{ onReorder }} />);
+
+    // Both rows are sources — a reorder can start anywhere in the list.
+    expect(rowTr('rd_a')).toHaveAttribute('draggable', 'true');
+    expect(rowTr('rd_b')).toHaveAttribute('draggable', 'true');
+
+    const dataTransfer = fakeDataTransfer();
+    // Nothing is marked before the gesture begins.
+    expect(rowTr('rd_a').className).not.toContain('gn-list__row--dragging');
+    expect(rowTr('rd_a').className).not.toContain('gn-list__row--drop-before');
+    fireEvent.dragStart(rowTr('rd_b'), { dataTransfer });
+
+    // The SOURCE is marked, and only the source: a list that painted every row
+    // as the one being dragged would satisfy "a class containing --dragging
+    // exists" and be useless to a reader.
+    expect(rowTr('rd_b').className).toContain('gn-list__row--dragging');
+    expect(rowTr('rd_a').className).not.toContain('gn-list__row--dragging');
+
+    fireEvent.dragOver(rowTr('rd_a'), { dataTransfer });
+    expect(rowTr('rd_a').className).toContain('gn-list__row--drop-before');
+    // The marker names the row under the pointer, not the dragged one.
+    expect(rowTr('rd_b').className).not.toContain('gn-list__row--drop-before');
+
+    fireEvent.drop(rowTr('rd_a'), { dataTransfer });
+    expect(onReorder).toHaveBeenCalledWith('rd_b', 'rd_a');
+    expect(onReorder).toHaveBeenCalledTimes(1);
+    // Both markers are cleared by the drop: a stale "before" line, or a row
+    // left faded, is a claim about a gesture that has ended.
+    expect(rowTr('rd_a').className).not.toContain('gn-list__row--drop-before');
+    expect(rowTr('rd_b').className).not.toContain('gn-list__row--dragging');
+  });
+
+  it('an ABANDONED drag clears both markers on dragend — the one path no handler of ours runs for', () => {
+    const onReorder = vi.fn();
+    render(<ControlledList rows={[ROW_A, ROW_B]} initial={chose([], 'flat')} rowDrag={{ onReorder }} />);
+
+    const dataTransfer = fakeDataTransfer();
+    fireEvent.dragStart(rowTr('rd_b'), { dataTransfer });
+    fireEvent.dragOver(rowTr('rd_a'), { dataTransfer });
+    expect(rowTr('rd_b').className).toContain('gn-list__row--dragging');
+    expect(rowTr('rd_a').className).toContain('gn-list__row--drop-before');
+
+    // A release over nothing: no `drop` fires on any element of ours, so
+    // `dragend` on the source is the only chance to put the list back.
+    fireEvent.dragEnd(rowTr('rd_b'), { dataTransfer });
+    expect(rowTr('rd_b').className).not.toContain('gn-list__row--dragging');
+    expect(rowTr('rd_a').className).not.toContain('gn-list__row--drop-before');
+    expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  it('dragover CANCELS the event, which is the whole reason a browser will fire a drop at all', () => {
+    const onReorder = vi.fn();
+    // Two renders, each queried inside its OWN container: both draw a row with
+    // the same `data-testid`, and a `screen`-wide lookup would be ambiguous.
+    const wired = render(
+      <ControlledList rows={[ROW_A, ROW_B]} initial={chose([], 'flat')} rowDrag={{ onReorder }} />,
+    ).container;
+    const unwired = render(
+      <ControlledList rows={[ROW_A, ROW_B]} initial={chose([], 'flat')} />,
+    ).container;
+
+    const rowIn = (container: HTMLElement, ticketId: string): Element => {
+      const row = container.querySelector(`[data-testid="ticket-card-${ticketId}"]`)?.closest('tr');
+      if (row === null || row === undefined) throw new Error(`no <tr> for ${ticketId}`);
+      return row;
+    };
+
+    // MEASURED, and the reason this case is written at the DISPATCH level: in a
+    // real browser a `drop` fires only over a target whose `dragover` called
+    // `preventDefault()`, but jsdom does NOT model that — `fireEvent.drop` above
+    // dispatches unconditionally. Measured directly: deleting the
+    // `preventDefault()` from `onDragOver` leaves every `fireEvent`-driven case
+    // in this describe GREEN (mutation M1 survived). So the property is pinned
+    // by reading `defaultPrevented` off a real event, never by observing that a
+    // drop happened — the drop case above would have stayed green either way.
+    const cancelled = new Event('dragover', { bubbles: true, cancelable: true });
+    Object.assign(cancelled, { dataTransfer: fakeDataTransfer() });
+    rowIn(wired, 'rd_a').dispatchEvent(cancelled);
+    expect(cancelled.defaultPrevented).toBe(true);
+
+    // CONTROL: the same dispatch against a list that never wired `rowDrag` is
+    // NOT cancelled. Without it, a `preventDefault` on some ancestor would
+    // satisfy the line above while the row's own handler was the one missing.
+    const untouched = new Event('dragover', { bubbles: true, cancelable: true });
+    Object.assign(untouched, { dataTransfer: fakeDataTransfer() });
+    rowIn(unwired, 'rd_a').dispatchEvent(untouched);
+    expect(untouched.defaultPrevented).toBe(false);
+  });
+
+  it('a drop on the tail zone reports `null` — "place last"', () => {
+    const onReorder = vi.fn();
+    render(<ControlledList rows={[ROW_A, ROW_B]} initial={chose([], 'flat')} rowDrag={{ onReorder }} />);
+
+    const dataTransfer = fakeDataTransfer();
+    fireEvent.dragStart(rowTr('rd_b'), { dataTransfer });
+    fireEvent.drop(tailZone(), { dataTransfer });
+
+    expect(onReorder).toHaveBeenCalledWith('rd_b', null);
+    expect(onReorder).toHaveBeenCalledTimes(1);
+  });
+
+  it('a drop on the dragged row itself is a no-op, and so is a drop carrying no ticket id', () => {
+    const onReorder = vi.fn();
+    render(<ControlledList rows={[ROW_A, ROW_B]} initial={chose([], 'flat')} rowDrag={{ onReorder }} />);
+
+    const dataTransfer = fakeDataTransfer();
+    fireEvent.dragStart(rowTr('rd_b'), { dataTransfer });
+    fireEvent.drop(rowTr('rd_b'), { dataTransfer });
+    expect(onReorder).not.toHaveBeenCalled();
+
+    // A drag that started OUTSIDE this list carries no ticket id. `onReorder('')`
+    // would name a ticket that does not exist in the caller's order, so the
+    // empty payload is refused here rather than handed on.
+    fireEvent.drop(tailZone(), { dataTransfer: fakeDataTransfer() });
+    expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  it('without rowDrag nothing is draggable, no tail zone renders, and no handler is attached', () => {
+    const onReorder = vi.fn();
+    render(<ControlledList rows={[ROW_A, ROW_B]} initial={chose([], 'flat')} />);
+
+    // The positive control for the two negatives below is the first test in
+    // this describe: the SAME query finds both on the rowDrag render.
+    expect(rowTr('rd_a')).not.toHaveAttribute('draggable');
+    expect(rowTr('rd_b')).not.toHaveAttribute('draggable');
+    expect(document.querySelector('.gn-list__tail-drop')).toBeNull();
+
+    // The absence is the whole of the default: firing the gesture a wired
+    // list answers must reach the callback zero times.
+    const dataTransfer = fakeDataTransfer();
+    fireEvent.dragStart(rowTr('rd_b'), { dataTransfer });
+    fireEvent.drop(rowTr('rd_a'), { dataTransfer });
+    expect(onReorder).not.toHaveBeenCalled();
   });
 });
