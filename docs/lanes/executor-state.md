@@ -148,7 +148,8 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > - **PLACEMENT IS A PRICED DECISION, and the price is measurable.** The new CSS family was **appended at
 >   the end of `ui.css`** rather than beside `.ticket-type-list__*` where a reader would look: inserting
->   there stales **46** of the repo's 135 `ui.css:NNN` citations, appending stales **0**. Measured both
+>   there stales **46** of the repo's 135 `ui.css:NNN` citations [**RE-MEASURED — see the CURRENT POSITION
+>   block at the top of this file: it is 45 of 134, and no threshold yields 46**], appending stales **0**. Measured both
 >   ways BEFORE choosing.
 > - **The restarted session's first job is to re-verify, not to trust.** Everything above was re-measured
 >   at `09354fc7` after the rebase: the seven checks, the three suites, the four typechecks, the prototype
@@ -213,7 +214,8 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > - **PLACEMENT IS A PRICED DECISION, and the price is measurable.** The new CSS family was **appended at
 >   the end of `ui.css`** rather than beside `.ticket-type-list__*` where a reader would look: inserting
->   there stales **46** of the repo's 135 `ui.css:NNN` citations, appending stales **0**. Measured both
+>   there stales **46** of the repo's 135 `ui.css:NNN` citations [**RE-MEASURED — see the CURRENT POSITION
+>   block at the top of this file: it is 45 of 134, and no threshold yields 46**], appending stales **0**. Measured both
 >   ways BEFORE choosing. The previous task staled 24 citations by not asking the question.
 > - **The dispatch's "next free" id had already expired — by this lane.** `13.883` was named free at 16:53
 >   and this lane took `13.883` in #473 minutes later. The previous task's own recorded lesson, applied:

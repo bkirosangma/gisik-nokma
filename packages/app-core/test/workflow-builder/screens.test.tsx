@@ -193,12 +193,24 @@ describe('WorkflowListScreen', () => {
     // The bar is decorative: the state's NAME is the accessible content.
     for (const bar of bars) expect(bar).toHaveAttribute('aria-hidden', 'true');
 
+    // One CARD per workflow — the title claims a card per workflow, and until
+    // this arm existed nothing counted them.
+    const cards = document.querySelectorAll('.workflow-list__card');
+    expect(cards).toHaveLength(1);
+
     // THE TWO NAMED ABSENCES, asserted rather than assumed — a badge that can
     // only ever say "Published" and a second button with no gateway method are
     // exactly what this repo keeps re-finding, so their absence is pinned.
+    // Each is checked by CLASS and by CONTENT or TAG: a class-shaped guard
+    // alone would pass a badge renamed to `.gn-chip`, or a second action
+    // authored as `<a className="gn-button">` — the pattern this repo already
+    // uses for the ticket-type editor's Cancel.
     expect(document.querySelector('.workflow-list__badge')).toBeNull();
     const actions = document.querySelector('.workflow-list__actions');
     expect(actions?.querySelectorAll('button')).toHaveLength(1);
+    const card = cards[0]!;
+    expect(card.textContent).not.toMatch(/Published|Superseded|Draft/);
+    expect(card.querySelectorAll('a, button')).toHaveLength(1);
   });
 
   /**

@@ -4343,7 +4343,7 @@
    lazy: inserting a block this size at that point shifts every `ui.css:NNN`
    citation below it, and 45 of the repo's 134 name a line past it. The two
    families sit 2,524 lines apart in this file — `.ticket-type-list__*`'s rules
-   at `:1740-1832`, this family's at `:4356-4409` — so the locality given up is
+   at `:1740-1832`, this family's at `:4356-4410` — so the locality given up is
    small and the citations kept are not. Move it if you are also prepared to
    sweep the citations.
 

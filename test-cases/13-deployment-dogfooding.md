@@ -11572,8 +11572,11 @@ every `*.css` in the repo held exactly **one** `workflow-list` occurrence and it
   **GUARD PROVED BY MUTATION, twice, each dying specifically.** Dropping the `neo` shadow reddens the
   token-layer assertion by name. Repointing `.workflow-list__state-bar--open` from `--gn-category-open`
   to `--gn-surface-sunken` reddens the ratio arm — **measured ratio 1.000**, the bar becoming invisible,
-  which is the exact defect the case exists for. Restored, `ui.css` returns to SHA-256
-  `99676339e7f3ae68498f82fd1fcc189454976b25ba5ea6871c89cd64a74c9e80` byte for byte.
+  which is the exact defect the case exists for. Restored, `ui.css` returned to SHA-256
+  `99676339e7f3ae68498f82fd1fcc189454976b25ba5ea6871c89cd64a74c9e80` byte for byte **at that point in the
+  branch's history**; the fix round that followed edited this file's own docblock, so the tip's hash is
+  `2b4be36e08b22b12b62b40c86a6980cd131a29d64f485a79c50081fba1e83358`. The proof is that the restore was
+  byte-exact against the pre-mutation bytes, which is a fact about that revision, not about this one.
 
   **A RECORDED DEVIATION — the version stays, in the meta line.** The prototype writes the version into
   the workflow's NAME (`"Delivery v4"`, `:3175`) because its data has no separate field. The product names
@@ -11585,12 +11588,36 @@ every `*.css` in the repo held exactly **one** `workflow-list` occurrence and it
 
   **PLACEMENT, priced rather than lazy.** The `workflow-list__*` rules are **appended at the end of
   `ui.css`** instead of beside `.ticket-type-list__*` where a reader would look. Inserting a block that
-  size at line ~1832 shifts every `ui.css:NNN` citation below it, and **46** of the repo's 135 name a line
-  past that point; appending stales **0**, measured both ways. The two families already sit 300 lines
-  apart in that file, so the locality given up is small and the citations kept are not. The reasoning is
+  size at line ~1832 shifts every `ui.css:NNN` citation below it, and **45** of the repo's 134 name a line
+  past that point; appending stales **0**, measured both ways. The two families sit **2,524** lines
+  apart in that file (`.ticket-type-list__*` at `:1740-1832`, this family at `:4356-4410`), so the locality
+  given up is small and the citations kept are not. The reasoning is
   in the CSS comment, so the next reader can move it deliberately rather than wonder.
 
   **Citations:** `packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx:112` (the grid),
   `:118` (the chip), `:120` (the bar and its category), `:127` (the meta line), `:99` (the subtitle),
-  `:103` (the primary action on the shared variant), `packages/ui/src/ui.css:4383` (the chip fill),
-  `:4393` (the neo shadow), `:4405` (the bar roles)
+  `:103` (the primary action on the shared variant), `packages/ui/src/ui.css:4384` (the chip fill),
+  `:4394` (the neo shadow), `:4406-4408` (the bar roles)
+
+  **RECORDED, NOT FIXED — this change removes the non-text-contrast sweep's only high reading, so
+  `test:e2e:stack` is expected to go red.** The committed roster
+  (`apps/web/e2e-stack/non-text-contrast-roster.json`, `totalClasses: 5`) has exactly two readings above 15:
+  `button.workflow-list__new` and the generic `button`, both **17.62**, both on `/settings/workflows`, both
+  carrying the UA default border `rgba(0,0,0,1)`. Both were bare `<button>`s before this change; both are now
+  `Button`, i.e. `.gn-button`, which sets `border: none` (`ui.css:60`, with the reasoning at `ui.css:33-35`).
+  The sweep scores only elements with a painted border (`helpers/non-text-contrast.ts:132-137`), so those two
+  readings disappear, the maximum falls to 4.36, and `viewport.spec.ts:1020`'s
+  `expect(bestSeen).toBeGreaterThan(15)` — the positive control proving the sweep can still tell red from
+  green in the ordinary range — fails. The roster is rewritten unconditionally (`:946-968`), so the two
+  entries would vanish with no trace. **Predicted from committed numbers and read CSS, not from a red run:
+  the suite needs the live stack and `docker compose` is out of bounds for this lane.** `apps/web/e2e-stack/`
+  is untouched by this branch (0 files changed). The repair is a decision about the control's premise — which
+  this change deliberately removes — rather than a defect in this slice. **Owner: whoever next regenerates the
+  viewport roster; raised to the controller.**
+
+  **A RECORDED DEVIATION, previously silent.** `.workflow-list__title` is `font-size: 1rem`
+  (`ui.css:4364`) where the prototype's heading is `20px/25px` (`desktop.dc.html:844`). The title is one of
+  the three `isSettingsShell` nits the dispatch measured, and the third of those is a deliberate freeze
+  (`globals.css:333`); this one was simply not carried over, and no case measures it. It is recorded rather
+  than changed, because a heading size is a settings-shell decision rather than a card-grid one — the same
+  reasoning that kept the other two nits out of slice 1. **Owner: the settings-shell pass.**
