@@ -662,7 +662,7 @@ reason on record, not an oversight:*
   this would have been dead in the query. Cases 13.722–13.726.
   `packages/domain/src/system-actors.ts`, `packages/domain/src/entity-state.ts`,
   `packages/domain/src/ticket-state.ts`,
-  `apps/server/migrations/1789300000000_proj-tickets-reopened-at.sql`,
+  `apps/server/migrations/1789500000000_proj-tickets-reopened-at.sql`,
   `apps/server/src/projections/tickets.ts`,
   `packages/app-core/src/online/mappers.ts`, `packages/app-core/src/provenance.ts`
 - ⚙️ **`proj_search` — the full-text projection** — one row per ticket holding its title,
