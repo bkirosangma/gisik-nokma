@@ -41,6 +41,306 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~19:4x IST. **SETTINGS → WORKFLOWS: REBASED ONTO #476,
+> # RENUMBERED TO `13.920`, AND F1 RULED AND FIXED IN THE SAME CHANGE SET (the sweep's control is now
+> # PLANTED, case `13.921`). ALL GREEN, VERIFIED MERGEABLE, PR #478 OPEN — AWAITING THE CONTROLLER'S
+> # MERGE.** `exec/settings-workflows`, ONE PR `--base main`.
+>
+> | | |
+> |---|---|
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it. The tip is the commit that carries this block; its ancestors are the 8 replayed work commits. |
+> | base | **REBASED onto `origin/main` = `1d131a68` (#476, members-styling)**, which is now the merge-base. **`git merge-tree --write-tree origin/main HEAD` EXIT 0 — verified mergeable, not assumed.** The rebase had exactly one conflicting file, `test-cases/13` (both sides appended a section), resolved as a **union**: exec2's `13.886`–`13.889` section and this branch's `13.920` section both present, 0 markers, both sides' positive controls firing once each. `Features.md` auto-merged. |
+> | the change | 7 files. `workflow-list-screen.tsx` (the card grid), `ui.css` (the new `workflow-list__*` family, appended at EOF), `screens.test.tsx` (10.62 + case **13.920**), `tokens.test.ts` (13.920's measured half), `test-cases/13`, `Features.md`, this file. |
+> | case ids | **`13.920`** — the first id of the block the controller assigned this lane (`13.920`–`13.949`). **IT WAS `13.884` AND THAT COLLIDED**: both executors minted `13.884`, each correctly, because they measured different trees; #476 merged first, so this branch yielded. Renumbered by exact line across all six files that carried it. **The one surviving `13.884` in `test-cases/13:11315` is EXEC 2'S HISTORICAL PROSE — left untouched deliberately, per the instruction.** Both ids are six characters, so no line moved and no citation shifted. |
+> | migration | **NONE.** Do not restart the server container. |
+> | suites | **app-core 1550/0** (94 files) · **ui 330/0** (5 files) · **web 530/0** · **four typechecks EXIT 0, all logs 0 bytes**. Node v22.22.2. Run with `rtk proxy pnpm exec vitest run` (see the method note below). Web is 520 **+10** — exec2's members tests arrived with the rebase. |
+> | seven checks | **all EXIT 0 at the rebased head**: `tasks` · `env` · `runbook` · `help` · `citations` (file 13 = **662** cited / 0 uncited) · `db-tz` (**`DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma`** → `Asia/Kolkata`) · `check-case-ids` (**2352**, union == sum). Citations 658→662 and ids 2348→2352 are exec2's four new cases, not drift. |
+> | gate | **NOT RUN BY THIS LANE** (the controller runs it). `pnpm turbo run build` **11/11** for the post-rebase dist rebuild. |
+>
+> ## ▣ F1 IS RULED AND FIXED — BOTH controls now stand on a PLANTED fixture (case `13.921`)
+>
+> **RULING 2 (the controller ran `test:e2e:stack`, which this lane cannot) went back once more and is now
+> satisfied.** The sweep has **two** controls and the first fix planted between them: the **negative**
+> control — `sweepBorders(page, 25)`, `absurd.below.length > 0` — sweeps the page the route loop ENDS on,
+> `/settings/workflows`, which after this change has **no painted borders at all** (roster `examined`
+> 9 → 4, `highestReading` 17.62 → 4.36, `totalClasses` 5 → 2, both `rgba(0,0,0,1)` entries gone). So
+> `below.length` was `0` and it failed **for exactly the reason F1 gave**.
+>
+> **The repair is the ORDERING**: the fixture is planted **ahead of both controls**, and its fixed 21:1
+> is BELOW the negative control's 25, so **one fixture satisfies both**. Neither threshold is lowered and
+> neither control is deleted. **A control that runs before the fixture it needs is not a control.**
+>
+> **Verified in Chromium against a borderless page** — the failing page's own shape: **before the plant
+> `below.length=0` (the reported failure reproduced) and after it `below.length=1`** with
+> `div.non-text-contrast-control` at 21 as the offender, while the positive control reads the same element
+> at 21. **F1 was found by thinking; this was found by running.** A green forced gate can see neither,
+> because `e2e-stack` is not in the turbo graph.
+>
+> ---
+>
+> ## ▣ F1 — the original half (the positive control), kept as record
+>
+> The controller confirmed F1 at the roster and ruled **#478 goes back, re-base the control in the SAME
+> change set**. Both readings above 15 were `rgba(0,0,0,1)` — Chrome's own default border on two BARE
+> `<button>`s — so the control **was resting on an unstyled button**, the defect class this whole day
+> removed. Putting them on `.gn-button` (`border: none`) dropped the maximum to **3.81**.
+>
+> **The `15` is NOT lowered and the assertion is NOT deleted.** What changed is what it stands on: the sweep
+> is handed an element whose ratio is known to the decimal — black on opaque white, **21.0** — and must read
+> it through the **same `sweepBorders` path**. A planted fixture survives every styling change, and asserts a
+> property of the INSTRUMENT rather than of the product.
+>
+> **VERIFIED END TO END IN CHROMIUM, not by arithmetic:** on a bare page the sweep reads **nothing**
+> (`examined=0`); after the plant it reads `div.non-text-contrast-control` at `ratio 21`,
+> `border rgba(0,0,0,1)`, `backdrop rgb(255,255,255)`. The empty BEFORE state is the control that the
+> reading came from the plant. **The white ground is a real ANCESTOR, not the control's own background** —
+> `backdropOf` walks to the PARENT, so painting the control itself would leave the ratio at the mercy of
+> whatever the page's body happens to be painted. `bestSeen` is still the PRODUCT's maximum and the roster's
+> `highestReading`; it is just no longer load-bearing for a threshold it can never durably hold.
+>
+> **`aside.gn-attention`'s 4.36 leaves by the same door in the same week** (owner adopted the prototype's
+> `--tintWarning` fill; exec 2 is implementing it), which is why the repair could not lean on it either.
+> **NOT run by this lane: the `test:e2e:stack` suite itself** — it needs the live stack and `docker compose`
+> is out of bounds here. The mechanism is verified through the real instrument; the full suite is the
+> controller's to confirm.
+>
+> ---
+>
+> ## ▣ THE REVIEWER'S PASS — recorded before the PR opened, per the freeze-line rule
+>
+> One per-task reviewer ran against `92c99406`, re-measured at `1fbc133b`. It hit both mandated jobs:
+> **the three arms still render** (by source identity — the diff hunks stop before the arm region, base
+> `:33-45` byte-equal to HEAD `:86-100`), and **no dead rule** (all 20 added rules map to a class the
+> component or its shared children emit). Findings, all addressed unless stated:
+>
+> | # | sev | finding | outcome |
+> |---|---|---|---|
+> | F2 | Important | the stale "**46** of the repo's 135" and "300 lines apart" survived in the catalogue **and in this file's own record blocks** | **fixed** — with a method lesson, below |
+> | F3 | Important | **my own fix round's one-line insert shifted the three `ui.css` citations it had just corrected**, plus its own range | **fixed** — 4384 / 4394 / 4406-4408 / 4356-4410 |
+> | F1 | Important | **this change removes the non-text-contrast sweep's only reading above 15** | **recorded, RAISED, NOT fixed** |
+> | F4 | Minor | the mutation-restore SHA-256 is a fact about the revision it was measured at | **fixed** — the sentence now says so and gives the tip's hash |
+> | F5 | Minor | 13.920's title claims "a card per workflow" but nothing counted cards | **fixed** — the case now counts them |
+> | F6 | Minor | both absence guards were class-shaped, so a badge renamed `.gn-chip` or a second action as `<a className="gn-button">` would pass | **fixed** — both now checked by CONTENT and TAG as well |
+> | F7 | Minor | `.workflow-list__title` is 1rem where the prototype is 20px/25px — an unrecorded divergence | **recorded** in the catalogue as a named divergence, not changed |
+>
+> ## ⛔ F1 — RAISED TO THE CONTROLLER. THE E2E-STACK SWEEP IS EXPECTED TO GO RED.
+>
+> The committed roster (`apps/web/e2e-stack/non-text-contrast-roster.json`, `totalClasses: 5`) has exactly
+> **two readings above 15**: `button.workflow-list__new` and the generic `button`, both **17.62**, both on
+> `/settings/workflows`, both carrying the **UA default black border**. Both were bare `<button>`s and are
+> now `Button`/`.gn-button`, which sets `border: none` (`ui.css:60`), and the sweep scores only elements with
+> a painted border (`helpers/non-text-contrast.ts:132-137`). So the maximum falls to **4.36** and
+> `viewport.spec.ts:1020`'s `expect(bestSeen).toBeGreaterThan(15)` — **the control proving the sweep can
+> still tell red from green** — fails; the roster is then rewritten unconditionally (`:946-968`) and both
+> entries vanish untraced.
+>
+> **Predicted from committed numbers and read CSS, NOT from a red run** — the suite needs the live stack and
+> `docker compose` is out of bounds for this lane. `apps/web/e2e-stack/` is untouched by this branch (0
+> files). The repair is a decision about the control's premise, which **this change deliberately removes**,
+> so it is not mine to make. **Owner: whoever next regenerates the viewport roster.**
+>
+> ## ▣ THE METHOD LESSON THAT COST THE MOST HERE
+>
+> **I swept the repo for the stale figures, got an EMPTY result, and reported "fully corrected" — a clean
+> bill read off a silent empty.** Two independent causes, one sweep: the string is wrapped in markdown
+> emphasis (`**46** of the repo's 135`), which my pattern could not match, and the other phrase is
+> **line-wrapped** ("300 lines" / "apart"), which a line-based `grep` cannot see at all. **An empty result is
+> a claim that needs its own control** — and the control that would have caught it is the one the fix round
+> then needed anyway: search for the CORRECTED value and confirm the OLD one is gone *from the same run*.
+>
+> The second lesson is F3, and it is the docblock's own thesis turned on its author: **inserting one line
+> into a file whose line numbers are cited shifts every citation below it.** I corrected three `ui.css`
+> citations and broke them in the same commit. If you edit `ui.css`, re-measure the citations to it before
+> you commit — the price is paid either way, and paying it knowingly is the whole point of the placement note.
+>
+> ---
+>
+> # ▣ RECORD — superseded by the block above.
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~18:1x IST. **SETTINGS → WORKFLOWS: FIX ROUND APPLIED, ALL GREEN
+> # AT THE NEW HEAD, AWAITING THE REVIEWER'S REPORT, THEN THE PR OPENS.** Supersedes the block below.
+> # `exec/settings-workflows`, rebased onto `origin/main` = `a12c4018`, ONE PR `--base main`.
+>
+> | | |
+> |---|---|
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it. Chain: `d8ccbf2e` (the code) → `09354fc7` (handoff) → `92c99406` (handoff) → **`00e8e3d8` (fix round)** → the commit carrying this block. |
+> | the fix round | **comment text only — 9 insertions / 8 deletions, every changed line inside a `/* */` block, a `/** */` docblock or a prose bullet. No executable line changed.** Two measurements re-measured and corrected, plus a citation off by one in five places. |
+> | re-verified AT `00e8e3d8` | **seven checks all EXIT 0** (`citations` file 13 = **658** cited / 0 uncited · `check-case-ids` **2348**, union == sum · `db-tz` with `DATABASE_URL=…:54329/…` → `Asia/Kolkata`) · **app-core 1550/0** (94 files) · **ui 330/0** (5 files) · **web 520/0** (48 files) · **four typechecks 0, all logs 0 bytes** · `turbo run build` **11/11**. Node v22.22.2. |
+> | migration | **NONE.** Do not restart the server container. |
+> | gate | **NOT RUN BY THIS LANE** (the controller runs it). |
+>
+> ## ▣ WHAT THE FIX ROUND CORRECTED — and why it was worth a fix round rather than a note
+>
+> 1. *"The two families already sit **300 lines** apart"* → **2,524**. `.ticket-type-list__*`'s selector
+>    rules are `ui.css:1740-1832`; this family's are `:4356-4409`. Wrong by most of an order of magnitude,
+>    though the placement argument itself (appending stales 0 citations, inserting stales ~45) is untouched.
+> 2. *"**46** of the repo's **135** `ui.css:NNN` citations"* → **45 of 134**, measured three ways: base
+>    `b14d3b9b` = 131/44; frozen head = 134/45 (this change adds exactly `ui.css:152` and `ui.css:4383`,
+>    removes none); upper bound with every directory = 134. **No threshold between 1500 and 1900 yields 46
+>    at all** — it was not a different insertion point measured correctly, it was never 46.
+> 3. *"(`:3185`)"* for the chip's fill, in **five** places → **`:3184`**. `:3185` is the BAR
+>    (`barStyle: … width:4px`); the fill and its `padding:3px 9px 3px 13px` are on the line above. **The
+>    dispatch carried the same off-by-one**, which is how it propagated into four files.
+>
+> A measured number that does not reproduce is this project's most expensive defect class, so these are
+> corrected at source. **The dispatch's `packages/ui/src/ui.css:1584-1670` for the ticket-type family is
+> wrong in the same direction** — `:1584` is inside a comment.
+>
+> ## ▣ ONE NEAR-MISS, RECORDED BECAUSE THE INSTRUMENT WOULD HAVE LIED CLEANLY
+>
+> Probing `--gn-shadow-sunken-compact` I called `themeStylesheet(style, theme)` and read **`none` for all
+> six style/theme combinations** — which would have condemned the new `[data-style="neo"] .workflow-list__state`
+> rule as **dead**, the exact thing the reviewer was told to hunt. **`themeStylesheet()` takes NO arguments
+> and returns all six blocks in one string**, so that call returned the `hig/light` block six times and my
+> "six combinations" were one combination read six times. Parsing the blocks properly: `[data-style="neo"]`
+> emits `inset 2px 2px 4px …` in **both** themes, `hig`/`minimal` emit `none` — exactly what the docblock
+> claims. **The rule is live and the finding was false.** A control must vary the axis the property lives on.
+>
+> ## ▣ STILL OPEN IN THIS TASK
+>
+> The per-task reviewer is running; **its report is recorded in the PR body before the PR opens** (the
+> dispatch's freeze-line requirement). If it lands findings that need a code change, that is a NEW HEAD and
+> the numbers above are re-measured there.
+>
+> ---
+>
+> # ▣ RECORD — superseded by the block above.
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~17:5x IST. **SETTINGS → WORKFLOWS IS REBASED, GREEN AND AT THE
+> # REVIEWER; THE PR OPENS ON THIS HEAD.** This session was restarted and recovered the branch from the
+> # handoff below — the two commits survived, so nothing was redone. `exec/settings-workflows`,
+> # **REBASED onto `origin/main` = `a12c4018`** (0 behind / 2 ahead at the time of writing), ONE PR
+> # `--base main`. **The queue after this is NOT empty** (order: `…-attention-part2-heading.md` — exec 2's
+> # own continuation — then `…-settings-workspace-tab.md`, then `…-migration-order-check.md`; the controller
+> # dispatches to whichever executor frees first). **HOLD for that dispatch.**
+>
+> | | |
+> |---|---|
+> | branch | `exec/settings-workflows`, merge-base with `origin/main` = **`a12c4018`**, **0 behind / 2 ahead**, **tree CLEAN**. Not pushed when this block was written; the PR opens ON the commit that carries it. |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it. |
+> | the change | 7 files: `workflow-list-screen.tsx` (the card grid), `ui.css` (the new `workflow-list__*` family, **appended at EOF**), `screens.test.tsx` (10.62 updated + case **13.920**), `tokens.test.ts` (13.920's measured half), `test-cases/13`, `Features.md`, this file |
+> | case ids | **`13.920`**. The dispatch said "next free `13.883`" — **that expired twice over**: this lane took `13.883` in **#473**, and main still carries it (**measured at `a12c4018`: 5 mentions**). Recounted by MARKER at this tip. |
+> | migration | **NONE.** Do not restart the server container. |
+> | suites | **app-core 1550/0** (94 files) · **ui 330/0** (5 files) · **web 520/0** (48 files) · **four typechecks EXIT 0, all logs 0 bytes** (`app-core` + `ui` `tsconfig.typecheck.json`, `web` `tsconfig.json` + `tsconfig.e2e.json`). Node v22.22.2. Run via `rtk proxy pnpm exec vitest run` — **the bare form is swallowed by the RTK vitest parser** (`[RTK:PASSTHROUGH] … All parsing tiers failed`), which returns a well-formed red with no test output. |
+> | seven checks | **all EXIT 0 at `09354fc7`**: `tasks` · `env` · `runbook` · `help` · `citations` (file 13 = **658** cited / 0 uncited) · `db-tz` (**`DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma`** → `Asia/Kolkata`; it exits **1** without it, by design) · `check-case-ids` (**2348**, union == sum, highest 15.34) |
+> | gate | **NOT RUN BY THIS LANE** (the controller runs it). `pnpm turbo run build` was run for the post-rebase dist rebuild: **11 successful / 11 total**. |
+> | tree | clean. No `dist`, no `task-ledger.tsv` beyond main's, no `.superpowers/`. |
+>
+> ## ▣ WHAT THIS TASK SHIPS
+>
+> The settings → workflows screen moves from a flat `<ul>` of rows to the prototype's card grid.
+> **The real defect was not the layout: `workflow-list__*` had no CSS rules at all** — and the primary
+> action rendered as a bare `<button>` with no class, resolving to the UA default rather than
+> `.gn-button--primary`. The whole family is new, the action moved onto the shared `Button
+> variant="primary"`, and the three existing arms (empty / loading / failure) are untouched.
+> The badge and the second action are **named absences** with missing FIELDS behind them
+> (`PublishedWorkflowDef` has no status member; `WorkflowAuthoringGateway` has no duplicate/history
+> method), and the case asserts their absence rather than a docblock asserting itself.
+>
+> **The chip is the avatar's defect one screen over.** The prototype fills it with `--trayBg`
+> (`--gn-surface-sunken`), which under `neo` is the SAME hex as the `.gn-card` behind it — so the chip
+> would composite to the card's own colour and its only boundary would vanish. The remedy is the one
+> `.ticket-type-list__badge` already ships: keep the fill, add `--gn-shadow-sunken-compact` under
+> `[data-style="neo"]`.
+>
+> ## ▣ THE CONTROL THE DISPATCH CARRIED, RE-MEASURED WITH ITS UNIT PINNED
+>
+> The dispatch supports the absence with *"the same sweep finds **31** `.ticket-type-list__` rules"*.
+> **31 is the raw-mention count, and most of those mentions are COMMENTS** — the first three
+> `ticket-type-list__` hits in `ui.css` are docblock prose (`:98`, `:103`, `:361`). I re-ran it on a
+> selector-position pattern (a line whose selector begins with the family and opens a block) so both
+> families are measured in the same unit:
+>
+> | at `b14d3b9b`, in `packages/ui/src/ui.css` | selector-position rules | raw mentions |
+> |---|---|---|
+> | `ticket-type-list__` (the sibling precedent) | **16** | 31 |
+> | `workflow-list__` (the family in question) | **0** | 0 |
+>
+> **The conclusion is unchanged and slightly stronger — the family is absent in BOTH units** — but the
+> dispatch's "31 rules" is a count whose unit was not pinned, and a count is only evidence once the unit
+> is. The instrument fires on this file: the same sweep finds `.gn-card` (1 selector match). Recorded
+> rather than silently restated, because the next reader will otherwise quote 31 as a rule count.
+>
+> ## ▣ METHOD NOTES THESE TWO SESSIONS EARNED
+>
+> - **PLACEMENT IS A PRICED DECISION, and the price is measurable.** The new CSS family was **appended at
+>   the end of `ui.css`** rather than beside `.ticket-type-list__*` where a reader would look: inserting
+>   there stales **46** of the repo's 135 `ui.css:NNN` citations [**RE-MEASURED — see the CURRENT POSITION
+>   block at the top of this file: it is 45 of 134, and no threshold yields 46**], appending stales **0**. Measured both
+>   ways BEFORE choosing.
+> - **The restarted session's first job is to re-verify, not to trust.** Everything above was re-measured
+>   at `09354fc7` after the rebase: the seven checks, the three suites, the four typechecks, the prototype
+>   citations (`:841` = `<sc-if value="{{ isWorkflows }}">`, `:845` = the subtitle sentence verbatim,
+>   `:849` = the `minmax(320px,1fr)` grid), and the CSS-absence control. The outgoing handoff's numbers
+>   were 2347 / 657 at the PRE-rebase tip; they are 2348 / 658 here **because main moved under the
+>   rebase** — a carried-forward count is a reading that expires.
+> - **`vitest` output is swallowed by the RTK proxy.** `pnpm exec vitest run` returned `EXIT=1` with no
+>   test output and `[RTK:PASSTHROUGH] vitest parser: All parsing tiers failed`; two packages even
+>   collided on one `~/Library/Application Support/rtk/tee/…` file. **`rtk proxy pnpm exec vitest run`
+>   is the form that works.** A red here is a fact about the proxy until proven otherwise.
+> - **`--concurrency=1` is not a vitest CLI flag.** The dispatch names it; vitest 3 rejects it outright
+>   (`CACError: Unknown option --concurrency`) and the run dies before collecting a single test. The
+>   package script is plain `vitest run`.
+> - **A rebase conflict can be entirely inside the handoff file.** The code commit and BOTH companion
+>   documents (`Features.md`, `test-cases/13`) auto-merged; only `executor-state.md` conflicted, because
+>   main and this branch had each appended a position block. Resolved newest-first, both sides kept.
+> - **`/usr/bin/cat` does not exist on this machine.** The shell-function proxy covers `cat` too; reading a
+>   file needs the Read tool or `/bin/cat`.
+>
+> ---
+>
+> # ▣ RECORD — the restarted session's predecessor, superseded by the block above.
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~17:3x IST. **THREE ITEMS FROM THIS LANE, TWO OPEN PRs AND ONE
+> # AT REVIEW.** (1) **#469** the `.gn-avatar` under `neo` — **MERGED** as `cb1f3d16`. (2) **#473** the
+> # owner-demotion guard — **OPEN, MERGEABLE**, awaiting the controller's merge. (3) **The settings →
+> # workflows card grid** — `exec/settings-workflows`, cut from `origin/main` = **`b14d3b9b`**, commit
+> # **`dceec034`**, ONE PR `--base main`, BUILT AND GREEN and at the reviewer when this block was written.
+> # **The queue after this is NOT empty** (order: `…-attention-part2-heading.md` — exec 2's own
+> # continuation — then `…-settings-workspace-tab.md`, then `…-migration-order-check.md`; the controller
+> # dispatches to whichever executor frees first). **HOLD for that dispatch.**
+>
+> | | |
+> |---|---|
+> | branch | `exec/settings-workflows`, cut from `origin/main` = `b14d3b9b`; **not rebased since**, and `main` had not moved at the time of writing. Re-measure before the PR. |
+> | the change | 6 files: `workflow-list-screen.tsx` (the card grid), `ui.css` (the new `workflow-list__*` family, **appended at EOF**), `screens.test.tsx` (10.62 updated + case **13.920**), `tokens.test.ts` (13.920's measured half), `test-cases/13`, `Features.md` |
+> | case ids | **`13.920`**. The dispatch said "next free `13.883`" — **that expired**: this lane took `13.883` in **#473** an hour later, so 13.920 was taken and the collision the previous task recorded was avoided by one. |
+> | migration | **NONE.** Do not restart the server container. |
+> | suites | **app-core 1550/0** (+1) · **ui 330/0** (+2) · **web 520/0** · app-core, ui and web typechecks 0. Node v22.22.2. |
+> | seven checks | **all EXIT 0**: `tasks` · `env` · `runbook` · `help` · `citations` (file 13 = **657** cited / 0 uncited) · `db-tz` · `check-case-ids` (**2347**, union == sum) |
+> | gate | **NOT RUN BY THIS LANE.** |
+>
+> ## ▣ WHAT THIS TASK SHIPS
+>
+> The settings → workflows screen moves from a flat `<ul>` of rows to the prototype's card grid. **The real
+> defect was not the layout: `workflow-list__*` had NO CSS AT ALL** — its only prior occurrence anywhere was
+> a comment naming `.workflow-list__new` among unclassed-control offenders — and the primary action rendered
+> as a bare `<button>`. The whole family is new, and the action moved onto the shared `Button
+> variant="primary"`. The badge and the second action are **named absences** with missing FIELDS behind
+> them, and the test asserts their absence rather than the docblock asserting itself.
+>
+> **The chip is the avatar's defect one screen over.** The prototype fills it with `--trayBg`
+> (`--gn-surface-sunken`), which under `neo` is the SAME hex as the card — so the chip composites to the
+> card's own colour and needs the `[data-style="neo"]` compact shadow `.ticket-type-list__badge` already
+> ships. Measured and asserted as a palette fact with a control.
+>
+> **GUARD PROVED BY MUTATION, twice:** dropping the neo shadow reddens the token-layer assertion by name;
+> repointing a category bar to `--gn-surface-sunken` reddens the ratio arm at **1.000** — the bar going
+> invisible. Restored, `ui.css` is byte-identical at `99676339e7f3ae68498f82fd1fcc189454976b25ba5ea6871c89cd64a74c9e80`.
+>
+> ## ▣ METHOD NOTES THIS TASK EARNED
+>
+> - **PLACEMENT IS A PRICED DECISION, and the price is measurable.** The new CSS family was **appended at
+>   the end of `ui.css`** rather than beside `.ticket-type-list__*` where a reader would look: inserting
+>   there stales **46** of the repo's 135 `ui.css:NNN` citations [**RE-MEASURED — see the CURRENT POSITION
+>   block at the top of this file: it is 45 of 134, and no threshold yields 46**], appending stales **0**. Measured both
+>   ways BEFORE choosing. The previous task staled 24 citations by not asking the question.
+> - **The dispatch's "next free" id had already expired — by this lane.** `13.883` was named free at 16:53
+>   and this lane took `13.883` in #473 minutes later. The previous task's own recorded lesson, applied:
+>   recount at your own tip, and treat a dispatch's number as a reading with a shelf life.
+> - **A prototype line number is only valid against the revision it was measured on.** The dispatch warns
+>   that the primary checkout's copy is 15 lines short (`isWorkflows` at `826` there, `841` at `main`), so
+>   every prototype read here went through `/usr/bin/git show origin/main:…` into a temp file.
+> - **`/usr/bin/cat` does not exist on this machine.** The shell-function proxy covers `cat` too; reading a
+>   file needs the Read tool or `/bin/cat`.
+
 > # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~17:1x IST. **THE AVATAR PR IS MERGED (#469 → `cb1f3d16`) AND
 > # THE OWNER-DEMOTION GUARD IS BUILT, GREEN, REBASED AND AWAITING ITS PR.** `exec/owner-demotion-guard`,
 > # ONE PR, `--base main`, rebased onto `origin/main` (the union of my avatar work, exec 2's attention
@@ -100,6 +400,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > - **A registry-pin test is a real gate, not an obstacle.** Adding the id reddened
 >   `engine.test.ts`'s `REFUSAL_RULES` equality — 22 entries against 23 — which is exactly what that
 >   test exists for. The id was added there; nothing was loosened.
+
 > # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~16:3x IST. **SECOND WAVE TASK 8 IS MERGED (#465 → `c2daa5b5`)
 > # AND THE AVATAR BUG DISPATCH IS BUILT, REVIEWED, FIXED, REBASED AND **OPEN AS PR #469 — MERGEABLE,
 > # AWAITING THE CONTROLLER'S MERGE.** NOTHING IS LEFT FOR THIS LANE TO DO ON IT.** The dispatch was

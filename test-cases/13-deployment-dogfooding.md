@@ -1822,6 +1822,48 @@ compute against one specific background — which is exactly why they are cases 
   not measuring anything, and that control stays honest at any future population.*
   *The instrument composites alpha, which `relativeLuminance` cannot — the checklist records that mode
   reading 11.87 where the truth is 1.85, a false GREEN. Every fill R1(c) introduces is `rgba()`.*
+- **13.921** ✅ The non-text-contrast sweep's positive control is **PLANTED**, so no styling change can
+  remove it. *It replaces `expect(bestSeen).toBeGreaterThan(15)`, which **until 2026-09-18 passed for a
+  reason unrelated to the property it named**: both readings above 15 (17.62, twice) were
+  `rgba(0,0,0,1)` — Chrome's own default border on two BARE `<button>`s on `/settings/workflows`. The
+  control was resting on an unstyled button, the exact defect class this day's work was removing.*
+  *Putting those buttons on `.gn-button` (`border: none`, `packages/ui/src/ui.css:60`) removed both
+  readings and the maximum fell to **3.81**, so the assertion went red — not because the instrument
+  broke, but because the defect it leaned on got fixed. `aside.gn-attention`'s 4.36 leaves by the same
+  door in the same week, which is why the repair could not lean on it either.*
+  *The `15` is NOT lowered and the assertion is NOT deleted. What changes is what it stands on: the
+  sweep is handed an element whose ratio is known to the decimal — black on an opaque white ground,
+  **21.0** — and must read it through the SAME `sweepBorders` path the measurement uses. A planted
+  fixture does not depend on the product happening to contain a high-contrast border, so it survives
+  every future styling change, and it asserts a property of the INSTRUMENT rather than of the product.*
+  *Verified end-to-end in Chromium rather than by arithmetic alone: on a bare page the sweep reads
+  **nothing** (`examined=0`), and after the plant it reads `div.non-text-contrast-control` at
+  `ratio 21`, `border rgba(0,0,0,1)`, `backdrop rgb(255,255,255)` — the empty BEFORE state being the
+  control that the reading came from the plant. The white ground is a real ANCESTOR rather than the
+  control's own background, because `backdropOf` walks to the PARENT; painting the control itself would
+  leave the ratio at the mercy of whatever the page's body is painted that day.*
+  *`bestSeen` remains the PRODUCT's own maximum and is still written as the roster's `highestReading` —
+  it is simply no longer load-bearing for a threshold it can never durably hold.*
+  ***THE NEGATIVE CONTROL HAD THE SAME DEFECT, AND IT WAS THE RUN THAT FOUND IT.** `viewport.spec.ts`
+  runs TWO controls through `sweepBorders`, and the negative one — `sweepBorders(page, 25)`,
+  `absurd.below.length > 0` — sweeps the page the route loop ENDS on, `/settings/workflows`. That is
+  precisely the page whose two bare buttons carried the `rgba(0,0,0,1)` border and became `.gn-button`
+  (`border: none`), so after the change **that page has no painted borders at all**: the roster's
+  `examined` falls 9 → 4, `highestReading` 17.62 → 4.36, `totalClasses` 5 → 2, both `rgba(0,0,0,1)`
+  entries gone, `below.length` is `0`, and the control fails **for exactly the reason the positive one
+  had**. The first version of this fix planted BETWEEN the two controls and was caught by running the
+  suite — F1 was found by thinking, this by running, and a green forced gate could see neither because
+  `e2e-stack` is not in the turbo graph.*
+  ***THE REPAIR IS THE ORDERING.** The fixture is planted ahead of BOTH controls. Its fixed 21:1 is
+  BELOW the negative control's 25, so **one fixture satisfies both** — the positive control reads it and
+  the negative control counts it as an offender. Neither threshold is lowered and neither control is
+  deleted; **a control that runs before the fixture it needs is not a control.** Verified in Chromium
+  against a borderless page, which is the failing page's own shape: **before the plant
+  `below.length=0` — the reported failure reproduced — and after it `below.length=1` with
+  `div.non-text-contrast-control` at 21 as the offender**, while the positive control reads the same
+  element at 21. Both now stand on the fixture, which depends on no product element, so neither this
+  change nor `aside.gn-attention`'s border leaving in the same week can take it away.* —
+  (`apps/web/e2e-stack/viewport.spec.ts`)
 - **13.284** ✅ A non-primary control is identifiable without a boundary — the affordance is fill plus an
   accent-coloured semibold label, and the case measures which of the two actually carries it.
   *Measured, because the ruling explicitly declined to assert it: **the FILL is 1.09–1.15 against every
@@ -11649,3 +11691,99 @@ sweep — each re-measured by the reviewer at the line it names, on copies, with
   reporter surfaced that as `total=7 passed=7 failed=0` with the broken file simply absent from the
   assertion list. **A mutation result of `failed=0` is not evidence unless the total equals the full
   suite's count**; the suite-level failure is in `testResults[].message`, not in `assertionResults`.
+## settings → workflows: the card grid, and a CSS family that did not exist (executor 1, 2026-09-18) — case `13.920`
+
+Slice 1 of the `isWorkflows` port (`docs/superpowers/plans/…`, dispatch
+`CTL-DISPATCH-2026-09-18-settings-workflows.md`). The prototype block is
+`design-system/interactive/desktop.dc.html:841-869` at `@227434a5` — read from `main`, and the dispatch
+records why that matters: the primary checkout sits on a retired branch whose copy is **15 lines short**,
+so `isWorkflows` is at `826` there and `841` here. The audit's own row is
+`docs/design/prototype-delta-2026-09-18.md:68` (`wire-gap`, M).
+
+**THE UNSTYLED FAMILY WAS THE REAL DEFECT, and it was total.** `workflow-list__*` had **NO CSS AT ALL** —
+every `*.css` in the repo held exactly **one** `workflow-list` occurrence and it was a comment listing
+`.workflow-list__new` among *"unclassed-control offenders"* (`apps/web/app/globals.css:44`); there were
+**zero rules**. The primary action rendered as a bare `<button>` resolving to the UA default rather than
+`.gn-button--primary`. The audit established the absence with a control — the same sweep finds 31
+`.ticket-type-list__` rules — so the instrument reaches CSS and this family was simply not in it.
+
+- ✅ **13.920 — the workflow card grid, its state chips and category bars, and the two absences the
+  prototype draws and this product cannot back.** Two halves, in two files, split the way every styling
+  case in this repo splits: `packages/app-core/test/workflow-builder/screens.test.tsx:165` proves the
+  COMPONENT applies the classes, and `packages/ui/test/tokens.test.ts:1443` proves the classes DRAW
+  something. A rule that sets a colour is not a boundary that reads.
+
+  **The component half.** The prototype's own header sentence — *"Publishing records a version. Nothing
+  already recorded is rewritten."* (`:845`) — is asserted character for character; it had **0 hits** in
+  the product before this. One chip per state, one bar per chip, and the bar's class is asserted to be
+  `workflow-list__state-bar--<category>` for each state IN ORDER, with a set-equality arm proving the
+  fixture really carries all three categories, so the list is not satisfied by one class repeated. Every
+  bar is `aria-hidden` — the state's NAME is the accessible content. **Both absences are asserted rather
+  than assumed:** `.workflow-list__badge` must be `null` and the action row must hold exactly one button.
+  A badge that can only ever say `Published` and a second button with no gateway method are exactly what
+  this repo keeps re-finding, so their absence is pinned in the test rather than left to the docblock.
+
+  **The measurement half, and it is the same defect as the avatar's, one screen over.** The prototype
+  fills a chip with `--trayBg` (`:3184`) — `--gn-surface-sunken` here — and under `neo` that role is the
+  SAME hex as the `.gn-card` behind it, so the chip composites to exactly the card's colour. Asserted as
+  a fact about the palette (`toBe(card)`, both themes) with a **control** that under `hig`/`minimal` the
+  two roles genuinely differ — so the claim is about `neo` rather than about the palette. That equality
+  is what makes the `[data-style="neo"]` compact shadow *load-bearing* rather than decorative, and the
+  rule is asserted to take its shadow from the token layer rather than a literal. The three category bars
+  are DATA (`WorkflowState.category`, `packages/domain/src/workflow.ts:3`), so each is held to the 3:1
+  WCAG 1.4.11 floor **against the chip composite**, in all six style/theme combinations. **Measured
+  minimum 3.733** (`hig`/`minimal` light, `open`); the roles are read out of `ui.css` rather than named
+  in the test, so a repoint cannot pass.
+
+  **GUARD PROVED BY MUTATION, twice, each dying specifically.** Dropping the `neo` shadow reddens the
+  token-layer assertion by name. Repointing `.workflow-list__state-bar--open` from `--gn-category-open`
+  to `--gn-surface-sunken` reddens the ratio arm — **measured ratio 1.000**, the bar becoming invisible,
+  which is the exact defect the case exists for. Restored, `ui.css` returned to SHA-256
+  `99676339e7f3ae68498f82fd1fcc189454976b25ba5ea6871c89cd64a74c9e80` byte for byte **at that point in the
+  branch's history**; the fix round that followed edited this file's own docblock, so the tip's hash is
+  `2b4be36e08b22b12b62b40c86a6980cd131a29d64f485a79c50081fba1e83358`. The proof is that the restore was
+  byte-exact against the pre-mutation bytes, which is a fact about that revision, not about this one.
+
+  **A RECORDED DEVIATION — the version stays, in the meta line.** The prototype writes the version into
+  the workflow's NAME (`"Delivery v4"`, `:3175`) because its data has no separate field. The product names
+  the workflow and its version separately, and case **10.62** asserts the version is shown, so dropping it
+  to match the drawing would lose a fact the screen already had. The meta line is therefore
+  `v7 · 3 states · 9 transitions` — the prototype's `"N states · N transitions"` plus the fact the row
+  list already carried. 10.62 was updated in the same change to build that string from the fixture rather
+  than typing today's numbers.
+
+  **PLACEMENT, priced rather than lazy.** The `workflow-list__*` rules are **appended at the end of
+  `ui.css`** instead of beside `.ticket-type-list__*` where a reader would look. Inserting a block that
+  size at line ~1832 shifts every `ui.css:NNN` citation below it, and **45** of the repo's 134 name a line
+  past that point; appending stales **0**, measured both ways. The two families sit **2,524** lines
+  apart in that file (`.ticket-type-list__*` at `:1740-1832`, this family at `:4356-4410`), so the locality
+  given up is small and the citations kept are not. The reasoning is
+  in the CSS comment, so the next reader can move it deliberately rather than wonder.
+
+  **Citations:** `packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx:112` (the grid),
+  `:118` (the chip), `:120` (the bar and its category), `:127` (the meta line), `:99` (the subtitle),
+  `:103` (the primary action on the shared variant), `packages/ui/src/ui.css:4384` (the chip fill),
+  `:4394` (the neo shadow), `:4406-4408` (the bar roles)
+
+  **RECORDED, NOT FIXED — this change removes the non-text-contrast sweep's only high reading, so
+  `test:e2e:stack` is expected to go red.** The committed roster
+  (`apps/web/e2e-stack/non-text-contrast-roster.json`, `totalClasses: 5`) has exactly two readings above 15:
+  `button.workflow-list__new` and the generic `button`, both **17.62**, both on `/settings/workflows`, both
+  carrying the UA default border `rgba(0,0,0,1)`. Both were bare `<button>`s before this change; both are now
+  `Button`, i.e. `.gn-button`, which sets `border: none` (`ui.css:60`, with the reasoning at `ui.css:33-35`).
+  The sweep scores only elements with a painted border (`helpers/non-text-contrast.ts:132-137`), so those two
+  readings disappear, the maximum falls to 4.36, and `viewport.spec.ts:1020`'s
+  `expect(bestSeen).toBeGreaterThan(15)` — the positive control proving the sweep can still tell red from
+  green in the ordinary range — fails. The roster is rewritten unconditionally (`:946-968`), so the two
+  entries would vanish with no trace. **Predicted from committed numbers and read CSS, not from a red run:
+  the suite needs the live stack and `docker compose` is out of bounds for this lane.** `apps/web/e2e-stack/`
+  is untouched by this branch (0 files changed). The repair is a decision about the control's premise — which
+  this change deliberately removes — rather than a defect in this slice. **Owner: whoever next regenerates the
+  viewport roster; raised to the controller.**
+
+  **A RECORDED DEVIATION, previously silent.** `.workflow-list__title` is `font-size: 1rem`
+  (`ui.css:4364`) where the prototype's heading is `20px/25px` (`desktop.dc.html:844`). The title is one of
+  the three `isSettingsShell` nits the dispatch measured, and the third of those is a deliberate freeze
+  (`globals.css:333`); this one was simply not carried over, and no case measures it. It is recorded rather
+  than changed, because a heading size is a settings-shell decision rather than a card-grid one — the same
+  reasoning that kept the other two nits out of slice 1. **Owner: the settings-shell pass.**

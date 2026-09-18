@@ -4394,3 +4394,76 @@
 .gn-filters__choice--row[data-mode='exclude'] { background: var(--gn-fill-quaternary); }
 /* The strip's exclude chip carries the same ⊘ glyph before "Not …". */
 .gn-project__filter-chip--exclude .gn-filters__choice-glyph { color: var(--gn-text-muted); }
+
+/* ── settings → workflows: the card grid (prototype `desktop.dc.html:841-869`) ──
+
+   APPENDED AT THE END OF THE FILE rather than beside `.ticket-type-list__*`,
+   where a reader would look for it, and the placement is PRICED rather than
+   lazy: inserting a block this size at that point shifts every `ui.css:NNN`
+   citation below it, and 45 of the repo's 134 name a line past it. The two
+   families sit 2,524 lines apart in this file — `.ticket-type-list__*`'s rules
+   at `:1740-1832`, this family's at `:4356-4410` — so the locality given up is
+   small and the citations kept are not. Move it if you are also prepared to
+   sweep the citations.
+
+   The chip fill is `--gn-surface-sunken`, which is the prototype's `--trayBg`
+   (`:3184`) on the product's role layer — and under `neo` that role is the SAME
+   hex as the `.gn-card` behind it, so the chip's only boundary would vanish.
+   That is not hypothetical: it is the `.gn-avatar` defect fixed the same day,
+   one screen over. The remedy is the one `.ticket-type-list__badge` already
+   ships — keep the fill, add the compact sunken shadow under `neo`. */
+.workflow-list { display: flex; flex-direction: column; gap: 0.9rem; }
+.workflow-list__loading { margin: 0; color: var(--gn-text-muted); }
+/* The same `--gn-text` the sibling screen's own load-error uses
+   (`.workflow-builder-screen__load-error`), rather than a danger tone: the
+   failure here is "we could not read", not "something is wrong with your data". */
+.workflow-list__load-error { margin: 0; color: var(--gn-text); }
+.workflow-list__header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.workflow-list__heading { display: flex; flex-direction: column; gap: 0.15rem; }
+.workflow-list__title { margin: 0; font-size: 1rem; }
+.workflow-list__subtitle { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
+.workflow-list__empty { margin: 0; color: var(--gn-text-muted); }
+/* `minmax(20rem, …)` is the prototype's own `minmax(320px,1fr)` (`:849`) — the
+   20rem floor is what makes this a grid of cards at desktop width and a single
+   column on a phone, with no media query. */
+.workflow-list__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+/* `.gn-card` supplies the surface, the shadow and the radius; this adds the
+   prototype's own interior metrics — `padding:18px` and `gap:12px` (`:851`). */
+.workflow-list__card { display: flex; flex-direction: column; gap: 0.75rem; padding: 1.125rem; }
+.workflow-list__name { margin: 0; font-size: 1.0625rem; line-height: 1.375rem; font-weight: 600; }
+.workflow-list__states { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; }
+/* `position: relative` is the bar's containing block; the 0.8125rem left padding
+   clears the 4px bar plus its own inset, which is the prototype's
+   `padding:3px 9px 3px 13px` (`:3184`) with the bar's width folded out. */
+.workflow-list__state {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  padding: 0.1875rem 0.5625rem 0.1875rem 0.8125rem;
+  border-radius: 0.375rem;
+  background: var(--gn-surface-sunken);
+}
+[data-style="neo"] .workflow-list__state { box-shadow: var(--gn-shadow-sunken-compact); }
+.workflow-list__state-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0.25rem;
+  border-radius: 0.375rem 0 0 0.375rem;
+}
+/* The three categories the DOMAIN already declares (`workflow.ts:3`), on the
+   three roles the product's own `.gn-chip__dot` uses for them (`ui.css:152-158`)
+   — no new role, and the mapping cannot drift from the chip's. */
+.workflow-list__state-bar--open { background: var(--gn-category-open); }
+.workflow-list__state-bar--active { background: var(--gn-category-active); }
+.workflow-list__state-bar--terminal { background: var(--gn-category-terminal); }
+.workflow-list__meta { margin: 0; font-size: 0.75rem; line-height: 1rem; color: var(--gn-text-muted); }
+.workflow-list__actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
