@@ -22,8 +22,9 @@
 
 ## ▲ TOP BLOCK — `isBuilder`: fit the design to the backend that exists (2026-09-18)
 
-**Position: the change set is COMPLETE and green; the PR is the next act.** Dispatch:
-`CTL-DISPATCH-2026-09-18-exec2-isbuilder`. One PR, `--base main`, branch `exec2/isbuilder`.
+**Position: the change set is COMPLETE, the review round is CLOSED, and the PR is open and awaiting the
+controller's merge.** Dispatch: `CTL-DISPATCH-2026-09-18-exec2-isbuilder`. One PR, `--base main`,
+branch `exec2/isbuilder`.
 
 ### Anchors — verify these; do not trust the row
 
@@ -33,10 +34,18 @@
 | base | **`ba96a8d2`** = `origin/main` = the `#443` merge (executor 2's Members work) |
 | `origin/main` | `ba96a8d2` at the last count — **recount; main moves without telling you** |
 | merge-base | `ba96a8d2` |
-| ahead | 1 commit (this one) — a reading, not a fact; `git rev-list --count origin/main..HEAD` |
+| ahead | 2 commits — a reading, not a fact; `git rev-list --count origin/main..HEAD` |
 | tree | clean at the last check |
 | HEAD | **verify with `/usr/bin/git rev-parse HEAD`.** A block cannot contain the commit that carries it, so any number here names an ANCESTOR, never the tip |
-| PR | `--base main`, not yet opened |
+| PR | `--base main`; **the reviewer pass is recorded in the body BEFORE the PR opened** |
+
+### The two commits
+
+1. **`de6d2fa8`** — the change set (the reviewed head).
+2. **`7fb68f3b`** — the review fix round. **No production code and no CSS rule changed between them**,
+   verified by hashing both stylesheets with comments stripped (`2daa369d…` and `bc83037a…` identical at
+   both heads, positive control: the test file that did change hashes differently). Tests, docs and CSS
+   *comments* only. That is what decided no second full review was owed.
 
 ### What shipped, and the measurement it rests on
 
@@ -119,15 +128,29 @@ went on harvesting the name while the card treatment was gone. That is case **13
 exist — a declaration-level table, in the shape `saved-filters-css-binding.test.tsx`'s 11.119 already
 established.
 
-### § 5 — CASE IDS: MY BLOCK IS `13.760`–`13.819`. USED `13.767`–`13.773`.
+### § 5 — CASE IDS: MY BLOCK IS `13.760`–`13.819`. USED `13.767`–`13.775`.
 
-**The next free id inside my block is `13.774`.** Recount by case MARKER only, never by substring — the
+**The next free id inside my block is `13.776`.** Recount by case MARKER only, never by substring — the
 block `13.767`–`13.819` was measured free before minting, and every hit in that measurement was prose
 *mentioning* the block's own bounds, which is exactly the trap this file records.
 
 Members used `13.760`–`13.766`. **The highest `13.*` marker in `test-cases/13` at the frozen tip is
-`13.766`**; the highest `13.*` id anywhere in `packages/` + `apps/` is `13.765`. If more than 60 ids are
+`13.775`**; the highest `13.*` id anywhere in `packages/` + `apps/` is `13.775`. If more than 60 ids are
 needed, **stop and ask** — do not run past the block.
+
+### § 5b — THE REVIEW ROUND, AND WHAT IT FOUND THAT MY OWN TESTS COULD NOT.
+
+An independent reviewer ran at `de6d2fa8`: four Important defects, all fixed; nine Minor. **Three were my
+instruments being blind in ways their own names did not admit** — deleting `gn-field__input` survived the
+whole app-core package; the role sweep was **digit-blind** (`var\((--gn-[a-z-]+)\)` cannot see
+`--gn-ink-2`); and case 13.771's recorded **cause** for the hole it closes was simply wrong — the harvest
+regex `[a-z][a-z0-9_-]*` **stops at the first uppercase letter**, which is why a mixed-case rename
+survived, not the media-query cross-talk I wrote down. The fourth was a **fabricated obstacle**: I
+justified refusing the prototype's `h1` with a `getByText` ambiguity the reviewer refuted by probe.
+
+**The lesson worth carrying: a check's NAME is not its instrument.** All three instrument defects were
+invisible until something aimed at the exact shape the instrument could not see, and each was found by a
+party who did not write it. The corrected regexes are `[A-Za-z]` and `[a-z0-9-]`.
 
 ### § 6 — WHAT IS *NOT* COVERED, NAMED RATHER THAN IMPLIED.
 
