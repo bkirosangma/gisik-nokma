@@ -63,7 +63,7 @@ require when this ticket was created?"*, and no claim already recorded can be
 retroactively refused. Marking a field required would place every existing ticket
 of that type out of compliance. **Named absence, owner: the plan that takes up
 type-level field enforcement.** It is recorded in `Features.md`, in the
-catalogue section for `13.776`–`13.784`, and in the commit message — the dispatch
+catalogue section for `13.776`–`13.785`, and in the commit message — the dispatch
 forbade shipping a silent no-op, and this is not one.
 
 ### What the wire actually cost
@@ -104,12 +104,31 @@ before believing ANY test result that consumes it — including a passing one.**
   `scripts/check-case-ids.mjs`. (`check:db-tz` needs
   `DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma`.)
 - **The forced gate was NOT run — the controller's.**
-- Six mutations run, each killed by a case specific to its own site: remove
+- **Seven** mutations run, each killed by a case specific to its own site: remove
   `required` from the schema (13.777); `.default(false)` (13.782 + an existing
   `toEqual`); the toggle never un-setting (13.778); `mapTicketTypes` dropping the
   member (13.784); the toggle never disabled (access.test.tsx `toBeDisabled`);
-  `Remove field` leaking back to members (**access.test.tsx:615** — this is the
-  one that proves the widened enumeration below did not open a hole).
+  `Remove field` leaking back to members (**access.test.tsx:610-615** — this is
+  the one that proves the widened enumeration below did not open a hole); and the
+  schema member removed from a mutated **`dist`** (13.785, the real-Postgres
+  round trip — `expected { id: 'fleet', … } to deeply equal { id: 'fleet', … }`).
+  That last one was run against `packages/domain/dist` **only**, with the source
+  left pristine, precisely so the running reviewer's view of the tree could not
+  change under it; `dist` is gitignored and untracked, and the file was restored
+  from a backed-up copy and verified by SHA-256 (`9d5889c3…` before and after).
+
+### ★ THE STRONGEST WITNESS, AND WHY IT IS NOT REDUNDANT WITH 13.784
+
+The dispatch named the failure mode precisely: *the core plan's final review
+found a flag dead in production while every view test drove a fake data source.*
+Until case **13.785** this change had nothing that answered that at the level it
+demands — every client case runs against a recording fetch or a fake gateway.
+**13.785 writes through the real projector into a real `jsonb` column and reads
+back through the real reader** (`apps/server/test/proj-ticket-types.test.ts:124`),
+which is the only place the column's own round-tripping is exercised at all. Its
+fixture is ONE decided field and ONE never-decided: an assertion on the first
+alone would pass for a projection that defaulted every field to required, and the
+second is asserted as key ABSENCE rather than falsiness.
 
 ### ★ ONE EXISTING CASE WAS WIDENED — and how it was proved not to go quiet
 
