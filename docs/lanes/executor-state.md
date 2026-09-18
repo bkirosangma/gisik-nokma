@@ -43,7 +43,8 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 > # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~12:5x IST. **SECOND WAVE, TASK 5 (the Backlog tab's
 > # rank order, drag reorder, and Move up / Move down) IS DONE, REVIEWED, FIXED, AND THEN FIXED AGAIN
-> # UNDER AN OWNER RULING. **PR #450 OPEN ON BASE `main`, MERGEABLE, AWAITING THE CONTROLLER'S
+> # UNDER AN OWNER RULING. **PR #450 OPEN ON BASE `main`, REBASED ONTO `origin/main` = `08bdd791`
+# (executor 2's Task 9, PR #449, merged while this was open), AWAITING THE CONTROLLER'S
 > # MERGE.** An independent
 > # review's four surviving mutants are all killed (below); the unranked-tail defect that same review
 > # found was HELD rather than shipped — the controller ruled a short hold cheaper than shipping it and
@@ -61,12 +62,12 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | | |
 > |---|---|
 > | branch | `exec/second-wave-t5-backlog-rank`, cut from `origin/main` = **`488bfb2d`** (Task 4, PR #446). Not rebased since; no peer landed under it while it was open |
-> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha printed here names an ANCESTOR. FOUR commits: **`204cf374`** (the task, 8 files, +1145/−67), **`8ec6d18b`** (the review fix round: four surviving mutants killed, three Minor fixes), **`7663ea4f`** (the grouping finding recorded as a measurement), and a **ruling commit** implementing option B with its cases. Plus the **handoff commit that carries this very block** on top, which cannot name itself. Every sha listed is an ANCESTOR of the head, never the head |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha printed here names an ANCESTOR. SIX commits, ALL REWRITTEN BY THE REBASE: **`27ed717b`** (the task, 8 files, +1145/−67), **`22fd0608`** (the review fix round: four surviving mutants killed, three Minor fixes), **`baeb4b52`** (the grouping finding recorded as a measurement), **`3c237b15`** (option B, the owner’s ruling), **`7fabf8da`** (the PR number), **`9ac3dabe`** (the docblock’s ruling record). Plus the **handoff commit that carries this very block**, which cannot name itself. **THE PRE-REBASE SHAS `204cf374` / `8ec6d18b` / `7663ea4f` / `7621ea86` / `2987b95d` / `5747ff9b` ARE ORPHANED** — `git merge-base --is-ancestor` is false for each while `git cat-file` still answers `commit`, which is this file’s opening trap for the fifth task running |
 > | base | **`488bfb2d`** = `origin/main`, carrying second-wave Tasks 1 (#441), 2 (#442), 3 (#444), 4 (#446) and executor 2's Members+InviteAdmin (#443) |
 > | PR base | **`main`** — `owner/workspace-edits` is retired and deleted |
 > | case ids | **`13.707`–`13.712`** — four from the task and two from the ruling fix — inside this executor's allocated block `13.700`–`13.759`; **`13.713`–`13.759` remain unminted**. **Recounted two independent ways at this tip and they agree:** over case MARKERS using `scripts/check-case-ids.mjs`'s own `ID_LINE` regex, the highest marker minted in the block was `13.706` (Task 4's); and `grep -rnE '13\.70[7-9]\|13\.710'` over `packages/`, `apps/` and `test-cases/` returned **no hits at all**, against a positive control over `13\.70[0-6]` (found in both) and a null control over `13\.999` (absent). The plan's own `13.622`–`13.625` were NOT used — the dispatch records them as taken |
-> | six checks | **all EXIT 0 at the ruling commit**, run through `pnpm run check:*` so no filename is guessed: `tasks` · `env` · `runbook` · `help` · `citations` (**ratchet holds exactly on every file**; file 13 = **567** cited / 0 uncited, up from Task 4's 561 by exactly this task's six ✅ cases) · `db-tz` **0 with `DATABASE_URL=postgres://gisik:gisik@localhost:54330/gisik_nokma`** (exits 2 without it, by design; note 54330, not the shared cross-lane test Postgres on 54329). Also `node scripts/check-case-ids.mjs` **EXIT 0** — **2257** unique ids (was 2251; +6 = this task's six cases), union == sum so no duplicates, self-test passed |
-> | suites | **app-core 1512 · apps/web 470, zero failures**, both `--no-file-parallelism`, Node **v22.22.2**, re-run after the fix round and after the dist rebuild. Both figures reconcile against Task 4's, which is what makes them a positive control that the new cases are COLLECTED rather than merely written: app-core **1486 + 26 = 1512** (20 cases in `backlog-rank.test.ts`, one added by the fix round) and apps/web **465 + 5 = 470** (the Task 5 describe blocks grew from 6 to 8 cases in the fix round; the file's pre-existing four are included in both numbers) |
+> | six checks | **all EXIT 0 at the ruling commit**, run through `pnpm run check:*` so no filename is guessed: `tasks` · `env` · `runbook` · `help` · `citations` (**ratchet holds exactly on every file**; file 13 = **584** cited / 0 uncited, up from Task 4's 561 by exactly this task's six ✅ cases) · `db-tz` **0 with `DATABASE_URL=postgres://gisik:gisik@localhost:54330/gisik_nokma`** (exits 2 without it, by design; note 54330, not the shared cross-lane test Postgres on 54329). Also `node scripts/check-case-ids.mjs` **EXIT 0** — **2274** unique ids (was 2251; +6 this task's, +17 executor 2's Task 9), union == sum so no duplicates, self-test passed |
+> | suites | **app-core 1528 · apps/web 470, zero failures**, both `--no-file-parallelism`, Node **v22.22.2**, re-run after the fix round and after the dist rebuild. Both figures reconcile against Task 4's, which is what makes them a positive control that the new cases are COLLECTED rather than merely written: app-core **1486 + 42 = 1528** (26 of this task’s, 16 of executor 2’s Task 9 which the rebase brought in) (20 cases in `backlog-rank.test.ts`, one added by the fix round) and apps/web **465 + 5 = 470** (the Task 5 describe blocks grew from 6 to 8 cases in the fix round; the file's pre-existing four are included in both numbers) |
 > | typechecks | **domain, app-core, ui and apps/web all EXIT 0** — run after rebuilding `packages/domain` and `packages/app-core` dist, which `apps/web` resolves through by package name |
 > | tree | clean at the frozen head; no `dist`, no `task-ledger.tsv`, no `.superpowers/` in the diff (checked by `git diff --name-only`) |
 > | dev stack | **no compose action was run at any point.** `curl -s localhost:3000/v1/auth/methods` still answers `{"google":true,"apple":false,"phone":false}` — the sign-in the 2026-09-09 env rule protects is intact |
@@ -172,6 +173,43 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > that is both the first and the last ranked one). **And a fourth mutant — M5 — survived because the
 > assertions were true of BOTH orders; when two candidate implementations both satisfy your case, the
 > case is not pinning the one you named.**
+>
+> ## ▣ THE REBASE — 2026-09-18, onto `origin/main` = `08bdd791`
+>
+> Executor 2's Task 9 (#449, `BulkCloseDialog`) merged while #450 was open and both wrote the same two
+> shared files. One conflict in six commits, in `Features.md`; `test-cases/13` and
+> `packages/app-core/src/index.ts` auto-merged. Resolution was a UNION, and the two places where a union
+> was NOT the right answer are named rather than smoothed:
+>
+> - **`Features.md`, 1 conflict, 2 lines vs 2.** Both sides appended bullets after the same anchor. The
+>   union is executor 2's `BulkCloseDialog` bullet **and** this task's "Backlog ranking" bullet — and the
+>   naive union produced FOUR lines because the Task 4 `rowDrag` bullet exists in two versions: main has
+>   the original ("no surface passes it yet") and this branch has the Task 5 correction of it. **Those are
+>   the same bullet, not two, so the superseded copy was DROPPED** — keeping both would have been a
+>   duplicate, i.e. drift. Distinguished mechanically, not by eye: the live original contains
+>   "ships here and **no surface passes it yet**", while the corrected copy carries that phrase only
+>   inside quotation marks. Verified after: `rowDrag` bullet ×1, `BulkCloseDialog` bullet ×1, Backlog
+>   ranking bullet ×1.
+> - **`packages/app-core/src/index.ts`** — add/add in the same region, auto-merged to a true union; the
+>   `HEAD`-to-`origin/main` diff is **additions only** (this task's seven-symbol block), with executor 2's
+>   `BulkCloseDialog`/`BulkCloseTicket` exports intact.
+> - **`test-cases/13`** auto-merged with no conflict, so it was verified by MARKER rather than trusted:
+>   **every one of this task's ids `13.707`–`13.712` is present exactly once, and every one of executor 2's
+>   `13.640`–`13.643`, `13.787`, `13.788` is present exactly once.**
+> - **The R4 warning did not bite:** this task's files never name the Dialog dismiss control, so the
+>   `Close` → `Close dialog` rename is not a coupling for this branch. Checked, not assumed —
+>   `grep -n "Close dialog\|Dismiss" ` over the three files returns nothing.
+>
+> **NOTHING OF THIS TASK WAS LOST, and the evidence is blobs rather than an argument.** Five of the six
+> files this task owns are **byte-identical before and after** the rebase (`git rev-parse HEAD:<path>`):
+> `backlog-rank.ts` `a2924bf2`, `backlog-rank.test.ts` `d351902a`, `backlog-rank-controls.tsx`
+> `d02d16c9`, `page.tsx` `95b1eb09`, `backlog-tab.test.tsx` `d13b3756` — so the code that was reviewed and
+> gated is the code now on the branch. The sixth, `index.ts`, differs by design (the union above). The two
+> shared catalogue files differ by design too. **The pre-rebase shas are ORPHANED and `cat-file` will still
+> resolve them.**
+>
+> Re-verified at the rebased head: **app-core 1528 · apps/web 470, zero failures**; four typechecks EXIT 0;
+> six checks + case-ids all EXIT 0 (**2274** unique ids; citations **584**/0).
 >
 > # ▣ CURRENT POSITION — SUPERSEDED. **HISTORY — Task 4 (`Table`/`TicketList`
 > # row drag plumbing and the tail drop zone) — MERGED as PR #446 at `488bfb2d`; it opened and merged
