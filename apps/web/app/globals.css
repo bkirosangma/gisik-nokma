@@ -761,9 +761,12 @@ input, textarea, select { font-family: inherit; }
 }
 
 /* ── Notifications — the switch MOVED OUT of this file (2026-09-18). ───────
-   These were three rules scoped to `.gn-account__notification-row
-   input[type='checkbox']`, and they are now `.gn-switch` in
-   `packages/ui/src/ui.css`, reached through `@gisik-nokma/ui`'s `Switch`.
+   These were FIVE rule bodies plus a reduced-motion arm — the base track, the
+   `::after` knob, `:checked`, `:checked::after` and `:focus-visible`, all scoped
+   to `.gn-account__notification-row input[type='checkbox']`. They are now the
+   `.gn-switch` family in `packages/ui/src/ui.css`, reached through
+   `@gisik-nokma/ui`'s `Switch`. (An earlier draft of this comment said "three",
+   which was a written count that was simply wrong.)
 
    The reason is not tidiness. The Settings → Workspace tab needed the same
    control, and a scoped rule in this file can only ever paint an element on a
@@ -2633,9 +2636,10 @@ input, textarea, select { font-family: inherit; }
 
    It wears the SAME shell as its two sibling tabs on this page. The shape is
    `ticket-type-list-screen.tsx:130` (`<section>`) through `:145` (`<Card>`),
-   and the same shape at `workflow-list-screen.tsx:183` through `:204` — both
-   under `packages/app-core/src/workflow-builder/`: a `section` whose header
-   carries an `h2` and a one-line summary, over a `Card` holding the content. **A fourth tab that invents its own layout is the
+   and the same shape at `workflow-list-screen.tsx:183` (`<section>`) through
+   `:205` (`<Card>`) — both under `packages/app-core/src/workflow-builder/`: a
+   `section` whose header carries an `h2` and a one-line summary, over a `Card`
+   holding the content. **A fourth tab that invents its own layout is the
    failure mode the dispatch named**, so where a sibling already has a number
    this file reuses it rather than picking a near neighbour:
 

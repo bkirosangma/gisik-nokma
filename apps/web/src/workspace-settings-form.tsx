@@ -91,7 +91,7 @@ type Knob = 'staleDays' | 'dueSoonDays' | 'autoCloseAfterDays';
  * opening on hover, focus and click; Save moved to its own row; the auto-close
  * control as a switch; and deliberate spacing. The screen now wears the same
  * shell as its two SIBLING tabs on this page — `section > header (h2 +
- * summary) > Card`, the shape `.ticket-type-list-screen.tsx:130-146` and
+ * summary) > Card`, the shape `ticket-type-list-screen.tsx:130-145` and
  * `workflow-list-screen.tsx:183-205` already establish — so the third tab is
  * not a fourth layout. The spacing tokens are named in
  * `globals.css`'s `.gn-workspace-settings` docblock rather than left to the eye.
@@ -377,8 +377,8 @@ export function WorkspaceSettingsForm({
                 Auto-close after
               </label>
               <InfoTip label="About Auto-close after">
-                Tickets that have sat in a terminal state longer than this are closed for you. Off
-                until you switch it on.
+                Tickets that have sat in a terminal state longer than this are closed for you.
+                Switch it off to leave them alone.
               </InfoTip>
             </div>
             {/* The switch is the CLAIM, and the input below is the value that

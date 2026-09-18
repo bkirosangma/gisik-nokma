@@ -4546,11 +4546,28 @@
    PROTOTYPE. The prototype hard-codes `#fff` in both themes; a literal here
    reddens the token-discipline suite, and there is deliberately no
    always-white role in `tokens.ts` (the palette is theme-aware by design). So
-   the knob is `surfaceRaised` plus a `borderStrong` ring: the ring is what
-   guarantees a visible edge in BOTH states and BOTH themes, where a bare
-   raised fill would vanish against the unchecked track. A knob is a non-text
-   UI part, so WCAG 1.4.11's 3:1 is what it owes, and the ring is what pays
-   it. */
+   the knob is `surfaceRaised` plus a `borderStrong` ring.
+
+   **"THE RING IS WHAT PAYS IT IN BOTH STATES AND BOTH THEMES" WAS WRONG, and
+   this text said exactly that until 2026-09-18.** Measured (the ring against
+   the fill composited over the card, from the roles themselves, all six
+   style×theme pairs):
+
+   | | ring vs unchecked track | ring vs accent | knob fill vs accent |
+   |---|---|---|---|
+   | hig/minimal light | 3.78 | 1.19 | 5.81 |
+   | hig/minimal dark | **2.95** | 1.19 | 5.89 |
+   | neo light | 3.41 | 1.19 | 5.20 |
+   | neo dark | 3.19 | 1.19 | 6.39 |
+
+   Two corrections follow, and neither is cosmetic. **Once the track is the
+   accent the ring is invisible on it (1.19)** — in the CHECKED state the knob's
+   edge is paid by its own `surfaceRaised` fill (5.20–6.39), not by the ring.
+   And **the ring falls short of the 3:1 a non-text UI part owes in hig/minimal
+   dark (2.95)**. That second figure is a CONTRAST DEBT on a control that
+   shipped before this file held it; it is recorded rather than papered over,
+   and it is invisible to every gate here because `CONTRAST_PAIRS` guards
+   `borderStrong` only against `surface`, never against `fillSecondary`. */
 .gn-switch {
   order: 2;
   flex: none;
@@ -4606,19 +4623,30 @@
    The trigger sits on a card surface and carries `--gn-text-muted`, which is
    the same role `.gn-field__label` uses for READ TEXT on that surface — so the
    3:1 this non-text control owes is already paid by a pairing the product
-   ships and the contrast roster guards; this adds no new pair.
+   ships and the contrast roster guards; this adds no new pair. */
 
-   The panel is `surfaceRaised` on the card behind it, which is the same
-   boundary `.gn-card` draws against its own parent, plus the raised shadow
-   that separates the two under `neo` where the surface roles collapse to one
-   hex. No new role, no literal. */
+/* 24x24, and the number is the product's own rather than a preference:
+   `ui.css:1246-1249` — "dense in-list controls get 24, standalone controls get
+   44" — and this is a dense control beside a field label. It shipped at 20x20
+   and that was under the floor; the review measured the hit area against
+   `* { box-sizing: border-box }` (`globals.css:5`) and it was exactly 20x20.
+
+   **The 44px tap ratchet still does not see it**, and that is recorded rather
+   than implied: `apps/web/e2e-viewport/tap-targets.ts:108` flags anything under
+   44, and its inline-control exemption (`:100-104`) needs `display: inline`
+   with a text-bearing parent — an `inline-flex` trigger holding an `aria-hidden`
+   SVG fails both. The reason it stays green is that **no roster covers the
+   settings routes at all** (`viewports.ts:171-176` lists help, privacy, terms,
+   sign-in and a 404 probe; `viewport.spec.ts:419-427` covers my-work, a
+   project, members and the two other settings tabs). That gap is the settings
+   cluster's, not this control's, and it is reported with a named owner. */
 .gn-infotip { position: relative; display: inline-flex; align-items: center; }
 .gn-infotip__trigger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.5rem;
+  height: 1.5rem;
   padding: 0;
   border: none;
   border-radius: 999px;
@@ -4630,6 +4658,17 @@
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 2px;
 }
+/* THE BORDER IS LOAD-BEARING, AND THE SHADOW ALONE WAS NOT ENOUGH — corrected
+   2026-09-18 after review. The first version of this rule had no border and
+   justified itself by analogy with `.gn-card`'s boundary against its PARENT.
+   The analogy does not hold: a card sits on `--gn-surface`, while this panel
+   sits on a CARD and is therefore `surfaceRaised` on `surfaceRaised` — the same
+   role on the same role. Under `hig` the raised shadow still separated them,
+   but **`SHADOWS.minimal.raised` is `[]` for both themes** (`tokens.ts`), so
+   `--gn-shadow-raised` resolves to `none` and the panel became 13px of text
+   painted over the number input beneath it with no boundary at all.
+   The hairline is what draws the edge in every style and theme; the shadow
+   stays as the thing that lifts the panel off the page where shadows exist. */
 .gn-infotip__panel {
   position: absolute;
   top: calc(100% + 0.375rem);
@@ -4639,6 +4678,7 @@
   width: max-content;
   max-width: 18rem;
   padding: 0.5rem 0.625rem;
+  border: 1px solid var(--gn-border);
   border-radius: var(--gn-radius-control);
   background: var(--gn-surface-raised);
   box-shadow: var(--gn-shadow-raised);

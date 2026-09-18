@@ -50,12 +50,18 @@ export type InfoTipProps = {
  * ## What it is NOT claimed to be
  *
  * The panel is in the DOM only while open, so it is a DISCLOSURE, not a
- * description: the input it explains does **not** carry
- * `aria-describedby` pointing at it. A screen-reader user reaches the
- * explanation by tabbing to this button, exactly as a sighted keyboard user
- * does. Making the explanation a permanent description of the field would be
- * better for that user and would need the panel to be always-present text —
- * recorded here as the honest limit of what shipped rather than implied away.
+ * description: the input it explains does **not** carry `aria-describedby`
+ * pointing at it.
+ *
+ * **And the parity between a screen-reader user and a sighted keyboard user
+ * stops at the button** — this paragraph claimed they "reach the explanation"
+ * alike until the review measured it, and that was an overstatement.
+ * Activating the button only INSERTS a `role="note"` node: nothing moves focus
+ * into it and there is no live region, so it is never announced. The sighted
+ * user watches the text appear; the screen-reader user must go looking for it.
+ * Making the explanation a permanent description of the field would be better
+ * for that user, and would need the panel to be always-present text — recorded
+ * here as the honest limit of what shipped rather than implied away.
  */
 export function InfoTip({ label, children, className }: InfoTipProps) {
   const [open, setOpen] = useState(false);

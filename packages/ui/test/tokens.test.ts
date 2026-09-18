@@ -1781,7 +1781,7 @@ describe('13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and t
  * it proves is the two things drift would actually break: that there is exactly
  * one switch rule set, and that the two states are not painted alike.
  */
-describe('13.899 — the switch is one rule set in ui.css, and its states differ', () => {
+describe('13.899–13.901 — the shared switch and the info tip, as declarations in ui.css', () => {
   const UI_CSS_TEXT = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
   const GLOBALS_CSS_TEXT = readFileSync(join(REPO_ROOT, 'apps/web/app/globals.css'), 'utf8');
 
@@ -1838,10 +1838,33 @@ describe('13.899 — the switch is one rule set in ui.css, and its states differ
     // of. Asserting only that ui.css has them would pass just as well if the
     // originals had been left behind — which is precisely the "two toggles that
     // drift" state the extraction exists to prevent.
+    //
+    // **Strengthened after review, and both halves of the fix matter.** The
+    // first version read ONE selector through the FIRST-MATCH `declarationsFor`
+    // helper — so a leftover `.gn-account__notification-row
+    // input[type='checkbox']:checked` (or `::after`, or `:focus-visible`)
+    // survived it, and would still restyle `/account`'s switch, because the
+    // shared `Switch` renders exactly that input. The removed block had five
+    // selector bodies, not one. Comments are stripped first, so this change's
+    // own prose about the move cannot satisfy the check, and the instrument is
+    // proved able to see the shape it claims is absent.
+    const LEFT_BEHIND = /\.gn-account__notification-row[^{}]*input\[type=['"]checkbox['"]\][^{}]*\{/;
+    const withoutComments = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, '');
+
+    // SELF-TEST: the instrument fires on the ORIGINAL rule. Without this the
+    // absence assertion below would pass just as well if the regex were wrong.
+    for (const body of ['', ':checked', '::after', ':checked::after', ':focus-visible']) {
+      expect(
+        LEFT_BEHIND.test(
+          `.gn-account__notification-row input[type='checkbox']${body} { color: var(--gn-text); }`,
+        ),
+        `the instrument cannot see a leftover \`…input[type='checkbox']${body}\` rule`,
+      ).toBe(true);
+    }
     expect(
-      declarationsFor(GLOBALS_CSS_TEXT, ".gn-account__notification-row input[type='checkbox']"),
+      LEFT_BEHIND.test(withoutComments(GLOBALS_CSS_TEXT)),
       'the pre-extraction switch rule is still in globals.css — there are now two switch rule sets',
-    ).toBeNull();
+    ).toBe(false);
   });
 
   it('the trailing-edge alignment stays on the ACCOUNT row, not on the shared switch', () => {
@@ -1909,6 +1932,44 @@ describe('13.899 — the switch is one rule set in ui.css, and its states differ
         ).not.toBe(colorOf(theme, knobFill, style));
       }
     }
+  });
+
+  it('13.901 the info panel keeps a boundary where the shadow cannot, and the trigger meets the 24px floor', () => {
+    const panel = declarationsFor(UI_CSS_TEXT, '.gn-infotip__panel');
+    if (panel === null) throw new Error('.gn-infotip__panel not found in ui.css');
+    const trigger = declarationsFor(UI_CSS_TEXT, '.gn-infotip__trigger');
+    if (trigger === null) throw new Error('.gn-infotip__trigger not found in ui.css');
+
+    // THE BOUNDARY, and the reason it has to be a border rather than a fill or a
+    // shadow. The panel is `surfaceRaised` and it sits on a CARD, which is also
+    // `surfaceRaised` — the same role on the same role, so the fill separates
+    // nothing. The shadow is real under hig and neo and `none` under minimal,
+    // which is asserted rather than asserted-about: `SHADOWS.minimal.raised` is
+    // `[]` in both themes, so a panel relying on it is invisible there. The
+    // border is the only thing that draws the edge in all six combinations.
+    expect(panel, 'the panel must declare a border').toMatch(/border:\s*1px solid var\(--gn-border\)/);
+    for (const theme of THEME_NAMES) {
+      expect(
+        shadowValueOf('minimal', theme, 'raised'),
+        'minimal has a raised shadow after all — this case\'s premise is stale',
+      ).toBe('none');
+    }
+    // …and the same role as the ground it lands on, which is why fill cannot do
+    // the job. Read OUT of both rules rather than named here.
+    const cardFill = declaredRole('.gn-infotip__panel', panel, 'background');
+    expect(cardFill).toBe('surfaceRaised');
+
+    // THE 24px FLOOR (`ui.css:1246-1249`: dense in-list controls get 24). The
+    // review measured the first version at exactly 20x20 — `globals.css:5` is
+    // `* { box-sizing: border-box }`, so the declared box IS the hit area, and
+    // `padding: 0` means no invisible slack either.
+    const rem = (property: string): number => {
+      const found = new RegExp(`(?:^|[\\s;])${property}:\\s*([0-9.]+)rem`).exec(trigger)?.[1];
+      if (found === undefined) throw new Error(`.gn-infotip__trigger declares no rem \`${property}\``);
+      return Number(found) * 16;
+    };
+    expect(rem('width'), 'the trigger is under the 24px floor').toBeGreaterThanOrEqual(24);
+    expect(rem('height'), 'the trigger is under the 24px floor').toBeGreaterThanOrEqual(24);
   });
 
   it('BOTH call sites reach the one component — the account rows and the workspace form', () => {

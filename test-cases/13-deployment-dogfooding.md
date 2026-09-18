@@ -12028,7 +12028,7 @@ doc is a dated audit snapshot whose line numbers describe the tree at audit time
 writers hold conflicting claims on those files. **Owner: the controller, at the next settings-cluster
 sweep.**
 
-## Settings → Workspace restyle: the switch, the info icons, the Save row (executor 2, 2026-09-18) — cases `13.895`–`13.900`
+## Settings → Workspace restyle: the switch, the info icons, the Save row (executor 2, 2026-09-18) — cases `13.895`–`13.901`
 
 The owner: *"the settings -> workspace tab, needs to be a better UI. also have an info icon near the
 fiends to give a brief explanation (hover/focus/click - same witht the projects nav item). save button
@@ -12039,7 +12039,7 @@ the auto-close field therefore became a switch, and **its polarity INVERTED** �
 where the box's tick meant off. That inversion is the whole hazard of the swap and is why the cases
 below pin both directions separately.
 
-`13.890`–`13.894` were already spent (`#480`, `#482`); these six continue the block. Recounted at this
+`13.890`–`13.894` were already spent (`#480`, `#482`); these seven continue the block. Recounted at this
 branch's tip by case MARKER only — `13.895`–`13.918` are free repo-wide, and every hit in a body-text
 sweep for the block's own bounds is prose *mentioning* the range, which is exactly the trap
 `scripts/check-case-ids.mjs` exists to tell apart.
@@ -12086,6 +12086,24 @@ sweep for the block's own bounds is prose *mentioning* the range, which is exact
   caller the NEXT boolean rather than the event, keeps the caller's `className` alongside its own row
   class, and passes `disabled` through. `InfoTip` is closed to begin with and names its button for what
   it explains.
+- ✅ **13.901 — the info panel keeps a boundary where the shadow cannot, and the trigger meets the
+  24px floor.** `packages/ui/test/tokens.test.ts`. Three things the review found entirely unpinned.
+  **(a)** The panel declares `border: 1px solid var(--gn-border)`, and the border is load-bearing
+  rather than decorative: the panel is `surfaceRaised` on a card that is also `surfaceRaised` (the
+  same role on the same role, so the fill separates nothing), and `SHADOWS.minimal.raised` is `[]` in
+  both themes — asserted in the case rather than asserted-about — so under `minimal` the shadow
+  resolves to `none` and the border is the only edge there is. The first version of the rule had no
+  border and justified itself by false analogy with `.gn-card`'s boundary against its PARENT, which is
+  `surfaceRaised` over `surface`, a boundary of a different kind. **(b)** The trigger is at least
+  24×24 — the product's own floor for a dense in-list control (`ui.css:1246-1249`). It shipped at
+  20×20, and the hit area is exactly the declared box because `globals.css:5` is
+  `* { box-sizing: border-box }` and the trigger's padding is `0`. **(c)** The 44px tap ratchet does
+  NOT see it, and that is recorded rather than left to read as compliance: the inline-control
+  exemption (`e2e-viewport/tap-targets.ts:100-104`) needs `display: inline` with a text-bearing
+  parent, and an `inline-flex` trigger holding an `aria-hidden` SVG fails both; the ratchet stays
+  green only because no roster walks the settings routes (`viewports.ts:171-176`,
+  `e2e-stack/viewport.spec.ts:419-427`). **Owner: whoever next owns the settings-cluster viewport
+  roster** — the whole settings page, not this control, is the gap.
 
 **A defect the tests caught before the PR, recorded because it is the kind a screenshot would not
 show.** `InfoTip`'s first `onClick` was a TOGGLE, and a toggle loses a race it cannot see: clicking a

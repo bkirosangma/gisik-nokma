@@ -52,13 +52,20 @@ export type SwitchProps = {
  * and this extraction does not change it; what it does change is that there is
  * now one place to change it in, if the owner ever wants the `switch` role.
  *
- * ## `order: 2`, and why the row is a flex container
+ * ## The DOM order, and the two things that are NOT true about it
  *
- * `.gn-switch` carries `order: 2` and `.gn-switch-row` is
- * `justify-content: space-between`. The text therefore stays FIRST in the DOM —
- * which is what a screen reader and a `getByLabelText` query both read — while
- * the switch is painted at the row's trailing edge. Reordering the JSX instead
- * would have put the control before its own label.
+ * The input is the FIRST child and the label text the second. The accessible
+ * name does not depend on that order at all: the `<label>` WRAPS both, so the
+ * name is the label's text content whichever way round they sit.
+ *
+ * **An earlier version of this docblock claimed `.gn-switch-row` is
+ * `justify-content: space-between` and that "the text therefore stays FIRST in
+ * the DOM". Both halves were false** — the text is second, and the row
+ * deliberately carries no `justify-content` at all. Corrected 2026-09-18,
+ * because a docblock describing a layout the CSS and this component's own case
+ * contradict is how the next reader is sent to re-add the property that
+ * `13.899` exists to keep off. The edge alignment lives on the ACCOUNT row
+ * (`.gn-account__notification-row` in `globals.css`) and nowhere else.
  */
 export function Switch({ checked, onChange, disabled = false, children, className }: SwitchProps) {
   return (
