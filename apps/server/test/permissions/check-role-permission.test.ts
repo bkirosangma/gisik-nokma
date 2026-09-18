@@ -1349,6 +1349,41 @@ describe('the last-owner guard on the real door — the SELECT, not just the rul
     expect(
       (await ingest.ingestClientBatch([setRole(workspaceId, admin, rows[0]!.user_id, 'member')], admin))[0],
     ).toMatchObject({ status: 'refused', rule: 'last-owner' });
+
+    // BATCHING must not be a way around the guard, and this is measured rather
+    // than assumed. Two events in ONE submission are judged one at a time, and
+    // the context reads through the ingest TRANSACTION's own client, so the
+    // count for the second event sees the first one's effect. An admin who
+    // demotes BOTH owners in a single batch therefore commits the first and is
+    // refused `last-owner` on the second. Without that visibility each event
+    // would see two owners, both would commit, and the workspace would reach
+    // zero owners — so THIS is the assertion that pins the property, and the
+    // per-event arm above it does not.
+    //
+    // The actor is an ADMIN rather than an owner on purpose: an owner demoting
+    // himself to member is refused on the SECOND event by the role gate (he is
+    // no longer an admin by then), which would make the case pass while the
+    // count was blind. An admin who is never demoted isolates the count.
+    const second = rows[0]!.user_id; // the one owner left after the demotion above
+    // `grantMember` MINTS its target, so this is a THIRD person, not `owner`
+    // restored — an earlier cut of this case demoted `owner` (a plain member by
+    // now) and `second` (one of two owners) and both committed, which is the
+    // assertion doing its job on the test rather than on the code.
+    const third = await grantMember(ingest, workspaceId, second, 'owner'); // owners: second + third
+    const batch = await ingest.ingestClientBatch(
+      [setRole(workspaceId, admin, second, 'member'), setRole(workspaceId, admin, third, 'member')],
+      admin,
+    );
+    expect(batch).toMatchObject([
+      { status: 'committed' },
+      { status: 'refused', rule: 'last-owner' },
+    ]);
+    const after = await db.pool.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM proj_memberships
+        WHERE workspace_id = $1 AND scope_kind = 'workspace' AND role = 'owner'`,
+      [workspaceId],
+    );
+    expect(Number(after.rows[0]!.n)).toBe(1);
   });
 
   /**

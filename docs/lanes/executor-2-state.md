@@ -75,12 +75,13 @@ controller flips them.
    offline replica enter through `evaluateEvent` and never pass through ingest's door. Added, and
    mutation-proven (removing it reddens exactly the misfiled-kind case).
 3. **The plan's Step 3 declares `REFUSAL_RULES.grantOwnerRequiresOwner` under "Produces" while its Step 7
-   emits the generic `permission.role`.** The two cannot both hold. **The id was emitted** via `refuseWith`,
+   emits the generic `permission.role`.** The two cannot both hold. **The id is emitted** via `refuseWith`,
    because a rule name nothing emits is a matching key that can never match and **all twenty ids already in
    `REFUSAL_RULES` are emitted somewhere (measured 20/20)**, so a twenty-first with no emitter would be the
-   catalogue's only dead entry. **THIS IS THE ONE OPEN RULING — it is flagged in the PR body.** The cost of
-   the other reading is a different string in a rendered refusal; the cost of this one would have been a
-   dead constant. Reversible in one line + one assertion.
+   catalogue's only dead entry. Filed as `EXEC2-RULING-2026-09-18-grant-owner-rule-id.md` with **both
+   readings priced**; **RULED 2026-09-18 by the controller: carry on with `refuseWith` and the new id.**
+   **CLOSED — do not reopen.** The plan's two steps still disagree, so the ruling is also recorded in
+   `test-cases/13` where a reader hitting Step 7 first will see it.
 4. **The plan's Step 7 line `return refuse(WORKSPACE_OWNER_GRANT_REASON)` is correct only against
    `check-permission.ts`'s LOCAL one-argument `refuse`** (`:213`, which injects `PERMISSION_ROLE_RULE`),
    not the rule-engine's two-argument one. A first cut of this work used the two-arg form, which would not
@@ -127,6 +128,27 @@ shape that sends the next session hunting for a problem that does not exist.
 4. **The owner-grant clause replaced with `if (false)`** → reddens the pure case AND the real-door case,
    so neither half is decorative.
 5. **The kind guard removed** → reddens exactly the misfiled-kind case.
+
+### ★ The gap my OWN second pass found, after the first commit — batching
+
+**A batch of two events is judged one at a time, and the context reads through the ingest TRANSACTION's
+own client, so the count for the second event sees the first's effect.** Measured on a scratch test
+before it was written into the suite, because the alternative — one submission demoting both owners —
+would have reached zero owners while every per-event assertion stayed green:
+
+```
+BATCH: [{"status":"committed"},{"status":"refused","rule":"last-owner"}]   OWNERS: 1
+```
+
+The case is now an assertion inside 13.820's real-door `it`, with a **stable ADMIN actor** rather than an
+owner on purpose: an owner demoting himself is refused on the second event by the ROLE gate (he is no
+longer an admin by then), so an owner-actor version would pass **while the count was blind**. **That is
+the assertion that pins the property; the per-event arm above it does not.**
+
+**The assertion caught my own error while I was writing it** — the first cut demoted `owner` (a plain
+member by then) and `second` (one of two owners), both committed, and the failure read
+`[committed, committed]`. `grantMember` MINTS its target, so "put the first owner back" was a third
+person. Recorded because the case is only load-bearing if a reader can see what its targets really are.
 
 ### What a restart must NOT redo
 

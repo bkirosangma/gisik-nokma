@@ -9838,10 +9838,17 @@ break unrelated suites for a consistency that buys nothing here.
   world-half. The count excludes the subject of the change, and that exclusion is load-bearing in the
   opposite direction from the obvious one: without it a sole owner counts **himself** and the guard never
   fires at all — pinned by mutation, which reddens the sole-owner case and leaves the accept arms green.
+  **Batching is not a way around it, and that is asserted rather than assumed.** Two events in ONE
+  submission are judged one at a time and the context reads through the ingest transaction's own client,
+  so the count for the second event sees the first's effect: an admin demoting **both** owners in a single
+  batch commits the first and is refused `last-owner` on the second. The actor is deliberately an ADMIN
+  and not an owner — an owner demoting himself is refused on the second event by the ROLE gate (he is no
+  longer an admin by then), which would let the case pass while the count was blind. **This assertion is
+  the one that pins the property; the per-event arm above it does not.**
   **Citations:** `packages/rule-engine/src/checks/membership.ts:87` (the check), `:103` (the move-out-of-owner
   test), `:82` (the target's current role), `packages/rule-engine/test/membership.test.ts:106`,
   `apps/server/test/permissions/check-role-permission.test.ts:1256` (the real-door half, where the `SELECT`
-  itself is what is under test)
+  itself is what is under test, and `:1377` the same-batch assertion)
 
 - ✅ **13.821 — a `membership.revoked` of the only owner is refused by the same rule.** The second door to
   the same state, and it must answer identically: there is no role in a `membership.revoked` payload, so a
@@ -9913,11 +9920,13 @@ with a matching sha256.**
    mandatory — the fixture suite and the offline replica enter through `evaluateEvent` and never pass
    through ingest's door, so no check may trust that dispatch.
 
-**One plan-text defect is recorded rather than silently repaired.** The plan's Step 3 declares
-`REFUSAL_RULES.grantOwnerRequiresOwner` under **"Produces"**, while its Step 7 emits the generic
-`permission.role` instead; the two cannot both hold. The id was taken as authoritative and emitted through
-`refuseWith`, because a rule name nothing emits is a matching key that can never match — all twenty ids
-already in `REFUSAL_RULES` are emitted somewhere (measured), so a twenty-first with no emitter would be the
-catalogue's only dead entry. The alternative reading costs only a different string in a rendered refusal;
-this one costs a dead constant. **Flagged to the controller in this PR's body as a ruling to confirm rather
-than settled unilaterally.**
+**One plan-text defect is recorded rather than silently repaired, and it has since been RULED ON.** The
+plan's Step 3 declares `REFUSAL_RULES.grantOwnerRequiresOwner` under **"Produces"**, while its Step 7 emits
+the generic `permission.role` instead; the two cannot both hold. The id was taken as authoritative and
+emitted through `refuseWith`, because a rule name nothing emits is a matching key that can never match —
+all twenty ids already in `REFUSAL_RULES` are emitted somewhere (measured), so a twenty-first with no
+emitter would be the catalogue's only dead entry. The alternative reading costs only a different string in
+a rendered refusal; this one costs a dead constant. **Flagged to the controller with both readings priced
+rather than settled unilaterally; the controller ruled on 2026-09-18: carry on with `refuseWith` and the
+new id.** The ruling is recorded here because the plan's two steps still disagree and a reader hitting
+Step 7 first would otherwise have to rediscover it.
