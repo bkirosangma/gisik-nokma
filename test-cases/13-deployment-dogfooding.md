@@ -7937,7 +7937,7 @@ in a follow-up.** `13.315` was first minted ✅ on a "structural warrant" — th
 and `ticket-list.tsx:676` both read `stateCategory`, so the List's tone was the Board's by construction.
 The reviewer read line 415: it is the **column header's** chip, reading `column.category`, and a Board
 **card** renders no state chip at all. The warrant was invented, the verdict is ❌, and the false
-sentence is quoted and refuted in the row. **The count was therefore 10 ✅ / 5 ❌, not 11 / 4 — and it is 11 ✅ / 4 ❌ as of 2026-09-18, because `13.309` was witnessed by `hig-per-screen/7b` and is marked ✅ IN PLACE in the list below rather than moved out of it.** The
+sentence is quoted and refuted in the row. **The count was therefore 10 ✅ / 5 ❌, not 11 / 4 — and it is 12 ✅ / 3 ❌ as of 2026-09-18, because `13.309` was witnessed by `hig-per-screen/7b` and `13.306` by `hig-per-screen/6b`, each marked ✅ IN PLACE in the list below rather than moved out of it.** The
 reviewer also read `13.307` and `13.309` against their primary sources; 13.309's ❌ was upheld, and
 13.307 kept its ✅ with an absence now enumerated in the row. *A verdict is only as good as the line it
 cites, and the first draft cited a line it had not read.*
@@ -8041,9 +8041,11 @@ cites, and the first draft cited a line it had not read.*
 
 ### Verdict (c) — unwitnessed. Minted ❌ with the deliverable named.
 
-> **One row in this list is no longer ❌.** `13.309` was witnessed on 2026-09-18 (`hig-per-screen/7b`)
-> and is marked ✅ in place below, so the audit's verdict and its outcome stay side by side. The other
-> four are unwitnessed exactly as minted.
+> **Two rows in this list are no longer ❌.** `13.309` was witnessed on 2026-09-18 (`hig-per-screen/7b`)
+> and `13.306` by `hig-per-screen/6b`; both are marked ✅ IN PLACE below, so the audit's verdict and its
+> outcome stay side by side. **The other three are unwitnessed exactly as minted.** One row here is a
+> verdict the WITNESS could not move on its own — `13.306` — and its own row says which half moved and
+> which half did not.
 
 - ❌ **13.304 — the `Only tickets in progress` checkbox "exists and toggles the rendered count": the
   plan's sentence is UNSATISFIABLE as written, and the half that is true is unwitnessed.** The checkbox
@@ -8060,14 +8062,34 @@ cites, and the first draft cited a line it had not read.*
   narrowing and produce a page that claims a narrowing it does not perform.
   (`apps/web/test/board-narrowing.test.tsx`, `apps/web/src/…/page.tsx`)
 
-- ❌ **13.306 — the prototype's invented resolution pair (`Keep mine` / `Keep theirs`) does not exist
-  in the product, and nothing asserts its absence.** The audit rejects the pair as a copy-rule
-  replacement (`docs/hig-reconciliation-audit.md:308`) and the prototypes still carry it
-  (`design-system/interactive/{desktop,mobile}.dc.html`), so a future port has a live source to copy
-  from. No test asserts that the three shipped labels are the ONLY resolution actions.
-  **Deliverable:** a case asserting the ticket surface renders no `Keep mine`/`Keep theirs` control
-  alongside the three shipped ones. It is filed ❌ rather than ✅ deliberately: absence is currently a
-  property of what nobody has written yet, which is exactly the state a guard exists to change.
+- ✅ **13.306 — the prototype's invented resolution pair, witnessed as ABSENT, with the shipped set pinned
+  EXACTLY and each control wired to its own resolution KIND.** The audit files the pair as *"I — SHOWN BUT
+  DOES NOT EXIST. Do not build."* (`docs/hig-reconciliation-audit.md:306`; its pair-specific bullet is
+  `:308`) and the prototype still draws all three of its labels
+  (`design-system/interactive/mobile.dc.html:353-355`), so a future port has a live source to copy from.
+  The witness renders the REAL `ContestBanner` and asserts four things: the three shipped controls **by
+  exact accessible name**; that each submits **its own resolution kind** (`converted-to-comment`, then
+  `discarded`, in order); that no control matching `Keep mine`/`Keep theirs` exists by role or in the
+  rendered text; and that the set is **exactly three per OPEN contest** (six for two contests, which is
+  what distinguishes "three per contest" from "three, given one contest"). **Two of those halves were
+  missing and neither is decoration — both were found by an independent review's mutation sweep, not by
+  the author:** the arm already in that file (12.193, whose assertions the catalogue cites as `13.305`'s
+  witness) finds its third control with `/discard/i`, which the prototype's OWN third label **`Discard
+  mine`** also satisfies, so a rename to the prototype's wording reddened nothing; and labels alone are
+  satisfied by a banner whose DISCARD button submits `converted-to-comment`, which silently removes the
+  product's discard path while every label assertion stays green. **Six planted mutations, each killing it
+  at a different assertion:** the pair added beside the three → the negative arm; `Discard` renamed to
+  `Discard mine` → the POSITIVE arm; a fourth control matching neither negative pattern → the count arm;
+  the banner rendering nothing → the anti-vacuity arm; the Discard button submitting the convert kind →
+  the kind arm; `.slice(0, 1)` on the open list → the per-contest arm. **THE FLAG IS RECORDED IN THE CASE
+  RATHER THAN SMOOTHED OVER:** `ContestBanner` is mounted NOWHERE in the product
+  (`docs/hig-reconciliation-audit.md:577`), so this is a **COMPONENT-level** guard and says nothing about
+  any screen. The two surfaces are easy to conflate and the difference is the point — the WEB ticket sheet
+  renders no contest UI at all (TicketSheet imports no contest component), while the MOBILE ticket screen
+  renders its OWN three buttons from its own markup (`apps/mobile/src/screens/ticket-screen.tsx:119-121`).
+  **Neither is this component, and this case witnesses neither. The ledger row must not be promoted as
+  though it did.** The verdict is ✅ on the guard's own terms: absence is now a property something checks,
+  which is exactly the state the ❌ was minted to change.
   (`packages/app-core/test/contests.test.tsx`)
 
 - ✅ **13.309 — the withheld-project-name fallback's TITLE text, witnessed — this is the row this

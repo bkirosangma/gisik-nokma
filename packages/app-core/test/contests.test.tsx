@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { newSubmittedEvent } from '@gisik-nokma/domain';
 import { CONTEST_RULES } from '@gisik-nokma/rule-engine';
 import { resolveContest, type ContestLike } from '../src/contests/contest-view-model.js';
@@ -63,7 +63,7 @@ function underTz(zone: string, body: () => void): void {
 
 describe('ContestBanner', () => {
   /**
-   * 12.25 — the 'what/who/when/rule' half is proven by this test (12.193), which asserts the banner text contains the actor, the claimed action, the rule and reason, and the claim time rendered as IST rather than the raw instant; the 'renders nothing when there is nothing contested' half is a separate assertion in the '12.201' test two blocks down (line 116, `expect(container.innerHTML).toBe('')`).
+   * 12.25 — the 'what/who/when/rule' half is proven by this test (12.193), which asserts the banner text contains the actor, the claimed action, the rule and reason, and the claim time rendered as IST rather than the raw instant; the 'renders nothing when there is nothing contested' half is a separate assertion in the '12.201' test two blocks down (line 129, `expect(container.innerHTML).toBe('')`).
    */
   /* 13.305 — the three real contested-claim resolutions render by their shipped
    * labels (the assertions at the foot of this case). It witnesses the
@@ -148,6 +148,97 @@ describe('ContestBanner', () => {
     fireEvent.click(screen.getByRole('button', { name: /redo/i }));
     expect(onRedo).toHaveBeenCalledWith(c);
     expect(onResolve).not.toHaveBeenCalled(); // handing back c.originalEvent would throw in resolveContest
+  });
+
+  /* 13.306 — the shipped resolutions are EXACTLY three, each wired to its own
+   * resolution KIND, and the prototype's invented pair is ABSENT.
+   *
+   * The absence is the deliverable. The other two halves are what stop it being
+   * vacuous, and neither is decoration:
+   *
+   *  - EXACT NAMES, because the arm already in this file (12.193, whose
+   *    assertions the catalogue cites as `13.305`'s witness) finds its third
+   *    control with `/discard/i` — which the prototype's own third label
+   *    **`Discard mine`** also satisfies. A rename to the prototype's wording
+   *    reddened nothing before this case.
+   *  - THE KINDS, because labels alone are satisfied by a banner whose
+   *    "Discard" button submits `converted-to-comment`: every label assertion
+   *    stays green while the product loses its discard path. Found by review as
+   *    a surviving mutation, and closed here.
+   *
+   * THE FLAG, recorded rather than smoothed over. `ContestBanner` is mounted
+   * NOWHERE in the product (`docs/hig-reconciliation-audit.md:577`), so this is
+   * a **COMPONENT-level** guard: it says nothing about any screen. Two surfaces
+   * are easy to conflate and the difference is the point — the WEB ticket sheet
+   * renders no contest UI at all (TicketSheet imports no contest component),
+   * while the MOBILE ticket screen renders its OWN three buttons from its own
+   * markup (`apps/mobile/src/screens/ticket-screen.tsx:119-121`). Neither is
+   * this component, and this case witnesses neither of them.
+   *
+   * Why the guard earns its place anyway: the audit files the pair as *"I —
+   * SHOWN BUT DOES NOT EXIST. Do not build."* (`docs/hig-reconciliation-audit.md:306`)
+   * and its pair-specific bullet is at `:308`; the prototype still draws all
+   * three labels (`design-system/interactive/mobile.dc.html:353-355`), so a
+   * future port has a live source to copy from. Absence is currently a property
+   * of what nobody has written yet, which is exactly the state a guard exists to
+   * change.
+   */
+  it('13.306 — the shipped resolutions are exactly three, and the invented pair is absent', () => {
+    const onResolve = vi.fn();
+    const view = render(
+      <ContestBanner contests={[contest()]} onResolve={onResolve} onRedo={() => undefined} />,
+    );
+    const banner = screen.getByRole('alert');
+
+    // POSITIVE ARM — the anti-vacuity control. An "absent controls" assertion on
+    // a banner that rendered NOTHING would pass; these three make that
+    // impossible. Exact names, not regexes: `/discard/i` in 12.193 would accept
+    // the prototype's `Discard mine`.
+    expect(within(banner).getByRole('button', { name: 'Redo legally' })).toBeTruthy();
+    expect(within(banner).getByRole('button', { name: 'Convert to comment' })).toBeTruthy();
+    expect(within(banner).getByRole('button', { name: 'Discard' })).toBeTruthy();
+
+    // EACH LABEL CARRIES ITS OWN KIND, in order. Without this, a banner that
+    // submitted `converted-to-comment` from the DISCARD button passes every
+    // other assertion here while the product silently loses its discard path —
+    // and a whole-file mutation proved exactly that before this arm existed.
+    fireEvent.click(within(banner).getByRole('button', { name: 'Convert to comment' }));
+    expect(onResolve).toHaveBeenNthCalledWith(1, expect.anything(), {
+      resolution: 'converted-to-comment',
+    });
+    fireEvent.click(within(banner).getByRole('button', { name: 'Discard' }));
+    expect(onResolve).toHaveBeenNthCalledWith(2, expect.anything(), { resolution: 'discarded' });
+
+    // NEGATIVE ARM — the deliverable. The prototype's pair, by the names it
+    // actually draws, as controls and in the rendered text.
+    expect(within(banner).queryByRole('button', { name: /keep mine/i })).toBeNull();
+    expect(within(banner).queryByRole('button', { name: /keep theirs/i })).toBeNull();
+    expect(banner.textContent).not.toContain('Keep mine');
+    expect(banner.textContent).not.toContain('Keep theirs');
+
+    // AND THE SET IS CLOSED — counted WITHIN the banner, not across
+    // `document.body`: the unit matters, because a document-wide count makes this
+    // assertion's correctness depend on a cleanup line in another file. Without
+    // this arm a control ADDED beside the three leaves every assertion above
+    // green, since they only ever name what they expect.
+    expect(within(banner).getAllByRole('button')).toHaveLength(3);
+
+    // AND IT IS THREE PER OPEN CONTEST, not three in total. With a single
+    // contest those two readings are indistinguishable, and a `.slice(0, 1)` on
+    // the open list passes every assertion above — measured as a surviving
+    // mutation before this arm existed. Unmount first, so the two renders cannot
+    // be mistaken for one another.
+    view.unmount();
+    render(
+      <ContestBanner
+        contests={[contest(), { ...contest(), contestedEventId: '01J9GCON000000000000000001' }]}
+        onResolve={vi.fn()}
+        onRedo={() => undefined}
+      />,
+    );
+    const both = screen.getByRole('alert');
+    expect(within(both).getAllByRole('button')).toHaveLength(6);
+    expect(within(both).getAllByRole('button', { name: 'Discard' })).toHaveLength(2);
   });
 });
 
