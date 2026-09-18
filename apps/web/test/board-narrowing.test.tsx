@@ -180,7 +180,6 @@ function listRow(overrides: Partial<ListRow> = {}): ListRow {
 function servedBoard(cards: BoardCard[], rows: TicketListView['rows'] = []) {
   return stubServices({
     getBoard: async () => boardOf(cards),
-    getAttention: async () => [],
     getMembers: async () => [],
     getTicketTypes: async () => [],
     getTickets: async (): Promise<TicketListView> => ({ projectId: PROJECT_ID, rows }),
@@ -464,7 +463,6 @@ describe('13.517 (flipped 2026-09-17) an assignee picked in the Filters sheet na
       <Providers
         services={stubServices({
           getBoard: async () => boardOf(threeCards),
-          getAttention: async () => [],
           getMembers: async () => ROSTER,
           getTicketTypes: async () => [],
           getTickets: async (): Promise<TicketListView> => ({
@@ -496,7 +494,6 @@ describe('13.517 (flipped 2026-09-17) an assignee picked in the Filters sheet na
       <Providers
         services={stubServices({
           getBoard: async () => boardOf(threeCards),
-          getAttention: async () => [],
           getMembers: async () => ROSTER,
           getTicketTypes: async () => [],
           getTickets: async (): Promise<TicketListView> => ({
@@ -533,7 +530,6 @@ describe('13.517 (flipped 2026-09-17) an assignee picked in the Filters sheet na
       <Providers
         services={stubServices({
           getBoard: async () => boardOf(threeCards),
-          getAttention: async () => [],
           getMembers: async () => ROSTER,
           getTicketTypes: async () => TYPES,
           getPreferences: async () => EMPTY_PREFERENCES,
@@ -578,7 +574,6 @@ describe('13.556b the scope note names the LIST tab, not the board, when it rend
       <Providers
         services={stubServices({
           getBoard: async () => boardOf(threeCards),
-          getAttention: async () => [],
           getMembers: async () => ROSTER,
           getTicketTypes: async () => [],
           getTickets: async (): Promise<TicketListView> => ({
@@ -646,11 +641,29 @@ describe('13.556b the scope note names the LIST tab, not the board, when it rend
  * existing `packages/app-core/test/views/board.test.tsx` already uses
  * (`getAllByRole('listitem')`), per this task's own brief ("use the query
  * the existing `board.test.tsx` uses rather than adding a role to satisfy a
- * test"). Verified against this exact page mount, not assumed: `AttentionStrip`
- * (`attention-strip.tsx:72`) returns `null` outright when its `items` array
- * is empty, which every fixture here stubs it to be, so it contributes no
- * stray `<li>` to the count; nothing else this page mounts (`AppNav`,
- * `FiltersSheet` closed) renders one either.
+ * test"). Verified against this exact page mount, not assumed. `AttentionStrip`
+ * was the component to check here — it returns `null` for an empty `items`
+ * array, and every fixture below stubs `getAttention` to `[]` — but the strip
+ * left the project page on 2026-09-18 (owner: *"the attention section should not
+ * be there in the project page"*; case 13.881), so nothing it would have drawn
+ * is on this page at all, and **the `getAttention: async () => []` overrides this
+ * file used to carry are gone with it.** An override for a read a page never
+ * makes is a fixture telling the next reader that it does — and 13.881 now
+ * asserts that read is never made, so leaving them would leave entries the
+ * suite's own case contradicts.
+ *
+ * **All EIGHTEEN were swept in the same change**, measured on the fix round's own
+ * diff as `^- *getAttention: async \(\) => \[\],$` with the ADDED side returning
+ * 0 in the same invocation as the control: **7 here**, 1 each in `backlog-tab`,
+ * `filters-sheet` and `list-bulk-close`, and **8** in `project-calendar-timeline`.
+ * *(An earlier draft of this paragraph said "eleven" — the count you get from
+ * sweeping four of the five files and forgetting this one. It was caught in
+ * review, which is the second reason it is written out per-file here.)* Every one
+ * of the five is a `ProjectPage`-only fixture. **`my-work-open-shared` and
+ * `page-refusals` KEEP theirs**, because they mount `MyWorkPage`, where the strip
+ * still lives — the distinction is which page the fixture mounts, not which file
+ * it is in. Nothing else this page mounts (`AppNav`, `FiltersSheet` closed)
+ * renders a `<li>` either.
  */
 
 /** Two columns, two cards — the workflow this project's board is attached to before Task 8 ever runs. */
@@ -736,7 +749,6 @@ function renderProjectPage({ groups }: { groups: BoardGroup[] }) {
     <Providers
       services={stubServices({
         getBoard: async () => board,
-        getAttention: async () => [],
         getMembers: async () => [],
         getTicketTypes: async () => [],
         getTickets: async (): Promise<TicketListView> => ({ projectId: PROJECT_ID, rows: [] }),
@@ -901,7 +913,6 @@ describe('13.473 an unresolvable picked workflow falls back to All, not a phanto
       <Providers
         services={stubServices({
           getBoard: async () => ({ projectId: PROJECT_ID, groups: [defaultWorkflow, otherWorkflow] }),
-          getAttention: async () => [],
           getMembers: async () => [],
           getTicketTypes: async () => [],
           getTickets: async (): Promise<TicketListView> => ({ projectId: PROJECT_ID, rows: [] }),

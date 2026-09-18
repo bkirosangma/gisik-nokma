@@ -20,7 +20,145 @@
 
 ---
 
-## ▲ TOP BLOCK — the nav's last-open project item, and the global tab memory (2026-09-18)
+## ▲ TOP BLOCK — the attention strip leaves the project page; the prototype restyle is measured and HELD (2026-09-18)
+
+**Position: THE PHASE IS CLOSED. `#471` is rebased, green, pushed, and at the controller's merge. Do NOT
+start anything else** — the dispatch says `members-styling` is queued behind an amendment and will be
+dispatched by the controller.
+
+Dispatches: `CTL-DISPATCH-2026-09-18-attention-project-page.md` **plus its AMENDMENT 1**, then
+**`CTL-DISPATCH-2026-09-18-exec2-rebase-471.md`** (the rulings and the rebase). One PR, `--base main`,
+branch **`exec2/attention-leaves-project-page`**.
+
+**Both items are RULED, and neither needs anything further from this session:**
+- **The ratchet — HOLD, do not hand-lower the floor.** My instinct was right and the reviewer was wrong.
+  The baseline is untouched; the derivation stands with its named owner. **This does not block `#471`** — a
+  known-red spec with a named owner is an accepted state.
+- **Part 2 — deferred to its own task, my recommendation accepted.** The heading question went to the owner;
+  its answer belongs in that task's brief. **Do not add Part 2 to `#471`.**
+
+**FIRST ACTION ON A RESTART: `gh pr list --state open`.** If a PR for this branch exists it is at the
+controller's merge and nothing below needs redoing. Then verify the anchors — do not trust the rows.
+
+### Anchors — verify these; do not trust the row
+
+| | |
+|---|---|
+| branch | `exec2/attention-leaves-project-page` |
+| cut from | **`438b956c`** = `origin/main` after `#466` merged — the amendment's sha |
+| base | `origin/main` **`cb1f3d16`** — rebased onto it after `#469` merged into the same catalogue file |
+| sha mapping | `0da73557`→`8576752f` · `4205f172`→`50db2300` · `bb7ba7f7`→`606ba48d` · `e1917421`→**`1dc041e9`** · then the handoff commit on top. **The pre-rebase shas are ORPHANED from `main`'s history and will still `cat-file` clean.** |
+| reviewed heads | round 1 reviewed `4205f172` (= `50db2300`) · round 2 reviewed `bb7ba7f7` (= `606ba48d`) |
+| frozen head | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit that carries it |
+| files | 11: `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` · `apps/web/test/page-refusals.test.tsx` · `apps/web/test/board-narrowing.test.tsx` · `apps/web/test/backlog-tab.test.tsx` · `apps/web/test/filters-sheet.test.tsx` · `apps/web/test/list-bulk-close.test.tsx` · `apps/web/test/project-calendar-timeline.test.tsx` · `apps/web/e2e-stack/non-text-contrast-roster.json` · `test-cases/13-deployment-dogfooding.md` · `Features.md` · this file |
+| ids minted | **`13.881`, `13.882`** — recounted at my tip BY MARKER; next free overall is `13.883` |
+| tree | clean |
+
+### What shipped
+
+**Part 1 — the removal.** Five sites leave `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`:
+the `AttentionStrip` / `useAttention` imports, the `useAttention` call, `attention.error` out of the
+expired-session list (**now three reads, not four** — the comment beside the notice said four and was
+corrected), and the whole render block. Three prose regions were corrected with them, because they
+described code that no longer exists. `AttentionStrip`, `useAttention`, `attention-strip.tsx` and
+`/my-work`'s mount are all untouched.
+
+**Cases.** `13.881` — the project page renders no strip **and never makes the read** (`getAttention`
+is stubbed to ANSWER, so a page that still called it fails). Its control is the board refusal, because
+both assertions are absences. `13.882` — `/my-work` still renders the strip.
+
+**Mutation-witnessed, both at the change-set head, each killing exactly ONE case:**
+- re-add the `useAttention` call alone (no render) → the ABSENCE stays **green**, only the spy at
+  `page-refusals.test.tsx:268` reddens. That is 13.881's docblock claim, measured.
+- remove My Work's strip render → only `13.882` reddens (1 failed / 13 passed).
+- Both files restored by `cp` with matching sha256 (`8dc7e7b9…`, `c818d396…`) and `git diff` empty.
+
+**Two stale records corrected beside the change**, neither of them mine to skip: `board-narrowing.test.tsx`'s
+docblock explained a strip that no longer mounts on that page (its inert `getAttention` overrides were
+left, deliberately — the helper shape is shared with fixtures that DO still mount the strip), and the
+`3.141` project-page case read *"one notice stands in for all four"* over five stubs of which the page
+makes three — `getAttention` dead by this change, `getPreferences` **already** dead before it.
+
+### ★ PART 2 IS HELD — this is the stop-and-ask, and it needs the controller
+
+The dispatch asked for the strip's styling to be checked against `desktop.dc.html:561-575`. It was
+checked; the delta is **structural, not CSS** — a tinted card, a visible *"Needs your attention"* heading
+with a warning icon, title-first rows, and the whole row as the click target. Taking the CSS-only rows
+(gap, row padding, the alert colour) alone would produce a treatment neither document draws.
+**Four of the deltas meet a record**, all cited in `test-cases/13`: the tint fill deletes the left border
+the controller **ruled to keep earlier the same day** (`hig-per-screen/7a`,`8a`); the heading's string
+differs from the shipped accessible name, which the copy rule says to FLAG not change;
+`docs/design/prototype-delta-2026-09-18.md:583-586` already gives `isMyWork` the port verdict `none`;
+and `--gn-tint-warning` is an alpha role with a documented single consumer (`tokens.ts`, the invitations
+banner — which is nonetheless a real precedent for exactly this conversion).
+
+**The full delta table, the recommendation, and a correction owed to the prototype-delta document are in
+`test-cases/13`'s section for this change.** Nothing in the change set presupposes the answer.
+
+### Reviews — two rounds, both discharged, both recorded in the PR body
+
+**Round 1, one reviewer, at `4205f172`.** Its one job was to confirm nothing else on the project page
+depended on the removed slice; it could not falsify that, and it independently reproduced **both**
+mutations in its own disposable clone with the same kill sets. No Critical, no Important code defect.
+Five findings, all fixed in `bb7ba7f7`: the `examined: 9` roster header, a wrong catalogue citation
+(`:106` → `:122`/`:169`), the undeclared handoff file, now-inert `getAttention` stubs across five
+`ProjectPage`-only fixtures, and — its sharpest — **my own claim that `.gn-project` "opens straight into
+the tab arms", which I asserted without reading what followed it.** It opens into the narrowing control
+and `gn-list-filter` (`page.tsx:1464`).
+
+**Round 2, scoped re-review, at `bb7ba7f7`** (the stub sweep went one file beyond round 1's finding).
+It confirmed the deletions are inert — four independent lines of attack, all failing to falsify, plus the
+structural proof that the read is never made and the `page-refusals.test.tsx:268` spy — and it verified
+each corrected prose claim against the line it cites. **It also caught a real error of mine: the count.**
+`board-narrowing`'s docblock said "eleven" stubs were swept; the true number is **18** (7 + 1 + 1 + 1 + 8),
+which is what you get when you sweep four files and forget the fifth — *a count that was not the number of
+the thing it counted*, the exact defect class the fix round was correcting. Corrected with the per-file
+breakdown, measured on the diff itself with the added side as the control. Its second finding (a "seven
+lines" count in the ratchet chain) was really a **unit disagreement**: the same range gave 7, 9 and 12
+depending on whether context lines are counted, so **the number was removed from the chain entirely** and
+the enumeration left as the claim.
+
+**Round 1's Important finding was NOT fixed, deliberately** — see the ratchet section above. The reviewer
+proposed hand-correcting the floor; this held, because lowering a floor is the direction that hides a
+loss. The disagreement is stated in the PR body and in `test-cases/13`, and it is the controller's call.
+
+### The rebase onto `cb1f3d16` — pure union replay, and what proves it
+
+`#469` wrote a 126-line section for case **`13.732`** to `test-cases/13` — the same file this branch
+appends to — so the head conflicted there; `Features.md` auto-merged. **One hunk, resolved as a UNION with
+both sections kept** (mine after #469's, in landing order), and no part of it needed a decision rather than
+a union. The old `13.733`-style question does not arise: their ids are in `13.700`–`13.759`, mine are
+`13.881`/`13.882` — no collision at all.
+
+**The evidence a restart should re-derive rather than trust:** `diff main's test-cases/13 → the resolved
+file` gives **0 lines removed** — not merely zero carrying #469's markers, ZERO at all — against **123
+added**, and the arithmetic closes exactly (10,972 + 123 − 0 = 11,095). Nine of the eleven files are
+**byte-identical** across the replay, verified by sha256 of each blob at the old and the new head, so **no
+source file changed** and this is not a fix round. `Features.md` shows 2 removed / 2 added, and both
+removals are the pre-edit text of the two bullets this change rewrites — a one-bullet-per-line file makes
+any edit read as a replacement. **The id instruments corroborate both sides surviving:** `check-case-ids`
+2345 → **2346** and file 13 655 → **656** checked cases, exactly one each, which is #469's `13.732`.
+
+### What a restart must NOT redo
+
+- **Do not re-run the mutations.** Both are recorded above with their kill sets.
+- **Do not re-run the full web suite to "check"** — it was 48 files / 520 tests / exit 0 at `0da73557`;
+  re-run only if a file changes.
+- **Do not hand-edit the roster again.** It is done and explained; the next sweep run overwrites it.
+- **Do not fold Part 2 into this PR.** It is held on purpose; the controller's ruling decides it.
+- **Do not run `docker compose` or bind :3001**, and do not run the forced gate — the controller's.
+
+### Gate evidence at `0da73557` (quoted raw, all zeros)
+
+`check:env` 0 · `check:tasks` 0 · `check:runbook` 0 · `check:citations` 0 · `check:help` 0 ·
+`check:db-tz` **0** with `DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma`, printing
+`database timezone: Asia/Kolkata` · `scripts/check-case-ids.mjs` 0 (*"2345 unique ids, highest 15.34"*).
+`pnpm turbo run typecheck` **0** — 17/17 tasks, 16 cache hits, `web` re-ran. Full web suite **exit 0**,
+48 files / 520 tests. **The forced gate was NOT run**; `docker compose` was NOT run and :3001 was not bound.
+
+---
+
+## ▼ PREVIOUS BLOCK — the nav's last-open project item, and the global tab memory (2026-09-18)
 
 **Position: THE CHANGE SET IS COMPLETE, THE REVIEWER ROUND AND ITS FIX ROUND ARE BOTH DISCHARGED, and the
 PR is opening against `main` with the reviewer recorded in its body.** Dispatch:

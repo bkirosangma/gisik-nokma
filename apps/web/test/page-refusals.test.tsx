@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HttpError, LIST_TOO_LARGE_ABSENCE, ServingGapError } from '@gisik-nokma/app-core/online';
@@ -100,6 +100,22 @@ const BOARD_WITH_DONE = {
       ],
     },
   ],
+};
+
+/**
+ * One attention item, in the shape `mapAttention` builds and with the reason
+ * `apps/server/src/routes/attention.ts` composes verbatim — the raw claimed day
+ * `2026-08-30`, never `30 Aug 2026`. Taken as the server's own spelling for the
+ * same reason `attention-strip.test.tsx`'s fixture is: "render the server's
+ * reason verbatim" is only testable against the server's actual wording.
+ */
+const ATTENTION_ITEM = {
+  kind: 'due-soon' as const,
+  ticketId: '01J9TICKET00000000000000AT',
+  projectId: '01J9PROJECT000000000000000',
+  title: 'File the GST return',
+  reason: 'Needed by 2026-08-30 — due within 7 days.',
+  claim: PROVENANCE_387,
 };
 
 describe('a refused read is rendered as the refusal, never as a spinner or an empty list', () => {
@@ -206,21 +222,74 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
   });
 
-  it('Project page: the attention strip refuses out loud rather than rendering nothing', async () => {
+  /**
+   * 13.881 — the attention strip is GONE from the project page, and the read
+   * behind it is not merely unrendered: it is NEVER MADE.
+   *
+   * Owner, 2026-09-18, verbatim: *"the attention section should not be there in
+   * the project page. its already there in the my work page."* The strip stays a
+   * component and stays mounted on `/my-work`; this is a removal from ONE route,
+   * so the case is a PAIR and the second half is the load-bearing one. A page
+   * that still called `useAttention` and discarded the answer would render no
+   * strip and pass an absence-only assertion, while still paying the read and
+   * still arming the expired-session rule on a 401 for a surface that no longer
+   * exists.
+   *
+   * The board refusal below is the CONTROL, not the subject: this case's
+   * assertions are absences, and an absence passes just as well against a page
+   * that threw before it rendered anything.
+   *
+   * This block replaces "Project page: the attention strip refuses out loud
+   * rather than rendering nothing". That property has not been dropped — the
+   * refusals case above asserts the identical sentence on `/my-work`, which is
+   * now the only page that mounts the strip.
+   */
+  it('Project page: no attention strip, and the attention read is never made', async () => {
+    const getAttention = vi.fn(async () => [ATTENTION_ITEM]);
     render(
       <Providers
         services={stubServices({
           getBoard: () => Promise.reject(new Error('GET /v1/projects/p1/board failed: 404')),
+          getAttention,
         })}
       >
         <ProjectPage />
       </Providers>,
     );
 
-    expect(
-      await screen.findByText(/What needs your attention cannot be shown yet\./),
-    ).toBeInTheDocument();
+    // CONTROL — the project page rendered, and rendered its board arm.
+    expect(await screen.findByText(/The board cannot be shown yet\./)).toBeInTheDocument();
+
+    // The strip is absent...
     expect(screen.queryByRole('complementary', { name: 'Needs attention' })).not.toBeInTheDocument();
+    // ...and so is the read behind it. This is the half an absence cannot reach:
+    // `getAttention` is stubbed to ANSWER here, so a page that still called it
+    // would draw a strip and fail the line above as well as this one.
+    expect(getAttention).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 13.882 — and the removal is a PROJECT-PAGE change and nothing wider.
+   *
+   * 13.881's assertions are both absences; on their own they are satisfied by
+   * deleting the strip everywhere. This is the paired positive, on the route the
+   * owner named as the one that keeps it: the same read, the same component,
+   * rendered.
+   */
+  it('My Work: the same read still renders the strip', async () => {
+    const getAttention = vi.fn(async () => [ATTENTION_ITEM]);
+    render(
+      <Providers services={stubServices({ getAttention })}>
+        <MyWorkPage />
+      </Providers>,
+    );
+
+    const strip = await screen.findByRole('complementary', { name: 'Needs attention' });
+    expect(within(strip).getByText('File the GST return')).toBeInTheDocument();
+    expect(
+      within(strip).getByText('Needed by 2026-08-30 — due within 7 days.'),
+    ).toBeInTheDocument();
+    expect(getAttention).toHaveBeenCalled();
   });
 
   /**
@@ -562,22 +631,33 @@ describe('3.141 an expired session sends the viewer to sign in — on ALL THREE 
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
   });
 
-  it('Project page: every read 401s, and one notice stands in for all four', async () => {
+  it('Project page: every read this page makes 401s, and one notice stands in for all of them', async () => {
+    // **The stub set was FIVE reads and the page makes THREE, and that gap is
+    // the reason this case was renamed rather than left alone.** It read "every
+    // read 401s, and one notice stands in for all four" — a count that was true
+    // when `useAttention` was one of this page's reads. The attention strip left
+    // the project page on 2026-09-18 (case 13.881), so `getAttention` below
+    // became a stub for a read this page does not make, and the count of reads
+    // the hook actually receives is now three. `getPreferences` was ALREADY
+    // dead before that: `usePreferences` appears on this page only inside a
+    // prose comment (`page.tsx:317` records why persisting is a separate
+    // change), and `stubServices`'s own default for it ANSWERS rather than
+    // rejecting, so the override could never have been load-bearing. Both are
+    // removed below — an override for a read a page never makes is a fixture
+    // telling the next reader that it does.
     render(
       <Providers
         services={stubServices({
           getBoard: expired('/v1/projects/p1/board'),
           getTickets: expired('/v1/projects/p1/tickets'),
-          getAttention: expired('/v1/workspaces/w1/attention'),
           getTicketTypes: expired('/v1/workspaces/w1/ticket-types'),
-          getPreferences: expired('/v1/me/preferences'),
         })}
       >
         <ProjectPage />
       </Providers>,
     );
     await waitFor(() => expect(push).toHaveBeenCalledWith('/sign-in'));
-    // ONE, printed as a list: four reads failed together and they are one event.
+    // ONE, printed as a list: three reads failed together and they are one event.
     const texts = (await screen.findAllByRole('status')).map((node) => node.textContent ?? '');
     expect(texts).toEqual([EXPIRED_SESSION_COPY]);
     expect(screen.queryByText(/cannot be shown yet/)).not.toBeInTheDocument();
