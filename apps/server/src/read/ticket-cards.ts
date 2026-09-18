@@ -39,12 +39,23 @@ export type ProjTicketRow = {
    * (spec §8.1, second wave 2026-09-18).
    */
   rank: string | null;
+  /**
+   * `TicketState.reopenedAt`'s column (spec §8.2, second wave 2026-09-18).
+   * **Unmapped, and unmapped on purpose**: unlike `closed_at`/`closed_by` there
+   * is no `TicketCard` field to fold it into, because when a ticket was last
+   * reopened is a SWEEP INPUT rather than something a card renders. It is
+   * selected here so the projection's own canonical column list is complete
+   * against the table — a reader that needs it builds its `SELECT` from
+   * `PROJ_TICKET_COLUMNS` and must not have to remember a column this list
+   * withheld.
+   */
+  reopened_at: Date | null;
 };
 
 export const PROJ_TICKET_COLUMNS =
   't.ticket_id, t.workspace_id, t.project_id, t.type_id, t.parent_id, ' +
   't.workflow_id, t.workflow_version, t.state_id, t.state_category, ' +
-  't.assignee_id, t.collaborator_ids, t.fields, t.closed_at, t.closed_by, t.rank';
+  't.assignee_id, t.collaborator_ids, t.fields, t.closed_at, t.closed_by, t.rank, t.reopened_at';
 
 /**
  * Rows for explicit ids, in `ticket_id` order.

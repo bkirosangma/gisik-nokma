@@ -8,6 +8,8 @@ import {
   TICKET_EVENT_TYPES,
   type TicketStateDeps,
 } from '../src/ticket-state.js';
+import { ULID_REGEX } from '../src/ids.js';
+import { SYSTEM_ACTOR_AUTO_CLOSE, SYSTEM_ACTOR_NAMES } from '../src/system-actors.js';
 import type { TicketTypeDef } from '../src/ticket-types.js';
 import { domainRegistry } from '../src/vocabulary.js';
 import type { PublishedWorkflowDef, WorkflowDef } from '../src/workflow.js';
@@ -186,6 +188,11 @@ describe('applyTicketEvent', () => {
       // the creation branch in `ticket-state.ts`). `toEqual` is exact, so this
       // line is what holds the decision in place.
       rank: null,
+      // The third of the same family (13.722): creation writes the null rather
+      // than omitting the key, for the reason the two above give — `toEqual` is
+      // exact, which is what makes this list the place the presence decision
+      // lives rather than a value a `?? null` reader would paper over.
+      reopenedAt: null,
       fields: {
         title: {
           value: 'File the GST return',
@@ -692,6 +699,88 @@ describe('13.696 ticket.ranked sets rank; ticket.created starts it null', () => 
   });
   it('TICKET_EVENT_TYPES names it, so every replay reader that iterates it sees them', () => {
     expect(TICKET_EVENT_TYPES).toContain('ticket.ranked');
+  });
+});
+
+/**
+ * 13.722 — `reopenedAt`: armed by an explicit reopen, disarmed by ANY
+ * transition (spec §8.2, second wave 2026-09-18).
+ *
+ * The field is a SWEEP INPUT, not a display fact. `ticket.reopened` already
+ * clears `closed`; what it could not say before this is *when* the reopen
+ * happened, and that timestamp is the whole reason the auto-close sweep needs
+ * it: a ticket sitting terminal for 30 days looks identical whether nobody has
+ * touched it or somebody reopened it yesterday, and closing it again an hour
+ * after a person deliberately reopened it is the behaviour §8.2's "reopen wins"
+ * clause exists to forbid.
+ *
+ * **Why ANY transition clears it, including one back into the same terminal
+ * state.** The clock the sweep measures is "how long has this ticket been
+ * sitting in the state it is in". A transition is a person acting on the
+ * ticket, which restarts that clock — so the reopened-ness is no longer the
+ * most recent thing that happened to it, and letting the flag survive would
+ * exempt the ticket from auto-close forever after one reopen. "Even back into
+ * the same terminal state" is not an edge case to tolerate; it is the re-arm
+ * path §8.2 names explicitly, and it is the reason this is cleared on the
+ * transition rather than derived from the transition log at sweep time.
+ */
+describe('13.722 ticket.reopened arms reopenedAt; any transition clears it', () => {
+  it('a created ticket is not reopened, with the field present and null', () => {
+    // `toBeNull` rather than `?? null`, on 13.696's ruling: `reopenedAt` is
+    // OPTIONAL on the domain type only because hundreds of test literals
+    // predate it. Every producer sets it — this branch is the first — and a
+    // `?? null` here would pass on a regression that dropped the key, which is
+    // the shape the dual-client rig's whole-`TicketState` `toEqual` compares.
+    expect(fold([createdWith({ start: 'focus' })]).reopenedAt).toBeNull();
+  });
+
+  it('an explicit reopen records the envelope server time, and moves nothing else', () => {
+    const before = fold([createdWith({ start: 'focus' }), transitioned('doing')]);
+    const reopenEnv = reopenedEvent();
+    const after = applyTicketEvent(before, reopenEnv, deps);
+    expect(after.reopenedAt).toBe(reopenEnv.serverTime);
+    // The whole rest of the state is byte-identical: strip the one field under
+    // test from both sides and the two must be indistinguishable. This is what
+    // distinguishes "the fold set one field" from "the fold rewrote the state
+    // and the field happens to be right".
+    expect({ ...after, reopenedAt: undefined }).toEqual({ ...before, reopenedAt: undefined });
+  });
+
+  it('a following transition clears it, including back into the SAME terminal state', () => {
+    const armed = fold([
+      createdWith({ start: 'focus' }),
+      transitioned('doing'),
+      transitioned('done'),
+      closedEvent(),
+      reopenedEvent(),
+    ]);
+    // The positive control, in the same measurement: after the reopen and
+    // before any transition the field IS set. Without this line the assertion
+    // below is satisfied by a reducer that never sets the field at all.
+    expect(armed.reopenedAt).toBe(reopenedEvent().serverTime);
+    expect(armed.stateId).toBe('done');
+
+    const rearmed = applyTicketEvent(armed, transitioned('done'), deps);
+    expect(rearmed.reopenedAt).toBeNull();
+    // Back into the state it was already in: the transition is real (its entry
+    // lands in the log) even though `stateId` does not move, which is exactly
+    // the case a "clear it only when the state changes" implementation gets
+    // wrong.
+    expect(rearmed.stateId).toBe('done');
+    expect(rearmed.transitions.length).toBe(armed.transitions.length + 1);
+  });
+
+  it('SYSTEM_ACTOR_AUTO_CLOSE is a ULID, so the ingest door can accept it as an actor', () => {
+    // Load-bearing rather than tidy: the sweep files its `ticket.closed` under
+    // this id, and `submittedEventSchema` requires `actorId` to be a ULID
+    // (`ids.ts`). A constant that failed this would refuse EVERY auto-close at
+    // the door — a sweep that reports `refused: N` forever and closes nothing.
+    expect(ULID_REGEX.test(SYSTEM_ACTOR_AUTO_CLOSE)).toBe(true);
+    // The negative control, through the same predicate: a 26-character string
+    // one character outside the alphabet is refused, so the line above is not
+    // passing on a regex that matches everything.
+    expect(ULID_REGEX.test('00000000000000000000SYS0AI')).toBe(false);
+    expect(SYSTEM_ACTOR_NAMES.get(SYSTEM_ACTOR_AUTO_CLOSE)).toBe('Auto-close');
   });
 });
 

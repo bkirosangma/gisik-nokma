@@ -9964,3 +9964,81 @@ new id — and then FIXED THE PLAN rather than leaving the conflict standing.** 
 `fff365bd`), matching this implementation. **So the plan and the code agree as of that commit, and an
 earlier draft of this paragraph — which said the two steps still disagreed — is struck rather than
 left standing**, since it was true only until the plan was corrected.
+---
+
+# Second wave, Task 7 — `reopenedAt`, the reserved auto-close actor, and its name
+
+Plan ids `13.630`–`13.634` were **taken** (recorded as taken in the dispatch), so this task's cases are
+**`13.722`–`13.726`**, recounted by case MARKER at the tip before the first mint: the block's
+high-water was `13.721` (Task 6's fix round) with `13.720`/`13.721` present as the positive control, and
+`13.722` returned **false**.
+
+**The task's correctness core is a timestamp that is not a display fact, and a constant that must pass
+the ingest door.** `reopenedAt` exists so the auto-close sweep can honour spec §8.2's "reopen wins": a
+ticket that sat terminal for 30 days because nobody came back and one a person deliberately reopened
+yesterday carry the SAME `closed: null` and the same terminal `stateId`, so without this field the
+sweep would close the second one an hour later. `SYSTEM_ACTOR_AUTO_CLOSE` is the actor the sweep files
+that close under; it must match `ULID_REGEX` or the ingest door refuses every event and the sweep
+reports `refused: N` forever — a failure that would present as a rules problem rather than as a bad
+constant. 13.722 pins the match with a negative control for exactly that reason.
+
+- ✅ **13.722 — `ticket.reopened` arms `reopenedAt`; ANY transition clears it, including back into the
+  same terminal state.** Four cases in `packages/domain/test/ticket-state.test.ts`. A created ticket is
+  present-and-null (`toBeNull`, not `?? null`: the field is optional on the DOMAIN type only because
+  hundreds of test literals predate it, so a `?? null` here would pass on a regression that dropped the
+  key — the shape the dual-client rig's whole-`TicketState` `toEqual` compares). The reopen case
+  records the envelope's `serverTime` and proves the rest of the state is byte-identical by stripping
+  the one field under test from both sides. The clear case carries its OWN positive control in the same
+  test — after the reopen and before the transition the field IS set — without which the clearing
+  assertion is satisfied by a reducer that never sets it at all; it then transitions back into `done`,
+  the state the ticket is already in, and asserts both `reopenedAt === null` and that the transition
+  LOG grew by one, which is what separates a real re-arm from a transition the fold skipped.
+  **Mutation M1** (drop `reopenedAt: null` from the `ticket.transitioned` case) → **13.722's clear case
+  reddens and nothing else in the file** (1 failed, 36 passed); the mutation was re-applied through the
+  editor after a first attempt died of a perl plumbing error, so the kill is the semantics and not a
+  bind error. The fourth case pins `ULID_REGEX.test(SYSTEM_ACTOR_AUTO_CLOSE)` with a one-character
+  negative control and the `SYSTEM_ACTOR_NAMES` entry, because a constant the ingest door refuses would
+  turn every auto-close into a refusal.
+- ✅ **13.723 — `proj_tickets.reopened_at` follows the state, all three arms.** One case in
+  `apps/server/test/projections/tickets-closed.test.ts` (a sibling of 13.572, which owns the
+  closed/reopened columns of this table). Real Postgres through `applyCommitted`; seeded along the real
+  path (terminal → closed → reopened → transitioned) rather than by hand-writing the column. `NULL` on
+  creation and through `rowToTicketState`; the reopen's `serverTime` after a reopen; `NULL` again after
+  a transition back into `done`. The middle arm is the control — without it the third passes against a
+  projection that never wrote the column — and the third is the arm an `ON CONFLICT SET` list that
+  omits this column cannot produce, leaving the row holding the reopen's stamp for the rest of the
+  ticket's life, which is the "never auto-closable again after one reopen" failure §8.2 names.
+- ✅ **13.724 — `mapTicketState` carries the wire's `reopenedAt` onto `TicketState.reopenedAt`.** One
+  case in `packages/app-core/test/online/mappers.test.ts`, through `mapTicketRead`. This is the last
+  member of this mapper that could have gone dead the 13.603 way: the route serves a whole
+  `TicketState` and the mapper enumerates its members BY HAND, so a member added to `rowToTicketState`
+  and not added here is silently dropped on this route alone. **The tolerance is stated rather than
+  incidental, and it is a deliberate difference from `mapClosed`/`mapRank`:** an absent `closed` or
+  `rank` is a visible product defect (a hidden badge, a reordered Backlog tab) so those throw, while
+  `reopenedAt` is a server-side sweep input no surface renders and its job here is that the mapped
+  state keep the same SHAPE as the one the replica folds locally. An absent key reads as `null` — the
+  same answer as an explicit null — and the case asserts that arm explicitly. The VALUE is still
+  policed: a number is refused rather than coerced into `string | null`.
+- ✅ **13.725 — `actorLabel` knows the reserved system actors, and the ROSTER cannot rename one.** Three
+  cases in `packages/app-core/test/provenance.test.ts`. The precedence is the load-bearing part, not
+  the lookup: system name FIRST, then the roster, then the id — so
+  `actorLabel(SYSTEM_ACTOR_AUTO_CLOSE, 'Someone')` still answers `'Auto-close'`, because a person's
+  name printed over a decision no person made is the claim honesty contract 1 exists to refuse. The
+  same test carries the positive control that an ordinary id still takes its roster name, so the system
+  lookup is a first check and not a replacement. The second case pins the sentence
+  (`formatStateProvenance` → `marked Done by Auto-close on 19 Aug 2026`), the second surface that would
+  otherwise print the raw 26-character id. The third pins `isSystemActor` **including
+  `isSystemActor('toString') === false`** — the reason `SYSTEM_ACTOR_NAMES` is a `Map` and not an object
+  literal, since `'toString' in {}` is true and an object-backed lookup would answer `true` for a name
+  no product reserved. **Mutation M2** (delete the `SYSTEM_ACTOR_NAMES` lookup from `actorLabel`) →
+  **both 13.725 arms and 13.726 redden** (2 failed of 26 in this file; 1 failed of 42 in the sheet
+  file), and nothing else.
+- ✅ **13.726 — a ticket the sweep closed reads `Closed by Auto-close on <date>`.** One case in
+  `packages/app-core/test/views/ticket-sheet.test.tsx`, 13.586's fixture with the actor swapped and
+  nothing else changed — which is the point: the badge, Reopen and the disabled Move… all go through
+  the one `nameOf` → `actorLabel` join, so the system actor needs no branch in the sheet and must not
+  acquire one. The date is 13.586's discriminating 19:00 UTC instant (00:30 IST, 21 Aug), so a
+  system-actor branch that formatted its own date would also redden this. The case asserts the id is
+  NOT on screen in the same render: a badge falling through to the honesty-contract-1 fallback would
+  print the 26-character id and satisfy a `toContain('Auto-close')`-shaped check only by accident of
+  the constant's own `SYS0AC` tail.

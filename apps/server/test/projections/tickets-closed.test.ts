@@ -201,3 +201,100 @@ describe('13.572 proj_tickets carries closed_at / closed_by', () => {
     });
   });
 });
+
+/**
+ * 13.723 — `proj_tickets.reopened_at`, the column Task 7 adds (spec §8.2,
+ * second wave 2026-09-18). A sibling of 13.572 above and deliberately built the
+ * same way: this file owns the `proj_tickets` columns the closed/reopened pair
+ * writes, and `rowToTicketState` is read back here rather than through a second,
+ * reimplemented mapping — the same reason that file's own header gives.
+ *
+ * **The three arms are the whole semantics, and the middle one is a control.**
+ * A created ticket is `NULL`; a reopen fills it with the envelope's server time;
+ * a following transition clears it again. Without the middle arm the third would
+ * pass against a projection that simply never wrote the column. The third is the
+ * one an `ON CONFLICT SET` list that omits this column cannot produce: the row
+ * would keep the reopen's stamp forever, so the sweep would skip the ticket for
+ * the rest of its life — a ticket that can never be auto-closed again after one
+ * reopen, which is the failure mode §8.2's re-arm sentence names.
+ *
+ * The final transition goes back into `done`, the state the ticket is already
+ * in, because that is the case a "clear it only when the state moved"
+ * implementation gets wrong (13.722 asserts the same path in the reducer).
+ */
+describe('13.723 proj_tickets carries reopened_at', () => {
+  it('a created ticket is NULL; a reopen fills it from the event; a transition clears it', async () => {
+    const ticketId = newUlid();
+    const actorId = newUlid();
+
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        workspaceId: WS,
+        actorId,
+        entity: { kind: 'ticket', id: ticketId },
+        type: 'ticket.created',
+        payload: { typeId: TYPE_ID, projectId: PRJ, parentId: null, title: 'Reopen the thing', start: 'focus' },
+      }),
+    ]);
+
+    let row = await rowFor(ticketId);
+    expect(row.reopened_at).toBeNull();
+    // The mapping half, on the same row: `null` survives as `null` rather than
+    // becoming `undefined`, which is what the dual-client rig's whole-state
+    // `toEqual` compares against the reducer's own `reopenedAt: null`.
+    expect(rowToTicketState(row).reopenedAt).toBeNull();
+
+    // The real path a reopen follows: terminal, closed, then reopened. The
+    // engine's doors are not present in `applyCommitted` (see this file's
+    // header), so seeding the path is what makes this a fact about the product
+    // rather than an artifact of the shortcut.
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        workspaceId: WS,
+        actorId,
+        entity: { kind: 'ticket', id: ticketId },
+        type: 'ticket.transitioned',
+        payload: { to: 'done' },
+      }),
+    ]);
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        workspaceId: WS,
+        actorId,
+        entity: { kind: 'ticket', id: ticketId },
+        type: 'ticket.closed',
+        payload: {},
+      }),
+    ]);
+    const reopenEvent = makeCommitted({
+      workspaceId: WS,
+      actorId,
+      entity: { kind: 'ticket', id: ticketId },
+      type: 'ticket.reopened',
+      payload: {},
+    });
+    await applyCommitted(db.pool, [reopenEvent]);
+
+    row = await rowFor(ticketId);
+    // Mutation targets, both directions: `next.reopenedAt ?? null` bound to a
+    // constant, or the `ON CONFLICT SET` line dropped, and this reddens naming
+    // the clock; `reopened_at = now()` and it reddens because the column must
+    // carry the CLAIM's recorded instant and not the projection's own.
+    expect(row.reopened_at.toISOString()).toBe(reopenEvent.serverTime);
+    expect(rowToTicketState(row).reopenedAt).toBe(reopenEvent.serverTime);
+
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        workspaceId: WS,
+        actorId,
+        entity: { kind: 'ticket', id: ticketId },
+        type: 'ticket.transitioned',
+        payload: { to: 'done' },
+      }),
+    ]);
+
+    row = await rowFor(ticketId);
+    expect(row.reopened_at).toBeNull();
+    expect(rowToTicketState(row).reopenedAt).toBeNull();
+  });
+});

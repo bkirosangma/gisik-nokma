@@ -61,6 +61,33 @@ export type TicketState = {
    * types (`TicketCard.rank`, `ListRow.rank`) carry it REQUIRED.
    */
   rank?: string | null;
+  /**
+   * When this ticket was last explicitly reopened (spec §8.2, second wave
+   * 2026-09-18): the `ticket.reopened` envelope's server time, or `null` for a
+   * ticket that has never been reopened OR has been acted on since.
+   *
+   * **A SWEEP INPUT, not a display fact** — nothing renders it, and it is
+   * deliberately absent from `TicketCard`/`ListRow`. It exists because the
+   * auto-close sweep has to tell "terminal for 30 days because nobody came
+   * back" apart from "terminal for 30 days, reopened by a person yesterday":
+   * both rows carry the same `closed: null` and the same terminal `stateId`,
+   * so without this the sweep would close a ticket an hour after someone
+   * deliberately reopened it.
+   *
+   * Cleared by ANY `ticket.transitioned`, including one back into the same
+   * terminal state, because the clock the sweep measures is "how long has this
+   * sat in the state it is in" and a transition restarts it. Letting the flag
+   * survive would exempt a ticket from auto-close forever after one reopen.
+   *
+   * OPTIONAL here on `rank`'s exact rule and for its exact reason: hundreds of
+   * `TicketState` literals in tests across five packages predate the field, so
+   * the DOMAIN type is optional while every producer sets it — the reducer on
+   * all three of `ticket.created`, `ticket.transitioned` and `ticket.reopened`,
+   * and `rowToTicketState` from the column. Readers spell `?? null` for the
+   * literals' sake. Unlike `rank` it is NOT carried on the wire's card types,
+   * because no surface displays it.
+   */
+  reopenedAt?: string | null;
 };
 
 export type MembershipState = {

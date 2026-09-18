@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { IST_CLOCK_NOTE } from '@gisik-nokma/domain';
+import { IST_CLOCK_NOTE, isSystemActor, SYSTEM_ACTOR_AUTO_CLOSE } from '@gisik-nokma/domain';
 import { actorLabel, formatDate, formatDateTime, formatStateProvenance } from '../src/provenance.js';
 import { claim } from './helpers/seed.js';
 
@@ -156,5 +156,57 @@ describe('formatStateProvenance — the unfold text', () => {
     expect(
       formatStateProvenance('Done', claim({ clientTime: '2026-08-01T09:58:12.000Z' })),
     ).toBe('marked Done by Anselma Marak on 19 Aug 2026');
+  });
+});
+
+/**
+ * 13.725 — `actorLabel` knows the reserved system actors, and the roster cannot
+ * rename one (spec §8.2, second wave 2026-09-18).
+ *
+ * The auto-close sweep closes tickets under `SYSTEM_ACTOR_AUTO_CLOSE`, and
+ * §8.2 fixes what a reader sees for it: the sheet reads "Closed by Auto-close
+ * on <date>". `actorLabel` is the ONE join every attribution in the product goes
+ * through — the sheet's badge, the field claims, the transition history — so
+ * teaching it the system name is what makes that sentence true everywhere at
+ * once rather than at the one call site somebody remembered.
+ *
+ * **The order is the load-bearing part, not the lookup.** System name FIRST,
+ * then the roster, then the id. A roster row keyed by this id — impossible
+ * through any shipped door, and exactly why the reservation is documented
+ * rather than assumed — would otherwise print a person's name over a decision
+ * no person made. The middle assertion below is that arm, and it is the reason
+ * this is a precedence rule rather than an extra fallback.
+ */
+describe('13.725 actorLabel knows the reserved system actors; the roster cannot rename one', () => {
+  it('names the auto-close actor whether or not a roster name arrives with it', () => {
+    expect(actorLabel(SYSTEM_ACTOR_AUTO_CLOSE, null)).toBe('Auto-close');
+    // The arm that makes the precedence a rule: a name for this id is REFUSED
+    // rather than preferred.
+    expect(actorLabel(SYSTEM_ACTOR_AUTO_CLOSE, 'Someone')).toBe('Auto-close');
+    // The positive control, through the same call: an ordinary id still takes
+    // the roster's name, so the system lookup is a FIRST check and not a
+    // replacement for the roster.
+    expect(actorLabel('user_anselma', 'Anselma Marak')).toBe('Anselma Marak');
+    // And the fallback below it is untouched — an ordinary id with no name is
+    // still attributed by id rather than blanked (honesty contract 1).
+    expect(actorLabel('user_anselma', null)).toBe('user_anselma');
+  });
+
+  it('the provenance sentence for a system actor reads as the spec fixes it', () => {
+    // `formatStateProvenance` is the unfold text the history view renders, and
+    // it goes through the same `actorLabel`. Asserted here because it is the
+    // second surface that would otherwise print the raw 26-character id.
+    expect(
+      formatStateProvenance('Done', claim({ actorId: SYSTEM_ACTOR_AUTO_CLOSE, actorName: null })),
+    ).toBe('marked Done by Auto-close on 19 Aug 2026');
+  });
+
+  it('isSystemActor is true for the reserved id and false for an ordinary one', () => {
+    expect(isSystemActor(SYSTEM_ACTOR_AUTO_CLOSE)).toBe(true);
+    expect(isSystemActor('user_anselma')).toBe(false);
+    // `Object.prototype` is the reason `SYSTEM_ACTOR_NAMES` is a `Map` rather
+    // than an object literal: `'toString' in {}` is true, so an object-backed
+    // lookup would answer `true` for a name no product ever reserved.
+    expect(isSystemActor('toString')).toBe(false);
   });
 });

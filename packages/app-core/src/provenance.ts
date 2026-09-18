@@ -1,12 +1,34 @@
-import { IST_DAY_REGEX, formatIstInstant, istDayBounds } from '@gisik-nokma/domain';
+import { IST_DAY_REGEX, formatIstInstant, istDayBounds, SYSTEM_ACTOR_NAMES } from '@gisik-nokma/domain';
 import type { ClaimProvenance } from './view-types.js';
 
 /**
  * Honesty contract 1: the UI never launders a claim into an anonymous fact.
  * A missing display name falls back to the raw actor id — attributed, never
  * blank, never a fabricated "system".
+ *
+ * ## The reserved actors are checked FIRST, and that order is the rule
+ *
+ * One actor in this product is not a person: `SYSTEM_ACTOR_AUTO_CLOSE`, the id
+ * the auto-close sweep files its `ticket.closed` under (spec §8.2). Its display
+ * name is fixed by the spec — the sheet reads "Closed by Auto-close on <date>"
+ * — and it is NOT a roster entry, because no workspace has a member by that id.
+ *
+ * So the lookup runs system → roster → id, and the MIDDLE step is what makes
+ * the first one load-bearing rather than an extra fallback: a roster row that
+ * happened to carry this id must not be able to rename a system actor. A
+ * person's name printed over a decision no person made is the exact claim this
+ * module's honesty contract exists to refuse, and "the roster is authoritative
+ * for every id" would produce it. `SYSTEM_ACTOR_NAMES` is a `Map` for the same
+ * class of reason at the other end: an object literal would answer `true` for
+ * `'toString'`, so `'constructor'`-shaped garbage from a wire body would read
+ * as a reserved actor.
+ *
+ * The fallback below it is unchanged and still total: an ordinary id with no
+ * name is attributed by id, never blanked.
  */
 export function actorLabel(actorId: string, actorName: string | null | undefined): string {
+  const systemName = SYSTEM_ACTOR_NAMES.get(actorId);
+  if (systemName !== undefined) return systemName;
   const name = actorName?.trim();
   return name !== undefined && name.length > 0 ? name : actorId;
 }

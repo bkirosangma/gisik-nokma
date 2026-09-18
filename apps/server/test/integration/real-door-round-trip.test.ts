@@ -772,6 +772,14 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — the single read'
         // rather than an absent key.
         closed: null,
         rank: null,
+        // The third of the family, and this file is where the wire's actual
+        // SHAPE is pinned rather than a mapper's reading of it: `toEqual` on the
+        // whole `ticketState` is what makes a member reaching the client a fact
+        // this test can fail on. Never reopened, so `null` and not an absent key
+        // (Task 7, backlog/closed spec §8.2). `reopenedAt` is a sweep input no
+        // client surface renders, but it still crosses this body, so it is
+        // pinned here for the same reason as the two above.
+        reopenedAt: null,
       },
       title: 'Count the crates',
       stateProvenance: {

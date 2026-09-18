@@ -1465,6 +1465,61 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     ).toBeNull();
   });
 
+  /**
+   * **13.724 — `reopenedAt` reaches the client, and it is the LAST field on this
+   * mapper that would have gone dead the 13.603 way.**
+   *
+   * The route serves a whole `TicketState` and `mapTicketState` enumerates its
+   * members BY HAND, so a member added to `rowToTicketState` and not added here
+   * is silently dropped on this route alone — which is exactly how `closed` was
+   * dead in production for a whole task while every consumer's test drove a
+   * fake (13.603).
+   *
+   * **Why this one is tolerant where `closed` and `rank` are strict.** Both of
+   * those are RENDERED — a dropped `closed` hides the badge and a dropped
+   * `rank` reorders the Backlog tab — so an absent key there is a silent,
+   * visible product defect and `mapClosed`/`mapRank` throw on it. `reopenedAt`
+   * is a SWEEP INPUT (spec §8.2): no client surface reads it, the sweep is
+   * server-side, and its only job on this mapper is that the mapped
+   * `TicketState` have the same SHAPE as the one the replica folds locally
+   * (`replica-data-source.ts` gets it free from the shared reducer), so the two
+   * remain comparable. An absent key therefore reads as `null` here — the same
+   * answer as an explicit null — rather than throwing on a body whose only
+   * fault is a key nothing renders. **The value is still policed**: a non-null
+   * value that is not a string is refused, because `string | null` is the whole
+   * type and coercing a number into it would be a claim nobody made.
+   */
+  it("13.724 mapTicketRead carries the wire ticketState's reopenedAt onto TicketState.reopenedAt", () => {
+    const reopenedAt = '2026-08-20T19:00:00.000Z';
+    expect(
+      mapTicketRead(
+        ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' }, null, null, null, reopenedAt),
+      ).ticket.reopenedAt,
+    ).toBe(reopenedAt);
+
+    // Present-and-null, the arm every pre-existing call site exercises: the two
+    // must not collapse into one value, because `null` ("never reopened, or
+    // transitioned since") and a stamp are different facts about the ticket.
+    expect(
+      mapTicketRead(ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' })).ticket
+        .reopenedAt,
+    ).toBeNull();
+
+    // The absent key, tolerated by this mapper and by no other reader of a
+    // `closed`/`rank`-shaped field on this body — asserted so the tolerance is
+    // a stated behaviour rather than an accident of `??`.
+    const omitted = ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' });
+    delete (omitted['ticketState'] as Record<string, unknown>)['reopenedAt'];
+    expect(mapTicketRead(omitted).ticket.reopenedAt).toBeNull();
+
+    // The value is policed: a number is not in `string | null`.
+    expect(() =>
+      mapTicketRead(
+        ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' }, null, null, null, 42),
+      ),
+    ).toThrow(MappingError);
+  });
+
   it('13.703 refuses a wire rank that is not a rank key, rather than passing it through', () => {
     // `mapRank` is not a `typeof raw === 'string'` check. A space is outside
     // the alphabet, so `''`-or-anything would let a key reach `compareByRank`,
@@ -1707,6 +1762,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     rollup: unknown = null,
     closed: unknown = null,
     rank: unknown = null,
+    reopenedAt: unknown = null,
   ): Record<string, unknown> {
     return {
       // The `proj_visibility` row the route still serves. The client reads
@@ -1749,6 +1805,12 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
         // 13.703, on the same rule: `rank` is REQUIRED on the wire (spec §8.1)
         // and this default is the same "never ranked" arm.
         rank,
+        // 13.724. The wire DOES always carry this key — `rowToTicketState`
+        // reads the column unconditionally — so a fixture that omits it is
+        // exercising `mapTicketState`'s deliberate tolerance rather than a
+        // shape the server ever produces. See that case for why it is tolerant
+        // where `closed` and `rank` are strict.
+        reopenedAt,
       },
       title: 'File the GST return',
       stateProvenance: {

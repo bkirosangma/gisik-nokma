@@ -624,6 +624,34 @@ reason on record, not an oversight:*
   `packages/app-core/src/view-types.ts`, `packages/app-core/src/online/mappers.ts`,
   `packages/app-core/src/online/online-data-source.ts`,
   `packages/app-core/src/replica/replica-data-source.ts`
+- ⚙️ **`reopenedAt`, and the reserved system actor `Auto-close`** — backlog/closed spec §8.2, second
+  wave, 2026-09-18 (Task 7). **Two halves of one rule: "an explicit reopen wins"**, and neither half
+  is a display fact. `TicketState.reopenedAt` is set by `ticket.reopened` to the ENVELOPE's
+  `serverTime` (never the claim's `clientTime` — the sweep compares it against a server-clock cutoff)
+  and cleared by ANY `ticket.transitioned`, **including one back into the same terminal state**: the
+  sweep measures how long a ticket has sat in the state it is in, and a transition restarts that
+  clock, so a flag that survived would exempt a ticket from auto-close forever after one reopen.
+  Cleared on the transition rather than derived from the log at sweep time, so the sweep stays one
+  column comparison instead of a per-candidate walk. Projected to `proj_tickets.reopened_at
+  timestamptz NULL`, read unconditionally by `rowToTicketState`, and **deliberately absent from
+  `TicketCard`/`ListRow`** — it is a SWEEP INPUT (Task 8's), not a card field, and putting it on the
+  card would change four routes' bodies for a value none of them shows. `SYSTEM_ACTOR_AUTO_CLOSE =
+  '00000000000000000000SYS0AC'` is the id the sweep files its `ticket.closed` under: a ULID, because
+  `submittedEventSchema` requires `actorId` to be one and a readable sentinel like `'system'` would be
+  refused at the ingest door, so every auto-close would come back `refused` and the failure would
+  present as a rules problem rather than as a malformed constant; and a RESERVED constant rather than
+  a generated ULID, because "unlikely to collide" is weaker than "cannot", and this id is written to
+  the ledger as an actor and read back by every provenance surface. **No user row ever carries it** —
+  `newUlid()` cannot mint it and nothing in the product accepts an actor id from a client.
+  `actorLabel` (`packages/app-core/src/provenance.ts`) consults `SYSTEM_ACTOR_NAMES` **before** the
+  workspace roster, so the sheet reads `Closed by Auto-close on <date>` and **a roster row cannot
+  rename a system actor** — a person's name printed over a decision no person made is the claim
+  honesty contract 1 exists to refuse. Cases 13.722–13.726.
+  `packages/domain/src/system-actors.ts`, `packages/domain/src/entity-state.ts`,
+  `packages/domain/src/ticket-state.ts`,
+  `apps/server/migrations/1789300000000_proj-tickets-reopened-at.sql`,
+  `apps/server/src/projections/tickets.ts`, `apps/server/src/read/ticket-cards.ts`,
+  `packages/app-core/src/online/mappers.ts`, `packages/app-core/src/provenance.ts`
 - ⚙️ **`proj_search` — the full-text projection** — one row per ticket holding its title,
   description and comments as PLAIN TEXT, plus a `tsvector` GENERATED from all three and weighted
   A/B/C so ranking can prefer a title hit. Fed by `ticket.created` (title), `ticket.field_set`

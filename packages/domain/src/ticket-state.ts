@@ -174,6 +174,13 @@ export function applyTicketEvent(
       // hundreds of test literals predate it, while "every producer sets them".
       // This is that producer.
       rank: null,
+      // 13.722: creation writes the null for the same reason it writes
+      // `rank: null` — the dual-client rig compares whole `TicketState`s with
+      // `toEqual`, so a reducer that omitted the key would force
+      // `rowToTicketState` to omit it too. A never-reopened ticket and a
+      // reopened-then-transitioned ticket are the same state as far as this
+      // field is concerned, and both read `null`.
+      reopenedAt: null,
     };
   }
 
@@ -225,6 +232,21 @@ export function applyTicketEvent(
             workflowVersion: wf.version,
           },
         ],
+        // ANY transition disarms the reopen clock (spec §8.2, 13.722), and it
+        // really is ANY: the fold below does not compare `p.to` against the
+        // state the ticket is already in, so a transition back into the SAME
+        // terminal state clears this too. That is the required behaviour rather
+        // than an oversight — the sweep measures "how long has this sat in the
+        // state it is in", a transition restarts that clock, and a ticket that
+        // transitioned back into `done` is one somebody acted on. It is also
+        // the case a "clear it only when `stateId` moves" implementation gets
+        // wrong, which is why 13.722 asserts the same-state path explicitly.
+        //
+        // Clearing here rather than deriving reopened-ness from the transition
+        // log at sweep time is what keeps the sweep a single column comparison:
+        // a "was the last event before this state's entry a reopen" query would
+        // have to walk the log per candidate on every hourly run.
+        reopenedAt: null,
       };
     }
     case 'ticket.assigned': {
@@ -304,7 +326,21 @@ export function applyTicketEvent(
     case 'ticket.reopened': {
       // The explicit reopen (spec §1.2): clears the flag, moves nothing else.
       ticketReopenedPayload.parse(env.payload);
-      return { ...state, closed: null };
+      return {
+        ...state,
+        closed: null,
+        // `reopenedAt` is the second half of the reopen, and it is what makes
+        // the auto-close sweep able to honour "reopen wins" (spec §8.2, 13.722).
+        // `closed: null` alone cannot say WHEN, so a ticket reopened a minute
+        // ago and a ticket closed-and-reopened months ago are indistinguishable
+        // to the sweep — and the one an hour old would be closed again.
+        //
+        // The envelope's `serverTime`, never `clientTime`: the sweep compares
+        // this against a server-clock cutoff, and a claim's own clock is the
+        // claim's, not the record's. `stateProvenanceFor` reads the same
+        // instant for the same reason.
+        reopenedAt: env.serverTime,
+      };
     }
     case 'ticket.ranked': {
       // Backlog-only is the engine's door (checkTicketRanked); this fold only

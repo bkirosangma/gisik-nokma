@@ -1314,6 +1314,23 @@ function mapRank(raw: unknown, path: string): string | null {
   return raw;
 }
 
+/**
+ * An OPTIONAL instant on the wire → `string | null` (spec §8.2, second wave
+ * 2026-09-18). `null`, an absent key and `undefined` all answer `null`; any
+ * other non-string is refused.
+ *
+ * The tolerance is the whole reason this is a named function rather than an
+ * inline `?? null`: `mapClosed` and `mapRank` beside it are strict, and a
+ * reader meeting the three should be able to see that the difference is a
+ * decision about THIS field (a server-side sweep input that no surface renders)
+ * rather than an inconsistency somebody introduced by accident. See
+ * `mapTicketState`'s comment at the call site for the reachability argument.
+ */
+function mapOptionalInstant(raw: unknown, path: string): string | null {
+  if (raw === null || raw === undefined) return null;
+  return asString(raw, path);
+}
+
 function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, string>): ListRow {
   const record = asRecord(raw, path);
   return {
@@ -1548,6 +1565,22 @@ function mapTicketState(raw: unknown, path: string): TicketState {
     // DOMAIN type (legacy literals only); the wire always sends it, because
     // `rowToTicketState` reads the column unconditionally.
     rank: mapRank(record['rank'], `${path}.rank`),
+    // The SAME lesson a third time, and the last member this mapper could still
+    // have dropped: `reopenedAt` reaches this body (`GET /v1/workspaces/:w/
+    // tickets/:id`) because `rowToTicketState` reads the column
+    // unconditionally, and enumerating fields by hand is precisely how `closed`
+    // went missing for a whole task (13.603).
+    //
+    // **Tolerant, unlike `mapClosed`/`mapRank`, and the difference is
+    // deliberate.** An absent `closed` or `rank` is a visible product defect —
+    // a hidden badge, a reordered Backlog tab — so those throw. `reopenedAt` is
+    // a SWEEP INPUT (spec §8.2): no client surface renders it, its only reader
+    // is server-side, and its job here is that this mapped `TicketState` keep
+    // the same SHAPE as the one `replica-data-source.ts` folds locally from the
+    // shared reducer. An absent key reads as `null`, the same answer as an
+    // explicit null. The VALUE is still policed: `string | null` is the whole
+    // type, so a number is refused rather than coerced.
+    reopenedAt: mapOptionalInstant(record['reopenedAt'], `${path}.reopenedAt`),
   };
 }
 
