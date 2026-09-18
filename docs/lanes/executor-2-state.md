@@ -20,7 +20,153 @@
 
 ---
 
-## ▲ TOP BLOCK — SECOND WAVE **TASK 12** (the plan's close-out) DONE. PR open against `main`. (2026-09-18, night)
+## ▲ TOP BLOCK — `settings → workflows` **TASK 9** DONE. PR open against `main`. (2026-09-18, night)
+
+**Position: the work is DONE, the review is RECORDED and ACTED ON, and the PR is being opened with
+`--base main`.** Branch **`exec2/settings-wf-task9`**, cut from `origin/main` **`77aa906a`**. Dispatch:
+the controller's in-pane message of 2026-09-18 naming *"settings → workflows Task 9 … the isSettingsShell
+token nits"*, with the plan at `docs/superpowers/plans/2026-09-18-settings-workflows-port.md` § Task 9.
+
+**FIRST ACTION ON A RESTART: `gh pr list --state open`.** If the PR is open it is at the controller's
+merge; **if it has MERGED, this block is history** and the controller's next dispatch is the position.
+
+### § 1 — WHAT SHIPPED (3 files; two CSS declarations and their record)
+
+| artefact | what |
+|---|---|
+| `apps/web/app/globals.css` | `flex: 0 0 12rem` → **`15.5rem`**; the active item's `--gn-fill-tertiary`/`--gn-text-accent`/`font-weight:700` → **`--gn-accent`/`--gn-accent-text`**, no weight; the block's docblock rewritten |
+| `apps/web/test/settings-shell-tokens.test.ts` | **new** — cases `13.907`–`13.910`, each with a mutation witness |
+| `test-cases/13-deployment-dogfooding.md` | the section for those four cases |
+
+**The finding worth carrying: the prototype draws its current nav item TWO ways, and the product had
+collapsed them into one.** Top nav `:2599` is a *tint* (`--tintAccent`); the settings sidebar `:3145` is a
+*solid accent fill* (`--accent`/`--onColor`); and `:31` declares a named pair (`--sideOnBg`/`--sideOnColor`)
+that **nothing in that file ever applies** — `grep` returns the two declarations and zero uses. This file
+had used the tint for both and its own docblock justified that as *"reusing `.gn-nav`'s own pattern rather
+than inventing a second one"*. That sentence described a divergence, not a decision. **The third nit —
+the subtitle — was left alone: the owner ruled it a deliberate freeze.**
+
+### § 2 — THE GATE, MEASURED AT `7685cf17` (node v22.22.2, every number)
+
+**These numbers were re-measured AFTER the rebase, not carried.** `origin/main` moved from `77aa906a` to
+`0f6155b5` (`#491`, executor 1's Task 5b) after this branch was cut, so the branch was **rebased with a
+UNION resolution** — both lanes' catalogue sections survive. **app-core moved 1556 → 1565** because `#491`
+added nine cases; a number measured before a rebase is a reading that expires. `#491` also touched
+`packages/ui/src/ui.css`, which 13.910 reads, so that guard was re-run rather than assumed — and the
+`ui.css` delta contains **zero** `aria-current` or `gn-help__nav-link` lines.
+
+`pnpm turbo run build` EXIT=0 **first** (10 cached, 11 total). Then per package, `vitest run
+--maxWorkers=2`: **web 547** (the 534 baseline + the 13 cases this branch adds) · **app-core 1565** ·
+**ui 351** · typecheck **17/17 EXIT=0**. All nine repo checks EXIT=0: `check:env` · `check:tasks` ·
+`check:db-tz` · `check:migrations` · `check:runbook` · `check:citations` · `check:help` ·
+`check-case-ids` (**2380** unique ids, zero duplicates) · `check-case-citations` (file 13 **690** cited /
+0 uncited). **The forced gate was NOT run** — that is the controller's.
+
+**Three measurements that need their conditions stated, because each is a false green or a false red if
+they are not:**
+
+- **`check:db-tz` needs `DATABASE_URL`, which this worktree does not have.** It exits 2 with
+  `DATABASE_URL is required`. With the documented dev URL
+  (`postgres://gisik:gisik@localhost:54329/gisik_nokma`) it reads `database timezone: Asia/Kolkata`,
+  EXIT=0.
+- **`check:case-ids` and `check:case-citations` have NO pnpm alias.** `pnpm run check:case-ids` exits 1
+  with `ERR_PNPM_NO_SCRIPT`, which is **indistinguishable in a log from a real red** — it cost this
+  session two phantom reds before the logs were read. Run them as `node scripts/check-case-ids.mjs` and
+  `node scripts/check-case-citations.mjs`. **Still owed to the controller**, and now demonstrated again.
+- The commits after `7685cf17` are docs-only. `git diff --name-only 7685cf17..HEAD` should list exactly
+  `docs/lanes/executor-2-state.md`; if it lists anything else, re-measure.
+
+**Every line anchor was re-verified after the rebase by CONTENT, not by offset**, and all survive:
+`globals.css:1227` `:1235` `:1242-1245` `:333` · `ui.css:3633` · `tokens.ts:1224` `:935-938` ·
+prototype `:808` `:3145` `:2599` `:31` `:59` `:800-1011`. `#491`'s `globals.css` change is at `:150`
+(7 lines → 7, no shift) and an append at `:2684`, both clear of the settings block.
+
+**One more `rtk` instance, recorded because it is the recorded hazard firing again:** `git diff
+77aa906a..origin/main -- apps/web/app/globals.css` printed **no hunks** while `--name-only` listed the
+file. Re-run through `/usr/bin/git`, the same range has two hunks. **A well-formed empty is exactly what
+this trap looks like.**
+
+### § 3 — THE REVIEW: 0 Critical, 0 Important, 6 Minor — ALL SIX ACTED ON
+
+One independent reviewer, read-only, over `018113c9`. Its verdict: *"the change does what it claims; I
+could not break it."* It re-derived every cited line, re-ran every mutation witness against the real test
+code, measured the change in a real build and a real layout engine, and planted six defects.
+
+**Two of the six were defects in MY OWN instruments, and one of those was a check that could not fail:**
+
+1. **A FALSE REASON under a load-bearing sentence.** 13.909's entry claimed the prototype's
+   `border-radius:10px` at `:3145` is *"the only control in that file that does"*. **A plain count returns
+   NINE** — an `<input type="search">` at `:1676`, three `<a>` doors at `:1855-1857`, and more. The
+   decision survives; the stated reason did not. The corrected and stronger claim is about **nav items**:
+   the top nav composes `NAV_BASE`, whose own radius is `var(--ctlR)` (`:2011`), so `:3145` is the one nav
+   item that departs from the prototype's own control-radius token.
+2. **A CHECK THAT COULD NOT FAIL** — `expect([144, 192]).not.toContain(248)`, a literal array on the
+   assertion's own line. Replaced by a loop that plants three bases and reads each back through the
+   extraction.
+3. **THE INSTRUMENT COULD NOT SEE A COMPETING RULE**, and this was the review's best find: 13.907–13.909
+   read `globals.css` alone, so an equal-specificity rule later in source order — or any higher-specificity
+   rule — would defeat the change with the suite green. **The reviewer measured exactly that**: two such
+   rules appended to a copy, ten passes, active item dead in a browser. **Added 13.910** in the shape
+   `members-styling.test.ts`'s 13.887 established, reading `ui.css` too. Proved **end-to-end, not just
+   in-process**: the plant was appended to the real `globals.css` (EXIT=1, reddening 13.910 by name) and
+   the file restored from a byte copy at **`sha256 517404944da99f83…`**, not by `git checkout`.
+   The review also measured the change EFFECTIVE — the built chunk carries exactly three `aria-current`
+   selectors, and the two `.gn-nav` ones need an ancestor the sidebar does not have.
+4. **A check with no failure mode** — an inert `(?<!__)` lookbehind. Removed.
+5. **A consequence the docs did not record**: the sidebar took 56px and cannot shrink, so the wrap
+   threshold between it and `.gn-settings__content` moves right by exactly that 56px. Recorded **inline on
+   the `flex` declaration**, so it adds no line and shifts no citation. The review swept 320–640px and
+   found no overflow at either value, and the `stack-phone-390` baselines are untouched.
+6. The handoff's own *"next free case id"* row said `13.907`; this branch spends it and three more.
+
+### § 4 — THE CITATION SWEEP, AND WHAT IT FOUND THAT WAS NOT MINE
+
+The rewritten docblock grew `globals.css` by **+33** lines for old lines 1189–1209 and **+32** for
+≥ 1213 — two offsets, because the active rule also lost its third declaration. Every `file:line` this
+branch ADDS was resolved **by content at its current line**, and every one verifies (prototype `:808`
+`:3145` `:2599` `:31` `:59` `:800-1011`; `globals.css:1227` `:1235` `:1242-1245` `:333`;
+`tokens.ts:1224` `:935-938`; `ui.css:3633`; the audit row `:637-647`).
+
+**The pre-existing prose line-citations are NOT mine and were NOT re-pointed.** Measured, not assumed:
+`.gn-members {` sat at `1375` in `HEAD` while `Features.md:332` cites it at `1407`, and
+`.gn-members__row:nth-child` sat at `1492` while `tokens.test.ts:1669` cites `1524` — **both already
+drifted before this branch existed**. A sweep found 29 `globals.css:` citations at or past 1189 across
+live docs; re-pointing them by offset is the thing Ruling 30 forbids, and several now point *closer* than
+they did. **Named owner: the controller**, together with the audit row below.
+
+### § 5 — HANDED TO THE CONTROLLER, DELIBERATELY NOT DONE HERE
+
+| item | why not mine |
+|---|---|
+| `docs/design/prototype-delta-2026-09-18.md:637-647` still reads as two OPEN deltas that this task closes, and its `globals.css:` citations shifted | controller-owned; that document self-declares as an expiring reading ordered to be re-measured, and `#489` set its annotation convention. Rewriting it is not a lane's call. |
+| `check:case-ids` / `check:case-citations` still have no `package.json` alias | **one line each**; the missing alias produces a false red that reads exactly like a real one. Demonstrated again this session. |
+| `docs/design/prototype-delta-2026-09-18.md:666` is still false | carried from the block below; unchanged. |
+| **A peer wrote one line into THIS file** — `#491` changed a citation in an older narrative block from `ticket-type-editor-screen.tsx:178-204` to `:283-309` | not mine to adjudicate. The new range is `onSave`'s submit path, which is plausible for the sentence it sits in, but the string the sentence names (`rank: z.number().int().min(1)`) is at `packages/domain/src/ticket-types.ts:98`, not in that file at all. **Owner: executor 1.** Kept rather than reverted — reverting would undo a peer's correction on my file without knowing its reason, and it is lanes prose, which is frozen. |
+
+### § 6 — WHAT IS *NOT* COVERED, NAMED RATHER THAN IMPLIED
+
+- **`font-weight: 500` and the item's other metrics at `:3145` are still not ported** (`min-height:44px`,
+  `padding:0 14px`, `font-size:15px`). Tap-target and type-scale questions, outside this task's named
+  scope; recorded in the rule's docblock so the difference reads as a decision, not an oversight.
+- **No viewport or `e2e-stack` run was attempted** — `e2e-stack` is not in the turbo graph, it needs a
+  stack, and the hot one on `:3001` is executor 1's. The wrap-threshold and 390px conclusions are the
+  review's layout-engine measurements, cited as such, not mine.
+- The **non-text-contrast roster** was checked and is not moved by this change: it composites **borders**
+  on those routes and this change touches a fill and a width. It remains the controller's owed item.
+
+### Rules that bind this branch
+- **Never `docker compose`** (any subcommand) and **never bind `:3001`**. Viewport work would use `:3021`.
+- **`--maxWorkers`, not `--concurrency`** — the latter is not a vitest 3.2.7 flag and gives seven
+  `CACError`s that read exactly like seven red packages. **Never pipe a test run into `head`.**
+- **Do not run the forced gate** — the controller does. **Do not edit `task-ledger.tsv`** — `main`'s.
+- `Features.md` needs no change here: it records this shell's shape but never its width or the active
+  item's fill. Verified, not assumed.
+- **Never `AskUserQuestion`** in this topology. A question for the owner is a file plus a one-line
+  pointer, then a hold.
+
+---
+
+## ▼ SUPERSEDED — SECOND WAVE **TASK 12** (the plan's close-out) DONE. Merged as PR **#490**. (2026-09-18, night)
 
 **Position: the work is DONE, the review is RECORDED, and the PR is being opened with `--base main`.**
 **Check `gh pr list --state open` before acting on this line** — if the PR is not there, it was not opened
@@ -300,7 +446,7 @@ reads exactly like a real one. Recording, not fixing. **Owner: the controller.**
 | Ruling: close this dispatch as already-delivered, and re-scope to the four families above (which needs its own ruling on inventing a treatment) | **the controller** |
 | `docs/design/prototype-delta-2026-09-18.md:666` is now FALSE and keeps spawning dispatches for finished work | **the controller** — deliberately NOT edited by me |
 | `check:case-ids` has no `package.json` alias, so `pnpm run check:case-ids` is a false red; one-line fix | **the controller** — deliberately NOT fixed by me |
-| Next free case id at this tip: **`13.907`** — `13.890`–`13.906` are all spent in `test-cases/13-deployment-dogfooding.md` (`13.902`–`13.906` by this branch) and the highest `13.*` anywhere is `13.920`. **Measured by case MARKER only.** The stale `13.902` this row used to carry was itself the fourth appearance of the shared-id-space collision — a number is a reading that expires, a block is the only form that stays true. | whoever mints next |
+| Next free case id at this tip: **`13.911`** — `13.890`–`13.910` are all spent in `test-cases/13-deployment-dogfooding.md` (`13.902`–`13.906` by the settings-workspace-tab branch, `13.907`–`13.910` by Task 9) and the highest `13.*` anywhere is `13.920`. **Measured by case MARKER only.** The stale `13.902` this row used to carry was itself the fourth appearance of the shared-id-space collision — a number is a reading that expires, a block is the only form that stays true. | whoever mints next |
 
 ---
 
