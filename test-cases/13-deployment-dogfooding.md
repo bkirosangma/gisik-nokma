@@ -11248,3 +11248,280 @@ since the heading is the visible half of what the owner is most likely reacting 
 superseded, the roster's `aside.gn-attention` entry re-measured (its `border` reading
 `rgba(178,80,0,1)` **is** that left border and disappears with it), and the `tintWarning` single-consumer
 note updated. **Nothing in this change presupposes that answer.**
+
+## The members screen's styling, measured against the prototype (executor 2, 2026-09-18) — ids `13.886`–`13.889`
+
+The owner's instruction, verbatim: *"next task to queue up is the workspace members UI. check the prototype
+for the styling and fix it."*
+
+**The measurement came first, and it contradicts the shape of the question.** The dispatch named five
+treatments it expected to be missing; **four of the five are already the prototype's values**, and the
+fifth is not a styling gap at all but a WIRE absence the page's own docblock already records. What the
+family really was missing is the one thing the dispatch did not name — and it was missing because it
+lives in the prototype's DATA rather than its markup.
+
+### The five, prototype value / shipped value / verdict
+
+| prototype (`desktop.dc.html`, `isMembers` = `:651-798` at this revision) | shipped (`apps/web/app/globals.css`) | verdict |
+|---|---|---|
+| table container: `--cardBg` / `--cardShadow` / `--cardR` / `overflow:auto` (`:658`) | `.gn-members`: `surface-raised` / `shadow-raised` / `radius-card` / `overflow:auto` | **aligned already** |
+| header row: `--trayBg`, `13px/18px/600`, `var(--label2)`, `padding:11px 18px` (`:662`) | `.gn-members__th`: `surface-sunken` (= the mapping's tray), `0.8125rem/1.125rem/600`, `text-muted`, `0.6875rem 1.125rem` | **aligned already** |
+| body: `17px` over `min-width:820px` (`:659`, `:672`) | `.gn-members__table`: `1.0625rem` over `51.25rem` | **aligned already** |
+| cells: `padding:13px 18px` (`:672`, `:678`, `:691`) | `.gn-members__cell`: `0.8125rem 1.125rem` | **aligned already** |
+| Person cell's second line: `{{ m.email }}`, `13px/18px`, `var(--label2)` (`:675`) | nothing to draw it from | **NOT alignable — wire absence** |
+| rows: `style: i % 2 ? "background:var(--fill4)" : ""` (`:3077`, attached at `:671`) | nothing — no rule mentioned the row at all | **MISSING — this change** |
+| page container: `padding:0 32px 24px`, `flex`, `gap:20px`, `animation:gnFade .25s ease` (`:652`) | `.gn-shell` (`padding:0 1.25rem 3rem`, block flow) | **the padding is reachable and NOT reached; the flex/`gap` half is not reachable without a restructure** — see below |
+
+**The two-line Person cell is the dispatch's explicit "named absence" branch, and the page docblock
+already carries it** (`apps/web/app/w/[workspaceId]/members/page.tsx:52-53`): the prototype's second line
+is the person's EMAIL, and `readMembers` selects `user_id`, `u."name"` and `role` and nothing else
+(`apps/server/src/routes/builder-reads.ts:247`). Drawing a second line from any other field would be
+inventing one. **Recorded, not asked**: the dispatch pre-answered this branch in its own text.
+
+### The zebra, and why the JSX never showed it
+
+`memberRows` (`:3058-3084`) sets `email`, `role`, `seen`, `scopeLabel` — and `style`, a zebra
+(`:3077`). It is attached to the row at `:671`, so a port driven by reading the markup sees a row with no
+styling at all, which is what happened. **`--fill4` → `--gn-fill-quaternary`** is the mapping table's own
+row, and zebra is a NAMED port metric rather than a detail — `Table`'s docblock counts it among the five
+List metrics it ports (`packages/ui/src/components/table.tsx:9`), and the ticket list's port names it
+(`packages/app-core/src/views/ticket-list.tsx:772`).
+
+**The parity is the prototype's: `i` is 0-based, so `i % 2` tints the 1-indexed EVEN rows.**
+`memberRows` is not the only place the prototype writes it — `listRows` writes the identical construct
+(`:2887`) — and the product's two ports of it LANDED ON ODD (`.gn-list__table-row:nth-child(odd)`,
+`packages/ui/src/ui.css:1088`; `.gn-timeline__row:nth-of-type(odd)`, `:2612`), so those two families read
+inverted against the prototype. **`13.887` follows the prototype; the inversion in the other two families
+is recorded at the rule with a named owner and is NOT harmonised here** — one screen's styling pass is not
+the place to re-parity two others.
+
+### The id space — COLLIDED, renumbered, and the collision is the point
+
+The amendment to this dispatch said *"next free `13.881`"*. **That was wrong before the branch was cut** —
+`13.881` and `13.882` were minted by `#471` (`exec2/attention-leaves-project-page`), which merged as
+`0e0dbff9` at 16:50, minutes after the amendment was written at 16:34. Recounted at this branch's tip by
+case MARKER, `13.883`–`13.885` were then free HERE, and this change minted them at 17:00:29.
+
+**Six minutes earlier, at 16:54:10, the other executor's branch had already minted `13.883`.** Its own head
+commit says so: *"Renumber to 13.883: the id the dispatch called free was taken by a parallel writer"*, and
+its block carries the lesson this file's head already states — *"a reading that is correct in one tree
+expires in another, which is exactly why the case-id protocol is written in BLOCKS."* **Neither tree can see
+the other**, so both repo gates pass on both (`check-case-ids` and `check-case-citations` exit 0 here and
+there) and the duplicate surfaces only when one PR lands and the other rebases — `check-case-ids.mjs`
+asserts `union == sum`, so the second merge goes red.
+
+**This branch yields, because its reading was the later one, and renumbers to `13.886`–`13.888`** —
+contiguous, above both trees' high-water mark. Measured on both sides at this tip:
+`exec/owner-demotion-guard` carries `13.883` ×5 and stops there (so `13.884`/`13.885` are free in both),
+and this tree's sweep for `13.88[345]` returns **no CASE ID** — the pattern does match six lines of
+prose (five here and one in `executor-2-state.md`), which is the difference between a sweep and a mint
+the file's own head is about, and `check-case-ids.mjs` anchors on the line head so none of them is read
+as one. `13.999` and `13.632866` remain this file's
+documented truncation traps and are excluded by the `{3}` width. **The remedy is an allocation, not a
+number**, and it is on the report to the controller: two executors minting from a shared "next free" pointer
+will collide again the next time both are dispatched from one — a BLOCK per executor is the only form of an
+id that stays true. **`13.889` joined the set later in the same change set**, when AMENDMENT 2 (owner
+  approved, 2026-09-18) ruled the two `Select` fields' labels in — measured free on this tree, on
+  `origin/main` and on `exec/owner-demotion-guard` before it was minted, so the next free is `13.890`.
+
+- ✅ **13.886 — the invite form's two native fields wear the product's `.gn-field` pattern, and still
+  submit.** `apps/web/test/members-page.test.tsx:988`. Read through the LABEL association rather than by
+  id, because a label that no longer labels is the failure a wrapper causes; then the real path end to
+  end — type, submit, read what the door was handed — because a wrapper that broke the value's route to
+  the handler is the other one. Mutation-witnessed: removing `className="gn-field__input"` from the
+  address input reddens this case ALONE (1 failed / 37), and un-wrapping the projects field back to the
+  bare pair reddens it alone as well.
+
+- ✅ **13.887 — the roster's zebra, on the rows the prototype actually tints.**
+  `apps/web/test/members-styling.test.ts:167`. FOUR claims, and each is there because a different defect
+  satisfies the others: the even-child rule carries `--gn-fill-quaternary`; NO odd-child rule exists (odd
+  beside even tints every row, which is a table with no zebra and no way to notice); **EXACTLY ONE rule
+  SELECTOR in either stylesheet names the row, matched across line breaks with comment spans stripped**; and an in-test witness that each plant LANDS
+  before it is asserted to redden — `replace` matching nothing prints success, which is this repo's own
+  recorded trap, and the witness now also asserts its anchor is unique so a second copy surfaces as a named
+  failure rather than a false red.
+
+  **The third claim is here because the FIRST review measured the case blind without it.** Every other
+  assertion here reads DECLARATIONS, and a later rule can neutralise the one they read while all of them
+  stay green: appending `.gn-members tbody .gn-members__row:nth-child(even) { background: transparent; }`
+  left **36/36 passing with the zebra dead in a browser** — 36, because that measurement predates this
+  case; the post-fix totals below are /37. The count catches it, and the witness asserts BOTH halves — the
+  extracted rule still reads `--gn-fill-quaternary` (the old check green) while the count has gone to two
+  (the new check red).
+
+  **AND THE SECOND REVIEW THEN DEFEATED THAT COUNT TWICE, which is why it is a SELECTOR scan now and not a
+  line scan.** Its first version matched LINES: it required the selector and its `{` on one line, and it
+  skipped any line starting with `*` (a guard meant for comments). Both evasions were measured green with
+  the zebra dead in a browser — a selector split across two lines (`0,3,0` beats `0,2,0`), and a
+  `*`-prefixed selector (`*` adds no specificity, so it TIES and wins on source order). Comments are now
+  stripped by CONTEXT instead of by a line prefix, **and that guard's own justification was false**:
+  `grep -n "gn-members__row" apps/web/app/globals.css` returns exactly one line, the rule itself, so the
+  premise ("this file documents the rule in prose naming its selector") was invented — and had such prose
+  existed, the prefix guard would have FALSE-REDDENED a correct tree, because prose there starts with bare
+  text rather than `*`.
+
+  Mutation-witnessed against the real file, tree restored and sha256-verified at every step: parity flipped
+  `even`→`odd` reddens 13.887 (4 failed / 37); the fill swapped to `--gn-surface-sunken` reddens 13.887
+  (2 failed / 37); the one-line override — 0 failed before this case existed — reddens 13.887 (2 failed /
+  37); **the two-line selector reddens 13.887 (2 failed / 37)**; **the `*`-prefixed selector reddens it too
+  (2 failed / 37)** — where the first version of the helper passed both; and the false-red CONTROL, a prose
+  comment NAMING the selector inside an otherwise correct tree, stays **37/37 green**. What remains outside
+  this instrument's reach is a rule that targets the ELEMENT rather than naming the row (`tr`, `tbody`); no
+  stylesheet in the product carries one today, and a rendered measurement is the e2e-viewport suite's job.
+
+- ✅ **13.888 — the four treatments that were already the prototype's, pinned as VALUES.**
+  `apps/web/test/members-styling.test.ts:125`. It asserts declarations — `0.8125rem`, `1.125rem`, `600`,
+  `var(--gn-surface-sunken)`, `0.6875rem 1.125rem`, `1.0625rem`, `51.25rem`, `var(--gn-radius-card)` —
+  rather than that a rule exists, which is the distinction this repo has been bitten by repeatedly: a rule
+  that is present and does nothing reads identically to one that works. It is a regression pin on four
+  treatments this change does NOT alter; the fifth and sixth rows of the table above are 13.887 and a
+  named absence respectively.
+
+- ✅ **13.889 — the two `Select` fields wear the field pattern's LABEL half, and stay the shared
+  `Select`.** `apps/web/test/members-page.test.tsx:1053`. RULED, not decided here: AMENDMENT 2
+  (owner-approved, 2026-09-18) — *"label it inside `.gn-field` … but pass no native-control class to
+  it."* Channel and Role are wrapped in `<label className="gn-field">` with a `.gn-field__label` span,
+  which is what the prototype draws (`desktop.dc.html:752-753`, `:758-759`), and no class is passed to the
+  `Select`. Mutation-witnessed against the real file, tree restored and sha256-verified: dropping the
+  `gn-field__label` class from the Channel label reddens 13.889 alone (1 failed / 38), and converting
+  that `Select` BACK to a native `<select>` reddens it alone as well (1 failed / 38).
+
+  **What the case deliberately does NOT assert, because either would be red against correct code.**
+  (a) The ABSENCE of `.gn-field__input` on the trigger — the shared component puts that class on its own
+  trigger (`packages/ui/src/select/select.tsx:254`), so it is on every `Select` in the product whatever
+  the caller does, and the ruling's instruction is about what THIS page passes. What the page controls,
+  and what the case asserts, is the label half. (b) The absence of a `<select>` element inside the
+  wrapper — the shared component renders a `HiddenSelect` (a visually hidden native `<select>`) on
+  purpose (`select.tsx:253`). The trigger's tag and class are the honest signal, and they are asserted.
+  **THERE IS NO VISIBLE RESIDUE, and the sentence that claimed one was refuted at the line by the third
+  review.** It said these rows show a 15px `Select` trigger beside two 17px inputs; the 15px came from the
+  PROTOTYPE's inline style, not from this product's cascade. `.gn-select__trigger` declares no
+  `font-size` (`packages/ui/src/ui.css:1604-1612`) while the `.gn-field__input` it also wears declares
+  `1.0625rem` (`:3866-3875`, and `packages/ui/src/select/select.tsx:254` puts both on the trigger), so
+  equal specificity and later source order give **17px — the same as the inputs and the same as the
+  prototype draws** (`desktop.dc.html:754`, `:760`).
+
+  **The same review defeated this case twice, and both defeats are now assertions** (D2 and D3, planted in
+  the real file with a sha256-verified restore, each killing 13.889 ALONE at 1 failed / 38):
+  `<label className="gn-field">` swapped for `<div className="gn-field">` stayed green, and moving the
+  `.gn-field__label` span AFTER the control stayed green — while `.gn-field` is `flex-direction: column`,
+  so DOM order IS visual order and the prototype's label-over-control would have been inverted on screen.
+  The case now asserts the wrapper's TAG and that the label is its first element.
+
+  **And the ruling's instruction is enforced by the COMPILER, which the same review measured**: passing
+  `className` to a `Select` is a `tsc` error (`SelectProps` has none), at all three sites it planted —
+  vitest stays green over it and `typecheck` reddens. A property with a compiler behind it needs no test
+  to hold it, and that is worth knowing before writing one.
+
+### The independent review, and what it forced
+
+One reviewer at the frozen head, with a lean brief: verify every citation at the line it names, check that
+no token outside the shared set was introduced, and decide whether the three cases can fail. It reproduced
+the sweep and ran its own mutations on copies under `/tmp` and never touched the live tree.
+
+**It found one CRITICAL and four Important or Minor defects. Every one is corrected above rather than
+argued with.**
+
+1. **CRITICAL — the case ids collided with the other executor's branch.** See *The id space* above: the
+   reviewer measured `13.883` already minted on `exec/owner-demotion-guard` six minutes before this
+   branch took it, and this branch yielded and renumbered to `13.886`–`13.888`. **The reviewer's
+   contribution was not the number but the LINKAGE**: it named the mechanism (`check-case-ids`'s
+   `union == sum` reddening only at the second rebase) that makes two internally-consistent trees a
+   deferred failure rather than a visible one.
+2. **IMPORTANT — the reason recorded for leaving the `Channel` and `Role` labels bare was FALSE.** It
+   said `.gn-field__input` is "a class for NATIVE controls" a `Select` cannot take. The shared component
+   puts that exact class on its own trigger (`packages/ui/src/select/select.tsx:254`, `:231`, `:432`).
+   Corrected in the case docblock and in `Features.md`: the verdict for those two fields is **alignable
+   and not aligned**, and the decision is the controller's because the amendment reserved it.
+3. **IMPORTANT — "the minted-link card … render as a bare stack" overstated the measurement.** A `Card`,
+   a `Button` and two `Select`s are styled shared families; only the form container, the `<h2>`, the
+   pending `<ul>` and the two label spans are genuinely rule-less. Corrected above and in `Features.md`.
+4. **IMPORTANT — the page-container verdict ignored an in-tree precedent.** `apps/web/app/globals.css:2088`
+   gives `.gn-legal` its own `padding-top`/`padding-bottom`, applied at
+   `apps/web/app/privacy/page.tsx:176` as `<main className="gn-shell gn-legal">` — **a route-scoped
+   modifier BESIDE the shared class, not a fork of it**, the same shape `gn-mcp-authorize` and
+   `gn-mcp-tokens` already use. So the prototype's `padding:0 32px 24px` is reachable in one rule as
+   `0 2rem 1.5rem`, and the honest verdict is **reachable and NOT reached**, not "not alignable".
+   **Not taken here**, because the other half of that row — `display:flex` with `gap:20px` — needs the
+   children inside one container, which IS the restructure the dispatch forbids, and taking the padding
+   half alone would draw a treatment neither document draws. It is on the report to the controller.
+5. **MINOR — four line-number defects, all fixed**: `packages/ui/src/ui.css:2611` → `:2612` (the
+   selector is on `:2612`; three files cited it), `members/page.tsx:55-57` → `:52-53` (the Email
+   absence, two files), `page.tsx:812-818` → `:812-821` (the sibling field block, two files), and a
+   **misattributed quotation**: the principle "assert a computed value, not that a rule exists" was
+   credited to case 13.284, which is about non-text contrast identification and says no such thing. The
+   quote is gone; the principle is stated plainly. **This one is the `verdict-must-cite-a-line-you-read`
+   shape inside the very docblock explaining the measurement discipline.**
+6. **MINOR — the zebra case could be defeated by a higher-specificity override**, which the reviewer
+   measured at 0 failures on a `/tmp` copy. The exactly-one-rule count assertion closes it, and the
+   witness asserts both halves — the old check green, the new check red.
+
+**Round 2, a scoped re-review at the fix head.** It confirmed all four defects closed and every corrected
+citation true at the line — and then found **no Critical and two Important defects, both of them in the
+FIX rather than in the original change**:
+
+- **the new cascade count could still be defeated.** A selector split across two lines, and a
+  `*`-prefixed selector, each left the suite green with the zebra dead in a browser — the helper matched
+  LINES and skipped anything starting with `*`. It is now a SELECTOR scan that strips comment spans by
+  context and matches across line breaks; both evasions redden 13.887 (2 failed / 37 each), and the
+  false-red control — prose naming the selector inside a correct tree — stays 37/37 green.
+- **the comment guard's premise was false, and its failure direction was a FALSE RED.** It claimed
+  `globals.css` documents this rule in prose that names its own selector; that file contains exactly one
+  such line, the rule. Had the prose existed, the guard would have reddened a CORRECT tree. Restating the
+  reason would not have fixed it — stripping comments by context removes the premise.
+- **the handoff's superseded block carried a number this branch now owns**: the blanket renumber rewrote
+  its historical "next free `13.883`" into `13.886`. Restored, marked superseded, with the live pointer
+  (`13.889` — measured free on this tree, on `origin/main` and on `exec/owner-demotion-guard`) named beside
+  it. **A blanket renumber corrupts historical prose**, which is worth more than the one row it broke.
+- **two Minor defects in this section**: the `13.88[345]` sweep sentence claimed a null where the sweep
+  returns six lines of prose (and no case id), and the "37/37 passing with the zebra dead" figure was
+  measured on the pre-fix 36-test tree.
+
+**AMENDMENT 2 arrived after both review rounds** (owner-approved, 2026-09-18): *"label it inside
+`.gn-field` … but pass no native-control class to it."* It settles the question round 1 raised and this
+change had left open — the two `Select` labels are now wrapped, with no class passed to the component —
+and it carries case 13.889 with its own two mutation witnesses. **It is a POST-FREEZE change to an open PR
+and is recorded as a new head rather than folded in as a footnote**; the frozen-head figures above are the
+pre-amendment ones and the PR body says which head carries what. The ruling's own caution is honoured:
+the shared `Select` is NOT restyled, and the role-change predicate is untouched — the row's role control
+was narrowed by a separate owner ruling the same day, a different task.
+
+**Confirmed, not merely agreed with:** the `isMembers` block's `:651-798`, the `memberRows` zebra and
+its 0-based index, the even-row parity, both odd-parity product zebras, the four already-aligned
+treatments on both sides, the `readMembers` wire absence, the mapping table, and the invitation-family
+sweep — each re-measured by the reviewer at the line it names, on copies, with a control.
+
+### Recorded with named owners, not fixed here
+
+- **THE INVITATION HALF OF THIS SCREEN HAS NO CSS FAMILY AT ALL** — the finding this dispatch did not
+  anticipate and the reason it is recorded rather than folded in. `.gn-invite-mint*` and
+  `.gn-invite-pending*` appear in `apps/web/app/globals.css` exactly once, `__url`'s `font-family`
+  (`:104`); a repo-wide `git grep` for the two families returns only that rule, the page's own JSX, and
+  prose. **The control runs in the same invocation**: the identical search reaches the `.gn-members` rules
+  in the same file, so this is a measured null and not a failed sweep. A SECOND INSTRUMENT AGREES FROM THE
+  OTHER SIDE: `apps/web/e2e-stack/non-text-contrast-roster.json` — a real browser — records `input` and
+  `select` on `/members` wearing Chrome's own UA border, `rgba(118,118,118,1)` at 3.81, which is what an
+  unstyled native control has. **What is unstyled is narrower than "the whole half", and the first version
+  of this sentence overstated it**: the form's own container, its `<h2>`, the pending `<ul>` and the two
+  bare label spans have no rule — while the minted-link card is a `Card` (`gn-card`,
+  `packages/ui/src/ui.css:160-165`), the submit is a `Button` and both pickers are the shared `Select`, all
+  styled shared families. **A next task should not go and re-style a `Card`.** **It is a family to PORT, not a treatment to align, and this dispatch bounds the
+  pass** — the amendment adds exactly one deliverable and says so. Owner: the controller, for the next
+  task on this screen. **The `.gn-field` wrapping is the visible half of the cure and does land here**;
+  the form's container, heading and pending list do not.
+- **The contrast roster's `/members` entries are stale as of this change.** Wrapping the two fields moves
+  them off the UA default onto `input.gn-field__input`, whose border is `var(--gn-border)` under
+  `hig`/`minimal` and ABSENT under `neo` — the arm that carries a sanctioned waiver for two other routes
+  (`/sign-in`, `/workspaces`) and does not carry `/members`. **The sweep that writes that file needs the
+  hot stack, which is executor 1's and out of bounds for this session**, so the file was NOT hand-edited:
+  a hand-edited generated record is partial by construction. Owner: whoever next runs the e2e-stack sweep.
+- **The dispatch's own citation of the prototype block (`:647-783`) is stale**; at this revision the
+  `isMembers` block opens at `:651` and closes at `:798`. The prototype-delta doc (`docs/design/
+  prototype-delta-2026-09-18.md:524-542`) carries the same drift in the other direction — its `### isMembers`
+  section describes the `<ul>` roster this screen has not had since `#443` and asserts the family is
+  unstyled throughout. Owner: the next change to that document.
+- **An instrument lesson, recorded because it was measured here.** The first `M4` plant removed a
+  `<label>`'s opening tag while leaving its closing one, so the file failed to TRANSFORM — and the JSON
+  reporter surfaced that as `total=7 passed=7 failed=0` with the broken file simply absent from the
+  assertion list. **A mutation result of `failed=0` is not evidence unless the total equals the full
+  suite's count**; the suite-level failure is in `testResults[].message`, not in `assertionResults`.

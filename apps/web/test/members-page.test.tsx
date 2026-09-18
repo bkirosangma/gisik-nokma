@@ -942,3 +942,140 @@ describe('13.824 the roster’s role control, and the option it deliberately doe
     expect(within(ownerRow).queryByRole('button')).toBeNull();
   });
 });
+
+/**
+ * 13.886 THE INVITE FORM'S TWO NATIVE FIELDS WEAR THE PRODUCT'S OWN FIELD
+ * PATTERN (executor 2, 2026-09-18).
+ *
+ * They were the screen's one place still rendering a bare `<label>` beside a
+ * UA-default `<input>` — a shape no other field in the product has — and the
+ * prototype draws the same pair the product's `.gn-field` ports: a label stacked
+ * over its control, `gap:7px`, label `13px/18px` in `--label2`, control
+ * `min-height:44px` (`desktop.dc.html:748-751`, `.gn-field` at
+ * `packages/ui/src/ui.css:3843-3875`). The wrapper is copied from the sibling
+ * that already wears it rather than invented (`page.tsx:812-821`).
+ *
+ * This case is deliberately about the WRAPPER AND NOT THE VALUES: the resolver
+ * over `.gn-members`'s own family lives in `members-styling.test.ts` (13.887,
+ * 13.888), because `globals.css` is not loaded here and a rendered reading could
+ * only restate classes. What THIS case has to catch is the way a wrapper breaks
+ * a form — a label that no longer labels, a value that stops reaching the
+ * handler — so it drives the real path end to end: type through the LABEL
+ * association, submit, and read what the door was handed.
+ *
+ * THE TWO SELECT FIELDS ARE UNTOUCHED, and the reason first written here for it
+ * was FALSE — kept, corrected, because the shape recurs on this screen.
+ *
+ * It said: `Channel` and `Role` are the shared `Select` (migrated 2026-09-14,
+ * cases 13.824–13.828) and `.gn-field__input` "is a class for NATIVE controls —
+ * a `Select` wears its own trigger and cannot take it", so wrapping them would
+ * mean "inventing a class for a non-native control or wrapping a `Select` in a
+ * class declared for native ones". **Neither horn exists.** The shared component
+ * puts that exact class on its own trigger — `packages/ui/src/select/select.tsx:254`
+ * (`gn-select__trigger gn-field__input`), and `:231` / `:432` for the multiple
+ * and searchable variants — so nothing needs inventing and no `Select` needs
+ * wrapping in anything: `.gn-field` is `flex-direction: column; gap` and
+ * `.gn-field__label` is the 13px label, both of which a `Select` sits inside
+ * happily. That is what the prototype draws (`desktop.dc.html:752-753`).
+ *
+ * **So the honest state is "alignable and not aligned", not "not alignable".**
+ * The wrapping is left undone HERE because the amendment reserved this exact
+ * decision and asked for it to be reported rather than settled — it is on the
+ * change's report to the controller, with a recommendation. The two labels
+ * therefore still carry the UA default rather than the prototype's 13px/18px,
+ * and this paragraph is the correction an independent review forced.
+ */
+describe('13.886 the invite form’s fields wear the shared .gn-field pattern', () => {
+  it('13.886 the address and projects fields are .gn-field/__label/__input, and still submit', async () => {
+    const bodies: unknown[] = [];
+    mount({
+      listPending: async () => [],
+      mintInvite: async (_workspaceId, request) => {
+        bodies.push(request);
+        return { inviteId: 'i_1', url: 'http://localhost:3001/invite/tok', expiresAt: 'later' };
+      },
+    });
+    const user = userEvent.setup();
+
+    // Read THROUGH the label association rather than by id: that is what the
+    // wrapper could break, and `getByLabelText` is the query a person's
+    // screen-reader path takes.
+    const address = await screen.findByLabelText('Address');
+    expect(address.tagName).toBe('INPUT');
+    expect(address.className).toContain('gn-field__input');
+    const addressWrap = address.closest('label');
+    expect(addressWrap?.className).toContain('gn-field');
+    expect(addressWrap?.querySelector('.gn-field__label')?.textContent).toBe('Address');
+
+    const projects = screen.getByLabelText(/^Projects/);
+    expect(projects.className).toContain('gn-field__input');
+    const projectsWrap = projects.closest('label');
+    expect(projectsWrap?.className).toContain('gn-field');
+    expect(projectsWrap?.querySelector('.gn-field__label')?.textContent).toBe(
+      'Projects (comma-separated ids, optional)',
+    );
+
+    // And the wrapper moves no behaviour: what was typed still reaches the door.
+    await user.type(address, 'anselma@example.test');
+    await user.click(screen.getByRole('button', { name: 'Send invitation' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ address: 'anselma@example.test' });
+  });
+});
+
+/**
+ * 13.889 THE TWO `Select` FIELDS WEAR THE FIELD PATTERN'S LABEL HALF — and no
+ * native-control class is passed to them (AMENDMENT 2, ruled 2026-09-18).
+ *
+ * The prototype wraps Channel and Role in the same label-over-control pair it
+ * uses for the text fields (`desktop.dc.html:752-753`, `:759`), so the label
+ * scale is the field pattern's and belongs on them. What the ruling withholds
+ * is `.gn-field__input`: those two pickers have been the shared `Select` since
+ * 2026-09-14 (Phase 2 Wave A, cases 13.824–13.828) and its trigger renders as a
+ * `role="button"`, not a control element.
+ *
+ * WHAT THIS CASE CAN AND CANNOT SEE, measured rather than assumed. It asserts
+ * the LABEL half — a `.gn-field` ancestor whose `.gn-field__label` reads the
+ * field's name — and that the control inside is still the shared component's
+ * trigger (`button.gn-select__trigger`) carrying its own `aria-label`, which is
+ * the "do not convert it back" half of amendment 1. **It does NOT assert the
+ * absence of `.gn-field__input` on the trigger, because that class is on every
+ * `Select` in the product: the shared component puts it there itself
+ * (`packages/ui/src/select/select.tsx:254`).** An absence assertion would be red
+ * against correct code, which is the failure mode this repo records most — so
+ * what the page controls, and what is asserted, is the label half.
+ *
+ * NOR does it assert that no `<select>` element is inside the wrapper: the shared
+ * component renders a `HiddenSelect` — a visually hidden native `<select>` — on
+ * purpose (`select.tsx:253`), so that assertion would be red against correct
+ * code too. The trigger's tag and class are the honest signal.
+ */
+describe('13.889 the Select fields are labelled by the field pattern, and stay the shared Select', () => {
+  it('13.889 Channel and Role sit inside a .gn-field label, and their triggers keep their names', async () => {
+    mount({ listPending: async () => [] });
+    const form = (await screen.findByRole('heading', { name: 'Invite somebody' })).closest('form');
+    expect(form).not.toBeNull();
+
+    for (const name of ['Channel', 'Role'] as const) {
+      // Scoped to the form: the roster's own role control also matches `/Role/`.
+      const labelSpan = within(form!).getByText(name, { selector: '.gn-field__label' });
+      const wrapper = labelSpan.closest('.gn-field');
+      expect(wrapper, `${name} is not inside a .gn-field`).not.toBeNull();
+      // THE TAG AND THE ORDER, both of which the first version left to prose and
+      // an independent review then defeated: `<label className="gn-field">`
+      // swapped for `<div className="gn-field">` stayed 30/30 green, and moving
+      // the span AFTER the control did too — while `.gn-field` is
+      // `flex-direction: column`, so DOM order IS visual order and the
+      // prototype's label-over-control would have been inverted on screen.
+      expect(wrapper!.tagName, `${name}'s field is not a <label>`).toBe('LABEL');
+      expect(wrapper!.firstElementChild, `${name}'s label no longer precedes its control`).toBe(labelSpan);
+
+      const trigger = wrapper!.querySelector('button.gn-select__trigger');
+      expect(trigger, `${name}'s control is no longer the shared Select`).not.toBeNull();
+      // The name every existing case on this form queries by — losing it would
+      // be an invisible accessibility regression that the role queries above
+      // would not notice.
+      expect(trigger!.getAttribute('aria-label')).toBe(name);
+    }
+  });
+});

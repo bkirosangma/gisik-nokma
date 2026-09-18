@@ -20,7 +20,139 @@
 
 ---
 
-## ▲ TOP BLOCK — the attention strip leaves the project page; the prototype restyle is measured and HELD (2026-09-18)
+## ▲ TOP BLOCK — the members screen's styling, measured against the prototype (2026-09-18, later the same day)
+
+**Position: the members-styling task is DONE and its PR is at the controller's merge.** Dispatches:
+`CTL-DISPATCH-2026-09-18-members-styling.md` **plus its AMENDMENT 1** (the `.gn-field` deliverable, and
+the id list). One branch, `exec2/members-styling`, **`--base main`**, cut from **`0e0dbff9`** — the tip
+the controller's own dispatch named, with the amendment's `7735b6ef` superseded by `#471`'s merge minutes
+later.
+
+**FIRST ACTION ON A RESTART: `gh pr list --state open`.** If this branch's PR is open it is at the
+controller's merge and nothing below needs redoing; if it has MERGED, this block is history and the
+controller's next dispatch is the position.
+
+### Anchors — verify these; do not trust the row
+
+| | |
+|---|---|
+| branch | `exec2/members-styling` |
+| cut from / base | **`0e0dbff9`** (`origin/main` after `#471` merged) |
+| frozen head | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit that carries it |
+| files | 7: `apps/web/app/w/[workspaceId]/members/page.tsx` · `apps/web/app/globals.css` · `apps/web/test/members-page.test.tsx` · **`apps/web/test/members-styling.test.ts` (new)** · `Features.md` · `test-cases/13-deployment-dogfooding.md` · this file |
+| ids minted | **`13.886`–`13.889`** (`13.889` for AMENDMENT 2, minted post-freeze) — and the FIRST three attempted were `13.883`–`13.885`, which **COLLIDED** with executor 1's `exec/owner-demotion-guard` (it minted `13.883` at 16:54:10, six minutes before this branch did at 17:00:29). This branch yielded and renumbered. **The remedy is an allocation, not a number — ask the controller for a BLOCK**; a shared "next free" pointer collides every time both executors are dispatched from one. Detail in `test-cases/13`'s section for this change. |
+| tree | clean; `docker compose` NOT run; :3001 and :3021 NOT bound |
+
+### What shipped, and the measurement that came first
+
+**The dispatch named five treatments it expected to be missing. Four are already the prototype's values
+and the fifth is a wire absence** — so the change set is smaller than the dispatch's shape implied, and
+the full prototype-versus-shipped table is in `test-cases/13`'s section for this change. What actually
+shipped:
+
+1. **THE ZEBRA — the one treatment the family really was missing.** It lives in the prototype's DATA
+   (`memberRows`, `desktop.dc.html:3077`) and attaches at `:671`, which is why a port driven by reading
+   the JSX never saw it. `.gn-members__row:nth-child(even)` now takes `--gn-fill-quaternary`, on the
+   prototype's parity (`i` is 0-based → even 1-indexed rows) and NOT the odd parity the product's two
+   other zebras use (`packages/ui/src/ui.css:1088`, `:2612`). **The inversion in those two families is
+   recorded at the rule with a named owner and NOT harmonised here.**
+2. **All FOUR invite fields now wear the product's `.gn-field` pattern** — the two native inputs
+   (Address, Projects) with `.gn-field__input` as amendment 1 asked, and **Channel and Role with the
+   LABEL half only, which AMENDMENT 2 ruled on 2026-09-18 (owner-approved)**: *"label it inside
+   `.gn-field` … but pass no native-control class to it."* The sibling shape is
+   `apps/web/app/w/[workspaceId]/page.tsx:812-821`; no handler, state or conditional moved. **The reason
+   first recorded for leaving the two Selects bare was FALSE** and the review refuted it at the line — the
+   shared component puts `gn-field__input` on its OWN trigger (`packages/ui/src/select/select.tsx:254`,
+   `:231`, `:432`) — **which is also why 13.889 asserts the label half and NOT the absence of that
+   class**: it is on every `Select` in the product either way, so an absence assertion would be red
+   against correct code. The component is NOT restyled and **the role-change predicate is untouched** (a
+   separate owner ruling this day, a different task).
+3. Cases `13.886`–`13.889`, `Features.md` and `test-cases/13` updated in the same change set.
+
+### Mutation witnesses, all against the real files, tree restored and sha256-verified
+
+- zebra parity flipped `even`→`odd` → **4 failed / 37**, all 13.887.
+- zebra fill swapped to `--gn-surface-sunken` → **2 failed / 37**, all 13.887.
+- **a higher-specificity override appended** (`.gn-members tbody .gn-members__row:nth-child(even) { background: transparent; }`) → **2 failed / 37**, all 13.887. **This one was 0 failed before the fix round** — the blind spot the review measured, now closed by 13.887's exactly-one-rule count.
+- `className="gn-field__input"` removed from the address input → **1 failed / 37**, 13.886 alone.
+- **A2-M1: the `gn-field__label` class dropped from the Channel label → 1 failed / 38, 13.889 alone.**
+- **A2-M2: the Channel `Select` converted BACK to a native `<select>` → 1 failed / 38, 13.889 alone.**
+- the projects field un-wrapped back to the bare pair → **1 failed / 37**, 13.886 alone.
+- `css` and `page.tsx` sha256 IDENTICAL before and after the whole sequence.
+
+**FIX ROUND after the review** (`83e4830c` → the fix commit, one round, no argument): the id collision
+renumbered; the false `Select` reason corrected in the case docblock and `Features.md`; "bare stack"
+narrowed to the four genuinely rule-less elements; the page-container verdict corrected to
+**reachable-and-not-reached** (`.gn-legal`, `globals.css:2088` applied as `gn-shell gn-legal` at
+`privacy/page.tsx:176` — a route-scoped modifier beside the shared class, not a fork); four line-number
+defects fixed (`ui.css:2611`→`:2612`, `page.tsx:55-57`→`:52-53`, `812-818`→`812-821`, and a
+misattributed quotation credited to 13.284); and 13.887 strengthened with the cascade count.
+
+**AMENDMENT 2 (owner-approved, 2026-09-18) arrived after both review rounds and is a POST-FREEZE change
+to an open PR — a NEW HEAD, not a footnote.** It settles the question round 1 raised and this change had
+left open: the two `Select` labels are wrapped in `.gn-field` + `.gn-field__label`, no class passed to
+the component, case **`13.889`** minted (free on all three surfaces at the time; next free is now
+`13.890`). Two mutation witnesses, both killing 13.889 ALONE. The PR body names which head carries what,
+and the frozen-head check figures above belong to the PRE-amendment head.
+
+**ROUND 3, scoped to the AMENDMENT 2 commit: no Critical, three findings of mine, all corrected.** The
+"visible residue" paragraph was FALSE at the line — the 15px came from the PROTOTYPE, not this product's
+cascade (`.gn-select__trigger` declares no `font-size`, `ui.css:1604-1612`; the `.gn-field__input` it also
+wears declares `1.0625rem`, `:3866-3875` → 17px, aligned with the inputs). Case 13.889 left the `<label>`
+TAG and the label-over-control ORDER to prose and the reviewer defeated both — `<div>` for `<label>`, and
+the span moved after the control, each staying green while `.gn-field` is `flex-direction: column` so DOM
+order IS visual order. Both are now asserted, and both defeats re-planted here kill 13.889 alone (1 failed
+/ 38). A docblock reason was wrong too: a `button` IS labelable, and the label associates with the
+`HiddenSelect`'s native `<select>`. **In the ruling's favour: passing `className` to a `Select` is a
+`tsc` ERROR** (three planted sites redden `typecheck` while vitest stays green) — amendment 2 has the
+compiler behind it.
+
+**ROUND 2, a scoped re-review: no Critical, and both Important findings were in the FIX, not the original.**
+(1) The cascade count it asked me to add could itself be defeated — a selector split across two lines, and
+a `*`-prefixed selector, each left the suite green with the zebra dead. The helper is now a SELECTOR scan
+that strips comment spans by context and matches across line breaks; both evasions redden 13.887 (2 failed
+/ 37 each) and the false-red control — prose naming the selector inside a correct tree — stays 37/37 green.
+(2) That helper's comment-guard premise was false (`globals.css` contains exactly ONE line naming the rule,
+and prose there starts with bare text, so the guard would have reddened a CORRECT tree). (3) The superseded
+block's id pointer had been corrupted by the blanket renumber and is restored, marked superseded, with the
+live pointer `13.889` named. **Two lessons worth carrying: a blanket renumber corrupts historical prose —
+and VITEST GREEN IS NOT TYPECHECK GREEN.** `tsc` (17/17) caught a `noUncheckedIndexedAccess` error in the
+new helper that 37/37 passing tests did not; the gate ran it, not the test run.
+
+**Instrument lesson, measured here and worth carrying:** the first attempt at the fourth mutation removed a
+`<label>`'s opening tag and left its closing one, so the file failed to TRANSFORM — and the JSON reporter
+showed that as **`total=7 passed=7 failed=0`**, the broken file simply absent from the assertion list.
+**`failed=0` is not evidence unless the total equals the full suite's count.**
+
+### Open items, with owners — none of them blocks the merge
+
+- **THE INVITATION HALF OF THIS SCREEN HAS NO CSS FAMILY AT ALL.** `.gn-invite-mint*` and
+  `.gn-invite-pending*` appear in `globals.css` exactly once (`__url`'s `font-family`), swept repo-wide
+  with a control that reaches `.gn-members` in the same run; the e2e-stack contrast roster agrees from a
+  real browser (`input`/`select` on `/members` wearing Chrome's UA border). **A family to PORT, not a
+  treatment to align — recorded, not fixed, because the amendment bounds the pass.** Owner: the controller,
+  for the next task on this screen.
+- **The contrast roster's `/members` entries are stale as of this change** (the wrapped fields are no
+  longer UA-default controls). The sweep needs the hot stack, which is executor 1's — **the file was NOT
+  hand-edited**, since a hand-edited generated record is partial. Owner: whoever next runs that sweep.
+- **Citation drift, measured:** the dispatch cites the prototype's `isMembers` block at `:647-783`; it
+  reads `:651-798` at this revision. `docs/design/prototype-delta-2026-09-18.md:524-542` still describes
+  the `<ul>` roster this screen has not had since `#443` and asserts the family is unstyled throughout.
+  Owner: the next change to that document.
+- **The members page's own container padding is REACHABLE and not reached.** The first verdict said "not
+  alignable without forking a shared class or restructuring"; the review refuted half of it with an
+  in-tree precedent — `.gn-legal` (`apps/web/app/globals.css:2088-2090`) carries its own paddings and is
+  applied as `<main className="gn-shell gn-legal">` (`apps/web/app/privacy/page.tsx:176`, and
+  `terms/page.tsx:183`), i.e. a route-scoped modifier BESIDE the shared class rather than a fork of it.
+  So the prototype's `padding:0 32px 24px` is one rule away as `0 2rem 1.5rem`. **Not taken**, because the
+  other half of that row (flex, `gap:20px`) needs the children inside one container — the restructure the
+  dispatch forbids — and half a treatment is a treatment neither document draws. On the report to the
+  controller.
+- **The `Select` labels question** above — asked of the controller in the report, not assumed.
+
+---
+
+## ▼ SUPERSEDED TOP BLOCK — the attention strip leaves the project page (2026-09-18). `#471` MERGED as `0e0dbff9`; nothing below needs redoing.
 
 **Position: THE PHASE IS CLOSED. `#471` is rebased, green, pushed, and at the controller's merge. Do NOT
 start anything else** — the dispatch says `members-styling` is queued behind an amendment and will be
@@ -51,7 +183,7 @@ controller's merge and nothing below needs redoing. Then verify the anchors — 
 | reviewed heads | round 1 reviewed `4205f172` (= `50db2300`) · round 2 reviewed `bb7ba7f7` (= `606ba48d`) |
 | frozen head | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit that carries it |
 | files | 11: `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` · `apps/web/test/page-refusals.test.tsx` · `apps/web/test/board-narrowing.test.tsx` · `apps/web/test/backlog-tab.test.tsx` · `apps/web/test/filters-sheet.test.tsx` · `apps/web/test/list-bulk-close.test.tsx` · `apps/web/test/project-calendar-timeline.test.tsx` · `apps/web/e2e-stack/non-text-contrast-roster.json` · `test-cases/13-deployment-dogfooding.md` · `Features.md` · this file |
-| ids minted | **`13.881`, `13.882`** — recounted at my tip BY MARKER; next free overall is `13.883` |
+| ids minted | **`13.881`, `13.882`** — recounted at my tip BY MARKER; next free overall WAS `13.883` **at that time**. **STALE AND SUPERSEDED**: the blanket renumber of the next task corrected this historical number by mistake, and it is restored because a superseded pointer is history while the position lives in the top block. This branch now holds `13.886`–`13.888`, and the LIVE next free is **`13.889`**. |
 | tree | clean |
 
 ### What shipped
