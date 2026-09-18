@@ -733,16 +733,19 @@ describe('13.766 the heading is Members, and nothing is counted before the roste
  * and therefore cannot see it** — `queries/role.js` defaults `hidden` to
  * `config.defaultHidden` (false) and filters on `isInaccessible`, which returns
  * true for `aria-hidden="true"` (`role-helpers.js:37`); react-aria wraps that
- * subtree in `aria-hidden` (`react-aria@3.52.1`,
- * `dist/private/select/react-aria/dist/private/select/HiddenSelect.mjs:58`). Which is precisely why the cases below query the
- * trigger `button` by name and then read options out of the `listbox` (the
- * pattern `apps/web/test/list-prefs-wiring.test.tsx:69` established, and what a person does).
+ * subtree in `aria-hidden` — in the installed `react-aria@3.52.1`, at
+ * `dist/private/select/HiddenSelect.mjs:58`. (Those two are package-internal
+ * paths inside `node_modules`, so they are named with their package rather than
+ * as repo-relative paths; the testing-library ones below are likewise.) Which is
+ * precisely why the cases below query the trigger `button` by name and then read
+ * options out of the `listbox` (the pattern
+ * `apps/web/test/list-prefs-wiring.test.tsx:69` established, and what a person
+ * does).
  * The duplication that bites is `getByLabelText`, whose label association does
  * NOT go through the accessibility tree: `HiddenSelect` wraps its native
- * `<select>` in a `<label>` carrying the caller's text
- * (`react-aria/dist/private/select/HiddenSelect.mjs:100`), so the label TEXT matches that `<select>` while the
- * trigger's own `aria-label` matches the button — two elements, hence "Found
- * multiple elements".
+ * `<select>` in a `<label>` carrying the caller's text (same package, `:100`),
+ * so the label TEXT matches that `<select>` while the trigger's own `aria-label`
+ * matches the button — two elements, hence "Found multiple elements".
  * **An earlier draft of this paragraph had the direction BACKWARDS** — it said
  * `getByRole` ignores `aria-hidden`, which is the opposite of what the installed
  * version does and of what this repo already states at `packages/ui/src/select/select.tsx:221-222`
