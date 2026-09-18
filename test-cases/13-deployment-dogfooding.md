@@ -10970,3 +10970,126 @@ same sweep run over every file in the worktree reports 150 and that larger numbe
 than repo files. The shift would be unverifiable by any gate, and rewriting citations whose original
 intent cannot be reconstructed is a worse artefact than a stale one a reader can measure.
 **Owner: the controller, as a priced decision.**
+
+## The attention strip leaves the project page (executor 2, 2026-09-18) — ids `13.881`–`13.882`
+
+The owner's instruction, verbatim: *"the attention section should not be there in the project page. its
+already there in the my work page. and check the prototype for styling of the attention tasks."*
+
+**Part 1 of that instruction is this change. Part 2 is measured and HELD** — and the hold is a finding
+rather than a skip, so it is recorded in full below; the next reader will otherwise assume nobody looked.
+
+`13.881`–`13.882` were measured free at this tip **by case MARKER only** before use, with the same
+instrument whose positive control found `13.880` in the file that carries it. `13.881` is the next free id
+overall; no existing case was renumbered, no other block was entered, and neither of the dispatch's
+allocated blocks (`13.700`–`13.759`, `13.760`–`13.819`, `13.820`–`13.849`, `13.850`–`13.880`) was touched.
+
+- ✅ **13.881 — the project page renders no attention strip, and never makes the attention read.**
+  `apps/web/test/page-refusals.test.tsx:247`. Two assertions and a control, and **the second assertion is
+  the load-bearing one**: a page that still called `useAttention` and discarded the answer would render no
+  strip and pass an absence-only check, while still paying the read and still arming the expired-session
+  rule on a 401 for a surface that no longer exists. `getAttention` is stubbed to ANSWER here
+  (`page-refusals.test.tsx:248`), so a page that still called it would draw a strip and fail the absence
+  *and* the `not.toHaveBeenCalled()` (`:268`). The control is the board refusal — both of this case's
+  assertions are absences, and an absence passes just as well against a page that threw before it rendered
+  anything.
+
+- ✅ **13.882 — and the removal is a PROJECT-PAGE change and nothing wider.**
+  `apps/web/test/page-refusals.test.tsx:279`. `13.881`'s two assertions are both absences; on their own
+  they are satisfied by deleting the strip everywhere. This is the paired positive, on the route the owner
+  named as the one that keeps it: the same read, the same component, rendered, with the item's title and
+  the server's own reason string read back out of the strip (`page-refusals.test.tsx:287`).
+
+**One property did not move, it moved house.** The block that previously stood here — *"Project page: the
+attention strip refuses out loud rather than rendering nothing"* — asserted the refusal on the project
+page. `/my-work` is now the only page that mounts the strip, and the refusals case at
+`page-refusals.test.tsx:106` asserts the identical sentence there, so the property is witnessed rather
+than dropped.
+
+### What was removed, and every reference that had to keep making sense
+
+Five sites in `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`, plus the prose corrections the
+dispatch's own rule required (*"If a docblock or a comment still explains a strip that is no longer there,
+correct it"*):
+
+| site | what |
+|---|---|
+| import block | `AttentionStrip` and `useAttention` dropped from the `@gisik-nokma/app-core` destructure |
+| hook call | `const attention = useAttention(dataSource, workspaceId)` deleted |
+| expired-session list | `attention.error` dropped — `page.tsx:963` **now passes three reads, not four** |
+| render block | the comment, the error arm and the strip arm removed; `.gn-project` (`page.tsx:1445`) opens straight into the tab arms |
+| prose `:1338` | "the attention strip, the board and the list all use" → "the board and the list both use" |
+| prose `:1441` | "Four reads can 401 together … four panels" → **"Three reads"** — a count is a fact about the code, and the code changed |
+| prose (Step 5b docblock) | the `attention.data ?? []` analogy kept its reasoning and lost its now-absent referent |
+
+One more, outside the page: `apps/web/test/board-narrowing.test.tsx` carried a docblock explaining that
+`AttentionStrip` contributes no stray `<li>` to its `getAllByRole('listitem')` counts. The conclusion still
+holds and its reason no longer does, so the reason was corrected — and the **now-inert**
+`getAttention: async () => []` overrides were deliberately left in place rather than swept, because the
+same helper shape is shared with fixtures that still mount a page carrying the strip and a blanket sweep
+would have removed one that is load-bearing. The docblock says so at the site.
+
+### The contrast roster — a generated record whose route list this change invalidates
+
+`apps/web/e2e-stack/non-text-contrast-roster.json` carries `aside.gn-attention` with
+`routes: ["/my-work", "/p/:projectId"]`. That file is **written** by the Step 5b sweep
+(`viewport.spec.ts`'s `writeFileSync`) and **read by nothing**, so this entry's route list is now stale and
+no gate can notice. `/p/:projectId` was removed from that one entry by hand. The reason is stated rather
+than implied: the sweep that would regenerate it needs the hot stack, which the two-executor override puts
+out of this session's reach. **This edit is a hand-correction of a record, not a measurement** — the next
+sweep run is expected to overwrite the file with the same answer, and if it does not, the sweep is right.
+
+### Part 2 — the prototype's styling, measured, and why it is HELD
+
+The dispatch asked for the strip's styling to be checked against
+`design-system/interactive/desktop.dc.html:561-575`. It was checked. The delta is real, but it is
+**structural rather than a CSS restyle**, and four of its parts meet a record the repo already holds.
+Measured, prototype → product:
+
+| # | prototype (`desktop.dc.html:561-575`) | product (`attention-strip.tsx:74-96`, `ui.css:1153-1189`) | class |
+|---|---|---|---|
+| 1 | `--tintWarning` card, `border-radius:var(--cardR)`, `padding:18px 20px` | `--gn-surface-raised` + `border-left:4px solid var(--gn-pending)`, `padding:0.6rem 0.9rem` | CSS — but see (a) |
+| 2 | visible heading `<p>Needs your attention</p>` + 20px warning-triangle SVG | no heading, no icon; accessible name is `aria-label="Needs attention"` | **structural** |
+| 3 | row order title → chip → why | chip → title → reason → claim | **structural** |
+| 4 | the whole row is the click target (`<div onClick>`) | the title is a `<button>` carrying a 24px floor | **structural** |
+| 5 | `gap:4px`; rows `padding:7px 0`, `min-height:24px` | `gap:0.45rem`; no row padding, the floor sits on the title | CSS |
+| 6 | `why` in `--label2` | `reason` in `var(--gn-text)` | CSS |
+
+**Why the set is held whole rather than the CSS-only rows taken and the rest reported.** Rows 1, 5 and 6
+are not independent of rows 2–4 — taking the tint fill while leaving the heading off produces a treatment
+the prototype does not draw and the product never chose, which is a third thing, invented. And each of the
+three structural rows meets a record:
+
+- **(a) The tint fill deletes the left border the controller ruled stays, today.** `task-ledger.tsv`'s
+  `hig-per-screen/7a` and `8a` rows carry the 2026-09-18 ruling that `.gn-attention`'s 4px left border
+  *"carries an affordance"* and is not a leftover, confirmed by Step 5b's own measurement of it at 4.36
+  against a 3:1 floor. The ruling's subject was whether that border is contrast DEBT; the prototype's
+  container would remove it as a design choice. **That is a decision, not a union, and it is the
+  controller's.**
+- **(b) The visible heading collides with the copy rule.** The prototype's heading string is *"Needs your
+  attention"*; the shipped accessible name is *"Needs attention"*. The dispatch's own rule is that the
+  product's copy wins and any string that would have to change is FLAGGED rather than changed silently —
+  and a visible heading beside an `aria-label` saying nearly the same thing is a double-name problem, not a
+  restyle.
+- **(c) The repo's own prototype-delta document already ruled this.** `docs/design/prototype-delta-
+  2026-09-18.md:583-586` — written today, read-only on product code — records the same delta, calls the
+  flat headingless shape *"a pre-existing ruling"*, and gives `isMyWork` the port verdict **`none`**. **A
+  correction to that document is owed and is recorded here rather than made there:** the ruling it cites
+  (`packages/app-core/src/views/attention-strip.tsx:37-70`) argues the list is FLAT rather than SECTIONED
+  PER KIND — no per-kind sub-headings — which is not the same claim as *no banner-level heading*. The
+  verdict may still be right; that citation does not by itself establish it, and a reader who follows it
+  finds the weaker argument.
+- **(d) `--gn-tint-warning` is an alpha role with a stated single consumer.** `packages/ui/src/tokens.ts`
+  records it as *"the only tint role this product has, consumed at exactly one place"*
+  (`apps/web/app/globals.css:1314`, the invitations banner), whose docblock adds the constraint that the
+  composite holds *"only because this banner sits at page level, not inside a card or other raised
+  surface"*. A second consumer must re-establish that condition rather than inherit it. The invitations
+  banner is nonetheless a real precedent for exactly this conversion (`globals.css:1296-1307`, Task 8,
+  2026-09-15) — which is why this is a recommendation and not a refusal.
+
+**Recommendation, for the controller.** Run Part 2 as its own task, carrying the owner's answer on (b),
+since the heading is the visible half of what the owner is most likely reacting to. If the answer is
+"adopt the prototype's treatment", rows 1–6 land together, with the left border's ruling explicitly
+superseded, the roster's `aside.gn-attention` entry re-measured (its `border` reading
+`rgba(178,80,0,1)` **is** that left border and disappears with it), and the `tintWarning` single-consumer
+note updated. **Nothing in this change presupposes that answer.**

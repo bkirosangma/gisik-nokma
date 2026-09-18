@@ -10,7 +10,6 @@ import {
   type WorkflowDef,
 } from '@gisik-nokma/domain';
 import {
-  AttentionStrip,
   Board,
   BulkCloseDialog,
   CalendarView,
@@ -21,7 +20,6 @@ import {
   matchesBoardCard,
   matchesListRow,
   sortByRank,
-  useAttention,
   useBoard,
   useLiveQuery,
   useTicketList,
@@ -89,13 +87,13 @@ import {
  * `ServingGapError` `mapListView` used to throw — `list.rows` is null,
  * `?? []` is `[]`, and `CalendarView` would draw a complete month grid with
  * nothing on it. That grid says "no ticket in this project has a claimed date",
- * which is the same invented fact as `attention.data ?? []` and the spinner over
- * a refused read: the defect this page's own `parentCandidates` note was written
- * about, one tab across. So the calendar and timeline arms use this page's own
- * `error → ShellRefusal, null → Loading…, data → view` shape, and Step 5b's
- * `<p>{board.error ?? 'Loading…'}</p>` spellings are NOT adopted for the two
- * existing arms either — those would have deleted `ShellRefusal` from the board
- * and the list on the way past.
+ * the same invented fact the spinner over a refused read produces: the defect
+ * this page's own `parentCandidates` note was written about, one tab across. So
+ * the calendar and timeline arms use this page's own `error → ShellRefusal,
+ * null → Loading…, data → view` shape, and Step 5b's `<p>{board.error ??
+ * 'Loading…'}</p>` spellings are NOT adopted for the two existing arms either —
+ * those would have deleted `ShellRefusal` from the board and the list on the way
+ * past.
  *
  * The Suspense boundary is `useSearchParams()`'s, exactly as on the sign-in
  * page — without it `next build` fails the route rather than warning.
@@ -328,7 +326,6 @@ function ProjectBoard() {
 
   const board = useBoard(dataSource, workspaceId, projectId);
   const list = useTicketList(dataSource, workspaceId, projectId, currentUserId, listFilter);
-  const attention = useAttention(dataSource, workspaceId);
 
   /**
    * THE BACKLOG'S OPTIMISTIC RANK OVERRIDES (second wave Task 5).
@@ -964,7 +961,6 @@ function ProjectBoard() {
   // — HTTP 401 for /v1/projects/…/board", which names the wrong cause and offers
   // the viewer nothing to do about it.
   const expired = useSignInOnExpiredSession([
-    attention.error,
     board.error,
     list.error,
     ticketTypes.error,
@@ -1339,9 +1335,8 @@ function ProjectBoard() {
    * A disabled picker with the reason beside it was the alternative, and it costs
    * an app-core prop change on `NewTicketDialog` plus a second place for the
    * refusal to be phrased. The gate keeps ONE rendering idiom on this page — the
-   * same `error → ShellRefusal, data → component` the attention strip, the board
-   * and the list all use — and puts the reason where the viewer is already
-   * looking.
+   * same `error → ShellRefusal, data → component` the board and the list both
+   * use — and puts the reason where the viewer is already looking.
    *
    * **That cost is no longer paid, and the reason it was accepted expired.** The
    * note here used to read: against the server that ships today `getTickets`
@@ -1443,19 +1438,11 @@ function ProjectBoard() {
       <AppNav workspaceId={workspaceId} />
       <div className="gn-shell__main">
         {expired ? (
-          // ONE notice for the page. Four reads can 401 together and they are one
-          // event: four panels would describe four.
+          // ONE notice for the page. Three reads can 401 together and they are one
+          // event: three panels would describe three.
           <ExpiredSessionNotice />
         ) : (
           <div className="gn-project">
-            {/* `?? []` would render no strip at all, which reads as "nothing needs
-                attention" — see `src/shell-refusal.tsx`. */}
-            {attention.error !== null ? (
-              <ShellRefusal what="What needs your attention" message={attention.error} />
-            ) : attention.data !== null ? (
-              <AttentionStrip items={attention.data} onOpenTicket={openTicket} />
-            ) : null}
-
             {/*
               ABOVE the tab arms, and that placement is the whole point rather than
               a layout choice.

@@ -37,8 +37,7 @@
       "border": "rgba(178,80,0,1)",
       "backdrop": "rgb(241,234,227)",
       "routes": [
-        "/my-work",
-        "/p/:projectId"
+        "/my-work"
       ]
     },
     {

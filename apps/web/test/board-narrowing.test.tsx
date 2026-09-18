@@ -646,11 +646,16 @@ describe('13.556b the scope note names the LIST tab, not the board, when it rend
  * existing `packages/app-core/test/views/board.test.tsx` already uses
  * (`getAllByRole('listitem')`), per this task's own brief ("use the query
  * the existing `board.test.tsx` uses rather than adding a role to satisfy a
- * test"). Verified against this exact page mount, not assumed: `AttentionStrip`
- * (`attention-strip.tsx:72`) returns `null` outright when its `items` array
- * is empty, which every fixture here stubs it to be, so it contributes no
- * stray `<li>` to the count; nothing else this page mounts (`AppNav`,
- * `FiltersSheet` closed) renders one either.
+ * test"). Verified against this exact page mount, not assumed. `AttentionStrip`
+ * was the component to check here — it returns `null` for an empty `items`
+ * array, and every fixture below stubs `getAttention` to `[]` — but the strip
+ * left the project page on 2026-09-18 (owner: *"the attention section should not
+ * be there in the project page"*; case 13.881), so nothing it would have drawn
+ * is on this page at all. **The `getAttention: async () => []` overrides below
+ * are therefore INERT, not load-bearing** — left in place rather than swept,
+ * because the same helper shape is shared with fixtures that do still mount a
+ * page carrying the strip. Nothing else this page mounts (`AppNav`,
+ * `FiltersSheet` closed) renders a `<li>` either.
  */
 
 /** Two columns, two cards — the workflow this project's board is attached to before Task 8 ever runs. */
