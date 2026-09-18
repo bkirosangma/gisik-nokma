@@ -20,6 +20,35 @@ the one already taken rather than making a new one.
 
 ---
 
+## ⛔ READ THIS FIRST — FOUR HEADINGS BELOW ARE **HELD**, AND THIS PLAN DISPATCHED THEM IN ERROR
+
+`docs/lanes/owner-holds.md` **§1** holds the wire-gap screens, and in this cluster that is
+**`isTypes` | reorder and per-type counts** and **`isWorkflows` | a badge and a second action**. The
+register's own words: *"The owner did not pick any of them. **Do not dispatch one**, and do not treat 'the
+owner named a different wire-gap' as a precedent for the rest."*
+
+**The controller wrote this plan and dispatched those tasks anyway**, then put them to the owner as
+"defaults" **without saying they were held**. An executor caught it, refused the held work, and flagged it
+in its PR title. **That is the correct behaviour and it is the reason this box exists.**
+
+| heading | held item | status |
+|---|---|---|
+| **Task 2** — the status badge | `isWorkflows`: *a badge* | **HELD — not built.** The ruling below ("drop it") happens to agree, but the item stays held until the owner names it |
+| **Task 3** — the second action | `isWorkflows`: *a second action* | **HELD — not built** |
+| **Task 7** — the ↑/↓ reorder buttons | `isTypes`: *reorder* | **HELD — not built.** The rest of Task 7 (zebra, strings, no Edit button) **shipped** in `#482` |
+| **Task 8** — the `"N tickets"` count | `isTypes`: *per-type counts* | **HELD — not built.** The `"Draft"` badge is separately ruled not-a-state; also not built |
+
+**Escalated to the owner by name** (`gisik-nokma-lanes/OWNER-QUESTION-2026-09-18-held-wire-gaps.md`), with
+one measurement passed on and explicitly marked as NOT lifting the hold: for the **reorder**, `rank` already
+exists on `TicketTypeDef` and `rank.ts` already computes the hierarchy implications, so it may be **a route
+over data that already exists** rather than new server surface — while the **count** genuinely needs server
+work, because the only population read is pinned to one workflow (`builder-reads.ts:408-414`).
+
+**Do not build any of the four until the owner names them.** Tasks **5, 6 and 9** are unaffected: Task 6 is
+the reorder's WIRE and is therefore held with Task 7; Tasks 5 and 9 proceed.
+
+---
+
 ## Ruled 2026-09-18 — every stop-and-ask in the first draft of this plan is now CLOSED
 
 The plan was written with three explicit stop-and-asks and one held screen. **The owner answered all of
