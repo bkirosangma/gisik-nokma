@@ -45,7 +45,9 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # rank order, drag reorder, and Move up / Move down) IS COMMITTED, ITS INDEPENDENT REVIEW IS RECORDED
 > # BELOW WITH ALL FOUR OF ITS SURVIVING MUTANTS NOW KILLED — AND THE PR IS DELIBERATELY *NOT* OPENED.
 > # I AM HOLDING ON ONE RULING (finding I5, below): in a backlog where nothing is ranked yet, "place
-> # last" moves the row to the TOP. The controller read the finding and ruled 2026-09-18 that a short
+> # last" moves the row to the TOP — and M-b, the same class (grouping makes the drawn order disagree
+> # with the rank order, on the DEFAULT grouping), is priced in the same request. The controller read the
+> # finding and ruled 2026-09-18 that a short
 > # hold is cheaper than shipping it and correcting it in a second PR.** Everything else is green and
 > # ready; the ONLY outstanding work is that ruling. This block is the position; everything below it is
 > # RECORD. **The queue after this task is NOT empty** — Task 6 of
@@ -139,11 +141,18 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > the overrides, while a REFUSAL (which does not reload) keeps its notice — which is what the person who
 > just watched their row snap back needs.
 >
-> **Minor — RECORDED, NOT FIXED.** M-b: with a non-flat grouping on the Backlog tab the drawn
-> neighbours are not the rank neighbours, so a move lands where rank order says rather than where the
-> screen says. The reviewer flagged this as its own least-certain finding and did not reproduce it; I did
-> not either. Owner: whoever next touches the Backlog tab's grouping. M-e: no signed-out fixture pins the
-> `session.kind` gate on the rank controls or the drag.
+> **Minor — RECORDED, NOT FIXED, AND UPGRADED TO MEASURED.** M-b: with a non-flat grouping on the
+> Backlog tab the drawn neighbours are not the rank neighbours, so a move lands where rank order says
+> rather than where the screen says. The reviewer offered this as its own **least-certain** claim and did
+> not reproduce it; **I reproduced it, and it is not rare — it is the DEFAULT**: `DEFAULT_GROUPING` is
+> `'epic'` (`packages/app-core/src/view-types.ts:495`), not `'flat'`, and the "Group by" control renders
+> on the Backlog tab. Measured against the built module — rank order `A('e1') B('e2') C('e1')` draws
+> `A C B` under `epic` (sections `epic:e1[A C]`, `epic:e2[B]`) and `A B C` under `flat`, so A's DRAWN
+> neighbour is C while its RANK neighbour is B. Invisible to every case in `backlog-tab.test.tsx` only
+> because each fixture's rows carry `epicId: null` and fall in one section. **Same class as I5 and NOT
+> covered by I5's remedy** — rescuing I5 by ranking the unranked rows leaves this one untouched. Priced
+> with it in `EXEC-2026-09-18-t5-unranked-tail.md`; owner: the same ruling. M-e: no signed-out fixture
+> pins the `session.kind` gate on the rank controls or the drag.
 >
 > **Method note this task earns.** Four of the five Important findings were *surviving mutants*, and
 > three of those four were survivable **because the fixtures were tidy** — supplied in the order the

@@ -8920,8 +8920,14 @@ distinguish an implementation from a coincidence.**
 did not perform (it forwarded `up ?? null`, turning the edge's `undefined` into "place last"); the drag's
 notice wore `gn-refusal--server` for transport failures and silence, which `ui.css:1216` states the rule
 against; and `rankNotice` was cleared by nothing, surviving reloads and tab switches. **One Minor is
-recorded, not fixed:** with a non-flat grouping the drawn neighbours are not the rank neighbours — the
-reviewer's own least-certain finding, not reproduced here either.
+recorded, not fixed — and MEASURED here after the reviewer offered it only as its least-certain claim:**
+`DEFAULT_GROUPING` is `'epic'`, not `'flat'` (`packages/app-core/src/view-types.ts:495`), so with backlog
+rows under more than one epic the tab draws them grouped while the handlers compute from the rank order —
+rank order `A('e1') B('e2') C('e1')` draws `A C B` under `epic` and `A B C` under `flat`, so A's drawn
+neighbour is C while its rank neighbour is B. Invisible to every case in `backlog-tab.test.tsx` only
+because each fixture's rows carry `epicId: null` and fall in one section. **Not fixed here**: like the
+unranked-tail defect it is a product decision (render the Backlog tab flat, or have the handlers read the
+section's rows), and it is priced alongside that one.
 
 - ⚠️ **OPEN FINDING, NOT A CASE — in a backlog where NOTHING is ranked, "place last" moves the row to the
   TOP.** `rank` starts `NULL` for every ticket (13.702), so this is the default state of every project.
