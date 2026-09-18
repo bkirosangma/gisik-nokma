@@ -29,12 +29,17 @@ import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
  * |---|---|---|
  * | `.react-flow` rect height | **0** | **480** |
  * | `.gn-workflow-canvas` rect height | 480 | 480 |
- * | node height / width / count | 75.27 / 91.98 / 4 | 75.27 / 91.98 / 4 |
+ * | FIRST node's height / width, and the node count | 75.27 / 91.98 / 4 | 75.27 / 91.98 / 4 |
  * | first node ∩ `.react-flow` box (area) | **0** | **6922.8** |
  *
+ * The third row is the **first** node's box, not a property of every node —
+ * they are not all the same height — and what it carries is that every one of
+ * them is non-zero on the broken tree, which the independent review's probe
+ * confirmed node by node.
+ *
  * The middle two rows are why this case does not assert on the container's own
- * height, on the node's height, or on the node COUNT. All three are already
- * satisfied on the broken tree — the node is laid out at its intrinsic size
+ * height, on a node's height, or on the node COUNT. All three are already
+ * satisfied on the broken tree — each node is laid out at its intrinsic size
  * inside a container that draws none of it — so an assertion on any of them is
  * a check that cannot fail. The two rows in bold are the ones that separate the
  * states, and the second of them is the property the person actually needs:

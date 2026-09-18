@@ -21,10 +21,15 @@ import type { Page } from '@playwright/test';
  * |---|---|---|
  * | `.react-flow` rect height | **0** | **480** |
  * | `.gn-workflow-canvas` rect height | 480 | 480 |
- * | node height / width / count | 75.27 / 91.98 / 4 | 75.27 / 91.98 / 4 |
+ * | FIRST node's height / width, and the node count | 75.27 / 91.98 / 4 | 75.27 / 91.98 / 4 |
  * | first node ∩ `.react-flow` box (area) | **0** | **6922.8** |
  *
- * The container's own height, the node's height, and the node COUNT are all
+ * The third row is the **first** node's box rather than a property of every
+ * node — the nodes are not all the same height — and the point it carries is
+ * that **every** one of them is non-zero on the broken tree, which the
+ * independent review's own probe confirmed node by node.
+ *
+ * The container's own height, a node's height, and the node COUNT are all
  * already satisfied on the broken tree: React Flow lays each node out at its
  * intrinsic size inside a container that draws none of it, so the DOM looks
  * perfect and the canvas is empty. Asserting on any of them is a check that

@@ -30,7 +30,7 @@ non-text-contrast roster.
 **FIRST ACTION ON A RESTART: `gh pr list --state open`.** If the PR is open it is at the controller's
 merge; **if it has MERGED, this block is history** and the controller's next dispatch is the position.
 
-### § 1 — WHAT SHIPPED (5 files; one declaration and its witnesses)
+### § 1 — WHAT SHIPPED (5 artefacts, plus this file; one declaration and its witnesses)
 
 | artefact | what |
 |---|---|
@@ -49,14 +49,22 @@ merge; **if it has MERGED, this block is history** and the controller's next dis
 |---|---|---|
 | `.react-flow` rect height | **0** | **480** |
 | `.gn-workflow-canvas` rect height | 480 | 480 |
-| node height / width / count | 75.27 / 91.98 / 4 | 75.27 / 91.98 / 4 |
+| FIRST node's height / width, and the node count | 75.27 / 91.98 / 4 | 75.27 / 91.98 / 4 |
 | first node ∩ `.react-flow` box (area) | **0px²** | **6923px²** |
-| planted pre-fix control → `.react-flow` | **0** | **0** |
+| planted pre-fix control → `.react-flow` | **0** † | **0** |
 
 **The middle rows are the dispatch's own suggested assertion and they do not discriminate** — the
-dispatch proposed "a node's rendered height is non-zero", and the node measures 75.27 on the broken tree
-because React Flow sizes it intrinsically inside a container that draws none of it. The case asserts the
-two bold rows; the control proves the instrument can report zero.
+dispatch proposed "a node's rendered height is non-zero", and the first node measures 75.27 on the broken
+tree because React Flow sizes it intrinsically inside a container that draws none of it. All four are
+non-zero (the independent review's probe confirmed it node by node). The case asserts the two bold rows.
+
+**† The control reads 0 in both states, but the `broken` column is NOT something the case measured in
+that run** — the case aborts at its first assertion on the broken tree, so the control block never
+executes there. The 0 was measured out-of-band, by a probe and again by the review. The control's job is
+to license the *green* run, and it does: on the fixed tree it executes and reads 0 while the product
+reads 480. Its non-vacuity was proved the other way — the review applied `display: grid` to the PLANTED
+element and it went to **480**, so it reads 0 because the pre-fix cascade is reproduced and not because
+the element is unstyled or off-screen.
 
 ### § 3 — THE TWO RUNS THAT PROVE IT, AND THE ONE THAT DOES NOT EXIST
 
@@ -101,6 +109,31 @@ from the dispatch's plain command and is disclosed here for that reason.
 parsing tiers failed`, truncated 34003 → 2000 chars). The full log survives in `rtk`'s tee dir. **Invoke
 the runner as `node node_modules/@playwright/test/cli.js test …` to bypass the proxy** — that is how both
 canvas runs were made.
+
+### § 5b — THE REVIEW: 0 Critical, 0 Important, 3 Minor — all three closed in a prose-only fix round
+
+One independent reviewer, read-only, over the first frozen head. It re-ran the case **against the hot
+stack** and quoted the failure (`.react-flow 0px · 4 node(s) · inside 0px²`, red at the first assertion),
+wrote its own probe to measure the broken tree node by node, and swept every `file:line` in the diff by
+content. **What it proved that the author had only argued:** the control is not vacuous — applying
+`display: grid` to the **planted** element takes it to **480**, so it reads 0 because the pre-fix cascade
+is reproduced and not because the element is unstyled or off-screen; and the one-declaration fix cannot
+re-flow a second child, because `workflow-canvas.tsx` renders React Flow as its **only** child.
+
+Its three Minors were all accuracy defects in prose the author wrote, and all three are closed: the
+"5 files" heading (the diff carries 6, the sixth being this file), the table row that read as every
+node's height when it is the **first** node's, and the control's `0 | 0` row not distinguishing *measured
+in both states* from *measured out-of-band in one* — see † above.
+
+**It could not verify the GREEN direction end-to-end** and said so: it confirmed the declaration's effect
+by in-page injection rather than by building and serving this worktree. The `:3021` run in § 3 is the
+author's own evidence for that half, and the review's injection reproduces the same two numbers.
+
+**Recorded, not fixed — outside this change's scope, with a named owner.** `apps/web/app/sign-in/page.tsx:46`
+cites `apps/server/src/auth/auth.ts:83` for `trustedOrigins`; line 83 is inside a docblock and the
+declaration is at `auth.ts:112`. It resolves to the right **file** and reads plausibly, so it misleads
+rather than corrects — the `stale-citation` shape. **Owner: whoever next touches the sign-in page.** (The
+author's own § 3 caveat cites `auth.ts:112` and was verified by the review.)
 
 ### § 6 — ANCHORS, verify these rather than trusting the row
 
