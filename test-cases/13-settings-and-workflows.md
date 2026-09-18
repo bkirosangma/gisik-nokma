@@ -982,3 +982,82 @@ either value, and at the `stack-phone-390` baseline the content pane is 366px be
 248 + 320 already exceeded the shell's inner width at `12rem` too). But a reader comparing screenshots
 just under that boundary should expect a difference, and `globals.css:1227` now carries the note inline
 so it is visible from the declaration that causes it.
+
+## The workflow builder's canvas drew into nothing — `min-height` is not a definite height (2026-09-19)
+
+**Owner-prioritised out of order.** ONE case, `13.911`, minted at the tip of `exec2/builder-canvas-collapse`
+over `origin/main` `ed4c992f` **by case MARKER only**: `13.890`–`13.910` are spent and `13.920`–`13.927`
+belong to another lane, so this case takes the first free id of the dispatched block and **the next free
+in that block is `13.912`**.
+
+- ✅ **13.911 — the builder's canvas is a box the viewer can see, and a node is drawn inside it.**
+  `apps/web/e2e-stack/builder-canvas.spec.ts`, instrument in `apps/web/e2e-stack/helpers/canvas-box.ts`.
+
+  **The defect, measured on the running app.** The builder rendered its whole chrome — breadcrumb, title,
+  Add state, Publish, the system-rules rail, the inspector — and an **empty canvas card**. Four
+  `.react-flow__node` elements were in the DOM the entire time; they were laid out inside a container that
+  computed to **zero height**, so the graph was invisible while every DOM-presence assertion in the repo
+  passed. **A count of elements present is not a claim about their geometry.**
+
+  **Why, and it is a general CSS trap rather than a typo.** `.gn-workflow-canvas` was
+  `height: 100%; min-height: 480px`, and React Flow's own stylesheet gives `.react-flow` `height: 100%`.
+  **A percentage height cannot resolve against a parent whose height comes only from `min-height`** —
+  `min-height` does not make a height *definite*, so the child's `100%` computed to `auto` → 0. The rule
+  was present, the class was present, and the canvas was still invisible. That is the whole reason this
+  case asserts a **measured** height and not the presence of a rule.
+
+  **The fix is one declaration: `display: grid`** on `.gn-workflow-canvas` (`packages/ui/src/ui.css`). A
+  grid track gives the child a definite height to fill. `min-height: 480px` is **untouched** — it is
+  load-bearing for the narrow-screen layout and the grid track resolves against it; the pair is the fix
+  and either half alone restores the bug. The rule now carries that reasoning inline.
+
+  **What discriminates, and what does not — measured in a real browser, same page, same session, both
+  states:**
+
+  | property | broken | fixed |
+  |---|---|---|
+  | `.react-flow` rect height | **0** | **480** |
+  | `.gn-workflow-canvas` rect height | 480 | 480 |
+  | FIRST node's height / width, and the node count | 75.27 / 91.98 / 4 | 75.27 / 91.98 / 4 |
+  | first node ∩ `.react-flow` box (area) | **0px²** | **6923px²** |
+
+  The third row is the **first** node's box rather than a property of every node — they are not all the
+  same height — and what it carries is that every one of them is non-zero on the broken tree, confirmed
+  node by node by the independent review's own probe.
+
+  **The middle rows are why the case does not assert on the container's own height, on a node's height, or
+  on the node COUNT** — all three are already satisfied on the broken tree, and the dispatch's own
+  suggested "a node's rendered height is non-zero" is measurably one of them. The two bold rows separate
+  the states; the second is the property the person needs, *a node drawn inside the canvas being looked
+  at*, and it is the one a future regression is most likely to fail.
+
+  **Not a unit test, by construction:** jsdom has no layout engine, so `getBoundingClientRect()` returns
+  zeros for everything and an assertion on the computed `display` would have passed on the broken tree.
+  It lives in `e2e-stack` because that suite already signs in and walks signed-in routes.
+
+  **The control is planted, and it runs the SAME helper as the measurement.** A height assertion that can
+  only report a positive number is not a measurement, so `measureCanvas` runs a second time over an
+  element reproducing the **pre-fix cascade** in-page — the same two classes, the grid track overridden
+  back to `block`, no definite height on its wrapper — and must read **0**. It is planted rather than
+  pointed at because the product no longer contains a broken canvas, and a control that depends on the
+  defect staying present dies with the fix.
+
+  **Both directions witnessed.** Against the hot stack (which was serving `main`, i.e. the unfixed tree)
+  the case **fails**, printing `.react-flow 0px · 4 node(s) · inside 0px²`. Against this branch's tree
+  served on `:3021` — a `next dev` from this worktree, after `pnpm turbo run build` — the same
+  measurement, through the same helper, reads **`flowHeight 480 · nodeAreaInsideFlow 6923`** while its
+  planted control reads **0**. The `:3021` run signs in on `:3001` and navigates across, because the
+  server's `trustedOrigins` is the single configured web origin; cookies are host-scoped, so the session
+  carries. That is a verification-run arrangement, not part of the case.
+
+  **The sweep for the same shape, reported and not fixed.** `packages/ui/src/ui.css` + `apps/web/app/globals.css`
+  were swept for `min-height` rules with percentage-height children, using `.gn-workflow-canvas` as the
+  **positive control** (the sweep must find the known instance, and does). Three more `height: 100%` sites
+  exist and **none of them is a second invisible canvas**: `.gn-sheet` (`ui.css:292`) resolves against
+  `.gn-sheet__scrim`, which is `position: fixed; inset: 0` and therefore definite; `.gn-workspace-card`
+  (`globals.css:378`) and `.gn-project-card` (`globals.css:1070`) take their `100%` against `<li>` grid
+  items, and **each child has intrinsic content height**, so where the percentage fails to resolve the
+  card keeps its content height rather than collapsing — a lost equal-height, not an invisible surface.
+  The trap here needs *both* halves: a parent sized only by `min-height` **and** a child with no intrinsic
+  height of its own (React Flow's children are absolutely positioned, so it has none). No second instance
+  was found. **Owner: whoever next adds a percentage-height child to a `min-height` container.**
