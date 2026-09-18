@@ -31,9 +31,9 @@ export type RankRow = { ticketId: string; rank: string | null };
  * row lands wherever the midpoint happens to sort — with `[A('g'), B('n'),
  * C(null)]` and C moved last, the midpoint `'i'` draws `A C B`, one row from
  * where the pointer was, and with nothing ranked at all it draws the row
- * FIRST (see the OPEN DEFECT below).
+ * FIRST (see the section below).
  *
- * ## OPEN DEFECT THIS FUNCTION CANNOT FIX (measured 2026-09-18, needs a ruling)
+ * ## THE CALLER NO LONGER REACHES THAT CASE — OWNER RULING, 2026-09-18, OPTION B
  *
  * `compareByRank` sorts EVERY ranked row above EVERY unranked one, so a rank
  * key can never place a row AFTER an unranked row. When `rows` holds no key at
@@ -44,10 +44,19 @@ export type RankRow = { ticketId: string; rank: string | null };
  * The same fact makes an enabled `Move down` a no-op whenever it would have to
  * step over an unranked row. Neither is a bug in this file — it is the plan's
  * §8 rule (the plan says `before` is "the last RANKED row's key") meeting a
- * case the plan does not contemplate. Recorded rather than fixed here because
- * the remedy is a product decision (refuse the inexpressible move, or rank the
- * unranked rows first), not a local repair. Owner: the controller ruling
- * requested in `gisik-nokma-lanes/EXEC-2026-09-18-t5-unranked-tail.md`.
+ * case the plan does not contemplate. It was recorded rather than repaired here
+ * because the remedy is a product decision (refuse the inexpressible move, or
+ * rank the unranked rows first), not a local repair.
+ *
+ * **THE OWNER RULED THE SECOND ONE ON 2026-09-18 — option B — and `planRankMove`
+ * below implements it: the caller ranks the rows that have no key FIRST, in
+ * their drawn order, then applies the move.** So this function's `null` answer
+ * is still correct and still reachable by a direct caller (and is still what
+ * 13.707 pins), but it is no longer the state a move is computed in: by the
+ * time `neighboursFor` runs inside `planRankMove`, every other row has a key.
+ * The original ruling request is recorded at
+ * `gisik-nokma-lanes/EXEC-2026-09-18-t5-unranked-tail.md` and the ruling at
+ * `gisik-nokma-lanes/CTL-EXEC1-2026-09-18-t5-ruling-b.md`.
  */
 function lastRankedKey(rows: readonly RankRow[]): string | null {
   for (let i = rows.length - 1; i >= 0; i -= 1) {
@@ -93,9 +102,10 @@ export function sortByRank<T extends RankRow>(rows: readonly T[]): T[] {
  * `compareByRank` sorts ranked rows above unranked ones, a new key above the
  * last ranked key still renders ABOVE every unranked row. So a move that has
  * to step over an unranked row does not land where the pointer was — it lands
- * after the last ranked row, which may be several rows higher. See the OPEN
- * DEFECT note on `lastRankedKey`: when no row is ranked at all, this returns
- * `null` and the caller's "place last" inverts to "place first".
+ * after the last ranked row, which may be several rows higher. See the ruling
+ * note on `lastRankedKey`: when no row is ranked at all, this returns `null`
+ * and a caller's "place last" inverts to "place first" — which is why the
+ * caller is `planRankMove`, which ranks the unranked rows before asking.
  *
  * `movedId` is excluded from the neighbour search throughout. Without that,
  * moving a row to the end reads "the last ranked row" as the row being moved
