@@ -24,9 +24,9 @@ import { TypeIcon } from './icons.js';
  *
  * - **the `Edit` button — RULED: NOT BUILT** (owner, 2026-09-18). Row-as-door is
  *   a **pre-existing** owner ruling, quoted at the rule itself (`packages/ui/src/
- *   ui.css:1603-1611`, owner 2026-09-10: *"remove [Edit] and open on just
+ *   ui.css:1811-1812`, owner 2026-09-10: *"remove [Edit] and open on just
  *   clicking the entire card/row"*). The whole row is one
- *   `<button aria-label={\`Edit ${type.name}\`}>` (`:65-70`), so an `Edit` button
+ *   `<button aria-label={\`Edit ${type.name}\`}>` (`:149-177`), so an `Edit` button
  *   beside it would be a second door to the same place — not a port.
  * - **the `"Draft"` badge — RULED: NOT BUILT** (owner, 2026-09-18). A draft ticket
  *   type is not a state this product has, so `TicketTypeDef` gains no draft flag
@@ -52,7 +52,7 @@ import { TypeIcon } from './icons.js';
  *   (`packages/rule-engine/src/checks/ticket-type.ts:60-62` refunds
  *   `type.builtin-rank`), so a swap that moved a built-in would be REFUSED rather
  *   than merely surprising; and the prototype's rank is its array index
- *   (`rank: String(i + 1)`, `desktop.dc.html:3150`), while this product's is a
+ *   (`rank: String(i + 1)`, `desktop.dc.html:3155`), while this product's is a
  *   stored number that nothing enforces uniqueness on.
  * - **the `"N tickets"` meta segment — HELD, the same register row.** Unlike the
  *   reorder, this one genuinely needs server surface: the only population read is
@@ -62,7 +62,7 @@ import { TypeIcon } from './icons.js';
  *   workflow it was created under, so that number stops being the type's count
  *   the moment a rebind leaves tickets behind — which is why the meta line names
  *   `rank N · N fields · <workflow name>` and no count at all, and why this
- *   screen's earlier note (`:17-23`) refused to print one.
+ *   screen's earlier note (`:100-107`) refused to print one.
  *   **If it needs a new projection rather than a query, it is a different size of
  *   task** (`docs/superpowers/plans/2026-09-18-settings-workflows-port.md:162`).
  *
@@ -75,7 +75,7 @@ import { TypeIcon } from './icons.js';
  * rows list, the same shape and the same token `.gn-members__row` already ships
  * (`apps/web/app/globals.css:1524`). **Two other families in this repo ported
  * this same construct to ODD and therefore read inverted against the prototype
- * (`.gn-list__table-row`, `ui.css:1088`; `.gn-timeline__row`, `:2671`) — that
+ * (`.gn-list__table-row`, `ui.css:1088`; `.gn-timeline__row`, `:2703`) — that
  * inversion is already recorded, with a named owner, at `globals.css:1518-1523`,
  * and harmonising them is not this screen's to do.**
  *

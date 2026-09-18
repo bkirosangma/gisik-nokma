@@ -237,11 +237,12 @@ describe('TicketTypeListScreen', () => {
     // the four seeds.
     expect(rowTexts[4]).toContain('Invoice');
     expect(rowTexts.slice(0, 4).some((text) => text.includes('Invoice'))).toBe(false);
-    // The control: the two stripes are distinguishable by POSITION, so a
-    // selector keyed on `:nth-child(even)` has five rows to choose from and
-    // picks two of them (rows 2 and 4) — not zero, and not all five.
-    const evenRows = children.filter((_, index) => (index + 1) % 2 === 0);
-    expect(evenRows).toHaveLength(2);
+    // NO "the even rows number two" assertion here, deliberately. It would be
+    // arithmetic off `toHaveLength(5)` two lines up — a control that cannot fail
+    // independently of the assertion beside it. The parity itself is not this
+    // half's to measure: it is read out of `ui.css` in
+    // `packages/ui/test/tokens.test.ts`, which is the only place it can be
+    // falsified.
   });
 });
 

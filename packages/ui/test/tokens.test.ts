@@ -1566,12 +1566,32 @@ describe('13.920 — a workflow state chip keeps a boundary under neo, and its c
  * (`desktop.dc.html:3159`, blob `6d7b67c0a52c`), so the tint falls on the
  * **1-indexed EVEN** rows. That is the whole content of the construct and it is
  * silently invertible: **two families in this repo already inverted it**
- * (`.gn-list__table-row`, `ui.css:1088`; `.gn-timeline__row`, `:2671` — both
- * `odd`), which is why the assertion below is a PAIR that reads the sibling
- * rules as its control rather than trusting this rule's own text. The second is
- * that the stripe is VISIBLE — a fill that composites to its own ground is a
- * stripe that draws nothing, the identical defect class 13.920 measured for the
- * state chip under `neo`.
+ * (`.gn-list__table-row`, `ui.css:1088`; `.gn-timeline__row`, `:2703` — both
+ * `odd`). The second is that the stripe is VISIBLE — a fill that composites to
+ * its own ground is a stripe that draws nothing, the identical defect class
+ * 13.920 measured for the state chip under `neo`.
+ *
+ * **What the control does and does not prove, because a control is where this
+ * repo's defects hide.** The parity case reads the selector out of `ui.css`, so
+ * the parity it asserts is the stylesheet's and not this file's. The control
+ * then reads the two inverted siblings **through the same instrument, on the
+ * same token**, and asserts their parity is the OTHER one — proving the two
+ * parity strings are distinguishable here and that this rule is not merely
+ * matching a sibling. **It does not prove how a browser stripes**, which needs a
+ * rendered page and which no case in this repo has; and it does not prove the
+ * siblings are *harmonised*, because nothing here changes them. Both limits are
+ * stated rather than left to be inferred from a green tick.
+ *
+ * **The ground is the CARD, not the row.** The zebra rule REPLACES
+ * `.ticket-type-list__row`'s own `background` rather than layering over it — one
+ * element paints one background — and neither `.ticket-type-list__rows` nor
+ * `.ticket-type-list__card` sets one, so the translucent stripe composites over
+ * `.gn-card`'s `--gn-surface-raised`. The first draft of this case measured
+ * against `surfaceSunken`, the fill the stripe replaces, and two of its four
+ * pinned readings therefore described a layer that is not on screen. Under `neo`
+ * the two roles are the same hex (`neoPaper`), which is why the error hid there
+ * and only showed under `hig`. 13.920 composites its chip over `surfaceRaised`
+ * for the same reason.
  */
 describe('13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and the stripe is visible', () => {
   const ZEBRA = '.ticket-type-list__rows li:nth-child(even) .ticket-type-list__row';
@@ -1592,20 +1612,39 @@ describe('13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and t
   };
 
   it('the parity is EVEN, and the two inverted families read ODD — the control', () => {
+    // LOOK THIS STRING UP IN THE FILE FIRST. It is what makes the parity
+    // assertions below facts about `ui.css` rather than about a literal in this
+    // test: if the selector is not in the stylesheet, nothing after it means
+    // anything, and this read is the only reason a `toMatch` on `ZEBRA` is not
+    // a tautology.
     expect(declarationsFor(UI_CSS_TEXT, ZEBRA), `${ZEBRA} not found in ui.css`).not.toBeNull();
-    // The parity itself, read out of the selector rather than restated here.
-    expect(ZEBRA).toContain(':nth-child(even)');
-    expect(ZEBRA).not.toContain('odd');
+    expect(ZEBRA).toMatch(/:nth-child\(even\)/);
+    expect(ZEBRA).not.toMatch(/odd/);
 
-    // THE CONTROL, and it is what makes the assertion above a measurement
-    // rather than a restatement: the same instrument, on the two families this
-    // port found inverted. If the sweep could not tell the parities apart, it
-    // would report ODD for these too and the pair would prove nothing.
-    expect(declarationsFor(UI_CSS_TEXT, '.gn-list__table-row:nth-child(odd)'), 'control: gn-list').not.toBeNull();
-    expect(
-      declarationsFor(UI_CSS_TEXT, '.gn-timeline__row:nth-of-type(odd)'),
-      'control: gn-timeline',
-    ).not.toBeNull();
+    // THE CONTROL — same instrument, same TOKEN, the OPPOSITE parity, on the
+    // two families this port measured as inverted. See the docblock for what
+    // this does and does not prove.
+    const inverted = [
+      { selector: '.gn-list__table-row:nth-child(odd)', label: 'gn-list' },
+      { selector: '.gn-timeline__row:nth-of-type(odd)', label: 'gn-timeline' },
+    ] as const;
+    const siblingParities = new Set<string>();
+    for (const { selector, label } of inverted) {
+      const body = declarationsFor(UI_CSS_TEXT, selector);
+      expect(body, `control: ${label} not found in ui.css`).not.toBeNull();
+      // The SAME token, so parity is the only thing that differs between the
+      // control and the rule under test.
+      expect(body, `control: ${label} must stripe with the same token`).toMatch(
+        /background:\s*var\(--gn-fill-quaternary\)/,
+      );
+      const parity = /:nth-(?:child|of-type)\((odd|even)\)/.exec(selector)?.[1];
+      expect(parity, `control: ${label} carries no parity`).toBe('odd');
+      siblingParities.add(parity!);
+    }
+    // A SET DIFFERENCE rather than a count: the control agrees with the rule
+    // under test on the token and disagrees on the parity, and that difference
+    // is the whole claim.
+    expect(siblingParities.has('even')).toBe(false);
   });
 
   it('the stripe differs from the row it sits on, in every style and theme', () => {
@@ -1631,13 +1670,29 @@ describe('13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and t
     // still has to keep the stripe visible below, and this says which one it
     // is meant to be.
     expect(stripeRole).toBe('fillQuaternary');
-    // The row's ground is the row's own resting fill, likewise read from the
-    // rule rather than assumed to be `surfaceSunken` forever.
-    const rowBody = declarationsFor(UI_CSS_TEXT, '.ticket-type-list__row');
-    if (rowBody === null) throw new Error('.ticket-type-list__row rule not found in ui.css');
-    const groundNamed = /(?:^|[\s;])background:\s*var\(--gn-([a-z-]+)\)/.exec(rowBody)?.[1];
+
+    // THE GROUND IS THE CARD, NOT THE ROW'S OWN FILL. The zebra rule REPLACES
+    // `.ticket-type-list__row`'s background rather than layering over it — one
+    // element paints one background — and neither `.ticket-type-list__rows` nor
+    // `.ticket-type-list__card` sets one, so what is behind the translucent
+    // stripe is `.gn-card`'s fill. Read from that rule, not named here.
+    const cardBody = declarationsFor(UI_CSS_TEXT, '.gn-card');
+    if (cardBody === null) throw new Error('.gn-card rule not found in ui.css');
+    const groundNamed = /(?:^|[\s;])background:\s*var\(--gn-([a-z-]+)\)/.exec(cardBody)?.[1];
+    if (groundNamed === undefined) {
+      throw new Error(`.gn-card declares no \`background: var(--gn-…)\`; it reads: ${cardBody.trim()}`);
+    }
     const groundRole = TOKEN_ROLES.find((candidate) => cssVariableName(candidate) === `--gn-${groundNamed}`);
-    if (groundRole === undefined) throw new Error(`.ticket-type-list__row's ground names --gn-${groundNamed}`);
+    if (groundRole === undefined) throw new Error(`.gn-card's ground names --gn-${groundNamed}`);
+    // The intermediary is asserted to carry no fill of its own, so the card
+    // really is the layer behind the row rather than an assumption.
+    for (const between of ['.ticket-type-list__card', '.ticket-type-list__rows']) {
+      const body = declarationsFor(UI_CSS_TEXT, between);
+      expect(body, `${between} not found in ui.css`).not.toBeNull();
+      expect(body, `${between} must not paint between the card and the stripe`).not.toMatch(
+        /(?:^|[\s;])background:/,
+      );
+    }
 
     const measured: Record<string, number> = {};
     for (const style of STYLE_NAMES) {
@@ -1653,10 +1708,32 @@ describe('13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and t
     }
     // The floor above is the guarantee; these are the readings it was set from,
     // so a palette nudge that keeps the case green still shows up as a movement.
-    expect(measured['hig/light']).toBeCloseTo(1.0951, 3);
-    expect(measured['hig/dark']).toBeCloseTo(1.2536, 3);
+    // All six combinations are pinned, not four: `minimal` shares `hig`'s
+    // primitives today, and a palette edit that separated them would otherwise
+    // move a measured value with nothing to catch it.
+    expect(measured['hig/light']).toBeCloseTo(1.1026, 3);
+    expect(measured['hig/dark']).toBeCloseTo(1.2727, 3);
+    expect(measured['minimal/light']).toBeCloseTo(1.1026, 3);
+    expect(measured['minimal/dark']).toBeCloseTo(1.2727, 3);
     expect(measured['neo/light']).toBeCloseTo(1.0757, 3);
     expect(measured['neo/dark']).toBeCloseTo(1.1727, 3);
+  });
+
+  it('the h2 carries the prototype metrics, so the third string is ported and not just relabelled', () => {
+    // The dispatch names THREE strings and two of them are witnessed in the
+    // component half (the action label, the summary sentence). This is the
+    // third: the heading's own TEXT never changed — only its metrics — so a
+    // component test that asserts the class cannot see it, and the port would
+    // otherwise be unpinned.
+    const body = declarationsFor(UI_CSS_TEXT, '.ticket-type-list__title');
+    if (body === null) throw new Error('.ticket-type-list__title rule not found in ui.css');
+    // `20px/25px/600` at `desktop.dc.html:820`, carried as rem at the 16px root.
+    expect(body).toMatch(/font-size:\s*1\.25rem/);
+    expect(body).toMatch(/line-height:\s*1\.5625rem/);
+    expect(body).toMatch(/font-weight:\s*600/);
+    // The metrics are the delta; the text is not. Stated so a reader does not
+    // mistake this for a copy change.
+    expect(body).not.toMatch(/content:/);
   });
 
   it('hover still wins on a striped row — the tie is broken by source order, not by !important', () => {
@@ -1673,5 +1750,15 @@ describe('13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and t
     // `hover` keeps the `li` that raises it to the tie — the bare selector is
     // the shape that loses, so its absence is the assertion.
     expect(declarationsFor(UI_CSS_TEXT, '.ticket-type-list__row:hover')).toBeNull();
+
+    // `!important` is the OTHER way this tie gets broken, and the name of this
+    // case claims it is not the way — so it is READ, not assumed. Without this
+    // the whole case would still pass with `!important` on the stripe, which is
+    // exactly the defect it exists to prevent: hover dying silently on the
+    // striped rows.
+    const stripeBody = declarationsFor(UI_CSS_TEXT, ZEBRA);
+    expect(stripeBody, `${ZEBRA} not found in ui.css`).not.toBeNull();
+    expect(stripeBody, 'the stripe must not reach for !important').not.toMatch(/!\s*important/);
+    expect(declarationsFor(UI_CSS_TEXT, ZEBRA_HOVER), 'nor may hover').not.toMatch(/!\s*important/);
   });
 });

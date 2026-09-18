@@ -11881,6 +11881,7 @@ should be dispatched as its own task rather than folded into this slice.
 
 **No test was added and no test changed.** 13.920's pins are unchanged and still pass; this change
 touches one docblock, `Features.md`, and this file.
+
 ## settings → workflows: the `isTypes` zebra and three strings — and two items the dispatch ordered that the hold register says are HELD (executor 2, 2026-09-18) — case `13.894`
 
 Task 7 of the settings-workflows plan (`docs/superpowers/plans/2026-09-18-settings-workflows-port.md:146`),
@@ -11898,7 +11899,7 @@ knowing before concluding one of them is stale.
   `(i % 2 ? ";background:var(--fill4)" : "")` over a **0-based** `i` (`:3159`), so the tint falls on the
   **1-indexed EVEN** rows. That single bit is silently invertible and **two families in this repo already
   inverted it** — `.gn-list__table-row:nth-child(odd)` (`packages/ui/src/ui.css:1088`) and
-  `.gn-timeline__row:nth-of-type(odd)` (`:2671`), both ODD, both therefore reading inverted against the
+  `.gn-timeline__row:nth-of-type(odd)` (`:2703`), both ODD, both therefore reading inverted against the
   prototype. Those two are **already recorded with a named owner** at `apps/web/app/globals.css:1518-1523`
   (*"owner: whoever next touches those two families"*), so this change adds the third member of the
   MATCHING set — `.gn-members__row:nth-child(even)` (`:1524`) was the first — and **re-records nothing and
@@ -11973,3 +11974,56 @@ knowing before concluding one of them is stale.
   `packages/ui/src/ui.css`, `apps/web/test/settings-page.test.tsx`,
   `packages/app-core/test/ticket-types/ticket-types.test.tsx`, `packages/ui/test/tokens.test.ts`,
   `docs/manual.md`, `packages/app-core/src/help/content.generated.ts`, `Features.md`
+
+### The review round — three Important, and one of them was in the test's own evidence
+
+One reviewer at `0fd14cd8`, read-only, record before the PR. **No Critical.** The port itself held —
+parity, specificity, source order, the DOM precondition and the rename all verified. All three Important
+findings were defects in **what the new evidence claimed about itself**, which is the class this repo
+catalogues most.
+
+- **I1 — the visibility pin composited against a layer the change itself replaces.** The zebra rule sets
+  `background` on the row; it does not layer over the row's own fill, and neither
+  `.ticket-type-list__rows` nor `.ticket-type-list__card` sets one — so the translucent stripe composites
+  over **`.gn-card`'s `--gn-surface-raised`**, not over `--gn-surface-sunken`. Under `neo` the two roles are
+  the same hex, which is why the error hid there and only showed under `hig`. **Corrected and re-measured:
+  1.1026 / 1.2727 (hig and minimal, light and dark) and 1.0757 / 1.1727 (neo)** — the stripe is *more*
+  visible than first asserted, so the error was conservative, but two of the four pinned numbers did not
+  describe the browser. All six style/theme combinations are now pinned rather than four. **13.920
+  composites its chip over `surfaceRaised` for the same reason**, so this was a divergence from the file's
+  own precedent.
+- **I2 — the hover case's name claimed a property no assertion read.** *"…not by `!important`"*, with
+  nothing reading the stylesheet for `!important`: a mutation adding it to the stripe left the case green,
+  which is precisely the defect the case exists to prevent — hover dying silently on the striped rows. The
+  claim is now read, not assumed: **`!important` on the stripe alone reddens that case.**
+- **I3 — five citations did not resolve, and two of them were invalidated by this change's own edit.**
+  `ui.css:2671` → **`:2703`** (my +32 lines moved it; the number appeared in four artifacts), the
+  row-as-door owner quote `ui.css:1603-1611` → **`:1811-1812`**, `desktop.dc.html:3150` → **`:3155`** for
+  `rank: String(i + 1)`, and the docblock's self-citations `:65-70`/`:17-23` → **`:149-177`**/**`:100-107`**.
+  **A citation that points into the docblock being read is the worst kind**: the reader cannot tell a stale
+  number from a forward reference. All corrected.
+
+**Also fixed:** the parity case's two `toContain` lines were tautologies on this file's own literal (kept
+only because the not-null read of that exact string out of `ui.css` is what makes them facts about the
+stylesheet — now stated); the "control" that asserted the siblings merely *exist* was **overstated** in its
+own comment and now reads their parity and their token through the same instrument, reporting the two
+limits it cannot cover; a "the even rows number two" control in the component half was **arithmetic off the
+`toHaveLength(5)` beside it** and has been **removed rather than padded**, with the reason recorded; and the
+h2's `20px/25px/600` — the third of the three ported strings — was pinned by **nothing**, so it now has its
+own case.
+
+**MUTATION BATTERY AFTER THE FIX ROUND — eight, each killed, all restored sha256-verified in the same
+invocation, the last two surgical (one rule, not the twelve an earlier `sed` matched).** Parity
+`even`→`odd`: 3 killed. Hover at the bare selector: **1, its own site.** Stripe repointed to the ground:
+**1, its own site.** `!important` added to the stripe: **1, its own site** — the reviewer's gap, now
+closed. Title metrics reverted: **1, its own site.** Row stops being an `<li>`: 3. Action label and summary
+reverted: **1 each.**
+
+**ONE FINDING IS REPORTED AND NOT FIXED, WITH A NAMED OWNER.** This change adds 83 lines to the top of the
+screen file, so citations to that file in **files this change does not touch** are now off:
+`docs/design/prototype-delta-2026-09-18.md:622` cites `ticket-type-list-screen.tsx:56`/`:50-52` and
+`ui.css:1590`, and the plan cites `ticket-type-list-screen.tsx:17-23`. `check:citations` passes — these are
+prose citations and it does not cover them. **They are recorded rather than rewritten**, because the delta
+doc is a dated audit snapshot whose line numbers describe the tree at audit time, and because two other
+writers hold conflicting claims on those files. **Owner: the controller, at the next settings-cluster
+sweep.**

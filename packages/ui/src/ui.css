@@ -1782,7 +1782,8 @@
      OUTLINE (see CONTRAST_PAIRS' focusRing-on-surface entry, minimum 3),
      not as a background fill. `--gn-fill-tertiary` is the alpha
      fill-hierarchy tier already used for row hover
-     (.gn-table__row--clickable:hover, .ticket-type-list__row:hover) —
+     (.gn-table__row--clickable:hover, and `.ticket-type-list__row:hover` as
+     raised to `(0,3,1)` below so it outranks that family's own zebra) —
      reused here rather than inventing a new hover treatment.
      No literal curly braces in this comment: components.test.tsx's
      rule() helper captures everything up to the first closing brace
@@ -1846,7 +1847,7 @@
    also where the parity is worked through.
 
    THE PRODUCT'S OTHER TWO ZEBRAS DIFFER, AND THAT IS RECORDED RATHER THAN
-   HARMONISED. `.gn-list__table-row` (`:1088`) and `.gn-timeline__row` (`:2671`)
+   HARMONISED. `.gn-list__table-row` (`:1088`) and `.gn-timeline__row` (`:2703`)
    both stripe the ODD child, so those two families read INVERTED against the
    prototype. **The measurement and its named owner already exist**
    (`globals.css:1518-1523`: *"owner: whoever next touches those two families"*),
