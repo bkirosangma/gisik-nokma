@@ -164,8 +164,13 @@ type Signature = {
  *     this is the one discriminator that works everywhere.
  *
  *   `.gn-legal__title` / `.gn-notfound__title` font-size
- *     25.6px (`1.6rem`)  — apps/web/app/globals.css:69-74
- *     21.6px (`1.35rem`) — apps/web/app/globals.css:219-220, under (max-width: 40rem)
+ *     34px   (`34px`)    — apps/web/app/globals.css:1913-1923 (Step 2c-2,
+ *                          2026-09-18 — the refreshed export's heading scale,
+ *                          replacing `1.6rem`. Was 25.6px before this change.)
+ *     21.6px (`1.35rem`) — apps/web/app/globals.css:2241, under (max-width: 40rem)
+ *                          — UNCHANGED by that port, deliberately: the export is
+ *                          a desktop mockup and says nothing about 390px, so
+ *                          the product's own downscale stands.
  *
  *   `.gn-notfound__actions` flex-direction
  *     row    — apps/web/app/globals.css:116-121
@@ -763,14 +768,22 @@ for (const route of UNAUTHED_ROUTES) {
       .toBe(spec.narrow60rem ? 12 : 20);
 
     if (sig.titleFontSize !== null) {
-      // globals.css:73 (1.6rem) vs globals.css:219-220 (1.35rem)
+      // globals.css (34px, the export's scale) vs the (max-width: 40rem)
+      // override (1.35rem). The WIDE value moved 25.6 → 34 in Step 2c-2
+      // (2026-09-18): the base rule took the refreshed export's heading scale,
+      // and the phone override deliberately did NOT follow it — the export is a
+      // desktop mockup and says nothing about a 390px viewport, so the
+      // product's own downscale stands. That is also why this discriminator
+      // still exists at all: had the phone rule been dropped with it, the title
+      // would have been 34px at every width and this field could no longer tell
+      // 768 from 1512.
       expect
         .soft(
           sig.titleFontSize,
           `title font-size at ${spec.width}px: (max-width:40rem)=${String(spec.narrow40rem)} ` +
-            `implies ${spec.narrow40rem ? 21.6 : 25.6}px (globals.css:73 / :219-220)`,
+            `implies ${spec.narrow40rem ? 21.6 : 34}px (globals.css 34px / its 40rem override)`,
         )
-        .toBeCloseTo(spec.narrow40rem ? 21.6 : 25.6, 1);
+        .toBeCloseTo(spec.narrow40rem ? 21.6 : 34, 1);
     }
     if (sig.helpH2FontSize !== null) {
       // ui.css `.gn-help__h2` (1.375rem) vs its (max-width: 40rem) override (1.15rem)
@@ -1491,7 +1504,7 @@ test('layouts at 390, 768 and 1512 are measurably DIFFERENT, not just each self-
     phone.sig.titleFontSize,
     `.gn-notfound__title font-size is IDENTICAL at 390px and 768px ` +
       `(${String(phone.sig.titleFontSize)}px both). The (max-width: 40rem) query at ` +
-      `globals.css:219-220 did not apply.`,
+      `globals.css:2241 did not apply.`,
   ).not.toBe(tablet.sig.titleFontSize);
   expect(
     phone.sig.notFoundActionsDirection,

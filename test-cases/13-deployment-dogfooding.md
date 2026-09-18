@@ -2102,8 +2102,12 @@ because the finding underneath it is a product gap, not a styling one.*
   was ALREADY `margin: 3rem auto` and therefore already centred horizontally, and a declaration does
   not say which axis a reader sees. Mutation: deleting `justify-content` reddens (b) on all three
   viewports; deleting the two `min-height` lines reddens (a). — (`apps/web/e2e-viewport/responsive.spec.ts`)
-- **13.322** ✅ `/privacy` carries a Back control, and **the branch that matters is the one without
-  history.** The accessible name is `Back to the previous page` while the visible word is `Back` —
+- **13.322** ✅ **SUPERSEDED 2026-09-18 (Step 2c-2) — its SUBJECT is gone, not its claim being false.**
+  The refreshed export's `isLegal` block draws a top bar with **no back affordance at all**
+  (`desktop.dc.html@6d7b67c0a52c:1720-1755`), so the control this case witnessed was removed by the
+  port. Read the block at the end of this file for what replaced it and what was lost with it; the
+  text below is kept because the ruling it pinned was real. — `/privacy` carries a Back control, and
+  **the branch that matters is the one without history.** The accessible name is `Back to the previous page` while the visible word is `Back` —
   asserted as containment, which is WCAG 2.5.3 (Label in Name) and what keeps voice control working.
   With `history.length > 1` the control calls `router.back()` and never `push`; with `history.length`
   driven to 1 it calls `push('/sign-in')` and never `back()`. *An unconditional `router.back()` is
@@ -2111,7 +2115,8 @@ because the finding underneath it is a product gap, not a styling one.*
   reader who opened the link in a new tab, where `back()` is a silent no-op and the page appears
   frozen.* Mutation: deleting the `history.length > 1` guard reddens the second case alone. —
   (`apps/web/test/not-found-and-legal.test.tsx`)
-- **13.323** ✅ The same pair for `/terms`. Both pages get the case because both had the same defect:
+- **13.323** ✅ **SUPERSEDED 2026-09-18 (Step 2c-2), the same removal as 13.322.** — The same pair for
+  `/terms`. Both pages get the case because both had the same defect:
   they linked only to EACH OTHER, so a reader arriving from the sign-in card could cross between them
   indefinitely without ever returning. — (`apps/web/test/not-found-and-legal.test.tsx`)
 
@@ -7653,3 +7658,105 @@ declared in `packages/ui/test/tokens.test.ts`.
 - ✅ **13.680 — the export's new light-neo SELECTOR is not ported, and the light-neo set is reachable with NO `data-theme` attribute.** The export moved its light-neo block to `body[data-theme="light"][data-style="neo"]`, which matches only when the theme is exactly `light`. This product treats light as the ABSENCE of the attribute, so adopting the selector verbatim would have dropped the entire light-neo token set for every user who has never chosen a theme — the default state. The case is a NEGATIVE one in the strict sense: it asserts the compound selector is absent AND that the bare `[data-style="neo"]` arm is emitted carrying `--gn-surface: #f1eae3`, so the values are reachable with no theme attribute at all. Both dark paths (explicit attribute, and OS preference when unchosen) are asserted still present. (`packages/ui/src/tokens.ts`, `packages/ui/test/tokens.test.ts`)
 
 - ✅ **13.681 — every contrast floor clears on the re-derived palette, and the roster was not weakened to reach them.** All `CONTRAST_PAIRS` rows across 3 styles × 2 themes, plus two things a bare pass/fail loop cannot state: the roster's SIZE is unchanged at 33 (a floor removed is a guarantee removed, and it would show here first), and no `minimum` sits below 3. The five roles T5 added are GROUNDS that no `CONTRAST_PAIRS` row names, so their obligation is measured here instead of left unstated — `dangerText`/`warningText`/`successText` on their own colours at 4.5, and `restricted`/`customMarker` against the surface at the 4.5 they actually need. **`contested` is the exception and is recorded rather than blessed:** it has no `*Text` role, but it IS read text today — `.gn-sync-status-bar__failed` sets `color: var(--gn-contested)` on `background: var(--gn-surface)` (`ui.css:2602`, consumed at `sync-status-bar.tsx:85`, 13.6px normal weight, so AA wants 4.5 and not the 3 its `CONTRAST_PAIRS` row declares) — and in `hig`/`minimal` light it measures **4.3746, below 4.5**. PRE-EXISTING and untouched by this change; `neo` light is 6.02, so T5 incidentally fixed it in the one style it touched. The case pins the failing value so a green 3:1 cannot absorb it. Its siblings go with it, measured and equally unblessed: `warning` on surface 4.2485 and `danger` on surface 4.4013 in `hig`/`minimal` light, pairs that **no `CONTRAST_PAIRS` row names at all**. Owner: whoever next touches the sync status bar or the `contested`/`warning`/`danger` roles. (`packages/ui/src/tokens.ts`, `packages/ui/test/tokens.test.ts`, `Features.md`)
+
+---
+
+## Step 2c-2 (2026-09-18) — the legal pair and the 404, to the refreshed export
+
+**Block `13.682`–`13.689`**, allocated by `CTL-DISPATCH-2026-09-18-step2c2-legal-notfound.md`. The
+highest id in this file before the block was `13.681` (2c-1's); **the next free id is therefore
+`13.690`**, recounted at this tip with the per-style counts rather than assumed — `node
+scripts/check-case-ids.mjs` reads **2196 unique ids** on the base and **2204** after this block, +8.
+
+The spec is `docs/design/prototype-delta-2026-09-18.md`'s own audit of the two blocks — `isLegal`
+(`desktop.dc.html@6d7b67c0a52c:1720-1755`) and `isNotFound` (`:1844-1862`) — whose verdicts are
+`port (M)` and `port (S)`. Both verdicts are NARROWER than their screen names suggest, and every case
+below sits on the narrow side of one of them: the legal port is three items plus a bar, and the 404's
+is three items with **no copy change at all**.
+
+**`13.322` and `13.323` are SUPERSEDED here** — not deleted, not renumbered, and not because they were
+wrong. The export's `isLegal` block draws **no back affordance anywhere in `:1720-1755`**, which was
+the dispatch's own condition for replacing `BackButton` rather than keeping both. What that costs,
+stated because a supersession that reads as a pure upgrade is how a loss goes unnoticed: the removed
+control's no-history branch went to `/sign-in`, and the bar's `Sign in` link goes to the same route,
+so a reader who landed with no history still has a destination — **the one-press return for a reader
+who DOES have history is gone**, and the export leaves them the browser's chrome and nothing else.
+
+**Every case in this block was mutation-witnessed, and the table is the evidence rather than the
+claim.** Twelve mutations, each reddening exactly the case(s) named: label rename → 13.685 · both tabs
+current → 13.684 · no tab current → 13.684 · hand-typed anchor row → 13.683 · row removed →
+13.683 + 13.685 · third 404 link removed → 13.687 · icon tile removed → 13.686 · 404 copy replaced →
+13.689 · heading size reverted → 13.688 · 520px column removed → 13.688 · bar removed → 13.682 ·
+`Back` control re-added → 13.682 + 13.685. **The first run of that table reported a mutation CLEAN
+and was wrong**: the mutation broke the JSX, vitest printed `Tests  no tests`, and a parser that only
+looks for `FAIL` lines cannot tell "nothing failed" from "nothing ran". The harness now requires the
+run's own summary line before it will report anything, which is the same rule this file's
+`rawMatches` controls exist for.
+
+- ✅ **13.682 — the legal pages carry the export's bar, and the `Back` control it replaced is gone.**
+  Two halves, and the second is the load-bearing one: asserting the `Sign in` link exists would pass
+  just as well against a page that kept `BackButton` beside the bar, which is exactly the shape the
+  dispatch rejected. So the absence is asserted by the old control's own accessible name
+  (`Back to the previous page`) — the same string 13.322/13.323 queried — and the two mutations fire
+  on opposite halves. The bar itself is the product's `.gn-nav` chrome, not a bespoke one, which is
+  what brings the 2.75rem tap floor and `--gn-surface` with it. (`apps/web/src/legal-nav.tsx`,
+  `apps/web/app/privacy/page.tsx`, `apps/web/app/terms/page.tsx`, `apps/web/app/globals.css`)
+- ✅ **13.683 — the anchor row IS the page's headings, label for label and anchor for anchor.** The
+  dispatch's words were "built from the pages' existing headings — not a hand-typed list", and this
+  is that property made checkable: each anchor's text equals its `<h2>`'s text, in order, and each
+  `href` equals that heading's own `id` prefixed with `#`. A second, independently typed list of
+  section names fails it the moment a heading is added, renamed or reordered — the only way this
+  drifts in practice. **Its boundary, stated rather than implied:** the comparison is against the
+  RENDERED headings, so a hand-typed row that happens to match today passes; what it cannot do is keep
+  passing after the next edit to either side. *(A first version found the row with
+  `getByRole('navigation', { name: 'On this page' })`, which made the label-rename mutation redden this
+  case as well as 13.685 — one mutation, two sites, neither case naming its own. It finds the row by
+  class now.)* (`apps/web/src/legal-chrome.tsx`, both pages)
+- ✅ **13.684 — the tab pair links the two legal routes and marks exactly ONE as current.** Exactly
+  two links, hrefs `/privacy` and `/terms` in that order, and `aria-current="page"` on the page's own
+  route and on nothing else — the failure a current-page indicator exists to prevent, and `aria-current`
+  on an `<a>` is what a screen reader announces as "current page". Both mutations fire: marking both
+  current, and marking neither. The class assertion is not cosmetic — the segments ride the SHARED
+  `.gn-segmented` control, and that inheritance is what carries the tap floor, the focus ring and
+  `--gn-text`'s contrast pair. (`apps/web/src/legal-chrome.tsx`, `apps/web/app/globals.css`)
+- ✅ **13.685 — the anchor row is named `On this page`, and it is the page's ONLY label.** The dispatch
+  required the new accessible names asserted BY STRING, because `e2e-viewport`'s sweep counts
+  ATTRIBUTES — it cannot tell this label from any other, so a rename would keep its count at 1 while
+  the announced name changed underneath. The label is load-bearing twice: it distinguishes this page's
+  two `<nav>` landmarks from each other, which ARIA requires; and it is what holds `/privacy` and
+  `/terms` at `ariaLabel: 1` in the baseline after `BackButton`'s label left with the control. **That
+  swap is precisely what the ratchet cannot judge** — its own docblock says an equal-count swap "is not
+  this gate's business ... that is the copy rule, reviewed by a person" — so it is pinned here instead
+  of absorbed by a number that did not move. `toBe(1)` and not "at least 1": a second label appearing
+  silently makes the live count RISE, and a rise is the direction nothing checks.
+  (`apps/web/src/legal-chrome.tsx`)
+- ✅ **13.686 — the 404 leads with the export's 72px tile, and it is hidden from assistive tech.** Three
+  properties with three reasons: `aria-hidden` because the tile repeats what the `h1` says and a screen
+  reader hearing it twice is a regression, not a decoration; the 34px svg box inside a 72px tile
+  because that is the export's own geometry (`:1847`); and the glyph's two cross strokes, which are
+  what make it this screen's mark rather than the bar's brand tile. (`apps/web/app/not-found.tsx`,
+  `apps/web/app/globals.css`)
+- ✅ **13.687 — the 404 offers the manual as a THIRD action, in the export's order, into a real route.**
+  The ORDER is asserted, not just the set: the export draws workspaces / manual / inbox
+  (`:1855-1857`), and this page's two existing links already agreed with it, so inserting the manual
+  anywhere else would have been arbitrary against both. `Search the manual` is the export's own label
+  and one of the two new accessible names the dispatch required BY STRING. A positive control on the
+  target asserts `app/help/page.tsx` exists on disk — "the route exists" was the audit's own reason for
+  calling this a bounded addition rather than a wire gap, and if that page is ever removed this reddens
+  here rather than shipping a link into a 404. (`apps/web/app/not-found.tsx`)
+- ✅ **13.688 — both headings take the export's 34/41/700/-0.4px at 72ch, and the 404 is a centred
+  520px column.** Read from the CSS SOURCE, because that is where those numbers live and jsdom resolves
+  neither an external stylesheet nor `ch` — a computed-style assertion here would measure nothing and
+  pass. The positive control is the RETIRED value: `1.6rem` must be absent from the rule, or the
+  assertions above describe a declaration something further down the file still overrides. Both
+  mutations fire — reverting the size, and deleting the 520px column. (`apps/web/app/globals.css`)
+- ✅ **13.689 — the export's 404 wording is ABSENT and the product's own three causes are intact.** The
+  one case here about what did NOT change, and the reason the reviewer's brief names it. The export
+  says "This page isn't here" and "Nothing was deleted."; adopting either would answer a question this
+  page exists to refuse — the API returns the same 404 for a thing that is absent and a thing that is
+  not yours, so a lead asserting nothing was deleted is false in one of the two cases and quietly so.
+  The third absent string is the export's illustrative `Last updated 8 September 2026`, which the audit
+  measured at zero product hits and which must not replace the `[DATE]` placeholder 13.251 counts.
+  BOTH directions are asserted, because either alone has a way to pass while being wrong: only the
+  absences would pass against a page somebody emptied, and only the presences would pass against one
+  that added the export's wording underneath. (`apps/web/app/not-found.tsx`)
