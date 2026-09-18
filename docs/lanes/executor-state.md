@@ -60,14 +60,15 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | | |
 > |---|---|
 > | branch | `exec/hig-6b-13306-resolution-pair`, cut from `origin/main` `7f9329cc`. **Upstream UNSET deliberately** — a branch cut from `origin/main` inherits it as upstream, and a bare `git push` would then target `main`. |
-> | the change | `git diff --name-only origin/main` → `Features.md`, `packages/app-core/test/contests.test.tsx`, `test-cases/13-deployment-dogfooding.md` |
+> | the change | **three product/doc files** — `Features.md`, `packages/app-core/test/contests.test.tsx`, `test-cases/13-deployment-dogfooding.md` — **plus THIS FILE**, which is why the literal `git diff --name-only origin/main` prints four. A handoff that edits itself cannot list itself as absent. |
 > | ledger `hig-per-screen/6b` | **NOT touched — see ruling 1.** The ledger is the controller's. |
 >
 > ## WHAT THE GUARD ASSERTS, AND THE FLAG IT CARRIES
 >
-> `ContestBanner` renders exactly three controls. The case pins them **by exact accessible name**
-> (`Redo legally` / `Convert to comment` / `Discard`), asserts the prototype's `Keep mine` / `Keep theirs`
-> are absent by role and in the rendered text, and asserts the control set is **exactly three**.
+> The case renders the REAL `ContestBanner` and asserts FOUR things: the three shipped controls **by exact
+> accessible name** (`Redo legally` / `Convert to comment` / `Discard`); that each submits **its own
+> resolution kind**, in order; that no control matching `Keep mine` / `Keep theirs` exists by role or in
+> the rendered text; and that the set is **exactly three per OPEN contest** (six for two contests).
 >
 > **The exactness is the part that was missing:** the pre-existing arm (12.193, cited as `13.305`'s
 > witness) finds its third control with `/discard/i`, which the prototype's OWN third label
@@ -75,9 +76,12 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > **THE FLAG, recorded in the case rather than smoothed over:** `ContestBanner` is mounted NOWHERE in the
 > product (`docs/hig-reconciliation-audit.md:577`) and TicketSheet imports no contest component at all, so
-> this is a **COMPONENT-level** guard. **It does not witness what the ticket surface renders — there is no
-> such surface — and the row must not be promoted as though it did.** The ✅ is on the guard's own terms,
-> which is what the ❌ asked for.
+> this is a **COMPONENT-level** guard. **It says nothing about any screen, and the row must not be promoted
+> as though it did.** An earlier draft of this block said *"there is no such surface"* — **that was WRONG,
+> and the review caught it:** the WEB ticket sheet renders no contest UI, but the **MOBILE ticket screen
+> renders its OWN three buttons from its own markup** (`apps/mobile/src/screens/ticket-screen.tsx:119-121`,
+> recorded in `Features.md` itself). Two surfaces, easy to conflate, and neither is this component. The ✅
+> is on the guard's own terms, which is what the ❌ asked for.
 >
 > ## VERIFICATION AT THE FROZEN HEAD — Node v22.22.2
 >
@@ -89,19 +93,25 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | `pnpm turbo run test` | **1** — `@gisik-nokma/server#test` only: three 30000 ms TIMEOUTS (`seed-cc`×2, `seed-dev`×1), each passing ALONE (`seed-dev` 8/8, `seed-cc` 9/9). **The same contention flake as `7b`; this diff touches no server file.** |
 > | seven checks + `check:case-ids` | all **0**. `case-ids` = **2380** unique, union == sum. **The +4 over 2376 is exec2's appended `13.907`–`13.910`, NOT this lane's** — `bare` and `bold` are unchanged, so this lane's prose added no counted id. |
 >
-> ## FOUR MUTATIONS, EACH KILLING IT AT A DIFFERENT ASSERTION
+> ## SIX MUTATIONS, EACH KILLING IT AT A DIFFERENT ASSERTION
+>
+> The first four are the author's. **The last two were found by an independent review sweeping for
+> SURVIVORS, and both were real holes rather than hypotheticals — the fix round below exists because of
+> them.** A recorded survivor is worth more than a killed mutation, so they are kept here by name.
 >
 > | mutation | died at |
 > |---|---|
 > | the pair added beside the three | the negative arm |
 > | `Discard` renamed to `Discard mine` | the **POSITIVE** arm — exactness is the guard |
-> | a fourth control matching neither negative pattern | **only** the count-at-three — so that arm is load-bearing, not redundant |
+> | a fourth control matching neither negative pattern | the count-at-three |
 > | the banner rendering nothing | the anti-vacuity arm |
+> | **the DISCARD button submitting `converted-to-comment`** | the kind arm — **SURVIVED before the fix round**: every label assertion stayed green while the product silently lost its discard path |
+> | **`.slice(0, 1)` on the open list** | the per-contest arm — **SURVIVED before the fix round**: with ONE contest, "three per contest" and "three, given one contest" are indistinguishable |
 >
 > ## SHIFT MAP — updated, and the reason it keeps moving
 >
-> `test-cases/13-deployment-dogfooding.md` is now **+42 lines below base line 8080 over `7f9329cc`**:
-> +29 from `#494`, +13 from `6b`. **`main :8616 → this branch :8629`.** Measured by `difflib` opcode
+> `test-cases/13-deployment-dogfooding.md` is now **+22 lines over `origin/main` (`7f9329cc`)**.
+> **`main :8616 → this branch :8638`.** `Features.md` is **+13 at `:2001`** (`main :2251 → :2264`). Measured by `difflib` opcode
 > mapping, never counted by hand. **Any rebase invalidates it; re-derive it.**
 >
 > ## OPEN RULINGS
@@ -272,7 +282,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > ## THE FINDING THE RE-CHECK PRODUCED — a citation that resolved to a BLANK LINE
 >
-> `Features.md:2251` cited `docs/hig-reconciliation-audit.md:690-718` for the ruling *"KEEP AND RESTYLE;
+> `Features.md:2264` cited `docs/hig-reconciliation-audit.md:690-718` for the ruling *"KEEP AND RESTYLE;
 > NEVER DELETE"*. **Line 690 is BLANK**; the ruling is at `:691`. (`:718`, the far end, IS correct.)
 > Written by `ee7ee37a` and **not shifted since** — the audit doc's only later edit (`a6d78c13`) touched
 > lines ~182-190, above the cited region, net-zero — so it was wrong when written. It sat on a line this
@@ -281,19 +291,17 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > sha256 `5a93a9cd…`). It is **same-length**, so no line moved and no citation shifted.
 >
 > **Recorded, NOT fixed — three, each with an owner:**
-> 1. **The identical stale string at `test-cases/13-deployment-dogfooding.md:8629` — FIXED, and
->    RE-POINTED the same day.** It was `:8587` when this item was written; `#494` inserted +29 lines
->    above it and it became `:8616`; then `6b` grew the `13.306` row by +13 and it became `:8629`.
->    **Three values in one day, every move from this lane's own insertions** — so treat no number here
->    as stable. Re-derive the mapping with `difflib` opcode-mapping against `origin/main` before relying
->    on it. **The string itself was wrong when written**
->    The owner this item named was *"whoever next edits that catalogue section"*, and `hig-per-screen/7b`
->    is that executor, so the clause fired rather than being left to decay again. Two things had to move:
->    the ANCHOR, because this lane's catalogue insertions shift every line below 8080 by **+29** (`:8587`
->    → `:8616`, measured by `difflib` opcode mapping against `origin/main`, not by eye); and the STRING,
->    because the citation was wrong when written — `hig-reconciliation-audit.md:690` is BLANK and the
->    ruling is at `:691`. Corrected to `:691-718`: **same length, so nothing downstream shifted.**
->    Verified at `cb07a669`. *Owner: closed.*
+> 1. **The identical stale string at `test-cases/13-deployment-dogfooding.md:8638` — FIXED, and re-pointed
+>    THREE times the same day.** It was `:8587` when this item was written; `#494` inserted +29 lines above
+>    it (`:8616`); `6b` grew the `13.306` row by +13 (`:8629`); and the same row's rewrite grew it again by
+>    +9 (`:8638`). **Four values in one day, every move caused by this lane's own insertions** — so treat
+>    no number in this file as stable: **re-derive the mapping with `difflib` opcode-mapping against
+>    `origin/main` before relying on it.** The owner this item named was *"whoever next edits that
+>    catalogue section"*, and `hig-per-screen/7b` is that executor, so the clause fired rather than
+>    decaying again. Two things had to move: the ANCHOR, above; and the STRING, because the citation was
+>    wrong when written — `hig-reconciliation-audit.md:690` is BLANK and the ruling is at `:691`.
+>    Corrected to `:691-718`: **same length, so nothing downstream shifted.** Verified at `cb07a669`.
+>    *Owner: closed.*
 > 2. **Two citations INTO this file were ALREADY stale before this rebase** — measured, not assumed.
 >    `docs/design/prototype-delta-2026-09-18.md:197` cites `executor-state.md:216` for the "Prototype
 >    delta" entry, but `:216` is the F1 control block; `plan10-adaptation-map.md:434` cites
@@ -301,7 +309,15 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >    citation-ratchet note. **This file is append-only at the TOP, so every inbound line citation decays
 >    on every update** — the CLASS is the finding, not either instance. Inserting this block shifts both
 >    again by its own length. *Owner: whoever next reasons about citations into a top-inserted narrative.*
-> 3. **A citation the union DROPS: `packages/ui/src/ui.css:1203-1211`.** Main's side of the conflicted
+> 3. **Four inbound citations this lane moved, re-pointed — and one it did NOT.** `Features.md` grew by
+>    **+13 lines at `:2001`**, so everything this lane cites below that moved. Fixed here: this file's own
+>    two citations of `Features.md:2251` → **`:2264`** (where `hig-reconciliation-audit.md:691-718` now
+>    lives). **Recorded, NOT fixed:** `Features.md:2366`, cited twice (`executor-state.md:985`,
+>    `test-cases/13:10638`) for the "all four jobs" drift — **that string appears NOWHERE in `Features.md`
+>    at either revision**, so the citation was already wrong before this lane touched the file and no line
+>    number repairs it. It needs the sentence FOUND, not the number moved. *Owner: whoever next edits the
+>    `Features.md` backups bullet.*
+> 4. **A citation the union DROPS: `packages/ui/src/ui.css:1203-1211`.** Main's side of the conflicted
 >    paragraph carried it (the `--gn-tint-warning` docblock documenting the role as a composite over its
 >    ground); this lane's table states the same fact as a measured result without re-citing it. The
 >    docblock is still at that line — nothing is stale, one pointer is simply no longer made. Recorded
@@ -420,7 +436,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 **A restore mistake worth recording, because it cost a file.** Mutating for the battery, this lane restored with `git checkout --`, which reverts to the last COMMIT and destroyed an uncommitted edit. The repo's rule is a checksum restore, not a git restore; the second and third mutations used a `/tmp` backup and verified `shasum` equality. **Use the backup.**
 
-The reviewer also flagged a PRE-EXISTING stale citation it did not attribute to this change (`Features.md:2251` cites `ui.css:1303` for a `danger`-as-text rule that is not there; the nearest are `:1327`/`:1337`/`:1381`/`:1462`). **Recorded, not fixed — owner: whoever owns the `danger`-as-text family.**
+The reviewer also flagged a PRE-EXISTING stale citation it did not attribute to this change (`Features.md:2264` cites `ui.css:1303` for a `danger`-as-text rule that is not there; the nearest are `:1327`/`:1337`/`:1381`/`:1462`). **Recorded, not fixed — owner: whoever owns the `danger`-as-text family.**
 
 Read the PR body, not this file, for the recorded pass.
 >

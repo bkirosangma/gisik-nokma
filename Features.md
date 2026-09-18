@@ -2005,10 +2005,12 @@ and leaves the head lying, which is how a contradiction survives a whole task.)*
   than tidy: the pre-existing arm finds the third control with `/discard/i`, which the prototype's own
   third label **`Discard mine`** also satisfies, so a rename to the prototype's wording reddened
   nothing until this guard existed. The audit files the pair as *"I — SHOWN BUT DOES NOT EXIST. Do not
-  build."* (`docs/hig-reconciliation-audit.md:307`) while the prototype still draws it, which is why a
+  build."* (`docs/hig-reconciliation-audit.md:306`) while the prototype still draws it, which is why a
   guard exists at all. **`ContestBanner` is mounted nowhere in the product**
   (`docs/hig-reconciliation-audit.md:577`), so this is a **component-level** guard and not a statement
-  about any screen. `packages/app-core/test/contests.test.tsx`
+  about any screen: the WEB ticket sheet renders no contest UI at all, while the MOBILE ticket screen
+  renders its OWN three buttons from its own markup (`apps/mobile/src/screens/ticket-screen.tsx:119-121`)
+  — neither is this component. `packages/app-core/test/contests.test.tsx`
 - ⚙️ **A queued resolution is never laundered into an accepted one** — against the replica source
   `ingest` throws `OfflineAcceptError` for a claim it has only queued, and `resolveContest` deliberately
   does not catch it. Catching it and answering `ok: true` would put "the server accepted your discard"

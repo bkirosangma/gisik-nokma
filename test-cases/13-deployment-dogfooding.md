@@ -8062,25 +8062,34 @@ cites, and the first draft cited a line it had not read.*
   narrowing and produce a page that claims a narrowing it does not perform.
   (`apps/web/test/board-narrowing.test.tsx`, `apps/web/src/…/page.tsx`)
 
-- ✅ **13.306 — the prototype's invented resolution pair, witnessed as ABSENT, with the shipped set
-  pinned EXACTLY for the first time.** The audit files the pair as *"I — SHOWN BUT DOES NOT EXIST. Do not
-  build."* (`docs/hig-reconciliation-audit.md:307`) and the prototype still draws all three of its labels
-  (`design-system/interactive/mobile.dc.html`), so a future port has a live source to copy from. The
-  witness renders the REAL `ContestBanner` and asserts three things: the three shipped controls **by exact
-  accessible name** (`Redo legally`, `Convert to comment`, `Discard`); that no control matching `Keep
-  mine`/`Keep theirs` exists, by role and in the rendered text; and that the control set is **exactly
-  three**. **The exactness is the part that was missing, and it is not decoration:** the arm already in
-  that file (12.193, cited as `13.305`'s witness) finds its third control with `/discard/i`, which the
-  prototype's OWN third label **`Discard mine`** also satisfies — so a rename to the prototype's wording
-  reddened nothing before this case. **Four planted mutations, each killing it at a different assertion:**
-  the pair added beside the three → the negative arm; `Discard` renamed to `Discard mine` → the POSITIVE
-  arm; a fourth control matching neither negative pattern → only the count-at-three; the banner rendering
-  nothing → the anti-vacuity arm. **THE FLAG IS RECORDED IN THE CASE RATHER THAN SMOOTHED OVER:**
-  `ContestBanner` is mounted NOWHERE in the product (`docs/hig-reconciliation-audit.md:577`) and
-  TicketSheet imports no contest component at all, so this is a **COMPONENT-level** guard. It does not
-  witness what the ticket surface renders — there is no such surface — and **the ledger row must not be
-  promoted as though it did.** The verdict is ✅ on the guard's own terms: absence is now a property
-  something checks, which is exactly the state the ❌ was minted to change.
+- ✅ **13.306 — the prototype's invented resolution pair, witnessed as ABSENT, with the shipped set pinned
+  EXACTLY and each control wired to its own resolution KIND.** The audit files the pair as *"I — SHOWN BUT
+  DOES NOT EXIST. Do not build."* (`docs/hig-reconciliation-audit.md:306`; its pair-specific bullet is
+  `:308`) and the prototype still draws all three of its labels
+  (`design-system/interactive/mobile.dc.html:353-355`), so a future port has a live source to copy from.
+  The witness renders the REAL `ContestBanner` and asserts four things: the three shipped controls **by
+  exact accessible name**; that each submits **its own resolution kind** (`converted-to-comment`, then
+  `discarded`, in order); that no control matching `Keep mine`/`Keep theirs` exists by role or in the
+  rendered text; and that the set is **exactly three per OPEN contest** (six for two contests, which is
+  what distinguishes "three per contest" from "three, given one contest"). **Two of those halves were
+  missing and neither is decoration — both were found by an independent review's mutation sweep, not by
+  the author:** the arm already in that file (12.193, whose assertions the catalogue cites as `13.305`'s
+  witness) finds its third control with `/discard/i`, which the prototype's OWN third label **`Discard
+  mine`** also satisfies, so a rename to the prototype's wording reddened nothing; and labels alone are
+  satisfied by a banner whose DISCARD button submits `converted-to-comment`, which silently removes the
+  product's discard path while every label assertion stays green. **Six planted mutations, each killing it
+  at a different assertion:** the pair added beside the three → the negative arm; `Discard` renamed to
+  `Discard mine` → the POSITIVE arm; a fourth control matching neither negative pattern → the count arm;
+  the banner rendering nothing → the anti-vacuity arm; the Discard button submitting the convert kind →
+  the kind arm; `.slice(0, 1)` on the open list → the per-contest arm. **THE FLAG IS RECORDED IN THE CASE
+  RATHER THAN SMOOTHED OVER:** `ContestBanner` is mounted NOWHERE in the product
+  (`docs/hig-reconciliation-audit.md:577`), so this is a **COMPONENT-level** guard and says nothing about
+  any screen. The two surfaces are easy to conflate and the difference is the point — the WEB ticket sheet
+  renders no contest UI at all (TicketSheet imports no contest component), while the MOBILE ticket screen
+  renders its OWN three buttons from its own markup (`apps/mobile/src/screens/ticket-screen.tsx:119-121`).
+  **Neither is this component, and this case witnesses neither. The ledger row must not be promoted as
+  though it did.** The verdict is ✅ on the guard's own terms: absence is now a property something checks,
+  which is exactly the state the ❌ was minted to change.
   (`packages/app-core/test/contests.test.tsx`)
 
 - ✅ **13.309 — the withheld-project-name fallback's TITLE text, witnessed — this is the row this
