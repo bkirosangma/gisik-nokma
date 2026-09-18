@@ -58,6 +58,13 @@ import {
 } from '../../../../../src/ticket-dates-input.js';
 import { useAppServices, useSessionStatus } from '../../../../../src/providers.js';
 import { useProjectName } from '../../../../../src/use-project-name.js';
+import {
+  DEFAULT_PROJECT_TAB,
+  readProjectTab,
+  rememberProjectTab,
+  useLastProject,
+  type ProjectTab,
+} from '../../../../../src/use-last-project.js';
 import { useWorkspaceName } from '../../../../../src/use-workspace-name.js';
 import {
   ExpiredSessionNotice,
@@ -170,7 +177,110 @@ function ProjectBoard() {
   // rail below (it precedes the board in a ticket's lifecycle), not the
   // first one a person lands on; nothing about the union's own default
   // changes.
-  const [view, setView] = useState<'board' | 'list' | 'calendar' | 'timeline' | 'backlog'>('board');
+  //
+  // THE UNION MOVED (owner request, 2026-09-18). `'board' | 'list' | …` used to
+  // be written out here as an inline union; it is now `ProjectTab`, declared
+  // once in `use-last-project.ts`, because the remembered tab this page reads
+  // and writes must be a value that hook will accept. Two copies of the list
+  // would be free to drift, and the failure would be silent: a tab this page
+  // can select and the hook rejects reads as "this project has no remembered
+  // tab" rather than as an error. `DEFAULT_PROJECT_TAB` is that same `'board'`,
+  // named once so the page and the nav cannot come to different conclusions.
+  //
+  // The `TAB_NOUN` record below is still `Record<typeof view, string>`, so a
+  // sixth member added to `PROJECT_TABS` and forgotten there still fails
+  // `typecheck` exactly as it did when the union was inline. That property is
+  // the reason the inline-ness was recorded in the first place; it was never
+  // the inline-ness itself.
+  const [view, setViewState] = useState<ProjectTab>(DEFAULT_PROJECT_TAB);
+
+  /**
+   * THE REMEMBERED TAB (owner, 2026-09-18: *"on click, open the project page
+   * (save the last open tab as well)"*).
+   *
+   * GLOBAL, which the owner said directly: it applies whenever a project opens,
+   * not only when you arrive through the nav item. A project reached from a
+   * card, a bookmark or a pasted link lands you where you left off.
+   *
+   * **Seeded by an EFFECT, not by `useState`'s initialiser**, and the difference
+   * is not stylistic. A client component is still rendered on the server, where
+   * `window` does not exist; an initialiser reading storage would answer
+   * `'board'` there and something else on the client, and React would meet a
+   * hydration mismatch on `aria-selected`. `theme-toggle.tsx` reads `gn-theme`
+   * in an effect for exactly this reason, and this follows that convention
+   * rather than inventing a second one. The cost is one frame on the default
+   * tab before the remembered one arrives, which is stated rather than hidden.
+   *
+   * `userId` is `null` when signed out, never `''`: the tab map is keyed by
+   * user, and an empty string is a key like any other — it would let a
+   * signed-out viewer's click be read back by the next signed-out viewer.
+   *
+   * `currentUserId` above is NOT reused, and the difference is exactly that
+   * empty string: it exists for the ticket reads, which want `''`, and this
+   * wants `null`.
+   */
+  const tabUserId = session.kind === 'signed-in' ? session.user.id : null;
+  /**
+   * A tab the person chose on THIS page outranks the memory, so the seed is
+   * applied at most once per project and never after a click — case 13.880,
+   * which a reviewer found and which the first version of this effect carried.
+   *
+   * The rail is not gated on the session. This page's main return is
+   * unconditional and nothing between it and the tablist asks what
+   * `session.kind` is, so the tabs are clickable during the one network round
+   * trip the session read takes. In that window `tabUserId` is `null`, so the
+   * click's own write goes nowhere — and because `tabUserId` is this effect's
+   * dependency, the session landing then RE-RAN it and put the stored tab back
+   * over the choice just made.
+   *
+   * Two refs rather than one, because they answer different questions:
+   * `seededForProject` is how a new project gets a fresh chance to be seeded,
+   * and `tabChosenHere` is what a click sets. Resetting the second when the
+   * FIRST changes is the whole of it — a person clicking in the loading window
+   * is not clicking "for" the project they navigated to next.
+   *
+   * **What this does NOT fix, stated rather than implied:** that click is still
+   * not written to the tab map, because there is no user id to key it by yet.
+   * The choice stands for as long as the page does and is forgotten on the next
+   * visit. Keying a write to a user the session has not named would be
+   * inventing one, and the window is a single round trip; recorded in the
+   * catalogue as a known limitation rather than papered over.
+   */
+  const seededForProject = useRef<string | null>(null);
+  const tabChosenHere = useRef(false);
+  useEffect(() => {
+    if (seededForProject.current !== projectId) {
+      seededForProject.current = projectId;
+      tabChosenHere.current = false;
+    }
+    if (tabChosenHere.current) return;
+    const rememberedTab = readProjectTab(projectId, tabUserId);
+    if (rememberedTab !== null) setViewState(rememberedTab);
+  }, [projectId, tabUserId]);
+
+  /**
+   * Opening a project is what makes it the last one opened — the counterpart of
+   * 13.427 one level up ("opening a workspace is what remembers it"), and the
+   * write the nav's own remembered-project READ depends on. Without it the nav
+   * would only ever update when you arrived through the nav item, which is the
+   * one route that does not need it.
+   */
+  useLastProject(workspaceId, projectId, tabUserId);
+
+  /**
+   * `setView` now WRITES as well as sets. Every control that changes the tab
+   * goes through it, so there is one place the memory is written and no arm can
+   * forget — the rail's five buttons, and anything later that selects a tab.
+   */
+  const setView = useCallback(
+    (tab: ProjectTab): void => {
+      // Read by the seed effect above, which must not undo this.
+      tabChosenHere.current = true;
+      setViewState(tab);
+      rememberProjectTab(projectId, tab, tabUserId);
+    },
+    [projectId, tabUserId],
+  );
   /**
    * The list's narrowing, and the reason there is one at all.
    *
@@ -1720,16 +1830,26 @@ function ProjectBoard() {
               // value, so a fifth `view` member added later would compile
               // unchanged and silently inherit `'timeline'`'s noun, the exact
               // "names the wrong place" defect this note exists to prevent.
-              // `view`'s own type is an inline union (`useState<'board' |
-              // 'list' | 'calendar' | 'timeline' | 'backlog'>` above), not a
-              // named alias, so `typeof view` is what keys this `Record` to
-              // it — a `Record<K, V>` requires EVERY member of `K` as a
-              // property, so a tab added to that union without a matching
-              // entry here fails `typecheck`, not silently at runtime.
+              // `view`'s own type is `ProjectTab`, and `typeof view` is what
+              // keys this `Record` to it — a `Record<K, V>` requires EVERY
+              // member of `K` as a property, so a tab added to that union
+              // without a matching entry here fails `typecheck`, not silently
+              // at runtime.
               // Proven, not asserted: fix round 2 deleted the `timeline`
               // entry and watched `tsc` reject it; Task 10 is the first REAL
               // addition since, and omitting `backlog` here does fail
               // `tsc` exactly as promised — confirmed by trying it.
+              //
+              // CORRECTED 2026-09-18 (the remembered tab): this paragraph used
+              // to say the union was "an inline union …, not a named alias",
+              // and offered that as the reason `typeof view` was the key. The
+              // union moved to `use-last-project.ts` when the remembered tab
+              // made the page and the hook share one list, so the parenthetical
+              // became false. What was load-bearing is unchanged and is the
+              // sentence above: `Record<typeof view, string>` demands every
+              // member whatever the type is spelled as. The clause is corrected
+              // rather than deleted, because a reader who remembers it should
+              // find the correction here rather than an absence.
               const TAB_NOUN: Record<typeof view, string> = {
                 backlog: 'backlog',
                 board: 'board',

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { AccountMenu } from "./account-menu.js";
 import { InboxNavLink } from "./inbox-nav-link.js";
 import { useCurrentUser } from "./providers.js";
+import { LastProjectNav } from "./last-project-nav.js";
 import { useLastWorkspace } from "./use-last-workspace.js";
 import { useWorkspaceName } from "./use-workspace-name.js";
 
@@ -137,6 +138,48 @@ import { useWorkspaceName } from "./use-workspace-name.js";
  * precedent: the Board item was removed for offering a link that could not
  * resolve, and a remembered workspace is the same hazard from a different
  * direction.
+ *
+ * ## Round 27 — the project you were last in, and the dropdown over it
+ *
+ * Owner: *"new nav item :right to the workspace name -> last open project name.
+ * on click, open the project page (save the last open tab as well). on hover,
+ * show the non archived projects as a dropdown, and clicking them opens those
+ * projects. if there is no last opened project, then this defaults to the first
+ * in the order that we display in the workspace page."*
+ *
+ * It is mounted immediately right of the workspace name, and it is its own
+ * component (`src/last-project-nav.tsx`) for the reason every other piece of
+ * this bar is: `account-menu.tsx`, `inbox-nav-link.tsx`, `legal-nav.tsx`. That
+ * component's docblock carries the behaviour; three things belong HERE, because
+ * they are about this bar rather than about it.
+ *
+ * **1. It is NOT the Board item returning.** Board was removed because one
+ * board per PROJECT meant its only reachable target was the route you were
+ * already standing on — "an item that resolves only to where you are is not a
+ * destination". A project id is now something this bar actually has (Round 25's
+ * remembered workspace resolves to one), so this is the first project-scoped
+ * destination that can point somewhere else. The rule that killed Board is the
+ * rule that shapes this: **it renders nothing at all when the workspace has no
+ * reachable project**, rather than falling back to something plausible.
+ *
+ * **2. The workspace it is about is `effectiveWorkspaceId`**, the same value My
+ * Work, Members and Settings read, and it is gated on `!noWorkspace` exactly as
+ * they are. That is deliberate rather than incidental: a second answer to
+ * "which workspace is this bar about" is how the remembered-workspace work
+ * would come undone.
+ *
+ * **3. `user?.id ?? null` is passed down, not re-read.** The component needs the
+ * user to key its storage record by; `AppNav` already holds the resolved
+ * session for `AccountMenu` and for the remembered workspace, and a second
+ * `useCurrentUser` call one level down would be a second subscription to the
+ * same question.
+ *
+ * **One consequence worth stating for whoever maintains this file:** case
+ * `11.185`'s closed-set arms did NOT change. Every arm's workspace fixture has
+ * `projects: []`, so before this round the new item rendered nothing in any of
+ * them and after it renders nothing still. A new arm was ADDED for the shape
+ * that has projects, because a closed-set tripwire that cannot see the newest
+ * member of the set is exactly the check that cannot fail.
  */
 export function AppNav({ workspaceId }: { workspaceId?: string }) {
   const pathname = usePathname();
@@ -210,6 +253,20 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
           >
             {workspaceName}
           </Link>
+        ) : null}
+        {/* IMMEDIATELY RIGHT OF THE WORKSPACE NAME (owner, 2026-09-18) — the
+            project you were last in, opening on hover into a dropdown of the
+            workspace's other non-archived projects.
+
+            It is gated on `!noWorkspace` exactly as My Work, Members and
+            Settings are, and `effectiveWorkspaceId` is the same value they
+            read, so there is one answer to "which workspace is this bar about".
+            The component renders NOTHING of its own when the workspace has no
+            reachable project, which is the rule Rounds 22 and 23 established:
+            the nav does not offer a link that cannot resolve. Its own docblock
+            carries the rest, including why this is what Board could never be. */}
+        {!noWorkspace && effectiveWorkspaceId !== undefined ? (
+          <LastProjectNav workspaceId={effectiveWorkspaceId} userId={user?.id ?? null} />
         ) : null}
         {/* NO Board item (Round 23, owner: "the board on the nav bar doesn't
             work. lets remove it"). See the docblock above for why it could

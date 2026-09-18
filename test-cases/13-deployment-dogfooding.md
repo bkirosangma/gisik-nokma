@@ -10470,3 +10470,378 @@ refusal is the real engine's `close-requires-terminal` naming "Doing", with the 
 `ticket.closed`'s only dispatch reaches `checkTicketClosed` alone and that the other refusals cannot fire
 for a SELECT-returned row; the daemon wiring, `.env.example` (check:env really fixed, not suppressed),
 `deploy/do/app.yaml` parity, same-commit hygiene, and that no migration was added.
+
+## The nav's last-open project item, and the global tab memory (executor 2, 2026-09-18) — ids `13.850`–`13.877`
+
+The owner's request, verbatim: *"new nav item :right to the workspace name -> last open project name. on
+click, open the project page (save the last open tab as well). on hover, show the non archived projects as
+a dropdown, and clicking them opens those projects. if there is no last opened project, then this defaults
+to the first in the order that we display in the workspace page."* Two answers they gave directly and which
+the design follows rather than infers: **the tab memory is GLOBAL** (it applies whenever a project opens,
+not only when you arrive through this item) and **the dropdown opens on hover AND on focus/click**.
+
+Block `13.850`–`13.879` is this executor's for this work. **The section uses `13.850`–`13.880` — one id
+MORE than the block, which is stated with its measurement in the last subsection rather than squeezed
+in.** `13.850`–`13.877` are the original change set; `13.878`–`13.880` are the three cases the review round
+required, and each of those three reproduced a real defect before it was fixed. Recounted at this tip **by case MARKER only**, with the instrument's own positive
+control in the same run: `13.826` was found, and `13.850`–`13.879` was empty across `test-cases/`,
+`apps/web/test/`, `apps/web/src/`, `apps/web/app/` and `Features.md` under a boundary-anchored pattern
+(`13\.8[5-7][0-9]([^0-9]|$)`, which excludes a `13.8500`-shaped truncation). The four-digit pattern is
+deliberately the *broader* instrument for a FREEDOM claim — it matches a bare mention as well as a marker —
+so "free under the broad instrument" implies "free under markers". The block's upper bound is checked
+against the catalogue's two documented truncation traps: `13.999` and `13.632866` are not case ids here, and
+a bare `grep '13\.[0-9][0-9][0-9]'` reads the first of them out of `13.9999`. No id was taken from any other
+block; the earlier blocks (`13.700`–`13.759`, `13.760`–`13.819`, `13.820`–`13.849`) are untouched, and no
+existing case was renumbered.
+
+Three of the paragraphs below are about defects this work FOUND rather than built, and they are recorded
+here rather than fixed silently, per the coordination doc's rule about what is outside a change's scope.
+
+- ✅ **13.850 — the three states, with `unknown` distinguished from `none` on the FIRST PAINT.** `unknown` is
+  the window before storage is read and `none` is a settled answer, and the nav does something different in
+  each: `none` licenses the first-project fallback, `unknown` licenses nothing. Collapsing them is the bug
+  the type exists to make unrepresentable, and it would flash a different project's name at every first
+  paint. Asserted at BOTH ends (`seen[0]` and the settled answer), so a two-state collapse cannot pass.
+  **Citations:** `apps/web/src/use-last-project.ts:119` (the type), `:145` (the hook), `apps/web/test/use-last-project.test.tsx:122`
+
+- ✅ **13.851 — another USER's project record is `none`, with the control in the same case.** `localStorage`
+  outlives a session, so an unkeyed record points the next person's nav at the previous person's project.
+  The control stores the identical record with only `userId` changed, so a `none` here cannot be a malformed
+  fixture or a wrong key: the same bytes, read by the right person, answer `remembered`.
+  **Citations:** `apps/web/src/use-last-project.ts:256` (the guard), `apps/web/test/use-last-project.test.tsx:142`
+
+- ✅ **13.852 — the plain positive.** A record for this user in this workspace is honoured. Without it both
+  absence cases above would pass on a hook that never reads storage at all.
+  **Citations:** `apps/web/src/use-last-project.ts:145`, `apps/web/test/use-last-project.test.tsx:162`
+
+- ✅ **13.853 — the PROJECT record does not leak across WORKSPACES.**
+  **This bullet's rationale was CORRECTED on 2026-09-18 after the review round, and the correction is the
+  point of leaving it visible.** It first said a record keyed by user alone would resolve `p_1` inside
+  whichever workspace the viewer was standing in, "and if another workspace has a project with that id, it
+  would silently name the WRONG project". **That arm cannot happen:** `proj_projects.project_id` is the
+  PRIMARY KEY and the migration's own comment records why an entity id belongs to exactly one workspace, so
+  there is no id to collide and no collision that could be silent. The reviewer could not construct it and
+  neither could the author. What the workspace half actually buys: it is part of the QUESTION the record
+  answers ("the last project you opened in THIS workspace"); it refuses a foreign record at the record
+  rather than depending on a later `find` to not notice it; and it stays correct if ids ever cease to be
+  global. The full replacement is in the file's own docblock at `apps/web/src/use-last-project.ts:35`.
+  The control reads the same record from the workspace it was written for.
+  **Citations:** `apps/web/src/use-last-project.ts:69` (the key), `:256` and `:258` (the two guards), `apps/web/test/use-last-project.test.tsx:183`
+
+- ✅ **13.854 — a browser with site data blocked does not throw, and answers `none`.** The accessor is what
+  raises, not the value, so this is the shape the guard exists for; an unguarded read would take down the
+  nav on every page. The assertion is on the settled answer and not merely on "did not throw", because a
+  hook that swallowed the error and invented an id would pass a throw-only assertion.
+  **Citations:** `apps/web/src/use-last-project.ts:338` (`readJson`), `apps/web/test/use-last-project.test.tsx:211`
+
+- ✅ **13.855 — the route is authority, asserted on the STORE as well as the return.** Opening a project is
+  what remembers it; a hook that answered `remembered` from the route without persisting would pass the
+  return half and lose the memory on the next page.
+  **Citations:** `apps/web/src/use-last-project.ts:210` (`rememberProject`), `apps/web/test/use-last-project.test.tsx:225`
+
+- ✅ **13.856 — a remembered tab reads back for the same person, and `null` for a project nothing was
+  remembered for.** The two arms in one case, because "reads back" alone is satisfiable by a reader that
+  returns something for everything.
+  **Citations:** `apps/web/src/use-last-project.ts:272`, `apps/web/test/use-last-project.test.tsx:249`
+
+- ✅ **13.857 — another user's TAB map is not honoured.** The control writes through the same writer with a
+  different user and reads it back with the writer's own user, so the `null` cannot be a writer that
+  silently did nothing.
+  **Citations:** `apps/web/src/use-last-project.ts:272`, `:279` (its user guard), `apps/web/test/use-last-project.test.tsx:264`
+
+- ✅ **13.858 — a stored value that is not a tab answers `null`, never a guess.** Five non-members
+  (`'settings'`, `''`, `'Board'`, `'{}'`, `'5'`) and five malformed containers (`'not json'`, a bare
+  string, an array, a missing `tabs`, `'null'`), with a member written through the writer as the control.
+  The union is the door: a value outside it reaching `useState` would put the rail into a state with no
+  selected segment and no rendering arm, which is a blank page rather than a wrong one.
+  **Citations:** `apps/web/src/use-last-project.ts:326` (`isProjectTab`), `:338`, `apps/web/test/use-last-project.test.tsx:282`
+
+- ✅ **13.859 — blocked storage on the tab path, reading AND writing, and a signed-out viewer writes
+  nothing.** The write half is the one that matters: it runs from `setView`, a click handler on the project
+  page, so an unguarded write turns "switch to the List tab" into an exception inside a React event handler.
+  **Citations:** `apps/web/src/use-last-project.ts:296` (`rememberProjectTab`), `apps/web/test/use-last-project.test.tsx:310`
+
+- ✅ **13.860 — the served project LIST keeps SERVED ORDER and keeps ARCHIVED rows.** Order is not this
+  hook's decision: `/workspaces` renders `workspace.projects` with the archived filtered and does NOT sort,
+  and the nav's fallback is that same order — so a hook that sorted, or that dropped archived rows on the
+  way out, would put the two on different answers to one question. The filtering belongs to the caller.
+  **Citations:** `apps/web/src/use-workspace-projects.ts:103`, `apps/web/app/workspaces/page.tsx:248`, `apps/web/test/use-workspace-projects.test.tsx:105`
+
+- ✅ **13.861 — a workspace the read SUCCEEDS without is `null`, and the cache is EVICTED.** `null` and `[]`
+  are different claims: `[]` says "this workspace exists and has no projects", which is the one thing the
+  nav's fallback would act on. The case warms the cache for the same id FIRST, so an eviction that never had
+  anything to evict cannot pass it, and asserts the third mount's FIRST frame is still null.
+  **Citations:** `apps/web/src/use-workspace-projects.ts:148` (the eviction), `apps/web/test/use-workspace-projects.test.tsx:134`
+
+- ✅ **13.862 — a REFUSED read is `null`, never an invented empty list.** `[]` would be this hook asserting
+  that a workspace exists and contains no projects, and the nav would render its "no reachable project"
+  branch — making a refusal indistinguishable from an empty project list.
+  **Citations:** `apps/web/src/use-workspace-projects.ts:103`, `apps/web/test/use-workspace-projects.test.tsx:157`
+
+- ✅ **13.863 — no session, or no workspace in scope, fires NOTHING.** The spy is what makes this about the
+  REQUEST rather than its answer: a `null` alone would also be produced by a read that fired and failed.
+  **Citations:** `apps/web/src/use-workspace-projects.ts:128` (the gate), `apps/web/test/use-workspace-projects.test.tsx:176`
+
+- ✅ **13.864 — THE JITTER, one level down.** `AppNav` is rendered by each PAGE, so every client-side
+  navigation remounts it; without the module cache the project item would vanish for the tick it takes to
+  read storage and come back. The assertion is on the FIRST frame of the SECOND mount, and the first mount
+  in the same case is the control that the cache was warm.
+  **Citations:** `apps/web/src/use-workspace-projects.ts:96` (the cache), `apps/web/test/use-workspace-projects.test.tsx:253`
+
+- ✅ **13.865 — the item names the remembered project and links to its page.** Name AND href, because a
+  rename of that string is the same orphaning by another route: the nav would say "Gamma" and point at
+  nothing.
+  **Citations:** `apps/web/src/last-project-nav.tsx:122`, `apps/web/test/last-project-nav.test.tsx:158`
+
+- ✅ **13.866 — with nothing remembered it falls back to the FIRST NON-ARCHIVED project in served order.**
+  The fixture's first row IS archived and is deliberately first: taking `projects[0]` would name
+  `Archived One` and pass a case that only checked "some project was named". Order is not re-derived.
+  **Citations:** `apps/web/src/last-project-nav.tsx:128`, `apps/web/test/last-project-nav.test.tsx:176`
+
+- ✅ **13.867 — NO REACHABLE PROJECT RENDERS NOTHING.** Two shapes, both in the case: a workspace the read
+  does not contain, and one whose every project is archived — the second being the one a "does it have
+  projects" check would wrongly pass. Asserted as an empty body, because a fallback to some other project
+  would satisfy a narrower assertion.
+  **Citations:** `apps/web/src/last-project-nav.tsx:186`, `apps/web/test/last-project-nav.test.tsx:198`
+
+- ✅ **13.868 — THE FALLBACK'S EDGE: archiving the project you were last in falls back rather than
+  disappearing.** A nav resolving the remembered id against ALL served projects — archived included — would
+  name `Archived One` here and be wrong, while passing 13.865 unchanged. This is the case the controller
+  asked to be WITNESSED rather than reasoned.
+  **Citations:** `apps/web/src/last-project-nav.tsx:121` (the non-archived filter), `:122` (the lookup it feeds), `apps/web/test/last-project-nav.test.tsx:224`
+
+- ✅ **13.869 — and when the remembered project is not served at all.** You were removed from it, or it was
+  deleted: the same hazard as 13.426 one level up, where a remembered id is a guess about the past and the
+  served read is what turns it into a fact.
+  **Citations:** `apps/web/src/last-project-nav.tsx:124`, `apps/web/test/last-project-nav.test.tsx:241`
+
+- ✅ **13.870 — the dropdown opens on HOVER and lists the non-archived projects in served order.**
+  `userEvent.hover` moves a pointer and nothing else, so an implementation that opened only on focus leaves
+  this red. The menu's accessible name is asserted, and the archived row's absence is the filter.
+  **Citations:** `apps/web/src/last-project-nav.tsx:249` (the menu), `apps/web/test/last-project-nav.test.tsx:259`
+
+- ✅ **13.871 — it opens on FOCUS and Escape closes it.** `userEvent.tab()` is the real keyboard path, so an
+  implementation opening only on pointer events is unusable without a mouse and reddens here. Case 13.871 is
+  also the witness for the interaction between two requirements that pull against each other: Escape returns
+  focus to the trigger, and focusing the trigger opens the menu, so without `suppressNextFocusOpen` the menu
+  reopens the instant Escape closes it and the case never settles.
+  **Citations:** `apps/web/src/last-project-nav.tsx:136` (the suppress ref), `:231` (`aria-haspopup`), `apps/web/test/last-project-nav.test.tsx:287`
+
+- ✅ **13.872 — clicking the item remembers the project AND seeds its tab.** Both asserted on local storage,
+  because the navigation it also triggers is `next/navigation`'s mocked `push` and would make either half
+  pass without the memory being written. The seeded tab for a project with no memory is `board`.
+  **Citations:** `apps/web/src/last-project-nav.tsx:204` (`openProject`), `apps/web/test/last-project-nav.test.tsx:314`
+
+- ✅ **13.873 — a row chosen from the DROPDOWN is what gets remembered, not the project the item showed.**
+  Separated from 13.872 because a single-armed case cannot tell the two apart: with only the item's own click
+  asserted, an implementation that ignored the row clicked and re-remembered the shown project would pass.
+  **Citations:** `apps/web/src/last-project-nav.tsx:259` (the row's own `openProject` call, `:244` is the item's), `apps/web/test/last-project-nav.test.tsx:348`
+
+- ✅ **13.874 — the project page OPENS at the remembered tab.** `waitFor` rather than a bare read, and that
+  is the honest shape: the seed is applied by an EFFECT, because a `useState` initialiser reading storage
+  would answer `null` on the server and disagree with the client at hydration. Without the seed the case
+  never settles on Timeline and times out.
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:251` (the seed effect; `:257` is the read inside it), `apps/web/test/project-calendar-timeline.test.tsx:693`
+
+- ✅ **13.875 — switching a tab WRITES it, and a fresh mount opens on it.** Neither half implies the other: a
+  page that seeded but never wrote would forget on navigation, and one that wrote but never seeded would
+  store a tab it never used. The remount is a real second mount against the same storage.
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:275` (`setView`), `apps/web/test/project-calendar-timeline.test.tsx:716`
+
+- ✅ **13.876 — another project's remembered tab does not decide this one's, and writing this one's does not
+  disturb it.** Discriminating in both directions: a page that read the map without looking up the id would
+  open on Timeline here and still pass 13.874, and a writer that replaced the whole map instead of merging
+  one entry would drop `p_other`. **This case did NOT start red**, and saying so matters: before the
+  implementation existed the page ignored storage entirely, so its first arm passed on the existing default.
+  It was strengthened — the merge assertion added — precisely because a case that cannot fail is not
+  evidence, and the strengthened form is what makes it red before the change.
+  **Citations:** `apps/web/src/use-last-project.ts:314` (the merge, inside the writer at `:296`), `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:195`, `apps/web/test/project-calendar-timeline.test.tsx:756`
+
+- ✅ **13.877 — opening a project REMEMBERS it, keyed by user AND workspace.** The counterpart of 13.427 one
+  level up, and the write the nav's READ depends on: without it the nav would only update when you arrived
+  through the nav item, which is the one route that does not need it. The workspace half is asserted because
+  a record missing it would resolve `p_1` inside whichever workspace the viewer happened to be standing in.
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:268`, `apps/web/test/project-calendar-timeline.test.tsx:846`
+
+- ✅ **13.878 — the projects cache is keyed by USER as well as workspace, because this list is viewer-filtered.** The Critical a reviewer found: the first version copied `use-workspace-name.ts`'s cache KEY (workspace id alone) onto a list that is not a name. `apps/server/src/read/visible-projects.ts` serves an owner the whole row set and everybody else only the projects they hold a membership in, so one `workspaceId` is a different list per viewer. Sign-out is `account-menu.tsx`'s `router.push('/sign-in')` — a CLIENT-side navigation — so module state survives it  and the next person's first paint names projects they cannot open, until the fresh read lands and indefinitely if it is slow. The FIRST FRAME is the assertion: the settled value is Bob's either way, so only a warm cache can make the second mount paint someone else's list.
+  **Citations:** `apps/web/src/use-workspace-projects.ts:92` (the key), `:110` (the user it is read from), `:124` (the initialiser), `apps/web/test/use-workspace-projects.test.tsx:230`
+
+- ✅ **13.879 — the nav names the project in the ROUTE, not the one storage still holds.** The Important a reviewer found, and the mechanism was MEASURED rather than taken from documentation: React commits passive effects CHILD-FIRST (a probe rendering a parent with one child logged `["child","parent"]`), and `AppNav` is rendered inside the project page's own JSX — so the nav's reader effect ran BEFORE the page's writer effect and named the project you had just left. It self-healed one navigation later, which is exactly what would let it survive a casual look. The fixture makes the fallback unable to produce the passing answer: `p_other` is served FIRST, so only reading the route names Alpha.
+  **Citations:** `apps/web/src/last-project-nav.tsx:114` (the route read), `:117` (the hook call it feeds), `apps/web/test/project-calendar-timeline.test.tsx:605`
+
+- ✅ **13.880 — a tab chosen while the session is still LOADING is not reverted when it lands.** The Minor a reviewer found. The rail is not gated on the session — the page's main return at `:1403` is unconditional and nothing between it and the tablist reads `session.kind` — so the tabs are clickable during the session read. `tabUserId` is `null` then, so the click's write goes nowhere, and because `tabUserId` is the seed effect's dependency the landing session RE-RAN it and put the stored tab back over the choice. The case stores `calendar` and clicks List, so the visible half is unambiguous.
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:249` and `:250` (the two refs), `:256` (the guard), `:278` (what a click sets), `apps/web/test/project-calendar-timeline.test.tsx:805`
+
+### The mount witness, and why 11.185's arms did NOT change
+
+`AppNav` renders the item (`apps/web/src/app-nav.tsx:269`), and that mount is witnessed **inside
+`apps/web/test/app-nav.test.tsx`** rather than only by the component's own test file — this file's sibling
+`test-cases/11` records the reason at length (Task 14: an import AND its element were deleted from
+`app-nav.tsx` and the whole suite stayed green, because the component was rendered only by its own test).
+A new case was added to `11.185`'s closed-set tripwire — *"WITH a workspace that HAS projects: the project
+item joins, right of the workspace name"* (`apps/web/test/app-nav.test.tsx:283`) — and it asserts the
+ordered href array, because **the position is as much the claim as the membership**: the owner asked for the
+item "right to the workspace name", and an ordered array is the only form that can tell that from anywhere
+else in the bar.
+
+**The three existing arms of `11.185` needed no change, and that is a fact about their fixtures rather than
+about the change.** Every one of those arms builds its workspace through the file's own `workspace()` helper,
+whose `projects` defaults to `[]` — so before this round the new item rendered nothing in all three, and
+after it renders nothing still. That is worth stating explicitly rather than leaving as an unexplained
+non-change: a reader who found three untouched arms might reasonably conclude the tripwire had been
+loosened to accommodate the new link. It was not; it was extended by one arm. **The corollary is the
+hazard:** a closed-set tripwire whose arms all lack the input that makes the new member appear is a check
+that cannot fail on that member, and adding the arm is the repair.
+
+### Two defects this work found, recorded rather than fixed in place
+
+**1. `test/setup.ts` must not import from `src/`, and the first version of this change did.** Nothing
+threw. Importing the remembered-state hooks' `clear*Cache` functions from a `setupFiles` entry pulled
+`providers.tsx` and then `auth-client.ts` into the module graph **before any test file's hoisted `vi.mock`
+could register a factory**, so `authClient.useSession()` returned the REAL client's initial
+`{ isPending: true }` and `useSessionStatus()` answered `{ kind: 'loading' }` **in every test file that
+mocks that module**. Four cases in `project-calendar-timeline.test.tsx` simply stopped writing anything — a
+loading session has no user id to key a record by — and every failure pointed at the page rather than at the
+file that caused it. The fix is that `setup.ts` now clears `localStorage` alone and imports nothing from
+`src/`; the module caches are cleared by each case's own file, next to the code that explains them. The
+hazard is recorded in `apps/web/test/setup.ts`'s own docblock because it is invisible from a green run and
+would be reintroduced by the next person who wants a global reset.
+
+**2. `--concurrency=1` is not a vitest flag.** The dispatch that carried this work specified it as the
+machine-load guard; vitest 3.2.7 rejects it outright (`CACError: Unknown option '--concurrency'`) before a
+single test is collected. The equivalent is **`--maxWorkers=1`**, which every run in this section used. The
+flag in the dispatch is a jest one; recorded here because a later reader following that sentence would get a
+tool error rather than a slower run, and the two failure modes look nothing alike.
+
+### Mutations — SIX, each sha256-confirmed to change the file and restored to the backup's sha EXACTLY
+
+A mutation is only evidence if it changes the PROPERTY under test rather than merely the source, and the
+kill sets below are what separates the cases that pin different halves of the same behaviour. **Every kill
+set here is a MEASURED result, not a predicted one** — and three of the six differ from what this section
+first claimed, which is stated rather than quietly corrected because the difference is the whole reason the
+run happens. Each ran against all five files this change touches (`use-last-project`, `use-workspace-
+projects`, `last-project-nav`, `project-calendar-timeline`, `app-nav`), and each was restored with the
+backup's sha256 verified equal to the original.
+
+1. **The remembered project resolved against ALL served projects, archived included** (the lookup reads
+   `projects` rather than the non-archived `live`) — reddens **13.868 alone**, 68 green. This is the one that
+   shows 13.865 does not cover the archived edge: the remembered project is still live in that case, so the
+   item's own name and href are unchanged and only the archived arm notices.
+2. **The fallback takes `projects[0]` instead of the first non-archived** — reddens **THREE, not the two
+   claimed: 13.866, 13.868 and 13.869**, 66 green. `13.869` is the one the prediction missed, and its
+   inclusion is correct rather than surprising: that case remembers a project which is not served at all, so
+   the remembered lookup yields nothing and the FALLBACK is exactly what it then asserts. A fallback mutation
+   is expected to redden every case that reaches the fallback, and two of the three do.
+3. **The workspace half of the project record's key dropped** (`storedWorkspaceId !== workspaceId` deleted) —
+   reddens **13.853 alone**, 68 green, with 13.853's own control still passing.
+4. **The user guard dropped from the PROJECT reader** (`storedUserId !== userId` deleted in `readFor`) —
+   reddens **13.851 alone**, 68 green. The claim this corrects is worth recording: this mutation was
+   predicted to redden 13.857 as well, and it does not, because **13.857's guard is a different site** — the
+   tab reader's own user check. Two readers, two guards, two mutations; the first draft of this list treated
+   them as one.
+5. **The user guard dropped from the TAB reader** (`storedUserId !== userId` deleted in `readProjectTab`) —
+   reddens **13.857 alone**, 68 green. This mutation was absent from the first draft of this list entirely,
+   which is the same error seen from the other side.
+6. **The tab merge replaced by a fresh map** (`{ ...existing.tabs }` → `{}`) — reddens **13.876 alone**, by
+   its second arm, 68 green. 13.874 and 13.875 stay green, and that is the point: neither has a second
+   project's entry to lose.
+
+**What the six do NOT cover, stated so a later reader does not read the table as complete.** No mutation
+targets the nav's `suppressNextFocusOpen` ref; deleting it reddens 13.871, but that was reasoned from the
+case's own assertion rather than measured, and it is recorded here as unwitnessed. No mutation targets
+`use-workspace-projects`' eviction or its zero-request gate, and no mutation targets the ARIA wiring
+(`aria-haspopup`, the menu's accessible name) — those are pinned by the cases but not shown to be pinned by
+a mutation, and the difference between "asserted" and "shown to discriminate" is the one this section exists
+to keep visible.
+
+### The review round — one independent reviewer, 1 Critical + 1 Important + 3 Minor, ALL FIVE CLOSED
+
+The reviewer ran against `53f2cadb` before the PR opened, briefed to attack the storage-keying and the
+fallback. It found five things, and **each of the three that named a defect this code could actually
+exhibit was reproduced by a failing case BEFORE the fix** — the reproduction is the evidence, not the
+finding's argument:
+
+- **C1 (Critical) → 13.878.** The projects cache was keyed by workspace id alone. Reproduced in
+  `13.878`'s first RED run as `expected [ { name: 'Alice Only', …(4) } ] to be null` — Alice's filtered
+  project list, served to Bob's first frame in the same browser. The reviewer's own cited premise was
+  checked rather than adopted: `apps/server/src/read/visible-projects.ts:51-74` really does return
+  `visible.filter((project) => eff.projects.has(project.projectId))` for every non-owner.
+- **I1 (Important) → 13.879.** The nav read storage before the page wrote it. The mechanism is a claim
+  about React's internals and was **measured, not read**: a throwaway probe rendering a parent with one
+  child logged `["child","parent"]`, so passive effects do commit child-first. Reproduced as
+  `Unable to find role="link" and name "Alpha"`.
+- **M2 (Minor) → 13.880.** The tab seed re-ran on the loading → signed-in transition. Reproduced as
+  `expected 'Calendar' to be 'List'`. The reviewer stated this finding's weak half honestly — it could not
+  measure that a person can land a click inside the session-read window — and the code path was checked
+  here: the page's main return is unconditional and nothing between it and the tablist reads
+  `session.kind`.
+- **M3 (Minor) → corrected prose, no case.** The docblock justified the user+workspace key by a project id
+  being able to collide across workspaces. **That arm is impossible and the reviewer could not construct
+  it, nor could I:** `proj_projects.project_id` is the PRIMARY KEY, and the migration's own comment says
+  an entity id is a ULID belonging to exactly one workspace. The keying is right; the reason was wrong and
+  is replaced with the three reasons that survive inspection, stated in the file.
+- **M4 (Minor) → 13.872 strengthened.** Its first assertion could not fail: the case's own fixture wrote
+  byte-identical bytes to what the assertion checked, so deleting the trigger's `onClick` left it green.
+  The record is now removed before the click, so only the click's own write can produce it.
+
+**Two findings the reviewer listed as sound are worth recording as sound**, because a review that only
+reports what is wrong is indistinguishable from one that only looked in one place: it independently
+confirmed the `readFor`/`readProjectTab` guards are checked before any id is handed back, and that the
+`useLastProject` module cache self-invalidates on a user or workspace change — i.e. the hole C1 has is
+**not** present in the sibling hook, which is why one is a Critical and the other is not.
+
+### The fix round's own mutations — FOUR, each re-run to prove its fix is pinned
+
+A fix is a change like any other, and the discipline is to verify it by RE-RUNNING the mutation rather
+than by reading the new test. Each of the four mutations below removes exactly what one fix added, and
+each kills **exactly one case**:
+
+1. **The projects cache keyed by workspace alone again** → **13.878 alone**, 71 green.
+2. **The nav stops reading the route's project** (`routeProjectId` → `undefined`) → **13.879 alone**, 71 green.
+3. **The seed's chosen-here guard removed** → **13.880 alone**, 71 green.
+4. **The trigger's own `onClick` removed** → **13.872 alone**, 71 green. *This one is the point of the
+   M4 repair: before it, the same mutation SURVIVED, because the fixture had already written the bytes
+   being asserted.*
+
+Each was sha256-confirmed to change the file and restored to the backup's sha EXACTLY.
+
+### Two things this fix round found that are NOT in the diff it was asked for
+
+**1. A partial `next/navigation` mock is an import-time throw, and the fix for I1 exposed four of them.**
+Adding `useParams` to `LastProjectNav` took **all fourteen cases in `test/settings-page.test.tsx` down at
+once in 43 ms** — an import-time failure, not a behavioural one, because that file mocks
+`next/navigation` with `useRouter`/`usePathname`/`useSearchParams` and no `useParams`. A mock is a
+MODULE, not a subset. Four files were missing it (`settings-page`, `sign-in`, `account-page`,
+`not-found-and-legal`); **only the first rendered the nav, so the other three were latent** and are
+repaired here rather than left for whoever mounts the bar on those pages next.
+
+**2. The cache key's first spelling made its own file unsearchable.** `cacheKey` joined the two ids with a
+NUL byte, which is a defensible way to make `('a','b:c')` and `('a:b','c')` different keys — and it made
+`grep -n cacheKey apps/web/src/use-workspace-projects.ts` print `Binary file … matches` instead of the
+line. A source file the repo's own inspection tools silently refuse to search is a blind instrument, which
+is the failure this project spends the most effort avoiding, and it would have stayed invisible until
+somebody needed a citation out of that file. Replaced with `JSON.stringify([userId, workspaceId])`, which
+is unambiguous without assuming anything about what an id may contain.
+
+### Known limitation, recorded rather than closed
+
+**A tab clicked during the session-read window is not REMEMBERED.** `13.880` stops the resolving session
+from reverting the choice, but the click's own write is still dropped, because `rememberProjectTab` takes
+a `userId` and there is not one yet — `use-last-project.ts:276` returns early on `null` rather than
+inventing a key. The choice stands for as long as the page does and is lost on the next visit. The window
+is one network round trip. **Owner: whoever next touches the session gating on
+`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`** — the two candidate repairs are gating the rail on
+`signed-in` (a product change, since the tablist is currently reachable signed out) and buffering the
+write until a user id exists (a second source of truth for a convenience).
+
+### Id block — one over, measured, and reported rather than squeezed
+
+**`13.880` is OUTSIDE the dispatch's block for this work, which is `13.850`–`13.879`.** The work needed
+31 cases and the block holds 30. `13.880` was measured free at this tip before it was used (boundary-
+anchored `13\.880([^0-9]|$)` across `test-cases/`, `apps/web/test/`, `apps/web/src/`, `apps/web/app/` and
+`Features.md`, returning only this change's own additions, with the same instrument's positive control
+finding `13.878` and `13.879` in the files that carry them). **No id was taken from any other block, no
+existing case was renumbered, and `13.850`–`13.879` are used contiguously with none spare** — the overrun
+was not avoidable by renumbering within the block, only by dropping coverage of a fix a reviewer required.
+Renumbering it is a one-line change plus its three citations if the controller prefers; asking first would
+have held the whole PR on an id.

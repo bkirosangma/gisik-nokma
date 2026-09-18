@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ListRow, RosterMember, TicketListView } from '@gisik-nokma/app-core';
 import type { TicketTypeDef } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
@@ -54,14 +54,29 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+/**
+ * MUTABLE, because case 13.880 has to put this page in the LOADING window and
+ * then let the session land — the transition is the whole of that case, and a
+ * frozen mock cannot produce it. Every other case in this file sees the
+ * signed-in value it always did, restored before each one.
+ */
+let mockSession: {
+  data: { user: { id: string; name: string } } | null;
+  isPending?: boolean;
+} = { data: { user: { id: 'user_kiro', name: 'Kiro' } } };
+
 vi.mock('../src/auth-client.js', () => ({
   authClient: {
-    useSession: () => ({ data: { user: { id: 'user_kiro', name: 'Kiro' } } }),
+    useSession: () => mockSession,
     signOut: async () => ({ data: {}, error: null }),
   },
 }));
 
 import ProjectPage from '../app/w/[workspaceId]/p/[projectId]/page.js';
+
+beforeEach(() => {
+  mockSession = { data: { user: { id: 'user_kiro', name: 'Kiro' } } };
+});
 
 afterEach(() => {
   push.mockClear();
@@ -566,4 +581,282 @@ describe('the roster is a convenience, never a gate', () => {
     expect(screen.queryByText(/cannot be shown yet/)).not.toBeInTheDocument();
   });
 
+});
+
+/**
+ * The nav item's project, witnessed at the PAGE level because that is where the
+ * defect this case forbids actually lives.
+ *
+ * `AppNav` is rendered INSIDE this page's JSX, so `LastProjectNav`'s effect is a
+ * DESCENDANT of `ProjectBoard`'s `useLastProject` write — and React commits
+ * passive effects CHILD-FIRST, which was measured here rather than taken from
+ * the docs: a probe rendering a parent with one child logged
+ * `["child","parent"]`. So the nav reads storage BEFORE the page writes the
+ * project it just opened, and without the route id the item names whatever was
+ * there before. It self-heals one navigation later, which is what makes it easy
+ * to miss: it is wrong exactly on the arrival that matters.
+ *
+ * The fixture is built so that the FALLBACK cannot produce the passing answer
+ * either — `p_other` is served FIRST, so an implementation that ignored both
+ * storage and the route would name Omega, and one that read only storage would
+ * name Omega too. Only reading the route names Alpha.
+ */
+describe('the nav item follows the route it is on', () => {
+  it('13.879 names the project in the route, not the one storage still holds', async () => {
+    window.localStorage.setItem(
+      'gn-last-project',
+      JSON.stringify({ userId: 'user_kiro', workspaceId: 'ws_1', projectId: 'p_other' }),
+    );
+
+    render(
+      <Providers
+        services={stubServices({
+          getBoard: async () => ({ projectId: 'p_1', groups: [] }),
+          getAttention: async () => [],
+          getMembers: async () => MEMBERS,
+          getTicketTypes: async () => [typeDef()],
+          getTickets: async (): Promise<TicketListView> => ({ projectId: 'p_1', rows: [row()] }),
+          getMyWorkspaces: async () => [
+            {
+              id: 'ws_1',
+              name: 'Convenience Corner',
+              role: 'owner',
+              memberCount: 1,
+              nameRestrictedProjectCount: 0,
+              projects: [
+                { id: 'p_other', name: 'Omega', archived: false, ticketCount: null, blockedCount: null },
+                { id: 'p_1', name: 'Alpha', archived: false, ticketCount: null, blockedCount: null },
+              ],
+            },
+          ],
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: 'Alpha' })).toHaveAttribute(
+        'href',
+        '/w/ws_1/p/p_1',
+      ),
+    );
+    expect(screen.queryByRole('link', { name: 'Omega' })).toBeNull();
+  });
+});
+
+/**
+ * The remembered tab (owner, 2026-09-18): *"on click, open the project page
+ * (save the last open tab as well)"*.
+ *
+ * The memory is GLOBAL — the owner answered that directly — so it applies
+ * whenever a project opens, not only when you arrive through the nav item. That
+ * is why the cases below live here, on the page, and not in
+ * `last-project-nav.test.tsx`: this file is where a project page is mounted
+ * with no nav item involved at all.
+ *
+ * ## These cases could not have been written before, and the reason is a real
+ * ## hazard rather than a technicality
+ *
+ * The page now WRITES to `localStorage` on every tab change, so every earlier
+ * case in this file (and in the eight other files that mount this page) leaves
+ * a record behind for the next one. `test/setup.ts` clears STORAGE before every
+ * case for exactly that reason; without it, whether `11.160` above sees Board
+ * selected would depend on which tab an earlier case happened to click.
+ *
+ * **Storage only — it does NOT clear the module caches, and an earlier draft of
+ * this very comment said it did.** `setup.ts` imports nothing from `src/` (its
+ * own docblock records the measured reason: doing so silently defeated
+ * `vi.mock` in every file that mocks the auth client), so the `clear*Cache`
+ * functions are out of its reach and each case's own file calls them. The
+ * distinction matters here because this file's cases vary the SESSION as well
+ * as storage, and a reader who believed the caches were cleared between cases
+ * would stop asking whether a first frame can come from a previous case. Case
+ * 13.880 is the one that would notice.
+ */
+describe('the remembered tab', () => {
+  /** The label of the one tab carrying `aria-selected="true"`. */
+  async function selectedTab(): Promise<string | undefined> {
+    const tabs = await viewTabs();
+    return tabs.find((tab) => tab.getAttribute('aria-selected') === 'true')?.textContent;
+  }
+
+  /**
+   * 13.874 — the page OPENS at the remembered tab.
+   *
+   * `waitFor` rather than a bare read, and that is the honest shape: the seed
+   * is applied by an effect, because a `useState` initialiser reading storage
+   * would answer `null` on the server and then disagree with the client at
+   * hydration — the same reason `theme-toggle.tsx` reads `gn-theme` in one.
+   * Without the seed this case never settles on Timeline and times out.
+   */
+  it('13.874 opens at the tab remembered for this project', async () => {
+    window.localStorage.setItem(
+      'gn-project-tabs',
+      JSON.stringify({ userId: 'user_kiro', tabs: { p_1: 'timeline' } }),
+    );
+    render(
+      <Providers services={servedList([row()])}>
+        <ProjectPage />
+      </Providers>,
+    );
+
+    await waitFor(async () => expect(await selectedTab()).toBe('Timeline'));
+  });
+
+  /**
+   * 13.875 — switching a tab WRITES it, and a fresh mount opens on it.
+   *
+   * Both halves matter and neither implies the other: a page that seeded from
+   * storage but never wrote would forget the moment you navigated away, and one
+   * that wrote but never seeded would store a tab it never used. The remount is
+   * a real second mount of the same component against the same storage, which
+   * is what a navigation to another page and back produces.
+   */
+  it('13.875 writes the tab on switch, and the next mount opens on it', async () => {
+    const first = render(
+      <Providers services={servedList([row()])}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await openTab('Calendar');
+
+    await waitFor(() =>
+      expect(JSON.parse(window.localStorage.getItem('gn-project-tabs') as string)).toEqual({
+        userId: 'user_kiro',
+        tabs: { p_1: 'calendar' },
+      }),
+    );
+
+    first.unmount();
+    render(
+      <Providers services={servedList([row()])}>
+        <ProjectPage />
+      </Providers>,
+    );
+
+    await waitFor(async () => expect(await selectedTab()).toBe('Calendar'));
+  });
+
+  /**
+   * 13.876 — a DIFFERENT project's remembered tab does not decide this one's,
+   * and writing this one's does not disturb it.
+   *
+   * The map is per project. The fixture is a record that exists but names
+   * another project, which is what makes it discriminating in BOTH directions:
+   * a page that read the map without looking up the id — one remembered tab for
+   * everything — would open on Timeline here and still pass 13.874, and a
+   * writer that replaced the whole map instead of merging one entry would drop
+   * `p_other` when the List tab is chosen.
+   *
+   * The write is asserted as a MAP of two entries rather than only as `p_1`'s,
+   * because that is the difference: `rememberProjectTab` reads the existing map
+   * back so this project's entry JOINS it.
+   */
+  it('13.876 opens at Board with nothing remembered for this project, and keeps another project’s entry', async () => {
+    window.localStorage.setItem(
+      'gn-project-tabs',
+      JSON.stringify({ userId: 'user_kiro', tabs: { p_other: 'timeline' } }),
+    );
+    render(
+      <Providers services={servedList([row()])}>
+        <ProjectPage />
+      </Providers>,
+    );
+
+    const tabs = await viewTabs();
+    expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual([
+      'false',
+      'true',
+      'false',
+      'false',
+      'false',
+    ]);
+
+    await openTab('List');
+
+    await waitFor(() =>
+      expect(JSON.parse(window.localStorage.getItem('gn-project-tabs') as string)).toEqual({
+        userId: 'user_kiro',
+        tabs: { p_other: 'timeline', p_1: 'list' },
+      }),
+    );
+  });
+
+  /**
+   * 13.880 — a tab chosen while the session is still LOADING is not reverted
+   * when the session lands.
+   *
+   * The rail is not gated on the session: the page's main return is
+   * unconditional and nothing between it and the tablist asks what
+   * `session.kind` is, so the tabs are clickable during the one network round
+   * trip the session read takes. In that window `tabUserId` is `null`, so
+   * `setView` writes nothing — and the seed effect, whose dependency
+   * `tabUserId` is, then RE-RUNS when the session resolves and applies the
+   * stored tab over the choice the person just made.
+   *
+   * The stored tab is deliberately a different one from the click: with
+   * `calendar` in storage, a click on List is reverted to Calendar by the
+   * resolving session, which is the visible half of this defect. The invisible
+   * half — the click's own write is dropped, because there is no user to key it
+   * by — is NOT fixed here and is recorded in the catalogue as a known
+   * limitation rather than papered over.
+   */
+  it('13.880 keeps a tab chosen while the session was still loading', async () => {
+    window.localStorage.setItem(
+      'gn-project-tabs',
+      JSON.stringify({ userId: 'user_kiro', tabs: { p_1: 'calendar' } }),
+    );
+    mockSession = { data: null, isPending: true };
+    const services = servedList([row()]);
+    const { rerender } = render(
+      <Providers services={services}>
+        <ProjectPage />
+      </Providers>,
+    );
+
+    await openTab('List');
+
+    // The session lands. `tabUserId` goes null -> 'user_kiro', which is the
+    // dependency that re-runs the seed.
+    mockSession = { data: { user: { id: 'user_kiro', name: 'Kiro' } } };
+    rerender(
+      <Providers services={services}>
+        <ProjectPage />
+      </Providers>,
+    );
+
+    await waitFor(async () => expect(await selectedTab()).toBe('List'));
+  });
+
+  /**
+   * 13.877 — opening a project is what REMEMBERS it, keyed by user AND
+   * workspace.
+   *
+   * The counterpart of 13.427 one level up ("opening a workspace is what
+   * remembers it"), and the write the nav item's READ depends on: without it
+   * the nav's "last open project" would only ever update when you arrived
+   * through the nav item itself, which is the one route that does not need it.
+   *
+   * The workspace id is asserted because it is the half the sibling hook has no
+   * analogue for — a project id is unique inside its workspace and meaningless
+   * outside it, so a record missing it would resolve `p_1` inside whichever
+   * workspace the viewer happened to be standing in.
+   */
+  it('13.877 records the opened project, keyed by user and workspace', async () => {
+    render(
+      <Providers services={servedList([row()])}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await viewTabs();
+
+    await waitFor(() =>
+      expect(JSON.parse(window.localStorage.getItem('gn-last-project') as string)).toEqual({
+        userId: 'user_kiro',
+        workspaceId: 'ws_1',
+        projectId: 'p_1',
+      }),
+    );
+  });
 });

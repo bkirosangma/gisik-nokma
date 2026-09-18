@@ -1,5 +1,5 @@
 import { cleanup } from '@testing-library/react';
-import { afterEach } from 'vitest';
+import { afterEach, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 
 /**
@@ -11,6 +11,50 @@ import '@testing-library/jest-dom/vitest';
  * toggle was still mounted and still carrying its own aria-label.
  */
 afterEach(cleanup);
+
+/**
+ * EVERY case starts with no remembered state.
+ *
+ * jsdom keeps ONE `localStorage` for a whole test file, so a case that writes
+ * leaves its record behind for every case after it — and a case that inherited
+ * the previous one's memory passes or fails on state its own body cannot see.
+ * That is order-dependence, which shows up as a suite that goes red when an
+ * unrelated test is renamed. `app-nav.test.tsx` recorded it for itself when
+ * Round 25 gave the nav a memory; it lives here now because the surface has
+ * grown past one file — the project page reads AND WRITES the remembered tab on
+ * every tab click, and nine test files mount that page.
+ *
+ * **This is a TEST-ONLY reset and must not be mistaken for product behaviour.**
+ * The product deliberately does NOT clear the remembered workspace or project
+ * on sign-out — `use-last-workspace.ts` argues that at length: the record is
+ * kept and simply not honoured, which also survives the case where sign-out
+ * never runs at all. Nothing here changes that; it removes the previous CASE,
+ * which the product has no equivalent of.
+ *
+ * ## ⛔ NOTHING HERE MAY IMPORT FROM `src/` — measured, and it cost an hour
+ *
+ * The first version of this block also cleared the remembered-state hooks'
+ * module caches, by importing their `clear*Cache` functions from `../src/…`.
+ * That SILENTLY DISABLED `vi.mock('../src/auth-client.js')` IN EVERY TEST FILE
+ * THAT MOCKS IT.
+ *
+ * The mechanism: this file is a `setupFiles` entry, so it runs BEFORE the test
+ * file's own module — and importing `use-workspace-name.ts` pulls in
+ * `providers.tsx` and then `auth-client.ts` with it. The real module was
+ * therefore instantiated and cached before any test file's hoisted `vi.mock`
+ * could register a factory, so `useSessionStatus()` answered the REAL client's
+ * initial `{ isPending: true }` — `{ kind: 'loading' }` — everywhere. Nothing
+ * threw. Four cases in `project-calendar-timeline.test.tsx` simply stopped
+ * writing anything, because a loading session has no user id to key a record
+ * by, and the failures pointed at the page rather than at this file.
+ *
+ * Anything a case needs beyond `localStorage` — the module caches above all —
+ * is cleared by that case's own file, next to the code that explains it. This
+ * block stays dependency-free on purpose.
+ */
+beforeEach(() => {
+  window.localStorage.clear();
+});
 
 /**
  * React 19 gates `act` behind this flag and warns on every call made without
