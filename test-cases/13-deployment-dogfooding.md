@@ -8235,3 +8235,51 @@ the new prefix-adjacent case, the first version of its pair list contained `('1'
 **hangs**, because `'10'` ends in `0` and is outside the key space: a test that times out rather than
 fails, for a pair no producer can emit. The pairs are now verified in-space, and the reason is written
 into the case.
+
+**Task 2 (engine + precheck) — `13.700`–`13.701`.** These two ids were **allocated**, not inferred: with a
+second executor minting ids on a disjoint branch, a bare "next free" number is a reading that expires the
+moment a peer writes, so the controller carved `13.700`–`13.759` for this executor and `13.760`–`13.819`
+for the other.
+
+**Recount, at this tip (branch `exec/second-wave-t2-engine`, cut from `origin/main` `43650f15`).** The
+dispatch states *"the highest id in this region is `13.699`"* — **that is false, and the shape of the
+error is the point.** `13.697`, `13.698` and `13.699` appear in this file only inside PROSE: the sentence
+"The next free id is `13.697`" and an earlier note about an "extras block `13.695`–`13.699`". Neither is a
+case marker. A substring sweep over a file that *discusses* case ids cannot separate a minted id from a
+mentioned one, so it reported a high-water mark four above the real one — the same class of silent-empty
+failure this file already records twice. **Measured over case markers (`^- ✅ **13.…`) and test names
+(`describe/it('13.…`) only, the highest marker on `main` is `13.696`**, which makes `13.697`–`13.699`
+genuinely free — and, less comfortably, unallocated: they sit in the core plan's wake, inside neither
+executor's block. Worth a ruling before anyone recounts and mints there. Neither the stale figure nor
+that gap touches the two ids below, which are inside this task's own block.
+
+- ✅ **13.700 — a `ticket.ranked` is accepted only for a ticket in the universal Backlog, and refused
+  `rank-requires-backlog` naming the state the ticket is actually in.** The door is the engine's rather
+  than the payload schema's, the same split `ticket.closed` has with `close-requires-terminal`: the schema
+  judges the KEY, the check judges the TICKET. The test is `stateId` and deliberately NOT `stateCategory`
+  — the universal `BACKLOG_STATE` carries `category: 'open'` (`packages/domain/src/workflow.ts:56`), so a
+  category test would admit every open ticket in the workspace, `"To do"` among them, while the backlog is
+  one reserved id no workflow may declare. The state NAME resolves over `statesWithBacklog(def)` — which
+  APPENDS the synthetic Backlog state that `def.states` never declares — and degrades to the bare state id
+  when the definition cannot be resolved, exactly as `close-requires-terminal` does. A **closed** ticket is
+  caught here too, by the backlog test rather than by a flag test, because closing does not clear `stateId`
+  (spec §2 keeps the final state visible), so a closed ticket is terminal and not backlog. The payload
+  door covers both halves of the key space — a space refuses on the alphabet, a trailing `0` refuses
+  because nothing sorts below it — and a misfiled entity kind is REFUSED naming the kind rather than
+  accepted. `evaluateEvent` dispatches the new arm. `packages/rule-engine/src/checks/rank.ts:49`,
+  `:60`, `packages/rule-engine/src/evaluate.ts:48`, `packages/rule-engine/test/rank.test.ts:48`
+
+- ✅ **13.701 — `precheckEvent` previews the identical verdict and the identical sentence from the client's
+  cached state; the engine and the pre-check cannot drift into two different reasons for one refusal.**
+  A `ticket.ranked` for a cached backlog ticket answers `passed` — genuinely, not manufactured from
+  absence: `checkTicketRanked` reads `stateId` (cached) and consults a workflow definition only to spell a
+  NAME inside a refusal it has already decided to give — and for a cached `todo` ticket it answers the
+  refusal with the reason the engine produces byte-for-byte. An UNCACHED ticket stays `not-evaluated`
+  rather than refusing, because "I have never heard of this ticket" is not "this ticket is not in the
+  backlog". The agreement half extends **13.604**'s table to a fifth reason, driving both real producers
+  over the same ticket/event pair. **The mutation is what proves the table is load-bearing:** dropping the
+  backlog check from `checks/rank.ts` (and rebuilding, since `dist` is what the client suite resolves
+  through) reddened 13.604's rank row while BOTH 13.701 cases stayed green — so the agreement case catches
+  the drift the two literals cannot, and the pre-check's own two cases hold their ground independently of
+  the engine's copy. `packages/app-core/src/precheck.ts:372`, `:387`,
+  `packages/app-core/test/precheck.test.ts:386`, `:490`

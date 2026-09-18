@@ -26,6 +26,7 @@ export const REFUSAL_RULES = {
   alreadyClosed: 'already-closed',
   notClosed: 'not-closed',
   closedTicket: 'closed-ticket',
+  rankRequiresBacklog: 'rank-requires-backlog',
 } as const;
 
 /**

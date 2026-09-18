@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eventEnvelopeSchema, isUlid, type TicketState, type WorkflowDef } from '@gisik-nokma/domain';
+import { eventEnvelopeSchema, isUlid, type SubmittedEvent, type TicketState, type WorkflowDef } from '@gisik-nokma/domain';
 import { REFUSAL_RULES, evaluateEvent } from '@gisik-nokma/rule-engine';
 import { createClientStateCache, type ClientStateCache } from '../src/cache.js';
 import {
@@ -48,6 +48,15 @@ function closeTicket() {
 
 function reopenTicket() {
   return make({ workspaceId: WS, entity: { kind: 'ticket', id: TICKET }, type: 'ticket.reopened', payload: {} });
+}
+
+function rankTicket(rank = 'i') {
+  return make({
+    workspaceId: WS,
+    entity: { kind: 'ticket', id: TICKET },
+    type: 'ticket.ranked',
+    payload: { rank },
+  });
 }
 
 function reparentUnder(newParentId: string | null) {
@@ -366,8 +375,33 @@ describe('13.583 precheckEvent mirrors checks/close.ts for ticket.closed / ticke
 });
 
 /**
- * 13.604 — Finding 7 (final whole-branch review, 2026-09-17): the four
- * refusal REASON strings above (`close-requires-terminal`, `already-closed`,
+ * 13.701 — `ticket.ranked` mirrored from `checks/rank.ts` (backlog/closed
+ * spec §8.1, second wave, 2026-09-18), hand-rolled for the same reason
+ * 13.583's pair is: `evaluate.ts` is a flat switch with one check per event
+ * type, and `checkTicketRanked` reads no ticket-type definition — so every
+ * fact the verdict rests on (`stateId`, and the workflow def only for the
+ * NAME inside a refusal already decided) is one this cache holds, and a
+ * genuine `passed` is reachable rather than manufactured from absence.
+ */
+describe('13.701 precheckEvent mirrors checks/rank.ts for ticket.ranked', () => {
+  it('a ticket.ranked for a backlog ticket passes', async () => {
+    const result = await precheckEvent(rankTicket(), readyCache({ stateId: 'backlog', stateCategory: 'open' }));
+    expect(result).toEqual({ kind: 'passed' });
+  });
+
+  it('a ticket.ranked for a todo ticket previews rank-requires-backlog, naming the state', async () => {
+    const result = await precheckEvent(rankTicket(), readyCache({ stateId: 'todo', stateCategory: 'open' }));
+    expect(result).toEqual({
+      kind: 'refused',
+      rule: REFUSAL_RULES.rankRequiresBacklog,
+      reason: 'Only a backlog ticket can be ranked; this one is in "To do".',
+    });
+  });
+});
+
+/**
+ * 13.604 — Finding 7 (final whole-branch review, 2026-09-17): the refusal
+ * REASON strings above (`close-requires-terminal`, `already-closed`,
  * `not-closed`, `closed-ticket`) are typed out twice — once in
  * `checks/close.ts`/`transition.ts`, once in `precheck.ts` — and every case
  * in 13.583 above checks `precheckEvent`'s own copy against a literal THIS
@@ -379,8 +413,8 @@ describe('13.583 precheckEvent mirrors checks/close.ts for ticket.closed / ticke
  * The RULE ID is not at risk — `precheck.ts` already imports `REFUSAL_RULES`
  * from `@gisik-nokma/rule-engine` (this file's own import line does too), so
  * that half is one constant on both sides. Only the REASON TEXT has no
- * shared source, which is what this case closes: it drives each of the four
- * refusals through BOTH real producers — `evaluateEvent` (the engine
+ * shared source, which is what this case closes: it drives each refusal
+ * through BOTH real producers — `evaluateEvent` (the engine
  * dispatch that calls `checkTicketClosed`/`checkTicketReopened`/
  * `evaluateTicketTransitioned` directly; `checks/close.ts` and
  * `transition.ts` are not exported for a test to call standalone, so the
@@ -389,8 +423,15 @@ describe('13.583 precheckEvent mirrors checks/close.ts for ticket.closed / ticke
  * SAME ticket/event pair, and asserts the `reason` neither side hard-codes:
  * byte-identical, not merely each equal to a string either file could drift
  * out from under.
+ *
+ * EXTENDED (second wave, spec §8.1, 2026-09-18) with a FIFTH reason,
+ * `rank-requires-backlog` — the same duplication, one plan later: the sentence
+ * is typed in `checks/rank.ts` and again in `precheck.ts`, and the case exists
+ * for exactly the reason it exists for the other four. Its producer pair is
+ * named `checks/rank.ts` rather than `transition.ts`, so the docblock above no
+ * longer enumerates files; the table below is the enumeration.
  */
-describe('13.604 the four close/reopen refusal reasons agree, engine and precheck', () => {
+describe('13.604 the close/reopen and rank refusal reasons agree, engine and precheck', () => {
   /**
    * Runs `event` through the real engine (`evaluateEvent` + `contextFromCache`,
    * the same adapter `precheckEvent` itself is mirrored from) and through
@@ -400,7 +441,7 @@ describe('13.604 the four close/reopen refusal reasons agree, engine and prechec
    * prove nothing about the two REASON strings this case exists to compare.
    */
   async function bothRefusalReasons(
-    event: ReturnType<typeof closeTicket>,
+    event: SubmittedEvent,
     cache: ClientStateCache,
   ): Promise<{ engineReason: string; clientReason: string }> {
     const engineVerdict = await evaluateEvent(completeForPrecheck(event), contextFromCache(cache));
@@ -436,6 +477,18 @@ describe('13.604 the four close/reopen refusal reasons agree, engine and prechec
   it('not-closed: reopening a ticket that is not closed', async () => {
     const cache = readyCache({ stateId: 'done', stateCategory: 'terminal' });
     const { engineReason, clientReason } = await bothRefusalReasons(reopenTicket(), cache);
+    expect(clientReason).toBe(engineReason);
+  });
+
+  /**
+   * The fifth reason (second wave, spec §8.1, 2026-09-18) — and the one this
+   * case exists for, stated in the dispatch: the engine and the pre-check are
+   * two independent producers of the SAME sentence, and a copy-edit landing in
+   * only one of them is invisible to every assertion that checks each against
+   * a literal the test file itself wrote.
+   */
+  it('rank-requires-backlog: ranking a doing ticket', async () => {
+    const { engineReason, clientReason } = await bothRefusalReasons(rankTicket(), readyCache());
     expect(clientReason).toBe(engineReason);
   });
 
