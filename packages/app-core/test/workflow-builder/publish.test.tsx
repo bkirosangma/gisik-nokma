@@ -126,6 +126,9 @@ describe('PublishControls gating', () => {
   /**
    * 10.56 — an advisory does not gate publish — the button stays enabled and the publish commits.
    */
+  /* 13.312 — the panel's text is the ENGINE's own: `adviseWorkflowDef` is
+   * imported and called on the same `def` the panel renders, and every returned
+   * `advisory.message` is asserted present — before AND after publishing. */
   it('an advisory does not gate publish — the button stays enabled and the publish commits', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(kanban));

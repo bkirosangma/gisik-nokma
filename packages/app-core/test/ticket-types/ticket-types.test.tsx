@@ -101,6 +101,7 @@ describe('TicketTypeListScreen', () => {
     expect(within(epicRow).getByText('Built-in')).toBeInTheDocument();
     const invoiceRow = screen.getByText('Invoice').closest('li')!;
     expect(within(invoiceRow).queryByText('Built-in')).not.toBeInTheDocument();
+    // 13.313 — the shipped `rank ${type.rank}` form, tied to THIS row's rank.
     expect(within(invoiceRow).getByText('rank 3')).toBeInTheDocument();
     expect(within(invoiceRow).getByText('1 field')).toBeInTheDocument();
     // 10.41 extended: the row also names the workflow the type is bound to —
@@ -375,6 +376,10 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     expect(screen.queryByTestId('workflow-divergence')).not.toBeInTheDocument();
   });
 
+  /* 13.310 — the move dialog's buttons carry the REAL workflow names, never the
+   * prototype's hard-coded `Move them to Scheduled`. `errandPublished.name` is
+   * `Errand` (`test/helpers/seed.ts:18`), not the rejected literal, so this
+   * expectation cannot be met by transcribing the prototype. */
   it('will not offer the move until the type is saved — otherwise new and old tickets swap places', async () => {
     const { user } = await rebind({ typePopulation: { task: { [kanbanPublished.id]: 14 } } });
     const move = await screen.findByRole('button', { name: `Move them to "${errandPublished.name}"…` });
