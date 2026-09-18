@@ -40,7 +40,7 @@ controller's next dispatch is the position.
 | cut from / base | **`0e0dbff9`** (`origin/main` after `#471` merged) |
 | frozen head | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit that carries it |
 | files | 7: `apps/web/app/w/[workspaceId]/members/page.tsx` · `apps/web/app/globals.css` · `apps/web/test/members-page.test.tsx` · **`apps/web/test/members-styling.test.ts` (new)** · `Features.md` · `test-cases/13-deployment-dogfooding.md` · this file |
-| ids minted | **`13.883`–`13.885`** — recounted at my tip BY MARKER (the amendment's "next free 13.881" was already stale: `#471` had minted 13.881/13.882) |
+| ids minted | **`13.886`–`13.888`** — and the FIRST three attempted were `13.883`–`13.885`, which **COLLIDED** with executor 1's `exec/owner-demotion-guard` (it minted `13.883` at 16:54:10, six minutes before this branch did at 17:00:29). This branch yielded and renumbered. **The remedy is an allocation, not a number — ask the controller for a BLOCK**; a shared "next free" pointer collides every time both executors are dispatched from one. Detail in `test-cases/13`'s section for this change. |
 | tree | clean; `docker compose` NOT run; :3001 and :3021 NOT bound |
 
 ### What shipped, and the measurement that came first
@@ -54,22 +54,33 @@ shipped:
    (`memberRows`, `desktop.dc.html:3077`) and attaches at `:671`, which is why a port driven by reading
    the JSX never saw it. `.gn-members__row:nth-child(even)` now takes `--gn-fill-quaternary`, on the
    prototype's parity (`i` is 0-based → even 1-indexed rows) and NOT the odd parity the product's two
-   other zebras use (`packages/ui/src/ui.css:1088`, `:2611`). **The inversion in those two families is
+   other zebras use (`packages/ui/src/ui.css:1088`, `:2612`). **The inversion in those two families is
    recorded at the rule with a named owner and NOT harmonised here.**
 2. **The invite form's two native fields wear the product's `.gn-field` pattern** (the amendment's
-   added deliverable), copied from `apps/web/app/w/[workspaceId]/page.tsx:812-818`. No handler, state or
+   added deliverable), copied from `apps/web/app/w/[workspaceId]/page.tsx:812-821`. No handler, state or
    conditional moved. **The `Channel` and `Role` fields are the shared `Select` and KEEP their bare
-   labels** — `.gn-field__input` is declared for native controls, and the amendment asked for that
-   ambiguity to be said out loud rather than settled: **it is on the report to the controller.**
-3. Cases `13.883`–`13.885`, `Features.md` and `test-cases/13` updated in the same change set.
+   labels — and the reason first recorded for that was FALSE**, refuted by the review at the line: the
+   shared component puts `gn-field__input` on its OWN trigger (`packages/ui/src/select/select.tsx:254`,
+   `:231`, `:432`), so nothing needs inventing and nothing needs wrapping. **The honest verdict is
+   "alignable and NOT aligned"**, and it is on the report to the controller with a recommendation.
+3. Cases `13.886`–`13.888`, `Features.md` and `test-cases/13` updated in the same change set.
 
 ### Mutation witnesses, all against the real files, tree restored and sha256-verified
 
-- zebra parity flipped `even`→`odd` → **3 failed / 36**, all 13.884.
-- zebra fill swapped to `--gn-surface-sunken` → **2 failed / 36**, all 13.884.
-- `className="gn-field__input"` removed from the address input → **1 failed / 36**, 13.883 alone.
-- the projects field un-wrapped back to the bare pair → **1 failed / 36**, 13.883 alone.
+- zebra parity flipped `even`→`odd` → **4 failed / 37**, all 13.887.
+- zebra fill swapped to `--gn-surface-sunken` → **2 failed / 37**, all 13.887.
+- **a higher-specificity override appended** (`.gn-members tbody .gn-members__row:nth-child(even) { background: transparent; }`) → **2 failed / 37**, all 13.887. **This one was 0 failed before the fix round** — the blind spot the review measured, now closed by 13.887's exactly-one-rule count.
+- `className="gn-field__input"` removed from the address input → **1 failed / 37**, 13.886 alone.
+- the projects field un-wrapped back to the bare pair → **1 failed / 37**, 13.886 alone.
 - `css` and `page.tsx` sha256 IDENTICAL before and after the whole sequence.
+
+**FIX ROUND after the review** (`83e4830c` → the fix commit, one round, no argument): the id collision
+renumbered; the false `Select` reason corrected in the case docblock and `Features.md`; "bare stack"
+narrowed to the four genuinely rule-less elements; the page-container verdict corrected to
+**reachable-and-not-reached** (`.gn-legal`, `globals.css:2088` applied as `gn-shell gn-legal` at
+`privacy/page.tsx:176` — a route-scoped modifier beside the shared class, not a fork); four line-number
+defects fixed (`ui.css:2611`→`:2612`, `page.tsx:55-57`→`:52-53`, `812-818`→`812-821`, and a
+misattributed quotation credited to 13.284); and 13.887 strengthened with the cascade count.
 
 **Instrument lesson, measured here and worth carrying:** the first attempt at the fourth mutation removed a
 `<label>`'s opening tag and left its closing one, so the file failed to TRANSFORM — and the JSON reporter
@@ -91,6 +102,15 @@ showed that as **`total=7 passed=7 failed=0`**, the broken file simply absent fr
   reads `:651-798` at this revision. `docs/design/prototype-delta-2026-09-18.md:524-542` still describes
   the `<ul>` roster this screen has not had since `#443` and asserts the family is unstyled throughout.
   Owner: the next change to that document.
+- **The members page's own container padding is REACHABLE and not reached.** The first verdict said "not
+  alignable without forking a shared class or restructuring"; the review refuted half of it with an
+  in-tree precedent — `.gn-legal` (`apps/web/app/globals.css:2088-2090`) carries its own paddings and is
+  applied as `<main className="gn-shell gn-legal">` (`apps/web/app/privacy/page.tsx:176`, and
+  `terms/page.tsx:183`), i.e. a route-scoped modifier BESIDE the shared class rather than a fork of it.
+  So the prototype's `padding:0 32px 24px` is one rule away as `0 2rem 1.5rem`. **Not taken**, because the
+  other half of that row (flex, `gap:20px`) needs the children inside one container — the restructure the
+  dispatch forbids — and half a treatment is a treatment neither document draws. On the report to the
+  controller.
 - **The `Select` labels question** above — asked of the controller in the report, not assumed.
 
 ---
@@ -126,7 +146,7 @@ controller's merge and nothing below needs redoing. Then verify the anchors — 
 | reviewed heads | round 1 reviewed `4205f172` (= `50db2300`) · round 2 reviewed `bb7ba7f7` (= `606ba48d`) |
 | frozen head | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit that carries it |
 | files | 11: `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` · `apps/web/test/page-refusals.test.tsx` · `apps/web/test/board-narrowing.test.tsx` · `apps/web/test/backlog-tab.test.tsx` · `apps/web/test/filters-sheet.test.tsx` · `apps/web/test/list-bulk-close.test.tsx` · `apps/web/test/project-calendar-timeline.test.tsx` · `apps/web/e2e-stack/non-text-contrast-roster.json` · `test-cases/13-deployment-dogfooding.md` · `Features.md` · this file |
-| ids minted | **`13.881`, `13.882`** — recounted at my tip BY MARKER; next free overall is `13.883` |
+| ids minted | **`13.881`, `13.882`** — recounted at my tip BY MARKER; next free overall is `13.886` |
 | tree | clean |
 
 ### What shipped

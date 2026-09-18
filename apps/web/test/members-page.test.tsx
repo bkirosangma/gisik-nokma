@@ -944,7 +944,7 @@ describe('13.824 the roster’s role control, and the option it deliberately doe
 });
 
 /**
- * 13.883 THE INVITE FORM'S TWO NATIVE FIELDS WEAR THE PRODUCT'S OWN FIELD
+ * 13.886 THE INVITE FORM'S TWO NATIVE FIELDS WEAR THE PRODUCT'S OWN FIELD
  * PATTERN (executor 2, 2026-09-18).
  *
  * They were the screen's one place still rendering a bare `<label>` beside a
@@ -953,29 +953,40 @@ describe('13.824 the roster’s role control, and the option it deliberately doe
  * over its control, `gap:7px`, label `13px/18px` in `--label2`, control
  * `min-height:44px` (`desktop.dc.html:748-751`, `.gn-field` at
  * `packages/ui/src/ui.css:3843-3875`). The wrapper is copied from the sibling
- * that already wears it rather than invented (`page.tsx:812-818`).
+ * that already wears it rather than invented (`page.tsx:812-821`).
  *
  * This case is deliberately about the WRAPPER AND NOT THE VALUES: the resolver
- * over `.gn-members`'s own family lives in `members-styling.test.ts` (13.884,
- * 13.885), because `globals.css` is not loaded here and a rendered reading could
+ * over `.gn-members`'s own family lives in `members-styling.test.ts` (13.887,
+ * 13.888), because `globals.css` is not loaded here and a rendered reading could
  * only restate classes. What THIS case has to catch is the way a wrapper breaks
  * a form — a label that no longer labels, a value that stops reaching the
  * handler — so it drives the real path end to end: type through the LABEL
  * association, submit, and read what the door was handed.
  *
- * THE TWO SELECT FIELDS ARE DELIBERATELY UNTOUCHED, and this is the point the
- * dispatch's amendment asked to be said out loud rather than resolved quietly.
- * `Channel` and `Role` are the shared `Select` (migrated 2026-09-14, cases
- * 13.824–13.828), and `.gn-field__input` is a class for NATIVE controls — a
- * `Select` wears its own trigger and cannot take it. So those two keep their
- * bare `<span>` label: wrapping them would mean either inventing a class for a
- * non-native control or wrapping a `Select` in a class declared for native ones,
- * and both are worse than the inconsistency. **Recorded as a question to the
- * controller, not settled here** — the labels of those two fields therefore do
- * not yet carry the prototype's 13px/18px label scale.
+ * THE TWO SELECT FIELDS ARE UNTOUCHED, and the reason first written here for it
+ * was FALSE — kept, corrected, because the shape recurs on this screen.
+ *
+ * It said: `Channel` and `Role` are the shared `Select` (migrated 2026-09-14,
+ * cases 13.824–13.828) and `.gn-field__input` "is a class for NATIVE controls —
+ * a `Select` wears its own trigger and cannot take it", so wrapping them would
+ * mean "inventing a class for a non-native control or wrapping a `Select` in a
+ * class declared for native ones". **Neither horn exists.** The shared component
+ * puts that exact class on its own trigger — `packages/ui/src/select/select.tsx:254`
+ * (`gn-select__trigger gn-field__input`), and `:231` / `:432` for the multiple
+ * and searchable variants — so nothing needs inventing and no `Select` needs
+ * wrapping in anything: `.gn-field` is `flex-direction: column; gap` and
+ * `.gn-field__label` is the 13px label, both of which a `Select` sits inside
+ * happily. That is what the prototype draws (`desktop.dc.html:752-753`).
+ *
+ * **So the honest state is "alignable and not aligned", not "not alignable".**
+ * The wrapping is left undone HERE because the amendment reserved this exact
+ * decision and asked for it to be reported rather than settled — it is on the
+ * change's report to the controller, with a recommendation. The two labels
+ * therefore still carry the UA default rather than the prototype's 13px/18px,
+ * and this paragraph is the correction an independent review forced.
  */
-describe('13.883 the invite form’s fields wear the shared .gn-field pattern', () => {
-  it('13.883 the address and projects fields are .gn-field/__label/__input, and still submit', async () => {
+describe('13.886 the invite form’s fields wear the shared .gn-field pattern', () => {
+  it('13.886 the address and projects fields are .gn-field/__label/__input, and still submit', async () => {
     const bodies: unknown[] = [];
     mount({
       listPending: async () => [],

@@ -663,7 +663,7 @@ function MintForm({ workspaceId, onMinted }: { workspaceId: string; onMinted: ()
       <h2 className="gn-invite-mint__heading">Invite somebody</h2>
 
       {/* The product's own field shape, copied from the sibling that already
-          wears it (`page.tsx:812-818`, the founding form) rather than invented:
+          wears it (`page.tsx:812-821`, the founding form) rather than invented:
           `.gn-field` wraps a `.gn-field__label` span and a `.gn-field__input`.
           The prototype draws the same pair — a label stacked over its control,
           `gap:7px`, label `13px/18px` in `--label2`, input `min-height:44px` —

@@ -11163,7 +11163,7 @@ superseded, the roster's `aside.gn-attention` entry re-measured (its `border` re
 `rgba(178,80,0,1)` **is** that left border and disappears with it), and the `tintWarning` single-consumer
 note updated. **Nothing in this change presupposes that answer.**
 
-## The members screen's styling, measured against the prototype (executor 2, 2026-09-18) — ids `13.883`–`13.885`
+## The members screen's styling, measured against the prototype (executor 2, 2026-09-18) — ids `13.886`–`13.888`
 
 The owner's instruction, verbatim: *"next task to queue up is the workspace members UI. check the prototype
 for the styling and fix it."*
@@ -11184,10 +11184,10 @@ lives in the prototype's DATA rather than its markup.
 | cells: `padding:13px 18px` (`:672`, `:678`, `:691`) | `.gn-members__cell`: `0.8125rem 1.125rem` | **aligned already** |
 | Person cell's second line: `{{ m.email }}`, `13px/18px`, `var(--label2)` (`:675`) | nothing to draw it from | **NOT alignable — wire absence** |
 | rows: `style: i % 2 ? "background:var(--fill4)" : ""` (`:3077`, attached at `:671`) | nothing — no rule mentioned the row at all | **MISSING — this change** |
-| page container: `padding:0 32px 24px`, `flex`, `gap:20px`, `animation:gnFade .25s ease` (`:652`) | `.gn-shell` (`padding:0 1.25rem 3rem`, block flow) | **not alignable without forking a shared class or restructuring** (the dispatch forbids the second) |
+| page container: `padding:0 32px 24px`, `flex`, `gap:20px`, `animation:gnFade .25s ease` (`:652`) | `.gn-shell` (`padding:0 1.25rem 3rem`, block flow) | **the padding is reachable and NOT reached; the flex/`gap` half is not reachable without a restructure** — see below |
 
 **The two-line Person cell is the dispatch's explicit "named absence" branch, and the page docblock
-already carries it** (`apps/web/app/w/[workspaceId]/members/page.tsx:55-57`): the prototype's second line
+already carries it** (`apps/web/app/w/[workspaceId]/members/page.tsx:52-53`): the prototype's second line
 is the person's EMAIL, and `readMembers` selects `user_id`, `u."name"` and `role` and nothing else
 (`apps/server/src/routes/builder-reads.ts:247`). Drawing a second line from any other field would be
 inventing one. **Recorded, not asked**: the dispatch pre-answered this branch in its own text.
@@ -11204,46 +11204,118 @@ List metrics it ports (`packages/ui/src/components/table.tsx:9`), and the ticket
 **The parity is the prototype's: `i` is 0-based, so `i % 2` tints the 1-indexed EVEN rows.**
 `memberRows` is not the only place the prototype writes it — `listRows` writes the identical construct
 (`:2887`) — and the product's two ports of it LANDED ON ODD (`.gn-list__table-row:nth-child(odd)`,
-`packages/ui/src/ui.css:1088`; `.gn-timeline__row:nth-of-type(odd)`, `:2611`), so those two families read
-inverted against the prototype. **`13.884` follows the prototype; the inversion in the other two families
+`packages/ui/src/ui.css:1088`; `.gn-timeline__row:nth-of-type(odd)`, `:2612`), so those two families read
+inverted against the prototype. **`13.887` follows the prototype; the inversion in the other two families
 is recorded at the rule with a named owner and is NOT harmonised here** — one screen's styling pass is not
 the place to re-parity two others.
 
-### The id space, and the amendment's own pointer going stale
+### The id space — COLLIDED, renumbered, and the collision is the point
 
-The amendment to this dispatch said *"next free `13.881`"*. **That was wrong before the branch was cut**
-— `13.881` and `13.882` were minted by `#471` (`exec2/attention-leaves-project-page`), which merged as
-`0e0dbff9` at 16:50, minutes after the amendment was written at 16:34. This is the same cache problem the
-head of this file documents, one dispatch later and measured rather than argued: **recounted at this
-branch's tip by case MARKER, the highest id anywhere in `test-cases/` and `docs/superpowers/plans/` is
-`13.882`** (`13.999` and `13.632866` remain the file's documented truncation traps, matched by the same
-sweep and excluded by the `{3}` width), so `13.883`–`13.885` are the next three. No existing case was
-renumbered and no other block was entered.
+The amendment to this dispatch said *"next free `13.881`"*. **That was wrong before the branch was cut** —
+`13.881` and `13.882` were minted by `#471` (`exec2/attention-leaves-project-page`), which merged as
+`0e0dbff9` at 16:50, minutes after the amendment was written at 16:34. Recounted at this branch's tip by
+case MARKER, `13.883`–`13.885` were then free HERE, and this change minted them at 17:00:29.
 
-- ✅ **13.883 — the invite form's two native fields wear the product's `.gn-field` pattern, and still
+**Six minutes earlier, at 16:54:10, the other executor's branch had already minted `13.883`.** Its own head
+commit says so: *"Renumber to 13.883: the id the dispatch called free was taken by a parallel writer"*, and
+its block carries the lesson this file's head already states — *"a reading that is correct in one tree
+expires in another, which is exactly why the case-id protocol is written in BLOCKS."* **Neither tree can see
+the other**, so both repo gates pass on both (`check-case-ids` and `check-case-citations` exit 0 here and
+there) and the duplicate surfaces only when one PR lands and the other rebases — `check-case-ids.mjs`
+asserts `union == sum`, so the second merge goes red.
+
+**This branch yields, because its reading was the later one, and renumbers to `13.886`–`13.888`** —
+contiguous, above both trees' high-water mark. Measured on both sides at this tip:
+`exec/owner-demotion-guard` carries `13.883` ×5 and stops there (so `13.884`/`13.885` are free in both),
+and this tree's sweep for `13.88[345]` returns nothing. `13.999` and `13.632866` remain this file's
+documented truncation traps and are excluded by the `{3}` width. **The remedy is an allocation, not a
+number**, and it is on the report to the controller: two executors minting from a shared "next free" pointer
+will collide again the next time both are dispatched from one — a BLOCK per executor is the only form of an
+id that stays true.
+
+- ✅ **13.886 — the invite form's two native fields wear the product's `.gn-field` pattern, and still
   submit.** `apps/web/test/members-page.test.tsx:977`. Read through the LABEL association rather than by
   id, because a label that no longer labels is the failure a wrapper causes; then the real path end to
   end — type, submit, read what the door was handed — because a wrapper that broke the value's route to
   the handler is the other one. Mutation-witnessed: removing `className="gn-field__input"` from the
-  address input reddens this case ALONE (1 failed / 36), and un-wrapping the projects field back to the
+  address input reddens this case ALONE (1 failed / 37), and un-wrapping the projects field back to the
   bare pair reddens it alone as well.
 
-- ✅ **13.884 — the roster's zebra, on the rows the prototype actually tints.**
-  `apps/web/test/members-styling.test.ts:100`. Three claims, and each is there because a different defect
-  satisfies the others: the even-child rule carries `--gn-fill-quaternary`; NO odd-child rule exists
-  (odd beside even tints every row, which is a table with no zebra and no way to notice); and an in-test
-  witness that both the value plant and the parity plant LAND before they are asserted to redden —
-  `replace` matching nothing prints success, which is this repo's own recorded trap. Mutation-witnessed
-  against the real file: flipping `even`→`odd` reddens 13.884 alone (3 failed / 36), and swapping the fill
-  to `--gn-surface-sunken` reddens 13.884 alone (2 failed / 36).
+- ✅ **13.887 — the roster's zebra, on the rows the prototype actually tints.**
+  `apps/web/test/members-styling.test.ts:100`. FOUR claims, and each is there because a different defect
+  satisfies the others: the even-child rule carries `--gn-fill-quaternary`; NO odd-child rule exists (odd
+  beside even tints every row, which is a table with no zebra and no way to notice); **EXACTLY ONE rule in
+  either stylesheet mentions `.gn-members__row` at all**; and an in-test witness that each plant LANDS
+  before it is asserted to redden — `replace` matching nothing prints success, which is this repo's own
+  recorded trap, and the witness now also asserts its anchor is unique so a second copy surfaces as a named
+  failure rather than a false red.
 
-- ✅ **13.885 — the four treatments that were already the prototype's, pinned as VALUES.**
+  **The third claim is here because an independent review measured the first version blind to it.** Every
+  other assertion in this case reads DECLARATIONS, and a later higher-specificity rule neutralises the one
+  they read while all of them stay green: appending
+  `.gn-members tbody .gn-members__row:nth-child(even) { background: transparent; }` left **37/37 passing
+  with the zebra dead in a browser**. The count catches it whatever specificity it carries, and the witness
+  asserts BOTH halves of that — the extracted rule still reads `--gn-fill-quaternary` (the old check green)
+  while the count has gone to two (the new check red). Mutation-witnessed against the real file, tree
+  restored and sha256-verified: parity flipped `even`→`odd` reddens 13.887 (4 failed / 37); the fill
+  swapped to `--gn-surface-sunken` reddens 13.887 (2 failed / 37); **the higher-specificity override, which
+  was 0 failed before, reddens 13.887 (2 failed / 37)**.
+
+- ✅ **13.888 — the four treatments that were already the prototype's, pinned as VALUES.**
   `apps/web/test/members-styling.test.ts:58`. It asserts declarations — `0.8125rem`, `1.125rem`, `600`,
   `var(--gn-surface-sunken)`, `0.6875rem 1.125rem`, `1.0625rem`, `51.25rem`, `var(--gn-radius-card)` —
   rather than that a rule exists, which is the distinction this repo has been bitten by repeatedly: a rule
   that is present and does nothing reads identically to one that works. It is a regression pin on four
-  treatments this change does NOT alter; the fifth and sixth rows of the table above are 13.884 and a
+  treatments this change does NOT alter; the fifth and sixth rows of the table above are 13.887 and a
   named absence respectively.
+
+### The independent review, and what it forced
+
+One reviewer at the frozen head, with a lean brief: verify every citation at the line it names, check that
+no token outside the shared set was introduced, and decide whether the three cases can fail. It reproduced
+the sweep and ran its own mutations on copies under `/tmp` and never touched the live tree.
+
+**It found one CRITICAL and four Important or Minor defects. Every one is corrected above rather than
+argued with.**
+
+1. **CRITICAL — the case ids collided with the other executor's branch.** See *The id space* above: the
+   reviewer measured `13.883` already minted on `exec/owner-demotion-guard` six minutes before this
+   branch took it, and this branch yielded and renumbered to `13.886`–`13.888`. **The reviewer's
+   contribution was not the number but the LINKAGE**: it named the mechanism (`check-case-ids`'s
+   `union == sum` reddening only at the second rebase) that makes two internally-consistent trees a
+   deferred failure rather than a visible one.
+2. **IMPORTANT — the reason recorded for leaving the `Channel` and `Role` labels bare was FALSE.** It
+   said `.gn-field__input` is "a class for NATIVE controls" a `Select` cannot take. The shared component
+   puts that exact class on its own trigger (`packages/ui/src/select/select.tsx:254`, `:231`, `:432`).
+   Corrected in the case docblock and in `Features.md`: the verdict for those two fields is **alignable
+   and not aligned**, and the decision is the controller's because the amendment reserved it.
+3. **IMPORTANT — "the minted-link card … render as a bare stack" overstated the measurement.** A `Card`,
+   a `Button` and two `Select`s are styled shared families; only the form container, the `<h2>`, the
+   pending `<ul>` and the two label spans are genuinely rule-less. Corrected above and in `Features.md`.
+4. **IMPORTANT — the page-container verdict ignored an in-tree precedent.** `apps/web/app/globals.css:2088`
+   gives `.gn-legal` its own `padding-top`/`padding-bottom`, applied at
+   `apps/web/app/privacy/page.tsx:176` as `<main className="gn-shell gn-legal">` — **a route-scoped
+   modifier BESIDE the shared class, not a fork of it**, the same shape `gn-mcp-authorize` and
+   `gn-mcp-tokens` already use. So the prototype's `padding:0 32px 24px` is reachable in one rule as
+   `0 2rem 1.5rem`, and the honest verdict is **reachable and NOT reached**, not "not alignable".
+   **Not taken here**, because the other half of that row — `display:flex` with `gap:20px` — needs the
+   children inside one container, which IS the restructure the dispatch forbids, and taking the padding
+   half alone would draw a treatment neither document draws. It is on the report to the controller.
+5. **MINOR — four line-number defects, all fixed**: `packages/ui/src/ui.css:2611` → `:2612` (the
+   selector is on `:2612`; three files cited it), `members/page.tsx:55-57` → `:52-53` (the Email
+   absence, two files), `page.tsx:812-818` → `:812-821` (the sibling field block, two files), and a
+   **misattributed quotation**: the principle "assert a computed value, not that a rule exists" was
+   credited to case 13.284, which is about non-text contrast identification and says no such thing. The
+   quote is gone; the principle is stated plainly. **This one is the `verdict-must-cite-a-line-you-read`
+   shape inside the very docblock explaining the measurement discipline.**
+6. **MINOR — the zebra case could be defeated by a higher-specificity override**, which the reviewer
+   measured at 0 failures on a `/tmp` copy. The exactly-one-rule count assertion closes it, and the
+   witness asserts both halves — the old check green, the new check red.
+
+**Confirmed, not merely agreed with:** the `isMembers` block's `:651-798`, the `memberRows` zebra and
+its 0-based index, the even-row parity, both odd-parity product zebras, the four already-aligned
+treatments on both sides, the `readMembers` wire absence, the mapping table, and the invitation-family
+sweep — each re-measured by the reviewer at the line it names, on copies, with a control.
 
 ### Recorded with named owners, not fixed here
 
@@ -11255,8 +11327,11 @@ renumbered and no other block was entered.
   in the same file, so this is a measured null and not a failed sweep. A SECOND INSTRUMENT AGREES FROM THE
   OTHER SIDE: `apps/web/e2e-stack/non-text-contrast-roster.json` — a real browser — records `input` and
   `select` on `/members` wearing Chrome's own UA border, `rgba(118,118,118,1)` at 3.81, which is what an
-  unstyled native control has. So the mint form, its heading, the minted-link card and the pending list
-  render as a bare stack. **It is a family to PORT, not a treatment to align, and this dispatch bounds the
+  unstyled native control has. **What is unstyled is narrower than "the whole half", and the first version
+  of this sentence overstated it**: the form's own container, its `<h2>`, the pending `<ul>` and the two
+  bare label spans have no rule — while the minted-link card is a `Card` (`gn-card`,
+  `packages/ui/src/ui.css:160-165`), the submit is a `Button` and both pickers are the shared `Select`, all
+  styled shared families. **A next task should not go and re-style a `Card`.** **It is a family to PORT, not a treatment to align, and this dispatch bounds the
   pass** — the amendment adds exactly one deliverable and says so. Owner: the controller, for the next
   task on this screen. **The `.gn-field` wrapping is the visible half of the cure and does land here**;
   the form's container, heading and pending list do not.

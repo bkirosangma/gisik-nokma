@@ -1516,7 +1516,7 @@ input, textarea, select { font-family: inherit; }
 
    THE PARITY IS THE PROTOTYPE'S, AND THE PRODUCT'S OTHER TWO ZEBRAS DIFFER.
    Recorded rather than harmonised in either direction: `.gn-list__table-row`
-   (`packages/ui/src/ui.css:1088`) and `.gn-timeline__row` (`:2611`) both stripe
+   (`packages/ui/src/ui.css:1088`) and `.gn-timeline__row` (`:2612`) both stripe
    the ODD child of a table ported from this same `i % 2` construct, so those two
    families read INVERTED against the prototype and against this rule. That is a
    measurement about two other screens with no bearing on this one, and changing
