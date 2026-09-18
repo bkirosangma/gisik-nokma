@@ -783,7 +783,10 @@ the daemon in a tight re-arm loop; the pre-fix code had no guard against either)
 - ✅ **13.203 — `backup-daemon-main.ts` registers two more jobs on the SAME scheduler as the existing
 pg-dump and ledger-export jobs, and neither reaches the `--once` path.** The entry point now calls
 `startScheduler` DIRECTLY with all four jobs, not `startBackupDaemon` — one scheduler, one `stop()`, one
-`'backup daemon scheduled'` log line, for all four. `startBackupDaemon`'s only remaining caller is its own
+`'backup daemon scheduled'` log line, for all four. **The count is FIVE as of Task 8 (second wave,
+2026-09-18), which added the `auto-close` job; the sentence above is this case's own measurement at the
+time it was written, and the heading in `test/ops/backup-daemon-main.test.ts` was corrected to match.**
+`startBackupDaemon`'s only remaining caller is its own
 test file above (13.9, 13.25–13.29), kept because it is what pins `startScheduler`'s stderr/alerter contract
 in one place; that pinning is what makes it true, by construction rather than by a fifth case, that a
 `sweep-orphans` failure in production alerts as `` `backup:sweep-orphans` `` with `msg: 'backup job failed'`
@@ -10337,3 +10340,133 @@ guard makes REACHABLE) would be unwitnessed, and without 13.828 the owner-row na
 implementation detail with nothing pinning it — M3 above shows 13.824 does not cover it. Both are within
 `13.820`–`13.849`; neither takes an id from any other block; the count is stated so that a later reader
 comparing this section against the plan's Step 6 sees five and does not read the difference as drift.
+
+---
+
+# Second wave, Task 8 — the auto-close sweep and its daemon job
+
+Plan ids `13.635`–`13.639` are the plan's own Step 1 assignment for this task, and the dispatch recorded
+them as taken. **Measured at this tip, they are unminted anywhere in the catalogue** — the only occurrence
+of `13.635`–`13.639` in this file before this section was the sentence naming them — and they sit outside
+this executor's block `13.700`–`13.759`. So this task's cases are **`13.727`–`13.731`**, recounted by case
+MARKER at the tip before the first mint: the block's high-water was `13.726` (Task 7), with
+`13.725`/`13.726` present as the positive control, and `13.727` returning **false**. The "taken" claim
+rests on the dispatch's record rather than on the repo, which is why it is stated that way here.
+
+**The case that decides the task is `AND t.reopened_at IS NULL`, and it is the assertion that proves
+Task 7's column earns its existence.** A ticket reopened yesterday and one nobody has touched for a month
+are identical on every column this sweep otherwise reads — both terminal, both `closed_at IS NULL`, both
+old — so without that clause the sweep re-closes a ticket an hour after a person deliberately reopened
+it, undoing an act they cannot make stick. **Mutation: drop the clause** → **13.727 reddens on its own
+report arithmetic (`candidates` 1→2, `closed` 1→2) and 13.729 reddens too**, and nothing else in the file
+moves. Both cases are about that clause, so the pair is a specific kill rather than a broad red.
+
+- ✅ **13.727 — the sweep closes only the ticket that is terminal, long-sitting and never reopened.** Two
+  cases in `apps/server/test/auto-close/sweep.test.ts`, each on its own database. Five tickets in one
+  workspace with `autoCloseAfterDays: 7`: A closes; B is inside the window; C is `active`, not terminal;
+  D is already closed; **E was reopened 30 days ago and untouched, and is skipped**. The report is
+  asserted whole (`{workspacesOn: 1, candidates: 1, closed: 1, refused: 0}`) and the close is proved in
+  the columns the product reads — `closed_at` set, exactly ONE `ticket.closed` in the ledger with
+  `actor_id = SYSTEM_ACTOR_AUTO_CLOSE` and `origin = 'server'`. The other four are each asserted
+  untouched FOR THEIR OWN REASON rather than by symmetry, and each against **the count the seeder left**
+  rather than zero: D and E already own one `ticket.closed` before the sweep runs, so a `toHaveLength(0)`
+  there failed for a reason unrelated to what it named — which is how the assertion was written on the
+  first pass and what caught it. The second case asserts the cutoff from BOTH sides: a ticket entered at
+  `2026-09-11T18:29:59.999Z` closes and one at exactly `2026-09-11T18:30:00.000Z` does not, which is the
+  half-open interval and, run under this file's non-India `TZ`, a red for any cutoff computed from the
+  machine's calendar rather than from IST.
+- ✅ **13.728 — a workspace without auto-close contributes nothing.** One case. An explicit
+  `autoCloseAfterDays: null` claim gives `workspacesOn: 0` with an old terminal ticket left open, and
+  **the control sits in the same test**: the SAME world then claims a 7-day window and the same sweep
+  answers `workspacesOn: 1` and closes it. Without that third arm a sweep that never counted any
+  workspace would pass this case perfectly.
+- ✅ **13.729 — a transition back into the terminal state re-arms the clock.** One case. A ticket
+  reopened and untouched is left alone (`candidates: 0` — the clause is in the SELECT, so the row is
+  never selected and there is no downstream "skip" to assert); it is then transitioned back into `done`
+  ten days before `now`, and the next sweep closes it. The fold's clearing of `reopened_at` is asserted
+  BEFORE the sweep, so a failure there names the reducer rather than the sweep.
+- ✅ **13.730 — the sweep closes THROUGH THE DOOR, proved by making the door say no.** One case, and the
+  plan offered two shapes: (a) construct a candidate the engine refuses, or (b) count ledger rows rather
+  than projection writes. **(a) was chosen and the reasoning is part of the case.** (b) is weaker than it
+  looks — a sweep that wrote `proj_tickets` directly AND appended a ledger row by hand would satisfy it,
+  and the whole question is whether an engine decision stands between the SELECT and the write. (a) is
+  decisive: a REFUSED close leaves the ticket open and the ledger empty, which no direct writer can
+  produce. **The race has to be injected, and saying why matters:** a statically-seeded candidate the
+  engine refuses is impossible, because the sweep's SELECT and `checkTicketClosed` read the SAME two
+  projection columns — so any ticket the SELECT returns is one the engine would accept. The window is
+  therefore temporal, and the only honest place to open it is the `ingest` dependency, which is exactly
+  the seam the real window sits on. The wrapper commits a real transition and then hands the batch to the
+  REAL service, so the refusal is the engine's own `close-requires-terminal`; the case then asserts
+  `refused: 1` AND `closed_at IS NULL` AND **zero** `ticket.closed` events — the second and third
+  together being what a direct writer cannot fake.
+- ✅ **13.731 — the auto-close job's interval is validated by `requirePositiveIntervalMs`, on the same
+  scheduler as the other four.** One case in `apps/server/test/ops/backup-daemon-main.test.ts`, which is
+  a **recorded placement deviation**: the plan named `test/auto-close/sweep.test.ts` as this task's test
+  file, but the mechanism is the DAEMON's env handling and the 40-line child-process harness that proves
+  it was built there by 13.203. Re-deriving it in the sweep file would be a second copy of a fixture with
+  its own failure modes. `AUTO_CLOSE_SWEEP_INTERVAL_MS=0` aborts the whole scheduler and the stderr names
+  the variable; 13.203 is its positive control, since it announces with only the OTHER sweep's interval
+  set — leaving this one on its `'3600000'` default — so the daemon really does arm all five jobs here.
+  **The describe heading in that file was corrected from "four jobs" to "five"**: the plan's Files block
+  calls `auto-close` "a fourth `ScheduledJob`", which was true when three existed, and the code is the
+  primary source.
+
+## Task 8's review round — one independent reviewer, verdict NOT CLEAN, and two mutations that survived
+
+One reviewer, dispatched before the PR opened, read the frozen tip `50fe9a0f`. Its brief was the two
+places the controller named as where this task can be wrong while looking green. **Verdict: NOT CLEAN —
+no Critical, two Important.** Both Importants were reproduced here before being acted on.
+
+**I1 — a docblock claim that was FALSE AS WIRED.** `logOf` defaulted to a **no-op**, so a refused or
+invalid close left no per-ticket trace anywhere in the process: the reason was discarded while the
+aggregate count went into the daemon's structured line. The numbers survived and the *why* did not —
+the worse half to lose — and the docblock claimed the opposite ("so it reaches the alerter the daemon
+wires up"), naming a connection that does not exist. The sibling it claimed to mirror defaults the other
+way (`notifications/sweep.ts:126` is `deps.log ?? console.error`). **Fixed:** the default is now
+`console.error`, matching the sibling, and the comment says what is true. Reproduced with a console spy —
+zero lines printed for a refused close.
+
+**I2 — a SURVIVING MUTANT on the IST-vs-UTC axis, and the `TZ` pin cannot see it.** Replacing
+`istDayOf(clientTime)` with `clientTime.slice(0, 10)` **survived every case in the file**. Between 18:30Z
+and midnight the two disagree — the UTC date still says the 18th while IST is already the 19th — so the
+cut-off walks one day further back and every eligible ticket waits until 05:30 IST to close, whole-day,
+every night, for 5.5 hours of the product's clock. **The file's non-India `TZ` gives it no protection at
+all**: a UTC slice never consults the process zone. And every case ran at midday, where the two spellings
+agree — so they passed for a reason unrelated to the property they named. **Fixed by a case, not by a
+comment:** 13.727 now carries an arm with `now = 2026-09-18T19:00:00.000Z`, where `istDayOf` says
+`2026-09-19` and the slice says `2026-09-18`, and a ticket entered IST 12 Sep closes under the correct
+code and stays open under the mutant. Re-run after the fix: **I2 dies on that arm and nothing else.**
+`notifications/sweep.ts:128` had the same warning one file over and this task did not inherit it.
+
+**M1 — the `!== 'committed'` count shape was prose, not a witness.** Mutating the counter to include
+only `status === 'refused'` **survived**, because no case ever fed the sweep an `invalid` result and the
+sweep builds its own envelopes by construction. **Fixed:** 13.730 has a second arm that hands the sweep a
+deliberate `invalid` answer and asserts `refused: 1`, so `closed + refused === candidates` is now pinned.
+That arm is labelled for what it is — a test of the sweep's OWN counting against the contract
+`ingestBatch` publishes, NOT a second proof that the door works, which the arm above owns.
+
+**M3 — idempotence was unpinned.** The module says the sweep is "idempotent by the ledger, not by a
+cursor" and no case ran a closing sweep twice. **Fixed:** 13.727's first arm now sweeps again and asserts
+all four counters are zero and the ticket is still closed exactly once.
+
+**M4 — per-workspace settings resolution was unpinned.** Every case seeded exactly ONE workspace, so
+hoisting the cut-off out of the loop would have survived. **Fixed:** a case with two workspaces on
+different windows (7 and 30 days) where the same ten-day-old ticket must close in one and stay open in the
+other, and `workspacesOn: 2` is witnessed for the first time. Writing it found a second thing — the
+seam helper published one workflow id for both workspaces, which `proj_workflows` (keyed by the workflow's
+own id) refuses; the helper is now parameterised.
+
+**M2 — "all four jobs" drift, two sites, now fixed.** `Features.md:2366` and this file's own 13.203 prose
+both still said four. Both now say five, with the change named rather than silently overwritten.
+
+**M5 — the "taken" sentence, sharpened rather than left implying the repo says it.** `13.635`–`13.639`
+have **zero** catalogue hits at this tip; the claim rests on the dispatch's record, and the sentence now
+says exactly that.
+
+**Confirmed and could not be faulted:** §8.2's cutoff arithmetic (re-derived, not accepted — `endUtc` is
+genuinely IST midnight, the interval half-open, N=1/365 and month/leap boundaries all correct); that
+`process.env.TZ` is live before the sweep computes; that 13.730's injected race is legitimate and the
+refusal is the real engine's `close-requires-terminal` naming "Doing", with the reviewer verifying that
+`ticket.closed`'s only dispatch reaches `checkTicketClosed` alone and that the other refusals cannot fire
+for a SELECT-returned row; the daemon wiring, `.env.example` (check:env really fixed, not suppressed),
+`deploy/do/app.yaml` parity, same-commit hygiene, and that no migration was added.

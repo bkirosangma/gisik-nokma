@@ -41,12 +41,116 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~15:1x IST. **SECOND WAVE TASK 7 IS MERGED (#459, at
-> # `ae71b207`). THE LIVE WORK IS STEP 13 — THE MIGRATION-ORDER FIX — PR #462 at `73c40ea3`: Task 7's
-> # migration was numbered BELOW Task 6's, which merged first, so `checkOrder` refused it and
-> # `proj_tickets.reopened_at` could never be created on any long-lived database.** Task 7 itself was
-> # built, reviewed CLEAN, fixed, rebased and merged; its five review findings are closed or recorded
-> # below. This block is the position; everything below it is RECORD.
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~15:4x IST. **SECOND WAVE TASK 8 (the auto-close sweep and
+> # its daemon job) IS BUILT, REVIEWED, FIXED AND FULLY GREEN. ONE THING IS NOT DONE: THE PR.** The
+> # independent reviewer returned **NOT CLEAN** — two Important, both reproduced and both closed — and
+> # **two mutations survived its first pass**, one of which this file's `TZ` pin structurally could not
+> # reach. Both now die; the details are below. **The queue after this task is NOT empty** — Tasks 9/10
+> # (bulk close) remain in the second-wave plan, and they are **dispatched by the controller rather than
+> # started by reflex. HOLD for that dispatch.** This block is the position; everything below it is RECORD.
+>
+> | | |
+> |---|---|
+> | branch | `exec/second-wave-t8-autoclose-sweep`, cut from `origin/main` = **`94866264`** |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha here names an ANCESTOR. The tip is THE COMMIT THAT CARRIES THIS BLOCK; its ancestors are **`dec1fdd9`** (the fix round) and **`a6c3d5cc`** (the task). The REVIEWED sha was **`a6c3d5cc`** — the reviewer read that, not the tip, and the fix round after it is described below. *(Shas orphaned by the 15:4x rebase onto `13e74c0b`: `50fe9a0f`→`a6c3d5cc` and `b974d25a`→`dec1fdd9`. The HANDOFF commit is deliberately not in this mapping — it is the tip, and any note about it would be invalidated by the next amend. Check with `git merge-base --is-ancestor`, never `cat-file`.)* |
+> | base moved | `origin/main` is now **`13e74c0b`**, two commits past `94866264` — a **ledger-only** commit (`f3c35d94`, PR #463). **No overlap with this branch's 7 files**, so the rebase before the PR is mechanical; re-measure rather than trusting that sentence. |
+> | case ids | **`13.727`–`13.731`**, FIVE ids, inside this executor's block `13.700`–`13.759`; **`13.732`–`13.759` remain unminted**. Recounted at the tip by case MARKER: the block's high-water was `13.726` (Task 7), with `13.725`/`13.726` present as the positive control and `13.727` returning **false**. `check-case-ids` at the tip: **2312** unique ids, union == sum. |
+> | migration | **NONE, and the dispatch asked for none.** The sweep adds a job and a source file; nothing here touches the schema, so there is no container restart after this merges. |
+> | seven checks | **all EXIT 0**: `tasks` · `env` · `runbook` · `help` · `citations` (**file 13 = 622 cited / 0 uncited**) · `db-tz` · `check-case-ids` (**2312**, union == sum). |
+> | suites | **server 152 files / 1554 passed (5 skipped) · domain 514 · app-core 1549 · rule-engine 331 · ui 325 · web 487 — zero failures**, Node **v22.22.2**. The server figures reconcile exactly against Task 7's 151/1548: **+1 file and +6 cases**, which are this task's 5 sweep cases and 1 daemon case. |
+> | typecheck | **17/17 tasks, EXIT 0.** |
+> | gate | **NOT RUN BY THIS LANE** (standing rule). The suite set above is the evidence. |
+> | tree | clean; the 7 files are `.env.example`, `Features.md`, the sweep + its test, the daemon + its test, `test-cases/13`. **No `dist`, no `task-ledger.tsv`, no `.superpowers/`.** |
+>
+> ## ▣ WHAT TASK 8 SHIPS, AND THE THREE SHORTER VERSIONS IT REFUSES
+>
+> A ticket that has SAT in a terminal state for the workspace's `autoCloseAfterDays` is closed by
+> `SYSTEM_ACTOR_AUTO_CLOSE` — the actor Task 7 reserved — on the **fifth** job of the existing backup
+> daemon, beside the notification sweep.
+>
+> 1. **Not a stored `entered_at` column.** "When did this enter its state?" is the last
+>    `ticket.created`/`ticket.transitioned` event's `server_time`, via the same LATERAL join
+>    `notifications/sweep.ts` uses for staleness. A column would be a second copy of a ledger fact.
+> 2. **Not elapsed milliseconds.** `cutoff = istDayBounds(isoDatePlusDays(todayIst, -N)).endUtc`, a
+>    strict `<`. `now - N * 86_400_000` would make a day count mean that many 24-hour spans from whenever
+>    the cron fired instead of the calendar a person reads.
+> 3. **Not a projection write.** One `ticket.closed` per candidate, `origin: 'server'`, handed to
+>    `ingestBatch`, so the engine's refusals still apply and the ledger records who closed what. A direct
+>    write would leave a closed row no event explains, in a table that no longer rebuilds from the ledger.
+>
+> **`AND t.reopened_at IS NULL` is the clause that decides whether Task 7's column earns its existence**:
+> a ticket reopened yesterday and one untouched for a month are identical on every column this sweep
+> otherwise reads. **Mutation run: dropping the clause reddens 13.727 on its own report arithmetic
+> (`candidates` 1→2, `closed` 1→2) AND 13.729, and moves nothing else in the file** — both cases are
+> about that clause, so it is a specific kill rather than a broad red.
+>
+> **13.730 chose the plan's shape (a) over (b), and the reasoning is in the case.** Counting ledger rows
+> instead of projection writes is weaker than it looks: a sweep that wrote `proj_tickets` directly AND
+> appended a ledger row by hand satisfies it, and the question is whether an engine decision stands
+> between the SELECT and the write. A refused close leaves the ticket open and the ledger empty, which no
+> direct writer produces. **The race had to be injected** because a statically-seeded candidate the engine
+> refuses is impossible — the SELECT and `checkTicketClosed` read the SAME two projection columns — so
+> the window is opened at the `ingest` dependency, which is exactly where the real one sits, and the
+> refusal is the real engine's own `close-requires-terminal`.
+>
+> ## ▣ TWO TEST-SIDE CORRECTIONS, BOTH FOUND BY RUNNING RATHER THAN READING
+>
+> - **My first expectation of `candidates` was wrong — 3, then 1, then 0.** `closed_at IS NULL` and
+>   `reopened_at IS NULL` are IN the SELECT, so D and E are never candidates at all, and the comment I
+>   had written claiming they were "skipped later by the projection" was a **false description of the
+>   implementation**. The corrected comment says the mutation moves BOTH counters, which is why it is a
+>   red rather than merely a difference.
+> - **The "untouched" loop asserted `toHaveLength(0)` for tickets the seeder had already closed** — D and
+>   E each own one `ticket.closed` before the sweep runs. That is a check failing for a reason unrelated
+>   to what it named; it now asserts **the count the seeder left**, per ticket.
+>
+> ## ▣ ONE RECORDED PLACEMENT DEVIATION
+>
+> **13.731 lives in `apps/server/test/ops/backup-daemon-main.test.ts`, not in the sweep test the plan
+> named.** The mechanism is the DAEMON's env handling and the 40-line child-process harness that proves it
+> was built there by 13.203; re-deriving it in the sweep file would be a second copy of a fixture with its
+> own failure modes. That file's heading is corrected from "four jobs" to **"five"** — the plan calls
+> `auto-close` "a fourth `ScheduledJob`", which was true when three existed, and **the code is the primary
+> source**.
+>
+> `AUTO_CLOSE_SWEEP_INTERVAL_MS` is documented in `.env.example`; **`check:env` caught that omission**
+> rather than letting it ship undocumented.
+>
+> ## ▣ THE REVIEW ROUND — NOT CLEAN, TWO IMPORTANT, AND TWO SURVIVING MUTATIONS
+>
+> **I1 — a docblock claim FALSE AS WIRED.** `logOf` defaulted to a NO-OP, so a refused or invalid close
+> left no per-ticket trace anywhere in the process: the reason discarded, the aggregate count kept. The
+> comment claimed the opposite ("reaches the alerter the daemon wires up"), naming a connection that does
+> not exist, and the sibling it claimed to mirror defaults the other way (`notifications/sweep.ts:126`).
+> Reproduced with a console spy. **Now `console.error`, for parity.**
+>
+> **I2 — A SURVIVING MUTANT THE `TZ` PIN CANNOT REACH.** `istDayOf(clientTime)` → `clientTime.slice(0,10)`
+> **survived every case.** Between 18:30Z and midnight the UTC date and the IST date differ, so the
+> cut-off walks a day back and every eligible ticket waits until 05:30 IST to close — 5.5 hours of the
+> product's clock, every night. **The non-India `TZ` gives it no protection at all, because a UTC slice
+> never consults the process zone**, and every case ran at midday where the spellings agree. **Fixed by a
+> CASE, not a comment**: 13.727 has an arm at `2026-09-18T19:00:00.000Z` where `istDayOf` says
+> `2026-09-19` and the slice says `2026-09-18`. Re-run: **dies on that arm and nothing else.**
+> `notifications/sweep.ts:128` had the same warning one file over and this task did not inherit it.
+>
+> **M1 — the `!== 'committed'` count was prose.** Counting only `'refused'` survived, because no case fed
+> the sweep an `invalid`. **Now pinned** by 13.730's second arm.
+> **M3 — idempotence was unpinned**; **M4 — per-workspace windows were unpinned** (one workspace per
+> case). **Both now pinned**, and writing M4's case exposed a second bug — the seam helper published one
+> workflow id for two workspaces, which `proj_workflows` refuses.
+> **M2 — "all four jobs" drift** at `Features.md:2366` and the 13.203 prose; **M5** — the "taken" sentence
+> now states the measured zero catalogue hits rather than implying the repo says it.
+>
+> **Re-verified after the fix round:** server **152 files / 1557** (1548 baseline + 6 and + 3 arms —
+> reconciles exactly), domain 514, app-core 1549, rule-engine 331, ui 325, web 487; build 11/11;
+> typecheck 17/17; all seven checks EXIT 0.
+>
+> # ▣ CURRENT POSITION — SUPERSEDED 2026-09-18 ~15:2x IST. **HISTORY — Task 7 (`reopenedAt`, the
+> # reserved `Auto-close` actor, `actorLabel`'s precedence) IS MERGED (#459, at `ae71b207`), AND SO IS
+> # step 13 — THE MIGRATION-ORDER FIX (#462 at `f68626ac`): Task 7's migration was numbered BELOW
+> # Task 6's, which merged first, so `checkOrder` refused it and `proj_tickets.reopened_at` could never
+> # be created on any long-lived database.** Both were reviewed CLEAN; their findings are closed or
+> # recorded below. Kept because everything below it is RECORD.
 > # **The queue after this task is NOT empty** — Tasks 8 (`reopenedAt` + the auto-close sweep) and
 > # 9/10 (bulk close) remain in `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md`,
 > # and they are **dispatched by the controller rather than started by reflex. HOLD for that dispatch.**

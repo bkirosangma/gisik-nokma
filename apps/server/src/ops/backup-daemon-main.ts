@@ -2,11 +2,15 @@
 // strict `null` as "no alerter", so the `|| null` at the call site below stays
 // load-bearing: `.env.example` ships ALERT_WEBHOOK_URL empty and `??` would
 // hand that empty string to WebhookErrorAlerter.
+import { evaluateEvent } from '@gisik-nokma/rule-engine';
 import { alerterFromConfig } from '../alerts/error-alerter.js';
 import { createObjectStoreFromEnv } from '../attachments/store-config.js';
+import { runAutoCloseSweep } from '../auto-close/sweep.js';
 import { ConfigError } from '../config.js';
 import { createPool } from '../db.js';
+import { createIngestService } from '../ingest/ingest-service.js';
 import { runNotificationSweep } from '../notifications/sweep.js';
+import { buildProjectionRegistry } from '../projections/index.js';
 import { createInAppTransport } from '../notifications/transport.js';
 import { sweepOrphanObjects } from '../tools/sweep-orphans.js';
 import { exportLedger } from './export-ledger.js';
@@ -136,6 +140,29 @@ async function main(): Promise<void> {
     rawSweepInterval === undefined || rawSweepInterval.trim() === '' ? '3600000' : rawSweepInterval,
   );
 
+  // The same read-once, validate-on-every-call shape, and the same EMPTY-means-
+  // unset handling, for the same reason: App Platform resolves an unset variable
+  // to `''`, and `Number('')` is `0`, which `requirePositiveIntervalMs` would
+  // then correctly refuse for a value the operator never actually set. The
+  // default is an hour, matching spec §8.2's `AUTO_CLOSE_SWEEP_INTERVAL_MS`.
+  const rawAutoCloseInterval = process.env.AUTO_CLOSE_SWEEP_INTERVAL_MS;
+  const autoCloseSweepIntervalMs = Number(
+    rawAutoCloseInterval === undefined || rawAutoCloseInterval.trim() === ''
+      ? '3600000'
+      : rawAutoCloseInterval,
+  );
+
+  // The auto-close sweep closes tickets, so it needs a door to close them
+  // THROUGH — the same composition `seed/cli-seed-dev-workspace.ts` uses, built
+  // here rather than there because this is the process that runs it on a timer.
+  // The engine and the projection registry are the real ones: a sweep wired to a
+  // permissive stub would report a clean run and write nothing.
+  const ingest = createIngestService({
+    pool,
+    evaluate: evaluateEvent,
+    projections: buildProjectionRegistry(),
+  });
+
   const scheduledJobs: ScheduledJob[] = [
     // The three schedule values below are NOT validated here, and that is the
     // choice rather than an omission: `msUntilNextUtc` refuses a malformed
@@ -203,6 +230,23 @@ async function main(): Promise<void> {
       },
       delayMs: () =>
         requirePositiveIntervalMs(notificationSweepIntervalMs, 'NOTIFICATION_SWEEP_INTERVAL_MS'),
+    },
+    {
+      name: 'auto-close',
+      run: async (): Promise<void> => {
+        const report = await runAutoCloseSweep({ pool, ingest });
+        console.log(
+          JSON.stringify({
+            msg: 'auto-close sweep complete',
+            workspacesOn: report.workspacesOn,
+            candidates: report.candidates,
+            closed: report.closed,
+            refused: report.refused,
+          }),
+        );
+      },
+      delayMs: () =>
+        requirePositiveIntervalMs(autoCloseSweepIntervalMs, 'AUTO_CLOSE_SWEEP_INTERVAL_MS'),
     },
   ];
 

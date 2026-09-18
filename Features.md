@@ -665,6 +665,28 @@ reason on record, not an oversight:*
   `apps/server/migrations/1789500000000_proj-tickets-reopened-at.sql`,
   `apps/server/src/projections/tickets.ts`,
   `packages/app-core/src/online/mappers.ts`, `packages/app-core/src/provenance.ts`
+- ✅ **Auto-close after N days (daemon job `auto-close`, `AUTO_CLOSE_SWEEP_INTERVAL_MS`)** —
+  backlog/closed spec §8.2, second wave, 2026-09-18 (Task 8). A ticket that has SAT in a terminal state
+  for the workspace's `autoCloseAfterDays` is closed by the reserved system actor, and the sweep runs
+  on the existing backup daemon beside the notification sweep. **Three things it deliberately is not:**
+  it reads "when did this enter its state?" from the LEDGER every run (the last
+  `ticket.created`/`ticket.transitioned` event's `server_time`, the same LATERAL join the staleness
+  sweep uses) rather than from a stored `entered_at` column that would be a second copy and would drift;
+  its cutoff is IST-DAY arithmetic (`istDayBounds(isoDatePlusDays(todayIst, -N)).endUtc`, a strict `<`
+  against a half-open interval) rather than `now - N * 86_400_000`, which would make a day count mean
+  that many 24-hour spans from whenever the cron fired instead of the calendar a person reads; and it
+  closes THROUGH THE INGEST DOOR, one `ticket.closed` per candidate with `origin: 'server'` and
+  `actorId: SYSTEM_ACTOR_AUTO_CLOSE`, so the engine's refusals still apply and the ledger records who
+  closed what — a direct projection write would be faster and would leave a closed row that no event
+  explains, in a table that no longer rebuilds from the ledger. **A ticket somebody explicitly reopened
+  is skipped** (`reopened_at IS NULL` in the SELECT, which is what makes Task 7's column earn its
+  existence) and so is one already closed; a transition — **including back into the same terminal
+  state** — re-arms the clock, so no reopen exempts a ticket forever. Refusals are COUNTED rather than
+  assumed away: a candidate the engine refuses (the world moved between the sweep's SELECT and its
+  close) stays open, and the run reports it. Idempotent by the ledger, not by a cursor — a ticket it
+  closed no longer satisfies `closed_at IS NULL`, so a second run in the same hour selects nothing.
+  Cases 13.727–13.731. `apps/server/src/auto-close/sweep.ts`,
+  `apps/server/src/ops/backup-daemon-main.ts`
 - ⚙️ **`proj_search` — the full-text projection** — one row per ticket holding its title,
   description and comments as PLAIN TEXT, plus a `tsvector` GENERATED from all three and weighted
   A/B/C so ranking can prefer a title hit. Fed by `ticket.created` (title), `ticket.field_set`
@@ -2341,9 +2363,10 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   one job's failure or schedule never touches another's. `startBackupDaemon` becomes a thin wrapper over it
   with an unchanged external signature, so its own existing tests (the stderr shape, the
   `` `backup:${name}` `` alerter key, the two-timer construction) pin the wrapper byte-for-byte with no
-  edits — but **`backup-daemon-main.ts` itself now calls `startScheduler` directly with all four jobs**,
-  not `startBackupDaemon`: one scheduler, one `stop()`, one `'backup daemon scheduled'` log line, for the
-  two backup jobs and the two errands below alike. `startBackupDaemon`'s only remaining caller is its own
+  edits — but **`backup-daemon-main.ts` itself now calls `startScheduler` directly with all five jobs**
+  (four when this bullet was written; Task 8 of the second wave added `auto-close`), not
+  `startBackupDaemon`: one scheduler, one `stop()`, one `'backup daemon scheduled'` log line, for the
+  two backup jobs and the three errands below alike. `startBackupDaemon`'s only remaining caller is its own
   test file, kept because it is what pins `startScheduler`'s stderr/alerter contract in one place; a
   `sweep-orphans` failure in production alerts through that SAME contract, as `` `backup:sweep-orphans` ``
   with `msg: 'backup job failed'` (cases 13.25/13.27's naming, extended to the two new jobs by construction

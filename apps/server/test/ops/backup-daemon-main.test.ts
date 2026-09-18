@@ -60,7 +60,7 @@ const runDaemon = (extra: Record<string, string>): Promise<Run> =>
     });
   });
 
-describe('backup-daemon-main — one scheduler for all four jobs', () => {
+describe('backup-daemon-main — one scheduler for all five jobs', () => {
   let db: TestDatabase;
   beforeAll(async () => {
     db = await createTestDatabase();
@@ -96,5 +96,32 @@ describe('backup-daemon-main — one scheduler for all four jobs', () => {
     });
     expect(run.stdout).not.toContain(SCHEDULED);
     expect(run.stderr).toContain('NOTIFICATION_SWEEP_INTERVAL_MS');
+  }, 60_000);
+
+  /**
+   * 13.731 — the auto-close job's own interval is validated the same way, and it
+   * is on the SAME scheduler as the other four.
+   *
+   * The positive control is the case above (13.203): the same command with only
+   * the notification variable set announces itself, and `AUTO_CLOSE_SWEEP_INTERVAL_MS`
+   * is unset there — so it takes its `'3600000'` default and the daemon really
+   * does arm all five jobs in this environment. Without that control, this case
+   * would pass against a daemon that died for an unrelated reason.
+   *
+   * **Where this case lives, and why it is not in `test/auto-close/sweep.test.ts`.**
+   * The plan named that file as this task's test file, but the mechanism being
+   * asserted is the DAEMON's env handling and the spawn harness that proves it
+   * was built here by 13.203. Re-deriving a 40-line child-process harness in the
+   * sweep file would be a second copy of a fixture with its own failure modes,
+   * and the property is about the fifth job being wired on the one scheduler —
+   * which is what this file's whole shape is about.
+   */
+  it('refuses a zero AUTO_CLOSE_SWEEP_INTERVAL_MS and names it, aborting the whole scheduler', async () => {
+    const run = await runDaemon({
+      DATABASE_URL: db.url,
+      AUTO_CLOSE_SWEEP_INTERVAL_MS: '0',
+    });
+    expect(run.stdout).not.toContain(SCHEDULED);
+    expect(run.stderr).toContain('AUTO_CLOSE_SWEEP_INTERVAL_MS');
   }, 60_000);
 });
