@@ -131,7 +131,7 @@ author's own evidence for that half, and the review's injection reproduces the s
 
 **THE FIX ROUND INTRODUCED ONE OF ITS OWN, and the scoped re-review caught it** — the shape is worth
 recording because it is the one this repo keeps re-finding. Correcting § 1's heading left § 6's anchor row
-still reading `| files | 5 |`: a stale cross-reference whose entire job is to point the reader at § 1, and
+still reading `| files | 5 (see § 1) |`: a stale cross-reference whose entire job is to point the reader at § 1, and
 therefore a false sentence in the very round that fixed the count. **A tally the fix moves is not near the
 edit.** Closed on the second pass, and this sentence exists so the next reader knows the round's own
 summary was overstated until it was. The re-review also confirmed the round mechanically: `ui.css`'s blob
