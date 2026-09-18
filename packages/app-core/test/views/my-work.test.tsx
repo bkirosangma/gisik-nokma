@@ -37,6 +37,9 @@ const VIEW: MyWorkView = {
 };
 
 describe('3.59 MyWork — assigned, in transit, contested (spec §7)', () => {
+  /* 13.307 — the four My Work section headings, witnessed across two cases: the
+   * three asserted here, and `Shared with me` as its own region in the 3.160
+   * case below. */
   it('renders the three sections', () => {
     render(<MyWork view={VIEW} onOpenTicket={vi.fn()} />);
     expect(screen.getByRole('region', { name: 'Assigned to me' })).toBeInTheDocument();
@@ -155,6 +158,9 @@ describe('3.59 MyWork — assigned, in transit, contested (spec §7)', () => {
  * deliberately does NOT list `inTransit` as a serving gap.
  */
 describe('3.58 MyWork — the in-transit section is empty because there is no outbox, not because a read was empty', () => {
+  /* 13.308 — `No claims in transit.` verbatim. Noted in the catalogue: the four
+   * sentences are NOT asserted in one all-empty render; this one rides the
+   * spec's own fixture, whose only empty section is in-transit. */
   it('renders the empty state, and the reason is structural', () => {
     render(<MyWork view={VIEW} onOpenTicket={vi.fn()} />);
     const transit = screen.getByRole('region', { name: 'My claims in transit' });
@@ -218,6 +224,8 @@ describe('3.58 MyWork — the in-transit section is empty because there is no ou
     expect(within(assigned).queryByText('claim in transit')).not.toBeInTheDocument();
   });
 
+  /* 13.307 — the fourth heading; 13.308 — `Nothing has been shared with you.`
+   * and `Nothing assigned to you.` asserted together under an ALL-EMPTY view. */
   it('3.160 the Shared with me section renders its rows, and says so when it has none', () => {
     // The section exists whether or not it has rows: a section that vanished
     // when empty is indistinguishable from one that failed to load, and for the
@@ -292,6 +300,8 @@ describe('3.58 MyWork — the in-transit section is empty because there is no ou
     expect(onOpenTicket).toHaveBeenCalledTimes(2);
   });
 
+  /* 13.308 — `Nothing assigned to you.` and `No contested claims.` under an
+   * all-empty view, beside the same shape asserted in the 3.160 case above. */
   it('the assigned section has its own honest empty state', () => {
     render(
       <MyWork view={{ assigned: [], inTransit: [], contested: [], shared: [] }} onOpenTicket={vi.fn()} />,

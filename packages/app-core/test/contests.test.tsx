@@ -65,6 +65,12 @@ describe('ContestBanner', () => {
   /**
    * 12.25 — the 'what/who/when/rule' half is proven by this test (12.193), which asserts the banner text contains the actor, the claimed action, the rule and reason, and the claim time rendered as IST rather than the raw instant; the 'renders nothing when there is nothing contested' half is a separate assertion in the '12.201' test two blocks down (line 116, `expect(container.innerHTML).toBe('')`).
    */
+  /* 13.305 — the three real contested-claim resolutions render by their shipped
+   * labels (the assertions at the foot of this case). It witnesses the
+   * COMPONENT: `ContestBanner` is mounted nowhere in the product, and the
+   * TicketSheet imports no contest component at all — recorded in
+   * `test-cases/13-deployment-dogfooding.md` under 13.305, kept separate from
+   * this verdict because the verdict's own stated mutation does pass. */
   it('12.193 — names what was claimed, by whom, when, and which rule now refuses it', () => {
     render(<ContestBanner contests={[contest()]} onResolve={() => undefined} onRedo={() => undefined} />);
     const banner = screen.getByRole('alert');

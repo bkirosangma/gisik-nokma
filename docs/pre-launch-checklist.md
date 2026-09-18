@@ -394,6 +394,16 @@ of an entry point. Fixed by `installTheme(document)`, tested as case 15.17.
   Its first green is owed to CI's `gate` job or to the next run with a real stack up.
 
 
+- **Mobile HIG adoption — DEFERRED 2026-09-08, owner: whoever next touches `apps/mobile` theming.**
+  The three mobile prototypes (MobileBoard, MobileHelp, MobileTicket) were audited
+  (`docs/hig-reconciliation-audit.md` §MobileBoard/§MobileHelp/§MobileTicket); their S rows are sound
+  but the token layer does not transfer — `colorOf()` in `apps/mobile` reads `themes` directly, so the
+  palette IS already Apple's after #353, and only spacing/radius/fill treatment remains. The I and D
+  rows apply unchanged: no invented sync-status wording, keep the raw `stateId` display until a ruling.
+  **Why this is written down rather than left implicit** — an unrecorded deferral is Plan 1's defect
+  class 4, and the HIG per-screen plan's Task 11 is deliberately docs-only for that reason. Catalogue:
+  `13.319` 🚫.
+
 - **`apps/mobile` was not rendered.** It is React Native; no browser viewport applies. Its colours were
   read statically and its pairs are included in 6a. One thing found there and **not** fixed:
   `help-screen.tsx:59` resolved every token through `colorOf('light', role)`, so the mobile help screen
