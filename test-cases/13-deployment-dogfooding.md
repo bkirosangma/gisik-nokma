@@ -11295,7 +11295,7 @@ id that stays true. **`13.889` joined the set later in the same change set**, wh
   `Select`.** `apps/web/test/members-page.test.tsx:1053`. RULED, not decided here: AMENDMENT 2
   (owner-approved, 2026-09-18) — *"label it inside `.gn-field` … but pass no native-control class to
   it."* Channel and Role are wrapped in `<label className="gn-field">` with a `.gn-field__label` span,
-  which is what the prototype draws (`desktop.dc.html:752-753`, `:759`), and no class is passed to the
+  which is what the prototype draws (`desktop.dc.html:752-753`, `:758-759`), and no class is passed to the
   `Select`. Mutation-witnessed against the real file, tree restored and sha256-verified: dropping the
   `gn-field__label` class from the Channel label reddens 13.889 alone (1 failed / 38), and converting
   that `Select` BACK to a native `<select>` reddens it alone as well (1 failed / 38).
@@ -11307,9 +11307,25 @@ id that stays true. **`13.889` joined the set later in the same change set**, wh
   and what the case asserts, is the label half. (b) The absence of a `<select>` element inside the
   wrapper — the shared component renders a `HiddenSelect` (a visually hidden native `<select>`) on
   purpose (`select.tsx:253`). The trigger's tag and class are the honest signal, and they are asserted.
-  **The visible residue is recorded rather than fixed**: these two rows show the shared `Select`'s 15px
-  trigger beside two 17px inputs, and that is the COMPONENT's placement, used at fifteen call sites — its
-  own task, not this one.
+  **THERE IS NO VISIBLE RESIDUE, and the sentence that claimed one was refuted at the line by the third
+  review.** It said these rows show a 15px `Select` trigger beside two 17px inputs; the 15px came from the
+  PROTOTYPE's inline style, not from this product's cascade. `.gn-select__trigger` declares no
+  `font-size` (`packages/ui/src/ui.css:1604-1612`) while the `.gn-field__input` it also wears declares
+  `1.0625rem` (`:3866-3875`, and `packages/ui/src/select/select.tsx:254` puts both on the trigger), so
+  equal specificity and later source order give **17px — the same as the inputs and the same as the
+  prototype draws** (`desktop.dc.html:754`, `:760`).
+
+  **The same review defeated this case twice, and both defeats are now assertions** (D2 and D3, planted in
+  the real file with a sha256-verified restore, each killing 13.889 ALONE at 1 failed / 38):
+  `<label className="gn-field">` swapped for `<div className="gn-field">` stayed green, and moving the
+  `.gn-field__label` span AFTER the control stayed green — while `.gn-field` is `flex-direction: column`,
+  so DOM order IS visual order and the prototype's label-over-control would have been inverted on screen.
+  The case now asserts the wrapper's TAG and that the label is its first element.
+
+  **And the ruling's instruction is enforced by the COMPILER, which the same review measured**: passing
+  `className` to a `Select` is a `tsc` error (`SelectProps` has none), at all three sites it planted —
+  vitest stays green over it and `typecheck` reddens. A property with a compiler behind it needs no test
+  to hold it, and that is worth knowing before writing one.
 
 ### The independent review, and what it forced
 

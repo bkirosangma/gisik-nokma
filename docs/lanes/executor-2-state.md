@@ -40,7 +40,7 @@ controller's next dispatch is the position.
 | cut from / base | **`0e0dbff9`** (`origin/main` after `#471` merged) |
 | frozen head | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit that carries it |
 | files | 7: `apps/web/app/w/[workspaceId]/members/page.tsx` · `apps/web/app/globals.css` · `apps/web/test/members-page.test.tsx` · **`apps/web/test/members-styling.test.ts` (new)** · `Features.md` · `test-cases/13-deployment-dogfooding.md` · this file |
-| ids minted | **`13.886`–`13.888`** — and the FIRST three attempted were `13.883`–`13.885`, which **COLLIDED** with executor 1's `exec/owner-demotion-guard` (it minted `13.883` at 16:54:10, six minutes before this branch did at 17:00:29). This branch yielded and renumbered. **The remedy is an allocation, not a number — ask the controller for a BLOCK**; a shared "next free" pointer collides every time both executors are dispatched from one. Detail in `test-cases/13`'s section for this change. |
+| ids minted | **`13.886`–`13.889`** (`13.889` for AMENDMENT 2, minted post-freeze) — and the FIRST three attempted were `13.883`–`13.885`, which **COLLIDED** with executor 1's `exec/owner-demotion-guard` (it minted `13.883` at 16:54:10, six minutes before this branch did at 17:00:29). This branch yielded and renumbered. **The remedy is an allocation, not a number — ask the controller for a BLOCK**; a shared "next free" pointer collides every time both executors are dispatched from one. Detail in `test-cases/13`'s section for this change. |
 | tree | clean; `docker compose` NOT run; :3001 and :3021 NOT bound |
 
 ### What shipped, and the measurement that came first
@@ -67,7 +67,7 @@ shipped:
    class**: it is on every `Select` in the product either way, so an absence assertion would be red
    against correct code. The component is NOT restyled and **the role-change predicate is untouched** (a
    separate owner ruling this day, a different task).
-3. Cases `13.886`–`13.888`, `Features.md` and `test-cases/13` updated in the same change set.
+3. Cases `13.886`–`13.889`, `Features.md` and `test-cases/13` updated in the same change set.
 
 ### Mutation witnesses, all against the real files, tree restored and sha256-verified
 
@@ -94,6 +94,18 @@ left open: the two `Select` labels are wrapped in `.gn-field` + `.gn-field__labe
 the component, case **`13.889`** minted (free on all three surfaces at the time; next free is now
 `13.890`). Two mutation witnesses, both killing 13.889 ALONE. The PR body names which head carries what,
 and the frozen-head check figures above belong to the PRE-amendment head.
+
+**ROUND 3, scoped to the AMENDMENT 2 commit: no Critical, three findings of mine, all corrected.** The
+"visible residue" paragraph was FALSE at the line — the 15px came from the PROTOTYPE, not this product's
+cascade (`.gn-select__trigger` declares no `font-size`, `ui.css:1604-1612`; the `.gn-field__input` it also
+wears declares `1.0625rem`, `:3866-3875` → 17px, aligned with the inputs). Case 13.889 left the `<label>`
+TAG and the label-over-control ORDER to prose and the reviewer defeated both — `<div>` for `<label>`, and
+the span moved after the control, each staying green while `.gn-field` is `flex-direction: column` so DOM
+order IS visual order. Both are now asserted, and both defeats re-planted here kill 13.889 alone (1 failed
+/ 38). A docblock reason was wrong too: a `button` IS labelable, and the label associates with the
+`HiddenSelect`'s native `<select>`. **In the ruling's favour: passing `className` to a `Select` is a
+`tsc` ERROR** (three planted sites redden `typecheck` while vitest stays green) — amendment 2 has the
+compiler behind it.
 
 **ROUND 2, a scoped re-review: no Critical, and both Important findings were in the FIX, not the original.**
 (1) The cascade count it asked me to add could itself be defeated — a selector split across two lines, and

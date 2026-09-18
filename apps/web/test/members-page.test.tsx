@@ -1061,6 +1061,14 @@ describe('13.889 the Select fields are labelled by the field pattern, and stay t
       const labelSpan = within(form!).getByText(name, { selector: '.gn-field__label' });
       const wrapper = labelSpan.closest('.gn-field');
       expect(wrapper, `${name} is not inside a .gn-field`).not.toBeNull();
+      // THE TAG AND THE ORDER, both of which the first version left to prose and
+      // an independent review then defeated: `<label className="gn-field">`
+      // swapped for `<div className="gn-field">` stayed 30/30 green, and moving
+      // the span AFTER the control did too — while `.gn-field` is
+      // `flex-direction: column`, so DOM order IS visual order and the
+      // prototype's label-over-control would have been inverted on screen.
+      expect(wrapper!.tagName, `${name}'s field is not a <label>`).toBe('LABEL');
+      expect(wrapper!.firstElementChild, `${name}'s label no longer precedes its control`).toBe(labelSpan);
 
       const trigger = wrapper!.querySelector('button.gn-select__trigger');
       expect(trigger, `${name}'s control is no longer the shared Select`).not.toBeNull();

@@ -691,24 +691,39 @@ function MintForm({ workspaceId, onMinted }: { workspaceId: string; onMinted: ()
           half of the field pattern, and NOT the native-control half.
 
           The prototype wraps both in the same label-over-control pair it uses
-          for the text fields (`desktop.dc.html:752-753`, `:759`), so the label
-          scale is the field pattern's and belongs on them. What does NOT belong
-          is `.gn-field__input`: the Role and Channel pickers have been the
-          shared `Select` since 2026-09-14 (Phase 2 Wave A, cases 13.824–13.828)
-          and its trigger renders as a `role="button"`, not a control element —
-          so passing a native-control class would be a second, drifting way to
-          draw the same field. The ruling's words: *"label it inside `.gn-field`
-          … but pass no native-control class to it."*
+          for the text fields — Channel at `desktop.dc.html:752` (label) and
+          `:753` (its span), Role at `:758` and `:759` — so the label scale is
+          the field pattern's and belongs on them. What does NOT belong is a
+          class passed by THIS page: the ruling's words are *"label it inside
+          `.gn-field` … but pass no native-control class to it"*, and the two
+          pickers have been the shared `Select` since 2026-09-14 (Phase 2 Wave
+          A, cases 13.824–13.828). **The instruction is enforced by the compiler
+          as well as by the ruling**: `SelectProps` has no `className`, so
+          passing one is a `tsc` error, measured at three sites by an
+          independent review.
 
           A `<label>` ELEMENT rather than a `<div>`, matching the prototype and
-          the sibling form; it associates with nothing here, since a button is
-          not a labelable element, and the control's own name is its
-          `aria-label`, which is deliberately kept — every existing case on this
-          form queries the trigger by that name. The visible consequence is
-          recorded rather than fixed: these two rows show the shared `Select`'s
-          own 15px trigger beside two 17px inputs, which is a difference in the
-          COMPONENT's placement and not this page's to restyle — it is used at
-          fifteen call sites. */}
+          the sibling form — and the reason first written here was WRONG, so it
+          is replaced rather than kept: it said the label "associates with
+          nothing here, since a button is not a labelable element". A `button`
+          IS labelable, and this one associates with the `HiddenSelect`'s native
+          `<select>` (`packages/ui/src/select/select.tsx:253`), its first
+          labelable descendant — which is what react-aria's own `HiddenSelect`
+          expects a wrapping label to do. The TRIGGER's accessible name is
+          untouched (it is the `aria-label` below, which every existing case on
+          this form queries by), and 13.889 asserts the tag, the order and that
+          name rather than leaving the choice to prose.
+
+          AND THERE IS NO VISUAL RESIDUE, which this paragraph first claimed and
+          an independent review refuted at the line: it said these rows show a
+          15px trigger beside two 17px inputs. That 15px came from the
+          PROTOTYPE's inline style and not from this product's cascade —
+          `.gn-select__trigger` declares no `font-size` at all
+          (`packages/ui/src/ui.css:1604-1612`) while the `.gn-field__input` it
+          also wears declares `1.0625rem` (`:3866-3875`, and `select.tsx:254`
+          puts both classes on the trigger). Equal specificity, later rule wins:
+          the trigger renders at 17px, the same size as the inputs and the same
+          size the prototype draws (`:754`, `:760`). The two rows are aligned. */}
       <label className="gn-field">
         <span className="gn-field__label">Channel</span>
         <Select
