@@ -1,6 +1,7 @@
 import {
   inviteSentPayload,
   membershipGrantedPayload,
+  membershipRevokedPayload,
   ticketCreatedPayload,
   visibilitySetPayload,
   type EventEnvelope,
@@ -83,6 +84,22 @@ export const WORKSPACE_MEMBERSHIP_REASON =
  * the workspace have zero owners — only zero of the ORIGINAL owner's role.
  */
 export const WORKSPACE_OWNER_GRANT_REASON = 'Only a workspace owner can grant the owner role.';
+/**
+ * The MIRROR of the sentence above, ruled the same day (owner, 2026-09-18,
+ * second sitting): *"may an admin demote a non-last owner: **no**."*
+ *
+ * It exists because the guard and this gate each closed half a door and the two
+ * halves did not meet. `grant-owner-requires-owner` refuses a payload that
+ * GRANTS `owner`; `last-owner` refuses a change that would leave the workspace
+ * with ZERO owners. Neither has anything to say about an admin demoting an
+ * owner **while another owner remains** — so an admin could do it, and the
+ * projection's `ON CONFLICT … DO UPDATE SET role = excluded.role` would write
+ * it. Ownership is a transfer of the workspace itself, which is the whole
+ * reason the grant half is owner-only; the removal half is the same act read
+ * backwards, and it was open.
+ */
+export const WORKSPACE_OWNER_REMOVE_REASON =
+  'Only a workspace owner can remove the owner role from a member.';
 export const PROJECT_ROSTER_REASON = 'Only a project admin can manage who is on this project.';
 /** Task 9 check 2, the guest half — answered in `checkRolePermission`, which owes it. */
 export const GUESTS_CANNOT_CREATE_TICKETS_REASON = 'Guests cannot create tickets.';
@@ -883,6 +900,118 @@ export async function checkVisibilityPermission(
 }
 
 /**
+ * "May this actor change who is an OWNER?" — the mirror of
+ * `grant-owner-requires-owner`, and the actor half of the ruling that an admin
+ * may not demote a non-last owner (owner, 2026-09-18: *"no"*).
+ *
+ * ## Why it is HERE and not in the rule engine beside `last-owner`
+ *
+ * The guard is split by the KIND of question, and this one is about the ACTOR,
+ * which is what `check-permission.ts` answers — the plan's own split, and the
+ * same one that put `grant-owner-requires-owner` in this module.
+ *
+ * The placement is not merely consistent, it is forced, and the reason is worth
+ * stating because "put the world-state question in the engine" is the rule a
+ * reader arrives with. This check needs TWO facts and only one of them is about
+ * the world:
+ *
+ *  - **who the actor is** — already resolved, in `ctx.eff.workspaceRole`. No
+ *    read, no query, and no second membership reader.
+ *  - **who the TARGET currently is** — a `proj_memberships` read, because
+ *    neither payload carries a previous role (`membership.granted` names only
+ *    the NEW one, and `membership.revoked` names no role at all).
+ *
+ * An engine-side version would have to ask the first question — which the
+ * engine must not, per that same split — and on the doors where it is asked
+ * most it could not answer the second: `packages/rule-engine/src/checks/
+ * membership.ts` records that the fixture context answers `null` for every
+ * membership and the offline replica holds the ACTOR's row alone. So the actor
+ * check would be unimplementable there and the target check impossible, which
+ * is the reverse of the `last-owner` situation: `countWorkspaceOwners` is a
+ * question about the WORLD that only the server can answer, and that is why it
+ * lives in the engine. Here it is the actor that only this layer knows.
+ *
+ * ## What this does NOT do
+ *
+ * It does not replace `last-owner` and must not: an OWNER demoting themselves
+ * out of the last ownership passes this check and is refused by the engine's
+ * count. The two are complementary, and each is reachable — this one refuses
+ * an admin acting on any owner, that one refuses an owner emptying the
+ * workspace. A case in `check-role-permission.test.ts` pins each.
+ *
+ * ## The reads, and why they are these reads
+ *
+ * `ctx.db` is the ingest TRANSACTION's own client, which is load-bearing for
+ * the same reason `SubmissionContext`'s docblock gives: the target's row must
+ * be read from the world the workspace lock has already settled, or a
+ * concurrently-committed grant is invisible to the gate about to judge its
+ * revocation.
+ *
+ * The read is `resolveEffectiveRole`, NOT a bare `proj_memberships` SELECT —
+ * that function is the module's one safe reader of the table (see
+ * `./effective-role.ts`: a project-scope row can survive a workspace removal,
+ * and only that function collapses such a row to "not a member"). It answers
+ * `workspaceRole: null` for someone outside the workspace, which is the same
+ * answer as "not an owner" on purpose: neither can be a move OUT of owner, so
+ * neither is this rule's business.
+ *
+ * A payload that does not PARSE is passed through rather than refused: it is
+ * the engine's `malformed-payload`, with the field path spelled out, and
+ * refusing it here would report a shape problem as a role problem. That is the
+ * same division `checkRolePermission`'s grant half makes, one function up.
+ */
+export async function checkMembershipOwnerAuthority(
+  env: EventEnvelope,
+  ctx: VisibilityContext,
+): Promise<Refusal | null> {
+  if (env.type !== 'membership.granted' && env.type !== 'membership.revoked') {
+    return null;
+  }
+  // Only an admin or an owner reaches this line: `checkRolePermission` has
+  // already refused everyone below admin with `WORKSPACE_MEMBERSHIP_REASON` and
+  // runs first in `checkPermission`. So the only question left is owner vs
+  // admin, and an owner is allowed through — an owner changing an owner's role
+  // is exactly what the ruling permits, and is how ownership is transferred.
+  if (ctx.eff.workspaceRole === 'owner') {
+    return null;
+  }
+
+  /**
+   * The target of the change, which is the only thing that differs between the
+   * two events: both name `userId`, and only `granted` names a role.
+   */
+  let targetUserId: string;
+  if (env.type === 'membership.granted') {
+    const parsed = membershipGrantedPayload.safeParse(env.payload);
+    if (!parsed.success) {
+      return null;
+    }
+    // A grant TO owner is the OTHER direction and is already refused above by
+    // `grant-owner-requires-owner`. Returning here rather than falling through
+    // keeps one act to one rule id.
+    if (parsed.data.role === 'owner') {
+      return null;
+    }
+    targetUserId = parsed.data.userId;
+  } else {
+    const parsed = membershipRevokedPayload.safeParse(env.payload);
+    if (!parsed.success) {
+      return null;
+    }
+    // A revocation is a move out of owner by construction — it names no role,
+    // and the projection deletes the row, so the target's owner status goes
+    // with it whatever the payload says.
+    targetUserId = parsed.data.userId;
+  }
+
+  const target = await resolveEffectiveRole(ctx.db, targetUserId, env.workspaceId);
+  if (target.workspaceRole !== 'owner') {
+    return null;
+  }
+  return refuseWith(REFUSAL_RULES.removeOwnerRequiresOwner, WORKSPACE_OWNER_REMOVE_REASON);
+}
+
+/**
  * The single permission gate the ingest service applies at the client door.
  *
  * Reads the role through `resolveEffectiveRole` and NEVER through a direct
@@ -890,13 +1019,17 @@ export async function checkVisibilityPermission(
  * someone no longer in the workspace (see `./effective-role.ts`, and the table
  * comment on the migration). `resolveEffectiveRole` is the only safe reader.
  *
- * Three passes, one context, and the ORDER is load-bearing at both seams:
+ * Four passes, one context, and the ORDER is load-bearing at every seam:
  *
  * 1. `checkRolePermission` — pure, and first because a claim from someone who
  *    is not here at all should not cause a single lookup.
- * 2. `checkProjectExists` — before any membership question about a project, so
+ * 2. `checkMembershipOwnerAuthority` — the owner-only act the role gate cannot
+ *    finish, because it needs the TARGET's current row. Second rather than
+ *    third so that a claim from below admin is still answered by the pure pass
+ *    above without a read, which is the property pass 1 exists to hold.
+ * 3. `checkProjectExists` — before any membership question about a project, so
  *    a nonexistent project is reported as one (owner decision 2026-08-26).
- * 3. `checkVisibilityPermission` — the audience questions, plus the two write-
+ * 4. `checkVisibilityPermission` — the audience questions, plus the two write-
  *    authority questions that had to be sequenced after a database read.
  *
  * The call site is unchanged: this is still the one `SubmissionGate` the ingest
@@ -917,6 +1050,16 @@ export async function checkPermission(
   const roleRefusal = checkRolePermission(env, permissionContext);
   if (roleRefusal !== null) {
     return roleRefusal;
+  }
+  // SECOND, and after the role gate on purpose: it is the question the role
+  // gate cannot finish. `checkRolePermission` settles "are you at least an
+  // admin"; this settles "and are you an owner, for the one act that is
+  // owner-only" — which needs the TARGET's row, so it is the first pass that
+  // reads. Ordering it after the pure gate means a non-admin's claim is still
+  // answered without a lookup, exactly as before this pass existed.
+  const ownerAuthorityRefusal = await checkMembershipOwnerAuthority(env, permissionContext);
+  if (ownerAuthorityRefusal !== null) {
+    return ownerAuthorityRefusal;
   }
   const projectRefusal = await checkProjectExists(ctx.db, env);
   if (projectRefusal !== null) {

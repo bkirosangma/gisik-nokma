@@ -29,6 +29,7 @@ export const REFUSAL_RULES = {
   rankRequiresBacklog: 'rank-requires-backlog',
   lastOwner: 'last-owner',
   grantOwnerRequiresOwner: 'grant-owner-requires-owner',
+  removeOwnerRequiresOwner: 'remove-owner-requires-owner',
 } as const;
 
 /**
