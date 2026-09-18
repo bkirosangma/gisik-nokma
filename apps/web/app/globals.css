@@ -760,70 +760,38 @@ input, textarea, select { font-family: inherit; }
   color: var(--gn-text-muted);
 }
 
-/* ── Notifications — the switch. ───────────────────────────────────────────
-   The prototype draws a 51x31 track with a 27px knob. This keeps the real
-   `<input type="checkbox">` underneath and restyles it, rather than building a
-   `role="switch"` div: the checkbox already carries the label association,
-   keyboard behaviour and checked state that `notifications-section.test.tsx`
-   asserts through `getByLabelText(...).not.toBeChecked()`, and none of that
-   should be re-implemented for a visual.
+/* ── Notifications — the switch MOVED OUT of this file (2026-09-18). ───────
+   These were FIVE rule bodies plus a reduced-motion arm — the base track, the
+   `::after` knob, `:checked`, `:checked::after` and `:focus-visible`, all scoped
+   to `.gn-account__notification-row input[type='checkbox']`. They are now the
+   `.gn-switch` family in `packages/ui/src/ui.css`, reached through
+   `@gisik-nokma/ui`'s `Switch`. (An earlier draft of this comment said "three",
+   which was a written count that was simply wrong.)
 
-   `order: 2` puts the switch at the row's trailing edge without reordering the
-   JSX, so the label text still precedes its own control in the DOM. */
-.gn-account__notification-row { justify-content: space-between; cursor: pointer; }
+   The reason is not tidiness. The Settings → Workspace tab needed the same
+   control, and a scoped rule in this file can only ever paint an element on a
+   page this file reaches — so the choice was "duplicate 60 lines of switch
+   CSS" or "hoist it". The ruling on that task: *"extract it into a shared
+   component and use it in both places rather than copying its CSS."*
 
-.gn-account__notification-row input[type='checkbox'] {
-  order: 2;
-  flex: none;
-  position: relative;
-  appearance: none;
-  -webkit-appearance: none;
-  margin: 0;
-  width: 3.1875rem;
-  height: 1.9375rem;
-  border: none;
-  border-radius: 999px;
-  background: var(--gn-fill-secondary);
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
+   **Nothing visual changed.** The declarations moved verbatim; the knob's
+   `borderStrong` ring, the 51×31 track, the 20px of travel and the
+   reduced-motion arm are all the same. `.gn-account__notification-row` itself
+   STAYS, because it is one of the four row selectors sharing the base rule
+   above — width, `flex-wrap`, `min-height`, padding — which is account layout
+   and has no business in a shared package. It is passed to `Switch` as its
+   `className`.
 
-/* THE KNOB IS A TOKEN, WHICH IS THE ONE PLACE THIS SWITCH CANNOT COPY THE
-   PROTOTYPE. The prototype hard-codes `#fff` in both themes; a literal here
-   reddens the token-discipline suite, and there is deliberately no
-   always-white role in `tokens.ts` (the palette is theme-aware by design). So
-   the knob is `surfaceRaised` plus a `borderStrong` ring: the ring is what
-   guarantees a visible edge in BOTH states and BOTH themes, where a bare
-   raised fill would vanish against the unchecked track. A knob is a non-text
-   UI part, so WCAG 1.4.11's 3:1 is what it owes, and the ring is what pays
-   it. */
-.gn-account__notification-row input[type='checkbox']::after {
-  content: '';
-  position: absolute;
-  top: 0.125rem;
-  left: 0.125rem;
-  width: 1.6875rem;
-  height: 1.6875rem;
-  border-radius: 999px;
-  border: 1px solid var(--gn-border-strong);
-  background: var(--gn-surface-raised);
-  transition: transform 0.15s ease;
-}
+   Do not re-add a switch rule here. If a second switch needs a different look,
+   that is a `Switch` prop or a `.gn-switch*` rule in `ui.css`, where both
+   callers can see it. */
 
-.gn-account__notification-row input[type='checkbox']:checked { background: var(--gn-accent); }
-
-/* 51 − 27 − (2 x 2) = 20px of travel. */
-.gn-account__notification-row input[type='checkbox']:checked::after { transform: translateX(1.25rem); }
-
-.gn-account__notification-row input[type='checkbox']:focus-visible {
-  outline: 2px solid var(--gn-focus-ring);
-  outline-offset: 2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .gn-account__notification-row input[type='checkbox'],
-  .gn-account__notification-row input[type='checkbox']::after { transition: none; }
-}
+/* `space-between` is the ONE thing the shared `.gn-switch-row` could not keep,
+   and it is not a detail: this row is full-width and wants its switch at the
+   trailing edge, while a switch in a form field wants its control beside its
+   own label. Both are correct for their screen, so the edge-alignment lives
+   HERE, on the account row, rather than in the shared component. */
+.gn-account__notification-row { justify-content: space-between; }
 
 /* ── Your workspaces — the row is a door. ──────────────────────────────────
    The prototype's row is a control that opens the workspace, with an accent
@@ -2660,3 +2628,59 @@ input, textarea, select { font-family: inherit; }
 }
 .gn-builder-crumb a:hover,
 .gn-builder-crumb a:focus-visible { color: var(--gn-text-accent); text-decoration: underline; }
+
+/* ── Settings → Workspace: the form (2026-09-18 restyle). ──────────────────
+   The owner: *"the settings -> workspace tab, needs to be a better UI. also
+   have an info icon near the fields to give a brief explanation (hover/focus/
+   click …). save button on a new row … and be mindful of the spacings."*
+
+   It wears the SAME shell as its two sibling tabs on this page. The shape is
+   `ticket-type-list-screen.tsx:130` (`<section>`) through `:145` (`<Card>`),
+   and the same shape at `workflow-list-screen.tsx:183` (`<section>`) through
+   `:205` (`<Card>`) — both under `packages/app-core/src/workflow-builder/`: a
+   `section` whose header carries an `h2` and a one-line summary, over a `Card`
+   holding the content. **A fourth tab that invents its own layout is the
+   failure mode the dispatch named**, so where a sibling already has a number
+   this file reuses it rather than picking a near neighbour:
+
+   | what | value | where it comes from |
+   |---|---|---|
+   | section column gap | `0.9rem` | `.ticket-type-list` (`ui.css:1798`) |
+   | h2 | `1.25rem` / `1.5625rem` / `600` | `.ticket-type-list__title` (`ui.css:1808`) |
+   | summary | `0.85rem`, `--gn-text-muted` | `.ticket-type-list__summary` (`ui.css:1809`) |
+   | label→control | `0.4375rem` | `.gn-field` (`ui.css:3935`), NOT re-declared here |
+
+   The three spacings this screen does own, named rather than eyeballed:
+   - **between field groups: `1.25rem`** — one step above `Card`'s own padding,
+     so three controls read as three groups rather than as one long column;
+   - **label to its info icon `0.375rem`, input to its unit `0.625rem`** — both
+     tighter than the group gap, which is what makes the grouping legible;
+   - **the Save row: `1.25rem` above it over a `--gn-border` hairline with
+     `0.75rem` of padding-top** — the button is a footer action, not a fourth
+     field, which is what moving it to its own row was FOR.
+
+   Every value is a token or the product's own rem scale; there is no literal
+   colour in this block. */
+.gn-workspace-settings { display: flex; flex-direction: column; gap: 0.9rem; }
+.gn-workspace-settings__header { display: flex; flex-direction: column; gap: 0.15rem; }
+.gn-workspace-settings__title { margin: 0; font-size: 1.25rem; line-height: 1.5625rem; font-weight: 600; }
+.gn-workspace-settings__summary { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
+.gn-workspace-settings__card { padding: 1.25rem; }
+.gn-workspace-settings__fields { display: flex; flex-direction: column; gap: 1.25rem; }
+.gn-workspace-settings__label-row { display: flex; align-items: center; gap: 0.375rem; }
+.gn-workspace-settings__control { display: flex; align-items: center; gap: 0.625rem; }
+/* A days-window is one to three digits. A number input stretched to the card's
+   full width reads as a text field and hides its own range, so it is sized to
+   its content class instead — `flex: none` because a flex item would otherwise
+   shrink below `width` on a narrow viewport rather than letting the row's own
+   `flex-wrap` in `.gn-settings` do its job. */
+.gn-workspace-settings__control .gn-field__input { width: 7rem; flex: none; }
+.gn-workspace-settings__switch { align-self: flex-start; }
+.gn-workspace-settings__actions {
+  display: flex;
+  align-items: center;
+  margin-top: 1.25rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--gn-border);
+}
+.gn-workspace-settings__readonly { margin: 0; color: var(--gn-text-muted); }

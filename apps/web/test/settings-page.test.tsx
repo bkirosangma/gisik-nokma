@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { WorkspaceMember } from '@gisik-nokma/app-core';
@@ -426,22 +426,28 @@ describe('13.716 the Workspace settings tab', () => {
   });
 
   /**
-   * 13.716 — ticking `Off` sends `null`, and that is NOT the same payload as
-   * sending nothing.
+   * 13.716 — switching auto-close OFF sends `null`, and that is NOT the same
+   * payload as sending nothing.
    *
    * This is the client end of the task's correctness core. The projection
    * distinguishes "the claim named the field and set it to null" from "the claim
-   * did not name the field" with a CASE; a form that omitted the key when Off
-   * was ticked would produce the second, and the workspace would stay ON while
-   * the user watched the box they just ticked. So the assertion is `null` by
-   * value AND the key being present.
+   * did not name the field" with a CASE; a form that omitted the key when the
+   * switch was turned off would produce the second, and the workspace would stay
+   * ON while the user watched the control they had just switched. So the
+   * assertion is `null` by value AND the key being present.
+   *
+   * **The control changed on 2026-09-18 and the SEMANTICS did not.** Where this
+   * clicked an `Off` checkbox (ticked = off), it now clicks a switch whose
+   * `checked` means ON — so the gesture that produces `null` is the opposite
+   * one. Case 13.895 pins that polarity directly; this case pins the payload it
+   * produces.
    */
-  it('13.716 ticking Off sends an explicit null, not an omitted key', async () => {
+  it('13.716 switching auto-close off sends an explicit null, not an omitted key', async () => {
     const captured: SubmittedEvent[][] = [];
     renderTab('admin', SETTINGS, captured);
 
     await screen.findByLabelText('Auto-close after');
-    await userEvent.click(screen.getByLabelText('Off'));
+    await userEvent.click(screen.getByLabelText('Close tickets automatically'));
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await screen.findByLabelText('Auto-close after');
@@ -589,19 +595,24 @@ describe('13.718-13.720 the Workspace settings tab — what the review found unp
   });
 
   /**
-   * 13.719 — **`Off` on a workspace that is ALREADY off is not a change**, and
-   * Save stays disabled.
+   * 13.719 — **turning auto-close off on a workspace that is ALREADY off is not
+   * a change**, and Save stays disabled.
    *
-   * The review proved this line unpinned by mutation (M9): making the `Off`
-   * branch claim `null` unconditionally left all 11 cases green, because every
-   * existing fixture starts at `autoCloseAfterDays: 30` with the box UNCHECKED.
-   * The already-off workspace was never exercised. It is the state most
-   * workspaces are in, since `null` is the default.
+   * The review proved this line unpinned by mutation (M9): making the off branch
+   * claim `null` unconditionally left all 11 cases green, because every existing
+   * fixture starts at `autoCloseAfterDays: 30` with the control UNTICKED. The
+   * already-off workspace was never exercised. It is the state most workspaces
+   * are in, since `null` is the default.
    *
    * The mutant was proved live rather than assumed harmless: on this fixture the
    * real code leaves Save disabled and the mutant enables it.
+   *
+   * **Updated for the switch (2026-09-18).** "Already off" now means the switch
+   * mounts UNCHECKED — the inverse of the box this replaced, which mounted
+   * ticked. That inversion is itself the assertion: a binding carried across
+   * unchanged would mount it checked here and fail this line.
    */
-  it('13.719 Off on an already-off workspace is not a change — Save stays disabled', async () => {
+  it('13.719 the switch is off on an already-off workspace, and toggling it is not a change', async () => {
     const captured: SubmittedEvent[][] = [];
     const services = stubServices(
       { getWorkspaceSettings: async () => OFF_SETTINGS },
@@ -632,16 +643,16 @@ describe('13.718-13.720 the Workspace settings tab — what the review found unp
       </Providers>,
     );
 
-    // The box mounts TICKED, because the workspace is already off.
-    const off = await screen.findByLabelText('Off');
-    expect(off).toBeChecked();
+    // The switch mounts OFF, because the workspace is already off.
+    const autoCloseSwitch = await screen.findByLabelText('Close tickets automatically');
+    expect(autoCloseSwitch).not.toBeChecked();
     expect(screen.getByLabelText('Auto-close after')).toBeDisabled();
     // Nothing has changed, so there is nothing to submit.
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
 
-    // Toggling it off and back on is still not a change.
-    await userEvent.click(off);
-    await userEvent.click(off);
+    // Turning it on and back off is still not a change.
+    await userEvent.click(autoCloseSwitch);
+    await userEvent.click(autoCloseSwitch);
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     expect(captured).toHaveLength(0);
   });
@@ -699,5 +710,216 @@ describe('13.718-13.720 the Workspace settings tab — what the review found unp
     await userEvent.type(screen.getByLabelText('Auto-close after'), '14');
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     expect(captured).toHaveLength(0);
+  });
+});
+
+/**
+ * The 2026-09-18 restyle of the Workspace tab — owner's instruction: *"the
+ * settings -> workspace tab, needs to be a better UI. also have an info icon
+ * near the fields to give a brief explanation (hover/focus/click …). save
+ * button on a new row. auto close on/off -> make it a radio rather than
+ * checkbox (check the account page on the styling of the radio.) and be mindful
+ * of the spacings."*
+ *
+ * The control question was settled by the owner after two wrong guesses: the
+ * thing on `/account` is a SWITCH (`notifications-section.tsx:51-58`, the
+ * `<Switch>` this change put there), not a radio group — so `Off` became a
+ * switch, and the CSS behind it was extracted
+ * into `@gisik-nokma/ui` rather than copied. Cases 13.899/13.900 (in
+ * `packages/ui`) are the other half of that.
+ *
+ * What these four cases are FOR, said plainly: the switch INVERTS the polarity
+ * of the control it replaced, and an inverted binding looks correct and saves
+ * the opposite claim. So the polarity is pinned in both directions, and the
+ * third state — a blank window — is pinned as neither of them.
+ */
+describe('13.895-13.898 the Workspace settings tab — the restyle', () => {
+  const SETTINGS = {
+    staleDays: 3,
+    dueSoonDays: 14,
+    autoCloseAfterDays: 30,
+    provenance: {
+      actorId: ME,
+      actorName: 'Anselma Marak',
+      clientTime: '2026-09-18T04:00:00.000Z',
+      serverTime: '2026-09-18T04:00:01.000Z',
+    },
+  };
+  const OFF_SETTINGS = { staleDays: 3, dueSoonDays: 14, autoCloseAfterDays: null, provenance: null };
+
+  function renderTab(
+    settings: typeof SETTINGS | typeof OFF_SETTINGS,
+    captured: SubmittedEvent[][],
+  ): void {
+    const services = stubServices(
+      { getWorkspaceSettings: async () => settings },
+      {
+        authoring: {
+          listMembers: async () => rosterWhereIAm('admin'),
+          listTicketTypes: async () => TYPES,
+          listWorkflows: async () => WORKFLOWS,
+        },
+      },
+    );
+    const dataSource = {
+      ...services.dataSource,
+      ingest: async (events: SubmittedEvent[]) => {
+        captured.push(events);
+        return events.map((event) => ({
+          status: 'committed' as const,
+          eventId: event.id,
+          seq: 1,
+          serverTime: '2026-09-18T04:00:02.000Z',
+        }));
+      },
+    };
+    setQuery({ workspaceId: WORKSPACE, tab: 'workspace' });
+    render(
+      <Providers services={{ ...services, dataSource }}>
+        <SettingsPage />
+      </Providers>,
+    );
+  }
+
+  /**
+   * 13.895 — **the switch's CHECKED state means ON, which is the inverse of the
+   * `Off` checkbox it replaced.**
+   *
+   * This is the case that exists because of the swap. The old control was a
+   * checkbox labelled `Off` whose TICKED state meant off; the shared `Switch`
+   * follows `/account`'s convention, where `checked` means ON. A binding carried
+   * across unchanged — `checked={autoCloseOff}` — renders a control that looks
+   * entirely correct and submits `null` for every workspace that is ON and a
+   * number for every workspace that is OFF.
+   *
+   * Both directions are asserted rather than one, and the fixture is chosen to
+   * make that discriminating: a workspace at `30` must mount CHECKED. The
+   * inverted mutant mounts it unchecked and fails on the first line, where a
+   * single "click then check the payload" case would pass against it half the
+   * time — the same half-the-time blind spot `13.897`'s click path records.
+   */
+  it('13.895 the switch reads ON for a workspace that is on, and turning it off is what claims null', async () => {
+    const captured: SubmittedEvent[][] = [];
+    renderTab(SETTINGS, captured);
+
+    const autoCloseSwitch = await screen.findByLabelText('Close tickets automatically');
+    expect(autoCloseSwitch).toBeChecked();
+    // ON means the window is a real, editable number.
+    expect(screen.getByLabelText('Auto-close after')).toBeEnabled();
+
+    await userEvent.click(autoCloseSwitch);
+    expect(autoCloseSwitch).not.toBeChecked();
+    // OFF means the window is not editable — the claim is that there is no
+    // window, so offering a number field beside it would be a lie.
+    expect(screen.getByLabelText('Auto-close after')).toBeDisabled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(captured).toHaveLength(1);
+    expect(captured[0]?.[0]?.payload).toEqual({ autoCloseAfterDays: null });
+  });
+
+  /**
+   * 13.896 — **the blank window is a THIRD state, and it is neither "off" nor a
+   * window.**
+   *
+   * The old docblock's whole reason for a separate control was that `null`
+   * ("off") and `''` ("not filled in yet") are different, and that a blank
+   * number box cannot tell them apart. Turning the switch ON over a blank box
+   * must not resolve that ambiguity by fiat: it leaves the box blank, sends
+   * nothing, and keeps Save disabled. A third switch position, or a blank box
+   * silently read as "off", would each destroy the distinction the control
+   * exists to carry.
+   */
+  it('13.896 switching ON over a blank window is not a claim — nothing is sent and Save stays disabled', async () => {
+    const captured: SubmittedEvent[][] = [];
+    renderTab(OFF_SETTINGS, captured);
+
+    const autoCloseSwitch = await screen.findByLabelText('Close tickets automatically');
+    expect(autoCloseSwitch).not.toBeChecked();
+    const window = screen.getByLabelText('Auto-close after');
+    expect(window).toBeDisabled();
+    expect(window).toHaveValue(null);
+
+    await userEvent.click(autoCloseSwitch);
+
+    // ON, and the field is now editable — but still EMPTY.
+    expect(autoCloseSwitch).toBeChecked();
+    expect(window).toBeEnabled();
+    expect(window).toHaveValue(null);
+    // Empty is not a window, so there is no complete claim on this field and
+    // nothing to submit. Note the polarity here: the switch is ON, and the
+    // absence of a number does NOT make it off.
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(captured).toHaveLength(0);
+  });
+
+  /**
+   * 13.897 — **the info icon opens on hover, on focus and on click.**
+   *
+   * All three were asked for by name, so all three are asserted separately: any
+   * one of them alone would leave the other two untested, and the CLICK path in
+   * particular is the one a plausible implementation gets wrong — a click
+   * focuses the button first, so a toggling `onClick` reads the state `onFocus`
+   * has just set and closes the panel straight away.
+   */
+  it('13.897 each field has an info icon that opens on hover, on focus and on click, and closes on Escape', async () => {
+    const captured: SubmittedEvent[][] = [];
+    renderTab(SETTINGS, captured);
+
+    await screen.findByLabelText('Stale after');
+    const trigger = screen.getByRole('button', { name: 'About Stale after' });
+    // Closed to begin with — otherwise "it opened" is unmeasurable.
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('note')).toBeNull();
+
+    await userEvent.hover(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('note')).toHaveTextContent('active state');
+    await userEvent.unhover(trigger);
+    expect(screen.queryByRole('note')).toBeNull();
+
+    // FOCUS — the keyboard path, which hover cannot cover.
+    act(() => trigger.focus());
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('note')).toBeNull();
+
+    // CLICK — see the docblock for why this is not redundant with focus.
+    await userEvent.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('note')).toHaveTextContent('active state');
+
+    // Every field has one, and each names what IT explains — three buttons all
+    // called "About" would be a single accessible name for three different
+    // disclosures, which is the ambiguity the field labels already avoid.
+    expect(screen.getByRole('button', { name: 'About Due soon within' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About Auto-close after' })).toBeInTheDocument();
+  });
+
+  /**
+   * 13.898 — **Save is on its own row below the fields, not a fourth control in
+   * the field column.**
+   *
+   * Asserted as a RELATIONSHIP rather than by class name: the row must not be
+   * inside `.gn-workspace-settings__fields`, and it must be a sibling of it
+   * under the same card. A rule that merely renamed the wrapper would satisfy a
+   * "has class X" assertion and fail this one — and "on a new row" is the
+   * owner's actual instruction.
+   */
+  it('13.898 Save sits on its own row, outside the field column', async () => {
+    const captured: SubmittedEvent[][] = [];
+    renderTab(SETTINGS, captured);
+
+    const save = await screen.findByRole('button', { name: 'Save' });
+    const row = save.closest('.gn-workspace-settings__actions');
+    expect(row, 'Save is not inside a row of its own').not.toBeNull();
+    // The discriminating half: a Save left inside the column would still be
+    // found by `closest('.gn-workspace-settings__actions')` if a wrapper had
+    // been added AROUND each field.
+    expect(row!.closest('.gn-workspace-settings__fields'), 'Save is inside the field column').toBeNull();
+
+    const card = row!.parentElement;
+    expect(card?.querySelector('.gn-workspace-settings__fields')).not.toBeNull();
+    expect(card?.className).toContain('gn-workspace-settings__card');
   });
 });

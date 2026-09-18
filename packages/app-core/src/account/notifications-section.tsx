@@ -1,4 +1,5 @@
 import { NOTIFICATION_KINDS, type NotificationKind } from '@gisik-nokma/domain';
+import { Switch } from '@gisik-nokma/ui';
 
 const LABELS: Record<NotificationKind, string> = {
   assignment: 'A ticket is assigned to you',
@@ -41,14 +42,20 @@ export function NotificationsSection({ mutedKinds, onToggle }: NotificationsSect
     <section className="gn-account__section gn-account__notifications">
       <h2 className="gn-account__section-title">Notifications</h2>
       {NOTIFICATION_KINDS.map((kind) => (
-        <label key={kind} className="gn-account__notification-row">
-          <input
-            type="checkbox"
-            checked={!mutedKinds.includes(kind)}
-            onChange={() => onToggle(kind)}
-          />
-          <span className="gn-account__row-text">{LABELS[kind]}</span>
-        </label>
+        /* The switch is `@gisik-nokma/ui`'s, extracted 2026-09-18 when the
+           Settings → Workspace tab needed the same control — see that
+           component's docblock. `.gn-account__notification-row` stays on the
+           label because it is one of the four row selectors sharing a single
+           base rule in `globals.css` (width, wrap, min-height, padding), which
+           is ACCOUNT layout and has no business in a shared package. */
+        <Switch
+          key={kind}
+          className="gn-account__notification-row"
+          checked={!mutedKinds.includes(kind)}
+          onChange={() => onToggle(kind)}
+        >
+          {LABELS[kind]}
+        </Switch>
       ))}
       {/* Prototype copy, kept because it is TRUE: preferences live on the
           caller's own server-owned `UserPreferences` row, so they are global

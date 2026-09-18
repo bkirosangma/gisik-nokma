@@ -20,7 +20,126 @@
 
 ---
 
-## ▲ TOP BLOCK — settings → workflows, plan Tasks 7 + 8: the zebra + three strings SHIPPED, and the two items the dispatch ordered are HELD against the register (2026-09-18, late night)
+## ▲ TOP BLOCK — Settings → Workspace restyle: the switch HOISTED, the info icons, the Save row (2026-09-18, night). PR OPEN, base `main`, awaiting the controller's merge.
+
+**Position: one branch, `exec2/settings-workspace-tab`, `--base main`.** Dispatch
+`CTL-DISPATCH-2026-09-18-settings-workspace-tab.md` + `-amendment-1.md`. The amendment said to cut from
+`origin/main` and named `c5c8a03f` or later; the tip was `2f16a38e` when the branch was cut.
+
+**FIRST ACTION ON A RESTART: `gh pr list --state open`.** If this branch's PR is open it is at the
+controller's merge and nothing below needs redoing; **if it has MERGED, this block is history and the
+controller's next dispatch is the position.**
+
+### Anchors — verify these; do not trust the row
+
+| | |
+|---|---|
+| branch | `exec2/settings-workspace-tab` |
+| cut from | **`2f16a38e`** — still an ancestor of `origin/main`, checked with `merge-base --is-ancestor`, not `cat-file` |
+| code reviewed | **`f1efbf39`** — the independent review's head |
+| code head | **`20706a19`** — the FIX round, which is what ships. A block cannot name the commit that carries it: the HANDOFF commit sits above, so `rev-parse HEAD` at the tip is NOT the code head |
+| `origin/main` at recount | **`fa1c7242`** — moved while this branch was in flight (`#484`, a docs-only plan correction, **zero file overlap** with this change's 12) |
+| branch commits | **2** above `origin/main` |
+| files | **13** — count with `/usr/bin/git diff --name-only origin/main...HEAD`, **three dots**. This row said **12** until the correction commit: the count was taken BEFORE the handoff commit added itself as the 13th file, which is the "a count is a reading, and a reading expires" trap. 12 is correct **about the code head `20706a19`**; 13 is correct about the branch tip. |
+| case ids | **`13.895`–`13.901`** — recounted AT THE TIP **by case MARKER only**; `13.895`–`13.918` were free repo-wide before minting, and 13.890–13.894 were spent by `#480`/`#482` |
+| tree | clean; pushed; `docker compose` NOT run; :3001 and :3021 NOT bound |
+
+### What shipped
+
+- **The tab wears its siblings' shell** — `section > header (h2 + summary) > Card`, the shape
+  `ticket-type-list-screen.tsx:130-145` and `workflow-list-screen.tsx:183-205` already draw.
+- **An info icon beside each of the three fields** (`InfoTip`), opening on hover, focus and click and
+  closing on Escape, blur, pointer-leave or an outside click.
+- **Save on its own row**, over a `--gn-border` hairline, asserted as a RELATIONSHIP (the row is not
+  inside the field column), not by class name.
+- **The `Off` checkbox became a SWITCH — and the polarity is INVERTED.** `checked` now means ON. This is
+  the hazard of the swap and it is pinned in both directions (13.895) plus the blank third state
+  (13.896).
+- **The switch was HOISTED, not copied.** Its CSS moved from `apps/web/app/globals.css` (five rule
+  bodies plus a reduced-motion arm, all scoped to `.gn-account__notification-row
+  input[type='checkbox']`) into `packages/ui/src/ui.css` as `.gn-switch`, and both call sites now render
+  `@gisik-nokma/ui`'s one `Switch`.
+- **No save semantics moved**: one `workspace.settings_set` carrying only the changed keys, the three
+  refusal sentences, the read-only line, the CASE-vs-COALESCE behaviour and the three ranges are
+  untouched.
+
+### Checks — six raw, at the code head `20706a19`
+
+`check:env` **0** · `check:tasks` **0** · `check:runbook` **0** · `check:citations` **0** · `check:help` **0**
+· `check:db-tz` **0** → `database timezone: Asia/Kolkata`. `check:case-ids` **0** → **2365 unique ids**
+(2358 before this branch; its seven cases are the delta).
+
+**`check:db-tz` NEEDS ITS URL NAMED, or it looks like a failure.** Run bare in this worktree it exits 1
+with `DATABASE_URL is required`. It is **0** when pointed at the shared TEST Postgres:
+`DATABASE_URL="postgres://gisik:gisik@localhost:54329/postgres" node scripts/check-db-timezone.mjs`.
+
+`typecheck` **0** (17/17) · `turbo run build` for `ui`+`app-core` **0** · `apps/web` build **0**.
+Suites: apps/web **534 / 0** · packages/ui **351 / 0** · packages/app-core **1554 / 0**.
+**The forced gate was NOT run** — the controller runs it.
+
+### Review — ONE reviewer at `f1efbf39`, and the fix round is `20706a19`
+
+**No Critical.** Four Important, every one verified against the code rather than adopted; three were
+defects in **what this change claimed about itself**, one of them inside its own control:
+
+1. `Switch`'s docblock described `justify-content: space-between` and label-first DOM order. **Both
+   false** — the row carries no `justify-content` by design, and the input is the first child.
+2. **The info panel had no boundary under `minimal`** and nothing could see it: the panel is
+   `surfaceRaised` on a card that is also `surfaceRaised`, and `SHADOWS.minimal.raised` is `[]`, so the
+   shadow resolved to `none`. Now bordered.
+3. **The ⓘ trigger was 20×20**, under the product's own 24px floor for a dense in-list control
+   (`ui.css:1246-1249`). Now 24×24. The **44px tap ratchet still never sees it** because no roster walks
+   the settings routes (`viewports.ts:171-176`, `viewport.spec.ts:419-427`) — recorded with a named
+   owner, not papered over.
+4. **"The ring pays 3:1 in BOTH states and BOTH themes" was false.** Re-measured here rather than
+   repeated: ring-vs-accent **1.19** in every style/theme (the knob's own fill pays the edge once ON,
+   5.20–6.39), and ring-vs-unchecked-track falls to **2.95** in hig/minimal dark — under the 3:1 a
+   non-text UI part owes. A contrast debt on a control that shipped before this file held it.
+
+**ONE FINDING IS REFUTED, NOT FIXED.** The reviewer read `ui.css:322` as not recording the `title=`
+ruling. That line reads *"TEXT, never a `title=` tooltip (spec §5.3)"* — the citation stands.
+
+**The control that checks the old rule set is GONE was itself the weakest case here.** It read ONE
+selector through a first-match helper, so a leftover `:checked`/`::after`/`:focus-visible` variant would
+have survived it — and would still have restyled `/account`, because the shared `Switch` renders exactly
+that input. It now sweeps all five variant forms, strips comments first so this change's own prose cannot
+satisfy it, and **self-tests the instrument against the rule it claims is absent**.
+
+### Mutation witnesses — thirteen, each killed, all restored sha256-verified
+
+**The first battery reported three FALSE KILLS, and the reason is worth carrying:** the harness counted
+ANY failure as a kill, and the ui suite had one pre-existing failure at the time. A count is not a kill
+signal — the witness is a NEW failure against a **baseline**. Fixed to be baseline-relative; the
+pre-existing failure turned out to be a real defect in this change's own new case (see below).
+
+Killed: polarity inverted (4) · InfoTip click toggles (1) · `onFocus` removed (1) · `onMouseEnter`
+removed (1) · checked track repainted (1) · knob ring repointed at the knob fill (1) · `space-between`
+hoisted into the shared row (1) · a call site stops importing the package entry point (1) · the account
+row loses its edge alignment (1) · **the Save row moved inside the field column (1)** · a leftover
+`:checked` variant re-added to `globals.css` (1) · the panel loses its border (1) · the trigger back
+under 24px (1).
+
+**TWO INSTRUMENT DEFECTS, BOTH IN THIS CHANGE'S OWN TESTS, BOTH FOUND BY RUNNING RATHER THAN READING:**
+
+- **`declarationsFor` was first-match.** `.gn-account__notification-row` is the TRAILING member of a
+  four-selector list in `globals.css`, so a `^`-anchored first match returned the SHARED ROW base rule
+  and the edge-alignment assertion failed for a reason unrelated to what it named. Multi-match now.
+- **`InfoTip`'s first `onClick` was a TOGGLE and lost a race it could not see**: a click focuses the
+  button, so React ran `onFocus` (open) and then `onClick`, which read the state it had just been given
+  and closed the panel. The click did nothing. It now opens idempotently.
+
+### Open items
+
+| item | owner |
+|---|---|
+| The 44px tap ratchet does not walk ANY settings route | **whoever owns the settings-cluster viewport roster** — the page, not this control |
+| The switch's knob ring measures **2.95** vs the unchecked track in hig/minimal dark | **the controller**, at the next contrast sweep — `CONTRAST_PAIRS` guards `borderStrong` only against `surface` |
+| `InfoTip`'s panel is never announced to a screen reader (no live region, no focus move) | recorded in the docblock; a permanent-description variant would fix it |
+| The `isTypes` reorder / per-type count | **held** by `owner-holds.md` §1; my `EXEC2-QUESTION-2026-09-18-isTypes-held-items.md` was upheld |
+
+---
+
+## ▼ SUPERSEDED TOP BLOCK — settings → workflows, plan Tasks 7 + 8: the zebra + three strings SHIPPED, and the two items the dispatch ordered are HELD against the register (2026-09-18, late night)
 
 **Position: PR #482 IS OPEN, base `main`, awaiting the controller's merge.** Dispatch
 `CTL-DISPATCH-2026-09-18-settings-wf-task78.md`. One branch, **`exec2/settings-wf-t7-t8`**,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Button } from '@gisik-nokma/ui';
+import { Button, Card, InfoTip, Switch } from '@gisik-nokma/ui';
 import {
   makeSubmittedFactory,
   type DataSource,
@@ -53,10 +53,54 @@ type Knob = 'staleDays' | 'dueSoonDays' | 'autoCloseAfterDays';
  *
  * The other two are required numbers with a range. Auto-close is
  * `number | null`, and `null` is a CLAIM — "off" — rather than an absence. It
- * gets an `Off` checkbox for exactly that reason: a user who wants auto-close
- * off has to be able to SAY so, and a blank number input cannot distinguish
- * "off" from "not filled in yet". Ticking `Off` disables the number input and
- * sends `null`; unticking it re-enables the input at its last value.
+ * gets a SWITCH for exactly that reason: a user who wants auto-close off has to
+ * be able to SAY so, and a blank number input cannot distinguish "off" from "not
+ * filled in yet". Switching it off disables the number input and sends `null`;
+ * switching it on re-enables the input at its last value.
+ *
+ * ## THE SWITCH REPLACED AN `Off` CHECKBOX ON 2026-09-18, AND THE POLARITY IS
+ * ## INVERTED — which is the whole hazard of that swap
+ *
+ * The old control was a checkbox labelled `Off` whose TICKED state meant off.
+ * `@gisik-nokma/ui`'s `Switch` follows the product's single switch convention —
+ * the one `/account`'s notification rows already use — where `checked` means
+ * ON. So a reader who carried the old binding across unchanged
+ * (`checked={autoCloseOff}`) would ship a control that LOOKS correct and sends
+ * the OPPOSITE claim on every save. The binding below is `checked={!autoCloseOff}`,
+ * and cases 13.895/13.896 pin both directions rather than one; a single
+ * direction passes against the inverted mutant half the time, which is exactly
+ * how this kind of defect survives a suite.
+ *
+ * The switch is the `/account` notifications control, not a copy of it —
+ * extracted into `packages/ui` in this same change (see `Switch`'s own
+ * docblock). Two toggles that drift is what that extraction exists to prevent.
+ *
+ * ## The blank input is a THIRD state, and it did not become a third switch
+ * ## position
+ *
+ * `null` ("off") and `''` ("not filled in yet") are different, and the switch
+ * carries only the first. Flipping the switch ON over a blank input leaves the
+ * input blank and the form unsubmittable — through `invalid`, below — rather
+ * than quietly meaning "off" (which would be a lie) or quietly meaning "on"
+ * (which would be a claim nobody made). That distinction is the whole reason
+ * the old `Off` control existed, and it survives the control change.
+ *
+ * ## What the 2026-09-18 restyle changed, and what it deliberately did not
+ *
+ * The owner asked for a better UI on this tab: an info icon beside each field
+ * opening on hover, focus and click; Save moved to its own row; the auto-close
+ * control as a switch; and deliberate spacing. The screen now wears the same
+ * shell as its two SIBLING tabs on this page — `section > header (h2 +
+ * summary) > Card`, the shape `ticket-type-list-screen.tsx:130-145` and
+ * `workflow-list-screen.tsx:183-205` already establish — so the third tab is
+ * not a fourth layout. The spacing tokens are named in
+ * `globals.css`'s `.gn-workspace-settings` docblock rather than left to the eye.
+ *
+ * **None of the SAVE semantics moved.** One `workspace.settings_set` carrying
+ * only the changed keys, the refusal split, the read-only sentence, the
+ * `CASE`-vs-`COALESCE` behaviour the projection depends on, and the three
+ * settings' units and ranges are all untouched — the diff above the markup is
+ * imports, class names and this docblock.
  *
  * ## ONE Save, carrying ONLY what changed
  *
@@ -259,102 +303,147 @@ export function WorkspaceSettingsForm({
   };
 
   return (
-    <div>
-      <div className="gn-field">
-        <label className="gn-field__label" htmlFor={`${fieldId}-stale`}>
-          Stale after
-        </label>
-        <input
-          id={`${fieldId}-stale`}
-          className="gn-field__input"
-          type="number"
-          min={1}
-          max={365}
-          value={draft.staleDays}
-          disabled={!canEdit || submitting}
-          onChange={(event) => setDraft({ ...draft, staleDays: event.target.value })}
-        />
-        {/* The unit is OUTSIDE the label element on purpose: the inputs are
-            addressed by `htmlFor`/`id` rather than by wrapping, so each
-            control's accessible name is exactly `Stale after` and not
-            `Stale after days`. `gn-field__label` is reused for the unit rather
-            than a new class invented for it — it is the product's one small
-            muted text treatment, and a new class here would be a new token to
-            keep in step with it. */}
-        <span className="gn-field__label">days</span>
-      </div>
-
-      <div className="gn-field">
-        <label className="gn-field__label" htmlFor={`${fieldId}-due-soon`}>
-          Due soon within
-        </label>
-        <input
-          id={`${fieldId}-due-soon`}
-          className="gn-field__input"
-          type="number"
-          min={0}
-          max={365}
-          value={draft.dueSoonDays}
-          disabled={!canEdit || submitting}
-          onChange={(event) => setDraft({ ...draft, dueSoonDays: event.target.value })}
-        />
-        <span className="gn-field__label">days</span>
-      </div>
-
-      <div className="gn-field">
-        <label className="gn-field__label" htmlFor={`${fieldId}-auto-close`}>
-          Auto-close after
-        </label>
-        <input
-          id={`${fieldId}-auto-close`}
-          className="gn-field__input"
-          type="number"
-          min={1}
-          max={365}
-          value={autoCloseOff ? '' : draft.autoCloseAfterDays}
-          disabled={!canEdit || submitting || autoCloseOff}
-          onChange={(event) => setDraft({ ...draft, autoCloseAfterDays: event.target.value })}
-        />
-        <span className="gn-field__label">days</span>
-      </div>
-
-      {/* The `Off` control, and the reason the field above is not simply a
-          number input: `null` is a claim the user has to be able to make, and a
-          blank number box cannot distinguish "off" from "not typed yet". Same
-          bare-label-wrapping-a-checkbox idiom the list filter and the calendar
-          legend use — no class of its own. */}
-      <label>
-        <input
-          type="checkbox"
-          checked={autoCloseOff}
-          disabled={!canEdit || submitting}
-          onChange={(event) => setAutoCloseOff(event.target.checked)}
-        />
-        Off
-      </label>
-
-      {canEdit ? (
-        <Button
-          variant="primary"
-          disabled={submitting || !dirty || invalid}
-          onClick={() => void save()}
-        >
-          Save
-        </Button>
-      ) : (
-        <p>Only a workspace admin can change these.</p>
-      )}
-
-      {serverRefusal !== null ? (
-        <p role="alert" className="gn-refusal gn-refusal--server">
-          {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
+    <section className="gn-workspace-settings">
+      <header className="gn-workspace-settings__header">
+        <h2 className="gn-workspace-settings__title">Workspace</h2>
+        <p className="gn-workspace-settings__summary">
+          How this workspace decides a ticket is stale, when a date is due soon, and whether tickets
+          close on their own.
         </p>
-      ) : null}
-      {transportError !== null ? (
-        <p role="alert" className="gn-refusal gn-refusal--transport">
-          {transportError}
-        </p>
-      ) : null}
-    </div>
+      </header>
+
+      <Card className="gn-workspace-settings__card">
+        <div className="gn-workspace-settings__fields">
+          <div className="gn-field">
+            <div className="gn-workspace-settings__label-row">
+              <label className="gn-field__label" htmlFor={`${fieldId}-stale`}>
+                Stale after
+              </label>
+              <InfoTip label="About Stale after">
+                A ticket that has sat in an active state longer than this is called out as Stale in
+                the attention strip.
+              </InfoTip>
+            </div>
+            {/* The unit is OUTSIDE the label element on purpose: the inputs are
+                addressed by `htmlFor`/`id` rather than by wrapping, so each
+                control's accessible name is exactly `Stale after` and not
+                `Stale after days`. `gn-field__label` is reused for the unit
+                rather than a new class invented for it — it is the product's
+                one small muted text treatment, and a new class here would be a
+                new token to keep in step with it. */}
+            <div className="gn-workspace-settings__control">
+              <input
+                id={`${fieldId}-stale`}
+                className="gn-field__input"
+                type="number"
+                min={1}
+                max={365}
+                value={draft.staleDays}
+                disabled={!canEdit || submitting}
+                onChange={(event) => setDraft({ ...draft, staleDays: event.target.value })}
+              />
+              <span className="gn-field__label">days</span>
+            </div>
+          </div>
+
+          <div className="gn-field">
+            <div className="gn-workspace-settings__label-row">
+              <label className="gn-field__label" htmlFor={`${fieldId}-due-soon`}>
+                Due soon within
+              </label>
+              <InfoTip label="About Due soon within">
+                A date you are watching that falls within this many days is called out as Due soon in
+                the attention strip.
+              </InfoTip>
+            </div>
+            <div className="gn-workspace-settings__control">
+              <input
+                id={`${fieldId}-due-soon`}
+                className="gn-field__input"
+                type="number"
+                min={0}
+                max={365}
+                value={draft.dueSoonDays}
+                disabled={!canEdit || submitting}
+                onChange={(event) => setDraft({ ...draft, dueSoonDays: event.target.value })}
+              />
+              <span className="gn-field__label">days</span>
+            </div>
+          </div>
+
+          <div className="gn-field">
+            <div className="gn-workspace-settings__label-row">
+              <label className="gn-field__label" htmlFor={`${fieldId}-auto-close`}>
+                Auto-close after
+              </label>
+              <InfoTip label="About Auto-close after">
+                Tickets that have sat in a terminal state longer than this are closed for you.
+                Switch it off to leave them alone.
+              </InfoTip>
+            </div>
+            {/* The switch is the CLAIM, and the input below is the value that
+                claim carries: `null` is something the user has to be able to
+                SAY, and a blank number box cannot distinguish "off" from "not
+                typed yet". Polarity is INVERTED relative to the `Off` checkbox
+                this replaced — `checked` is ON — see this component's docblock;
+                a switch is exactly the control where the inverted binding looks
+                right and saves wrong. A distinct accessible name from the
+                input's `Auto-close after` is deliberate: two controls sharing
+                one name makes every `getByLabelText` for it ambiguous. */}
+            <Switch
+              className="gn-workspace-settings__switch"
+              checked={!autoCloseOff}
+              disabled={!canEdit || submitting}
+              onChange={(autoCloseOn) => setAutoCloseOff(!autoCloseOn)}
+            >
+              Close tickets automatically
+            </Switch>
+            <div className="gn-workspace-settings__control">
+              <input
+                id={`${fieldId}-auto-close`}
+                className="gn-field__input"
+                type="number"
+                min={1}
+                max={365}
+                value={autoCloseOff ? '' : draft.autoCloseAfterDays}
+                disabled={!canEdit || submitting || autoCloseOff}
+                onChange={(event) => setDraft({ ...draft, autoCloseAfterDays: event.target.value })}
+              />
+              <span className="gn-field__label">days</span>
+            </div>
+          </div>
+        </div>
+
+        {/* The alerts sit between the fields and the Save row, so the sentence
+            explaining a refused claim is read immediately before the control
+            that produced it. */}
+        {serverRefusal !== null ? (
+          <p role="alert" className="gn-refusal gn-refusal--server">
+            {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
+          </p>
+        ) : null}
+        {transportError !== null ? (
+          <p role="alert" className="gn-refusal gn-refusal--transport">
+            {transportError}
+          </p>
+        ) : null}
+
+        <div className="gn-workspace-settings__actions">
+          {canEdit ? (
+            <Button
+              variant="primary"
+              disabled={submitting || !dirty || invalid}
+              onClick={() => void save()}
+            >
+              Save
+            </Button>
+          ) : (
+            <p className="gn-workspace-settings__readonly">
+              Only a workspace admin can change these.
+            </p>
+          )}
+        </div>
+      </Card>
+    </section>
   );
 }

@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 // Named import, not the default: `@testing-library/user-event` ships no
 // `"type": "module"`, so NodeNext resolves its types as CJS and a default
 // import lands on the module namespace (no `.setup`) under this repo's
@@ -12,8 +12,10 @@ import { Avatar, initialsOf } from '../src/components/avatar.js';
 import { Button } from '../src/components/button.js';
 import { Chip } from '../src/components/chip.js';
 import { Dialog } from '../src/components/dialog.js';
+import { InfoTip } from '../src/components/info-tip.js';
 import { SegmentedControl } from '../src/components/segmented-control.js';
 import { Sheet } from '../src/components/sheet.js';
+import { Switch } from '../src/components/switch.js';
 import { Table, type TableColumn } from '../src/components/table.js';
 
 describe('Button', () => {
@@ -546,5 +548,98 @@ describe('13.551 — tri-state choice rules', () => {
   it('an excluded person row keeps the ROW ground, not the chip-level exclude ground (spec §4)', () => {
     expect(rule(".gn-filters__choice[data-mode='exclude']")).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
     expect(rule(".gn-filters__choice--row[data-mode='exclude']")).toMatch(/background:\s*var\(--gn-fill-quaternary\)/);
+  });
+});
+
+/**
+ * 13.900 — `Switch` and `InfoTip`, the two primitives the 2026-09-18 restyle
+ * added to this package.
+ *
+ * These are the COMPONENT halves. `tokens.test.ts`'s 13.899 proves the CSS is
+ * one rule set and that the two states differ; `apps/web/test/settings-page
+ * .test.tsx`'s 13.895–13.897 prove the two screens wire them the way their
+ * docblocks claim. Neither half is sufficient alone — the same split
+ * `settings-page.test.tsx`'s own docblock records for `AppNav`/`LastProjectNav`.
+ */
+describe('13.900 — Switch', () => {
+  it('is a real checkbox named by the label it wraps, so getByLabelText resolves to it', () => {
+    render(
+      <Switch checked onChange={() => {}}>
+        Close tickets automatically
+      </Switch>,
+    );
+    const control = screen.getByLabelText('Close tickets automatically');
+    expect(control).toBeInstanceOf(HTMLInputElement);
+    expect(control).toHaveAttribute('type', 'checkbox');
+    expect(control).toHaveClass('gn-switch');
+    expect(control).toBeChecked();
+  });
+
+  it('hands the caller the NEXT state, not the event', async () => {
+    const onChange = vi.fn();
+    render(
+      <Switch checked={false} onChange={onChange}>
+        Auto-close
+      </Switch>,
+    );
+    await userEvent.click(screen.getByLabelText('Auto-close'));
+    // The boolean, not a `ChangeEvent` — a caller that has to reach through
+    // `event.target` is the shape `SegmentedControl` already avoids.
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+
+  it('keeps the caller\'s className alongside its own row class, and passes disabled through', () => {
+    render(
+      <Switch checked={false} onChange={() => {}} disabled className="gn-account__notification-row">
+        A row label
+      </Switch>,
+    );
+    // Both classes, which is what lets `/account` keep its own row layout
+    // (full-width, edge-aligned) without a second switch implementation.
+    expect(screen.getByLabelText('A row label').closest('label')).toHaveClass(
+      'gn-switch-row',
+      'gn-account__notification-row',
+    );
+    // The label still names the disabled control, which is the whole reason
+    // the DOM keeps a real input rather than a `role="switch"` div.
+    expect(screen.getByLabelText('A row label')).toBeDisabled();
+  });
+});
+
+describe('13.900 — InfoTip', () => {
+  it('is closed to begin with, naming its button for what it explains', () => {
+    render(
+      <InfoTip label="About Stale after">Tickets sat too long are called out as Stale.</InfoTip>,
+    );
+    const trigger = screen.getByRole('button', { name: 'About Stale after' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('note')).toBeNull();
+  });
+
+  it('opens on hover, on focus and on click, and Escape closes it', async () => {
+    render(<InfoTip label="About Stale after">Tickets sat too long are called out as Stale.</InfoTip>);
+    const trigger = screen.getByRole('button', { name: 'About Stale after' });
+    const panelText = 'Tickets sat too long are called out as Stale.';
+
+    await userEvent.hover(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('note')).toHaveTextContent(panelText);
+    await userEvent.unhover(trigger);
+    expect(screen.queryByRole('note')).toBeNull();
+
+    // FOCUS — the keyboard path, and the one hover cannot cover.
+    act(() => trigger.focus());
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('note')).toBeNull();
+
+    // CLICK — and this one is not redundant. `onClick` deliberately OPENS
+    // rather than toggling, because a click focuses the button first, so a
+    // toggling handler would read the state `onFocus` had just set and close
+    // the panel again: a click that appears to do nothing. That defect is
+    // exactly what this line catches.
+    await userEvent.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('note')).toHaveTextContent(panelText);
   });
 });
