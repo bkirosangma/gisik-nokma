@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ISO_DATETIME_REGEX, isRealCalendarDatetime, ulidString } from '../envelope.js';
+import { RANK_KEY_REGEX, isRankKey } from '../rank.js';
 
 /**
  * The payload shapes of the ticket vocabulary (spec §3). Schemas only — the
@@ -172,4 +173,27 @@ export const ticketWorkflowReboundPayload = z.object({
 export const ticketClosedPayload = z.object({}).strict();
 /** `ticket.reopened` (spec §1.2) — the explicit reopen; same empty payload. */
 export const ticketReopenedPayload = z.object({}).strict();
+
+/**
+ * `ticket.ranked` (spec §8.1) — one reorder is one event carrying the new key,
+ * which is what makes a drag cost one claim instead of renumbering the column.
+ * The key space is `isRankKey`'s, not `RANK_KEY_REGEX`'s, and the difference is
+ * load-bearing: the regex admits `'a0'`, and a key ending in `0` has NO key
+ * below it, so `rankBetween` can neither return nor refuse — it appends `'0'`
+ * forever (measured: `NONTERMINATING at i=20001`). The regex stays as the first
+ * check because its message names the alphabet, which is the more useful error
+ * for the common mistake; the refine closes the unorderable tail.
+ *
+ * Backlog-only is the ENGINE's door, not this schema's — `checkTicketRanked`
+ * (Task 2) refuses a rank on a ticket that is not in the backlog, the same
+ * split `ticket.closed` has with `close-requires-terminal`.
+ */
+export const ticketRankedPayload = z
+  .object({
+    rank: z
+      .string()
+      .regex(RANK_KEY_REGEX, 'must be a rank key over 0-9a-z')
+      .refine(isRankKey, "must not end in '0' — nothing sorts below it, so the key would be unorderable"),
+  })
+  .strict();
 
