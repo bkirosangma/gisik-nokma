@@ -1,0 +1,244 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
+
+/**
+ * Cases 13.907–13.909 — `isSettingsShell`'s two token nits, and the one
+ * prototype value this task deliberately does NOT port.
+ *
+ * Every bare `:NNN` below is `design-system/interactive/desktop.dc.html`, read
+ * out of `main`, where the shell is `:800-1011`: its `<nav>` at `:808`, and its
+ * nav-item style at `:3145`.
+ *
+ * WHY A SOURCE SCAN. `globals.css` is not loaded by jsdom here, so a rendered
+ * assertion could only restate class names — and a case that asserts a class
+ * EXISTS proves nothing about what it does. The three claims below are the
+ * DECLARED values, each compared against the prototype line it ports, and each
+ * carries a mutation witness that traverses the SAME path as the measurement
+ * (this repo's idiom, established by `neo-card-radius.test.ts` and
+ * `members-styling.test.ts`).
+ *
+ * **The claim that needed the most care is 13.908's, because the product is
+ * self-consistent and the prototype is NOT.** The prototype draws its top nav's
+ * current item as a *tint* (`background:var(--tintAccent);color:var(--accent)`
+ * at `:2599`) and its settings SIDEBAR's current item as a *solid accent*
+ * (`background:var(--accent);color:var(--onColor)` at `:3145`) — two different
+ * treatments for the same idea, and the prototype even declares a named pair for
+ * the second (`--sideOnBg:var(--accent); --sideOnColor:var(--onColor)` at `:31`,
+ * which nothing in that file ever applies). The product had collapsed both onto
+ * the top-nav tint, which is why `globals.css`'s own docblock could say the
+ * sidebar reuses `.gn-nav`'s pattern "rather than inventing a second one" and be
+ * describing a divergence rather than a decision. 13.908 restores the
+ * prototype's second treatment; 13.909 is the value that stays a token.
+ */
+const TEST_DIR = dirname(fileURLToPath(import.meta.url));
+const GLOBALS_CSS_PATH = resolve(TEST_DIR, '../app/globals.css');
+
+/**
+ * Full rule body, selector line through its matching closing brace — the shape
+ * `members-styling.test.ts:53` established. The single-line version in
+ * `neo-card-radius.test.ts` truncates every rule in this family, whose
+ * declarations each sit on their own line.
+ */
+function ruleFor(css: string, selectorPattern: RegExp): string | undefined {
+  const lines = css.split('\n');
+  const startIndex = lines.findIndex((line) => selectorPattern.test(line));
+  if (startIndex === -1) return undefined;
+  const openIndex = lines.findIndex((line, i) => i >= startIndex && line.includes('{'));
+  if (openIndex === -1) return undefined;
+  const closeIndex = lines.findIndex((line, i) => i >= openIndex && line.includes('}'));
+  if (closeIndex === -1) return undefined;
+  return lines.slice(startIndex, closeIndex + 1).join('\n');
+}
+
+/**
+ * `property → value` for one rule body, comments dropped by CONTEXT rather than
+ * by a line prefix: `globals.css` documents many of these rules in prose that
+ * names their own selectors, so a prefix test both misses real rules and eats
+ * sentences. Braces are located in the STRIPPED text — locating them in the
+ * original and slicing the stripped copy is off by every comment's length.
+ */
+function declarations(rule: string): Map<string, string> {
+  const out = new Map<string, string>();
+  const stripped = rule.replace(/\/\*[\s\S]*?\*\//g, '');
+  const body = stripped.slice(stripped.indexOf('{') + 1, stripped.lastIndexOf('}'));
+  for (const part of body.split(';')) {
+    const at = part.indexOf(':');
+    if (at === -1) continue;
+    out.set(part.slice(0, at).trim(), part.slice(at + 1).trim());
+  }
+  return out;
+}
+
+/** The rule's flex-basis in CSS px, resolving `rem` at the root's own 16px. */
+function basisPx(rule: string): number | undefined {
+  const decls = declarations(rule);
+  const flex = decls.get('flex');
+  const raw = flex !== undefined ? flex.split(/\s+/).at(-1) : decls.get('flex-basis') ?? decls.get('width');
+  if (raw === undefined) return undefined;
+  const n = Number.parseFloat(raw);
+  if (Number.isNaN(n)) return undefined;
+  if (raw.endsWith('rem')) return n * 16;
+  if (raw.endsWith('px')) return n;
+  return undefined;
+}
+
+/**
+ * Replace the FIRST rule matching `selectorPattern` with `replacement`. Every
+ * witness below plants through this, because appending a rule to the end of the
+ * file would leave `ruleFor` — which returns the first match — reading the REAL
+ * rule: a control that does not traverse the measurement's path is not a
+ * control. Throws rather than returning the input unchanged, so a plant that
+ * cannot apply is loud instead of silent.
+ */
+function withRule(css: string, selectorPattern: RegExp, replacement: string): string {
+  const rule = ruleFor(css, selectorPattern);
+  if (rule === undefined) throw new Error(`no rule matched ${String(selectorPattern)} to replace`);
+  return css.replace(rule, replacement);
+}
+
+const css = readFileSync(GLOBALS_CSS_PATH, 'utf8');
+
+const SIDEBAR = /(?<!__)\.gn-settings__sidebar\s*\{/;
+const SIDEBAR_ITEM = /^\.gn-settings__sidebar a,$/;
+const SIDEBAR_ACTIVE = /\.gn-settings__sidebar a\[aria-current='page'\]\s*\{/;
+
+/** The prototype's active pair, as `:3145` spells it, in product token names. */
+const ITEM_ACTIVE_BG = 'var(--gn-accent)';
+const ITEM_ACTIVE_FG = 'var(--gn-accent-text)';
+
+describe("13.907 — the settings sidebar is the prototype's 248px, not the 192px it shipped", () => {
+  it("resolves the sidebar's flex-basis to the prototype's 248px", () => {
+    const rule = ruleFor(css, SIDEBAR);
+    expect(rule, 'no rule for .gn-settings__sidebar').toBeDefined();
+    // 248/16 = 15.5rem — asserted as the RESOLVED pixel value, so that a later
+    // edit to `14rem` reads as the 224px drift from the prototype it is, rather
+    // than as a string that merely looks different.
+    expect(basisPx(rule!), `sidebar basis in px, from: ${String(rule)}`).toBe(248);
+  });
+
+  /*
+   * MUTATION WITNESS. Plant a basis that is NOT the prototype's through the same
+   * extraction the case uses, and confirm it reads back as its own value — with
+   * the old 12rem/192px called out, since that is the value this task removes.
+   */
+  it("a planted basis is read as its own value, and 12rem reads as the old 192", () => {
+    const plant = (value: string) =>
+      withRule(css, SIDEBAR, `.gn-settings__sidebar {\n  flex: 0 0 ${value};\n}`);
+    expect(basisPx(ruleFor(plant('9rem'), SIDEBAR)!)).toBe(144);
+    expect(basisPx(ruleFor(plant('12rem'), SIDEBAR)!)).toBe(192);
+    // The property that matters: neither planted reading equals the prototype's.
+    expect([144, 192]).not.toContain(248);
+  });
+});
+
+describe("13.908 — the current sidebar item is the prototype's SOLID accent, not the top nav's tint", () => {
+  const rule = ruleFor(css, SIDEBAR_ACTIVE);
+
+  it('paints the current item with the accent PAIR the prototype names at :3145', () => {
+    expect(rule, "no rule for .gn-settings__sidebar a[aria-current='page']").toBeDefined();
+    const decls = declarations(rule!);
+    expect(decls.get('background'), `background, from: ${String(rule)}`).toBe(ITEM_ACTIVE_BG);
+    expect(decls.get('color')).toBe(ITEM_ACTIVE_FG);
+  });
+
+  /*
+   * The pair is not a new guarantee: `tokens.ts`'s `CONTRAST_PAIRS` already
+   * declares `{ fg: 'accentText', bg: 'accent', minimum: 4.5 }`, and
+   * `packages/ui/test/tokens.test.ts` measures it against every style and theme.
+   * This case is the other half — that the RULE actually uses that pair.
+   */
+  it("names neither of the top nav's tint roles — the near-miss `--gn-text-accent` included", () => {
+    expect(rule?.includes('--gn-fill-tertiary'), `from: ${String(rule)}`).toBe(false);
+    expect(rule?.includes('--gn-text-accent')).toBe(false);
+  });
+
+  it("adds no declaration the prototype's active delta does not carry", () => {
+    // The prototype's active state is `:3145`'s base string with exactly two
+    // declarations appended. `font-weight: 700` was the product's own addition,
+    // and under a solid fill it is the kind of invented emphasis this repo
+    // records rather than keeps.
+    const extra = [...declarations(rule!).keys()].filter((n) => n !== 'background' && n !== 'color');
+    expect(extra, `extra declarations in: ${String(rule)}`).toEqual([]);
+  });
+
+  /*
+   * MUTATION WITNESSES — one per claim above, each planted into the SAME rule
+   * the case reads, each aimed so a survivor would identify its own site.
+   */
+  it('a planted tint pair is caught by all three claims', () => {
+    const mutated = withRule(
+      css,
+      SIDEBAR_ACTIVE,
+      `.gn-settings__sidebar a[aria-current='page'] {\n  background: var(--gn-fill-tertiary);\n  color: var(--gn-text-accent);\n  font-weight: 700;\n}`,
+    );
+    const decls = declarations(ruleFor(mutated, SIDEBAR_ACTIVE)!);
+    expect(decls.get('background')).not.toBe(ITEM_ACTIVE_BG);
+    expect(decls.get('color')).not.toBe(ITEM_ACTIVE_FG);
+    expect(ruleFor(mutated, SIDEBAR_ACTIVE)?.includes('--gn-fill-tertiary')).toBe(true);
+    expect(ruleFor(mutated, SIDEBAR_ACTIVE)?.includes('--gn-text-accent')).toBe(true);
+    expect(
+      [...decls.keys()].filter((n) => n !== 'background' && n !== 'color'),
+    ).toEqual(['font-weight']);
+  });
+
+  it('a font-weight planted ALONE is caught, by the extra-declaration claim alone', () => {
+    const mutated = withRule(
+      css,
+      SIDEBAR_ACTIVE,
+      `.gn-settings__sidebar a[aria-current='page'] {\n  background: var(${ITEM_ACTIVE_BG.slice(4, -1)});\n  color: var(${ITEM_ACTIVE_FG.slice(4, -1)});\n  font-weight: 700;\n}`,
+    );
+    const decls = declarations(ruleFor(mutated, SIDEBAR_ACTIVE)!);
+    // The pair claims stay green — this plant changes only the extra claim.
+    expect(decls.get('background')).toBe(ITEM_ACTIVE_BG);
+    expect(decls.get('color')).toBe(ITEM_ACTIVE_FG);
+    expect([...decls.keys()].filter((n) => n !== 'background' && n !== 'color')).toEqual(['font-weight']);
+  });
+});
+
+describe('13.909 — the item radius stays `--gn-radius-control`, and that is a measured deviation', () => {
+  it("the item's radius is the token, and no literal competes with it", () => {
+    const rule = ruleFor(css, SIDEBAR_ITEM);
+    expect(rule, 'no rule for .gn-settings__sidebar a').toBeDefined();
+    const decls = declarations(rule!);
+    expect(decls.get('border-radius'), `from: ${String(rule)}`).toBe('var(--gn-radius-control)');
+    // The prototype hard-codes `border-radius:10px` here (`:3145`) — and it is
+    // the only control in that file that does: its own neo block sets
+    // `--ctlR:14px` at `:59`, so a literal port would leave this one item at
+    // 10px while every other control under `neo` is 14px. The token expresses
+    // the style axis the prototype's literal cannot, and this rule is where the
+    // deviation is declared rather than left to look like an oversight.
+    expect(/border-radius:\s*[\d.]+\s*(px|rem)/.test(rule!)).toBe(false);
+  });
+
+  /*
+   * MUTATION WITNESSES. The second claim is the one that distinguishes "a token
+   * is used" from "no literal competes" — different properties, and only the
+   * second is this case's real content. Each plant is aimed at one of them.
+   */
+  it("a planted literal radius is caught, by the literal claim alone", () => {
+    const literal = withRule(
+      css,
+      SIDEBAR_ITEM,
+      `.gn-settings__sidebar a,\n.gn-settings__sidebar-item--disabled {\n  border-radius: 10px;\n}`,
+    );
+    const decls = declarations(ruleFor(literal, SIDEBAR_ITEM)!);
+    expect(/border-radius:\s*[\d.]+\s*(px|rem)/.test(ruleFor(literal, SIDEBAR_ITEM)!)).toBe(true);
+    // The first claim survives this plant untouched — the two are separable.
+    expect(decls.get('border-radius')).not.toBe('var(--gn-radius-control)');
+  });
+
+  it('a planted TOKEN of the wrong role is caught, by the token claim alone', () => {
+    const wrongToken = withRule(
+      css,
+      SIDEBAR_ITEM,
+      `.gn-settings__sidebar a,\n.gn-settings__sidebar-item--disabled {\n  border-radius: var(--gn-radius-card);\n}`,
+    );
+    const decls = declarations(ruleFor(wrongToken, SIDEBAR_ITEM)!);
+    expect(decls.get('border-radius')).not.toBe('var(--gn-radius-control)');
+    // No literal appears — this plant is invisible to the second claim, which is
+    // why both claims exist.
+    expect(/border-radius:\s*[\d.]+\s*(px|rem)/.test(ruleFor(wrongToken, SIDEBAR_ITEM)!)).toBe(false);
+  });
+});

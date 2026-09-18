@@ -12557,3 +12557,64 @@ genuinely moved and are given their new homes by content rather than silently re
 pointed at a BLANK COMMENT LINE — collateral from the `required` docblock landing after the delta audit was
 written. A content-preserving repair would have laundered them into looking maintained, so they were
 corrected to the real target and the pre-existing staleness is recorded rather than absorbed.
+## settings → workflows Task 9: the settings shell's two token nits, and the one prototype value that is NOT a port (executor 2, 2026-09-18) — cases `13.907`–`13.909`
+
+The `isSettingsShell` block is `design-system/interactive/desktop.dc.html:800-1011`, read from `main`; its
+`<nav>` is `:808`, its nav item is `:3145`. The audit's row is
+`docs/design/prototype-delta-2026-09-18.md:637-647`. **The block's third nit — the subtitle at `17px/22px`
+against the frozen `0.8rem` at `globals.css:333` — is RULED to stay** (owner, 2026-09-18): a deliberate
+freeze outranks a prototype delta, and this task does not touch it.
+
+- ✅ **13.907 — the settings sidebar is the prototype's 248px, not the 192px it shipped.**
+  `:808` draws `width:248px;flex:none`; the rule read `flex: 0 0 12rem` (192px), 56px short
+  (`apps/web/app/globals.css:1227`). The case asserts the **resolved pixel value**, 248, not the string
+  `15.5rem` — so a later edit to `14rem` reads as the 224px drift from the prototype it is rather than as
+  a spelling that merely looks different. A count is evidence only once its unit is pinned, and `rem` at
+  the root's own 16px is that unit here.
+
+  **Mutation witness, and it plants through the same extraction the case reads**: a basis of `9rem` reads
+  back as 144 and `12rem` as 192 — the value this task removes called out by name. A witness that appended
+  a competing rule to the end of the file instead would have left `ruleFor` — which returns the FIRST
+  match — reading the real rule, and the control would have traversed a different path from the
+  measurement. It is the bug this repo has paid for before, caught here before the first run.
+
+- ✅ **13.908 — the current sidebar item is the prototype's SOLID accent, not the top nav's tint**
+  (`apps/web/app/globals.css:1242-1245`). `:3145` appends `background:var(--accent);color:var(--onColor)`
+  to the item's base style. This file had used `.gn-nav`'s pair — `--gn-fill-tertiary` /
+  `--gn-text-accent` — and its own docblock justified that as "reusing `.gn-nav`'s own pattern rather than
+  inventing a second one".
+
+  **The product was self-consistent and the prototype is not.** The prototype draws its TOP nav's current
+  item as a *tint* (`:2599`, `background:var(--tintAccent)`) and its settings sidebar's current item as a
+  *solid fill*, and it even declares a named pair for the second that nothing in that file ever applies
+  (`--sideOnBg:var(--accent); --sideOnColor:var(--onColor)`, `:31`). Collapsing both onto the tint was
+  ours; the docblock was describing a divergence, not a decision. `--gn-accent`/`--gn-accent-text` is a
+  pair `CONTRAST_PAIRS` already holds to 4.5 (`packages/ui/src/tokens.ts:1224`), so no new guarantee is
+  needed — and `.gn-help__nav-link[aria-current='location']` (`packages/ui/src/ui.css:3633`) already
+  ships exactly this pair on an active nav item, so the treatment is not new to the product either.
+
+  **Three claims, each with its own plant, because they are separable and only one of them is the
+  port.** (a) the background is `var(--gn-accent)`; (b) the foreground is `var(--gn-accent-text)` — and the
+  near-miss assertion names `--gn-text-accent`, which is a different role that differs from
+  `--gn-accent-text` by the order of its two words; (c) the rule adds **no declaration** `:3145`'s active
+  delta does not carry. The `font-weight: 700` that used to sit here is what (c) is for: the prototype's
+  active state is its base style plus exactly two declarations, and the emphasis was ours — `.gn-nav`'s,
+  in fact, imported along with its tint. A plant of the tint pair reddens all three; a plant of
+  `font-weight` **alone** reddens (c) and leaves (a) and (b) green.
+
+- ✅ **13.909 — the item's radius stays `--gn-radius-control`, and that is a measured deviation**
+  (`apps/web/app/globals.css:1235`). `:3145` hard-codes `border-radius:10px`. **It is the only control in
+  that file that does**: its own neo block sets `--ctlR:14px` (`:59`), and `tokens.ts`'s `radii` table
+  carries `hig`/`minimal` `8px` and `neo` `14px` (`packages/ui/src/tokens.ts:935-938`) — the product's
+  token IS the prototype's `--ctlR`, exactly, in both styles. A literal port would therefore leave this
+  one item at 10px while every other control under `neo` is 14px. **The token expresses the style axis the
+  prototype's literal cannot**, and the rule is where that is declared rather than left to look like an
+  oversight. This case pins an existing state rather than changing one, which is why it was green before
+  the fix.
+
+  **Its second claim is the substantive one, and its two plants are aimed to prove they are separable:**
+  "a token is used" and "no literal competes" are different properties, and only the second is the port's
+  real content. Planting `border-radius:10px` reddens the literal claim while the token claim is
+  trivially false too; planting `var(--gn-radius-card)` — a **wrong token of the right shape** — reddens
+  the token claim alone and is **invisible** to the literal claim. A single claim would have missed one of
+  the two.

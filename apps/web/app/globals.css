@@ -1184,14 +1184,47 @@ input, textarea, select { font-family: inherit; }
    content this route is showing. Two sections since Round 21 moved MCP tokens
    to `/account` (Ticket types and Workflows, both inlined — see the page's own
    docblock). Same shape as every other admin-ish layout in this file: raised
-   surface, token roles only, `aria-current` for the active section reusing
-   `.gn-nav`'s own pattern rather than inventing a second one. */
+   surface, token roles only, `aria-current` for the active section.
+
+   THE TWO PARTS OF THE PROTOTYPE'S SHELL THIS PORT CARRIES (Task 9,
+   2026-09-18). The prototype's shell is
+   `design-system/interactive/desktop.dc.html:800-1011`, its `<nav>` is `:808`
+   and its nav item is `:3145`.
+
+   1. WIDTH — `:808` draws `width:248px;flex:none` against this rule's
+      `flex: 0 0 12rem`, 56px short. `15.5rem` is 248/16 exactly, kept in `rem`
+      like every other length in this file.
+   2. THE CURRENT ITEM — `:3145` appends `background:var(--accent);
+      color:var(--onColor)` to the item's base style: a SOLID accent fill. This
+      file had used `.gn-nav`'s pair instead (`--gn-fill-tertiary` /
+      `--gn-text-accent`) and called that "reusing `.gn-nav`'s own pattern
+      rather than inventing a second one" — but `.gn-nav`'s pair is the
+      TINTED idea, and it is the prototype's own answer for its TOP nav's
+      current item (`:2599`, `background:var(--tintAccent)`). The prototype
+      draws the same idea two ways and names a pair for the second that
+      nothing in that file ever applies (`--sideOnBg:var(--accent);
+      --sideOnColor:var(--onColor)`, `:31`). Collapsing both onto the tint was
+      ours; `--gn-accent`/`--gn-accent-text` is the prototype's, and it is a
+      pair `tokens.ts`'s CONTRAST_PAIRS already holds to 4.5. The
+      `font-weight: 700` that used to sit on this rule went with it, because
+      `:3145`'s active state is its base style plus exactly those two
+      declarations — that emphasis was ours as well.
+
+   THE ITEM'S OTHER METRICS AT `:3145` ARE STILL NOT PORTED — `min-height:44px`,
+   `padding:0 14px`, `font-size:15px`, `font-weight:500` against this file's
+   `padding: 0.5rem 0.7rem` and its inherited size and weight. Those are
+   tap-target and type-scale questions rather than token ones, they are outside
+   this task's named scope, and they are recorded here so the difference reads
+   as a decision rather than an oversight. `.gn-help__nav-link[aria-current=
+   'location']` (`packages/ui/src/ui.css:3633`) is this rule's nearest neighbour
+   — the same accent pair, with a `font-weight:600` that this one does not
+   carry, because `:3145`'s active state has none. */
 .gn-settings { display: flex; flex-wrap: wrap; gap: 1.25rem; margin-top: 0.8rem; align-items: flex-start; }
 .gn-settings__sidebar {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  flex: 0 0 12rem;
+  flex: 0 0 15.5rem;
   background: var(--gn-surface-raised);
   box-shadow: var(--gn-shadow-raised);
   border-radius: var(--gn-radius-card);
@@ -1207,9 +1240,8 @@ input, textarea, select { font-family: inherit; }
 .gn-settings__sidebar a:hover,
 .gn-settings__sidebar a:focus-visible { background: var(--gn-fill-quaternary); }
 .gn-settings__sidebar a[aria-current='page'] {
-  background: var(--gn-fill-tertiary);
-  color: var(--gn-text-accent);
-  font-weight: 700;
+  background: var(--gn-accent);
+  color: var(--gn-accent-text);
 }
 .gn-settings__sidebar-item--disabled { color: var(--gn-text-muted); }
 .gn-settings__content { flex: 1 1 20rem; min-width: 0; }
