@@ -9453,9 +9453,9 @@ about the code, and both were unwitnessed decisions rather than unconstrained pa
    the harness reported `replacement count 2 (expected 1)` rather than half-applying it.
 10. **Control re-run** (the plan's own: batch → N calls) → still RED, so round 2's harness is measuring.
 
-## `Close all (N)` on a terminal board column (executor 2, 2026-09-18) — block `13.760`–`13.819`, ids `13.789`–`13.792`
+## `Close all (N)` on a terminal board column (executor 2, 2026-09-18) — block `13.760`–`13.819`, ids `13.789`–`13.793`
 
-**Second-wave Task 10.** Four ids drawn from this executor's own block `13.760`–`13.819`, continuing the
+**Second-wave Task 10.** Five ids drawn from this executor's own block `13.760`–`13.819`, continuing the
 allocation the 2026-09-18 two-executor override set up so two writers never mint into one tip. The plan's
 own step text names `13.644`–`13.646`, from its `13.613`–`13.649` reservation; those ids are NOT taken —
 a marker sweep over `test-cases/` and a repo-wide sweep over `*.ts`/`*.tsx`/`*.md` both find `13.644`,
@@ -9484,16 +9484,14 @@ empty answer.
   The last third renders the `moves`-less board and asserts no such button anywhere, after an explicit
   `cleanup()` — React Testing Library unmounts between TESTS, not within one, so a bare second `render()`
   would leave both trees mounted and the query answering about either.
-  **Citations:** `packages/app-core/src/views/board.tsx:540` (the three-term gate), `:256` (the snapshot at
-  click time), `:427` (the single mount), `packages/app-core/test/views/board-close.test.tsx:286`.
+  **Citations:** `packages/app-core/src/views/board.tsx:592` (the three-term gate), `:305` (the opener), `:478`
+  (the single mount), `packages/app-core/test/views/board-close.test.tsx:286`.
 - ✅ **13.790 — an empty terminal column shows no `Close all` button.** Spec §8.3 words the action as
   "N = cards in the column", so `Close all (0)` is not a control this surface has to offer. This case is a
   NEGATIVE and cannot fail before the button exists, which is why it is not the pair that carries the
   gate: its discriminating power is against the removal of the `cards.length > 0` term specifically, and
   the mutation that drops that single term reddens **this case and nothing else in the file**.
-  **Citations:** `packages/app-core/src/views/board.tsx:294` (the conditional clear), `:427` (the dialog),
-  `packages/app-core/test/views/board-close.test.tsx:411`.
-  **Citations:** `packages/app-core/src/views/board.tsx:540` (the `cards.length > 0` term),
+  **Citations:** `packages/app-core/src/views/board.tsx:592` (the `cards.length > 0` term),
   `packages/app-core/test/views/board-close.test.tsx:354`.
 - ✅ **13.791 — a click on `Close all` never opens a ticket, paired with a positive control.** The action
   lives in the column `<header>`, OUTSIDE `BoardCardSlot`, so the card-click bail
@@ -9515,6 +9513,38 @@ empty answer.
   present, the committed `Alpha` no longer pending, and the confirm control gone because nothing is left to
   try. The mutation that reinstates the dispatch's literal reading reddens **this case and nothing else in
   the file**.
+  **Citations:** `packages/app-core/src/views/board.tsx:346` (the conditional clear), `:478` (the one dialog
+  mount), `packages/app-core/test/views/board-close.test.tsx:411`.
+
+- ✅ **13.793 — an OPEN dialog's tickets cannot be swapped under it.** `BulkCloseDialog` states its own
+  precondition in its docblock: a parent that swaps `tickets` while the dialog stays OPEN (no `open`
+  transition) is *not covered by its reset*, and it declares that this "cannot arise" for its two named
+  consumers. For this consumer it could. `open` is `bulkClose !== null`, so writing a second column's
+  tickets into a non-null `bulkClose` is a swap with no transition, the `useEffect(…, [open])` never fires,
+  and the previous opening's `closedIds`/`failures` survive against a list they do not describe. The
+  concrete failure is a FULL success that does not clear — column B closes completely, but stale ids from
+  column A are still subtracted from B's `pending`, so `committed.length < tickets.length` and the dialog
+  stays mounted with a `Could not close` row naming the OTHER column's ticket and no confirm left to press.
+
+  The fix refuses the swap (`board.tsx:307`), and **the two obvious alternatives were measured and
+  rejected rather than merely not chosen.** A `key` on the dialog — a remount — DOES reset that stale
+  state, which is exactly what makes it tempting; it is also WORSE, because the attempt token lives in
+  `attemptRef` on the INSTANCE, nothing bumps a destroyed instance's token, and an answer still in flight
+  then passes its own check and calls the OLD closure's `onClosed` — the precise defect 13.787 exists to
+  prevent, and what the dialog's own docblock says a fresh mount cannot fix. Closing through `null` first
+  does not work either: two `setState` calls in one handler batch into one render, so `bulkClose` goes
+  straight from A's tickets to B's with `open` true throughout.
+
+  **The reachability is a KEYBOARD path in a browser, not a pointer one** — `Dialog` renders a
+  full-viewport scrim that blocks pointer events, and the second button is reachable only if focus escapes
+  the modal (`Dialog` ships no focus trap and no portal; recorded as a named follow-on on the SHARED
+  component, not repaired from here). **jsdom does not hit-test the scrim**, so an ordinary `user.click`
+  in the test exercises exactly the state transition the escaped-focus path produces — which is why the
+  invariant is testable in this harness at all, and the case's docblock says so rather than implying a
+  pointer can do it. The case also asserts the refusal does not WEDGE the surface: dismissing and opening
+  the other column afterwards behaves like any first opening.
+  **Citations:** `packages/app-core/src/views/board.tsx:307` (the guard), `:305` (the opener),
+  `packages/app-core/test/views/board-close.test.tsx:477`.
 
 **Mutations run against `packages/app-core/test/views/board-close.test.tsx`, each restored from a byte copy
 verified by sha256 (not `git checkout`), each guarded by a replacement count of exactly 1.**
@@ -9523,5 +9553,10 @@ verified by sha256 (not `git checkout`), each guarded by a replacement count of 
    negative) and 13.790. The plan predicted 13.644's negative; that id is now 13.789's.
 2. **The `cards.length > 0` term dropped** → reddens **13.790 and nothing else**.
 3. **`bulkClose` cleared UNCONDITIONALLY in `onClosed`** — the task dispatch's literal wording, and the
-   control for this task's correction → reddens **13.792 and nothing else**. This is the mutation that
-   proves the conditional clear is load-bearing rather than decorative, and that 13.792 is aimed at it.
+   control for this task's correction → reddens **13.792** and **13.793** (whose partial-close setup
+   depends on the dialog surviving a partial, so it cannot reach its own subject without it). This is the
+   mutation that proves the conditional clear is load-bearing rather than decorative, and that 13.792 is
+   aimed at it.
+4. **The swap guard removed** (`openBulkClose` writes unconditionally, so a second column overwrites an
+   open dialog) → reddens **13.793 and nothing else**. This one exists because an independent review found
+   the reachable path; the mutation confirms the guard, not the prose, is what holds the invariant.

@@ -252,9 +252,61 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, moves }
    */
   const [bulkClose, setBulkClose] = useState<BulkCloseTicket[] | null>(null);
 
-  /** Opens the dialog on ONE column's cards, in the column's own render order. */
+  /**
+   * Opens the dialog on ONE column's cards, in the column's own render order —
+   * and does NOTHING while an opening is already on screen.
+   *
+   * ## Why the swap is refused rather than served
+   *
+   * `BulkCloseDialog` states its own precondition at the top of its docblock:
+   * *"a parent that swaps `tickets` while the dialog stays OPEN (no `open`
+   * transition) is not covered by the reset … **Both consumers this task names
+   * open and close it, so it cannot arise for them.**"* That second sentence is
+   * a claim about THIS component, and before this guard it was false. `open` is
+   * `bulkClose !== null`, so writing a second column's tickets into a non-null
+   * `bulkClose` is a swap with no `open` transition: the dialog's
+   * `useEffect(…, [open])` never fires, and the PREVIOUS opening's `closedIds`
+   * and `failures` survive against a ticket list they do not describe. The
+   * concrete failure is a FULL success that does not clear — column B closes
+   * completely, but `closedIds` from column A still holds, so those stale ids
+   * are subtracted from B's `pending`, `committed.length < tickets.length`, and
+   * the dialog stays mounted with a `Could not close` row naming a ticket from
+   * the other column and no confirm left to press.
+   *
+   * ## Why not the two obvious alternatives
+   *
+   * **A `key` on the dialog — REMOUNTING IS WORSE HERE, not merely different.**
+   * A fresh mount DOES reset `closedIds`/`failures`, and that is exactly what
+   * makes it tempting. But the attempt token lives in `attemptRef`, on the
+   * INSTANCE; a remount destroys that instance and nothing bumps its token, so
+   * an answer still in flight from the old opening passes its own (unchanged)
+   * token check and calls the OLD closure's `onClosed` — the precise defect case
+   * 13.787 exists to prevent, and the very thing the dialog's docblock says a
+   * fresh mount cannot fix (*"the stale closure still holds the OLD `onClosed`
+   * prop and calls it"*). A fix for one stale-state bug that re-opens the
+   * late-callback bug is not a fix.
+   *
+   * **Closing through `null` first — does not work.** Two `setState` calls in
+   * one handler are batched into one render, so `bulkClose` goes straight from
+   * A's tickets to B's with `open` true throughout. The transition has to be a
+   * rendered `open: true → false → true`, which one click cannot produce.
+   *
+   * So the swap is refused, and refusing it is the honest reading of what the
+   * surface IS: `Dialog` renders `aria-modal="true"` over a full-viewport scrim
+   * that owns the screen. A column action reached while a dialog is open has
+   * been reached *behind a modal* — a keyboard-focus escape, not a legitimate
+   * second interaction — and the correct response to that is to ignore it, not
+   * to serve it and corrupt the open dialog's state. Case 13.793 holds it.
+   *
+   * (Dropping `aria-modal`'s focus escape itself is the shared `Dialog`'s
+   * business — it ships no focus trap and no portal — and is recorded as a
+   * named follow-on rather than repaired from here.)
+   */
   const openBulkClose = (column: BoardColumn): void => {
-    setBulkClose(column.cards.map((card) => ({ ticketId: card.ticketId, title: card.title })));
+    setBulkClose((current) => {
+      if (current !== null) return current;
+      return column.cards.map((card) => ({ ticketId: card.ticketId, title: card.title }));
+    });
   };
 
   /**

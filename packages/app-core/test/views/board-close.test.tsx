@@ -448,4 +448,103 @@ describe('Board Close all (N) — a terminal column’s bulk close (spec §8.3, 
     expect(within(stillOpen).queryByText('Alpha')).not.toBeInTheDocument();
     expect(within(stillOpen).queryByRole('button', { name: 'Close 1 ticket' })).not.toBeInTheDocument();
   });
+
+  /**
+   * 13.793 — AN OPEN DIALOG'S TICKETS CANNOT BE SWAPPED UNDER IT.
+   *
+   * `BulkCloseDialog` states its own precondition at the top of its docblock —
+   * a parent that swaps `tickets` while the dialog stays OPEN is *not covered
+   * by its reset*, and it declares that this "cannot arise" for its two named
+   * consumers. For this consumer it could: `open` is `bulkClose !== null`, so
+   * writing a second column's tickets into a non-null `bulkClose` is a swap
+   * with no `open` transition, the `useEffect(…, [open])` never fires, and the
+   * previous opening's `closedIds`/`failures` survive against a list they do
+   * not describe. `openBulkClose` now refuses that write — case 13.793 is the
+   * witness, and `board.tsx`'s docblock there has the full reasoning, including
+   * why a `key` on the dialog (remount) would be WORSE rather than merely
+   * different: it re-opens the late-callback defect 13.787 closed.
+   *
+   * **Reaching the second button with the dialog open is a KEYBOARD path in a
+   * browser, not a pointer one** — `Dialog` renders a full-viewport scrim that
+   * blocks pointer events, and the button is only reachable if focus escapes
+   * the modal (`Dialog` ships no focus trap and no portal; recorded as a named
+   * follow-on on the shared component). **jsdom does not hit-test the scrim**,
+   * so an ordinary `user.click` here exercises exactly the state transition the
+   * escaped-focus path would produce, which is why the invariant is testable at
+   * all in this harness. The click is a PROXY for the focus escape, and the
+   * docblock says so rather than implying a pointer can do it.
+   */
+  it('13.793 — an open dialog’s tickets cannot be swapped under it by another column’s action', async () => {
+    const user = userEvent.setup();
+    const alpha = boardCardSeed({ ticketId: 'tk_alpha', title: 'Alpha' });
+    const beta = boardCardSeed({ ticketId: 'tk_beta', title: 'Beta' });
+    const gamma = boardCardSeed({ ticketId: 'tk_gamma', title: 'Gamma' });
+    const { moves } = movesFor(WF_ERRAND, async (events) =>
+      events.map((event) =>
+        event.entity.id === 'tk_beta'
+          ? {
+              status: 'refused' as const,
+              eventId: event.id,
+              rule: 'close-requires-terminal',
+              reason: 'Not in a terminal state.',
+            }
+          : committed(event, 1),
+      ),
+    );
+    // TWO terminal columns, so there are two live column actions at once. A
+    // second `terminal` column is data the component never inspects — the gate
+    // reads `column.category` and nothing else — so this needs no new fixture
+    // vocabulary.
+    const base = errandGroupWithCardIn('todo', []);
+    const board: BoardView = {
+      projectId: 'prj_1',
+      groups: [
+        {
+          ...base,
+          columns: [
+            ...base.columns.filter((column) => column.stateId !== 'done'),
+            { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, cards: [alpha, beta] },
+            {
+              stateId: 'archived',
+              name: 'Archived',
+              category: 'terminal',
+              blocked: false,
+              cards: [gamma],
+            },
+          ],
+        },
+      ],
+    };
+    render(<Board board={board} onOpenTicket={() => {}} moves={moves} />);
+    await settled();
+
+    // Open on Done and drive it to a PARTIAL outcome, which is what leaves the
+    // dialog mounted with state that a swap would misdescribe.
+    await user.click(screen.getByRole('button', { name: 'Close all 2 in Done' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Close 2 tickets' });
+    await user.click(within(dialog).getByRole('button', { name: 'Close 2 tickets' }));
+    await waitFor(() =>
+      expect(within(screen.getByRole('dialog')).getByText('Could not close')).toBeInTheDocument(),
+    );
+
+    // The swap attempt. Under the pre-guard code this replaced the dialog's
+    // ticket list: the title became `Close 1 ticket`, `Gamma` appeared, and the
+    // stale `Beta` refusal stayed pinned beside it.
+    await user.click(screen.getByRole('button', { name: 'Close all 1 in Archived' }));
+
+    const unchanged = screen.getByRole('dialog');
+    expect(unchanged).toHaveAccessibleName('Close 2 tickets');
+    expect(within(unchanged).getByText('Could not close')).toBeInTheDocument();
+    expect(within(unchanged).getByText('Beta — Not in a terminal state.')).toBeInTheDocument();
+    expect(within(unchanged).queryByText('Gamma')).not.toBeInTheDocument();
+
+    // ...and the refusal did not WEDGE the surface: dismissing and opening the
+    // other column then behaves like any first opening.
+    await user.click(within(unchanged).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Close all 1 in Archived' }));
+    const fresh = await screen.findByRole('dialog', { name: 'Close 1 ticket' });
+    expect(within(fresh).getByText('Gamma')).toBeInTheDocument();
+    expect(within(fresh).queryByText('Could not close')).not.toBeInTheDocument();
+  });
 });
