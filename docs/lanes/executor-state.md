@@ -41,7 +41,121 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~10:2x IST. **SECOND WAVE, TASK 3 (SERVER + WIRE:
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~11:5x IST. **SECOND WAVE, TASK 4 (`Table`/`TicketList`
+> # row drag plumbing and the tail drop zone) IS DONE, REVIEWED, FIXED (TWICE) AND COMMITTED. PR OPEN,
+> # BASE `main`, AWAITING THE CONTROLLER'S MERGE.** This block is the position; everything below it is
+> # RECORD. **The queue after this task is NOT empty** — Task 5 of
+> # `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md` (Backlog tab: rank order, drag
+> # reorder, Move up / Move down) is next, and it is **dispatched by the controller rather than started by
+> # reflex. HOLD for that dispatch.** Task 5 is the FIRST caller of `rowDrag` — nothing passes it yet.
+> # A SECOND EXECUTOR IS LIVE on a disjoint workstream in `gisik-nokma-exec2`; branches are one-per-task
+> # and every PR is `--base main`.
+>
+> | | |
+> |---|---|
+> | branch | `exec/second-wave-t4-rowdrag`, **REBASED onto `origin/main` = `d069fd94`** (executor 2's `isBuilder`, PR #445, landed while this branch was open). See the rebase record below — the conflict was ONE file and every reviewed blob was verified identical after it |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha printed here names an ANCESTOR. Three task commits, AS REBASED: **`a0656a4c`** (the task, 8 files), **`6c0b3faa`** (fix round 1, 5 files), **`17795bfc`** (fix round 2, 3 files); this handoff sits on top of all three, and the PR head is whatever `rev-parse` says, never this line. **The pre-rebase shas `d28d609b` / `dc0a5539` / `ae83ed30` / `625a03e2` are ORPHANED by the rebase** — `--is-ancestor` is false for each while `git cat-file` still answers `commit`, which is this file's opening trap hit for the fourth task running |
+> | rebase | **`git diff 625a03e2 60696f67` shows the peer's files as well as this task's, which is expected** — the pre-rebase head was based on `fb346a9f`. What proves nothing was LOST is the blob table below: **the five code/test blobs are byte-identical before and after**, so the reviewed code is the code being gated. `pnpm install` and a full dist rebuild ran BEFORE any suite was trusted, per the standing rule |
+> | base | **`fb346a9f`** = `origin/main`, carrying second-wave Tasks 1 (#441), 2 (#442), 3 (#444) and executor 2's Members+InviteAdmin (#443) |
+> | PR base | **`main`** — `owner/workspace-edits` is retired and deleted |
+> | six checks | **all EXIT 0 at the REBASED head**, re-run after `pnpm install` + dist rebuild, each run through `pnpm run check:*` so no filename is guessed: `tasks` · `env` · `runbook` · `help` · `citations` (**ratchet holds exactly on every file**; file 13 = **561** cited / 0 uncited — this task's two new ✅ cases plus executor 2's block) · `db-tz` **0 with `DATABASE_URL=postgres://gisik:gisik@localhost:54330/gisik_nokma`** (it exits **2** without it, by design — and note **54330, not 54329**: 54329 is the workspace's shared cross-lane TEST Postgres, and `docker-compose.dev.yml` is asserted not to publish it). Also `node scripts/check-case-ids.mjs` **EXIT 0** (**2251** unique ids, highest 15.34) |
+> | suites | **app-core 1486 · ui 324, zero failures**, both `--no-file-parallelism`, Node **v22.22.2** — a positive control that the new cases are collected rather than merely written |
+> | typechecks | **ui, app-core and apps/web all EXIT 0**, run after rebuilding `packages/ui` and `packages/app-core` dist |
+> | tree | clean at the frozen head; no `dist`, no `task-ledger.tsv`, no `.superpowers/` in the diff |
+> | dev stack | **no compose action was run at any point.** `curl -s localhost:3000/v1/auth/methods` answers `{"google":true,"apple":false,"phone":false}` — the sign-in the 2026-09-09 env rule protects is intact |
+>
+> ## ▣ WHAT TASK 4 SHIPS
+>
+> One optional prop, one `Table` hook, one tail zone, three CSS classes:
+>
+> - `packages/app-core/src/views/ticket-list.tsx` — `TicketListProps.rowDrag?: { onReorder(movedTicketId, beforeTicketId) }`. When present each `<tr>` is `draggable` and carries `onDragStart`/`onDragEnd`/`onDragOver`/`onDrop` as **React props on the row, not a registry** (13.534's lesson, in the docblock); `DRAG_TICKET_FORMAT` is **imported from `./board.js`**, never re-declared. A single `.gn-list__tail-drop` after the sections means "place last" (`onReorder(moved, null)`). **Three payloads are refused at the component:** an empty one; a drop of a row on itself; and **a payload that is not one of this list's own ticket ids** — the third was MISSING until the review, and it is the one an "is the payload empty?" test cannot reach.
+> - `packages/ui/src/components/table.tsx` — `rowProps?: (row) => HTMLAttributes<HTMLTableRowElement>`, spread onto each `<tr>` after the built-ins, with **`className` composed** from `gn-table__row`(`--clickable`) + `rowClassName` + the caller's. Optional and additive; `Table` still has exactly one production consumer (`ticket-list.tsx`, re-measured by the reviewer).
+> - `packages/ui/src/ui.css` — `.gn-list__row--dragging`, `.gn-list__row--drop-before`, `.gn-list__tail-drop`, **ONE contiguous block** (find it by the three selectors; cited by SELECTOR rather than by line, because two successive rounds of edits in this very task moved the numbers, which is exactly why nothing in the file or this block names one). `ui.css` is contended with executor 2 — the PR body names the region.
+>
+> ## ▣ THE REVIEWS — two passes, before the PR opened. NEITHER WAS CLEAN.
+>
+> **Pass 1 at `d28d609b`: two Important, four Minor. Both Important were REPRODUCED here before being acted on; all six accepted (fix round `dc0a5539`).**
+>
+> 1. **Important — a foreign drag was NOT refused.** The drop gated on `moved === ''`, and the comment above it asserted a false premise ("a gesture that began outside this list carries no id"). **It does.** `DRAG_TICKET_FORMAT` is plain `'text/plain'` — deliberately, so no allowlist has to be maintained — which is the UNIVERSAL format: a link, a text selection or a file dragged in from another application arrives NON-EMPTY. Measured: dropping `'https://example.com/some-link'` on a row called `onReorder('https://example.com/some-link', 'rd_a')`. The Board reads the same format and is safe only because it then looks the value up in a registry that answers `undefined` for a stranger; this component has no registry, so the fix is a `Set` of the rows it is showing, applied at BOTH targets.
+> 2. **Important — the drop marker went stale over the tail zone.** The tail `<div>` is a SIBLING of the sections, not an ancestor of any `<tr>`, so a browser stops firing `dragover` on whichever row the pointer came from the moment it crosses in; nothing cleared it, so that row kept `--drop-before` while the pointer sat on the target meaning LAST — read "insert before the last row", release, get "place last". Fixed in the tail's own `dragover`. **The `ui.css` paragraph claiming the tail "takes the accent only while the gesture is over it" was FALSE** — no rule did that.
+> 3. **Minor — an assertion that could not fail.** `expect(onReorder).not.toHaveBeenCalled()` in the `no rowDrag` arm tested a spy never placed in the tree. Deleted.
+> 4. **Minor — a pinned row paints `--dragging` on both its copies.** Cosmetic and data-safe. **Follow-on, owner: the first task that renders the drag on a surface where a row can legitimately appear twice.**
+> 5. **Minor — three prose claims corrected**, including a file count of 14 that is **13** and a `:1176` citation this task's own added lines had already invalidated.
+> 6. **Minor — documented, not guarded:** `rowProps` spreads after `onClick`, so a caller's `onClick` would replace `onRowClick`. No caller does this.
+>
+> **Pass 2 (scoped, at `dc0a5539`): both Important fixes upheld; one Minor and one observation, both acted on (fix round `ae83ed30`).**
+>
+> - **THE MOST USEFUL THING THIS TASK PRODUCED: MY OWN MUTATION KILL WAS CONTINGENT ON A LITERAL.** The fix round claimed M9/M10 die on the foreign-drag case. `DRAG_TICKET_FORMAT` appeared in `ticket-list.test.tsx` **only inside comments** — the case hand-typed `'text/plain'`, the same value, so it passed. The reviewer's **paired experiment**, reproduced here: M9 alone exits **1** (a real kill); the constant drifted ALONE exits **0** (the whole file is format-agnostic once nothing agrees on the literal); the constant drifted **with** the membership check removed exits **0 — M9 SURVIVES**, because the payload then reaches `getData` under a format the component no longer reads, comes back `''`, and is refused by the EMPTY clause instead. **Fixed by importing the constant; the third leg now exits 1.** The 13.705 docblock had asserted *"imported, never re-spelled"* and was FALSE — written ahead of the code it described.
+> - **Minor — a sentence arguing against line numbers carried a stale line number.** Replacing `:1176` with `:1203/:1204/:1209` was correct at `d28d609b`, and the fix round's own further `ui.css` edits moved them again. Now cited by selector, with no number to chase.
+> - **Observation, recorded not fixed — a mutant with NO browser-visible effect reads as a kill here.** Deleting the row `onDrop`'s marker clears reddens 13.705's first case, yet in a browser it is behaviourally nil: `dragend` always fires and `onDragEnd` does byte-identical clearing — which the "abandoned drag" case itself proves. No case here fires `dragEnd` after a `drop`, so post-drop marker state is pinned where a browser supplies it for free. **Not a code defect, but this file's kill COUNT and its COVERAGE are not the same number** — say so rather than let a battery read as coverage.
+> - **Features.md was in sync by luck, not by edit** — its bullet enumerated two refused payloads where the code refuses three, and its case count said six `it`s where 13.705 has **seven** (guessed, not counted; corrected after counting).
+>
+> **Follow-on named by the fix rounds, not fixed: the tail zone has no drag-over state of its own.** What tells a user they are over it is the ROW marker going out. Styling the target itself is a fourth class the approved plan does not name, and a lit edge beside a still-lit "insert here" line was the worse of the two readings. Owner: the task that first reports the affordance as unclear.
+>
+> ## ▣ THE REBASE — one conflicted file, resolved as a union, and verified by blob not by prose
+>
+> **Executor 2's `isBuilder` (#445) merged to `main` as `d069fd94` while this PR was open.** The PR went `CONFLICTING`, and the diagnosis is worth keeping because it was NOT what the dispatch predicted: the contended file, **`packages/ui/src/ui.css`, auto-merged cleanly** — the single conflict was **`test-cases/13-deployment-dogfooding.md`**, the shared catalogue, because both workstreams appended to it. Both sides were **pure additions** (peer `+178`, mine `+201`, zero deletions on either side), so the resolution is a union and nothing had to be judged.
+>
+> **`git merge-tree --write-tree --name-only HEAD origin/main`** is what named the file BEFORE any rebase was started — it reports the conflicts without touching a worktree, which is the cheap way to scope one.
+>
+> **The peer's hunk was verified by EXACT SUBSTRING, not by grepping for a heading.** Both the peer's 15,354-character block and this task's 8,244-character block are present **verbatim** in the merged file, each header appears **exactly once**, and no conflict marker survives. This is Task 3's recorded rule (*"after a rebase, verify the PEER'S hunk survived by hashing against the merge stages, never by grepping the merged file for a heading"*) — a dropped hunk and a kept one look identical to `grep -c`.
+>
+> **What proves THIS task's work survived is a blob table, and it is the thing a restarted executor should re-run:**
+>
+> | file | pre-rebase `625a03e2` | rebased |
+> |---|---|---|
+> | `packages/app-core/src/views/ticket-list.tsx` | `60545c00da18` | `60545c00da18` |
+> | `packages/ui/src/components/table.tsx` | `a1e5de1b77de` | `a1e5de1b77de` |
+> | `packages/app-core/test/views/ticket-list.test.tsx` | `eb91f7761e20` | `eb91f7761e20` |
+> | `packages/ui/test/components.test.tsx` | `99652ca4151f` | `99652ca4151f` |
+> | `packages/app-core/test/views/ticket-list-css-binding.test.tsx` | `4c8d24ace7f8` | `4c8d24ace7f8` |
+>
+> **Five blobs identical ⇒ the reviewed code is the code being gated.** The three auto-merged files (`ui.css`, `Features.md`, the catalogue) gained the peer's content and were checked by PRESENCE — this task's three selectors, its Features.md bullet, and its catalogue blocks are all in the merged file, against the peer's own additions as a positive control.
+>
+> **Everything re-verified after the rebase**, because a rebase is a new head and the gate does not transfer: `pnpm install` and a full dist rebuild FIRST (the standing rule — imports by package name resolve through `./dist`), then app-core **1486** · ui **324** zero failures, six checks 0, three typechecks 0.
+>
+> ## ▣ THE PLAN'S OWN MUTATION TARGET CANNOT FAIL — measured, and the tell was a survivor
+>
+> Step 5 asks for `preventDefault()` to be dropped from `dragover` and expects the drop case to redden "exactly as a browser does". **It does not.** jsdom does not model a browser's rule that a `drop` fires only over a target whose `dragover` cancelled, and `fireEvent.drop` dispatches unconditionally: with the `preventDefault()` deleted, **every `fireEvent`-driven case in 13.705 stayed GREEN**. The plan anticipated this and named the fallback, so the drop READ was mutated instead — and the cancelled event is now pinned at the **dispatch** level (`defaultPrevented` read off a real `Event`, with a control that the same dispatch against a list with no `rowDrag` is NOT cancelled). **That case kills the mutant the plan was aiming at.** The plan was right about the browser and wrong about jsdom; the general move is that when the harness does not simulate a rule, assert the rule's OWN mechanism directly.
+>
+> ## ▣ MUTATIONS — thirteen, each restored by `cp` and verified by sha256
+>
+> Every mutation was verified to have CHANGED the file before its result was read, and every restore verified by sha256. **Three reported SURVIVED, and NONE was a code defect** — one was a real test gap, one was not a mutation at all, and one was a kill contingent on a literal:
+>
+> | | mutation | verdict |
+> |---|---|---|
+> | M1 | `onDragOver` loses `preventDefault()` | **survived the `fireEvent` cases**; **KILLED** by the dispatch-level `defaultPrevented` case added for it |
+> | M2 | the drop reads no ticket id (`getData` → `''`) | killed |
+> | M3 | the self-drop guard removed | killed (re-confirmed independently by the reviewer) |
+> | M4 | the tail zone renders regardless of `rowDrag` | killed |
+> | M5 | `onReorder`'s arguments swapped | killed |
+> | M6 | `Table` REPLACES `className` instead of appending | killed |
+> | M7 | `Table` drops the per-row spread | killed (re-confirmed independently) |
+> | M8 | the dragged row never gets `--dragging` | **SURVIVED — a REAL test gap.** 13.705 pinned `--drop-before` and never `--dragging`; two cases added; M8/M8b/M8c now die |
+> | M9 | the ROW drop loses the membership check | killed — but **contingent**; see below |
+> | M10 | the TAIL drop loses the membership check | killed — same contingency |
+> | M11 | the TAIL `dragover` stops clearing the marker | **first written as a NO-EFFECT mutation** (the edit DUPLICATED the clear instead of removing it, so behaviour never changed and it read as a survivor); rewritten as a real removal, it dies on the tail case |
+> | drift | `DRAG_TICKET_FORMAT` changed alone | **exit 0 — the suite is blind to it.** This is what exposed M9's contingency |
+> | drift+M9/M10 | **drift + membership removed at both targets** | **exit 0 — M9 SURVIVED.** After importing the constant: **exit 1** |
+>
+> ## ▣ CASE IDS — RECOUNTED, NOT ADOPTED
+>
+> Block `13.700`–`13.759`; Tasks 1–3 used `13.694`–`13.696` and `13.700`–`13.704`. Recounted at this tip over case MARKERS and test NAMES only (a substring sweep cannot separate a minted id from a mentioned one — this file's own recorded trap), with BOTH controls: `/usr/bin/git grep -nE '13\.70[56]' fb346a9f` returns **no hits**, against a positive control of the same command shape over `13\.70[0-4]` (**13 files** — the first draft of this block said 14; the reviewer caught it, and the miscount was MINE, not a measurement's) and a null-control over the three lines that quote the block as a RANGE in prose (`test-cases/13:8241`, `:8313`, `:8427`). **Next free in this block is `13.707`.** The plan's own `13.621`/`13.621a` were NOT used: the dispatch records them as taken, and a letter-suffixed id is invisible to `check-case-citations.mjs` by its own Global Constraint note — so the pair became two plain ids the script can see. **`13.697`–`13.699` remain UNALLOCATED** — Task 2 flagged this for a ruling and it is still open; nobody mint there without one.
+>
+> ## ▣ METHOD NOTES THIS TASK EARNED — they generalise
+>
+> - **A kill is only as good as the path it travels. Verify a mutation's kill survives a change the test can see.** M9 died with the original literal and SURVIVED the moment the format constant moved — because the test re-spelled the value the component reads through a constant. **If a case hand-types a value the code reads via a constant, its kill is contingent on two copies agreeing**, and nothing in the suite says so. Import the constant, then re-run the mutant with the constant drifted.
+> - **A survivor is evidence about the TEST before the code — and a "survivor" may be no mutation at all.** Three survivors here, three different causes: a real gap in a case whose NAME claimed a property its fixtures could not reach (M8); an edit that DUPLICATED the line it meant to delete and changed nothing (M11); and a kill contingent on a literal (M9). **Verify the mutation CHANGED THE FILE before reading its result, and verify the kill fails on its OWN case** — not merely that the suite went red.
+> - **When a case's fixtures cannot produce the payload it names, the case cannot fail.** 13.705's foreign-drag case named "a payload carrying no ticket id" and only ever exercised an EMPTY one; its `dataTransfer` stand-in, faithful to a browser, is structurally incapable of producing anything else. **The reviewer's phrase is the keeper: a case's NAME is not its property.**
+> - **A mutant with no browser-visible effect still reddens a suite that supplies the redundant path by hand.** No case here fires `dragEnd` after a `drop`, so the drop-side clears are pinned by hand where a browser pins them for free. **A kill count is not a coverage count.**
+> - **Do not argue against line numbers and then cite line numbers.** Two rounds of this task moved `ui.css`'s rule numbers; the first "fix" replaced stale numbers with fresh ones that the very next commit invalidated. Cite by SELECTOR.
+> - **`app-core` imports `@gisik-nokma/ui` by PACKAGE NAME, which resolves through `packages/ui/dist`.** A correct implementation still failed 13.705 until that dist was rebuilt, while the ui suite — which imports the relative path — had already gone green. The tell is a GREEN ui suite beside a RED app-core suite for the same change.
+> - **When a class-union checker reddens, extend the FIXTURE, do not subtract from the check.** 13.671's second direction exists to catch exactly a styled-but-unrendered class; subtracting the three names would delete the guard for the classes it was built to watch.
+> - **A wrong script filename and a real failure both print `EXIT=1`.** `node scripts/check-tasks.mjs` (no such file) produced six identical `EXIT=1`s. Hit the scripts through `pnpm run check:*` — and treat six identical failures as a harness error before six findings.
+> - **The shell `diff` returned a FALSE "identical" on this task's own handoff edit.** `diff before.md after.md; echo $?` printed exit **0** for two files with different sha256s and a 88-line difference. `/usr/bin/git diff --no-index` correctly reported **89 insertions / 1 deletion**. The brief names this trap (*"never a shell `diff`, which has returned a false 'identical' here"*) and it is now reproduced: **verify a file edit by sha, by line count, or by `git diff --no-index` — never by shell `diff`.**
+> - **`git merge-tree --write-tree --name-only <A> <B>` scopes a conflict without touching a worktree.** It named the ONE conflicting file and, in the same run, showed which files auto-merge — which is how the contended `ui.css` was cleared before a rebase was started rather than discovered mid-rebase.
+> - **A handoff committed BEFORE a rebase is a handoff that lies after it.** This file's own position block was written, committed, and pushed claiming "not rebased", and the rebase made that false within the hour — along with every task sha it named, all orphaned. **Re-read the position block after ANY operation that moves a head** (rebase, amend, cherry-pick) and fix it in the same action, not in the next one.
+> # ▣ CURRENT POSITION — SUPERSEDED. **HISTORY — Task 3 (server + wire: `proj_tickets.rank`, `ListRow.rank`/`TicketCard.rank`), MERGED as #444 at `fb346a9f`; its PR opened and merged while this was the live position. Kept because everything below it is RECORD: the review record, the mutation table and the method notes are Task 3's, not Task 4's.**
 > # `proj_tickets.rank`, `ListRow.rank`/`TicketCard.rank`, the mapper, the replica) IS DONE, REVIEWED AND
 > # COMMITTED. PR OPEN, BASE `main`, AWAITING THE CONTROLLER'S MERGE.** This block is the position;
 > # everything below it is RECORD. **The queue after this task is NOT empty** — Task 4 of
