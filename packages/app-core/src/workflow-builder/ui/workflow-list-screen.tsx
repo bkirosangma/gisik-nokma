@@ -56,8 +56,9 @@ import { ReadOnlyBanner } from './read-only-banner.js';
  *    block declares ten `screen:` values — `board`, `builder`, `legal`,
  *    `mcptokens`, `signin`, `typeeditor`, `types`, `workflows`, `workspace`,
  *    `workspaces` — and **none of them is a workflow history screen**; the only
- *    "history" in the prototype is the ticket sheet's History tab (`:3589`,
- *    `:3734`). The handler `"View history"` is wired to (`:3187`) fires a
+ *    history SURFACE in the prototype is the ticket sheet's History tab (`:3589`,
+ *    `:3734`), the word appearing elsewhere only in legal prose and toasts, which
+ *    are not views. The handler `"View history"` is wired to (`:3187`) fires a
  *    **toast** — `"…has 128 recorded events — history is read-only"` — and
  *    navigates nowhere. So porting it would mean designing a view the prototype
  *    does not draw, which is a product decision rather than a port.
@@ -70,11 +71,25 @@ import { ReadOnlyBanner } from './read-only-banner.js';
  *    own docblock says "the latest published definition per workflow id" and
  *    which loops `getWorkflowDefFromProjection(db, workspaceId, id)` with **no
  *    version selector** — the reader's `ORDER BY version DESC LIMIT 1` branch. So
- *    there is no superseded card for the button to sit on. Nor does any
- *    builder-facing read enumerate versions: `WorkflowAuthoringGateway`
- *    (`../gateway.ts:56-94`) is version-BLIND — neither `listWorkflows` nor
- *    `getWorkflow(workspaceId, workflowId)` takes a version, and no version-list
- *    method exists.
+ *    there is no superseded card for the button to sit on.
+ *
+ *    **The version-aware read, however, DOES exist — end to end — and the first
+ *    draft of this block denied it. Corrected here rather than left standing.**
+ *    `DataSourceQuery.getWorkflowDef(workspaceId, workflowId, version?)`
+ *    (`packages/app-core/src/data-source.ts:146`) takes a version,
+ *    `online-data-source.ts:277-281` sends `?version=`, the replica adapter
+ *    answers one locally, and the server route
+ *    `GET /v1/workspaces/:ws/workflows/:wf?version=N` serves any single version
+ *    (`apps/server/src/routes/builder-reads.ts:517-546`, numeric branch at
+ *    `apps/server/src/projections/workflows.ts:116-120`).
+ *    `WorkflowAuthoringGateway` (`../gateway.ts:56-94`) is version-BLIND — neither
+ *    `listWorkflows` nor `getWorkflow(workspaceId, workflowId)` takes a version —
+ *    but the adapter that implements it DROPS an argument that already exists one
+ *    layer down (`apps/web/src/authoring/data-source-gateway.ts:224`, whose own
+ *    seam docblock names the member as `getWorkflowDef(workspaceId, workflowId,
+ *    v?)` at `:26`). Publishing is contiguous (`base.version + 1`), so versions
+ *    `1..N` are walkable from the `N` the list already returns. **What is missing
+ *    is an exposed parameter, not a read.**
  *
  * **What the measurement does NOT say, recorded because it is the strongest
  * argument the other way.** The chain is not missing from the product. Every
@@ -90,11 +105,16 @@ import { ReadOnlyBanner } from './read-only-banner.js';
  * `workspace_seq` order for everyone including guests"
  * (`apps/server/src/sync/sync-routes.ts:172-198`), so every published version of
  * every workflow is already reachable by a client that asks the replica door.
- * What is missing is a **builder-facing** read — `WorkflowAuthoringGateway`
- * takes no version and lists no versions — plus a gateway method and a designed
- * view. That is why the conditional ruling resolved to "no button": the DATA is
- * already there, the AFFORDANCE is not, and the one thing that is neither is the
- * view itself, which the prototype does not draw.
+ * **THE RESOLUTION, stated plainly so it is not mistaken for a claim about the
+ * wire.** The conditional ruling's DATA half is **SATISFIED**: the chain is
+ * readable, by version, through reads that already ship. The absence therefore
+ * rests entirely on the **AFFORDANCE** half — the prototype draws no history view
+ * (its own handler is a toast), and the card it hangs `"View history"` on is a
+ * SUPERSEDED version's, which this screen does not render. Building the button
+ * means designing the view it opens *and* deciding where the button lives, and
+ * both are product decisions rather than ports. **Raised to the controller as a
+ * ruling rather than taken here**, because inventing a screen is the one thing a
+ * measurement cannot authorise.
  *
  * Both absences are named in the catalogue entry rather than left as empty slots
  * here, and case 13.920 pins both at the RENDERED node — a class-shaped guard
