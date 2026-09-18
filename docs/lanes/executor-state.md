@@ -41,12 +41,18 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~16:1x IST. **SECOND WAVE TASK 8 IS MERGED (#465 → `c2daa5b5`)
-> # AND THE CONTROLLER'S NEXT DISPATCH IS BUILT, REVIEWED, FIXED AND GREEN. ONE THING IS NOT DONE: THE
-> # PR.** The dispatch was `CTL-DISPATCH-2026-09-18-avatar-neo-invisible.md` + its amendment 1 — an
-> # owner bug report, not a plan task. **The queue after this is NOT empty** (second-wave Tasks 9/10,
-> # bulk close, then Task 12 close-out) and those are DISPATCHED BY THE CONTROLLER rather than started by
-> # reflex. **HOLD for that dispatch.** This block is the position; everything below it is RECORD.
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~16:3x IST. **SECOND WAVE TASK 8 IS MERGED (#465 → `c2daa5b5`)
+> # AND THE AVATAR BUG DISPATCH IS BUILT, REVIEWED, FIXED, REBASED AND **OPEN AS PR #469 — MERGEABLE,
+> # AWAITING THE CONTROLLER'S MERGE.** NOTHING IS LEFT FOR THIS LANE TO DO ON IT.** The dispatch was
+> # `CTL-DISPATCH-2026-09-18-avatar-neo-invisible.md` + its amendment 1 — an owner bug report, not a plan
+> # task. **The queue after this is NOT empty** (second-wave Tasks 9/10, bulk close, then Task 12
+> # close-out) and those are DISPATCHED BY THE CONTROLLER rather than started by reflex. **HOLD for that
+> # dispatch.** This block is the position; everything below it is RECORD.
+>
+> | | |
+> |---|---|
+> | PR | **#469**, `--base main`, head **`fe366a57`**, `MERGEABLE` (its `UNSTABLE` check state is the billing-blocked CI shape, not a conflict). Reviewer recorded in the body BEFORE it opened, per the freeze-line rule. |
+> | rebase | `main` moved to `efc23e67` (exec 2's #466) under this branch. **One conflict, in `test-cases/13` — exactly the file amendment 1 named — resolved as a UNION**: 0 ids overlap, three markers removed and nothing else (diff-proof + control), all of exec 2's `13.850`–`13.879` present at the new head. `Features.md` auto-merged on a different line. **`ui.css` and `tokens.test.ts` are blob-identical to the reviewed commit** (`a06c731f`, `0518ca79`), so the review and both mutation proofs carry over untouched. |
 >
 > | | |
 > |---|---|
