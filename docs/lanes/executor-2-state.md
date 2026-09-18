@@ -129,6 +129,15 @@ in both states* from *measured out-of-band in one* — see † above.
 by in-page injection rather than by building and serving this worktree. The `:3021` run in § 3 is the
 author's own evidence for that half, and the review's injection reproduces the same two numbers.
 
+**THE FIX ROUND INTRODUCED ONE OF ITS OWN, and the scoped re-review caught it** — the shape is worth
+recording because it is the one this repo keeps re-finding. Correcting § 1's heading left § 6's anchor row
+still reading `| files | 5 |`: a stale cross-reference whose entire job is to point the reader at § 1, and
+therefore a false sentence in the very round that fixed the count. **A tally the fix moves is not near the
+edit.** Closed on the second pass, and this sentence exists so the next reader knows the round's own
+summary was overstated until it was. The re-review also confirmed the round mechanically: `ui.css`'s blob
+is byte-identical across it (`24f4a625a90cae4e5a43cfefd479d49a60e48f65`) and every changed line in the two
+code-shaped files is inside a block comment (zero non-comment `+`/`-` lines survive the filter).
+
 **Recorded, not fixed — outside this change's scope, with a named owner.** `apps/web/app/sign-in/page.tsx:46`
 cites `apps/server/src/auth/auth.ts:83` for `trustedOrigins`; line 83 is inside a docblock and the
 declaration is at `auth.ts:112`. It resolves to the right **file** and reads plausibly, so it misleads
@@ -143,7 +152,7 @@ author's own § 3 caveat cites `auth.ts:112` and was verified by the review.)
 | cut from | `origin/main` **`ed4c992f`** |
 | base | `main` — the old `owner/workspace-edits` integration branch is RETIRED |
 | frozen head | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit carrying it |
-| files | 5 (see § 1) |
+| files | **5 artefacts + this file** (6 in the diff) — see § 1 |
 | tree | clean after the commit |
 | checks | at the frozen head: `check:env` 0 · `check:tasks` 0 · `check:db-tz` 0 **with `DATABASE_URL`** (2 without it — `DATABASE_URL is required`; it has no fallback) · `check:runbook` 0 · `check:citations` 0 · `check:help` 0 · `check:migrations` 0 · `node scripts/check-case-ids.mjs` 0 (**2381** unique) · `node scripts/check-case-citations.mjs` 0 · `pnpm turbo run build` 0 (11/11) · `@gisik-nokma/ui` test 0 · app-core `test/workflow-builder` **PASS 205 / FAIL 0** · `tsc -p tsconfig.e2e.json` 0 |
 | NOT run | the forced gate — the controller's, by the dispatch's own rule |
