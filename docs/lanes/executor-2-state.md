@@ -22,12 +22,20 @@
 
 ## ▲ TOP BLOCK — settings → workflows, plan Tasks 7 + 8: the zebra + three strings SHIPPED, and the two items the dispatch ordered are HELD against the register (2026-09-18, late night)
 
-**Position: the un-held half is committed, pushed, and at review. The PR is NOT open yet — the reviewer
-records first.** Dispatch `CTL-DISPATCH-2026-09-18-settings-wf-task78.md`. One branch,
-**`exec2/settings-wf-t7-t8`**, **`--base main`**, cut from **`origin/main` = `99884bc9`**.
+**Position: PR #482 IS OPEN, base `main`, awaiting the controller's merge.** Dispatch
+`CTL-DISPATCH-2026-09-18-settings-wf-task78.md`. One branch, **`exec2/settings-wf-t7-t8`**,
+**`--base main`**, cut from **`origin/main` = `99884bc9`**.
 
-**FIRST ACTION ON A RESTART: `gh pr list --state open`.** If this branch has a PR, read its body; if it has
-MERGED, this block is history and the controller's next dispatch is the position.
+**FIRST ACTION ON A RESTART: `gh pr list --state open`.** If #482 is open it is at the controller's merge and
+nothing below needs redoing; **if it has MERGED, this block is history** and the controller's next dispatch
+is the position.
+
+> **HEAD MOVED AFTER THE FREEZE LINE, DISCLOSED.** The handoff commit `8ee52744` was pushed and the PR
+> opened from it; **this correction is a THIRD commit and a NEW HEAD**, not a footnote on the old one. It
+> changes one sentence that was true when written (the PR was not yet open) and would have been **false
+> within minutes** — and a restart surface telling a fresh session to open a PR that already exists is the
+> `restart-surface-goes-stale` failure this repo has already paid for. **The reviewed head `0fd14cd8`, the
+> fix head `1955eae1` and the code content are untouched by it.**
 
 ### ⛔ THE DISPATCH ORDERED TWO ITEMS THE HOLD REGISTER SAYS ARE HELD — NOT BUILT, ESCALATED
 
