@@ -22,8 +22,8 @@
 
 ## ▲ TOP BLOCK — second wave Task 11: List row checkboxes and `Close selected (N)` (2026-09-18)
 
-**Position: the change set is COMPLETE and committed at `8f6dde42`, the reviewer has run over that sha
-and its outcome is recorded below, and the PR is open awaiting the controller's merge.** Dispatch:
+**Position: the change set is COMPLETE, the review round is CLOSED and fully discharged, and the PR is
+open awaiting the controller's merge.** Dispatch:
 `CTL-DISPATCH-2026-09-18-exec2-secondwave-t11.md`. One PR, `--base main`, branch
 **`exec2/secondwave-t11-list-selection`**, cut from `origin/main` = `43885e26` (which is also the `#452`
 merge — Task 10's).
@@ -40,9 +40,10 @@ that says "open" about a merged PR is this lane's most-repeated failure; the che
 |---|---|
 | branch | `exec2/secondwave-t11-list-selection` |
 | base | **`43885e26`** = `origin/main` at cut time = the `#452` merge (Task 10) |
-| change commit | **`8f6dde42`** — the commit the reviewer ran against |
-| frozen head | **verify with `/usr/bin/git rev-parse HEAD`.** A block cannot name the commit carrying it |
-| ahead | recount at the tip; the handoff commit itself is one of them |
+| reviewed head | **`8f6dde42`** — the commit the reviewer actually ran against |
+| frozen head | **`fa7bb609`** as this was written — **verify with `/usr/bin/git rev-parse HEAD`**, because a block cannot name the commit carrying it, and the handoff commit that carries this line is one MORE than whatever is here |
+| ahead | **3** at `fa7bb609`, before the handoff commit; recount, do not quote |
+| three commits, and the split is the review's boundary | `8f6dde42` change · `907327cc` handoff + two docblock corrections (written BEFORE the review returned — it is not part of the reviewed diff) · `fa7bb609` everything the review produced |
 | behind | **recount.** `main` moves without telling you, and this lane merges into it |
 | PR | opens from this branch, `--base main`, reviewer recorded in the body BEFORE it opens |
 
@@ -71,9 +72,11 @@ PARTIAL close too, so an `open` derived from the selection unmounts the dialog i
 dialog's own open flag at once**, `onClosed` reloads UNCONDITIONALLY, and the snapshot is released only on
 a COMPLETE close. **13.794 is the witness; the mutation that reinstates the plan's literal reading
 reddens 13.794 and nothing else.** The same review-found path Task 10 closed is closed here too
-(`setPendingClose((current) => current ?? snapshot)`), with 13.795 as its witness — and 13.795's CONTROL
-half (dismiss, press again, see the CURRENT selection) is what stops "the titles did not change" passing
-on a click that never reached the handler.
+(`setPendingClose((current) => current ?? snapshot)`), with 13.795 as its witness. 13.795's CONTROL half
+(dismiss, press again, see the CURRENT selection) shows the element is LIVE and the selection really did
+change — **it does not show the refused click arrived**, which is the sharper claim an earlier draft made
+and the review corrected: a third click cannot separate the guard from a handler that swallows clicks only
+while `pendingClose !== null`, and no assertion can, because a correctly refused click is a no-op.
 
 ### Case ids — measured, not taken
 
@@ -84,10 +87,46 @@ were free. **Positive control in the same run**: `13.640` resolved as taken, and
 resolved as absent — confirming the controller's correction of its own earlier claim. **The next free id
 in this lane's block is `13.796`.**
 
+### ★ THE REVIEW ROUND — no Critical, no behaviour defect, five overclaims and a citation drift
+
+One reviewer over `8f6dde42`. It tried to break the load-bearing claim — that the selection and the
+dialog cannot disagree — across four named scenarios (a partial whose `closedIds.length` equals the
+snapshot's; a second confirm that could flip the equality; a swap with no `open` transition; a stale
+snapshot reaching the batch) and could not, and it re-derived the release condition from the dialog's own
+partition of `pending` rather than taking this change set's word for it. What it found instead is this
+repo's most-recorded defect class: **prose claiming more than anything witnesses.** All five are fixed in
+`fa7bb609` and each is recorded there with the measurement that established it.
+
+1. **The clearing wrapper's caller claim** (the source was already corrected in `907327cc`, written before
+   the review returned; **`Features.md` was not** — it repeated it, and is now corrected). One caller, not
+   "the page's own reload sites".
+2. **Seven `page.tsx` citations off by exactly ten lines** — shifted by `907327cc`'s docblock fix, and
+   invisible to `check:case-citations`, which enforces only that a case id is NAMED under a test
+   directory and never a `path:line`. Re-measured and read back, all sixteen, including the bare `:NNN`
+   forms. **A read-back that matches only the full `path:line` shape skips half the set silently — this
+   round's own first read-back did exactly that.**
+3. A false line distance in `ui.css` ("two hundred lines below" — nearer twenty), re-cited by selector.
+4. A quotation attributed to `BulkCloseDialog`'s docblock that is the PLAN's wording.
+5. **"The plan's own text produces [the unmount]"** — corrected in the source docblock, the catalogue and
+   `Features.md`. The plan names neither a snapshot nor an `open` expression: it does not produce the
+   unmount, it fails to forbid it. Both literal readings fall short of §8.3, which is the honest form.
+6. 13.795's control half proves the click is LIVE, not that the refused click ARRIVED — corrected in the
+   test docblock and the catalogue.
+7. "The label keeps the FULL selection count" — the count is over VISIBLE rows; corrected.
+
+**Verification at `fa7bb609`:** app-core **1536/0** · ui **325/0** · web **475/0**; the whole workspace's
+**22 build+typecheck tasks 0**; **seven checks raw 0** (`check:db-tz` with the documented
+`postgres://gisik:gisik@localhost:54329/gisik_nokma` prints `database timezone: Asia/Kolkata`). **The
+forced gate was NOT run** — the controller runs it.
+
 ### What a restart must NOT redo
 
 - The plan's Task 11 text is **not** to be implemented literally — see the correction above. If a
   dispatch ever quotes it again, the correction wins.
+- **Do not re-litigate the review round's five findings.** Each is fixed at `fa7bb609` with the
+  measurement that established it, and three of them exist because a first draft stated a property more
+  strongly than the case beside it witnesses. A future edit that restores the stronger wording restores
+  the defect.
 - `packages/app-core/test/views/ticket-list-css-binding.test.tsx` (13.671) is a bidirectional
   class↔CSS equality. It REDDENED when this task's two classes were added and was extended, which is
   the check working as designed: a new class in either package must be reflected in that fixture.
