@@ -189,6 +189,65 @@ export type TicketListProps = {
   rowDrag?: {
     onReorder: (movedTicketId: string, beforeTicketId: string | null) => void;
   };
+  /**
+   * Row selection (second wave Task 11, spec §8.3's List bullet).
+   *
+   * OPTIONAL, and absence is the entire pre-Task-11 behaviour: no checkbox
+   * column, no extra cell, no extra header — the same rule `rowAction` above
+   * follows, and 13.647's control arm is what measures it.
+   *
+   * **A CONTROLLED pair, deliberately.** `selected` is the truth and
+   * `onToggle` reports the gesture upward, which is the shape `prefs`/
+   * `onPrefsChange` and `rowDrag.onReorder` already use. The component must
+   * not own the checked set, because three things about a selection are the
+   * CALLER's to decide and none of them is visible from in here:
+   *
+   * - **what makes a selection closeable** — spec §8.3's "enabled only when
+   *   every selected row is terminal and not closed" is a fact about each
+   *   row's `stateCategory` and `closed`, which the caller holds;
+   * - **when the selection stops being true** — a reload re-answers the list,
+   *   and the ids picked from the old answer are the caller's to clear;
+   * - **what a bulk surface does with the tickets** — the caller snapshots
+   *   them for `BulkCloseDialog` (`apps/web`'s project page), which is the
+   *   one thing that keeps a PARTIAL close readable (see that arm's docblock).
+   *
+   * A component-owned set would be a second source of truth beside all three,
+   * and 13.647 asserts the controlled property directly: a click reports the
+   * id and the box does not move, because `selected` did not.
+   *
+   * The checkbox is a leading `<td>`, added to `columns` the same way
+   * `rowAction`'s trailing one is, so `Table`'s one-`<th>`-per-column rule
+   * holds in `<thead>` and in every `<tbody>` row alike.
+   *
+   * **The accessible name is `Select <title>`, so it collides the same way
+   * `rowAction`'s does** — a row assigned to `currentUserId` renders twice
+   * (pinned and sectioned; this component's own invariant 1), and the pin's
+   * checkbox carries the identical name. A caller whose rows can be assigned
+   * to the viewer must key its own query on the row, not on the name.
+   */
+  selection?: { selected: ReadonlySet<string>; onToggle: (ticketId: string) => void };
+  /**
+   * A slot for the caller's own control, rendered in `.gn-list__controls`
+   * immediately AFTER the summary sentence (and after its narrowing note).
+   *
+   * OPTIONAL, and absence renders nothing at all. Task 11's `Close selected
+   * (N)` is the first consumer; the slot exists rather than a `bulkClose` prop
+   * because what the action SAYS and when it is enabled are the caller's
+   * (see `selection` above), and a component that took the tickets and a
+   * callback would be re-deriving a decision it cannot see.
+   *
+   * Placed AFTER the summary sentence — and that ordering is the whole of what
+   * is pinned: 13.647 asserts the control follows `list-summary`, and a
+   * mutation that hoists the slot above it reddens that case and nothing else.
+   * Its position among the arrangement controls that follow (grouping,
+   * columns, origin) is deliberately NOT pinned, because nothing decides it —
+   * spec §8.3 says only "in the list's control row", and a test that froze the
+   * exact index would be measuring a choice the spec left open. Measured, not
+   * assumed: moving the slot to the END of the row leaves all 71 cases in
+   * `ticket-list.test.tsx` green, which is the honest characterisation of that
+   * freedom rather than a gap.
+   */
+  controls?: ReactNode;
 };
 
 /**
@@ -231,6 +290,8 @@ export function TicketList({
   rowAction,
   emptyCopy,
   rowDrag,
+  selection,
+  controls,
 }: TicketListProps) {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   /*
@@ -415,6 +476,10 @@ export function TicketList({
             narrowed to {narrowing} — not the whole project
           </span>
         )}
+        {/* The caller's own control (Task 11) — see `controls`' own docblock for
+            why it sits after the summary sentence and before the arrangement
+            controls, and why its absence renders nothing at all. */}
+        {controls ?? null}
         <div className="gn-list__control">
           <span>Group by</span>
           <Select
@@ -550,6 +615,7 @@ export function TicketList({
             onToggleCollapse={toggleCollapse}
             onOpenTicket={onOpenTicket}
             rowAction={rowAction}
+            selection={selection}
             {...(dragRowProps === undefined ? {} : { rowProps: dragRowProps })}
           />
         </section>
@@ -605,6 +671,7 @@ export function TicketList({
               onToggleCollapse={toggleCollapse}
               onOpenTicket={onOpenTicket}
               rowAction={rowAction}
+              selection={selection}
               {...(dragRowProps === undefined ? {} : { rowProps: dragRowProps })}
             />
           </section>
@@ -739,6 +806,7 @@ function ListTable({
   onOpenTicket,
   rowAction,
   rowProps,
+  selection,
 }: {
   nodes: ListRowNode[];
   columns: ListColumnId[];
@@ -748,8 +816,47 @@ function ListTable({
   rowAction?: (row: ListRow) => ReactNode;
   /** Second wave Task 4 — see `TicketListProps.rowDrag`. Absent on every surface that does not reorder. */
   rowProps?: (node: ListRowNode) => HTMLAttributes<HTMLTableRowElement>;
+  /** Second wave Task 11 — see `TicketListProps.selection`. Absent on every surface that does not select. */
+  selection?: { selected: ReadonlySet<string>; onToggle: (ticketId: string) => void };
 }) {
   const tableColumns: TableColumn<ListRowNode>[] = [
+    // Second wave Task 11 (spec §8.3, the List bullet) — the LEADING checkbox
+    // column, present only when a caller supplies `selection`.
+    //
+    // A controlled `<input type="checkbox">` rather than a drawn box, for the
+    // same three reasons this file's column-tray checkboxes give: a real
+    // checked state, a real keyboard contract, and an accessible name a query
+    // can resolve. `checked` reads the caller's `selected` and `onChange`
+    // reports — the box never moves on its own, which is what makes the
+    // caller's clearing observable (13.647 asserts exactly that).
+    //
+    // The header cell is EMPTY (`header: ''`) rather than the column being
+    // omitted from the header row: `Table` renders one `<th>` per entry, so a
+    // mismatch here would be the `<thead>`/`<tbody>` width bug this file's own
+    // `rowAction` note warns about, not a tidy-up.
+    //
+    // The `id` is `select` and not a `ListColumnId`: it is not a user-chosen
+    // column, cannot be toggled in the tray, and is never persisted — it is a
+    // control column, threaded like `rowAction`'s and belonging to no
+    // preference.
+    ...(selection === undefined
+      ? []
+      : [
+          {
+            id: 'select',
+            header: '',
+            headerClassName: 'gn-list__table-header',
+            cellClassName: 'gn-list__select',
+            cell: (node: ListRowNode) => (
+              <input
+                type="checkbox"
+                aria-label={`Select ${node.row.title}`}
+                checked={selection.selected.has(node.row.ticketId)}
+                onChange={() => selection.onToggle(node.row.ticketId)}
+              />
+            ),
+          },
+        ]),
     {
       id: 'title',
       header: 'Title',

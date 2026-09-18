@@ -9560,3 +9560,113 @@ verified by sha256 (not `git checkout`), each guarded by a replacement count of 
 4. **The swap guard removed** (`openBulkClose` writes unconditionally, so a second column overwrites an
    open dialog) → reddens **13.793 and nothing else**. This one exists because an independent review found
    the reachable path; the mutation confirms the guard, not the prose, is what holds the invariant.
+
+## List row checkboxes and `Close selected (N)` (executor 2, 2026-09-18) — ids `13.647`–`13.649`, plus `13.794`–`13.795`
+
+**Second-wave Task 11.** The plan's own step text names `13.647`–`13.649`, from its `13.613`–`13.649`
+reservation. **Measured before minting, not taken from the dispatch**: this file's highest case MARKER at
+that tip was `13.793`, and `13.647`/`13.648`/`13.649` were free — so they are used as the plan wrote them,
+which is also what Task 9 did with the plan's `13.640`–`13.643`. (The dispatch's warning that they might
+not be free was itself a correction of an earlier wrong claim about `13.644`–`13.646`; that measurement
+stands — those three ids appear nowhere in this repo except the plan file. `13.644`–`13.646` remain free
+and are recorded as such rather than re-used.)
+
+The review round's own cases come from this executor's block `13.760`–`13.819`, continuing it at `13.794`.
+The block exists because two executors mint ids concurrently and a *number* handed to a peer is a reading
+that expires; a block is the only form that stays true.
+
+- ✅ **13.647 — `TicketList`'s `selection` and `controls` slots, and the checkbox column's width.** With
+  `selection`, every row carries a leading checkbox whose accessible name is `Select <title>` and whose
+  checked state follows the caller's `selected`; toggling reports the id through `onToggle` and the box
+  does **not** move, because `selection` is a CONTROLLED pair and the caller owns the set. The cell really
+  is LEADING (the checkbox is the row's first `<td>`), and `<thead>`'s cell count equals every `<tbody>`
+  row's — the column-count invariant that a spread-added column can break on one side only. Without
+  `selection` no checkbox renders anywhere AND the table is a column narrower, so the negative is not
+  passing because some other prop suppressed it. `controls` renders inside `.gn-list__controls` and AFTER
+  the summary sentence — compared with `compareDocumentPosition` MASKED to `DOCUMENT_POSITION_FOLLOWING`
+  and checked against that constant, never against truthiness, since `PRECEDING` is also non-zero and the
+  sloppy form of this assertion is green in both directions — and absent, renders nothing.
+  **Citations:** `packages/app-core/src/views/ticket-list.tsx:228` (the `selection` prop), `:250`
+  (`controls`), `:482` (the slot's render), `:846` (the leading column),
+  `packages/app-core/test/views/ticket-list.test.tsx:1080`
+
+- ✅ **13.648 — `Close selected (N)`: the gate, the batch, and the clear.** Spec §8.3's own sentence —
+  *"enabled only when every selected row is terminal and not closed — the cross-column case"* — with BOTH
+  terms asserted against their own negative: a `Doing` row is terminal's, a closed `Done` row is
+  `closed === null`'s, and the case returns to enabled afterwards so neither negative is passing because
+  the control latched off. The label keeps the FULL selection count while disabled. Confirming ingests
+  **ONE `ingest` call carrying TWO `ticket.closed` envelopes** in list order with the real actor — a loop
+  of two single-event calls would satisfy "one event per ticket" and turn one atomic door into two — and
+  `onClosed`'s reload follows, the selection is empty afterwards, and the dialog has left (a COMPLETE
+  close, which is the half 13.794 shows the other side of). The read is call-count-driven, so "the list
+  reloaded" is falsifiable rather than satisfied by a fixed answer.
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:652` (the selection),
+  `:655` (the gate), `apps/web/test/list-bulk-close.test.tsx:166`
+
+- ✅ **13.649 — a signed-out viewer is offered neither the checkboxes nor the control.** Its first
+  assertion is the positive control, and it is the reason the case means anything: the List's rows ARE on
+  screen, so the two absences are the session gate working and not a blank page. `currentUserId` is `''`
+  before the session resolves and while signed out, and a `ticket.closed` built from an empty actor is
+  refused by `checkRolePermission` for a reason (`env.actorId !== ctx.sessionUserId`) that names the
+  person's permissions rather than the truth — case 3.144's defect, one surface over.
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2127` (the signed-in gate),
+  `apps/web/test/list-bulk-close.test.tsx:283`
+
+- ✅ **13.794 — a PARTIAL close reloads the list and KEEPS the dialog, with the refusal listed.** **This
+  is the case the plan's own text gets wrong, and the correction is the whole reason the List's state is
+  two pieces rather than one.** §8.3's Board bullet is one sentence carrying both halves — *"Per-ticket
+  refusals … stay listed; the rest close and the board reloads"* — and the List bullet inherits it through
+  "same dialog, same batch". The plan wires `onClosed` → `list.reload()` with the selection cleared on
+  reload; `onClosed` fires on a partial too, so an `open` derived from the selection would unmount the
+  dialog in the same tick its `Could not close` rows were written and the person would never read the
+  reason their ticket was refused. The fix: the tickets are **snapshotted at click time** and the dialog
+  keeps its **own open flag** (they are `pendingClose`, one piece of state serving both), while `onClosed`
+  reloads UNCONDITIONALLY and releases the snapshot only on a complete close. The case drives a two-ticket
+  selection where the second is refused and asserts the refusal listed verbatim, the committed ticket no
+  longer pending, the reads incremented — "the rest close and the list reloads", on this outcome too — the
+  dialog still mounted, and the selection cleared by the reload. **That last assertion is what makes the
+  survival above a fact about the dialog's own flag rather than about the selection never having moved.**
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:653` (the snapshot and the flag),
+  `:2256` (the conditional release), `apps/web/test/list-bulk-close.test.tsx:324`
+
+- ✅ **13.795 — an OPEN dialog's tickets cannot be swapped under it.** `BulkCloseDialog` states its own
+  precondition: a parent swapping `tickets` while the dialog stays OPEN is *not covered by its reset*,
+  because the reset is an effect keyed on `open`. `open` is `pendingClose !== null`, so a second selection
+  written into a non-null snapshot is a swap with no transition, and the previous opening's
+  `closedIds`/`failures` survive against a list they do not describe — the concrete failure being a FULL
+  success that does not clear, with a `Could not close` row naming the other selection's ticket and no
+  confirm left to press. The opener refuses the swap. **This is Task 10's case 13.793 one surface over —
+  the same guard on the same shared component, found there by an independent review and applied here
+  before a review had to find it twice.** The reachability is a KEYBOARD path in a browser (`Dialog` ships
+  no focus trap and no portal — recorded as a named follow-on on the SHARED component and now named twice,
+  from two surfaces, rather than repaired from either); jsdom does not hit-test the scrim, so an ordinary
+  click drives exactly the state transition an escaped focus produces. **The CONTROL is inside the case
+  and is half of it:** after dismissing, the same click on the same control opens a fresh dialog carrying
+  the CURRENT selection — so "the titles did not change" cannot pass on a click that never reached the
+  handler.
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2165` (the guard),
+  `:2246` (the one dialog mount), `apps/web/test/list-bulk-close.test.tsx:414`
+
+**Mutations, each restored from a byte copy verified by sha256 (not `git checkout`, which errors on an
+untracked path), each guarded by a replacement count of exactly 1.**
+
+1. **The plan's own — the `closed === null` term dropped from the gate** → reddens **13.648's gate `it`
+   and nothing else**, which is the kill the plan predicted for this task.
+2. **The clear made UNCONDITIONAL** (`setPendingClose(null)`), which is what the plan's text plus the task
+   dispatch produce read literally → reddens **13.794 and nothing else**. This is the control for the
+   correction above and it proves the conditional is load-bearing rather than decorative.
+3. **The SNAPSHOT removed** (`tickets` tracking the live selection instead) → reddens **13.794 and
+   13.795**. Two sites, because two properties depend on the same piece of state — the partial's report
+   and the open dialog's immunity to a swap.
+4. **The swap guard removed** → reddens **13.795 and nothing else**.
+5. **The checkbox column no longer gated on `selection`** → reddens **13.647's control arm** plus four
+   pre-existing cases that assert exact table shape (3.51, 3.52 ×3). A structural mutation reddening
+   structural neighbours is the expected shape here, and the case this task added is among the killed.
+6. **`controls` hoisted ABOVE the summary** → reddens **13.647's `controls` `it` and nothing else**, which
+   is what pins the ordering the docblock claims.
+7. **`controls` moved to the END of the controls row** → **SURVIVED, all 71 green.** Recorded rather than
+   quietly dropped, because it changes the source and the rendered output while changing nothing the case
+   asserts: the slot is still after the summary. The property 13.647 pins is therefore exactly "after the
+   summary sentence", and the component's docblock was corrected to say that and to record the survival —
+   spec §8.3 says only "in the list's control row", so the position among the arrangement controls is a
+   freedom this task deliberately does not freeze.

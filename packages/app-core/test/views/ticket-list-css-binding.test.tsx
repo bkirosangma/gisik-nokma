@@ -171,6 +171,16 @@ const ALL_COLUMNS: ListColumnId[] = ['status', 'assignee', 'dueDate', 'progress'
  *   RIGHT to redden. That is not a hypothetical: this file reddened exactly
  *   that way when the three classes were first added, which is the check
  *   working as designed rather than an inconvenience of it.
+ * - `__select` (second wave Task 11) — the row-checkbox cell, drawn only when a
+ *   caller supplies `selection`. The FIFTH render passes one.
+ * - `__bulk-close` is the ONE class in this union that `TicketList` does not
+ *   render itself: it is the class on the control a caller puts in the
+ *   `controls` slot, and that slot is the whole reason it exists (`apps/web`'s
+ *   List arm is its only consumer today). The fifth render reproduces that node,
+ *   because the alternative — leaving it out — would redden the CSS-side case
+ *   below for a class that IS rendered in the product, one package up. Named
+ *   here rather than silently satisfied, since a reader of the union deserves to
+ *   know which of its members the component is not the author of.
  */
 const ROWS: ListRow[] = [
   listRowSeed({ ticketId: 'epicA', title: 'Registrations', typeId: 'epic', typeRank: 1 }),
@@ -261,6 +271,18 @@ function renderEverything(): HTMLElement {
     listOf({ prefs: chose('status') }),
     listOf({}),
     listOf({ rows: [], narrowing: 'stateCategories: active', emptyCopy: 'Nothing here.' }),
+    // The fifth render (second wave Task 11) — the only one that draws the
+    // checkbox cell, and the only one that reproduces the caller's own control
+    // in the `controls` slot. See the fixture docblock for why `__bulk-close` is
+    // a member of this union that the component does not author.
+    listOf({
+      selection: { selected: new Set<string>(), onToggle: vi.fn() },
+      controls: (
+        <button type="button" className="gn-list__bulk-close">
+          Close selected (0)
+        </button>
+      ),
+    }),
   ]) {
     host.append(render(element).container);
   }

@@ -12,6 +12,7 @@ import {
 import {
   AttentionStrip,
   Board,
+  BulkCloseDialog,
   CalendarView,
   CreateTicketFlow,
   TicketList,
@@ -26,6 +27,7 @@ import {
   useTicketList,
   type Actor,
   type BoardFilterSpec,
+  type BulkCloseTicket,
   type FilterSpec,
   type GroupLabels,
   type ListFilterSpec,
@@ -590,6 +592,75 @@ function ProjectBoard() {
   }, [list.rows, listNarrowing, listFilterSpec, filter.closed, showClosedOnDates, projectId]);
 
   const listUnappliedAxes = useMemo(() => describeUnappliedListAxes(filter), [filter.collaboratorIds, filter.exclude]);
+
+  /**
+   * THE LIST'S ROW SELECTION, AND THE ONE BULK-CLOSE OPENING IT CAN HAVE
+   * (second wave Task 11, spec §8.3's List bullet).
+   *
+   * ## The two pieces of state are deliberately SEPARATE, and that is the fix
+   *
+   * `selectedIds` is the person's live selection. `pendingClose` is the
+   * SNAPSHOT of the tickets one opening of `BulkCloseDialog` is about, and it
+   * is `null` exactly when no dialog is up.
+   *
+   * **The obvious design — `open` derived from the selection — is the one the
+   * plan's own text produces, and it deletes half of §8.3.** The plan wires
+   * `onClosed` → `list.reload()` with the selection cleared on reload. §8.3's
+   * Board bullet is one sentence carrying both halves — *"Per-ticket refusals …
+   * stay listed; the rest close and the board reloads"* — and the List bullet
+   * says "same dialog, same batch". `onClosed` fires on a PARTIAL close too
+   * (the dialog calls it whenever at least one ticket committed), so a clear
+   * on reload unmounts the dialog in the same tick the `Could not close` rows
+   * are written, and the person never reads the reason their ticket was
+   * refused. Task 10's arm carries the same correction, with 13.792 as its
+   * witness; this is that correction applied to its second consumer, and
+   * 13.794 is the witness here.
+   *
+   * So: **the tickets are snapshotted at CLICK time** (the reload cannot change
+   * what an open report is a report about — the dialog's own docblock states
+   * this precondition) and **the dialog keeps its OWN open flag** (clearing the
+   * selection cannot unmount it). `onClosed` reloads UNCONDITIONALLY — "the
+   * rest close and the list reloads" holds on both outcomes — and the snapshot
+   * is released only on a COMPLETE close, which is the one outcome with nothing
+   * left to read.
+   *
+   * ## Why the selection is cleared by the RELOAD, and only by this one
+   *
+   * A selection is a claim about a list, and it stops being true when the list
+   * is re-asked. The clear lives in `reloadListClearingSelection` — the wrapper
+   * this page's own reload sites call — and not on `list.rows`' identity, for
+   * the reason `rankOverrides` above gives in the other direction: a background
+   * stream refetch also changes what `list.rows` holds, and clearing there
+   * would wipe a selection out from under someone who never asked for a read.
+   * Keyed on the CALL, a re-ask this client makes is what resets the claim.
+   *
+   * The wrapper is not used by the dialog's `onClose`: dismissing an opening
+   * changes nothing about the list, and a Cancel that also threw the selection
+   * away would be the surface tidying up after the person.
+   *
+   * ## What the control is enabled on
+   *
+   * §8.3: *"enabled only when every selected row is terminal and not closed —
+   * the cross-column case."* Both terms are read off the rows this list is
+   * SHOWING, not off a stored copy of them, so a row a peer moved or closed
+   * mid-selection disables the control on the next render rather than being
+   * closed on the strength of a stale reading. The label keeps the FULL
+   * selection count while disabled; the disabled state is what says "not
+   * these", and a number that shrank as rows were added would answer "how many
+   * will close" with a count nobody can check against the boxes they ticked.
+   */
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [pendingClose, setPendingClose] = useState<BulkCloseTicket[] | null>(null);
+  const listSelectedRows = (listNarrowing?.rows ?? []).filter((row) => selectedIds.has(row.ticketId));
+  const canBulkClose =
+    listSelectedRows.length > 0 &&
+    listSelectedRows.every((row) => row.stateCategory === 'terminal' && row.closed === null);
+
+  /** The page's own reload of the list, with the selection's claim on it retired — see the docblock above. */
+  const reloadListClearingSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    list.reload();
+  }, [list.reload]);
 
   /**
    * THE BACKLOG NARROWING (Task 10, backlog/closed spec §5.4) — the Backlog
@@ -2038,6 +2109,72 @@ function ProjectBoard() {
                 prefsEditable={list.canSetPrefs}
                 labels={labels}
                 onOpenTicket={openTicket}
+                /*
+                  THE BULK-CLOSE CAPABILITY (second wave Task 11, spec §8.3),
+                  gated on `session.kind === 'signed-in'` — the same precedent
+                  the board's `moves`, the Backlog tab's `rowAction` and
+                  `rowDrag` all set (`currentUserId`'s own declaration, above):
+                  a `ticket.closed` built from an empty `actorId` reaches
+                  `POST /v1/events` and is refused by `checkRolePermission`
+                  (`env.actorId !== ctx.sessionUserId`) — case 3.144's defect,
+                  which tells the person about their permissions when the truth
+                  is that this browser never said who they were. Omitted
+                  entirely rather than passed inert, so a signed-out viewer gets
+                  no checkbox column at all (13.649).
+                */
+                {...(session.kind === 'signed-in'
+                  ? {
+                      selection: {
+                        selected: selectedIds,
+                        onToggle: (ticketId: string) =>
+                          setSelectedIds((current) => {
+                            const next = new Set(current);
+                            if (next.has(ticketId)) next.delete(ticketId);
+                            else next.add(ticketId);
+                            return next;
+                          }),
+                      },
+                      controls: (
+                        <button
+                          type="button"
+                          className="gn-list__bulk-close"
+                          disabled={!canBulkClose}
+                          /*
+                            THE SNAPSHOT, and the guard, in one write. `current
+                            ?? …` is 13.795's refusal: `BulkCloseDialog`'s reset
+                            is an effect keyed on `open`, so writing a second
+                            selection into a non-null `pendingClose` swaps the
+                            dialog's `tickets` with no transition, and the
+                            previous opening's `closedIds`/`failures` survive
+                            against a list they do not describe. The reachable
+                            path is a keyboard one (`Dialog` ships no focus trap
+                            or portal — recorded as a named follow-on on the
+                            shared component, not repaired from here); jsdom
+                            does not hit-test the scrim, so the case drives it
+                            with an ordinary click.
+
+                            `.map` over the ROWS, not over the set: the order is
+                            the list's own, which is the order the dialog lists
+                            the titles in, and the batch is built in that order —
+                            the core's Ruling 37 shape, where position i of the
+                            answer describes position i of the request.
+                          */
+                          onClick={() =>
+                            setPendingClose(
+                              (current) =>
+                                current ??
+                                listSelectedRows.map((row) => ({
+                                  ticketId: row.ticketId,
+                                  title: row.title,
+                                })),
+                            )
+                          }
+                        >
+                          {`Close selected (${listSelectedRows.length})`}
+                        </button>
+                      ),
+                    }
+                  : {})}
               />
             ) : (
               <p>Loading…</p>
@@ -2085,6 +2222,40 @@ function ProjectBoard() {
         boardStateOptions={boardStateOptions}
         boardLoaded={board.data !== null}
         boardError={board.error}
+      />
+
+      {/*
+        THE LIST'S BULK CLOSE (second wave Task 11, spec §8.3). One dialog, the
+        same one the Board's `Close all (N)` mounts (`BulkCloseDialog`'s own
+        docblock: "one dialog, two surfaces, one batch"), and it lives HERE
+        rather than inside `TicketList` for the reason the whole arm's state
+        does: the snapshot must outlive a reload of the list, and a dialog owned
+        by the component whose rows are being reloaded could not.
+
+        `open` is `pendingClose !== null` and `tickets` is that same snapshot,
+        which is what makes the partial outcome readable: the reload clears the
+        SELECTION without touching either.
+
+        `onClosed` reloads unconditionally and releases the snapshot only on a
+        COMPLETE close. `closedIds.length === current.length` compares against
+        `current` — the snapshot as it stands — rather than against a captured
+        `pendingClose`, because the updater form is the one reading React has
+        not already closed over: a stale `pendingClose` here would release a
+        dialog the person is still reading.
+      */}
+      <BulkCloseDialog
+        open={pendingClose !== null}
+        tickets={pendingClose ?? []}
+        dataSource={dataSource}
+        workspaceId={workspaceId}
+        currentUserId={currentUserId}
+        onClose={() => setPendingClose(null)}
+        onClosed={(closedIds) => {
+          reloadListClearingSelection();
+          setPendingClose((current) =>
+            current !== null && closedIds.length === current.length ? null : current,
+          );
+        }}
       />
     </main>
   );
