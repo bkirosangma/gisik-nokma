@@ -691,6 +691,8 @@ describe('REFUSAL_RULES', () => {
       notClosed: 'not-closed',
       closedTicket: 'closed-ticket',
       rankRequiresBacklog: 'rank-requires-backlog',
+      lastOwner: 'last-owner',
+      grantOwnerRequiresOwner: 'grant-owner-requires-owner',
     });
   });
 

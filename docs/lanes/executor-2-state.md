@@ -20,7 +20,215 @@
 
 ---
 
-## ▲ TOP BLOCK — second wave Task 11: List row checkboxes and `Close selected (N)` (2026-09-18)
+## ▲ TOP BLOCK — membership Task 1: the last-owner guard, in both layers (2026-09-18)
+
+**Position: the change set is COMPLETE, the review round is CLOSED and fully discharged, and the PR is
+opening against `main` with the reviewer recorded in its body.** Dispatch:
+`CTL-DISPATCH-2026-09-18-exec2-membership-t1.md`. Plan of record:
+`docs/superpowers/plans/2026-09-18-membership-role-guard.md` (Task 1). One PR, `--base main`, branch
+**`exec2/membership-t1-last-owner`**.
+
+**CHECK `gh pr list --state open` BEFORE ACTING ON THE POSITION LINE ABOVE.** The Task 11 block this one
+replaced said "the PR is open awaiting the controller's merge" and PR **#454 had already merged** at
+`06b0e29d`. That is the third consecutive block in this file to be stale in the conservative direction —
+the direction nobody audits. One command settles it.
+
+### Anchors — verify these; do not trust the row
+
+| | |
+|---|---|
+| branch | `exec2/membership-t1-last-owner` |
+| base | **`61a105dd`** = `origin/main` = the `#456` merge (the controller's plan fix) |
+| reviewed head | **`a6877594`** — the commit the reviewer ran against |
+| frozen head | **verify with `/usr/bin/git rev-parse HEAD`.** A block cannot name the commit carrying it. At the last count it was **`763b762f`** after the rebase onto `61a105dd`, and the handoff commit carrying this line is one MORE than whatever is here |
+| ahead / behind | **5 / 0** at `763b762f`, before the handoff commit — **recount, do not quote** |
+| the two rebases | `a6877594` → `a5a824c3` (onto `b71bc0d3`, resolving ONE conflict in `test-cases/13` where Task 6 appended a section) → `763b762f` (onto `61a105dd`, clean) |
+| **what moved under the review** | **`/usr/bin/git diff a6877594 HEAD -- <the six reviewed code files>` touches ONLY `membership.ts`, and every changed line is a ` * ` comment** — 29 insertions / 3 deletions, verified line by line. No executable line moved, so the reviewed logic is intact; the review round's other edits are prose and tests |
+| PR | opens from this branch, `--base main`, reviewer recorded in the body BEFORE it opens |
+
+### What shipped
+
+`packages/rule-engine/src/checks/membership.ts` (NEW — `checkMembershipGranted`, `checkMembershipRevoked`,
+`ownersOrThrow`, `isCurrentlyOwner`) · `packages/rule-engine/src/engine.ts` (the OPTIONAL
+`countWorkspaceOwners`) · `packages/rule-engine/src/refusal-rules.ts` (two ids) ·
+`packages/rule-engine/src/evaluate.ts` (two dispatch arms — **these two types passed through untouched
+until now, which is exactly what let the hole live**) · `packages/rule-engine/src/checks/context-helpers.ts`
+(a `getMembershipState` narrowing helper, mirroring `getTicketState`) ·
+`apps/server/src/engine-context.ts` (the `SELECT` over `proj_memberships`) ·
+`apps/server/src/permissions/check-permission.ts` (the actor half) · tests
+`packages/rule-engine/test/membership.test.ts` (NEW, 16), `packages/rule-engine/test/engine.test.ts`
+(the exhaustive `REFUSAL_RULES` equality gained two rows — it REDDENED when the ids were added, which is
+that check working as designed), `apps/server/test/permissions/check-role-permission.test.ts` (4 pure +
+2 real-door) · `Features.md` (two bullets) · `test-cases/13`.
+**`task-ledger.tsv` untouched** — the rows exist (`membership-role-guard` 1 and 2, both `todo`) and the
+controller flips them.
+
+### ★ FOUR PLAN-TEXT DEFECTS — measured, not assumed; do not re-litigate them
+
+1. **The plan's Step 1 test code cannot pass.** It uses `userId: 'u1'`, and `membershipGrantedPayload`'s
+   `userId` is `ulidString`. **Measured**: `membershipGrantedPayload.safeParse({userId:'u1',...})` fails
+   with `userId: must be a ULID`. A test transcribed faithfully would be red **for a reason unrelated to
+   this guard**, and the tempting repair — loosen the assertion — deletes the witness. Real ULIDs
+   throughout; case 13.822 pins the `'u1'` shape as a `malformed-payload` so it cannot return.
+2. **The plan's Step 5 code block omits the `env.entity.kind` guard its own prose requires** ("type guard,
+   **kind guard**, `safeParse`…"). `evaluate.ts`'s docblock makes it mandatory — the fixture suite and the
+   offline replica enter through `evaluateEvent` and never pass through ingest's door. Added, and
+   mutation-proven (removing it reddens exactly the misfiled-kind case).
+3. **The plan's Step 3 declares `REFUSAL_RULES.grantOwnerRequiresOwner` under "Produces" while its Step 7
+   emits the generic `permission.role`.** The two cannot both hold. **The id is emitted** via `refuseWith`,
+   because a rule name nothing emits is a matching key that can never match and **all twenty ids already in
+   `REFUSAL_RULES` are emitted somewhere (measured 20/20)**, so a twenty-first with no emitter would be the
+   catalogue's only dead entry. Filed as `EXEC2-RULING-2026-09-18-grant-owner-rule-id.md` with **both
+   readings priced**; **RULED 2026-09-18 by the controller: carry on with `refuseWith` and the new id.**
+   **CLOSED — do not reopen. The controller then FIXED THE PLAN rather than leaving the conflict
+   standing**: Step 7 now reads `refuseWith(REFUSAL_RULES.grantOwnerRequiresOwner, …)` (PR #456,
+   `fff365bd`), so **the plan and this code agree** — a sentence in the first draft of the handoff saying
+   they still disagreed was true only until that commit.
+4. **The plan's Step 7 line `return refuse(WORKSPACE_OWNER_GRANT_REASON)` is correct only against
+   `check-permission.ts`'s LOCAL one-argument `refuse`** (`:213`, which injects `PERMISSION_ROLE_RULE`),
+   not the rule-engine's two-argument one. A first cut of this work used the two-arg form, which would not
+   compile. Recorded because the plan's line looks wrong and is not.
+
+### ★ THE REVIEW ROUND — no Critical, the escalation closed, and TWO of my own records measured FALSE
+
+One reviewer over `a6877594`. **It could not perform the escalation**, and it independently confirmed the
+count's agreement with `resolveEffectiveRole`, `excludingUserId` at both call sites, and that no case stays
+green under the mutation it claims to pin. What it found is mostly **my prose claiming more than the runs
+witnessed** — this repo's signature defect — plus one real consequence of the throw.
+
+1. **[Important] The throw is reachable as a crash on the offline replica, and my docblock claimed that
+   door ENFORCES the guard. It does not.** Chain, each link read: `local-context.ts:217` serves the actor's
+   own membership **with a role**; no in-memory context implements `countWorkspaceOwners`; and
+   `outbox.ts:315` calls `evaluateEvent` with **no try/catch**, so the throw escapes `enqueue` — which
+   contracts to return an `IngestResult` and whose docblock claims its verdict is *"identical to the answer
+   the server will give on the same facts"*. For this guard the server **refuses** and the replica
+   **throws**. **Latent today** (no shipped client emits these events; measured, zero hits). **Named
+   follow-on on the roster's role control**, recorded in `test-cases/13`, NOT fixed here — the replica
+   genuinely holds one row, so the repair is where a throwing evaluation is caught, not a counter invented
+   in a context that cannot answer. **The docblock is corrected**; it previously said placing the guard in
+   the engine meant the replica enforced it.
+2. **[Important] My recorded mutation #3 was invalid evidence, and the record asserted otherwise.**
+   `test-cases/13` said the "corrected" re-run — clause deleted whole, *"valid SQL, `$2` still bound"* —
+   killed the case. **Measured false:** that deletion removes the query's ONLY `$2`, leaving one placeholder
+   against a two-element parameter array, and the case reddened with
+   `bind message supplies 2 parameters, but prepared statement "" requires 1` — **the identical failure
+   class the same paragraph calls "not a kill"**. So there were **two** invalid attempts, not one, and the
+   second was recorded as the good one. **The kill that counts keeps both placeholders**
+   (`AND ($2::text IS NULL OR $2::text IS NOT NULL)`), verified by reading the mutated line back, with a
+   true `AssertionError` and no bind or syntax error. Recorded in full in `test-cases/13`, because the
+   lesson is that **all three attempts exit 1** and the two wrong ones look *better*.
+3. **[Minor]** `test-cases/13` cited `membership.ts:63` as "(the throw)"; `:69` is the throw, `:63` the
+   helper's signature. Corrected.
+4. **[Minor]** Mutation #1's numbers were right and their description was not: the five reds **include
+   13.822's THROWS arm**, so "kills refusals and nothing else" is false, and of the eleven green only
+   **eight** are accept arms (three are `malformed-payload` refusals). Corrected.
+5. **[Minor]** The world-half `Features.md` bullet sat under §5 (*Tickets, hierarchy & rollups*) though a
+   membership guard is not a ticket feature; **moved into §6 beside its actor half** so the guard reads as
+   one feature. Its *"cannot have one through the shared fixture suite"* also named the wrong reason —
+   corrected to: the harness DOES serve a roster with roles but has no `countWorkspaceOwners`, so a fixture
+   case would **THROW** rather than exercise the rule. "Cannot" was a claim about the harness's current
+   shape stated as an impossibility.
+
+**The pattern worth carrying: every finding was a sentence stronger than the measurement under it, and the
+reviewer found them by RUNNING the thing rather than reading it.** Two were in records I had written to
+document exactly this defect class.
+
+### Bypasses I ruled OUT by measurement, so a restart need not redo them
+
+- **Invite acceptance does not bypass the actor half.** `apps/server/src/invites/acceptance.ts:166` does
+  push a `membership.granted`, and through the INTERNAL door, so the permission gate does not see it — but
+  `inviteSentPayload.role` is `z.enum(['admin','member','guest'])`
+  (`packages/domain/src/events/invites.ts:61`), a hand-written enum whose docblock says reusing
+  `workspaceRoleSchema` "would admit `owner`". No invite can confer ownership. **The engine half still runs
+  on that path**, which is a reason to have it in the engine rather than only in the gate.
+- **The founding grant is unaffected.** `bootstrap-workspace` appends `membership.granted {role:'owner'}`
+  for a founder who holds no membership yet, so `isCurrentlyOwner` is false and the guard accepts — which
+  the passing founding-sequence tests confirm rather than my reasoning.
+- **A batch cannot empty the workspace** — see the section above; now a pinned assertion.
+- **The count and `resolveEffectiveRole` cannot disagree on who is an owner.** `effective-role.ts` sets
+  `workspaceRole` from the `scope_kind === 'workspace'` row and null otherwise, so `workspaceRole === 'owner'`
+  holds for exactly the rows `countWorkspaceOwners` counts — one predicate, two spellings.
+
+### Case ids — measured, not taken
+
+**Cases `13.820`–`13.823`**, the plan's block `13.820`–`13.849`; the rest stays free for Task 2.
+Measured **by case MARKER** at this tip: the highest section-13 marker is **`13.795`**, the whole
+`13.820`–`13.849` band is **free including any letter-suffixed variant**, and the controls behaved
+(`13.793`/`13.794`/`13.795` taken; `13.796`, `13.818`, `13.819`, `13.850`, `13.900` absent). **A first
+measurement sorted the suffix with `parseFloat` and printed `13.99` as the highest — the suffix is a CASE
+NUMBER, not a decimal, so that ordering was wrong; the per-id lookup above is the one that counts.**
+`check:case-ids` is green and the union is 2297 after the rebase.
+
+### Verification at the rebased head
+
+`packages/rule-engine` **331/331** · `apps/server` **151 files, 1547 passed, 5 skipped, 0 failed** ·
+typecheck **8/8** (`rule-engine`, `server`, `domain`) · **six checks raw 0** (`check:env`, `check:tasks`,
+`check:runbook`, `check:citations`, `check:help`, and `check:db-tz` **with the documented**
+`DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma`, printing `database timezone:
+Asia/Kolkata`). **The forced gate was NOT run** — the controller runs it. **`docker compose` was NOT run**
+and **:3001 was not bound**, per the two-executor override.
+
+**A `/dev/tcp` probe reported port 54329 CLOSED when it was open** (`lsof` and `nc` both said OPEN;
+`gisik-nokma-exec-postgres-1`, up 11h). Recorded because a false "the database is down" is exactly the
+shape that sends the next session hunting for a problem that does not exist.
+
+### Mutations — each applied to a byte backup, confirmed to CHANGE the file, run, restored by `cp` with matching sha256
+
+1. **`isCurrentlyOwner` returns false** → reddens **5**: 13.820 and 13.821's refusal arms plus both
+   `evaluateEvent` reachability arms, with all **11 accept arms green**. The asymmetry is the evidence —
+   the mutation kills refusals and nothing else, so it names its own site.
+2. **The stub's count ignores `excludingUserId`** → reddens the same 4 refusal arms, accepts green.
+3. **The server's SQL drops the `excludingUserId` clause** → reddens **exactly one case, the real-door
+   sole-owner refusal, 46 green.** This is the mutation that justifies the database suite: no stub and no
+   pure test can see it.
+   **★ A FIRST ATTEMPT AT THIS MUTATION WAS INVALID EVIDENCE AND LOOKED LIKE A KILL.** The perl
+   substitution dropped `$2` from the string and produced `AND (::text IS NOT NULL)` — a SQL **syntax
+   error**. The case reddened, but it would have reddened identically for a missing bind parameter, a
+   mistyped column, or an absent table. Re-run with the clause deleted whole (valid SQL, `$2` still
+   bound), it killed the same single case. **The two attempts are indistinguishable from the exit code
+   alone**, and the invalid one is the more convincing-looking.
+4. **The owner-grant clause replaced with `if (false)`** → reddens the pure case AND the real-door case,
+   so neither half is decorative.
+5. **The kind guard removed** → reddens exactly the misfiled-kind case.
+
+### ★ The gap my OWN second pass found, after the first commit — batching
+
+**A batch of two events is judged one at a time, and the context reads through the ingest TRANSACTION's
+own client, so the count for the second event sees the first's effect.** Measured on a scratch test
+before it was written into the suite, because the alternative — one submission demoting both owners —
+would have reached zero owners while every per-event assertion stayed green:
+
+```
+BATCH: [{"status":"committed"},{"status":"refused","rule":"last-owner"}]   OWNERS: 1
+```
+
+The case is now an assertion inside 13.820's real-door `it`, with a **stable ADMIN actor** rather than an
+owner on purpose: an owner demoting himself is refused on the second event by the ROLE gate (he is no
+longer an admin by then), so an owner-actor version would pass **while the count was blind**. **That is
+the assertion that pins the property; the per-event arm above it does not.**
+
+**The assertion caught my own error while I was writing it** — the first cut demoted `owner` (a plain
+member by then) and `second` (one of two owners), both committed, and the failure read
+`[committed, committed]`. `grantMember` MINTS its target, so "put the first owner back" was a third
+person. Recorded because the case is only load-bearing if a reader can see what its targets really are.
+
+### What a restart must NOT redo
+
+- **Do not re-implement the plan's Step 1 test code as written** — see defect 1. It cannot pass.
+- **The guard has no end-to-end fixture and CANNOT have one through the shared fixture suite.**
+  `buildMemoryContext` answers `null` for every membership (so `wasOwner` is always false there) and the
+  fixture harness, which does serve roles, is reached only through fixture JSON, none of which carries a
+  `membership.granted` candidate. Its witnesses are the two test files above. Recorded in `Features.md` as
+  a hedge rather than left to be inferred.
+- **The real-door tests MUST use `ingestClientBatch`, not `ingestBatch`.** `ingestBatch` is the internal
+  append path and runs **no permission gate** — the first cut of the database block used it and the
+  self-promotion case came back `committed`. `last-owner` would have hidden the same error, because the
+  engine runs on both doors. This is pinned as a comment in the block.
+- **Do not "fix" the `grantOwnerRequiresOwner` decision before the controller rules on it** — see defect 3.
+
+---
+
+## ▼ PREVIOUS BLOCK — second wave Task 11: List row checkboxes and `Close selected (N)` (2026-09-18)
 
 **Position: the change set is COMPLETE, the review round is CLOSED and fully discharged, and the PR is
 open awaiting the controller's merge.** Dispatch:

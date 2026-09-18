@@ -9823,3 +9823,144 @@ mirror states the product can really produce (`getTicketTypes` does the same), w
 rule is that a read a case did not stub must fail loudly. The web stub's refusal is the one that
 pins the settings screen, and 13.716/13.718 depend on it. Changing the core fake to refuse would
 break unrelated suites for a consistency that buys nothing here.
+
+## The last-owner guard, in both layers (executor 2, 2026-09-18) — plan `2026-09-18-membership-role-guard` Task 1, ids `13.820`–`13.823`
+
+- ✅ **13.820 — a `membership.granted` that would leave the workspace with no owner is refused, and one
+  that would not is accepted.** The guard fires only on a move **out** of owner, and that narrowing is
+  the case's whole content rather than a detail: a grant to somebody who is not currently an owner is
+  accepted even when the workspace has exactly one owner (`wasOwner` is false, so the count is never
+  consulted), re-stating the sole owner as an owner is accepted, and demoting one of **two** owners is
+  accepted because the workspace is not emptied. **The accept arms are the assertions that make the
+  refusal mean something** — a guard that refused every owner-touching grant would satisfy the refusal
+  alone. The demotion is driven by an **admin** on the real door, which is the point: the permission gate
+  admits an admin to roster management on purpose, so a refusal there can only have come from the engine's
+  world-half. The count excludes the subject of the change, and that exclusion is load-bearing in the
+  opposite direction from the obvious one: without it a sole owner counts **himself** and the guard never
+  fires at all — pinned by mutation, which reddens the sole-owner case and leaves the accept arms green.
+  **Batching is not a way around it, and that is asserted rather than assumed.** Two events in ONE
+  submission are judged one at a time and the context reads through the ingest transaction's own client,
+  so the count for the second event sees the first's effect: an admin demoting **both** owners in a single
+  batch commits the first and is refused `last-owner` on the second. The actor is deliberately an ADMIN
+  and not an owner — an owner demoting himself is refused on the second event by the ROLE gate (he is no
+  longer an admin by then), which would let the case pass while the count was blind. **This assertion is
+  the one that pins the property; the per-event arm above it does not.**
+  **Citations:** `packages/rule-engine/src/checks/membership.ts:87` (the check), `:103` (the move-out-of-owner
+  test), `:82` (the target's current role), `packages/rule-engine/test/membership.test.ts:106`,
+  `apps/server/test/permissions/check-role-permission.test.ts:1256` (the real-door half, where the `SELECT`
+  itself is what is under test, and `:1377` the same-batch assertion)
+
+- ✅ **13.821 — a `membership.revoked` of the only owner is refused by the same rule.** The second door to
+  the same state, and it must answer identically: there is no role in a `membership.revoked` payload, so a
+  revocation is a move out of owner by construction and the only question is whether the target held it.
+  Revoking one of two owners is accepted; revoking somebody who is not an owner is accepted. **This case is
+  why the guard lives in the engine rather than in the permission gate alone** — the gate never sees the
+  ledger, so a rule written there could not tell a sole owner from a second one.
+  **Citations:** `packages/rule-engine/src/checks/membership.ts:114` (the check), `:130` (its refusal),
+  `packages/rule-engine/test/membership.test.ts:168`
+
+- ✅ **13.822 — the guard THROWS rather than refusing when its context cannot count owners, and its other
+  exits are unchanged.** Witnessed rather than asserted, because the plan asked for that specifically:
+  `countWorkspaceOwners` is OPTIONAL on `EngineContext` so every context that predates it still
+  typechecks, and the guard's answer to a context that cannot supply it is a **throw** — a refusal minted
+  from an absent counter would be the sentence *"this change would leave the workspace with no owner"*
+  made by something that never counted, dressed as a fact about the workspace. **The case carries its own
+  control and half of it is the control:** the SAME cannot-count context accepts a change that never needs
+  the count, which is what separates "throws because the count is unavailable" from "throws on every
+  membership event" — the second would make every context that predates this guard unusable. The kind
+  guard is pinned here too, refuting a misfiled entity kind by name rather than accepting it, and a
+  malformed payload stays `malformed-payload` rather than becoming a role refusal. **A defect in the
+  plan's own Step 1 code is pinned as a case rather than left to be rediscovered:** its sample payloads use
+  `userId: 'u1'`, and `membershipGrantedPayload`'s `userId` is `ulidString` — measured, `'u1'` fails with
+  `userId: must be a ULID`, so a test transcribed from the plan would be red for a reason unrelated to this
+  guard and the tempting repair would be to loosen the assertion, which deletes the witness.
+  **Citations:** `packages/rule-engine/src/checks/membership.ts:69` (the throw — `:63` is the helper's
+  signature, and an earlier draft cited that as "the throw"), `:91` (the kind refusal),
+  `packages/rule-engine/test/membership.test.ts:196`
+
+- ✅ **13.823 — only a workspace OWNER may grant the owner role, which is what stops an admin promoting
+  themselves.** The actor half, and the half that closes an escalation the world half cannot: an admin
+  could demote the sole owner and then promote themselves, and at no step of that does the workspace hold
+  zero owners — only zero of the *original* owner's role — so 13.820 alone does not refuse it. An admin
+  is refused `grant-owner-requires-owner` for `membership.granted { role: 'owner' }`; an owner is not,
+  which is the control that stops the rule from being a deadlock in which no workspace can ever gain a
+  second owner. A third assertion pins the **ordering** as behaviour: a plain member granting owner is
+  refused by the broad `permission.role` sentence about their standing, not by this narrower rule, because
+  the wide refusal runs first and the sentence a person reads should be about the thing that actually
+  stopped them. A malformed owner grant is deliberately **not** refused here — it falls through to the
+  engine's `malformed-payload`, which names the field — and that is asserted too, so the two layers cannot
+  start answering for each other.
+  **Citations:** `apps/server/src/permissions/check-permission.ts:602` (the clause), `:85` (the sentence),
+  `apps/server/test/permissions/check-role-permission.test.ts:290` (the pure case),
+  `:1355` (the real-door case, through the client door because the internal one does not run the gate)
+
+**Mutations, each applied to a backed-up file, confirmed to have CHANGED it, run, then restored by `cp`
+with a matching sha256.**
+
+1. **The `wasOwner` guard removed** (`isCurrentlyOwner` returns false) → reddens **five**: 13.820's and
+   13.821's refusal arms, both `evaluateEvent` reachability arms, **and 13.822's THROWS arm** — 11 green.
+   An earlier draft called this "kills refusals and nothing else", which is wrong twice: it also kills the
+   throw, and of the eleven green only **eight** are accept arms (the other three are
+   `malformed-payload` refusals, which this mutation correctly leaves alone).
+2. **The stub's count ignores `excludingUserId`** → reddens the same four refusal/reachability arms, the
+   rest green.
+3. **The server's SQL ignores `excludingUserId`** → reddens **exactly one case, the real-door sole-owner
+   refusal, 46 green** — with a genuine `AssertionError`, which took three attempts to obtain and the two
+   failures are the point of this entry.
+   **★ TWO SUCCESSIVE ATTEMPTS AT THIS MUTATION WERE INVALID EVIDENCE AND BOTH LOOKED LIKE KILLS.**
+   *(a)* A perl substitution dropped `$2` and produced `AND (::text IS NOT NULL)` — a SQL **syntax
+   error**. *(b)* The "corrected" re-run deleted the clause whole; that removed the query's **only** `$2`,
+   leaving one placeholder against a two-element parameter array, and the case reddened with
+   `bind message supplies 2 parameters, but prepared statement "" requires 1` — **a bind error, the same
+   failure class as (a)**, and it was recorded here as "the kill that counts" until an independent review
+   measured it false. Neither run could have distinguished a wrong predicate from a mistyped column, a
+   missing parameter, or an absent table.
+   *(c)* The kill that counts keeps **both placeholders** and makes the clause a tautology —
+   `AND ($2::text IS NULL OR $2::text IS NOT NULL)` — verified by reading the mutated line back, with the
+   failure text confirmed to be `AssertionError: expected { status: 'committed' } to match object
+   { status: 'refused' }` and **not** a bind or syntax error.
+   **A mutation that reddens for a reason unrelated to the property it names is not a kill — and the exit
+   code cannot tell you which you have.** The first two attempts exit 1 exactly like the third, and both
+   were more convincing-looking than the real one.
+4. **The owner-grant clause replaced with `if (false)`** → reddens the pure permission case **and** the
+   real-door self-promotion case, both halves, so neither is decorative.
+5. **The `env.entity.kind !== 'membership'` guard removed** → reddens exactly the misfiled-kind case.
+   Worth recording that this guard was **absent from the plan's Step 5 code block while its prose required
+   it** ("type guard, **kind guard**, `safeParse`…"), and that `evaluate.ts`'s own docblock makes it
+   mandatory — the fixture suite and the offline replica enter through `evaluateEvent` and never pass
+   through ingest's door, so no check may trust that dispatch.
+
+**★ A NAMED FOLLOW-ON this task creates and does not fix: the throw is reachable on the offline replica.**
+
+Found by the independent review, and it is a real consequence of the throw decision rather than a
+theoretical one. The chain, each link read: `packages/sync-client/src/precheck/local-context.ts:217` serves
+the ACTOR's own membership **with a role**, from bootstrap `me`; none of the four in-memory contexts
+implements `countWorkspaceOwners` (the server's is the only implementation), so `ownersOrThrow` throws
+there; and `packages/sync-client/src/outbox/outbox.ts:315` calls `evaluateEvent` with **no `try`/`catch`**,
+so the throw escapes `enqueue` — which its own contract describes as returning an `IngestResult`, and
+whose docblock claims the local verdict is *"identical to the answer the server will give on the same
+facts"*. For this guard it is not: the server **refuses**, the replica **throws**.
+
+**Latent today, not live** — no shipped client emits `membership.granted` or `membership.revoked`
+(measured: zero hits across `apps/web/src`, `packages/app-core/src`, `packages/sync-client/src`). **It goes
+live with the roster's role control**, which wires exactly that event to the client ingest path.
+*Owner: that task — the one that makes it reachable.* **The repair is not in this file and must not be a
+second membership reader:** the replica genuinely holds one row and cannot count owners, so what needs
+changing is where a throwing evaluation is caught, not a context inventing an answer it does not have.
+Recorded rather than repaired here because the trigger does not exist yet and because fixing it means
+editing a file this task has no other reason to touch.
+
+**One plan-text defect is recorded rather than silently repaired, and it has since been RULED ON.** The
+plan's Step 3 declares `REFUSAL_RULES.grantOwnerRequiresOwner` under **"Produces"**, while its Step 7 emits
+the generic `permission.role` instead; the two cannot both hold. The id was taken as authoritative and
+emitted through `refuseWith`, because a rule name nothing emits is a matching key that can never match —
+all twenty ids already in `REFUSAL_RULES` are emitted somewhere (measured), so a twenty-first with no
+emitter would be the catalogue's only dead entry. The alternative reading costs only a different string in
+a rendered refusal; this one costs a dead constant. **Flagged to the controller with both readings priced
+rather than settled unilaterally; the controller ruled on 2026-09-18: carry on with `refuseWith` and the
+new id — and then FIXED THE PLAN rather than leaving the conflict standing.** Step 7 of
+`docs/superpowers/plans/2026-09-18-membership-role-guard.md` now reads
+`refuseWith(REFUSAL_RULES.grantOwnerRequiresOwner, WORKSPACE_OWNER_GRANT_REASON)` (PR #456,
+`fff365bd`), matching this implementation. **So the plan and the code agree as of that commit, and an
+earlier draft of this paragraph — which said the two steps still disagreed — is struck rather than
+left standing**, since it was true only until the plan was corrected.

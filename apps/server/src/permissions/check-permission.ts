@@ -1,10 +1,11 @@
 import {
   inviteSentPayload,
+  membershipGrantedPayload,
   ticketCreatedPayload,
   visibilitySetPayload,
   type EventEnvelope,
 } from '@gisik-nokma/domain';
-import type { Refusal } from '@gisik-nokma/rule-engine';
+import { REFUSAL_RULES, type Refusal } from '@gisik-nokma/rule-engine';
 import type { Queryable } from '../db/queryable.js';
 import { projectExists } from '../projections/proj-projects.js';
 import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
@@ -67,6 +68,21 @@ export const WORKSPACE_ALREADY_FOUNDED_REASON =
   'This workspace has already been founded; it cannot be founded again.';
 export const WORKSPACE_MEMBERSHIP_REASON =
   'Only a workspace owner or admin can manage workspace membership.';
+/**
+ * The narrower refusal that rides WITH the one above, never instead of it
+ * (owner ruling 2026-09-18): the senders who may grant membership are an admin
+ * question, and among them the senders who may grant the OWNER role are an
+ * owner question.
+ *
+ * It exists because `isWorkspaceAdmin` is `role === 'owner' || role === 'admin'`
+ * — deliberately wide, and right for roster management — while granting
+ * ownership is a transfer of the workspace itself. An admin who could write
+ * `membership.granted { role: 'owner' }` had an escalation that needed no
+ * guard to defeat: they could demote the sole owner and promote themselves, in
+ * two events, with the last-owner guard also in place, because at no point did
+ * the workspace have zero owners — only zero of the ORIGINAL owner's role.
+ */
+export const WORKSPACE_OWNER_GRANT_REASON = 'Only a workspace owner can grant the owner role.';
 export const PROJECT_ROSTER_REASON = 'Only a project admin can manage who is on this project.';
 /** Task 9 check 2, the guest half — answered in `checkRolePermission`, which owes it. */
 export const GUESTS_CANNOT_CREATE_TICKETS_REASON = 'Guests cannot create tickets.';
@@ -548,6 +564,43 @@ export function checkRolePermission(env: EventEnvelope, ctx: PermissionContext):
   if (env.type === 'membership.granted' || env.type === 'membership.revoked') {
     if (!isWorkspaceAdmin) {
       return refuse(WORKSPACE_MEMBERSHIP_REASON);
+    }
+    // Ruling (owner, 2026-09-18): only an OWNER may grant the owner role.
+    //
+    // This is the ACTOR half of the last-owner guard; the WORLD half — "would
+    // this change leave the workspace with no owner?" — is
+    // `rule-engine/src/checks/membership.ts` and runs in the engine, after this
+    // gate and for every door rather than only this one. The two are
+    // complementary and NEITHER alone closes the escalation: the engine guard
+    // alone still lets an admin demote the sole owner and then promote
+    // themselves, because the workspace never has zero owners at any step —
+    // only zero of the original owner's role.
+    //
+    // There is NO `isWorkspaceOwner` in this file to reuse, and none is added:
+    // the body computes `isWorkspaceAdmin = role === 'owner' || role === 'admin'`
+    // above and nothing narrower, so the comparison is written inline against
+    // the `role` already in scope. A second read of the effective role would be
+    // a second thing to keep in step.
+    if (env.type === 'membership.granted') {
+      const parsed = membershipGrantedPayload.safeParse(env.payload);
+      // A payload that does not parse is NOT refused here: it is the engine's
+      // `malformed-payload`, with the field path spelled out, and refusing it
+      // here would report a shape problem as a role problem.
+      if (parsed.success && parsed.data.role === 'owner' && role !== 'owner') {
+        // `refuseWith`, not the one-argument `refuse` above, because this rule
+        // is its own sentence rather than another way of saying "you are not an
+        // admin" — the same argument that gave `PERMISSION_VISIBILITY_RULE` its
+        // own id. The members page renders the rule string, so which id is
+        // emitted is visible to a person, and "only an owner can hand over the
+        // workspace" is not the same thing to be told as "only an admin can
+        // manage membership". PLAN DEVIATION, recorded: the plan's Step 3
+        // declares this id under "Produces", its Step 7 emits the generic
+        // `permission.role` instead, and the two cannot both hold. The id wins
+        // because a rule name nothing emits is a matching key that can never
+        // match — and all twenty ids already in `REFUSAL_RULES` are emitted
+        // somewhere (measured). Flagged to the controller in the PR body.
+        return refuseWith(REFUSAL_RULES.grantOwnerRequiresOwner, WORKSPACE_OWNER_GRANT_REASON);
+      }
     }
   }
   if (env.type === 'project.member_added' || env.type === 'project.member_removed') {

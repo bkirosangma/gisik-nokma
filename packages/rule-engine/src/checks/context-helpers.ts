@@ -1,4 +1,4 @@
-import type { TicketState, TicketTypeDef } from '@gisik-nokma/domain';
+import type { MembershipState, TicketState, TicketTypeDef } from '@gisik-nokma/domain';
 import type { EngineContext, TenantScope } from '../engine.js';
 
 /**
@@ -45,4 +45,30 @@ export async function getTicketTypeDef(
   id: string,
 ): Promise<TicketTypeDef | null> {
   return ctx.getTicketTypeDef(scope, id);
+}
+
+/**
+ * A membership state, narrowed the same way and for the same reason as
+ * `getTicketState` above — a cast to `MembershipState` would compile against a
+ * `TicketState` and then read `undefined` off `.role`, which is the one field
+ * the caller asks about.
+ *
+ * The id is `membershipId(workspaceId, userId)`, so this read is already asked
+ * inside a named tenancy — there is no `TenantScope` parameter, and
+ * `engine-context.ts`'s factory docblock gives the full argument for why
+ * `getEntityState('membership')` does not take one. Callers must build the id
+ * with `membershipId`, never from a payload field, which the same docblock
+ * records as the condition under which that stops being true.
+ *
+ * `null` means "not a member of this workspace", which is a statement about the
+ * person and not about a gap in any context: the server reads it through
+ * `resolveEffectiveRole`, and the two in-memory contexts answer it two different
+ * ways by design.
+ */
+export async function getMembershipState(
+  ctx: EngineContext,
+  id: string,
+): Promise<MembershipState | null> {
+  const state = await ctx.getEntityState('membership', id);
+  return state !== null && state.kind === 'membership' ? state : null;
 }
