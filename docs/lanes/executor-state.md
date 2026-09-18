@@ -41,7 +41,56 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~23:0x IST. **`hig-per-screen/7b` IS BUILT: CASE `13.309`
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~22:5x IST. **`hig-per-screen/7b` IS MERGED. THIS LANE HAS NO
+> # TASK IN FLIGHT AND IS HOLDING FOR THE NEXT DISPATCH.**
+> # **Supersedes the block below. That block says the PR awaited a merge — it has had one, and this one
+> # exists to stop a relaunched executor opening a PR that is already closed.**
+>
+> ## THE MERGE — VERIFIED, NOT TRUSTED
+>
+> | | |
+> |---|---|
+> | merged as | **`7f9329cc`** — `Merge pull request #494`, a **real merge commit**, not a squash. Parents `1fc65c8f` (main) + `794c5fc6` (this lane). |
+> | reachability | **all three commits are ancestors of `origin/main`** — `cb07a669`, `ef0433ec`, `794c5fc6` each pass `git merge-base --is-ancestor`. (`git branch --contains` empty is the orphan test; none is orphaned.) |
+> | **the strongest check** | **the merge commit's tree is `fce64956…` — byte-identical to the tree this lane PREDICTED with `git merge-tree` and inspected BEFORE the merge.** So every pre-merge finding transfers exactly: 12700 lines, each new marker appearing exactly once, exec2's appended block intact, and the corrected citation on **line 8616**. |
+> | content | `my-work.test.tsx`, `Features.md` and this file are **IDENTICAL** between the branch tip and merged `main`; `test-cases/13` differs by exactly exec2's **+112-line EOF append**, which is the only difference it should have. |
+> | on `main` now | catalogue `13.309` = `✅`, the audit tally is **`11 ✅ / 4 ❌`**, the old "is unwitnessed" sentence appears **0** times, and the witness is in the tree. |
+>
+> ## ⛔ ONE THING ON `main` IS STALE, AND IT IS NOT THIS LANE'S TO EDIT
+>
+> **The ledger row `hig-per-screen/7b` still reads `todo`, and its note still says `13.309 is ❌`.** Both
+> are false on `main` at `7f9329cc` — the case is witnessed and merged. **Owner: the controller.** The
+> ledger is edited only on `main`, only by the controller, which is exactly why this lane did not flip
+> it. **Reported, not fixed** — the instinct to fix what you find is the one that hides compounds.
+>
+> ## WHAT THE NEXT EXECUTOR INHERITS — read before starting anything
+>
+> - **DO NOT REDO `13.309`.** It is witnessed by `13.309 the withheld-name fallback carries its exact
+>   title text` in `packages/app-core/test/views/my-work.test.tsx`, merged at `7f9329cc`.
+> - **Remaining non-done rows on `origin/main`:** `hig-per-screen` **3b** (HELD — the owner reviews
+>   sign-in first), **5b** (needs a controller ruling: its plan sentence is unsatisfiable), **6b**
+>   (`13.306` ❌ — the closest analogue to `7b`, unheld), **7b** (merged; the row is the stale item
+>   above), **10**; plus `board-prototype-port/1` (**STRUCK — do not implement**) and
+>   `backlog-and-closed-second-wave/12` (not started).
+> - **This lane's shift map still holds:** the `test-cases/13` insertions are **+29 below base line
+>   8080**, confirmed against the merged file (`base :8587 → merged :8616`).
+> - **The gate is contention-flaky on this machine.** An earlier full run at the *identical source* was
+>   red on four timeouts (app-core `workflow-builder/access`×2 + `publish`×1 at the 5 s default, server
+>   `seed-dev` at 30 s); every one passes alone and the next full run at the same code exited 0.
+>   **Re-run a red timeout alone before reading it as a defect.**
+> - **Hosted CI is red repo-wide and NO JOB RUNS** — `gh run view 35371155543` reports, verbatim, *"The
+>   job was not started because recent account payments have failed or your spending limit needs to be
+>   increased."* The standing auto-merge authorization's *"independent CI run green"* condition **cannot
+>   be met by any PR until the owner restores Actions billing.** It is an owner action, not a code one.
+> - **`pnpm`'s path is not its runtime.** A turbo failure line prints `…/node/v24.11.1/bin/pnpm run
+>   test`; that is the pnpm BINARY's location. `pnpm exec node -e "process.version"` answers
+>   `v22.22.2`. Do not record that v24 string as a gate-environment finding.
+>
+> ## OPEN RULINGS
+>
+> **None from `7b`.** The one open item is the stale ledger row above, and it is the controller's.
+>
+> > # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~23:0x IST. **`hig-per-screen/7b` IS BUILT: CASE `13.309`
 > # IS WITNESSED, EVERY LOCAL INSTRUMENT IS GREEN AT THE FROZEN HEAD, AND THE PR AWAITS THE
 > # CONTROLLER'S MERGE.** `exec/hig-7b-13309-withheld-title`, ONE PR `--base main`.
 > # **Supersedes the block below it; the block below is HISTORY.**
