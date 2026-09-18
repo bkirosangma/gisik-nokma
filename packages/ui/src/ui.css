@@ -615,9 +615,17 @@
    this button is not part of — applying that class to it would be true only
    of the METRICS, not of the DOM it actually sits in. Kept as one rule body
    (not a copy) so the two can never drift: any future change to this
-   word-sized button's own numbers changes both consumers at once. */
+   word-sized button's own numbers changes both consumers at once.
+   Second wave Task 10 (backlog/closed spec §8.3, 2026-09-18) — the same body
+   again, for the board COLUMN header's `Close all (N)`. Third member of the
+   alias set, added here rather than to a rule of its own for the reason the
+   `.gn-row-action` paragraph above already gives: one body cannot drift from
+   itself. Like `.gn-row-action` it is a distinct class because the DOM is
+   distinct — this button sits in `.gn-board__column-header`, not in a card —
+   and like it, only the METRICS are shared. */
 .gn-board-card__close,
-.gn-row-action {
+.gn-row-action,
+.gn-board__column-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -633,12 +641,14 @@
   cursor: pointer;
 }
 .gn-board-card__close:focus-visible,
-.gn-row-action:focus-visible {
+.gn-row-action:focus-visible,
+.gn-board__column-action:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 1px;
 }
 .gn-board-card__close:disabled,
-.gn-row-action:disabled { opacity: 0.4; cursor: not-allowed; }
+.gn-row-action:disabled,
+.gn-board__column-action:disabled { opacity: 0.4; cursor: not-allowed; }
 /* Ruling 28 (board-prototype-port coordinator, 2026-09-16) — a pure layout
    no-op. `board.tsx` wraps the three mutually-exclusive move notices
    (`MoveRefusalNotice` / server-refusal / transport-error) in one `<div
