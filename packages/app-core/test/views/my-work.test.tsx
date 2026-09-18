@@ -300,6 +300,68 @@ describe('3.58 MyWork — the in-transit section is empty because there is no ou
     expect(onOpenTicket).toHaveBeenCalledTimes(2);
   });
 
+  /* 13.309 — the withheld-name fallback's TITLE text, witnessed.
+   *
+   * The plan's sentence for this screen has two halves and this file pinned one
+   * of them: `projectName === null` rendering the ID (the 3.161 case above).
+   * The other half is *why* the id is a fallback rather than a blank — the
+   * `title` attribute that tells the viewer the name was withheld from THEM —
+   * and until now a string that nothing checked carried the fallback's whole
+   * reason for existing.
+   *
+   * THE TRAP, recorded at the site because it is the task: the source spells
+   * this string with **U+2019**, and the PLAN that specifies this screen spells it
+   * with a straight U+0027 (`docs/superpowers/plans/2026-09-08-hig-per-screen.md:902`,
+   * and `docs/hig-reconciliation-audit.md:729` after it). A case transcribed from
+   * either therefore compares the wrong character, fails, and fails in the shape of
+   * a MISSING FALLBACK rather than a wrong apostrophe. The two controls below are
+   * what make those two situations tellable apart.
+   *
+   * The catalogue row this case was minted from carried the straight form too, until
+   * this change corrected it on 2026-09-18 — so the row is no longer a source of the
+   * wrong character, and the plan still is.
+   */
+  it('13.309 the withheld-name fallback carries its exact title text', () => {
+    const withheld: WorkItem = {
+      ...GST,
+      ticketId: 't-withheld-title',
+      title: 'Collect the shop keys',
+      projectName: null,
+      projectId: 'prj_withheld',
+    };
+    render(
+      <MyWork
+        view={{ assigned: [], inTransit: [], contested: [], shared: [withheld, GST] }}
+        onOpenTicket={vi.fn()}
+      />,
+    );
+    const region = screen.getByRole('region', { name: 'Shared with me' });
+
+    // THE RENDERED ATTRIBUTE, not the source string and not a substring: the
+    // whole text, spelled as the source spells it. `getByText` returns the span
+    // the id renders in, so this is the node the user's pointer lands on.
+    expect(within(region).getByText('prj_withheld')).toHaveAttribute(
+      'title',
+      'You have not been told this project’s name.',
+    );
+
+    // CONTROL 1 — the SAME lookup, one character different, must MISS. U+2019 is
+    // what the source uses; U+0027 is what this repo's catalogue quotes. Without
+    // this line the assertion above would pass just as happily on a test and a
+    // source that had quietly agreed on the WRONG character, and would go on
+    // passing — the check would be about "some apostrophe" rather than about
+    // this string.
+    expect(within(region).queryByTitle("You have not been told this project's name.")).toBeNull();
+
+    // CONTROL 2 — it is the WITHHELD row's title and not a title every project
+    // line carries. The named sibling renders in the same section, under the
+    // same rule; a mutation that moved the title onto both branches would fail
+    // here and nowhere else.
+    expect(within(region).getAllByTitle('You have not been told this project’s name.')).toHaveLength(
+      1,
+    );
+  });
+
   /* 13.308 — `Nothing assigned to you.` and `No contested claims.` under an
    * all-empty view, beside the same shape asserted in the 3.160 case above. */
   it('the assigned section has its own honest empty state', () => {

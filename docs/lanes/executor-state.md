@@ -41,7 +41,120 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~22:0x IST. **TASK 5b REBASED ONTO `77aa906a` (#490):
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~23:0x IST. **`hig-per-screen/7b` IS BUILT: CASE `13.309`
+> # IS WITNESSED, EVERY LOCAL INSTRUMENT IS GREEN AT THE FROZEN HEAD, AND THE PR AWAITS THE
+> # CONTROLLER'S MERGE.** `exec/hig-7b-13309-withheld-title`, ONE PR `--base main`.
+> # **Supersedes the block below it; the block below is HISTORY.**
+>
+> ## LIVE ANCHORS — measured with `/usr/bin/git` at the sha, not inherited
+>
+> | | |
+> |---|---|
+> | the frozen PRODUCT head | **`cb07a669`** — the commit the verification table below was measured at, one commit, three files. **This handoff commit is its CHILD**, and no block can contain its own sha: check `/usr/bin/git rev-parse HEAD` and `git log --oneline -2`. |
+> | branch | `exec/hig-7b-13309-withheld-title`, cut from `origin/main` and rebased onto it. **Upstream is deliberately UNSET** — it is created tracking `origin/main`, so a bare `git push` would have targeted `main`. Unset before the first edit. |
+> | `origin/main` | `4b25f586` (#493, cycle 7 — docs only: `controller-state.md` and one ledger row that is NOT `7b`) |
+> | tree | clean at `cb07a669` |
+> | the change | `git diff --name-only origin/main...HEAD` → `Features.md`, `test-cases/13-deployment-dogfooding.md`, `packages/app-core/test/views/my-work.test.tsx` |
+> | PR | **#494**, `--base main`, `mergeable: MERGEABLE`, `UNSTABLE` (the CI billing blocker below, repo-wide). **The review and EVERY check below were measured at `ef0433ec`**, the fix-round commit; the commit carrying this table adds only this row. |
+> | ledger `hig-per-screen/7b` | **still `todo`, ON PURPOSE.** It is now PROMOTABLE — see below. The ledger is edited only on `main`, only by the controller. **I did not flip it.** |
+>
+> ## THE TASK, AND WHAT IT TURNED OUT TO BE
+>
+> The row was `todo` for one reason: the plan's sentence for the My Work fallback has two halves and only
+> the first was pinned. `projectName === null` rendering the ID WAS asserted (`getByText('prj_withheld')`,
+> in the case that also proves the row stays openable). The second half — the `title` attribute that tells
+> the viewer the name was withheld FROM THEM, which is the fallback's whole reason for existing — was
+> asserted nowhere. **`13.309` now has a witness that drives the real render and reads the RENDERED
+> attribute**, not a source string. **No new case id was minted** (block `13.920`–`13.949` untouched;
+> `check-case-ids` reports the same 2376 unique ids at this head as at the base).
+>
+> **The apostrophe is the whole task, and it is now pinned from both sides.** The source spells the string
+> with **U+2019**. The positive assertion spells U+2019; a second lookup with a straight U+0027 must MISS,
+> or the assertion would be about "some apostrophe" rather than about this string; a third counts the
+> titled nodes at exactly one, so the title belongs to the FALLBACK and not to every project line.
+>
+> **THE STRING, AS THE SOURCE SPELLS IT — quoted for the controller:** `You have not been told this
+> project’s name.` — **the apostrophe in `project’s` is U+2019 (a right single quotation mark), NOT
+> U+0027.** It is a `title` attribute on the `--id` span at `my-work.tsx:220`.
+>
+> **THE POSITIVE CONTROL ON THE SEARCH, as the dispatch required:** `grep -rn` for the U+2019 string over
+> every `.ts`/`.tsx` in the repo returns exactly ONE source hit — `packages/app-core/src/views/my-work.tsx:220`
+> — and the same invocation's other hits are this diff's own new test lines. The straight-quote form at this
+> head survives only in the PLAN (`docs/superpowers/plans/2026-09-08-hig-per-screen.md:902`) and the
+> reconciliation audit (`docs/hig-reconciliation-audit.md:729`), **not** in the catalogue — this change
+> corrected the catalogue's straight form, which is exactly what made two of my own sentences false; see
+> the review round below.
+>
+> ## VERIFICATION AT THE FROZEN HEAD — re-measured, not carried
+>
+> | check | result |
+> |---|---|
+> | `pnpm turbo run build` | 11/11, EXIT 0 |
+> | `pnpm turbo run typecheck` | **17/17, EXIT 0** |
+> | `packages/app-core` my-work suite | **21 passed, 0 failed** — including `13.309 the withheld-name fallback carries its exact title text` |
+> | `pnpm turbo run test` | **16/17 tasks** — one RED at `@gisik-nokma/server#test`: `seed-dev.test.ts > lands, and a re-run is a no-op`, a **30 s TIMEOUT under full-suite contention** (collect 139 s). **Re-run ALONE it passes 8/8, EXIT 0.** Not this change: the diff touches no server file. |
+> | seven checks + `check:case-ids` | `env` 0 · `tasks` 0 · `runbook` 0 · `help` 0 · `citations` 0 · `migrations` 0 · `db-tz` 0 · `case-ids` 0 (2376 unique) |
+> | `check:db-tz` | exits **2** without `DATABASE_URL` — its DESIGNED precondition, not a red. With the documented `postgres://gisik:gisik@localhost:54329/gisik_nokma` it prints `database timezone: Asia/Kolkata` and exits 0. |
+> | forced gate | **NOT RUN** — the dispatch forbids it here; it is the controller's. |
+> | Node | **v22.22.2**, and this one cost a measurement. `pnpm`'s binary lives under `…/v24.11.1/bin/`, so a turbo failure line prints `…/v24.11.1/bin/pnpm run test` — **that is the pnpm PATH, not the runtime.** `pnpm exec node -e "process.version"` → `v22.22.2`. **Do not record that v24 string as a gate-environment finding; I nearly did.** |
+>
+> ## THE MUTATIONS — all three fired, each at its own site
+>
+> Replacing the title text, and straightening the source's apostrophe, each REDDEN the case at the positive
+> `toHaveAttribute`. **The straight-quote CONTROL needed a second run**: the positive assertion stops the
+> test before the control is reached, so in shipped order it is masked — reordered FIRST and unmasked
+> against a straightened source it fails alone (`expected <span> to be null`). **That is the difference
+> between a control and a decoration, and it is why the run was repeated rather than reasoned about.**
+> Source restored byte-identically (`shasum -a 256` equal before and after).
+>
+> ## THE REVIEW ROUND — it earned its cost
+>
+> One independent reviewer, told to falsify. It CONFIRMED the witness with five planted mutations of its
+> own (adding one I had not tried: a title on BOTH ternary branches, which dies only at the count-at-one
+> assertion — so that assertion is load-bearing and not decorative), and it found **three defects I had
+> introduced**, all now fixed:
+>
+> 1. **A FALSE CLAUSE about the members page.** I had written that `/workspaces`, `/w/<id>` and the members
+>    page all carry the `nameRestrictedProjectCount` treatment. **The members page carries NO withheld-name
+>    treatment at all** — measured: no `nameRestrictedProjectCount`, no restricted line, and its only
+>    project-shaped control is an invitation form field hidden from a guest (`members/page.tsx:621`). The
+>    count is consumed in exactly TWO files (`workspaces/page.tsx:250`, `w/[workspaceId]/page.tsx:628`).
+>    Corrected in the row, with the correction recorded there.
+> 2. **A CITATION THAT ONLY APPEARED TO SUPPORT ITS CLAIM.** The dispatch's `members/page.tsx:41` resolves
+>    — to prose about the withheld ROLE `<select>`. It contains the word "withheld" and means something
+>    else. **This is the repo's signature defect and it took an independent reader to see it.**
+> 3. **TWO SENTENCES MY OWN DIFF FALSIFIED.** My test comment and the `Features.md` sentence both said the
+>    catalogue quotes the string with a straight apostrophe — and this same diff had just corrected the
+>    catalogue's straight form to U+2019. **True when written, false at the head they shipped in.** Both
+>    re-pointed at the PLAN, which still carries the straight form — so the trap is named where it still
+>    lives rather than where it used to.
+>
+> ## A RECORDED DEBT CLOSED, AND ONE RECORDED WITH AN OWNER
+>
+> - **CLOSED:** `executor-state.md`'s own item 1 (the stale string in the catalogue) — see the correction
+>   in the block below. Its owner clause named *"whoever next edits that catalogue section"*, which is this
+>   task, so it was fixed rather than re-deferred.
+> - **RECORDED, NOT FIXED — a second off-by-one of the same family:** `docs/lanes/executor-2-state.md:2497`
+>   cites `hig-reconciliation-audit.md:690-712`, and `:690` is blank there too. *Owner: executor 2, or
+>   whoever next edits that lane file.*
+>
+> ## SHIFT MAP — this lane's own, for whoever rebases it next
+>
+> `test-cases/13-deployment-dogfooding.md` grows by **+29 lines below base line 8080**: +4 (a blockquote
+> under the Verdict (c) heading), +16→+21 (the `13.309` row), +4→+8 (the three-surface correction). The
+> final same-length citation fix moves nothing. **Measured by `difflib` opcode mapping against
+> `origin/main`, not counted by hand** — `base :8587 → mine :8616`, and `base :8700 → mine :8729`.
+> **Main's `test-cases/13` lowest hunk was `:8167` when this lane branched; if main has since edited above
+> `:8080`, this map needs re-deriving, not reusing.**
+>
+> ## OPEN RULINGS
+>
+> **None from this task.** Nothing needed a ruling: every hunk was a union by construction, the rebase was
+> clean (no conflict at all), and the ledger flip is the controller's by standing rule.
+> **`hig-per-screen/7b` is PROMOTABLE** — `13.309` is `✅` and its witness is collected by the gate. Tell
+> the controller to flip it; I did not.
+>
+> > # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~22:0x IST. **TASK 5b REBASED ONTO `77aa906a` (#490):
 > # ONE FILE RESOLVED AS A UNION, A CITATION THAT RESOLVED TO A BLANK LINE FOUND AND CORRECTED,
 > # EVERY CHECK AND THE THREE AFFECTED SUITES GREEN AT THE NEW HEAD, PR #491 MEASURED MERGEABLE.
 > # AWAITING THE CONTROLLER'S MERGE.** `exec/task5b-not-ported-items`, ONE PR `--base main`.
@@ -97,8 +210,14 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > sha256 `5a93a9cd…`). It is **same-length**, so no line moved and no citation shifted.
 >
 > **Recorded, NOT fixed — three, each with an owner:**
-> 1. **The identical stale string at `test-cases/13-deployment-dogfooding.md:8587`**, in a region this
->    branch does not touch. *Owner: whoever next edits that catalogue section.*
+> 1. **The identical stale string at `test-cases/13-deployment-dogfooding.md:8616` — FIXED 2026-09-18.**
+>    The owner this item named was *"whoever next edits that catalogue section"*, and `hig-per-screen/7b`
+>    is that executor, so the clause fired rather than being left to decay again. Two things had to move:
+>    the ANCHOR, because this lane's catalogue insertions shift every line below 8080 by **+29** (`:8587`
+>    → `:8616`, measured by `difflib` opcode mapping against `origin/main`, not by eye); and the STRING,
+>    because the citation was wrong when written — `hig-reconciliation-audit.md:690` is BLANK and the
+>    ruling is at `:691`. Corrected to `:691-718`: **same length, so nothing downstream shifted.**
+>    Verified at `cb07a669`. *Owner: closed.*
 > 2. **Two citations INTO this file were ALREADY stale before this rebase** — measured, not assumed.
 >    `docs/design/prototype-delta-2026-09-18.md:197` cites `executor-state.md:216` for the "Prototype
 >    delta" entry, but `:216` is the F1 control block; `plan10-adaptation-map.md:434` cites
