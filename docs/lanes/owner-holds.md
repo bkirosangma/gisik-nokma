@@ -86,3 +86,47 @@ came from the controller's decision list of 2026-09-18, answered item by item.
 | The second wave (spec §8, 12 tasks) | *"make the plan with the controller… claude is already out of limits"* | proceeds under the **DeepSeek controller**, not a Claude session |
 | The three `claimed` ledger rows | **accept** | `shared-select-phase-1/10`, `/12`, `workspaces-prototype-port/0` → `done 422 56b79e3a` |
 | Older items (Task 4's look, the two 2c Help passages, "five things", the invite line, the emulator images, the audit's product-scope wishlist) | *"this is already done"* | dropped; not tracked here |
+
+---
+
+## Ruled later the same day — 2026-09-18, second sitting
+
+Two of the three questions the controller had left outstanding were answered directly. Both are
+**decisions that create work**, not holds, and both are recorded here so the register is not mistaken for
+the whole of the owner's rulings.
+
+### 1. An admin may NOT demote a non-last owner — **"no"** (2026-09-18)
+
+> Owner, verbatim: *"may an admin demote a non-last owner: **no**."*
+
+**This closes a door the membership role guard deliberately left half-open.** The guard
+(`docs/superpowers/plans/2026-09-18-membership-role-guard.md`, shipped 2026-09-18) closed two things: a
+workspace losing its **last** owner (`last-owner`), and an admin **granting** `owner`
+(`grant-owner-requires-owner`). Neither covers **demoting an owner while another owner remains** — so an
+admin can still do it today, and the projection overwrites on conflict.
+
+**The consequence is a rule change, not a UI change:** changing any member's role **to or from `owner`**
+becomes an **owner-only** act. An admin keeps moving members between `admin` / `member` / `guest`.
+
+**It also narrows the roster's role control** (drawn 2026-09-18, cases 13.824–13.828): an admin must not
+be offered a role change that removes `owner` from a row. Whether the control can already build such a
+payload is **to be measured, not assumed** — that claim was wrong once already in this exact file.
+Dispatched as `CTL-DISPATCH-2026-09-18-owner-demotion-guard.md`.
+
+### 2. Build `scripts/check-migration-order.mjs` — **"yes"** (2026-09-18)
+
+> Owner, verbatim: *"build scripts/check-migration-order.mjs: **yes**."*
+
+**The measured need:** a reviewer reverted a migration rename on 2026-09-18 and the full 1,548-test server
+suite passed — nothing in the repository pins migration ordering, and the forced gate **structurally
+cannot** (a fresh test database applies every migration cleanly in numerical order). The hidden failure is
+not benign: the hot stack applies migrations only at container start and **its entrypoint aborts on a
+failed migration**, so an out-of-order prefix takes the app down — which it did.
+
+Dispatched as `CTL-DISPATCH-2026-09-18-migration-order-check.md`.
+
+### Still open for the owner
+
+**Does `hig-per-screen/3a` close?** The row is `todo`; Members shipped only its backed surface. The
+elaboration the owner asked for is in `docs/lanes/controller-state.md`'s top entry, with the measurement
+that makes the answer non-obvious. **No work item waits on it.**
