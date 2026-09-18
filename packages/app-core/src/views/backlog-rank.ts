@@ -1,4 +1,4 @@
-import { compareByRank } from '@gisik-nokma/domain';
+import { compareByRank, rankBetween } from '@gisik-nokma/domain';
 
 /**
  * Second wave Task 5 (backlog/closed second-wave plan, spec §8) — the Backlog
@@ -150,4 +150,85 @@ export function moveTarget<T extends RankRow>(
   }
   if (index === sorted.length - 1) return undefined;
   return sorted[index + 2]?.ticketId ?? null;
+}
+
+/** One row that had no key and is about to be given one. */
+export type RankBackfill = { ticketId: string; rank: string };
+
+/** What a move must ingest: keys for the rows that had none, then the key for the moved row. */
+export type RankMovePlan = {
+  /** Keys for the rows that had none, in DRAWN order. Empty when every other row already had one. */
+  backfill: RankBackfill[];
+  /** The key the moved row takes. */
+  rank: string;
+};
+
+/**
+ * The events a move must ingest — OWNER RULING, 2026-09-18, option B.
+ *
+ * ## Why this exists at all
+ *
+ * `compareByRank` sorts EVERY ranked row above EVERY unranked one, so a rank
+ * key can never place a row AFTER a row that has no key. Two moves are
+ * therefore unrepresentable on their own — and both are the ordinary case,
+ * because `rank` starts `null` for every ticket and so every project's backlog
+ * begins with nothing ranked:
+ *
+ * - "place last" in an all-unranked backlog: the only key available is the
+ *   midpoint, and a midpoint is the FIRST ranked row, so the row went to the
+ *   top (`[t1,t2,t3,t4]` + `t4` to the tail drew `t4 t1 t2 t3`);
+ * - any move that has to step over an unranked row: the row landed after the
+ *   last RANKED row, several places from where the pointer was, and if it was
+ *   already there the move committed an event and changed nothing.
+ *
+ * The owner ruled that the fix is to rank the rows that have no key FIRST, in
+ * their current drawn order, and then apply the move — one ingest, N+1 events.
+ * The drawn order is preserved because the backfilled keys are strictly
+ * ascending and all sit above the last existing key, which is exactly where
+ * `compareByRank` was already drawing those rows.
+ *
+ * ## The cost the owner accepted, stated rather than implied
+ *
+ * This is the first path on this surface that writes MORE THAN ONE event for
+ * one gesture, so a batch can partially succeed. `submitRank` reads the
+ * results BY INDEX and treats a partial application as its own outcome: the
+ * client's optimistic keys are dropped and the server's own state is reloaded,
+ * so the tab shows what the server actually holds rather than what was asked
+ * for. What a reader sees in the partial case is therefore NEVER a lie about
+ * the server's state — but it can be a silently different order from the one
+ * they asked for, and that is the price of B. The realistic partial (a prefix
+ * committing, since the server applies a batch in order) leaves the drawn
+ * order UNCHANGED and simply does not perform the move; a non-prefix partial
+ * can reorder, and the reload is what makes that visible instead of hidden.
+ */
+export function planRankMove<T extends RankRow>(
+  sorted: readonly T[],
+  movedId: string,
+  beforeId: string | null,
+): RankMovePlan {
+  const others = sorted.filter((row) => row.ticketId !== movedId);
+  const newKeys = new Map<string, string>();
+  const backfill: RankBackfill[] = [];
+  // The unranked rows are a contiguous TAIL of `sorted` (that is what
+  // `compareByRank` does), and they are visited in drawn order, so the keys
+  // ascend and the visible order is untouched by the backfill itself.
+  let cursor = lastRankedKey(others);
+  for (const row of others) {
+    if (row.rank !== null) continue;
+    const key = rankBetween(cursor, null);
+    backfill.push({ ticketId: row.ticketId, rank: key });
+    newKeys.set(row.ticketId, key);
+    cursor = key;
+  }
+  // The neighbours are read against the backfilled list, so "place last" now
+  // has a last key to sit after and the moved row lands where it was asked to.
+  const effective =
+    backfill.length === 0
+      ? sorted
+      : sorted.map((row) => {
+          const key = newKeys.get(row.ticketId);
+          return key === undefined ? row : { ...row, rank: key };
+        });
+  const { before, after } = neighboursFor(effective, movedId, beforeId);
+  return { backfill, rank: rankBetween(before, after) };
 }

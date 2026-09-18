@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { moveTarget, neighboursFor, sortByRank, type RankRow } from '../../src/views/backlog-rank.js';
+import { rankBetween } from '@gisik-nokma/domain';
+import { moveTarget, neighboursFor, planRankMove, sortByRank, type RankRow } from '../../src/views/backlog-rank.js';
 
 /**
  * 13.707 — the Backlog tab's rank arithmetic, pure and headless.
@@ -195,5 +196,96 @@ describe('13.707 moveTarget — where a Move up / Move down button points', () =
   it('an unknown movedId has no target in either direction', () => {
     expect(moveTarget(SORTED, 'ZZ', 'up')).toBeUndefined();
     expect(moveTarget(SORTED, 'ZZ', 'down')).toBeUndefined();
+  });
+});
+
+/**
+ * 13.711 — `planRankMove`: rank the rows that have no key FIRST, in drawn
+ * order, then apply the move. OWNER RULING 2026-09-18, option B, after the
+ * defect below was measured on the shipped build.
+ *
+ * Every case here is written as an OUTCOME — apply the plan the way
+ * `submitRank` will and read the order that results — rather than as a
+ * assertion about the keys, because the keys were never the point: the defect
+ * was that a perfectly valid key was drawn in the wrong place.
+ */
+describe('13.711 planRankMove — the unranked rows are ranked first, then the move', () => {
+  /** Apply a plan the way `submitRank` does, and report the drawn order. */
+  function applyPlan(rows: RankRow[], movedId: string, plan: ReturnType<typeof planRankMove>): string[] {
+    const keys = new Map(plan.backfill.map((b) => [b.ticketId, b.rank] as const));
+    keys.set(movedId, plan.rank);
+    return sortByRank(
+      rows.map((row) => {
+        const key = keys.get(row.ticketId);
+        return key === undefined ? row : { ...row, rank: key };
+      }),
+    ).map((row) => row.ticketId);
+  }
+
+  /** A brand-new backlog: every row unranked, which is how every project starts (`rank` is `null` until first ranked). */
+  const FRESH: RankRow[] = [r('t1', null), r('t2', null), r('t3', null), r('t4', null)];
+
+  it('THE CONTROL — without the plan, the same move has no key to sit after', () => {
+    // This is the defect the ruling exists to fix, asserted in the same run as
+    // the fix so the fix is a fact about a measurable difference rather than a
+    // description. `neighboursFor` answers `{null, null}` here, and
+    // `rankBetween(null, null)` is the midpoint — the FIRST ranked row — so
+    // the row dragged to the bottom drew at the TOP.
+    expect(neighboursFor(FRESH, 't4', null)).toEqual({ before: null, after: null });
+  });
+
+  it('PLANTED DEFECT: a tail drop in a fresh backlog now lands the row LAST', () => {
+    // KILLS: any plan that leaves an unranked row unranked, and any backfill
+    // whose keys do not ascend — either would draw `t4` above a row it was
+    // dragged below. The assertion is the ORDER, so a plan that produced a
+    // plausible-looking key in the wrong place cannot pass it.
+    const plan = planRankMove(FRESH, 't4', null);
+    expect(applyPlan(FRESH, 't4', plan)).toEqual(['t1', 't2', 't3', 't4']);
+  });
+
+  it('PLANTED DEFECT: a Move down that has to step over an unranked row now moves it', () => {
+    // The second shape of the same defect. `[A('g'), B('n'), C(null)]`: B's
+    // "down" target is the tail, and the only key available above 'g' drew B
+    // BEFORE C — so the button ingested an event and the order was unchanged.
+    const sorted = [r('A', 'g'), r('B', 'n'), r('C', null)];
+    const plan = planRankMove(sorted, 'B', null);
+    expect(applyPlan(sorted, 'B', plan)).toEqual(['A', 'C', 'B']);
+  });
+
+  it('the backfill assigns ascending keys in DRAWN order, and every one above the last existing key', () => {
+    // The property the drawn order is preserved BY, stated directly: the keys
+    // must ascend, and they must all sit above the last key already present —
+    // because `compareByRank` was already drawing those rows there, and a key
+    // that dipped below an existing one would move a row the user never
+    // touched.
+    const sorted = [r('A', 'g'), r('B', null), r('C', null)];
+    const plan = planRankMove(sorted, 'C', null);
+    expect(plan.backfill.map((b) => b.ticketId)).toEqual(['B']);
+    expect((plan.backfill[0]?.rank ?? '') > 'g').toBe(true);
+
+    const three = planRankMove([r('A', 'g'), r('B', null), r('C', null)], 'A', null);
+    expect(three.backfill.map((b) => b.ticketId)).toEqual(['B', 'C']);
+    const [first, second] = three.backfill;
+    expect((first?.rank ?? '') > 'g').toBe(true);
+    expect((second?.rank ?? '') > (first?.rank ?? '')).toBe(true);
+  });
+
+  it('backfills nothing when every other row already has a key — the ordinary move is untouched', () => {
+    // KILLS: a plan that ranks rows unnecessarily. With no unranked row the
+    // answer must be exactly what `neighboursFor`/`rankBetween` gave before
+    // this function existed, which is what keeps 13.708–13.710 green and what
+    // keeps the single-event path SINGLE.
+    const plan = planRankMove(SORTED, 'C', 'B');
+    expect(plan.backfill).toEqual([]);
+    expect(plan.rank).toBe(rankBetween(neighboursFor(SORTED, 'C', 'B').before, neighboursFor(SORTED, 'C', 'B').after));
+  });
+
+  it('the moved row is not backfilled and does not displace its own neighbours', () => {
+    // KILLS: backfilling the moved row itself, which would both waste an event
+    // and — because the backfill runs before the move — feed the move's own
+    // neighbour search a key for the row being moved.
+    const plan = planRankMove(FRESH, 't1', null);
+    expect(plan.backfill.map((b) => b.ticketId)).toEqual(['t2', 't3', 't4']);
+    expect(applyPlan(FRESH, 't1', plan)).toEqual(['t2', 't3', 't4', 't1']);
   });
 });

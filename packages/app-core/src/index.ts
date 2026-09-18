@@ -57,7 +57,10 @@ export { AttentionStrip, useAttention, type AttentionStripProps } from './views/
 export {
   moveTarget,
   neighboursFor,
+  planRankMove,
   sortByRank,
+  type RankBackfill,
+  type RankMovePlan,
   type RankRow,
 } from './views/backlog-rank.js';
 export { MyWork, useMyWork, type MyWorkProps } from './views/my-work.js';

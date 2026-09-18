@@ -667,3 +667,182 @@ describe('13.710 the Move up / Move down edges', () => {
     expect(screen.getByRole('button', { name: 'Move First down' })).toBeEnabled();
   });
 });
+
+/**
+ * 13.712 — the owner's ruling on the unranked tail (2026-09-18, option B):
+ * rank the rows that have no key FIRST, in their drawn order, then apply the
+ * move, all in one ingest.
+ *
+ * The cases below are the two behaviours that were BROKEN before the ruling
+ * (measured on the shipped build: a tail drop in a fresh backlog drew the row
+ * at the TOP, and a Move down that stepped over an unranked row drew the order
+ * unchanged), plus the partial-application case the owner accepted as the cost
+ * rather than waived.
+ */
+describe('13.712 the unranked backlog tail — option B: rank first, then move', () => {
+  const U1 = backlogRow('br_1', 'First', null);
+  const U2 = backlogRow('br_2', 'Second', null);
+  const U3 = backlogRow('br_3', 'Third', null);
+  const U4 = backlogRow('br_4', 'Fourth', null);
+
+  it('PLANTED DEFECT: a tail drop in a FRESH backlog lands the row LAST, and every unranked row gets a key', async () => {
+    // KILLS, in one case, both halves of the defect and the optimistic half
+    // too: a plan that leaves rows unranked (the order would be `br_4` first,
+    // because the moved row would be the only ranked one), and a `submitRank`
+    // that applies the moved row's optimistic key WITHOUT the backfilled
+    // rows' — the same wrong order, on screen, before the answer lands.
+    const services = servedWorld([U1, U2, U3, U4]);
+    const captured: CapturedRank[] = [];
+    const answers: Array<(results: unknown[]) => void> = [];
+    services.dataSource.ingest = async (events) => {
+      for (const event of events) {
+        captured.push({
+          entityId: event.entity.id,
+          type: event.type,
+          rank: (event.payload as { rank?: unknown }).rank,
+        });
+      }
+      return await new Promise((resolve) => {
+        answers.push(resolve as (results: unknown[]) => void);
+      });
+    };
+
+    render(
+      <Providers services={services}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
+    await screen.findByText('Fourth');
+    expect(backlogOrder()).toEqual(['br_1', 'br_2', 'br_3', 'br_4']);
+
+    const dataTransfer = fakeDataTransfer();
+    fireEvent.dragStart(rowTr('br_4'), { dataTransfer });
+    fireEvent.dragOver(tailZone(), { dataTransfer });
+    fireEvent.drop(tailZone(), { dataTransfer });
+
+    await waitFor(() => expect(captured).toHaveLength(4));
+    // The move is the LAST event, and every earlier one is a distinct row.
+    expect(captured.map((c) => c.entityId)).toEqual(['br_1', 'br_2', 'br_3', 'br_4']);
+    expect(captured.every((c) => c.type === 'ticket.ranked')).toBe(true);
+
+    // The backfill keys ascend above the tail they already occupied, and the
+    // moved row's key is above all of them — which is what makes it LAST. The
+    // assertion is the comparisons, never a literal key.
+    const keys = captured.map((c) => c.rank as string);
+    for (let i = 1; i < keys.length; i += 1) {
+      expect((keys[i] as string) > (keys[i - 1] as string)).toBe(true);
+    }
+
+    // Optimistically LAST while the ingest is still open.
+    await waitFor(() => expect(backlogOrder()).toEqual(['br_1', 'br_2', 'br_3', 'br_4']));
+
+    answers[0]?.(captured.map((c, i) => ({ status: 'committed' as const, eventId: `e${i}`, seq: i + 1, serverTime: '2026-09-17T09:05:00.000Z' })));
+  });
+
+  it('PLANTED DEFECT: Move down that has to step over an unranked row now moves it', async () => {
+    // The second shape. `[br_1('g'), br_2('n'), br_3(null)]`: Second's "down"
+    // target is the tail, and before the ruling the only key available above
+    // 'g' drew it BEFORE Third — an enabled button that spent an ingest and
+    // changed nothing.
+    const R1 = backlogRow('br_1', 'First', 'g');
+    const R2 = backlogRow('br_2', 'Second', 'n');
+    const R3 = backlogRow('br_3', 'Third', null);
+    const captured: CapturedRank[] = [];
+    // The reload answers with the ranks the move JUST produced, so the order
+    // asserted below is the SERVER'S and not the client's optimistic override
+    // surviving a stub that never changed its answer. A fixture that kept
+    // returning the old rows would leave that assertion satisfied by the
+    // override, which is a weaker claim than it reads as.
+    let calls = 0;
+    const services = servedWorld([R1, R2, R3], {
+      getTickets: async (): Promise<TicketListView> => {
+        calls += 1;
+        if (calls === 1) return { projectId: PROJECT, rows: [R1, R2, R3] };
+        const keys = new Map(captured.map((entry) => [entry.entityId, entry.rank as string] as const));
+        return {
+          projectId: PROJECT,
+          rows: [R1, R2, R3].map((row) => {
+            const key = keys.get(row.ticketId);
+            return key === undefined ? row : { ...row, rank: key };
+          }),
+        };
+      },
+    });
+    services.dataSource.ingest = async (events) => {
+      for (const event of events) {
+        captured.push({
+          entityId: event.entity.id,
+          type: event.type,
+          rank: (event.payload as { rank?: unknown }).rank,
+        });
+      }
+      return events.map((event) => ({
+        status: 'committed' as const,
+        eventId: event.id,
+        seq: 1,
+        serverTime: '2026-09-17T09:05:00.000Z',
+      }));
+    };
+
+    render(
+      <Providers services={services}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
+    await screen.findByText('Third');
+    expect(backlogOrder()).toEqual(['br_1', 'br_2', 'br_3']);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Move Second down' }));
+
+    await waitFor(() => expect(captured).toHaveLength(2));
+    // The unranked row is ranked first, then the move — never the other way.
+    expect(captured[0]?.entityId).toBe('br_3');
+    expect(captured[1]?.entityId).toBe('br_2');
+    expect((captured[1]?.rank as string) > (captured[0]?.rank as string)).toBe(true);
+    await waitFor(() => expect(backlogOrder()).toEqual(['br_1', 'br_3', 'br_2']));
+  });
+
+  it('a PARTIAL application is reported and the list reloads to the server\'s own state', async () => {
+    // The cost the owner accepted rather than waived. Half the batch commits;
+    // the tab must NOT keep showing the order that was asked for, and the
+    // person must be told. Reported on the transport channel, because part of
+    // it committed — it is not a verdict.
+    let reloads = 0;
+    const services = servedWorld([U1, U2, U3, U4], {
+      getTickets: async (): Promise<TicketListView> => {
+        reloads += 1;
+        return { projectId: PROJECT, rows: [U1, U2, U3, U4] };
+      },
+    });
+    services.dataSource.ingest = async (events) =>
+      events.map((event, index) =>
+        index === 0
+          ? { status: 'committed' as const, eventId: event.id, seq: 1, serverTime: '2026-09-17T09:05:00.000Z' }
+          : { status: 'refused' as const, eventId: event.id, rule: 'some-rule', reason: 'Some reason.' },
+      );
+
+    render(
+      <Providers services={services}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
+    await screen.findByText('Fourth');
+    const before = reloads;
+
+    const dataTransfer = fakeDataTransfer();
+    fireEvent.dragStart(rowTr('br_4'), { dataTransfer });
+    fireEvent.dragOver(tailZone(), { dataTransfer });
+    fireEvent.drop(tailZone(), { dataTransfer });
+
+    expect(
+      await screen.findByText('Only 1 of the 4 parts of this move reached the server — the list has been reloaded to match what the server holds.'),
+    ).toBeInTheDocument();
+    // Reloaded: the tab shows what the server holds, not what was asked for.
+    await waitFor(() => expect(reloads).toBeGreaterThan(before));
+    // Never dressed as a verdict — part of the batch committed.
+    expect(screen.queryByText(/^Refused by the server/)).not.toBeInTheDocument();
+  });
+});

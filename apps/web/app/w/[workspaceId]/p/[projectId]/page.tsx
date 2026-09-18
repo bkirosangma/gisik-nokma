@@ -263,13 +263,6 @@ function ProjectBoard() {
   }, []);
   useEffect(() => {
     setRankOverrides((current) => (current.size === 0 ? current : new Map()));
-    // The drag's notice is cleared by the same answer, and for the same
-    // reason: it describes a gesture against the order the server had just
-    // sent, and a fresh answer is a new order for it to be wrong about. Left
-    // alone it outlived the reload AND every tab switch. A REFUSAL does not
-    // reload, so a refusal's notice stays until the next answer — which is
-    // what the person who just watched their row snap back needs.
-    setRankNotice(null);
   }, [list.rows]);
 
   /**
@@ -669,6 +662,15 @@ function ProjectBoard() {
    */
   const onReorderBacklogRow = useCallback(
     (movedId: string, beforeId: string | null) => {
+      // Cleared as a NEW move begins, which is where it goes stale — and NOT
+      // when the list reloads. The review's M-d was right that nothing cleared
+      // it, but the reload is the wrong moment and measurably so: a PARTIAL
+      // application reports its outcome and then reloads to show the server's
+      // state, so clearing on the answer ate the very message explaining what
+      // the person was looking at. The next gesture replaces it, a success
+      // clears it, and a failure keeps it — which is what someone who just
+      // watched their row snap back needs.
+      setRankNotice(null);
       void (async () => {
         const outcome = await submitRank(movedId, beforeId, {
           sorted: backlogRows,
@@ -680,7 +682,11 @@ function ProjectBoard() {
         });
         if (outcome.status === 'refused') {
           setRankNotice({ channel: 'server', text: `Refused by the server — ${outcome.rule}: ${outcome.reason}` });
-        } else if (outcome.status === 'unreachable') {
+        } else if (outcome.status === 'unreachable' || outcome.status === 'partial') {
+          // `partial` rides the transport channel on purpose: part of the
+          // batch DID commit, so it is not a verdict, and the refusal class is
+          // for verdicts. Its message says what happened; `submitRank` has
+          // already reloaded the list to match the server.
           setRankNotice({ channel: 'transport', text: outcome.message });
         } else {
           setRankNotice(null);

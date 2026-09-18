@@ -41,15 +41,15 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~12:3x IST. **SECOND WAVE, TASK 5 (the Backlog tab's
-> # rank order, drag reorder, and Move up / Move down) IS COMMITTED, ITS INDEPENDENT REVIEW IS RECORDED
-> # BELOW WITH ALL FOUR OF ITS SURVIVING MUTANTS NOW KILLED — AND THE PR IS DELIBERATELY *NOT* OPENED.
-> # I AM HOLDING ON ONE RULING (finding I5, below): in a backlog where nothing is ranked yet, "place
-> # last" moves the row to the TOP — and M-b, the same class (grouping makes the drawn order disagree
-> # with the rank order, on the DEFAULT grouping), is priced in the same request. The controller read the
-> # finding and ruled 2026-09-18 that a short
-> # hold is cheaper than shipping it and correcting it in a second PR.** Everything else is green and
-> # ready; the ONLY outstanding work is that ruling. This block is the position; everything below it is
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~12:5x IST. **SECOND WAVE, TASK 5 (the Backlog tab's
+> # rank order, drag reorder, and Move up / Move down) IS DONE, REVIEWED, FIXED, AND THEN FIXED AGAIN
+> # UNDER AN OWNER RULING. PR OPEN ON BASE `main`, AWAITING THE CONTROLLER'S MERGE.** An independent
+> # review's four surviving mutants are all killed (below); the unranked-tail defect that same review
+> # found was HELD rather than shipped — the controller ruled a short hold cheaper than shipping it and
+> # correcting it in a second PR — and the OWNER THEN RULED **OPTION B**: rank the rows that have no key
+> # first, in their drawn order, then apply the move, in ONE ingest. It is implemented in the ruling
+> # commit, with the partial-batch cost the owner accepted handled explicitly rather than left implicit.
+> # This block is the position; everything below it is
 > # RECORD. **The queue after this task is NOT empty** — Task 6 of
 > # `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md` (`autoCloseAfterDays`: the
 > # setting, the projection, the wire, and the Workspace settings tab) is next, and it is **dispatched
@@ -60,12 +60,12 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | | |
 > |---|---|
 > | branch | `exec/second-wave-t5-backlog-rank`, cut from `origin/main` = **`488bfb2d`** (Task 4, PR #446). Not rebased since; no peer landed under it while it was open |
-> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha printed here names an ANCESTOR. TWO commits: **`204cf374`** (the task, 8 files, +1145/−67) and a **fix round** carrying the review's repairs — the four surviving-mutant kills, three Minor fixes, the docblock corrections and this handoff. `204cf374` is an ANCESTOR of the fix round, not the head |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha printed here names an ANCESTOR. FOUR commits: **`204cf374`** (the task, 8 files, +1145/−67), **`8ec6d18b`** (the review fix round: four surviving mutants killed, three Minor fixes), **`7663ea4f`** (the grouping finding recorded as a measurement), and a **ruling commit** implementing option B with its cases. Every earlier sha is an ANCESTOR of the head, never the head |
 > | base | **`488bfb2d`** = `origin/main`, carrying second-wave Tasks 1 (#441), 2 (#442), 3 (#444), 4 (#446) and executor 2's Members+InviteAdmin (#443) |
 > | PR base | **`main`** — `owner/workspace-edits` is retired and deleted |
-> | case ids | **`13.707`–`13.710`**, inside this executor's allocated block `13.700`–`13.759`. **Recounted two independent ways at this tip and they agree:** over case MARKERS using `scripts/check-case-ids.mjs`'s own `ID_LINE` regex, the highest marker minted in the block was `13.706` (Task 4's); and `grep -rnE '13\.70[7-9]\|13\.710'` over `packages/`, `apps/` and `test-cases/` returned **no hits at all**, against a positive control over `13\.70[0-6]` (found in both) and a null control over `13\.999` (absent). The plan's own `13.622`–`13.625` were NOT used — the dispatch records them as taken |
-> | six checks | **all EXIT 0 at `204cf374`**, run through `pnpm run check:*` so no filename is guessed: `tasks` · `env` · `runbook` · `help` · `citations` (**ratchet holds exactly on every file**; file 13 = **565** cited / 0 uncited, up from Task 4's 561 by exactly this task's four ✅ cases) · `db-tz` **0 with `DATABASE_URL=postgres://gisik:gisik@localhost:54330/gisik_nokma`** (exits 2 without it, by design; note 54330, not the shared cross-lane test Postgres on 54329). Also `node scripts/check-case-ids.mjs` **EXIT 0** — **2255** unique ids (was 2251; +4 = this task's cases), union == sum so no duplicates, self-test passed |
-> | suites | **app-core 1506 · apps/web 467, zero failures**, both `--no-file-parallelism`, Node **v22.22.2**, re-run after the fix round and after the dist rebuild. Both figures reconcile against Task 4's, which is what makes them a positive control that the new cases are COLLECTED rather than merely written: app-core **1486 + 20 = 1506** (20 cases in `backlog-rank.test.ts`, one added by the fix round) and apps/web **465 + 2 = 467** (the Task 5 describe blocks grew from 6 to 8 cases in the fix round; the file's pre-existing four are included in both numbers) |
+> | case ids | **`13.707`–`13.712`** — four from the task and two from the ruling fix — inside this executor's allocated block `13.700`–`13.759`; **`13.713`–`13.759` remain unminted**. **Recounted two independent ways at this tip and they agree:** over case MARKERS using `scripts/check-case-ids.mjs`'s own `ID_LINE` regex, the highest marker minted in the block was `13.706` (Task 4's); and `grep -rnE '13\.70[7-9]\|13\.710'` over `packages/`, `apps/` and `test-cases/` returned **no hits at all**, against a positive control over `13\.70[0-6]` (found in both) and a null control over `13\.999` (absent). The plan's own `13.622`–`13.625` were NOT used — the dispatch records them as taken |
+> | six checks | **all EXIT 0 at the ruling commit**, run through `pnpm run check:*` so no filename is guessed: `tasks` · `env` · `runbook` · `help` · `citations` (**ratchet holds exactly on every file**; file 13 = **567** cited / 0 uncited, up from Task 4's 561 by exactly this task's six ✅ cases) · `db-tz` **0 with `DATABASE_URL=postgres://gisik:gisik@localhost:54330/gisik_nokma`** (exits 2 without it, by design; note 54330, not the shared cross-lane test Postgres on 54329). Also `node scripts/check-case-ids.mjs` **EXIT 0** — **2257** unique ids (was 2251; +6 = this task's six cases), union == sum so no duplicates, self-test passed |
+> | suites | **app-core 1512 · apps/web 470, zero failures**, both `--no-file-parallelism`, Node **v22.22.2**, re-run after the fix round and after the dist rebuild. Both figures reconcile against Task 4's, which is what makes them a positive control that the new cases are COLLECTED rather than merely written: app-core **1486 + 26 = 1512** (20 cases in `backlog-rank.test.ts`, one added by the fix round) and apps/web **465 + 5 = 470** (the Task 5 describe blocks grew from 6 to 8 cases in the fix round; the file's pre-existing four are included in both numbers) |
 > | typechecks | **domain, app-core, ui and apps/web all EXIT 0** — run after rebuilding `packages/domain` and `packages/app-core` dist, which `apps/web` resolves through by package name |
 > | tree | clean at the frozen head; no `dist`, no `task-ledger.tsv`, no `.superpowers/` in the diff (checked by `git diff --name-only`) |
 > | dev stack | **no compose action was run at any point.** `curl -s localhost:3000/v1/auth/methods` still answers `{"google":true,"apple":false,"phone":false}` — the sign-in the 2026-09-09 env rule protects is intact |
@@ -128,9 +128,18 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > the DEFAULT state of every project, since `rank` starts NULL (Task 3's 13.702). The module's docblock
 > claimed the opposite — "after the last row and after the last key are the same position in the
 > rendered order" — and **that sentence was FALSE**; it is corrected in the fix commit, with the defect
-> named in the source. **Recorded, not fixed: the remedy is a product decision, priced three ways in
-> `gisik-nokma-lanes/EXEC-2026-09-18-t5-unranked-tail.md`, with a recommendation and a standing offer to
-> take whichever the controller rules.**
+> named in the source. **RESOLVED — the controller held the PR (a short hold being cheaper than shipping it and correcting it
+> in a second PR), escalated with its own independent verification, and the OWNER RULED OPTION B on
+> 2026-09-18: rank the rows that have no key first, in their drawn order, then apply the move, in ONE
+> `dataSource.ingest` carrying N+1 events. Implemented in the ruling commit as `planRankMove` (pure,
+> cases 13.711) plus `submitRank` publishing the backfilled keys optimistically too (13.712) — without
+> which the moved row would be the only ranked row on screen and would draw ABOVE the rows it was
+> dragged past, i.e. the same defect on the client. THE ACCEPTED COST IS HANDLED EXPLICITLY, not left
+> implicit: results are read BY INDEX, a partly-committed batch reports its own `partial` outcome on the
+> transport channel (part of it committed, so it is not a verdict), drops every optimistic key and
+> RELOADS so the tab shows the server's state rather than the requested one. Three mutants were run
+> against the fix and all three die: no-backfill (both new web cases red), no-optimistic-keys-for-
+> backfilled-rows (both red), and a `partial` reported as `committed` (the partial case red).
 >
 > **Minor — all three FIXED in this change set.** M-a: `rank()`'s docblock claimed a re-check the body
 > did not perform (it forwarded `up ?? null`, turning the edge's `undefined` into "place last" — a

@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { rankBetween } from '@gisik-nokma/domain';
-import { makeSubmittedFactory, moveTarget, neighboursFor, type DataSource, type ListRow } from '@gisik-nokma/app-core';
+import { makeSubmittedFactory, moveTarget, planRankMove, type DataSource, type ListRow } from '@gisik-nokma/app-core';
 
 /**
  * Second wave Task 5 — the Backlog tab's Move up / Move down, and the ONE
@@ -57,67 +56,141 @@ export type RankDeps = {
   onRanked: () => void;
 };
 
-/** The three answers a caller can render, already split the way Ruling 27 requires. */
+/** The answers a caller can render, already split the way Ruling 27 requires. */
 export type RankOutcome =
   | { status: 'committed' }
   | { status: 'refused'; rule: string; reason: string }
-  | { status: 'unreachable'; message: string };
+  | { status: 'unreachable'; message: string }
+  /**
+   * SOME of the events in the batch committed and some did not. Its own status
+   * rather than a folded refusal, because it is neither a verdict nor a
+   * dropped connection, and calling it either would be a lie about the cause.
+   * See `submitRank`'s docblock for what the reader sees.
+   */
+  | { status: 'partial'; applied: number; total: number; message: string };
 
 /**
  * Move `movedId` to sit just before `beforeId` — or last, when `beforeId` is
- * `null` — by ingesting one `ticket.ranked`.
+ * `null` — by ingesting the events `planRankMove` says the move needs.
  *
- * The order of the three steps is load-bearing. The key is computed FIRST, so
- * a `rankBetween` throw (an inverted neighbour pair — the caller's own bug)
- * happens before anything is shown as moved and before any event exists. The
- * override is applied before the await, so the row moves under the pointer
- * rather than after a round trip. And the override is cleared on every
- * non-committed answer, because an override that outlives its answer is a row
- * displayed at a position the server never agreed to.
+ * ## Why this can be more than one event (owner ruling, 2026-09-18, option B)
+ *
+ * A rank key cannot place a row AFTER a row that has no key, so in a backlog
+ * where nothing is ranked — the state every project starts in — "place last"
+ * and any move that steps over an unranked row are unrepresentable. The ruling
+ * is to rank those rows first, in their drawn order, and then apply the move,
+ * all in one `ingest`. `planRankMove` computes both halves; this function
+ * sends them.
+ *
+ * ## What the reader sees when only SOME events commit
+ *
+ * The results are read BY INDEX, and the first index that is not `committed`
+ * decides the outcome. If it is index 0 nothing was applied and this is the
+ * ordinary refusal/silence/transport case. If it is LATER, the batch partially
+ * applied: some rows now carry keys and the move did not happen (or happened
+ * against a list the server only half-ranked). **The drawn order can therefore
+ * differ from the one the person asked for** — that is the cost of option B,
+ * accepted by the owner, not waived. This function does not paper over it: it
+ * reports `partial`, drops every optimistic key it applied, and calls
+ * `onRanked()` so the tab reloads and shows the SERVER'S OWN state. The person
+ * is told what happened rather than left with a client-side order the server
+ * never agreed to.
+ *
+ * The realistic partial — the server applies a batch in order, so a PREFIX
+ * commits — leaves the drawn order unchanged and simply does not perform the
+ * move, because the backfilled keys ascend within the tail they already
+ * occupied. A non-prefix partial can genuinely reorder, and the reload is what
+ * makes that visible instead of hidden.
+ *
+ * The order of the steps is load-bearing. The keys are computed first, so a
+ * `rankBetween` throw (an inverted neighbour pair — the caller's own bug)
+ * happens before anything is shown as moved and before any event exists. Every
+ * optimistic key is applied before the await, INCLUDING the backfilled rows':
+ * without those, the moved row would be the only ranked row in the client's
+ * list and would draw above the rows it was dragged past — the very defect
+ * this ruling fixes, reintroduced optimistically. And every key this call
+ * applied is dropped on any non-committed answer, because a key that outlives
+ * its answer is a row displayed at a position the server never agreed to.
  */
 export async function submitRank(
   movedId: string,
   beforeId: string | null,
   deps: RankDeps,
 ): Promise<RankOutcome> {
-  const { before, after } = neighboursFor(deps.sorted, movedId, beforeId);
-  const rank = rankBetween(before, after);
-  deps.onOptimistic(movedId, rank);
+  const plan = planRankMove(deps.sorted, movedId, beforeId);
+  const applied = [...plan.backfill.map((entry) => entry.ticketId), movedId];
+  for (const entry of plan.backfill) deps.onOptimistic(entry.ticketId, entry.rank);
+  deps.onOptimistic(movedId, plan.rank);
 
-  let committed = false;
+  let keep = false;
   try {
     const make = makeSubmittedFactory({ actorId: deps.currentUserId, origin: 'web' });
-    const event = make({
-      workspaceId: deps.workspaceId,
-      entity: { kind: 'ticket', id: movedId },
-      type: 'ticket.ranked',
-      payload: { rank },
-    });
-    const results = await deps.dataSource.ingest([event]);
-    const result = results[0];
-    if (result === undefined) {
-      // Ruling 27/41: silence, not a refusal.
-      return { status: 'unreachable', message: 'The server did not answer this move.' };
-    }
-    if (result.status === 'committed') {
-      committed = true;
+    const events = [
+      ...plan.backfill.map((entry) =>
+        make({
+          workspaceId: deps.workspaceId,
+          entity: { kind: 'ticket', id: entry.ticketId },
+          type: 'ticket.ranked',
+          payload: { rank: entry.rank },
+        }),
+      ),
+      make({
+        workspaceId: deps.workspaceId,
+        entity: { kind: 'ticket', id: movedId },
+        type: 'ticket.ranked',
+        payload: { rank: plan.rank },
+      }),
+    ];
+    const results = await deps.dataSource.ingest(events);
+    // BY INDEX, and a MISSING result counts as a failure rather than being
+    // skipped: an answer shorter than the batch is silence about the tail of
+    // it, which is not a commit.
+    const failedAt = events.findIndex((_, index) => results[index]?.status !== 'committed');
+    if (failedAt === -1) {
+      keep = true;
       deps.onRanked();
       return { status: 'committed' };
     }
-    return result.status === 'refused'
-      ? { status: 'refused', rule: result.rule, reason: result.reason }
-      : { status: 'refused', rule: result.code, reason: result.message };
+    if (failedAt > 0) {
+      // Partial. Reload so the tab shows what the server holds, and say so.
+      deps.onRanked();
+      return {
+        status: 'partial',
+        applied: failedAt,
+        total: events.length,
+        message: `Only ${failedAt} of the ${events.length} parts of this move reached the server — the list has been reloaded to match what the server holds.`,
+      };
+    }
+    const failure = results[0];
+    if (failure === undefined) {
+      // Ruling 27/41: silence, not a refusal.
+      return { status: 'unreachable', message: 'The server did not answer this move.' };
+    }
+    if (failure.status !== 'committed') {
+      // The batch's FIRST event is the one that did not commit, so this is the
+      // ordinary one-event failure — a refusal, or a rejected event, split the
+      // way Ruling 27 requires.
+      return failure.status === 'refused'
+        ? { status: 'refused', rule: failure.rule, reason: failure.reason }
+        : { status: 'refused', rule: failure.code, reason: failure.message };
+    }
+    // UNREACHABLE, and said rather than cast away: `failedAt === 0` means the
+    // first event did not commit, so a `committed` first result contradicts
+    // the index that got us here. If a future change to the loop above ever
+    // makes this reachable, silence is the honest answer — the batch reported
+    // no failure and no success worth acting on.
+    return { status: 'unreachable', message: 'The server did not answer this move.' };
   } catch (cause) {
     // Ruling 27: a transport failure is not a refusal either.
     const message = cause instanceof Error ? cause.message : String(cause);
     return { status: 'unreachable', message: `We could not reach the server for this move — ${message}` };
   } finally {
-    // The snap-back. Reached for BOTH failure shapes and for the throw above,
-    // which is why it is a `finally` and not two branches — and NOT for the
-    // committed path, where the override must survive until the reload's own
-    // answer lands (that is what keeps the row from flicking back to its old
-    // position during the round trip).
-    if (!committed) deps.onOptimistic(movedId, null);
+    // The snap-back. Reached for BOTH failure shapes, for the partial case and
+    // for the throw above — which is why it is a `finally` and not branches —
+    // and NOT for the committed path, where the keys must survive until the
+    // reload's own rows land (that is what keeps the list from flicking back
+    // to its old positions during the round trip).
+    if (!keep) for (const id of applied) deps.onOptimistic(id, null);
   }
 }
 
@@ -190,6 +263,14 @@ export function BacklogRankControls({
         return;
       }
       if (outcome.status === 'unreachable') {
+        setServerRefusal(null);
+        setTransportError(outcome.message);
+        return;
+      }
+      if (outcome.status === 'partial') {
+        // NOT the refusal channel: part of the batch did commit, so this is
+        // not a verdict, and `ui.css` is explicit that a non-verdict never
+        // wears `--server`. The sentence already says what happened.
         setServerRefusal(null);
         setTransportError(outcome.message);
         return;
