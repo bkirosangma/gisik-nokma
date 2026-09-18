@@ -10175,9 +10175,10 @@ next free id in the block, and the second-wave block `13.760`–`13.819` is unto
   `selected ? selected.label : placeholder`) — so an owner's cell would read `Select…` beside the person who
   owns the workspace, on the screen whose whole subject is who holds what. Offering the row a control would
   also be a demotion door with no designed flow, the mirror of the promotion the plan refuses to add.
-  **This narrowing is a CONSERVATIVE DEFAULT taken by the executor and filed for a ruling, not a decision
-  taken silently**: `gisik-nokma-lanes/EXEC2-2026-09-18-owner-row-editability.md`. If the answer is that
-  owner rows should be editable, the predicate at `:430` and this case change together and nothing else does.
+  **This narrowing was a CONSERVATIVE DEFAULT taken by the executor, filed rather than assumed, and it has
+  since been RULED ON: the controller confirmed it on 2026-09-18**, answering
+  `gisik-nokma-lanes/EXEC2-2026-09-18-owner-row-editability.md`, which priced both readings. If that
+  decision is ever revisited, the predicate at `:430` and this case change together and nothing else does.
   **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:430`, `:518`,
   `apps/web/test/members-page.test.tsx:910`
 
@@ -10240,7 +10241,7 @@ piece of work.
 3. **Capitalised labels were NOT adopted, and this is a deviation from the plan's sample rather than an
    oversight.** The plan expects `['Admin', 'Member', 'Guest']`; the shipped control offers
    `['admin', 'member', 'guest']`. Two reasons, and the second is decisive: the mint form on this same page
-   already ships the lowercase labels (`page.tsx:472-481`, pinned by case 3.132), and the roster's chip
+   already ships the lowercase labels (`page.tsx:669-671`, pinned by case 3.132), and the roster's chip
    prints the wire's own token — case 13.761 pins that with the reasoning that a case expecting `'Owner'`
    "would be asserting a mapping nobody wrote". A capitalised label here would be a display mapping living
    in exactly one control; the mixed presentation it produces on one screen (a lower-case `owner` chip

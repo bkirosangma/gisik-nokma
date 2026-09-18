@@ -901,11 +901,10 @@ describe('13.824 the roster’s role control, and the option it deliberately doe
    * the promotion this plan refuses to add.
    *
    * So the control is offered where it can state the value it would change, and
-   * the chip stays where it cannot. This is a CONSERVATIVE DEFAULT taken here
-   * rather than a ruling: it is filed with the controller in
-   * `gisik-nokma-lanes/EXEC2-2026-09-18-owner-row-editability.md`, and if the
-   * answer is that owner rows should be editable, this arm and this case change
-   * together.
+   * the chip stays where it cannot. This was a CONSERVATIVE DEFAULT taken here
+   * and has since been RULED ON: the controller confirmed it on 2026-09-18,
+   * answering `gisik-nokma-lanes/EXEC2-2026-09-18-owner-row-editability.md`. If
+   * that decision is ever revisited, this arm and this case change together.
    */
   it('13.828 an OWNER’s row keeps the chip, because the control cannot state the value it holds', async () => {
     mount({ listPending: async () => [] });

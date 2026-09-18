@@ -100,10 +100,12 @@ export const COPY_IT_NOW = 'Copy it now — it is not stored and cannot be shown
  * owner's row; offering that row a control would also be a demotion door with no
  * designed flow — the mirror of the promotion the plan refuses to add.
  *
- * **This narrowing is a CONSERVATIVE DEFAULT taken by the executor, not a
- * ruling**, and it is filed with the controller (the dispatch protocol's
- * one-line question) because the prototype genuinely disagrees with it. If the
- * ruling is that owner rows should be editable, the predicate in the Role cell
+ * **This narrowing was a CONSERVATIVE DEFAULT taken by the executor, and it has
+ * since been RULED ON: the controller confirmed it on 2026-09-18**, answering the
+ * question filed as `gisik-nokma-lanes/EXEC2-2026-09-18-owner-row-editability.md`
+ * (which priced both readings). The earlier sentence in this spot said the
+ * narrowing was "not a ruling", which was true only until the answer came back.
+ * The default stands; if it is ever revisited, the predicate in the Role cell
  * and case 13.828 change together, and nothing else does.
  *
  * ## THE ROLE GATE IS THE SERVER'S 403, and that is an adaptation worth naming
@@ -483,16 +485,16 @@ export default function MembersPage() {
 
 /**
  * The roles the roster's role control may SET — the invite form's own three
- * (`:472-481`), with the same omission and the same reason. `owner` is absent
+ * (`:669-671`), with the same omission and the same reason. `owner` is absent
  * because there is no ownership-transfer flow: the prototype offers it
- * (`:680-685`), `inviteSentPayload` refuses it, `check-permission.ts:373`
+ * (`:680-685`), `inviteSentPayload` refuses it, `check-permission.ts:389`
  * records that the invite path "refuses `owner`, and stops there", and Task 1's
  * `grant-owner-requires-owner` now refuses it on the ingest door too. Promoting
  * somebody to owner is a task of its own, not an option in a dropdown.
  *
  * The LABELS are the wire's own tokens and not prettified, which is the
  * judgement the roster's chip already carries and case 13.761 pins: the mint
- * form on this same page ships `admin / member / guest` (`:472-481`), and a
+ * form on this same page ships `admin / member / guest` (`:669-671`), and a
  * capitalised label here would be a display mapping that exists in exactly one
  * control and nowhere else in the product.
  */
