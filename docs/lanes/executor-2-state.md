@@ -20,7 +20,87 @@
 
 ---
 
-## ▲ TOP BLOCK — the attention strip's Part 2, adopted WHOLE (2026-09-18, evening)
+## ▲ TOP BLOCK — settings → workflows, plan Tasks 2 + 3: two RULED absences, and one of them ESCALATED as a departure (2026-09-18, night)
+
+**Position: the change is committed and reviewed; the PR is open at the controller's merge.** Dispatch:
+`CTL-DISPATCH-2026-09-18-settings-wf-task3.md`. One branch, **`exec2/settings-wf-t2-t3`**,
+**`--base main`**, cut from **`f5f8b6dd`** (the sha the controller's own paste named).
+
+**FIRST ACTION ON A RESTART: `gh pr list --state open`.** If this branch's PR is open it is at the
+controller's merge and nothing below needs redoing; if it has MERGED, this block is history and the
+controller's next dispatch is the position.
+
+### The shape of what shipped: NO product code, and that IS the deliverable
+
+Both tasks were ruled before dispatch and both resolve to "do not build". What ships is the RECORD — a
+docblock, `Features.md`, a catalogue section — so a later reader comparing this screen to the prototype
+meets a decision and a measurement rather than a silence that reads as an oversight.
+
+- **Task 2 — the status badge is DROPPED.** `PublishedWorkflowDef` gains no status field and no event is
+  added: the list serves only published definitions, so a field holding exactly one value would be a badge
+  that lies by omission the moment a second state exists.
+- **Task 3 — `"View history"` is NOT built, and the record says this is a DEPARTURE from the ruling
+  rather than compliance with it.** The ruling is data-conditional; its data half is **SATISFIED**; on its
+  own words the button was owed. What stops it is a second rule from the same task text — a button with no
+  door behind it is "the exact defect this repo keeps re-finding" — and here it would have no door: the
+  prototype draws no history view (its handler is a toast) and the card it hangs on is a superseded
+  version's, which this screen does not render. **Two rules collide and only the owner can pick:
+  ESCALATED to the controller in the PR body and in a message.**
+- **A correction to the dispatch's own framing, recorded:** `"View history"` is the superseded card's
+  **`primary`** label (`:3178`), NOT a second action — every card's `secondLabel` is `"Duplicate"`. The
+  plan and the delta doc (`:635`) group the three strings as "the second action", and that grouping hides
+  the one that is not second.
+
+### Anchors — verify these; do not trust the row
+
+| | |
+|---|---|
+| branch | `exec2/settings-wf-t2-t3` |
+| cut from / base | **`f5f8b6dd`** (`origin/main`) |
+| reviewed head | **`36657dc4`** — what the reviewer reviewed. |
+| fix rounds | **`fa22318d`** (the Critical), **`969a6e39`** (the re-review's surviving finding). A block cannot name the commit that carries it: the HANDOFF commit sits one above, so `rev-parse HEAD` at the tip is NOT the code head. |
+| files | **4** — `packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx` · `Features.md` · `test-cases/13-deployment-dogfooding.md` · this file. Count with `/usr/bin/git diff --name-only origin/main...HEAD`, **three dots**; `A..B` compares tips and would list a peer's files as yours. |
+| ids minted | **NONE — deliberate.** Exec 2's block `13.890`–`13.919` is used only through `13.893`; **`13.894` onward is still free.** Both absences are already pinned at the RENDERED node by **13.920** (`screens.test.tsx:208-213`), and neither ruling adds an assertion a run could falsify — so an id would create a case no run can ever turn ❌. |
+| tree | clean; `docker compose` NOT run; :3001 and :3021 NOT bound |
+
+### The measurement, in one paragraph
+
+The chain is **not missing**: `proj_workflows` holds every published version as its own row,
+`readWorkflowVersions` (`apps/server/src/sync/ledger-deps.ts:156-174`) already returns the whole ladder,
+and the version-aware read ships **end to end** — `getWorkflowDef(workspaceId, workflowId, version?)`
+(`data-source.ts:146`) carries a version the online adapter sends as `?version=`
+(`online-data-source.ts:277-281`) to a route serving any single version (`builder-reads.ts:517-546`).
+`WorkflowAuthoringGateway` is version-blind and its web adapter **drops** that argument
+(`data-source-gateway.ts:224`). Versions are contiguous **by server-side enforcement**
+(`rule-engine/src/workflow-defined.ts:53-58`, `:63-68`). **What is missing is an exposed parameter, not
+a read — which is exactly why the ruling's condition was met and the absence is a departure.**
+
+### OPEN RULING — the one thing this step is waiting on
+
+**Does the owner want a workflow history view built?** The ruling's words owed a button; the
+do-no-harm rule forbids a button with no door; the door does not exist because the prototype never drew
+one. If YES: a bounded task, **no schema change**, needs a gateway parameter exposed, a way to walk
+`1..N`, and a designed view. If NO: the absence stands, already recorded. **Nothing further is blocked
+on it** — the PR can merge either way, because the record is true under both answers.
+
+### Checks at the code head
+
+Six raw, all 0: `check:env` · `check:tasks` · `check:runbook` · `check:citations` · `check:help` ·
+`check:db-tz` → `database timezone: Asia/Kolkata`. `check-case-ids` **0** → **2357 unique ids**,
+unchanged. `typecheck` **0**; `vitest run test/workflow-builder --no-file-parallelism` **205 passed /
+0 failed**, no orphaned workers. **The forced gate was NOT run** — the controller runs it.
+
+**THE REVIEW FOUND A CRITICAL IN MY FIRST DRAFT, AND IT WAS RIGHT.** I had written that a history view
+"would need a route over data no route serves". False — and false about the nearest door: the
+`?version=` route ships, and the web adapter simply drops the parameter. I verified the refutation
+against the tree myself before acting on it. **The lesson, because it will recur: I HAD READ that route
+earlier in the session and failed to carry it into the record — a true observation about ENUMERATION
+smuggled in as a claim about READABILITY.** Check what the requirement actually says before answering a
+stronger question than it asked.
+
+---
+
+## ▼ SUPERSEDED TOP BLOCK — the attention strip's Part 2, adopted WHOLE (2026-09-18, evening)
 
 **Position: the change is committed, reviewed, and its PR is at the controller's merge.** Dispatch:
 `CTL-DISPATCH-2026-09-18-attention-part2-heading.md` **plus AMENDMENT 1**, which WIDENS it — the owner
