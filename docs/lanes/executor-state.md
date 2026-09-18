@@ -41,7 +41,122 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~21:3x IST. **TASK 5b: THE FIVE
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~22:0x IST. **TASK 5b REBASED ONTO `77aa906a` (#490):
+> # ONE FILE RESOLVED AS A UNION, A CITATION THAT RESOLVED TO A BLANK LINE FOUND AND CORRECTED,
+> # EVERY CHECK AND THE THREE AFFECTED SUITES GREEN AT THE NEW HEAD, PR #491 MEASURED MERGEABLE.
+> # AWAITING THE CONTROLLER'S MERGE.** `exec/task5b-not-ported-items`, ONE PR `--base main`.
+> # Supersedes the block below it; the block below is HISTORY.
+>
+> ## LIVE ANCHORS — measured with `/usr/bin/git` at the sha, not inherited
+>
+> | | |
+> |---|---|
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — no block can contain the commit that carries it. At writing: `f7ecf228` (the citation-correction commit; the handoff commit you are reading is its CHILD). |
+> | branch | `exec/task5b-not-ported-items` — REBASED and force-pushed with lease; `ls-remote` confirms the remote holds `f7ecf228`, not the old tip |
+> | `origin/main` | `77aa906a` — #490 (exec2's Task 12 closeout). **This is the new merge-base.** |
+> | pre-rebase tip | `b2bc7eba` — **ORPHANED. `git branch --contains b2bc7eba` is empty; `cat-file` still passes on it and lies.** |
+> | tree | clean at `f7ecf228` |
+> | the change | 19 files, membership unchanged by the rebase — `git diff --stat origin/main...HEAD` |
+> | PR #491 | `mergeable: MERGEABLE`, `mergeStateStatus: UNSTABLE` (checks pending, and see the CI finding below) |
+>
+> ## SHA MAPPING — every sha in every block BELOW this one is dead
+>
+> | old | new | what |
+> |---|---|---|
+> | `9ea1ddbd` | `c95f407d` | the code commit (the 5 NOT-ported items + the 147-citation sweep) |
+> | `86c4e293` | `305f7669` | handoff and catalogue |
+> | `b2bc7eba` | `2f42fe5f` | the review round |
+> | — | `f7ecf228` | NEW: the citation correction (below) |
+> | `c473c781` | — | the OLD base (#488's merge). No longer the merge-base. |
+>
+> ## THE REBASE — the controller dispatched it; the conflict was measured BEFORE it was resolved
+>
+> `git merge-tree --write-tree origin/main HEAD` → EXIT 1, **one file**: `test-cases/13-deployment-dogfooding.md`.
+> Main had moved 6 commits, and **none touched any SOURCE file this branch cites** — main's changed files
+> are exactly `Features.md`, `test-cases/13`, `executor-2-state.md`, and the backlog spec. **So no cited
+> source line moved**, and that is a measurement, not a hope.
+>
+> **RESOLUTION — two hunks, one paragraph, and the union of the right shape.** #490 did NOT edit the
+> paragraph the conflict sits in; it APPENDED three sections after it. Hunk 1 therefore takes this lane's
+> table in place of the five bullets and keeps main's appended sections; hunk 2 appends this lane's
+> `13.924`–`13.927` catalogue section at EOF, after main's.
+> **Built by SPLICE, not by eye**: the file was rebuilt from main's own blob plus this branch's block.
+> The prefix control **fails on purpose** (main's 41 swept citation lines differ) — which is why the
+> *diff* is the verification: `git diff origin/main resolved` prints **exactly** the paragraph swap,
+> 15 removed / 17 added, and nothing else. Then: 0 conflict markers, both sides' sections present,
+> `check-case-ids` union == sum.
+>
+> ## THE FINDING THE RE-CHECK PRODUCED — a citation that resolved to a BLANK LINE
+>
+> `Features.md:2251` cited `docs/hig-reconciliation-audit.md:690-718` for the ruling *"KEEP AND RESTYLE;
+> NEVER DELETE"*. **Line 690 is BLANK**; the ruling is at `:691`. (`:718`, the far end, IS correct.)
+> Written by `ee7ee37a` and **not shifted since** — the audit doc's only later edit (`a6d78c13`) touched
+> lines ~182-190, above the cited region, net-zero — so it was wrong when written. It sat on a line this
+> branch rewrites, where a reader would take it as swept by the 147-citation repair.
+> **Corrected to `:691-718`** by one single-occurrence replacement (count asserted == 1; byte backup
+> sha256 `5a93a9cd…`). It is **same-length**, so no line moved and no citation shifted.
+>
+> **Recorded, NOT fixed — three, each with an owner:**
+> 1. **The identical stale string at `test-cases/13-deployment-dogfooding.md:8587`**, in a region this
+>    branch does not touch. *Owner: whoever next edits that catalogue section.*
+> 2. **Two citations INTO this file were ALREADY stale before this rebase** — measured, not assumed.
+>    `docs/design/prototype-delta-2026-09-18.md:197` cites `executor-state.md:216` for the "Prototype
+>    delta" entry, but `:216` is the F1 control block; `plan10-adaptation-map.md:434` cites
+>    `executor-state.md:1979-1980` for the owner-set stop point, but those lines are the mutation /
+>    citation-ratchet note. **This file is append-only at the TOP, so every inbound line citation decays
+>    on every update** — the CLASS is the finding, not either instance. Inserting this block shifts both
+>    again by its own length. *Owner: whoever next reasons about citations into a top-inserted narrative.*
+> 3. **A citation the union DROPS: `packages/ui/src/ui.css:1203-1211`.** Main's side of the conflicted
+>    paragraph carried it (the `--gn-tint-warning` docblock documenting the role as a composite over its
+>    ground); this lane's table states the same fact as a measured result without re-citing it. The
+>    docblock is still at that line — nothing is stale, one pointer is simply no longer made. Recorded
+>    rather than re-added, because re-adding is a content change to an already-reviewed block.
+>
+> ## VERIFICATION AT `f7ecf228` — every number re-measured, none carried
+>
+> | check | result |
+> |---|---|
+> | `pnpm turbo run build` | **11/11** (`FULL TURBO` — content unchanged, so the cache hit is honest) |
+> | `pnpm turbo run typecheck` | **17/17, EXIT 0** |
+> | the seven repo checks | `tasks` · `env` · `runbook` · `help` · `citations` · `db-tz` · `migrations` — **all EXIT 0** |
+> | `check:citations` | `13-deployment-dogfooding.md`: **686 cited / 0 uncited**; ratchet exact on every file |
+> | `scripts/check-case-ids.mjs` | **2376 unique**, union == sum, highest `15.34` |
+> | `check:db-tz` | `Asia/Kolkata` (against `postgres://gisik:gisik@localhost:54329/gisik_nokma`) |
+> | `check:migrations` | 27 migrations, **0 new against origin/main** |
+> | app-core · ui · web suites | **1565 / 351 / 534 passed**, 0 failed (94 / 6 / 49 files) |
+> | node | `v22.22.2` (spawn-probed) |
+> | gate | **NOT run by this lane** — it is the controller's |
+>
+> **The line-count-neutrality claim was RE-MEASURED, not restated** (it is what saved the 102 repairs):
+> `git diff -U0 origin/main HEAD` → `ui.css` `@@ -1978,4 +1978,4 @@` **plus** a pure EOF append
+> (`@@ -4734,0 +4735,57 @@`); `globals.css` `@@ -153 +153 @@` plus an EOF append (`@@ -2686,0 +2687,44 @@`);
+> `tokens.ts` `@@ -344,6 +344,6 @@`. Each is a same-count replacement or an append at EOF, so no
+> existing citation moved. Each cited line was then opened and read.
+>
+> ## ⛔ CI IS RED REPO-WIDE FOR A REASON THAT IS NOT CODE — GitHub Actions is not running jobs
+>
+> **`gh run view 35367339608` (a run on `main` itself) reports, for every job:
+> *"The job was not started because recent account payments have failed or your spending limit needs to
+> be increased."*** The PR checks fail in ~3 s, which is the same fact: `scope`, `check-runbook`,
+> `check-citations`, `check-help`, `check-migrations` and `gate` are **FAILURE because nothing ran**,
+> while `build`/`typecheck`/`tests`/`e2e` are SKIPPED behind them. This is **not** attributable to any
+> branch: every run on `main` since at least `adaac40c` fails identically. **It is an OWNER action
+> (Actions billing / spending limit) and it blocks the standing auto-merge authorization's "independent
+> CI run green" condition for every PR in the repo.** The local instruments are green (table above);
+> the hosted ones cannot run at all.
+>
+> ## WHAT A RESTARTED EXECUTOR SHOULD DO
+>
+> **Nothing is half-done.** The conflict is resolved, the branch is pushed, the PR is MERGEABLE. Do not
+> re-resolve anything. **Do not use any sha in the blocks below this one** — they are pre-rebase and
+> orphaned; the mapping table above is the translation. A future push to this branch must be
+> `--force-with-lease` (the remote was rewritten). *The next task is the controller's to dispatch;
+> nothing is queued here.*
+>
+> ---
+>
+> # ▣ CURRENT POSITION — SUPERSEDED 2026-09-18 ~22:0x IST by the block above. **HISTORY — kept as record.**
+> # **TASK 5b: THE FIVE
 > # NOT-PORTED ITEMS OF `isTypeEditor`, EACH GIVEN A RULE. ALL GREEN, ONE PR OPEN
 > # — AWAITING THE CONTROLLER'S MERGE.** `exec/task5b-not-ported-items`, ONE PR `--base main`.
 >
