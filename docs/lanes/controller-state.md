@@ -31,6 +31,32 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## ✅ FRIDAY 2026-09-18 ~18:0x IST — **CYCLE 5: `#476` MERGED, `#478` SENT BACK ON A CONTROL DEFECT ITS OWN GATE COULD NOT SEE, AND CASE-ID **BLOCKS** ALLOCATED AFTER A SECOND LIVE COLLISION.** `main` is `1d131a68` + this PR; **zero open PRs**; ledger **301 done / 0 claimed / 7 todo**.
+
+### If you are the DeepSeek controller reading this: your position, in five lines
+1. **`main` = this PR's merge (after `1d131a68`).** Merged this cycle: **`#476`** (members styling + the `3a` residue → `1d131a68`), after **`#473`** (the demotion guard → `a12c4018`) and the controller records `#474`, `#475`, `#477`.
+2. **EXEC 1** is on **`#478` sent back** — the settings-workflows card grid, whose gate is GREEN and whose change is right, but which knowingly breaks a control in `e2e-stack` (see F1 below). **EXEC 2** is on **attention Part 2** (rows 1–6, the owner adopted the prototype treatment whole).
+3. **CASE-ID BLOCKS ARE ALLOCATED** (`CTL-ID-BLOCKS-2026-09-18.md`): landed `13.880`–`13.889`; **exec 2 `13.890`–`13.919`**; **exec 1 `13.920`–`13.949`**. **Exec 1 was told to renumber a colliding `13.884` → `13.920` and DID** (verified: `13.920` ×2, the surviving `13.884` is exec 2's historical prose). **Never hand out a tip; a bare number expires.**
+4. **THE QUEUE:** `settings-workflows` Tasks 2–9 (all rulings inline in the plan), `attention-part2-heading` (+amendment 1), `settings-workspace-tab`, `migration-order-check`, `builder-unstyled-families`. **All older briefs still carry a stale `13.879` id list — append an amendment, never rewrite.**
+5. **Rulings you cannot make:** a ledger STATUS change beyond the flips the position names, a merge with conflicts outside the files named, an executor deviation you cannot measure, a scope question. Write the question to the owner in your pane and HOLD; **never `AskUserQuestion`**.
+
+### F1 — **A CONTROL WAS PASSING FOR A REASON UNRELATED TO WHAT IT NAMED, AND MY OWN DISPATCH CAUSED IT**
+`apps/web/e2e-stack/viewport.spec.ts` asserts `expect(bestSeen).toBeGreaterThan(15)` — a control proving the non-text-contrast sweep's scale reaches high values. **I read the roster at the source:** the only two readings above 15 are `17.62` on `button.workflow-list__new` and a generic `button`, **both with `border: rgba(0,0,0,1)` — the UA default border on BARE buttons**, and `highestReading` is `17.62` across all 7 routes so nothing else holds it up. **My dispatch told exec 1 to move those buttons onto `.gn-button`, which sets `border: none`.** The control was resting on a defect — an unstyled button — which is the very thing the day's styling work exists to remove.
+**Ruled: `#478` goes BACK.** Re-base the control in the SAME change set; **do NOT lower the 15, do NOT delete the assertion.** Preferred repair: plant a known high-contrast border and assert the sweep reads it **through the same path** as the measurement. Fallback: assert `bestSeen` equals the `highestReading` the roster records — a property of the INSTRUMENT, which is what a control is for.
+**THE LESSON, and it generalises: a green forced gate is not a clearance.** `e2e-stack` is not in the turbo graph, so the gate **structurally cannot** see this class of defect. **When your own instruction causes a defect, the gate will still be green.**
+**And a second interaction nobody had to find twice:** `aside.gn-attention` records `4.36` with `border: rgba(178,80,0,1)` — **that is the left border the owner has just ruled away.** Exec 2 is removing it now, so after both changes the roster's maximum is **3.81**.
+
+### ID BLOCKS — the second live collision in one afternoon, and this one was caught BEFORE it landed
+Exec 2 minted `13.884`–`13.889`; exec 1 independently minted **`13.884`**. Both were right when they measured; **they measured different trees.** `#476` merged first, `13.884` is now on `main`, and exec 1 renumbered to `13.920`. **`check:case-ids` caught the earlier one (`13.881`) at merge time, reporting one id against two file-and-line pairs** — that is the guard working, but it is a renumber after a review round you should not have to pay twice. Both executors asked for blocks rather than tips; both have one.
+
+### THE LESSON I EARNED MYSELF: I KILLED A RUNNING TASK ON A FALSE "CLEAN"
+Restarting exec 1, I ran `git status` — **clean** — and concluded there was nothing to lose. It had **two unpushed commits** on `exec/settings-workflows` and was mid-task. Nothing was lost (the commits were on the local branch and it resumed from its own handoff) but its session context was. **A clean worktree is not "no work": committed-but-unpushed is indistinguishable from an empty branch.** **Check `git log origin/main..<branch>` BEFORE killing, not `git status`.** This is the same family as everything else today — a signal that looked like an answer.
+
+### OUTSTANDING FOR THE OWNER — two NEW questions, neither blocking
+1. **Should `test-cases/13-deployment-dogfooding.md` become per-task or per-section files?** It has conflicted **three times today** (`#465`/`#466`, `#469`/`#471`, and again on the current pair), each costing a rebase. Raised by exec 1, agreed with by the controller. **It is a repo-structure change and it is the owner's call.** No work waits on it.
+2. **Queue order after the settings cluster** — the controller is taking the approved default: finish settings→workflows, then second-wave `12` (the plan close-out), then the remaining wire-gap screens in `docs/design/prototype-delta-2026-09-18.md`'s order. **Say so if you want it elsewise.**
+The three older questions (migration-order guard, admin demoting a non-last owner, `hig-per-screen/3a`) are all **ANSWERED** — see the register in `owner-holds.md`.
+
 ## ✅ FRIDAY 2026-09-18 ~17:1x IST — **CYCLE 4: FOUR PRs MERGED (`#469`–`#472`), TWO EXECUTORS IN FLIGHT, TWO NEW WORK ORDERS WRITTEN, AND THE `hig-per-screen/3a` CLOSURE RECORDED.** `main` is `0e0dbff9` + this PR; **zero open PRs**; ledger **301 done / 0 claimed / 7 todo**.
 
 ### If you are the DeepSeek controller reading this: your position, in five lines
