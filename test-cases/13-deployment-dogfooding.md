@@ -8300,3 +8300,129 @@ that gap touches the two ids below, which are inside this task's own block.
   withheld-definition branch; re-running mutation E now reddens exactly those two cases. The claim above
   becomes true only because the table now covers both branches.
   `packages/app-core/test/precheck.test.ts:130`, `:429`, `:546`
+
+## The members roster, ported from the prototype (executor 2, 2026-09-18) — block `13.760`–`13.766`
+
+Block `13.760`–`13.819`, allocated to executor 2 by the controller so that two executors minting
+in parallel cannot collide. **One clause of this paragraph was corrected at the rebase onto `main`
+(2026-09-18), and the correction is kept visible rather than overwritten** — it is the same id-arithmetic
+fault this file keeps recording. It read "`13.694` is still unwritten", and it was: at the shared base
+`afbd361d` the highest case MARKER in this file was `13.693`, and `13.694` appeared only as prose
+("the next free id is `13.694`"). Executor 1s Task 1 then measured the same thing at its own tip and
+minted **`13.694`–`13.696`** — the section immediately above this one. The live picture is therefore:
+`13.694`–`13.696` minted by executor 1, `13.697`–`13.699` **minted by nobody**, `13.700`–`13.759`
+reserved to executor 1, `13.760`–`13.819` reserved to executor 2 (this section). Every id below was
+recounted at this tip before minting rather than assumed from the block floor.
+
+The screen is `design-system/interactive/desktop.dc.html@6d7b67c0a52c:651-798` — the members screen's
+body, with the invite panel to follow at `:722`. The prototype draws **five** table columns and two
+side panels; the members read serves **three** fields (`user_id`, `u."name"`, `role` —
+`apps/server/src/routes/builder-reads.ts:247`). The port is therefore partial by construction, and the
+four things not drawn are named as deliberate absences in the page's own file docblock and in the
+commit message rather than left to be inferred from an empty column. **A case is not minted for them:**
+they are scope decisions about surface nobody wrote, not scenarios with an assertion, and minting a
+`🚫` apiece would put four numbers in this file that no test could ever flip. The precedent — `13.319`'s
+mobile deferral — is a 🚫 because the work was SCHEDULED and then consciously dropped; these columns
+were never in scope for a client whose route cannot serve them.
+
+- ✅ **13.760 — `role` survives the mapper, and a member with no role is refused rather than
+  defaulted.** The one defect class this repo has been bitten by hardest is a field the server sends
+  and the client silently drops, and every view-level test drives a fake data source, so none of them
+  can see the drop: the assertion has to be made at the mapper, the single seam the wire crosses, and
+  against a fixture typed as the server's own `MemberListResponse`. `RosterMember = Actor & { role:
+  string }` (`view-types.ts:44`) — an `Actor` with a field ADDED, so `rosterByActorId` and the board's
+  roster join keep compiling, which the case asserts beside the values (`mappers.ts:431`, the `role`
+  read at `:438`). The second arm runs its positive control FIRST and through the same path: the
+  identical body WITH its role maps cleanly, then the body without one throws
+  `members.members[0].role: expected a string` and it is a `MappingError`, not a `ServingGapError` —
+  the route does send this field, so a body missing it is unreadable rather than unserved.
+  (`packages/app-core/test/online/mappers.test.ts:148`, `packages/app-core/src/view-types.ts:44`,
+  `packages/app-core/src/online/mappers.ts:431`)
+
+- ✅ **13.761 — the roster is a table with a Person column and a Role column, one row per person, role
+  printed as the wire's own token.** This is the other half of the absences recorded above: "we left a
+  column out" must not quietly become "we left the table out". The role is asserted as `owner` /
+  `member`, NOT as a prettified label, because that is what the row carries — `role` is a plain
+  `string` on `RosterMember` (never a second `WorkspaceRole` list to drift from), and a case expecting
+  "Owner" would assert a mapping nobody wrote. The case also pins the ABSENCE of a per-row control:
+  no `combobox`, no `button` inside the table, because the prototype's role cell is a `<select>` under
+  `canEditRole` (`:679-685`) and no route accepts a role change on this branch — a picker here would be
+  a control that cannot be honoured. (`apps/web/app/w/[workspaceId]/members/page.tsx:253`, `:256`,
+  `:259`, `:294`, `apps/web/test/members-page.test.tsx:446`)
+
+- ✅ **13.762 — the monogram draws one capital and does not repeat it to a screen reader.** The
+  prototype's disc repeats the person's first letter BESIDE their name (`:674-675`), so read aloud the
+  row would say "A Anselma Marak" unless the disc is hidden from assistive tech. Both halves are
+  asserted because each alone passes on a broken screen: the half that only checks the letter passes on
+  a screen that says it twice, the half that only checks the accessible name passes on a screen that
+  draws no disc at all — which is the whole port. The positive arm is `getByRole('row', { name: /Anselma
+  Marak/ })`; the negative arm is `queryByRole('row', { name: /A Anselma/ })`. That pattern cannot match
+  the name on its own — "Anselma" does not contain "A Anselma" — so the negative assertion is a real
+  measurement rather than a tautology.
+  (`apps/web/app/w/[workspaceId]/members/page.tsx:272`, `apps/web/test/members-page.test.tsx:481`)
+
+- ✅ **13.763 — the summary line is COUNTED from the roster the viewer was served, not a literal.** The
+  prototype's own string (`:3032`) hardcodes "one owner"; the port counts owners and admins from the
+  roster instead, and it counts the people THIS viewer may be told about rather than the workspace's
+  membership, because `readMembers` hides guests from a non-admin caller. The sentence is therefore
+  `You can see N people · O owner(s), A admin(s). Membership and roles are per workspace.` The case
+  mounts TWICE over two different rosters — two people, one owner; then three people, one owner, one
+  admin, with a guest riding along in the total and in neither count. A constant, or a summary counted
+  from a fixture, passes the first mount and fails the second, which is the pair's entire job.
+  (`apps/web/app/w/[workspaceId]/members/page.tsx:222`, `:367`, `apps/web/test/members-page.test.tsx:517`)
+
+- ✅ **13.764 — the workspace name is OPTIONAL, and the clause is omitted rather than filled.** The
+  prototype's sentence opens "N people in <workspace name>", and on this branch the name is genuinely
+  unavailable far more often than missing: `getMyWorkspaces` refuses whole (`mapWorkspaceRefs` throws a
+  `ServingGapError`). `useWorkspaceName` already answers `string | null` and fails silently to `null`,
+  so the summary keeps the prototype's wording and drops the `in <name>` clause when it has no name.
+  Both readings are asserted, and the second asserts the WHOLE string with `toBe` — a substring
+  assertion on the front half would sail past `undefined` or `in null` — and then asserts the text does
+  not contain the raw workspace id and does not contain `undefined`. The un-stubbed
+  `getMyWorkspaces` is the shape of the real refusal rather than a stand-in for it, because
+  `stubServices` rejects an un-stubbed read by name.
+  (`apps/web/app/w/[workspaceId]/members/page.tsx:222`, `apps/web/src/use-workspace-name.ts`,
+  `apps/web/test/members-page.test.tsx:559`)
+
+- ✅ **13.765 — an empty roster says what is listed, not who exists, and no count is drawn over it.**
+  `online-data-source.ts` answers `[]` BOTH for a body whose `members` array is empty AND for the 404
+  this route sends a guest (`door(..., 'no-guests')`) — one shape, two meanings, and the client cannot
+  tell them apart. Since a workspace always has an owner, `[]` in practice means "you may not read
+  this roster" rather than "nobody is here", so "Nobody is in this workspace" would be a confident
+  claim about the world drawn from an absence. The page says `No members are listed here.`, true of
+  both readings, and the summary is suppressed because "You can see 0 people" is a number nobody
+  counted and the qualification that makes the non-empty line honest has nothing to qualify.
+  (`apps/web/app/w/[workspaceId]/members/page.tsx:244`, `apps/web/test/members-page.test.tsx:600`)
+
+- ✅ **13.766 — the heading is `Members` and nothing is counted before the roster answers.** The
+  heading is the prototype's own (`:654`); this route's `<h1>` read `People` until 2026-09-18, and the
+  rename is deliberate rather than tidy-up — the prototype is the spec and the nav item that reaches
+  this page already says Members. The loading arm is asserted with a read that NEVER settles, which is
+  the only way to hold the page in that state: a resolved stub's assertion races the microtask queue.
+  Both absence halves are asserted too — no table and no summary before the read answered, because a
+  roster drawn over a pending read is a roster nobody was served.
+  (`apps/web/app/w/[workspaceId]/members/page.tsx:218`, `:229`,
+  `apps/web/test/members-page.test.tsx:623`)
+
+**The CSS family** is new rather than edited (`.gn-members` had no rules at all before this change) and
+lives with the other screen families in `apps/web/app/globals.css:1407-1550`, built on the shared
+`--gn-*` role tokens per the mapping table at
+`docs/superpowers/plans/2026-09-16-board-prototype-port.md:33-52` — no literal colours. Three class
+names were already in use and keep working (`.gn-members`, `.gn-members__row`, `.gn-members__not-admin`);
+the rest are added. The monogram disc uses `--gn-fill-tertiary` rather than `.gn-avatar`'s
+`--gn-surface-sunken` because under `neo` all three surface roles collapse onto one `neoPaper` hex, so a
+disc drawn in `surface-sunken` would lose its edge against the card it sits on. The role chip is the
+shared `.gn-chip` CLASS rather than the `Chip` component, because the component always renders a dot and
+the prototype's role chip has none.
+
+**Not measured at this tip, and named rather than implied:** the Playwright/e2e-stack and the
+HIG-per-screen e2e suites were NOT run (they need the hot stack on port 3001, which a peer holds). The
+three geometry baselines they own were reasoned about rather than measured — `accessible-names-baseline.json`
+and `type-scale-baseline.json` are floors, and the smallest type this change introduces is `0.8125rem`,
+above the 12px floor — but reasoning is not a measurement and no id is minted on the strength of it.
+
+**Recount, at this tip.** Six ids are minted here (`13.761`–`13.766`) plus `13.760` in the app-core
+mapper suite, all inside the reserved block `13.760`–`13.819`; the next free id inside this executor's
+block is `13.767`. Measured, not assumed: the highest case HEADING in this file is `13.693` (Step 4b's
+block, three sections up), and `13.694`–`13.759` are unwritten — `13.694` is the next free id in the
+file and `13.760` is the floor of the reserved block, and the two are not the same number.

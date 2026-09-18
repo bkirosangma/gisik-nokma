@@ -2,6 +2,47 @@ import type { FieldClaim, StateCategory, TicketState } from '@gisik-nokma/domain
 
 export type Actor = { id: string; name: string };
 /**
+ * A roster entry from `GET /v1/workspaces/:workspaceId/members`, as this client
+ * holds it: `Actor` plus the `role` the server has always sent
+ * (`routes/builder-reads.ts:247` selects it; `:259` returns it).
+ *
+ * ## Why a SEPARATE type rather than a third field on `Actor`
+ *
+ * `Actor` is not only the roster's shape. It is also a ticket's `assignee`
+ * (`:110`, `:199`), and that value is produced two ways that cannot know a
+ * role: `online/mappers.ts`'s `mapAssignee` resolves an id through the id→name
+ * map `rosterByActorId` builds, and `replica/replica-data-source.ts`'s `actorOf`
+ * synthesises `{id, name: id}` for an actor the local ledger names but no roster
+ * covers. A required `role` on `Actor` would oblige both to invent one — the
+ * single move this client's mapper module refuses everywhere else — and would
+ * then be printing a membership role on a value whose only claim is "this is
+ * who moved the ticket". A required-role `Actor` would also oblige every
+ * literal `Actor[]` in the test tree to carry one.
+ *
+ * `RosterMember` is `Actor` with a field ADDED, so it is assignable to `Actor`
+ * everywhere: `rosterByActorId`, the board join, `visibility-editor.tsx` and the
+ * project page's `members` prop all keep compiling and keep meaning what they
+ * meant. Only a caller that wants the role names the narrower type.
+ *
+ * ## `role` is REQUIRED, and it is a plain `string`
+ *
+ * REQUIRED, because the two states must not be able to look alike. "The server
+ * did not send a role" and "this person is a member" are different claims about
+ * a person's standing in a workspace, and an optional field collapses them at
+ * the first `?? 'member'` anyone writes. `mapActors` refuses an entry without
+ * one rather than defaulting it, which is the same rule `mapCause` and
+ * `mapRollup` above apply to their own required wire fields.
+ *
+ * A plain `string` rather than the domain's `WorkspaceRole` union, which is the
+ * choice `WorkspaceRef.role` (`:52`) already makes for this same field out of
+ * the same server vocabulary and for the same two reasons: validating here
+ * would give this client a second copy of the role list free to drift from the
+ * server's, and a role added server-side would blank the whole members screen —
+ * every person taken off it — over the text inside one chip. The server is the
+ * authority on its own vocabulary; this reads what it says.
+ */
+export type RosterMember = Actor & { role: string };
+/**
  * `archived` and the two counts arrived with Task 16 (owner brief 2026-09-09).
  *
  * **`null` is WITHHELD, and it is not `0`.** The server omits the count keys

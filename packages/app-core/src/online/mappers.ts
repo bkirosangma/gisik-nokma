@@ -24,6 +24,7 @@ import type {
   ParentRef,
   ProjectViewPrefs,
   RollupToViewer,
+  RosterMember,
   SavedFilter,
   TicketHistoryEvent,
   TicketListView,
@@ -392,19 +393,49 @@ export function mapRollup(raw: unknown, path = 'rollup'): RollupToViewer | null 
 }
 
 /**
- * `GET /v1/workspaces/:workspaceId/members` → `Actor[]`.
+ * `GET /v1/workspaces/:workspaceId/members` → `RosterMember[]`.
  *
- * `{userId, displayName}` → `{id, name}` is a rename and nothing more. `role` is
- * dropped: the client's `Actor` has no room for it, and the server disclosing
- * more than the client reads is the safe direction.
+ * `{userId, displayName, role}` → `{id, name, role}` is a rename plus the role
+ * CARRIED rather than dropped.
+ *
+ * ## The docblock this replaces, and why its argument was wrong HERE
+ *
+ * It read: "`role` is dropped: the client's `Actor` has no room for it, and the
+ * server disclosing more than the client reads is the safe direction." The
+ * second clause is true of a value nobody can use, and it was false about this
+ * one for a reason the sentence could not see from where it stood: `role` is
+ * the SUBJECT of the screen that reads this method. `/w/[workspaceId]/members`
+ * draws a person and their standing in the workspace, so dropping the field did
+ * not withhold a disclosure — it removed a column the product is supposed to
+ * draw, and no test noticed because every view test drove a fake data source.
+ * **A withheld field and an unbuilt column look identical from the client.**
+ *
+ * The route has sent `role` since it first answered
+ * (`routes/builder-reads.ts:247`, returned at `:259`), and the wire type is
+ * `WorkspaceMember` (`packages/domain/src/read-models.ts:547`).
+ *
+ * ## What did NOT change
+ *
+ * `rosterByActorId` below still answers the id→name map the board join wants,
+ * and `RosterMember` is an `Actor`, so nothing on that path moves. The board
+ * sends `assigneeId` and no role, and it still gets no role — the width added
+ * here is on the ROSTER value, not on the ticket's `assignee`.
+ *
+ * `role` is REQUIRED and read with `asString`, so an entry that arrives without
+ * one is a `MappingError` naming the path rather than a person silently
+ * rendered as whatever a default would have been. See `RosterMember`'s docblock
+ * (`view-types.ts`) for why absent and `member` must not be able to look alike,
+ * and why the value stays a plain `string` rather than the domain's
+ * `WorkspaceRole` union.
  */
-export function mapActors(raw: unknown): Actor[] {
+export function mapActors(raw: unknown): RosterMember[] {
   const record = asRecord(raw, 'members');
   return asArray(record['members'], 'members.members').map((entry, index) => {
     const member = asRecord(entry, `members.members[${index}]`);
     return {
       id: asString(member['userId'], `members.members[${index}].userId`),
       name: asString(member['displayName'], `members.members[${index}].displayName`),
+      role: asString(member['role'], `members.members[${index}].role`),
     };
   });
 }

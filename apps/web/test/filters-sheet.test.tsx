@@ -2,12 +2,12 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type {
-  Actor,
   BoardCard,
   BoardView,
   ClaimProvenance,
   FilterSpec,
   ListRow,
+  RosterMember,
   TicketListView,
 } from '@gisik-nokma/app-core';
 import type { TicketTypeDef } from '@gisik-nokma/domain';
@@ -108,9 +108,14 @@ function boardOf(cards: BoardCard[]): BoardView {
   };
 }
 
-const ROSTER: Actor[] = [
-  { id: 'u1', name: 'Uma One' },
-  { id: 'u9', name: 'Nine Nonesuch' },
+/**
+ * `role` is REQUIRED since 2026-09-18 (case 13.760) — `getMembers` answers
+ * `RosterMember[]`, because the route has always sent a role per person and the
+ * members screen draws it. The filter sheet reads only the names.
+ */
+const ROSTER: RosterMember[] = [
+  { id: 'u1', name: 'Uma One', role: 'owner' },
+  { id: 'u9', name: 'Nine Nonesuch', role: 'member' },
 ];
 
 /** Full `TicketTypeDef` shape — `customDateFieldsByType` (`src/ticket-dates-input.ts:117`) reads `.fields` on every entry unconditionally, so an `{id, name}`-only fixture throws before the sheet is ever reached. */
@@ -375,7 +380,7 @@ describe('13.453 absence: the roster not yet read renders a sentence, never an i
       <Providers
         services={servedBoard(twoCards, {
           // Never resolves — `members.data` stays `null` for the life of this test.
-          getMembers: () => new Promise<Actor[]>(() => undefined),
+          getMembers: () => new Promise<RosterMember[]>(() => undefined),
         })}
       >
         <ProjectPage />

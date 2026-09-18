@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useParams } from 'next/navigation';
 import { Button, Card, Select } from '@gisik-nokma/ui';
-import { formatDateTime, makeSubmittedFactory, type Actor } from '@gisik-nokma/app-core';
+import { formatDateTime, makeSubmittedFactory, type RosterMember } from '@gisik-nokma/app-core';
 import { InviteAdminError, type MintedInvite, type PendingInvite } from '@gisik-nokma/app-core/online';
 import { AppNav } from '../../../../src/app-nav.js';
 import { ShellRefusal } from '../../../../src/shell-refusal.js';
 import { useAppServices, useCurrentUser } from '../../../../src/providers.js';
+import { useWorkspaceName } from '../../../../src/use-workspace-name.js';
 
 /**
  * The minted link's copy. Pinned by Plan 6 Task 15b item 2 and exported so the
@@ -24,6 +25,39 @@ export const COPY_IT_NOW = 'Copy it now — it is not stored and cannot be shown
 /**
  * `/w/[workspaceId]/members` — the roster, and for owners and admins the invite
  * machinery (Plan 6 Task 15b, item 2).
+ *
+ * ## The roster table, and the FOUR things the prototype draws that are NOT here
+ *
+ * The screen is ported from `desktop.dc.html@6d7b67c0a52c:651-798`. What the
+ * product can back from the wire is a Person column and a Role column over the
+ * roster `GET /v1/workspaces/:workspaceId/members` already serves, plus a
+ * heading and a derived summary line. Four things the prototype draws are
+ * deliberately ABSENT, and each is absent for the same reason rather than four
+ * different ones — the product has no field, no door, or no read behind it, and
+ * a screen that drew them anyway would be inventing:
+ *
+ * - **Project access, Assigned and Last seen columns** (`:664-666`, `:691-693`).
+ *   `readMembers` selects `user_id`, `u."name"` and `role` and nothing else
+ *   (`routes/builder-reads.ts:247`), so none of the three has a wire field.
+ * - **The role `<select>`** (`:679-685`). The prototype gates it on
+ *   `canEditRole` (data `:3061`, `myRoleIsAdmin`), and the product has NO
+ *   per-member role-change door at all: no route accepts one, and `role` is
+ *   written only by membership creation. The non-editable chip arm
+ *   (`:687-690`) is the one rendered. A picker that submitted nothing, or that
+ *   submitted an event no door consumes, is a control lying about what it can
+ *   do — and the same `canEditRole` value would have to be invented too, since
+ *   the caller's own role is unreadable on this branch (see the gate section
+ *   below).
+ * - **The "Ticket-only access" panel and its "Add to workspace" button**
+ *   (`:700-718`). It is built from `ticketOnlyPeople` (data `:3034`), a join of
+ *   the workspace's TICKETS against a people directory — no product read
+ *   computes that set, and the button behind it writes a membership the product
+ *   has no door for.
+ * - **`Email`**, which the prototype renders inside the Person cell (`:675`) and
+ *   which is not on this wire either.
+ *
+ * What IS here and was already here — the invite panel and its 403 gate — is
+ * unchanged. Its strings are load-bearing and match the prototype verbatim.
  *
  * ## THE ROLE GATE IS THE SERVER'S 403, and that is an adaptation worth naming
  *
@@ -67,8 +101,15 @@ export default function MembersPage() {
   const { workspaceId } = params;
   const { dataSource, invitesAdmin } = useAppServices();
   const user = useCurrentUser();
+  /**
+   * The workspace's own served name, for the summary line — `null` while it is
+   * pending and `null` if the read refuses, and the summary is built WITHOUT it
+   * in that case rather than printing a placeholder. Its own docblock says why:
+   * "a caller renders no name rather than the raw id or a stale guess".
+   */
+  const workspaceName = useWorkspaceName(workspaceId);
 
-  const [members, setMembers] = useState<Actor[] | null>(null);
+  const [members, setMembers] = useState<RosterMember[] | null>(null);
   const [membersError, setMembersError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingInvite[] | null>(null);
   const [revokeRefusal, setRevokeRefusal] = useState<string | null>(null);
@@ -173,20 +214,90 @@ export default function MembersPage() {
   return (
     <main className="gn-shell">
       <AppNav workspaceId={workspaceId} />
-      <h1 className="gn-page-title">People</h1>
+      <div className="gn-members__head">
+        <h1 className="gn-page-title">Members</h1>
+        {/* No summary until the roster has answered: a count drawn over a
+            read that has not returned is a number nobody counted. */}
+        {members !== null && members.length > 0 ? (
+          <p className="gn-members__summary">{memberSummary(members, workspaceName)}</p>
+        ) : null}
+      </div>
 
       {membersError !== null ? (
         <ShellRefusal what="The roster" message={membersError} />
       ) : members === null ? (
-        <p>Loading…</p>
+        <p className="gn-members__loading">Loading…</p>
+      ) : members.length === 0 ? (
+        /*
+         * THE EMPTY ROSTER IS TWO READINGS WEARING ONE SHAPE, and this says the
+         * one that is true of both instead of picking.
+         *
+         * `online-data-source.ts` answers `[]` BOTH for a body whose `members`
+         * array is empty and for the 404 this route sends a guest
+         * (`door(..., 'no-guests')`). A workspace always has an owner, so a
+         * genuinely empty roster is not something a real workspace produces —
+         * which means `[]` here is, in practice, "you may not read this
+         * roster". "Nobody is in this workspace" would be a confident statement
+         * about the world drawn from an absence, on the screen whose whole
+         * subject is who is here; "no members are listed" is true either way.
+         */
+        <p className="gn-members__empty">No members are listed here.</p>
       ) : (
-        <ul className="gn-members">
-          {members.map((member) => (
-            <li key={member.id} className="gn-members__row">
-              {member.name}
-            </li>
-          ))}
-        </ul>
+        /* The table is the prototype's (`desktop.dc.html@6d7b67c0a52c:658-698`):
+           a card holding a Person column and a Role column, no more — the
+           prototype's three other columns have no wire field behind them (see
+           the file docblock). `overflow: auto` on the card is what carries the
+           table's `min-width` on a phone, exactly as the prototype's own
+           container does. */
+        <div className="gn-members">
+          <table className="gn-members__table">
+            <thead>
+              <tr>
+                <th scope="col" className="gn-members__th gn-members__th--person">
+                  Person
+                </th>
+                <th scope="col" className="gn-members__th">
+                  Role
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {members.map((member) => (
+                <tr key={member.id} className="gn-members__row">
+                  <td className="gn-members__cell">
+                    <span className="gn-members__person">
+                      {/* `aria-hidden` because the monogram repeats the first
+                          letter of the name beside it: without it the cell's
+                          accessible name reads "A Anselma Marak". */}
+                      <span className="gn-members__initial" aria-hidden="true">
+                        {initialOf(member.name)}
+                      </span>
+                      <span className="gn-members__name">{member.name}</span>
+                    </span>
+                  </td>
+                  <td className="gn-members__cell">
+                    {/* The prototype's NON-EDITABLE arm (`:687-690`) and only
+                        that arm. Its `canEditRole` arm is a `<select>`
+                        (`:679-685`) and the product has no per-member
+                        role-change door, so no picker and no role-change event
+                        is built here — a control that could not be honoured is
+                        worse than the absence of one. The value is the wire's
+                        own token, printed as it arrives.
+
+                        It wears the SHARED `.gn-chip` — the product's port of
+                        this very element, whose `--chipBg`/`--chipShadow` roles
+                        are the ones the mapping table names. The `Chip`
+                        component is not used because it always renders a
+                        `.gn-chip__dot`, and this chip has no dot; see
+                        `.gn-members__role` in `globals.css` for the one
+                        declaration the shared rule does not already carry. */}
+                    <span className="gn-chip gn-members__role">{member.role}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {adminGate.kind === 'asking' ? (
@@ -211,6 +322,67 @@ export default function MembersPage() {
       )}
     </main>
   );
+}
+
+/**
+ * The monogram the prototype draws at the head of the Person cell
+ * (`desktop.dc.html@6d7b67c0a52c:674`). Its own `m.k` is a person KEY; this
+ * product has a NAME, which is the better source for a first letter and the
+ * only one the wire carries. `toUpperCase` for the same reason the prototype's
+ * keys are capitalised — a lowercase "a" beside "Anselma Marak" reads as a
+ * rendering fault rather than as a monogram.
+ */
+function initialOf(name: string): string {
+  // `slice(0, 1)` is measured WRONG here, not merely unfashionable: it splits a
+  // surrogate pair. On Node v22.22.2, `'🐧 Penguin Team'.slice(0, 1)` returns a
+  // lone high surrogate, which renders as U+FFFD — a replacement glyph in the
+  // disc beside a real person's name. `Array.from` iterates by CODE POINT, so an
+  // emoji or any astral-plane character yields the whole character.
+  //
+  // `trimStart` for the same class of measured fault: a name typed with leading
+  // whitespace (`'  Kiro'`) took the space as its initial and rendered a BLANK
+  // disc. The monogram renders a name, and leading whitespace is not part of one.
+  return Array.from(name.trimStart())[0]?.toUpperCase() ?? '';
+}
+
+/**
+ * The line under the heading, DERIVED and never invented.
+ *
+ * The prototype's own data (`desktop.dc.html@6d7b67c0a52c:3032`) is
+ * `` `${n} people in ${ws.name} · one owner, ${adminN} admins. Membership and
+ * roles are per workspace.` `` Two of its three pieces are claims this client
+ * can only make with a qualification, and each is qualified rather than copied:
+ *
+ * - **"one owner" is COUNTED, not asserted.** The roster carries every visible
+ *   person's `role` (case 13.760), so the owner count is a fact this viewer was
+ *   served. The prototype's literal would be a guess standing on the screen
+ *   whose whole subject is who holds what.
+ * - **"N people" is VIEWER-SCOPED, because the roster is.** `readMembers` hides
+ *   guests from a non-admin caller (`read/membership-roster.ts`'s
+ *   `ROSTER_VISIBLE_CLAUSE`), so this number is the people *this* viewer may be
+ *   told about, not the workspace's membership. "You can see" is the whole
+ *   difference between a count and a claim about the world, and dropping it
+ *   would hand a member a smaller number dressed as the true one.
+ * - **The workspace name is OPTIONAL and is OMITTED, never faked.** It comes
+ *   from `getMyWorkspaces`, which refuses whole (`mapWorkspaceRefs` throws a
+ *   `ServingGapError`), and `useWorkspaceName` answers `null` rather than the
+ *   raw id or a stale guess. With no name the sentence is shorter and still
+ *   true; the prototype's own clause order is kept so the two readings sit in
+ *   the same place.
+ *
+ * Nothing else about the line is conditionally rendered: "Membership and roles
+ * are per workspace." is the prototype's and is true of every workspace.
+ */
+function memberSummary(members: readonly RosterMember[], workspaceName: string | null): string {
+  const people = members.length;
+  const owners = members.filter((member) => member.role === 'owner').length;
+  const admins = members.filter((member) => member.role === 'admin').length;
+  const counted = `You can see ${people} ${people === 1 ? 'person' : 'people'}${
+    workspaceName === null ? '' : ` in ${workspaceName}`
+  }`;
+  return `${counted} · ${owners} ${owners === 1 ? 'owner' : 'owners'}, ${admins} ${
+    admins === 1 ? 'admin' : 'admins'
+  }. Membership and roles are per workspace.`;
 }
 
 /**

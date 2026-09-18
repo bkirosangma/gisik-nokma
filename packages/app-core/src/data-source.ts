@@ -7,12 +7,12 @@ import type {
   WorkflowDef,
 } from '@gisik-nokma/domain';
 import type {
-  Actor,
   AttentionItem,
   BoardView,
   FilterSpec,
   Grouping,
   MyWorkView,
+  RosterMember,
   SearchHit,
   TicketHistoryEvent,
   TicketListView,
@@ -130,7 +130,14 @@ export type Unsubscribe = () => void;
  */
 export type DataSourceQuery = {
   getMyWorkspaces(): Promise<WorkspaceRef[]>;
-  getMembers(workspaceId: string): Promise<Actor[]>;
+  /**
+   * The workspace roster. `RosterMember[]` and not `Actor[]`: the route sends a
+   * `role` per person (`routes/builder-reads.ts:247`) and the members screen
+   * DRAWS it, so a signature that did not carry it would be the client asking
+   * the mapper for less than the server says. `RosterMember` is an `Actor`, so
+   * every caller that only wants names is unaffected.
+   */
+  getMembers(workspaceId: string): Promise<RosterMember[]>;
   getBoard(projectId: string): Promise<BoardView>;
   getTickets(projectId: string, filter: FilterSpec, grouping: Grouping): Promise<TicketListView>;
   getTicket(workspaceId: string, ticketId: string): Promise<TicketRead | null>;

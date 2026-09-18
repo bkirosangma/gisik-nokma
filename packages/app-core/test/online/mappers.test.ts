@@ -120,26 +120,69 @@ describe('3.37 mapRollup — three fields line up, the fourth is refused', () =>
   });
 });
 
-describe('3.37 mapActors — {userId, displayName} is a rename and nothing more', () => {
-  it('maps the roster and drops role, which the client type has no room for', () => {
-    const body: MemberListResponse = {
-      workspaceId: '01J9GWS0000000000000000000',
-      members: [
-        { userId: ANSELMA, displayName: 'Anselma Marak', role: 'owner' },
-        { userId: BIREN, displayName: 'Biren Sangma', role: 'member' },
-      ],
-    };
-    expect(mapActors(body)).toEqual([
-      { id: ANSELMA, name: 'Anselma Marak' },
-      { id: BIREN, name: 'Biren Sangma' },
-    ]);
-    expect(rosterByActorId(mapActors(body)).get(BIREN)).toBe('Biren Sangma');
-  });
-
+describe('3.37 mapActors — {userId, displayName, role} is a rename plus the role', () => {
   it('throws MappingError naming the path on a garbled member', () => {
     expect(() => mapActors({ workspaceId: 'w', members: [{ userId: 1 }] })).toThrow(
       /members\.members\[0\]\.userId: expected a string/,
     );
+  });
+});
+
+/**
+ * 13.760 — `role` is CARRIED end to end, and an entry without one is REFUSED.
+ *
+ * This case exists for the one failure shape this repo has already been bitten
+ * by: a field the server sends and the client silently drops, where every VIEW
+ * test drives a fake data source and therefore cannot see the drop at all. So
+ * the assertion here is made at the mapper — the single seam the wire crosses —
+ * against a fixture typed as the SERVER's own `MemberListResponse`, which is
+ * what stops this suite from testing a body nobody sends (see the file
+ * docblock).
+ *
+ * The two arms are deliberately a matched pair. The first says the value
+ * survives; the second says its ABSENCE does not silently become some default,
+ * because "the server did not say" and "this person is a member" are different
+ * claims about a person's standing and only one of them is true of a body that
+ * lost the key.
+ */
+describe('13.760 mapActors carries `role`, and refuses a member that has none', () => {
+  const body: MemberListResponse = {
+    workspaceId: '01J9GWS0000000000000000000',
+    members: [
+      { userId: ANSELMA, displayName: 'Anselma Marak', role: 'owner' },
+      { userId: BIREN, displayName: 'Biren Sangma', role: 'member' },
+    ],
+  };
+
+  it('carries the role for a real server-shaped payload, alongside the id and the name', () => {
+    expect(mapActors(body)).toEqual([
+      { id: ANSELMA, name: 'Anselma Marak', role: 'owner' },
+      { id: BIREN, name: 'Biren Sangma', role: 'member' },
+    ]);
+    // The roster JOIN is unchanged by the wider shape, and that is asserted
+    // rather than assumed: it is the one shipped consumer that only ever
+    // wanted id→name, and the reason `RosterMember` extends `Actor` instead of
+    // replacing it.
+    expect(rosterByActorId(mapActors(body)).get(BIREN)).toBe('Biren Sangma');
+  });
+
+  it('REFUSES a member with no role, rather than defaulting one', () => {
+    // The positive control runs FIRST and through the SAME path the refusal is
+    // measured on: the identical body WITH its role maps cleanly. Without it a
+    // refusal could be about any of the three fields, and this case would be
+    // asserting the fixture rather than the missing key.
+    expect(mapActors({ ...body, members: [{ userId: ANSELMA, displayName: 'Anselma Marak', role: 'member' }] }))
+      .toEqual([{ id: ANSELMA, name: 'Anselma Marak', role: 'member' }]);
+
+    expect(() =>
+      mapActors({ workspaceId: 'w', members: [{ userId: ANSELMA, displayName: 'Anselma Marak' }] }),
+    ).toThrow(/members\.members\[0\]\.role: expected a string/);
+    // A MappingError, not a ServingGapError: the route DOES send this field, so
+    // a body without one is a body this client cannot read rather than a fact
+    // nobody serves.
+    expect(() =>
+      mapActors({ workspaceId: 'w', members: [{ userId: ANSELMA, displayName: 'Anselma Marak' }] }),
+    ).toThrow(MappingError);
   });
 });
 
