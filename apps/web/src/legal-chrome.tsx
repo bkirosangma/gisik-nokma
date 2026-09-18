@@ -14,13 +14,13 @@ import type { ReactNode } from 'react';
  * drifts in the direction that reads as correct (the page still renders, the
  * anchors still resolve, and the one section somebody added is simply missing
  * from the row until a reader notices). So each page declares its sections once
- * — `{ id, title }` beside the prose that section renders — and hands that same
+ * — `{ title, body }`, the anchor derived from the title — and hands that same
  * array to both `LegalToc` here and its own `<h2>`s. A section cannot be in one
  * and not the other, because there is no second thing to update.
  *
- * The witness for that property is a unit case, not this comment: the rendered
- * TOC's labels and anchors are compared against the rendered `<h2>`s' own text
- * and ids (`legal-screens.test.tsx`). Deleting the `<h2>` mapping reddens it.
+ * The witness for that property is a unit case, not this comment: case 13.683
+ * in `apps/web/test/not-found-and-legal.test.tsx` compares the rendered row's
+ * labels and anchors against the rendered `<h2>`s' own text and ids.
  *
  * ## The tab pair
  *

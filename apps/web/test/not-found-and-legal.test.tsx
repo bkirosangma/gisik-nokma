@@ -269,8 +269,15 @@ describe('the legal pages’ top bar', () => {
     it(`13.683 ${label}'s anchor row IS its headings, label for label and anchor for anchor`, () => {
       const { container } = render(node);
 
-      const toc = screen.getByRole('navigation', { name: 'On this page' });
-      const anchors = within(toc).getAllByRole('link');
+      // Found by CLASS, not by `getByRole('navigation', { name: 'On this
+      // page' })`. The role query would work, and it made this case fail for a
+      // reason that is not its own: renaming the label reddened 13.683 as well
+      // as 13.685, so one mutation pointed at two sites and neither case named
+      // its own. The property here is the row's CONTENT, and the row is
+      // identified by the class that content lives under.
+      const toc = container.querySelector('.gn-legal__toc');
+      expect(toc, `${label} has no anchor row`).not.toBeNull();
+      const anchors = within(toc as HTMLElement).getAllByRole('link');
       const headings = Array.from(container.querySelectorAll('section.gn-legal__section > h2'));
 
       expect(headings.length, `${label} rendered no headings to build a row from`).toBeGreaterThan(
