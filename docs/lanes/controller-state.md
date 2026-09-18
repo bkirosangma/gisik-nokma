@@ -1,5 +1,36 @@
 # Cross-lane controller — live state
 
+## ⚙ FRIDAY 2026-09-18 ~08:3x IST — **TOPOLOGY CHANGE, owner-ordered: `owner/workspace-edits` IS RETIRED AND DELETED, ALL PRs NOW TARGET `main`, AND THERE ARE TWO EXECUTORS RUNNING IN PARALLEL.** **READ THIS BEFORE TRUSTING ANY EARLIER ENTRY'S TOPOLOGY.** `main` is `afbd361d`; zero open PRs.
+
+### The three things this changes — each supersedes a standing rule above
+1. **`owner/workspace-edits` no longer exists.** The owner: *"close off the owner/workspace edits branch once its safe. and go with merging to main, and creating different branches for different tasks."* Verified safe before deleting, not assumed: `git log origin/main..origin/owner/workspace-edits` → **0 commits, exit 0, 0 stderr**, with a positive control the other way (23 commits main had that the branch lacked), and `merge-base --is-ancestor` true. Deleted from origin at `84cad818` — **that sha is the recreatable tip; nothing was lost, main contains it all.** The owner's primary checkout may still be on the retired branch locally: they were told to run `git checkout main && git pull`.
+2. **Every branch is now cut from `origin/main` and every PR is `--base main`. One branch per task.** The "executor's PRs → `owner/workspace-edits`; landings at cluster boundaries" rule is dead with the branch. **There are no landings any more** — a merged PR to `main` IS the landing, and `main` is the only integration line.
+3. **TWO EXECUTORS.** The owner: *"open up a 2nd executor to take things in parallel and finish this up quicker."* This deliberately replaces the serial rule in `dispatch-controller-serial.md`; the invariant that matters is preserved — **the controller is still the only merger, and no executor merges its own PR.**
+
+### The second executor — where it is and what keeps it from colliding
+| | executor 1 | executor 2 |
+|---|---|---|
+| tmux | `gisik:1` | `gisik:2` |
+| worktree | `/Users/kiro/my_projects/gisik-nokma-exec` | `/Users/kiro/my_projects/gisik-nokma-exec2` |
+| branch prefix | `exec/` | `exec2/` |
+| handoff file | `docs/lanes/executor-state.md` | **`docs/lanes/executor-2-state.md`** |
+| workstream | the backlog/closed second wave (12 tasks) | Members + InviteAdmin, then `isBuilder` |
+| prompt | `.exec-prompt-restart-2026-09-18.md` | the same brief **+ `override-2026-09-18-executor-2.md`** |
+
+**Two writers on one handoff file would conflict on every merge, which is why executor 2 has its own.** The override carries the three rules that exist because two executors on a 16 GB box is the condition that OOM'd this machine once already (five lanes drove free memory to ~66 MB and forced a restart):
+1. **Executor 2 never runs `docker compose`** — the hot stack (`server`, `web` on **:3001**) is mounted from executor 1's worktree and is live under a peer. Taking it down takes it out from under a running task.
+2. **No one binds :3001 but executor 1.** Executor 2 uses **:3021** for the viewport suite.
+3. **Test runs at `--concurrency=1`** where the runner allows, never piped into `head`.
+
+### What is in flight right now
+- **Executor 1** — second wave Task 1 (`exec/second-wave-t1-rank`, `969c5bff`), and it has been told the base changed: open the PR `--base main`. Its branch was cut from the now-deleted branch, which is harmless (that content is contained in main).
+- **Executor 2** — Members + InviteAdmin (`CTL-DISPATCH-2026-09-18-exec2-members-inviteadmin.md`), branch `exec2/members-inviteadmin`. The owner lifted the sign-in hold (decision-list item 4: *"yes"*), which is what the audit's two `held` rows were waiting on. **The dispatch's decisive first question** is whether `role` is on the server's members response and merely dropped by `mappers.ts:405-408`, or absent from the wire entirely — the first is a mapper fix plus a mapper test (the repo's "carry a wire field end to end in ONE task" rule), the second is a stop-and-ask. It is measuring that now.
+
+### Machinery carried forward unchanged
+Six checks raw 0 at the frozen head; the forced gate run by the **controller only** (never either executor) with the Node named from inside the run; reviewer recorded in the PR body **before** it opens; handoff committed before the freeze; `gh pr merge --merge`; tree identity; the full-tree drop check with no path filter; API reachability; owner told to `git pull`; the executor relaunched at the fixed point; this file anchored. **`--delete-branch` still exits 1 while a worktree holds the branch — verify the merge by API, never by exit status** (it happened on both merges of the previous cycle).
+
+**Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
+
 ## ✅ FRIDAY 2026-09-18 ~08:2x IST — **THE DEEPSEEK CONTROLLER'S FIRST CYCLE: STEP 5b MERGED (#436 → `84cad818`) AND LANDED (#437 → `main` `4d6aca41`); the owner answered the decision list, the second wave's Task 1 is dispatched, and THE HOLDS ARE NOW A FILE — `docs/lanes/owner-holds.md`. Ledger 287 done / 0 claimed / 19 todo.** `main` is `4d6aca41` + this PR; zero open PRs.
 
 ### If you are the DeepSeek controller reading this: your position, in five lines
