@@ -2789,7 +2789,9 @@ Four unbuildable columns mean **3a is true only for the backed surface.**
    same invocation.**
 
 `13.999` is a documented truncation trap in file 13, not an id
-(`test-cases/13-deployment-dogfooding.md:23,2406,4680,7273`). The `3.129`–`3.139` ids in
+(`test-cases/13-deployment-dogfooding.md:84`, `13-neomorphism-and-workspace-screens.md:131`,
+`13-board-prototype-port.md:428`, `13-owner-requests-and-backlog.md:1428` — the four pre-split lines of
+`13-deployment-dogfooding.md`, re-pointed when that file was split into part-files on 2026-09-19). The `3.129`–`3.139` ids in
 `apps/web/test/members-page.test.tsx` are a **different numbering line** — never renumber them.
 
 ### § 5 — THE STALE-`dist` TRAP (a false RED on a rebased tree).
