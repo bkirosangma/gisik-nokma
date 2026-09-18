@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import type { WorkspaceRef } from '@gisik-nokma/app-core';
+import type { ProjectRef, WorkspaceRef } from '@gisik-nokma/app-core';
 import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
 
@@ -63,7 +63,9 @@ vi.mock('../src/auth-client.js', () => ({
 
 import { AppNav } from '../src/app-nav.js';
 import { clearLastWorkspaceCache } from '../src/use-last-workspace.js';
+import { clearLastProjectCache } from '../src/use-last-project.js';
 import { clearWorkspaceNameCache } from '../src/use-workspace-name.js';
+import { clearWorkspaceProjectsCache } from '../src/use-workspace-projects.js';
 import HelpPage from '../app/help/page.js';
 import AccountPage from '../app/account/page.js';
 
@@ -91,6 +93,18 @@ function workspace(over: Partial<WorkspaceRef> & { id: string }): WorkspaceRef {
     projects: [],
     ...over,
   };
+}
+
+/**
+ * A served `ProjectRef`, for the one arm below whose workspace has projects.
+ *
+ * Every OTHER arm's workspace has `projects: []` and therefore rendered no
+ * project item at all before this round — which is why none of them needed
+ * changing when it landed, and why the arm that has them carries the whole of
+ * this round's coverage in this file.
+ */
+function project(over: Partial<ProjectRef> & { id: string }): ProjectRef {
+  return { name: `Project ${over.id}`, archived: false, ticketCount: 0, blockedCount: 0, ...over };
 }
 
 const NO_NAV_SERVICES = stubServices({}, { notifications: { unreadCount: async () => 0 } });
@@ -121,6 +135,13 @@ beforeEach(() => {
   // has, one layer up. Both are cleared so every case starts cold.
   clearLastWorkspaceCache();
   clearWorkspaceNameCache();
+  // The last-open-project item (2026-09-18): `AppNav` now mounts
+  // `LastProjectNav`, so this
+  // file shares the remembered-project hook's module cache and the served
+  // project LIST's, exactly as it already shared the two above — and for the
+  // same reason, one paragraph up in this file's own beforeEach comment.
+  clearLastProjectCache();
+  clearWorkspaceProjectsCache();
   mockSessionUser = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
 });
 
@@ -259,6 +280,42 @@ describe('AppNav — the mounts, not the components', () => {
      * was its only consumer. The project is expressed by `currentPath` alone,
      * which is all the component ever reads it from now.
      */
+    it('WITH a workspace that HAS projects: the project item joins, right of the workspace name', async () => {
+      currentPath = '/inbox';
+      render(
+        <Providers
+          services={workspacesOf([
+            workspace({
+              id: 'ws_1',
+              name: 'Convenience Corner',
+              projects: [
+                project({ id: 'p_beta', name: 'Beta' }),
+                project({ id: 'p_gamma', name: 'Gamma' }),
+              ],
+            }),
+          ])}
+        >
+          <AppNav workspaceId="ws_1" />
+        </Providers>,
+      );
+      await screen.findByRole('link', { name: 'Convenience Corner' });
+      const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
+      // THE POSITION IS THE ASSERTION as much as the membership is: the owner
+      // asked for the item "right to the workspace name", and an ordered array
+      // is the only form of this case that can tell that from anywhere else in
+      // the bar. `/w/ws_1` is the workspace-name link; `/w/ws_1/p/p_beta` is
+      // the remembered-or-first project, and nothing sits between them.
+      expect(hrefs).toEqual([
+        '/workspaces',
+        '/w/ws_1',
+        '/w/ws_1/p/p_beta',
+        '/w/ws_1/my-work',
+        '/w/ws_1/members',
+        '/settings?workspaceId=ws_1',
+        '/inbox',
+      ]);
+    });
+
     it('WITH a workspace AND a project in the route: the set is UNCHANGED, no Board', async () => {
       currentPath = '/w/ws_1/p/p_1';
       render(

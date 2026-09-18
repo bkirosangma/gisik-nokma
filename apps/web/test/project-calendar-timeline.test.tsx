@@ -567,3 +567,164 @@ describe('the roster is a convenience, never a gate', () => {
   });
 
 });
+
+/**
+ * The remembered tab (owner, 2026-09-18): *"on click, open the project page
+ * (save the last open tab as well)"*.
+ *
+ * The memory is GLOBAL — the owner answered that directly — so it applies
+ * whenever a project opens, not only when you arrive through the nav item. That
+ * is why the cases below live here, on the page, and not in
+ * `last-project-nav.test.tsx`: this file is where a project page is mounted
+ * with no nav item involved at all.
+ *
+ * ## These cases could not have been written before, and the reason is a real
+ * ## hazard rather than a technicality
+ *
+ * The page now WRITES to `localStorage` on every tab change, so every earlier
+ * case in this file (and in the eight other files that mount this page) leaves
+ * a record behind for the next one. `test/setup.ts` clears storage and the
+ * module caches before every case for exactly that reason; without it, whether
+ * `11.160` above sees Board selected would depend on which tab an earlier case
+ * happened to click.
+ */
+describe('the remembered tab', () => {
+  /** The label of the one tab carrying `aria-selected="true"`. */
+  async function selectedTab(): Promise<string | undefined> {
+    const tabs = await viewTabs();
+    return tabs.find((tab) => tab.getAttribute('aria-selected') === 'true')?.textContent;
+  }
+
+  /**
+   * 13.874 — the page OPENS at the remembered tab.
+   *
+   * `waitFor` rather than a bare read, and that is the honest shape: the seed
+   * is applied by an effect, because a `useState` initialiser reading storage
+   * would answer `null` on the server and then disagree with the client at
+   * hydration — the same reason `theme-toggle.tsx` reads `gn-theme` in one.
+   * Without the seed this case never settles on Timeline and times out.
+   */
+  it('13.874 opens at the tab remembered for this project', async () => {
+    window.localStorage.setItem(
+      'gn-project-tabs',
+      JSON.stringify({ userId: 'user_kiro', tabs: { p_1: 'timeline' } }),
+    );
+    render(
+      <Providers services={servedList([row()])}>
+        <ProjectPage />
+      </Providers>,
+    );
+
+    await waitFor(async () => expect(await selectedTab()).toBe('Timeline'));
+  });
+
+  /**
+   * 13.875 — switching a tab WRITES it, and a fresh mount opens on it.
+   *
+   * Both halves matter and neither implies the other: a page that seeded from
+   * storage but never wrote would forget the moment you navigated away, and one
+   * that wrote but never seeded would store a tab it never used. The remount is
+   * a real second mount of the same component against the same storage, which
+   * is what a navigation to another page and back produces.
+   */
+  it('13.875 writes the tab on switch, and the next mount opens on it', async () => {
+    const first = render(
+      <Providers services={servedList([row()])}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await openTab('Calendar');
+
+    await waitFor(() =>
+      expect(JSON.parse(window.localStorage.getItem('gn-project-tabs') as string)).toEqual({
+        userId: 'user_kiro',
+        tabs: { p_1: 'calendar' },
+      }),
+    );
+
+    first.unmount();
+    render(
+      <Providers services={servedList([row()])}>
+        <ProjectPage />
+      </Providers>,
+    );
+
+    await waitFor(async () => expect(await selectedTab()).toBe('Calendar'));
+  });
+
+  /**
+   * 13.876 — a DIFFERENT project's remembered tab does not decide this one's,
+   * and writing this one's does not disturb it.
+   *
+   * The map is per project. The fixture is a record that exists but names
+   * another project, which is what makes it discriminating in BOTH directions:
+   * a page that read the map without looking up the id — one remembered tab for
+   * everything — would open on Timeline here and still pass 13.874, and a
+   * writer that replaced the whole map instead of merging one entry would drop
+   * `p_other` when the List tab is chosen.
+   *
+   * The write is asserted as a MAP of two entries rather than only as `p_1`'s,
+   * because that is the difference: `rememberProjectTab` reads the existing map
+   * back so this project's entry JOINS it.
+   */
+  it('13.876 opens at Board with nothing remembered for this project, and keeps another project’s entry', async () => {
+    window.localStorage.setItem(
+      'gn-project-tabs',
+      JSON.stringify({ userId: 'user_kiro', tabs: { p_other: 'timeline' } }),
+    );
+    render(
+      <Providers services={servedList([row()])}>
+        <ProjectPage />
+      </Providers>,
+    );
+
+    const tabs = await viewTabs();
+    expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual([
+      'false',
+      'true',
+      'false',
+      'false',
+      'false',
+    ]);
+
+    await openTab('List');
+
+    await waitFor(() =>
+      expect(JSON.parse(window.localStorage.getItem('gn-project-tabs') as string)).toEqual({
+        userId: 'user_kiro',
+        tabs: { p_other: 'timeline', p_1: 'list' },
+      }),
+    );
+  });
+
+  /**
+   * 13.877 — opening a project is what REMEMBERS it, keyed by user AND
+   * workspace.
+   *
+   * The counterpart of 13.427 one level up ("opening a workspace is what
+   * remembers it"), and the write the nav item's READ depends on: without it
+   * the nav's "last open project" would only ever update when you arrived
+   * through the nav item itself, which is the one route that does not need it.
+   *
+   * The workspace id is asserted because it is the half the sibling hook has no
+   * analogue for — a project id is unique inside its workspace and meaningless
+   * outside it, so a record missing it would resolve `p_1` inside whichever
+   * workspace the viewer happened to be standing in.
+   */
+  it('13.877 records the opened project, keyed by user and workspace', async () => {
+    render(
+      <Providers services={servedList([row()])}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await viewTabs();
+
+    await waitFor(() =>
+      expect(JSON.parse(window.localStorage.getItem('gn-last-project') as string)).toEqual({
+        userId: 'user_kiro',
+        workspaceId: 'ws_1',
+        projectId: 'p_1',
+      }),
+    );
+  });
+});

@@ -1719,6 +1719,16 @@ input, textarea, select { font-family: inherit; }
    2.75rem tap floor comes from `.gn-nav a, .gn-nav button` above — not repeated
    here, so there is one place that number lives. */
 .gn-nav__account { position: relative; }
+
+/* The last-open-project item's wrapper (owner, 2026-09-18). It exists for the
+   SAME reason `.gn-nav__account` above does: `.gn-nav__menu` is
+   `position: absolute` with `inset-inline-end: 0` and `top: calc(100% + …)`, so
+   it anchors to the nearest positioned ancestor. Without this rule the
+   dropdown would anchor to whatever is positioned further up — or to the
+   viewport — and would not line up under the item it belongs to. It was caught
+   by comparing this to the account menu's wrapper rather than by a test: no
+   unit test in this suite can see a missing `position: relative`. */
+.gn-nav__project { position: relative; }
 .gn-nav__avatar-button {
   border-radius: 999px;
   padding: 0;
