@@ -180,7 +180,6 @@ function listRow(overrides: Partial<ListRow> = {}): ListRow {
 function servedBoard(cards: BoardCard[], rows: TicketListView['rows'] = []) {
   return stubServices({
     getBoard: async () => boardOf(cards),
-    getAttention: async () => [],
     getMembers: async () => [],
     getTicketTypes: async () => [],
     getTickets: async (): Promise<TicketListView> => ({ projectId: PROJECT_ID, rows }),
@@ -464,7 +463,6 @@ describe('13.517 (flipped 2026-09-17) an assignee picked in the Filters sheet na
       <Providers
         services={stubServices({
           getBoard: async () => boardOf(threeCards),
-          getAttention: async () => [],
           getMembers: async () => ROSTER,
           getTicketTypes: async () => [],
           getTickets: async (): Promise<TicketListView> => ({
@@ -496,7 +494,6 @@ describe('13.517 (flipped 2026-09-17) an assignee picked in the Filters sheet na
       <Providers
         services={stubServices({
           getBoard: async () => boardOf(threeCards),
-          getAttention: async () => [],
           getMembers: async () => ROSTER,
           getTicketTypes: async () => [],
           getTickets: async (): Promise<TicketListView> => ({
@@ -533,7 +530,6 @@ describe('13.517 (flipped 2026-09-17) an assignee picked in the Filters sheet na
       <Providers
         services={stubServices({
           getBoard: async () => boardOf(threeCards),
-          getAttention: async () => [],
           getMembers: async () => ROSTER,
           getTicketTypes: async () => TYPES,
           getPreferences: async () => EMPTY_PREFERENCES,
@@ -578,7 +574,6 @@ describe('13.556b the scope note names the LIST tab, not the board, when it rend
       <Providers
         services={stubServices({
           getBoard: async () => boardOf(threeCards),
-          getAttention: async () => [],
           getMembers: async () => ROSTER,
           getTicketTypes: async () => [],
           getTickets: async (): Promise<TicketListView> => ({
@@ -651,11 +646,18 @@ describe('13.556b the scope note names the LIST tab, not the board, when it rend
  * array, and every fixture below stubs `getAttention` to `[]` — but the strip
  * left the project page on 2026-09-18 (owner: *"the attention section should not
  * be there in the project page"*; case 13.881), so nothing it would have drawn
- * is on this page at all. **The `getAttention: async () => []` overrides below
- * are therefore INERT, not load-bearing** — left in place rather than swept,
- * because the same helper shape is shared with fixtures that do still mount a
- * page carrying the strip. Nothing else this page mounts (`AppNav`,
- * `FiltersSheet` closed) renders a `<li>` either.
+ * is on this page at all, and **the `getAttention: async () => []` overrides this
+ * file used to carry are gone with it.** An override for a read a page never
+ * makes is a fixture telling the next reader that it does — and 13.881 now
+ * asserts that read is never made, so leaving them would leave eleven entries
+ * the suite's own case contradicts. All eleven were swept in the same change:
+ * seven here, and one or more each in `filters-sheet`, `backlog-tab`,
+ * `list-bulk-close` and `project-calendar-timeline`, every one of them a
+ * `ProjectPage`-only fixture. `my-work-open-shared` and `page-refusals` KEEP
+ * theirs, because they mount `MyWorkPage`, where the strip still lives — the
+ * distinction is which page the fixture mounts, not which file it is in. Nothing
+ * else this page mounts (`AppNav`, `FiltersSheet` closed) renders a `<li>`
+ * either.
  */
 
 /** Two columns, two cards — the workflow this project's board is attached to before Task 8 ever runs. */
@@ -741,7 +743,6 @@ function renderProjectPage({ groups }: { groups: BoardGroup[] }) {
     <Providers
       services={stubServices({
         getBoard: async () => board,
-        getAttention: async () => [],
         getMembers: async () => [],
         getTicketTypes: async () => [],
         getTickets: async (): Promise<TicketListView> => ({ projectId: PROJECT_ID, rows: [] }),
@@ -906,7 +907,6 @@ describe('13.473 an unresolvable picked workflow falls back to All, not a phanto
       <Providers
         services={stubServices({
           getBoard: async () => ({ projectId: PROJECT_ID, groups: [defaultWorkflow, otherWorkflow] }),
-          getAttention: async () => [],
           getMembers: async () => [],
           getTicketTypes: async () => [],
           getTickets: async (): Promise<TicketListView> => ({ projectId: PROJECT_ID, rows: [] }),

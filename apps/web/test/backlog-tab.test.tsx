@@ -92,7 +92,6 @@ const WORKFLOW: WorkflowDef = {
 function servedWorld(rows: ListRow[], overrides: Partial<DataSourceQuery> = {}) {
   return stubServices({
     getBoard: async () => ({ projectId: PROJECT, groups: [] }),
-    getAttention: async () => [],
     getMembers: async () => [],
     getTicketTypes: async () => [typeDef()],
     getTickets: async (): Promise<TicketListView> => ({ projectId: PROJECT, rows }),

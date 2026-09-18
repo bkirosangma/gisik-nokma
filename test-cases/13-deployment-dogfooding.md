@@ -11002,9 +11002,9 @@ allocated blocks (`13.700`–`13.759`, `13.760`–`13.819`, `13.820`–`13.849`,
 
 **One property did not move, it moved house.** The block that previously stood here — *"Project page: the
 attention strip refuses out loud rather than rendering nothing"* — asserted the refusal on the project
-page. `/my-work` is now the only page that mounts the strip, and the refusals case at
-`page-refusals.test.tsx:106` asserts the identical sentence there, so the property is witnessed rather
-than dropped.
+page. `/my-work` is now the only page that mounts the strip, and the refusals case there
+(`page-refusals.test.tsx:122`) asserts the identical sentence at `page-refusals.test.tsx:169`, so the
+property is witnessed rather than dropped.
 
 ### What was removed, and every reference that had to keep making sense
 
@@ -11017,7 +11017,7 @@ correct it"*):
 | import block | `AttentionStrip` and `useAttention` dropped from the `@gisik-nokma/app-core` destructure |
 | hook call | `const attention = useAttention(dataSource, workspaceId)` deleted |
 | expired-session list | `attention.error` dropped — `page.tsx:963` **now passes three reads, not four** |
-| render block | the comment, the error arm and the strip arm removed; `.gn-project` (`page.tsx:1445`) opens straight into the tab arms |
+| render block | the comment, the error arm and the strip arm removed; `.gn-project` (`page.tsx:1445`) is now followed directly by the narrowing control's docblock and `<div className="gn-list-filter">` (`page.tsx:1464`) — **the tab arms are further down, not next** |
 | prose `:1338` | "the attention strip, the board and the list all use" → "the board and the list both use" |
 | prose `:1441` | "Four reads can 401 together … four panels" → **"Three reads"** — a count is a fact about the code, and the code changed |
 | prose (Step 5b docblock) | the `attention.data ?? []` analogy kept its reasoning and lost its now-absent referent |
@@ -11036,8 +11036,70 @@ would have removed one that is load-bearing. The docblock says so at the site.
 (`viewport.spec.ts`'s `writeFileSync`) and **read by nothing**, so this entry's route list is now stale and
 no gate can notice. `/p/:projectId` was removed from that one entry by hand. The reason is stated rather
 than implied: the sweep that would regenerate it needs the hot stack, which the two-executor override puts
-out of this session's reach. **This edit is a hand-correction of a record, not a measurement** — the next
-sweep run is expected to overwrite the file with the same answer, and if it does not, the sweep is right.
+out of this session's reach. **This edit is a hand-correction of a record, not a measurement, and it is PARTIAL on purpose.** The
+`routes` list was right to change; the header aggregates were not touched. `examined: 9` and
+`totalClasses: 5` describe the PRE-change sweep, and the next run is expected to write `examined: 8` —
+`aside.gn-attention` is the only roster entry covering `/p/:projectId`, and the sweep's `examinedTotal`
+sums per route, so that route's single bordered element leaves with the strip. Lowering it by hand would
+be asserting a number nobody measured, which is the same reason the accessible-name ratchet below is left
+alone. **Read that header as a record of the run that produced it, not as a description of this tree.**
+
+### ⚠️ A consequence no gate in this change's scope can see: the signed-in accessible-name ratchet
+
+`apps/web/e2e-stack/accessible-names-baseline.json` records `stack-phone-390|/p/:projectId` with
+**`ariaLabel: 66`**, and the strip's `<aside aria-label="Needs attention">` was one of those 66. The chain,
+each link checkable, and the first three found independently by the reviewer and by this executor:
+
+1. `RATCHETED` includes `ariaLabel` (`apps/web/e2e-viewport/accessible-names.ts:89`, counted by
+   `hasAttribute` at `:49`) and the assertion is a **FLOOR** —
+   `expect(...).toBeGreaterThanOrEqual(accessibleBaseline[attr])`
+   (`apps/web/e2e-stack/viewport.spec.ts:673`). A DECREASE is the failure this instrument exists to catch.
+2. `AttentionStrip` carries exactly one named attribute, `aria-label="Needs attention"`
+   (`packages/app-core/src/views/attention-strip.tsx:74`) — no `role` — so only `ariaLabel` can move.
+3. The strip verifiably rendered on `/p/:projectId` in that session: `AttentionStrip` returns `null` for an
+   empty list (`:72`), and the non-text-contrast roster written by the same suite records
+   `aside.gn-attention` **on `/p/:projectId`**, which it can only do for a selector it found rendered there.
+4. Nothing else that gained or lost an `aria-label` between the baseline's own commit (`5aab0a90`) and this
+   branch's base is in the measured DOM — the reviewer diffed every `aria-label` line across
+   `apps/web/app`, `apps/web/src`, `packages/app-core/src` and `packages/ui/src` for that range (seven
+   lines) and showed each is on another route, another tab, or behind a closed disclosure. The sweep
+   navigates the project bare (`viewport.spec.ts:467`) with `DEFAULT_PROJECT_TAB = 'board'`.
+
+So the count is 66 → 65, `65 >= 66` is false, and the suite reddens with its own sentence naming the
+cause: *"13.287: /p/:projectId LOST ariaLabel: baseline 66, now 65."*
+
+**It is recorded and NOT fixed, and that is a deliberate disagreement with the reviewer's recommendation.**
+The reviewer proposed hand-correcting the key to 65 in this commit, which the guard's own message invites
+("commit that says which element and why"). This change does not, for one reason: **lowering a floor is the
+direction that hides a loss.** If the strip was present in that run — likely, on the evidence above — then
+65 is right and this costs a red that explains itself. If it was NOT present, then 66 never included the
+strip, 65 is wrong, and the guard is silently weakened by one for ever. Both the reviewer and this executor
+name that last link as the one we cannot close without running the sweep, and the repo's stated preference
+is the loud failure over the quiet one. Re-seeding needs the hot stack, which the two-executor override
+puts out of this session's reach. **Owner: whoever runs `e2e-stack` next.** One run settles it, and the red
+it prints says exactly what to commit.
+
+Two other ratchets were checked in the same pass and are **unaffected**: `tap-target-baseline.json` holds a
+single key (`stack-phone-390|/my-work`) and does not baseline `/p/:projectId` at all, and
+`type-scale-baseline.json` records `0` for that route.
+
+**A correction made in passing, and it is load-bearing for the paragraph above.** `Features.md`'s
+`StyleToggle` paragraph said `apps/web/e2e-stack/accessible-names-baseline.json` "is `{}` (that suite has
+never been executed)". That was true when it was written and is not true now: the file was `{}` when Step
+5b began, and `5aab0a90` seeded it from run B and proved it asserts in run C, including a negative control
+that raised `/members`' recorded `ariaLabel` 5 → 6, watched it redden, and restored it byte-identically.
+The sentence now says so, because the ratchet above is only worth reporting if it is live.
+
+### One pre-existing overclaim found while removing, recorded rather than fixed
+
+`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:959` reads *"Every read on this page, one rule, one
+author"* over the expired-session list. That is not true of the whole page and was not before this change:
+the page also calls `getMyWorkspaces` (twice, through `src/use-project-name.ts:51` and
+`src/use-workspace-name.ts:72`) and `getWorkflowDef` (`page.tsx:938`), and their rejections are swallowed
+rather than routed to the notice — the exact shape the sentence denies. **No hunk of this change lands on
+that line, so it is pre-existing and is left alone.** Owner: whoever next touches this page's read wiring.
+Recorded here for the same reason the rest of this section exists — a sentence about code is a claim, and
+this one is false.
 
 ### Part 2 — the prototype's styling, measured, and why it is HELD
 

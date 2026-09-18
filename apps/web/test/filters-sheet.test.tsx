@@ -128,7 +128,6 @@ const TYPES: TicketTypeDef[] = [
 function servedBoard(cards: BoardCard[], overrides: Parameters<typeof stubServices>[0] = {}) {
   return stubServices({
     getBoard: async () => boardOf(cards),
-    getAttention: async () => [],
     getMembers: async () => ROSTER,
     getTicketTypes: async () => TYPES,
     getTickets: async () => ({ projectId: PROJECT_ID, rows: [] }),

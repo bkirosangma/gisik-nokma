@@ -148,7 +148,6 @@ function typeDef(overrides: Partial<TicketTypeDef> = {}): TicketTypeDef {
 function servedList(rows: ListRow[], types: TicketTypeDef[] = [typeDef()]) {
   return stubServices({
     getBoard: async () => ({ projectId: 'p_1', groups: [] }),
-    getAttention: async () => [],
     getMembers: async () => MEMBERS,
     getTicketTypes: async () => types,
     getTickets: async (): Promise<TicketListView> => ({ projectId: 'p_1', rows }),
@@ -263,7 +262,6 @@ describe('the project page mounts four views over one list read', () => {
       <Providers
         services={stubServices({
           getBoard: async () => ({ projectId: 'p_1', groups: [] }),
-          getAttention: async () => [],
           getMembers: async () => MEMBERS,
           getTicketTypes: async () => [typeDef()],
           getTickets: REFUSED_LIST,
@@ -292,7 +290,6 @@ describe('the project page mounts four views over one list read', () => {
       <Providers
         services={stubServices({
           getBoard: async () => ({ projectId: 'p_1', groups: [] }),
-          getAttention: async () => [],
           getMembers: async () => MEMBERS,
           getTicketTypes: async () => [typeDef()],
           getTickets: REFUSED_LIST,
@@ -454,7 +451,6 @@ describe('the project page mounts four views over one list read', () => {
       <Providers
         services={stubServices({
           getBoard: async () => ({ projectId: 'p_1', groups: [] }),
-          getAttention: async () => [],
           getMembers: async () => MEMBERS,
           getTicketTypes: async () => [typeDef()],
           getTickets: REFUSED_LIST,
@@ -483,7 +479,6 @@ describe('the roster is a convenience, never a gate', () => {
       <Providers
         services={stubServices({
           getBoard: async () => ({ projectId: 'p_1', groups: [] }),
-          getAttention: async () => [],
           getTicketTypes: async () => [typeDef()],
           getTickets: async (): Promise<TicketListView> => ({
             projectId: 'p_1',
@@ -539,7 +534,6 @@ describe('the roster is a convenience, never a gate', () => {
       <Providers
         services={stubServices({
           getBoard: async () => ({ projectId: 'p_1', groups: [] }),
-          getAttention: async () => [],
           getMembers: async () => MEMBERS,
           getTicketTypes: async () => [typeDef()],
           getTickets: () => new Promise<TicketListView>(() => {}),
@@ -564,7 +558,6 @@ describe('the roster is a convenience, never a gate', () => {
       <Providers
         services={stubServices({
           getBoard: async () => ({ projectId: 'p_1', groups: [] }),
-          getAttention: async () => [],
           getMembers: async () => MEMBERS,
           getTicketTypes: async () => [typeDef()],
           getTickets: () => new Promise<TicketListView>(() => {}),
@@ -612,7 +605,6 @@ describe('the nav item follows the route it is on', () => {
       <Providers
         services={stubServices({
           getBoard: async () => ({ projectId: 'p_1', groups: [] }),
-          getAttention: async () => [],
           getMembers: async () => MEMBERS,
           getTicketTypes: async () => [typeDef()],
           getTickets: async (): Promise<TicketListView> => ({ projectId: 'p_1', rows: [row()] }),
