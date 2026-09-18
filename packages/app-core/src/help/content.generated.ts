@@ -3280,15 +3280,23 @@ export const HELP_CONTENT: HelpContent = [
         "intro": [],
         "entries": [
           {
-            "id": "the-needs-attention-strip",
-            "title": "The \"Needs attention\" strip",
+            "id": "the-needs-your-attention-strip",
+            "title": "The \"Needs your attention\" strip",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "A row at the top of My Work and project pages, with three kinds of thing, in this order:"
+                    "text": "A row at the top of My Work, headed "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Needs your attention\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", with three kinds of thing, in this order:"
                   }
                 ]
               },
@@ -3358,7 +3366,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " No box, no \"all caught up\" message, nothing. That is deliberate — an empty box headed \"Needs attention\" reads like an all-clear you did not earn. A blank space there is the normal way of saying \"nothing needs you right now\"."
+                    "text": " No box, no \"all caught up\" message, nothing. That is deliberate — an empty box headed \"Needs your attention\" reads like an all-clear you did not earn. A blank space there is the normal way of saying \"nothing needs you right now\"."
                   }
                 ]
               },
@@ -4884,7 +4892,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " rather than making something up: your list of workspaces, the people list, the ordinary search, the standard My Work view, the \"Needs attention\" strip, and both reading and saving your preferences. Each one names what is missing rather than showing you an empty screen."
+                    "text": " rather than making something up: your list of workspaces, the people list, the ordinary search, the standard My Work view, the \"Needs your attention\" strip, and both reading and saving your preferences. Each one names what is missing rather than showing you an empty screen."
                   }
                 ]
               },
@@ -7884,15 +7892,15 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "my-needs-attention-strip-isn-t-showing",
-            "title": "My \"Needs attention\" strip isn't showing.",
+            "id": "my-needs-your-attention-strip-isn-t-showing",
+            "title": "My \"Needs your attention\" strip isn't showing.",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "If nothing needs attention, the strip does not appear at all — no box, no \"all caught up\" message, nothing. That is deliberate: an empty box headed \"Needs attention\" reads like an all-clear you did not earn. A blank space there is the normal way of saying \"nothing needs you right now\"."
+                    "text": "If nothing needs attention, the strip does not appear at all — no box, no \"all caught up\" message, nothing. That is deliberate: an empty box headed \"Needs your attention\" reads like an all-clear you did not earn. A blank space there is the normal way of saying \"nothing needs you right now\"."
                   }
                 ]
               }
@@ -8386,7 +8394,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " rather than making something up: your list of workspaces, the people list, the ordinary search, the standard My Work view, the \"Needs attention\" strip, and both reading and saving your preferences. Each names what is missing rather than showing an empty screen."
+                    "text": " rather than making something up: your list of workspaces, the people list, the ordinary search, the standard My Work view, the \"Needs your attention\" strip, and both reading and saving your preferences. Each names what is missing rather than showing an empty screen."
                   }
                 ]
               }

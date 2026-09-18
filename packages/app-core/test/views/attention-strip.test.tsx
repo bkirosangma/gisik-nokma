@@ -157,11 +157,96 @@ describe('3.55 AttentionStrip — an absent kind is absent, never an empty secti
   it('PLANTED DEFECT: and "nothing" means no container either — an empty strip is not a quiet strip', () => {
     // `container.toBeEmptyDOMElement()` above already covers this, but only
     // because `<aside>` is the outermost node. A component that returned an
-    // empty `<aside aria-label="Needs attention" />` would still be a surface
-    // on screen announcing itself as the answer to "what needs attention".
+    // empty `<aside aria-label="Needs your attention" />` would still be a
+    // surface on screen announcing itself as the answer to "what needs
+    // attention". **The name here moved with the heading on 2026-09-18** — an
+    // absence assertion against a name the component no longer uses is
+    // vacuously true, which is the check-that-cannot-fail shape rather than a
+    // weaker check.
     render(<AttentionStrip items={[]} onOpenTicket={vi.fn()} />);
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Needs attention')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Needs your attention')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Cases 13.890–13.892 — Part 2 of the attention-strip instruction: the
+ * prototype's visible heading, adopted (owner ruling, 2026-09-18 —
+ * *"i want the prototype's visible heading adopted"*), together with the tint
+ * card, `--gn-tint-warning`.
+ *
+ * ## WHY THE NAME IS THE HEADING, AND NOT `aria-labelledby`
+ *
+ * The region used to be named `"Needs attention"` by `aria-label` while the
+ * prototype's visible heading reads `"Needs your attention"` — WCAG 2.5.3's
+ * exact failure, a visible label the accessible name does not contain. Two
+ * implementations fix that: keep `aria-label` and set it to the visible string,
+ * or drop it and name the region from the `<p>` via `aria-labelledby`.
+ *
+ * **This file takes the first, and the reason is measured rather than
+ * stylistic.** `e2e-stack/viewport.spec.ts` ratchets the COUNT of elements
+ * carrying an `aria-label` with `toBeGreaterThanOrEqual`, per route, from
+ * `e2e-stack/accessible-names-baseline.json` — `/my-work` is floored at **8**,
+ * and this strip's `aside` is one of them. `aria-labelledby` would remove that
+ * attribute from every route the strip renders on, dropping the count to 7. The
+ * standing rule for a floor is that it is not hand-lowered to meet a restyle
+ * (`#471`'s recorded ruling, 2026-09-18). So the name keeps its attribute and
+ * changes its value.
+ *
+ * **What is NOT claimed here:** that the ratchet was RE-RUN. It cannot be, from
+ * this worktree — `e2e-stack` requires the compose stack, which is executor 1's
+ * and is mounted from executor 1's tree, so a run here would measure a tree
+ * without this change. What is claimed is the direction and the arithmetic, and
+ * 13.890 pins the attribute's presence, which is the half a unit test can hold.
+ */
+describe('13.890–13.892 AttentionStrip — the prototype’s visible heading, adopted', () => {
+  it('13.890 — the region’s accessible name IS the visible heading, character for character', () => {
+    const { container } = render(<AttentionStrip items={ITEMS} onOpenTicket={vi.fn()} />);
+    const strip = container.querySelector('aside.gn-attention');
+    expect(strip, 'no strip rendered').not.toBeNull();
+    const heading = strip!.querySelector('.gn-attention__heading');
+    expect(heading, 'the visible heading is not rendered at all').not.toBeNull();
+
+    // Read the RENDERED text, not a string in the source. `<svg>` contributes
+    // none, but a heading whose glyph were a character would, and that is the
+    // difference between this and a `toContain` on the component file.
+    const visible = heading!.textContent ?? '';
+    expect(visible).toBe('Needs your attention');
+
+    // THE PROPERTY, and the one the shipped code failed: the two agree.
+    expect(strip!.getAttribute('aria-label')).toBe(visible);
+
+    // …and the accessible-name computation itself agrees, which is what an
+    // assistive technology reads rather than the attribute.
+    expect(screen.getByRole('complementary', { name: visible })).toBe(strip);
+  });
+
+  it('13.891 — the heading’s icon is decorative, so the name is not the sentence twice', () => {
+    const { container } = render(<AttentionStrip items={ITEMS} onOpenTicket={vi.fn()} />);
+    const icon = container.querySelector('svg.gn-attention__icon');
+    expect(icon, 'the heading’s icon is gone').not.toBeNull();
+    expect(icon!.getAttribute('aria-hidden')).toBe('true');
+    // `aria-hidden` alone would be defeated by a name of its own, which an
+    // assistive technology may still read on some platforms.
+    expect(icon!.getAttribute('aria-label')).toBeNull();
+    expect(icon!.querySelector('title')).toBeNull();
+  });
+
+  it('13.892 — the row runs title → chip → reason, the prototype’s order', () => {
+    // `ITEMS[0]` carries a claim, so the row has four children and the CLAIM's
+    // position is pinned too — it is a product addition the prototype does not
+    // draw, and "it is still last, after the three the prototype orders" is the
+    // claim. A reorder that left it first would satisfy a three-item check.
+    const { container } = render(<AttentionStrip items={[ITEMS[0]!]} onOpenTicket={vi.fn()} />);
+    const row = container.querySelector('.gn-attention__item');
+    expect(row, 'no row rendered').not.toBeNull();
+    const classes = [...row!.children].map((child) => child.className);
+    expect(classes).toEqual([
+      'gn-attention__title',
+      'gn-chip gn-chip--blocked',
+      'gn-attention__reason',
+      'gn-attention__claim',
+    ]);
   });
 });
 

@@ -592,9 +592,9 @@ comes back — an absence, not a zero.
 Click the row. If the marking fails it reloads to show you the truth rather than leaving a fake "read"
 mark.
 
-**My "Needs attention" strip isn't showing.**
+**My "Needs your attention" strip isn't showing.**
 If nothing needs attention, the strip does not appear at all — no box, no "all caught up" message,
-nothing. That is deliberate: an empty box headed "Needs attention" reads like an all-clear you did not
+nothing. That is deliberate: an empty box headed "Needs your attention" reads like an all-clear you did not
 earn. A blank space there is the normal way of saying "nothing needs you right now".
 
 **Seven days is too long / too short for us.**
@@ -727,7 +727,7 @@ cannot online: nothing offers to.
 waiting to send" section is always empty on the web. Offline is the apps' job.
 
 **Seven things flatly refuse offline** rather than making something up: your list of workspaces, the
-people list, the ordinary search, the standard My Work view, the "Needs attention" strip, and both
+people list, the ordinary search, the standard My Work view, the "Needs your attention" strip, and both
 reading and saving your preferences. Each names what is missing rather than showing an empty screen.
 
 **I made a job offline and it vanished from the board.**

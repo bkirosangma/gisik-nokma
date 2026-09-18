@@ -67,15 +67,55 @@ export type AttentionStripProps = {
  * sectioned strip has to decide what to draw under a heading with no rows, and
  * every honest answer to that is "do not draw the heading". A flat list renders
  * what exists by construction.
+ *
+ * **"Do not draw the heading" is about a PER-KIND SUB-heading, and the single
+ * banner-level heading below is a different thing.** The two sentences read as
+ * if they disagree, so, plainly: a sectioned strip needs one heading per kind,
+ * and a kind with no rows has nothing honest to put under its own heading. The
+ * heading this component draws names the WHOLE strip, not a kind, and it can
+ * never outlive its rows — `items.length === 0` returns `null` above, before
+ * any of this is reached. A banner heading over zero rows would be the
+ * fabricated all-clear refusal 3 already forbids; that is the case this
+ * paragraph rules out, and the flat list above is what keeps it impossible.
  */
 export function AttentionStrip({ items, onOpenTicket }: AttentionStripProps) {
   if (items.length === 0) return null;
   return (
-    <aside className="gn-attention" aria-label="Needs attention">
+    /* The accessible name is the visible heading, character for character.
+       WCAG 2.5.3 fails on a visible label that its accessible name does not
+       contain, and "Needs attention" beside a heading reading "Needs your
+       attention" is that failure. This keeps `aria-label` rather than naming
+       the region from the `<p>` via `aria-labelledby`, and the reason is
+       measured rather than stylistic: `aria-labelledby` would remove an
+       `aria-label` attribute from every route this strip renders on, and
+       `e2e-stack/viewport.spec.ts` ratchets that attribute's COUNT with
+       `toBeGreaterThanOrEqual` — `/my-work` is floored at 8 and the strip's
+       `aside` is one of them. A floor is not hand-lowered to meet a restyle. */
+    <aside className="gn-attention" aria-label="Needs your attention">
+      <p className="gn-attention__heading">
+        {/* Decorative: the heading beside it already says this, so a name here
+            would be the same sentence read twice. */}
+        <svg
+          className="gn-attention__icon"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.9"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 4.5 3.5 19h17Z" />
+          <path d="M12 10v4" />
+          <path d="M12 16.5h.01" />
+        </svg>
+        Needs your attention
+      </p>
       <ul className="gn-attention__items">
         {items.map((item) => (
           <li key={`${item.kind}:${item.ticketId}`} className="gn-attention__item">
-            <Chip tone={KIND_TONE[item.kind]}>{KIND_LABEL[item.kind]}</Chip>
             <button
               type="button"
               className="gn-attention__title"
@@ -83,6 +123,7 @@ export function AttentionStrip({ items, onOpenTicket }: AttentionStripProps) {
             >
               {item.title}
             </button>
+            <Chip tone={KIND_TONE[item.kind]}>{KIND_LABEL[item.kind]}</Chip>
             <span className="gn-attention__reason">{item.reason}</span>
             {item.claim !== null ? (
               <span className="gn-attention__claim">
