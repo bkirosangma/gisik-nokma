@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { IngestResult, WorkflowDef } from '@gisik-nokma/domain';
+import { SYSTEM_ACTOR_AUTO_CLOSE } from '@gisik-nokma/domain';
 import { createClientStateCache } from '../../src/cache.js';
 import { ServingGapError, SERVING_GAPS } from '../../src/online/mappers.js';
 import type { AttachmentListEntry } from '../../src/views/attachment-list.js';
@@ -908,6 +909,46 @@ describe('TicketSheet — Close, Reopen and the badge (backlog/closed spec §5.3
     expect(batch).toHaveLength(1);
     expect(batch[0]!.type).toBe('ticket.reopened');
     expect(batch[0]!.payload).toEqual({});
+  });
+
+  /**
+   * **13.726 — a ticket the auto-close sweep closed reads "Closed by Auto-close
+   * on <date>", and not the raw 26-character actor id.**
+   *
+   * Spec §8.2 fixes the sentence; this is the surface that renders it. The
+   * fixture is 13.586's with the actor swapped and nothing else changed, which
+   * is the point: the badge, the Reopen button and the disabled Move… all go
+   * through the same `nameOf` → `actorLabel` join, so the system actor needs no
+   * special case here and must not acquire one. If the sheet grew its own
+   * "if system actor" branch, 13.586 and this case would stop proving that the
+   * ONE join handles both.
+   *
+   * The date is the discriminating 19:00 UTC instant 13.586 chose, so this case
+   * would also catch a system-actor branch that formatted its own date.
+   */
+  it('13.726 a sweep-closed ticket reads "Closed by Auto-close on <date>"', async () => {
+    const read = ticketRead({
+      ticket: ticketStateSeed({
+        stateId: 'done',
+        stateCategory: 'terminal',
+        // The auto-close sweep's actor, with `actorName: null` exactly as the
+        // roster answers for it — nothing in any workspace resolves this id to
+        // a person, which is what makes the name come from `actorLabel`'s
+        // system lookup rather than from a roster row.
+        closed: { actorId: SYSTEM_ACTOR_AUTO_CLOSE, at: '2026-08-20T19:00:00.000Z' },
+      }),
+    });
+    const source = sheetSource(read);
+    renderSheet(read, source);
+    await waitFor(() =>
+      expect(within(stateRow()).getByRole('button', { name: 'Reopen' })).toBeInTheDocument(),
+    );
+    expect(screen.getByText('Closed by Auto-close on 21 Aug 2026')).toBeInTheDocument();
+    // The negative control, in the same render: the id itself is NOT on screen.
+    // A badge that fell through to the honesty-contract-1 fallback would print
+    // the 26-character id and satisfy a `toContain('Auto-close')`-shaped check
+    // only by accident of the constant's own tail.
+    expect(screen.queryByText(new RegExp(SYSTEM_ACTOR_AUTO_CLOSE))).toBeNull();
   });
 
   /** 13.587 — a non-terminal ticket shows neither button. */

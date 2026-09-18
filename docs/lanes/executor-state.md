@@ -41,7 +41,126 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~13:1x IST. **SECOND WAVE, TASK 6
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~14:1x IST. **SECOND WAVE, TASK 7
+> # (`reopenedAt`, the reserved auto-close actor `SYSTEM_ACTOR_AUTO_CLOSE`, and `actorLabel`'s
+> # system-first precedence) IS BUILT, REVIEWED, FIXED, REBASED, AND FULLY GATE-GREEN.** The
+> # independent reviewer returned **CLEAN**; its five findings are closed or recorded below. **The PR IS
+> # THE ONLY THING NOT DONE.** This block is the position; everything below it is RECORD.
+> # **The queue after this task is NOT empty** — Tasks 8 (`reopenedAt` + the auto-close sweep) and
+> # 9/10 (bulk close) remain in `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md`,
+> # and they are **dispatched by the controller rather than started by reflex. HOLD for that dispatch.**
+> # A SECOND EXECUTOR IS LIVE on a disjoint workstream in `gisik-nokma-exec2`; branches are one-per-task
+> # and every PR is `--base main`.
+>
+> | | |
+> |---|---|
+> | branch | `exec/second-wave-t7-reopened-at` |
+> | base | **`36ec6ae3`** = `origin/main`, carrying PR #458 (a **ledger-only** commit, `b793780b`) on top of #457 (executor 2's membership Task 1) and #456 (a plan fix). `--base main`. |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha here names an ANCESTOR. The tip is THE COMMIT THAT CARRIES THIS BLOCK. Its ancestors are **`d89750dc`** (the first handoff), **`f1083126`** (the fix round), **`dc7be7d3`** (the task). **FOUR commits ahead of `origin/main`** with the ruling commit. **The LAST commit is post-review and post-ruling**: the controller ruled DROP on the dead `PROJ_TICKET_COLUMNS` entry and it was applied in that commit — the only change since the reviewer's `74b12565`, and it removes one line of a shared SQL constant plus one type member, with the server suite re-run green at 1548 afterwards. *(Every sha cited before the 14:0x rebase is ORPHANED: `cabf36bf`→`dc7be7d3`, `74b12565`→`dc7be7d3`, `5c975c21`→`f1083126`. Check with `git merge-base --is-ancestor`, never `cat-file`.)* |
+> | reviewed sha | **`74b12565`** — the reviewer read THAT commit, not the tip. The rebase to `f1083126` was proved **source-neutral**: same 17 files, **0 blobs differ** pre/post, with a control showing the comparison is not trivially passing. A reader can reproduce the equivalence with `/usr/bin/git diff --name-only dda4c342...74b12565` vs `/usr/bin/git diff --name-only 36ec6ae3...f1083126` (both list the same 17 files). |
+> | case ids | **`13.722`–`13.726`**, FIVE ids, inside this executor's block `13.700`–`13.759`; **`13.727`–`13.759` remain unminted**; executor 2's `13.760`–`13.819` untouched. Recounted at the tip by case MARKER with `scripts/check-case-ids.mjs`'s own `ID_LINE` regex: the block's high-water was `13.721` (Task 6's), `13.722` returned **false** and `13.720`/`13.721` present as the positive control. `check-case-ids` at the tip: **2302 unique ids, union == sum** (was 2293; +5 this task, +4 from executor 2's merged `13.820`–`13.823`). |
+> | migration | **`apps/server/migrations/1789300000000_proj-tickets-reopened-at.sql`** — `ADD COLUMN reopened_at timestamptz NULL` + COMMENT; **Down drops it**. **The hot dev stack migrates ONLY at container start**, so after this merges the server container must be restarted or every route touching the column 500s. **The controller said it will do that; this lane ran NO compose action at all.** |
+> | seven checks | **all EXIT 0 at `f1083126`**, through `pnpm run check:*` so no filename is guessed: `tasks` · `env` · `runbook` · `help` · `citations` (**ratchet holds exactly**: file 13 = **612** cited / 0 uncited) · `db-tz` **0 with `DATABASE_URL=postgres://gisik:gisik@localhost:54330/gisik_nokma`** · `node scripts/check-case-ids.mjs` (**2302** unique, union == sum). |
+> | suites | **domain 514 · app-core 1549 · rule-engine 331 · ui 325 · server 1548 (5 skipped) · web 482 — zero failures**, Node **v22.22.2**, re-run after `pnpm turbo run build`. |
+> | typechecks | **17/17 tasks, EXIT 0.** |
+> | gate | **THIS LANE DID NOT RUN IT.** The controller made "do not run the forced gate" a standing rule for Task 7 (its gate waits for a peer's vitest pool). The evidence above is the full suite set run package-by-package instead. |
+> | tree | clean; **no `dist`, no `task-ledger.tsv`, no `.superpowers/`** in the diff. |
+> | dev stack | **no compose action was run at any point.** |
+>
+> ## ▣ WHAT TASK 7 SHIPS, AND THE TWO THINGS IT EXISTS FOR
+>
+> **1. `reopenedAt` — a timestamp that is a SWEEP INPUT, not a display fact.** The auto-close sweep
+> (spec §8.2) has to tell a ticket nobody came back to apart from one a person reopened yesterday; both
+> carry the same `closed: null` and the same terminal `stateId`. `ticket.reopened` sets it from the
+> ENVELOPE's `serverTime` (never the claim's `clientTime` — the sweep compares it to a server-clock
+> cutoff), and **ANY** `ticket.transitioned` clears it, including one back into the same terminal state
+> — the sweep measures how long a ticket has sat in its state and a transition restarts that clock.
+>
+> **2. `SYSTEM_ACTOR_AUTO_CLOSE` — a reserved ULID the ingest door will accept.** It must match
+> `ULID_REGEX` or the sweep's every `ticket.closed` is refused at the door and the failure presents as
+> a rules problem rather than a bad constant. Verified through the REAL door, not just the regex:
+> `submittedEventSchema.safeParse({... actorId: SYSTEM_ACTOR_AUTO_CLOSE})` → **true**, and the control
+> `actorId: 'system'` → **false** with `actorId - must be a ULID`. `actorLabel` consults
+> `SYSTEM_ACTOR_NAMES` **before** the roster, so the sheet reads `Closed by Auto-close on <date>` and a
+> roster row cannot rename a system actor.
+>
+> `reopenedAt` is deliberately NOT on `TicketCard`/`ListRow` — it is a sweep input and putting it on the
+> card would change the body of every card-serving route (**measured: FIVE route files call
+> `assembleTicketCards`** — `attention`, `board`, `list`, `my-work`, `search`; `tickets.ts` imports the
+> module and never calls the assembler). It reaches a client only through the single-ticket route.
+>
+> ## ▣ THE REVIEW — one independent pass at `74b12565`, verdict CLEAN. FIVE FINDINGS.
+>
+> **FIXED — the tolerance's stated rationale was FALSE.** `mapOptionalInstant` is right to be tolerant
+> (`?? null` is what the plan mandates; the value is policed), but the docblock justified it with
+> "keeps the same SHAPE as the one `replica-data-source.ts` folds locally" — **and no such comparison
+> exists**: the repo's two-sided rig compares the server PROJECTION against the replica, and neither
+> side passes through this mapper. The comment now states the real price: a spent tripwire, for a
+> comparison nobody makes. Comment-only; no behaviour change.
+>
+> **FIXED — "last explicitly reopened" was pinned by NOTHING.** `state.reopenedAt ?? env.serverTime`
+> (first-write-wins) **survived all 514 domain cases**. **My first attempt at a pin did not kill it
+> either, and that is the part worth carrying:** `??` differs from a plain stamp only when a
+> `ticket.reopened` arrives while `reopenedAt` is ALREADY set, and that attempt walked
+> `closed → reopened → transition → closed → reopened` — the transition clears the flag, so the mutant
+> read a null. **The discriminating path needs a second reopen with no transition between, and the
+> doors permit exactly that**: `ticket.reopened` clears `closed` and leaves the ticket terminal,
+> `checkTicketClosed` refuses only on `already-closed` + `close-requires-terminal`, and
+> `checkTicketReopened` refuses only on `not-closed` — so `closed → reopened → closed → reopened` is
+> accepted end to end. Re-run after the fix: **M4 dies on that case and nothing else** (1 failed, 513
+> of 514).
+>
+> **FIXED — a wrong count.** "four routes' bodies" is **five** (measured). The Features.md sentence now
+> carries the number and names the files.
+>
+> **RULED AND APPLIED — `t.reopened_at` was DEAD SELECTION in `PROJ_TICKET_COLUMNS`, and the
+> controller ruled DROP.** The plan's Task 7 `Files:` line required it; **nothing read it** —
+> `assembleTicketCards` never touched the column, `rowToTicketState` is fed by `SELECT *`, and the
+> plan's own Task 8 Step 3 gives the sweep its own SQL ("mirrors `notifications/sweep.ts:227-243`"), so
+> no reader was waiting for the list to carry it. **Mutation M3 (delete `, t.reopened_at` from the
+> list) SURVIVED the entire server suite — reproduced here, 1548 passed / 0 failed, byte-identical to
+> baseline** — and that measurement is what settled it. The controller verified the two row types were
+> ONE decision rather than two: `rowToTicketState` reads `row.reopened_at` off **`TicketRow`** in
+> `apps/server/src/projections/tickets.ts`, a DIFFERENT type, and **that read STAYS**. Removed: the
+> constant entry AND the declared `ProjTicketRow.reopened_at` member. The plan contradicted itself
+> (Task 7 `Files:` vs Task 8's own SQL) and the code now agrees with Task 8. Server suite re-run after
+> the drop: **still 1548 passed / 5 skipped**, unchanged, because the line was read by nothing.
+>
+> **RECORDED, NOT FIXED, TASK 8's TO WEIGH — `reopenedAt` survives a state move that is not a
+> `ticket.transitioned`.** Both `ticket.workflow_rebound` and `foldTicketToWorkflowVersion` move
+> `stateId` by spreading the state, so a ticket reopened and then rebound or folded into a terminal
+> state keeps the flag and the sweep would skip it **forever**. **The direction is safe** — a non-null
+> flag can only make the sweep skip MORE, never close what it should skip, so no false close is
+> reachable — and spec §8.2 says "cleared by any `ticket.transitioned`", so it matches the spec's
+> letter. Nothing pins either direction.
+>
+> ## ▣ METHOD NOTES THIS TASK EARNED — carry these
+>
+> - **A stale `packages/rule-engine/dist` produced THREE false server failures.** `apps/server` resolves
+>   `@gisik-nokma/rule-engine` BY PACKAGE NAME through `dist/`; main's merged membership source was not
+>   in it, `grant-owner-requires-owner` was absent from `dist` entirely, and
+>   `test/permissions/check-role-permission.test.ts` failed 3 cases. `pnpm turbo run build` fixed it and
+>   the suite went green at 1548. **The control is the tell: grep the rule id in `dist` before and
+>   after.** A red suite after a rebase is not evidence about your change until the dists are rebuilt.
+> - **Two-dot vs three-dot bit this lane TWICE in one session.** `git diff --stat origin/main` (working
+>   tree vs a MOVED main) listed a peer's files as deletions in mine; `git diff --name-only HEAD..
+>   origin/main` listed my own files as main's. Use `A...B`. The memory entry is right and it is easy to
+>   forget under time pressure.
+> - **The zsh `set -- $pair` non-split produced a FALSE "IDENTICAL".** A byte-identity control looped
+>   over `"a b"` pairs printed IDENTICAL for two files it never hashed. Redone with explicit paths. The
+>   false-positive direction is the dangerous one: it looked like a pass.
+> - **A perl mutation with a bad replacement produced a SYNTAX ERROR, which is "no tests", not a kill.**
+>   Discarded and redone through the editor. A mutation that does not compile measures nothing.
+> - **The union on `test-cases/13` was proved by SET DIFFERENCE, not by count**: main 692 ids, branch
+>   693, merged 697, added = exactly the branch's five, **lost from either side = ZERO**; both preserved
+>   blocks byte-identical to their sources with the control in the same invocation. **NAME THE
+>   INSTRUMENT:** those three figures are every id-shaped bullet head in the file (`13.*`, `14.*`,
+>   `15.*` …), matched with the checker's own `ID_LINE`. The reviewer ran a `13.*`-SCOPED instrument,
+>   read 627→634, and could not reconcile the two — both are correct and they measure different
+>   universes. **The claim is the SET RELATION, and it holds under either instrument**; a count without
+>   its filter is the reading that expires.
+>
+> # ▣ CURRENT POSITION — SUPERSEDED 2026-09-18 ~14:1x IST. **HISTORY — Task 6
 > # (`autoCloseAfterDays` end to end, plus the Workspace settings tab) IS COMMITTED, REVIEWED, FIXED,
 > # AND GATE-GREEN, THEN **REBASED TWICE ONTO A MOVING `origin/main`** — first onto `43885e26`
 > # (executor 2's Task 10, #452) and then onto `06b0e29d` (their Task 11, #454, plus a plan PR,

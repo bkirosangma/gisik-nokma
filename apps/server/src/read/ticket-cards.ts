@@ -41,6 +41,32 @@ export type ProjTicketRow = {
   rank: string | null;
 };
 
+/**
+ * `TicketState.reopenedAt` IS DELIBERATELY ABSENT from this list and from the
+ * row type above, and the absence is a RULING rather than an omission.
+ *
+ * The plan's Task 7 `Files:` line originally asked for `t.reopened_at` here.
+ * It was measured and removed: **nothing on these routes reads it.** This list
+ * and `ProjTicketRow` exist to feed `assembleTicketCards`, which builds CARDS,
+ * and `reopenedAt` is a server-side SWEEP INPUT (spec §8.2) that no card
+ * carries — so carrying it here put one dead column into six routes' SELECTs
+ * and declared a row member none of them dereferenced. The plan's own Task 8
+ * Step 3 gives the auto-close sweep its own SQL, so no reader was waiting for
+ * the list to have it either. The mutation that deleted the entry **survived
+ * the entire server suite** (1,548 passed, byte-identical to baseline), which
+ * is what settled it.
+ *
+ * The value is NOT lost: `rowToTicketState` reads it off its own `TicketRow`
+ * in `projections/tickets.ts`, fed by that file's queries, and the
+ * single-ticket route serves it through `getTicketStateFromDb`. A second
+ * column list carrying a column no route on it consumes is the "carried but
+ * never read" shape this repo's mapper rule exists to prevent — the closed
+ * flag was dead in production; this would have been dead in the query.
+ *
+ * If a future card-serving route needs the column, add it HERE with that
+ * reader named; do not add it on the assumption that a canonical list should
+ * be complete against the table.
+ */
 export const PROJ_TICKET_COLUMNS =
   't.ticket_id, t.workspace_id, t.project_id, t.type_id, t.parent_id, ' +
   't.workflow_id, t.workflow_version, t.state_id, t.state_category, ' +

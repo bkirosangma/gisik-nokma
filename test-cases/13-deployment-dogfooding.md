@@ -9964,3 +9964,155 @@ new id — and then FIXED THE PLAN rather than leaving the conflict standing.** 
 `fff365bd`), matching this implementation. **So the plan and the code agree as of that commit, and an
 earlier draft of this paragraph — which said the two steps still disagreed — is struck rather than
 left standing**, since it was true only until the plan was corrected.
+---
+
+# Second wave, Task 7 — `reopenedAt`, the reserved auto-close actor, and its name
+
+Plan ids `13.630`–`13.634` were **taken** (recorded as taken in the dispatch), so this task's cases are
+**`13.722`–`13.726`**, recounted by case MARKER at the tip before the first mint: the block's
+high-water was `13.721` (Task 6's fix round) with `13.720`/`13.721` present as the positive control, and
+`13.722` returned **false**.
+
+**The task's correctness core is a timestamp that is not a display fact, and a constant that must pass
+the ingest door.** `reopenedAt` exists so the auto-close sweep can honour spec §8.2's "reopen wins": a
+ticket that sat terminal for 30 days because nobody came back and one a person deliberately reopened
+yesterday carry the SAME `closed: null` and the same terminal `stateId`, so without this field the
+sweep would close the second one an hour later. `SYSTEM_ACTOR_AUTO_CLOSE` is the actor the sweep files
+that close under; it must match `ULID_REGEX` or the ingest door refuses every event and the sweep
+reports `refused: N` forever — a failure that would present as a rules problem rather than as a bad
+constant. 13.722 pins the match with a negative control for exactly that reason.
+
+- ✅ **13.722 — `ticket.reopened` arms `reopenedAt`; ANY transition clears it, including back into the
+  same terminal state.** Four cases in `packages/domain/test/ticket-state.test.ts`. A created ticket is
+  present-and-null (`toBeNull`, not `?? null`: the field is optional on the DOMAIN type only because
+  hundreds of test literals predate it, so a `?? null` here would pass on a regression that dropped the
+  key — the shape the dual-client rig's whole-`TicketState` `toEqual` compares). The reopen case
+  records the envelope's `serverTime` and proves the rest of the state is byte-identical by stripping
+  the one field under test from both sides. The clear case carries its OWN positive control in the same
+  test — after the reopen and before the transition the field IS set — without which the clearing
+  assertion is satisfied by a reducer that never sets it at all; it then transitions back into `done`,
+  the state the ticket is already in, and asserts both `reopenedAt === null` and that the transition
+  LOG grew by one, which is what separates a real re-arm from a transition the fold skipped.
+  **Mutation M1** (drop `reopenedAt: null` from the `ticket.transitioned` case) → **13.722's clear case
+  reddens and nothing else in the file** (1 failed, 36 passed); the mutation was re-applied through the
+  editor after a first attempt died of a perl plumbing error, so the kill is the semantics and not a
+  bind error. The fourth case pins `ULID_REGEX.test(SYSTEM_ACTOR_AUTO_CLOSE)` with a one-character
+  negative control and the `SYSTEM_ACTOR_NAMES` entry, because a constant the ingest door refuses would
+  turn every auto-close into a refusal.
+  **The fifth case is a review-round addition, and its history is the point** (see the review section
+  below): `state.reopenedAt ?? env.serverTime` — a first-write-wins stamp — **survived** all 514 domain
+  cases until this case existed, because the sweep's predicate is only "is it NULL" and nothing held
+  the field's documented meaning to the word *last*. **The first version of this case did not kill it
+  either**, and the reason is worth keeping: `??` differs from a plain stamp only when a
+  `ticket.reopened` arrives while `reopenedAt` is ALREADY set, and that version walked
+  `closed → reopened → transition → closed → reopened` — the transition clears the flag, so the mutant
+  read a null and behaved identically. **The discriminating path needs a second reopen with no
+  transition between, and the doors permit exactly that**: `ticket.reopened` clears `closed` and leaves
+  the ticket in its terminal state (§1.2), `checkTicketClosed` refuses only on `already-closed` +
+  `close-requires-terminal`, and `checkTicketReopened` refuses only on `not-closed` — so
+  `closed → reopened → closed → reopened` is accepted end to end, and at that second reopen the field
+  still holds the FIRST instant. The case asserts BOTH directions there (`toBe(second)` and
+  `not.toBe(first)`), because the first alone would also pass a stamp carrying both. Re-run after the
+  fix: **M4 dies on this case and nothing else** (1 failed, 513 passed of 514).
+- ✅ **13.723 — `proj_tickets.reopened_at` follows the state, all three arms.** One case in
+  `apps/server/test/projections/tickets-closed.test.ts` (a sibling of 13.572, which owns the
+  closed/reopened columns of this table). Real Postgres through `applyCommitted`; seeded along the real
+  path (terminal → closed → reopened → transitioned) rather than by hand-writing the column. `NULL` on
+  creation and through `rowToTicketState`; the reopen's `serverTime` after a reopen; `NULL` again after
+  a transition back into `done`. The middle arm is the control — without it the third passes against a
+  projection that never wrote the column — and the third is the arm an `ON CONFLICT SET` list that
+  omits this column cannot produce, leaving the row holding the reopen's stamp for the rest of the
+  ticket's life, which is the "never auto-closable again after one reopen" failure §8.2 names.
+- ✅ **13.724 — `mapTicketState` carries the wire's `reopenedAt` onto `TicketState.reopenedAt`.** One
+  case in `packages/app-core/test/online/mappers.test.ts`, through `mapTicketRead`. This is the last
+  member of this mapper that could have gone dead the 13.603 way: the route serves a whole
+  `TicketState` and the mapper enumerates its members BY HAND, so a member added to `rowToTicketState`
+  and not added here is silently dropped on this route alone. **The tolerance is stated rather than
+  incidental, and it is a deliberate difference from `mapClosed`/`mapRank`:** an absent `closed` or
+  `rank` is a visible product defect (a hidden badge, a reordered Backlog tab) so those throw, while
+  `reopenedAt` is a server-side sweep input no surface renders and its job here is that the mapped
+  state keep the same SHAPE as the one the replica folds locally. An absent key reads as `null` — the
+  same answer as an explicit null — and the case asserts that arm explicitly. The VALUE is still
+  policed: a number is refused rather than coerced into `string | null`.
+- ✅ **13.725 — `actorLabel` knows the reserved system actors, and the ROSTER cannot rename one.** Three
+  cases in `packages/app-core/test/provenance.test.ts`. The precedence is the load-bearing part, not
+  the lookup: system name FIRST, then the roster, then the id — so
+  `actorLabel(SYSTEM_ACTOR_AUTO_CLOSE, 'Someone')` still answers `'Auto-close'`, because a person's
+  name printed over a decision no person made is the claim honesty contract 1 exists to refuse. The
+  same test carries the positive control that an ordinary id still takes its roster name, so the system
+  lookup is a first check and not a replacement. The second case pins the sentence
+  (`formatStateProvenance` → `marked Done by Auto-close on 19 Aug 2026`), the second surface that would
+  otherwise print the raw 26-character id. The third pins `isSystemActor` **including
+  `isSystemActor('toString') === false`** — the reason `SYSTEM_ACTOR_NAMES` is a `Map` and not an object
+  literal, since `'toString' in {}` is true and an object-backed lookup would answer `true` for a name
+  no product reserved. **Mutation M2** (delete the `SYSTEM_ACTOR_NAMES` lookup from `actorLabel`) →
+  **both 13.725 arms and 13.726 redden** (2 failed of 26 in this file; 1 failed of 42 in the sheet
+  file), and nothing else.
+- ✅ **13.726 — a ticket the sweep closed reads `Closed by Auto-close on <date>`.** One case in
+  `packages/app-core/test/views/ticket-sheet.test.tsx`, 13.586's fixture with the actor swapped and
+  nothing else changed — which is the point: the badge, Reopen and the disabled Move… all go through
+  the one `nameOf` → `actorLabel` join, so the system actor needs no branch in the sheet and must not
+  acquire one. The date is 13.586's discriminating 19:00 UTC instant (00:30 IST, 21 Aug), so a
+  system-actor branch that formatted its own date would also redden this. The case asserts the id is
+  NOT on screen in the same render: a badge falling through to the honesty-contract-1 fallback would
+  print the 26-character id and satisfy a `toContain('Auto-close')`-shaped check only by accident of
+  the constant's own `SYS0AC` tail.
+
+## Task 7's review round — one independent reviewer, verdict CLEAN, and two surviving mutations
+
+One reviewer, dispatched before the PR opened, read the frozen tip `74b12565` (base `dda4c342`) and
+attacked every new test by mutation. **Verdict: CLEAN** — no defect that breaks behaviour or violates
+the Task 7 contract. Five findings, recorded here in full because **three of them were about claims
+rather than code, and the two surviving mutations are worth more than the kills**.
+
+- **Important — `t.reopened_at` in `PROJ_TICKET_COLUMNS` is dead selection, and pinned by nothing.**
+  The plan's Task 7 `Files:` line requires it; nothing reads it. `assembleTicketCards` never touches
+  `row.reopened_at`, the only consumer of the column is `rowToTicketState` (fed by `SELECT *`), and the
+  plan's own Task 8 Step 3 gives the sweep its own SQL, so no reader is waiting for the list to carry
+  it. **Mutation M3 (delete `, t.reopened_at` from the list) SURVIVES the entire server suite —
+  reproduced here, 1548 passed / 0 failed, byte-identical to baseline.** The line was kept because the
+  plan is the authority being audited against, and both readings were priced rather than hidden.
+  **RULED, AND THE RULING IS DROP.** The controller checked the two row types separately rather than
+  assuming they were one decision — `rowToTicketState` reads `row.reopened_at` off **`TicketRow`** in
+  `apps/server/src/projections/tickets.ts`, a DIFFERENT type fed by that file's own queries, and that
+  read stays; `ProjTicketRow` and `PROJ_TICKET_COLUMNS` exist to feed `assembleTicketCards`, which
+  builds cards, and the plan itself says this is not a card field. So **both the constant entry and the
+  declared `ProjTicketRow.reopened_at` member were removed**, and the surviving mutation is what
+  settled it: keeping a dead column in a shared SELECT to satisfy a line written on an assumption is
+  the "carried but never read" pattern this repo's mapper rule exists to prevent, wearing the opposite
+  hat. The plan contradicted itself — Task 7's `Files:` line versus Task 8's own SQL — and the code now
+  agrees with Task 8. Verified after the drop: the server suite is still **1548 passed / 5 skipped**,
+  unchanged, because the line was read by nothing.
+- **Minor, FIXED — the tolerance's stated rationale was false.** `mapOptionalInstant` is right to be
+  tolerant (`?? null` is what the plan mandates, the value is policed, and no surface reads the field),
+  but the docblock justified it with "keeps the same SHAPE as the one `replica-data-source.ts` folds
+  locally" — **and no such comparison exists**: the repo's two-sided rig compares the server
+  PROJECTION against the replica, and neither side passes through this mapper. The comment now states
+  the real price (a spent tripwire for a comparison nobody makes) and says when the read should become
+  strict. A comment asserting a signal the product does not emit is the same defect class as a test
+  asserting a property nothing pins.
+- **Minor, recorded, belongs to Task 8 — `reopenedAt` survives a state move that is not a
+  `ticket.transitioned`.** Both `ticket.workflow_rebound` and `foldTicketToWorkflowVersion` move
+  `stateId` by spreading the state, so a ticket reopened and then rebound or folded into a terminal
+  state keeps the flag and Task 8's sweep would skip it forever. **The direction is safe** — a non-null
+  flag can only make the sweep skip more, never close what it should skip, so no false close is
+  reachable — and spec §8.2's clear rule is literally "cleared by any `ticket.transitioned`", so this
+  matches the spec's letter. Nothing pins either direction; Task 8 is where the sweep's semantics is
+  exercised.
+- **Minor, FIXED with a correction — "last reopened" was pinned by nothing.** Covered in 13.722 above;
+  the short version is that the first attempt at a pin walked a path where the mutant is
+  indistinguishable, and only the no-transition double reopen kills it.
+- **Minor, FIXED — "four routes' bodies" undercounted.** Measured: **five** route files call
+  `assembleTicketCards` (`attention`, `board`, `list`, `my-work`, `search`; `tickets.ts` imports the
+  module but never calls the assembler). The Features.md sentence now carries the measured number and
+  names the files. The sibling `four other routes` comment at `ticket-cards.ts:25` is pre-existing and
+  not this task's; recorded, not edited.
+
+**What the reviewer confirmed and could not fault:** the `actorLabel` precedence (system → roster → id,
+all fifteen call sites read); the `ULID_REGEX` match with a control genuinely outside the class;
+`newUlid()` cannot mint the constant and no client can forge it (`check-permission.ts` refuses
+`env.actorId !== ctx.sessionUserId`); the migration's Down as a true inverse; the `ON CONFLICT SET`
+list reaching an existing row to clear it; the timestamptz handling under a pinned Asia/Kolkata test
+database; that no other whole-`TicketState` literal was stale; that `task-ledger.tsv` is correctly
+untouched; and that the rebase union lost nothing (`comm -23` of the id sets is empty, additions are
+exactly `13.722`–`13.726`).

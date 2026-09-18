@@ -1314,6 +1314,23 @@ function mapRank(raw: unknown, path: string): string | null {
   return raw;
 }
 
+/**
+ * An OPTIONAL instant on the wire → `string | null` (spec §8.2, second wave
+ * 2026-09-18). `null`, an absent key and `undefined` all answer `null`; any
+ * other non-string is refused.
+ *
+ * The tolerance is the whole reason this is a named function rather than an
+ * inline `?? null`: `mapClosed` and `mapRank` beside it are strict, and a
+ * reader meeting the three should be able to see that the difference is a
+ * decision about THIS field (a server-side sweep input that no surface renders)
+ * rather than an inconsistency somebody introduced by accident. See
+ * `mapTicketState`'s comment at the call site for the reachability argument.
+ */
+function mapOptionalInstant(raw: unknown, path: string): string | null {
+  if (raw === null || raw === undefined) return null;
+  return asString(raw, path);
+}
+
 function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, string>): ListRow {
   const record = asRecord(raw, path);
   return {
@@ -1548,6 +1565,33 @@ function mapTicketState(raw: unknown, path: string): TicketState {
     // DOMAIN type (legacy literals only); the wire always sends it, because
     // `rowToTicketState` reads the column unconditionally.
     rank: mapRank(record['rank'], `${path}.rank`),
+    // The SAME lesson a third time, and the last member this mapper could still
+    // have dropped: `reopenedAt` reaches this body (`GET /v1/workspaces/:w/
+    // tickets/:id`) because `rowToTicketState` reads the column
+    // unconditionally, and enumerating fields by hand is precisely how `closed`
+    // went missing for a whole task (13.603).
+    //
+    // **Tolerant, unlike `mapClosed`/`mapRank`, and the price is stated rather
+    // than argued away.** The plan's Task 7 Files line mandates this read
+    // ("`mapTicketState` reads `reopenedAt ?? null`"), so an absent key answers
+    // `null` — the same value as an explicit null, which is the distinction
+    // 13.724 asserts. What that costs is real and it is one thing: the
+    // tripwire. `mapClosed`/`mapRank` throw on an absent key because an absent
+    // key there means the SERVER stopped sending a field a surface renders, and
+    // 13.603 is what that costs when nobody notices. `reopenedAt` is a
+    // server-side sweep input, and that is measured rather than assumed:
+    // `reopenedAt` appears across `packages/*/src` and `apps/*/src` in exactly
+    // one producer — this line — and **no comparator exists between this
+    // mapper's output and a folded replica state** (the repo's two-sided rig
+    // compares the server PROJECTION against the replica, and neither side
+    // passes through this mapper). So a silent drop here would be invisible,
+    // and the tolerance spends a tripwire for a comparison nobody makes today.
+    // Recorded rather than left implied; if a surface ever renders this field,
+    // the read should become strict on `mapRank`'s rule.
+    //
+    // The VALUE is still policed: `string | null` is the whole type, so a
+    // number is refused rather than coerced (13.724's final arm).
+    reopenedAt: mapOptionalInstant(record['reopenedAt'], `${path}.reopenedAt`),
   };
 }
 
