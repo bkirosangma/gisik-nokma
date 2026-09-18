@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Dialog } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { makeSubmittedFactory } from '../submit.js';
@@ -84,15 +84,42 @@ type Failure = { ticketId: string; title: string; reason: string };
  * screen. Stated as a reading rather than left implicit, because the plan names
  * the call and not its empty case.
  *
- * ## A reopened dialog does not remember its last attempt
+ * ## A reopened dialog does not remember its last attempt — and a late answer
+ * cannot reach the new one
  *
- * Ruling 13.532's own rule ("a closed-and-reopened dialog does not remember its
- * last pick"), applied to this one: opening the dialog clears the previous
- * attempt's outcome. A parent that swaps `tickets` while the dialog stays OPEN
- * is not covered by that reset and would show a stale outcome; the two
- * consumers this task names both close and reopen it (Task 10 keys it off
- * `bulkClose === null`, Task 11 off the selection), so the case is stated here
- * rather than guarded for.
+ * Opening the dialog clears the previous attempt's outcome AND its latch, and
+ * bumps the token every write is gated on, so an answer that arrives after a
+ * dismissal belongs to nobody (see `attemptRef`, case 13.787). The house
+ * precedent for a reopened dialog starting clean is a fresh mount — case
+ * `13.532`, where `board.tsx`'s `MoveArrows` renders `TransitionDialog` only
+ * while its state is non-null — and this component does NOT rely on it: a
+ * remount fixes stale STATE across opens and cannot fix a late prop callback
+ * from the old closure.
+ *
+ * One case remains the consumer's, and it is stated rather than guarded:
+ * a parent that swaps `tickets` while the dialog stays OPEN (no `open`
+ * transition) is not covered by the reset, and would see the previous
+ * attempt's outcome against the new list. Both consumers this task names open
+ * and close it, so it cannot arise for them.
+ *
+ * ## What Tasks 10 and 11 must do — a requirement, not an inference
+ *
+ * This component never dismisses itself, so **the consumer owns the
+ * dismissal**, and the partial outcome is the thing that makes it delicate:
+ *
+ * - **Task 10** must clear its own `bulkClose` state inside `onClosed` (or
+ *   after it) to make the dialog leave on a full success. `moves.onMoved()`
+ *   alone reloads the board and leaves the dialog mounted and empty.
+ * - **Task 11** must SNAPSHOT the tickets at click time and keep its own open
+ *   flag. Its plan text wires `onClosed` → `list.reload()` with the selection
+ *   cleared on reload, which would set `open` false and unmount the dialog the
+ *   moment a PARTIAL close reports — destroying the `Could not close` rows
+ *   spec §8.3 requires it to keep on screen.
+ *
+ * Both are one-line consequences of the interface rather than surprises, which
+ * is why they are written here: the plan words `onClosed` as a reload and does
+ * not mention the dismissal, and a reader who takes that literally gets a
+ * dialog that never leaves on success and never stays on a partial.
  */
 export function BulkCloseDialog({
   open,
@@ -108,12 +135,40 @@ export function BulkCloseDialog({
   const [transportError, setTransportError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // 13.532, one dialog over: an opening starts from nothing.
+  /**
+   * WHICH OPENING AN ANSWER BELONGS TO. Every write `confirm` makes after an
+   * `await` is gated on this being unchanged, and the opening bumps it.
+   *
+   * Without it, an answer that arrives after the dialog was dismissed lands on
+   * the NEXT opening — the plan's own consumer mounts the dialog once and
+   * toggles `open` (Task 10: "renders `BulkCloseDialog` once"), so the instance
+   * survives the dismissal and the in-flight closure writes into an opening it
+   * knows nothing about: a phantom `Could not close` carrying the previous
+   * batch's refusal, and an `onClosed` for tickets nobody just asked to close —
+   * which, for a parent that dismisses in `onClosed`, dismisses the new dialog
+   * before it is ever used. Case 13.787.
+   *
+   * **A fresh mount does not cover this**, which is why the fix is a token and
+   * not a mount discipline. Unmounting stops `setState` landing on the dead
+   * instance, but the stale closure still holds the OLD `onClosed` prop and
+   * calls it — and `setSubmitting(false)` from a dead attempt would release a
+   * LIVE attempt's latch. The house precedent for a reopened dialog starting
+   * clean is a fresh mount (case `13.532`, `board.tsx`'s `MoveArrows` renders
+   * the dialog only while its state is non-null); that mechanism fixes STATE
+   * across opens and cannot fix a late PROP CALLBACK, so this component carries
+   * its own guard rather than depending on how a consumer mounts it.
+   */
+  const attemptRef = useRef(0);
+
+  // An opening starts from nothing — including a previous attempt's latch, so a
+  // reopened dialog is never stuck behind a call that no longer concerns it.
   useEffect(() => {
     if (!open) return;
+    attemptRef.current += 1;
     setClosedIds(new Set());
     setFailures([]);
     setTransportError(null);
+    setSubmitting(false);
   }, [open]);
 
   const make = makeSubmittedFactory({ actorId: currentUserId, origin: 'web' });
@@ -126,6 +181,7 @@ export function BulkCloseDialog({
 
   const confirm = async (): Promise<void> => {
     if (submitting || pending.length === 0) return;
+    const attempt = attemptRef.current;
     setSubmitting(true);
     try {
       const batch = pending.map((ticket) =>
@@ -137,6 +193,11 @@ export function BulkCloseDialog({
         }),
       );
       const results = await dataSource.ingest(batch);
+      // The opening this call belonged to is over — dismissed, or dismissed and
+      // reopened since. Its outcome is nobody's answer now, and every write
+      // below (including the `finally`) would land on a dialog that did not
+      // make this call. See `attemptRef`, and case 13.787.
+      if (attemptRef.current !== attempt) return;
       if (results.length !== batch.length || results.some((result) => result === undefined)) {
         // Silence, not a partial success — see the docblock.
         setTransportError('The server did not answer this close.');
@@ -167,10 +228,13 @@ export function BulkCloseDialog({
       }
       if (committed.length > 0) onClosed(committed);
     } catch (cause) {
+      if (attemptRef.current !== attempt) return;
       const message = cause instanceof Error ? cause.message : String(cause);
       setTransportError(`We could not reach the server for this close — ${message}`);
     } finally {
-      setSubmitting(false);
+      // Gated, not merely tidy: an ungated reset would release the latch of a
+      // LIVE attempt in the next opening.
+      if (attemptRef.current === attempt) setSubmitting(false);
     }
   };
 

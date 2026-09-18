@@ -9114,7 +9114,7 @@ BEFORE minting rather than after.
   submit three correct events and misreport every one of the moment a single ticket is refused. The batch
   is also asserted envelope-by-envelope — `payload: {}` on all three (the envelope alone carries actor and
   time, spec §1.2), `entity` kind/id in the listed order, `workspaceId`, `actorId` and `origin: 'web'`.
-  `packages/app-core/test/views/bulk-close-dialog.test.tsx:104`, `packages/app-core/src/views/bulk-close-dialog.tsx:127`
+  `packages/app-core/test/views/bulk-close-dialog.test.tsx:105`, `packages/app-core/src/views/bulk-close-dialog.tsx:182`
 
 - ✅ **13.641 — a refused second ticket is listed under `Could not close`; the rest are reported closed.**
   The verdict is per ticket, so the two that committed are reported and the refused one is NOT: a dialog
@@ -9125,7 +9125,7 @@ BEFORE minting rather than after.
   former, which is the one asserted. It also asserts `onClose` was never called, which is what makes
   "stays open" a measurement rather than a property of the harness: under an implementation that closed
   itself on confirmation, this task's whole failure list would be unmounted before anyone could read it.
-  `packages/app-core/test/views/bulk-close-dialog.test.tsx:153`, `packages/app-core/src/views/bulk-close-dialog.tsx:168`
+  `packages/app-core/test/views/bulk-close-dialog.test.tsx:154`, `packages/app-core/src/views/bulk-close-dialog.tsx:229`
 
 - ✅ **13.642 — a rejected ingest shows the transport notice, reports nothing closed, re-enables confirm.**
   A rejected promise is not a refusal (Ruling 27/34): the notice wears `.gn-refusal--transport` and this
@@ -9136,8 +9136,8 @@ BEFORE minting rather than after.
   still pending — because index alignment is the only thing that makes the answers meaningful, so a short
   array cannot be read as "the first one committed". A third `it` covers the `invalid` envelope, whose
   reason is the error's `message` rather than a rule's `reason`, plus Cancel closing without a second
-  submit. `packages/app-core/test/views/bulk-close-dialog.test.tsx:197`, `:222`, `:244`,
-  `packages/app-core/src/views/bulk-close-dialog.tsx:140`, `:171`
+  submit. `packages/app-core/test/views/bulk-close-dialog.test.tsx:198`, `:223`, `:399`,
+  `packages/app-core/src/views/bulk-close-dialog.tsx:201`, `:233`
 
 - ✅ **13.643 — the `Dialog` dismiss control's accessible name is `Close dialog`.** R4 of this task. The
   control's visible text is `×`, so its accessible name is whatever `aria-label` says and nothing in a
@@ -9147,13 +9147,80 @@ BEFORE minting rather than after.
   find exactly one element: that second assertion is the one that FAILED under the old label (testing-
   library threw "found multiple elements"), so it is the assertion that catches the defect rather than one
   that merely describes the fix. `packages/ui/test/components.test.tsx:100`,
-  `packages/ui/src/components/dialog.tsx:38`
+  `packages/ui/src/components/dialog.tsx:51`
+
+- ✅ **13.787 — an answer arriving after a dismissal never lands on the NEXT opening.** Minted in the
+  review round (block `13.760`–`13.819`, the first id drawn there since `13.786`), and it is the only
+  defect this change has that no test could see: every earlier case resolves its promise while the dialog
+  is still open. Cancel, Escape, the scrim and `×` all stay live during a submit — deliberately, since a
+  person must be able to walk away from a slow call — so the window is the whole round trip, and the
+  plan's own consumer mounts the dialog once and toggles `open` (Task 10: "renders `BulkCloseDialog`
+  once"), meaning the instance survives the dismissal. The in-flight closure then writes into an opening
+  it knows nothing about: a phantom `Could not close` carrying the PREVIOUS batch's refusal, and an
+  `onClosed(['a','c'])` for tickets nobody just asked to close — which, for a parent that dismisses in
+  `onClosed`, dismisses the new dialog before it is ever used. The case drives exactly that (a deferred
+  first ingest, rerendered closed then reopened for a different pair, then resolved) and asserts the new
+  opening is untouched. **A fresh mount does not cover this**, which is why the fix is an attempt token
+  and not a mount discipline: unmounting stops `setState` landing on the dead instance, but the stale
+  closure still holds the OLD `onClosed` prop and calls it, and an ungated `setSubmitting(false)` would
+  release a LIVE attempt's latch. It was RED before the fix — `expected "spy" to not be called at all,
+  but actually been called 1 times` with `['a','c']` — and the token mutation (`attemptRef.current += 1`
+  → `+= 0`) reddens this case and nothing else in the file.
+  `packages/app-core/test/views/bulk-close-dialog.test.tsx:305`, `packages/app-core/src/views/bulk-close-dialog.tsx:200`
+
+- ✅ **13.788 — when every ticket is refused, nothing is reported closed and all are listed.** The
+  complement of 13.641, and it exists because the decision it pins was UNWITNESSED: an independent review
+  made `onClosed` fire unconditionally and all seven cases stayed green, since no case had reached an
+  all-refused outcome — 13.641 always leaves something committed and its confirm is gone afterwards, so
+  nothing could press it again. Asserted: `onClosed` NOT called, all three titles listed under
+  `Could not close`, and the confirm control gone under 13.641's own rule.
+  `packages/app-core/test/views/bulk-close-dialog.test.tsx:373`,
+  `packages/app-core/src/views/bulk-close-dialog.tsx:229`
+
+#### The review round — one Critical, two unwitnessed decisions, four wrong causes
+
+One reviewer, over commit `ef6da16b`, attacking the three load-bearing points specifically. It could not
+falsify the ONE-call assertion or the R4 blast radius (both re-run), found one reproduced defect and two
+surviving mutations, and closed the trail on several of this change's own sentences.
+
+1. **The Critical — a dismissed attempt's answer applied to the next opening.** Reproduced by the reviewer
+   as two failing probes before it was believed; now the shipped fix, with 13.787 as its witness. The
+   docblock's own mitigation was **inverted**: it named "the two consumers close and reopen it" as the
+   reason the case needed no guard, when close-and-reopen is the TRIGGER. Corrected in place.
+2. **Two mutations survived the first suite.** Deleting the `undefined`/holed half of the silence guard,
+   and making `onClosed` fire unconditionally, both left 7/7 green — with controls in the same invocation
+   confirming the sites were live. Both are now witnessed (the holed arm inside the silence case, and
+   13.788 for the all-refused outcome), and both mutations now redden their own witness.
+3. **A stale `Close`/`Close dialog` cause, twice.** `dialog.tsx`'s comment and this file's R4 paragraph
+   both said spec §5.3's ticket-sheet Close was the first collision with `Dialog`'s dismiss. Measured
+   false: `TicketSheet` renders `Sheet`, not `Dialog` (`ticket-sheet.tsx:429`), and Ruling 31 fixed that
+   collision by renaming **`Sheet`'s** dismiss to `Close sheet` on 2026-09-17. The plan's own rationale is
+   inexact too — a `Close N tickets` confirm cannot collide with a dismiss named `Close`, because
+   testing-library's `name:` is an exact-string match. The rename ships (it is R4) with the honest reason:
+   preventive, plus consistency with `Sheet`. A right verdict with a wrong cause is how a real hole gets
+   read as covered later.
+4. **`Ruling 13.532` cited as a ruling.** `13.532` is a CASE id, and the mechanism it pins is a fresh
+   mount (`board.tsx:892-895`), not an effect keyed on `open` — and the substitution is not equivalent,
+   which is finding 1's root cause. Corrected to cite the case and to say what the mechanism can and
+   cannot do.
+
+**Recorded, not fixed (out of scope, named owners):** (a) a results array of the right LENGTH whose
+entries are the wrong tickets' answers is undetectable, since nothing compares `result.eventId` to
+`batch[index].id` — the core's own reader has the same limitation (`flows/guarded-child-event.ts:294-296`),
+so this is a server-contract assumption rather than a local bug, and it belongs with that one; owner:
+whoever next touches the ingest contract. (b) An `OfflineAcceptError` from the replica source (thrown
+AFTER every event is enqueued, `replica-data-source.ts:1192`) renders as a transport failure and invites
+a retry that queues N more — `board.tsx`'s `closeCard` and `ticket-sheet.tsx`'s `closeOrReopen` have the
+identical gap, and the sentence is the plan's, so it belongs in the plan/task that owns offline accept
+wording rather than in this commit; owner: the offline-accept follow-on. (c) The stale comment at
+`packages/app-core/test/views/ticket-sheet.test.tsx:820`; owner: whoever next opens that file.
+
 
 #### The R4 blast radius was MEASURED, not grepped
 
 The plan told this task to grep for every suite a shared accessible-name change would redden, and the
 answer the grep gave was **none**. That answer was then checked against the runner rather than trusted:
-the full `packages/ui` (325 passing), `packages/app-core` (1499) and `apps/web` (459) suites were run
+the full `packages/ui` (325 passing), `packages/app-core` (1502) and `apps/web` (459) suites were run
 against the change, and no suite outside `packages/ui/test/components.test.tsx` queries the Dialog dismiss
 by name at all — the Dialog's own block queries Escape and the scrim, `Sheet`'s dismiss already says
 `Close sheet` (`packages/ui/src/components/sheet.tsx:28`), and `ticket-sheet.test.tsx`'s `name: 'Close'`
@@ -9162,7 +9229,7 @@ recorded, not fixed** (outside this task's scope): `packages/app-core/test/views
 states that `Sheet`'s dismiss carries `aria-label="Close"`; it says `Close sheet`, and the queries beneath
 it are scoped, so nothing reddens either way. Owner: whoever next opens that file.
 
-#### Mutation evidence (6 mutations, each reddening its own site, all restored by sha256)
+#### Mutation evidence (6 mutations in round 1, 4 more in round 2, each reddening its own site, all restored by sha256)
 
 Every mutant was applied by an exact single-occurrence replacement — a replacement count other than 1 is
 reported as a HARNESS FAILURE rather than a survivor — run against the owning suite, and restored from a
@@ -9183,3 +9250,16 @@ left a mutated tree behind).
    `toHaveBeenCalledWith([['a','c']])`.
 6. **R4 reverted** (`aria-label="Close"`) → 13.643 reddens with `Unable to find an accessible element with
    the role "button" and name "Close dialog"`, and nothing else in that file moves.
+
+**Round 2, after the review round — the two survivors and the new Critical.** Round 1 left two mutants
+alive, which is the finding that matters most here: a surviving mutation is evidence about the TESTS, not
+about the code, and both were unwitnessed decisions rather than unconstrained paths.
+
+7. **The `undefined`/holed half of the silence guard deleted** → reddens **"a holed results array of the
+   RIGHT length is silence as well"** (the witness added in round 2). Round 1: SURVIVED 7/7.
+8. **`onClosed` fired unconditionally** → reddens **13.788** (added in round 2). Round 1: SURVIVED 7/7.
+9. **The attempt token made inert** (`attemptRef.current += 1` → `+= 0`) → reddens **13.787 and nothing
+   else in the file**, which is the fix's own site. This one was written only after the gate's first
+   anchor turned out to be non-unique (it appears at two sites, in the happy path and the `catch`), and
+   the harness reported `replacement count 2 (expected 1)` rather than half-applying it.
+10. **Control re-run** (the plan's own: batch → N calls) → still RED, so round 2's harness is measuring.

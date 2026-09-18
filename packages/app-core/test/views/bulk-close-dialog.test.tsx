@@ -1,6 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import type { IngestResult } from '@gisik-nokma/domain';
 import { BulkCloseDialog } from '../../src/views/bulk-close-dialog.js';
 import { createFakeDataSource, type FakeDataSource } from '../helpers/fake-data-source.js';
 import { WS } from '../helpers/seed.js';
@@ -239,6 +240,160 @@ describe('BulkCloseDialog — one dialog, N ticket.closed in one batch (spec §8
     expect(onClosed).not.toHaveBeenCalled();
     await waitFor(() => expect(confirm()).toBeEnabled());
     expect(screen.getAllByRole('listitem')).toHaveLength(3);
+  });
+
+  /**
+   * The same guard's other half, and it exists because a mutant SURVIVED here.
+   * An independent review deleted the `undefined`-at-a-position clause and the
+   * whole suite stayed green — an unwitnessed decision inside a sentence this
+   * file already claimed to prove ("short — or holed"). Neither shipped
+   * `DataSource` can produce this shape (`mapIngestResults` throws on a length
+   * mismatch before returning, and the replica answers one result per event or
+   * throws), so this arm is INTERFACE-defence rather than a live path — which
+   * is exactly why it needs a witness: unreachable code with no test is a
+   * clause nothing can falsify, and the next reader cannot tell it from dead
+   * weight.
+   */
+  it('a holed results array of the RIGHT length is silence as well', async () => {
+    const user = userEvent.setup();
+    const source = createFakeDataSource({}, (events) =>
+      events.map((event, index) =>
+        index === 1
+          ? undefined
+          : {
+              status: 'committed' as const,
+              eventId: event.id,
+              seq: index + 1,
+              serverTime: SERVER_TIME,
+            },
+      ) as IngestResult[],
+    );
+    const { onClosed } = renderDialog(source);
+
+    await user.click(confirm());
+    const notice = await screen.findByRole('alert');
+    expect(notice).toHaveClass('gn-refusal', 'gn-refusal--transport');
+    expect(notice).toHaveTextContent('The server did not answer this close.');
+
+    expect(onClosed).not.toHaveBeenCalled();
+    await waitFor(() => expect(confirm()).toBeEnabled());
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+  });
+
+  /**
+   * 13.787 — an answer that arrives after the dialog was dismissed must not
+   * land on the NEXT opening. Found by an independent review, reproduced there
+   * as a failing probe, and it is the one defect in this component that no
+   * test could see: every existing case resolves its promise while the dialog
+   * is still open.
+   *
+   * The window is the whole round trip, because Cancel, Escape, the scrim and
+   * `×` all stay live while `submitting` is true — deliberately, since a
+   * person must always be able to walk away from a slow call. The plan's own
+   * consumer mounts the dialog once and toggles `open` (Task 10: "renders
+   * `BulkCloseDialog` once"), so the instance survives the dismissal and the
+   * in-flight closure writes into the next opening: a phantom
+   * `Could not close` carrying the PREVIOUS batch's refusal, and an `onClosed`
+   * for tickets nobody just asked to close (which, for a parent that dismisses
+   * in `onClosed`, dismisses the new dialog before it is ever used).
+   *
+   * A fresh mount — the house mechanism `13.532` pins for a remembered pick —
+   * does NOT cover this, and that is why the fix is a token rather than a
+   * mount discipline: unmounting stops `setState` landing, but the stale
+   * closure still holds the OLD `onClosed` prop and calls it.
+   */
+  it('13.787 an answer arriving after a dismissal never lands on the next opening', async () => {
+    const user = userEvent.setup();
+    let release: ((results: IngestResult[]) => void) | null = null;
+    const source = createFakeDataSource({}, (events) => {
+      void events;
+      return new Promise<IngestResult[]>((resolve) => {
+        release = resolve;
+      });
+    });
+    const onClosed = vi.fn();
+    const SECOND = [
+      { ticketId: 'd', title: 'Book the venue' },
+      { ticketId: 'e', title: 'Send the invitations' },
+    ];
+    const props = {
+      dataSource: source,
+      workspaceId: WS,
+      currentUserId: 'user_kiro',
+      onClose: vi.fn(),
+      onClosed,
+    };
+
+    const view = render(<BulkCloseDialog open tickets={TICKETS} {...props} />);
+    await user.click(confirm());
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+
+    // Dismissed, then opened again for a different pair — the first attempt
+    // is still in flight throughout.
+    view.rerender(<BulkCloseDialog open={false} tickets={TICKETS} {...props} />);
+    view.rerender(<BulkCloseDialog open tickets={SECOND} {...props} />);
+    expect(screen.getByRole('dialog', { name: 'Close 2 tickets' })).toBeInTheDocument();
+
+    await act(async () => {
+      release?.([
+        { status: 'committed', eventId: 'e1', seq: 1, serverTime: SERVER_TIME },
+        {
+          status: 'refused',
+          eventId: 'e2',
+          rule: 'close-requires-terminal',
+          reason: 'Only a terminal ticket can be closed.',
+        },
+        { status: 'committed', eventId: 'e3', seq: 2, serverTime: SERVER_TIME },
+      ]);
+    });
+
+    // Nothing from the dismissed attempt is reported, and the new opening is
+    // untouched: its own list, its own confirm, no phantom failure section.
+    expect(onClosed).not.toHaveBeenCalled();
+    expect(screen.queryByRole('heading', { name: 'Could not close' })).toBeNull();
+    expect(screen.getByRole('dialog', { name: 'Close 2 tickets' })).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      'Book the venue',
+      'Send the invitations',
+    ]);
+    expect(confirm()).toHaveTextContent('Close 2 tickets');
+    expect(confirm()).toBeEnabled();
+  });
+
+  /**
+   * 13.788 — every ticket refused: nothing is reported closed, and `onClosed`
+   * is NOT called. This case exists because the opposite decision was
+   * unwitnessed — an independent review made `onClosed` fire unconditionally
+   * and all seven cases stayed green, since no case before this one reached an
+   * all-refused outcome (13.641 always leaves something committed, and its
+   * confirm is gone afterwards, so nothing could press it again). The
+   * docblock states the empty case as a deliberate reading; a reading with no
+   * witness is a claim, not a decision.
+   */
+  it('13.788 when every ticket is refused, nothing is reported closed and all are listed', async () => {
+    const user = userEvent.setup();
+    const source = createFakeDataSource({}, (events) =>
+      events.map((event) => ({
+        status: 'refused' as const,
+        eventId: event.id,
+        rule: 'close-requires-terminal',
+        reason: 'Only a terminal ticket can be closed.',
+      })),
+    );
+    const { onClosed } = renderDialog(source);
+
+    await user.click(confirm());
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Could not close' })).toBeInTheDocument(),
+    );
+
+    expect(onClosed).not.toHaveBeenCalled();
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+    expect(
+      screen.getByText('File the GST return — Only a terminal ticket can be closed.'),
+    ).toBeInTheDocument();
+    // Nothing left to try, the same rule 13.641 asserts for the partial case.
+    expect(screen.queryByRole('button', { name: /^Close \d+ tickets?$/ })).toBeNull();
   });
 
   it('lifts the refusal verbatim for an invalid envelope, and Cancel closes without submitting', async () => {
