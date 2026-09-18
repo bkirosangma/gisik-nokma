@@ -67,11 +67,12 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > - **DO NOT REDO `13.309`.** It is witnessed by `13.309 the withheld-name fallback carries its exact
 >   title text` in `packages/app-core/test/views/my-work.test.tsx`, merged at `7f9329cc`.
-> - **Remaining non-done rows on `origin/main`:** `hig-per-screen` **3b** (HELD — the owner reviews
->   sign-in first), **5b** (needs a controller ruling: its plan sentence is unsatisfiable), **6b**
->   (`13.306` ❌ — the closest analogue to `7b`, unheld), **7b** (merged; the row is the stale item
->   above), **10**; plus `board-prototype-port/1` (**STRUCK — do not implement**) and
->   `backlog-and-closed-second-wave/12` (not started).
+> - **Remaining non-done rows on `origin/main`, and every one of them needs a DECISION, not an
+>   implementer:** `3b` (HELD — the owner reviews sign-in first) · `5b` (needs a controller ruling:
+>   its plan sentence is unsatisfiable) · **`6b` — see the CORRECTION below, it is a ruling too** ·
+>   `7b` (merged; the row is the stale item above) · `10` (**McpAuthorize and McpTokens are wire-gap
+>   per the delta audit, so it cannot be finished as transcription**) · plus `board-prototype-port/1`
+>   (**STRUCK — do not implement**) and `backlog-and-closed-second-wave` (rows 1–4 done).
 > - **This lane's shift map still holds:** the `test-cases/13` insertions are **+29 below base line
 >   8080**, confirmed against the merged file (`base :8587 → merged :8616`).
 > - **The gate is contention-flaky on this machine.** An earlier full run at the *identical source* was
@@ -85,6 +86,31 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > - **`pnpm`'s path is not its runtime.** A turbo failure line prints `…/node/v24.11.1/bin/pnpm run
 >   test`; that is the pnpm BINARY's location. `pnpm exec node -e "process.version"` answers
 >   `v22.22.2`. Do not record that v24 string as a gate-environment finding.
+>
+> ## ⚠ CORRECTION — `6b` is NOT the nearest executable task, and the first version of this block said it was
+>
+> An earlier draft of this block described `hig-per-screen/6b` as *"the closest analogue to `7b`"*. **That
+> was wrong**, and the error is worth keeping because of its shape: I read the ledger row's NOTE and not
+> its FLAG. The row carries:
+>
+> > *"FLAG: `ContestBanner` is mounted nowhere in the product (`docs/hig-reconciliation-audit.md:577`,
+> > re-measured), so the surface 6b presumes does not render; not promotable as though it did."*
+>
+> **Re-measured here, three independent ways:** `ContestBanner` appears only as a definition
+> (`packages/app-core/src/contests/contest-banner.tsx:25`), a barrel export (`src/index.ts:306`), a built
+> `dist/`, and in **tests** — there is **no mount site in any app**; the audit states the same at `:577`;
+> and the shipped resolutions are **`Redo legally` / `Convert to comment` / `Discard`**, not the
+> prototype's `Keep mine` / `Keep theirs`.
+>
+> **Why that makes it a ruling rather than a task:** `13.306`'s named deliverable is a case asserting the
+> ticket surface renders no `Keep mine`/`Keep theirs` control. **On a sheet that mounts no contest
+> component at all, that assertion passes because nothing renders — not because the product refuses the
+> pair.** It is the "check that cannot fail" class, and what it needs is a decision about what the case
+> SHOULD assert, not an implementer.
+>
+> **So the honest position of this lane is: no executable row.** `3b` is held by the owner, `5b` and `6b`
+> need rulings, `7b` is merged, `10` is blocked on wire gaps, and `board-prototype-port/1` is struck.
+> **That is a ruling request, not idleness.**
 >
 > ## OPEN RULINGS
 >
