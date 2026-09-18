@@ -20,7 +20,150 @@
 
 ---
 
-## ▲ TOP BLOCK — `isBuilder`: fit the design to the backend that exists (2026-09-18)
+## ▲ TOP BLOCK — `isTypeEditor`: fields gain `required` (2026-09-18)
+
+**Position: the change set is COMPLETE, all suites and checks are green at the
+head below, the independent reviewer is running, and the PR is NOT yet open.**
+Dispatch: `CTL-DISPATCH-2026-09-18-exec2-typerequired`. Owner ruling behind it:
+decision-list item 1, **"1 - yes"** (2026-09-18). One PR, `--base main`, branch
+`exec2/type-required`. **Next step after the review lands: record the reviewer in
+the PR body, push, open the PR.**
+
+### Anchors — verify these; do not trust the row
+
+| | |
+|---|---|
+| branch | `exec2/type-required` |
+| base | **`d069fd94`** = `origin/main` at this count |
+| `origin/main` | `d069fd94` — **recount; main moves without telling you** |
+| merge-base | `d069fd94` |
+| ahead | **1** commit (`origin/main..HEAD`) |
+| behind | 0 |
+| tree | clean (`git status --porcelain` empty) |
+| HEAD | `d56fca85` — **verify with `/usr/bin/git rev-parse HEAD`.** A block cannot contain the commit that carries it, so the number above names an ANCESTOR once this file is committed |
+
+### ★ THE MEASUREMENT THAT DECIDED THE SHAPE — read this before re-scoping
+
+**Nothing enforces a type-level `required` field today, and that is structural,
+not budgetary.** The engine's only `require-field` is EDGE-SCOPED — a workflow
+rule evaluated when a ticket crosses one transition
+(`packages/rule-engine/src/rules/require-field.ts:5`, surfaced by
+`packages/app-core/src/views/transition-dialog.tsx:216`) — answering *may this
+move happen?*, not *does this type expect a value?*. `checkTicketFieldSet`
+refuses a field absent from the type and a value of the wrong kind and accepts a
+clear of any custom field unconditionally
+(`packages/rule-engine/src/checks/fields.ts:148-155`). `ticket.created` reads no
+fields at all.
+
+**Why enforcement is a CAPABILITY and not a wiring job:** a type definition is
+last-writer-wins with no superseded row kept
+(`apps/server/src/projections/ticket-types.ts:39-46` — the omission is stated
+there as deliberate). The engine therefore cannot answer *"what did this type
+require when this ticket was created?"*, and no claim already recorded can be
+retroactively refused. Marking a field required would place every existing ticket
+of that type out of compliance. **Named absence, owner: the plan that takes up
+type-level field enforcement.** It is recorded in `Features.md`, in the
+catalogue section for `13.776`–`13.784`, and in the commit message — the dispatch
+forbade shipping a silent no-op, and this is not one.
+
+### What the wire actually cost
+
+**Only the schema member and the toggle.** The path is transparent end to end:
+`FieldsEditor.onChange` sets `def.fields` → `buildTicketTypeDefinedEvent` passes
+the whole def as the payload (`workflow-builder/events.ts`) → the projector
+`JSON.stringify`s the parsed fields into JSONB (`projections/ticket-types.ts:79`)
+→ `readTicketTypes` returns them verbatim → `mapTicketTypes` casts them. **The
+schema member is the one load-bearing change**: a zod object STRIPS an undeclared
+key, so without it a `required: true` would have vanished at every parse site
+(projection, offline replica, engine memory context) while the editor still
+rendered "Required". Case 13.777 is that witness.
+
+`required: z.boolean().optional()`, deliberately NOT `.default(false)` — matching
+the `options` member directly above it. A default is applied AT PARSE, so every
+definition recorded before today would come back claiming `required: false`, a
+claim its author never made (the `p.value ?? null` defect class this series
+already corrected, `rule-engine/src/checks/fields.ts:77-83`). **No migration is
+needed because of that choice**, and absence stays distinguishable from `false`.
+
+### ★ THE TRAP THAT COST TIME HERE — a stale `dist` produced a FALSE GREEN
+
+The first app-core reading of the schema-removal mutation came back **GREEN and
+was wrong**: `packages/domain/dist` was stale and app-core resolves
+`@gisik-nokma/domain` **by package name** through it, so the mutation never
+reached the suite. Rebuilt, the same mutation reddened 13.777 immediately
+(`expected undefined to be true`). **The rule, restated because a green is the
+direction nobody audits: after editing a workspace package's SOURCE, rebuild it
+before believing ANY test result that consumes it — including a passing one.**
+
+### Verification at this head
+
+- Suites: **domain 506/0 · ui 322/0 · app-core 1485/0 · web 459/0**.
+- `pnpm -r run typecheck`: **11 of 12 workspace projects, exit 0, zero errors**.
+- Six checks plus the seventh instrument, all raw **0**: `check:env`,
+  `check:tasks`, `check:db-tz`, `check:runbook`, `check:citations`, `check:help`,
+  `scripts/check-case-ids.mjs`. (`check:db-tz` needs
+  `DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma`.)
+- **The forced gate was NOT run — the controller's.**
+- Six mutations run, each killed by a case specific to its own site: remove
+  `required` from the schema (13.777); `.default(false)` (13.782 + an existing
+  `toEqual`); the toggle never un-setting (13.778); `mapTicketTypes` dropping the
+  member (13.784); the toggle never disabled (access.test.tsx `toBeDisabled`);
+  `Remove field` leaking back to members (**access.test.tsx:615** — this is the
+  one that proves the widened enumeration below did not open a hole).
+
+### ★ ONE EXISTING CASE WAS WIDENED — and how it was proved not to go quiet
+
+`packages/app-core/test/workflow-builder/access.test.tsx:567` asserts every
+button a MEMBER is offered on the ticket-type editor is an icon choice or a gated
+Field-type control, all disabled — a gate-coming-down check. The new toggle is a
+ninth button, so the predicate now names it. **It belongs in that set by the
+test's own taxonomy:** a value control on the DEFINITION like the Field-type
+trigger, not a collection action like `Remove field`. That taxonomy is also why
+showing it **disabled** beats hiding it — a member still learns which fields are
+required. The third term is enumerated with its own count (2, one per fixture
+field) rather than folded into a catch-all, and the `Remove field` mutation above
+still reddens the predicate.
+
+### Two deviations from the prototype, both stated
+
+1. **The tinted pill is NOT ported.** `--tintAccent` has no product role
+   (`tokens.ts:342-344`, `tintWarning` is the only tint role) — the same refusal
+   `isBuilder` recorded for `--tintDanger`/`--tintSuccess`. The states are the
+   shared `.gn-button--primary`/`--ghost` variants, so both grounds are pairs the
+   contrast audit already carries; `ui.css`'s `.fields-editor__required` is
+   **sizing only**.
+2. **The pill sits at `.gn-button`'s 2.75rem**, not the prototype's 32px —
+   matching the name input and Remove button beside it in the same row.
+
+### Recorded, not fixed (out of scope, named owners)
+
+- **`.fields-editor__row`'s accessible names are not field-specific.**
+  `Remove field` is already the same on every row (`access.test.tsx:621` relies
+  on two of them), and the new toggle follows that convention ("Required" /
+  "Optional", static). A screen-reader user tabbing two fields hears the same
+  two names twice. **Owner: whoever next owns accessible names on this screen** —
+  fixing it here would diverge from the neighbouring control and is a row-wide
+  change, not this flag's.
+- **The prototype's field kinds differ from the product's** (it offers
+  Text/Date/Number/Attachment; `CUSTOM_FIELD_KINDS` is
+  text/number/date/select/person). Pre-existing, untouched by this change.
+
+### Rules that bind this branch
+- **Never `docker compose`** (any subcommand) and **never bind `:3001`** — a
+  peer's hot stack is there. Viewport work would use `:3021`. **No viewport run
+  was attempted**: the ticket-type editor is not in
+  `apps/web/e2e-viewport/responsive.spec.ts` and not in the accessible-names
+  baseline (both keyed by route), so a run would prove nothing about this screen.
+- Test runs at `--maxWorkers=1` (**not** `--concurrency` — that is not a vitest
+  flag). Do not run the forced gate — the controller does.
+- **Do not edit `task-ledger.tsv`** — it is `main`'s; the controller flips rows.
+- `Features.md` and `test-cases/13-deployment-dogfooding.md` change in the
+  **same commit** as the code.
+- **Never `AskUserQuestion`** in this topology.
+
+---
+
+## ▼ PREVIOUS BLOCK — `isBuilder`: fit the design to the backend that exists (2026-09-18). MERGED as PR #445 (`d069fd94`).
 
 **Position: the change set is COMPLETE, the review round is CLOSED, the branch is REBASED onto `main`,
 and the PR is open and awaiting the controller's merge.** Dispatch:
@@ -40,14 +183,25 @@ branch `exec2/isbuilder`.
 | HEAD | **verify with `/usr/bin/git rev-parse HEAD`.** A block cannot contain the commit that carries it, so any number here names an ANCESTOR, never the tip |
 | PR | **#445**, `--base main`; reviewer pass recorded in the body BEFORE it opened |
 
-### ⛔ THE PRE-REBASE SHAS ARE ORPHANED. DO NOT CITE THEM.
+### ⛔ HISTORICAL — this block is CLOSED. Do not re-run its commands.
+
+**MERGED as PR #445 into `d069fd94`.** Everything below is kept for the method it records; none of it is
+work outstanding. Two of its shas are orphaned and one command in it is now MISLEADING — read this
+before copying anything out of it.
 
 `de6d2fa8` (the change set, and the head the reviewer ran against), `7fb68f3b` (the fix round) and
 `b3a7bdef` (the previous freeze) were orphaned by the rebase onto `fb346a9f`. **`git cat-file` still
 resolves all three — it passes on reflog-only commits — and `git branch --contains` returns nothing.**
 That asymmetry is the reason this warning is here rather than left to a reader to discover.
 
-**The ONE command that confirms the reviewed code survived the rebase — expect EMPTY output:**
+> **⛔ DO NOT RUN THE PRESERVATION COMMAND BELOW NOW.** It was written when `HEAD` was the isBuilder
+> branch tip. `HEAD` is no longer that branch, so the command returns a large diff for a reason that has
+> nothing to do with lost work — a well-formed wrong answer of exactly the kind this file keeps
+> recording. If the question is ever reopened, address the merge commit explicitly
+> (`d069fd94`) rather than `HEAD`.
+
+**The command as it stood, preserved only so its shape is readable — expect EMPTY only against the
+isBuilder tip:**
 
 ```
 git diff b3a7bdef HEAD -- \
