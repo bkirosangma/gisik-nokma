@@ -125,8 +125,33 @@ failed migration**, so an out-of-order prefix takes the app down — which it di
 
 Dispatched as `CTL-DISPATCH-2026-09-18-migration-order-check.md`.
 
-### Still open for the owner
+### 3. The attention strip takes the prototype's whole treatment — **both rulings** (2026-09-18)
 
-**Does `hig-per-screen/3a` close?** The row is `todo`; Members shipped only its backed surface. The
-elaboration the owner asked for is in `docs/lanes/controller-state.md`'s top entry, with the measurement
-that makes the answer non-obvious. **No work item waits on it.**
+> Owner, verbatim, in two answers: *"i want the prototype's visible heading adopted"* and, on the
+> follow-up, *"yes to the prototype's tint fill too."*
+
+This is **one decision landing as a whole**, not two: the delta table's own argument is that taking the
+tint fill while leaving the heading off *"produces a treatment the prototype does not draw and the product
+never chose, which is a third thing, invented"*. Rows 1–6 of Part 2 land together.
+
+**It supersedes the `.gn-attention` left-border ruling, and the record must not be read as an overturned
+measurement.** `task-ledger.tsv`'s `7a`/`8a` rows carry a 2026-09-18 ruling that the 4px left border
+*"carries an affordance"* and is not debt, confirmed by Step 5b's sweep at **4.36 against a 3:1 floor**.
+**That subject was contrast debt, and its answer was no — it stands.** What the owner has decided is that
+the border goes as a **design choice**, which is a different question with a different decider. Both rows
+now say so, in those words.
+
+Dispatched as `CTL-DISPATCH-2026-09-18-attention-part2-heading.md` + `…-amendment-1.md`. The amendment
+also pulls in the consequences: the non-text-contrast roster's `aside.gn-attention` entry re-measured (its
+`border: rgba(178,80,0,1)` reading **is** this border), and `packages/ui/src/tokens.ts`'s
+`--gn-tint-warning` single-consumer note corrected — the strip is the role's **second** consumer and does
+not sit at page level, so it must re-establish the composite condition rather than inherit it.
+
+### Ruled earlier the same day, and now closed
+
+**`hig-per-screen/3a` closed as superseded by `#443`** — *"for 3a. go with your recommendation."* The row
+is `done`, evidence `#443`'s merge commit `ba96a8d2`; its one verifiably-absent deliverable (the `.gn-field`
+form wrapping) moved into the `members-styling` dispatch by amendment. `3b` was **not** covered by that
+ruling and stays `todo`.
+
+**Nothing is open for the owner.** Both remaining answers this register was waiting on have been given.
