@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { fetchMagicLink, purgeInbox } from './helpers/mailpit.js';
 import { ACCOUNTANT_EMAIL, OWNER_EMAIL } from './helpers/sign-in.js';
+import { probeShellCommand, seedArgv, seedShape } from './helpers/seed-shape.js';
 import { assertStackIsTheStack, SERVER, WEB } from './helpers/stack.js';
 
 /**
@@ -26,6 +27,14 @@ import { assertStackIsTheStack, SERVER, WEB } from './helpers/stack.js';
  * and must NOT be read as evidence that the CC seed can run in a production
  * container — the runbook's "Seeding production" says to run it from a
  * checkout, and that is not merely a preference.
+ *
+ * AND THE `reference/` MOUNT SURVIVES HOT MODE, which is worth stating rather
+ * than inferring: `docker-compose.hot.yml` adds `./reference:/repo/reference:ro`
+ * on top of the base file's `/app/reference` mount (compose MERGES `volumes`
+ * lists), and the hot stage's WORKDIR is `/repo`. So the seed's relative read of
+ * `reference/convenience-corner-tracker/board.data.js` resolves in that shape
+ * too, by a different mount at a different path. Two mounts, one affordance —
+ * neither of which App Platform has.
  */
 
 const COMPOSE_FILE = 'docker-compose.dev.yml';
@@ -78,19 +87,40 @@ export default async function globalSetup(): Promise<void> {
   await createUser(OWNER_EMAIL);
   await createUser(ACCOUNTANT_EMAIL);
 
+  const composeExec = [
+    'compose', '-f', COMPOSE_FILE, 'exec', '-T',
+    '-e', `SEED_OWNER_EMAIL=${OWNER_EMAIL}`,
+    '-e', `SEED_ACCOUNTANT_EMAIL=${ACCOUNTANT_EMAIL}`,
+    'server',
+  ];
+
   /**
-   * 13.180 — globalSetup runs seed:cc via `docker compose exec ... server node dist/seed/...` — inside the DEV compose container, on every e2e-stack run — and asserts the seed's own report names 'guest configured'; the corrected reasoning (reference/ is absent from the runtime image, present in dev only via docker-compose.dev.yml's bind mount) lives in this file's header docblock, not in the app image.
+   * 13.180 — globalSetup runs seed:cc via `docker compose exec ... server ...` — inside the DEV
+   * compose container, on every e2e-stack run — and asserts the seed's own report names 'guest
+   * configured'; the corrected reasoning (reference/ is absent from the runtime image, present in
+   * dev only via docker-compose.dev.yml's bind mount) lives in this file's header docblock, not in
+   * the app image.
+   *
+   * AMENDED 2026-09-18 (Step 5b) — THE COMMAND IS SHAPE-AWARE, and it has to be, because there are
+   * two images this suite runs against and only one of them has a `dist`. The prod-parity image
+   * (`docker-compose.dev.yml` alone) carries `/app/dist` and no `src`, so `node dist/seed/…` is
+   * right there. The hot image (`-f docker-compose.hot.yml`, `target: dev`) bind-mounts
+   * `apps/server/src` at `/repo/apps/server/src`, has WORKDIR `/repo`, and has NO `dist` anywhere —
+   * measured in this worktree's own container, 2026-09-18 — so the previous unconditional command
+   * died with MODULE_NOT_FOUND before a single spec ran. Both shapes, and why the probe is a
+   * separate exec rather than one `sh -c` with `a && b || c`, are in `helpers/seed-shape.ts`.
    */
-  const output = execFileSync(
-    'docker',
-    [
-      'compose', '-f', COMPOSE_FILE, 'exec', '-T',
-      '-e', `SEED_OWNER_EMAIL=${OWNER_EMAIL}`,
-      '-e', `SEED_ACCOUNTANT_EMAIL=${ACCOUNTANT_EMAIL}`,
-      'server', 'node', 'dist/seed/cli-seed-convenience-corner.js',
-    ],
-    { cwd: REPO_ROOT, encoding: 'utf8' },
-  );
+  const probe = execFileSync('docker', [...composeExec, 'sh', '-c', probeShellCommand()], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  });
+  const shape = seedShape(probe);
+  console.log(`[e2e-stack] server image shape: ${shape} — seeding via ${seedArgv(shape).join(' ')}`);
+
+  const output = execFileSync('docker', [...composeExec, ...seedArgv(shape)], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  });
   console.log(`[e2e-stack] ${output.trim()}`);
 
   // The seed's own report, asserted in BOTH directions. "It ran" is not "it
