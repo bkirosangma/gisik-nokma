@@ -11787,3 +11787,97 @@ every `*.css` in the repo held exactly **one** `workflow-list` occurrence and it
   (`globals.css:333`); this one was simply not carried over, and no case measures it. It is recorded rather
   than changed, because a heading size is a settings-shell decision rather than a card-grid one — the same
   reasoning that kept the other two nits out of slice 1. **Owner: the settings-shell pass.**
+
+## settings → workflows: the two absences the prototype draws are RULED, not left as slots (executor 2, 2026-09-18)
+
+Plan Tasks 2 and 3 (`docs/superpowers/plans/2026-09-18-settings-workflows-port.md:101-122`),
+dispatch `CTL-DISPATCH-2026-09-18-settings-wf-task3.md`, branch `exec2/settings-wf-t2-t3`.
+
+**NO NEW CASE ID IS MINTED, and that is a decision rather than an omission.** Both absences are
+already pinned at the **RENDERED** node by **13.920**
+(`packages/app-core/test/workflow-builder/screens.test.tsx:208-213`: `.workflow-list__badge` is
+`null`, `.workflow-list__actions` holds exactly one `button`, the card's `textContent` matches
+none of `/Published|Superseded|Draft/`, and the card holds exactly one `a, button`). Neither
+ruling below adds an assertion a reader could falsify, so minting an id for them would put a case
+in this catalogue that no run can ever turn ❌ — the opposite of what a case is for. **The tasks'
+deliverable IS the record**: the screen's docblock, `Features.md`, and this entry. Executor 2's
+block `13.890`–`13.919` is therefore still free from `13.894` on, exactly as it was before.
+
+**Task 2 — `PublishedWorkflowDef` gains no status field; the badge is not built.** Owner ruling
+2026-09-18, approving the controller's recommendation. The list serves only published
+definitions, so a field that can hold exactly one value would be a badge that lies by omission
+the moment a second state exists. `"Published"` is derivable from the read itself (had the badge
+been built, it would have been a constant), and the prototype's other two values — `"Superseded"`
+and `"Draft · N issues"` (`desktop.dc.html:3175-3178`) — are not on the wire, nor will an event be
+added to carry them. Recorded in the docblock as a scope decision rather than as a missing field.
+
+**Task 3 — `"View history"`: MEASURED FIRST, then not built.** The ruling was conditional — build
+it *if the version chain is readable from an existing read* — so the measurement is the
+deliverable. Two facts, each read rather than inferred:
+
+1. **The prototype has no history view to port.** `"View history"` is the **`primary`** label of
+   the SUPERSEDED card (`:3178`), *not* a second action: every card's `secondLabel` is
+   `"Duplicate"` (`"Discard draft"` on the draft card). The plan and the delta doc group the three
+   strings as "the second action" (`docs/design/prototype-delta-2026-09-18.md:635`), and that
+   grouping hides the one that is not second — a correction to the dispatch's own framing, not to
+   its conclusion. The block declares ten `screen:` values (`board`, `builder`, `legal`,
+   `mcptokens`, `signin`, `typeeditor`, `types`, `workflows`, `workspace`, `workspaces`) and
+   **none is a workflow history screen**; the only history SURFACE in the prototype is the ticket
+   sheet's History tab (`:3589`, `:3734`), the word appearing elsewhere only in legal prose and
+   toasts, which are not views. The handler `"View history"` is wired to (`:3187`)
+   fires a **toast** — *"…has 128 recorded events — history is read-only"* — and navigates
+   nowhere. So porting it would mean designing a view the prototype does not draw.
+2. **The card that carries the affordance is not rendered by this product.** The prototype lists
+   a superseded version as its own card (`"Field ops v2"` and `"Field ops v1"`, `:3176`, `:3178`).
+   This screen renders one card per workflow id — `gateway.listWorkflows` →
+   `GET /v1/workspaces/:id/workflows` → `latestWorkflowDefs`
+   (`apps/server/src/read/workflow-defs.ts:25-38`), whose docblock says "the latest published
+   definition per workflow id" and which loops `getWorkflowDefFromProjection(db, workspaceId, id)`
+   with no version selector, i.e. the reader's `ORDER BY version DESC LIMIT 1` branch. There is no
+   superseded card for the button to sit on.
+
+   **The version-aware read DOES exist — end to end — and the first draft of this entry denied it.
+   Corrected rather than left standing, and the correction is the reviewer's Critical finding, verified
+   against the tree rather than accepted.** `DataSourceQuery.getWorkflowDef(workspaceId, workflowId,
+   version?)` (`packages/app-core/src/data-source.ts:146`) declares a version parameter; the ONLINE
+   adapter sends it (`online-data-source.ts:277-281` builds `?version=`), the replica adapter answers one
+   locally, and the server route `GET /v1/workspaces/:workspaceId/workflows/:workflowId?version=N` serves
+   any single version (`apps/server/src/routes/builder-reads.ts:517-546`, numeric branch at
+   `apps/server/src/projections/workflows.ts:116-120`). `WorkflowAuthoringGateway`
+   (`packages/app-core/src/workflow-builder/gateway.ts:56-94`) **is** version-BLIND — neither
+   `listWorkflows` nor `getWorkflow(workspaceId, workflowId)` takes a version — but the adapter that
+   implements it **DROPS an argument that already exists one layer down**
+   (`apps/web/src/authoring/data-source-gateway.ts:224`, whose own seam docblock names the member as
+   `getWorkflowDef(workspaceId, workflowId, v?)` at `:26`). Versions are contiguous **by server-side
+   ENFORCEMENT**, not by convention: the engine refuses a first version that is not 1, and any later
+   version that is not `latest + 1` (`packages/rule-engine/src/workflow-defined.ts:53-58`, `:63-68`, rule
+   `workflowVersion` at `refusal-rules.ts:18`) — so `1..N` is walkable from the `N` the list already
+   returns. **What is missing is an exposed parameter, not a read.**
+
+**The strongest argument the other way, recorded rather than glossed.** The chain is NOT missing
+from the product. Every published version is its own row in `proj_workflows` — the projection's
+docblock gives the reason ("every published version, queryable individually, because the engine's
+version walk needs the intermediates and their stateMappings, not just the newest definition") —
+`getWorkflowDefFromProjection` reads any one of them by number, and `readWorkflowVersions`
+(`apps/server/src/sync/ledger-deps.ts:156-174`) already returns the whole ladder as
+`Map<number, WorkflowDef>`. So a history view would need **no new schema and no new event**. Nor is
+the chain even unserved over HTTP: `GET /v1/sync/bootstrap?workspaceId=<id>` returns "definitions
+in `workspace_seq` order for everyone including guests"
+(`apps/server/src/sync/sync-routes.ts:172-198`), so every published version of every workflow is
+already reachable by a client that asks the replica door.
+
+**THE RESOLUTION — a DEPARTURE from the ruling's words, stated that way so a reader does not take this
+absence as what the ruling asked for.** The ruling is DATA-conditional and its data half is
+**SATISFIED** — the chain is readable, by version, through reads that already ship — so **on the ruling's
+own words the button was owed.** What stops this change short is a second rule from the same task text
+colliding with the first: a button with no door behind it is *"the exact defect this repo keeps
+re-finding"* (plan `:118-120`). Here it would have no door — the prototype draws no history view (its own
+handler is a toast), and the card it hangs `"View history"` on is a SUPERSEDED version's, which this
+screen does not render — so it would open nothing and sit nowhere. **Those two rules cannot both be
+honoured, and only the owner can pick between them: ESCALATED to the controller, not decided here.**
+Building it means designing the view and choosing where the button lives — two product decisions, and
+inventing a screen is the one thing a measurement cannot authorise. The work needs no schema change and
+should be dispatched as its own task rather than folded into this slice.
+
+**No test was added and no test changed.** 13.920's pins are unchanged and still pass; this change
+touches one docblock, `Features.md`, and this file.
