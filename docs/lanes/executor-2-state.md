@@ -23,12 +23,21 @@
 | | |
 |---|---|
 | branch | `exec2/members-inviteadmin` |
-| base | `afbd361d` = `origin/main` = the `#438` merge (the anchor-holds controller commit) |
-| `origin/main` | `afbd361d` |
-| merge-base | `afbd361d` |
-| ahead | 0 at the moment this block was written — **recount at your sha, this is a reading** |
-| tree | clean at the moment this block was written |
+| base | **`43650f15`** = `origin/main` = the `#441` merge (executor 1's second-wave Task 1) |
+| `origin/main` | `43650f15` at the last count — **recount; main moves without telling you** |
+| merge-base | `43650f15` |
+| ahead | **3** commits — a reading, not a fact; `git rev-list --count origin/main..HEAD` |
+| tree | clean at the last check |
 | HEAD | **verify with `/usr/bin/git rev-parse HEAD`.** A block cannot contain the commit that carries it, so any number here names an ANCESTOR, never the tip |
+| PR | `--base main`; the branch was **rebased onto `43650f15`**, so the remote copy is force-pushed |
+
+> **The branch was REBASED onto main and the earlier shas are gone.** `afbd361d` was the base when this
+> work began; executor 1's Task 1 landed as `43650f15` **while this branch was in review**, and the
+> rebase was done then — not earlier, so it did not move the head under a running reviewer. The reviewed
+> shas (`2ec10228` the port, `54895f36` the fix round) are preserved on
+> `origin/exec2/members-inviteadmin`'s reflog and in the remote's history before the force-push; the
+> rebased equivalents are the first two commits on this branch.
+> **Every other sha in this file's prose is a fact about the moment it was written.**
 
 ## The mission
 
@@ -229,3 +238,40 @@ person's name; and `'  Kiro'` → `' '`, a blank disc. Now `Array.from(name.trim
 *"Flag, never silently reword."* It was **not** silent — recorded in the commit message, the page
 docblock, `Features.md` and a test docblock — and it removes a real inconsistency (`app-nav.tsx` already
 said "Members"). **Flagged in the PR body for the controller/owner; the flag is the ruling's ask.**
+
+Plus **two Minors from the scoped re-review of the fix round**, both fixed and both worth keeping:
+- **I fixed an under-claim and introduced an OVER-claim.** My replacement help text said the People page
+  "lists everyone in the workspace". False for a non-admin — `ROSTER_VISIBLE_CLAUSE`
+  (`$2::boolean OR m.role <> 'guest'`, `apps/server/src/read/membership-roster.ts:43`) is bound to
+  `isWorkspaceAdmin`, so a member's roster withholds guest rows. Both passages now say "the people you
+  can see", true of every viewer.
+- **A check that could not fail, written by me and REMOVED.** `expect(...).not.toContain('�')`
+  cannot fire for the mutation it names: the broken helper's `textContent` is the lone surrogate
+  `"\ud83d"`, and U+FFFD is what a BROWSER paints for an unpaired surrogate, not what the string holds.
+
+## § 8 — THE REBASE, THE CONFLICT, AND THE STALE-`dist` TRAP THAT COST A FALSE RED
+
+**Rebase onto `43650f15`.** ONE conflict, in `test-cases/13-deployment-dogfooding.md`, and it was purely
+additive: executor 1's Task 1 section and mine both append at EOF. Resolved by **keeping both**, and
+verified rather than assumed — no marker residue, both headings present, and every id on both sides
+intact (`13.694`–`13.696` theirs, `13.760`–`13.766` mine, one occurrence each). `Features.md` auto-merged.
+My section's prose said *"`13.694` is still unwritten"*, which their landing made FALSE, so that clause
+was corrected in place at the rebase and the correction is kept visible rather than overwritten.
+
+**⛔ THE TRAP — read this before reporting ANY red on a rebased tree.** After the rebase, `app-core` went
+RED: 5 failures, `TypeError: Cannot read properties of undefined (reading 'safeParse')` at
+`packages/app-core/src/precheck.ts:373`. **It was not a defect, in main or here. It was a STALE `dist`.**
+`precheck.ts` imports `ticketRankedPayload` from `@gisik-nokma/domain` **by package name**, which resolves
+through `packages/domain/dist` — and `dist` was built at 08:35, before the rebase pulled executor 1's
+domain source in at 09:24. The symbol was in `src/` and absent from `dist/`.
+- **Fix:** `pnpm --filter @gisik-nokma/domain build`. 5 failures → 2.
+- **The SAME trap in a second package:** the remaining 2 were `expected the real engine to refuse this
+  event; it accepted` (`test/precheck.test.ts:487`) — `@gisik-nokma/rule-engine` resolves by package name
+  too, and its `dist` was equally stale (no `rank-requires-backlog`). Rebuilt it: **all green**.
+- **After the rebuilds: app-core 91 files / 1460 tests passing, web 43 / 453, both typechecks 0, six
+  checks all 0, Node v22.22.2.** `dist` is untracked, so there is nothing to commit from this.
+- **This is the documented rule biting for real:** *a cross-package mutation under bare `vitest` tests
+  the stale `dist`; the resolving property is IMPORT STYLE, not package boundary.* Any red on a
+  freshly-rebased tree should be re-measured **after rebuilding the workspace packages** before it is
+  reported as a defect. I nearly reported main as broken.
+
