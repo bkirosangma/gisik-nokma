@@ -9012,8 +9012,14 @@ the same distinction and 13.776's control is one case down.
 enumeration is how a check goes quiet.** `packages/app-core/test/workflow-builder/access.test.tsx:567`
 asserts that every button a MEMBER is offered on the ticket-type editor is an icon choice or a gated
 Field-type control, and that every one of them is disabled — a gate-coming-down check. The new toggle is
-a ninth button on that screen, so the predicate had to name it or the suite would have reddened for the
-right reason and been "fixed" the wrong way. **It is a value control on the DEFINITION — the same
+a **twentieth** button on that screen (16 icon choices — `Object.keys(TYPE_ICONS)`,
+`ticket-types/icons.tsx:102`, counted by measurement and NOT by eye, because `'file-text'` is a QUOTED
+key a naive key-sweep misses — plus 2 Field-type Select triggers plus the 2 toggles), so the predicate
+had to name it or the suite would have reddened for the right reason and been "fixed" the wrong way.
+*(An earlier draft of this paragraph said "a ninth button". That figure was invented and matched no
+count reproducible from the fixture; the independent review caught it. The reviewer's own first count of
+the icon set was 15, wrong for the quoted-key reason — the same instrument-blindness shape this file
+catalogues, caught by the party who wrote it.)* **It is a value control on the DEFINITION — the same
 taxonomy that admits the Field-type trigger and the icon choices — not a collection action like
 `Remove field`**, which is why showing it disabled is correct rather than hiding it: a member reading a
 type still learns which of its fields are required. The widening was proved not to have opened a hole by
@@ -9034,8 +9040,54 @@ mutation: rendering `Remove field` for a member again **still** reddens the pred
   every field to required; the second is asserted as key ABSENCE, not falsiness.
   (`apps/server/test/proj-ticket-types.test.ts:124`)
 
-**Recount, at this tip.** Ten ids are minted here (`13.776`–`13.785`), all inside the reserved block
-`13.760`–`13.819`; **the next free id inside this executor's block is `13.786`**. Measured by case MARKER
+- ✅ **13.786 — the `required` flag survives the INGEST DOOR.** The first and most consequential parse
+  site, and the one an earlier draft of this change's own docblock got wrong by listing only the three
+  READ sites. `parseEvent` stores the schema's **output**, not the raw payload
+  (`packages/domain/src/parse-event.ts:177`, `payload: payload.data`), so a member `ticketTypeDefSchema`
+  does not declare is stripped **before the event is ever recorded** — every later reader then sees an
+  event that never carried it, and no amount of care at the projection, the replica or the memory
+  context can recover a key that never reached the ledger. The witness is the EXISTING
+  `roundTrips('ticket-type.defined', …)` call, which asserts `result.event.payload).toEqual(payload)`:
+  a stripped member reddens there rather than three hops downstream. Its fixture carries two fields
+  deliberately, one claiming `required: true` and one never-decided, so the `toEqual` cannot pass for a
+  door that defaulted every field. **Mutation-killed by removing the schema member — the door's own
+  `toEqual` reddens.** Raised by the independent review of 2026-09-18, which measured that the three
+  parse sites this change originally named are all reads and named the door as the case worth spending;
+  it was added at near-zero cost because the assertion already existed.
+  (`packages/domain/test/ticket-events.test.ts:59`)
+
+**The independent review round (2026-09-18): no Critical, no Important, six Minor — and four of the six
+were defects in THIS CHANGE'S OWN documentation rather than in its code.** Recorded because the pattern
+is the one this repo keeps paying for: an instrument or a sentence that is wrong in a direction nobody
+audits.
+
+1. **A fabricated figure.** "The new toggle is a ninth button on that screen" matched no reproducible
+   count. The real figure is **twenty** (16 icon choices + 2 Field-type triggers + 2 toggles), and the
+   review's own first count of the icon set was 15 because `'file-text'` is a QUOTED key a naive key-sweep
+   cannot see — the instrument-blindness shape this file catalogues elsewhere, self-caught by the party
+   who wrote it. The figure is corrected in both places it appeared; this paragraph is the record.
+2. **A wrong CAUSE attached to a right verdict.** The widened access predicate's comment said the toggle
+   was "already covered by the sweep above". Measured false — `valueControls()` returns the same eight
+   members with the toggle present as without it, because a `required` toggle is not a
+   textbox/combobox/checkbox/spinbutton. The verdict (it belongs in the allowed set) stands; the stated
+   reason did not, and a wrong cause is how a real hole gets read as covered later. Corrected in place.
+3. **A vacuity hole one field wide.** 13.784's absence half was `'required' in (fields[1] ?? {})`, which
+   answers `false` for a response TRUNCATED to one field — the `?? {}` hands it a fresh empty object. A
+   `toHaveLength(2)` guard now precedes it, **mutation-proved** by shrinking the fixture (reddens:
+   `expected [ { id: 'amount', … } ] to have a length of 2 but got 1`).
+4. **An incomplete list that led with the wrong site.** The schema docblock named the projection, the
+   replica and the memory context as the parses a strip would hit — all three are READS. The door is
+   `parseEvent`, and it came first. Corrected in the docblock; 13.786 is the resulting witness.
+
+The remaining two were: the new `ui.css` rule `flex: none` is pinned by no test (true, and now stated
+outright in that rule's own docblock rather than implied away — its `.fields-editor__add`/`__row`
+siblings are in the same position, so it is not a regression, and 13.780 now pins that the component
+applies the class at all), and the note that no server-side case witnessed the door — which 13.786 now
+does. **Seven mutations were killed before the review; two more were added for the review's findings
+(the truncated fixture, the removed layout class), and the door mutation makes ten.**
+
+**Recount, at this tip.** Eleven ids are minted here (`13.776`–`13.786`), all inside the reserved block
+`13.760`–`13.819`; **the next free id inside this executor's block is `13.787`**. Measured by case MARKER
 only: the highest `13.*` marker in this file at this tip was `13.775` before this section, and the
 block's own upper bound `13.819` appears only as prose *mentioning* it — the trap this file records
 twice above.

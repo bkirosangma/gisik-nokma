@@ -38,6 +38,17 @@ export type BuiltinFieldId = (typeof BUILTIN_FIELD_IDS)[number];
  * `JSON.stringify(def.fields)` (`:79`) carries the key through verbatim once it
  * survives the parse.
  *
+ * **THE FIRST PARSE SITE IS THE INGEST DOOR, AND IT IS THE ONE THAT MATTERS
+ * MOST.** Those three are reads; `parseEvent` runs at submission and stores the
+ * schema's OUTPUT — `payload.data`, not the raw payload — into the ledger
+ * (`packages/domain/src/parse-event.ts`, bound by `vocabulary.ts:100`). So
+ * without this member the flag would be stripped *before it was ever recorded*,
+ * and every later reader would be looking at an event that never carried it.
+ * An independent reviewer raised this on 2026-09-18 and was right: the three
+ * read sites were the wrong list to lead with. The conclusion is unchanged and
+ * stronger — a member this schema does not declare cannot reach the ledger at
+ * all, which is what makes the declaration load-bearing rather than cosmetic.
+ *
  * ## NOTHING ENFORCES IT. That is a recorded absence, not an oversight.
  *
  * Measured 2026-09-18 at `d069fd94`, before the toggle was designed: no code

@@ -22,12 +22,18 @@
 
 ## ▲ TOP BLOCK — `isTypeEditor`: fields gain `required` (2026-09-18)
 
-**Position: the change set is COMPLETE, all suites and checks are green at the
-head below, the independent reviewer is running, and the PR is NOT yet open.**
+**Position: the change set is COMPLETE, the review round is CLOSED, all suites
+and checks are green at the head below, and the PR is being opened.**
 Dispatch: `CTL-DISPATCH-2026-09-18-exec2-typerequired`. Owner ruling behind it:
 decision-list item 1, **"1 - yes"** (2026-09-18). One PR, `--base main`, branch
-`exec2/type-required`. **Next step after the review lands: record the reviewer in
-the PR body, push, open the PR.**
+`exec2/type-required`.
+
+**The review round returned: NO Critical, NO Important, six Minor — and four of
+the six were defects in THIS CHANGE'S OWN DOCUMENTATION rather than in its code.**
+All six are fixed or recorded, and two new cases came out of it (13.786, the
+ingest-door witness, which the reviewer correctly identified as the case worth
+spending and which `parseEvent`'s existing `roundTrips` assertion made nearly
+free). Details in § "The review round" below.
 
 ### Anchors — verify these; do not trust the row
 
@@ -63,7 +69,7 @@ require when this ticket was created?"*, and no claim already recorded can be
 retroactively refused. Marking a field required would place every existing ticket
 of that type out of compliance. **Named absence, owner: the plan that takes up
 type-level field enforcement.** It is recorded in `Features.md`, in the
-catalogue section for `13.776`–`13.785`, and in the commit message — the dispatch
+catalogue section for `13.776`–`13.786`, and in the commit message — the dispatch
 forbade shipping a silent no-op, and this is not one.
 
 ### What the wire actually cost
@@ -104,18 +110,21 @@ before believing ANY test result that consumes it — including a passing one.**
   `scripts/check-case-ids.mjs`. (`check:db-tz` needs
   `DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma`.)
 - **The forced gate was NOT run — the controller's.**
-- **Seven** mutations run, each killed by a case specific to its own site: remove
-  `required` from the schema (13.777); `.default(false)` (13.782 + an existing
-  `toEqual`); the toggle never un-setting (13.778); `mapTicketTypes` dropping the
-  member (13.784); the toggle never disabled (access.test.tsx `toBeDisabled`);
-  `Remove field` leaking back to members (**access.test.tsx:610-615** — this is
-  the one that proves the widened enumeration below did not open a hole); and the
-  schema member removed from a mutated **`dist`** (13.785, the real-Postgres
-  round trip — `expected { id: 'fleet', … } to deeply equal { id: 'fleet', … }`).
-  That last one was run against `packages/domain/dist` **only**, with the source
-  left pristine, precisely so the running reviewer's view of the tree could not
-  change under it; `dist` is gitignored and untracked, and the file was restored
-  from a backed-up copy and verified by SHA-256 (`9d5889c3…` before and after).
+- **Ten** mutations run, each killed by a case specific to its own site: seven
+  before the review — remove `required` from the schema (13.777);
+  `.default(false)` (13.782 + an existing `toEqual`); the toggle never un-setting
+  (13.778); `mapTicketTypes` dropping the member (13.784); the toggle never
+  disabled (access.test.tsx `toBeDisabled`); `Remove field` leaking back to
+  members (**access.test.tsx:610-615** — the one that proves the widened
+  enumeration did not open a hole); and the schema member removed from a mutated
+  **`dist`** (13.785, the real-Postgres round trip) — and **three after it**,
+  each covering a review finding: the fixture truncated to one field (13.784's new
+  `toHaveLength(2)` guard), the layout class removed (13.780), and the schema
+  member removed so the **ingest door** strips it (13.786).
+  Mutation 7 was run against `packages/domain/dist` **only**, with the source left
+  pristine, precisely so the running reviewer's view of the tree could not change
+  under it; `dist` is gitignored and untracked, and the file was restored from a
+  backed-up copy and verified by SHA-256 (`9d5889c3…` before and after).
 
 ### ★ THE STRONGEST WITNESS, AND WHY IT IS NOT REDUNDANT WITH 13.784
 
@@ -135,13 +144,71 @@ second is asserted as key ABSENCE rather than falsiness.
 `packages/app-core/test/workflow-builder/access.test.tsx:567` asserts every
 button a MEMBER is offered on the ticket-type editor is an icon choice or a gated
 Field-type control, all disabled — a gate-coming-down check. The new toggle is a
-ninth button, so the predicate now names it. **It belongs in that set by the
-test's own taxonomy:** a value control on the DEFINITION like the Field-type
-trigger, not a collection action like `Remove field`. That taxonomy is also why
-showing it **disabled** beats hiding it — a member still learns which fields are
-required. The third term is enumerated with its own count (2, one per fixture
-field) rather than folded into a catch-all, and the `Remove field` mutation above
-still reddens the predicate.
+**twentieth** button on that render (16 icon choices + 2 Field-type triggers + 2
+toggles — measured, not estimated; `Object.keys(TYPE_ICONS)` is 16 and
+`'file-text'` is a QUOTED key a naive sweep misses), so the predicate now names
+it. **It belongs in that set by the test's own taxonomy:** a value control on the
+DEFINITION like the Field-type trigger, not a collection action like
+`Remove field`. That taxonomy is also why showing it **disabled** beats hiding it
+— a member still learns which fields are required. The third term is enumerated
+with its own count (2, one per fixture field) rather than folded into a
+catch-all, and the `Remove field` mutation above still reddens the predicate.
+
+### ★ THE REVIEW ROUND — no Critical, no Important, and four of six Minor were MY OWN DOCUMENTATION
+
+An independent reviewer ran against `d56fca85`. **The headline finding is that the
+central claim survived an attempt to refute it**: it searched for any enforcement
+point for a type-level `required` — `\.required\b`, `requireField`, `required=`,
+every `CustomFieldDef` consumer — opened the two that could have enforced it
+(`checks/fields.ts:29-59`, `rules/require-field.ts:5-18`), and confirmed the
+absence is real and the flag is carried end to end with no hop dropping it. It
+also measured the zod semantics the design rests on against the repo's own zod: a
+schema without the member strips it, `.optional()` keeps absence absent,
+`.default(false)` materialises it — i.e. **the two states the design distinguishes
+really are distinguishable**, which was the claim with the least obvious proof.
+
+**Then it attacked the instruments and found four things wrong with what I WROTE,
+not with what I shipped:**
+
+1. **A FABRICATED FIGURE.** "The new toggle is a ninth button on that screen"
+   matched no reproducible count. It is **twenty** (16 icon choices + 2 Field-type
+   triggers + 2 toggles). I had invented "ninth" the way a plausible number gets
+   invented — it sounded like the right size for a screen with a few controls, and
+   nothing I ran would have contradicted it. **The reviewer's own first count of
+   the icon set was 15, wrong because `'file-text'` is a QUOTED key a naive
+   key-sweep cannot see** — it caught its own instrument and said so, which is the
+   behaviour this file's §32 exists to record.
+2. **A WRONG CAUSE ATTACHED TO A RIGHT VERDICT.** The widened access predicate's
+   comment claimed the toggle was "already covered by the sweep above". Measured
+   FALSE: `valueControls()` returns the same eight members with the toggle present
+   as without it. The verdict stood; the reason did not. **A wrong cause is how a
+   real hole gets read as covered later**, so it was corrected rather than left.
+3. **A VACUITY HOLE ONE FIELD WIDE.** 13.784's absence half was
+   `'required' in (fields[1] ?? {})` — which answers `false` for a response
+   TRUNCATED to one field, because `?? {}` hands it a fresh empty object. A
+   `toHaveLength(2)` guard now precedes it, mutation-proved (mutation 8).
+4. **AN INCOMPLETE LIST THAT LED WITH THE WRONG SITE.** The schema docblock named
+   the projection, the replica and the memory context as the parses a strip would
+   hit. **All three are READS. The door is `parseEvent`, and it comes first** —
+   it stores the schema's OUTPUT (`parse-event.ts:177`, `payload.data`), so a
+   member the schema does not declare is stripped BEFORE the event is ever
+   recorded. The docblock is corrected and **13.786 is the resulting witness**,
+   added at near-zero cost because `roundTrips`' existing
+   `result.event.payload).toEqual(payload)` already asserted exactly this.
+
+The other two: the new `ui.css` rule `flex: none` is pinned by no test — true, and
+now **stated outright in that rule's own docblock** rather than implied away
+(its `.fields-editor__add`/`__row` siblings are in the same position, so it is not
+a regression; 13.780 now pins that the component applies the class at all, and
+mutation 9 proves that assertion can fail). And no server-side case witnessed the
+door — which 13.786 now does.
+
+**What the review did NOT find is worth as much as what it did:** it could not
+construct a member-visible authoring control that leaves `access.test.tsx` green
+(it verified that jest-dom's `toBeDisabled` rejects an `aria-disabled`-only
+control rather than being satisfied by it), and every `file:line` citation it
+opened said what the citing text claimed. **Recorded because a clean review
+reported as clean is the only kind of clean review worth anything.**
 
 ### Two deviations from the prototype, both stated
 

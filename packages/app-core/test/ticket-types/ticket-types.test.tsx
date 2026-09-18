@@ -454,6 +454,12 @@ describe('TicketTypeEditorScreen — the `required` field flag', () => {
     const off = screen.getByRole('button', { name: 'Optional' });
     expect(off).toHaveClass('gn-button');
     expect(off).toHaveClass('gn-button--ghost');
+    // The layout class too. It carries no colour (ui.css is sizing only), so
+    // nothing else would notice if the component stopped applying it — and the
+    // CSS rule itself is pinned by NO test (`.fields-editor__add` and `__row`
+    // are in the same position), which `ui.css`'s own docblock now states
+    // outright rather than implying coverage.
+    expect(off).toHaveClass('fields-editor__required');
     // Colour is NOT this change's to declare: `ui.css`'s `.fields-editor__required`
     // is sizing only, so both states resolve through the variant classes and
     // both grounds are pairs the contrast audit already carries. A `--on` rule

@@ -1497,7 +1497,19 @@
    stated rather than silent: the tint role does not exist in this product
    (`tokens.ts:342-344` — `tintWarning` is the only tint role), and the pill
    sits at `.gn-button`'s own 2.75rem rather than 32px, matching the Remove
-   button and the name input it stands beside in the same row. */
+   button and the name input it stands beside in the same row.
+
+   NO TEST PINS THIS RULE, and that is stated rather than left to be assumed
+   (independent review, 2026-09-18 — an earlier version of this docblock implied
+   coverage it does not have). The css-binding scanner's prefix list covers
+   `workflow-builder-screen`/`state-inspector`/`inspector-panel`/
+   `transition-inspector` only, and case 13.780 asserts the `gn-button` VARIANT
+   classes, not this one — so deleting `flex: none` reddens nothing. It is not a
+   regression: `.fields-editor__add` and `.fields-editor__row` sit in exactly the
+   same position. What IS pinned is that the component applies the class at all
+   (13.780), which is the half a scanner would be able to see. Recorded so the
+   next reader does not read this rule's plainness as proof of its being
+   checked. */
 .fields-editor__required { flex: none; }
 
 .gn-select__trigger {

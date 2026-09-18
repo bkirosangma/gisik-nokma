@@ -713,6 +713,15 @@ describe('3.140 getTicketTypes reads the route that shipped', () => {
     const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
     const [invoice] = await source.query.getTicketTypes(WORKSPACE);
 
+    // The fixture's shape asserted BEFORE its contents. Without this the
+    // absence half below is VACUOUS when the response is truncated: `?? {}`
+    // would hand `'required' in {}` a fresh empty object and answer `false`
+    // whatever the wire said. An independent reviewer found this on 2026-09-18
+    // — a hole one field wide, and exactly the shape this repo keeps recording,
+    // where an assertion passes for a reason unrelated to the property it
+    // names. The positive half does pin `fields[0]`, so the list could not
+    // shrink to zero; it is the SECOND field that needed the guard.
+    expect(invoice?.fields).toHaveLength(2);
     expect(invoice?.fields[0]).toMatchObject({ id: 'amount', name: 'Amount', type: 'number', required: true });
     // Absence, not falsiness — `undefined` would also satisfy
     // `toBe(undefined)` while the key existed, and the difference between
