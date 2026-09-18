@@ -41,6 +41,54 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~18:1x IST. **SETTINGS → WORKFLOWS: FIX ROUND APPLIED, ALL GREEN
+> # AT THE NEW HEAD, AWAITING THE REVIEWER'S REPORT, THEN THE PR OPENS.** Supersedes the block below.
+> # `exec/settings-workflows`, rebased onto `origin/main` = `a12c4018`, ONE PR `--base main`.
+>
+> | | |
+> |---|---|
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it. Chain: `d8ccbf2e` (the code) → `09354fc7` (handoff) → `92c99406` (handoff) → **`00e8e3d8` (fix round)** → the commit carrying this block. |
+> | the fix round | **comment text only — 9 insertions / 8 deletions, every changed line inside a `/* */` block, a `/** */` docblock or a prose bullet. No executable line changed.** Two measurements re-measured and corrected, plus a citation off by one in five places. |
+> | re-verified AT `00e8e3d8` | **seven checks all EXIT 0** (`citations` file 13 = **658** cited / 0 uncited · `check-case-ids` **2348**, union == sum · `db-tz` with `DATABASE_URL=…:54329/…` → `Asia/Kolkata`) · **app-core 1550/0** (94 files) · **ui 330/0** (5 files) · **web 520/0** (48 files) · **four typechecks 0, all logs 0 bytes** · `turbo run build` **11/11**. Node v22.22.2. |
+> | migration | **NONE.** Do not restart the server container. |
+> | gate | **NOT RUN BY THIS LANE** (the controller runs it). |
+>
+> ## ▣ WHAT THE FIX ROUND CORRECTED — and why it was worth a fix round rather than a note
+>
+> 1. *"The two families already sit **300 lines** apart"* → **2,524**. `.ticket-type-list__*`'s selector
+>    rules are `ui.css:1740-1832`; this family's are `:4356-4409`. Wrong by most of an order of magnitude,
+>    though the placement argument itself (appending stales 0 citations, inserting stales ~45) is untouched.
+> 2. *"**46** of the repo's **135** `ui.css:NNN` citations"* → **45 of 134**, measured three ways: base
+>    `b14d3b9b` = 131/44; frozen head = 134/45 (this change adds exactly `ui.css:152` and `ui.css:4383`,
+>    removes none); upper bound with every directory = 134. **No threshold between 1500 and 1900 yields 46
+>    at all** — it was not a different insertion point measured correctly, it was never 46.
+> 3. *"(`:3185`)"* for the chip's fill, in **five** places → **`:3184`**. `:3185` is the BAR
+>    (`barStyle: … width:4px`); the fill and its `padding:3px 9px 3px 13px` are on the line above. **The
+>    dispatch carried the same off-by-one**, which is how it propagated into four files.
+>
+> A measured number that does not reproduce is this project's most expensive defect class, so these are
+> corrected at source. **The dispatch's `packages/ui/src/ui.css:1584-1670` for the ticket-type family is
+> wrong in the same direction** — `:1584` is inside a comment.
+>
+> ## ▣ ONE NEAR-MISS, RECORDED BECAUSE THE INSTRUMENT WOULD HAVE LIED CLEANLY
+>
+> Probing `--gn-shadow-sunken-compact` I called `themeStylesheet(style, theme)` and read **`none` for all
+> six style/theme combinations** — which would have condemned the new `[data-style="neo"] .workflow-list__state`
+> rule as **dead**, the exact thing the reviewer was told to hunt. **`themeStylesheet()` takes NO arguments
+> and returns all six blocks in one string**, so that call returned the `hig/light` block six times and my
+> "six combinations" were one combination read six times. Parsing the blocks properly: `[data-style="neo"]`
+> emits `inset 2px 2px 4px …` in **both** themes, `hig`/`minimal` emit `none` — exactly what the docblock
+> claims. **The rule is live and the finding was false.** A control must vary the axis the property lives on.
+>
+> ## ▣ STILL OPEN IN THIS TASK
+>
+> The per-task reviewer is running; **its report is recorded in the PR body before the PR opens** (the
+> dispatch's freeze-line requirement). If it lands findings that need a code change, that is a NEW HEAD and
+> the numbers above are re-measured there.
+>
+> ---
+>
+> # ▣ RECORD — superseded by the block above.
 > # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~17:5x IST. **SETTINGS → WORKFLOWS IS REBASED, GREEN AND AT THE
 > # REVIEWER; THE PR OPENS ON THIS HEAD.** This session was restarted and recovered the branch from the
 > # handoff below — the two commits survived, so nothing was redone. `exec/settings-workflows`,
