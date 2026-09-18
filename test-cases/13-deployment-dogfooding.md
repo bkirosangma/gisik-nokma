@@ -11839,19 +11839,20 @@ deliverable. Two facts, each read rather than inferred:
    **The version-aware read DOES exist — end to end — and the first draft of this entry denied it.
    Corrected rather than left standing, and the correction is the reviewer's Critical finding, verified
    against the tree rather than accepted.** `DataSourceQuery.getWorkflowDef(workspaceId, workflowId,
-   version?)` (`packages/app-core/src/data-source.ts:146`) takes a version, `online-data-source.ts:277-281`
-   sends `?version=`, the replica adapter answers one locally, and the server route
-   `GET /v1/workspaces/:ws/workflows/:wf?version=N` serves any single version
-   (`apps/server/src/routes/builder-reads.ts:517-546`, numeric branch at
+   version?)` (`packages/app-core/src/data-source.ts:146`) declares a version parameter; the ONLINE
+   adapter sends it (`online-data-source.ts:277-281` builds `?version=`), the replica adapter answers one
+   locally, and the server route `GET /v1/workspaces/:workspaceId/workflows/:workflowId?version=N` serves
+   any single version (`apps/server/src/routes/builder-reads.ts:517-546`, numeric branch at
    `apps/server/src/projections/workflows.ts:116-120`). `WorkflowAuthoringGateway`
    (`packages/app-core/src/workflow-builder/gateway.ts:56-94`) **is** version-BLIND — neither
    `listWorkflows` nor `getWorkflow(workspaceId, workflowId)` takes a version — but the adapter that
    implements it **DROPS an argument that already exists one layer down**
    (`apps/web/src/authoring/data-source-gateway.ts:224`, whose own seam docblock names the member as
-   `getWorkflowDef(workspaceId, workflowId, v?)` at `:26`). Publishing is contiguous
-   (`packages/app-core/src/workflow-builder/ui/publish-controls.tsx:34,124` — `base.version + 1`), so
-   versions `1..N` are walkable from the `N` the list already returns. **What is missing is an exposed
-   parameter, not a read.**
+   `getWorkflowDef(workspaceId, workflowId, v?)` at `:26`). Versions are contiguous **by server-side
+   ENFORCEMENT**, not by convention: the engine refuses a first version that is not 1, and any later
+   version that is not `latest + 1` (`packages/rule-engine/src/workflow-defined.ts:53-58`, `:63-68`, rule
+   `workflowVersion` at `refusal-rules.ts:18`) — so `1..N` is walkable from the `N` the list already
+   returns. **What is missing is an exposed parameter, not a read.**
 
 **The strongest argument the other way, recorded rather than glossed.** The chain is NOT missing
 from the product. Every published version is its own row in `proj_workflows` — the projection's
@@ -11865,15 +11866,18 @@ in `workspace_seq` order for everyone including guests"
 (`apps/server/src/sync/sync-routes.ts:172-198`), so every published version of every workflow is
 already reachable by a client that asks the replica door.
 
-**THE RESOLUTION, stated plainly so it is not mistaken for a claim about the wire.** The conditional
-ruling's DATA half is **SATISFIED** — the chain is readable, by version, through reads that already
-ship. The absence therefore rests entirely on the **AFFORDANCE** half: the prototype draws no history
-view (its own handler is a toast), and the card it hangs `"View history"` on is a SUPERSEDED version's,
-which this screen does not render. Building the button means designing the view it opens *and*
-deciding where the button lives — two product decisions, not a port. **Raised to the controller as a
-ruling rather than taken here**, because inventing a screen is the one thing a measurement cannot
-authorise. If the owner wants it, the work needs no schema change and should be dispatched as its own
-task rather than folded into this slice.
+**THE RESOLUTION — a DEPARTURE from the ruling's words, stated that way so a reader does not take this
+absence as what the ruling asked for.** The ruling is DATA-conditional and its data half is
+**SATISFIED** — the chain is readable, by version, through reads that already ship — so **on the ruling's
+own words the button was owed.** What stops this change short is a second rule from the same task text
+colliding with the first: a button with no door behind it is *"the exact defect this repo keeps
+re-finding"* (plan `:118-120`). Here it would have no door — the prototype draws no history view (its own
+handler is a toast), and the card it hangs `"View history"` on is a SUPERSEDED version's, which this
+screen does not render — so it would open nothing and sit nowhere. **Those two rules cannot both be
+honoured, and only the owner can pick between them: ESCALATED to the controller, not decided here.**
+Building it means designing the view and choosing where the button lives — two product decisions, and
+inventing a screen is the one thing a measurement cannot authorise. The work needs no schema change and
+should be dispatched as its own task rather than folded into this slice.
 
 **No test was added and no test changed.** 13.920's pins are unchanged and still pass; this change
 touches one docblock, `Features.md`, and this file.
