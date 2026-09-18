@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { IngestResult, SubmittedEvent } from '@gisik-nokma/domain';
+import { membershipId, type IngestResult, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { DataSourceQuery, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
 import { InviteAdminError, type PendingInvite } from '@gisik-nokma/app-core/online';
 import MembersPage, { COPY_IT_NOW } from '../app/w/[workspaceId]/members/page.js';
@@ -187,7 +187,16 @@ describe('3.132 the mint form honours the two refusals the door would give', () 
   it('offers admin, member and guest — and never owner', async () => {
     const user = userEvent.setup();
     mount({ listPending: async () => [] });
-    await user.click(await screen.findByRole('button', { name: /Role/ }));
+    // SCOPED TO THE FORM 2026-09-18, when the roster gained a role control of
+    // its own. The query above was `findByRole('button', { name: /Role/ })`,
+    // and it was unambiguous only by accident: it worked while the mint form's
+    // picker was the page's ONLY control whose accessible name contained
+    // "Role". The roster's control is named `Role for Anselma Marak`, so the
+    // unscoped regex now matches two elements and throws. This case is about
+    // the MINT form's picker, so its query says so.
+    const form = (await screen.findByRole('heading', { name: 'Invite somebody' })).closest('form');
+    expect(form).not.toBeNull();
+    await user.click(within(form!).getByRole('button', { name: /Role/ }));
     const listbox = await screen.findByRole('listbox');
     expect(within(listbox).getAllByRole('option').map((option) => option.textContent)).toEqual([
       'admin',
@@ -219,7 +228,12 @@ describe('3.132 the mint form honours the two refusals the door would give', () 
     // Type a project id FIRST, then switch to guest — the state survives the
     // switch, so this is the shape that would leak the key.
     await user.type(screen.getByLabelText(/^Projects/), '01J9PROJECT000000000000000');
-    await user.click(screen.getByRole('button', { name: /Role/ }));
+    // Scoped for the same reason as the case above: the roster's own role
+    // control also matches `/Role/` since 2026-09-18, and this case is about the
+    // mint form's picker.
+    const form = (await screen.findByRole('heading', { name: 'Invite somebody' })).closest('form');
+    expect(form).not.toBeNull();
+    await user.click(within(form!).getByRole('button', { name: /Role/ }));
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'guest' }));
     expect(screen.queryByLabelText(/^Projects/)).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Send invitation' }));
@@ -457,13 +471,21 @@ describe('13.761 the roster is a table with a Person and a Role column', () => {
     expect(within(rows[1]!).getByText('Kiro')).toBeInTheDocument();
     expect(within(rows[1]!).getByText('owner')).toBeInTheDocument();
     expect(within(rows[2]!).getByText('Anselma Marak')).toBeInTheDocument();
-    expect(within(rows[2]!).getByText('member')).toBeInTheDocument();
-    // NO control per row. The prototype's role cell is an `<select>` under
-    // `canEditRole` (`:679-685`) and the product has no per-member role-change
-    // door: no route accepts one and `role` is written only at membership
-    // creation. A picker here would be a control that cannot be honoured.
-    expect(within(table).queryByRole('combobox')).toBeNull();
-    expect(within(table).queryByRole('button')).toBeNull();
+    // RE-POINTED 2026-09-18, when the role control landed (13.824–13.828), and
+    // the REPLACEMENT asserts the same property rather than a weaker one. This
+    // case used to end with `queryByRole('combobox')`/`queryByRole('button')`
+    // both null — "NO control per row" — and that absence was a PROXY for the
+    // thing the case is actually about: that no role is prettified, and that
+    // nothing on this screen offers a change it cannot honour. The proxy was
+    // true only while the guards Task 1 added did not exist, so it is replaced
+    // by the property itself, asserted in BOTH arms at once: the owner's row
+    // chips the wire token, and the row the control can edit announces itself
+    // and displays that same token. A capitalised label anywhere in either arm
+    // fails this line.
+    expect(within(rows[1]!).queryByRole('button')).toBeNull();
+    expect(
+      within(rows[2]!).getByRole('button', { name: /Role for Anselma Marak/ }),
+    ).toHaveTextContent('member');
   });
 });
 
@@ -680,5 +702,216 @@ describe('13.766 the heading is Members, and nothing is counted before the roste
     expect(screen.getByText('Loading…')).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.queryByText(/You can see/)).toBeNull();
+  });
+});
+
+/**
+ * 13.824–13.828 THE ROLE CONTROL (2026-09-18; plan
+ * `2026-09-18-membership-role-guard` Task 2, executor 2).
+ *
+ * The prototype's role cell has two arms (`desktop.dc.html@6d7b67c0a52c:679-690`):
+ * an `<select>` under `canEditRole` and a static chip otherwise. Only the chip
+ * shipped in #443, because the door behind a picker did not exist — `POST
+ * /events` accepts a `membership.granted` with a role, but until Task 1 nothing
+ * refused an admin demoting the sole owner or promoting themselves. Task 1
+ * closed that; this is the control, and it is the FIRST case set here that can
+ * say a role change is possible at all.
+ *
+ * ## Why every case below addresses the OTHER person's row and not the viewer's
+ *
+ * The fixture's signed-in user IS `ROSTER[0]` — Kiro, the workspace owner — so
+ * the owner arm of the control is the viewer's own row. A case that reached for
+ * "the role control" without scoping would be reaching for the one row this
+ * design deliberately does not put a control on (13.828), and would pass or fail
+ * for a reason unrelated to what it names.
+ *
+ * ## The query shape is the shared `Select`'s, MEASURED rather than assumed
+ *
+ * `packages/ui/src/select/select.tsx:253` renders a `HiddenSelect` alongside the
+ * visible trigger: a visually-hidden (not `display:none`) native `<select>` that
+ * carries the same `aria-label`, and testing-library's `getByRole` does not
+ * respect `aria-hidden`. That is why `getByLabelText` throws "Found multiple
+ * elements" here and why `list-prefs-wiring.test.tsx:69` queries the trigger
+ * `button` by name and then reads options out of the `listbox` — the pattern
+ * copied below, which is also what a person does.
+ *
+ * ## EVERY NAME QUERY BELOW IS A REGEX, and that is a measurement, not a style
+ *
+ * **The trigger's accessible name is `<its current value> <the caller's
+ * aria-label>`** — for the second person's control, `member Role for Anselma
+ * Marak`. Measured by probing `queryAllByRole('button', { name })` against the
+ * rendered page: the exact strings `'Role for Anselma Marak'` and `'member'`
+ * each return **0**, the concatenation `'member Role for Anselma Marak'`
+ * returns **1**, and the regex `/Role/` returns **2** (this control and the mint
+ * form's). The cause is `useSelect`'s own wiring: react-aria sets
+ * `aria-labelledby="<the value span's id> <the trigger's own id>"` on the
+ * trigger, and the accessible-name algorithm resolves those references and
+ * concatenates them, so the caller's `aria-label` is APPENDED to the value
+ * rather than being the name.
+ *
+ * Two consequences are load-bearing here. First, a case that queried the
+ * control by its exact `aria-label` would fail against a control that is
+ * present and correct, for a reason unrelated to what it names — which is how
+ * this was found. Second, and worse, the mirror-image case: an ABSENCE
+ * assertion anchored to the start of that name (`/^Role for /`) can never
+ * match, so it holds whether or not the control is rendered. 13.826's absence
+ * arm is unanchored for exactly that reason.
+ *
+ * **Recorded rather than fixed, with a named owner:** this is the shared
+ * component's behaviour on every `Select` in the product, its trigger being
+ * announced as its value with the caller's label trailing it. Changing it means
+ * changing `packages/ui/src/select/select.tsx` and every call site that was
+ * written against the current names — outside this task's scope. Owner: whoever
+ * next touches that file.
+ */
+const MEMBER_ID = '01J9USER000000000000000001';
+
+describe('13.824 the roster’s role control, and the option it deliberately does not offer', () => {
+  it('13.824 an admin sees a role control offering admin, member and guest — and NOT owner', async () => {
+    const user = userEvent.setup();
+    mount({ listPending: async () => [] });
+    await user.click(await screen.findByRole('button', { name: /Role for Anselma Marak/ }));
+    const listbox = await screen.findByRole('listbox');
+    // `owner` is absent, and that is the whole decision this case carries: the
+    // prototype offers it, the invite door refuses it, and there is no
+    // ownership-transfer flow — so minting an owner from a roster row would be
+    // a transfer with no door designed for it.
+    expect(within(listbox).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'admin',
+      'member',
+      'guest',
+    ]);
+  });
+
+  /**
+   * 13.825 THE WRITE. Three claims in one case, and each of the three is there
+   * because a different defect satisfies the other two:
+   *
+   * - **exactly one event** — a control that submitted on every render, or that
+   *   sent a batch, would pass a "something was sent" assertion;
+   * - **the right event** — entity id, payload `userId` and payload `role`.
+   *   `membershipId(workspaceId, userId)` is the key the projection upserts on
+   *   and the id Task 1's guard reads the target's current role through, so an
+   *   entity id that merely looks right addresses a different row of the world;
+   * - **the roster re-read** — without it the control would ingest and leave the
+   *   old role on screen, which is a write the person cannot see land.
+   */
+  it('13.825 changing a role ingests exactly one membership.granted, and re-reads the roster', async () => {
+    const user = userEvent.setup();
+    const ingest = vi.fn();
+    let rosterReads = 0;
+    mount({ listPending: async () => [] }, ingest, undefined, {
+      getMembers: async () => {
+        rosterReads += 1;
+        return ROSTER;
+      },
+    });
+    await user.click(await screen.findByRole('button', { name: /Role for Anselma Marak/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'guest' }));
+
+    await waitFor(() => expect(ingest).toHaveBeenCalledTimes(1));
+    const events = ingest.mock.calls[0]![0] as SubmittedEvent[];
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      workspaceId: WS,
+      type: 'membership.granted',
+      entity: { kind: 'membership', id: membershipId(WS, MEMBER_ID) },
+      payload: { userId: MEMBER_ID, role: 'guest' },
+    });
+    await waitFor(() => expect(rosterReads).toBe(2));
+  });
+
+  /**
+   * 13.826 THE GATE, witnessed rather than inferred. The viewer is the same
+   * fixture and the same roster; the only thing that changed is the door's
+   * answer, because the pending read is this page's one readable role signal —
+   * and for a member that read 403s.
+   *
+   * Both halves: the control is ABSENT, and the role is still SAID. A case that
+   * asserted only the absence would pass on a page that drew no role at all,
+   * which is a roster that no longer answers the question it exists to answer.
+   */
+  it('13.826 a member sees the role as text and no control at all', async () => {
+    mount({ listPending: async () => Promise.reject(new InviteAdminError(403, ADMIN_ONLY)) });
+    expect(await screen.findByText('Anselma Marak')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(ADMIN_ONLY)).toBeInTheDocument());
+    // UNANCHORED, and the anchor was a check that could not have failed: the
+    // trigger's accessible name is `<value> <aria-label>`
+    // (`member Role for Anselma Marak`, measured below), so a `/^Role for /`
+    // pattern can never match it and the absence assertion would have held on a
+    // page that rendered the control to a member. The pattern now matches the
+    // string that is actually there.
+    expect(screen.queryByRole('button', { name: /Role for / })).toBeNull();
+    expect(screen.getByText('member')).toBeInTheDocument();
+  });
+
+  /**
+   * 13.827 THE REFUSAL, and this is the case the surface most needs. Task 1 put a
+   * guard behind this write that can say no (`last-owner`,
+   * `grant-owner-requires-owner`), and a control that swallowed the answer would
+   * show the click as having worked — the person reads their own intent as fact
+   * while the server holds the old role. That is the same defect 3.138 pins on
+   * Withdraw, on the same page.
+   *
+   * Both halves again, and the second is the one that is easy to lose: the
+   * refusal is on screen, AND the cell still says the role the server actually
+   * holds. The control is driven by the roster and not by local state, so a
+   * refused change cannot leave `guest` sitting in the cell — and `rosterReads`
+   * stays at 1, because a refused write must not re-read either.
+   */
+  it('13.827 a REFUSED role change is said out loud, and the cell does not move', async () => {
+    const user = userEvent.setup();
+    const reason = 'This change would leave the workspace with no owner.';
+    let rosterReads = 0;
+    mount(
+      { listPending: async () => [] },
+      () => undefined,
+      (event) => ({ status: 'refused', eventId: event.id, rule: 'last-owner', reason }),
+      {
+        getMembers: async () => {
+          rosterReads += 1;
+          return ROSTER;
+        },
+      },
+    );
+    await user.click(await screen.findByRole('button', { name: /Role for Anselma Marak/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'guest' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('last-owner');
+    expect(alert).toHaveTextContent(reason);
+    const control = screen.getByRole('button', { name: /Role for Anselma Marak/ });
+    expect(control).toHaveTextContent('member');
+    expect(control).not.toHaveTextContent('guest');
+    expect(rosterReads).toBe(1);
+  });
+
+  /**
+   * 13.828 THE ARM THE PROTOTYPE DRAWS AND THIS PRODUCT CANNOT.
+   *
+   * The prototype gates its select on the VIEWER alone (`:3061`,
+   * `canEditRole: myRoleIsAdmin`) and offers `Owner` in the option list, so its
+   * owner rows are editable like any other. This product removed `Owner` from
+   * the options — and the two halves do not compose: a `Select` whose `value`
+   * matches no option renders its PLACEHOLDER (`select.tsx:255`,
+   * `selected ? selected.label : placeholder`), so an owner's cell would read
+   * `Select…` — a cell that does not say what that person's role is, on the
+   * screen whose whole subject is who holds what. Offering the row a control
+   * would also be a demotion door with no designed flow, which is the mirror of
+   * the promotion this plan refuses to add.
+   *
+   * So the control is offered where it can state the value it would change, and
+   * the chip stays where it cannot. This is a CONSERVATIVE DEFAULT taken here
+   * rather than a ruling: it is filed with the controller in
+   * `gisik-nokma-lanes/EXEC2-2026-09-18-owner-row-editability.md`, and if the
+   * answer is that owner rows should be editable, this arm and this case change
+   * together.
+   */
+  it('13.828 an OWNER’s row keeps the chip, because the control cannot state the value it holds', async () => {
+    mount({ listPending: async () => [] });
+    const table = await screen.findByRole('table');
+    const ownerRow = within(table).getAllByRole('row')[1]!;
+    expect(within(ownerRow).getByText('owner')).toBeInTheDocument();
+    expect(within(ownerRow).queryByRole('button')).toBeNull();
   });
 });

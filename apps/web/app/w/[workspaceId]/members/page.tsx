@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useParams } from 'next/navigation';
 import { Button, Card, Select } from '@gisik-nokma/ui';
+import { membershipId } from '@gisik-nokma/domain';
 import { formatDateTime, makeSubmittedFactory, type RosterMember } from '@gisik-nokma/app-core';
 import { InviteAdminError, type MintedInvite, type PendingInvite } from '@gisik-nokma/app-core/online';
 import { AppNav } from '../../../../src/app-nav.js';
@@ -26,28 +27,23 @@ export const COPY_IT_NOW = 'Copy it now — it is not stored and cannot be shown
  * `/w/[workspaceId]/members` — the roster, and for owners and admins the invite
  * machinery (Plan 6 Task 15b, item 2).
  *
- * ## The roster table, and the FOUR things the prototype draws that are NOT here
+ * ## The roster table, and the THREE things the prototype draws that are NOT here
  *
  * The screen is ported from `desktop.dc.html@6d7b67c0a52c:651-798`. What the
  * product can back from the wire is a Person column and a Role column over the
  * roster `GET /v1/workspaces/:workspaceId/members` already serves, plus a
- * heading and a derived summary line. Four things the prototype draws are
- * deliberately ABSENT, and each is absent for the same reason rather than four
+ * heading and a derived summary line. Three things the prototype draws are
+ * deliberately ABSENT, and each is absent for the same reason rather than three
  * different ones — the product has no field, no door, or no read behind it, and
- * a screen that drew them anyway would be inventing:
+ * a screen that drew them anyway would be inventing. (A fourth — the role
+ * `<select>` — was absent on that same reasoning until 2026-09-18 and is now
+ * drawn in part; its own section below carries the correction, because the
+ * reason it was withheld turned out to be false even though withholding it was
+ * right.)
  *
  * - **Project access, Assigned and Last seen columns** (`:664-666`, `:691-693`).
  *   `readMembers` selects `user_id`, `u."name"` and `role` and nothing else
  *   (`routes/builder-reads.ts:247`), so none of the three has a wire field.
- * - **The role `<select>`** (`:679-685`). The prototype gates it on
- *   `canEditRole` (data `:3061`, `myRoleIsAdmin`), and the product has NO
- *   per-member role-change door at all: no route accepts one, and `role` is
- *   written only by membership creation. The non-editable chip arm
- *   (`:687-690`) is the one rendered. A picker that submitted nothing, or that
- *   submitted an event no door consumes, is a control lying about what it can
- *   do — and the same `canEditRole` value would have to be invented too, since
- *   the caller's own role is unreadable on this branch (see the gate section
- *   below).
  * - **The "Ticket-only access" panel and its "Add to workspace" button**
  *   (`:700-718`). It is built from `ticketOnlyPeople` (data `:3034`), a join of
  *   the workspace's TICKETS against a people directory — no product read
@@ -58,6 +54,57 @@ export const COPY_IT_NOW = 'Copy it now — it is not stored and cannot be shown
  *
  * What IS here and was already here — the invite panel and its 403 gate — is
  * unchanged. Its strings are load-bearing and match the prototype verbatim.
+ *
+ * ## THE ROLE CONTROL — CORRECTED 2026-09-18, and the wrong sentence is kept
+ *
+ * Until this date the Role cell carried a comment saying the prototype's select
+ * was omitted because *"the product has NO per-member role-change door at all:
+ * no route accepts one, and `role` is written only by membership creation."*
+ * **Both halves of that are measurable and both are false.** `POST /events`
+ * (`apps/server/src/routes/events.ts`) is the generic client batch door; its
+ * body schema is `{ events: unknown[] }` with `minItems: 1` and no per-type
+ * constraint, and `membership.granted` is admitted by it. And
+ * `apps/server/src/projections/proj-memberships.ts` upserts `ON CONFLICT …
+ * DO UPDATE SET role = excluded.role`, so `role` is written by any later grant
+ * and not only at membership creation.
+ *
+ * The conclusion — do not draw a picker — was right, and it was right for a
+ * reason nobody had checked. What was missing was never the door; it was the
+ * **guard**. An admin could already submit a role change, and with it demote the
+ * sole owner and promote themselves, so a picker would have been a control
+ * offering to do the one thing the workspace could not survive. Task 1 of
+ * `docs/superpowers/plans/2026-09-18-membership-role-guard` closed that in both
+ * layers (the actor question in `check-permission.ts`, the world-state question
+ * in the rule engine), and this cell now draws the control the prototype draws,
+ * scoped as the sections below describe.
+ *
+ * The earlier sentence is **corrected rather than deleted**, which is this
+ * repo's convention for a refuted claim: a passage that vanishes takes its
+ * mistake with it, and the next person to wonder why the picker was withheld
+ * finds nothing to tell them it once was.
+ *
+ * ## THE ROLE CONTROL IS OFFERED WHERE IT CAN STATE THE VALUE, which is narrower than the prototype
+ *
+ * The prototype gates the select on the VIEWER alone (`:3061`,
+ * `canEditRole: myRoleIsAdmin`) and lists `Owner` among its options, so its
+ * owner rows are editable like any other. This product omits `Owner` from the
+ * options — the invite form's judgement, and the same one the plan records — and
+ * **the two halves do not compose.** `Select` renders
+ * `selected ? selected.label : placeholder`
+ * (`packages/ui/src/select/select.tsx:255`); with no option whose value is
+ * `owner` there is no selected item, so an owner's cell would render the
+ * placeholder `Select…` beside the person who owns the workspace. A cell that
+ * does not say what its person's role is, on the screen whose whole subject is
+ * who holds what, is the failure this page's docblock is about. So the control
+ * is drawn for every row whose role it can state, and the chip stays on an
+ * owner's row; offering that row a control would also be a demotion door with no
+ * designed flow — the mirror of the promotion the plan refuses to add.
+ *
+ * **This narrowing is a CONSERVATIVE DEFAULT taken by the executor, not a
+ * ruling**, and it is filed with the controller (the dispatch protocol's
+ * one-line question) because the prototype genuinely disagrees with it. If the
+ * ruling is that owner rows should be editable, the predicate in the Role cell
+ * and case 13.828 change together, and nothing else does.
  *
  * ## THE ROLE GATE IS THE SERVER'S 403, and that is an adaptation worth naming
  *
@@ -113,15 +160,21 @@ export default function MembersPage() {
   const [membersError, setMembersError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingInvite[] | null>(null);
   const [revokeRefusal, setRevokeRefusal] = useState<string | null>(null);
+  const [roleRefusal, setRoleRefusal] = useState<string | null>(null);
   const [adminGate, setAdminGate] = useState<
     { kind: 'asking' } | { kind: 'admin' } | { kind: 'member'; why: string } | { kind: 'failed'; why: string }
   >({ kind: 'asking' });
 
-  useEffect(() => {
+  /** The roster read, and it is a callback rather than a bare effect because a
+   *  committed role change re-runs it: the cell renders the role the SERVER
+   *  holds, so the only way a change becomes visible is by re-reading it. */
+  const loadMembers = useCallback(() => {
     dataSource.query.getMembers(workspaceId).then(setMembers, (cause: unknown) => {
       setMembersError(cause instanceof Error ? cause.message : String(cause));
     });
   }, [dataSource, workspaceId]);
+
+  useEffect(loadMembers, [loadMembers]);
 
   const loadPending = useCallback(() => {
     invitesAdmin.listPending(workspaceId).then(
@@ -211,6 +264,70 @@ export default function MembersPage() {
       );
   };
 
+  /**
+   * Changing somebody's workspace role, through the ORDINARY ingest door.
+   *
+   * `membership.granted` is a registered domain event and `POST /events` is the
+   * generic client batch every other claim on this shell goes through — the
+   * same door the withdraw above uses. **No new server route was added for
+   * this** and none is needed; what made the control impossible until
+   * 2026-09-18 was not a missing door but a missing GUARD (an admin could
+   * already submit a role change, and could demote the sole owner with it), and
+   * the guard now lives in the engine and the permission gate where every other
+   * client is subject to it too.
+   *
+   * The entity id is `membershipId(workspaceId, userId)` — the key the
+   * projection upserts on and the id the guard reads the target's CURRENT role
+   * through. The payload restates the `userId`, exactly as the withdraw above
+   * restates its `inviteId`, because `parse-event.ts` refuses the entity and the
+   * payload disagreeing.
+   *
+   * A committed change re-reads the roster rather than setting local state: the
+   * cell renders what the server holds, so an optimistic update would put a role
+   * on screen that nothing has confirmed. And a REFUSAL is said out loud for
+   * the reason 3.138 gives about the withdrawal — the guard behind this write can
+   * genuinely say no (`last-owner`, `grant-owner-requires-owner`), and a
+   * swallowed answer would show the person their own intent as a fact.
+   */
+  const changeRole = (member: RosterMember, role: string): void => {
+    setRoleRefusal(null);
+    if (user === null) {
+      setRoleRefusal('You are not signed in, so this change was not sent.');
+      return;
+    }
+    const make = makeSubmittedFactory({ actorId: user.id, origin: 'web' });
+    void dataSource
+      .ingest([
+        make({
+          workspaceId,
+          entity: { kind: 'membership', id: membershipId(workspaceId, member.id) },
+          type: 'membership.granted',
+          payload: { userId: member.id, role },
+        }),
+      ])
+      .then(
+        (results) => {
+          const [result] = results;
+          if (result === undefined) {
+            setRoleRefusal('The server returned no answer for this change.');
+            return;
+          }
+          if (result.status === 'committed') {
+            loadMembers();
+            return;
+          }
+          setRoleRefusal(
+            result.status === 'refused'
+              ? `${result.rule}: ${result.reason}`
+              : `${result.code}: ${result.message}`,
+          );
+        },
+        (cause: unknown) => {
+          setRoleRefusal(cause instanceof Error ? cause.message : String(cause));
+        },
+      );
+  };
+
   return (
     <main className="gn-shell">
       <AppNav workspaceId={workspaceId} />
@@ -276,22 +393,50 @@ export default function MembersPage() {
                     </span>
                   </td>
                   <td className="gn-members__cell">
-                    {/* The prototype's NON-EDITABLE arm (`:687-690`) and only
-                        that arm. Its `canEditRole` arm is a `<select>`
-                        (`:679-685`) and the product has no per-member
-                        role-change door, so no picker and no role-change event
-                        is built here — a control that could not be honoured is
-                        worse than the absence of one. The value is the wire's
-                        own token, printed as it arrives.
+                    {/* THE TWO ARMS, and the predicate between them is where
+                        this diverges from the prototype — see the case below
+                        and the file docblock's role-control section.
 
-                        It wears the SHARED `.gn-chip` — the product's port of
-                        this very element, whose `--chipBg`/`--chipShadow` roles
-                        are the ones the mapping table names. The `Chip`
+                        The prototype gates its `<select>` on the VIEWER alone
+                        (`:3061`, `canEditRole: myRoleIsAdmin`) and offers
+                        `Owner` in the options, so its owner rows are editable
+                        like any other. This product removed `Owner` from the
+                        options, and the two halves do not compose: a `Select`
+                        whose `value` matches no option renders its PLACEHOLDER
+                        (`packages/ui/src/select/select.tsx:255`, `selected ?
+                        selected.label : placeholder`), so an owner's cell would
+                        read `Select…` — a cell that does not say what that
+                        person's role is, on the screen whose whole subject is
+                        who holds what. A control that cannot state the value it
+                        would change is the same failure as a control that
+                        cannot be honoured, one step quieter.
+
+                        The viewer half is the page's existing gate and not a
+                        second role read: `adminGate.kind === 'admin'` is the
+                        server's own answer to "may you manage this workspace's
+                        people", asked of `GET .../invites`, which 403s for
+                        exactly the population the ingest door refuses. The two
+                        are the same question, so a second client-side answer
+                        could only drift from it — and on this branch the
+                        caller's own role is unreadable anyway.
+
+                        The chip arm wears the SHARED `.gn-chip` — the product's
+                        port of this very element, whose `--chipBg`/`--chipShadow`
+                        roles are the ones the mapping table names. The `Chip`
                         component is not used because it always renders a
                         `.gn-chip__dot`, and this chip has no dot; see
                         `.gn-members__role` in `globals.css` for the one
                         declaration the shared rule does not already carry. */}
-                    <span className="gn-chip gn-members__role">{member.role}</span>
+                    {adminGate.kind === 'admin' && isEditableRole(member.role) ? (
+                      <Select
+                        options={EDITABLE_ROLE_OPTIONS}
+                        value={member.role}
+                        onChange={(next) => changeRole(member, next)}
+                        aria-label={`Role for ${member.name}`}
+                      />
+                    ) : (
+                      <span className="gn-chip gn-members__role">{member.role}</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -299,6 +444,18 @@ export default function MembersPage() {
           </table>
         </div>
       )}
+
+      {/* A refused role change, in the authority's own words — the rule and the
+          engine's reason, exactly as the withdrawal below carries them. It sits
+          under the roster and not in the invitations block, because that is
+          where the action was taken; the guard behind this write can genuinely
+          refuse (`last-owner`, `grant-owner-requires-owner`), and a screen that
+          said nothing would leave the person reading their own click as fact. */}
+      {roleRefusal !== null ? (
+        <p role="alert" className="gn-refusal gn-refusal--server">
+          {roleRefusal}
+        </p>
+      ) : null}
 
       {adminGate.kind === 'asking' ? (
         <p>Checking whether you can invite people…</p>
@@ -322,6 +479,44 @@ export default function MembersPage() {
       )}
     </main>
   );
+}
+
+/**
+ * The roles the roster's role control may SET — the invite form's own three
+ * (`:472-481`), with the same omission and the same reason. `owner` is absent
+ * because there is no ownership-transfer flow: the prototype offers it
+ * (`:680-685`), `inviteSentPayload` refuses it, `check-permission.ts:373`
+ * records that the invite path "refuses `owner`, and stops there", and Task 1's
+ * `grant-owner-requires-owner` now refuses it on the ingest door too. Promoting
+ * somebody to owner is a task of its own, not an option in a dropdown.
+ *
+ * The LABELS are the wire's own tokens and not prettified, which is the
+ * judgement the roster's chip already carries and case 13.761 pins: the mint
+ * form on this same page ships `admin / member / guest` (`:472-481`), and a
+ * capitalised label here would be a display mapping that exists in exactly one
+ * control and nowhere else in the product.
+ */
+const EDITABLE_ROLE_OPTIONS = [
+  { value: 'admin', label: 'admin' },
+  { value: 'member', label: 'member' },
+  { value: 'guest', label: 'guest' },
+];
+
+/**
+ * Whether the control can STATE this role, which is the narrower question the
+ * cell actually asks — not whether the role exists.
+ *
+ * `owner` is the one role that answers no, and the reason is mechanical rather
+ * than stylistic: `Select` renders `selected ? selected.label : placeholder`
+ * (`packages/ui/src/select/select.tsx:255`), and with no option whose value is
+ * `owner` there is no `selected`, so the cell would render `Select…` beside a
+ * person who is in fact the workspace's owner. A `string` test rather than a
+ * `WorkspaceRole` test because `RosterMember.role` is a plain `string` (see
+ * that type's docblock) — a value this client does not recognise gets the chip
+ * and prints itself, which is the honest arm for an unknown token.
+ */
+function isEditableRole(role: string): boolean {
+  return EDITABLE_ROLE_OPTIONS.some((option) => option.value === role);
 }
 
 /**
