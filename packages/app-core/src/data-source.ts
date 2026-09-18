@@ -19,6 +19,7 @@ import type {
   TicketRead,
   UserPreferences,
   WorkspaceRef,
+  WorkspaceSettings,
 } from './view-types.js';
 
 /**
@@ -147,6 +148,37 @@ export type DataSourceQuery = {
   search(workspaceId: string, text: string, filter?: FilterSpec): Promise<SearchHit[]>;
   getMyWork(workspaceId: string): Promise<MyWorkView>;
   getAttention(workspaceId: string): Promise<AttentionItem[]>;
+  /**
+   * The workspace's thresholds and auto-close window, as `/settings`'s Workspace
+   * tab shows them (second wave, Task 6).
+   *
+   * **Why this is a separate method rather than a wider `getAttention`.** The
+   * server has sent `settings` as a sibling of `items` on
+   * `/v1/workspaces/:ws/attention` since Plan 5, and the client dropped it —
+   * `mapAttention` reads `items` and returns `AttentionItem[]`. Widening
+   * `getAttention`'s RETURN would change a shipped signature for every strip
+   * caller that does not want settings; this method reads the SAME route and
+   * returns only the sibling mapped, so nothing that works today moves.
+   *
+   * The cost, named rather than hidden: this fetches the attention body to read
+   * one key of it. The server has no dedicated settings route, and adding one is
+   * a larger change than this task (`EXEC-2026-09-18-t6-settings-read.md`). If a
+   * `GET /v1/workspaces/:ws/settings` ever lands, this method is a one-line
+   * re-point and its cases do not move.
+   *
+   * **This shape is DELIBERATE AND OWNER-APPROVED, not the residue of an
+   * unanswered question.** The task plan named a `mapWorkspaceSettings` that did
+   * not exist and a settings read the attention strip supposedly already
+   * performed; the executor measured both claims false, took the additive
+   * ruling, and flagged it as a scope change rather than quietly widening
+   * `getAttention`. The controller confirmed the default and the OWNER confirmed
+   * it in turn (2026-09-18), so a future reader should read this as a decided
+   * design and not as a workaround awaiting review.
+   *
+   * It takes a `workspaceId` like every other read here — the caller supplies
+   * it, never a stored "current workspace".
+   */
+  getWorkspaceSettings(workspaceId: string): Promise<WorkspaceSettings>;
   getPreferences(workspaceId: string): Promise<UserPreferences>;
   putPreferences(workspaceId: string, preferences: UserPreferences): Promise<void>;
 };

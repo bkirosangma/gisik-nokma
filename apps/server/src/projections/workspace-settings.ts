@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg';
 import {
+  DEFAULT_AUTO_CLOSE_AFTER_DAYS,
   DEFAULT_DUE_SOON_DAYS,
   DEFAULT_STALE_DAYS,
   workspaceSettingsSetPayloadSchema,
@@ -46,6 +47,41 @@ import type { Projection } from './registry.js';
  * last changed the settings, which is a fact about the row rather than about
  * either key.
  *
+ * ## `auto_close_after_days` is a CASE, NOT a COALESCE, and that is the point
+ *
+ * Second wave, Task 6 (spec §8). The two thresholds above can use `COALESCE`
+ * because their schema has no `null` case, so an absent key and a NULL bind are
+ * the same thing. `autoCloseAfterDays` is `.nullable().optional()` and the two
+ * states it can be in are DIFFERENT claims:
+ *
+ * - `undefined` — "this claim does not mention auto-close" → leave the column.
+ * - `null`      — "turn auto-close OFF"               → write NULL.
+ *
+ * `COALESCE(EXCLUDED.auto_close_after_days, existing.auto_close_after_days)`
+ * CANNOT TELL THOSE APART. The explicit `null` binds as NULL, the COALESCE falls
+ * through to the stored value, and a claim that turns auto-close off is
+ * **silently ignored** — accepted by the door, committed to the ledger, its
+ * provenance even updated, and with no effect on the setting. That is the exact
+ * failure this column's shape exists to prevent, and it is why the write is:
+ *
+ *     auto_close_after_days = CASE WHEN $7 THEN $8 ELSE <existing> END
+ *
+ * where `$7` is `payload.autoCloseAfterDays !== undefined` — a PRESENCE boolean,
+ * computed from the parsed payload, which is the only place the
+ * present-versus-null distinction still exists by the time SQL sees it. Zod
+ * preserves it (`.optional()` would otherwise erase it at parse time); this
+ * parameter is what carries it the rest of the way.
+ *
+ * The regression proof lives in `test/projections/workspace-settings.test.ts`
+ * (case 13.714): swapping this CASE for a COALESCE must redden the
+ * clear-to-null case and nothing else. If that case passes under a COALESCE it
+ * is not testing what it claims.
+ *
+ * On INSERT there is no prior value to preserve, so the column takes
+ * `payload.autoCloseAfterDays ?? null` directly — and NULL on a fresh row is the
+ * correct default (`DEFAULT_AUTO_CLOSE_AFTER_DAYS`), so a first claim that does
+ * not mention auto-close leaves the workspace off, exactly as if no row existed.
+ *
  * ## Unqualified table names
  *
  * `proj_workspace_settings`, never `public.proj_workspace_settings`:
@@ -62,13 +98,20 @@ export const workspaceSettingsProjection: Projection = {
       return;
     }
     const payload = workspaceSettingsSetPayloadSchema.parse(event.payload);
+    // PRESENT, not non-null: this boolean is the whole present-versus-null
+    // distinction, and it is computed from the parsed payload because `null` and
+    // `undefined` are still different values there. Bound as `$7` below and used
+    // as the CASE guard — see the docblock.
+    const autoClosePresent = payload.autoCloseAfterDays !== undefined;
     await tx.query(
       `INSERT INTO proj_workspace_settings
-         (workspace_id, stale_days, due_soon_days, set_by, set_client_time, set_server_time)
-       VALUES ($1, $2, $3, $4, $5, $6)
+         (workspace_id, stale_days, due_soon_days, set_by, set_client_time, set_server_time,
+          auto_close_after_days)
+       VALUES ($1, $2, $3, $4, $5, $6, $8)
        ON CONFLICT (workspace_id) DO UPDATE SET
          stale_days = COALESCE(EXCLUDED.stale_days, proj_workspace_settings.stale_days),
          due_soon_days = COALESCE(EXCLUDED.due_soon_days, proj_workspace_settings.due_soon_days),
+         auto_close_after_days = CASE WHEN $7 THEN $8 ELSE proj_workspace_settings.auto_close_after_days END,
          set_by = EXCLUDED.set_by,
          set_client_time = EXCLUDED.set_client_time,
          set_server_time = EXCLUDED.set_server_time`,
@@ -87,6 +130,13 @@ export const workspaceSettingsProjection: Projection = {
         // way for the ledger.
         event.clientTime,
         event.serverTime,
+        // $7 = PRESENT (`null` counts as present); $8 = the value, which is
+        // NULL for both "off" and "not mentioned" — the CASE is what tells them
+        // apart, and `$7` is what it consults. On INSERT there is nothing to
+        // preserve, so `$8` alone is right and a fresh row with no mention of
+        // auto-close stores NULL, which IS the default.
+        autoClosePresent,
+        payload.autoCloseAfterDays ?? null,
       ],
     );
   },
@@ -114,7 +164,7 @@ export async function getWorkspaceSettings(
   workspaceId: string,
 ): Promise<WorkspaceSettings> {
   const { rows } = await db.query(
-    `SELECT stale_days, due_soon_days, set_by, set_client_time, set_server_time
+    `SELECT stale_days, due_soon_days, auto_close_after_days, set_by, set_client_time, set_server_time
        FROM proj_workspace_settings WHERE workspace_id = $1`,
     [workspaceId],
   );
@@ -122,6 +172,7 @@ export async function getWorkspaceSettings(
     | {
         stale_days: number | null;
         due_soon_days: number | null;
+        auto_close_after_days: number | null;
         set_by: string;
         set_client_time: Date;
         set_server_time: Date;
@@ -131,12 +182,22 @@ export async function getWorkspaceSettings(
     return {
       staleDays: DEFAULT_STALE_DAYS,
       dueSoonDays: DEFAULT_DUE_SOON_DAYS,
+      autoCloseAfterDays: DEFAULT_AUTO_CLOSE_AFTER_DAYS,
       provenance: null,
     };
   }
   return {
     staleDays: row.stale_days ?? DEFAULT_STALE_DAYS,
     dueSoonDays: row.due_soon_days ?? DEFAULT_DUE_SOON_DAYS,
+    // `?? DEFAULT` for the same reason as the two above, and here it is worth
+    // naming because the default IS null: `row.auto_close_after_days` is NULL
+    // both for "explicitly off" and for "never mentioned", and BOTH read as
+    // `null` — which is correct, because the reader's answer is "auto-close is
+    // off", and `provenance` is what distinguishes whether anyone chose it. There
+    // is deliberately no `?? 0` or sentinel: off is null on the wire and in the
+    // domain type, and inventing a second spelling here would put the sweep and
+    // the settings form on different vocabularies.
+    autoCloseAfterDays: row.auto_close_after_days ?? DEFAULT_AUTO_CLOSE_AFTER_DAYS,
     provenance: {
       actorId: row.set_by,
       // Both clocks are timestamptz, so both arrive as Date and both leave as

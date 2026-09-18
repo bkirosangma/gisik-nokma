@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { WorkspaceMember } from '@gisik-nokma/app-core';
+import type { SubmittedEvent } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
 
@@ -287,5 +288,190 @@ describe('the workspace-name subtitle keeps its pinned size (ROUTED 3)', () => {
       selector: '.gn-workspace-list__role',
     });
     expect(subtitle).toHaveClass('gn-workspace-list__role', 'gn-workspace-list__role--pinned');
+  });
+});
+
+/**
+ * Second wave, Task 6 — the `/settings?tab=workspace` tab.
+ *
+ * The task's plan named this as `13.629`; that id was taken, so these are
+ * `13.716` (the block `13.700`–`13.759` is this executor's, and `13.713`–`13.712`
+ * were already minted by Tasks 5 and 6's own domain/projection/mapper cases).
+ *
+ * What these cases are FOR, said plainly: the form is the first surface in the
+ * product that can set `autoCloseAfterDays`, and the one thing it must get right
+ * is that `null` — "off" — is a value it can send, distinct from "leave it
+ * alone". The partial-update assertion below ("and NOTHING else") is the other
+ * half: a form that re-sent all three knobs on every save would silently reset
+ * whichever ones the user did not touch, and the projection's CASE cannot save
+ * it, because a claim that names a knob with its OLD value is a real claim.
+ */
+describe('13.716 the Workspace settings tab', () => {
+  const SETTINGS = {
+    staleDays: 3,
+    dueSoonDays: 14,
+    autoCloseAfterDays: 30,
+    provenance: {
+      actorId: ME,
+      actorName: 'Anselma Marak',
+      clientTime: '2026-09-18T04:00:00.000Z',
+      serverTime: '2026-09-18T04:00:01.000Z',
+    },
+  };
+
+  /**
+   * A `Providers` tree whose data source CAPTURES ingests and answers them
+   * `committed`, so a case can assert what the form submitted AND that the
+   * form's own success path ran. The stock `stubServices` data source answers
+   * `[]`, which the form (correctly, per Ruling 27) reads as silence rather
+   * than as success — so a case that asserted on the captured call alone would
+   * never exercise `onSaved`.
+   */
+  function renderTab(
+    role: WorkspaceMember['role'],
+    settings: typeof SETTINGS | null,
+    captured: SubmittedEvent[][],
+  ): void {
+    const services = stubServices(
+      {
+        getWorkspaceSettings: async () => settings ?? SETTINGS,
+      },
+      {
+        authoring: {
+          listMembers: async () => rosterWhereIAm(role),
+          listTicketTypes: async () => TYPES,
+          listWorkflows: async () => WORKFLOWS,
+        },
+      },
+    );
+    const dataSource = {
+      ...services.dataSource,
+      ingest: async (events: SubmittedEvent[]) => {
+        captured.push(events);
+        return events.map((event) => ({
+          status: 'committed' as const,
+          eventId: event.id,
+          seq: 1,
+          serverTime: '2026-09-18T04:00:02.000Z',
+        }));
+      },
+    };
+    setQuery({ workspaceId: WORKSPACE, tab: 'workspace' });
+    render(
+      <Providers services={{ ...services, dataSource }}>
+        <SettingsPage />
+      </Providers>,
+    );
+  }
+
+  /**
+   * 13.716 — the tab renders all three knobs with the SERVER's current values,
+   * the sidebar link marks itself `aria-current`, and Save is disabled until
+   * something actually changes (the schema refuses the empty claim, so an
+   * enabled no-op Save would be a button whose only outcome is a refusal).
+   */
+  it('13.716 renders the three knobs at their current values and disables Save until something changes', async () => {
+    const captured: SubmittedEvent[][] = [];
+    renderTab('admin', SETTINGS, captured);
+
+    expect(await screen.findByLabelText('Stale after')).toHaveValue(3);
+    expect(screen.getByLabelText('Due soon within')).toHaveValue(14);
+    expect(screen.getByLabelText('Auto-close after')).toHaveValue(30);
+
+    // The sidebar link exists and is the current page — the shell's own claim.
+    const link = screen.getByRole('link', { name: 'Workspace' });
+    expect(link).toHaveAttribute('aria-current', 'page');
+
+    // Nothing typed yet: Save is inert, and nothing was submitted.
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(captured).toHaveLength(0);
+  });
+
+  /**
+   * 13.716 — changing ONLY `Auto-close after` and saving ingests exactly ONE
+   * `workspace.settings_set` whose payload carries `autoCloseAfterDays` and
+   * NOTHING else.
+   *
+   * "And nothing else" is the assertion that matters. A form that echoed the
+   * other two knobs back would submit `{staleDays: 3, dueSoonDays: 14,
+   * autoCloseAfterDays: 14}`, which the projection would apply faithfully — so
+   * the bug would be invisible in the row it wrote and would only surface when
+   * two people edited different knobs at once.
+   */
+  it('13.716 saving only the auto-close change ingests one claim carrying that field alone', async () => {
+    const captured: SubmittedEvent[][] = [];
+    renderTab('admin', SETTINGS, captured);
+
+    const autoClose = await screen.findByLabelText('Auto-close after');
+    await userEvent.clear(autoClose);
+    await userEvent.type(autoClose, '14');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await screen.findByLabelText('Auto-close after');
+    expect(captured).toHaveLength(1);
+    const batch = captured[0] ?? [];
+    expect(batch).toHaveLength(1);
+    const event = batch[0]!;
+    expect(event.type).toBe('workspace.settings_set');
+    expect(event.entity).toEqual({ kind: 'workspace', id: WORKSPACE });
+    // EXACTLY the one key that changed. `toEqual` on the whole payload is what
+    // makes "nothing else" a measurement rather than a hope.
+    expect(event.payload).toEqual({ autoCloseAfterDays: 14 });
+  });
+
+  /**
+   * 13.716 — ticking `Off` sends `null`, and that is NOT the same payload as
+   * sending nothing.
+   *
+   * This is the client end of the task's correctness core. The projection
+   * distinguishes "the claim named the field and set it to null" from "the claim
+   * did not name the field" with a CASE; a form that omitted the key when Off
+   * was ticked would produce the second, and the workspace would stay ON while
+   * the user watched the box they just ticked. So the assertion is `null` by
+   * value AND the key being present.
+   */
+  it('13.716 ticking Off sends an explicit null, not an omitted key', async () => {
+    const captured: SubmittedEvent[][] = [];
+    renderTab('admin', SETTINGS, captured);
+
+    await screen.findByLabelText('Auto-close after');
+    await userEvent.click(screen.getByLabelText('Off'));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await screen.findByLabelText('Auto-close after');
+    expect(captured).toHaveLength(1);
+    const event = captured[0]?.[0];
+    expect(event).toBeDefined();
+    expect(event!.payload).toEqual({ autoCloseAfterDays: null });
+    // Present-with-null, not omitted: the same distinction the projection's CASE
+    // consumes. `toEqual({autoCloseAfterDays: null})` above would already fail
+    // on `{}`, so this pins the VALUE rather than the key's existence alone.
+    expect(Object.hasOwn(event!.payload as object, 'autoCloseAfterDays')).toBe(true);
+  });
+
+  /**
+   * 13.716 — a member sees the values read-only, with the sentence that says
+   * why, and NO Save control at all.
+   *
+   * The absence of the button is asserted rather than a disabled one shown:
+   * `check-permission.ts:582` refuses this event from a non-admin, and offering
+   * a control whose only outcome is a refusal teaches a user that the product
+   * is broken rather than that they lack the role.
+   */
+  it('13.716 a member sees the current values read-only, with no Save', async () => {
+    const captured: SubmittedEvent[][] = [];
+    renderTab('member', SETTINGS, captured);
+
+    // The values are still SHOWN — the honest thing to show someone who cannot
+    // change a setting is the setting.
+    expect(await screen.findByLabelText('Stale after')).toHaveValue(3);
+    expect(screen.getByLabelText('Due soon within')).toHaveValue(14);
+    expect(screen.getByLabelText('Auto-close after')).toHaveValue(30);
+
+    expect(
+      screen.getByText('Only a workspace admin can change these.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(captured).toHaveLength(0);
   });
 });

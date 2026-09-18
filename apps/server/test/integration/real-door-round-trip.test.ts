@@ -1316,7 +1316,7 @@ describe('GET /v1/workspaces/:workspaceId/attention — with the clock frozen an
     const expected = {
       workspaceId,
       generatedAt: frozenNow.toISOString(),
-      settings: { staleDays: 7, dueSoonDays: 7, provenance: null },
+      settings: { staleDays: 7, dueSoonDays: 7, autoCloseAfterDays: null, provenance: null },
       items: [
         {
           kind: 'stale',

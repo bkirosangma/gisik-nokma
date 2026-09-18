@@ -51,7 +51,7 @@ beforeEach(async () => {
 function settingsEvent(
   workspaceId: string,
   actorId: string,
-  payload: Record<string, number>,
+  payload: Record<string, number | null>,
   overrides: { serverTime?: string; clientTime?: string } = {},
 ) {
   return makeCommitted({
@@ -81,6 +81,7 @@ describe('getWorkspaceSettings — what the server answers', () => {
     expect(await getWorkspaceSettings(db.pool, newUlid())).toEqual({
       staleDays: DEFAULT_STALE_DAYS,
       dueSoonDays: DEFAULT_DUE_SOON_DAYS,
+      autoCloseAfterDays: null,
       provenance: null,
     });
   });
@@ -135,8 +136,124 @@ describe('getWorkspaceSettings — what the server answers', () => {
     expect(await getWorkspaceSettings(db.pool, untouched)).toEqual({
       staleDays: DEFAULT_STALE_DAYS,
       dueSoonDays: DEFAULT_DUE_SOON_DAYS,
+      autoCloseAfterDays: null,
       provenance: null,
     });
+  });
+});
+
+/**
+ * Second wave, Task 6 (spec §8): `autoCloseAfterDays`, and the ONE thing about
+ * it that is not like the other two knobs.
+ *
+ * `staleDays` and `dueSoonDays` are written with `COALESCE(EXCLUDED.x,
+ * existing.x)`, which is correct for them because their schema has no `null`
+ * case — an absent key binds NULL and keeps the prior value, and there is no
+ * legal claim it could be confused with. `autoCloseAfterDays` is
+ * `.nullable().optional()`, so `null` IS a legal claim ("turn auto-close off")
+ * and `undefined` is "do not touch it". `COALESCE` cannot tell those apart: it
+ * would read an explicit `null` as an absence and silently ignore the claim.
+ *
+ * The projection therefore writes the column with a presence boolean:
+ *
+ *   auto_close_after_days = CASE WHEN $n_present THEN $n ELSE <existing> END
+ *
+ * and the case below is the one that FAILS if that CASE is swapped back for a
+ * `COALESCE`. It is the reason this task exists.
+ */
+describe('13.714 autoCloseAfterDays — the CASE, not a COALESCE', () => {
+  /**
+   * 13.714 — the assertion a `COALESCE` cannot pass: a claim that sets
+   * `autoCloseAfterDays` to `null` CLEARS a previously claimed number.
+   *
+   * Under `COALESCE(EXCLUDED.auto_close_after_days, existing.auto_close_after_days)`
+   * the explicit `null` binds as NULL, the COALESCE falls through to the stored
+   * `30`, and this assertion reads `30` where it must read `null`. That is not a
+   * near miss — it is the whole defect, and it is silent: the claim is accepted,
+   * the row is written, the provenance even updates to the person who made it,
+   * and the setting simply does not change.
+   *
+   * BOTH HALVES ARE ASSERTED, because either alone can pass for the wrong
+   * reason. The `30` proves the first claim landed; the `null` proves the second
+   * one was not discarded. A case that asserted only the `null` would also pass
+   * against a projection that never wrote the column at all.
+   */
+  it('a claim setting it to null CLEARS a stored value — the assertion COALESCE fails', async () => {
+    const workspaceId = newUlid();
+    const alice = newUlid();
+    const bala = newUlid();
+
+    await applyCommitted(db.pool, [settingsEvent(workspaceId, alice, { autoCloseAfterDays: 30 })]);
+    const on = await getWorkspaceSettings(db.pool, workspaceId);
+    // Half one: the number landed, and the reader serves it.
+    expect(on.autoCloseAfterDays).toBe(30);
+
+    const clearing = settingsEvent(workspaceId, bala, { autoCloseAfterDays: null });
+    await applyCommitted(db.pool, [clearing]);
+
+    const off = await getWorkspaceSettings(db.pool, workspaceId);
+    // Half two: THE assertion. COALESCE answers 30 here.
+    expect(off.autoCloseAfterDays).toBeNull();
+    // And the column itself, not only the reader's answer — the reader could in
+    // principle be defaulting, and this reads the stored row.
+    expect((await rowsFor([workspaceId]))[0]).toMatchObject({ auto_close_after_days: null });
+    // Provenance still follows the ROW: the person who turned it off is now the
+    // workspace's settings author. A cleared value is a claim like any other.
+    expect(off.provenance?.actorId).toBe(bala);
+  });
+
+  /**
+   * 13.714 — a claim naming only `autoCloseAfterDays` leaves `stale_days`
+   * untouched, and a claim naming only `staleDays` leaves a stored
+   * `auto_close_after_days` untouched. Both directions, because the failure
+   * modes are different: the first catches a projection that reset the other
+   * knobs, the second catches one whose new parameter leaked into the old
+   * columns (a mis-numbered `$n`).
+   */
+  it('is partial in BOTH directions — the other knobs are never collateral', async () => {
+    const workspaceId = newUlid();
+    const actor = newUlid();
+    await applyCommitted(db.pool, [
+      settingsEvent(workspaceId, actor, { staleDays: 3, dueSoonDays: 10 }),
+      settingsEvent(workspaceId, actor, { autoCloseAfterDays: 14 }),
+    ]);
+
+    const afterAuto = await getWorkspaceSettings(db.pool, workspaceId);
+    expect(afterAuto.autoCloseAfterDays).toBe(14);
+    // The auto-close claim did not reset the two thresholds.
+    expect(afterAuto.staleDays).toBe(3);
+    expect(afterAuto.dueSoonDays).toBe(10);
+
+    await applyCommitted(db.pool, [settingsEvent(workspaceId, actor, { staleDays: 9 })]);
+
+    const afterStale = await getWorkspaceSettings(db.pool, workspaceId);
+    expect(afterStale.staleDays).toBe(9);
+    // …and the threshold claim did not drop auto-close. This is the direction a
+    // COALESCE would get RIGHT, which is why it is asserted beside the one it
+    // gets wrong: a case that only ever exercises one direction cannot tell
+    // which of the two mechanisms the code is using.
+    expect(afterStale.autoCloseAfterDays).toBe(14);
+  });
+
+  /**
+   * 13.714 — a workspace with no row answers `autoCloseAfterDays: null`, which
+   * is `DEFAULT_AUTO_CLOSE_AFTER_DAYS` and is a real answer rather than a
+   * missing field: auto-close is OFF for a workspace nobody has configured, and
+   * the sweep (Task 8) reads exactly this to decide whether the workspace is in
+   * scope. A `undefined` or an omitted key here would make that read
+   * "off" by accident rather than by contract.
+   */
+  it('a workspace with no row at all answers null — off is the default, not an absence', async () => {
+    const settings = await getWorkspaceSettings(db.pool, newUlid());
+    expect(settings).toEqual({
+      staleDays: DEFAULT_STALE_DAYS,
+      dueSoonDays: DEFAULT_DUE_SOON_DAYS,
+      autoCloseAfterDays: null,
+      provenance: null,
+    });
+    // The key is PRESENT with a null value, not omitted — the distinction the
+    // sweep and the settings form both rest on.
+    expect(Object.hasOwn(settings, 'autoCloseAfterDays')).toBe(true);
   });
 });
 

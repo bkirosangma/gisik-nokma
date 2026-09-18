@@ -133,6 +133,13 @@ export function stubServices(
     // an invented blank and pass.
     getMyWork: unstubbed('getMyWork'),
     getAttention: unstubbed('getAttention'),
+    // UNSTUBBED, same rule again (second wave Task 6). The settings screen's
+    // whole job is to show what this workspace CHOSE, so a default here would
+    // be this helper inventing a choice — `staleDays: 7` with
+    // `provenance: null` reads exactly like a workspace that claimed 7 days,
+    // and the case asserting "renders the current values" would pass without
+    // the server being asked anything.
+    getWorkspaceSettings: unstubbed('getWorkspaceSettings'),
     getPreferences: async () => EMPTY_PREFERENCES,
     putPreferences: async () => undefined,
     ...overrides,

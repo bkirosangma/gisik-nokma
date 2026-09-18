@@ -3,16 +3,18 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { TicketTypeListScreen, WorkflowListScreen } from '@gisik-nokma/app-core';
+import { TicketTypeListScreen, WorkflowListScreen, useLiveQuery } from '@gisik-nokma/app-core';
 import { AppNav } from '../../src/app-nav.js';
 import { WiringNotReady, useBuilderWiring } from '../../src/authoring/builder-wiring.js';
+import { useAppServices } from '../../src/providers.js';
 import { NewTicketTypePane, TicketTypeEditorPane } from '../../src/ticket-type-editor-pane.js';
 import { useWorkspaceName } from '../../src/use-workspace-name.js';
+import { WorkspaceSettingsForm } from '../../src/workspace-settings-form.js';
 
-type SettingsTab = 'ticket-types' | 'workflows';
+type SettingsTab = 'ticket-types' | 'workflows' | 'workspace';
 
 function isSettingsTab(value: string | null): value is SettingsTab {
-  return value === 'ticket-types' || value === 'workflows';
+  return value === 'ticket-types' || value === 'workflows' || value === 'workspace';
 }
 
 function tabHref(workspaceId: string | null, tab: SettingsTab): string {
@@ -196,26 +198,103 @@ function SettingsContent() {
           ) : (
             <span className="gn-settings__sidebar-item--disabled">Workflows</span>
           )}
+          {/* Second wave Task 6 (plan ruling R5): the workspace's own knobs —
+              `staleDays`, `dueSoonDays` and `autoCloseAfterDays` — which had no
+              UI anywhere in the product until now. Third in the sidebar rather
+              than first: the two above are what people come to Settings to
+              edit, and this one is set once. */}
+          {workspaceId !== null ? (
+            <Link
+              href={tabHref(workspaceId, 'workspace')}
+              aria-current={tab === 'workspace' ? 'page' : undefined}
+            >
+              Workspace
+            </Link>
+          ) : (
+            <span className="gn-settings__sidebar-item--disabled">Workspace</span>
+          )}
           {/* NO "MCP tokens" entry (Round 21, owner: "move MCP tokens to the
               account page. as this should not be scoped to a workspace"). It
-              lives on `/account` now — see that page's own comment. Both
-              remaining sections are workspace-scoped, which is what this shell
-              is for. */}
+              lives on `/account` now — see that page's own comment. Every
+              section here is workspace-scoped, which is what this shell is
+              for. */}
         </nav>
         <div className="gn-settings__content">
           {workspaceId === null ? (
             <p>
-              Pick a workspace to see its ticket types and workflows —{' '}
+              Pick a workspace to see its ticket types, workflows and settings —{' '}
               <Link href="/workspaces">open one</Link>.
             </p>
           ) : tab === 'workflows' ? (
             <WorkspaceWorkflows workspaceId={workspaceId} />
+          ) : tab === 'workspace' ? (
+            <WorkspaceSettingsTab workspaceId={workspaceId} />
           ) : (
             <WorkspaceTicketTypes workspaceId={workspaceId} typeId={typeId} />
           )}
         </div>
       </div>
     </main>
+  );
+}
+
+/**
+ * Second wave Task 6 — the **Workspace** tab: the three `workspace.settings_set`
+ * knobs, read through the `DataSource` and written back as one claim.
+ *
+ * ## Why this reads through `useAppServices` and not `useBuilderWiring`
+ *
+ * `useBuilderWiring` answers the authoring question — "may this person edit
+ * types and workflows, and what is their role" — and its `gateway` is the
+ * authoring surface, which knows nothing about workspace settings. The settings
+ * read is a `DataSource.query` method (the same seam every page reads through),
+ * so it comes from `useAppServices().dataSource`, and the ROSTER the form needs
+ * for its refusal text comes from `useBuilderWiring`'s `session`.
+ *
+ * ## The role is read from the wiring, and it is the SAME rule the server uses
+ *
+ * `canEdit` is `owner || admin`, mirroring `check-permission.ts:582`, which
+ * refuses `workspace.settings_set` from anyone else. This is deliberately not a
+ * second authorisation system: the server's check is the one that decides, and
+ * this flag decides only whether the controls are drawn. A member sees the
+ * values and the sentence that says why they cannot change them.
+ *
+ * ## The three states, and none of them is a blank form
+ *
+ * `canEdit` is false while the role is still being resolved, so a member never
+ * flashes an editable form on the way to the read-only one. A failed read
+ * renders the failure rather than a form full of defaults — a default is a
+ * value nobody chose, and this screen exists to show what WAS chosen.
+ */
+function WorkspaceSettingsTab({ workspaceId }: { workspaceId: string }) {
+  const { dataSource } = useAppServices();
+  const wiring = useBuilderWiring(workspaceId);
+  const settings = useLiveQuery(dataSource, workspaceId, `workspace-settings:${workspaceId}`, () =>
+    dataSource.query.getWorkspaceSettings(workspaceId),
+  );
+
+  if (wiring.kind !== 'ready') return <WiringNotReady wiring={wiring} />;
+  if (settings.error !== null) {
+    return (
+      <p role="alert" className="gn-refusal gn-refusal--server">
+        {settings.error}
+      </p>
+    );
+  }
+  if (settings.data === null) return <p>Loading settings…</p>;
+
+  return (
+    <WorkspaceSettingsForm
+      dataSource={dataSource}
+      workspaceId={workspaceId}
+      settings={settings.data}
+      canEdit={wiring.session.role === 'owner' || wiring.session.role === 'admin'}
+      currentUserId={wiring.session.userId}
+      // Re-read rather than patching local state: the form then shows the
+      // SERVER's values, which is the only way a projection that clamped, or a
+      // claim the engine adjusted, becomes visible on this screen.
+      onSaved={settings.reload}
+    />
   );
 }
 

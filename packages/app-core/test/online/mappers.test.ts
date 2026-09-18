@@ -30,6 +30,7 @@ import {
   mapTicketRead,
   mapWorkflowDef,
   mapWorkspaceRefs,
+  mapWorkspaceSettings,
   rosterByActorId,
   toClientFilterSpec,
   toServerFilterSpec,
@@ -1176,7 +1177,7 @@ describe('3.39 the blocked methods refuse, and enumerate what is absent', () => 
     const body: AttentionResponse = {
       workspaceId: 'w',
       generatedAt: '2026-09-02T10:00:00.000Z',
-      settings: { staleDays: 7, dueSoonDays: 7, provenance: null },
+      settings: { staleDays: 7, dueSoonDays: 7, autoCloseAfterDays: null, provenance: null },
       items: [
         { kind: 'blocked', card, stateName: 'Waiting', reason: 'In "Waiting" — a blocked state.' },
         {
@@ -1245,7 +1246,7 @@ describe('3.39 the blocked methods refuse, and enumerate what is absent', () => 
     const body: AttentionResponse = {
       workspaceId: 'w',
       generatedAt: '2026-09-02T10:00:00.000Z',
-      settings: { staleDays: 7, dueSoonDays: 7, provenance: null },
+      settings: { staleDays: 7, dueSoonDays: 7, autoCloseAfterDays: null, provenance: null },
       items: [
         {
           kind: 'blocked',
@@ -1889,3 +1890,138 @@ describe('13.372 mapWorkspaceRefs distinguishes a WITHHELD count from a counted 
   });
 });
 
+
+/**
+ * Second wave, Task 6 — `mapWorkspaceSettings`, the mapper the plan named and
+ * this tree did not have.
+ *
+ * The task's `Files:` block told the implementer to extend
+ * `mapWorkspaceSettings` in this file. No such function existed anywhere in the
+ * repo (`/usr/bin/git log -S'mapWorkspaceSettings' --all` returns only the plan
+ * commit that wrote the sentence), and `mapAttention` reads `items` and drops
+ * the `settings` sibling the server DOES send. So the client could not see a
+ * workspace's settings at all, and the `/settings` Workspace tab had nothing to
+ * render. This mapper is that missing half; the deviation is recorded in
+ * `EXEC-2026-09-18-t6-settings-read.md` and in the PR body.
+ *
+ * It is deliberately a mapper over the SETTINGS OBJECT rather than over the whole
+ * attention body: the response carries `settings` as a sibling of `items`, so the
+ * settings read does not need the strip's fixtures, and a caller that wants both
+ * calls this beside `mapAttention` rather than through it.
+ */
+describe('13.715 mapWorkspaceSettings — the workspace settings read', () => {
+  const ANSELMA = '01J9ANSELMA00000000000000';
+  const roster = new Map([[ANSELMA, 'Anselma Marak']]);
+
+  function settingsBody(overrides: Record<string, unknown> = {}): unknown {
+    return {
+      staleDays: 7,
+      dueSoonDays: 3,
+      autoCloseAfterDays: 30,
+      provenance: {
+        actorId: ANSELMA,
+        clientTime: '2026-09-18T04:00:00.000Z',
+        serverTime: '2026-09-18T04:00:01.000Z',
+      },
+      ...overrides,
+    };
+  }
+
+  /**
+   * 13.715 — the three knobs map by name, the provenance gains the roster name
+   * for its actor, and `autoCloseAfterDays` arrives as a NUMBER.
+   */
+  it('13.715 maps all three knobs and names the provenance actor from the roster', () => {
+    expect(mapWorkspaceSettings(settingsBody(), 'attention.settings', roster)).toEqual({
+      staleDays: 7,
+      dueSoonDays: 3,
+      autoCloseAfterDays: 30,
+      provenance: {
+        actorId: ANSELMA,
+        actorName: 'Anselma Marak',
+        clientTime: '2026-09-18T04:00:00.000Z',
+        serverTime: '2026-09-18T04:00:01.000Z',
+      },
+    });
+  });
+
+  /**
+   * 13.715 — `autoCloseAfterDays: null` maps to `null` and NOT to an absence or
+   * a substituted default. This is the client half of the CASE/COALESCE
+   * distinction: the server sends `null` for "auto-close is off", and a mapper
+   * that turned it into `undefined` (or dropped the key) would make the
+   * settings form render an empty box where "Off" belongs — and, worse, would
+   * make "off" indistinguishable from "this build does not know the field".
+   */
+  it('13.715 carries null through as null — off is a VALUE, not a missing key', () => {
+    const mapped = mapWorkspaceSettings(
+      settingsBody({ autoCloseAfterDays: null }),
+      'attention.settings',
+      roster,
+    );
+    expect(mapped.autoCloseAfterDays).toBeNull();
+    // Present-with-null, not omitted: `toEqual` would pass on `{...}` without
+    // the key only if the expectation also omitted it, so this asserts the key
+    // itself rather than trusting the deep-equal.
+    expect(Object.hasOwn(mapped, 'autoCloseAfterDays')).toBe(true);
+    // And it is NOT coerced to a number — `0` is not the off spelling anywhere
+    // in this feature (the schema refuses it).
+    expect(mapped.autoCloseAfterDays).not.toBe(0);
+  });
+
+  /**
+   * 13.715 — `provenance: null` maps to `null`: a workspace nobody has
+   * configured has nobody to attribute its settings to, and inventing an actor
+   * would be the client making a claim the ledger never recorded.
+   */
+  it('13.715 a null provenance stays null rather than inventing an author', () => {
+    const mapped = mapWorkspaceSettings(
+      settingsBody({ provenance: null }),
+      'attention.settings',
+      roster,
+    );
+    expect(mapped.provenance).toBeNull();
+    // The positive control, in the same run: the SAME mapper with a provenance
+    // present does not answer null, so the line above is the null branch and not
+    // a mapper that returns null unconditionally.
+    expect(
+      mapWorkspaceSettings(settingsBody(), 'attention.settings', roster).provenance,
+    ).not.toBeNull();
+  });
+
+  /**
+   * 13.715 — a knob that is missing or the wrong type is REFUSED, not defaulted.
+   *
+   * Same rule as every mapper in this file: refuse what cannot happen in
+   * production. The server always sends all three keys (`getWorkspaceSettings`
+   * applies the defaults itself, so it never omits one), which means a missing
+   * key is a body this client does not understand — and substituting 7 for it
+   * would render a threshold nobody chose, on the one screen whose entire job is
+   * to show what was chosen.
+   */
+  it('13.715 refuses a missing knob or a mistyped one instead of defaulting it', () => {
+    expect(() =>
+      mapWorkspaceSettings(
+        { dueSoonDays: 3, autoCloseAfterDays: null, provenance: null },
+        'attention.settings',
+        roster,
+      ),
+    ).toThrow(MappingError);
+    expect(() =>
+      mapWorkspaceSettings(
+        { staleDays: 7, dueSoonDays: 3, provenance: null },
+        'attention.settings',
+        roster,
+      ),
+    ).toThrow(MappingError);
+    // A STRING where a nullable number belongs — the shape a JSON round trip
+    // through a sloppy serializer produces.
+    expect(() =>
+      mapWorkspaceSettings(
+        settingsBody({ autoCloseAfterDays: '30' }),
+        'attention.settings',
+        roster,
+      ),
+    ).toThrow(MappingError);
+  });
+});

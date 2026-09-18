@@ -584,7 +584,12 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
 
     expect(response.workspaceId).toBe(read.world.workspaceId);
     expect(response.generatedAt).toBe(SCENARIO_NOW.toISOString());
-    expect(response.settings).toEqual({ staleDays: 7, dueSoonDays: 7, provenance: null });
+    expect(response.settings).toEqual({
+      staleDays: 7,
+      dueSoonDays: 7,
+      autoCloseAfterDays: null,
+      provenance: null,
+    });
 
     // blocked — `sharedTask` sits in `wf-errands`'s blocked-flagged `waiting`.
     // No clock is involved in this bucket at all.
@@ -650,7 +655,12 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     // Before: no claim exists, so the numbers are defaults and there is nobody
     // to attribute them to.
     const before = await strip('member');
-    expect(before.settings).toEqual({ staleDays: 7, dueSoonDays: 7, provenance: null });
+    expect(before.settings).toEqual({
+      staleDays: 7,
+      dueSoonDays: 7,
+      autoCloseAfterDays: null,
+      provenance: null,
+    });
 
     const claim = await claimSettings(30, 2);
 
@@ -662,6 +672,11 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     expect(after.settings).toEqual({
       staleDays: 30,
       dueSoonDays: 2,
+      // The claim named neither `staleDays` alone nor auto-close: `claimSettings`
+      // sends `{staleDays, dueSoonDays}` and nothing else, so auto-close is
+      // still the never-claimed default here, which is `null` (second wave
+      // Task 6).
+      autoCloseAfterDays: null,
       provenance: {
         actorId: read.world.owner,
         clientTime: claim.clientTime,

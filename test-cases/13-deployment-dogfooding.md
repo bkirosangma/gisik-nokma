@@ -8800,7 +8800,15 @@ The highest id minted inside this executor's block (`13.700`–`13.759`) is **`1
 (absent from code, and documented at `:8699` as a truncation trap). **`13.711` and `13.712` were then minted by the owner-ruled fix** (option B, below), recounted the same
 two ways at that tip — the only hits for either id were the earlier prose sentences of this very block
 saying they were free, which is the mentioned-versus-minted trap this file records — so **`13.713`–
-`13.759` remain unminted** and executor 2's parallel block (`13.760`–`13.819`) is untouched. The plan's
+`13.759` remain unminted** and executor 2's parallel block (`13.760`–`13.819`) is untouched.
+
+**UPDATE 2026-09-18 (Task 6): `13.713`–`13.717` are now MINTED, and the trap fired again on the way
+in.** A plain substring sweep for the next free id reported `13.713` as PRESENT and it had to be
+discounted: the only hit was this file's own sentence above, which *mentions* `13.713` as free without
+minting it. A MARKER-ONLY recount — the `ID_LINE` regex `scripts/check-case-ids.mjs` itself uses, over
+`packages/` + `apps/` + `test-cases/` — put the block's high-water at `13.712` (Task 5's) and returned
+`false` for `13.713`, with `13.711`/`13.712` present as the positive control. **`13.718`–`13.759`
+remain unminted**; executor 2's `13.760`–`13.819` is still untouched. The plan's
 own ids `13.622`–`13.625` were **NOT** used — the dispatch records them as taken.
 
 **The first RED for the pure module was NOT an assertion failure, and that is recorded rather than
@@ -9679,3 +9687,89 @@ untracked path), each guarded by a replacement count of exactly 1.**
    summary sentence", and the component's docblock was corrected to say that and to record the survival —
    spec §8.3 says only "in the list's control row", so the position among the arrangement controls is a
    freedom this task deliberately does not freeze.
+
+---
+
+# Second wave, Task 6 — `autoCloseAfterDays`: setting, projection, wire, and the Workspace settings tab
+
+Plan ids `13.622`–`13.625` were **taken** (recorded as taken in the dispatch), so this task's cases are
+**`13.713`–`13.717`**, recounted by case MARKER at the tip (see the update above — a substring sweep
+reported `13.713` present and it was this file mentioning it, not minting it).
+
+**The task's correctness core is one field's present-versus-null distinction, and it is tested at four
+layers.** `autoCloseAfterDays` is `number | null`, where `null` is a CLAIM ("turn auto-close off") and
+`undefined` is "this claim does not mention it". `COALESCE(EXCLUDED.x, existing.x)` cannot tell those
+apart, so a claim that turns auto-close off would be silently ignored — accepted, committed, its
+provenance updated, and with no effect on the setting. The projection therefore writes a `CASE` guarded
+by a presence boolean, and 13.714 is the assertion a `COALESCE` fails.
+
+- ✅ **13.713 — the domain schema accepts `autoCloseAfterDays` alone, as a number AND as `null`, and
+  refuses `0`, `366`, and a claim that names nothing.** Three cases in
+  `packages/domain/test/events/workspace-settings.test.ts`. The load-bearing assertion is that `null`
+  and `undefined` survive `parse` as DIFFERENT values (`{autoCloseAfterDays: null}` parses to an object
+  with the key, not to `{}` and not to `{autoCloseAfterDays: undefined}`), because Zod is the only
+  layer where that distinction still exists — by the time SQL sees the bind, both are NULL and only the
+  presence boolean separates them. `0` is refused rather than accepted as a second spelling of "off",
+  so there is exactly one way to say each thing and the CASE's `$n` can never hold a `0` the sweep
+  would have to special-case. The empty-claim case asserts `{autoCloseAfterDays: undefined}` is refused
+  too: it is the empty claim wearing a key, and the projection would read it as "not present".
+- ✅ **13.714 — the projection: a claim setting `autoCloseAfterDays` to `null` CLEARS a stored value,
+  which is the assertion `COALESCE` cannot pass.** Three cases in
+  `apps/server/test/projections/workspace-settings.test.ts`. The first applies `30`, asserts the reader
+  serves `30` (so the first claim landed), then applies an explicit `null` and asserts the reader
+  answers `null` AND the stored column reads `null` — both halves, because a case asserting only the
+  `null` would also pass against a projection that never wrote the column at all. Provenance follows
+  the row, so the person who turned it off is the settings author. The second case is partiality in
+  BOTH directions (an auto-close claim leaves `stale_days`/`due_soon_days` alone, and a threshold claim
+  leaves a stored auto-close alone) — the second direction is one a `COALESCE` gets RIGHT, which is why
+  it is asserted beside the one it gets wrong: a file exercising one direction cannot tell which
+  mechanism the code is using. The third pins `autoCloseAfterDays: null` for a workspace with no row,
+  present-with-null rather than omitted, which is what the sweep (Task 8) reads to decide scope.
+- ✅ **13.715 — `mapWorkspaceSettings` carries all three knobs and names the provenance actor, with
+  `null` passing through as `null`.** Four cases in `packages/app-core/test/online/mappers.test.ts`.
+  **This mapper is the one the task plan named and the tree did not have** — see
+  `Features.md` and `EXEC-2026-09-18-t6-settings-read.md`. Its discriminating assertions: `null` maps
+  to `null` and is NOT coerced to `0` or dropped (`Object.hasOwn` on the mapped result, not just a
+  deep-equal); a `null` provenance stays null, with the same mapper returning non-null on a body that
+  HAS one, so the assertion is the null branch rather than an unconditional null; and a missing or
+  mistyped knob is REFUSED rather than defaulted — a mapper answering `7` for an absent `staleDays`
+  would render a threshold with nobody behind it on the one screen whose job is to show what was
+  chosen.
+- ✅ **13.716 — `/settings?tab=workspace` renders the three knobs at their current values, saves ONLY
+  what changed, sends an explicit `null` for `Off`, and is read-only for a member.** Four cases in
+  `apps/web/test/settings-page.test.tsx`. The partial-update case asserts the submitted payload is
+  EXACTLY `{autoCloseAfterDays: 14}` — `toEqual` on the whole payload is what makes "and nothing else"
+  a measurement, since a form echoing all three knobs would write a faithful row and the bug would only
+  surface when two people edited different knobs. The `Off` case asserts `{autoCloseAfterDays: null}`
+  with the key present, which is the client end of the projection's CASE: a form that OMITTED the key
+  when Off was ticked would leave the workspace ON while the user watched the box they just ticked.
+  Save is asserted DISABLED until something changes (the schema refuses the empty claim, so an
+  always-enabled Save would be a button whose only outcome is a refusal notice), and the member case
+  asserts the values are still SHOWN with the read-only sentence and **no Save control at all** rather
+  than a disabled one.
+- ✅ **13.717 — the read door `DataSourceQuery.getWorkspaceSettings` reads the attention route, maps its
+  `settings` sibling, and refuses a body without one.** Three cases in
+  `packages/app-core/test/online/online-data-source.test.ts`. Added by the recorded deviation, so these
+  pin the shape's own decisions: the recorded URL list is asserted to CONTAIN the attention route and
+  to NOT contain a `/settings` path or a contests read (the positive control on the call, since the
+  recording fetch 404s anything it was not given); `autoCloseAfterDays: null` survives the round trip
+  with a number-case control in the same run; and a body missing `settings` REJECTS rather than
+  rendering a form of invented defaults, again with a restored-fixture control so the rejection is
+  caused by the missing key.
+
+**The CASE-vs-`COALESCE` mutation, run and recorded — and an earlier version of it DISCARDED as not
+isolating its property.**
+
+1. **First attempt: `COALESCE` swapped in but `$7` still bound.** RED, but for the wrong reason —
+   `could not determine data type of parameter $7`, because removing the CASE removed the only
+   reference to that parameter and Postgres cannot infer its type. **9 of 12 cases failed**, all with
+   that plumbing error. This is a mutation that changes the source but not the property under test, in
+   the direction that condemns innocent checks; it was discarded rather than reported as a kill.
+2. **The faithful mutant: a self-consistent `COALESCE` implementation** — the CASE replaced AND the
+   presence boolean dropped from the parameter array, which is what an implementer who never knew
+   about the distinction would actually write. **RED, and exactly one case: 13.714's clear-to-null,
+   `expected 30 to be null`.** 11 of 12 passed, including the two neighbouring 13.714 cases and every
+   pre-existing case in the file. The mutation names its own site and nothing else moves.
+3. **Restore verified by checksum, not by reading**: the pristine file was copied aside first and its
+   SHA-256 recorded in the same invocation as the backup's, so the "restored" comparison is
+   same-path/same-invocation rather than a shell `diff`.

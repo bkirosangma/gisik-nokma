@@ -51,6 +51,18 @@ export function createFakeDataSource(
     // workspace, which is what a default is for. Overrides that care take it.
     getMyWork: async () => ({ assigned: [], inTransit: [], contested: [], shared: [] }),
     getAttention: async () => [],
+    // The server's REAL answer for a workspace nobody has configured, not an
+    // invented blank (second wave, Task 6): `getWorkspaceSettings` applies the
+    // domain's defaults and answers `provenance: null` when no row exists, so
+    // this mirrors a state the product can actually produce. `autoCloseAfterDays:
+    // null` is that default AND the "off" claim, which is why a case that cares
+    // about the difference must override this rather than read it.
+    getWorkspaceSettings: async () => ({
+      staleDays: 7,
+      dueSoonDays: 7,
+      autoCloseAfterDays: null,
+      provenance: null,
+    }),
     getPreferences: async () => ({ version: 1, projects: {}, savedFilters: [] }),
     putPreferences: async () => {},
     ...overrides,

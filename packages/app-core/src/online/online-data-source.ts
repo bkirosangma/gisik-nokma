@@ -5,6 +5,7 @@ import {
   boardWorkspaceId,
   mapActors,
   mapAttention,
+  mapWorkspaceSettings,
   mapBoardView,
   mapHistory,
   mapIngestResults,
@@ -355,6 +356,37 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
         workspaceRoster(workspaceId),
       ]);
       return mapAttention(raw, contests, roster);
+    },
+
+    /**
+     * The SAME route as `getAttention`, one key of it (second wave, Task 6).
+     *
+     * `/v1/workspaces/:ws/attention` is the only door that serves a workspace's
+     * settings — `AttentionResponse.settings` is a sibling of its `items` — and
+     * the server has sent it since Plan 5. This reads that key and nothing else,
+     * which is why it does not call `mapAttention` and does not fetch the
+     * contests list: neither has anything this method returns.
+     *
+     * The roster is read for the same reason `getAttention` reads it — so the
+     * settings' `provenance` can name the person who claimed them rather than
+     * printing a raw id. It is a second round trip this method could skip, and
+     * deliberately does not: a settings screen that showed "someone" where the
+     * name is known would be this client withholding a fact it has.
+     *
+     * `mapWorkspaceSettings` refuses a body without the three knobs, so a server
+     * that stopped sending `settings` fails loudly here rather than rendering a
+     * form full of defaults.
+     */
+    getWorkspaceSettings: async (workspaceId) => {
+      const [raw, roster] = await Promise.all([
+        http.get(`/v1/workspaces/${workspaceId}/attention`),
+        workspaceRoster(workspaceId),
+      ]);
+      const record = raw as { settings?: unknown } | null;
+      if (record === null || typeof record !== 'object') {
+        throw new HttpError(200, `/v1/workspaces/${workspaceId}/attention`);
+      }
+      return mapWorkspaceSettings(record.settings, 'attention.settings', roster);
     },
 
     /**
