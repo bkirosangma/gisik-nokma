@@ -3,8 +3,8 @@ import type { ReactNode } from 'react';
 
 /**
  * The two pieces of navigation the refreshed export added to `/privacy` and
- * `/terms` — the segmented tab pair (`desktop.dc.html` `isLegal`, `:1730-1735`)
- * and the anchor row (`:1738-1742`) — rendered from ONE source per page.
+ * `/terms` — the segmented tab pair (`desktop.dc.html` `isLegal`, `:1734-1738`)
+ * and the anchor row (`:1741-1745`) — rendered from ONE source per page.
  *
  * ## Why the TOC takes the page's sections instead of its own list
  *

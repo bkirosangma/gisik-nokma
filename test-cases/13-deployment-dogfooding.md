@@ -7733,12 +7733,12 @@ run's own summary line before it will report anything, which is the same rule th
 - ✅ **13.686 — the 404 leads with the export's 72px tile, and it is hidden from assistive tech.** Three
   properties with three reasons: `aria-hidden` because the tile repeats what the `h1` says and a screen
   reader hearing it twice is a regression, not a decoration; the 34px svg box inside a 72px tile
-  because that is the export's own geometry (`:1846`); and the glyph's two cross strokes, which are
+  because that is the export's own geometry (`:1847`); and the glyph's two cross strokes, which are
   what make it this screen's mark rather than the bar's brand tile. (`apps/web/app/not-found.tsx`,
   `apps/web/app/globals.css`)
 - ✅ **13.687 — the 404 offers the manual as a THIRD action, in the export's order, into a real route.**
   The ORDER is asserted, not just the set: the export draws workspaces / manual / inbox
-  (`:1853-1855`), and this page's two existing links already agreed with it, so inserting the manual
+  (`:1855-1857`), and this page's two existing links already agreed with it, so inserting the manual
   anywhere else would have been arbitrary against both. `Search the manual` is the export's own label
   and one of the two new accessible names the dispatch required BY STRING. A positive control on the
   target asserts `app/help/page.tsx` exists on disk — "the route exists" was the audit's own reason for

@@ -1906,7 +1906,7 @@ input, textarea, select { font-family: inherit; }
    that measured both is `docs/design/prototype-delta-2026-09-18.md`.
 
    The heading scale is the export's own four numbers, taken verbatim rather
-   than converted: `34px / 41px / 700 / -0.4px` (`:1731`, `:1849`) with the
+   than converted: `34px / 41px / 700 / -0.4px` (`:1733`, `:1851`) with the
    measure widened from 68ch to the export's `72ch`. BOTH screens take it,
    because the export draws both headings identically — writing the numbers
    twice is how one of them ends up a round behind. */
@@ -1925,7 +1925,7 @@ input, textarea, select { font-family: inherit; }
 .gn-legal__head .gn-legal__title { margin-bottom: 0; }
 
 /* The export's content measure: a 72ch column, centred inside `.gn-shell`'s
-   existing 80rem frame (`:1732`). `.gn-shell` still owns the outer width and
+   existing 80rem frame (`:1731`). `.gn-shell` still owns the outer width and
    the page padding; this narrows only the prose, which is what the measure is
    for. A block container rather than a flex column, deliberately: every child
    below already carries its own bottom margin, and a `gap` would add a second
@@ -1934,7 +1934,7 @@ input, textarea, select { font-family: inherit; }
 .gn-legal__column { max-width: 72ch; margin-inline: auto; }
 
 /* Title left, tabs right, wrapping to two rows below the export's own break
-   (`:1730`, `flex-wrap:wrap`). */
+   (`:1732`, `flex-wrap:wrap`). */
 .gn-legal__head {
   display: flex;
   align-items: center;
@@ -1973,7 +1973,7 @@ input, textarea, select { font-family: inherit; }
 .gn-legal__head .gn-segmented { flex: none; }
 .gn-legal__tabs .gn-segmented__item { flex: none; padding: 0 0.85rem; text-decoration: none; }
 
-/* ── The anchor row (`legalToc`, `:1738-1742`) ─────────────────────────────
+/* ── The anchor row (`legalToc`, `:1741-1745`) ─────────────────────────────
    2.75rem again, and here it is a DELIBERATE departure from the export, which
    draws a compact 15px row with `gap:7px 20px`. A wrapped row of anchor links
    is not a sentence, so the tap-target sweep's inline-in-prose exemption does
@@ -2000,7 +2000,7 @@ input, textarea, select { font-family: inherit; }
    of it (`--app-nav-offset`, defined above with `.gn-nav`). */
 .gn-legal__section { scroll-margin-top: var(--app-nav-offset); }
 
-/* ── The bar's own three pieces (`isLegal` `:1721-1730`) ───────────────────
+/* ── The bar's own three pieces (`isLegal` `:1722-1729`) ───────────────────
    The BAR is `.gn-nav`, the product's chrome — see `apps/web/src/legal-nav.tsx`
    for why. Only the parts the export adds are styled here. */
 .gn-nav__brand { display: inline-flex; align-items: center; gap: 0.6rem; flex: none; }
@@ -2022,14 +2022,14 @@ input, textarea, select { font-family: inherit; }
 .gn-nav__wordmark { font-size: 17px; line-height: 22px; font-weight: 600; }
 
 /* ── The 404's own two additions ────────────────────────────────────────────
-   `isNotFound` draws a centred 520px column (`:1845`) where this page used the
+   `isNotFound` draws a centred 520px column (`:1846`) where this page used the
    shell's full 80rem. Only the MEASURE moves; the three causes, the "why it
    will not say" panel and the closing aside keep their left alignment, because
    the export has no counterpart for any of them and centring four paragraphs
    of reasoning would be a readability change dressed as a port. */
 .gn-notfound { max-width: 520px; margin-inline: auto; }
 
-/* The 72px rounded tile (`:1846`), glyph and radius verbatim. `surfaceRaised`
+/* The 72px rounded tile (`:1847`), glyph and radius verbatim. `surfaceRaised`
    on `surface` under `--gn-shadow-raised` is `.gn-card`'s own pairing, so the
    tile reads as one of the product's raised surfaces rather than as a new kind
    of object. The icon is `--gn-text-muted`, the export's `--label3` — it is
@@ -2229,8 +2229,16 @@ input, textarea, select { font-family: inherit; }
 }
 
 @media (max-width: 40rem) {
+  /* `line-height` is restated here because Step 2c-2 made the base rule's
+     leading a FIXED `41px` (the export's own number, paired with its 34px
+     heading). A fixed value does not scale, so without this line the phone's
+     21.6px title would have inherited 41px of leading — a ratio of 1.9, on the
+     heading of the two pages a locked-out reader is most likely to open.
+     `1.25` is what this rule had BEFORE that change, via the base rule's own
+     unitless value, so the phone's typography is byte-for-byte what it was:
+     this line restores a decision, it does not take one. */
   .gn-notfound__title,
-  .gn-legal__title { font-size: 1.35rem; }
+  .gn-legal__title { font-size: 1.35rem; line-height: 1.25; }
   .gn-notfound__actions { flex-direction: column; align-items: stretch; }
   .gn-notfound__link { justify-content: center; }
 }

@@ -62,7 +62,7 @@ import Link from 'next/link';
 export default function NotFound() {
   return (
     <main className="gn-shell gn-notfound">
-      {/* The export's 72px rounded tile (`:1846`), glyph paths verbatim. The
+      {/* The export's 72px rounded tile (`:1847`), glyph paths verbatim. The
           whole tile is `aria-hidden`: it repeats what the h1 says, so a screen
           reader announcing it would be reading the heading twice. That is also
           why it adds nothing to the accessible-names sweep's counts. */}
@@ -116,7 +116,7 @@ export default function NotFound() {
         &ldquo;5 of 6&rdquo;: the shape of what is hidden is itself information.
       </p>
 
-      {/* Three links, in the export's own order (`:1853-1855`). This page had
+      {/* Three links, in the export's own order (`:1855-1857`). This page had
           two; the manual is the one it omitted, and it is the only one of the
           three that answers "I do not know how this works", which is a real
           cause of landing here that the three-cause list above does not name. */}

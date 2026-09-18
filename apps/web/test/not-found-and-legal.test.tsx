@@ -197,7 +197,7 @@ describe('the legal pages', () => {
  * control worked and the two cases witnessed both of its branches.
  *
  * The refreshed export's `isLegal` block draws a top bar with a brand tile, the
- * wordmark and a `Sign in` link (`desktop.dc.html@6d7b67c0a52c:1721-1730`) —
+ * wordmark and a `Sign in` link (`desktop.dc.html@6d7b67c0a52c:1722-1729`) —
  * **and no back affordance anywhere in `:1720-1755`**, which is the condition
  * the dispatch put on replacing the control rather than keeping both. So the
  * control is gone and its two cases have no subject. They are recorded as
@@ -371,7 +371,7 @@ describe('the 404, ported from the export without taking its copy', () => {
    * Three properties, each with its own reason. `aria-hidden` because the tile
    * repeats what the `h1` says and a screen reader reading it twice is a
    * regression, not a decoration; the 72px and the glyph paths because the
-   * export draws exactly those (`:1846`) and the tile is otherwise the kind of
+   * export draws exactly those (`:1847`) and the tile is otherwise the kind of
    * element that gets quietly resized by the next spacing pass.
    *
    * The paths are asserted by COUNT and by their distinguishing commands rather
@@ -402,7 +402,7 @@ describe('the 404, ported from the export without taking its copy', () => {
    * 13.687 — the third action link, and the ORDER.
    *
    * The order is asserted, not just the set, because it is the export's
-   * (`:1853-1855`: workspaces, manual, inbox) and this page's two existing
+   * (`:1855-1857`: workspaces, manual, inbox) and this page's two existing
    * links already agreed with it — inserting the manual anywhere else would
    * have looked arbitrary against both. "Search the manual" is the export's own
    * label and is asserted BY STRING: it is one of the two new accessible names
@@ -457,6 +457,17 @@ describe('the 404, ported from the export without taking its copy', () => {
     expect(block).not.toContain('1.6rem');
 
     expect(css.replace(/\s+/g, ' ')).toContain('.gn-notfound { max-width: 520px; margin-inline: auto; }');
+
+    // The phone rule, which the export's fixed 41px leading would otherwise have
+    // broken: a FIXED line-height does not scale, so the 21.6px title this
+    // block sets at ≤40rem would have inherited 41px of leading — a ratio of
+    // 1.9 — had the block not restated it. Asserted here so that deleting the
+    // restatement is a red rather than something only a phone screenshot would
+    // show, and asserted as the PAIR so a bare `font-size` edit cannot satisfy
+    // it by accident.
+    expect(css.replace(/\s+/g, ' ')).toContain(
+      '.gn-notfound__title, .gn-legal__title { font-size: 1.35rem; line-height: 1.25; }',
+    );
   });
 
   /**

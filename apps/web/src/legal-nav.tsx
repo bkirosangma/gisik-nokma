@@ -7,12 +7,12 @@ import { useCurrentUser } from './providers.js';
 
 /**
  * The bar the refreshed export draws on the two legal routes — `desktop.dc.html`
- * `isLegal`, `:1721-1730` — transcribed as the export's own RULE rather than
+ * `isLegal`, `:1722-1729` — transcribed as the export's own RULE rather than
  * only its picture.
  *
  * ## What the export draws, and the LINE that decided `BackButton`'s fate
  *
- * `:1721-1730` is a `<div>` with `background:var(--navBg)` and
+ * `:1722-1729` is a `<div>` with `background:var(--navBg)` and
  * `box-shadow:var(--navShadow)` holding exactly three things: a 30px rounded
  * brand tile carrying a folder glyph, the `Gisik Nokma` wordmark as a `<span>`,
  * and a `Sign in` `<a>`. **There is no back affordance anywhere in the block,
@@ -67,7 +67,7 @@ export function LegalNav() {
   return (
     <nav className="gn-nav">
       <div className="gn-nav__inner">
-        {/* Both halves are `<span>`s, matching the export (`:1724-1725`): it
+        {/* Both halves are `<span>`s, matching the export (`:1723` tile, `:1726` wordmark): it
             draws neither as a link. That is also what keeps this bar from
             adding a destination the product has not decided on — `/` redirects
             to `/workspaces`, which bounces a signed-out reader straight back to
