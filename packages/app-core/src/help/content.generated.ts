@@ -4559,7 +4559,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "New ticket type"
+                    "text": "New type"
                   },
                   {
                     "kind": "text",

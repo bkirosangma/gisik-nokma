@@ -106,9 +106,9 @@ describe('the ticket-type editor is inlined on /settings, not a separate route',
   });
 
   /**
-   * 10.72 — clicking `New ticket type` does the same, with `typeId=new`.
+   * 10.72 — clicking `New type` does the same, with `typeId=new`.
    */
-  it('clicking New ticket type pushes typeId=new on the same route', async () => {
+  it('clicking New type pushes typeId=new on the same route', async () => {
     setQuery({ workspaceId: WORKSPACE, tab: 'ticket-types' });
     render(
       <Providers
@@ -127,7 +127,7 @@ describe('the ticket-type editor is inlined on /settings, not a separate route',
       </Providers>,
     );
 
-    const newButton = await screen.findByRole('button', { name: 'New ticket type' });
+    const newButton = await screen.findByRole('button', { name: 'New type' });
     await userEvent.click(newButton);
 
     const pushed = new URL(String(push.mock.calls[0]?.[0]), 'https://example.test');

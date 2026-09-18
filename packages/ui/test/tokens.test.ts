@@ -1555,3 +1555,123 @@ describe('13.920 — a workflow state chip keeps a boundary under neo, and its c
     );
   });
 });
+
+/**
+ * The ticket-type list's ZEBRA — case **13.894**, the measured half
+ * (`packages/app-core/test/ticket-types/ticket-types.test.tsx` carries the
+ * render half and the DOM precondition).
+ *
+ * **A zebra has two properties and a rule-exists check witnesses neither.** The
+ * first is its PARITY — the prototype stripes `(i % 2 ? …)` over a 0-based `i`
+ * (`desktop.dc.html:3159`, blob `6d7b67c0a52c`), so the tint falls on the
+ * **1-indexed EVEN** rows. That is the whole content of the construct and it is
+ * silently invertible: **two families in this repo already inverted it**
+ * (`.gn-list__table-row`, `ui.css:1088`; `.gn-timeline__row`, `:2671` — both
+ * `odd`), which is why the assertion below is a PAIR that reads the sibling
+ * rules as its control rather than trusting this rule's own text. The second is
+ * that the stripe is VISIBLE — a fill that composites to its own ground is a
+ * stripe that draws nothing, the identical defect class 13.920 measured for the
+ * state chip under `neo`.
+ */
+describe('13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and the stripe is visible', () => {
+  const ZEBRA = '.ticket-type-list__rows li:nth-child(even) .ticket-type-list__row';
+  const ZEBRA_HOVER = '.ticket-type-list__rows li .ticket-type-list__row:hover';
+  const UI_CSS_TEXT = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
+
+  /** `src` over `dst` — the compositing `relativeLuminance` deliberately lacks. */
+  const over = (src: string, dst: string): string => {
+    const hex = (h: string, i: number): number => Number.parseInt(h.slice(i, i + 2), 16);
+    const alpha = src.length === 9 ? hex(src, 7) / 255 : 1;
+    const channel = (i: number): number => Math.round(hex(src, i) * alpha + hex(dst, i) * (1 - alpha));
+    return `#${[1, 3, 5].map((i) => channel(i).toString(16).padStart(2, '0')).join('')}`;
+  };
+
+  const declarationsFor = (css: string, selector: string): string | null => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`^${escaped}\\s*\\{([^}]*)\\}`, 'm').exec(css)?.[1] ?? null;
+  };
+
+  it('the parity is EVEN, and the two inverted families read ODD — the control', () => {
+    expect(declarationsFor(UI_CSS_TEXT, ZEBRA), `${ZEBRA} not found in ui.css`).not.toBeNull();
+    // The parity itself, read out of the selector rather than restated here.
+    expect(ZEBRA).toContain(':nth-child(even)');
+    expect(ZEBRA).not.toContain('odd');
+
+    // THE CONTROL, and it is what makes the assertion above a measurement
+    // rather than a restatement: the same instrument, on the two families this
+    // port found inverted. If the sweep could not tell the parities apart, it
+    // would report ODD for these too and the pair would prove nothing.
+    expect(declarationsFor(UI_CSS_TEXT, '.gn-list__table-row:nth-child(odd)'), 'control: gn-list').not.toBeNull();
+    expect(
+      declarationsFor(UI_CSS_TEXT, '.gn-timeline__row:nth-of-type(odd)'),
+      'control: gn-timeline',
+    ).not.toBeNull();
+  });
+
+  it('the stripe differs from the row it sits on, in every style and theme', () => {
+    // THE ROLE IS READ OUT OF THE RULE, never named here. Hard-coding it would
+    // make this test a statement about the palette that no CSS edit could ever
+    // falsify — it would go on passing while the row was striped with something
+    // else entirely, or with the ground itself. That is the shape 13.920 avoids
+    // by declaring no token names, and a mutation proved it matters: repointing
+    // the stripe to `--gn-surface-sunken` left a hard-coded version green.
+    const body = declarationsFor(UI_CSS_TEXT, ZEBRA);
+    if (body === null) throw new Error(`${ZEBRA} rule not found in ui.css`);
+    const named = /(?:^|[\s;])background:\s*var\(--gn-([a-z-]+)\)/.exec(body)?.[1];
+    if (named === undefined) {
+      throw new Error(`${ZEBRA} declares no \`background: var(--gn-…)\`; it reads: ${body.trim()}`);
+    }
+    const stripeRole = TOKEN_ROLES.find((candidate) => cssVariableName(candidate) === `--gn-${named}`);
+    if (stripeRole === undefined) {
+      throw new Error(`${ZEBRA}'s background names --gn-${named}, which is not a role in TOKEN_ROLES`);
+    }
+    // The prototype's `--fill4` maps to `--gn-fill-quaternary` (the mapping
+    // `.gn-members__row` already ships for this construct,
+    // `apps/web/app/globals.css:1524`); a repoint to any OTHER visible role
+    // still has to keep the stripe visible below, and this says which one it
+    // is meant to be.
+    expect(stripeRole).toBe('fillQuaternary');
+    // The row's ground is the row's own resting fill, likewise read from the
+    // rule rather than assumed to be `surfaceSunken` forever.
+    const rowBody = declarationsFor(UI_CSS_TEXT, '.ticket-type-list__row');
+    if (rowBody === null) throw new Error('.ticket-type-list__row rule not found in ui.css');
+    const groundNamed = /(?:^|[\s;])background:\s*var\(--gn-([a-z-]+)\)/.exec(rowBody)?.[1];
+    const groundRole = TOKEN_ROLES.find((candidate) => cssVariableName(candidate) === `--gn-${groundNamed}`);
+    if (groundRole === undefined) throw new Error(`.ticket-type-list__row's ground names --gn-${groundNamed}`);
+
+    const measured: Record<string, number> = {};
+    for (const style of STYLE_NAMES) {
+      for (const theme of THEME_NAMES) {
+        const ground = colorOf(theme, groundRole, style);
+        const stripe = over(colorOf(theme, stripeRole, style), ground);
+        const ratio = contrastRatio(ground, stripe);
+        measured[`${style}/${theme}`] = ratio;
+        expect(ratio, `${style}/${theme}: the stripe composites onto its own ground and draws nothing`).toBeGreaterThan(
+          1.05,
+        );
+      }
+    }
+    // The floor above is the guarantee; these are the readings it was set from,
+    // so a palette nudge that keeps the case green still shows up as a movement.
+    expect(measured['hig/light']).toBeCloseTo(1.0951, 3);
+    expect(measured['hig/dark']).toBeCloseTo(1.2536, 3);
+    expect(measured['neo/light']).toBeCloseTo(1.0757, 3);
+    expect(measured['neo/dark']).toBeCloseTo(1.1727, 3);
+  });
+
+  it('hover still wins on a striped row — the tie is broken by source order, not by !important', () => {
+    // A striped row matches BOTH rules. They carry equal specificity (3 classes,
+    // 1 element each), so the later one wins; if the hover rule were left as the
+    // bare `.ticket-type-list__row:hover` it would lose to the stripe and hover
+    // would silently stop responding on exactly the even rows.
+    const stripeAt = UI_CSS_TEXT.indexOf(ZEBRA);
+    const hoverAt = UI_CSS_TEXT.indexOf(ZEBRA_HOVER);
+    expect(stripeAt, 'the zebra rule must exist').toBeGreaterThanOrEqual(0);
+    expect(hoverAt, 'the hover rule must exist at the raised selector').toBeGreaterThanOrEqual(0);
+    expect(hoverAt, 'hover must come AFTER the stripe to win the specificity tie').toBeGreaterThan(stripeAt);
+    expect(declarationsFor(UI_CSS_TEXT, ZEBRA_HOVER)).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
+    // `hover` keeps the `li` that raises it to the tie — the bare selector is
+    // the shape that loses, so its absence is the assertion.
+    expect(declarationsFor(UI_CSS_TEXT, '.ticket-type-list__row:hover')).toBeNull();
+  });
+});

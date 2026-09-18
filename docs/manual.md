@@ -970,7 +970,7 @@ has, and a **Built-in** badge on the four that came with the workspace.
 
 ### Making a new type
 
-Press **New ticket type** and fill in:
+Press **New type** and fill in:
 
 - **Name** — call it what your business calls it. "Callout". "Quote". "Job".
 - **Icon** — pick one.
