@@ -41,19 +41,20 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~18:4x IST. **SETTINGS → WORKFLOWS: REVIEW ROUND APPLIED, ALL
-> # GREEN, PR OPENING ON THE COMMIT THAT CARRIES THIS BLOCK.** `exec/settings-workflows`, ONE PR
-> # `--base main`. **One Important finding is RAISED TO THE CONTROLLER and is not fixed here — see below.**
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~19:1x IST. **SETTINGS → WORKFLOWS: REBASED ONTO #476,
+> # RENUMBERED TO `13.920`, ALL GREEN, VERIFIED MERGEABLE. PR OPENING ON THE COMMIT THAT CARRIES THIS
+> # BLOCK.** `exec/settings-workflows`, ONE PR `--base main`. **One Important finding is RAISED TO THE
+> # CONTROLLER and is not fixed here — see below.**
 >
 > | | |
 > |---|---|
-> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it. Chain: `d8ccbf2e` (code) → 3 handoff commits → `00e8e3d8` (fix round) → `1fbc133b` (handoff) → **`e911a8f3` (review round)** → this commit. |
-> | base | merge-base with `origin/main` = **`a12c4018`**. **`main` has since moved to `21cdaa81` (#477), whose two commits touch only `docs/superpowers/plans/2026-09-18-settings-workflows-port.md` — a file this branch does not touch, so 0 overlap and no rebase was needed.** No rebase was done deliberately: it would move the frozen head away from the one the checks and the reviewer pass cover. |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it. The tip is the commit that carries this block; its ancestors are the 8 replayed work commits. |
+> | base | **REBASED onto `origin/main` = `1d131a68` (#476, members-styling)**, which is now the merge-base. **`git merge-tree --write-tree origin/main HEAD` EXIT 0 — verified mergeable, not assumed.** The rebase had exactly one conflicting file, `test-cases/13` (both sides appended a section), resolved as a **union**: exec2's `13.886`–`13.889` section and this branch's `13.920` section both present, 0 markers, both sides' positive controls firing once each. `Features.md` auto-merged. |
 > | the change | 7 files. `workflow-list-screen.tsx` (the card grid), `ui.css` (the new `workflow-list__*` family, appended at EOF), `screens.test.tsx` (10.62 + case **13.920**), `tokens.test.ts` (13.920's measured half), `test-cases/13`, `Features.md`, this file. |
-> | case ids | **`13.920`**; `13.883` verified TAKEN on `main` (5 mentions). |
+> | case ids | **`13.920`** — the first id of the block the controller assigned this lane (`13.920`–`13.949`). **IT WAS `13.884` AND THAT COLLIDED**: both executors minted `13.884`, each correctly, because they measured different trees; #476 merged first, so this branch yielded. Renumbered by exact line across all six files that carried it. **The one surviving `13.884` in `test-cases/13:11315` is EXEC 2'S HISTORICAL PROSE — left untouched deliberately, per the instruction.** Both ids are six characters, so no line moved and no citation shifted. |
 > | migration | **NONE.** Do not restart the server container. |
-> | suites | **app-core 1550/0** (94 files) · **ui 330/0** (5 files) · **web 520/0** (48 files) · **four typechecks EXIT 0, all logs 0 bytes**. Node v22.22.2. Run with `rtk proxy pnpm exec vitest run` (see the method note below). |
-> | seven checks | **all EXIT 0**: `tasks` · `env` · `runbook` · `help` · `citations` (file 13 = **658** cited / 0 uncited) · `db-tz` (**`DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma`** → `Asia/Kolkata`) · `check-case-ids` (**2348**, union == sum). |
+> | suites | **app-core 1550/0** (94 files) · **ui 330/0** (5 files) · **web 530/0** · **four typechecks EXIT 0, all logs 0 bytes**. Node v22.22.2. Run with `rtk proxy pnpm exec vitest run` (see the method note below). Web is 520 **+10** — exec2's members tests arrived with the rebase. |
+> | seven checks | **all EXIT 0 at the rebased head**: `tasks` · `env` · `runbook` · `help` · `citations` (file 13 = **662** cited / 0 uncited) · `db-tz` (**`DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma`** → `Asia/Kolkata`) · `check-case-ids` (**2352**, union == sum). Citations 658→662 and ids 2348→2352 are exec2's four new cases, not drift. |
 > | gate | **NOT RUN BY THIS LANE** (the controller runs it). `pnpm turbo run build` **11/11** for the post-rebase dist rebuild. |
 >
 > ## ▣ THE REVIEWER'S PASS — recorded before the PR opened, per the freeze-line rule
