@@ -9187,7 +9187,7 @@ the same distinction and 13.776's control is one case down.
   clearing nobody made" (`packages/rule-engine/src/checks/fields.ts:77-83`, corrected earlier in this
   series). Asserted as key ABSENCE rather than as a falsy value — `toEqual` would pass on `undefined`
   while the key existed — with its positive control one case down.
-  (`packages/app-core/test/ticket-types/ticket-types.test.tsx:356`)
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx:456`)
 
 - ✅ **13.777 — pressing the toggle writes an explicit `true`, flips the label to "Required", and the
   flag reaches the submitted `ticket-type.defined` payload.** The assertion runs the submitted payload
@@ -9195,19 +9195,19 @@ the same distinction and 13.776's control is one case down.
   zod object STRIPS a member it does not declare: without the schema change the editor would still have
   rendered "Required" while the recorded definition said nothing, and a surface-only test would have
   been green through exactly that. **This case is what the schema member being load-bearing means.**
-  (`packages/app-core/test/ticket-types/ticket-types.test.tsx:382`, mutation-killed by removing
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx:482`, mutation-killed by removing
   `required` from `customFieldDefSchema` — `expected undefined to be true`)
 
 - ✅ **13.778 — pressing twice records an explicit `false`.** Never-said and said-optional are
   different recorded states, and preserving that difference is why the schema member is `.optional()`
   and not `.default(false)`. The toggle writes `field.required !== true`, so an untouched field reads
   false only because nothing has been claimed and the first press always writes `true`.
-  (`packages/app-core/test/ticket-types/ticket-types.test.tsx:405`)
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx:505`)
 
 - ✅ **13.779 — the toggle is disabled for a non-author, like every other control in the row.** The
   toggle is a WRITE, so it takes the gate the name input and `Remove field` take (owner decision
   2026-08-26).
-  (`packages/app-core/test/ticket-types/ticket-types.test.tsx:426`)
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx:526`)
 
 - ✅ **13.780 — the toggle is a real `.gn-button`, and its two states are the shared `primary`/`ghost`
   variants rather than a private colour of its own.** The colour half is the point: `ui.css`'s
@@ -9218,7 +9218,7 @@ the same distinction and 13.776's control is one case down.
   rule restating `--gn-accent` would have passed the two `toHaveClass('gn-button')` assertions and
   failed this one. **Second deviation, also stated:** the prototype's pill is 32px, this sits at
   `.gn-button`'s own 2.75rem, matching the name input and the Remove button it stands beside.
-  (`packages/app-core/test/ticket-types/ticket-types.test.tsx:447`, `packages/ui/src/ui.css`)
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx:547`, `packages/ui/src/ui.css`)
 
 - ✅ **13.781 — `required: true` survives `customFieldDefSchema.parse`.** The schema-level witness that
   the member is declared rather than stripped. Every parse site in the product routes through this
@@ -12196,3 +12196,84 @@ the same tree gives `EXIT 0` against the parent branch's *base* and `EXIT 1` aga
 and the CI job now passes `--base origin/${{ github.base_ref || 'main' }}`, so a pull request is measured
 against the branch it will actually land on. **14 of the last 400 merges here were based on a non-main
 branch**, so the shape is used rather than hypothetical.
+
+## settings → workflows: the ticket-type editor's Implications card, and a sentence the product only said to itself (executor 1, 2026-09-18) — cases `13.922`–`13.923`
+
+The two items of Task 5's `isTypeEditor` port that carry **no product decision**, and nothing else. The
+prototype block is `design-system/interactive/desktop.dc.html:871-957`, read from `main`; the audit's own
+row is `docs/design/prototype-delta-2026-09-18.md:638`. **What is NOT in this slice is named at the end of
+this section**, because a partial port that reads as a finished one is the exact failure this catalogue
+exists to stop — and the delta row this slice was staged from had already gone stale in one place
+(`customFieldDefSchema`'s `required`, closed hours earlier by `#447` at `caf1edec`), which is why every
+line here was re-measured against `origin/main` before it was written.
+
+- ✅ **13.922 — the Implications card renders the prototype's three-item list, with the workspace-derived
+  hierarchy sentence as its MIDDLE item.** The prototype's two constant lines
+  (*"Two pickers will re-order: the board's New ticket menu and MCP's `create_ticket`."* and *"Published
+  workflows are versioned — nothing already recorded is rewritten."*, `:950` and `:952`) now bracket the
+  sentence `rankImplicationsCopy` computes from the workspace's own types
+  (`packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx:440`).
+
+  **The assertion is the rendered list, IN ORDER** (`packages/app-core/test/ticket-types/ticket-types.test.tsx:296`),
+  and that is the whole point of the case. The failure it has to catch is a port that swaps the derived
+  sentence out for the two constants — which would still render an "Implications" card, would still show
+  both prototype strings, and would have silently deleted the only line on that panel computed from real
+  data. Two of the three items are constants; the test exists to say which one is not.
+
+  **Proved by a discriminating mutation.** Swapping the derived item to the end reddens **13.922 alone**
+  (`Tests 1 failed | 30 passed`), while the pre-existing case at `:277` — which queries the same
+  `rank-implications` testid and asserts its text — **stays green**, because the node is still there with
+  the right words. A *contains-all-three* assertion would also have stayed green. That is what makes this
+  case worth its line count: it sees ORDER, and the instrument that was already here cannot.
+
+- ✅ **13.923 — the divergence notice tells the admin that staying put is a decision, in the prototype's own
+  words** (`packages/app-core/test/ticket-types/ticket-types.test.tsx:620`, rendered at
+  `packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx:341`).
+
+  The product already **held** this position — its source says *"Staying put is a decision, not the absence
+  of one"* as a comment beside the Leave button — and the delta audit measured the prototype's sentence at
+  **0 hits** across `apps/` and `packages/`. A position the product takes only in its own source is a
+  position the admin deciding this cannot read, and that is the gap the case pins. It renders with the two
+  buttons and not outside them, because it is a sentence about THAT choice: the `left` branch above it has
+  already made the decision, and the migrated branch has finished making it.
+
+  **Mutation:** deleting the note reddens **13.923 alone** (`1 failed | 30 passed`).
+
+**THE CSS IS FOUR NEW RULES APPENDED AT THE END OF `ui.css`, and the placement is priced rather than
+lazy.** `.ticket-type-editor__implications` is **not** redefined — its typography lives in a rule it already
+shares with `__builtin-note` (`packages/ui/src/ui.css:1942-1943`), and that rule is left byte-identical; the
+list carries a second class for its shape (`:4714`, `:4720`), plus the prototype's inline chip (`:4725`) and
+the note (`:4734`). Editing the shared rule in place would have added lines at `:1942` and pushed every
+citation below it stale. **This change APPENDS AT EOF instead, which moves no existing citation at all —
+a structural fact, not a count.** A count was the wrong instrument and this is the record of why: the same
+figure read **33, then 34, then 32** across three merges in one afternoon, because a count is a reading that
+expires and its universe must be named every time. **Every `ui.css` and test-file number above was
+re-measured after the last rebase onto `4505cb6d`**, which moved `ui.css` again — the first pass swept only
+the former, and three citations that had come
+to resolve to unrelated code rather than to nothing were corrected afterwards.
+
+**One claim in this slice is reasoning, not measurement, and it is flagged rather than dressed up.** The
+prototype gets its row rhythm from `display:flex` + `gap:6px` (`:949`). This slice does **not** transcribe
+that; it uses a sibling margin, `li + li { margin-top: 0.375rem }`, so the card keeps its bullets. The
+reason is that a flex container blockifies its children, which is a CSS-spec rule rather than something
+observed here — **no browser was run for this slice, and none can be: the viewport suite is not in this
+branch's gate.** The shape chosen is the one that does not depend on the answer, so nothing here breaks
+whichever way the spec question lands. What IS asserted is the rendered `<li>` order and text, which is
+independent of it.
+
+**NOT in this slice, and each one is a product decision the port brief does not contain:**
+
+- **The header row.** The prototype puts Cancel + Save together in the h2 row at 22px (`:874-880`); the
+  product's Save is at the form's foot and its header lives in `apps/web/src/ticket-type-editor-pane.tsx:108-113`,
+  a different package. Moving it is plumbing plus a visible change to where saving happens.
+- **The right-hand `--tintWarning` placement of the divergence card.** `--gn-tint-warning` is an ALPHA role
+  that `packages/ui/src/ui.css:1203-1211` documents as measured as a **composite over its ground**, correct
+  only when the consumer sits at page level. The divergence card sits on a raised card, so that condition
+  would have to be re-established and re-measured rather than inherited — a measurement, not a move.
+- **The "Choose again" reopen control** (`:944`). The product's migrated branch is terminal and no reopen
+  door exists; a button with no door behind it is the defect this repo keeps re-finding.
+- **The prototype's state-naming.** It draws *"Move them to Scheduled"* — a **state**; the product names the
+  **workflow** (`ticket-type-editor-screen.tsx:312`), deliberately.
+- **The field-kind vocabulary.** Prototype `Text / Date / Number / Attachment` (`:919`) vs the product's
+  `['text','number','date','select','person']` (`packages/domain/src/ticket-types.ts:4`). Vocabulary **and**
+  casing differ, and `Attachment` is a data-model question rather than a label question.

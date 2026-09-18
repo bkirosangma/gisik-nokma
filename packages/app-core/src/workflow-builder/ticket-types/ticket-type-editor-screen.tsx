@@ -301,6 +301,7 @@ export function TicketTypeEditorScreen(props: {
                       // opens". A test aimed at these two terms would have to defeat
                       // the combobox gate in its own setup, and would then be
                       // asserting that setup rather than the gate.
+                      <>
                       <div className="ticket-type-editor__divergence-actions">
                         <button
                           type="button"
@@ -325,6 +326,22 @@ export function TicketTypeEditorScreen(props: {
                           </p>
                         )}
                       </div>
+                      {/* The prototype states the position the product already
+                          held in a source comment beside the Leave button —
+                          "Staying put is a decision, not the absence of one."
+                          A comment is not something an admin deciding this can
+                          read, which is exactly what the delta audit's 0-hit
+                          measurement across `apps/` and `packages/` showed: a
+                          position the product takes only in its own source.
+
+                          It renders with the two buttons and not outside them,
+                          because it is a sentence about THAT choice — the
+                          `left` branch above it has already made the decision
+                          and the migrated branch has finished making it. */}
+                      <p className="ticket-type-editor__divergence-note">
+                        Neither choice is recommended over the other — leaving them is a decision, not a deferral.
+                      </p>
+                      </>
                     )}
                     {rebind.phase === 'mapping' && pendingTarget !== null ? (
                       <WorkflowRebindDialog
@@ -394,9 +411,35 @@ export function TicketTypeEditorScreen(props: {
         <aside className="ticket-type-editor__aside">
           <Card className="ticket-type-editor__card">
             <h3 className="ticket-type-editor__aside-title">Implications</h3>
-            <p className="ticket-type-editor__implications" data-testid="rank-implications">
-              {rankImplicationsCopy(implications)}
-            </p>
+            {/* The prototype's three-item list (`desktop.dc.html:949-953`), and
+                the derived sentence is its MIDDLE item rather than something
+                this port replaced. Two of the three lines are constant; the
+                second is the only line on this screen computed from the
+                workspace's own types (`rankImplications`), and a port that
+                swapped it out would still render an "Implications" card and
+                still show both prototype strings while silently deleting it.
+                Case 13.922 is the assertion that says which one is not
+                constant.
+
+                The prototype sets these at 15px/20px under a 17px title. This
+                screen runs a compressed scale throughout — its own aside title
+                is 0.9rem — so the items keep the size they already had
+                (0.75rem, shared with `__builtin-note`) rather than arriving
+                larger than the heading they sit under. The prototype's rhythm
+                (a 1.25rem indent, 0.375rem between rows, a real bullet) is
+                adopted; its type size is not, and that is a deliberate
+                divergence rather than an oversight. */}
+            <ul
+              className="ticket-type-editor__implications ticket-type-editor__implications-list"
+              data-testid="rank-implications-list"
+            >
+              <li>
+                {'Two pickers will re-order: the board’s New ticket menu and MCP’s '}
+                <code className="ticket-type-editor__code">create_ticket</code>.
+              </li>
+              <li data-testid="rank-implications">{rankImplicationsCopy(implications)}</li>
+              <li>Published workflows are versioned — nothing already recorded is rewritten.</li>
+            </ul>
           </Card>
         </aside>
       </div>
