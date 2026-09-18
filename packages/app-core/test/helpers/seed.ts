@@ -105,6 +105,9 @@ export function listRowSeed(overrides: Partial<ListRow> = {}): ListRow {
     // REQUIRED since backlog/closed spec §1.2 (2026-09-17); `null` is the same
     // "never closed, or reopened" default `serverCard()` in mappers.test.ts uses.
     closed: null,
+    // REQUIRED since spec §8.1 (second wave, 2026-09-18); `null` is the same
+    // "never ranked" default the wire's own `TicketCard.rank` uses.
+    rank: null,
     ...overrides,
   };
 }

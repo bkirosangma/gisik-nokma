@@ -112,6 +112,7 @@ function row(overrides: Partial<ListRow> = {}): ListRow {
     // same reason `online/mappers.ts` fills `BoardCard.pending` with `false`.
     pending: false,
     closed: null,
+    rank: null,
   };
   return { ...base, ...overrides, fields: { ...base.fields, ...overrides.fields } };
 }

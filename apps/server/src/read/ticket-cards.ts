@@ -33,12 +33,18 @@ export type ProjTicketRow = {
   /** `TicketCard.closed`'s pair, unmapped — see `assembleTicketCards` for the fold (backlog/closed spec §3.1, 2026-09-17). */
   closed_at: Date | null;
   closed_by: string | null;
+  /**
+   * `TicketCard.rank`, unmapped — the column and the card field are both
+   * `string | null` with the same meaning, so there is no fold to make here
+   * (spec §8.1, second wave 2026-09-18).
+   */
+  rank: string | null;
 };
 
 export const PROJ_TICKET_COLUMNS =
   't.ticket_id, t.workspace_id, t.project_id, t.type_id, t.parent_id, ' +
   't.workflow_id, t.workflow_version, t.state_id, t.state_category, ' +
-  't.assignee_id, t.collaborator_ids, t.fields, t.closed_at, t.closed_by';
+  't.assignee_id, t.collaborator_ids, t.fields, t.closed_at, t.closed_by, t.rank';
 
 /**
  * Rows for explicit ids, in `ticket_id` order.
@@ -157,6 +163,14 @@ export async function assembleTicketCards(
         row.closed_at === null || row.closed_by === null
           ? null
           : { actorId: row.closed_by, at: row.closed_at.toISOString() },
+      // Straight off the row: `rank` is one column with one meaning and the
+      // card field is the same `string | null`, so unlike `closed` above there
+      // is nothing to fold and no pair that could disagree. Reading it here,
+      // beside `closed`, is what carries the key onto EVERY card-building route
+      // (board, list, my-work, search, attention, single-ticket) — the list is
+      // the one spec §8.1 names, and the others get it for free rather than by
+      // a second enumeration that could be forgotten (case 13.603's failure).
+      rank: row.rank,
     });
   }
   return cards;

@@ -171,6 +171,7 @@ function listRow(overrides: Partial<ListRow> = {}): ListRow {
     hasRestrictedParent: false,
     pending: false,
     closed: null,
+    rank: null,
   };
   return { ...base, ...overrides };
 }

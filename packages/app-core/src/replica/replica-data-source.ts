@@ -750,6 +750,14 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       // (backlog/closed spec §1.2, 2026-09-17) — the boundary read every
       // other producer of a `closed` field takes.
       closed: state.closed ?? null,
+      // `state.rank ?? null` — the same boundary read, for the same reason:
+      // `TicketState.rank?` is optional on the domain type (legacy literals)
+      // while `ListRow.rank` is REQUIRED (spec §8.1, second wave 2026-09-18).
+      // The reducer DOES write the null at creation (Task 3's decision, so the
+      // fold and `rowToTicketState` stay `toEqual`-equal across the dual-client
+      // rig), so this fallback is aimed at hand-built states in fixtures rather
+      // than at a second meaning for the field.
+      rank: state.rank ?? null,
     };
   }
 

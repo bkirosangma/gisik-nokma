@@ -194,6 +194,19 @@ export type TicketCard = {
   rollup: TicketRollup | null;
   /** The closed flag (backlog/closed spec §3.3, 2026-09-17); see this type's own docblock. */
   closed: { actorId: string; at: string } | null;
+  /**
+   * The backlog rank key (spec §8.1, second wave 2026-09-18), or `null` when
+   * nobody has ranked this ticket. REQUIRED here for the same reason `closed`
+   * above is: every producer of a card is the server's own assembler, reading
+   * `proj_tickets.rank`, so there is no legacy literal to spare — and the
+   * server always emits the key, which is what lets `mapRank` refuse an absent
+   * one rather than defaulting it (case 13.703).
+   *
+   * Note where the ORDER lives: not on this type and not in the list route.
+   * Ruling R1 keeps the route's `ticket_id` keyset order, so a card carries its
+   * key and the client sorts. A rank is meaningful only within one project.
+   */
+  rank: string | null;
 };
 
 /**

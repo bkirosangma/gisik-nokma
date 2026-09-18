@@ -181,6 +181,11 @@ describe('applyTicketEvent', () => {
       collaboratorIds: [],
       transitions: [],
       closed: null,
+      // Beside `closed` because it is the same kind of fact: creation writes
+      // the null rather than leaving the key absent (Task 3's decision — see
+      // the creation branch in `ticket-state.ts`). `toEqual` is exact, so this
+      // line is what holds the decision in place.
+      rank: null,
       fields: {
         title: {
           value: 'File the GST return',
@@ -630,17 +635,23 @@ describe('13.566 ticket.closed / ticket.reopened', () => {
  * like a status change to every reader of the transition log.
  */
 describe('13.696 ticket.ranked sets rank; ticket.created starts it null', () => {
-  it('a created ticket is unranked', () => {
-    // `?? null` rather than `toBeNull`, and the reason is the opposite of a
-    // weakening: creation deliberately does NOT write `rank` (see the creation
-    // branch in `ticket-state.ts`), because `rowToTicketState` reads columns and
-    // there is no `rank` column until Task 3 — writing it here would make the
-    // reducer's state and the server's read model disagree, which thirteen
-    // dual-client rig cases assert against. The contract this case pins is the
-    // READER's: `rank ?? null` is null for an unranked ticket, which is how
-    // every consumer spells it. A `toBeNull` here would instead pin the field's
-    // PRESENCE, i.e. the very thing that broke that boundary.
-    expect(fold([createdWith({ start: 'backlog' })]).rank ?? null).toBeNull();
+  it('a created ticket is unranked, with the field present and null', () => {
+    // **Tightened by Task 3 (2026-09-18), and the tightening is the point.**
+    // Task 1 asserted `rank ?? null` here on purpose: creation did not write the
+    // field, because `rowToTicketState` builds a `TicketState` from COLUMNS and
+    // there was no `rank` column yet, and a `toBeNull` then would have pinned
+    // the very PRESENCE that broke the reducer/read-model boundary. Task 3 adds
+    // the column and settles the question the other way — creation now writes
+    // `rank: null` (see the creation branch in `ticket-state.ts`) — so
+    // `toBeNull` is now exactly the claim that must hold, and `?? null` would
+    // pass on a regression that dropped the key again.
+    //
+    // What measures the agreement rather than the field: the dual-client rig
+    // compares whole `TicketState`s with `toEqual` (`apps/server/test/
+    // dual-client/scenarios.test.ts:203`, `rig.test.ts:92`/`:315`), so the
+    // reducer's output and the server's column read have to be equal in SHAPE,
+    // not merely in the value a `?? null` reader would see.
+    expect(fold([createdWith({ start: 'backlog' })]).rank).toBeNull();
   });
   it('ticket.ranked { rank } sets it and touches nothing else', () => {
     const before = fold([createdWith({ start: 'backlog' })]);

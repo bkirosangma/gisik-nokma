@@ -269,6 +269,19 @@ export type ListRow = {
    * optionality onto this type. `null` means never closed, or reopened.
    */
   closed: { actorId: string; at: string } | null;
+  /**
+   * The backlog rank key (spec §8.1, second wave 2026-09-18), or `null` when
+   * nobody has ranked the ticket — REQUIRED here on the same rule as `closed`
+   * above it, and for the same reason: every producer of a row (the online
+   * mapper, the replica) is this task's own code, so there is no legacy literal
+   * to spare, and a reader spells `state.rank ?? null` at the boundary rather
+   * than inheriting `TicketState.rank?`'s optionality onto this type.
+   *
+   * `null` and a key are NOT the same claim to a consumer: the Backlog tab's
+   * order (`compareByRank`) puts ranked rows first by key and unranked rows
+   * after them by `ticketId`, so the distinction is the whole sort.
+   */
+  rank: string | null;
 };
 
 export type TicketListView = { projectId: string; rows: ListRow[] };

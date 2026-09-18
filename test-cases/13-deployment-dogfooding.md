@@ -8426,3 +8426,101 @@ mapper suite, all inside the reserved block `13.760`–`13.819`; the next free i
 block is `13.767`. Measured, not assumed: the highest case HEADING in this file is `13.693` (Step 4b's
 block, three sections up), and `13.694`–`13.759` are unwritten — `13.694` is the next free id in the
 file and `13.760` is the floor of the reserved block, and the two are not the same number.
+
+**Reconciliation note at the rebase joint (executor 1, 2026-09-18), because these two sections were written on
+two branches and their id recounts were taken at two different tips.** Both are kept VERBATIM — neither is
+rewritten, and the disagreement is left readable rather than smoothed away. Executor 2 measured the highest case
+HEADING as `13.693` at base `afbd361d`; Task 2 of the second wave then merged (13.700/13.701, PR #442,
+`7c2a1777`), so on the MERGED tree the highest marker is `13.701` and executor 2 s "13.694 is the next free id in
+the file" no longer describes this file. Neither block collides: 13.700–13.704 and 13.760–13.766 are disjoint.
+`13.694`–`13.699` remain genuinely unallocated — Task 2 flagged the gap for a ruling and it is still open.
+Measured here after the merge, over case MARKERS and test NAMES only.
+
+**Task 3 (server + wire) — `13.702`–`13.704`.** Ids recounted at this tip (branch `exec/second-wave-t3-wire`,
+cut from `origin/main` `7c2a1777`), over case MARKERS and test NAMES only, never a substring sweep: the
+highest marker in this file is `13.701` (Task 2's pair) and the highest test name is `13.682`, so **`13.702`
+is the next free id**. The dispatch's "`13.702`" was right; the recount is what makes it a fact rather than
+an echo, and it is the third time this block has had to say so. `13.697`–`13.699` remain unallocated — Task
+2's note that this wants a ruling before anyone mints there still stands, and this task did not touch them.
+
+**The decision Task 1 deferred, settled here with its measurement.** Task 1 left `rank` unwritten by the
+creation branch, because `rowToTicketState` builds a `TicketState` from COLUMNS and the column did not
+exist yet; its comment said so and handed the question to Task 3. **`ticket.created` now writes `rank:
+null`**, and `rowToTicketState` reads the column unconditionally. The alternative — leaving the key absent
+until `ticket.ranked` — was MEASURED rather than weighed: the dual-client rig compares whole
+`TicketState`s with `toEqual`, so a reducer that omits forces the server read to omit too, and an omitting
+server read puts an absent key on the single-ticket wire for every unranked ticket, which `mapRank` would
+have to tolerate — exactly the shape case 13.603's second `it` forbids. **The mutation is what turns that
+argument into evidence:** making `rowToTicketState` omit the key when the column is NULL (`rank: row.rank`
+→ `...(row.rank === null ? {} : { rank: row.rank })`) reddened **13 rig cases across all four dual-client
+files** (`grant-backfill` 2, `rig` 2, `scenarios` 6, `socket-cut` 3), every one of them
+`expected { …(14) } to deeply equal { …(15) }` — a one-key shape mismatch, which is what "the two producers
+must agree" looks like when it is broken. The same mutation reddened 13.702's presence pin. Spec §8.1
+states the same answer in the domain's words ("`null` = never ranked") and the plan's Global Constraints
+state the rule ("every producer sets them"); the rig is why the rule is safe to follow.
+
+- ✅ **13.702 — `proj_tickets.rank` exists, starts NULL for a ticket nobody has ranked, and takes the key a
+  `ticket.ranked` carries; `rowToTicketState` reads it into `TicketState.rank`; the migration's Down drops
+  the column and leaves its neighbour standing.** The column is one field with one meaning, so unlike the
+  `closed` pair above it there is no fold and nothing that could disagree with anything. Both halves of the
+  write are pinned, and by the SAME assertions: dropping `rank` from the INSERT's column list and dropping
+  `rank = EXCLUDED.rank` from the ON CONFLICT SET list redden identically — `expected null to be 'i'` at
+  the first ranking and at the `rowToTicketState` read — **because `ticket.created` already inserted the
+  row, so even the first `ticket.ranked` travels the `ON CONFLICT … DO UPDATE` path.** This bullet said
+  the opposite when first written ("reddens only on the SECOND", the re-rank), and an **independent
+  reviewer measured it false**; the re-rank assertion it pointed at is never reached under the mutation.
+  The re-rank block stays as a behavioural assertion (a second `ticket.ranked` on the same ticket is not
+  ignored) with its marginal coverage explicitly undemonstrated, not as a witness for the write's halves. The read is
+  asserted with `toBeNull()` and NOT `?? null`: `?? null` passes on an absent field, and PRESENCE-AND-NULL
+  is the property the rig needs. The Down half is a case for a migration that nothing else exercises — the
+  Up runs in every test on this machine, the Down runs nowhere, and a rename in one half would otherwise
+  never be noticed. It takes its own database, asks the runner for the migration **by the name the runner
+  itself recorded in `pgmigrations`** rather than a guessed convention, and asserts a neighbour column
+  (`closed_at`) survives — with a positive control that the migration HAD run, so "the column is gone" is
+  not vacuously true of a table that never had it. `apps/server/migrations/1789200000000_proj-tickets-rank.sql`,
+  `apps/server/src/projections/tickets.ts:164`, `:229`, `:257`,
+  `apps/server/test/projections/tickets-rank.test.ts:98`
+
+- ✅ **13.703 — the same wire key reaches the client on BOTH bodies it is served on: `mapListPage` →
+  `mapListRow` and `mapTicketRead` → `mapTicketState`; `null` survives as never-ranked; and a key outside
+  the alphabet is REFUSED naming `.rank` rather than passed through.** This is the Global Constraint's case
+  and its docblock says so: *"every new wire field is carried end to end in ONE task — server assembler →
+  JSON → `mappers.ts` — with a mapper test"*, written after the core plan's final review found the closed
+  flag dead in production while every view test drove a fake. **Both routes, because both exist and both
+  were enumerated by hand** — which is how 13.603's blocker happened, one route's consumers green against a
+  fake while the other route's field was missing for a task. The two halves are independently pinned
+  (measured: removing the `mapListRow` call reddened both assertions; removing the `mapTicketState` call
+  reddened only `expected undefined to be 'n'`). The predicate is `isRankKey`, **not the `RANK_KEY_REGEX`
+  the plan's Interfaces line names**, and the deviation is load-bearing: the regex admits `'a0'`, whose
+  ordering `rankBetween` cannot express (it appends `'0'` forever), so a client-side predicate looser than
+  the door's would admit into the Backlog tab's sort a key the domain refuses to place. Mutation 5 —
+  `isRankKey(raw)` → `typeof raw === 'string'` — reddened exactly this case and nothing else.
+  `packages/app-core/src/online/mappers.ts:1277`, `:1339`, `:1518`,
+  `packages/app-core/test/online/mappers.test.ts:1389`, `:1424`
+
+- ✅ **13.704 — the replica's list row carries the folded rank: `null` before a ranking, the key after
+  it, on the SAME row.** The fold itself is 13.696's; what this case measures is the read door the Backlog
+  tab actually uses, that `getTickets` reads `state.rank` rather than a constant, and that the boundary read
+  is `?? null` so an absent field on a hand-built fixture cannot become a different claim. `null` and a key
+  are not interchangeable here: `compareByRank` separates ranked rows from unranked ones by exactly this,
+  so the assertion is `toBe('i')` and not "some string was present".
+  `packages/app-core/src/replica/replica-data-source.ts:760`,
+  `packages/app-core/test/replica/replica-data-source.test.ts:1046`
+
+**Amendment to 13.696 (Task 3) — a TIGHTENING, not a new id, and it is written as prose rather than as a
+bullet because `scripts/check-case-ids.mjs` reads line HEADS and a re-minted bullet is a duplicate (it caught
+this exact mistake here on the first run: `13.696: …:8117, …:8371`).** A created ticket's `rank` is now
+asserted present-and-`null`, not merely "reads as null". Task 1 wrote the assertion as `rank ?? null` on
+purpose, and its comment said why: with creation not writing the field, `toBeNull` would have pinned the very
+PRESENCE that broke the reducer/server boundary, and a reader could not tell absent from null. Task 3 makes
+presence the contract, so the assertion becomes `toBeNull()` — which fails on `undefined` — and the case now
+pins the decision instead of tolerating either reading.
+`packages/domain/src/ticket-state.ts:176`, `packages/domain/test/ticket-state.test.ts:654`
+
+**Plan-text corrections found while executing this task.** (1) The plan's Step 1 asks for *"the migration's
+Down drops the column (the core's `1789100000000` test shape)"* — **no such test shape exists**; the closed
+migration's Down is exercised nowhere in this repo (`grep` over `apps/server/test` finds no down-migration
+test at all). The shape was written from scratch here rather than cited, and the plan sentence should not be
+read as evidence that the older migration is covered. (2) The plan's Interfaces line names `RANK_KEY_REGEX`
+for `mapRank`; `isRankKey` is used instead, for the reason above — this is the second time in this plan that
+a text-level "use the loose predicate" instruction was overtaken by the domain's own tighter one.

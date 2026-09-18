@@ -132,6 +132,7 @@ const LIST: TicketListView = {
       // `false` the board card above carries, for the same reason.
       pending: false,
       closed: null,
+      rank: null,
     },
   ],
 };
