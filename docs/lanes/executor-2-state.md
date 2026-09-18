@@ -35,13 +35,13 @@ controller's merge and nothing below needs redoing. Then verify the anchors — 
 | | |
 |---|---|
 | branch | `exec2/nav-last-project` |
-| cut from | **`94866264`** = the base the dispatch named |
+| cut from | **`94866264`** = the base the dispatch named; **REBASED onto `c2daa5b5`** on 2026-09-18 |
 | frozen head | **`verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit that carries it; whatever is here is one MORE than the last commit below |
-| commits | `53f2cadb` (the change set) · `aac83da3` (FIX ROUND — the reviewer's five findings) · `b00a643b` (handoff) · the CORRECTION commit (the scoped re-review's four prose/citation findings, plus this row) |
+| commits | **`32ee34af`** (change set) · **`34dceb49`** (FIX ROUND) · **`50fd122e`** (handoff) · **`2c256a6a`** (re-review corrections) · the REBASE commit — old shas `53f2cadb` / `aac83da3` / `b00a643b` / `9e4e51b2` are ORPHANED and will still `cat-file` clean |
 | reviewed head | **`53f2cadb`** by the one reviewer, against the named brief (storage-keying and the fallback) |
-| `origin/main` | **`13e74c0b`** — it has MOVED since the dispatch (`94866264` → `13e74c0b`) |
+| `origin/main` | **`c2daa5b5`** after the rebase — `origin/main` IS an ancestor of HEAD, so the branch is LINEAR and 0 behind |
 | ahead / behind | **recount, do not quote** — `git rev-list --left-right --count origin/main...HEAD` |
-| **conflict** | **NONE, measured**: the only thing that landed on main is `docs/lanes/task-ledger.tsv` (`#463`), which this branch does not touch. **Do NOT rebase** — it would move the head after the reviewer's pass for a tidier graph. |
+| **conflict** | **NONE now** — resolved by the rebase below. The earlier "do NOT rebase" note is SUPERSEDED: it was written when main's only new file was `task-ledger.tsv`, and exec 1's `#465` then wrote to `test-cases/13` as well. |
 | tree | clean |
 | files | 18 against `94866264` |
 | failures on render | none known |
@@ -58,6 +58,57 @@ effect and writes on every `setView`; `view`'s union moved here as `ProjectTab`.
 `Features.md`, `test-cases/13` — Round 27 paragraph and cases **13.850–13.880**.
 
 **`task-ledger.tsv` untouched** — not a plan-file task, so it has no ledger row and none was added.
+
+### THE REBASE — 2026-09-18 — a UNION, with the equivalence claim stated precisely
+
+Dispatch `CTL-DISPATCH-2026-09-18-exec2-rebase-466.md`. `#466` conflicted on
+`test-cases/13-deployment-dogfooding.md` because exec 1's `#465` merged at 15:48 and appended its Task 8
+section at the same place mine went. Rebased onto **`c2daa5b5`**; the branch is now linear on main
+(`origin/main` is an ancestor of HEAD, 0 behind / 4 ahead).
+
+**SHA MAPPING — old → new.** The four old shas are orphaned; `git cat-file` still resolves them and will
+hand back pre-rebase content, which is exactly why this table is here rather than a reassurance:
+
+| old | new | subject |
+|---|---|---|
+| `53f2cadb` | **`32ee34af`** | the change set |
+| `aac83da3` | **`34dceb49`** | fix round |
+| `b00a643b` | **`50fd122e`** | handoff |
+| `9e4e51b2` | **`2c256a6a`** | re-review corrections |
+
+**THE EQUIVALENCE CLAIM, SCOPED TO THE REBASE AND NOT TO THE HEAD MOVE.** The previous claim in this file
+was "bytes identical", and a reader could apply it to the whole head move — which is FALSE, because the
+new head also contains main's work. Precisely, three checkable statements:
+
+1. **Every file this branch changes EXCEPT the two main also touched is BYTE-IDENTICAL across the rebase.**
+   Verified file-by-file with `git diff --quiet 9e4e51b2 2c256a6a -- <path>`: **17 of 17 identical** — all
+   16 `apps/web` files and `docs/lanes/executor-2-state.md`.
+2. **For the shared file, the rebase removed NOTHING from either side.** Old→new shows additions only
+   (the peer's section and its `13.203` correction) with **0 deletions of my content**; and against main
+   it is **375 / 0** — my section added, nothing of theirs removed. The peer's marker count is **13 on main
+   and 13 here**.
+3. **`Features.md` auto-merged by PURE INSERTION**, verified rather than assumed: the one changed line
+   differs by a single `insert` opcode at offset 19187, with main's version a **prefix** of the merged one.
+   The peer's Task 8 text survives intact and mine is appended. An auto-merge on a shared line is exactly
+   where a side gets dropped silently, so it was checked by opcode rather than by eye.
+
+**NO SOURCE FILE CHANGED, so this is NOT a fix round and no scoped re-review was dispatched.** The
+resolution touched two documentation files; statement 1 is the evidence, file-by-file, rather than an
+argument from the conflict's shape.
+
+**The resolution was a verbatim union, and CONTAINMENT WAS PROVEN rather than chosen.** The sides were
+main's `# Second wave, Task 8 …` (129 lines) and mine `## The nav's last-open project item …` (264). The
+resolver used here asserts that ONE side contains the other before taking it and REFUSES otherwise — the
+generic "take theirs" shape is what discarded a peer's 99-line section earlier today. It was used again on
+the second conflict, where my earlier resolution's tail was a strict prefix of the fix round's. Result:
+`10343 common + 129 + 264 + the one blank line my section originally carried = 10737`.
+
+### Checks at the rebased head — SEVEN, all raw 0
+
+`check:citations`: `test-cases/13` **653 cited / 0 uncited** (was 648 — **+5, exactly the peer's five
+cases**). `check-case-ids`: **2343 unique ids** (was 2338 — **+5**, the same parity), self-test passed. Web
+package **519/519** across 48 files; `tsc --noEmit` exit 0. **Next free id, recounted BY CASE MARKER at this
+tip: `13.881`** — 178 `13.xxx` markers, max `13.880`, no gaps inside `13.850`–`13.880`.
 
 ### Cases 13.850–13.880 — and `13.880` is ONE ID OUTSIDE the dispatch's block
 
