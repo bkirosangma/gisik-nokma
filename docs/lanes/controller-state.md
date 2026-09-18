@@ -31,6 +31,48 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## ✅ FRIDAY 2026-09-18 ~15:3x IST — **CONTROLLER HANDOVER AT 76 % CONTEXT. TWO EXECUTORS LIVE, TWO TASKS IN FLIGHT, FOUR WORK ORDERS ALREADY WRITTEN AND QUEUED.** `main` is `13e74c0b`; zero open PRs; ledger 299 done / 0 claimed / 9 todo. **Everything below is what a successor needs to pick up mid-stride without asking the owner anything.**
+
+### If you are the DeepSeek controller reading this: your position, in five lines
+1. **`main` = this PR's merge (after `13e74c0b`). Zero open PRs.** The integration branch `owner/workspace-edits` is **RETIRED AND DELETED** — every branch is cut from `origin/main`, every PR is `--base main`, one branch per task, **there are no landings any more**.
+2. **TWO EXECUTORS RUN.** `gisik:1` / `/Users/kiro/my_projects/gisik-nokma-exec` / prefix `exec/` / handoff `docs/lanes/executor-state.md`. `gisik:2` / `…-exec2` / prefix `exec2/` / handoff `docs/lanes/executor-2-state.md`. Both DeepSeek, launched through `exec-claude.sh` with prompt `.exec-prompt-restart-2026-09-18.md`; executor 2 also gets `override-2026-09-18-executor-2.md`. **Restart an executor by pasting a POINTER to a file, never the content** — a long content paste truncates silently and the executor then answers a question you did not ask.
+3. **Your loop per PR:** wait until the executor's turn has ENDED → six checks at the frozen head → forced gate (copy the WHOLE `docs/lanes/gate-lock/` dir to a scratchpad, `GATE_REPO=/Users/kiro/my_projects/gisik-nokma-ctl`, `run_in_background`, read `WRAPPER_EXIT=0` + `Tasks: 33 successful, 33 total` + `NODE=v22.*`) → `gh pr merge --merge --delete-branch` → tree identity → partitioned drop check → **restart the server container if the PR added a migration, and VERIFY the column exists afterwards** → ledger flip → relaunch the executor at the fixed point → anchor.
+4. **The queue is written and waiting.** Four work orders exist in `gisik-nokma-lanes/` as `CTL-DISPATCH-2026-09-18-*.md`: **avatar-neo-invisible**, **attention-project-page**, **members-styling**, **settings-workspace-tab**. Dispatch them to whichever executor frees first, in that order. Each is a complete brief; do not rewrite them.
+5. **Rulings you cannot make:** a ledger STATUS change beyond the flips the position names, a merge with conflicts outside the files named, an executor deviation you cannot measure, a scope question. Write the question to the owner in your pane and HOLD; **never `AskUserQuestion`** — the idle nudger's pasted Enter answers it with your own first option.
+
+### IN FLIGHT RIGHT NOW — pick these up first
+| lane | task | branch | state |
+|---|---|---|---|
+| exec 1 | second-wave **Task 8** — the auto-close sweep + daemon job | `exec/second-wave-t8-autoclose-sweep` | near freeze: M1 killed, hygiene fixes, `Features.md` updating |
+| exec 2 | **the nav's "last open project" item** + dropdown | `exec2/nav-last-project` | running the full check sweep |
+
+**Neither has opened its PR.** Task 8 adds **NO migration** — I checked; do not restart the stack for it. The nav feature's design was brainstormed with the owner and **approved** ("looks good"): *tab memory is GLOBAL*, the dropdown opens on **hover AND focus/click**, project memory in `localStorage` keyed by user **and workspace**, copying `apps/web/src/use-last-workspace.ts`'s three-state shape (`unknown`/`none`/`remembered`) and its user-keying reason.
+
+### OUTSTANDING FOR THE OWNER — three questions, none blocking
+1. **Build `scripts/check-migration-order.mjs`?** A repo-level check reading the migration directory and refusing a prefix not strictly above the current maximum. **Measured need:** executor 1's reviewer reverted a migration rename and the full 1,548-test server suite passed — nothing in the repository pins migration ordering, and the forced gate structurally cannot. The controller recommended yes; the owner has not answered.
+2. **May an admin demote a non-last owner?** `grant-owner-requires-owner` stops an admin GRANTING owner; nothing stops one DEMOTING an owner while another remains. Asymmetric — may be intended, may be the same door half-open.
+3. **Does `hig-per-screen/3a` close?** Members shipped only its backed surface; the row deliberately stays `todo`.
+
+### THE TRAPS — every one of these fired today
+1. **A GATE DOES NOT TRANSFER ACROSS A MOVED HEAD, and an executor can push WHILE you gate.** I merged #460 having gated a head it had already moved past; the delta was one docs commit and I **re-gated at the merged tree rather than declaring it transferred**. Check `gh pr view <n> --json headRefOid` IMMEDIATELY BEFORE the merge, not when you start the gate.
+2. **THE HOT STACK MIGRATES ONLY AT CONTAINER START, and its entrypoint ABORTS ON A FAILED MIGRATION — so restarting it can take the stack DOWN.** That happened: a migration whose numeric prefix preceded an already-applied one made `checkOrder` throw, the container exited 1, and the owner's app was dead until the rename landed. **Restarting after a migration is a step you VERIFY, not one you perform.**
+3. **`SELECT t.rank` on a table lacking that column reports `WITHIN GROUP is required for ordered-set aggregate rank`, NOT "column does not exist"** (the bare form does say that; the qualified one does not).
+4. **TWO EXECUTORS COLLIDE ON SHARED FILES EVERY TIME** — `Features.md`, `test-cases/13`, `ui.css`, `globals.css`, `mappers.ts`. Never resolve it yourself: send it back to its author, with *"stop and ask if a hunk needs a real decision rather than a union"*. Then **audit the rebase independently** — diff the new head against `main` and assert **0 lines removed** carrying each peer's marker, against a non-empty diff. A generic "take theirs, drop ours" resolver discarded a peer's entire 99-line section today; `MERGEABLE` goes green either way.
+5. **CASE IDS NEED BLOCKS.** Taken: `13.700`–`13.759` (exec 1), `13.760`–`13.819` (exec 2), `13.820`–`13.849` (membership), `13.850`–`13.879` (nav). Each executor **recounts at its own tip by case MARKER only** — a substring sweep cannot tell a minted id from a mentioned one.
+6. **INSTRUMENTS THAT LIED TODAY, all recorded in memory:** `rtk`'s twelfth mode breaks `$(git …)` substitution (empty variable, no error, and an empty pathspec means "no filter" so a filtered diff silently widens to the whole repo); a `gh pr merge` whose `jq` produced `{"number":455}` failed while the chained `echo` reported success; a literal-string grep for a `REFUSAL_RULES` id returns 0 for every live id because the source refers to them by PROPERTY; and my own case-id control used an id from an **unmerged** PR so it proved nothing.
+7. **`gh pr merge --delete-branch` exits 1 while a worktree holds the branch — that is the LOCAL deletion refusing, never the merge failing.** Verify by API. And **never delete a branch a PR is based on without retargeting that PR first**: GitHub auto-closes such PRs and then refuses both retarget and reopen.
+
+### REPORT FORMAT — the owner ruled it binding "always"
+**ONE task-level table on every progress or report request:** rows are TASKS not plans (`#` / task / status), status is a bold state word plus the minimum that makes it checkable, one re-measured anchors line below (`main` sha · open PRs · ledger · PRs merged), at most two caveat lines. **Findings and process notes go in a SEPARATE answer.** Never carry a figure forward. Full text in memory `progress-report-format.md`.
+
+### Machinery carried forward
+Six checks raw 0 at the frozen head; the forced gate run by the **controller only**; reviewer recorded in the PR body **before** it opens (missing → send it back — enforced four times today); handoff committed before the freeze; tree identity; the full-tree drop check partitioned rather than interpreted; API reachability; ledger flips with every sha verified an ancestor at the flip. **The gate now STARVES** — it refuses to start while a peer's vitest pool is live (the guard that stops two executors OOMing a 16 GB box), so it takes 2.5–6.5 min against a 2.5-minute run, and every PR now conflicts at least once because of the longer window.
+
+### Ledger
+**299 done / 0 claimed / 9 todo.** The 9 are: second-wave `8` (in flight) and `12` (close-out), plus the seven the owner HELD — the wire-gap screens, McpAuthorize/McpTokens, the legal copy, and the contrast debts `13.690`–`13.693`. **`docs/lanes/owner-holds.md` is the register; read it before dispatching anything.** The membership plan (2 tasks) is COMPLETE.
+
+### Next
+Both in-flight PRs → machinery → merges → then the four queued work orders in order, then second-wave Task 12 (plan close-out: final gate, catalogue checks, citation sweep, spec amendments). **Estimated completion ~18:30–19:00 IST** on measured per-task durations, with the caveat that each queued fix is unsized until an executor reads it.
 ## ✅ FRIDAY 2026-09-18 ~11:1x IST — **DEEPSEEK-CONTROLLER CYCLE 2: the second wave is RUNNING (Tasks 1–4 landed) and five PRs merged since the last anchor. Two executors, three rebase collisions, and one live-stack outage traced to a migration the container never ran. READ THE FOUR RULES BELOW — each cost real time to learn.** `main` is `488bfb2d`; zero open PRs.
 
 ### If you are the DeepSeek controller reading this: your position, in five lines
