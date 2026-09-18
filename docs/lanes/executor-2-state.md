@@ -37,7 +37,7 @@ merge; **if it has MERGED, this block is history** and the controller's next dis
 | `packages/ui/src/ui.css` | `.gn-workflow-canvas` gains **`display: grid`**; the trap is recorded inline. `min-height: 480px` untouched |
 | `apps/web/e2e-stack/builder-canvas.spec.ts` | **new** — case `13.911`, one test, with its planted control |
 | `apps/web/e2e-stack/helpers/canvas-box.ts` | **new** — the measurement, parameterised by root so the control runs the SAME code |
-| `test-cases/13-deployment-dogfooding.md` | the section for `13.911` at the foot |
+| `test-cases/13-settings-and-workflows.md` | the section for `13.911`, at the foot of the part-file |
 | `Features.md` | the canvas bullet amended (`:2263`) |
 
 **Ids: `13.911` minted, recounted at this tip BY CASE MARKER.** `13.890`–`13.910` were already spent and
@@ -143,6 +143,27 @@ cites `apps/server/src/auth/auth.ts:83` for `trustedOrigins`; line 83 is inside 
 declaration is at `auth.ts:112`. It resolves to the right **file** and reads plausibly, so it misleads
 rather than corrects — the `stale-citation` shape. **Owner: whoever next touches the sign-in page.** (The
 author's own § 3 caveat cites `auth.ts:112` and was verified by the review.)
+
+### § 5c — THE REBASE ONTO THE SPLIT `main` (2026-09-19, ~03:0x)
+
+`main` moved `ed4c992f` → **`98ffab2a`** while this branch was in review: **the test-cases split landed**
+(#498, `8d144483`), and `test-cases/13-deployment-dogfooding.md` is now an **index** with eleven
+part-files. This branch is rebased onto it. **One conflict, resolved to the split's own rule** —
+*"Where a new case goes. Into the part-file whose topic it belongs to — not here."* — so case `13.911`'s
+section lives at the foot of **`test-cases/13-settings-and-workflows.md`**, the part-file whose range held
+the old file's tail where the section had been appended, and **not** in the index. No id was renumbered
+and no case text changed. `13.911` is still free on the new main: markers there run to `13.910` and then
+jump to another lane's `13.920`–`13.927`.
+
+**The rebase compressed the catalogue moves into the first commit**: the fix-round commits' edits to that
+section were already folded into the text that moved, so replaying them against the index is a no-op and
+their diffs no longer carry the relabel. The final tree is what the review passed; the history is not —
+and this sentence exists so a reader of commit 2 is not surprised by a message describing an edit its diff
+does not show.
+
+**Re-verified at the rebased head:** `13.911` appears twice in the part-file and zero times in the index;
+`ui.css:1404` still reads `display: grid`; and every `file:line` in the section points at **source**, not
+at the catalogue, so the split's shift map does not reach it.
 
 ### § 6 — ANCHORS, verify these rather than trusting the row
 
