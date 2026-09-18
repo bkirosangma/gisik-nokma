@@ -45,6 +45,17 @@ export type TicketState = {
    * `state.closed ?? null`. The wire types carry it required.
    */
   closed?: { actorId: string; at: string } | null;
+  /**
+   * The backlog rank key (spec §8.1): set by `ticket.ranked`, and ABSENT on a
+   * ticket nobody has ranked — including one just created, which does not write
+   * it (see `ticket-state.ts`'s creation branch for why the field starts
+   * absent rather than null). Meaningful only within the ticket's project.
+   * OPTIONAL here, and only here, because the same hundreds of `TicketState`
+   * literals in tests that predate `closed` predate this too; every reader
+   * spells `state.rank ?? null`, so absent and null mean the same thing and no
+   * reader can tell them apart. The wire types carry it required.
+   */
+  rank?: string | null;
 };
 
 export type MembershipState = {

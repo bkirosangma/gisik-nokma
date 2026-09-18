@@ -146,6 +146,15 @@ function reopenedEvent(): EventEnvelope {
   });
 }
 
+/** `rank` is typed `unknown` so the refusal cases can hand it a value the key space forbids. */
+function rankedEvent(rank: unknown): EventEnvelope {
+  return makeEnvelope({
+    type: 'ticket.ranked',
+    entity: { kind: 'ticket', id: TICKET },
+    payload: { rank },
+  });
+}
+
 /** Replays a list of envelopes through `applyTicketEvent` with this file's `deps`, oldest first. */
 function fold(events: EventEnvelope[]): TicketState {
   let state: TicketState | undefined;
@@ -564,10 +573,12 @@ describe('TICKET_EVENT_TYPES', () => {
     // ticket: a type's workflow binding changes what NEW tickets get, never
     // where an existing one sits.
     expect((TICKET_EVENT_TYPES as readonly string[]).includes('ticket-type.defined')).toBe(false);
-    // TWELVE of the FIFTEEN registered against entityKind 'ticket' (backlog/closed
+    // THIRTEEN of the SIXTEEN registered against entityKind 'ticket' (backlog/closed
     // spec, 2026-09-17: 'ticket.closed' and 'ticket.reopened' joined the list —
-    // both move `closed`, so both belong here even though neither moves stateId).
-    expect(TICKET_EVENT_TYPES).toHaveLength(12);
+    // both move `closed`, so both belong here even though neither moves stateId;
+    // spec §8.1, 2026-09-18: 'ticket.ranked' joined it for the same reason — it
+    // moves `rank`, which is head state, and moves nothing else).
+    expect(TICKET_EVENT_TYPES).toHaveLength(13);
   });
 });
 
@@ -608,6 +619,68 @@ describe('13.566 ticket.closed / ticket.reopened', () => {
   it('TICKET_EVENT_TYPES names both, so every replay reader that iterates it sees them', () => {
     expect(TICKET_EVENT_TYPES).toContain('ticket.closed');
     expect(TICKET_EVENT_TYPES).toContain('ticket.reopened');
+  });
+});
+
+/**
+ * 13.696 — the rank key folds onto the ticket, and ONLY the key (spec §8.1).
+ * Rank is a shared manual order within one project: the Backlog tab sorts by it
+ * and a reorder is exactly one `ticket.ranked`, so the fold must move `rank` and
+ * nothing else — a fold that also touched `stateId` would make a reorder look
+ * like a status change to every reader of the transition log.
+ */
+describe('13.696 ticket.ranked sets rank; ticket.created starts it null', () => {
+  it('a created ticket is unranked', () => {
+    // `?? null` rather than `toBeNull`, and the reason is the opposite of a
+    // weakening: creation deliberately does NOT write `rank` (see the creation
+    // branch in `ticket-state.ts`), because `rowToTicketState` reads columns and
+    // there is no `rank` column until Task 3 — writing it here would make the
+    // reducer's state and the server's read model disagree, which thirteen
+    // dual-client rig cases assert against. The contract this case pins is the
+    // READER's: `rank ?? null` is null for an unranked ticket, which is how
+    // every consumer spells it. A `toBeNull` here would instead pin the field's
+    // PRESENCE, i.e. the very thing that broke that boundary.
+    expect(fold([createdWith({ start: 'backlog' })]).rank ?? null).toBeNull();
+  });
+  it('ticket.ranked { rank } sets it and touches nothing else', () => {
+    const before = fold([createdWith({ start: 'backlog' })]);
+    const after = applyTicketEvent(before, rankedEvent('n'), deps);
+    expect(after.rank).toBe('n');
+    // The whole rest of the state is byte-identical: strip the one field under
+    // test from both sides and the two must be indistinguishable.
+    expect({ ...after, rank: undefined }).toEqual({ ...before, rank: undefined });
+  });
+  it('a malformed rank (a space) throws at parse — the reducer never applies it', () => {
+    const before = fold([createdWith({ start: 'backlog' })]);
+    // The assertion names the CAUSE rather than "something threw". As first
+    // written this test PASSED with `rank.js` still missing, because an unknown
+    // event type throws too — a different failure wearing the same colour, and
+    // one that would have stayed green if `ticket.ranked` had been registered
+    // with a permissive schema.
+    const message = messageOf(() => applyTicketEvent(before, rankedEvent('a b'), deps));
+    expect(message).toContain('must be a rank key over 0-9a-z');
+    expect(message).not.toContain('not a ticket event');
+  });
+  it('a TRAILING-ZERO key is refused at the door, because it has no room below it', () => {
+    // Not a style rule. `rankBetween('a', 'a0')` has no answer to give — nothing
+    // in `[0-9a-z]` sorts under `'0'` — and the plan's own algorithm does not
+    // fail on it, it appends `'0'` forever (measured before this door existed:
+    // `NONTERMINATING at i=20001` with a step cap). Every producer is safe by
+    // construction (`rankBetween` only ever appends a digit >= 1), so this door
+    // is the single place a hand-written key could get in. `isRankKey` is the
+    // predicate that defines the space, and the door uses it rather than the
+    // looser `RANK_KEY_REGEX`, which admits `'a0'`.
+    const before = fold([createdWith({ start: 'backlog' })]);
+    const message = messageOf(() => applyTicketEvent(before, rankedEvent('a0'), deps));
+    expect(message).toContain("must not end in '0'");
+    // The positive control, through the same call: a legal key is accepted, so
+    // the refusal above is about the trailing zero and not about the door
+    // refusing `ticket.ranked` outright. Without it, a schema that rejected
+    // every rank would pass the line above.
+    expect(applyTicketEvent(before, rankedEvent('a1'), deps).rank).toBe('a1');
+  });
+  it('TICKET_EVENT_TYPES names it, so every replay reader that iterates it sees them', () => {
+    expect(TICKET_EVENT_TYPES).toContain('ticket.ranked');
   });
 });
 

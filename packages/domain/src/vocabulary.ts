@@ -21,6 +21,7 @@ import {
   ticketCollaboratorPayload,
   ticketCreatedPayload,
   ticketFieldSetPayload,
+  ticketRankedPayload,
   ticketReopenedPayload,
   ticketReparentedPayload,
   ticketWorkflowReboundPayload,
@@ -173,6 +174,21 @@ domainRegistry.register({
   version: 1,
   entityKind: 'ticket',
   payloadSchema: ticketReopenedPayload,
+});
+
+/**
+ * `ticket.ranked` (backlog/closed spec §8.1, 2026-09-18). Filed against the
+ * ticket whose key it sets, like every other ticket claim. It belongs in
+ * `TICKET_EVENT_TYPES` beside the closed pair for the same reason they do:
+ * it moves head state (`rank`) and leaves `stateId` alone, so any replay
+ * reader that iterates that list must see it. Backlog-only is the engine's
+ * door (`rank-requires-backlog`), not this registry's.
+ */
+domainRegistry.register({
+  type: 'ticket.ranked',
+  version: 1,
+  entityKind: 'ticket',
+  payloadSchema: ticketRankedPayload,
 });
 
 domainRegistry.register({

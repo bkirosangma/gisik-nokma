@@ -13,6 +13,7 @@ export * from './simple-kanban.js';
 export * from './workflows/errand-with-waits.js';
 export * from './advise-workflow.js';
 export * from './entity-state.js';
+export * from './rank.js';
 export * from './ist-day.js';
 export * from './doc-text.js';
 export * from './doc-mentions.js';

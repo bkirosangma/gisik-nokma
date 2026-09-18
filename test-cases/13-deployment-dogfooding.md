@@ -8074,3 +8074,164 @@ cites, and the first draft cited a line it had not read.*
 none of them moves this file's high-water mark; the highest id in the file is still `13.693` (Step 4b's
 block) and the next free id is still `13.694`, recounted rather than assumed. **No new id beyond the
 reserved block was minted, and none was needed** — which is the outcome the reservation was for.
+
+
+---
+
+## Backlog and closed (owner request, 2026-09-17) — the second wave, spec §8
+
+### Second wave (spec §8)
+
+**Task 1 (domain) — `13.694`–`13.696`. The ids were MEASURED at the tip, not taken from the plan.**
+The plan says to start at `13.613`; that block was consumed long before this task began — `13.613`–`13.620`
+by Steps 1 and 1b, `13.650`–`13.671` by Step 2. This file's own two "Recount, at this tip" notes already
+recorded the highest case marker as `13.693`, re-measured here per style (bare / bold / marker-first)
+before minting. `13.694` and `13.695` were free; `13.695`/`13.696` were free as well, because Step 5a's
+dispatch pencilled an "extras block `13.695`–`13.699`" that was never drawn on — the merged 5a PR minted
+nothing outside `13.301`–`13.319`. **Step 5b's handoff carries an off-by-one and is corrected here:** it
+reads the `13.694` pointer sentence as meaning "the next block starts at `13.695`", but `13.694` appears
+in this file only as that pointer prose, never as a case marker, so it was free and is what was minted.
+**The next free id is `13.697`.**
+
+- ✅ **13.694 — `rankBetween` yields a key strictly between its neighbours, and inserting between the
+  same pair 200 times straight renumbers nobody.** The ordering property the whole ranking feature rests
+  on: the returned key is strictly between the two neighbours it was given, and repeating an insertion
+  between the same pair only lengthens the NEW key — no other ticket's key ever changes, which is what
+  makes a reorder exactly one `ticket.ranked`. `(null, null)` yields a first key; `before >= after`
+  (including `a === b`) THROWS rather than guessing, because the caller's neighbours are wrong and a
+  silent answer would corrupt the shared order. The case also pins the key space: `isRankKey` refuses the
+  empty string, spaces, characters outside the alphabet, a non-string, and any key ending in `0`.
+  **And it pins the property the module claims "by construction" — that every key `rankBetween` RETURNS
+  is itself valid, on prefix-adjacent neighbours (`('a','ab')`, `('001','0011')`, `('zz','zz1')`, …) and
+  over 300 chained insertions.** That last one is not decoration: see the review section below, where a
+  mutant that leaves this whole file green was measured before the assertion existed.
+  `packages/domain/src/rank.ts:54`, `packages/domain/test/rank.test.ts:18`
+
+- ✅ **13.695 — `compareByRank`: ranked tickets first by key, the unranked after them by `ticketId`
+  ascending.** A ULID is creation order, so "unranked" reads as "in the order they were filed", which is
+  what someone who has never dragged anything expects to see. Equal keys fall back to `ticketId` rather
+  than returning 0, so the order is TOTAL and stable: a comparator that reported equality would let the
+  sort's own tie-breaking decide a shared manual order nobody chose, and two clients could then render
+  the same project differently. `packages/domain/src/rank.ts:85`, `packages/domain/test/rank.test.ts:119`
+
+- ✅ **13.696 — `ticket.ranked` sets `rank` and touches nothing else; a created ticket is unranked.**
+  The event carries `{rank}` and is registered against `entityKind: 'ticket'`; the reducer folds it onto
+  `TicketState.rank`, and the case asserts the REST of the state is indistinguishable with the field
+  stripped from both sides — `stateId` in particular never moves, for the same reason it does not on the
+  closed pair: a reorder is not a status change, and letting it look like one would put a move nobody
+  made into the transition log four-eyes reads. `ticket.ranked` also joins `TICKET_EVENT_TYPES`, so
+  every replay reader that iterates that list sees it. The creation half asserts the READER's contract
+  (`rank ?? null` is null), not the field's presence — see the ruling below for why.
+  `packages/domain/src/ticket-state.ts:299`, `packages/domain/test/ticket-state.test.ts:632`
+
+#### RULING (executor, conservative default): creation does NOT write `rank`
+
+**Task 1's step text says "creation sets `rank: null`", and following it makes the gate red.** The first
+gate run came back **28 of 33 tasks**, `@gisik-nokma/server#test` failed, thirteen cases across four
+`test/dual-client/` files, every one of them this diff:
+
+```
+expect(onB?.ticket).toEqual(await h.projTicket(ticketId));
+  AssertionError: expected { kind: 'ticket', …(15) } to deeply equal { kind: 'ticket', …(14) }
+  +   "rank": null,
+```
+
+The left side is the client's replica, folded by the shared `applyTicketEvent`; the right side is the
+server's read model, and `rowToTicketState` builds a `TicketState` **from columns**
+(`apps/server/src/projections/tickets.ts:128`). There is no `rank` column — **Task 3 creates it**
+(`apps/server/migrations/1789200000000_proj-tickets-rank.sql`) — so writing the field in the reducer
+makes the two readers disagree, and those rig cases exist precisely to assert `replica.fold ≡ server.read`.
+
+The plan is internally inconsistent here, and the inconsistency was invisible until the gate ran: its
+`Files:` block for Task 1 lists **only domain files**, so it does not expect a server change; its own
+Global Constraint says *every new wire field is carried end to end in ONE task*; and its own **Task 7**
+shows the correct shape for exactly this situation — `reopenedAt` sets creation's `null` **and** adds
+`reopened_at`, `$17`, `rowToTicketState` and the mapper **in the same task**. For `rank` the plan split
+them across Tasks 1 and 3.
+
+**Ruled (conservative default, recorded rather than asked):** creation omits `rank`. The field stays
+absent on BOTH sides until the task that owns the column can move them together. Every reader spells
+`state.rank ?? null`, which is the contract `entity-state.ts` already states for this optional field, so
+absent and null are the same fact to every consumer — only `toEqual` across the client/server boundary
+can tell them apart. **Not fixed by adding `rank: null` to `rowToTicketState` instead**, which was the
+obvious alternative and is worse: a hardcoded null in the mapper would be the "closed flag dead in
+production" failure this plan's Global Constraint was written to prevent, because from Task 2 onward a
+real rank could be ingested while the read model kept answering null. **Task 3 inherits one decision:**
+whether the reducer's creation writes the null once the column exists. Whoever lands it should decide
+with both sides in hand, as Task 7 does.
+
+#### The second deviation: the payload door refuses keys the plan's schema admits
+
+**The plan's docblock declares the key space excludes keys ending in `0`; the schema it ships admits
+them.** `RANK_KEY_REGEX` is `/^[0-9a-z]+$/`, so `'a0'` parses clean; `isRankKey` refuses it. That is not
+cosmetic. The independent reviewer proved the two-case theorem and confirmed it empirically: *any* key
+strictly between `'a'` and `'a0'` would have to be `'a' + t` with `t` non-empty and `t < '0'`, and
+`'0'` is the alphabet's minimum, so no such `t` exists — and `rankBetween` does not refuse the request
+either. Run in a child process with a heap cap, the real `rankBetween('a', 'a0')` **never returned**; it
+grew the string until the allocation aborted (`SIGABRT`), while its positive control
+`rankBetween('a', 'a1')` returned `"a0i"` in 0 ms. `ticketRankedPayload` therefore refines with
+`isRankKey` instead of the loose regex (`packages/domain/src/events/ticket-events.ts:191`). **No
+signature in the plan's Interfaces block changed**, and `RANK_KEY_REGEX` is still exported and still the
+first check, because its message names the alphabet — the more useful error for the common mistake.
+
+Two corrections the review forced on the *prose*, both kept because a right rule with a wrong reason
+reads as verified: (1) the docblock's stated reason ("a trailing `0` would equal its prefix") was simply
+false — `'a0' > 'a'`; the real reason is that nothing sorts below `'0'`. (2) The mechanism is narrower
+than "a trailing zero": it needs `before` to be a STRICT PREFIX of `after` with every remaining digit
+`0`, which is why `rankBetween(null, 'a0')` terminates fine. The shipped rule is broader than the
+mechanism, which is the safe direction for a rule enforced at a door, and the docblock now says so.
+
+#### The independent review — what it confirmed, and the real hole it found
+
+The reviewer was told to **re-derive the ordering property against `rankBetween` itself**, not to re-read
+the author's tests. It imported the shipped module, and reported:
+
+- **Fuzz, HELD**: 4,000 random insertions into a maintained sorted list, asserting strict betweenness,
+  ascending order and `isRankKey` validity after EVERY step; longest key 5 chars.
+- **Exhaustive, HELD**: 522,753 ordered pairs of valid keys (alphabet `01az`, length ≤ 5) — zero
+  non-terminating, zero not-strictly-between, zero invalid results.
+- **No-renumbering, HELD** — asserted directly, which the shipped file did not do: 250 middle insertions,
+  41,375 pre-existing keys compared byte-for-byte, zero mutated.
+- **Both refusals throw**; a 600-insertion same-pair run terminates at key length 101.
+- **The trailing-zero claim, HELD** — both halves, including the theorem above.
+
+**The hole it found is the one worth recording.** It mutation-tested the test file and reported a mutant
+that **passes the entire file**: stop descending once `lo` is exhausted
+(`h - l > 1 || i >= lo.length`) — a plausible "optimisation" — which returns `'0010'` for
+`('001','0011')`. That key is strictly between its neighbours and ends in `'0'`: exactly the unorderable
+shape the door exists to refuse, produced by the function the door protects. **Reproduced here
+independently before acting on it: exit 0, zero failures, whole file green.** Its own honest caveat is
+kept: the non-termination result is a bounded non-return plus a faithful model, and a formal proof of
+termination was not attempted.
+
+The response is the new assertion in 13.694 above; **with it added, that mutant now fails** (M7 below).
+The reviewer also listed four further properties the file's prose claimed but did not pin — no-renumbering
+(nothing compared a pre-existing key to a snapshot), key-length growth, determinism, and the descent
+corridor being sampled by a single 200-iteration run. The first is now pinned by the reviewer's own
+measurement and is a candidate for a future case; the rest are recorded here rather than silently fixed,
+because none of them is a defect in the shipped code.
+
+#### Mutation evidence (8 mutations, each reddening its own site, all restored by sha256)
+
+| # | mutation | killed by |
+|---|---|---|
+| M1 | `rankBetween` returns the lower neighbour instead of a midpoint | 13.694 × 5 |
+| M2 | `isRankKey` drops the trailing-zero rule | 13.694 trailing-zero **and** 13.696 door |
+| M3 | `compareByRank` puts unranked FIRST | 13.695 "ranked before unranked" |
+| M4 | `compareByRank` returns 0 for equal keys | 13.695 × 2 |
+| M5 | `ticket.ranked` folds as a no-op | 13.696 × 2 |
+| M6 | the door drops the `isRankKey` refine | 13.696 door — **the door deviation is load-bearing** |
+| M7 | descending stops once `lo` is exhausted | 13.694's new "every key RETURNS is valid" — **the reviewer's survivor, now killed** |
+| M8 | `TICKET_EVENT_TYPES` omits `ticket.ranked` | the list case **and** 13.696 |
+
+**Baseline is 45 tests green** (was 44; +1 for the assertion M7 is caught by). Every mutation restored
+the file to a sha256 matching the original.
+
+**Two checks this task found in itself, and fixed rather than shipped.** (1) The "a malformed rank
+throws" test PASSED during RED, before `rank.ts` existed, because an unknown event TYPE throws too — a
+check that could not fail for the property it named. It now asserts the CAUSE (`must be a rank key over
+0-9a-z`, and NOT `not a ticket event`), with a positive control through the same call. (2) While writing
+the new prefix-adjacent case, the first version of its pair list contained `('1','10')` — and that pair
+**hangs**, because `'10'` ends in `0` and is outside the key space: a test that times out rather than
+fails, for a pair no producer can emit. The pairs are now verified in-space, and the reason is written
+into the case.

@@ -10,6 +10,7 @@ import {
   ticketCollaboratorPayload,
   ticketCreatedPayload,
   ticketFieldSetPayload,
+  ticketRankedPayload,
   ticketReopenedPayload,
   ticketReparentedPayload,
   ticketWorkflowReboundPayload,
@@ -54,7 +55,7 @@ export type TicketStateDeps = {
 };
 
 /**
- * The event types this reducer folds — TWELVE of the FIFTEEN registered against
+ * The event types this reducer folds — THIRTEEN of the SIXTEEN registered against
  * `entityKind: 'ticket'`, not all of them. **This is not the ticket-entity
  * set**, and reading it as one has already cost a defect: `visibility.set`,
  * `claim.contested` and `claim.contested_resolved` are filed against a ticket
@@ -81,6 +82,7 @@ export const TICKET_EVENT_TYPES = [
   'ticket.workflow_rebound',
   'ticket.closed',
   'ticket.reopened',
+  'ticket.ranked',
   'comment.added',
   'attachment.added',
 ] as const;
@@ -147,6 +149,21 @@ export function applyTicketEvent(
       fields: { title: claim(p.title, env) },
       transitions: [],
       closed: null,
+      // `rank` is deliberately NOT written here, and that is a departure from
+      // Task 1's step text (spec §8.1, plan `2026-09-17-backlog-and-closed-second-wave.md`).
+      // The step says "creation sets `rank: null`", but `rowToTicketState`
+      // builds a TicketState from COLUMNS and there is no `rank` column yet —
+      // Task 3 creates it. Writing the field here makes the reducer's output
+      // and the server's read model disagree, and thirteen dual-client rig
+      // cases assert exactly `replica.fold ≡ server.read`; they go red. That is
+      // the right answer from them: an absent key and an explicit null are
+      // indistinguishable to every reader (`state.rank ?? null`, the contract
+      // `entity-state.ts` states) but NOT to `toEqual` across that boundary.
+      // The plan's own Task 7 shows the shape this field should have followed —
+      // `reopenedAt` sets creation's null AND adds `reopened_at` in the SAME
+      // task. Task 3 owns the column, `rowToTicketState` and the replica read;
+      // whoever lands it should decide whether creation writes the null then,
+      // when both sides can move together.
     };
   }
 
@@ -278,6 +295,15 @@ export function applyTicketEvent(
       // The explicit reopen (spec §1.2): clears the flag, moves nothing else.
       ticketReopenedPayload.parse(env.payload);
       return { ...state, closed: null };
+    }
+    case 'ticket.ranked': {
+      // Backlog-only is the engine's door (checkTicketRanked); this fold only
+      // replays what the engine accepted, per this function's header. `stateId`
+      // is untouched, for the same reason it is on the closed pair: a reorder
+      // is not a status change, and letting it look like one would put a move
+      // nobody made into the transition log four-eyes reads.
+      const p = ticketRankedPayload.parse(env.payload);
+      return { ...state, rank: p.rank };
     }
     case 'comment.added':
     case 'attachment.added':
