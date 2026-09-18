@@ -648,11 +648,22 @@ reason on record, not an oversight:*
   `actorLabel` (`packages/app-core/src/provenance.ts`) consults `SYSTEM_ACTOR_NAMES` **before** the
   workspace roster, so the sheet reads `Closed by Auto-close on <date>` and **a roster row cannot
   rename a system actor** — a person's name printed over a decision no person made is the claim
-  honesty contract 1 exists to refuse. Cases 13.722–13.726.
+  honesty contract 1 exists to refuse. **A RULED REMOVAL, and it is worth reading as one:** the plan's
+  Task 7 `Files:` line asked for `t.reopened_at` in `read/ticket-cards.ts`'s `PROJ_TICKET_COLUMNS` and
+  a matching `ProjTicketRow` member. Both were added, then measured, then **dropped on the controller's
+  ruling** — that constant and that row type exist to feed `assembleTicketCards`, which builds CARDS,
+  and this field is a SWEEP INPUT no card carries, so carrying it put one dead column into six routes'
+  SELECTs and declared a member nothing dereferenced. The mutation deleting the entry **survived the
+  entire server suite** (1,548 passed, byte-identical to baseline), which is what settled it; the
+  plan's own Task 8 Step 3 gives the sweep its own SQL, so no reader was waiting for the list to have
+  it. The value is not lost — `rowToTicketState` reads it off its own `TicketRow` in
+  `projections/tickets.ts`, and the single-ticket route serves it. This is the "carried but never read"
+  shape the mapper rule exists to prevent, one layer down: the closed flag was dead in production;
+  this would have been dead in the query. Cases 13.722–13.726.
   `packages/domain/src/system-actors.ts`, `packages/domain/src/entity-state.ts`,
   `packages/domain/src/ticket-state.ts`,
   `apps/server/migrations/1789300000000_proj-tickets-reopened-at.sql`,
-  `apps/server/src/projections/tickets.ts`, `apps/server/src/read/ticket-cards.ts`,
+  `apps/server/src/projections/tickets.ts`,
   `packages/app-core/src/online/mappers.ts`, `packages/app-core/src/provenance.ts`
 - ⚙️ **`proj_search` — the full-text projection** — one row per ticket holding its title,
   description and comments as PLAIN TEXT, plus a `tsvector` GENERATED from all three and weighted

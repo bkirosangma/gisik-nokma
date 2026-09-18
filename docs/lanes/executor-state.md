@@ -56,7 +56,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > |---|---|
 > | branch | `exec/second-wave-t7-reopened-at` |
 > | base | **`36ec6ae3`** = `origin/main`, carrying PR #458 (a **ledger-only** commit, `b793780b`) on top of #457 (executor 2's membership Task 1) and #456 (a plan fix). `--base main`. |
-> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha here names an ANCESTOR. The tip is THE HANDOFF COMMIT THAT CARRIES THIS BLOCK. Its ancestors are **`f1083126`** (the fix round), **`dc7be7d3`** (the task). **Three commits ahead of `origin/main`** including the handoff commit. *(Every sha cited before the 14:0x rebase is ORPHANED: `cabf36bf`→`dc7be7d3`, `74b12565`→`dc7be7d3`, `5c975c21`→`f1083126`. Check with `git merge-base --is-ancestor`, never `cat-file`.)* |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha here names an ANCESTOR. The tip is THE COMMIT THAT CARRIES THIS BLOCK. Its ancestors are **`d89750dc`** (the first handoff), **`f1083126`** (the fix round), **`dc7be7d3`** (the task). **FOUR commits ahead of `origin/main`** with the ruling commit. **The LAST commit is post-review and post-ruling**: the controller ruled DROP on the dead `PROJ_TICKET_COLUMNS` entry and it was applied in that commit — the only change since the reviewer's `74b12565`, and it removes one line of a shared SQL constant plus one type member, with the server suite re-run green at 1548 afterwards. *(Every sha cited before the 14:0x rebase is ORPHANED: `cabf36bf`→`dc7be7d3`, `74b12565`→`dc7be7d3`, `5c975c21`→`f1083126`. Check with `git merge-base --is-ancestor`, never `cat-file`.)* |
 > | reviewed sha | **`74b12565`** — the reviewer read THAT commit, not the tip. The rebase to `f1083126` was proved **source-neutral**: same 17 files, **0 blobs differ** pre/post, with a control showing the comparison is not trivially passing. A reader can reproduce the equivalence with `/usr/bin/git diff --name-only dda4c342...74b12565` vs `/usr/bin/git diff --name-only 36ec6ae3...f1083126` (both list the same 17 files). |
 > | case ids | **`13.722`–`13.726`**, FIVE ids, inside this executor's block `13.700`–`13.759`; **`13.727`–`13.759` remain unminted**; executor 2's `13.760`–`13.819` untouched. Recounted at the tip by case MARKER with `scripts/check-case-ids.mjs`'s own `ID_LINE` regex: the block's high-water was `13.721` (Task 6's), `13.722` returned **false** and `13.720`/`13.721` present as the positive control. `check-case-ids` at the tip: **2302 unique ids, union == sum** (was 2293; +5 this task, +4 from executor 2's merged `13.820`–`13.823`). |
 > | migration | **`apps/server/migrations/1789300000000_proj-tickets-reopened-at.sql`** — `ADD COLUMN reopened_at timestamptz NULL` + COMMENT; **Down drops it**. **The hot dev stack migrates ONLY at container start**, so after this merges the server container must be restarted or every route touching the column 500s. **The controller said it will do that; this lane ran NO compose action at all.** |
@@ -113,15 +113,18 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > **FIXED — a wrong count.** "four routes' bodies" is **five** (measured). The Features.md sentence now
 > carries the number and names the files.
 >
-> **RECORDED, NOT FIXED, AND FLAGGED TO THE CONTROLLER — `t.reopened_at` in `PROJ_TICKET_COLUMNS` is
-> DEAD SELECTION.** The plan's Task 7 `Files:` line requires it; **nothing reads it** —
-> `assembleTicketCards` never touches the column, `rowToTicketState` is fed by `SELECT *`, and the
+> **RULED AND APPLIED — `t.reopened_at` was DEAD SELECTION in `PROJ_TICKET_COLUMNS`, and the
+> controller ruled DROP.** The plan's Task 7 `Files:` line required it; **nothing read it** —
+> `assembleTicketCards` never touched the column, `rowToTicketState` is fed by `SELECT *`, and the
 > plan's own Task 8 Step 3 gives the sweep its own SQL ("mirrors `notifications/sweep.ts:227-243`"), so
-> no reader is waiting for the list to carry it. **Mutation M3 (delete `, t.reopened_at` from the list)
-> SURVIVES the entire server suite — reproduced here, 1548 passed / 0 failed, byte-identical to
-> baseline.** Kept because the plan is the authority being audited against; the alternative is one
-> string in `apps/server/src/read/ticket-cards.ts` plus the declared `ProjTicketRow.reopened_at`
-> member. **Both readings are in the PR body. This is an owner/controller call, not this lane's.**
+> no reader was waiting for the list to carry it. **Mutation M3 (delete `, t.reopened_at` from the
+> list) SURVIVED the entire server suite — reproduced here, 1548 passed / 0 failed, byte-identical to
+> baseline** — and that measurement is what settled it. The controller verified the two row types were
+> ONE decision rather than two: `rowToTicketState` reads `row.reopened_at` off **`TicketRow`** in
+> `apps/server/src/projections/tickets.ts`, a DIFFERENT type, and **that read STAYS**. Removed: the
+> constant entry AND the declared `ProjTicketRow.reopened_at` member. The plan contradicted itself
+> (Task 7 `Files:` vs Task 8's own SQL) and the code now agrees with Task 8. Server suite re-run after
+> the drop: **still 1548 passed / 5 skipped**, unchanged, because the line was read by nothing.
 >
 > **RECORDED, NOT FIXED, TASK 8's TO WEIGH — `reopenedAt` survives a state move that is not a
 > `ticket.transitioned`.** Both `ticket.workflow_rebound` and `foldTicketToWorkflowVersion` move

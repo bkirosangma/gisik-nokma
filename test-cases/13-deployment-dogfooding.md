@@ -10071,10 +10071,18 @@ rather than code, and the two surviving mutations are worth more than the kills*
   plan's own Task 8 Step 3 gives the sweep its own SQL, so no reader is waiting for the list to carry
   it. **Mutation M3 (delete `, t.reopened_at` from the list) SURVIVES the entire server suite —
   reproduced here, 1548 passed / 0 failed, byte-identical to baseline.** The line was kept because the
-  plan is the authority being audited against, and the alternative is priced rather than hidden: the
-  change is one string in `apps/server/src/read/ticket-cards.ts`, and dropping it would remove the
-  declared `ProjTicketRow.reopened_at` member too. **Flagged to the controller with both readings
-  rather than settled here.**
+  plan is the authority being audited against, and both readings were priced rather than hidden.
+  **RULED, AND THE RULING IS DROP.** The controller checked the two row types separately rather than
+  assuming they were one decision — `rowToTicketState` reads `row.reopened_at` off **`TicketRow`** in
+  `apps/server/src/projections/tickets.ts`, a DIFFERENT type fed by that file's own queries, and that
+  read stays; `ProjTicketRow` and `PROJ_TICKET_COLUMNS` exist to feed `assembleTicketCards`, which
+  builds cards, and the plan itself says this is not a card field. So **both the constant entry and the
+  declared `ProjTicketRow.reopened_at` member were removed**, and the surviving mutation is what
+  settled it: keeping a dead column in a shared SELECT to satisfy a line written on an assumption is
+  the "carried but never read" pattern this repo's mapper rule exists to prevent, wearing the opposite
+  hat. The plan contradicted itself — Task 7's `Files:` line versus Task 8's own SQL — and the code now
+  agrees with Task 8. Verified after the drop: the server suite is still **1548 passed / 5 skipped**,
+  unchanged, because the line was read by nothing.
 - **Minor, FIXED — the tolerance's stated rationale was false.** `mapOptionalInstant` is right to be
   tolerant (`?? null` is what the plan mandates, the value is policed, and no surface reads the field),
   but the docblock justified it with "keeps the same SHAPE as the one `replica-data-source.ts` folds

@@ -39,23 +39,38 @@ export type ProjTicketRow = {
    * (spec §8.1, second wave 2026-09-18).
    */
   rank: string | null;
-  /**
-   * `TicketState.reopenedAt`'s column (spec §8.2, second wave 2026-09-18).
-   * **Unmapped, and unmapped on purpose**: unlike `closed_at`/`closed_by` there
-   * is no `TicketCard` field to fold it into, because when a ticket was last
-   * reopened is a SWEEP INPUT rather than something a card renders. It is
-   * selected here so the projection's own canonical column list is complete
-   * against the table — a reader that needs it builds its `SELECT` from
-   * `PROJ_TICKET_COLUMNS` and must not have to remember a column this list
-   * withheld.
-   */
-  reopened_at: Date | null;
 };
 
+/**
+ * `TicketState.reopenedAt` IS DELIBERATELY ABSENT from this list and from the
+ * row type above, and the absence is a RULING rather than an omission.
+ *
+ * The plan's Task 7 `Files:` line originally asked for `t.reopened_at` here.
+ * It was measured and removed: **nothing on these routes reads it.** This list
+ * and `ProjTicketRow` exist to feed `assembleTicketCards`, which builds CARDS,
+ * and `reopenedAt` is a server-side SWEEP INPUT (spec §8.2) that no card
+ * carries — so carrying it here put one dead column into six routes' SELECTs
+ * and declared a row member none of them dereferenced. The plan's own Task 8
+ * Step 3 gives the auto-close sweep its own SQL, so no reader was waiting for
+ * the list to have it either. The mutation that deleted the entry **survived
+ * the entire server suite** (1,548 passed, byte-identical to baseline), which
+ * is what settled it.
+ *
+ * The value is NOT lost: `rowToTicketState` reads it off its own `TicketRow`
+ * in `projections/tickets.ts`, fed by that file's queries, and the
+ * single-ticket route serves it through `getTicketStateFromDb`. A second
+ * column list carrying a column no route on it consumes is the "carried but
+ * never read" shape this repo's mapper rule exists to prevent — the closed
+ * flag was dead in production; this would have been dead in the query.
+ *
+ * If a future card-serving route needs the column, add it HERE with that
+ * reader named; do not add it on the assumption that a canonical list should
+ * be complete against the table.
+ */
 export const PROJ_TICKET_COLUMNS =
   't.ticket_id, t.workspace_id, t.project_id, t.type_id, t.parent_id, ' +
   't.workflow_id, t.workflow_version, t.state_id, t.state_category, ' +
-  't.assignee_id, t.collaborator_ids, t.fields, t.closed_at, t.closed_by, t.rank, t.reopened_at';
+  't.assignee_id, t.collaborator_ids, t.fields, t.closed_at, t.closed_by, t.rank';
 
 /**
  * Rows for explicit ids, in `ticket_id` order.
