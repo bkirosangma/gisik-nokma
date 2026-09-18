@@ -33,13 +33,20 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > times. Nothing is pushed after it. The gate was re-run at this head and its result is in the PR body,
 > because a file cannot name the sha of the commit that contains it.
 >
+> **This block has been RE-COMMITTED once, and the reason matters.** It first landed as `251c0521` as
+> the freeze line; the independent review then ran against that head and found two false statements in
+> comments this step had written, and the fix round (`a5a58a4c`) moved the head. Rather than leave this
+> block claiming to be the freeze line while sitting two commits behind it — the exact shape of the
+> defect the controller recorded — the block is updated to describe the fix round and becomes the
+> freeze line again.
+>
 > | | |
 > |---|---|
 > | branch | `exec/step2c2-legal-notfound`, cut from `origin/owner/workspace-edits` at `ed225690` |
 > | **PR** | base **`owner/workspace-edits`** — verified via `gh pr view --json baseRefName`, not assumed |
 > | merge-base | `ed225690` (= `origin/owner/workspace-edits` when the branch was cut; it is PR #426's merge commit) |
 > | tree | clean |
-> | gate | `corepack pnpm turbo run build test typecheck --force --concurrency=2` → **33/33 successful, 0 cached, EXIT 0**, twice (at `a0f6d172` and again at the frozen head); `grep -c 'FAIL\|failed'` over each log = **0**; interpreter probed from inside the toolchain — **node v22.22.2**, **pnpm 9.15.0** (NOT the v24 corepack that a bare `pnpm` on PATH resolves to). Per package: domain 486 · ui 322 · rule-engine 306 · editor 178 · sync-client 90 · app-core 1454 · desktop 9 · mobile 29 · **web 438** · mcp-server 44 · server 1534 / 5 skipped |
+> | gate | `corepack pnpm turbo run build test typecheck --force --concurrency=2` → **33/33 successful, 0 cached, EXIT 0**, three times (at `a0f6d172`, at `251c0521`, and again at this block's own commit); `grep -c 'FAIL\|failed'` over each log = **0**; interpreter probed from inside the toolchain — **node v22.22.2**, **pnpm 9.15.0** (NOT the v24 corepack that a bare `pnpm` on PATH resolves to). Per package: domain 486 · ui 322 · rule-engine 306 · editor 178 · sync-client 90 · app-core 1454 · desktop 9 · mobile 29 · **web 438** · mcp-server 44 · server 1534 / 5 skipped |
 > | six checks | all **EXIT 0**: `env` · `tasks` · `runbook` · `citations` · `help` (via pnpm) and `case-ids` via **`node scripts/check-case-ids.mjs`**. `case-ids` reads **2204 unique ids**, +8 for this block (2196 before) |
 > | viewport suite | `pnpm run test:e2e:viewport`, its own `next dev` on **3021** → **28 passed, 2 skipped, 3 failed**. All three failures are `/help`'s **pre-existing** tap-target ratchet — identical in count, baseline and viewports to the base control the 2c-1 session ran. **No failure names `/privacy`, `/terms` or the 404 probe**: the accessible-names, tap-target and type-scale ratchets all pass on the routes this step touched |
 >
@@ -101,6 +108,39 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > **Both were LOOKED AT, not merely produced.** The legal shots show the bar, the tabs with Privacy
 > raised, the 8-link row and the prose unchanged; the 404 shots show the tile, the larger heading and
 > all three links with "Search the manual" between workspaces and inbox.
+>
+> ## ▣ THE INDEPENDENT REVIEW — run at `251c0521`, and it found things
+>
+> One reviewer, two jobs only (the accessible names; the copy rule). **Both verdicts CONFIRMED**, and
+> it earned them: it measured the four accessible-name counts on the LIVE pages at 390/768/1512 with
+> the suite's own stub rather than reading the baseline, and it AST-diffed the prose of both revisions
+> including whitespace-bearing `{' '}` chunks — 65/65 chunks identical on each legal page, and on the
+> 404 the ONLY difference in the whole stream is the inserted `Search the manual`.
+>
+> **Its two Important/Minor comment findings were real, and both were my own false statements:**
+>
+> - `globals.css` defended the 44px anchor floor with "the export draws a compact 15px row". The
+>   export's toc item is `font-size:17px` (`:3978`); 15px is the META line (`:1740`). Fixed, and the
+>   reason beside it strengthened — the inline exemption could not have been borrowed anyway, because
+>   a flex item computes to `block` (blockification), so the row's `display: flex` would have to go
+>   first. **The reviewer's own citation for this was two lines off** (`:3976` is a JS data line): a
+>   finding is not adopted until its primary source is read.
+> - `not-found.tsx` said the export has no counterpart for the page's closing aside. The export DOES
+>   draw one (`:1859`). Fixed.
+>
+> **Two Minor findings are RECORDED, not fixed, with the reason:**
+>
+> - `accessible-names-baseline.json`'s `rawMatches` is stale for these routes (98/96/56 recorded,
+>   129/128/64 measured live). `rawMatches` is deliberately not ratcheted and the file's writer only
+>   ever adds ABSENT keys — existing keys are never rewritten, by design, so that a branch which
+>   lowered a count cannot re-baseline over it. Hand-editing it here would be that same act wearing a
+>   tidy-up's clothes. **Owner: whoever next changes these routes' element count for a reason other
+>   than a port.**
+> - The signed-in render of the legal bar GAINS `aria-label`/`role` counts (`AccountMenu` +
+>   `InboxNavLink`, absent at base), and **nothing measures it** — the viewport suite has no
+>   `storageState` and runs anonymous. A gain is not a regression, but the claim "nothing else gained
+>   or lost a name" is true only of the signed-out surface. Stated in the PR body; the new cases cover
+>   the signed-out render, which is the one the sweeps see.
 >
 > ## ▣ THE NEXT STEP IS NOT NAMED HERE
 >
