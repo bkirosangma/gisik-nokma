@@ -3356,15 +3356,24 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   fourth that one deliberate click costs one unit and leaves the magic link available.
   **Both directions mutation-checked:** adding `/passkey` to `SIGN_IN_PREFIXES` reddens the bucket
   case alone; pointing the probe at a non-auth path reddens the exhaustion case alone.
-  **NOT WITNESSED END TO END, and named rather than left to be discovered:**
-  `apps/web/e2e-stack/passkey-registration.spec.ts` (register a credential over a CDP virtual
-  authenticator on `/account`, sign out, then sign in with it on `/sign-in`, no magic link in the
-  second half) is written and typechecked — `tsconfig.e2e.json` includes `e2e-stack/**`, so it cannot
-  rot silently — but was **never executed**: the stack port was held by a developer's own `next dev`,
-  and `playwright.stack.config.ts` refuses (correctly) to adopt a stray server. Its first green is owed
-  to CI's `gate` job. So the WebAuthn ceremony itself, and the runtime URL better-auth's generated
-  client builds for `listUserPasskeys`/`deletePasskey`, are the two things no test in this change set
-  observes; the member NAMES are settled by `typecheck` (with a negative control) and the PATHS by (h).
+  **WITNESSED END TO END 2026-09-18 (Step 5b) — this paragraph used to read "NOT WITNESSED END TO
+  END", and the history is kept because a named-but-unrun witness is the only reason nobody could
+  see it.** `apps/web/e2e-stack/passkey-registration.spec.ts` (register a credential over a CDP
+  virtual authenticator on `/account`, sign out, then sign in with it on `/sign-in`, no magic link in
+  the second half) was written and typechecked — `tsconfig.e2e.json` includes `e2e-stack/**`, so it
+  could not rot silently — and was **never executed**, because the suite died inside `globalSetup`
+  before any spec ran. Two defects, both in the seed step and both fixed in
+  `e2e-stack/helpers/seed-shape.ts`: `MODULE_NOT_FOUND` for a `dist` the hot image does not have, then
+  `ENOENT` for `board.data.js` after pnpm moved the cwd to the package directory. The run line:
+  `✓ 1 e2e-stack/passkey-registration.spec.ts:75:1 › register a passkey on /account, then sign in with
+  it — no magic link in the second half (19.6s)`.
+  **What the green establishes, precisely:** the WebAuthn ceremony runs — `addPasskey` produces a
+  credential the server stores and re-lists, and `signIn.passkey` authenticates with it, with no
+  inbox purge and no email field touched in the second half. So the runtime URL better-auth's
+  generated client builds for `listUserPasskeys` is now observed. **What it does NOT:** the spec reads
+  the delete control's accessible name but never clicks it, so `deletePasskey`'s runtime URL remains
+  unobserved end to end — the same gap this paragraph recorded, now covering one method instead of
+  two. The member NAMES are still settled by `typecheck` (with a negative control) and the PATHS by (h).
   **The Account STYLING port adds four more cases to this same pending block** (owner, 2026-09-15:
   "take the styling of the account page and fix the styling in the code", then "it still doesn't match
   the Style"). **THE REFERENCE IS THE DESKTOP PROTOTYPE'S `isAccount` SCREEN**
@@ -3443,6 +3452,29 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   `apps/web/app/globals.css`, `packages/ui/test/token-discipline.test.ts`,
   `apps/web/app/account/page.tsx`, `packages/app-core/src/account/notifications-section.tsx`,
   `design-system/interactive/desktop.dc.html`)
+
+- **13.330** ✅ **A passkey is registered on `/account` over a CDP virtual authenticator and then
+  signs in — with no magic link in the second half.** `apps/web/e2e-stack/passkey-registration.spec.ts`
+  (the spec's own docblock carries the run line; first live green 2026-09-18, Step 5b). The second half
+  purges no inbox, fetches no link and fills no email field, so landing off `/sign-in` is reachable only
+  by a completed WebAuthn authentication; the row is identified by a per-run-unique label rather than an
+  empty-list precondition, so residue from an earlier run cannot make the registration look like it
+  worked. **This is the case the paragraph above used to record as "NOT WITNESSED END TO END."**
+  *RECORDED EXCEPTION, and it is one — read this before minting the next account case.* This id is
+  taken from **Task 12's** reservation `13.327`–`13.333`, which Task 12 never wrote; **Task 12 was then
+  superseded entirely** by the account/help-screens plan (`docs/superpowers/plans/2026-09-15-account-help-screens.md`,
+  "Do not touch `~/my_projects/gisik-nokma-exec` or the `exec/task12-passkeys` branch"), whose cases live
+  under the placeholder **`pending-13.4xx`** above. That block's own closing note says *"Rename every case
+  in this block to real case ids, in order, once a block is requested"* — so a single minted id here is
+  a **deliberate exception to that note**, taken on `CTL-DISPATCH-2026-09-18-step5b-stack-suite-hot.md`'s
+  explicit naming of `13.330`, and only because the dispatch's premise ("read which case ids it cites")
+  was false: the spec cited none, and the reservation it was described from is superseded. The
+  Block-`13.4xx` rename, when it happens, is unaffected — it starts at `13.400`, and `13.330` is outside
+  it. The ten sibling account cases still carry no real id and still cite nothing.
+  *Mutation, named rather than run:* 13.330's own second half is the falsifier — deleting the
+  `signIn.passkey` call makes the `waitForURL` off `/sign-in` time out. It was not run as a mutation in
+  this step because the suite is red for four unrelated reasons (see the PR body), and a mutation whose
+  control is already red measures nothing.*
 
 - **13.400** ❌ **The selected segment is PRESSED under `neo`, lifted under `hig`, flat under `minimal`**
   — `[data-style="neo"] .gn-segmented__item--on` overrides the base rule's `var(--gn-shadow-raised)`

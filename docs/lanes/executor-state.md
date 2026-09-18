@@ -41,7 +41,119 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~07:5x IST. **STEP 5a (THE `hig-per-screen` RESIDUE:
+> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~07:4x IST. **STEP 5b (THE `e2e-stack` SUITE LEARNS
+> # THE HOT STACK · 13.330'S PASSKEY WITNESS · THE 7a/8a SWEEP) IS DONE. PR OPENED FROM THE HEAD
+> # BELOW; NOT YET MERGED.** This block is the position. **Everything below it is RECORD** — the
+> # Step 5a block immediately following says its PR is open; it has since MERGED as `0d011791`.
+>
+> | | |
+> |---|---|
+> | branch | `exec/step5b-stack-suite-hot`, off `origin/owner/workspace-edits` |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`; do NOT trust a sha printed in this row** — a block cannot contain the commit that carries it, so any number here names an ANCESTOR, never the tip. For orientation: the content tree this block describes is `5aab0a9092898ca2a379d1e52cff17034a3db451` (3 ahead of base), and **every commit after it edits only THIS file** — so nothing but the handoff moved after the gate was run |
+> | base | `0d011791` = `origin/owner/workspace-edits` = the `#433` merge commit |
+> | `origin/main` | `6a8155fe` (moved during this step; the 5a landing) |
+> | tree | clean at the frozen head |
+> | PR base | **`owner/workspace-edits`**, NOT `main` |
+> | gate | `corepack pnpm turbo run build test typecheck --force --concurrency=2` at the frozen head → **33 successful, 33 total, 0 cached**, EXIT 0, 1m46s; Node **v22.22.2** (`node -v`, probed from the same shell) |
+> | six checks | `tasks` · `citations` **2084/0** · `case-ids` **2225** (was 2224; +1 = the minted 13.330, via `node scripts/check-case-ids.mjs` — there is NO `pnpm check:case-ids` script, that name EXITs 1 with an empty message) · `env` · `runbook` (26 refs) · `help` — all EXIT 0 |
+>
+> ## ▣ WHAT LANDED
+>
+> **Part 1 — the seed step is shape-aware, in TWO halves, and the second was found only by running
+> it.** `apps/web/e2e-stack/global-setup.ts` ran `node dist/seed/cli-seed-convenience-corner.js`
+> unconditionally. The hot image has no `dist` at all (measured: WORKDIR `/repo`,
+> `test -f dist/seed/…` absent, `ls apps/server/dist` → No such file or directory), so the suite died
+> at `globalSetup` before any spec ran — the "e2e-stack RED by construction" the 2026-09-17 Task 12
+> pause recorded. Fixed, and then the FIRST LIVE RUN died again: `pnpm --filter … run <script>` sets
+> the cwd to the PACKAGE directory, so the seed's relative default for `board.data.js` resolved to
+> `/repo/apps/server/reference/…` and the run failed on `ENOENT`. The source shape now states
+> `--board-path` outright. Both halves are in the new pure module
+> `apps/web/e2e-stack/helpers/seed-shape.ts`; the PROD half cannot be run here, so it is witnessed by
+> `apps/web/test/seed-shape.test.ts` (6/6) instead of shipping unmeasured. A mutation making the two
+> shapes collapse was killed by exactly the two tests that should kill it. The prod shape's command is
+> deliberately NOT made "consistent" — that half cannot be run from this worktree, so changing it
+> would be an unmeasured edit to the path that already works.
+>
+> **Part 2 — the suite runs. 3 passed / 4 failed.** The green that matters:
+> `✓ e2e-stack/passkey-registration.spec.ts:75:1 › register a passkey on /account, then sign in with
+> it — no magic link in the second half (19.6s)` — **13.330's first-ever live witness**, for a spec
+> the catalogue itself named as never-executed and owed to CI.
+>
+> **The seed/`globalSetup` path works in the hot container**, quoted from the run:
+> `[e2e-stack] server image shape: source — seeding via pnpm --filter @gisik-nokma/server run seed:cc
+> --board-path /repo/reference/convenience-corner-tracker/board.data.js`, then the seed's own summary
+> `Convenience Corner seed: 0 committed, 123 already present, 23 errand tickets, guest configured.`
+>
+> **Part 3 — the seven families, live: 1 entry, and it is ABOVE the floor.** 0 of 5 distinct bordered
+> classes below 3:1, 9 bordered elements examined across 7 routes, positive control 17.62.
+> `aside.gn-attention` **4.36** on `/my-work` and `/p/:projectId` — the controller's ruling that these
+> borders STAY is confirmed by measurement, not merely obeyed. **The prediction is CORRECTED, not
+> confirmed:** `.gn-state-node--selected` is NOT in the roster, because the swept routes render the
+> workflow LIST, not the editor canvas — `.gn-state*` and `.gn-transition*` are absent from the
+> POPULATION rather than passing it. The committed roster file was also STALE (two sanctioned waivers
+> against the spec source's one; 19 examined elements against today's 9; backdrop `rgb(237,228,219)`
+> against today's `rgb(241,234,227)`), and the run corrected it.
+>
+> ## ▣ FOUR FAILURES, ALL PRE-EXISTING, NONE CHASED — each recorded with a NAMED OWNER
+>
+> 1. **`smoke.spec.ts:30` and 2. `smoke.spec.ts:64`** — `getByText('Shop operations')` resolves to a
+>    `<P>` INSIDE the workspace door-link (whose `aria-label` is "Convenience Corner"), so the click
+>    lands on `/w/<id>`; measured with a throwaway probe, and the container request log shows NO
+>    request to `/p/` at all. The project link exists separately as `a[href*="/p/"]`. Stale selector
+>    vs. the Round-19c workspace card — **not** a hot-stack defect. **Owner: whoever next touches
+>    `apps/web/e2e-stack/`.**
+> 3. **`viewport.spec.ts:93`** — its NAME is the sideways-scroll case and it is not what failed: the
+>    overflow assertions PASSED. It failed at the tap-target ratchet, **6 → 11**, and every one of the
+>    eight new offenders is `button.gn-attention__title` at 24px height. A real product observation.
+>    **Owner: `hig-per-screen/7a`** (the plan task owning `.gn-attention*`).
+> 4. **`visibility.spec.ts:26`** — the property HOLDS (guest sees the heading, zero 'Shop operations',
+>    card reads "1 project · name restricted"); only its positive control went stale, because the
+>    guest's card no longer carries a 'My Work' link. **Owner: whoever next touches
+>    `apps/web/e2e-stack/`.**
+>
+> **A ratchet is NOT re-baselined around any of them.** `tap-target-baseline.json` is untouched at
+> `{"stack-phone-390|/my-work": 6}`: a rose count re-recorded is a ratchet that has stopped ratcheting.
+>
+> ## ▣ OPEN RULINGS AND RULINGS TAKEN
+>
+> - **TAKEN (recorded exception): 13.330 was MINTED** even though the block that owns the account
+>   cases, `pending-13.4xx`, says *"Rename every case in this block to real case ids, in order, once a
+>   block is requested."* The dispatch named `13.330` for exactly this witness and its premise ("read
+>   which case ids it cites") was FALSE — the spec cited none, and Task 12's `13.327`–`13.333`
+>   reservation was superseded entirely by the account/help-screens plan. The alternative was a
+>   witness with no id at all. The 13.4xx rename is unaffected (it starts at `13.400`). **Cheap to
+>   reverse; the controller should say so if it disagrees.**
+> - **RECORDED, NOT FIXED (two dispatch premises measured false).** (1) The dispatch said
+>   `/account` was the one missing key in `accessible-names-baseline.json` with "0 entries"; the file
+>   was `{}` for ALL SEVEN routes, and **`/account` is not in the accessible-name sweep's route list
+>   at all**, so it could not be seeded from a live read. (2) The dispatch said a missing baseline
+>   "FAILS by design"; for THIS instrument it **records and annotates instead of asserting** — the
+>   naked-ratchet shape the spec's own comment already records. Changing a shared instrument's
+>   failure mode is not this step's scope.
+> - **The seeded baseline is PROVEN to assert**: run B seeded under `UPDATE_ACCESSIBLE_BASELINE=1`,
+>   run C re-ran plain (no annotations, all 7 keys present, green), and a negative control raising
+>   `/members`' recorded `ariaLabel` 5 → 6 went RED naming
+>   `13.287: /members LOST ariaLabel: baseline 6, now 5`, then was restored to a byte-identical
+>   checksum (sha256 compared against the backup, not `git diff`).
+> - **FOUR STACK RUNS, all quoted in the PR body.** Run A (`globalSetup` died on `MODULE_NOT_FOUND`),
+>   run A′ (died on `ENOENT`), run B (seeded; 4 failed / 3 passed), run C (plain; identical 4/3).
+>   The suite is deterministic across B and C.
+>
+> ## ▣ WHAT IS NOT DONE, AND WHY
+>
+> - **The four failures above are OPEN with named owners** — the suite is RED, deliberately, and the
+>   PR body carries the table rather than a claim that it is green.
+> - **`deletePasskey`'s runtime URL is still unobserved end to end.** The passkey spec reads the
+>   delete control's accessible name but never clicks it; the catalogue's corrected paragraph now says
+>   so precisely, covering one method instead of the two it used to.
+> - The hot containers were UP before this step and are UP after it, from this worktree
+>   (`docker-compose.dev.yml` + `docker-compose.hot.yml`); `curl -s localhost:3000/v1/auth/methods`
+>   answers `{"google":true,...}` after the last compose action, which was none.
+
+> # ▣ RECORD — Step 5a. **DONE and MERGED** into `owner/workspace-edits` as `0d011791` (PR #433).
+> # Kept verbatim below as record; read it for the states-cases audit and the mobile deferral, not
+> # for position.
+> # **STEP 5a (THE `hig-per-screen` RESIDUE:
 > # THE MOBILE DEFERRAL SENTENCE · THE STATES-CASES AUDIT FOR `13.301`–`13.315` · THE 7a/8a BORDER
 > # MEASUREMENT) IS DONE, CHECKED, REVIEWED, AND ITS PR IS OPEN AGAINST `owner/workspace-edits`.**
 > # This block is the position. **Everything below it — INCLUDING the Step 4b block that follows
