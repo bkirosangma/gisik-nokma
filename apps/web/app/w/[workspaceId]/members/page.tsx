@@ -292,11 +292,20 @@ export default function MembersPage() {
    *
    * **Which refusals can actually reach here — corrected after the independent
    * review challenged this paragraph's first version, which named the two rules
-   * plan-internally and was wrong about both.** `grant-owner-requires-owner`
+   * plan-internally and was wrong about both, and RE-CORRECTED 2026-09-18 when a
+   * third rule landed and this list did not name it.** `grant-owner-requires-owner`
    * fires only on a payload granting `owner`
-   * (`apps/server/src/permissions/check-permission.ts:589`) and
+   * (`apps/server/src/permissions/check-permission.ts:619`) and
    * `EDITABLE_ROLE_OPTIONS` cannot build one, so it can NEVER fire from this
-   * control. `last-owner` fires only when the SERVER's row for that user holds
+   * control. **`remove-owner-requires-owner` is the same shape and is the one a
+   * reader is most likely to get wrong:** it fires only when the SERVER's row
+   * for the target holds `owner`, and `isEditableRole` suppresses the control on
+   * an owner's row — so it too arrives only through a STALE roster read, not in
+   * the ordinary case. **When it does arrive it arrives INSTEAD OF `last-owner`,
+   * for the same stale read**, because the gate runs before the engine
+   * (`check-permission.ts:1060`), which is why a refusal alert here may now name
+   * a rule the previous paragraph did not anticipate. `last-owner` fires only when the
+   * SERVER's row for that user holds
    * `owner` (`packages/rule-engine/src/checks/membership.ts:139-146`) while the
    * rendered row is editable, and `isEditableRole` suppresses the control on an
    * owner's row — both halves reading `proj_memberships` — so it is reachable
@@ -504,7 +513,7 @@ export default function MembersPage() {
  * The roles the roster's role control may SET — the invite form's own three
  * (`:688-690`), with the same omission and the same reason. `owner` is absent
  * because there is no ownership-transfer flow: the prototype offers it
- * (`desktop.dc.html:680-685`), `inviteSentPayload` refuses it, `apps/server/src/permissions/check-permission.ts:389`
+ * (`desktop.dc.html:680-685`), `inviteSentPayload` refuses it, `apps/server/src/permissions/check-permission.ts:406`
  * records that the invite path "refuses `owner`, and stops there", and Task 1's
  * `grant-owner-requires-owner` now refuses it on the ingest door too. Promoting
  * somebody to owner is a task of its own, not an option in a dropdown.

@@ -9865,9 +9865,14 @@ break unrelated suites for a consistency that buys nothing here.
 - ✅ **13.821 — a `membership.revoked` of the only owner is refused by the same rule.** The second door to
   the same state, and it must answer identically: there is no role in a `membership.revoked` payload, so a
   revocation is a move out of owner by construction and the only question is whether the target held it.
-  Revoking one of two owners is accepted; revoking somebody who is not an owner is accepted. **This case is
-  why the guard lives in the engine rather than in the permission gate alone** — the gate never sees the
-  ledger, so a rule written there could not tell a sole owner from a second one.
+  Revoking one of two owners is accepted **by the ENGINE**; revoking somebody who is not an owner is
+  accepted. **This case is why the guard lives in the engine rather than in the permission gate alone** —
+  the gate never sees the ledger, so a rule written there could not tell a sole owner from a second one.
+  **AMENDED 2026-09-18 (second sitting): "revoking one of two owners is accepted" is now true of the ENGINE
+  and FALSE of the client door, and the sentence above did not say which it meant.** The owner ruled that
+  an admin may not remove owner status from ANY owner, so on the client door an admin revoking one of two
+  owners is refused `remove-owner-requires-owner` before the engine is consulted; an OWNER revoking one of
+  two still commits. Measured on the real door, both ways. See **13.881**.
   **Citations:** `packages/rule-engine/src/checks/membership.ts:114` (the check), `:130` (its refusal),
   `packages/rule-engine/test/membership.test.ts:168`
 
@@ -9902,7 +9907,7 @@ break unrelated suites for a consistency that buys nothing here.
   stopped them. A malformed owner grant is deliberately **not** refused here — it falls through to the
   engine's `malformed-payload`, which names the field — and that is asserted too, so the two layers cannot
   start answering for each other.
-  **Citations:** `apps/server/src/permissions/check-permission.ts:602` (the clause), `:85` (the sentence),
+  **Citations:** `apps/server/src/permissions/check-permission.ts:619` (the clause), `:86` (the sentence),
   `apps/server/test/permissions/check-role-permission.test.ts:290` (the pure case),
   `:1355` (the real-door case, through the client door because the internal one does not run the gate)
 
