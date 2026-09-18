@@ -1782,7 +1782,8 @@
      OUTLINE (see CONTRAST_PAIRS' focusRing-on-surface entry, minimum 3),
      not as a background fill. `--gn-fill-tertiary` is the alpha
      fill-hierarchy tier already used for row hover
-     (.gn-table__row--clickable:hover, .ticket-type-list__row:hover) —
+     (.gn-table__row--clickable:hover, and `.ticket-type-list__row:hover` as
+     raised to `(0,3,1)` below so it outranks that family's own zebra) —
      reused here rather than inventing a new hover treatment.
      No literal curly braces in this comment: components.test.tsx's
      rule() helper captures everything up to the first closing brace
@@ -1800,7 +1801,11 @@
    the heading column and the New-type button do not share a line. */
 .ticket-type-list__header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
 .ticket-type-list__heading { display: flex; flex-direction: column; gap: 0.15rem; }
-.ticket-type-list__title { margin: 0; font-size: 1rem; }
+/* `20px/25px/600` — the prototype's own h2 metrics (`desktop.dc.html:820`,
+   blob `6d7b67c0a52c`), carried as rem at the 16px root this product sets. Was
+   `1rem` with no line-height of its own, so it inherited the UA's normal
+   leading and sat visibly lighter and smaller than the drawing. */
+.ticket-type-list__title { margin: 0; font-size: 1.25rem; line-height: 1.5625rem; font-weight: 600; }
 .ticket-type-list__summary { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
 .ticket-type-list__card { padding: 0.5rem; }
 .ticket-type-list__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
@@ -1828,7 +1833,35 @@
   text-align: left;
   cursor: pointer;
 }
-.ticket-type-list__row:hover { background: var(--gn-fill-tertiary); }
+/* The prototype's ZEBRA. Its rows carry
+   `(i % 2 ? ";background:var(--fill4)" : "")` over a **0-based** `i`
+   (`desktop.dc.html:3159`, blob `6d7b67c0a52c`), so the tint falls on the
+   **1-indexed EVEN** rows — exactly what `:nth-child(even)` selects here. The
+   `<ul>` holds nothing but the type rows, one `<li>` each, so `:nth-child` and
+   `:nth-of-type` choose the same set and `:nth-child` is the simpler of the two
+   where nothing forces the distinction — the same argument `.gn-list__table-row`
+   records for its own choice (`:1080-1087`).
+
+   `--fill4` → `--gn-fill-quaternary` is the mapping `.gn-members__row` already
+   uses for this identical construct (`apps/web/app/globals.css:1524`), which is
+   also where the parity is worked through.
+
+   THE PRODUCT'S OTHER TWO ZEBRAS DIFFER, AND THAT IS RECORDED RATHER THAN
+   HARMONISED. `.gn-list__table-row` (`:1088`) and `.gn-timeline__row` (`:2703`)
+   both stripe the ODD child, so those two families read INVERTED against the
+   prototype. **The measurement and its named owner already exist**
+   (`globals.css:1518-1523`: *"owner: whoever next touches those two families"*),
+   so this rule adds the third member of the matching set and re-records
+   nothing — harmonising those two is not this screen's change. */
+.ticket-type-list__rows li:nth-child(even) .ticket-type-list__row {
+  background: var(--gn-fill-quaternary);
+}
+/* Raised to the zebra rule's own specificity `(0,3,1)` and placed after it, so
+   hover still wins on a striped row — the equal-specificity/later-source-order
+   technique this file already uses against `.gn-table__cell` (`:1090-1096`)
+   rather than `!important` or an invented `:where()`. Without this the striped
+   even rows would be the one place hover silently stopped responding. */
+.ticket-type-list__rows li .ticket-type-list__row:hover { background: var(--gn-fill-tertiary); }
 .ticket-type-list__row:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 2px;

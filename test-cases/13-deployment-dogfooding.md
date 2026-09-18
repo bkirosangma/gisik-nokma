@@ -11881,3 +11881,149 @@ should be dispatched as its own task rather than folded into this slice.
 
 **No test was added and no test changed.** 13.920's pins are unchanged and still pass; this change
 touches one docblock, `Features.md`, and this file.
+
+## settings → workflows: the `isTypes` zebra and three strings — and two items the dispatch ordered that the hold register says are HELD (executor 2, 2026-09-18) — case `13.894`
+
+Task 7 of the settings-workflows plan (`docs/superpowers/plans/2026-09-18-settings-workflows-port.md:146`),
+the port part only, on `exec2/settings-wf-t7-t8` from `origin/main` = `99884bc9`. The prototype block is
+`design-system/interactive/desktop.dc.html:817-839` at commit `227434a5`, **blob `6d7b67c0a52c`** — the two
+shas are the commit and the blob of the same file and both are cited across the docs, which is worth
+knowing before concluding one of them is stale.
+
+- ✅ **13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and the stripe is visible.** Two
+  halves, split the way every styling case in this repo splits: `packages/app-core/test/ticket-types/ticket-types.test.tsx`
+  proves the COMPONENT renders the ported strings and the DOM the parity depends on, and
+  `packages/ui/test/tokens.test.ts` measures the `ui.css` rule.
+
+  **The zebra, and why the parity is the whole case.** The prototype stripes
+  `(i % 2 ? ";background:var(--fill4)" : "")` over a **0-based** `i` (`:3159`), so the tint falls on the
+  **1-indexed EVEN** rows. That single bit is silently invertible and **two families in this repo already
+  inverted it** — `.gn-list__table-row:nth-child(odd)` (`packages/ui/src/ui.css:1088`) and
+  `.gn-timeline__row:nth-of-type(odd)` (`:2703`), both ODD, both therefore reading inverted against the
+  prototype. Those two are **already recorded with a named owner** at `apps/web/app/globals.css:1518-1523`
+  (*"owner: whoever next touches those two families"*), so this change adds the third member of the
+  MATCHING set — `.gn-members__row:nth-child(even)` (`:1524`) was the first — and **re-records nothing and
+  harmonises nothing**. The case reads the sibling rules as its own control: if the instrument could not
+  tell the parities apart it would report ODD for them too, and the pair would prove nothing.
+
+  **The DOM precondition is asserted in the component half because `:nth-child` counts ELEMENTS.** Every
+  row must be a DIRECT `<li>` of the one `<ul>`, one per type, in the rendered order — a wrapper, a header
+  row, or a row moved out of the list would shift every stripe by one and land on ODD. Five rows render,
+  so `:nth-child(even)` has two to choose from: not zero, not all five.
+
+  **The measurement.** `--fill4` → `--gn-fill-quaternary` over the row's own resting fill, composited and
+  measured in all six style/theme combinations: **1.0951** (hig/light), **1.2536** (hig/dark), **1.0757**
+  (neo/light), **1.1727** (neo/dark). No style collapses the stripe onto its own ground, so unlike the
+  state chip in 13.920 there is no shadow-shaped repair owed here. The case asserts a floor of **1.05**
+  and pins the four readings, so a palette nudge that stays green still shows up as a movement.
+
+  **THE ROLE IS READ OUT OF THE RULE, NOT NAMED IN THE TEST, and a mutation is why.** The first draft
+  hard-coded `surfaceSunken`/`fillQuaternary`; repointing the stripe at the ground token left it GREEN,
+  because a hard-coded palette assertion is unfalsifiable by any CSS edit — the exact
+  check-that-cannot-fail shape this repo keeps re-finding. It now reads the role out of the declarations,
+  as 13.920 does, and the same mutation reddens it.
+
+  **The three strings**, all the prototype's: the action is `"New type"` (`:823`), the h2 carries its
+  `20px/25px` (`:820`), and the summary is its sentence (data `:3150`). This screen's own singular
+  handling is KEPT — the prototype writes `${n} types.` unconditionally and would say "1 types." — and it
+  is witnessed by a second render with one type rather than by a negative against the five-type one,
+  which would be a check that cannot fail.
+
+  **`"New type"` had a blast radius the dispatch did not name, carried end to end in this change:**
+  `ticket-type-list-screen.tsx`, `apps/web/test/settings-page.test.tsx` (10.72),
+  `packages/app-core/test/ticket-types/ticket-types.test.tsx`, this file, and `docs/manual.md:973` with
+  `content.generated.ts` regenerated (`check:help` fails when the two disagree). **The one that matters
+  most is a CONTROL that would have been silently disarmed:** `"hides New ticket type from non-authors"` is
+  a `queryByRole(...).not.toBeInTheDocument()`, and left on the old string it would have gone on passing
+  while being unable to fail. The editor pane's own `"New ticket type"` heading
+  (`apps/web/src/ticket-type-editor-pane.tsx:155`) is a DIFFERENT screen and is deliberately untouched.
+
+  **MUTATION BATTERY — three on the CSS, three on the component, all restored and sha256-verified in the
+  same invocation.** Parity `even`→`odd`: 3 killed. Hover rule left at the bare selector: **1 killed, its
+  own site.** Stripe repointed to the ground token: **1 killed, its own site.** Row stops being an `<li>`:
+  3 killed. Action label and summary sentence reverted: **1 each, their own site.**
+
+  **TWO ITEMS THE DISPATCH ORDERED ARE NOT BUILT, AND BOTH ARE HOLDS RATHER THAN DECISIONS.**
+  `docs/lanes/owner-holds.md` §1 lists *"`isTypes` | reorder and per-type counts"* as **HELD (owner,
+  2026-09-18)**, and the register's own rule is that an item leaves it only when the owner names it — never
+  on a belief, and never because another document says so. The dispatch
+  (`CTL-DISPATCH-2026-09-18-settings-wf-task78.md`) says both are *"ruled"*; the plan's own ruled table
+  lists only the `"Draft"` badge and the Edit button for this screen; and `controller-state.md:324` agrees
+  with the register (*"NOT dispatched by default; the owner picks which are wanted"*). **Escalated to the
+  controller by name, and held — not decided here.** `EXEC2-QUESTION-2026-09-18-isTypes-held-items.md`.
+
+  **One measurement that bears on the reorder's hold, and does NOT lift it.** §1 scopes itself to screens
+  *"whose prototype controls have no server behind them"*, and for the reorder that premise is false: the
+  gateway declares no update op, but the editor already writes `rank` through the ONE existing door —
+  `onSave` authors a `ticket-type.defined` carrying the whole definition and calls `gateway.submit`
+  (`ticket-type-editor-screen.tsx:178-204`), and `ticketTypeDefSchema.rank` is
+  `z.number().int().min(1)` (`packages/domain/src/ticket-types.ts:98`). **So if the hold lifts it is a
+  render task, not the wire task the audit scoped it as** — and the plan's own Task 6 text anticipated
+  exactly this (*"may be a route over existing data rather than a new concept — measure before
+  designing"*). Two things a later implementer must carry that the prototype does not model: the four
+  built-ins are rank-locked server-side (`packages/rule-engine/src/checks/ticket-type.ts:60-62`), and the
+  product's rank is a stored number with no uniqueness enforcement, while the prototype's is its array
+  index. **The count is the opposite: it genuinely needs server surface** — the only population read is
+  pinned to one workflow and the route counts `WHERE workflow_id = $n`
+  (`apps/server/src/routes/builder-reads.ts:408-414`).
+
+  **The prototype's leading 34px rank tile is a delta this change does NOT close** — the row still leads
+  with `<TypeIcon>` and carries `rank N` in the meta line. It is neither ruled nor held; it is simply
+  outside this task's scope, and it is reported rather than left to be discovered by a reader comparing
+  the two. `packages/app-core/src/workflow-builder/ticket-types/ticket-type-list-screen.tsx`,
+  `packages/ui/src/ui.css`, `apps/web/test/settings-page.test.tsx`,
+  `packages/app-core/test/ticket-types/ticket-types.test.tsx`, `packages/ui/test/tokens.test.ts`,
+  `docs/manual.md`, `packages/app-core/src/help/content.generated.ts`, `Features.md`
+
+### The review round — three Important, and one of them was in the test's own evidence
+
+One reviewer at `0fd14cd8`, read-only, record before the PR. **No Critical.** The port itself held —
+parity, specificity, source order, the DOM precondition and the rename all verified. All three Important
+findings were defects in **what the new evidence claimed about itself**, which is the class this repo
+catalogues most.
+
+- **I1 — the visibility pin composited against a layer the change itself replaces.** The zebra rule sets
+  `background` on the row; it does not layer over the row's own fill, and neither
+  `.ticket-type-list__rows` nor `.ticket-type-list__card` sets one — so the translucent stripe composites
+  over **`.gn-card`'s `--gn-surface-raised`**, not over `--gn-surface-sunken`. Under `neo` the two roles are
+  the same hex, which is why the error hid there and only showed under `hig`. **Corrected and re-measured:
+  1.1026 / 1.2727 (hig and minimal, light and dark) and 1.0757 / 1.1727 (neo)** — the stripe is *more*
+  visible than first asserted, so the error was conservative, but two of the four pinned numbers did not
+  describe the browser. All six style/theme combinations are now pinned rather than four. **13.920
+  composites its chip over `surfaceRaised` for the same reason**, so this was a divergence from the file's
+  own precedent.
+- **I2 — the hover case's name claimed a property no assertion read.** *"…not by `!important`"*, with
+  nothing reading the stylesheet for `!important`: a mutation adding it to the stripe left the case green,
+  which is precisely the defect the case exists to prevent — hover dying silently on the striped rows. The
+  claim is now read, not assumed: **`!important` on the stripe alone reddens that case.**
+- **I3 — five citations did not resolve, and two of them were invalidated by this change's own edit.**
+  `ui.css:2671` → **`:2703`** (my +32 lines moved it; the number appeared in four artifacts), the
+  row-as-door owner quote `ui.css:1603-1611` → **`:1811-1812`**, `desktop.dc.html:3150` → **`:3155`** for
+  `rank: String(i + 1)`, and the docblock's self-citations `:65-70`/`:17-23` → **`:149-177`**/**`:100-107`**.
+  **A citation that points into the docblock being read is the worst kind**: the reader cannot tell a stale
+  number from a forward reference. All corrected.
+
+**Also fixed:** the parity case's two `toContain` lines were tautologies on this file's own literal (kept
+only because the not-null read of that exact string out of `ui.css` is what makes them facts about the
+stylesheet — now stated); the "control" that asserted the siblings merely *exist* was **overstated** in its
+own comment and now reads their parity and their token through the same instrument, reporting the two
+limits it cannot cover; a "the even rows number two" control in the component half was **arithmetic off the
+`toHaveLength(5)` beside it** and has been **removed rather than padded**, with the reason recorded; and the
+h2's `20px/25px/600` — the third of the three ported strings — was pinned by **nothing**, so it now has its
+own case.
+
+**MUTATION BATTERY AFTER THE FIX ROUND — eight, each killed, all restored sha256-verified in the same
+invocation, the last two surgical (one rule, not the twelve an earlier `sed` matched).** Parity
+`even`→`odd`: 3 killed. Hover at the bare selector: **1, its own site.** Stripe repointed to the ground:
+**1, its own site.** `!important` added to the stripe: **1, its own site** — the reviewer's gap, now
+closed. Title metrics reverted: **1, its own site.** Row stops being an `<li>`: 3. Action label and summary
+reverted: **1 each.**
+
+**ONE FINDING IS REPORTED AND NOT FIXED, WITH A NAMED OWNER.** This change adds 83 lines to the top of the
+screen file, so citations to that file in **files this change does not touch** are now off:
+`docs/design/prototype-delta-2026-09-18.md:622` cites `ticket-type-list-screen.tsx:56`/`:50-52` and
+`ui.css:1590`, and the plan cites `ticket-type-list-screen.tsx:17-23`. `check:citations` passes — these are
+prose citations and it does not cover them. **They are recorded rather than rewritten**, because the delta
+doc is a dated audit snapshot whose line numbers describe the tree at audit time, and because two other
+writers hold conflicting claims on those files. **Owner: the controller, at the next settings-cluster
+sweep.**

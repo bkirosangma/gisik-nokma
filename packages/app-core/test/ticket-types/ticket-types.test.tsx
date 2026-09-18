@@ -153,7 +153,7 @@ describe('TicketTypeListScreen', () => {
     expect(row.querySelector('svg.type-icon')?.querySelectorAll('path, circle').length ?? 0).toBeGreaterThan(0);
   });
 
-  it('hides New ticket type from non-authors', async () => {
+  it('hides New type from non-authors', async () => {
     render(
       <TicketTypeListScreen
         workspaceId={newUlid()}
@@ -164,7 +164,85 @@ describe('TicketTypeListScreen', () => {
       />,
     );
     expect(await screen.findByText('Epic')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'New ticket type' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New type' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * 13.894 — the `isTypes` port's render half: the three ported strings and the
+   * DOM precondition the zebra's parity depends on.
+   *
+   * **Why the DOM shape is asserted at all.** The zebra is CSS —
+   * `.ticket-type-list__rows li:nth-child(even) .ticket-type-list__row` — and
+   * `:nth-child` counts ELEMENTS, so the parity is only the prototype's while
+   * every row is a DIRECT `<li>` child of that one list, one per type. A wrapper
+   * element, a header row, or a row moved out of the `<ul>` would silently shift
+   * every stripe by one and land on the ODD rows — the exact inversion two other
+   * families in this repo already shipped (`packages/ui/src/ui.css:1088`,
+   * `:2671`). That is a structural property of this component, so it is pinned
+   * here; the rule's own parity and its visibility are measured in
+   * `packages/ui/test/tokens.test.ts`.
+   */
+  it('13.894 the ported strings render, and every row is a direct <li> of the one list', async () => {
+    const custom: TicketTypeDef = {
+      id: newUlid(),
+      name: 'Invoice',
+      icon: 'receipt',
+      rank: 5,
+      workflowId: kanbanPublished.id,
+      fields: [],
+    };
+    const { container } = render(
+      <TicketTypeListScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={createFakeGateway({ workflows: [kanbanPublished], ticketTypes: [...builtins, custom] })}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />,
+    );
+    expect(await screen.findByText('Invoice')).toBeInTheDocument();
+
+    // The prototype's own strings (`desktop.dc.html:820`, `:823`, `:3150`).
+    expect(screen.getByRole('heading', { name: 'Ticket types' })).toHaveClass('ticket-type-list__title');
+    expect(screen.getByRole('button', { name: 'New type' })).toBeInTheDocument();
+    expect(screen.getByText('5 types. Rank orders them in every picker.')).toBeInTheDocument();
+
+    // This screen's own singular handling is KEPT — the prototype writes
+    // `${n} types.` unconditionally and would say "1 types." here. A second
+    // render rather than a negative against the five-type one: `1 type…` is
+    // absent there whatever the code does, so asserting its absence would be a
+    // check that cannot fail.
+    const single = render(
+      <TicketTypeListScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={createFakeGateway({ workflows: [kanbanPublished], ticketTypes: [builtins[0]!] })}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />,
+    );
+    expect(await single.findByText('1 type. Rank orders them in every picker.')).toBeInTheDocument();
+    single.unmount();
+
+    // The parity precondition: every row is a direct `<li>` child of the one
+    // `<ul>`, in the order rendered, with nothing between them.
+    const rows = container.querySelector('.ticket-type-list__rows')!;
+    const children = Array.from(rows.children);
+    expect(children).toHaveLength(5);
+    expect(children.every((child) => child.tagName === 'LI')).toBe(true);
+    const rowTexts = children.map((child) => child.querySelector('.ticket-type-list__row')?.textContent ?? '');
+    expect(rowTexts.every((text) => text.length > 0)).toBe(true);
+    // The order is `listTicketTypes`'s own — position is what the parity keys
+    // on, so the fifth row is asserted to be the custom type rather than any of
+    // the four seeds.
+    expect(rowTexts[4]).toContain('Invoice');
+    expect(rowTexts.slice(0, 4).some((text) => text.includes('Invoice'))).toBe(false);
+    // NO "the even rows number two" assertion here, deliberately. It would be
+    // arithmetic off `toHaveLength(5)` two lines up — a control that cannot fail
+    // independently of the assertion beside it. The parity itself is not this
+    // half's to measure: it is read out of `ui.css` in
+    // `packages/ui/test/tokens.test.ts`, which is the only place it can be
+    // falsified.
   });
 });
 
