@@ -4,6 +4,7 @@ import {
   statesWithBacklog,
   ticketClosedPayload,
   ticketCreatedPayload,
+  ticketRankedPayload,
   ticketReopenedPayload,
   ticketReparentedPayload,
   ticketTransitionedPayloadSchema,
@@ -110,6 +111,7 @@ export async function precheckEvent(
 
   if (submitted.type === 'ticket.closed') return precheckTicketClosed(submitted, cache);
   if (submitted.type === 'ticket.reopened') return precheckTicketReopened(submitted, cache);
+  if (submitted.type === 'ticket.ranked') return precheckTicketRanked(submitted, cache);
 
   // Every other type: the shared engine has no case for it, so an accept from
   // it would mean only "this engine had nothing to say", which is not a
@@ -346,6 +348,49 @@ function precheckTicketReopened(submitted: SubmittedEvent, cache: ClientStateCac
   if (ticket === undefined) return notEvaluated();
   if ((ticket.closed ?? null) === null) {
     return { kind: 'refused', rule: REFUSAL_RULES.notClosed, reason: 'This ticket is not closed.' };
+  }
+  return { kind: 'passed' };
+}
+
+/**
+ * `ticket.ranked`, hand-rolled from `checks/rank.ts`'s order for the same
+ * reason the closed pair above is: `evaluate.ts` is a flat switch with one
+ * check per event type, so there is nothing to route through.
+ *
+ * It CAN answer `passed`, and the reason is the one `precheckTicketClosed`
+ * gives: `checkTicketRanked` reads `stateId` — a cached fact — and consults a
+ * workflow def only to spell a NAME inside a refusal it has already decided to
+ * give. So once the ticket is cached, every fact the verdict rests on is one
+ * this client actually holds, and a `passed` here is not an accept
+ * manufactured from absence.
+ *
+ * An UNCACHED ticket stays `not-evaluated` rather than refusing: "I have never
+ * heard of this ticket" is not "this ticket is not in the backlog", and a
+ * refusal preview built on the client's incomplete view would be wrong on
+ * exactly the tickets a sync has not yet delivered.
+ */
+function precheckTicketRanked(submitted: SubmittedEvent, cache: ClientStateCache): PrecheckResult {
+  const parsed = ticketRankedPayload.safeParse(submitted.payload);
+  if (!parsed.success) return notEvaluated();
+  const ticket = cache.getTicket(submitted.entity.id);
+  if (ticket === undefined) return notEvaluated();
+  if (ticket.stateId !== BACKLOG_STATE_ID) {
+    // Read ONLY for the name below, never for the verdict — an uncached def
+    // degrades the name to the bare state id rather than turning a confident
+    // refusal into `not-evaluated`, exactly as `checks/rank.ts`'s own
+    // `def === null` branch does.
+    const def = cache.getWorkflowDef(ticket.workflowId);
+    const stateName =
+      def === undefined ? ticket.stateId : statesWithBacklog(def).find((state) => state.id === ticket.stateId)?.name ?? ticket.stateId;
+    return {
+      kind: 'refused',
+      rule: REFUSAL_RULES.rankRequiresBacklog,
+      // The literal is typed twice — here and in `checks/rank.ts` — exactly as
+      // the four reasons above are, and 13.604's extension is what holds the
+      // two copies together. Do not "fix" one by importing the other: a shared
+      // constant would make the agreement test vacuous.
+      reason: `Only a backlog ticket can be ranked; this one is in "${stateName}".`,
+    };
   }
   return { kind: 'passed' };
 }

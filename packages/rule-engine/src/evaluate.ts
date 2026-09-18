@@ -7,6 +7,7 @@ import { checkTicketFieldSet } from './checks/fields.js';
 import { checkTicketTypeDefined } from './checks/ticket-type.js';
 import { checkTicketWorkflowRebound } from './checks/workflow-rebind.js';
 import { checkTicketClosed, checkTicketReopened } from './checks/close.js';
+import { checkTicketRanked } from './checks/rank.js';
 import type { Accept, EngineContext, Refusal } from './engine.js';
 
 /**
@@ -44,6 +45,8 @@ export async function evaluateEvent(env: EventEnvelope, ctx: EngineContext): Pro
       return checkTicketClosed(env, ctx);
     case 'ticket.reopened':
       return checkTicketReopened(env, ctx);
+    case 'ticket.ranked':
+      return checkTicketRanked(env, ctx);
     default:
       return { refused: false };
   }
