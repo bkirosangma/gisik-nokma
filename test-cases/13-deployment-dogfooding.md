@@ -3095,6 +3095,8 @@ true the moment the tree changes.
   `/settings?workspaceId=<id>` the same way. `Workflows` is unchanged — its own editor (the builder) was
   never inlined into `/settings`, so repointing its list here would be cosmetic, not a fix.
   — (`apps/web/test/workspace-home.test.tsx`)
+  **SUPERSEDED by 13.673 (2026-09-18):** the text above is the five-door description; the live behaviour
+  is 13.673's.
 - **13.388** ✅ The DOOR decides, not the page — driven with no UI in the picture at all. A `member` and a
   `guest` each submit `project.created`, `project.archived` and `project.restored` at the real client door
   and are refused; the RULE and the REASON are asserted, not merely "not committed", because a refusal
@@ -3724,6 +3726,7 @@ is no gate behind this one to display. **Owner: whoever next takes the rename-pe
   where the two disagree — and asserts the collapsed order first as a positive control, so a failure is
   about the disclosure rather than about the grid never having been ordered at all. —
   (`workspace-home.test.tsx`)
+  **SUPERSEDED by 13.674 (2026-09-18):** reversed — archived cards sort to the END.
 
 ### Round 21 — owner corrections to the workspace-home port
 
@@ -7664,8 +7667,9 @@ declared in `packages/ui/test/tokens.test.ts`.
 ## Step 2c-2 (2026-09-18) — the legal pair and the 404, to the refreshed export
 
 **Block `13.682`–`13.689`**, allocated by `CTL-DISPATCH-2026-09-18-step2c2-legal-notfound.md`. The
-highest id in this file before the block was `13.681` (2c-1's); **the next free id is therefore
-`13.690`**, recounted at this tip with the per-style counts rather than assumed — `node
+highest id in this file before the block was `13.681` (2c-1's); **the next free id at this tip was
+therefore `13.690`** — Step 4b's block at the foot of this file now occupies `13.690`–`13.693`, so the
+next free id is `13.694` — recounted at this tip with the per-style counts rather than assumed — `node
 scripts/check-case-ids.mjs` reads **2196 unique ids** on the base and **2204** after this block, +8.
 
 The spec is `docs/design/prototype-delta-2026-09-18.md`'s own audit of the two blocks — `isLegal`
@@ -7760,3 +7764,63 @@ run's own summary line before it will report anything, which is the same rule th
   BOTH directions are asserted, because either alone has a way to pass while being wrong: only the
   absences would pass against a page somebody emptied, and only the presences would pass against one
   that added the export's wording underneath. (`apps/web/app/not-found.tsx`)
+
+---
+
+## Three contrast debts and one stale calibration, recorded as cases rather than fixed (Step 4b, 2026-09-18) — block `13.690`–`13.693`
+
+Block `13.690`–`13.693`, allocated by `CTL-DISPATCH-2026-09-18-step4b-ledger-evidence.md`. Unlike every
+other block in this file these four are **`❌` by construction**: no commit performed the work, and each
+names its FIX as the deliverable so the entry cannot be closed by editing the measurement instead. All
+four come out of PR #426's review, which measured them and recorded them as pre-existing; Step 4b gives
+each an id, because a debt held only in a review comment has no owner and no scope.
+
+**The arithmetic below was re-derived for this block rather than transcribed from the review.** Every
+figure reproduces the review's to four decimal places — which is the point rather than the reassurance: a
+transcription reproduces a wrong number exactly as faithfully as a right one, and the fourth case is
+precisely that. Ratios use the WCAG 2.x relative-luminance formula on the shipped role→primitive map;
+`13.6px` is `0.85rem` at the browser's 16px default. `hig` and `minimal` share one colour map (they
+diverge only in `radii`/`shadows`), so each measurement below is stated once for both.
+
+- ❌ **13.690 — `contested` is READ TEXT on `surface` in `hig`/`minimal` light and measures 4.3746
+  against AA's 4.5.** `.gn-sync-status-bar__failed { color: var(--gn-contested); }` (`ui.css:2602`) sits
+  inside a bar that sets `background: var(--gn-surface)` and `font-size: 0.85rem` at normal weight, so
+  this is body-sized text and its floor is 4.5, not 3. In `hig`/`minimal` light `surface` is `warmPaper`
+  `#efe7df` and `contested` is `magenta600` `#d30f45`; `neo` light ships its own darker
+  `neoLightContested` `#9a3054` and clears at 6.0238. **The existing gate cannot see this:** the roster's
+  own `contested` row is `{ fg: 'contested', bg: 'surface', minimum: 3 }` — the marker tier — and 4.3746
+  clears 3 while failing 4.5, so the row that has to move first is the minimum, not the hex. 13.681 pins
+  the failing value; this case names the fix, because a case that only pins a number is satisfied by
+  deleting the pin. Deliverable: `contested` gains a read-text role clearing 4.5 on `surface` in `hig`
+  and `minimal` light, or the sync bar stops painting it as text — the `neo` map is the precedent for the
+  first. Owner: whoever next touches the sync status bar or the `contested` role.
+  (`packages/ui/src/ui.css`, `packages/ui/src/tokens.ts`)
+
+- ❌ **13.691 — `warning` on `surface` measures 4.2485 in `hig`/`minimal` light, and NO `CONTRAST_PAIRS`
+  row names the pair.** `amber700` `#b25000` on `warmPaper` `#efe7df`. The roster's only `warning` row is
+  `{ fg: 'warningText', bg: 'warning' }` — text on the warning colour — a different pair that cannot fail
+  from this one being wrong, which is why it reads as guarded. Deliverable: add the row. `neo` light
+  already carries a purpose-built `neoLightWarning` `#8c4708`, so the shape of the fix exists in the same
+  file. (`packages/ui/src/tokens.ts`)
+
+- ❌ **13.692 — `danger` on `surface` measures 4.4013 in `hig`/`minimal` light, and NO `CONTRAST_PAIRS`
+  row names that pair either.** `red600` `#d70015` on `warmPaper` `#efe7df` — the closest of the three to
+  the floor and still under it. Same shape and same deliverable as 13.691, with `neoLightDanger`
+  `#9e2a20` as the precedent; the two are split into separate ids because the roster is a list of PAIRS,
+  and a row added for one role leaves the other equally unguarded.
+  (`packages/ui/src/tokens.ts`)
+
+- ❌ **13.693 — `tokens.ts`'s `green700` calibration arithmetic is stale: it is computed against a text
+  colour the light theme stopped shipping on 2026-09-16.** `tokens.ts:36-38` records that `successText` on
+  `success` measures **4.40** against 4.5 for Apple's `#248A3D` and **5.40** for the incumbent `green700`
+  `#1e7a34`; `:117` repeats the 4.40. Both reproduce exactly against **pure white** — re-measured here as
+  4.3953 and 5.4004 — and that was the right ground when the docblock was written (`c71e58bb`,
+  2026-09-08, whose light `successText` was the primitive `white`). `b05e723f` (2026-09-16) introduced
+  `onColorWarmLight` `#fbf7f3` and repointed `successText` to it, and against that ground the same two
+  hexes measure **4.1233** and **5.0662**. **The conclusion survives** — both values stay on the same
+  side of 4.5, so `green700` is still the correct keeper — but the recorded arithmetic does not, and it
+  is the kind that gets quoted forward into the next decision as a measured fact. Deliverable: the two
+  docblocks re-derived against the shipped ground, each stating which ground it was computed on. The same
+  commit moved `accentText`, `dangerText`, `warningText` and `textInverted` onto that primitive, so the
+  re-derivation should sweep their rows too rather than assume this one is alone.
+  (`packages/ui/src/tokens.ts`)

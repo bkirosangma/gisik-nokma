@@ -20,7 +20,130 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~06:1x IST. **STEP 2c-2 (THE LEGAL PAIR AND THE 404) IS
+> # ⛔ TOOL HAZARD, MEASURED 2026-09-18 ~07:0x IST — READ BEFORE ANY `git log` IN THIS WORKTREE.
+> # A `PreToolUse` hook (`rtk hook claude`, in `~/.claude/settings.json`) rewrites Bash commands that
+> # begin with `git` into `rtk git …`, and **`rtk git log` IGNORES its revision argument and logs HEAD
+> # instead.** Reproduced directly, more than once, by explicit invocation:
+> #   `rtk git log -1 --format=%H 657c69f0`        → `f4bf7a36…`  (the worktree's HEAD at that moment)
+> #   `rtk git log --oneline 798efa01..3831bb49`   → 50 lines     (the real range is 295 commits)
+> # **It is not consistently wrong, and that is the dangerous part.** Other runs of the same command
+> # SHAPE through the hook agreed exactly with the real binary (295 = 295; 8 = 8 and 126 = 126 for
+> # range+pathspec queries), so "it agreed last time" is not evidence and neither is "it looked fine".
+> # Both outputs are well-formed — a HEAD-based or truncated log reads exactly like a real one — so
+> # nothing inside the run can reveal it. **USE `/usr/bin/git` FOR EVERY git COMMAND WHOSE OUTPUT IS
+> # EVIDENCE IN THIS LANE**; an absolute path is not rewritten. Do not assume any subcommand is
+> # exempt: the hook also rewrites `git show` and `git diff`.
+> # Step 4b rests entirely on shas read out of `git log`; all 33 were derived with `/usr/bin/git`.
+> # **Step 4a's 41 promotions (#423) were made by the controller through this same shell and have NOT
+> # been re-audited** — treat their method as unverified rather than wrong.
+> # Step 4b's independent reviewer was told to reproduce this control first. It confirmed the hazard
+> # and added that the pathspec is dropped too — but **that figure did not reproduce here** (it
+> # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
+> # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
+
+> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~07:1x IST. **STEP 4b (THE LEDGER'S 36 `claimed` ROWS,
+> # THE `SUPERSEDED` POINTERS, AND FOUR CONTRAST-DEBT CASES) IS DONE, CHECKED, REVIEWED, AND ITS PR IS
+> # OPEN AGAINST `main`.** This block is the position; everything below it is RECORD.
+>
+> Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-step4b-ledger-evidence.md`. **The Step 2c-2 block
+> immediately below is a RECORD of a MERGED PR (#428), NOT the position.** Nothing in it is outstanding;
+> do not start work from it.
+>
+> **This step's PR targets `main`, not `owner/workspace-edits`.** That is the dispatch's own stated
+> exception — #429 landed the owner's branch on `main`, and the ledger's canonical home is `main`. The
+> branch was cut from `origin/main` at `657c69f0` and **moved to `5a5f06f0`** when the controller pushed
+> its anchor commit mid-step; the move was `reset --soft` + `git restore`, and **the controller's 15
+> lines in `controller-state.md` are byte-identical to `main`** — verified with
+> `git diff --quiet origin/main -- docs/lanes/controller-state.md`. (A `reset --soft` leaves a stale
+> index that READS as a staged deletion of the new commit's files; that is what happened here and was
+> caught by diffing against `origin/main` rather than by trusting `git status`.)
+>
+> | | |
+> |---|---|
+> | branch | `exec/step4b-ledger-evidence`, from `origin/main` |
+> | **PR** | base **`main`** — this step's own exception to "PRs target `owner/workspace-edits`" |
+> | merge-base | `5a5f06f0` (= `origin/main` at the freeze) |
+> | tree | clean at the frozen head |
+> | scope | **docs + catalogue ONLY** — `docs/lanes/task-ledger.tsv`, `test-cases/13-deployment-dogfooding.md`, and this file. **No source file differs from `main`**, and `git diff f4bf7a36 HEAD -- apps/ packages/` is empty, so the owner's hot containers see exactly the merged 2c-2 product |
+> | gate | docs-only, so `corepack pnpm turbo run typecheck --force` (the dispatch's own allowance) → **17/17 successful, 0 cached, EXIT 0**. Node **v22.22.2**, probed from inside the toolchain |
+> | six checks | all **EXIT 0**: `tasks` — **306 tasks / 306 rows, 280 done / 3 claimed / 23 todo** (was 246 / 36 / 24) · `citations` — ratchet holds; `13-deployment-dogfooding.md` **524 cited / 0 uncited / 524** (uncited count unmoved) · `case-ids` — **2208 unique ids, was 2204**, i.e. exactly the four minted · `env` · `runbook` · `help` |
+>
+> ## ▣ WHAT LANDED
+>
+> **Part 1 — the ledger.** Of the 36 `claimed 422 -` rows, **33 promoted to `done 422 <sha>`** and **3
+> stay `claimed` with a reason**. Every sha was confirmed twice: `git merge-base --is-ancestor <sha>
+> origin/main` exit 0, and `gh api repos/…/commits/<sha>/pulls` → **422**, both run as a loop over all 33.
+> The method for each row is in its note: the plan's `### Task N:` `Files:` block, then the FIRST commit
+> that makes the task's own change — **read from the diff, not the subject**, because the range carries
+> 295 commits, many named "Task N fix round 1", and `Task N` collides across plans on the same day.
+>
+> The three that stay: `shared-select-phase-1/10` and `/12` are **verification tasks that declare no
+> artefact**, so no commit can carry them; `workspaces-prototype-port/0`'s declared artefact is under
+> `.superpowers/`, which `.gitignore:26` ignores — **the baseline file exists but is not in git**.
+>
+> **`hig-per-screen/6a` → `done 354 863c11dd`** — a deviation from the dispatch, which named `422`.
+> Measured by scanning every `ui.css` revision on `main` (76 commits touch the file): zero real
+> `border`/`border-*` declarations remain under `.gn-sheet*`/`.gn-ticket*`/`.gn-history*` from
+> `863c11dd` forward; three remained at its parent `188abb63`. `863c11dd` *"The borders come off"*
+> (**#354**, 2026-09-08) removed 48 border declarations in a **contrast campaign, not this task**, and
+> is **before the #422 fork** — the dispatch's own second branch ("already true before the fork → cite
+> the PR that did it"). The plan's prescribed commit (`"Ticket sheet: HIG surface"`) does not exist,
+> which is why the row sat `todo`. **`hig-per-screen/10` stays `todo`**, its note now naming Help's
+> artefact commit (`9500106c`) and recording that Legal/NotFound were ported by #428 while
+> **McpAuthorize/McpTokens remain wire-gap**.
+>
+> **Part 2 — the catalogue.** `13.387` and `13.413` each gained one trailing `SUPERSEDED` sentence
+> (`by 13.673` / `by 13.674`); no renumber, no deletion, statuses unchanged. `13.387`'s pointer was
+> checked against the `13.673` entry's own prose ("13.387's live revision"), not only the dispatch. The
+> `13.690` sentence inside the 2c-2 block that predicted the next free id was corrected **in the same
+> commit**, so no forward pointer is left stale. **Block `13.690`–`13.693`, four `❌` cases**, recording
+> three contrast debts from #426's review plus one stale calibration; each names its FIX as the
+> deliverable, because a case that only pins a number can be satisfied by deleting the pin.
+>
+> **The arithmetic was re-derived, not transcribed, and one number did not survive.** Verified on the
+> shipped role→primitive map: `contested` on `surface` in `hig`/`minimal` light **4.3746** (its roster
+> row declares `minimum: 3`, so the gate cannot see it), `warning` on surface **4.2485** and `danger` on
+> surface **4.4013** — neither pair named by ANY `CONTRAST_PAIRS` row. All reproduce #426's review to
+> four decimals. The fourth did not: `tokens.ts:36-38` records `successText` on `success` as **4.40 /
+> 5.40**, which reproduces **exactly against pure white** (4.3953 / 5.4004) — correct grounds when
+> `c71e58bb` wrote it on 2026-09-08, when light `successText` *was* the `white` primitive. `b05e723f`
+> (2026-09-16) introduced `onColorWarmLight` `#fbf7f3` and repointed `successText` to it; on the
+> shipped ground the same hexes measure **4.1233 / 5.0662**. The conclusion survives; the recorded
+> arithmetic does not.
+>
+> ## ▣ REVIEW, AND WHERE THE FREEZE LINE IS
+>
+> The reviewer ran **before the PR opened** and its six-row sample was drawn at random, not chosen. The
+> frozen head is the commit that ADDS this block. **Nothing is pushed after it.**
+>
+> **Reviewer result (an independent agent, dispatched before the PR opened).** Six of the 33 promoted
+> rows were drawn **at random — fixed seed, not chosen**: `workspaces-prototype-port/10`,
+> `account-help-screens/1`, `filter-exclude-all-tabs/11`, `shared-select-phase-1/7`,
+> `filter-exclude-all-tabs/9`, `workspaces-prototype-port/4`. It re-derived each sha from the plan's
+> `Files:` block and the diffs **before** comparing to the recorded value: **6/6 agree**, all six
+> ancestry-confirmed and all six owned by PR #422. It surfaced two things that are now in the tree:
+>
+> * `filter-exclude-all-tabs/11` carries a genuine **subject collision** — `c2c8be1c`, the
+>   *backlog-and-closed-core* plan's Task 12, is the same day with a near-identical subject and also
+>   contains the string "one line per task". The recorded `7e45bf7c` is correct only because its
+>   paragraph cites 13.538–13.561, `TriStateChoice` and `boardFilter.exclude`; a subject-matched
+>   derivation has a real chance of taking the wrong one. This is the dispatch's own warning, met.
+> * `shared-select-phase-1/7` is a **split** task: the recorded commit carries the component half, and
+>   the test half landed one commit later in `19055d0a` (whose parent is exactly `17b09f4a`).
+>   Confirmed here and **disclosed in the ledger note** rather than left implied.
+>
+> **Two of the reviewer's own claims did NOT reproduce under my re-check** and are not in the tree:
+> that `git show` is *not* rewritten by the hook (it is), and a pathspec-truncation figure (I measure
+> the real count). Recorded because a peer's finding is a claim, not a fact — and the two that did
+> hold are the ones that changed the artefacts.
+>
+> ## ▣ NEXT
+>
+> The controller merges. **The executor holds for the controller's next dispatch** — do not start
+> anything from this block or from any block below it. The three `claimed` rows and `hig-per-screen/10`
+> are the only tasks this step did not close, and each carries its reason in the ledger itself.
+
+> # ▣ RECORD — THURSDAY 2026-09-18 ~06:1x IST. **STEP 2c-2 (THE LEGAL PAIR AND THE 404) IS
 > # DONE, GATED, REVIEWED, AND ITS PR IS OPEN AGAINST `owner/workspace-edits`.** This block is the
 > # position; everything below it is RECORD.
 >
