@@ -293,6 +293,15 @@ function WorkspaceSettingsTab({ workspaceId }: { workspaceId: string }) {
       // Re-read rather than patching local state: the form then shows the
       // SERVER's values, which is the only way a projection that clamped, or a
       // claim the engine adjusted, becomes visible on this screen.
+      //
+      // **This line alone does NOT deliver that, and the independent review
+      // caught it.** The reload gives THIS page a new `settings` object; the form
+      // holds its draft in `useState` initialisers, which React runs once, so it
+      // kept rendering the submitted values and the sentence above was false.
+      // The other half lives in `WorkspaceSettingsForm`'s `adoptOnNextLoad`
+      // effect, which re-derives the draft from the next `settings` this form
+      // sees after ITS OWN successful save. If that effect is ever removed, this
+      // comment is a lie again — case 13.718 is what fails.
       onSaved={settings.reload}
     />
   );

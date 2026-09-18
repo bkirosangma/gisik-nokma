@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { WorkspaceMember } from '@gisik-nokma/app-core';
@@ -472,6 +472,226 @@ describe('13.716 the Workspace settings tab', () => {
       screen.getByText('Only a workspace admin can change these.'),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(captured).toHaveLength(0);
+  });
+});
+
+/**
+ * Fix round, after the independent review. Two of these close SURVIVING MUTANTS
+ * the reviewer proved live (`Off` coercion; the `invalid` gate) — a survivor is
+ * evidence about the TESTS rather than about the code, and a docblock claiming a
+ * property no test pins is the shape this series keeps recording.
+ */
+describe('13.718-13.720 the Workspace settings tab — what the review found unpinned', () => {
+  /**
+   * Re-declared rather than shared: the block above declares its own `SETTINGS`
+   * INSIDE its `describe` callback, so it is not in scope here. The first run of
+   * these cases failed with `Unable to find a label with the text of: Stale
+   * after` — a ReferenceError inside the stub surfacing as a missing form, i.e.
+   * a case failing for a reason unrelated to the property it names. The
+   * auto-close `30` is what makes this the ON fixture; 13.719 below uses the OFF
+   * one.
+   */
+  const SETTINGS = {
+    staleDays: 3,
+    dueSoonDays: 14,
+    autoCloseAfterDays: 30,
+    provenance: {
+      actorId: ME,
+      actorName: 'Anselma Marak',
+      clientTime: '2026-09-18T04:00:00.000Z',
+      serverTime: '2026-09-18T04:00:01.000Z',
+    },
+  };
+  const OFF_SETTINGS = {
+    staleDays: 3,
+    dueSoonDays: 14,
+    autoCloseAfterDays: null,
+    provenance: null,
+  };
+
+  /**
+   * 13.718 — **the form shows the SERVER's values after a save, even when the
+   * server's answer differs from what was submitted.**
+   *
+   * This is the review's Important finding (F1) and it was a REAL defect, not a
+   * false comment: the draft and the `Off` box are `useState` initialisers, which
+   * React runs ONCE, so `onSaved`'s `settings.reload` gave the page new data and
+   * the form kept rendering the user's stale draft. The page's own comment
+   * promised "a projection that clamped, or a claim the engine adjusted, becomes
+   * visible on this screen" — and it did not.
+   *
+   * The fixture is built so the divergence is VISIBLE, which is the whole point:
+   * the second read answers `30` where the user submitted `14`. A form that
+   * tracked the server shows 30; a form that kept its draft shows 14. The
+   * assertion is on the server's number, so this case fails against the
+   * pre-fix code and cannot pass for the wrong reason.
+   */
+  it('13.718 adopts the server values after a save, even when they differ from what was sent', async () => {
+    const captured: SubmittedEvent[][] = [];
+    const services = stubServices(
+      {
+        // First read: what the user sees and edits. Second read (after the
+        // save): the server's own answer, deliberately DIFFERENT.
+        getWorkspaceSettings: (() => {
+          let call = 0;
+          return async () => {
+            call += 1;
+            return call === 1 ? SETTINGS : { ...SETTINGS, autoCloseAfterDays: 30 };
+          };
+        })(),
+      },
+      {
+        authoring: {
+          listMembers: async () => rosterWhereIAm('admin'),
+          listTicketTypes: async () => TYPES,
+          listWorkflows: async () => WORKFLOWS,
+        },
+      },
+    );
+    const dataSource = {
+      ...services.dataSource,
+      ingest: async (events: SubmittedEvent[]) => {
+        captured.push(events);
+        return events.map((event) => ({
+          status: 'committed' as const,
+          eventId: event.id,
+          seq: 1,
+          serverTime: '2026-09-18T04:00:02.000Z',
+        }));
+      },
+    };
+    setQuery({ workspaceId: WORKSPACE, tab: 'workspace' });
+    render(
+      <Providers services={{ ...services, dataSource }}>
+        <SettingsPage />
+      </Providers>,
+    );
+
+    const autoClose = await screen.findByLabelText('Auto-close after');
+    await userEvent.clear(autoClose);
+    await userEvent.type(autoClose, '14');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    // The submit happened…
+    expect(captured).toHaveLength(1);
+    expect(captured[0]?.[0]?.payload).toEqual({ autoCloseAfterDays: 14 });
+    // …and the field now shows the SERVER'S 30, not the submitted 14.
+    await waitFor(() => {
+      expect(screen.getByLabelText('Auto-close after')).toHaveValue(30);
+    });
+  });
+
+  /**
+   * 13.719 — **`Off` on a workspace that is ALREADY off is not a change**, and
+   * Save stays disabled.
+   *
+   * The review proved this line unpinned by mutation (M9): making the `Off`
+   * branch claim `null` unconditionally left all 11 cases green, because every
+   * existing fixture starts at `autoCloseAfterDays: 30` with the box UNCHECKED.
+   * The already-off workspace was never exercised. It is the state most
+   * workspaces are in, since `null` is the default.
+   *
+   * The mutant was proved live rather than assumed harmless: on this fixture the
+   * real code leaves Save disabled and the mutant enables it.
+   */
+  it('13.719 Off on an already-off workspace is not a change — Save stays disabled', async () => {
+    const captured: SubmittedEvent[][] = [];
+    const services = stubServices(
+      { getWorkspaceSettings: async () => OFF_SETTINGS },
+      {
+        authoring: {
+          listMembers: async () => rosterWhereIAm('admin'),
+          listTicketTypes: async () => TYPES,
+          listWorkflows: async () => WORKFLOWS,
+        },
+      },
+    );
+    const dataSource = {
+      ...services.dataSource,
+      ingest: async (events: SubmittedEvent[]) => {
+        captured.push(events);
+        return events.map((event) => ({
+          status: 'committed' as const,
+          eventId: event.id,
+          seq: 1,
+          serverTime: '2026-09-18T04:00:02.000Z',
+        }));
+      },
+    };
+    setQuery({ workspaceId: WORKSPACE, tab: 'workspace' });
+    render(
+      <Providers services={{ ...services, dataSource }}>
+        <SettingsPage />
+      </Providers>,
+    );
+
+    // The box mounts TICKED, because the workspace is already off.
+    const off = await screen.findByLabelText('Off');
+    expect(off).toBeChecked();
+    expect(screen.getByLabelText('Auto-close after')).toBeDisabled();
+    // Nothing has changed, so there is nothing to submit.
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+
+    // Toggling it off and back on is still not a change.
+    await userEvent.click(off);
+    await userEvent.click(off);
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(captured).toHaveLength(0);
+  });
+
+  /**
+   * 13.720 — **an unparseable draft disables Save and submits nothing.**
+   *
+   * The reviewer proved the `invalid` gate unpinned by mutation (M12): removing
+   * it from BOTH the `save()` early return and the button's `disabled` left all
+   * 11 cases green, because no case ever constructed an invalid draft.
+   *
+   * The second half of the finding is why the docblock above the gate was
+   * REWRITTEN rather than left alone: it claimed the user "sees that something
+   * is wrong", and the reviewer measured that no alert appears — the only signal
+   * is the greyed-out button. The comment now says that, because a comment
+   * describing a signal the product does not emit is the same defect class as a
+   * test asserting a property nothing pins.
+   */
+  it('13.720 an emptied number field disables Save and ingests nothing', async () => {
+    const captured: SubmittedEvent[][] = [];
+    const services = stubServices(
+      { getWorkspaceSettings: async () => SETTINGS },
+      {
+        authoring: {
+          listMembers: async () => rosterWhereIAm('admin'),
+          listTicketTypes: async () => TYPES,
+          listWorkflows: async () => WORKFLOWS,
+        },
+      },
+    );
+    const dataSource = {
+      ...services.dataSource,
+      ingest: async (events: SubmittedEvent[]) => {
+        captured.push(events);
+        return events.map((event) => ({
+          status: 'committed' as const,
+          eventId: event.id,
+          seq: 1,
+          serverTime: '2026-09-18T04:00:02.000Z',
+        }));
+      },
+    };
+    setQuery({ workspaceId: WORKSPACE, tab: 'workspace' });
+    render(
+      <Providers services={{ ...services, dataSource }}>
+        <SettingsPage />
+      </Providers>,
+    );
+
+    const stale = await screen.findByLabelText('Stale after');
+    await userEvent.clear(stale);
+    // A change elsewhere does NOT rescue it: the form refuses to submit a claim
+    // that silently omits the field the user emptied.
+    await userEvent.clear(screen.getByLabelText('Auto-close after'));
+    await userEvent.type(screen.getByLabelText('Auto-close after'), '14');
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     expect(captured).toHaveLength(0);
   });
 });

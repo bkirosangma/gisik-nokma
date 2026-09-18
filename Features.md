@@ -578,6 +578,24 @@ reason on record, not an oversight:*
   disabled control is not. **It reads through a new additive `DataSourceQuery.getWorkspaceSettings`**
   (see the next bullet). Cases 13.716. `apps/web/src/workspace-settings-form.tsx`,
   `apps/web/app/settings/page.tsx`, `apps/web/test/settings-page.test.tsx`
+  **Fix round, after the independent review (2026-09-18).** The review found one **Important** defect
+  and three mutations that survived the whole suite. **The Important one was real, not a false
+  comment:** `onSaved`'s `settings.reload` gave the page new data, but the form's draft and `Off` box
+  are `useState` **initialisers** — React runs them once — so the form kept rendering the SUBMITTED
+  values, and the sentence promising that a clamped or engine-adjusted claim "becomes visible on this
+  screen" was false. Case 13.718 reproduced it (a second read answering `30` left the field on the
+  submitted `14`) and is its regression test; the fix, `adoptOnNextLoad`, re-derives the draft from
+  the next `settings` the form sees after **its own** successful save — deliberately not "adopt on
+  every change", since `useLiveQuery` refetches on every stream move and an unconditional adopt would
+  clobber a draft mid-typing. The three survivors each got a case and each case was proved to kill its
+  own mutant: **M9** (the `Off` branch claiming `null` unconditionally, live but unexercised because no
+  fixture was in the already-off state) dies on **13.719**; **M12** (the `invalid` gate removed from
+  both the guard and the button) dies on **13.720**; **M7** (the read door's non-object guard returning
+  defaults instead of refusing) dies on **13.721**, whose reachability is stated as a guard rather than
+  a witnessed behaviour because no production path to it was found. The same review measured that the
+  `invalid` gate's promised signal does not exist — the user sees a greyed-out button and nothing else
+  — so that docblock was **rewritten rather than left alone**, and a message naming the offending field
+  is recorded as a follow-on instead of implied. Cases 13.718–13.721
 - ⚙️ **`getWorkspaceSettings` on the client `DataSource`** — second wave, 2026-09-18 (Task 6), and a
   **recorded deviation from the task plan** rather than a transcription of it. The plan told the
   implementer to extend a `mapWorkspaceSettings` in `app-core/src/online/mappers.ts` and asserted the

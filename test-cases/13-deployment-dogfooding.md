@@ -9773,3 +9773,53 @@ isolating its property.**
 3. **Restore verified by checksum, not by reading**: the pristine file was copied aside first and its
    SHA-256 recorded in the same invocation as the backup's, so the "restored" comparison is
    same-path/same-invocation rather than a shell `diff`.
+
+**Task 6 fix round, after the independent review — `13.718`–`13.721`.** The review found one
+**Important** defect and three mutations that SURVIVED the whole suite. A survivor is evidence about
+the TESTS rather than about the code, so each one got a case, and each case was then proved to kill
+its own mutant before the fix was called done.
+
+- ✅ **13.718 — the form adopts the SERVER's values after a save, even when they differ from what was
+  submitted.** The review's Important finding (F1), and it was a REAL defect rather than a false
+  comment. `onSaved`'s `settings.reload` gave the page new data, but the form holds its draft and its
+  `Off` box in `useState` **initialisers**, which React runs once — so it kept rendering the
+  submitted values, and the page's comment promising that "a projection that clamped, or a claim the
+  engine adjusted, becomes visible on this screen" was false. **Reproduced before it was fixed**: the
+  fixture has the second read answer `30` where the user submitted `14`, and the case failed with the
+  field showing `14`. The fix is `adoptOnNextLoad`, which re-derives the draft from the next
+  `settings` the form sees after ITS OWN successful save — deliberately NOT "adopt on every settings
+  change", because `useLiveQuery` refetches whenever the workspace stream moves and an unconditional
+  adopt would clobber a draft somebody is typing the moment another admin saved anything.
+  `apps/web/src/workspace-settings-form.tsx`, `apps/web/app/settings/page.tsx`
+- ✅ **13.719 — `Off` on an already-off workspace is not a change, and Save stays disabled.** Kills
+  the review's surviving mutation **M9** (the `Off` branch claiming `null` unconditionally), which the
+  reviewer proved LIVE: the mutant left all 11 cases green while enabling Save on a workspace that was
+  already off. Every pre-existing fixture started at `autoCloseAfterDays: 30` with the box unchecked,
+  so the state most workspaces are actually in — `null` is the default — was never exercised.
+  Re-run after the fix: **M9 dies on 13.719 and nothing else.**
+- ✅ **13.720 — an emptied number field disables Save and ingests nothing.** Kills the review's
+  surviving mutation **M12** (the `invalid` gate removed from BOTH the `save()` guard and the button),
+  which survived the whole suite because no case ever built an invalid draft. Re-run after the fix:
+  **M12 dies on 13.720 and nothing else.** The same finding had a second half, and it is why the
+  docblock above the gate was **rewritten rather than left alone**: it claimed the user "sees that
+  something is wrong", and the reviewer measured that no alert appears — the entire signal is a
+  greyed-out button. A comment describing a signal the product does not emit is the same defect class
+  as a test asserting a property nothing pins. A message naming the offending field is recorded as a
+  follow-on, NOT implied by the comment.
+- ✅ **13.721 — `getWorkspaceSettings` refuses a body that is not an object.** Kills the review's
+  surviving mutation **M7** (the non-object guard returning the domain defaults instead of throwing),
+  which left all 29 cases green because the existing 13.717 case supplies a body that IS an object and
+  merely lacks `settings`, so it refuses inside `mapWorkspaceSettings` for a different reason. Re-run
+  after the fix: **M7 dies on 13.721 and nothing else.** **Reachability is stated honestly rather than
+  implied**: neither the reviewer nor this session found a production path that feeds the route a
+  non-object body, so this pins a GUARD rather than a witnessed server behaviour — which is the
+  guard's whole job at a network boundary the type system does not police.
+
+**Not fixed, and recorded rather than smoothed.** The review noted a Minor inconsistency: the core
+fake (`packages/app-core/test/helpers/fake-data-source.ts`) invents defaults for this door while the
+web stub (`apps/web/test/helpers/stub-services.ts`) deliberately refuses. **Kept as-is, on purpose**:
+the two helpers have different jobs and always have — the core fake is a working fake whose defaults
+mirror states the product can really produce (`getTicketTypes` does the same), while the web stub's
+rule is that a read a case did not stub must fail loudly. The web stub's refusal is the one that
+pins the settings screen, and 13.716/13.718 depend on it. Changing the core fake to refuse would
+break unrelated suites for a consistency that buys nothing here.

@@ -1087,3 +1087,55 @@ describe('13.717 getWorkspaceSettings — the workspace settings read door', () 
     await expect(restoredSource.query.getWorkspaceSettings(WORKSPACE)).resolves.toBeDefined();
   });
 });
+
+/**
+ * Fix round, after the independent review. **The read door's non-object-body
+ * guard was pinned by nothing**: mutation M7 — replacing the `HttpError` with a
+ * return of the domain defaults — left all 29 cases green, because the 13.717
+ * "refuses a body without settings" case supplies a body that IS an object and
+ * merely lacks the key, so it refuses inside `mapWorkspaceSettings` for a
+ * different reason. A guard that can be deleted silently is the "silently
+ * returns a default where it should refuse" class this project keeps recording.
+ *
+ * **Reachability, stated honestly:** the reviewer could not establish a
+ * production path that feeds the route's body as a non-object, and neither could
+ * this session. This case therefore pins a GUARD rather than a witnessed
+ * server behaviour — which is worth doing precisely because the guard's whole
+ * job is to be the thing that fails if that ever changes, and nothing about a
+ * response shape is guaranteed by the type system at a network boundary.
+ */
+describe('13.721 getWorkspaceSettings refuses a body that is not an object', () => {
+  const MEMBERS_BODY = {
+    workspaceId: WORKSPACE,
+    members: [{ userId: ANSELMA, displayName: 'Anselma Marak', role: 'owner' }],
+  };
+
+  /**
+   * 13.721 — a 200 whose body is a STRING (not null, not an object) is refused
+   * rather than read for a `settings` key that cannot be there.
+   *
+   * The control is in the same run: the identical fixture with a real object
+   * body resolves, so the rejection is caused by the SHAPE and not by the
+   * fixture being broken.
+   */
+  it('13.721 rejects a non-object body, and the same fixture with an object resolves', async () => {
+    const bad = recordingFetch({
+      [`/v1/workspaces/${WORKSPACE}/attention`]: 'not-an-object',
+      [`/v1/workspaces/${WORKSPACE}/members`]: MEMBERS_BODY,
+    });
+    const badSource = createOnlineDataSource({ baseUrl: '', fetchImpl: bad.fetchImpl });
+    await expect(badSource.query.getWorkspaceSettings(WORKSPACE)).rejects.toBeInstanceOf(HttpError);
+
+    const good = recordingFetch({
+      [`/v1/workspaces/${WORKSPACE}/attention`]: {
+        workspaceId: WORKSPACE,
+        generatedAt: '2026-09-18T04:00:00.000Z',
+        settings: { staleDays: 7, dueSoonDays: 7, autoCloseAfterDays: null, provenance: null },
+        items: [],
+      },
+      [`/v1/workspaces/${WORKSPACE}/members`]: MEMBERS_BODY,
+    });
+    const goodSource = createOnlineDataSource({ baseUrl: '', fetchImpl: good.fetchImpl });
+    await expect(goodSource.query.getWorkspaceSettings(WORKSPACE)).resolves.toBeDefined();
+  });
+});

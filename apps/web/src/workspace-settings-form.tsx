@@ -105,6 +105,44 @@ export function WorkspaceSettingsForm({
   const [serverRefusal, setServerRefusal] = useState<{ rule: string; reason: string } | null>(null);
   const [transportError, setTransportError] = useState<string | null>(null);
   const mountedRef = useRef(true);
+  /**
+   * The last `settings` object this form derived its draft from. `useLiveQuery`
+   * hands a NEW object on every load, so identity is a sound signal that the
+   * server has answered again.
+   */
+  const derivedFrom = useRef(settings);
+  /**
+   * Set when a SAVE commits, and consumed by the effect below.
+   *
+   * The draft and the `Off` box are `useState` INITIALISERS, which React runs
+   * ONCE — so without this, `onSaved`'s reload gives the page new data and the
+   * form keeps rendering the user's draft. **That is not hypothetical: it is the
+   * independent review's Important finding, and case 13.718 reproduces it** —
+   * a second read answering `30` left the field showing the submitted `14` with
+   * Save enabled, so the page's comment promising that "a projection that
+   * clamped, or a claim the engine adjusted, becomes visible on this screen"
+   * was false.
+   *
+   * It is deliberately NOT "adopt on every settings change". `useLiveQuery`
+   * refetches whenever the workspace stream moves, so an unconditional adopt
+   * would clobber a draft somebody is typing the moment another admin saved
+   * anything. This adopts only across a save THIS form made — the one moment the
+   * user's draft is spent and the server's answer is the thing they asked for.
+   */
+  const adoptOnNextLoad = useRef(false);
+  useEffect(() => {
+    if (derivedFrom.current === settings) return;
+    derivedFrom.current = settings;
+    if (!adoptOnNextLoad.current) return;
+    adoptOnNextLoad.current = false;
+    setDraft({
+      staleDays: String(settings.staleDays),
+      dueSoonDays: String(settings.dueSoonDays),
+      autoCloseAfterDays:
+        settings.autoCloseAfterDays === null ? '' : String(settings.autoCloseAfterDays),
+    });
+    setAutoCloseOff(settings.autoCloseAfterDays === null);
+  }, [settings]);
   useEffect(
     () => () => {
       mountedRef.current = false;
@@ -120,8 +158,18 @@ export function WorkspaceSettingsForm({
    * input — and both mean off. Every other value must parse to a finite number;
    * an unparseable one is NOT dropped from the change set, because dropping it
    * would submit a claim that silently omits what the user typed. Instead the
-   * whole form reports itself unsubmittable (below), so the user sees that
-   * something is wrong rather than watching a field they edited be ignored.
+   * whole form reports itself unsubmittable via `invalid` (below).
+   *
+   * **WHAT `invalid` ACTUALLY DOES, stated because the earlier text claimed
+   * more.** It disables Save. That is the ENTIRE signal — the independent review
+   * measured it and found no alert, no message, nothing but a greyed-out button,
+   * so an earlier sentence here saying the user "sees that something is wrong"
+   * described a signal the product does not emit. The gate is doing real work
+   * (mutation M12, removing it from both the `save()` guard and the button,
+   * survived the whole suite until case 13.720 pinned it); the sentence around
+   * it was the defect. A message naming the offending field would be better and
+   * is NOT built here — recorded as a follow-on rather than implied by a
+   * comment.
    */
   const changes = useMemo(() => {
     const out: Partial<Record<Knob, number | null>> = {};
@@ -183,6 +231,11 @@ export function WorkspaceSettingsForm({
         if (mountedRef.current) {
           setServerRefusal(null);
           setTransportError(null);
+          // Arms the adopt-on-load effect: the next `settings` this form sees is
+          // the server's answer to THIS claim, and it — not the draft — is what
+          // the fields must show. See the ref's own docblock for why this is not
+          // simply "always adopt".
+          adoptOnNextLoad.current = true;
         }
         onSaved();
         return;
