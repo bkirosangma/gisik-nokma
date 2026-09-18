@@ -52,6 +52,14 @@ export {
   type TicketListState,
 } from './views/ticket-list.js';
 export { AttentionStrip, useAttention, type AttentionStripProps } from './views/attention-strip.js';
+// Second wave Task 5 — the Backlog tab's rank arithmetic. Pure and headless;
+// `apps/web`'s `backlog-rank-controls.tsx` is the only caller today.
+export {
+  moveTarget,
+  neighboursFor,
+  sortByRank,
+  type RankRow,
+} from './views/backlog-rank.js';
 export { MyWork, useMyWork, type MyWorkProps } from './views/my-work.js';
 export {
   PlainTextEditorSlot,

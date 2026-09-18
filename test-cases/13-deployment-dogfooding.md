@@ -8789,6 +8789,107 @@ exists to catch, so it failed and was right to. The fix is a fourth, DRIVEN rend
 component painting the wrong one would not pass a class-union scan) rather than a subtraction from the
 equality. `packages/app-core/test/views/ticket-list-css-binding.test.tsx:229`, `:267`
 
+**Task 5 (the Backlog tab's rank order, drag reorder, Move up / Move down) — `13.707`–`13.710`.** Ids
+recounted at this tip (branch `exec/second-wave-t5-backlog-rank`, cut from `origin/main` `488bfb2d`) two
+independent ways: over case MARKERS in this file using the same `ID_LINE` regex `scripts/check-case-ids.mjs`
+sweeps with — never a substring sweep — and over `13.*` ids anywhere in `packages/` + `apps/`. Both agree.
+The highest id minted inside this executor's block (`13.700`–`13.759`) is **`13.706`** (Task 4's), and
+`13.707`–`13.710` appear **nowhere**: `grep -rnE '13\.70[7-9]|13\.710'` over `packages/`, `apps/` and
+`test-cases/` returns no hits at all, against a positive control of the same command shape over
+`13\.70[0-6]`, which finds them in both the catalogue and the code, and a null control over `13\.999`
+(absent from code, and documented at `:8699` as a truncation trap). `13.711`–`13.759` remain unminted;
+executor 2's parallel block (`13.760`–`13.819`) is untouched. The plan's own ids `13.622`–`13.625` were
+**NOT** used — the dispatch records them as taken.
+
+**The first RED for the pure module was NOT an assertion failure, and that is recorded rather than
+smoothed.** `packages/app-core/src/views/backlog-rank.ts` did not exist when
+`test/views/backlog-rank.test.ts` was written, so the first run failed on module resolution. That is a
+weaker signal than a test failing on its own assertion, because it cannot distinguish a case that pins a
+property from one that would pass against anything — so the falsifiability of this file rests on M1 below,
+run after the module existed, not on the RED. The web half's RED was the stronger kind: the six new cases
+failed inside a rendered page for a concrete reason (`Unable to find an accessible element with the role
+"button" and name "Move First up"`), while the four pre-existing cases in the same file stayed green.
+
+**The mutation battery — two, each restored by `cp` and verified by sha256, each verified to have CHANGED
+the file before its result was read.** M1 `neighboursFor` returns the swapped pair `{ before: after,
+after: before }` (the plan's own target) → **killed**, 6 of 19 cases red. M2 `submitRank` ingests
+`before ?? 'i'` instead of the computed key (also the plan's own target) → **killed**, 3 of 10 red — **and
+those three are the one-line proof the dispatch asked for: both 13.709 drag cases fail alongside 13.708's
+between assertion, which is only possible because the drag and the two buttons compute their keys through
+the same `submitRank`.** A second, independently-computed neighbour for the drag would have kept 13.709
+green while 13.708 alone went red.
+
+**Three defects were introduced by this task's own edits and caught before the commit — two by a gate, one
+by reading.** A JSX comment written as `{/* … */}` is **not valid in a JSX opening tag's ATTRIBUTE list**:
+esbuild parses the brace as a spread attribute and refuses (`Expected "..." but found "}"`), which is why
+every comment in that position in `page.tsx` is bare `/* … */`. And `apps/web`'s `typecheck` caught two
+errors `vitest run` structurally cannot see, because vitest transpiles without type-checking: an import of
+`DRAG_TICKET_FORMAT` that the test never used (it is not on the app-core barrel — that package's own suite
+imports it by relative path), and a deferred resolver held in `let answer: ((… ) => void) | null = null`,
+which TypeScript narrows to `null` at the call site because the only assignment happens inside a callback
+the checker cannot see (`answer?.()` reports *Type 'never' has no call signatures*). The resolver is now a
+one-slot array, which is not narrowed that way. **A green `vitest run` is not evidence of type-correctness,
+and this is the second task running where that gap was where the defect lived.**
+
+**The cross-package `dist` rule fired in its documented direction.** `apps/web` imports `sortByRank` from
+`@gisik-nokma/app-core` by package name, so it resolves through `packages/app-core/dist`, while the app-core
+suite imports `../../src/views/backlog-rank.js` by relative path — the suite that catches a change is the
+relative-path one, and the by-package-name one tests a stale `dist`. `pnpm --filter @gisik-nokma/domain
+--filter @gisik-nokma/app-core build` ran BEFORE any suite was trusted.
+
+- ✅ **13.707 — the three pure rank helpers: order, the `rankBetween` neighbour pair, and where a Move up /
+  Move down button points.** Nineteen cases, and every assertion is about ORDER or ABOUT WHICH ROW'S KEY,
+  never about a key's spelling — because `rankBetween` only refuses an *inverted* pair (`before >= after`),
+  so a pair that is merely off by one row produces a perfectly valid key in the wrong place and the tab
+  renders it happily. `sortByRank`'s cases separate "sorts by rank" from "sorts by id" with a fixture whose
+  ranks and ids run in OPPOSITE orders (`z`/`'g'` before `a`/`'n'`), so a helper that ignored `rank`
+  entirely cannot pass. `neighboursFor` pins the rule the plan asked to be written down — when the row is
+  placed last and the last row is UNRANKED, `before` is the last **ranked** row's key, because an unranked
+  row has no key to sit after; reading `.rank` off the immediately preceding row answers `null`, and
+  `rankBetween(null, null)` is the midpoint, i.e. the row is teleported to the TOP of the backlog while the
+  pointer sat on the tail zone. The moved row is excluded from its own neighbour search (a case that fails
+  with A's own key if it is not), and an unknown id is a non-crash. `moveTarget` pins the boundary BETWEEN
+  its two edge cases at a two-row list, and that `down` points two rows below rather than one — pointing at
+  the row directly below is a NO-OP that would spend a server round trip to move nothing.
+  `packages/app-core/src/views/backlog-rank.ts:55`, `:82`, `:113`,
+  `packages/app-core/test/views/backlog-rank.test.ts:30`, `:74`, `:134`
+
+- ✅ **13.708 — the Backlog tab draws rows in rank order, `Move down` ingests exactly one `ticket.ranked`
+  whose key is strictly BETWEEN its neighbours, the row moves before the server answers, and a refusal
+  snaps the order back with the reason shown.** Three cases, each naming the other two's failure as its
+  control. The order case feeds the stub the rows in the REVERSE of the answer, so a tab that rendered
+  `rows` as they arrived draws exactly backwards. The between-assertion is two comparisons on the CAPTURED
+  PAYLOAD (`rank > 'n'` and `rank < 't'`) and never a literal, because a literal would pass on any
+  plausible spelling — including one that sorts the row somewhere else entirely — and M2 proves the
+  assertion is load-bearing. The optimistic half holds the ingest OPEN on purpose: a stub that resolved
+  immediately would let the reload land first and make "the row moved optimistically" indistinguishable
+  from "the row moved". The refusal case asserts the optimistic position FIRST and then the snap-back, so a
+  component that never moved at all cannot satisfy it, and it asserts the Ruling-27 sentence shape
+  (`Refused by the server — <rule>: <reason>`) rather than merely that something was rendered.
+  `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:631`, `:242`,
+  `apps/web/src/backlog-rank-controls.tsx:78`, `apps/web/test/backlog-tab.test.tsx:335`
+
+- ✅ **13.709 — a drag of the last row onto the first ingests a key BELOW the first row's, and a drop on
+  the tail zone ingests a key ABOVE the last ranked row's.** Asserted with `<`/`>` on the captured payload,
+  never a literal key. These two cases are the drag half of the plan's one-path requirement: M2 reddens
+  both of them together with 13.708's between assertion, which is what makes "the drag and the buttons
+  share `submitRank`" a measurement rather than a claim about the source. The gesture is driven through the
+  same `dataTransfer` stand-in Task 4's suite uses (`ticket-list.test.tsx:1509`), copied rather than
+  re-invented so both suites exercise the component through an identical transfer shape; and because the
+  tail drop is genuinely a DIFFERENT target from a row drop, the two cases cannot both pass by way of one
+  handler.
+  `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:651`, `:1949`,
+  `apps/web/src/backlog-rank-controls.tsx:78`, `apps/web/test/backlog-tab.test.tsx:469`
+
+- ✅ **13.710 — only the top row's `Move up` and the bottom row's `Move down` are disabled.** The two
+  disabled assertions plus four enabled ones, and the enabled half is the point: `Move Second down` must
+  stay ENABLED even though there is no row two below it, because that button means "place last" — a
+  component that disabled the button whenever `index + 2` ran past the end would pass the two disabled
+  lines and silently strand the second-to-last row, which is the exact off-by-one `moveTarget`'s docblock
+  exists to prevent.
+  `packages/app-core/src/views/backlog-rank.ts:113`, `apps/web/src/backlog-rank-controls.tsx:163`,
+  `apps/web/test/backlog-tab.test.tsx:540`
+
 **Two plan-text deviations, both named rather than silently taken.** (1) The plan puts the tail zone "after
 the table" and cites `ticket-list.tsx`'s `ListTable` mount; it is rendered ONCE in `TicketList`, after the
 sections, because a grouped list mounts one `ListTable` per SECTION and a zone per section would put N drop

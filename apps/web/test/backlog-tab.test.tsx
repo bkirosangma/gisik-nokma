@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BACKLOG_STATE_ID, type TicketTypeDef, type WorkflowDef } from '@gisik-nokma/domain';
@@ -259,5 +259,308 @@ describe('13.595 Start on a Backlog row', () => {
     await waitFor(() => expect(startButton).toBeEnabled());
     // Never the transport wording, for a refusal — Ruling 27/41's split.
     expect(screen.queryByText(/did not answer this start/)).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Second wave Task 5 — the Backlog tab's rank order, drag reorder, and the
+// Move up / Move down buttons.
+// ---------------------------------------------------------------------------
+
+/**
+ * The page's rows, in the order the DOM renders them. `TicketList` puts
+ * `data-testid="ticket-card-<ticketId>"` on each row's title cell, so the
+ * query is in DOCUMENT ORDER — which is the only thing these cases are
+ * about. Reading the order out of the fixture instead would assert what the
+ * stub answered, not what the tab drew.
+ */
+function backlogOrder(): string[] {
+  return Array.from(document.querySelectorAll('[data-testid^="ticket-card-"]')).map((el) =>
+    (el.getAttribute('data-testid') ?? '').replace('ticket-card-', ''),
+  );
+}
+
+/** A backlog row with a rank key. `assignee: null` still — see `row()`'s own note. */
+function backlogRow(ticketId: string, title: string, rank: string | null): ListRow {
+  return row({
+    ticketId,
+    title,
+    typeId: 'task',
+    stateId: BACKLOG_STATE_ID,
+    stateName: 'Backlog',
+    stateCategory: 'open',
+    rank,
+  });
+}
+
+/**
+ * The drag stub Task 4's own suite uses (`ticket-list.test.tsx:1509`), copied
+ * rather than re-invented so the two suites drive the component through the
+ * identical transfer shape.
+ */
+function fakeDataTransfer(): DataTransfer {
+  const store = new Map<string, string>();
+  return {
+    setData: (format: string, data: string) => {
+      store.set(format, data);
+    },
+    getData: (format: string) => store.get(format) ?? '',
+    effectAllowed: 'uninitialized',
+  } as unknown as DataTransfer;
+}
+
+function rowTr(ticketId: string): HTMLTableRowElement {
+  const tr = screen.getByTestId(`ticket-card-${ticketId}`).closest('tr');
+  if (tr === null) throw new Error(`no <tr> for ${ticketId}`);
+  return tr;
+}
+
+function tailZone(): Element {
+  const tail = document.querySelector('.gn-list__tail-drop');
+  if (tail === null) throw new Error('no .gn-list__tail-drop rendered');
+  return tail;
+}
+
+type CapturedRank = { entityId: string; type: string; rank: unknown };
+
+/**
+ * 13.708 — the Backlog tab's rank ORDER, and `Move down`.
+ *
+ * The three halves are deliberately separate. The order case can be passed by
+ * a tab that ignores the buttons; the button case can be passed by a tab that
+ * ingests the right event while drawing the wrong order; and the refusal case
+ * can be passed by one that never moves optimistically at all (there would be
+ * nothing to snap back). Each names the other two's failure as its control.
+ */
+describe('13.708 the Backlog tab in rank order, and Move down', () => {
+  const FIRST = backlogRow('br_1', 'First', 'g');
+  const SECOND = backlogRow('br_2', 'Second', 'n');
+  const THIRD = backlogRow('br_3', 'Third', 't');
+
+  it('draws ranked rows by key and unranked rows last, whatever order the server sent', async () => {
+    // The stub's order is the reverse of the answer, so a tab that rendered
+    // `rows` as they arrived would draw exactly backwards.
+    const unranked = backlogRow('br_0', 'Unranked', null);
+    render(
+      <Providers services={servedWorld([unranked, THIRD, SECOND, FIRST])}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
+    await screen.findByText('First');
+
+    expect(await waitFor(() => backlogOrder())).toEqual(['br_1', 'br_2', 'br_3', 'br_0']);
+  });
+
+  it('Move down ingests ONE ticket.ranked whose key is strictly between its two neighbours, and the row moves before the server answers', async () => {
+    let reloads = 0;
+    const services = servedWorld([FIRST, SECOND, THIRD], {
+      // Counted, so "the reload follows a committed move" is a fact about a
+      // request rather than about a render that might have come from anywhere.
+      getTickets: async (): Promise<TicketListView> => {
+        reloads += 1;
+        return { projectId: PROJECT, rows: [FIRST, SECOND, THIRD] };
+      },
+    });
+    const captured: CapturedRank[] = [];
+    // HELD OPEN ON PURPOSE. The optimistic half of this case is only
+    // observable while the ingest is still in flight; a stub that resolves
+    // immediately would let the reload land first and make "the row moved
+    // optimistically" indistinguishable from "the row moved".
+    // A ONE-SLOT MAILBOX, deliberately an array rather than a `let`: TypeScript
+    // narrows a `let x: T | null = null` to `null` at the call site, because
+    // the only assignment happens inside this callback and the checker cannot
+    // see that the callback ran — `answer?.()` then reports "Type 'never' has
+    // no call signatures", which is a compile-time refusal of a pattern that
+    // works at runtime. An indexed read is not narrowed that way.
+    const answers: Array<(results: unknown[]) => void> = [];
+    services.dataSource.ingest = async (events) => {
+      for (const event of events) {
+        captured.push({
+          entityId: event.entity.id,
+          type: event.type,
+          rank: (event.payload as { rank?: unknown }).rank,
+        });
+      }
+      return await new Promise((resolve) => {
+        answers.push(resolve as (results: unknown[]) => void);
+      });
+    };
+
+    render(
+      <Providers services={services}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
+    await screen.findByText('First');
+    expect(backlogOrder()).toEqual(['br_1', 'br_2', 'br_3']);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Move First down' }));
+
+    await waitFor(() => expect(captured).toHaveLength(1));
+    expect(captured[0]?.entityId).toBe('br_1');
+    expect(captured[0]?.type).toBe('ticket.ranked');
+    // THE BETWEEN ASSERTION, ON THE CAPTURED PAYLOAD AND NEVER ON A LITERAL.
+    // 'First' was at the top, so moving it down places it between 'Second'
+    // ('n') and 'Third' ('t'). A literal key would pass on any plausible
+    // spelling — including one that sorts the row somewhere else entirely —
+    // so the assertion is the two comparisons themselves.
+    const rank = captured[0]?.rank as string;
+    expect(typeof rank).toBe('string');
+    expect(rank > 'n').toBe(true);
+    expect(rank < 't').toBe(true);
+
+    // Optimistic, and the ORDER is the claim: the row is now second, while
+    // the ingest has not answered.
+    await waitFor(() => expect(backlogOrder()).toEqual(['br_2', 'br_1', 'br_3']));
+
+    // ...and the committed answer pulls a reload, which is what reconciles the
+    // tab with the server's own key.
+    const before = reloads;
+    answers[0]?.([{ status: 'committed', eventId: 'e1', seq: 1, serverTime: '2026-09-17T09:05:00.000Z' }]);
+    await waitFor(() => expect(reloads).toBeGreaterThan(before));
+  });
+
+  it('a refused move snaps the order back to the server\'s, and says why', async () => {
+    const services = servedWorld([FIRST, SECOND, THIRD]);
+    const answers: Array<(results: unknown[]) => void> = [];
+    services.dataSource.ingest = async () =>
+      await new Promise((resolve) => {
+        answers.push(resolve as (results: unknown[]) => void);
+      });
+
+    render(
+      <Providers services={services}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
+    await screen.findByText('First');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Move First down' }));
+    // Moved optimistically first: without this the snap-back below would be
+    // satisfied by a component that never moved at all.
+    await waitFor(() => expect(backlogOrder()).toEqual(['br_2', 'br_1', 'br_3']));
+
+    answers[0]?.([
+      {
+        status: 'refused',
+        eventId: 'e1',
+        rule: 'rank-requires-backlog',
+        reason: 'Only a backlog ticket can be ranked; this one is in "To do".',
+      },
+    ]);
+
+    expect(
+      await screen.findByText(
+        'Refused by the server — rank-requires-backlog: Only a backlog ticket can be ranked; this one is in "To do".',
+      ),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(backlogOrder()).toEqual(['br_1', 'br_2', 'br_3']));
+  });
+});
+
+/**
+ * 13.709 — the drag path. It must reach the SAME `submitRank` the buttons
+ * use: the two cases below assert the keys a drag produces, which is exactly
+ * what a second, independently-computed neighbour would get wrong.
+ */
+describe('13.709 dragging a Backlog row', () => {
+  const FIRST = backlogRow('br_1', 'First', 'g');
+  const SECOND = backlogRow('br_2', 'Second', 'n');
+  const THIRD = backlogRow('br_3', 'Third', 't');
+
+  function draggedServices(): { services: ReturnType<typeof servedWorld>; captured: CapturedRank[] } {
+    const services = servedWorld([FIRST, SECOND, THIRD]);
+    const captured: CapturedRank[] = [];
+    services.dataSource.ingest = async (events) => {
+      for (const event of events) {
+        captured.push({
+          entityId: event.entity.id,
+          type: event.type,
+          rank: (event.payload as { rank?: unknown }).rank,
+        });
+      }
+      return events.map((event) => ({
+        status: 'committed' as const,
+        eventId: event.id,
+        seq: 1,
+        serverTime: '2026-09-17T09:05:00.000Z',
+      }));
+    };
+    return { services, captured };
+  }
+
+  it('a drop on a row ingests a key below that row\'s own', async () => {
+    const { services, captured } = draggedServices();
+    render(
+      <Providers services={services}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
+    await screen.findByText('Third');
+
+    // Row 3 onto row 1 — the far end, so the key has to be built against the
+    // FIRST row's key and nothing below it.
+    const dataTransfer = fakeDataTransfer();
+    fireEvent.dragStart(rowTr('br_3'), { dataTransfer });
+    fireEvent.dragOver(rowTr('br_1'), { dataTransfer });
+    fireEvent.drop(rowTr('br_1'), { dataTransfer });
+
+    await waitFor(() => expect(captured).toHaveLength(1));
+    expect(captured[0]?.entityId).toBe('br_3');
+    expect(captured[0]?.type).toBe('ticket.ranked');
+    expect((captured[0]?.rank as string) < 'g').toBe(true);
+  });
+
+  it('a drop on the tail zone ingests a key above the last RANKED row\'s', async () => {
+    const { services, captured } = draggedServices();
+    render(
+      <Providers services={services}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
+    await screen.findByText('Third');
+
+    const dataTransfer = fakeDataTransfer();
+    fireEvent.dragStart(rowTr('br_3'), { dataTransfer });
+    fireEvent.dragOver(tailZone(), { dataTransfer });
+    fireEvent.drop(tailZone(), { dataTransfer });
+
+    await waitFor(() => expect(captured).toHaveLength(1));
+    expect(captured[0]?.entityId).toBe('br_3');
+    expect((captured[0]?.rank as string) > 'n').toBe(true);
+  });
+});
+
+/** 13.710 — the two edges: only the top row's Move up and the bottom row's Move down are disabled. */
+describe('13.710 the Move up / Move down edges', () => {
+  it('disables only the top row\'s up and the bottom row\'s down', async () => {
+    const FIRST = backlogRow('br_1', 'First', 'g');
+    const SECOND = backlogRow('br_2', 'Second', 'n');
+    const THIRD = backlogRow('br_3', 'Third', 't');
+    render(
+      <Providers services={servedWorld([FIRST, SECOND, THIRD])}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
+    await screen.findByText('First');
+
+    expect(screen.getByRole('button', { name: 'Move First up' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Move Third down' })).toBeDisabled();
+
+    // THE CONTROL: the middle row has both directions available, and the
+    // second row's Move down must NOT be disabled — it means "place last",
+    // which is a move the row can still make. A component that disabled the
+    // button whenever there was no row two below would pass the two lines
+    // above and strand the second-to-last row.
+    expect(screen.getByRole('button', { name: 'Move Second up' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Move Second down' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Move Third up' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Move First down' })).toBeEnabled();
   });
 });
