@@ -1887,16 +1887,17 @@ input, textarea, select { font-family: inherit; }
   padding-bottom: 4rem;
 }
 
-/* The way back off a legal page. Both pages linked only to EACH OTHER, so a
-   reader who arrived from sign-in could reach Terms from Privacy and Privacy
-   from Terms and never return to what they were doing. The control sits above
-   the title because that is where a reader looks for it, and it is left-aligned
-   in its own row so it never reads as part of the heading. */
-/* No `align-self`: `.gn-legal` is a block container, not a flex one, so the
-   property would have parsed, applied to nothing, and read as deliberate. The
-   button is `inline-flex` from `.gn-button` and therefore already sits at the
-   left of its own line; only the gap under it needs stating. */
-.gn-legal__back { margin-bottom: 1rem; }
+/* `.gn-legal__back` lived here. It styled the Back control both legal pages
+   carried from 2026-09-08 (owner feedback: the two pages linked only to each
+   other, so a reader could cross between them forever and never get back). The
+   refreshed export's `isLegal` block draws a top bar and NO back affordance
+   anywhere in `:1720-1755`, so the control, its rule and
+   `apps/web/src/back-button.tsx` all left together in Step 2c-2 (2026-09-18).
+   The rule is noted rather than kept: a live class for a control no route
+   mounts is what the next reader would wire something up to by mistake. The
+   reasoning behind the control survives in `apps/web/src/legal-nav.tsx` (what
+   replaced it and what was lost with it), in `Features.md`, and in
+   `test-cases/13-deployment-dogfooding.md`'s 13.322/13.323 supersession note. */
 
 /* ── The legal pair and the 404, to the REFRESHED export (2026-09-18) ───────
    Everything from here to the blank line before `.gn-notfound__lead` is this
