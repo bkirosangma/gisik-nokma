@@ -7824,3 +7824,186 @@ diverge only in `radii`/`shadows`), so each measurement below is stated once for
   commit moved `accentText`, `dangerText`, `warningText` and `textInverted` onto that primitive, so the
   re-derivation should sweep their rows too rather than assume this one is alone.
   (`packages/ui/src/tokens.ts`)
+
+---
+
+## The states-cases audit and the mobile deferral (Step 5a, 2026-09-18) — the reserved block `13.301`–`13.315`, resolved
+
+`13.301`–`13.319` was reserved by `docs/superpowers/plans/2026-09-08-hig-per-screen.md` on 2026-09-08
+for Tasks 3–11's states halves and never minted. The tasks shipped; the ids stayed reserved; and a
+reserved id that is never pinned is the same defect class as an unrecorded deferral (Plan 1's class 4)
+— the work reads as covered because a number was set aside for it. Part 2 of
+`CTL-DISPATCH-2026-09-18-step5a-residue.md` ordered the audit. `13.295`–`13.297` (Task 3b, Members)
+stay reserved and untouched on the owner's sign-in hold.
+
+**The method, which is the only thing that makes the verdicts worth anything.** For each id the plan's
+own sentence was read first, then the tests were swept for a witness of THAT sentence — the assertion,
+not a comment beside it. Three verdicts were permitted and no fourth: **(a) pinned** — a test witnesses
+it, so the case is minted ✅ and the citing test carries the id; **(b) covered** — an already-minted case
+states it, so the id gets one line here and no row; **(c) unwitnessed** — minted ❌ with the deliverable
+named, so the entry cannot be closed by editing the measurement instead of doing the work. **No case was
+written to make a verdict come out (a)**, and no verdict is `?`. **No id in this block came out (b)** —
+every one of the fifteen is either witnessed directly or is not witnessed at all, which is itself a
+finding about how these tasks landed.
+
+**One measurement note, because it nearly produced fifteen wrong verdicts at once.** The first sweep put
+the test-path list in an unquoted shell variable; under `zsh` that does not word-split, so `grep` got one
+nonexistent path, wrote its error to `/dev/null`, and printed nothing — fifteen well-formed empty results
+that read exactly like "unwitnessed", which was the verdict four of them were about to be given. The
+sweep was re-run with literal paths **and a positive control through the identical pipeline** (a literal
+known to exist in `board.tsx`). **A null result needs a positive control from the same run**, and the
+same trap then recurred once more in the re-run itself, which is why the row text below names the file
+and line rather than a count.
+
+### Verdict (a) — pinned. The case is minted ✅ and the witness now carries its id.
+
+- ✅ **13.301 — the reopen cause chip renders for a card whose `cause` is not null.** Witness: renders
+  a card seeded `cause: { kind: 'reopened-for-child', childTicketId: 't_child' }` and asserts
+  `getByText('reopened — live work added')`. The plan's own mutation — delete the `card.cause !== null`
+  branch — reddens it, which is what makes it a guard rather than a screenshot. **Stated because a
+  reader will assume both arms: this case has only one.** Every card in the render carries a cause, so
+  nothing asserts the chip is ABSENT when `cause` is null; the `!== null` guard is witnessed from the
+  positive side only. That is the plan's own sentence's shape ("renders for a seeded reopened card"),
+  not a gap this audit introduced — recorded rather than silently widened, because widening it would
+  have meant writing a test to make a verdict come out (a). (`packages/app-core/test/views/board.test.tsx`)
+
+- ✅ **13.302 — the provenance control unfolds to text carrying BOTH an actor and a time.** Witness:
+  clicks the control whose accessible name is `who · when` and asserts the unfolded string
+  `marked Doing by Anselma Marak on 19 Aug 2026` — one assertion, both halves. A sibling two cases
+  down asserts the nameless-claim arm (`marked Doing by user_anselma on 19 Aug 2026`), so the actor is
+  never dropped for want of a display name. The block below it varies `TZ` over the same unfold, so the
+  *time* half is witnessed against the domain's formatter rather than the machine's zone.
+  (`packages/app-core/test/views/board.test.tsx`)
+
+- ✅ **13.303 — an empty project renders `No tickets here yet — create one.`** Witness: asserts
+  `getByText(EMPTY_BOARD_COPY)` **and** `expect(EMPTY_BOARD_COPY).toBe('No tickets here yet — create
+  one.')` in the same case, so the rendered text is tied to the literal rather than to whatever the
+  constant happens to hold — a re-export of an empty string would fail. Same case asserts
+  `queryAllByRole('region')` is empty, so the copy is not painted over scaffolding.
+  (`packages/app-core/test/views/board.test.tsx`)
+
+- ✅ **13.305 — the three real contested-claim resolutions render by their shipped labels.** Witness:
+  asserts three controls by their shipped names — `/redo/i`, `/convert to comment/i`, `/discard/i` — on
+  a banner holding one live contest. The plan's mutation (remove one real action) reddens it, which is
+  the plan's own stated falsifiability criterion and the reason this is ✅ rather than ❌.
+  **A caveat that belongs on the row, not under it:** `ContestBanner` is mounted **nowhere** in the
+  product. `docs/hig-reconciliation-audit.md:577` recorded this on 2026-09-08 and it is re-measured
+  here — the only non-test references anywhere in the repo are the component's own definition,
+  `Features.md`, the audit and the plans' own quotes. The plan's Task 6b is about the **TicketSheet**,
+  which imports no contest component at all. **So this case witnesses the component, and the surface
+  the plan named does not render contest resolution on the web.** The two claims are kept apart on
+  purpose: folding the unmounted fact into this verdict would have marked ❌ a case whose own stated
+  mutation passes. Reported to the controller as a scope-changing finding.
+  (`packages/app-core/test/contests.test.tsx`)
+
+- ✅ **13.307 — all four My Work section headings are present.** Witness: one case asserts three
+  regions by accessible name — `Assigned to me`, `My claims in transit`, `My contested claims` — and a
+  second asserts the fourth, `Shared with me`, as a region of its own with a row in it and without one.
+  The four are witnessed across two cases rather than in a single render; the property is "each heading
+  is present", and each is. (`packages/app-core/test/views/my-work.test.tsx`)
+
+- ✅ **13.308 — the four empty-state sentences render verbatim.** Witness: `No claims in transit.`;
+  `Nothing has been shared with you.` and `Nothing assigned to you.` asserted together under a fixture
+  whose four sections are ALL empty; `No contested claims.` under the same shape. **Not all four in one
+  render**, and the difference is stated rather than smoothed over: the in-transit sentence is asserted
+  under the spec's own fixture, whose only empty section is in-transit. Every sentence is pinned
+  verbatim as a literal, which is the part the plan's sentence is about.
+  (`packages/app-core/test/views/my-work.test.tsx`)
+
+- ✅ **13.310 — the move dialog's button text contains the incoming workflow's REAL name.** Witness:
+  finds the button by `` `Move them to "${errandPublished.name}"…` `` — built from the fixture's own
+  workflow. **Checked for vacuity rather than assumed:** `errandPublished` is `cloneTemplate(
+  WORKFLOW_TEMPLATES[1])`, whose name is `Errand` (`packages/app-core/test/helpers/seed.ts:18`) — not
+  the prototype's hard-coded `Scheduled`, so the assertion cannot be satisfied by transcription of the
+  rejected copy. An earlier case in the same file asserts the prototype's phrasing is ABSENT.
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+
+- ✅ **13.311 — each workflow row's open control carries an aria-label containing that row's name.**
+  Witness: `getByRole('button', { name: 'Open Simple kanban' })` — the expected name is a hard-coded
+  row name rather than one read back off the fixture, so a template that dropped the interpolation
+  cannot satisfy it. (`packages/app-core/test/workflow-builder/screens.test.tsx`)
+
+- ✅ **13.312 — the issues panel's text equals a string produced by `adviseWorkflowDef`.** Witness:
+  imports the real `adviseWorkflowDef`, calls it on the SAME `def` the panel is rendering, and asserts
+  every returned `advisory.message` appears on screen — in both the pre-publish and post-publish states,
+  so the panel is not a thing cleared by publishing. The expected strings are produced by the function
+  under test rather than re-typed, which is the only way to assert "the engine's own words" rather than
+  "the words someone copied out of the engine".
+  (`packages/app-core/test/workflow-builder/publish.test.tsx`)
+
+- ✅ **13.313 — TicketTypes' rank label is the shipped `rank ${type.rank}` form.** Witness asserts
+  `rank 3` on a row whose fixture is rank 3, and a sibling case pins the rank IMPLICATIONS derived
+  from the same types, so the label is tied to the row's own rank rather than to a fixed string.
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+
+- ✅ **13.315 — List rows carry their state's `Chip tone`.** Witness: two rows are measured, and the
+  chip class tracks the row's state category — `gn-chip--active` for `Doing`, `gn-chip--terminal` for
+  `Done` — **with the negative arm** (`terminal` must not carry `active`), so the modifier is proven to
+  follow the row's category rather than to be one class hard-coded for every chip. **What this does NOT
+  assert is the comparison to the Board**, which is the plan's phrasing; that half is structural —
+  `board.tsx:415` and `ticket-list.tsx:676` both read `stateCategory` — and the row says so rather than
+  implying a test that does not exist. (`packages/app-core/test/views/ticket-list.test.tsx`)
+
+### Verdict (c) — unwitnessed. Minted ❌ with the deliverable named.
+
+- ❌ **13.304 — the `Only tickets in progress` checkbox "exists and toggles the rendered count": the
+  plan's sentence is UNSATISFIABLE as written, and the half that is true is unwitnessed.** The checkbox
+  exists and is clicked in three suites. It cannot toggle the count the plan means, and the reason is
+  a type: `getBoard(projectId: string)` takes no filter at all
+  (`packages/app-core/src/data-source.ts:134`), so the Board's `N of M` is the complete board total
+  under every value of `activeOnly` — `board-narrowing.test.tsx:26-52` measures this against the
+  primary source and records it. What the control really narrows is the LIST's server read, and **that
+  half is asserted nowhere**: no test ticks the control and then asserts the List's row set shrank.
+  Deliverable: a case that ticks the control and asserts the narrowed List (and, in the same case, that
+  the Board's own count is UNMOVED — the negative arm is the part that makes the narrowing real rather
+  than claimed). The recorded impossibility is part of the deliverable, not a note about it: a future
+  reader who implements the plan's sentence literally will move the Board's count into the list's
+  narrowing and produce a page that claims a narrowing it does not perform.
+  (`apps/web/test/board-narrowing.test.tsx`, `apps/web/src/…/page.tsx`)
+
+- ❌ **13.306 — the prototype's invented resolution pair (`Keep mine` / `Keep theirs`) does not exist
+  in the product, and nothing asserts its absence.** The audit rejects the pair as a copy-rule
+  replacement (`docs/hig-reconciliation-audit.md:308`) and the prototypes still carry it
+  (`design-system/interactive/{desktop,mobile}.dc.html`), so a future port has a live source to copy
+  from. No test asserts that the three shipped labels are the ONLY resolution actions.
+  **Deliverable:** a case asserting the ticket surface renders no `Keep mine`/`Keep theirs` control
+  alongside the three shipped ones. It is filed ❌ rather than ✅ deliberately: absence is currently a
+  property of what nobody has written yet, which is exactly the state a guard exists to change.
+  (`packages/app-core/test/contests.test.tsx`)
+
+- ❌ **13.309 — the withheld-project-name fallback's TITLE text is unwitnessed.** The plan's sentence
+  has two halves; the first is pinned and the second is not. `projectName === null` rendering the
+  **id** is asserted (`getByText('prj_withheld')`, in a case that also proves the withheld row is still
+  openable — a correction recorded at the site). The **exact title text**,
+  `You have not been told this project's name.` (`my-work.tsx:220`), is asserted by no test anywhere.
+  Searched with **both apostrophe forms** — the source uses U+2019, so a straight-quote grep could not
+  have found it even if a test did use it — and with a positive control on the source string, which
+  matched. **Deliverable:** assert the title on the withheld row. Until then the fallback's reason for
+  existing is carried by a string nothing checks.
+  (`packages/app-core/test/views/my-work.test.tsx`)
+
+- ❌ **13.314 — "List renders the same tickets Board does, by count" is unwitnessed, and the product
+  is deliberately built so it need not hold.** No test compares the two counts. The two views read
+  different routes — the List through `getTickets` (which takes a filter) and the Board through
+  `getBoard` (which cannot) — so they can legitimately disagree, and one suite already asserts they DO:
+  a narrowed list reads `1 of 2 shown` while the board reads `1 of 3 shown`
+  (`apps/web/test/board-narrowing.test.tsx:330-336`). **Deliverable:** state the property that is
+  actually true and worth guarding — on an UNNARROWED project both views render the same ticket set —
+  and witness that, rather than the plan's phrasing, which is false under narrowing by construction.
+  (`packages/app-core/test/views/ticket-list.test.tsx`, `apps/web/test/board-narrowing.test.tsx`)
+
+### Verdict from Part 1 — the mobile deferral, recorded with an owner
+
+- 🚫 **13.319 — HIG per-screen adoption on `apps/mobile`, deferred rather than done.** `apps/mobile` is
+  React Native; the `--gn-*` CSS variables the whole plan is written in do not exist there, so the
+  per-screen adoption does not transfer and the task is docs-only by construction. Recorded under "What
+  was NOT measured" in `docs/pre-launch-checklist.md` with the owner the plan names — *whoever next
+  touches `apps/mobile` theming* — and with the reason the palette half is already satisfied
+  (`colorOf()` reads `themes` directly, so the palette IS Apple's after #353; only spacing, radius and
+  fill treatment remain). 🚫 rather than ❌ because this is a conscious scope decision with a named
+  owner, not an unmade debt. (`docs/superpowers/plans/2026-09-08-hig-per-screen.md` § Task 11)
+
+**Recount, at this tip.** The fifteen ids above are all inside the reserved block `13.301`–`13.319`, so
+none of them moves this file's high-water mark; the highest id in the file is still `13.693` (Step 4b's
+block) and the next free id is still `13.694`, recounted rather than assumed. **No new id beyond the
+reserved block was minted, and none was needed** — which is the outcome the reservation was for.

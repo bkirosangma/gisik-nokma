@@ -1314,6 +1314,11 @@ describe('13.663 the title cell indents by depth, from the row’s own numbers',
   });
 });
 
+/* 13.315 — List rows carry their state's `Chip tone`: two categories measured,
+ * with the negative arm (`terminal` must not carry `active`), so the modifier
+ * follows the row's category rather than being one class hard-coded for every
+ * chip. The comparison to the Board is structural (`stateCategory` on both
+ * sides), not asserted here — the catalogue row says so. */
 describe('13.664 the status pill renders the state’s name and its category dot', () => {
   it('shows `Doing` inside a chip carrying the active category’s own modifier, and `Done` under terminal’s', () => {
     render(<ControlledList initial={chose(['status'], 'flat')} />);

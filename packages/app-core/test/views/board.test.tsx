@@ -169,6 +169,9 @@ describe('Board — grouping is a rearrangement, never a filter (invariant 5)', 
 });
 
 describe('Board card — the provenance unfold (honesty contract 1)', () => {
+  /* 13.302 — the provenance control unfolds to text carrying BOTH an actor and
+   * a time, in one asserted string. The sibling below pins the nameless-claim
+   * arm, so the actor is never dropped for want of a display name. */
   it('unfolds to "marked <state> by <who> on <when>"', async () => {
     const user = userEvent.setup();
     render(<Board board={errandBoard()} onOpenTicket={() => {}} />);
@@ -192,6 +195,11 @@ describe('Board card — the provenance unfold (honesty contract 1)', () => {
     expect(screen.getByText('5 of 8 done · 2 restricted')).toBeInTheDocument();
   });
 
+  /* 13.301 — the reopen-cause chip. Present-arm only: every card in this render
+   * carries a `cause`, so nothing here asserts the chip is ABSENT when it is
+   * null. That is the reserved case's own shape ("renders for a seeded reopened
+   * card"), recorded in `test-cases/13-deployment-dogfooding.md` rather than
+   * widened here. */
   it('renders the reopen cause — a reopen is never an anonymous flip', () => {
     const board = errandBoard([
       boardCardSeed({ cause: { kind: 'reopened-for-child', childTicketId: 't_child' } }),
@@ -789,6 +797,9 @@ describe('3.112 an empty board says words, not nothing', () => {
    * `<div class="gn-board">` — loaded, refused nothing, said nothing, and
    * indistinguishable from a board still painting.
    */
+  /* 13.303 — the empty board's pinned copy. The literal is asserted BESIDE its
+   * use, so a re-export of a different string cannot satisfy the render
+   * assertion; `queryAllByRole('region')` empty keeps it off scaffolding. */
   it('renders the pinned copy where it used to render an empty div', () => {
     render(<Board board={emptyBoard} onOpenTicket={() => {}} />);
     expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
