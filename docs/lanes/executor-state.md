@@ -41,7 +41,78 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~23:0x IST. **`hig-per-screen/7b` IS BUILT: CASE `13.309`
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~23:4x IST. **`hig-per-screen/6b` IS BUILT: CASE `13.306` IS
+> # WITNESSED. NO TASK IN FLIGHT AFTER THIS; HOLDING FOR THE CONTROLLER.**
+> # **Supersedes the block below it.** That block says the `7b` PR awaited a merge — **it has had one:
+> # #494 merged at `7f9329cc`** — so read its "awaits merge" line as HISTORY, not as state.
+>
+> ## WHY THIS TASK WAS TAKEN WITHOUT A WRITTEN DISPATCH — declared, not smuggled
+>
+> The controller's own routing table (`controller-state.md`, cycle 7) states: *"THE WRITTEN BRIEFS ARE
+> EXHAUSTED … What remains is **ledger-driven**."* **So the ledger IS the dispatch, and holding for a brief
+> was the wrong model.** Of the rows it names: `3b` is already executor 2's (`CTL-DISPATCH-2026-09-18-exec2-members-inviteadmin.md`),
+> `5b` needs a ruling, `10` is blocked on wire gaps, and `board-prototype-port/1` is STRUCK. **`6b` was the
+> one row left with a deliverable this lane could execute** — and its FLAG constrains what may be CLAIMED,
+> which is why the case records the constraint in its own docblock.
+>
+> ## LIVE ANCHORS — measured with `/usr/bin/git` at the sha, not inherited
+>
+> | | |
+> |---|---|
+> | branch | `exec/hig-6b-13306-resolution-pair`, cut from `origin/main` `7f9329cc`. **Upstream UNSET deliberately** — a branch cut from `origin/main` inherits it as upstream, and a bare `git push` would then target `main`. |
+> | the change | `git diff --name-only origin/main` → `Features.md`, `packages/app-core/test/contests.test.tsx`, `test-cases/13-deployment-dogfooding.md` |
+> | ledger `hig-per-screen/6b` | **NOT touched — see ruling 1.** The ledger is the controller's. |
+>
+> ## WHAT THE GUARD ASSERTS, AND THE FLAG IT CARRIES
+>
+> `ContestBanner` renders exactly three controls. The case pins them **by exact accessible name**
+> (`Redo legally` / `Convert to comment` / `Discard`), asserts the prototype's `Keep mine` / `Keep theirs`
+> are absent by role and in the rendered text, and asserts the control set is **exactly three**.
+>
+> **The exactness is the part that was missing:** the pre-existing arm (12.193, cited as `13.305`'s
+> witness) finds its third control with `/discard/i`, which the prototype's OWN third label
+> **`Discard mine`** also satisfies — so a rename to the prototype's wording reddened nothing until now.
+>
+> **THE FLAG, recorded in the case rather than smoothed over:** `ContestBanner` is mounted NOWHERE in the
+> product (`docs/hig-reconciliation-audit.md:577`) and TicketSheet imports no contest component at all, so
+> this is a **COMPONENT-level** guard. **It does not witness what the ticket surface renders — there is no
+> such surface — and the row must not be promoted as though it did.** The ✅ is on the guard's own terms,
+> which is what the ❌ asked for.
+>
+> ## VERIFICATION AT THE FROZEN HEAD — Node v22.22.2
+>
+> | check | result |
+> |---|---|
+> | `pnpm turbo run build` | **0** — 11/11 |
+> | `pnpm turbo run typecheck` | **0** — 17/17 |
+> | `packages/app-core`, full run | **94/94 files, 1567/1567 tests** (the +1 is this case) |
+> | `pnpm turbo run test` | **1** — `@gisik-nokma/server#test` only: three 30000 ms TIMEOUTS (`seed-cc`×2, `seed-dev`×1), each passing ALONE (`seed-dev` 8/8, `seed-cc` 9/9). **The same contention flake as `7b`; this diff touches no server file.** |
+> | seven checks + `check:case-ids` | all **0**. `case-ids` = **2380** unique, union == sum. **The +4 over 2376 is exec2's appended `13.907`–`13.910`, NOT this lane's** — `bare` and `bold` are unchanged, so this lane's prose added no counted id. |
+>
+> ## FOUR MUTATIONS, EACH KILLING IT AT A DIFFERENT ASSERTION
+>
+> | mutation | died at |
+> |---|---|
+> | the pair added beside the three | the negative arm |
+> | `Discard` renamed to `Discard mine` | the **POSITIVE** arm — exactness is the guard |
+> | a fourth control matching neither negative pattern | **only** the count-at-three — so that arm is load-bearing, not redundant |
+> | the banner rendering nothing | the anti-vacuity arm |
+>
+> ## SHIFT MAP — updated, and the reason it keeps moving
+>
+> `test-cases/13-deployment-dogfooding.md` is now **+42 lines below base line 8080 over `7f9329cc`**:
+> +29 from `#494`, +13 from `6b`. **`main :8616 → this branch :8629`.** Measured by `difflib` opcode
+> mapping, never counted by hand. **Any rebase invalidates it; re-derive it.**
+>
+> ## OPEN RULINGS
+>
+> 1. **`6b` promotion** — ✅ on the guard's own terms, but the FLAG means the row must not be promoted as
+>    though the ticket surface rendered it. **The controller should decide, and say why.**
+> 2. **`7b`** — merged at `7f9329cc`; its ledger row still reads `todo` and still says `13.309 is ❌`.
+> 3. **The stale ledger rows generally** — `7b` and `backlog-and-closed-second-wave/12` both describe
+>    unstarted work that has merged. Cycle 7 already escalated the second to the owner.
+>
+> > # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~23:0x IST. **`hig-per-screen/7b` IS BUILT: CASE `13.309`
 > # IS WITNESSED, EVERY LOCAL INSTRUMENT IS GREEN AT THE FROZEN HEAD, AND THE PR AWAITS THE
 > # CONTROLLER'S MERGE.** `exec/hig-7b-13309-withheld-title`, ONE PR `--base main`.
 > # **Supersedes the block below it; the block below is HISTORY.**
@@ -210,7 +281,12 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > sha256 `5a93a9cd…`). It is **same-length**, so no line moved and no citation shifted.
 >
 > **Recorded, NOT fixed — three, each with an owner:**
-> 1. **The identical stale string at `test-cases/13-deployment-dogfooding.md:8616` — FIXED 2026-09-18.**
+> 1. **The identical stale string at `test-cases/13-deployment-dogfooding.md:8629` — FIXED, and
+>    RE-POINTED the same day.** It was `:8587` when this item was written; `#494` inserted +29 lines
+>    above it and it became `:8616`; then `6b` grew the `13.306` row by +13 and it became `:8629`.
+>    **Three values in one day, every move from this lane's own insertions** — so treat no number here
+>    as stable. Re-derive the mapping with `difflib` opcode-mapping against `origin/main` before relying
+>    on it. **The string itself was wrong when written**
 >    The owner this item named was *"whoever next edits that catalogue section"*, and `hig-per-screen/7b`
 >    is that executor, so the clause fired rather than being left to decay again. Two things had to move:
 >    the ANCHOR, because this lane's catalogue insertions shift every line below 8080 by **+29** (`:8587`
