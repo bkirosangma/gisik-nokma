@@ -121,6 +121,27 @@ export type EngineContext = {
    * another's rank, workflow binding and field list.
    */
   getTicketTypeDef(scope: TenantScope, typeId: string): Promise<TicketTypeDef | null>;
+  /**
+   * How many members of this workspace hold the `owner` role, optionally
+   * ignoring one user — the subject of the change under judgement, because an
+   * owner being demoted must not count themselves.
+   *
+   * SCOPED (ruling P14's shape, and for its reason): the id is a workspace, the
+   * answer is a count over that one tenancy, and a caller that named another
+   * workspace would be asking a question the actor has no standing to ask.
+   *
+   * A COUNT and not a list, deliberately: a check has no business reading other
+   * members' rows, and a list would tempt one to.
+   *
+   * OPTIONAL so every context that predates this still typechecks — the same
+   * shape, and the same consequence, as `getContest` above. A check that needs
+   * it and cannot get it THROWS rather than refusing: a context that cannot
+   * count owners has made no claim about the world, and "this change would
+   * leave the workspace with no owner" is a claim about the world. Manufactured
+   * from an absence it would be a sentence about the actor dressed as a fact
+   * about their workspace.
+   */
+  countWorkspaceOwners?(scope: TenantScope, excludingUserId?: string): Promise<number>;
 };
 
 /**

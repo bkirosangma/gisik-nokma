@@ -8,6 +8,7 @@ import { checkTicketTypeDefined } from './checks/ticket-type.js';
 import { checkTicketWorkflowRebound } from './checks/workflow-rebind.js';
 import { checkTicketClosed, checkTicketReopened } from './checks/close.js';
 import { checkTicketRanked } from './checks/rank.js';
+import { checkMembershipGranted, checkMembershipRevoked } from './checks/membership.js';
 import type { Accept, EngineContext, Refusal } from './engine.js';
 
 /**
@@ -47,6 +48,13 @@ export async function evaluateEvent(env: EventEnvelope, ctx: EngineContext): Pro
       return checkTicketReopened(env, ctx);
     case 'ticket.ranked':
       return checkTicketRanked(env, ctx);
+    // The last-owner guard (owner ruling 2026-09-18). These two types passed
+    // through untouched until this arm existed, which is precisely what let an
+    // admin demote the sole owner and promote themselves.
+    case 'membership.granted':
+      return checkMembershipGranted(env, ctx);
+    case 'membership.revoked':
+      return checkMembershipRevoked(env, ctx);
     default:
       return { refused: false };
   }

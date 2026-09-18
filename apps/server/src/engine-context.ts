@@ -366,5 +366,53 @@ export function createEngineContext(client: PoolClient): EngineContext {
       // same absence.
       return await getTicketTypeFromDb(client, scope.workspaceId, typeId);
     },
+    /**
+     * Owners of one workspace, for the last-owner guard (owner ruling
+     * 2026-09-18).
+     *
+     * ## Why a fresh query here is safe when the table's own comment says not to
+     *
+     * `proj_memberships` carries a loud instruction — "READ IT THROUGH
+     * `resolveEffectiveRole`, never directly" — and `sweep-user-preferences.ts`
+     * calls a bare read of it P22, so a new `SELECT` against this table owes an
+     * argument rather than an assumption. The hazard it names is specific: a
+     * PROJECT-scope row survives a revocation, so a bare read can report a
+     * person who is no longer in the workspace. `scope_kind = 'workspace'` is
+     * exactly the predicate that excludes that class, and it makes this query
+     * agree with `resolveEffectiveRole` by construction rather than by
+     * coincidence: that function sets `workspaceRole` from the
+     * `scope_kind === 'workspace'` row and null otherwise, so
+     * `workspaceRole === 'owner'` holds for precisely the rows counted here.
+     * The count and the audited reader are two spellings of one fact.
+     *
+     * The redundant half is recorded rather than dropped: `role = 'owner'`
+     * already excludes every project-scope row, because `project.member_added`
+     * hardcodes `role = 'member'` (`proj-memberships.ts`, and the column comment
+     * on the migration says so). `scope_kind` is kept anyway — it is the term
+     * that carries the safety argument above, and a future project-scope role
+     * grant would silently make `role = 'owner'` alone mean something wider.
+     *
+     * ## `excludingUserId` and the NULL test
+     *
+     * The caller is judging a change to ONE person, and an owner being demoted
+     * must not be counted among the owners who remain. `$2::text IS NULL OR
+     * user_id <> $2` keeps the one-statement shape: a second query for the
+     * "ignore nobody" case would be a second place for the predicate to drift.
+     * The cast is explicit because a bare `$2 IS NULL` leaves Postgres
+     * inferring the parameter's type from context, and `pg` sends the JS `null`
+     * as an untyped parameter.
+     */
+    async countWorkspaceOwners(scope, excludingUserId) {
+      const { rows } = await client.query<{ n: string }>(
+        `SELECT count(*)::text AS n
+           FROM proj_memberships
+          WHERE workspace_id = $1
+            AND scope_kind = 'workspace'
+            AND role = 'owner'
+            AND ($2::text IS NULL OR user_id <> $2)`,
+        [scope.workspaceId, excludingUserId ?? null],
+      );
+      return Number(rows[0]?.n ?? '0');
+    },
   };
 }

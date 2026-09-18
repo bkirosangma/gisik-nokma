@@ -9823,3 +9823,101 @@ mirror states the product can really produce (`getTicketTypes` does the same), w
 rule is that a read a case did not stub must fail loudly. The web stub's refusal is the one that
 pins the settings screen, and 13.716/13.718 depend on it. Changing the core fake to refuse would
 break unrelated suites for a consistency that buys nothing here.
+
+## The last-owner guard, in both layers (executor 2, 2026-09-18) — plan `2026-09-18-membership-role-guard` Task 1, ids `13.820`–`13.823`
+
+- ✅ **13.820 — a `membership.granted` that would leave the workspace with no owner is refused, and one
+  that would not is accepted.** The guard fires only on a move **out** of owner, and that narrowing is
+  the case's whole content rather than a detail: a grant to somebody who is not currently an owner is
+  accepted even when the workspace has exactly one owner (`wasOwner` is false, so the count is never
+  consulted), re-stating the sole owner as an owner is accepted, and demoting one of **two** owners is
+  accepted because the workspace is not emptied. **The accept arms are the assertions that make the
+  refusal mean something** — a guard that refused every owner-touching grant would satisfy the refusal
+  alone. The demotion is driven by an **admin** on the real door, which is the point: the permission gate
+  admits an admin to roster management on purpose, so a refusal there can only have come from the engine's
+  world-half. The count excludes the subject of the change, and that exclusion is load-bearing in the
+  opposite direction from the obvious one: without it a sole owner counts **himself** and the guard never
+  fires at all — pinned by mutation, which reddens the sole-owner case and leaves the accept arms green.
+  **Citations:** `packages/rule-engine/src/checks/membership.ts:87` (the check), `:103` (the move-out-of-owner
+  test), `:82` (the target's current role), `packages/rule-engine/test/membership.test.ts:106`,
+  `apps/server/test/permissions/check-role-permission.test.ts:1256` (the real-door half, where the `SELECT`
+  itself is what is under test)
+
+- ✅ **13.821 — a `membership.revoked` of the only owner is refused by the same rule.** The second door to
+  the same state, and it must answer identically: there is no role in a `membership.revoked` payload, so a
+  revocation is a move out of owner by construction and the only question is whether the target held it.
+  Revoking one of two owners is accepted; revoking somebody who is not an owner is accepted. **This case is
+  why the guard lives in the engine rather than in the permission gate alone** — the gate never sees the
+  ledger, so a rule written there could not tell a sole owner from a second one.
+  **Citations:** `packages/rule-engine/src/checks/membership.ts:114` (the check), `:130` (its refusal),
+  `packages/rule-engine/test/membership.test.ts:168`
+
+- ✅ **13.822 — the guard THROWS rather than refusing when its context cannot count owners, and its other
+  exits are unchanged.** Witnessed rather than asserted, because the plan asked for that specifically:
+  `countWorkspaceOwners` is OPTIONAL on `EngineContext` so every context that predates it still
+  typechecks, and the guard's answer to a context that cannot supply it is a **throw** — a refusal minted
+  from an absent counter would be the sentence *"this change would leave the workspace with no owner"*
+  made by something that never counted, dressed as a fact about the workspace. **The case carries its own
+  control and half of it is the control:** the SAME cannot-count context accepts a change that never needs
+  the count, which is what separates "throws because the count is unavailable" from "throws on every
+  membership event" — the second would make every context that predates this guard unusable. The kind
+  guard is pinned here too, refuting a misfiled entity kind by name rather than accepting it, and a
+  malformed payload stays `malformed-payload` rather than becoming a role refusal. **A defect in the
+  plan's own Step 1 code is pinned as a case rather than left to be rediscovered:** its sample payloads use
+  `userId: 'u1'`, and `membershipGrantedPayload`'s `userId` is `ulidString` — measured, `'u1'` fails with
+  `userId: must be a ULID`, so a test transcribed from the plan would be red for a reason unrelated to this
+  guard and the tempting repair would be to loosen the assertion, which deletes the witness.
+  **Citations:** `packages/rule-engine/src/checks/membership.ts:63` (the throw), `:91` (the kind refusal),
+  `packages/rule-engine/test/membership.test.ts:196`
+
+- ✅ **13.823 — only a workspace OWNER may grant the owner role, which is what stops an admin promoting
+  themselves.** The actor half, and the half that closes an escalation the world half cannot: an admin
+  could demote the sole owner and then promote themselves, and at no step of that does the workspace hold
+  zero owners — only zero of the *original* owner's role — so 13.820 alone does not refuse it. An admin
+  is refused `grant-owner-requires-owner` for `membership.granted { role: 'owner' }`; an owner is not,
+  which is the control that stops the rule from being a deadlock in which no workspace can ever gain a
+  second owner. A third assertion pins the **ordering** as behaviour: a plain member granting owner is
+  refused by the broad `permission.role` sentence about their standing, not by this narrower rule, because
+  the wide refusal runs first and the sentence a person reads should be about the thing that actually
+  stopped them. A malformed owner grant is deliberately **not** refused here — it falls through to the
+  engine's `malformed-payload`, which names the field — and that is asserted too, so the two layers cannot
+  start answering for each other.
+  **Citations:** `apps/server/src/permissions/check-permission.ts:602` (the clause), `:85` (the sentence),
+  `apps/server/test/permissions/check-role-permission.test.ts:290` (the pure case),
+  `:1355` (the real-door case, through the client door because the internal one does not run the gate)
+
+**Mutations, each applied to a backed-up file, confirmed to have CHANGED it, run, then restored by `cp`
+with a matching sha256.**
+
+1. **The `wasOwner` guard removed** (`isCurrentlyOwner` returns false) → reddens **13.820's and 13.821's
+   refusal arms and both `evaluateEvent` reachability arms, five in all, with the eleven accept arms still
+   green.** The asymmetry is the evidence: the mutation kills refusals and nothing else, so it identifies
+   its own site rather than reddening the file.
+2. **The stub's count ignores `excludingUserId`** → reddens the four refusal arms, accept arms green.
+3. **The server's SQL drops the `excludingUserId` clause** → reddens **exactly one case, the real-door
+   sole-owner refusal, 46 green.** This is the mutation that justifies the database suite's existence: no
+   stub and no pure test can see it.
+   **A first attempt at this mutation is recorded because it was invalid evidence and looked like a kill.**
+   The perl substitution dropped `$2` from the string and produced `AND (::text IS NOT NULL)` — a SQL
+   **syntax error**. The case reddened, but it would have reddened identically for a missing bind
+   parameter, for a typo in any column name, or for the table being absent; it proved the engine fails
+   loudly, not that the assertion can tell a wrong predicate from a right one. Re-run with the clause
+   deleted whole (valid SQL, `$2` still bound), it killed the same single case — which is the kill that
+   counts. **A mutation that reddens for a reason unrelated to the property it names is not a kill**, and
+   the two attempts are indistinguishable from the exit code alone.
+4. **The owner-grant clause replaced with `if (false)`** → reddens the pure permission case **and** the
+   real-door self-promotion case, both halves, so neither is decorative.
+5. **The `env.entity.kind !== 'membership'` guard removed** → reddens exactly the misfiled-kind case.
+   Worth recording that this guard was **absent from the plan's Step 5 code block while its prose required
+   it** ("type guard, **kind guard**, `safeParse`…"), and that `evaluate.ts`'s own docblock makes it
+   mandatory — the fixture suite and the offline replica enter through `evaluateEvent` and never pass
+   through ingest's door, so no check may trust that dispatch.
+
+**One plan-text defect is recorded rather than silently repaired.** The plan's Step 3 declares
+`REFUSAL_RULES.grantOwnerRequiresOwner` under **"Produces"**, while its Step 7 emits the generic
+`permission.role` instead; the two cannot both hold. The id was taken as authoritative and emitted through
+`refuseWith`, because a rule name nothing emits is a matching key that can never match — all twenty ids
+already in `REFUSAL_RULES` are emitted somewhere (measured), so a twenty-first with no emitter would be the
+catalogue's only dead entry. The alternative reading costs only a different string in a rendered refusal;
+this one costs a dead constant. **Flagged to the controller in this PR's body as a ruling to confirm rather
+than settled unilaterally.**

@@ -20,6 +20,7 @@ import {
   SERVER_ORIGIN_REASON,
   WORKSPACE_ALREADY_FOUNDED_REASON,
   WORKSPACE_MEMBERSHIP_REASON,
+  WORKSPACE_OWNER_GRANT_REASON,
   INVITE_ACCEPTANCE_IS_THE_SERVERS_REASON,
 } from '../../src/permissions/check-permission.js';
 import type { EffectiveRole } from '../../src/permissions/effective-role.js';
@@ -283,6 +284,82 @@ describe('checkRolePermission — planted defects', () => {
     expect(
       checkRolePermission(e, ctx(eff('member', [[newUlid(), true]]))),
     ).toEqual({ refused: true, rule: PERMISSION_ROLE_RULE, reason: WORKSPACE_MEMBERSHIP_REASON });
+  });
+
+  /**
+   * 13.823 — the ACTOR half of the last-owner guard (owner ruling 2026-09-18).
+   *
+   * It is one half of a pair and the pairing is the point: `13.820` (the WORLD
+   * half, in `packages/rule-engine`) refuses a change that would leave the
+   * workspace with no owner. That guard alone does NOT close the escalation an
+   * admin had, because an admin could demote the sole owner and then promote
+   * themselves — at no point does the workspace hold zero owners, only zero of
+   * the original owner's ROLE. This case is what refuses the second step, and
+   * the first step is refused by neither if it is the only guard present.
+   *
+   * The rule string is spelled here rather than imported: importing it would
+   * make the assertion agree with the module about a wire contract the members
+   * page renders.
+   */
+  it('refuses an admin granting the owner role, and lets an owner grant it', () => {
+    const grantee = newUlid();
+    const grantOwner = () =>
+      env({
+        type: 'membership.granted',
+        entity: { kind: 'membership', id: membershipId(WS, grantee) },
+        payload: { userId: grantee, role: 'owner' },
+      });
+    expect(checkRolePermission(grantOwner(), ctx(eff('admin')))).toEqual({
+      refused: true,
+      rule: 'grant-owner-requires-owner',
+      reason: WORKSPACE_OWNER_GRANT_REASON,
+    });
+    // The owner may — otherwise the rule would be a deadlock rather than a
+    // guard, and no workspace could ever gain a second owner.
+    expect(checkRolePermission(grantOwner(), ctx(eff('owner')))).toBeNull();
+  });
+
+  it('CONTROL: the same admin may grant any role that is not owner', () => {
+    // Same actor, same event type, same target, one difference: the role. A
+    // gate that refused every grant from an admin would satisfy the case above
+    // and be catastrophically wrong, and only this distinguishes them.
+    const grantee = newUlid();
+    const grantAdmin = env({
+      type: 'membership.granted',
+      entity: { kind: 'membership', id: membershipId(WS, grantee) },
+      payload: { userId: grantee, role: 'admin' },
+    });
+    expect(checkRolePermission(grantAdmin, ctx(eff('admin')))).toBeNull();
+  });
+
+  it('CONTROL: a plain member granting owner is refused as NOT A MEMBER MANAGER, not by the owner rule', () => {
+    // Ordering, which is a behaviour and not a detail: the broad refusal runs
+    // first, so the sentence a plain member reads is about their standing in
+    // the workspace rather than about a role they never tried to hand over.
+    const grantee = newUlid();
+    const e = env({
+      type: 'membership.granted',
+      entity: { kind: 'membership', id: membershipId(WS, grantee) },
+      payload: { userId: grantee, role: 'owner' },
+    });
+    expect(checkRolePermission(e, ctx(eff('member')))).toEqual({
+      refused: true,
+      rule: PERMISSION_ROLE_RULE,
+      reason: WORKSPACE_MEMBERSHIP_REASON,
+    });
+  });
+
+  it('does NOT refuse a malformed owner grant as a role problem — the engine owns that verdict', () => {
+    // A payload this gate cannot parse is left to the engine's
+    // `malformed-payload`, which names the offending field. Refusing it here
+    // would report a shape problem as an authority problem, and the two have
+    // different remedies.
+    const e = env({
+      type: 'membership.granted',
+      entity: { kind: 'membership', id: membershipId(WS, newUlid()) },
+      payload: { userId: newUlid(), role: 'owner', scope: 'project' },
+    });
+    expect(checkRolePermission(e, ctx(eff('admin')))).toBeNull();
   });
 
   it('refuses project roster changes from a plain project member', () => {
@@ -1146,5 +1223,154 @@ describe('the gate at the client door — refusals before the rule engine', () =
       rule: PERMISSION_ROLE_RULE,
     });
     expectCommitted(await ingest.ingestBatch([event]));
+  });
+});
+
+/**
+ * The last-owner guard against the REAL database (owner ruling 2026-09-18).
+ *
+ * ## Why this block exists when `packages/rule-engine/test/membership.test.ts` is green
+ *
+ * That suite drives the guard through a hand-rolled context — it has to, because
+ * neither in-memory context can serve a membership role for anybody but the
+ * actor. A stub context proves the guard's LOGIC and says nothing whatever about
+ * the other half of it: `countWorkspaceOwners` is a `SELECT` against
+ * `proj_memberships`, and every branch of the guard is downstream of whether
+ * that query returns the number the guard thinks it returns. A wrong column, a
+ * predicate that excludes the wrong rows, or a count that ignores
+ * `excludingUserId` would leave the stub suite 16/16 green while the guard did
+ * nothing on the only path that runs in production. That is this repository's
+ * signature failure — a mocked contract is the thing that excuses the server
+ * from existing — and the remedy is to drive the real ingest service against a
+ * real database, which is what these cases do.
+ *
+ * ## The control is the point, not the decoration
+ *
+ * Two of the three cases below exist to stop the first from passing for the
+ * wrong reason. A guard hard-coded to refuse "an admin changing an owner" would
+ * satisfy the attack case alone; the second-owner case is what forces the count
+ * to be read. A gate that refused every `membership.granted` naming `owner`
+ * would satisfy the self-promotion case; the owner's own grant is what forces
+ * the actor check to be a comparison rather than a blanket refusal.
+ */
+describe('the last-owner guard on the real door — the SELECT, not just the rule', () => {
+  /**
+   * EVERY event below goes through `ingestClientBatch`, and the first cut of
+   * this block did not — it used `ingestBatch` and the self-promotion case came
+   * back `committed`. The cause is the two-door design the case ABOVE this
+   * block pins: `ingestBatch` is the internal append path and does NOT run the
+   * permission gate, so a case asserting a permission refusal through it is
+   * vacuous — it passes or fails for reasons unrelated to the rule, and here it
+   * failed, which is the only reason the mistake was visible at all. `last-owner`
+   * would have hidden the same error, because the engine runs on both doors.
+   * The client door is the one the product uses and the only one that runs both
+   * halves.
+   */
+  async function foundedWorkspace(ingest: IngestService) {
+    const workspaceId = newUlid();
+    const owner = newUlid();
+    expectCommitted(await ingest.ingestBatch([founding(workspaceId, owner)]));
+    return { workspaceId, owner };
+  }
+
+  const setRole = (workspaceId: string, actor: string, userId: string, role: string): SubmittedEvent =>
+    submitted({
+      workspaceId,
+      entity: { kind: 'membership', id: membershipId(workspaceId, userId) },
+      type: 'membership.granted',
+      payload: { userId, role },
+      actorId: actor,
+    });
+
+  /** Grants `role`, through the CLIENT door as `actor`, and returns the new user. */
+  async function grantMember(
+    ingest: IngestService,
+    workspaceId: string,
+    actor: string,
+    role: string,
+  ): Promise<string> {
+    const user = newUlid();
+    const result = await ingest.ingestClientBatch([setRole(workspaceId, actor, user, role)], actor);
+    expectCommitted(result);
+    return user;
+  }
+
+  /**
+   * 13.820 (the real-door half) — the attack the task exists for, plus the
+   * controls that make the refusal mean something.
+   */
+  it('refuses an admin demoting the SOLE owner, and commits the same demotion once a second owner exists', async () => {
+    const ingest = ingestService();
+    const { workspaceId, owner } = await foundedWorkspace(ingest);
+    const admin = await grantMember(ingest, workspaceId, owner, 'admin');
+
+    // The attack: an ADMIN demotes the SOLE OWNER. The permission gate admits
+    // the admin on purpose — roster management is theirs — so the refusal here
+    // can only have come from the engine's world-half, which means it can only
+    // have come from a correct count.
+    expect((await ingest.ingestClientBatch([setRole(workspaceId, admin, owner, 'member')], admin))[0]).toMatchObject(
+      { status: 'refused', rule: 'last-owner' },
+    );
+
+    // The other door to the same state, and it must answer the same.
+    expect(
+      (
+        await ingest.ingestClientBatch(
+          [
+            submitted({
+              workspaceId,
+              entity: { kind: 'membership', id: membershipId(workspaceId, owner) },
+              type: 'membership.revoked',
+              payload: { userId: owner },
+              actorId: admin,
+            }),
+          ],
+          admin,
+        )
+      )[0],
+    ).toMatchObject({ status: 'refused', rule: 'last-owner' });
+
+    // CONTROL. A second owner is minted by the owner (who may), and the SAME
+    // demotion by the SAME admin then commits. This is the case that forces
+    // `countWorkspaceOwners` to actually read the projection: a query that
+    // always answered 1, or one that ignored `excludingUserId` and counted the
+    // target, would keep the refusal above green and redden here.
+    await grantMember(ingest, workspaceId, owner, 'owner');
+    expectCommitted(await ingest.ingestClientBatch([setRole(workspaceId, admin, owner, 'member')], admin));
+
+    // And the count is now ONE, so the remaining owner can no longer be demoted
+    // — the guard follows the table rather than reusing its first answer.
+    const { rows } = await db.pool.query<{ user_id: string }>(
+      `SELECT user_id FROM proj_memberships
+        WHERE workspace_id = $1 AND scope_kind = 'workspace' AND role = 'owner'`,
+      [workspaceId],
+    );
+    expect(rows).toHaveLength(1);
+    expect(
+      (await ingest.ingestClientBatch([setRole(workspaceId, admin, rows[0]!.user_id, 'member')], admin))[0],
+    ).toMatchObject({ status: 'refused', rule: 'last-owner' });
+  });
+
+  /**
+   * 13.823 (the real-door half) — the escalation the world-half alone cannot
+   * close, because the workspace never holds zero owners at any step of it.
+   */
+  it('refuses an admin promoting THEMSELVES to owner, and commits the same grant from an owner', async () => {
+    const ingest = ingestService();
+    const { workspaceId, owner } = await foundedWorkspace(ingest);
+    const admin = await grantMember(ingest, workspaceId, owner, 'admin');
+
+    expect(
+      (await ingest.ingestClientBatch([setRole(workspaceId, admin, admin, 'owner')], admin))[0],
+    ).toMatchObject({ status: 'refused', rule: 'grant-owner-requires-owner' });
+
+    // CONTROL: the same event type from the OWNER, through the SAME door,
+    // commits — so the rule is a comparison against the actor's role and not a
+    // refusal of the event type. Without this, a gate that refused every
+    // owner-grant would pass the case above, and no workspace could ever gain a
+    // second owner.
+    expectCommitted(
+      await ingest.ingestClientBatch([setRole(workspaceId, owner, newUlid(), 'owner')], owner),
+    );
   });
 });
