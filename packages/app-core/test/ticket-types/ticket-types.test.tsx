@@ -282,6 +282,28 @@ describe('TicketTypeEditorScreen — creating a custom type', () => {
   });
 
   /**
+   * 13.922 — the Implications card is the prototype's three-item list
+   * (`desktop.dc.html:949-953`), and the workspace-derived hierarchy sentence
+   * is its MIDDLE item rather than something the port replaced.
+   *
+   * The assertion is on the rendered list, in order, because the failure it
+   * has to catch is a port that swaps the derived sentence out for the two
+   * constant ones: that would still render an "Implications" card, would still
+   * show both prototype strings, and would have silently deleted the only line
+   * on this screen computed from the workspace's own types. Two of the three
+   * items are constants; the test exists to say which one is not.
+   */
+  it('renders the prototype’s three implications, keeping the derived one in the middle', async () => {
+    renderEditor(null);
+    const list = await screen.findByTestId('rank-implications-list');
+    expect(within(list).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'Two pickers will re-order: the board’s New ticket menu and MCP’s create_ticket.',
+      'Can sit under: Epic, Story · or at the project root.',
+      'Published workflows are versioned — nothing already recorded is rewritten.',
+    ]);
+  });
+
+  /**
    * 10.43 — select field without options: schema refusal in zod's own words; save blocked.
    */
   it('surfaces the schema refusal for a select field without options and blocks saving', async () => {
@@ -579,6 +601,29 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     await rebind({ typePopulation: { task: { [kanbanPublished.id]: 0 } } });
     expect(
       await screen.findByText(`No tickets of this type are on "${kanbanPublished.name}" — nothing stays behind.`),
+    ).toBeInTheDocument();
+  });
+
+  /**
+   * 13.923 — the notice carries the prototype's own sentence about the two
+   * choices: *"Neither choice is recommended over the other — leaving them is a
+   * decision, not a deferral."* (`desktop.dc.html:937`).
+   *
+   * The product already HELD that position — the source says "Staying put is a
+   * decision, not the absence of one" as a comment beside the Leave button —
+   * and a comment is not something an admin deciding this can read. The delta
+   * audit measured the sentence at 0 hits across `apps/` and `packages/`, which
+   * is exactly the shape a position the product takes only in its own source
+   * makes. The assertion is on the rendered node because that is the claim:
+   * the admin is told, not the reader of the file.
+   */
+  it('tells the admin that staying put is a decision, in the prototype’s own words', async () => {
+    await rebind({ typePopulation: { task: { [kanbanPublished.id]: 14 } } });
+    const notice = await screen.findByTestId('workflow-divergence');
+    expect(
+      within(notice).getByText(
+        'Neither choice is recommended over the other — leaving them is a decision, not a deferral.',
+      ),
     ).toBeInTheDocument();
   });
 

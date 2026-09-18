@@ -4687,3 +4687,48 @@
   line-height: 1.125rem;
   text-wrap: pretty;
 }
+/* ── settings → workflows, Task 5: the ticket-type editor's Implications card ──
+
+   The prototype's three-item list (`desktop.dc.html:949-953`). FOUR rules for a
+   port the audit called `port (M)`, and they are here rather than beside
+   `.ticket-type-editor__*` (~1,900) for a measured reason, not for convenience.
+
+   `__implications` is NOT redefined. Its typography lives in a rule it already
+   SHARES with `__builtin-note` at `:1942-1943`, and that rule is left exactly as
+   it was; the list simply carries a second class for the SHAPE. Editing the
+   shared rule in place would have added lines at `:1942` and pushed every
+   citation below it stale. **This change APPENDS AT EOF instead, which moves no
+   existing citation at all — and that is a structural fact, not a count.** A
+   count is the wrong instrument here: this figure read 33, then 34, then 32
+   across three merges in one afternoon, because a count is a reading that
+   expires and its universe has to be named every time. (The one used while it
+   was used was the QUALIFIED `ui.css:NNNN` form, which cannot even see this
+   file's own bare-form citations — including the four rules below.)
+   The locality given up is the same trade the `workflow-list__*` family made —
+   the two families sit 2,523 lines apart — and it is priced the same way.
+
+   TWO CLASSES ARE ONE `<ul>`, and the split is not cosmetic. `.ticket-type-editor__implications`
+   supplies margin/type/colour; `__implications-list` supplies the indent and the
+   row gap. A single renamed class would have had to repeat the typography, and
+   the copy would then be free to drift from `__builtin-note`'s. */
+.ticket-type-editor__implications-list { padding-left: 1.25rem; }
+/* A sibling margin, NOT `display:flex` + `gap`. The prototype uses flex
+   (`:949`). A flex container blockifies its children, which would delete the
+   list markers — that is REASONING from the spec, not measured here: no browser
+   was run, and none can be, because the viewport suite is not in this gate.
+   Either way the card keeps its bullets, and `display` is not what 13.922 asserts. */
+.ticket-type-editor__implications-list li + li { margin-top: 0.375rem; }
+/* The prototype's inline chip (`:950`): `--fill3` ground, 6px radius, 1px 6px
+   padding. `--fill3` is the role the mapping table gives `--gn-fill-tertiary`,
+   and the mono stack is `--gn-font-mono` — the same one `.gn-help__code` uses
+   for the identical job 968 lines up. */
+.ticket-type-editor__code {
+  font-family: var(--gn-font-mono);
+  background: var(--gn-fill-tertiary);
+  border-radius: 0.375rem;
+  padding: 0.0625rem 0.375rem;
+}
+/* The prototype's `:937` line at 12px/16px in the label2 role — the same
+   treatment as the hint it sits beside, because it is the same kind of
+   sentence: a note under the buttons about the choice those buttons make. */
+.ticket-type-editor__divergence-note { margin: 0; font-size: 0.75rem; color: var(--gn-text-muted); }
