@@ -9021,8 +9021,21 @@ mutation: rendering `Remove field` for a member again **still** reddens the pred
 (`access.test.tsx:610-615`, `expected false to be true`, reported at `:615`), and dropping the toggle's
 `disabled` reddens the per-button assertion beneath it.
 
-**Recount, at this tip.** Nine ids are minted here (`13.776`–`13.784`), all inside the reserved block
-`13.760`–`13.819`; **the next free id inside this executor's block is `13.785`**. Measured by case MARKER
+- ✅ **13.785 — a field's `required` flag survives a real Postgres round trip, and a field that never
+  decided crosses as ABSENT.** The strongest available witness for the failure mode the dispatch for
+  this flag named — *the core plan's final review once found a flag dead in PRODUCTION while every view
+  test drove a fake data source* — and the reason it is not redundant with 13.784 above. The
+  client-side cases run against a recording fetch or a fake gateway; **this one writes through the real
+  projector into a real `jsonb` column and reads back through the real reader**, which is the only
+  place the column's own round-tripping is exercised at all. `fields` is `jsonb`, so the `toEqual`
+  assertion is also what says the member arrives as a boolean rather than a string — the property the
+  case above it pins for a select field's `options`. The fixture is deliberately ONE decided field and
+  ONE never-decided, because an assertion on the first alone would pass for a projection that defaulted
+  every field to required; the second is asserted as key ABSENCE, not falsiness.
+  (`apps/server/test/proj-ticket-types.test.ts:124`)
+
+**Recount, at this tip.** Ten ids are minted here (`13.776`–`13.785`), all inside the reserved block
+`13.760`–`13.819`; **the next free id inside this executor's block is `13.786`**. Measured by case MARKER
 only: the highest `13.*` marker in this file at this tip was `13.775` before this section, and the
 block's own upper bound `13.819` appears only as prose *mentioning* it — the trap this file records
 twice above.
