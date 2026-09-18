@@ -9091,3 +9091,95 @@ does. **Seven mutations were killed before the review; two more were added for t
 only: the highest `13.*` marker in this file at this tip was `13.775` before this section, and the
 block's own upper bound `13.819` appears only as prose *mentioning* it — the trap this file records
 twice above.
+
+## The bulk-close dialog, and the Dialog dismiss's own name (executor 2, 2026-09-18) — block `13.640`–`13.643`
+
+**Second-wave Task 9**, reassigned to executor 2 on 2026-09-18 while executor 1 was mid-Task-5. These four
+ids are the PLAN's, not this executor's: `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md`
+reserves `13.613`–`13.649` for its twelve tasks and names `13.640`–`13.643` in this task's own step text,
+so the ids come from the reservation rather than from the `13.760`–`13.819` block this executor was given
+for its other work. Verified free before minting with the sanctioned recount
+(`git grep -hoE '13\.[0-9]{3}' -- docs/superpowers/plans test-cases | sort -u | tail`) — `13.640`–`13.643`
+appear in the plans and nowhere as a catalogue marker — which is the same collision the note at the head
+of this file records for `13.613`–`13.616`/`13.650`–`13.653`, caught this time by reading the reservation
+BEFORE minting rather than after.
+
+- ✅ **13.640 — confirming ingests ONE batch of three `ticket.closed` in the listed order.** Spec §8.3's
+  third bullet binds two halves at once — one event PER TICKET, and no server-side bulk endpoint — and only
+  the batch satisfies both: one event per ticket keeps the ledger honest (an auto-closed ticket and a
+  bulk-closed one are the same row), while one CALL is the door's own shape. A loop of N single-element
+  calls passes every other assertion in this file and fails this one, which is why the case asserts
+  `source.ingested` has length **1** rather than that three events exist somewhere. The ORDER assertion is
+  not decoration either: results are read by index, so a batch built from a different iteration would
+  submit three correct events and misreport every one of the moment a single ticket is refused. The batch
+  is also asserted envelope-by-envelope — `payload: {}` on all three (the envelope alone carries actor and
+  time, spec §1.2), `entity` kind/id in the listed order, `workspaceId`, `actorId` and `origin: 'web'`.
+  `packages/app-core/test/views/bulk-close-dialog.test.tsx:104`, `packages/app-core/src/views/bulk-close-dialog.tsx:127`
+
+- ✅ **13.641 — a refused second ticket is listed under `Could not close`; the rest are reported closed.**
+  The verdict is per ticket, so the two that committed are reported and the refused one is NOT: a dialog
+  that reported all three because the call returned would be the "the call succeeded, therefore the work
+  happened" defect. The case asserts `onClosed(['a', 'c'])` exactly once, that the dialog is STILL OPEN,
+  that the heading and the `<title> — <reason>` row are on screen, and that **the confirm control is GONE
+  rather than disabled at zero** — the plan offered both readings and told the implementer to pick the
+  former, which is the one asserted. It also asserts `onClose` was never called, which is what makes
+  "stays open" a measurement rather than a property of the harness: under an implementation that closed
+  itself on confirmation, this task's whole failure list would be unmounted before anyone could read it.
+  `packages/app-core/test/views/bulk-close-dialog.test.tsx:153`, `packages/app-core/src/views/bulk-close-dialog.tsx:168`
+
+- ✅ **13.642 — a rejected ingest shows the transport notice, reports nothing closed, re-enables confirm.**
+  A rejected promise is not a refusal (Ruling 27/34): the notice wears `.gn-refusal--transport` and this
+  client's own sentence with the cause's message, `onClosed` is never called, and the latch resets so the
+  person can try again with the whole list intact. **The silence branch is witnessed beside it**, in the
+  same file and by the same case's own Interfaces sentence: a results array SHORTER than the batch it
+  answers reads as silence — `The server did not answer this close.`, nothing reported closed, all three
+  still pending — because index alignment is the only thing that makes the answers meaningful, so a short
+  array cannot be read as "the first one committed". A third `it` covers the `invalid` envelope, whose
+  reason is the error's `message` rather than a rule's `reason`, plus Cancel closing without a second
+  submit. `packages/app-core/test/views/bulk-close-dialog.test.tsx:197`, `:222`, `:244`,
+  `packages/app-core/src/views/bulk-close-dialog.tsx:140`, `:171`
+
+- ✅ **13.643 — the `Dialog` dismiss control's accessible name is `Close dialog`.** R4 of this task. The
+  control's visible text is `×`, so its accessible name is whatever `aria-label` says and nothing in a
+  screenshot or a `getByText` can tell the two spellings apart — which is how the collision survived until
+  a feature put a plain "Close" button in a dialog's body (spec §5.3's ticket-sheet Close). The case pins
+  the new spelling AND makes the unscoped `getByRole('button', { name: 'Close' })` inside such a dialog
+  find exactly one element: that second assertion is the one that FAILED under the old label (testing-
+  library threw "found multiple elements"), so it is the assertion that catches the defect rather than one
+  that merely describes the fix. `packages/ui/test/components.test.tsx:100`,
+  `packages/ui/src/components/dialog.tsx:38`
+
+#### The R4 blast radius was MEASURED, not grepped
+
+The plan told this task to grep for every suite a shared accessible-name change would redden, and the
+answer the grep gave was **none**. That answer was then checked against the runner rather than trusted:
+the full `packages/ui` (325 passing), `packages/app-core` (1499) and `apps/web` (459) suites were run
+against the change, and no suite outside `packages/ui/test/components.test.tsx` queries the Dialog dismiss
+by name at all — the Dialog's own block queries Escape and the scrim, `Sheet`'s dismiss already says
+`Close sheet` (`packages/ui/src/components/sheet.tsx:28`), and `ticket-sheet.test.tsx`'s `name: 'Close'`
+queries are all `within(stateRow())`-scoped to that sheet's own feature button. **One stale comment
+recorded, not fixed** (outside this task's scope): `packages/app-core/test/views/ticket-sheet.test.tsx:820`
+states that `Sheet`'s dismiss carries `aria-label="Close"`; it says `Close sheet`, and the queries beneath
+it are scoped, so nothing reddens either way. Owner: whoever next opens that file.
+
+#### Mutation evidence (6 mutations, each reddening its own site, all restored by sha256)
+
+Every mutant was applied by an exact single-occurrence replacement — a replacement count other than 1 is
+reported as a HARNESS FAILURE rather than a survivor — run against the owning suite, and restored from a
+byte copy verified by sha256 (not `git checkout`, which ERRORS on the untracked component and would have
+left a mutated tree behind).
+
+1. **The plan's own mutation — the batch becomes N calls.** 13.640 reddens exactly as the plan predicted:
+   `expected [ [ { …(9) } ], [ { …(9) } ], …(1) ] to have a length of 1 but got 3`. It also reddens 13.641,
+   because the index alignment the answers depend on is destroyed with it.
+2. **The batch built out of order** (`[...pending].reverse()`) → 13.640 reddens on the entity list:
+   `expected [ { kind: 'ticket', id: 'c' }, …(2) ] to deeply equal [ { kind: 'ticket', id: 'a' }, …(2) ]`.
+3. **The short-array guard weakened** to "all answers undefined" → the silence witness reddens with
+   `Unable to find role="alert"`: two answers for three envelopes would otherwise be read as a partial
+   success.
+4. **Refused tickets left in the pending list** → 13.641 reddens on `expected <button …> to be null`: the
+   confirm control that the plan says must be gone comes back.
+5. **`onClosed` reporting every pending id instead of the committed ones** → 13.641 reddens on
+   `toHaveBeenCalledWith([['a','c']])`.
+6. **R4 reverted** (`aria-label="Close"`) → 13.643 reddens with `Unable to find an accessible element with
+   the role "button" and name "Close dialog"`, and nothing else in that file moves.
