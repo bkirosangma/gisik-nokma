@@ -8840,8 +8840,11 @@ double-render is already accepted for `rowAction`, so this may be intended, and 
 guessed at.
 
 **Minor 3 — prose corrected, three places.** The `ui.css` citation to `.gn-refusal--*` used PRE-insertion
-line numbers (`:1176`; the rules are at `:1203`/`:1204`/`:1209` after this task's 27 added lines) — now cited
-by SELECTOR, because a line number that is right in one revision is a false citation in the next. The
+line numbers (`:1176`) — now cited by SELECTOR, because a line number that is right in one revision is a
+false citation in the next, **and this entry proved its own point twice over**: that fix first replaced the
+numbers with a fresh set (`:1203`/`:1204`/`:1209`, correct for `d28d609b`), and the fix round's own further
+edits to `ui.css` moved the rules again. A reviewer caught the second staleness, which is why the sentence
+you are reading names no line number at all. The
 `--gn-fill-quaternary` sentence described the zebra token as though the new rule painted it; the rule is
 `opacity` alone and names no colour, so the sentence now says that. The control's file count was 13, not 14.
 
@@ -8854,3 +8857,48 @@ discovered; a guard would be a second decision point with nothing to decide.
 a user they are over it is the row marker going out. Styling the target itself is a fourth class, which the
 approved plan does not name — and a lit edge beside a still-lit "insert here" line was the worse of the two
 readings. Owner: the task that first reports the affordance as unclear.
+
+**Scoped re-review of the fix round (2026-09-18) — both Important fixes upheld, one Minor and one
+observation worth carrying.**
+
+**The most valuable finding of the whole task is that MY OWN MUTATION KILL WAS CONTINGENT.** This file's
+fix-round block above claims M9/M10 die on the foreign-drag case. The re-review showed that kill was
+contingent on a literal: `DRAG_TICKET_FORMAT` appeared in `ticket-list.test.tsx` **only inside comments** —
+the case hand-typed `'text/plain'`, the same value, so it passed. The reviewer ran a **paired experiment**,
+and it was reproduced here before the fix:
+
+| | change | exit | result |
+|---|---|---|---|
+| C | M9 alone, original format | **1** | killed on the FOREIGN case — a real kill |
+| A | `DRAG_TICKET_FORMAT` changed, code intact | **0** | the whole file is GREEN — it is format-agnostic once nothing agrees on the literal |
+| B | format changed **+** the membership check removed at both targets | **0** | **M9 SURVIVES** |
+
+**B is the finding.** With the constant drifted, the foreign payload reaches `getData` under a format the
+component no longer reads, comes back `''`, and is refused by the EMPTY clause instead — so the case stayed
+green while no longer testing the property in its name. The kill was real only because two hand-typed copies
+of `'text/plain'` happened to agree. **Fixed by importing the constant** (the test's own docblock at 13.705
+had asserted "imported, never re-spelled" and was FALSE — the sentence was written ahead of the code it
+described, which is this file's oldest recurring mistake). Re-verified after the fix: the drift experiment
+now leaves both the case and the mutant honest, because the test and the component read one value.
+
+**Finding 2 (Minor) — a sentence arguing against line numbers carried a stale line number.** The fix round
+replaced a stale `:1176` citation with `:1203`/`:1204`/`:1209`, correct for `d28d609b`; the fix round's own
+further edits then moved the rules again. Now cited by selector, with no number for a reader to chase.
+
+**Observation — a mutant with NO browser-visible effect reads as a kill here, and the kill count therefore
+overstates browser-observable coverage.** Deleting `setDraggingId(null)`/`setDropBeforeId(null)` from the
+**row** `onDrop` reddens 13.705's first case — yet in a browser it is behaviourally nil, because `dragend`
+always fires on the source after a drop and the component's own `onDragEnd` does byte-identical clearing.
+The suite proves that redundancy itself: the "ABANDONED drag clears both markers on `dragend`" case passes.
+The cause is that no case in this file fires `dragEnd` after a `drop`, so the post-drop marker state is
+pinned where a browser supplies it for free. **Not a defect in the code** (clearing on drop is deliberate:
+the component does not depend on a second event arriving), but it means this file's kill COUNT and its
+COVERAGE are not the same number. Recorded rather than papered over.
+
+**Two further things the re-review confirmed rather than merely accepted.** `rows` is the correct membership
+set — `sections` and `pinned` both derive from it, so rendered ids ⊆ `set(rows)` always, and a stale `rows`
+mid-reload refuses only rows that genuinely left the list, which is the conservative direction. And the
+choice of fix for the stale tail marker is the TESTABLE one: a container `dragleave` would have to be guarded
+against firing on every child boundary *and* is unverifiable in this harness, because jsdom never synthesises
+`dragenter`/`dragleave` from pointer movement — whereas the tail's `onDragOver` clear is driven by the same
+`fireEvent.dragOver` the cases already use.

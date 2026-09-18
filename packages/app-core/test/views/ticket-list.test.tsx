@@ -16,6 +16,10 @@ import {
   type UserPreferences,
 } from '../../src/view-types.js';
 import { TicketList, useTicketList } from '../../src/views/ticket-list.js';
+// `board.tsx`'s own exported constant, imported so this file cannot drift from
+// it — see 13.705's docblock for the paired experiment that proved a hand-typed
+// copy of the literal makes a mutant kill contingent rather than real.
+import { DRAG_TICKET_FORMAT } from '../../src/views/board.js';
 import type { GroupLabels } from '../../src/views/list-model.js';
 import { createFakeDataSource, type FakeDataSource } from '../helpers/fake-data-source.js';
 import { PROJECT, TICKET, WS, claim, listRowSeed } from '../helpers/seed.js';
@@ -1531,9 +1535,22 @@ function fakeDataTransfer(): DataTransfer {
  * the gesture, so nothing needs registering at all.
  *
  * **`DRAG_TICKET_FORMAT` is imported, never re-spelled.** Two formats that
- * drift apart make every drop a silent no-op, which is why the assertion below
- * drives the real constant through `board.tsx`'s own exported value rather
- * than a hand-typed `'text/plain'`.
+ * drift apart make every drop a silent no-op, which is why the cases below
+ * drive the real constant through `board.tsx`'s own exported value rather than
+ * a hand-typed `'text/plain'`.
+ *
+ * **That sentence was FALSE when it was first written, and the way it was false
+ * is worth keeping.** The constant appeared in this file only inside comments;
+ * the foreign-drag case hand-typed `'text/plain'` — the same value, so it
+ * passed. An independent reviewer ran the paired experiment: change the
+ * constant on its own and **this whole file stays GREEN** (it is
+ * format-agnostic once nothing agrees on the literal), and change the constant
+ * **with** the membership check removed and the mutation **SURVIVES** — the
+ * foreign payload then reaches `getData` under a format the component no longer
+ * reads, comes back `''`, and is refused by the EMPTY clause instead. The kill
+ * this file reported for that mutant was contingent on a literal, not on the
+ * property. Both halves are now measured against the imported constant, and
+ * the experiment is re-run in the catalogue's fix-round block.
  */
 describe('13.705 the rowDrag slot: rows drag, the row reports itself as the before-neighbour, and the tail zone means last', () => {
   const ROW_A: ListRow = listRowSeed({ ticketId: 'rd_a', title: 'Rank one' });
@@ -1705,7 +1722,10 @@ describe('13.705 the rowDrag slot: rows drag, the row reports itself as the befo
     // format, and no source of ours.
     for (const foreign of ['https://example.com/some-link', 'rd_not_in_this_list']) {
       const dataTransfer = fakeDataTransfer();
-      dataTransfer.setData('text/plain', foreign);
+      // The IMPORTED constant, never a hand-typed `'text/plain'` — see this
+      // describe's docblock for the paired experiment that made the difference
+      // between a real kill and one contingent on a literal.
+      dataTransfer.setData(DRAG_TICKET_FORMAT, foreign);
       fireEvent.drop(rowTr('rd_a'), { dataTransfer });
       fireEvent.drop(tailZone(), { dataTransfer });
     }
