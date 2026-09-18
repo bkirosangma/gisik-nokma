@@ -22,9 +22,9 @@
 
 ## ▲ TOP BLOCK — membership Task 2: the roster's role control, with `Owner` omitted (2026-09-18)
 
-**Position: the change set is COMPLETE and gated, the reviewer's pass returned and the fix round is
-applied, a SCOPED RE-REVIEW of the fix is RUNNING, and the PR is NOT YET OPEN.** Dispatch:
-`CTL-DISPATCH-2026-09-18-exec2-membership-t2.md`. Plan of record:
+**Position: the change set is COMPLETE, the review round and its scoped re-review have both returned and
+are fully discharged, and the PR is opening against `main` with the reviewer recorded in its body.**
+Dispatch: `CTL-DISPATCH-2026-09-18-exec2-membership-t2.md`. Plan of record:
 `docs/superpowers/plans/2026-09-18-membership-role-guard.md` Task 2. One PR, `--base main`, branch
 **`exec2/membership-t2-role-control`**.
 
@@ -37,7 +37,7 @@ the controller's merge and nothing below needs redoing. Then verify the anchors 
 |---|---|
 | branch | `exec2/membership-t2-role-control` |
 | base | **`dda4c342`** = the `#457` merge I cut from. **`origin/main` has since moved to `36ec6ae3`** (`#458`, `ctl/ledger-wave2` — `docs/lanes/task-ledger.tsv` ONLY, 4 lines), so the branch is **2 behind and 0 conflicted**. **Do NOT rebase**: rebasing moves the head after the reviewer's pass and the only thing gained is a tidier graph. The controller's merge brings the ledger row with it. |
-| commits | `19a5c3c9` (the change set) · `b3eb8b80` (ruling recorded + 4 stale citations) · `fdc1e09f` (handoff) · **`526c9fbf` (the FIX ROUND)** |
+| commits | `19a5c3c9` (the change set) · `b3eb8b80` (ruling recorded + 4 stale citations) · `fdc1e09f` (handoff) · **`526c9fbf` (FIX ROUND 1)** · **`ec4df6ec` (FIX ROUND 2 — every citation re-measured at this tip)** · `56095a02` (a double-prefixed citation my own sweep wrote) |
 | reviewed head | **`19a5c3c9`** by the full reviewer; **`526c9fbf`** by the scoped re-review |
 | frozen head | **`verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit that carries it; whatever is here is one MORE than the last commit below |
 | ahead / behind | recount, do not quote |
@@ -56,6 +56,17 @@ overstated refusal reachability, a **backwards** `aria-hidden` claim in the test
 untouched" sentence, a citation to an explanation rather than an assertion, and two overclaims in
 `19a5c3c9`'s own commit message (recorded in the catalogue, since a message cannot be edited without moving
 the reviewed shas).
+
+**THE SCOPED RE-REVIEW** confirmed the comment-only claim by reading the hunks and then found the one thing
+fix round 1 had done to itself: **a fix is a change like any other, and every citation round 1 wrote had
+been measured at the reviewed head rather than at its own tip** — `526c9fbf` added 17 lines to `page.tsx`
+that moved every line below them, so a reader verifying the new reachability claim landed on prose. It also
+found the corrected claim surviving **verbatim** in `Features.md:331` and the 13.827 test docblock, and
+"THREE places" counting a universe that silently excluded the package defining the function. **Fix round 2
+(`ec4df6ec`) addresses all of it**, and a read-back instrument (`/tmp/citecheck.py` in that session; every
+citation in the added lines with its target line printed) was written because eyeballing had failed twice.
+**No third review was run**: fix round 2 is prose and line numbers only, the reviewer had already named the
+defect and the criterion, and the instrument now checks it mechanically.
 
 ### What shipped
 
