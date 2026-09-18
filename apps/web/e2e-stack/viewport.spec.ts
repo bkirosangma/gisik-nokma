@@ -1016,38 +1016,43 @@ test('records non-text contrast across the signed-in surface, with a positive co
     'non-text contrast regressed — these classes render below WCAG 1.4.11 3:1',
   ).toEqual([]);
 
-  // The negative control, run through the SAME path as the measurement: at a
-  // threshold nothing could clear, the instrument must find offenders.
-  const absurd = await sweepBorders(page, 25);
-  expect(
-    absurd.below.length,
-    'the sweep reported no offenders even at 25:1 — it is not measuring, and its ' +
-      'zero above means nothing',
-  ).toBeGreaterThan(0);
-
   /*
-   * ## 13.921 — and it can still tell red from green in the ordinary range
-   * ## (case 13.283 is the sweep; this is its control) — but the thing it
-   * ## stands on had to change, because it was standing on a defect
+   * ## 13.921 — THE FIXTURE COMES FIRST, because BOTH controls stand on it
    *
-   * This read `expect(bestSeen).toBeGreaterThan(15)` and passed for a reason
-   * unrelated to the property it named. Both readings above 15 (17.62, twice)
+   * Two controls run through `sweepBorders` below, and **the plant sits ahead
+   * of both**. That ordering is the repair, not tidiness: *a control that runs
+   * before the fixture it needs is not a control.* This was found by RUNNING
+   * the suite, not by reading it — the first version of this fix planted
+   * between the two controls, and the negative one went red.
+   *
+   * The element is a fixed, known **21:1** — black on an opaque white ground —
+   * which is BELOW the negative control's 25, so **one fixture satisfies
+   * both**: the positive control reads it, and the negative control counts it
+   * as an offender. Neither threshold is lowered and neither control is
+   * deleted.
+   *
+   * ## The positive control stopped resting on the product
+   *
+   * It read `expect(bestSeen).toBeGreaterThan(15)` and passed for a reason
+   * unrelated to the property it named: both readings above 15 (17.62, twice)
    * were `rgba(0,0,0,1)` — the UA's default border on two BARE `<button>`s on
-   * `/settings/workflows`. The control was resting on an unstyled button.
-   * Putting those buttons on `.gn-button` (`border: none`) removed both
-   * readings and the maximum fell to 3.81, so this went red: not because the
-   * instrument broke, but because the defect it leaned on got fixed. A control
-   * satisfied by a product defect is not a control.
+   * `/settings/workflows`. It was resting on an unstyled button, and putting
+   * those buttons on `.gn-button` (`border: none`) removed both readings.
    *
-   * The 15 is NOT lowered and the assertion is NOT deleted. What changes is
-   * what it stands on: the sweep is handed an element whose ratio is known to
-   * the decimal — black on an opaque white ground, 21.0 — and must read it
-   * through the SAME `sweepBorders` path the measurement uses. A planted
-   * fixture cannot be removed by a styling change, so it survives every future
-   * one, and it asserts a property of the INSTRUMENT rather than a property of
-   * the product. `bestSeen` remains the PRODUCT's own maximum and is still
-   * recorded as the roster's `highestReading`; it is simply no longer load-
-   * bearing for a threshold it can never durably hold.
+   * ## So did the negative control — which is what the suite caught
+   *
+   * It sweeps the page the route loop ENDS on, `/settings/workflows`, and
+   * after that same change **that page has no painted borders at all** — its
+   * two `rgba(0,0,0,1)` entries are gone, the sweep's `examined` drops with
+   * them, and `absurd.below.length` was `0`. It failed for exactly the reason
+   * the positive one had. **Both controls now stand on the fixture**, which
+   * depends on no product element, so no styling change can take it away —
+   * neither this one nor `aside.gn-attention`'s border leaving in the same
+   * week.
+   *
+   * `bestSeen` remains the PRODUCT's own maximum and is still recorded as the
+   * roster's `highestReading`; it is simply no longer load-bearing for a
+   * threshold it can never durably hold.
    */
   await page.evaluate((className) => {
     const ground = document.createElement('div');
@@ -1067,6 +1072,28 @@ test('records non-text contrast across the signed-in surface, with a positive co
     document.body.appendChild(ground);
   }, PLANTED_CONTROL_SELECTOR);
 
+  // The NEGATIVE control, through the SAME path as the measurement: at a
+  // threshold nothing could clear, the instrument must find offenders. The
+  // planted 21:1 is an offender at 25 — which is what makes the fixture,
+  // rather than the product, the thing this control rests on.
+  const absurd = await sweepBorders(page, 25);
+  expect(
+    absurd.below.length,
+    'the sweep reported no offenders even at 25:1 — it is not measuring, and its ' +
+      'zero above means nothing',
+  ).toBeGreaterThan(0);
+  /* Printed rather than only asserted: a control whose RESULT is invisible in
+     the log cannot be audited by whoever reads the run, and the run is the only
+     place this defect was ever going to show up. */
+  console.log(
+    `[non-text-contrast] NEGATIVE control: sweepBorders(page, 25) found ` +
+      `${absurd.below.length} offender(s) — ${
+        absurd.below.map((r) => `${r.selector} ${r.ratio.toFixed(2)}`).join(', ') || 'NONE, which fails'
+      }`,
+  );
+
+  // The POSITIVE control, through the same path: the instrument must read the
+  // planted element at the ratio it was built to have.
   const plantedSweep = await sweepBorders(page);
   const planted = plantedSweep.readings.find(
     (r) => r.selector === `div.${PLANTED_CONTROL_SELECTOR}`,
@@ -1086,6 +1113,12 @@ test('records non-text contrast across the signed-in surface, with a positive co
      halved the reading would still clear 15 and fail here — which is the
      direction a loose threshold cannot see. */
   expect(planted!.ratio).toBeCloseTo(21, 1);
+  console.log(
+    `[non-text-contrast] POSITIVE control: the planted element read ` +
+      `${planted!.ratio.toFixed(2)}:1 (border ${planted!.border} on ${planted!.backdrop}) ` +
+      `through the same sweepBorders path — while the product's own maximum was ` +
+      `${bestSeen.toFixed(2)}.`,
+  );
 
   await page.evaluate(() => {
     document.querySelector('[data-planted-control]')?.remove();

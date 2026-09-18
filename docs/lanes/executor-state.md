@@ -57,7 +57,28 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | seven checks | **all EXIT 0 at the rebased head**: `tasks` · `env` · `runbook` · `help` · `citations` (file 13 = **662** cited / 0 uncited) · `db-tz` (**`DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma`** → `Asia/Kolkata`) · `check-case-ids` (**2352**, union == sum). Citations 658→662 and ids 2348→2352 are exec2's four new cases, not drift. |
 > | gate | **NOT RUN BY THIS LANE** (the controller runs it). `pnpm turbo run build` **11/11** for the post-rebase dist rebuild. |
 >
-> ## ▣ F1 IS RULED AND FIXED — the sweep's positive control is now PLANTED (case `13.921`)
+> ## ▣ F1 IS RULED AND FIXED — BOTH controls now stand on a PLANTED fixture (case `13.921`)
+>
+> **RULING 2 (the controller ran `test:e2e:stack`, which this lane cannot) went back once more and is now
+> satisfied.** The sweep has **two** controls and the first fix planted between them: the **negative**
+> control — `sweepBorders(page, 25)`, `absurd.below.length > 0` — sweeps the page the route loop ENDS on,
+> `/settings/workflows`, which after this change has **no painted borders at all** (roster `examined`
+> 9 → 4, `highestReading` 17.62 → 4.36, `totalClasses` 5 → 2, both `rgba(0,0,0,1)` entries gone). So
+> `below.length` was `0` and it failed **for exactly the reason F1 gave**.
+>
+> **The repair is the ORDERING**: the fixture is planted **ahead of both controls**, and its fixed 21:1
+> is BELOW the negative control's 25, so **one fixture satisfies both**. Neither threshold is lowered and
+> neither control is deleted. **A control that runs before the fixture it needs is not a control.**
+>
+> **Verified in Chromium against a borderless page** — the failing page's own shape: **before the plant
+> `below.length=0` (the reported failure reproduced) and after it `below.length=1`** with
+> `div.non-text-contrast-control` at 21 as the offender, while the positive control reads the same element
+> at 21. **F1 was found by thinking; this was found by running.** A green forced gate can see neither,
+> because `e2e-stack` is not in the turbo graph.
+>
+> ---
+>
+> ## ▣ F1 — the original half (the positive control), kept as record
 >
 > The controller confirmed F1 at the roster and ruled **#478 goes back, re-base the control in the SAME
 > change set**. Both readings above 15 were `rgba(0,0,0,1)` — Chrome's own default border on two BARE

@@ -1843,7 +1843,26 @@ compute against one specific background — which is exactly why they are cases 
   control's own background, because `backdropOf` walks to the PARENT; painting the control itself would
   leave the ratio at the mercy of whatever the page's body is painted that day.*
   *`bestSeen` remains the PRODUCT's own maximum and is still written as the roster's `highestReading` —
-  it is simply no longer load-bearing for a threshold it can never durably hold.* —
+  it is simply no longer load-bearing for a threshold it can never durably hold.*
+  ***THE NEGATIVE CONTROL HAD THE SAME DEFECT, AND IT WAS THE RUN THAT FOUND IT.** `viewport.spec.ts`
+  runs TWO controls through `sweepBorders`, and the negative one — `sweepBorders(page, 25)`,
+  `absurd.below.length > 0` — sweeps the page the route loop ENDS on, `/settings/workflows`. That is
+  precisely the page whose two bare buttons carried the `rgba(0,0,0,1)` border and became `.gn-button`
+  (`border: none`), so after the change **that page has no painted borders at all**: the roster's
+  `examined` falls 9 → 4, `highestReading` 17.62 → 4.36, `totalClasses` 5 → 2, both `rgba(0,0,0,1)`
+  entries gone, `below.length` is `0`, and the control fails **for exactly the reason the positive one
+  had**. The first version of this fix planted BETWEEN the two controls and was caught by running the
+  suite — F1 was found by thinking, this by running, and a green forced gate could see neither because
+  `e2e-stack` is not in the turbo graph.*
+  ***THE REPAIR IS THE ORDERING.** The fixture is planted ahead of BOTH controls. Its fixed 21:1 is
+  BELOW the negative control's 25, so **one fixture satisfies both** — the positive control reads it and
+  the negative control counts it as an offender. Neither threshold is lowered and neither control is
+  deleted; **a control that runs before the fixture it needs is not a control.** Verified in Chromium
+  against a borderless page, which is the failing page's own shape: **before the plant
+  `below.length=0` — the reported failure reproduced — and after it `below.length=1` with
+  `div.non-text-contrast-control` at 21 as the offender**, while the positive control reads the same
+  element at 21. Both now stand on the fixture, which depends on no product element, so neither this
+  change nor `aside.gn-attention`'s border leaving in the same week can take it away.* —
   (`apps/web/e2e-stack/viewport.spec.ts`)
 - **13.284** ✅ A non-primary control is identifiable without a boundary — the affordance is fill plus an
   accent-coloured semibold label, and the case measures which of the two actually carries it.
