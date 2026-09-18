@@ -22,11 +22,11 @@
 
 ## ▲ TOP BLOCK — membership Task 2: the roster's role control, with `Owner` omitted (2026-09-18)
 
-**Position: the change set is COMPLETE and gated, the reviewer's pass is RUNNING, and the PR is NOT YET
-OPEN.** Dispatch: `CTL-DISPATCH-2026-09-18-exec2-membership-t2.md`. Plan of record:
+**Position: the change set is COMPLETE and gated, the reviewer's pass returned and the fix round is
+applied, a SCOPED RE-REVIEW of the fix is RUNNING, and the PR is NOT YET OPEN.** Dispatch:
+`CTL-DISPATCH-2026-09-18-exec2-membership-t2.md`. Plan of record:
 `docs/superpowers/plans/2026-09-18-membership-role-guard.md` Task 2. One PR, `--base main`, branch
-**`exec2/membership-t2-role-control`**, commits **`19a5c3c9`** (the change set) and **`b3eb8b80`** (the
-controller's ruling recorded + four of my own stale citations fixed).
+**`exec2/membership-t2-role-control`**.
 
 **FIRST ACTION ON A RESTART: `gh pr list --state open`.** If a PR for this branch exists, the task is at
 the controller's merge and nothing below needs redoing. Then verify the anchors — do not trust the rows.
@@ -37,10 +37,24 @@ the controller's merge and nothing below needs redoing. Then verify the anchors 
 |---|---|
 | branch | `exec2/membership-t2-role-control` |
 | base | **`dda4c342`** = the `#457` merge I cut from. **`origin/main` has since moved to `36ec6ae3`** (`#458`, `ctl/ledger-wave2` — `docs/lanes/task-ledger.tsv` ONLY, 4 lines), so the branch is **2 behind and 0 conflicted**. **Do NOT rebase**: rebasing moves the head after the reviewer's pass and the only thing gained is a tidier graph. The controller's merge brings the ledger row with it. |
-| reviewed head | **`19a5c3c9`** — the commit the reviewer was dispatched against |
-| frozen head | **`b3eb8b80`** — `19a5c3c9` plus a PROSE-ONLY partition (see below) |
-| ahead / behind | **2 / 2** at `b3eb8b80` — **recount, do not quote** |
+| commits | `19a5c3c9` (the change set) · `b3eb8b80` (ruling recorded + 4 stale citations) · `fdc1e09f` (handoff) · **`526c9fbf` (the FIX ROUND)** |
+| reviewed head | **`19a5c3c9`** by the full reviewer; **`526c9fbf`** by the scoped re-review |
+| frozen head | **`verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit that carries it; whatever is here is one MORE than the last commit below |
+| ahead / behind | recount, do not quote |
 | tree | clean |
+
+### THE REVIEW ROUND — no Critical, two Important, five Minor; ALL SEVEN ADDRESSED at `526c9fbf`
+
+The reviewer's sharpest finding was against a claim I had labelled **"measured"**: the follow-on paragraph's
+sweep had been **truncated by my own `sed -n '1,20p'`**, which cut `apps/mobile` off the end. Three
+construction sites, not two; the definition cited was an import line. Re-run untruncated. The other
+Important: the engine docblock still carried the trigger this change refuted — corrected **in
+`packages/rule-engine/src/checks/membership.ts`**, the one place the fix reached outside the reviewed diff
+(a comment), and the reason a scoped re-review was dispatched rather than assumed unnecessary. Minors:
+overstated refusal reachability, a **backwards** `aria-hidden` claim in the test docblock, a false "block
+untouched" sentence, a citation to an explanation rather than an assertion, and two overclaims in
+`19a5c3c9`'s own commit message (recorded in the catalogue, since a message cannot be edited without moving
+the reviewed shas).
 
 ### What shipped
 
@@ -107,7 +121,9 @@ prose by construction. No executable line moved, so the reviewed logic is intact
 
 ### Verification at `b3eb8b80` — recounted, not quoted
 
-**web 487/487** (whole package, `--maxWorkers=1`) · **members-page 28/28** · **app-core 1544/1544** ·
+**Re-run at `526c9fbf` after the fix round:** rule-engine **331/331** · members-page **28/28** · `tsc`
+exit **0** on rule-engine and web · **all seven checks raw 0**.
+**At `b3eb8b80`: web 487/487** (whole package, `--maxWorkers=1`) · **members-page 28/28** · **app-core 1544/1544** ·
 **`tsc --noEmit` on apps/web exit 0** · **SEVEN checks raw 0**: `check:env`, `check:tasks`,
 `check:db-tz` (needs `DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma`, prints
 `database timezone: Asia/Kolkata`), `check:runbook`, `check:citations` (2161 checked, 0 uncited;
@@ -125,6 +141,12 @@ sentence was written.
 - **Do not re-open the owner-row question.** Ruled, and recorded in four places.
 - **Do not "fix" the plan's Step 1 sample code in place.** The plan is the controller's document; the
   defects are recorded here and in `test-cases/13` instead.
+- **Do not re-run the review round.** It returned no Critical; its two Importants and five Minors are all
+  addressed at `526c9fbf`, each verified at source, and the corrections name themselves in place. A scoped
+  re-review of that fix is the last outstanding step before the PR.
+- **If you re-run a sweep for any claim in this block, do NOT truncate it.** The one Important finding here
+  exists because the author's own `sed -n '1,20p'` cut an app off the end of a sweep and the sentence still
+  said "measured". Count the universe first.
 
 ## ▼ PREVIOUS BLOCK — membership Task 1: the last-owner guard, in both layers (2026-09-18)
 
