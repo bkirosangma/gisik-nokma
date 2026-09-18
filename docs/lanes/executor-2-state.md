@@ -22,11 +22,11 @@
 
 ## ▲ TOP BLOCK — `isTypeEditor`: fields gain `required` (2026-09-18)
 
-**Position: the change set is COMPLETE, the review round is CLOSED, all suites
-and checks are green at the head below, and the PR is being opened.**
-Dispatch: `CTL-DISPATCH-2026-09-18-exec2-typerequired`. Owner ruling behind it:
-decision-list item 1, **"1 - yes"** (2026-09-18). One PR, `--base main`, branch
-`exec2/type-required`.
+**Position: the change set is COMPLETE, the review round is CLOSED, the branch is
+REBASED onto `main`, and PR #447 is open and awaiting the controller's merge.**
+Dispatch: `CTL-DISPATCH-2026-09-18-exec2-typerequired`, then
+`CTL-EXEC2-2026-09-18-rebase-447`. Owner ruling behind it: decision-list item 1,
+**"1 - yes"** (2026-09-18). One PR, `--base main`, branch `exec2/type-required`.
 
 **The review round returned: NO Critical, NO Important, six Minor — and four of
 the six were defects in THIS CHANGE'S OWN DOCUMENTATION rather than in its code.**
@@ -40,13 +40,78 @@ free). Details in § "The review round" below.
 | | |
 |---|---|
 | branch | `exec2/type-required` |
-| base | **`d069fd94`** = `origin/main` at this count |
-| `origin/main` | `d069fd94` — **recount; main moves without telling you** |
-| merge-base | `d069fd94` |
-| ahead | **1** commit (`origin/main..HEAD`) |
+| base | **`488bfb2d`** = `origin/main` = the `#446` merge (executor 1's second-wave Task 4, the row drag) |
+| `origin/main` | `488bfb2d` at the last count — **recount; main moves without telling you** |
+| merge-base | `488bfb2d` |
+| ahead | **6** commits (`origin/main..HEAD`) |
 | behind | 0 |
 | tree | clean (`git status --porcelain` empty) |
-| HEAD | `d56fca85` — **verify with `/usr/bin/git rev-parse HEAD`.** A block cannot contain the commit that carries it, so the number above names an ANCESTOR once this file is committed |
+| HEAD | **verify with `/usr/bin/git rev-parse HEAD`.** A block cannot contain the commit that carries it, so any number here names an ANCESTOR, never the tip |
+| PR | **#447**, `--base main`; reviewer pass recorded in the body BEFORE it opened |
+
+### ⛔ THE PRE-REBASE SHAS ARE ORPHANED. DO NOT CITE THEM.
+
+`5212a2f7` (the frozen head PR #447 first opened at), `d56fca85` (the commit the
+reviewer actually ran against), `be237c73`, `27427836`, `51d78f93` and
+`e292c2e2` were all orphaned by the rebase onto `488bfb2d`. **`git cat-file`
+still resolves every one of them — it passes on reflog-only commits — and
+`git branch --contains` returns nothing.** That asymmetry is why this warning is
+here rather than left to a reader to discover. `5212a2f7` survives only as the
+local safety ref `backup/exec2-type-required-preRebase-5212a2f7`, which is NOT
+pushed and must not be relied on by anyone else.
+
+### § 0 — THE REBASE (2026-09-18), AND WHAT IT COST
+
+Executor 1's Task 4 (#446) merged to `main` as `488bfb2d` while this change was
+open, so PR #447 went CONFLICTING. **One file conflicted:
+`test-cases/13-deployment-dogfooding.md`, both sides appending at EOF** — the
+same shape, and the same file, as this lane's previous rebase. `Features.md` and
+`packages/ui/src/ui.css` auto-merged.
+
+**Resolved by union, and the audit is the part worth keeping.** Every line the
+PEER added to the catalogue (200 of them, `d069fd94..488bfb2d`) is present in the
+final tree — **0 absent** — and every line THIS change added (188) is present
+too — **0 absent**. The positive control is what makes that a measurement rather
+than a probe that cannot fire: the same probe run against a tree without the
+resolution reports **178 of the peer's 200 absent**.
+
+**And the control earned its keep twice in one sitting.** The first run of the
+preservation command returned `0` — for BOTH the measurement and its control,
+which is impossible if the probe works. Cause: **zsh does not word-split an
+unquoted `$PATHS`**, so the whole variable was passed as ONE pathspec matching
+nothing. Both zeros were vacuous. Re-run with the paths spelled out, the
+measurement is `0` and its control is `22`. **A control that does not fire when
+it should have is the same defect as one that fires when it should not** — and
+this is the zsh trap this project has recorded before, caught here only because
+the control was run in the same invocation as the measurement.
+
+**What survived the rebase, stated as a command a reader can run.** Over the
+source and test files the reviewed commit touches — the three merged files
+(`Features.md`, `ui.css`, `test-cases/13-…`) excluded on purpose, since they
+differ from the reviewed version by exactly the peer's content — expect **EMPTY**:
+
+```
+git diff d56fca85 caf1edec -- \
+  packages/domain/src/ticket-types.ts \
+  packages/domain/test/ticket-types.test.ts \
+  packages/app-core/src/workflow-builder/ticket-types/fields-editor.tsx \
+  packages/app-core/test/ticket-types/ticket-types.test.tsx \
+  packages/app-core/test/workflow-builder/access.test.tsx \
+  packages/app-core/test/online/online-data-source.test.ts
+```
+
+Positive control: the same command with
+`backup/exec2-type-required-preRebase-5212a2f7` in place of `caf1edec` returns
+**22 lines**, so an empty result is a measurement rather than a probe that cannot
+fire. `caf1edec` is the rebased equivalent of the reviewed `d56fca85` — commit 1
+of 6 on this branch.
+
+### Verification at the REBASED head
+
+Suites: **domain 506/0 · ui 324/0 · app-core 1492/0 · web 459/0 · server 1538/0**.
+(ui and app-core are HIGHER than pre-rebase because main's Task 4 tests arrived
+with the rebase.) Typechecks **11 of 12, exit 0**. Six checks plus
+`check-case-ids.mjs` all raw **0**.
 
 ### ★ THE MEASUREMENT THAT DECIDED THE SHAPE — read this before re-scoping
 
