@@ -16,23 +16,42 @@ revisit them."*
 
 ## Held
 
-### 1. The wire-gap screens — HELD (owner, 2026-09-18)
+### 1. The wire-gap screens — **PARTLY LIFTED 2026-09-19.** Read the per-row status.
 
 Seven screens from the 2026-09-18 prototype delta audit whose prototype controls have no server
 behind them. Each is server + mapper work, i.e. the most expensive category in the queue.
 
-| Screen | What is missing |
-|---|---|
-| `isInbox` | the filter and the bulk actions |
-| `isTypes` | reorder and per-type counts |
-| `isWorkflows` | a badge and a second action |
-| `isMcpTokens` | row names (the issue-token flow itself is separately ruled out) |
-| `isInvite` | three read fields |
-| `isMcpAuth` | scopes, client, and the deny route |
-| `isWorkspace` | project description, chips, delete |
+**The owner answered all seven, row by row, on 2026-09-19.** **Four rows are now LIFTED and three remain
+HELD — do not dispatch a `HELD` row, and do not treat a lifted row as licence for a held one.**
 
-The owner did **not** pick any of them. Do not dispatch one, and do not treat "the owner named a
-different wire-gap" as a precedent for the rest.
+| Screen | What is missing | status |
+|---|---|---|
+| `isInbox` | the filter and the bulk actions | **HELD** |
+| `isTypes` | reorder and per-type counts | **LIFTED 2026-09-19 — both halves approved** |
+| `isWorkflows` | a badge and a second action | **SPLIT: the badge is DROPPED (not held, not to be built); the second action is LIFTED with version history (§9.1) as ONE decision** |
+| `isMcpTokens` | row names (the issue-token flow itself is separately ruled out) | **HELD** |
+| `isInvite` | three read fields | **HELD** |
+| `isMcpAuth` | scopes, client, and the deny route | **HELD** |
+| `isWorkspace` | project description, chips, delete | **HELD** |
+
+**The rule this section was written for still stands for the three HELD rows**: the owner picked them
+individually, so do not generalise from the lifted ones.
+
+#### The 2026-09-19 rulings, verbatim, and what each means
+
+| item | owner's answer | effect |
+|---|---|---|
+| `isTypes` **reorder** (↑/↓) | **yes** | build it. `rank` already exists on `TicketTypeDef` and `rank.ts` already computes the hierarchy implications, so this is likely **a route and a gateway method over data that already exists** |
+| `isTypes` **per-type counts** | **yes** | build it. **This one needs NEW server surface**: the only population read is pinned to one workflow (`WHERE … workflow_id = $3`), which the screen itself records would print a WRONG number |
+| `isWorkflows` **status badge** | **drop it** | not built, and recorded as a **named absence** — not as an outstanding gap. The read serves only published workflows, so a field holding one value would be a badge that lies by omission |
+| `isWorkflows` **second action** + **version history** | **yes** | **ONE decision, one task.** The version chain is already readable (route `?version=`, `data-source.ts:146` `version?: number`); the web adapter drops the argument at `data-source-gateway.ts:224` and **no history screen exists** — so this is the first port that draws a screen the prototype does not |
+
+#### And one product question outside this register, ruled the same day
+**`Attachment` as a custom field kind — NO.** `CUSTOM_FIELD_KINDS` is `['text','number','date','select','person']`;
+the prototype's `Text/Date/Number/Attachment` is a **different set, not a superset**, and adding `Attachment`
+decides whether a custom field can hold a file. **Recorded as a deliberate absence** in
+`packages/domain/src/ticket-types.ts`'s docblock and in the ticket-type editor's — a reader comparing the two
+must find the reason, not a silence.
 
 ### 2. `McpAuthorize` and `McpTokens` — HELD (owner, 2026-09-18)
 
@@ -154,4 +173,29 @@ is `done`, evidence `#443`'s merge commit `ba96a8d2`; its one verifiably-absent 
 form wrapping) moved into the `members-styling` dispatch by amendment. `3b` was **not** covered by that
 ruling and stays `todo`.
 
-**Nothing is open for the owner.** Both remaining answers this register was waiting on have been given.
+---
+
+## 2026-09-19 — the register's §1 answered row by row, and one repo-structure decision
+
+The owner answered **all seven** questions the controller put by name, in one message. **Six are recorded
+above** (§1's table and the `Attachment` ruling). The seventh is not a hold and is recorded here:
+
+### `test-cases/13-deployment-dogfooding.md` is to be **SPLIT** — **yes** (2026-09-19)
+
+**The measured need:** that single file was touched by **104 commits today** across 71 merges, and it
+conflicted on essentially every merge *pair* — including both merges the controller made in the final
+hour. Each conflict costs a rebase, an independent audit and a re-gate; it is the most frequent single
+source of rework in the queue.
+
+**What "split" means is NOT yet decided** — per-task files and per-section files are both live readings.
+**The brief that does this work must name which shape it takes and why**, and it must update every reader
+of the file (`check-case-ids.mjs`, `check-case-citations.mjs`, the citation ratchet, the roster header)
+rather than leaving one pointed at a file that no longer exists. **A checker that silently finds fewer
+files is the failure mode this repo catalogues most**, so the split's own PR must show the counts before
+and after and reconcile them.
+
+**Sequencing, and it matters:** the split **must land before the newly-lifted feature work**, because that
+work appends cases to this file and would collide with a structural move underneath it.
+
+**Nothing is open for the owner** — as of 2026-09-19 every question this register, the decision list and the
+controller's escalations have put to them has been answered.
