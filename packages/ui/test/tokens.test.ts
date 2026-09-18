@@ -620,6 +620,26 @@ describe('a control without a boundary — which signal identifies it', () => {
  * The banner sits at page level, so its ground is `surface` and only
  * `surface`. If it is ever nested inside a card, this check is measuring the
  * wrong ground and must gain the `surfaceRaised` composite too.
+ *
+ * ## SECOND CONSUMER (2026-09-18) — the attention strip, and why this block is unchanged
+ *
+ * `tintWarning` stopped being a single-consumer role when `.gn-attention` took
+ * the fill (`ui.css`, owner ruling 2026-09-18). That role's `tokens.ts` note
+ * said "consumed at exactly one place"; it now names two. **The strip's ground
+ * is re-established, not inherited**: it mounts inside `.gn-shell__main` on
+ * `/w/<id>/my-work`, above `--gn-surface`, so it is the SAME composite the
+ * banner already measures — and the roster's real-browser reading for that
+ * element records exactly that backdrop (`e2e-stack/non-text-contrast-roster.json`'s
+ * `aside.gn-attention` entry: `rgb(241,234,227)`).
+ *
+ * **No assertion was added, deliberately.** The strip's text is `--gn-text` —
+ * the heading (which inherits, since nothing between `body` and `.gn-attention`
+ * sets a colour), `.gn-attention__title`, and the `Chip` itself, whose tone
+ * modifiers all set only `.gn-chip__dot`'s background — and `--gn-text-muted`
+ * for the reason and the claim. Those are precisely the two roles the two
+ * assertions below already cover, in all six style×theme combinations. A third block asserting the same two pairs against the same
+ * wash would be a check that cannot fail for a reason of its own, which is the
+ * shape case 11.213 was RETRACTED for (see its entry above).
  */
 describe('tintWarning composites legibly on every surface it can reach', () => {
   /** `src` over `dst` — the compositing `relativeLuminance` deliberately lacks. */

@@ -180,7 +180,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
 
     // The half that makes the two above a test: neither falsehood is also here.
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
-    expect(screen.queryByRole('complementary', { name: 'Needs attention' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Needs your attention' })).not.toBeInTheDocument();
   });
 
   it('Workspaces: the list refuses, and the page does not claim there are none', async () => {
@@ -261,7 +261,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
     expect(await screen.findByText(/The board cannot be shown yet\./)).toBeInTheDocument();
 
     // The strip is absent...
-    expect(screen.queryByRole('complementary', { name: 'Needs attention' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Needs your attention' })).not.toBeInTheDocument();
     // ...and so is the read behind it. This is the half an absence cannot reach:
     // `getAttention` is stubbed to ANSWER here, so a page that still called it
     // would draw a strip and fail the line above as well as this one.
@@ -284,7 +284,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
       </Providers>,
     );
 
-    const strip = await screen.findByRole('complementary', { name: 'Needs attention' });
+    const strip = await screen.findByRole('complementary', { name: 'Needs your attention' });
     expect(within(strip).getByText('File the GST return')).toBeInTheDocument();
     expect(
       within(strip).getByText('Needed by 2026-08-30 — due within 7 days.'),

@@ -1185,14 +1185,57 @@
   cursor: pointer;
   accent-color: var(--gn-accent);
 }
+/* The attention strip is the prototype's tinted card, adopted WHOLE (owner
+   ruling, 2026-09-18): `--tintWarning` fill, `--cardR` radius, `18px 20px`
+   padding (`desktop.dc.html:561-575`). No value here is a literal — each is the
+   token role the mapping table gives it.
+
+   WHAT LEFT, AND WHY IT IS NOT A REVERSAL. This rule carried a
+   `border-left: 4px solid var(--gn-pending)` marker. `task-ledger.tsv`'s
+   `hig-per-screen/7a`/`8a` rows ruled on 2026-09-18 that the marker STAYS,
+   because it renders at 4.36 against a 3:1 floor and a marker that passes and
+   carries an affordance is not a leftover. **That measurement and that
+   conclusion stand — the border was never a contrast failure.** The owner has
+   since decided the border goes as a DESIGN CHOICE, which is a different
+   question decided by a different party. A reader who finds only "the border
+   ruling was superseded" will think a measurement was overturned; none was.
+
+   THIS IS THE SECOND CONSUMER OF `--gn-tint-warning`, and `tokens.ts`'s note on
+   that role said it had exactly one. It is an ALPHA role, measured as a
+   COMPOSITE over `--gn-surface`, and that composite is the right ground only
+   when the consumer sits at page level. This strip does: it mounts inside
+   `.gn-shell__main` on `/w/<id>/my-work` — one mount, after the 2026-09-18
+   removal from the project page — whose ground is `--gn-surface`. The roster
+   agrees from a real browser: `apps/web/e2e-stack/non-text-contrast-roster.json`'s
+   `aside.gn-attention` entry records the backdrop `rgb(241,234,227)`. The
+   condition is RE-ESTABLISHED here, not inherited. */
 .gn-attention {
-  border-left: 4px solid var(--gn-pending);
-  border-radius: 8px;
-  background: var(--gn-surface-raised);
-  padding: 0.6rem 0.9rem;
+  background: var(--gn-tint-warning);
+  border-radius: var(--gn-radius-card);
+  padding: 1.125rem 1.25rem;
 }
-.gn-attention__items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.45rem; }
-.gn-attention__item { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+/* The prototype's heading row (`:562-565`): a 20px warning triangle beside
+   `Needs your attention`, 17px/22px at weight 600, the two 10px apart. The icon
+   takes `color` rather than a `stroke` attribute of its own because it is drawn
+   with `stroke="currentColor"` — the same shape `.gn-invitations__icon` uses,
+   and for the reason stated there: a saturated hue meant for a 20px glyph is a
+   `color`, not a surface fill. */
+.gn-attention__heading {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0;
+  font-size: 1.0625rem;
+  line-height: 1.375rem;
+  font-weight: 600;
+}
+.gn-attention__icon { flex: none; color: var(--gn-warning); }
+/* The prototype's rhythm (`:567` `margin-top:10px`; `:571` `gap:4px` and rows at
+   `padding:7px 0`, `min-height:24px`). The 24px is not decoration — it is the
+   same WCAG 2.5.8 floor `.gn-attention__title`'s note below holds, now met by
+   the row that contains the button as well as by the button. */
+.gn-attention__items { list-style: none; margin: 0.625rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.gn-attention__item { position: relative; display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; min-height: 1.5rem; padding: 0.4375rem 0; cursor: pointer; }
 /* 24px — WCAG 2.5.8's floor, not 2.5.5's 44. Measured on the signed-in shell at
    390px before this: `249x23`, `266x23`, `305x23`, `270x23` for the attention
    titles and `249x23`, `119x23` for my-work's — six of the seven offenders,
@@ -1220,7 +1263,22 @@
   padding: 0;
   text-align: left;
 }
-.gn-attention__reason { color: var(--gn-text); }
+/* THE WHOLE ROW IS THE CLICK TARGET (prototype `:572` — a `cursor:pointer` div
+   wrapping the row, its `onClick` on the row itself). The button stays the
+   button: its accessible name is the ticket title and it keeps the 24px floor
+   above. Its `::after` is what stretches over the row it sits in — the same
+   pattern `.gn-project-card__door:after` already uses in this product.
+
+   Stretching the button rather than making the `<li>` a button is the half that
+   is not a preference: the row also carries a chip and the server's reason, and
+   a row-level button would put both inside the control's ACCESSIBLE NAME — the
+   title would stop being the name of the thing you are opening. */
+.gn-attention__title::after { content: ''; position: absolute; inset: 0; }
+/* The prototype draws `why` in `--label2` (`:574`), which is this product's
+   `--gn-text-muted`. It is not a downgrade to a decorative grey: `tokens.test.ts`'s
+   `tintWarning` composite block asserts `textMuted` clears 4.5 against this very
+   wash, in all six style×theme combinations. */
+.gn-attention__reason { color: var(--gn-text-muted); }
 .gn-attention__claim { color: var(--gn-text-muted); font-size: 0.85rem; }
 
 .gn-my-work { display: flex; flex-direction: column; gap: 1.2rem; }
@@ -1584,7 +1642,7 @@
    The prototype draws this as a 32px tinted pill
    (`desktop.dc.html:3207-3208`, `--tintAccent` wash). Two deviations, both
    stated rather than silent: the tint role does not exist in this product
-   (`tokens.ts:342-344` — `tintWarning` is the only tint role), and the pill
+   (`tokens.ts:343-349` — `tintWarning` is the only tint role), and the pill
    sits at `.gn-button`'s own 2.75rem rather than 32px, matching the Remove
    button and the name input it stands beside in the same row.
 
@@ -1996,8 +2054,9 @@
 
    THE PROTOTYPE'S `--tintDanger`/`--tintSuccess` WASHES ARE NOT ADOPTED. Its
    issues card is a red wash and its all-clear a green one; this product has no
-   tint role for either (`tokens.ts:201-202` and `:342-344` — `tintWarning` is
-   the only tint role that exists, consumed by the invitation banner), and
+   tint role for either (`tokens.ts:201-202` and `:343-349` — `tintWarning` is
+   the only tint role that exists, consumed since 2026-09-18 by the invitation
+   banner AND the attention strip), and
    minting two to match a drawing is the "new token roles" line this repo has
    already refused. `.issues-panel`'s existing `danger` left rule and
    `.issues-panel--clean`'s `success` one are this product's own spelling of the

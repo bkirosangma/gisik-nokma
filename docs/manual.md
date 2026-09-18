@@ -688,9 +688,9 @@ person. Past that you are told you have too many, and closing one frees a slot s
 
 ## §9 — What needs attention, and the Inbox
 
-### The "Needs attention" strip
+### The "Needs your attention" strip
 
-A row at the top of My Work and project pages, with three kinds of thing, in this order:
+A row at the top of My Work, headed *"Needs your attention"*, with three kinds of thing, in this order:
 
 1. **Blocked** — sitting in a stage somebody flagged as blocked.
 2. **Stale** — has been sitting in the same stage too long.
@@ -701,7 +701,7 @@ since 2026-07-10 — past the 7-day staleness threshold."* or *"Needed by 2026-0
 days."*
 
 **If nothing needs attention, the strip does not appear at all.** No box, no "all caught up" message,
-nothing. That is deliberate — an empty box headed "Needs attention" reads like an all-clear you did
+nothing. That is deliberate — an empty box headed "Needs your attention" reads like an all-clear you did
 not earn. A blank space there is the normal way of saying "nothing needs you right now".
 
 **Changing the thresholds:** if you are the owner or an admin you can change both numbers — how long
@@ -1048,7 +1048,7 @@ or the job list until the server has confirmed it. Do not panic — search for i
 search and it will turn up.
 
 **Seven things flatly refuse offline** rather than making something up: your list of workspaces, the
-people list, the ordinary search, the standard My Work view, the "Needs attention" strip, and both
+people list, the ordinary search, the standard My Work view, the "Needs your attention" strip, and both
 reading and saving your preferences. Each one names what is missing rather than showing you an empty
 screen.
 

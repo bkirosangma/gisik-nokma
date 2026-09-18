@@ -11142,6 +11142,9 @@ each link checkable, and the first three found independently by the reviewer and
    (`apps/web/e2e-stack/viewport.spec.ts:673`). A DECREASE is the failure this instrument exists to catch.
 2. `AttentionStrip` carries exactly one named attribute, `aria-label="Needs attention"`
    (`packages/app-core/src/views/attention-strip.tsx:74`) — no `role` — so only `ariaLabel` can move.
+   *(The attribute's VALUE and its line are as-they-stood in that run: the 2026-09-18 Part 2 change moved it
+   to `:94` and set it to `"Needs your attention"`, keeping the attribute itself — which is the whole of
+   what this link rests on. The count did not move either way.)*
 3. The strip verifiably rendered on `/p/:projectId` in that session: `AttentionStrip` returns `null` for an
    empty list (`:72`), and the non-text-contrast roster written by the same suite records
    `aside.gn-attention` **on `/p/:projectId`**, which it can only do for a selector it found rendered there.
@@ -11194,7 +11197,14 @@ that line, so it is pre-existing and is left alone.** Owner: whoever next touche
 Recorded here for the same reason the rest of this section exists — a sentence about code is a claim, and
 this one is false.
 
-### Part 2 — the prototype's styling, measured, and why it is HELD
+### Part 2 — the prototype's styling, measured, and why it was HELD
+
+> **⚠ SUPERSEDED THE SAME DAY — read the "✅ RESOLVED" block at the end of this section before acting on
+> anything below.** The owner adopted the prototype's treatment whole on 2026-09-18 and rows 1–6 landed
+> together. What follows is kept because it is the measurement that made the adoption whole rather than
+> piecemeal, and because **(a)/(b)/(c)/(d) are the four records the decision had to meet** — one of them
+> as a design choice, not by a measurement. **Row 1's border ruling stands as a measurement; it was
+> superseded as a design decision.**
 
 The dispatch asked for the strip's styling to be checked against
 `design-system/interactive/desktop.dc.html:561-575`. It was checked. The delta is real, but it is
@@ -11248,6 +11258,120 @@ since the heading is the visible half of what the owner is most likely reacting 
 superseded, the roster's `aside.gn-attention` entry re-measured (its `border` reading
 `rgba(178,80,0,1)` **is** that left border and disappears with it), and the `tintWarning` single-consumer
 note updated. **Nothing in this change presupposes that answer.**
+
+### ✅ RESOLVED 2026-09-18 — Part 2 is ADOPTED WHOLE (executor 2) — ids `13.890`–`13.893`
+
+**The answer came back yes to both halves, and the two rulings supersede the two records the table above
+was built on — one of them as a DESIGN choice, not by a measurement.**
+
+- Owner, on the heading: *"i want the prototype's visible heading adopted."*
+- Owner, on the tint fill, asked again because the first answer left it open: *"yes to the prototype's
+  tint fill too."*
+
+So **rows 1–6 all landed together, in one commit**, exactly as the recommendation above anticipated: the
+set was never separable, and taking the tint while leaving the heading off *"produces a treatment the
+prototype does not draw and the product never chose, which is a third thing, invented"* — an argument that
+runs in the other direction too, which is why adoption is whole rather than piecemeal.
+
+**Row 1's supersession, stated precisely so a later reader does not think a measurement was overturned.**
+`task-ledger.tsv`'s `hig-per-screen/7a`/`8a` rows ruled the 4px left border STAYS, because it renders at
+**4.36 against a 3:1 floor** and a marker that passes and carries an affordance is not a leftover. **That
+measurement and that conclusion stand — the border was never a contrast failure.** The owner has since
+decided the border goes as a **design choice**, which is a different question with a different decider.
+The same sentence is at the rule (`packages/ui/src/ui.css`, `.gn-attention`) so a reader who arrives from
+the CSS meets it there too.
+
+| # | prototype (`desktop.dc.html:561-575`) | shipped 2026-09-18 | where |
+|---|---|---|---|
+| 1 | `--tintWarning` card, `--cardR`, `padding:18px 20px` | `--gn-tint-warning` / `--gn-radius-card` / `1.125rem 1.25rem`; **the 4px `--gn-pending` left border is gone** | `ui.css`, `.gn-attention` |
+| 2 | visible `<p>Needs your attention</p>` + 20px warning-triangle SVG | the same string, `1.0625rem/1.375rem/600`, the same 20px triangle (`stroke="currentColor"`, `aria-hidden`), and **the accessible name is that string character for character** | `attention-strip.tsx`; `ui.css`, `__heading`/`__icon` |
+| 3 | row order title → chip → why | button(title) → chip → reason → claim | `attention-strip.tsx` |
+| 4 | whole row is the click target | the button keeps the 24px floor and its `::after` stretches over the row | `ui.css`, `.gn-attention__title::after` |
+| 5 | `gap:4px`; rows `padding:7px 0`, `min-height:24px` | `gap: 0.25rem`; rows `padding: 0.4375rem 0`, `min-height: 1.5rem`; heading→list `0.625rem` | `ui.css`, `__items`/`__item` |
+| 6 | `why` in `--label2` | reason in `var(--gn-text-muted)` | `ui.css`, `__reason` |
+
+**The claim row is kept and moved, not dropped.** The prototype draws three things per row; the product
+draws four, because `item.claim` renders server-composed provenance and dropping it would lose
+information. It is now LAST, after the three the prototype orders — `13.892` pins that position rather
+than only the first three.
+
+**Row 2's accessible name: which implementation, and why it is the one that does not move a floor.**
+Two implementations fix the double-name problem — keep `aria-label` and set it to the visible string, or
+drop it and name the region from the `<p>` via `aria-labelledby`. **This took the first.** `aria-labelledby`
+removes an `aria-label` ATTRIBUTE from every route the strip renders on, and
+`apps/web/e2e-stack/viewport.spec.ts` ratchets that attribute's COUNT with `toBeGreaterThanOrEqual` from
+`accessible-names-baseline.json` — `/my-work` is floored at **8**. The standing rule is that a floor is not
+hand-lowered to meet a restyle. **The ratchet was NOT re-run and this file does not claim it was**: the
+`e2e-stack` suite needs the compose stack, which belongs to executor 1 and is mounted from executor 1's
+tree, so a run from this worktree would measure a tree without this change. What is recorded is the
+direction and the arithmetic, plus `13.890`'s pin that the attribute is still there.
+
+**The two consequential items the amendment named, and what actually happened to each.**
+
+1. **The non-text-contrast roster's `aside.gn-attention` entry — NOT re-measured, and NOT hand-edited.**
+   The entry (`ratio: 4.36`, `border: rgba(178,80,0,1)`) is a generated record of the run that produced
+   it, and with the border gone that element's reading is no longer a border reading at all. The sweep
+   needs the same compose stack, so it could not be re-run here — and **a hand-edited generated record is
+   PARTIAL** (recorded lesson, `packages/app-core`'s members-styling change). The file is left exactly as
+   the last run wrote it; its header counts (`examined: 9`, `totalClasses: 5`) describe the PRE-change
+   sweep, and its `/members` `input`/`select` entries were already stale for the same reason. **Owner:
+   whoever next runs that sweep** — which is a task that already exists, because `/members` needs it too.
+2. **`--gn-tint-warning`'s single-consumer note — updated, and the condition RE-ESTABLISHED rather than
+   inherited.** `tokens.ts` now names two consumers and states the ground for each. The strip's mount is
+   `.gn-shell__main` on `/w/<id>/my-work`, whose ground is `--gn-surface`, so the composite the existing
+   `tintWarning` block measures is the right one — and that block already asserts exactly the two text
+   roles the strip paints (`text` for the heading and title, `textMuted` for the reason and claim) across
+   all six style×theme combinations. **No new assertion was added**, deliberately: a third block asserting
+   the same two pairs against the same wash would be a check that cannot fail for a reason of its own —
+   the shape case `11.213` was retracted for. The block's docblock records the second consumer and why it
+   needed no new teeth.
+
+**A correction to `docs/design/prototype-delta-2026-09-18.md:583-586` is owed and RECORDED, not made** —
+it is a read-only delta record for the 2026-09-18 export. It gives `isMyWork` the port verdict **`none`**
+and cites `attention-strip.tsx`'s refusal 3 for it, but that citation argues the WEAKER claim (the list is
+flat rather than sectioned PER KIND — no per-kind sub-headings), which is not the same claim as *no
+banner-level heading*. The owner has now ruled a banner heading in, which makes the correction due rather
+than optional. **Owner: the next rewrite of that document.** See `13.890`'s docblock for the same note
+written beside the code.
+
+- ✅ **13.890 — the region's accessible name IS the visible heading, character for character.**
+  `packages/app-core/test/views/attention-strip.test.tsx`. The heading's text is read off the RENDERED
+  `<p>`, and the assertion is `aria-label === that text` — not that a string exists in the component file,
+  which is the shape this repo has been bitten by repeatedly. It also asserts the accessible-name
+  COMPUTATION agrees (`getByRole('complementary', { name })`), because that is what assistive technology
+  reads rather than the attribute. Mutation-witnessed: reverting the `aria-label` to `Needs attention`
+  reddens this case alone (1 failed / 20 in the file).
+- ✅ **13.891 — the heading's icon is decorative, so the name is not the sentence twice.**
+  `attention-strip.test.tsx`. Asserts the SVG is present, `aria-hidden="true"`, and carries no
+  `aria-label` and no `<title>` child — `aria-hidden` alone would be defeated by a name of its own.
+  Mutation-witnessed: dropping `aria-hidden` reddens this case alone.
+- ✅ **13.892 — the row runs title → chip → reason, the prototype's order.**
+  `attention-strip.test.tsx`. Asserted as the rendered child class SEQUENCE, with the claim's fourth
+  position pinned too: a reorder that left the claim first would satisfy a three-item check.
+  Mutation-witnessed: moving the `<Chip>` before the button reddens this case alone.
+- ✅ **13.893 — the CSS, measured rule by rule, with a cascade guard.** `packages/ui/test/attention-styling.test.ts`
+  (new). Six cases: the extraction control; row 1 (the tint, and **no `border-left` anywhere in the
+  family** plus no `--gn-pending`); row 2 (the heading's type and the icon's `color`); rows 3–6 (the
+  rhythm, `position: relative` + the stretched `::after`, and the muted reason); **no family selector
+  declared twice in either stylesheet**; and witnesses for each. **The witnesses earned their keep
+  immediately**: the first `familyRules` resolved rules BY NAME, so a planted duplicate of
+  `.gn-attention__items` was invisible to it — the cascade blind spot the file's own docblock claims a
+  source scan cannot see, reproduced inside the scan written to look for it. The scan now walks
+  sequentially and the uniqueness claim is generalised to every selector in the family.
+
+  **A round of review found two more gaps in that same case, both now closed and both witnessed.**
+  **(i)** The "no `border-left` anywhere in the family" claim scanned `ui.css` only — while the file's own
+  docblock had already named `globals.css` as the second stylesheet a rule could hide in. Measured:
+  appending `.gn-attention__items { border-left: 4px solid var(--gn-pending); }` to
+  `apps/web/app/globals.css` left the suite **6/6 green**, and `layout.tsx` loads `ui.css` before
+  `globals.css`, so the later rule draws the line in a real browser — the half-applied row 1 this case
+  exists to forbid, one line away in the file the docblock had identified and the scan had not read. Both
+  stylesheets are now scanned and both are witnessed (**1 failed / 6**, row 1 alone). **(ii)** The
+  container scan is a fixed list of SPELLINGS, not a parser: `[class~="gn-attention"] { background:
+  transparent; }` — the same class, the same specificity, later in source order — evaded both helpers
+  (one requires a literal `.`, the other requires the line to start with the name). That form is now
+  caught (**1 failed / 6**, the uniqueness case), and the helper's docblock names the residual it still
+  does not cover rather than implying the set is closed.
 
 ## The members screen's styling, measured against the prototype (executor 2, 2026-09-18) — ids `13.886`–`13.889`
 
