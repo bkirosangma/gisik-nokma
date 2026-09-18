@@ -1974,13 +1974,21 @@ input, textarea, select { font-family: inherit; }
 .gn-legal__tabs .gn-segmented__item { flex: none; padding: 0 0.85rem; text-decoration: none; }
 
 /* ── The anchor row (`legalToc`, `:1741-1745`) ─────────────────────────────
-   2.75rem again, and here it is a DELIBERATE departure from the export, which
-   draws a compact 15px row with `gap:7px 20px`. A wrapped row of anchor links
-   is not a sentence, so the tap-target sweep's inline-in-prose exemption does
-   not apply to it and must not be borrowed: `display: inline-flex` plus the
-   44px floor is the honest reading, and `/privacy` and `/terms` both hold a
-   zero-offender baseline that this keeps. The row is taller than the export's
-   as a result — that is the trade, stated rather than hidden. */
+   2.75rem again, and here it is a DELIBERATE departure from the export, whose
+   own item is `display:inline-flex; align-items:center; min-height:24px;
+   font-size:17px` (`:3978`) inside a `gap:7px 20px` row (`:1741`). **The 15px
+   is NOT this control's** — that is the meta line's size one block up
+   (`:1740`), and an earlier revision of this comment attributed it here, which
+   is the kind of number a reader has no way to check from the CSS alone.
+
+   A wrapped row of anchor links is not a sentence, so the tap-target sweep's
+   inline-in-prose exemption does not apply to it and must not be borrowed —
+   and it could not be, mechanically: the exemption needs `display: inline`,
+   and a flex item computes to `block` regardless (blockification), so dropping
+   the row's own `display: flex` would be required first. `display: inline-flex`
+   plus the 44px floor is the honest reading, and `/privacy` and `/terms` both
+   hold a zero-offender baseline that this keeps. The row is taller than the
+   export's as a result — that is the trade, stated rather than hidden. */
 .gn-legal__toc {
   display: flex;
   flex-wrap: wrap;

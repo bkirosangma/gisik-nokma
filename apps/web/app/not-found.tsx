@@ -40,10 +40,14 @@ import Link from 'next/link';
  * (`docs/design/prototype-delta-2026-09-18.md`) reached a verdict worth keeping
  * beside the code: **the export is THINNER than this page, not ahead of it.**
  * It draws an icon tile, an h1, one lead, three action rows and one aside; this
- * page carries the three causes, the "why it will not say" panel, and the
- * closing aside the export has no counterpart for. So exactly three things are
- * ported — the 72px icon tile, a third action link, and the heading's
- * scale/measure — and nothing is removed to make the two look alike.
+ * page carries the three causes and the "why it will not say" panel, neither of
+ * which the export has any counterpart for. **The export DOES draw an aside**
+ * (`:1859`, "ask them to re-share it from the ticket") — a different sentence
+ * in the same structural slot, and an earlier revision of this comment claimed
+ * the export had none, which would have handed a reader re-litigating the port
+ * a false premise about what was on the other side of it. So exactly three
+ * things are ported — the 72px icon tile, a third action link, and the
+ * heading's scale/measure — and nothing is removed to make the two look alike.
  *
  * **The copy is deliberately NOT ported.** The export says "This page isn't
  * here" / "Nothing was deleted."; both strings have zero product hits, and the
