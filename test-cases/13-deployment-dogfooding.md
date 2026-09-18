@@ -8167,7 +8167,7 @@ in this file only as that pointer prose, never as a case marker, so it was free 
   made into the transition log four-eyes reads. `ticket.ranked` also joins `TICKET_EVENT_TYPES`, so
   every replay reader that iterates that list sees it. The creation half asserts the READER's contract
   (`rank ?? null` is null), not the field's presence — see the ruling below for why.
-  `packages/domain/src/ticket-state.ts:299`, `packages/domain/test/ticket-state.test.ts:632`
+  `packages/domain/src/ticket-state.ts:345`, `packages/domain/test/ticket-state.test.ts:644`
 
 #### RULING (executor, conservative default): creation does NOT write `rank`
 
@@ -8183,7 +8183,7 @@ expect(onB?.ticket).toEqual(await h.projTicket(ticketId));
 
 The left side is the client's replica, folded by the shared `applyTicketEvent`; the right side is the
 server's read model, and `rowToTicketState` builds a `TicketState` **from columns**
-(`apps/server/src/projections/tickets.ts:128`). There is no `rank` column — **Task 3 creates it**
+(`apps/server/src/projections/tickets.ts:135`). There is no `rank` column — **Task 3 creates it**
 (`apps/server/migrations/1789200000000_proj-tickets-rank.sql`) — so writing the field in the reducer
 makes the two readers disagree, and those rig cases exist precisely to assert `replica.fold ≡ server.read`.
 
@@ -8312,7 +8312,7 @@ that gap touches the two ids below, which are inside this task's own block.
   door covers both halves of the key space — a space refuses on the alphabet, a trailing `0` refuses
   because nothing sorts below it — and a misfiled entity kind is REFUSED naming the kind rather than
   accepted. `evaluateEvent` dispatches the new arm. `packages/rule-engine/src/checks/rank.ts:49`,
-  `:60`, `packages/rule-engine/src/evaluate.ts:48`, `packages/rule-engine/test/rank.test.ts:48`
+  `:60`, `packages/rule-engine/src/evaluate.ts:49`, `packages/rule-engine/test/rank.test.ts:48`
 
 - ✅ **13.701 — `precheckEvent` previews the identical verdict and the identical sentence from the client's
   cached state; the engine and the pre-check cannot drift into two different reasons for one refusal.**
@@ -8327,7 +8327,7 @@ that gap touches the two ids below, which are inside this task's own block.
   through) reddened 13.604's rank row while BOTH 13.701 cases stayed green — so the agreement case catches
   the drift the two literals cannot, and the pre-check's own two cases hold their ground independently of
   the engine's copy. `packages/app-core/src/precheck.ts:372`, `:387`,
-  `packages/app-core/test/precheck.test.ts:386`, `:490`
+  `packages/app-core/test/precheck.test.ts:407`, `:527`
 
   **FIX ROUND 1 (independent review, Important 1, 2026-09-18) — "cannot drift" was FALSE as first
   written, for a reason worth keeping.** The sentence is produced by **two different expressions**, the
@@ -8523,7 +8523,7 @@ state the rule ("every producer sets them"); the rig is why the rule is safe to 
   itself recorded in `pgmigrations`** rather than a guessed convention, and asserts a neighbour column
   (`closed_at`) survives — with a positive control that the migration HAD run, so "the column is gone" is
   not vacuously true of a table that never had it. `apps/server/migrations/1789200000000_proj-tickets-rank.sql`,
-  `apps/server/src/projections/tickets.ts:164`, `:229`, `:257`,
+  `apps/server/src/projections/tickets.ts:169`, `:245`, `:274`,
   `apps/server/test/projections/tickets-rank.test.ts:98`
 
 - ✅ **13.703 — the same wire key reaches the client on BOTH bodies it is served on: `mapListPage` →
@@ -8540,8 +8540,8 @@ state the rule ("every producer sets them"); the rig is why the rule is safe to 
   ordering `rankBetween` cannot express (it appends `'0'` forever), so a client-side predicate looser than
   the door's would admit into the Backlog tab's sort a key the domain refuses to place. Mutation 5 —
   `isRankKey(raw)` → `typeof raw === 'string'` — reddened exactly this case and nothing else.
-  `packages/app-core/src/online/mappers.ts:1277`, `:1339`, `:1518`,
-  `packages/app-core/test/online/mappers.test.ts:1389`, `:1424`
+  `packages/app-core/src/online/mappers.ts:1278`, `:1357`, `:1536`,
+  `packages/app-core/test/online/mappers.test.ts:1390`, `:1425`
 
 - ✅ **13.704 — the replica's list row carries the folded rank: `null` before a ranking, the key after
   it, on the SAME row.** The fold itself is 13.696's; what this case measures is the read door the Backlog
@@ -8549,8 +8549,8 @@ state the rule ("every producer sets them"); the rig is why the rule is safe to 
   is `?? null` so an absent field on a hand-built fixture cannot become a different claim. `null` and a key
   are not interchangeable here: `compareByRank` separates ranked rows from unranked ones by exactly this,
   so the assertion is `toBe('i')` and not "some string was present".
-  `packages/app-core/src/replica/replica-data-source.ts:760`,
-  `packages/app-core/test/replica/replica-data-source.test.ts:1046`
+  `packages/app-core/src/replica/replica-data-source.ts:786`,
+  `packages/app-core/test/replica/replica-data-source.test.ts:1051`
 
 **Amendment to 13.696 (Task 3) — a TIGHTENING, not a new id, and it is written as prose rather than as a
 bullet because `scripts/check-case-ids.mjs` reads line HEADS and a re-minted bullet is a duplicate (it caught
@@ -8560,7 +8560,7 @@ purpose, and its comment said why: with creation not writing the field, `toBeNul
 PRESENCE that broke the reducer/server boundary, and a reader could not tell absent from null. Task 3 makes
 presence the contract, so the assertion becomes `toBeNull()` — which fails on `undefined` — and the case now
 pins the decision instead of tolerating either reading.
-`packages/domain/src/ticket-state.ts:176`, `packages/domain/test/ticket-state.test.ts:654`
+`packages/domain/src/ticket-state.ts:176`, `packages/domain/test/ticket-state.test.ts:661`
 
 **Plan-text corrections found while executing this task.** (1) The plan's Step 1 asks for *"the migration's
 Down drops the column (the core's `1789100000000` test shape)"* — **no such test shape exists**; the closed
@@ -8809,8 +8809,8 @@ a stale `dist`.
   for a format mismatch instead of papering over one, and one instance is passed to every event of a gesture
   because a real browser hands the identical object to each. `preventDefault()` on `dragover` is pinned at
   the dispatch level for the reason above.
-  `packages/app-core/src/views/ticket-list.tsx:189`, `:255`, `:298`, `:623`, `:635`,
-  `packages/app-core/test/views/ticket-list.test.tsx:1538`
+  `packages/app-core/src/views/ticket-list.tsx:189`, `:339`, `:384`, `:715`, `:745`,
+  `packages/app-core/test/views/ticket-list.test.tsx:1668`
 
 - ✅ **13.706 — `Table` spreads a row's own attributes onto its `<tr>` and APPENDS the caller's `className`
   to the built-ins rather than replacing them.** `rowClassName` (Ruling 21) can say only one class for every
@@ -8822,8 +8822,8 @@ a stale `dist`.
   caller's class is last — is what makes "appended" a claim this case can fail on rather than a synonym for
   "present". The control renders the same table with no `rowProps` and asserts no caller attribute appears,
   while `rowClassName` still applies.
-  `packages/ui/src/components/table.tsx:66`, `:102`, `:114`,
-  `packages/ui/test/components.test.tsx:143`
+  `packages/ui/src/components/table.tsx:75`, `:111`, `:123`,
+  `packages/ui/test/components.test.tsx:180`
 
 **The maximal fixture in 13.671's CSS-binding equality check had to grow, and it reddened first.** That case
 asserts, in both directions, that every class the List renders is a class `ui.css` styles and that no rule
@@ -8832,7 +8832,7 @@ them only MID-GESTURE — left them styled and unrendered, which is precisely th
 exists to catch, so it failed and was right to. The fix is a fourth, DRIVEN render in `renderEverything()`
 (`dragstart` on the first row, `dragover` on the last, so the two markers land on two different rows and a
 component painting the wrong one would not pass a class-union scan) rather than a subtraction from the
-equality. `packages/app-core/test/views/ticket-list-css-binding.test.tsx:229`, `:267`
+equality. `packages/app-core/test/views/ticket-list-css-binding.test.tsx:239`, `:289`
 
 **Task 5 (the Backlog tab's rank order, drag reorder, Move up / Move down) — `13.707`–`13.710`.** Ids
 recounted at this tip (branch `exec/second-wave-t5-backlog-rank`, cut from `origin/main` `488bfb2d`) two
@@ -8910,7 +8910,7 @@ relative-path one, and the by-package-name one tests a stale `dist`. `pnpm --fil
   own key — without the filter). An unknown id is a non-crash. `moveTarget` pins the boundary BETWEEN
   its two edge cases at a two-row list, and that `down` points two rows below rather than one — pointing at
   the row directly below is a NO-OP that would spend a server round trip to move nothing.
-  `packages/app-core/src/views/backlog-rank.ts:73`, `:110`, `:141`,
+  `packages/app-core/src/views/backlog-rank.ts:82`, `:120`, `:151`,
   `packages/app-core/test/views/backlog-rank.test.ts:31`, `:75`, `:155`
 
 - ✅ **13.708 — the Backlog tab draws rows in rank order, `Move down` ingests exactly one `ticket.ranked`
@@ -8925,20 +8925,20 @@ relative-path one, and the by-package-name one tests a stale `dist`. `pnpm --fil
   from "the row moved". The refusal case asserts the optimistic position FIRST and then the snap-back, so a
   component that never moved at all cannot satisfy it, and it asserts the Ruling-27 sentence shape
   (`Refused by the server — <rule>: <reason>`) rather than merely that something was rendered.
-  `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:643`, `:242`,
-  `apps/web/src/backlog-rank-controls.tsx:115`, `apps/web/test/backlog-tab.test.tsx:335`
+  `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:850`, `:351`,
+  `apps/web/src/backlog-rank-controls.tsx:115`, `apps/web/test/backlog-tab.test.tsx:334`
 
 - ✅ **13.709 — a drag of the last row onto the first ingests a key BELOW the first row's, and a drop on
   the tail zone ingests a key ABOVE the last ranked row's.** Asserted with `<`/`>` on the captured payload,
   never a literal key. These two cases are the drag half of the plan's one-path requirement: M2 reddens
   both of them together with 13.708's between assertion, which is what makes "the drag and the buttons
   share `submitRank`" a measurement rather than a claim about the source. The gesture is driven through the
-  same `dataTransfer` stand-in Task 4's suite uses (`ticket-list.test.tsx:1509`), copied rather than
+  same `dataTransfer` stand-in Task 4's suite uses (`ticket-list.test.tsx:1622`), copied rather than
   re-invented so both suites exercise the component through an identical transfer shape; and because the
   tail drop is genuinely a DIFFERENT target from a row drop, the two cases cannot both pass by way of one
   handler.
-  `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:663`, `:1974`,
-  `apps/web/src/backlog-rank-controls.tsx:115`, `apps/web/test/backlog-tab.test.tsx:572`
+  `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:870`, `:2181`,
+  `apps/web/src/backlog-rank-controls.tsx:115`, `apps/web/test/backlog-tab.test.tsx:571`
 
 - ✅ **13.710 — only the top row's `Move up` and the bottom row's `Move down` are disabled.** The two
   disabled assertions plus four enabled ones, and the enabled half is the point: `Move Second down` must
@@ -8946,8 +8946,8 @@ relative-path one, and the by-package-name one tests a stale `dist`. `pnpm --fil
   component that disabled the button whenever `index + 2` ran past the end would pass the two disabled
   lines and silently strand the second-to-last row, which is the exact off-by-one `moveTarget`'s docblock
   exists to prevent.
-  `packages/app-core/src/views/backlog-rank.ts:141`, `apps/web/src/backlog-rank-controls.tsx:236`,
-  `apps/web/test/backlog-tab.test.tsx:643`
+  `packages/app-core/src/views/backlog-rank.ts:151`, `apps/web/src/backlog-rank-controls.tsx:236`,
+  `apps/web/test/backlog-tab.test.tsx:642`
 
 - ✅ **13.711 — `planRankMove`: rank the rows that have no key FIRST, in their drawn order, then apply the
   move (owner ruling 2026-09-18, option B).** Six cases, every one written as an OUTCOME — apply the plan
@@ -8963,7 +8963,7 @@ relative-path one, and the by-package-name one tests a stale `dist`. `pnpm --fil
   when every other row already has a key** — which is what keeps the ordinary move a SINGLE event and
   13.708–13.710 green — and the **moved row is not backfilled**, which would both waste an event and feed
   the move's own neighbour search a key for the row being moved.
-  `packages/app-core/src/views/backlog-rank.ts:204`, `packages/app-core/test/views/backlog-rank.test.ts:212`
+  `packages/app-core/src/views/backlog-rank.ts:214`, `packages/app-core/test/views/backlog-rank.test.ts:212`
 
 - ✅ **13.712 — the two broken behaviours now behave, and a PARTIAL batch is reported rather than hidden.**
   Three cases in the web suite. The first is the fresh-backlog tail drop: four unranked rows, the last
@@ -8979,8 +8979,8 @@ relative-path one, and the by-package-name one tests a stale `dist`. `pnpm --fil
   owner accepted: a batch whose first event commits and whose rest do not reports `partial` on the
   transport channel (part of it committed, so it is not a verdict), **reloads so the tab shows the
   server's own state**, and says so in a sentence naming how many parts landed.
-  `apps/web/src/backlog-rank-controls.tsx:115`, `:158`, `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:663`,
-  `apps/web/test/backlog-tab.test.tsx:682`
+  `apps/web/src/backlog-rank-controls.tsx:115`, `:158`, `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:870`,
+  `apps/web/test/backlog-tab.test.tsx:681`
 
 **The review round found FOUR MUTANTS THAT SURVIVED THE WHOLE SUITE, and all four now die. Three of the
 four survived because the fixtures were tidy** — supplied in the order the assertion wanted, with a rank on
@@ -9006,10 +9006,10 @@ distinguish an implementation from a coincidence.**
 
 **Three Minor findings were fixed in the same change set**: `rank()`'s docblock claimed a re-check its body
 did not perform (it forwarded `up ?? null`, turning the edge's `undefined` into "place last"); the drag's
-notice wore `gn-refusal--server` for transport failures and silence, which `ui.css:1216` states the rule
+notice wore `gn-refusal--server` for transport failures and silence, which `ui.css:1363` states the rule
 against; and `rankNotice` was cleared by nothing, surviving reloads and tab switches. **One Minor is
 recorded, not fixed — and MEASURED here after the reviewer offered it only as its least-certain claim:**
-`DEFAULT_GROUPING` is `'epic'`, not `'flat'` (`packages/app-core/src/view-types.ts:495`), so with backlog
+`DEFAULT_GROUPING` is `'epic'`, not `'flat'` (`packages/app-core/src/view-types.ts:519`), so with backlog
 rows under more than one epic the tab draws them grouped while the handlers compute from the rank order —
 rank order `A('e1') B('e2') C('e1')` draws `A C B` under `epic` and `A B C` under `flat`, so A's drawn
 neighbour is C while its rank neighbour is B. Invisible to every case in `backlog-tab.test.tsx` only
@@ -9388,7 +9388,7 @@ BEFORE minting rather than after.
   the new spelling AND makes the unscoped `getByRole('button', { name: 'Close' })` inside such a dialog
   find exactly one element: that second assertion is the one that FAILED under the old label (testing-
   library threw "found multiple elements"), so it is the assertion that catches the defect rather than one
-  that merely describes the fix. `packages/ui/test/components.test.tsx:100`,
+  that merely describes the fix. `packages/ui/test/components.test.tsx:102`,
   `packages/ui/src/components/dialog.tsx:51`
 
 - ✅ **13.787 — an answer arriving after a dismissal never lands on the NEXT opening.** Minted in the
@@ -9442,7 +9442,7 @@ surviving mutations, and closed the trail on several of this change's own senten
    preventive, plus consistency with `Sheet`. A right verdict with a wrong cause is how a real hole gets
    read as covered later.
 4. **`Ruling 13.532` cited as a ruling.** `13.532` is a CASE id, and the mechanism it pins is a fresh
-   mount (`board.tsx:892-895`), not an effect keyed on `open` — and the substitution is not equivalent,
+   mount (`board.tsx:1081-895`), not an effect keyed on `open` — and the substitution is not equivalent,
    which is finding 1's root cause. Corrected to cite the case and to say what the mechanism can and
    cannot do.
 
@@ -9451,11 +9451,11 @@ entries are the wrong tickets' answers is undetectable, since nothing compares `
 `batch[index].id` — the core's own reader has the same limitation (`flows/guarded-child-event.ts:294-296`),
 so this is a server-contract assumption rather than a local bug, and it belongs with that one; owner:
 whoever next touches the ingest contract. (b) An `OfflineAcceptError` from the replica source (thrown
-AFTER every event is enqueued, `replica-data-source.ts:1192`) renders as a transport failure and invites
+AFTER every event is enqueued, `replica-data-source.ts:1220`) renders as a transport failure and invites
 a retry that queues N more — `board.tsx`'s `closeCard` and `ticket-sheet.tsx`'s `closeOrReopen` have the
 identical gap, and the sentence is the plan's, so it belongs in the plan/task that owns offline accept
 wording rather than in this commit; owner: the offline-accept follow-on. (c) The stale comment at
-`packages/app-core/test/views/ticket-sheet.test.tsx:820`; owner: whoever next opens that file.
+`packages/app-core/test/views/ticket-sheet.test.tsx:821`; owner: whoever next opens that file.
 
 
 #### The R4 blast radius was MEASURED, not grepped
@@ -9467,7 +9467,7 @@ against the change, and no suite outside `packages/ui/test/components.test.tsx` 
 by name at all — the Dialog's own block queries Escape and the scrim, `Sheet`'s dismiss already says
 `Close sheet` (`packages/ui/src/components/sheet.tsx:28`), and `ticket-sheet.test.tsx`'s `name: 'Close'`
 queries are all `within(stateRow())`-scoped to that sheet's own feature button. **One stale comment
-recorded, not fixed** (outside this task's scope): `packages/app-core/test/views/ticket-sheet.test.tsx:820`
+recorded, not fixed** (outside this task's scope): `packages/app-core/test/views/ticket-sheet.test.tsx:821`
 states that `Sheet`'s dismiss carries `aria-label="Close"`; it says `Close sheet`, and the queries beneath
 it are scoped, so nothing reddens either way. Owner: whoever next opens that file.
 
@@ -9653,8 +9653,8 @@ that expires; a block is the only form that stays true.
   `onClosed`'s reload follows, the selection is empty afterwards, and the dialog has left (a COMPLETE
   close, which is the half 13.794 shows the other side of). The read is call-count-driven, so "the list
   reloaded" is falsifiable rather than satisfied by a fixed answer.
-  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:681` (the selection),
-  `:684` (the gate), `apps/web/test/list-bulk-close.test.tsx:166`
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:788` (the selection),
+  `:684` (the gate), `apps/web/test/list-bulk-close.test.tsx:165`
 
 - ✅ **13.649 — a signed-out viewer is offered neither the checkboxes nor the control.** Its first
   assertion is the positive control, and it is the reason the case means anything: the List's rows ARE on
@@ -9662,8 +9662,8 @@ that expires; a block is the only form that stays true.
   before the session resolves and while signed out, and a `ticket.closed` built from an empty actor is
   refused by `checkRolePermission` for a reason (`env.actorId !== ctx.sessionUserId`) that names the
   person's permissions rather than the truth — case 3.144's defect, one surface over.
-  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2156` (the signed-in gate),
-  `apps/web/test/list-bulk-close.test.tsx:283`
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2263` (the signed-in gate),
+  `apps/web/test/list-bulk-close.test.tsx:282`
 
 - ✅ **13.794 — a PARTIAL close reloads the list and KEEPS the dialog, with the refusal listed.** **This
   is the case the plan's own text gets wrong, and the correction is the whole reason the List's state is
@@ -9684,8 +9684,8 @@ that expires; a block is the only form that stays true.
   longer pending, the reads incremented — "the rest close and the list reloads", on this outcome too — the
   dialog still mounted, and the selection cleared by the reload. **That last assertion is what makes the
   survival above a fact about the dialog's own flag rather than about the selection never having moved.**
-  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:682` (the snapshot and the flag),
-  `:2289` (the conditional release), `apps/web/test/list-bulk-close.test.tsx:332`
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:789` (the snapshot and the flag),
+  `:2289` (the conditional release), `apps/web/test/list-bulk-close.test.tsx:331`
 
 - ✅ **13.795 — an OPEN dialog's tickets cannot be swapped under it.** `BulkCloseDialog` states its own
   precondition: a parent swapping `tickets` while the dialog stays OPEN is *not covered by its reset*,
@@ -9706,8 +9706,8 @@ that expires; a block is the only form that stays true.
   cannot distinguish the shipped guard from a handler that swallows a click only while `pendingClose !==
   null` — the two are observationally identical, because a correctly refused click is a no-op.** The
   guard-removal mutation is what proves the guard; the control proves the click is not dead.
-  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2194` (the guard),
-  `:2279` (the one dialog mount), `apps/web/test/list-bulk-close.test.tsx:431`
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2301` (the guard),
+  `:2279` (the one dialog mount), `apps/web/test/list-bulk-close.test.tsx:430`
 
 **Mutations, each restored from a byte copy verified by sha256 (not `git checkout`, which errors on an
 untracked path), each guarded by a replacement count of exactly 1.**
@@ -12277,3 +12277,173 @@ independent of it.
 - **The field-kind vocabulary.** Prototype `Text / Date / Number / Attachment` (`:919`) vs the product's
   `['text','number','date','select','person']` (`packages/domain/src/ticket-types.ts:4`). Vocabulary **and**
   casing differ, and `Attachment` is a data-model question rather than a label question.
+---
+
+## Second wave Task 12 — closing paragraph: final gate, catalogue checks, citation sweep
+
+Closes out the second-wave plan (`docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md`,
+spec §8). The plan's own last step, and the one this section is.
+
+### The gate, per package, with its Node
+
+`node --version` → **v22.22.2** for every number below. `pnpm turbo run build --force` ran FIRST and
+exited 0, because these suites import sibling packages **by package name** and would otherwise resolve a
+stale `dist` and report a false red. Each package then ran its own `vitest run --maxWorkers=2` and its own
+`typecheck`.
+
+| Package | Tests | Files | Typecheck |
+|---|---|---|---|
+| `packages/domain` | PASS 514 / FAIL 0 | 30 | EXIT=0 |
+| `packages/rule-engine` | PASS 331 / FAIL 0 | 16 | EXIT=0 |
+| `packages/app-core` | PASS 1554 / FAIL 0 | 94 | EXIT=0 |
+| `packages/ui` | PASS 351 / FAIL 0 | 6 | EXIT=0 |
+| `packages/mcp-server` | PASS 44 / FAIL 0 | 8 | EXIT=0 |
+| `apps/web` | PASS 534 / FAIL 0 | 49 | EXIT=0 |
+| `apps/server` (Postgres 16.15 on 54329) | PASS 1563 / FAIL 0 / **SKIP 5** | 153 | EXIT=0 |
+
+**The skip count is at the 5-skip baseline**, quoted rather than assumed. The forced gate itself
+(`pnpm turbo run build test typecheck`) was **NOT** run here — it is the controller's, run at the frozen
+head; these are the packages' own suites, which is the evidence this task owes.
+
+**One instrument defect, recorded rather than buried.** The first attempt passed `--concurrency=1`, which
+is **not a vitest 3.2.7 option**: every package exited 1 with `CACError: Unknown option '--concurrency'`.
+Seven red packages that were one flag. The runner does not allow that flag, so the load limit used is
+`--maxWorkers=2`. A red that is an instrument error is indistinguishable in a log from a red that is a
+defect, and only reading the log body told them apart.
+
+### Catalogue checks, and TWO expectations in the plan text that are stale
+
+| check | exit | measured |
+|---|---|---|
+| `check:env` | 0 | — |
+| `check:tasks` | 0 | — |
+| `check:db-tz` | 0 | `database timezone: Asia/Kolkata` |
+| `check:runbook` | 0 | 27 references, 20 distinct, all resolve |
+| `check:citations` | 0 | ratchet holds exactly on every file |
+| `check:help` | 0 | 2 documents, 29 sections, 224 entries |
+| `check:migrations` | 0 | 27 migrations, 0 new against `origin/main`, highest `1789500000000` |
+| `node scripts/check-case-ids.mjs` | **0** | **2370 unique ids, ZERO duplicates**, highest `15.34` |
+| `node scripts/check-case-citations.mjs` | **0** | file 13: **680 cited / 0 uncited / 680 total** |
+
+**The plan's Task 12 text predicted the opposite on both catalogue checks, and both predictions are
+stale.** It says `check-case-ids.mjs` may report "only `13.387`/`13.413`" and that file 13's uncited set
+must be "exactly `13.401`/`13.476`/`13.477`". Measured at this head: **no duplicate case id exists in the
+repo at all**, and **no case in file 13 is uncited**. Those two baselines were real; they were closed by
+work that landed after the plan was written, and the checks are now strictly GREEN rather than
+green-by-exemption. **Because a green that replaced an allowance is exactly the shape that reads as a
+weakened check, the duplicate case was proved to still fire:** a `13.387` marker appended to file 13
+(backup taken, sha256 `dbce682e…`) made `check-case-ids.mjs` **exit 1** and name the offender at its new
+line; the file was restored and its sha256 matched the backup exactly, and the clean run exited 0 again.
+The two markers the plan names are themselves each still singular — `13.387` and `13.413` each appear
+**once** as a case marker.
+
+### The citation sweep (Ruling 30's method — open the file, never add an offset)
+
+**Scope, measured rather than taken from the plan's own table:**
+`git diff --numstat 2f28acd5..HEAD -- '*.ts' '*.tsx' '*.css' '*.sql'` → **128 source files** moved since
+the plan's first task landed (`2f28acd5` is the parent of #441's merge, which is the commit immediately
+before Task 1 reached `main`). Restricting to files the plan's OWN eleven merges grew gives **77 source
+files**, which is the universe used: sweeping the wider delta would attribute other plans' citations to
+this one.
+
+**Instrument, and why it is not a grep.** Every citation the wave ADDED was extracted from the added
+lines of its eleven merges (**1713 normative added lines**, **97 qualified + 52 bare = 149 citations**,
+both citation FORMS handled — a bare `:NNN` continuing a named file is the form no tool catches). For
+each, the commit that introduced it was located, and the cited line's **content** was compared between
+that commit and `HEAD`. **Every single re-point was found this way, never by applying an offset.**
+
+**Result: 58 distinct re-points, 60 citation numbers changed, across 41 lines in this file and 2 in
+`Features.md`.**
+The rule applied throughout: *name the line that now carries the content the citation named when it was
+written.* Representative re-points, each verified by reading the new line:
+
+| citation | was (correct when written) | now |
+|---|---|---|
+| `packages/domain/src/ticket-state.ts:299` | `case 'ticket.ranked': {` | **`:345`** |
+| `packages/domain/test/ticket-state.test.ts:632` | `describe('13.696 …` | **`:644`** |
+| `apps/server/src/projections/tickets.ts:128` | `export function rowToTicketState(…)` | **`:135`** |
+| `apps/server/src/projections/tickets.ts:229` | `rank = EXCLUDED.rank` | **`:245`** |
+| `packages/rule-engine/src/evaluate.ts:48` | `case 'ticket.ranked':` | **`:49`** |
+| `packages/app-core/src/views/backlog-rank.ts:73` | `export function sortByRank` | **`:82`** |
+| `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:643` | `const backlogRows = useMemo(` | **`:850`** |
+| `packages/ui/test/components.test.tsx:143` | `describe('13.706 …` | **`:180`** |
+
+**This is the whole reason Ruling 30 forbids offsets:** on that one page the shifts run +207, +109, +107,
+and on `tickets.ts` +5, +16, +17 for three lines in the same block. No single delta would have been right
+for even one file.
+
+**Verification, and its control.** The instrument was re-run against the working tree: **0 citations in a
+wave-added line still name a moved line.** The control is the same instrument on the same code against the
+UN-fixed tree, where it reported **66 candidates** — so a 0 is a reading, not a dead probe. Separately, 0
+path-qualified citations still carry an old number.
+
+**Already-stale citations, left as written and named here rather than silently repaired.** A handful of the
+wave's citations were imprecise *at birth* — the line they named did not carry the fact even then (the
+`13.703` mapper set `mappers.ts:1277`/`:1339`/`:1518` and `mappers.test.ts:1389` are the clearest: those
+three name the mapper FILE's neighbourhoods, not the `rank: mapRank(…)` sites, which were `:1370`/`:1549`
+at birth and are `:1388`/`:1567` now). Ruling 30's method corrects DRIFT, not a claim that never matched;
+re-pointing those to the fact-bearing lines would be guessing at an intent rather than restoring one, so
+they were left and are listed here. **The frozen historical narrative in `docs/lanes/*.md` is likewise
+untouched**, per this catalogue's own precedent — those files are a running handoff log, not a spec.
+
+### Per-task mutation summary
+
+One line per task, quoting each task's own recorded evidence in this file rather than re-running ~50
+mutations — the same convention the core plan's Task 12 used.
+
+- **Task 1** — **8 mutations**, each reddening its own site, all restored by sha256 (baseline 45 tests
+  green; +1 for the assertion M7 is caught by). The mutation the independent reviewer found that **passed
+  the entire file** — stop descending once `lo` is exhausted, returning `'0010'` for `('001','0011')` — is
+  now killed by the assertion added in response.
+- **Task 2** — the engine mirror's mutation (E) reddens exactly the two cases it should, and the identical
+  mutation in the client's copy (F) kills its own case; **dropping the agreement clause reddened `13.604`'s
+  rank row while BOTH `13.701` cases stayed green**, which is what shows the agreement case is the one
+  carrying that property.
+- **Task 3** — dropping `rank` from the INSERT's column list and dropping `rank = EXCLUDED.rank` from the
+  ON CONFLICT SET list **redden identically** (`expected null to be 'i'`), because `ticket.created` already
+  inserted the row so even the first ranking travels the UPDATE path. Emission-shape mutation → **13 rig
+  cases across all four `test/dual-client/` files plus `13.702`'s presence pin**. `isRankKey(raw)` →
+  `typeof raw === 'string'` → **`13.703` alone**.
+- **Task 4** — the `Table` row hook: presence kills the "replaced, not appended" mutant (M6); the ORDER
+  assertion is what makes "appended" failable rather than a synonym for "present".
+- **Task 5** — **two mutations, each verified to have CHANGED the file before its result was read**:
+  `neighboursFor` returning the swapped pair → 6 of 19 cases red; `submitRank` ingesting `before ?? 'i'`
+  instead of the computed key → 3 of 10 red.
+- **Task 6** — the CASE-vs-`COALESCE` mutation, and **an earlier version of it was DISCARDED because it
+  reddened for a reason unrelated to the property it named**.
+- **Task 7** — `reopenedAt: null` dropped from the `ticket.transitioned` case → **`13.722`'s clear case
+  reddens and nothing else in the file**. Two mutations **survived** the reviewer's round and are recorded
+  as survivors rather than quietly closed.
+- **Task 8** — the sweep's reviewer returned **NOT CLEAN** with two surviving mutations, and
+  `AND t.reopened_at IS NULL` is the clause that makes Task 7's column load-bearing.
+- **Task 9** — **6 mutations in round 1 and 4 more in round 2**, each applied by an exact
+  single-occurrence replacement (**a replacement count other than 1 is reported as a HARNESS FAILURE
+  rather than a survivor**), each restored from a byte copy.
+- **Task 10** — mutations against `board-close.test.tsx`, each restored from a byte copy verified by
+  sha256 (**not `git checkout`**), each guarded by a replacement count of exactly 1.
+- **Task 11** — the plan's own `closed === null` term dropped from the gate → **`13.648`'s gate `it`**;
+  each restored from a byte copy verified by sha256, not `git checkout`, which errors on an untracked path.
+
+### Letter-suffixed ids (the citation script cannot see them)
+
+Hand-checked by `grep -rln` under `packages/*/test` and `apps/*/test`. **File 13 holds 22
+letter-suffixed ids; 20 appear under a test path.** The two that do not are both explained and neither is
+a gap: **`13.621a` was deliberately NEVER MINTED** — the dispatch recorded the plan's own ids as taken and
+this file says so at its id note — and **`13.40a` is not a case at all** but an example in the prose
+describing what the id script's regex would and would not match. **This plan added no suffixed id.**
+
+### Follow-ons named during execution
+
+Cross-referenced from the spec's `## Follow-ons named during execution — second wave` rather than
+duplicated:
+
+- **Per-project `autoCloseAfterDays` override** — spec §9's own first entry; the setting is
+  workspace-scoped and a project-level override needs a project settings surface that does not exist.
+- **Ranking under grouping/nesting is DISPLAY-ONLY** — plan ruling R2; the rank order is flat.
+- **The Board's `Close all (N)` and the List's `Close selected (N)` share one dialog, one batch and one
+  path, but carry NO keyboard shortcut.**
+- **`ListRow.closed.actorName` is still the core plan's follow-on**, and this wave makes it also name
+  `Auto-close` — but only through `provenance.ts`'s `actorLabel`. The system actor has no `users` row and
+  no membership, so any reader joining the roster for a name renders it blank.
+- **`isTypes` (reorder, per-type counts) and `isWorkflows` (a badge, a second action) are HELD, not
+  outstanding** — `docs/lanes/owner-holds.md` §1. A hold is a decision, not a debt.

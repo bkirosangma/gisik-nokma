@@ -20,7 +20,99 @@
 
 ---
 
-## ▲ TOP BLOCK — `scripts/check-migration-order.mjs` BUILT. PR open against `main`. (2026-09-18, night)
+## ▲ TOP BLOCK — SECOND WAVE **TASK 12** (the plan's close-out) DONE. PR open against `main`. (2026-09-18, night)
+
+**Position: the work is DONE, the review is RECORDED, and the PR is being opened with `--base main`.**
+**Check `gh pr list --state open` before acting on this line** — if the PR is not there, it was not opened
+and the closing paragraph plus this handoff are complete except for that step. Branch `exec2/secondwave-closeout`,
+cut from `origin/main` `82db1b6f`. Dispatch `CTL-DISPATCH-2026-09-18-secondwave-task12.md`.
+**FIRST ACTION ON A RESTART: `gh pr list --state open`.** If the PR is open it is at the controller's merge;
+**if it has MERGED, this block is history** and the controller's next dispatch is the position.
+
+### § 1 — WHAT SHIPPED (docs-only; no product file differs from `origin/main`)
+
+| artefact | what |
+|---|---|
+| `test-cases/13-deployment-dogfooding.md` | the closing paragraph; **41 lines re-pointed** |
+| `docs/superpowers/specs/2026-09-17-backlog-and-closed-design.md` | §8.1 rewritten in place; the second-wave Amendments + Follow-ons sections |
+| `Features.md` | **2 citations re-pointed** |
+
+### § 2 — THE GATE, MEASURED (node v22.22.2, every number)
+
+`pnpm turbo run build --force` EXIT=0 **first**. Then, per package, `vitest run --maxWorkers=2` + its own
+`typecheck`: domain 514 · rule-engine 331 · app-core **1556** · ui 351 · mcp-server 44 · web 534 · server
+**1563 passed / 5 skipped** (the baseline). Seven typechecks EXIT=0. **The forced gate was NOT run** —
+that is the controller's.
+
+**These numbers were re-measured at the REBASED head, not carried.** `origin/main` advanced by #488
+(executor 1's `isTypeEditor` Task 5) after this branch was cut, and it touches `Features.md` and
+`test-cases/13`, so the branch was **rebased with a UNION resolution** — both sides' content survives.
+app-core moved 1554 → **1556** because #488 added two cases. A number measured before a rebase is a
+reading that expires.
+
+### § 2b — THE FINAL WHOLE-BRANCH REVIEW: 6 seams PASS, 0 Critical, 1 Important, 4 Minor
+
+One independent reviewer, read-only, over the wave's whole change. Its findings are recorded in the PR body
+and, for the Important one, as a **named-owner follow-on in the spec** rather than patched here — it is an
+under-specification (a `ticket.workflow_rebound` is invisible to the auto-close clock in BOTH directions:
+it can close a freshly-migrated ticket on the next hourly run, and it can exempt a reopened one forever)
+and §8.2's own wording shares the gap. **The one thing it falsified in the spec IS corrected: §8.1's
+`useLayoutEffect` drag claim, which described a mechanism that was never built.**
+
+**Why its findings still bind this head:** 20 of the 21 product files it cites are **byte-identical**
+across the rebase, and the 21st (`packages/ui/src/ui.css`) differs by **45 added / 0 removed** — #488's
+append-at-EOF, which by construction moves no existing line, and the review cites no `ui.css` line.
+
+**One instrument defect, recorded: `--concurrency=1` is NOT a vitest 3.2.7 option.** The first attempt
+gave all seven packages `CACError: Unknown option` and EXIT=1 — seven red packages that were one flag, and
+indistinguishable in a log from seven real reds. The load limiter that exists is `--maxWorkers`.
+
+### § 3 — TWO PLAN EXPECTATIONS ARE STALE, BOTH IN THE GREEN DIRECTION
+
+The plan allows `check-case-ids.mjs` to report the pre-existing `13.387`/`13.413` duplicates, and requires
+file 13's uncited set to be exactly `13.401`/`13.476`/`13.477`. **Measured: 2370 unique ids, ZERO
+duplicates, EXIT=0; file 13 680 cited / 0 uncited, EXIT=0.** Because a green that replaced an allowance is
+the shape that reads as a weakened check, **a duplicate was planted**: `check-case-ids` exited 1 naming it,
+the file was restored to sha256 `dbce682e…` byte-identical, and the clean run returned to 0.
+
+All eight repo checks EXIT=0 at this head: `check:env` · `check:tasks` · `check:db-tz` · `check:runbook` ·
+`check:citations` · `check:help` · **`check:migrations`** · `check-case-ids` · `check-case-citations`.
+
+### § 4 — THE CITATION SWEEP (Ruling 30), AND WHY THE METHOD MATTERS
+
+Universe: the **77 source files the plan's own eleven merges grew** (the wider `2f28acd5..HEAD` delta is
+**128 files** but includes other plans' work). Every citation the wave ADDED, from its added normative
+lines — 1713 lines, **149 citations, 97 qualified + 52 bare** (the bare form is what no tool catches).
+
+**58 distinct re-points / 60 numbers, across 41 lines here and 2 in `Features.md`.** Each was derived by
+finding the commit that introduced the citation and matching the **content** the cited line carried then
+against the line that carries it now — **never an offset**, and the reason is measured: shifts on one page
+run +207/+109/+107, and three lines in one `tickets.ts` block shift +5/+16/+17.
+
+**Verification with its control:** the same instrument against the working tree reports **0 remaining**;
+against the un-fixed tree it reports **66 candidates**. A 0 with a live probe.
+
+**Already-imprecise-at-birth citations were LEFT and NAMED** (the `13.703` mapper set names the mapper
+file's neighbourhoods, not the `rank: mapRank(…)` sites) — Ruling 30 corrects drift, not a claim that
+never matched, and re-pointing those would be guessing at an intent. `docs/lanes/*.md` prose is frozen
+historical narrative and was not swept.
+
+### § 5 — SUFFIXED IDS AND FOLLOW-ONS
+
+File 13 holds 22 letter-suffixed ids; **20 appear under a test path**. The two that do not are both
+explained: **`13.621a` was deliberately never minted** and **`13.40a` is prose about the id script's own
+regex**. This plan added no suffixed id. `isTypes`/`isWorkflows` are recorded as **HELD**, not outstanding.
+
+### § 6 — OPEN ITEMS (neither is this task's to close)
+
+| item | owner |
+|---|---|
+| `check:case-ids` still has no pnpm alias; `pnpm run check:case-ids` exits 1 with `ERR_PNPM_NO_SCRIPT`, indistinguishable in a log from a real red | **the controller** (one line in `package.json`) |
+| `docs/design/prototype-delta-2026-09-18.md:666` is still false (carried from the block below) | **the controller** |
+
+---
+
+## ▼ SUPERSEDED — `scripts/check-migration-order.mjs` BUILT. Merged as #487 (`25b0ae62`). (2026-09-18, night)
 
 **Position: PR #487 IS OPEN, base `main`, MERGEABLE, awaiting the controller's merge.** Branch
 `exec2/migration-order-check`, cut from `origin/main` `2c62c01a`. Dispatch
