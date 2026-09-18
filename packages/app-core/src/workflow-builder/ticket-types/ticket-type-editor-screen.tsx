@@ -116,7 +116,6 @@ function EditorHeader(props: {
   canAuthor: boolean;
   cancel?: ReactNode;
   saveDisabled: boolean;
-  saving: boolean;
   onSave(): void;
 }) {
   const Heading = props.heading;
@@ -234,7 +233,6 @@ export function TicketTypeEditorScreen(props: {
       canAuthor={canAuthor}
       cancel={props.cancel}
       saveDisabled={saveDisabled}
-      saving={save.phase === 'saving'}
       onSave={() => void onSave()}
     />
   );

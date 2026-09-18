@@ -12268,7 +12268,7 @@ built or ruled, and the two that remain are rules with owners rather than unfini
 | # | item | Task 5b outcome |
 |---|---|---|
 | 1 | **the header row** — prototype Cancel + Save in the h2 row at 22px (`:874-880`) | **BUILT.** The row is the SCREEN's (`packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx:124`, `EditorHeader` at `:112`), because the screen owns `parsed`, `save` and the `canAuthor` gate and two components' subtrees cannot be one flex row. The pane hands its Cancel in as a node (`apps/web/src/ticket-type-editor-pane.tsx:114-125`). **The Save MOVED; it did not multiply** — one control, every gate it had. Case **13.924**. |
-| 2 | **the right-hand `--tintWarning` placement** of the divergence card | **BUILT, and the composite was re-measured on BOTH candidate grounds** before the move: over `surface`, `text` 10.51–11.94 and `textMuted` 8.23–12.08; over `surfaceRaised`, 9.79–11.91 and 9.33–9.91. Both clear the 4.5 floor, so **the placement does not depend on the measurement**. The notice is now `ticket-type-editor-screen.tsx:463`, in the aside, and its 3px marker is gone (`packages/ui/src/ui.css`, § DIVERGENCE at EOF). Case **13.925**. |
+| 2 | **the right-hand `--tintWarning` placement** of the divergence card | **BUILT, and the composite was re-measured on BOTH candidate grounds** before the move: over `surface`, `text` 10.51–11.94 and `textMuted` 8.23–12.08; over `surfaceRaised`, 9.79–11.91 and 8.45–10.74. Both clear the 4.5 floor, so **the placement does not depend on the measurement**. The notice is now `ticket-type-editor-screen.tsx:463`, in the aside, and its 3px marker is gone (`packages/ui/src/ui.css`, § DIVERGENCE at EOF). Case **13.925**. |
 | 3 | **the "Choose again" reopen control** (`:944`) | **NOT BUILT — a rule, not an omission.** No reopen door exists on `WorkflowAuthoringGateway`, and a button with no door behind it is the defect this repo keeps re-finding. Recorded as an ABSENCE with an owner (whoever first adds a reopen route), not as an empty slot. Case **13.926** asserts the migrated branch stays terminal. |
 | 4 | **the prototype's state-naming** — *"Move them to Scheduled"*, a **state** | **NO CHANGE.** The product names the **workflow** (`ticket-type-editor-screen.tsx:514`), deliberately: a re-binding moves tickets between workflows and the state mapping is the dialog's own, per ticket. Now recorded at the button itself, so a reader comparing the two screens does not read it as a transcription slip. |
 | 5 | **the field-kind vocabulary** — prototype `Text / Date / Number / Attachment` (`:919`) vs the product's `['text','number','date','select','person']` (`packages/domain/src/ticket-types.ts:4`) | **THE VOCABULARY IS UNCHANGED; the LABEL was fixed.** The value stays the lowercase wire member; the label is the prototype's (`packages/app-core/src/workflow-builder/ticket-types/fields-editor.tsx:121-124`). Adding `Attachment` is a **data-model** decision (it decides whether a custom field can hold a file) and is with the owner — **not in this PR**. Case **13.927** pins both halves in one test, so a future rename cannot pass by satisfying the label half alone. |
@@ -12459,7 +12459,7 @@ each item's outcome rather than only its status. The prototype block is
 `design-system/interactive/desktop.dc.html@6d7b67c0a52c:871-957`.
 
 - ✅ **13.924 — the type's name, Cancel and Save are ONE ROW, and the Save moved rather than multiplied**
-  (`packages/app-core/test/ticket-types/ticket-types.test.tsx:942` and `:956`, rendered at
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx:952` and `:956`, rendered at
   `packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx:124`).
 
   The prototype puts all three on one line at 22px (`:874-880`); the product had the name and Cancel in a
@@ -12474,8 +12474,23 @@ each item's outcome rather than only its status. The prototype block is
   (`packages/app-core/test/workflow-builder/access.test.tsx:631`, unchanged and still green). A header Save
   that was always enabled would report a definition the server will reject.
 
+  **THREE MORE ASSERTIONS WERE ADDED BY THE TASK'S OWN REVIEW ROUND, and the first of them is the reason
+  the round was worth running.** A mutation — deleting `display: flex` from `.gn-type-editor-header` —
+  left the first case **GREEN**, because *"all three are inside `[data-testid="type-editor-header"]`"* is
+  satisfied by a block-layout STACK. **The claim "they are ONE ROW" was passing for a reason unrelated to
+  row-ness**, which is this repo's signature defect class; row-ness is a layout property and lives in a
+  stylesheet the DOM assertion never reads. The repair reads `apps/web/app/globals.css` across the same
+  package boundary `builder-css-binding.test.tsx` already crosses, and pins `display: flex`,
+  `justify-content: space-between` and the row title's own `1.375rem` (`:988`). **Re-run after the fix: the
+  same mutation reddens exactly that case and nothing else** (`1 failed | 39 passed`).
+
+  The other two pin claims that were true only by construction: the heading tracks the LIVE name — frozen
+  at the fetched one, the mutation reddens exactly that case (`:1009`) — and the header renders in the
+  LOADING arm, which nothing had exercised at all (deleting `{header}` from the early return reddens
+  exactly that case at `:1029`).
+
 - ✅ **13.925 — the divergence notice is the prototype's `--tintWarning` card in the RIGHT column, above
-  Implications, with its 3px marker gone** (`packages/app-core/test/ticket-types/ticket-types.test.tsx:976`
+  Implications, with its 3px marker gone** (`packages/app-core/test/ticket-types/ticket-types.test.tsx:1056`
   and `:1004`, rendered at
   `packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx:463`).
 
@@ -12488,7 +12503,7 @@ each item's outcome rather than only its status. The prototype block is
   **The composite was re-measured on BOTH candidate grounds before the move**, because
   `--gn-tint-warning` is an ALPHA role whose documented correctness is a condition on its ground: over
   `surface`, `text` 10.51–11.94 and `textMuted` 8.23–12.08; over `surfaceRaised` — the ground the card it
-  left sat on — 9.79–11.91 and 9.33–9.91. **Both clear the 4.5 floor, so the placement does not depend on
+  left sat on — 9.79–11.91 and 8.45–10.74. **Both clear the 4.5 floor, so the placement does not depend on
   the measurement**, and no new assertion was added for it: the ground is `surface`, which
   `packages/ui/test/tokens.test.ts`'s `tintWarning` block already asserts both roles against in all six
   style×theme combinations. A third block measuring the same two pairs over the same ground would be a
@@ -12500,7 +12515,7 @@ each item's outcome rather than only its status. The prototype block is
   inline-start rule.
 
 - ✅ **13.926 — a completed move is TERMINAL: the prototype's `Choose again` control is deliberately not
-  built** (`packages/app-core/test/ticket-types/ticket-types.test.tsx:1022`).
+  built** (`packages/app-core/test/ticket-types/ticket-types.test.tsx:1102`).
 
   The prototype's `strandedDone` card offers a control that re-opens a finished move (`:930`). **No reopen
   door exists on `WorkflowAuthoringGateway`, and a button with no door behind it is the defect this repo
@@ -12509,7 +12524,7 @@ each item's outcome rather than only its status. The prototype block is
   `reopen`, and no second move offered on the same screen. **Owner: whoever first adds a reopen route.**
 
 - ✅ **13.927 — the field-kind labels are the prototype's while the VALUE picked is still the wire
-  vocabulary** (`packages/app-core/test/ticket-types/ticket-types.test.tsx:1051`, labels at
+  vocabulary** (`packages/app-core/test/ticket-types/ticket-types.test.tsx:1131`, labels at
   `packages/app-core/src/workflow-builder/ticket-types/fields-editor.tsx:121-124`, `FIELD_TYPE_LABELS` at
   `:33`).
 

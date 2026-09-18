@@ -861,7 +861,7 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Update the component**
 
-Replace the native `<select>` at `ticket-type-editor-screen.tsx:357–264`:
+Replace the native `<select>` at `ticket-type-editor-screen.tsx:357–364`:
 
 ```tsx
 // before

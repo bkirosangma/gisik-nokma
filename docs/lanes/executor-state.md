@@ -73,7 +73,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > ## THE MEASUREMENT THE DISPATCH ASKED FOR, AND WHICH WAY IT WENT
 >
-> `--gn-tint-warning` is an ALPHA role whose documented correctness is a condition on its GROUND. Measured over BOTH candidate grounds, all six style×theme combinations, BEFORE the move: over `surface` (where the notice now sits) `text` 10.51–11.94 and `textMuted` 8.23–12.08; over `surfaceRaised` (the ground the card it left sat on) `text` 9.79–11.91 and `textMuted` 9.33–9.91. **BOTH clear the 4.5 floor, so the placement does not depend on the measurement.** The controller believed the card sat on a raised surface; it does not, and saying so is part of the answer. Its 3px `--gn-warning` marker goes with the fill — a design choice, not a contrast change, and **no ledger row covers this element** (`hig-per-screen/7a`/`8a` rule on `.gn-attention` and `.gn-state-node`, both re-measured).
+> `--gn-tint-warning` is an ALPHA role whose documented correctness is a condition on its GROUND. Measured over BOTH candidate grounds, all six style×theme combinations, BEFORE the move: over `surface` (where the notice now sits) `text` 10.51–11.94 and `textMuted` 8.23–12.08; over `surfaceRaised` (the ground the card it left sat on) `text` 9.79–11.91 and `textMuted` 8.45–10.74. **BOTH clear the 4.5 floor, so the placement does not depend on the measurement.** The controller believed the card sat on a raised surface; it does not, and saying so is part of the answer. Its 3px `--gn-warning` marker goes with the fill — a design choice, not a contrast change, and **no ledger row covers this element** (`hig-per-screen/7a`/`8a` rule on `.gn-attention` and `.gn-state-node`, both re-measured).
 >
 > ## THE FINDING THAT COST THE MOST, AND THE METHOD THAT AVOIDED IT
 >
@@ -89,7 +89,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > ## GATE COMPOSITION — RECOUNTED AT THIS SHA, NOT CARRIED
 >
-> `pnpm turbo run build test typecheck` → **32 of 33 tasks successful.** The one failure is `@gisik-nokma/server#test`, **4 timeouts at 30034 / 30402 / 30051 / 3554 ms**, and **this diff has ZERO `apps/server` files** (measured: `git status --porcelain | grep -c apps/server` → 0). Re-run in isolation at the same tree: **`PASS (1563) FAIL (0) skipped (5)`, exit 0.** This is the recorded load-induced-timeout class, not a regression. Node `v22.22.2`.
+> `pnpm turbo run build test typecheck` → **32 of 33 tasks successful.** The one failure is `@gisik-nokma/server#test`, a **30 s timeout on `seedDevWorkspace > lands, and a re-run is a no-op`** (the first run of this task hit four of them, 30034 / 30402 / 30051 / 3554 ms; the count varies with machine load, which is itself the evidence). **This diff has ZERO `apps/server` files** (measured: `git status --porcelain | grep -c apps/server` → 0). Re-run in isolation at the same tree, twice: **`PASS (1563) FAIL (0) skipped (5)`, exit 0.** This is the recorded load-induced-timeout class, not a regression. Node `v22.22.2`.
 >
 > **All seven repo checks raw 0 at the code commit:** `tasks` · `env` · `runbook` · `help` · `citations` · `db-tz` · `migrations`. `check:case-ids` was NOT re-run by this lane; the case block is the controller's `13.920`–`13.949` and this change mints **13.924–13.927** (13.922/13.923 were spent by the merged Task 5 partial).
 >
@@ -97,7 +97,22 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > ## WHAT IS IN FLIGHT, AND WHAT A RESTARTED EXECUTOR SHOULD DO
 >
-> **Nothing is half-done.** One PR, one commit plus this handoff. If the reviewer's fix round is not yet recorded in the PR body, **that is the next action** — read the PR, not this file, for its outcome.
+> **Nothing is half-done. The review round RAN and its fixes are IN.** One per-task reviewer, dispatched to falsify, ran against `9ea1ddbd` and reported. It **survived every load-bearing claim** — the Save moved and not multiplied (a second Save added at the foot reddens 15 tests); the composite clears 4.5 on both grounds (re-derived independently from `tokens.ts`); the ground is genuinely `surface` (`body` is the only background above the notice); the line-count neutrality is EXACT (`git diff -U0` shows three hunks and no others); the class vocabulary is untouched; `.gn-type-editor-header .gn-page-title` was genuinely dead; and **no test was weakened** (zero removed lines containing `it(`/`expect(`/`.skip`).
+
+**What it broke, and what was done about each:**
+
+1. **THE ONE THAT MATTERS — 13.924's "they are ONE ROW" check passed for a reason unrelated to row-ness.** Deleting `display: flex` from `.gn-type-editor-header` left it GREEN, because "all three are inside `[data-testid="type-editor-header"]`" is satisfied by a block-layout STACK. Row-ness is a layout property and lives in a stylesheet the DOM assertion never reads. **Fixed** by reading `apps/web/app/globals.css` across the boundary `builder-css-binding.test.tsx` already crosses; re-running the same mutation now reddens exactly that case (`1 failed | 39 passed`).
+2. **Two claims were true by construction and pinned by nothing** — the heading tracking the LIVE name, and the header rendering in the LOADING arm. Both now have a case, and each kills exactly its own mutation.
+3. **Three citation defects this lane introduced**, all found by the reviewer and all now fixed: a range whose END was never remapped because the sweep's regex accepted only a HYPHEN and the citation used an **EN DASH** (`:357–264` → `:357–364`); a citation's **bare `(:NNN)` siblings** on a line whose filename-bearing half WAS repaired (invisible to a sweep keyed on `<file>:<line>`); and a **second bare citation** left beside one this change had repaired.
+4. **A mis-transcribed measurement** — the `surfaceRaised` `textMuted` range was quoted as `9.33–9.91`; the true range is **`8.45–10.74`** (the `neo` pair was omitted, and `neo` collapses both grounds to one hex). Corrected in five places: this file, `ui.css`, `Features.md` and `test-cases/13` (twice). **The floor is unaffected (8.23) and the verdict is unchanged**, but a quoted range that silently drops two of its six combinations is the shape this repo keeps punishing.
+   **The figure is still wrong in `9ea1ddbd`'s commit MESSAGE, and that is deliberate.** Rewriting it would orphan the sha the reviewer's pass is recorded against — the exact hazard this repo warns about with `git cat-file`. The next commit names and corrects it instead, so the correction is declared rather than hidden.
+5. **A dead prop** (`EditorHeader`'s `saving`) — removed.
+
+**A restore mistake worth recording, because it cost a file.** Mutating for the battery, this lane restored with `git checkout --`, which reverts to the last COMMIT and destroyed an uncommitted edit. The repo's rule is a checksum restore, not a git restore; the second and third mutations used a `/tmp` backup and verified `shasum` equality. **Use the backup.**
+
+The reviewer also flagged a PRE-EXISTING stale citation it did not attribute to this change (`Features.md:2251` cites `ui.css:1303` for a `danger`-as-text rule that is not there; the nearest are `:1327`/`:1337`/`:1381`/`:1462`). **Recorded, not fixed — owner: whoever owns the `danger`-as-text family.**
+
+Read the PR body, not this file, for the recorded pass.
 >
 > Opening rulings from this task, all recorded where they belong rather than here: (a) the heading's element LEVEL is the caller's, not the prototype's tag; (b) `Attachment` is the owner's; (c) "Choose again" is a rule with an owner.
 >

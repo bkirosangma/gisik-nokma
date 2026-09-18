@@ -897,11 +897,21 @@ describe('TicketTypeEditorScreen — the five NOT-ported items (Task 5b)', () =>
   const task = builtins.find((builtin) => builtin.id === 'task')!;
   const bothWorkflows = { workflows: [kanbanPublished, errandPublished] };
   const UI_CSS = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
+  /**
+   * `.gn-type-editor-header` lives in the WEB stylesheet, not `ui.css` — the same
+   * split `builder-css-binding.test.tsx` already reads across (`WEB_CSS_PATH`).
+   * It is read here because 13.924's claim is *one ROW*, and row-ness is a
+   * LAYOUT property: it lives in this file and in no DOM assertion.
+   */
+  const WEB_CSS = readFileSync(join(REPO_ROOT, 'apps/web/app/globals.css'), 'utf8');
 
   /** One rule's body, comments stripped — the selector must match a real block. */
-  function ruleBody(selector: string): string {
-    const withoutComments = UI_CSS.replace(/\/\*[\s\S]*?\*\//g, '');
-    const match = new RegExp(`(?:^|\\})\\s*${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(
+  function ruleBody(css: string, selector: string): string {
+    const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    // The prefix is `}`, whitespace or start-of-input rather than `}` alone: a
+    // rule may sit directly under a docblock's `*/`, which `.gn-type-editor-
+    // header__actions` does (it is appended at the end of `globals.css`).
+    const match = new RegExp(`(?:^|[}\\s])\\s*${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(
       withoutComments,
     );
     if (match === null) throw new Error(`no rule for ${selector}`);
@@ -964,6 +974,76 @@ describe('TicketTypeEditorScreen — the five NOT-ported items (Task 5b)', () =>
   });
 
   /**
+   * 13.924, THE HALF A CONTAINMENT ASSERTION CANNOT SEE, and it was found by
+   * mutation, not by reading: deleting `display: flex` from
+   * `.gn-type-editor-header` leaves the case above GREEN, because "all three are
+   * inside `[data-testid="type-editor-header"]`" is satisfied by a block-layout
+   * STACK. Row-ness is a layout property; it lives in a stylesheet the DOM
+   * assertion never reads, so the claim "they are ONE ROW" was passing for a
+   * reason unrelated to row-ness — this repo's signature defect class.
+   *
+   * The instrument is the one `builder-css-binding.test.tsx` already built for
+   * this exact blind spot, read across the same package boundary (`WEB_CSS_PATH`).
+   */
+  it('13.924: the row really is a row — the containment check alone cannot see layout', () => {
+    const header = ruleBody(WEB_CSS, '.gn-type-editor-header');
+    expect(header).toContain('display: flex');
+    expect(header).toContain('justify-content: space-between');
+    // …and the two ends are the name and the actions, in that order.
+    expect(header).toContain('flex-wrap: wrap');
+    expect(ruleBody(WEB_CSS, '.gn-type-editor-header__actions')).toContain('display: flex');
+    // The prototype's OWN scale for this row (`:875`), not `.gn-page-title`'s 34px.
+    // A regression to the page-title size would satisfy every DOM assertion here.
+    expect(ruleBody(WEB_CSS, '.gn-type-editor-header__title')).toContain('font-size: 1.375rem');
+  });
+
+  /**
+   * 13.924 — the heading is bound to the LIVE name, which the prototype does
+   * (`editTypeName`, `:876`) and the product's pane did not: it rendered the name
+   * it had FETCHED, so typing left the heading on the old one until a save.
+   *
+   * Pinned because the claim is otherwise only true by construction: mutating
+   * `name={def.name}` to `name={props.initialDef?.name ?? ''}` reddens nothing
+   * without this case.
+   */
+  it('13.924: the heading tracks the LIVE name, not the one that was fetched', async () => {
+    const user = userEvent.setup();
+    renderWithCancel(task);
+    const name = await screen.findByRole('textbox', { name: 'Type name' });
+    await user.clear(name);
+    await user.type(name, 'Site inspection');
+    const row = screen.getByTestId('type-editor-header');
+    expect(within(row).getByRole('heading', { name: 'Site inspection' })).toBeInTheDocument();
+    // The control: the FETCHED name is still in scope here, so a heading frozen at
+    // first render would go on reading it and fail the line above.
+    expect(within(row).queryByRole('heading', { name: task.name })).not.toBeInTheDocument();
+  });
+
+  /**
+   * 13.924 — the header renders in the LOADING arm too. The pane used to draw the
+   * name and Cancel from its own fetch while the screen showed "Loading ticket
+   * types…"; folding the header into the screen would have blanked it during
+   * every load if the early return had stayed bare. Nothing exercised that branch
+   * until this case: deleting `{header}` from it reddens nothing else.
+   */
+  it('13.924: the header renders while the screen is still loading, not only once the reads land', async () => {
+    const gateway = createFakeGateway({ workflows: [kanbanPublished], ticketTypes: builtins });
+    render(
+      <TicketTypeEditorScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={{ ...gateway, listWorkflows: () => new Promise(() => {}) }}
+        initialDef={task}
+        cancel={<a href="/back">Cancel</a>}
+      />,
+    );
+    const row = await screen.findByTestId('type-editor-header');
+    expect(within(row).getByRole('heading', { name: task.name })).toBeInTheDocument();
+    expect(within(row).getByRole('link', { name: 'Cancel' })).toBeInTheDocument();
+    expect(screen.getByText('Loading ticket types…')).toBeInTheDocument();
+  });
+
+  /**
    * 13.925 — the divergence notice moves OUT of the Workflow card and into the
    * right-hand column, above Implications, as a `--tintWarning` card: the
    * prototype's own annotation for this block reads *"the bordered + left-ruled
@@ -1002,7 +1082,7 @@ describe('TicketTypeEditorScreen — the five NOT-ported items (Task 5b)', () =>
    * `.gn-attention` already took.
    */
   it('13.925: the notice is the tintWarning wash, not the raised surface, and its 3px marker is gone', () => {
-    const body = ruleBody('.ticket-type-editor__divergence');
+    const body = ruleBody(UI_CSS, '.ticket-type-editor__divergence');
     expect(body).toContain('background: var(--gn-tint-warning)');
     expect(body).not.toContain('--gn-surface-raised');
     expect(body).not.toMatch(/border-left\s*:/);
