@@ -454,16 +454,24 @@ export const primitives = {
    * on `fillTertiary` COMPOSITED over `surface` — a translucent, blue-tinted
    * fill that reads measurably DARKER than the bare surface underneath it
    * (`fillWarmHig3` over `warmPaper` composites to `#D9D4D1`, `fillWarmNeo3`
-   * over `neoPaper` to `#E3D8CD`). Deriving against the four surfaces alone
+   * over `neoPaper` to `#E7DDD4`). Deriving against the four surfaces alone
    * (an earlier pass here landed on `#33619C`) passed every declared row and
    * then FAILED at 4.29 against exactly this composite — caught by
    * `test/tokens.test.ts`'s own 13.284 case, which is why the composite is
    * folded into this derivation rather than left for that test to surface.
    *
+   * **The two `neo` figures below moved on 2026-09-18 with T5, and the pair is
+   * kept visible so the move is legible: `neoPaper` `#EDE4DB` → `#F1EAE3`
+   * lightened the ground, so `neoPaper` goes 5.311 → **5.596** and the `neo`
+   * ghost composite 4.755 → **4.984**, the composite hex `#E3D8CD` →
+   * `#E7DDD4`.** Both still clear 4.5, and re-measured rather than assumed.
+   * The BINDING constraint is untouched by the move, which is the point: it is
+   * the `hig`/`minimal` composite, and T5 does not reach `hig`/`minimal`.**
+   *
    * Measured at `#325D97` (L≈0.3928, stepped from L≈0.4991): `warmPaper`
-   * 5.453, `warmRaised` 6.258, `warmSunken` 4.762, `neoPaper` 5.311, the
+   * 5.453, `warmRaised` 6.258, `warmSunken` 4.762, `neoPaper` 5.596, the
    * `hig`/`minimal` ghost-button composite 4.539 (the binding constraint),
-   * the `neo` ghost-button composite 4.755. All six ≥4.5.
+   * the `neo` ghost-button composite 4.984. All six ≥4.5.
    */
   textAccentLight: '#325d97',
 
@@ -1264,10 +1272,13 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
    * numbers on the fill; splitting the role is what let `accent` become the
    * owner's own, duller-as-text hue while `textAccent` gets its own, darker
    * (light) / lighter (dark) derived value (`primitives.textAccentLight`/
-   * `textAccentDark` — see their docblocks for the exact derivation). Smallest
-   * margin in the RENAMED set is `textAccent` on `neo`'s `surface`/
-   * `surfaceRaised` (one shared hex, `neoPaper`) at **5.311** against 4.5 —
-   * `hig`/`minimal`'s own `warmPaper`/`warmRaised` clear at 5.45/6.26. (The
+   * `textAccentDark` — see their docblocks for the exact derivation). **The
+   * smallest margin in the RENAMED set moved on 2026-09-18 (T5) and the
+   * sentence that used to name `neo` here is superseded rather than edited
+   * away:** T5 lightened `neoPaper`, so `textAccent` on `neo`'s
+   * `surface`/`surfaceRaised` went **5.311 → 5.596** — which makes it no
+   * longer the smallest. The smallest is now `hig`/`minimal`'s own
+   * `warmPaper` at **5.453**, with `warmRaised` at 6.26. (The
    * primitive's own binding constraint is tighter still — 4.539, against
    * `.gn-button--ghost`'s fillTertiary-composited background — but that pair
    * is not one of these two declared rows; see `textAccentLight`'s docblock.)

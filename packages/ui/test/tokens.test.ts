@@ -1136,13 +1136,47 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
         `neo/light: ${text} on ${role}`,
       ).toBeGreaterThanOrEqual(4.5);
     }
-    // `contested`/`restricted`/`customMarker` carry no text role — they are
-    // never a ground for text — so they owe the 3:1 a non-text boundary owes.
-    for (const role of ['contested', 'restricted', 'customMarker'] as const) {
+    /*
+     * `contested` / `restricted` / `customMarker` have no `*Text` role of their
+     * own. **That is not the same as "never used as text", which the first
+     * draft of this comment claimed and an independent reviewer falsified.**
+     * `contested` IS read text today: `.gn-sync-status-bar__failed` sets
+     * `color: var(--gn-contested)` on `background: var(--gn-surface)`
+     * (`packages/ui/src/ui.css:2602`, consumed at
+     * `packages/app-core/src/sync/sync-status-bar.tsx:85`, 13.6px normal
+     * weight — so AA wants 4.5, not the 3 the `CONTRAST_PAIRS` row declares).
+     * `restricted` is text too (`.gn-ticket-sheet__restricted`).
+     *
+     * **So the declared `{ contested, surface, minimum: 3 }` row is a non-text
+     * floor standing in for a text job, and in `hig`/`minimal` LIGHT the real
+     * requirement is not met: 4.3746 against 4.5.** PRE-EXISTING — this change
+     * neither caused nor moved it (it is the same `magenta600` value either
+     * side), and `neo` light is 6.02, so T5 incidentally FIXED it in the one
+     * style it touched.
+     *
+     * It is asserted below at its ACTUAL value rather than blessed at 3: a
+     * `toBeGreaterThanOrEqual(3)` here would pass on a real AA failure and read
+     * as a guarantee. Same shape as case 13.360's `surfaceSunken` half.
+     * Owner: whoever next touches `.gn-sync-status-bar` or the `contested` role.
+     * The siblings are recorded with it — measured on `hig`/minimal light,
+     * `warning` is 4.2485 and `danger` is 4.4013 against the same surface, and
+     * NO `CONTRAST_PAIRS` row names either pair at all.
+     */
+    expect(
+      contrastRatio(colorOf('light', 'contested'), colorOf('light', 'surface')),
+      'hig/minimal light: contested as TEXT on surface — below AA. Recorded, not blessed.',
+    ).toBeLessThan(4.5);
+    expect(
+      contrastRatio(colorOf('light', 'contested', 'neo'), colorOf('light', 'surface', 'neo')),
+      'neo/light: the same pair, which T5 moved ABOVE 4.5',
+    ).toBeGreaterThanOrEqual(4.5);
+    // For these two the 3:1 row is slack rather than a stand-in — they clear
+    // the TEXT floor in every light style, so nothing is being papered over.
+    for (const role of ['restricted', 'customMarker'] as const) {
       expect(
-        contrastRatio(colorOf('light', role, 'neo'), colorOf('light', 'surface', 'neo')),
-        `neo/light: ${role} against surface`,
-      ).toBeGreaterThanOrEqual(3);
+        contrastRatio(colorOf('light', role), colorOf('light', 'surface')),
+        `hig/minimal light: ${role} against surface`,
+      ).toBeGreaterThanOrEqual(4.5);
     }
   });
 });
