@@ -82,6 +82,18 @@ narrowed to the four genuinely rule-less elements; the page-container verdict co
 defects fixed (`ui.css:2611`→`:2612`, `page.tsx:55-57`→`:52-53`, `812-818`→`812-821`, and a
 misattributed quotation credited to 13.284); and 13.887 strengthened with the cascade count.
 
+**ROUND 2, a scoped re-review: no Critical, and both Important findings were in the FIX, not the original.**
+(1) The cascade count it asked me to add could itself be defeated — a selector split across two lines, and
+a `*`-prefixed selector, each left the suite green with the zebra dead. The helper is now a SELECTOR scan
+that strips comment spans by context and matches across line breaks; both evasions redden 13.887 (2 failed
+/ 37 each) and the false-red control — prose naming the selector inside a correct tree — stays 37/37 green.
+(2) That helper's comment-guard premise was false (`globals.css` contains exactly ONE line naming the rule,
+and prose there starts with bare text, so the guard would have reddened a CORRECT tree). (3) The superseded
+block's id pointer had been corrupted by the blanket renumber and is restored, marked superseded, with the
+live pointer `13.889` named. **Two lessons worth carrying: a blanket renumber corrupts historical prose —
+and VITEST GREEN IS NOT TYPECHECK GREEN.** `tsc` (17/17) caught a `noUncheckedIndexedAccess` error in the
+new helper that 37/37 passing tests did not; the gate ran it, not the test run.
+
 **Instrument lesson, measured here and worth carrying:** the first attempt at the fourth mutation removed a
 `<label>`'s opening tag and left its closing one, so the file failed to TRANSFORM — and the JSON reporter
 showed that as **`total=7 passed=7 failed=0`**, the broken file simply absent from the assertion list.
@@ -146,7 +158,7 @@ controller's merge and nothing below needs redoing. Then verify the anchors — 
 | reviewed heads | round 1 reviewed `4205f172` (= `50db2300`) · round 2 reviewed `bb7ba7f7` (= `606ba48d`) |
 | frozen head | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit that carries it |
 | files | 11: `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` · `apps/web/test/page-refusals.test.tsx` · `apps/web/test/board-narrowing.test.tsx` · `apps/web/test/backlog-tab.test.tsx` · `apps/web/test/filters-sheet.test.tsx` · `apps/web/test/list-bulk-close.test.tsx` · `apps/web/test/project-calendar-timeline.test.tsx` · `apps/web/e2e-stack/non-text-contrast-roster.json` · `test-cases/13-deployment-dogfooding.md` · `Features.md` · this file |
-| ids minted | **`13.881`, `13.882`** — recounted at my tip BY MARKER; next free overall is `13.886` |
+| ids minted | **`13.881`, `13.882`** — recounted at my tip BY MARKER; next free overall WAS `13.883` **at that time**. **STALE AND SUPERSEDED**: the blanket renumber of the next task corrected this historical number by mistake, and it is restored because a superseded pointer is history while the position lives in the top block. This branch now holds `13.886`–`13.888`, and the LIVE next free is **`13.889`**. |
 | tree | clean |
 
 ### What shipped

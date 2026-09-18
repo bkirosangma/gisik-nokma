@@ -71,16 +71,55 @@ const css = readFileSync(GLOBALS_CSS_PATH, 'utf8');
 const uiCss = readFileSync(UI_CSS_PATH, 'utf8');
 
 /**
- * Rule-header lines mentioning the roster row, across BOTH stylesheets. A rule
- * header is a line carrying the selector and an opening brace, and a line that
- * *starts* like a comment is excluded — `globals.css` documents this rule in
- * prose that names its own selector, and a sweep that counted comment lines
- * would report the family as twice its size.
+ * The SELECTORS of every rule mentioning the roster row, across BOTH
+ * stylesheets. A selector, not a line — and the first version of this helper
+ * matched LINES, which an independent review then defeated twice:
+ *
+ * 1. it required the selector and its opening brace on the same line, so an
+ *    override written in the ordinary multi-line style — selector on one line,
+ *    `{` on the next — was invisible to it, leaving the suite green with the
+ *    zebra dead in a browser (0,3,0 beats 0,2,0);
+ * 2. it excluded any line STARTING with `*`, which was meant to skip comments
+ *    and in fact skipped a real rule whose selector begins with the universal
+ *    selector (`*.gn-members__row:nth-child(even)` — `*` adds no specificity,
+ *    so that rule ties and wins on source order).
+ *
+ * COMMENTS ARE STRIPPED BY CONTEXT, NOT BY A LINE PREFIX, and the docblock that
+ * justified the prefix was itself false: it claimed `globals.css` documents this
+ * rule in prose naming its own selector, and `grep -n "gn-members__row"` on that
+ * file returns exactly ONE line — the rule. Worse, had such a sentence ever been
+ * written the guard would have FALSE-REDDENED a correct tree, because prose in
+ * that file starts with bare text rather than `*`. Stripping comment spans is
+ * right in both directions: a comment quoting the selector is not counted, and a
+ * rule whose selector starts with `*` is.
+ *
+ * WHAT THIS STILL CANNOT SEE, stated rather than implied: a rule that overrides
+ * the zebra by targeting the ELEMENT instead of naming the row (`tr`, `tbody`).
+ * Neither stylesheet carries such a rule today — swept for the same instrument's
+ * sake — so the count below is the whole of this screen's row styling as things
+ * stand; a rendered measurement is the e2e-viewport suite's job, not this file's.
  */
-function rowRuleHeaders(...sheets: string[]): string[] {
-  return sheets
-    .flatMap((sheet) => sheet.split('\n'))
-    .filter((line) => /\.gn-members__row/.test(line) && line.includes('{') && !/^\s*[*/]/.test(line));
+function rowRuleSelectors(...sheets: string[]): string[] {
+  const selectors: string[] = [];
+  for (const sheet of sheets) {
+    // Comment spans removed first, so a commented-out rule cannot be counted
+    // and a live one cannot be skipped.
+    const text = sheet.replace(/\/\*[\s\S]*?\*\//g, '');
+    // `[^{}]*` spans NEWLINES, so a selector split over two lines is captured
+    // whole; the braces inside a nested at-rule are consumed one at a time, so
+    // the rules inside `@media` are seen in turn.
+    const pattern = /([^{}]*)\{/g;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text)) !== null) {
+      // `?? ''` because `noUncheckedIndexedAccess` types a capture group as
+      // `string | undefined`; the group in this pattern always participates, so
+      // this is a type-level narrowing and not a behaviour change. **Vitest was
+      // green over this line and `tsc` was not** — the two are different checks.
+      const selector = match[1] ?? '';
+      if (/\.gn-members__row\b/.test(selector)) selectors.push(selector.trim().replace(/\s+/g, ' '));
+    }
+  }
+  return selectors;
 }
 
 describe('13.888 the roster table wears the prototype’s four card-and-table treatments', () => {
@@ -145,25 +184,32 @@ describe('13.887 the roster’s zebra, on the rows the prototype actually tints'
 
   /**
    * THE CASCADE CLAIM — and it is here because an independent review measured
-   * this case blind to it. Everything above reads DECLARATIONS, and a later
-   * higher-specificity rule can neutralise the one they read while every value
-   * assertion stays green. Measured on this tree before this test existed:
-   * appending `.gn-members tbody .gn-members__row:nth-child(even) { background:
-   * transparent; }` left **36/36 passing with the zebra dead in a browser**.
+   * this case blind to it. Everything above reads DECLARATIONS, and a later rule
+   * can neutralise the one they read while every value assertion stays green.
+   * Measured on this tree before this test existed: appending
+   * `.gn-members tbody .gn-members__row:nth-child(even) { background: transparent; }`
+   * left **36/36 passing with the zebra dead in a browser**.
    *
-   * So the claim is a COUNT over BOTH stylesheets: exactly one rule header in
-   * the product mentions this row at all. A second one — an override, a
-   * re-parity, a duplicate — reddens here whatever specificity it carries,
-   * because the count is the thing that changed.
+   * So the claim is a COUNT over BOTH stylesheets: exactly one rule in the
+   * product NAMES this row at all. A second one — an override, a re-parity, a
+   * duplicate — reddens here whatever specificity it carries and however it is
+   * laid out, because the count is the thing that changed.
+   *
+   * **The first version of this check was defeated twice, and the second review
+   * measured both**: a selector split across two lines, and a selector starting
+   * with `*`. `rowRuleSelectors` above is the answer to both, and the witness
+   * below plants each of them. What remains outside this instrument's reach is a
+   * rule that targets the ELEMENT rather than naming the row, which no
+   * stylesheet in the product does today.
    */
-  it('exactly ONE rule in either stylesheet mentions the row, so nothing can silently override it', () => {
-    const headers = rowRuleHeaders(css, uiCss);
-    expect(headers, `row rule headers found: ${JSON.stringify(headers)}`).toHaveLength(1);
-    expect(headers[0]).toContain('.gn-members__row:nth-child(even)');
+  it('exactly ONE rule in either stylesheet names the row, so nothing can silently override it', () => {
+    const selectors = rowRuleSelectors(css, uiCss);
+    expect(selectors, `row rule selectors found: ${JSON.stringify(selectors)}`).toHaveLength(1);
+    expect(selectors[0]).toContain('.gn-members__row:nth-child(even)');
   });
 
   /**
-   * MUTATION WITNESS. Three plants, because the case makes three claims:
+   * MUTATION WITNESS. Four plants, because the case makes four claims:
    *
    * 1. the VALUE — the same selector carrying a different role must redden it.
    *    Each plant is asserted to have LANDED (`replace` matching nothing prints
@@ -177,6 +223,10 @@ describe('13.887 the roster’s zebra, on the rows the prototype actually tints'
    *    `--gn-fill-quaternary` (the old check green), while the count has gone to
    *    two (the new check red). A witness that only showed the new assertion
    *    reddening would not prove it is the one covering the gap.
+   * 4. THE TWO EVASIONS the second review measured against the first version of
+   *    this helper — a two-line selector and a `*`-prefixed one — plus a PROSE
+   *    comment naming the selector, which is the false-red direction and must
+   *    stay at one.
    */
   it('the value, parity and cascade assertions each fail on their own plant', () => {
     const ANCHOR = '.gn-members__row:nth-child(even) { background: var(--gn-fill-quaternary); }';
@@ -202,6 +252,29 @@ describe('13.887 the roster’s zebra, on the rows the prototype actually tints'
     expect(ruleFor(plantedOverride, /^\.gn-members__row:nth-child\(even\)\s*\{/)).toContain(
       'var(--gn-fill-quaternary)',
     );
-    expect(rowRuleHeaders(plantedOverride, uiCss)).toHaveLength(2);
+    expect(rowRuleSelectors(plantedOverride, uiCss)).toHaveLength(2);
+
+    // EVASION 1 — the selector split across two lines. The first version of the
+    // helper matched LINES and required the brace on the selector's own line, so
+    // this plant was invisible to it and the zebra died in a browser with the
+    // suite green. The selector-form scan sees it.
+    const twoLine = `${css}\n.gn-members tbody\n.gn-members__row:nth-child(even) { background: transparent; }\n`;
+    expect(twoLine, 'the two-line plant did not land').not.toBe(css);
+    expect(rowRuleSelectors(twoLine, uiCss)).toHaveLength(2);
+
+    // EVASION 2 — a `*`-prefixed selector. `*` adds no specificity, so the rule
+    // TIES the shipped one and wins on source order; the first version skipped
+    // it because the line started with `*`, which was meant for comments.
+    const starPrefixed = `${css}\n*.gn-members__row:nth-child(even) { background: transparent; }\n`;
+    expect(starPrefixed, 'the star-prefixed plant did not land').not.toBe(css);
+    expect(rowRuleSelectors(starPrefixed, uiCss)).toHaveLength(2);
+
+    // THE OTHER DIRECTION, which is the one that reddens a CORRECT tree: prose in
+    // a docblock that quotes the selector. Comments are stripped by context, so
+    // this stays at one — and the first version's line-prefix guard would have
+    // counted it, because prose in `globals.css` starts with bare text.
+    const proseComment = css.replace(ANCHOR, `${ANCHOR}\n/* A note about .gn-members__row and its one rule. */`);
+    expect(proseComment, 'the prose plant did not land').not.toBe(css);
+    expect(rowRuleSelectors(proseComment, uiCss)).toHaveLength(1);
   });
 });

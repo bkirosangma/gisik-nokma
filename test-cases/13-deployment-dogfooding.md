@@ -11227,7 +11227,10 @@ asserts `union == sum`, so the second merge goes red.
 **This branch yields, because its reading was the later one, and renumbers to `13.886`–`13.888`** —
 contiguous, above both trees' high-water mark. Measured on both sides at this tip:
 `exec/owner-demotion-guard` carries `13.883` ×5 and stops there (so `13.884`/`13.885` are free in both),
-and this tree's sweep for `13.88[345]` returns nothing. `13.999` and `13.632866` remain this file's
+and this tree's sweep for `13.88[345]` returns **no CASE ID** — the pattern does match six lines of
+prose (five here and one in `executor-2-state.md`), which is the difference between a sweep and a mint
+the file's own head is about, and `check-case-ids.mjs` anchors on the line head so none of them is read
+as one. `13.999` and `13.632866` remain this file's
 documented truncation traps and are excluded by the `{3}` width. **The remedy is an allocation, not a
 number**, and it is on the report to the controller: two executors minting from a shared "next free" pointer
 will collide again the next time both are dispatched from one — a BLOCK per executor is the only form of an
@@ -11242,27 +11245,44 @@ id that stays true.
   bare pair reddens it alone as well.
 
 - ✅ **13.887 — the roster's zebra, on the rows the prototype actually tints.**
-  `apps/web/test/members-styling.test.ts:128`. FOUR claims, and each is there because a different defect
+  `apps/web/test/members-styling.test.ts:167`. FOUR claims, and each is there because a different defect
   satisfies the others: the even-child rule carries `--gn-fill-quaternary`; NO odd-child rule exists (odd
-  beside even tints every row, which is a table with no zebra and no way to notice); **EXACTLY ONE rule in
-  either stylesheet mentions `.gn-members__row` at all**; and an in-test witness that each plant LANDS
+  beside even tints every row, which is a table with no zebra and no way to notice); **EXACTLY ONE rule
+  SELECTOR in either stylesheet names the row, matched across line breaks with comment spans stripped**; and an in-test witness that each plant LANDS
   before it is asserted to redden — `replace` matching nothing prints success, which is this repo's own
   recorded trap, and the witness now also asserts its anchor is unique so a second copy surfaces as a named
   failure rather than a false red.
 
-  **The third claim is here because an independent review measured the first version blind to it.** Every
-  other assertion in this case reads DECLARATIONS, and a later higher-specificity rule neutralises the one
-  they read while all of them stay green: appending
-  `.gn-members tbody .gn-members__row:nth-child(even) { background: transparent; }` left **37/37 passing
-  with the zebra dead in a browser**. The count catches it whatever specificity it carries, and the witness
-  asserts BOTH halves of that — the extracted rule still reads `--gn-fill-quaternary` (the old check green)
-  while the count has gone to two (the new check red). Mutation-witnessed against the real file, tree
-  restored and sha256-verified: parity flipped `even`→`odd` reddens 13.887 (4 failed / 37); the fill
-  swapped to `--gn-surface-sunken` reddens 13.887 (2 failed / 37); **the higher-specificity override, which
-  was 0 failed before, reddens 13.887 (2 failed / 37)**.
+  **The third claim is here because the FIRST review measured the case blind without it.** Every other
+  assertion here reads DECLARATIONS, and a later rule can neutralise the one they read while all of them
+  stay green: appending `.gn-members tbody .gn-members__row:nth-child(even) { background: transparent; }`
+  left **36/36 passing with the zebra dead in a browser** — 36, because that measurement predates this
+  case; the post-fix totals below are /37. The count catches it, and the witness asserts BOTH halves — the
+  extracted rule still reads `--gn-fill-quaternary` (the old check green) while the count has gone to two
+  (the new check red).
+
+  **AND THE SECOND REVIEW THEN DEFEATED THAT COUNT TWICE, which is why it is a SELECTOR scan now and not a
+  line scan.** Its first version matched LINES: it required the selector and its `{` on one line, and it
+  skipped any line starting with `*` (a guard meant for comments). Both evasions were measured green with
+  the zebra dead in a browser — a selector split across two lines (`0,3,0` beats `0,2,0`), and a
+  `*`-prefixed selector (`*` adds no specificity, so it TIES and wins on source order). Comments are now
+  stripped by CONTEXT instead of by a line prefix, **and that guard's own justification was false**:
+  `grep -n "gn-members__row" apps/web/app/globals.css` returns exactly one line, the rule itself, so the
+  premise ("this file documents the rule in prose naming its selector") was invented — and had such prose
+  existed, the prefix guard would have FALSE-REDDENED a correct tree, because prose there starts with bare
+  text rather than `*`.
+
+  Mutation-witnessed against the real file, tree restored and sha256-verified at every step: parity flipped
+  `even`→`odd` reddens 13.887 (4 failed / 37); the fill swapped to `--gn-surface-sunken` reddens 13.887
+  (2 failed / 37); the one-line override — 0 failed before this case existed — reddens 13.887 (2 failed /
+  37); **the two-line selector reddens 13.887 (2 failed / 37)**; **the `*`-prefixed selector reddens it too
+  (2 failed / 37)** — where the first version of the helper passed both; and the false-red CONTROL, a prose
+  comment NAMING the selector inside an otherwise correct tree, stays **37/37 green**. What remains outside
+  this instrument's reach is a rule that targets the ELEMENT rather than naming the row (`tr`, `tbody`); no
+  stylesheet in the product carries one today, and a rendered measurement is the e2e-viewport suite's job.
 
 - ✅ **13.888 — the four treatments that were already the prototype's, pinned as VALUES.**
-  `apps/web/test/members-styling.test.ts:86`. It asserts declarations — `0.8125rem`, `1.125rem`, `600`,
+  `apps/web/test/members-styling.test.ts:125`. It asserts declarations — `0.8125rem`, `1.125rem`, `600`,
   `var(--gn-surface-sunken)`, `0.6875rem 1.125rem`, `1.0625rem`, `51.25rem`, `var(--gn-radius-card)` —
   rather than that a rule exists, which is the distinction this repo has been bitten by repeatedly: a rule
   that is present and does nothing reads identically to one that works. It is a regression pin on four
@@ -11311,6 +11331,27 @@ argued with.**
 6. **MINOR — the zebra case could be defeated by a higher-specificity override**, which the reviewer
    measured at 0 failures on a `/tmp` copy. The exactly-one-rule count assertion closes it, and the
    witness asserts both halves — the old check green, the new check red.
+
+**Round 2, a scoped re-review at the fix head.** It confirmed all four defects closed and every corrected
+citation true at the line — and then found **no Critical and two Important defects, both of them in the
+FIX rather than in the original change**:
+
+- **the new cascade count could still be defeated.** A selector split across two lines, and a
+  `*`-prefixed selector, each left the suite green with the zebra dead in a browser — the helper matched
+  LINES and skipped anything starting with `*`. It is now a SELECTOR scan that strips comment spans by
+  context and matches across line breaks; both evasions redden 13.887 (2 failed / 37 each), and the
+  false-red control — prose naming the selector inside a correct tree — stays 37/37 green.
+- **the comment guard's premise was false, and its failure direction was a FALSE RED.** It claimed
+  `globals.css` documents this rule in prose that names its own selector; that file contains exactly one
+  such line, the rule. Had the prose existed, the guard would have reddened a CORRECT tree. Restating the
+  reason would not have fixed it — stripping comments by context removes the premise.
+- **the handoff's superseded block carried a number this branch now owns**: the blanket renumber rewrote
+  its historical "next free `13.883`" into `13.886`. Restored, marked superseded, with the live pointer
+  (`13.889` — measured free on this tree, on `origin/main` and on `exec/owner-demotion-guard`) named beside
+  it. **A blanket renumber corrupts historical prose**, which is worth more than the one row it broke.
+- **two Minor defects in this section**: the `13.88[345]` sweep sentence claimed a null where the sweep
+  returns six lines of prose (and no case id), and the "37/37 passing with the zebra dead" figure was
+  measured on the pre-fix 36-test tree.
 
 **Confirmed, not merely agreed with:** the `isMembers` block's `:651-798`, the `memberRows` zebra and
 its 0-based index, the even-row parity, both odd-parity product zebras, the four already-aligned
