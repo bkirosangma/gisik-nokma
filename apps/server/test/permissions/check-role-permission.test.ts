@@ -1430,7 +1430,7 @@ describe('the last-owner guard on the real door — the SELECT, not just the rul
   });
 
   /**
-   * 13.881 — an admin may not demote a NON-LAST owner (owner ruling 2026-09-18,
+   * 13.883 — an admin may not demote a NON-LAST owner (owner ruling 2026-09-18,
    * second sitting: *"may an admin demote a non-last owner: **no**."*).
    *
    * ## The door, the four attempts, and why each control is here
@@ -1459,7 +1459,7 @@ describe('the last-owner guard on the real door — the SELECT, not just the rul
    *  - Attempt 4 pins that the GRANT half still answers with its own id, so this
    *    change did not swallow the rule that already shipped.
    */
-  it('13.881 refuses an admin removing owner status from ANY owner, and leaves every other admin act working', async () => {
+  it('13.883 refuses an admin removing owner status from ANY owner, and leaves every other admin act working', async () => {
     const ingest = ingestService();
     const { workspaceId, owner } = await foundedWorkspace(ingest);
     const admin = await grantMember(ingest, workspaceId, owner, 'admin');

@@ -9856,7 +9856,7 @@ break unrelated suites for a consistency that buys nothing here.
   owners in a single batch"*, which is now refused on the FIRST event. **The batch arm keeps its actor
   reasoning in inverted form:** the actor must now be an owner, and an owner stays an owner for both
   events because the second is the one refused. Measured by mutation: disabling the new gate check makes
-  the batch arm's first event commit again and returns this case to `last-owner`. See **13.881**.
+  the batch arm's first event commit again and returns this case to `last-owner`. See **13.883**.
   **Citations:** `packages/rule-engine/src/checks/membership.ts:87` (the check), `:103` (the move-out-of-owner
   test), `:82` (the target's current role), `packages/rule-engine/test/membership.test.ts:106`,
   `apps/server/test/permissions/check-role-permission.test.ts:1256` (the real-door half, where the `SELECT`
@@ -9872,7 +9872,7 @@ break unrelated suites for a consistency that buys nothing here.
   and FALSE of the client door, and the sentence above did not say which it meant.** The owner ruled that
   an admin may not remove owner status from ANY owner, so on the client door an admin revoking one of two
   owners is refused `remove-owner-requires-owner` before the engine is consulted; an OWNER revoking one of
-  two still commits. Measured on the real door, both ways. See **13.881**.
+  two still commits. Measured on the real door, both ways. See **13.883**.
   **Citations:** `packages/rule-engine/src/checks/membership.ts:114` (the check), `:130` (its refusal),
   `packages/rule-engine/test/membership.test.ts:168`
 
@@ -9911,7 +9911,17 @@ break unrelated suites for a consistency that buys nothing here.
   `apps/server/test/permissions/check-role-permission.test.ts:290` (the pure case),
   `:1355` (the real-door case, through the client door because the internal one does not run the gate)
 
-## An admin may not remove owner status from ANY owner (executor 1, 2026-09-18, second sitting) — case `13.881`
+## An admin may not remove owner status from ANY owner (executor 1, 2026-09-18, second sitting) — case `13.883`
+
+> **THE ID WAS `13.881`, AND IT COLLIDED — recorded because the collision is the lesson, not the fix.**
+> Both executors measured "next free is `13.881`" at their own tips, minutes apart, and **both were right
+> at the moment they measured**; exec 2's attention-strip entry (`13.881`–`13.882`) merged first, so this
+> case renumbered to `13.883` before its PR opened. The bare number was the defect: **a reading that is
+> correct in one tree expires in another**, which is exactly why the case-id protocol is written in
+> BLOCKS (`13.700`–`13.759` and so on) rather than as a tip. `check-case-ids` caught it — the duplicate
+> was reported as two files-and-lines for one id, and it FAILS rather than warning — so the gate did its
+> job here and the cost was one renumber. Recorded at this length because the next executor handed a
+> "next free" number will otherwise take it, and the number is only true until someone else takes it.
 
 **The owner's ruling, verbatim:** *"may an admin demote a non-last owner: **no**."*
 
@@ -9923,7 +9933,7 @@ excluded.role` would write it. **Measured on the real door before the fix: the e
 is a transfer of the workspace itself, which is the whole reason the grant half is owner-only; the removal
 half is the same act read backwards, and it was open.
 
-- ✅ **13.881 — an admin removing owner status from ANY owner is refused, and every other admin act keeps
+- ✅ **13.883 — an admin removing owner status from ANY owner is refused, and every other admin act keeps
   working.** One case in `apps/server/test/permissions/check-role-permission.test.ts`, through
   **`ingestClientBatch`** — the client door, the only one that runs both halves; `ingestBatch` is the
   internal append path and does not apply the permission gate, so a permission assertion driven through it

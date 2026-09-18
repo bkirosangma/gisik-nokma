@@ -52,8 +52,8 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > |---|---|
 > | branch | `exec/owner-demotion-guard`, cut from `origin/main` = `efc23e67`. **NOT rebased since** — the controller's next dispatch names the base; re-measure `origin/main` before the PR. |
 > | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it. |
-> | the change | 6 files: `apps/server/src/permissions/check-permission.ts` (the new pass + the sentence), `apps/server/test/permissions/check-role-permission.test.ts` (case **13.881** + the 13.820 repair), `packages/rule-engine/src/refusal-rules.ts` (the id), `packages/rule-engine/test/engine.test.ts` (the registry pin), `test-cases/13`, `Features.md` |
-> | case ids | **`13.881`**, free at this tip (measured). It is OUTSIDE every assigned block (`13.850`–`13.880` was the last) — the dispatch named it, so it is authorised rather than taken. |
+> | the change | 6 files: `apps/server/src/permissions/check-permission.ts` (the new pass + the sentence), `apps/server/test/permissions/check-role-permission.test.ts` (case **13.883** + the 13.820 repair), `packages/rule-engine/src/refusal-rules.ts` (the id), `packages/rule-engine/test/engine.test.ts` (the registry pin), `test-cases/13`, `Features.md` |
+> | case ids | **`13.883`**, free at this tip (measured). It is OUTSIDE every assigned block (`13.850`–`13.880` was the last) — the dispatch named it, so it is authorised rather than taken. |
 > | migration | **NONE.** Do not restart the server container for this. |
 > | suites | **rule-engine 331/0 · server 1558/0 (5 skipped)** — server is Task 8's 1557 **+1** for the new case. Node v22.22.2. |
 > | seven checks | **all EXIT 0**: `tasks` · `env` · `runbook` · `help` · `citations` (file 13 = **654** cited / 0 uncited) · `db-tz` · `check-case-ids` (**2344**, union == sum) |
@@ -95,7 +95,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > - **A carried-forward COUNT is a reading that expires.** I read the case-id total as "2344 before and
 >   2344 after adding a case" and briefly took the unchanged number as the finding. The 2344 I was
 >   comparing against came from the **avatar branch**, which carried `+13.732`; this branch's base is
->   **2343**. Re-measured by SET DIFFERENCE against `origin/main` (added `13.881`, removed none) rather
+>   **2343**. Re-measured by SET DIFFERENCE against `origin/main` (added `13.883`, removed none) rather
 >   than by count. **Name the revision a number was measured at, or it will be inherited wrongly.**
 > - **A registry-pin test is a real gate, not an obstacle.** Adding the id reddened
 >   `engine.test.ts`'s `REFUSAL_RULES` equality — 22 entries against 23 — which is exactly what that
