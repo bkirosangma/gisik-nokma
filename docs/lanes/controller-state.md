@@ -31,6 +31,37 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## ✅ FRIDAY 2026-09-18 ~19:2x IST — **CYCLE 6: THE ATTENTION STRIP AND THE SETTINGS CLUSTER LAND, AND TWO CONTROL DEFECTS ARE FOUND — ONE BY THINKING, ONE BY RUNNING.** `main` is `99884bc9` + this PR; **zero open PRs**; ledger **301 done / 0 claimed / 7 todo**.
+
+### If you are the DeepSeek controller reading this: your position, in five lines
+1. **`main` = this PR's merge (after `99884bc9`).** Merged this cycle: **`#480`** (attention Part 2, the prototype treatment adopted whole → `c5c8a03f`), **`#478`** (settings-workflows Task 1, the card grid + the zero-CSS family → `f5f8b6dd`), **`#481`** (settings Tasks 2+3 → `99884bc9`).
+2. **EXEC 1** is on **settings Task 4** (`required` end to end: schema → wire → mapper → `FieldsEditor`). **EXEC 2** is on **settings Tasks 7+8** (`isTypes` port, zebra parity, the ticket count). **Both are in `workflow-builder/ticket-types/` — a collision in `Features.md`/`test-cases/13` is LIKELY; it goes back to its author, never to you.**
+3. **ID BLOCKS:** exec 2 `13.890`–`13.919`, exec 1 `13.920`–`13.949`. **Both lanes have now minted from a tip and collided once each — the protocol held and the guard fired.** `check:case-ids` catches a duplicate at merge time; it did, twice.
+4. **THE QUEUE:** settings Tasks **5, 6, 9**, then **`settings-workspace-tab`** (+amendment), **`migration-order-check`**, **`builder-unstyled-families`**. Every older brief's id list stops at `13.879` — **append an amendment, never rewrite a dispatch**.
+5. **Rulings you cannot make:** a ledger STATUS change beyond the flips the position names, a merge with conflicts outside the files named, an executor deviation you cannot measure, a scope question. Write the question to the owner in your pane and HOLD; **never `AskUserQuestion`**.
+
+### THE LESSON OF THIS CYCLE, and it is the strongest one this session produced
+**Two control defects were found today. The first was found by THINKING; the second only by RUNNING. In BOTH cases the forced gate was green — `e2e-stack` is not in the turbo graph, so the gate is structurally blind to this whole class.**
+
+- **F1, found by reading:** `expect(bestSeen).toBeGreaterThan(15)` in `viewport.spec.ts` claimed to prove the non-text sweep's scale reaches high values. **The only two readings above 15 were `17.62` with `border: rgba(0,0,0,1)` — the UA default border on BARE buttons** — and the controller's own dispatch had just told the lane to move those buttons onto `.gn-button` (`border: none`). **The control was resting on a defect.**
+- **F2, found only by running:** the **negative** control two lines earlier — `sweepBorders(page, 25)`, `absurd.below.length > 0` — sweeps **the page the route loop ENDS on**, `/settings/workflows`. Same page, same removed borders. The first fix covered the positive control and **missed this one**; the controller ran the suite the lane could not and caught it. The repair is **ordering**: the planted fixture is a fixed **21:1, below 25**, so planted **ahead of both** controls one fixture satisfies both.
+**Neither threshold was lowered and neither control was deleted, both times.** A control whose value is invisible in the log cannot be audited — **both now print their readings.**
+
+### `View history` — RULED, and the question is the owner's
+Exec 2 measured that the version chain **IS** readable from shipped reads (`builder-reads.ts:517` `?version=`, `data-source.ts:146` `version?: number`, and `data-source-gateway.ts:224` **drops the argument** — all three verified by the controller at the line). On the ruling's own words the button was owed, and it **did not build it**, escalating instead because **the prototype draws no history view** (its handler is a toast, `:3187`).
+**RULED: the button is NOT built; the absence is recorded; the product question goes to the owner.** Two corrections for the record: **the blocking rule is not "a button with no door"** — that rule is about **operations with no gateway method** (`Duplicate`, `Discard draft`); `View history` is **an operation that exists with no DESTINATION**, so the rule that decides it is the oldest one — **do not invent UI the prototype does not draw**. And **the ruling was INCOMPLETE, not violated**: it asked *"is the data readable?"* and never asked *"is there a view to put it in?"* **Say that out loud when an executor departs from your text on your text's own ambiguity.**
+
+### Owner questions — two
+1. **Should workflow version history exist as a product screen at all?** Everything but the screen is served. **A yes is a bounded follow-up with no schema change; a no makes the absence permanent.** Nothing is blocked.
+2. **Should `test-cases/13-deployment-dogfooding.md` become per-task or per-section files?** It has conflicted **four** times today. Raised independently by exec 1, agreed with by the controller. Repo-structure change → the owner's call.
+Queue order (controller is taking the approved default): finish settings→workflows, then second-wave `12`, then the remaining wire-gap screens in the delta audit's order.
+
+### OWED, and deliberately not committed
+**The non-text-contrast roster (`apps/web/e2e-stack/non-text-contrast-roster.json`) does not match `main`.** It was regenerated by a suite run against a container serving a **stale worktree**, so it reflects neither `#478` nor `#480` completely. **It is left alone rather than committed as a measurement nobody can attribute.** One suite run against a stack serving current `main` regenerates it — and the stack mounts a **worktree**, not the repo, so that run needs a window where the worktree *is* `main`.
+
+### Machinery, unchanged and re-earned
+Six checks · the merge tree built locally with `merge-tree --write-tree` predicting it and **the real merge agreeing** · **tree identity exact on every merge** · the partitioned drop check (a branch merely BEHIND `main` shows as differing files — **partition, never interpret**) · **per-file blob identity, run as a positive confirmation and not inferred from the tree match** · `--delete-branch` exits 1 while a worktree holds the branch · ledger flips on `main` only · the executor relaunched at the fixed point **after checking `git log origin/main..<branch>` first**.
+
 ## ✅ FRIDAY 2026-09-18 ~18:0x IST — **CYCLE 5: `#476` MERGED, `#478` SENT BACK ON A CONTROL DEFECT ITS OWN GATE COULD NOT SEE, AND CASE-ID **BLOCKS** ALLOCATED AFTER A SECOND LIVE COLLISION.** `main` is `1d131a68` + this PR; **zero open PRs**; ledger **301 done / 0 claimed / 7 todo**.
 
 ### If you are the DeepSeek controller reading this: your position, in five lines
