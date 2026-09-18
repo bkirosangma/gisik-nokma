@@ -41,7 +41,100 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~07:1x IST. **STEP 4b (THE LEDGER'S 36 `claimed` ROWS,
+> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~07:5x IST. **STEP 5a (THE `hig-per-screen` RESIDUE:
+> # THE MOBILE DEFERRAL SENTENCE · THE STATES-CASES AUDIT FOR `13.301`–`13.315` · THE 7a/8a BORDER
+> # MEASUREMENT) IS DONE, CHECKED, REVIEWED, AND ITS PR IS OPEN AGAINST `owner/workspace-edits`.**
+> # This block is the position. **Everything below it — INCLUDING the Step 4b block that follows
+> # immediately — is RECORD**; the Step 4b PR it describes has since merged as `cbebc189`.
+>
+> Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-step5a-residue.md`. **Only its final line
+> reached this pane** — *"…the 15 verdicts by letter, Part 3's before/after count, and the ledger rows
+> the PR makes true."* The dispatch FILE was then read in full and is the authority; the truncated
+> paste is recorded so a future restart does not read a tail as a brief.
+>
+> | | |
+> |---|---|
+> | branch | `exec/step5a-residue` |
+> | PR | base **`owner/workspace-edits`** (NOT `main` — the dispatch's own base line) |
+> | merge-base | `52eeaf3a` (= `origin/owner/workspace-edits`; an ancestor of `origin/main`) |
+> | `origin/main` at the freeze | `b6071480` (the controller's #432 anchor) |
+> | tree | clean at the frozen head |
+> | gate | `corepack pnpm turbo run build test typecheck --force --concurrency=2` at the frozen head → **33 successful, 33 total, 0 cached**; Node **v22.22.2**, probed from inside the toolchain |
+> | six checks | all **EXIT 0**: `tasks` 306 tasks / 306 rows · `citations` **2084 cited / 0 uncited**, file 13 at **535/0** (was 524 — the 11 new ✅, every one cited) · `case-ids` **2224** (was 2208, = the 16 minted) · `env` · `runbook` (26 refs) · `help` |
+>
+> ## ▣ WHAT LANDED
+>
+> **Part 1 — the mobile deferral.** One bullet added under "What was NOT measured" in
+> `docs/pre-launch-checklist.md`, the sentence the plan's Task 11 prescribes verbatim, owner named as
+> the plan names it (*whoever next touches `apps/mobile` theming*) — **not invented**, because the plan
+> names no person. Requires no code.
+>
+> **Part 2 — the states-cases audit, the reserved block `13.301`–`13.315` resolved.** Fifteen verdicts,
+> **10 (a) pinned / 0 (b) / 5 (c) unwitnessed**, each derived from the plan's OWN sentence and then a
+> sweep of the tests for a witness of THAT sentence. The five ❌ are `13.304` (the plan's sentence is
+> **unsatisfiable** — `getBoard(projectId)` takes no filter, `data-source.ts:134`, so the control cannot
+> toggle the Board's count), `13.306` (nothing asserts the prototype's invented pair is absent),
+> `13.309` (the withheld-name fallback's **title text** is asserted nowhere; the id half is, at
+> `my-work.test.tsx`), `13.314` (no List-vs-Board count test, and the two views can legitimately
+> differ), and **`13.315`, CORRECTED FROM ✅ BY THE REVIEWER** — see below. Plus `13.319` 🚫, the mobile
+> deferral, one line with its reason.
+>
+> **The reviewer round earned its place, and the finding was mine.** `13.315` was first minted ✅ on a
+> "structural warrant" I wrote without reading the line it named — the claim that `board.tsx:415` and
+> `ticket-list.tsx:676` both read `stateCategory`, so the List's chip tone was the Board's by
+> construction. The reviewer read line 415: it is the **column header's** chip, reading
+> `column.category`, and `BoardCardView` (`board.tsx:745-762`) renders no state chip on a card at all —
+> so the plan's comparison half has **no referent**, and the verdict is ❌. The false sentence is quoted
+> and refuted in the catalogue row rather than deleted. **The reviewer also read `13.307` and `13.309`
+> against their sources: 13.309's ❌ upheld; 13.307 kept ✅ with the `<h3>`-vs-`aria-label` absence now
+> enumerated in the row.
+>
+> **`13.307`'s nuance, for the next reader:** its four sections are genuinely witnessed and the plan's
+> own mutation passes, so it is ✅ — but the plan's word is "headings", and the accessible name comes
+> from `aria-label` on `<section role="region">` while the `<h3 className="gn-my-work__heading">` sits
+> beside it. Deleting all four `<h3>`s leaves every assertion green.
+>
+> **Part 3 — the 7a/8a border measurement. The remedy was NOT applied, and that is a deliberate
+> deviation with evidence behind it.** Measured: **5 real border declarations remain across 2 of the
+> seven families** — `.gn-attention` (`border-left: 4px solid var(--gn-pending)`) and `.gn-state-node`
+> plus its three category modifiers — and **all five use `var()` colours, which is exactly why a
+> literal-colour count reads 0 for every family.** They are **not leftovers**: the repo's own committed
+> roster already records the attention border RENDERING at **4.14** (`aside.gn-attention`, border
+> `rgba(178,80,0,1)` = `amber700` = `--gn-pending`, above the 3:1 floor), and `.gn-state-node--selected`
+> (`ui.css:1217-1219`, set by `state-node.tsx:14`) **restates `border-color`** — so "borders → fills"
+> there deletes the selection affordance rather than restyling it.
+>
+> ## ▣ TWO THINGS THE NEXT SESSION MUST NOT RE-DERIVE
+>
+> 1. **The dispatch's base claim is false.** Its line 4 says the base "equals the last landing plus
+>    nothing — `main` is ahead only in controller docs". Measured: `main` is ahead of
+>    `origin/owner/workspace-edits` in **`test-cases/13-deployment-dogfooding.md`** too, by 66 lines —
+>    Step 4b's `13.690`–`13.693` block and the "next free id is `13.694`" pointer — which the dispatch's
+>    own Part 2 instructions reference. Both that file and `docs/lanes/executor-state.md` were
+>    forward-ported from `main` on this branch, checksummed (`shasum -a 256`) against `main`'s blobs
+>    with the pre-forward branch blob as the control. **The ledger and `controller-state.md` were NOT
+>    touched** — the ledger is the controller's (dispatch line 6).
+> 2. **The named instrument cannot run against this stack.** `apps/web/e2e-stack/viewport.spec.ts` is
+>    the ONLY place `sweepBorders` is used (the `e2e-viewport` match is prose). Its `globalSetup` shells
+>    `docker compose exec … server node dist/seed/cli-seed-convenience-corner.js`, and the **hot dev
+>    server container runs from a bind-mounted source tree** (`/repo`, no `dist`) — so the run dies
+>    before any spec with `MODULE_NOT_FOUND`. Fixing that means changing a **shared instrument**, which
+>    is not this task's; rebuilding the container is forbidden (the `.env` rule) and unnecessary.
+>    **Owner: whoever next needs the e2e-stack suite against a hot dev stack.**
+>
+> ## ▣ TOOL HAZARD, REFINED — CARRIES FORWARD FROM STEP 4b
+>
+> The `rtk` `git log` fault below is real and still unfixed. **A second, cheaper trap cost this step
+> four wrong verdicts' worth of risk: an unquoted shell variable holding a path list does NOT
+> word-split under `zsh`, so `grep -rFn PATTERN $PATHS` searches ONE nonexistent path, prints nothing,
+> and writes the error to `/dev/null` — fifteen well-formed empty results that read exactly like
+> "unwitnessed".** It recurred twice in one session, the second time in the re-run. **Use literal paths,
+> and print a positive control from the same run before believing a null.**
+>
+> # ▣ RECORD — STEP 4b. Everything below this line describes a MERGED PR (`cbebc189`). Nothing in it is
+> # outstanding. Do not start work from it.
+>
+> # ▣ (Step 4b's own position block, written 2026-09-18 ~07:1x IST.) **STEP 4b (THE LEDGER'S 36 `claimed` ROWS,
 > # THE `SUPERSEDED` POINTERS, AND FOUR CONTRAST-DEBT CASES) IS DONE, CHECKED, REVIEWED, AND ITS PR IS
 > # OPEN AGAINST `main`.** This block is the position; everything below it is RECORD.
 >

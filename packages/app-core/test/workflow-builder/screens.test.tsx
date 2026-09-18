@@ -136,6 +136,8 @@ describe('WorkflowListScreen', () => {
     expect(await screen.findByText('Simple kanban')).toBeInTheDocument();
     expect(screen.getByText('v7')).toBeInTheDocument();
     expect(screen.getByText('3 states')).toBeInTheDocument();
+    // 13.311 — the per-row open control's aria-label carries THAT row's name;
+    // the expected name is hard-coded, so a lost interpolation cannot pass.
     await user.click(screen.getByRole('button', { name: 'Open Simple kanban' }));
     expect(onOpen).toHaveBeenCalledWith(first.id);
   });
