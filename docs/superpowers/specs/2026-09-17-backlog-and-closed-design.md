@@ -429,7 +429,11 @@ everyone sees the same order.
 - **UI.** The Backlog tab's rows are draggable with the board's own native
   DnD idiom (`dragstart` on the row, `drop` on a row = "place before this
   row", drop on the list's tail zone = "place last"; the dragged id in
-  `dataTransfer`; `useLayoutEffect` registration, as `13.534` taught). A
+  `dataTransfer`; drag props computed per node each render, with the drop
+  handler reading `dataTransfer` and guarding on a `draggableIds` set rather
+  than looking an id up in a possibly-stale map — **NOT the `useLayoutEffect`
+  registration `13.534` taught, which the final whole-branch review measured
+  absent and unnecessary here** (amended 2026-09-18, see Amendments). A
   keyboard alternative on every row — "Move up" / "Move down" buttons
   (`aria-label` "Move <title> up") — so ordering is never pointer-only. The
   row moves optimistically; a refusal snaps it back with the notice. The tab
@@ -1107,3 +1111,43 @@ gap this wave found and chose not to close.
   are HELD, not outstanding.** `docs/lanes/owner-holds.md` §1 lists both as
   deliberately unbuilt and escalated to the owner. A hold is not a gap, and prose that
   reads them as unbuilt scope is describing a decision, not a debt.
+
+### Found by the final whole-branch review, recorded rather than fixed (2026-09-18)
+
+Each names the file it would touch. None is a code deviation from this spec; the first
+is a gap this spec's own §8.2 wording shares, which is why it is recorded here rather
+than patched in the sweep.
+
+- **IMPORTANT — `ticket.workflow_rebound` is invisible to the auto-close clock, in both
+  directions.** The sweep selects `e.type IN ('ticket.created','ticket.transitioned')`
+  (`apps/server/src/auto-close/sweep.ts:176-183`), and the reducer deliberately neither
+  appends to `transitions[]` nor touches `reopened_at` on a rebind
+  (`packages/domain/src/ticket-state.ts:302-316`). A rebind into a DECLARED terminal state
+  of another workflow is accepted by the door (`checks/workflow-rebind.ts:77-124`). So
+  (a) a ticket an admin has just migrated into `Done` inherits its OLD entry time and is
+  auto-closed on the next hourly run, and (b) a ticket carrying `reopened_at` from an
+  earlier reopen keeps it through the rebind and is exempt **forever**
+  (`sweep.ts:187`). Neither is witnessed: `13.635`'s fixture holds no rebound ticket.
+  **Owner: whoever next touches the auto-close sweep** — it is a real product decision
+  (should a migration arm the clock?) before it is a code change, and this spec's own
+  §8.2 sentence names the same `transitions[]` instant, so the answer belongs there.
+- **MINOR — the board's `Close all (N)` accessible name does not contain its visible
+  text.** `packages/app-core/src/views/board.tsx:596` sets
+  `aria-label={`Close all ${n} in ${column.name}`}` while `:599` renders `Close all (N)`,
+  so a voice-control user saying "click Close all (2)" does not match (WCAG 2.5.3, Label
+  in Name). `board-close.test.tsx:301` pins the divergence, so it is deliberate and
+  locked in. Making the visible text `Close all (2) in Done` satisfies both.
+  **Owner: whoever next touches the board's column header.**
+- **MINOR — `precheckTicketRanked` has no caller on the rank path.**
+  `packages/app-core/src/precheck.ts:114` routes `ticket.ranked` to it, but no
+  `precheckEvent` caller reaches it — the rank submit
+  (`apps/web/src/backlog-rank-controls.tsx:115-195`) goes straight to `ingest`. The
+  branch is dead in production; the cost is a missing instant client-side refusal
+  preview, not a correctness hole, since `checkTicketRanked` still refuses at the server
+  door. **Owner: whoever next touches the Backlog rank controls.**
+- **MINOR — the stored rank key has no second door.** The migration adds bare `text`
+  with no CHECK (`migrations/1789200000000_proj-tickets-rank.sql:8-9`), so the
+  no-trailing-zero rule is held by the writer alone. A hand-planted or out-of-band write
+  could store an unorderable key and nothing would notice until it reached
+  `rankBetween`. Bounded: the client's `mapRank` throws on the read path, so the failure
+  is loud rather than silent. **Owner: whoever next opens a migration on `proj_tickets`.**
