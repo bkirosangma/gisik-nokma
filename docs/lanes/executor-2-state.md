@@ -46,13 +46,20 @@ had used the tint for both and its own docblock justified that as *"reusing `.gn
 than inventing a second one"*. That sentence described a divergence, not a decision. **The third nit —
 the subtitle — was left alone: the owner ruled it a deliberate freeze.**
 
-### § 2 — THE GATE, MEASURED AT `38cab5f5` (node v22.22.2, every number)
+### § 2 — THE GATE, MEASURED AT `7685cf17` (node v22.22.2, every number)
+
+**These numbers were re-measured AFTER the rebase, not carried.** `origin/main` moved from `77aa906a` to
+`0f6155b5` (`#491`, executor 1's Task 5b) after this branch was cut, so the branch was **rebased with a
+UNION resolution** — both lanes' catalogue sections survive. **app-core moved 1556 → 1565** because `#491`
+added nine cases; a number measured before a rebase is a reading that expires. `#491` also touched
+`packages/ui/src/ui.css`, which 13.910 reads, so that guard was re-run rather than assumed — and the
+`ui.css` delta contains **zero** `aria-current` or `gn-help__nav-link` lines.
 
 `pnpm turbo run build` EXIT=0 **first** (10 cached, 11 total). Then per package, `vitest run
---maxWorkers=2`: **web 547** (the 534 baseline + the 13 cases this branch adds) · **app-core 1556** ·
+--maxWorkers=2`: **web 547** (the 534 baseline + the 13 cases this branch adds) · **app-core 1565** ·
 **ui 351** · typecheck **17/17 EXIT=0**. All nine repo checks EXIT=0: `check:env` · `check:tasks` ·
 `check:db-tz` · `check:migrations` · `check:runbook` · `check:citations` · `check:help` ·
-`check-case-ids` (**2376** unique ids, zero duplicates) · `check-case-citations` (file 13 **686** cited /
+`check-case-ids` (**2380** unique ids, zero duplicates) · `check-case-citations` (file 13 **690** cited /
 0 uncited). **The forced gate was NOT run** — that is the controller's.
 
 **Three measurements that need their conditions stated, because each is a false green or a false red if
@@ -66,8 +73,18 @@ they are not:**
   with `ERR_PNPM_NO_SCRIPT`, which is **indistinguishable in a log from a real red** — it cost this
   session two phantom reds before the logs were read. Run them as `node scripts/check-case-ids.mjs` and
   `node scripts/check-case-citations.mjs`. **Still owed to the controller**, and now demonstrated again.
-- The handoff commit is docs-only. `git diff --name-only 38cab5f5..HEAD` should list exactly
+- The commits after `7685cf17` are docs-only. `git diff --name-only 7685cf17..HEAD` should list exactly
   `docs/lanes/executor-2-state.md`; if it lists anything else, re-measure.
+
+**Every line anchor was re-verified after the rebase by CONTENT, not by offset**, and all survive:
+`globals.css:1227` `:1235` `:1242-1245` `:333` · `ui.css:3633` · `tokens.ts:1224` `:935-938` ·
+prototype `:808` `:3145` `:2599` `:31` `:59` `:800-1011`. `#491`'s `globals.css` change is at `:150`
+(7 lines → 7, no shift) and an append at `:2684`, both clear of the settings block.
+
+**One more `rtk` instance, recorded because it is the recorded hazard firing again:** `git diff
+77aa906a..origin/main -- apps/web/app/globals.css` printed **no hunks** while `--name-only` listed the
+file. Re-run through `/usr/bin/git`, the same range has two hunks. **A well-formed empty is exactly what
+this trap looks like.**
 
 ### § 3 — THE REVIEW: 0 Critical, 0 Important, 6 Minor — ALL SIX ACTED ON
 
@@ -124,6 +141,7 @@ they did. **Named owner: the controller**, together with the audit row below.
 | `docs/design/prototype-delta-2026-09-18.md:637-647` still reads as two OPEN deltas that this task closes, and its `globals.css:` citations shifted | controller-owned; that document self-declares as an expiring reading ordered to be re-measured, and `#489` set its annotation convention. Rewriting it is not a lane's call. |
 | `check:case-ids` / `check:case-citations` still have no `package.json` alias | **one line each**; the missing alias produces a false red that reads exactly like a real one. Demonstrated again this session. |
 | `docs/design/prototype-delta-2026-09-18.md:666` is still false | carried from the block below; unchanged. |
+| **A peer wrote one line into THIS file** — `#491` changed a citation in an older narrative block from `ticket-type-editor-screen.tsx:178-204` to `:283-309` | not mine to adjudicate. The new range is `onSave`'s submit path, which is plausible for the sentence it sits in, but the string the sentence names (`rank: z.number().int().min(1)`) is at `packages/domain/src/ticket-types.ts:98`, not in that file at all. **Owner: executor 1.** Kept rather than reverted — reverting would undo a peer's correction on my file without knowing its reason, and it is lanes prose, which is frozen. |
 
 ### § 6 — WHAT IS *NOT* COVERED, NAMED RATHER THAN IMPLIED
 
