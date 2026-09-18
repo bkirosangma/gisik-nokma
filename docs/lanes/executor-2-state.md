@@ -22,7 +22,9 @@
 
 ## ▲ TOP BLOCK — SECOND WAVE **TASK 12** (the plan's close-out) DONE. PR open against `main`. (2026-09-18, night)
 
-**Position: PR IS OPEN, base `main`, awaiting the controller's merge.** Branch `exec2/secondwave-closeout`,
+**Position: the work is DONE, the review is RECORDED, and the PR is being opened with `--base main`.**
+**Check `gh pr list --state open` before acting on this line** — if the PR is not there, it was not opened
+and the closing paragraph plus this handoff are complete except for that step. Branch `exec2/secondwave-closeout`,
 cut from `origin/main` `82db1b6f`. Dispatch `CTL-DISPATCH-2026-09-18-secondwave-task12.md`.
 **FIRST ACTION ON A RESTART: `gh pr list --state open`.** If the PR is open it is at the controller's merge;
 **if it has MERGED, this block is history** and the controller's next dispatch is the position.
@@ -38,9 +40,28 @@ cut from `origin/main` `82db1b6f`. Dispatch `CTL-DISPATCH-2026-09-18-secondwave-
 ### § 2 — THE GATE, MEASURED (node v22.22.2, every number)
 
 `pnpm turbo run build --force` EXIT=0 **first**. Then, per package, `vitest run --maxWorkers=2` + its own
-`typecheck`: domain 514 · rule-engine 331 · app-core 1554 · ui 351 · mcp-server 44 · web 534 · server
+`typecheck`: domain 514 · rule-engine 331 · app-core **1556** · ui 351 · mcp-server 44 · web 534 · server
 **1563 passed / 5 skipped** (the baseline). Seven typechecks EXIT=0. **The forced gate was NOT run** —
 that is the controller's.
+
+**These numbers were re-measured at the REBASED head, not carried.** `origin/main` advanced by #488
+(executor 1's `isTypeEditor` Task 5) after this branch was cut, and it touches `Features.md` and
+`test-cases/13`, so the branch was **rebased with a UNION resolution** — both sides' content survives.
+app-core moved 1554 → **1556** because #488 added two cases. A number measured before a rebase is a
+reading that expires.
+
+### § 2b — THE FINAL WHOLE-BRANCH REVIEW: 6 seams PASS, 0 Critical, 1 Important, 4 Minor
+
+One independent reviewer, read-only, over the wave's whole change. Its findings are recorded in the PR body
+and, for the Important one, as a **named-owner follow-on in the spec** rather than patched here — it is an
+under-specification (a `ticket.workflow_rebound` is invisible to the auto-close clock in BOTH directions:
+it can close a freshly-migrated ticket on the next hourly run, and it can exempt a reopened one forever)
+and §8.2's own wording shares the gap. **The one thing it falsified in the spec IS corrected: §8.1's
+`useLayoutEffect` drag claim, which described a mechanism that was never built.**
+
+**Why its findings still bind this head:** 20 of the 21 product files it cites are **byte-identical**
+across the rebase, and the 21st (`packages/ui/src/ui.css`) differs by **45 added / 0 removed** — #488's
+append-at-EOF, which by construction moves no existing line, and the review cites no `ui.css` line.
 
 **One instrument defect, recorded: `--concurrency=1` is NOT a vitest 3.2.7 option.** The first attempt
 gave all seven packages `CACError: Unknown option` and EXIT=1 — seven red packages that were one flag, and
