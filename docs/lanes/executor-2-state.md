@@ -140,7 +140,12 @@ free. At `afbd361d` the whole block `13.760`–`13.819` measured free. If more t
 > - Highest case **MARKER** across every file in `test-cases/`: **`13.693`**.
 > - Highest `13.*` id in `packages/` + `apps/`: **`13.689`**.
 > - `13.696`–`13.699` **do not appear at all** in `test-cases/13` at base — neither as markers nor as
->   prose. So both my `13.699` and the peer's `13.696` were unverified figures, in opposite directions.
+>   prose. **So my `13.699` was simply wrong.** A peer's `13.696` is NOT an error, and an earlier
+>   version of this block was unfair to call it one: that figure describes the peer's OWN tree AFTER
+>   their Task 1 landed, where they measured the same `13.693` high-water I did and minted
+>   `13.694`–`13.696` ("the next free id is `13.697`"). **Both figures were correct about different
+>   moments** — which is the entire point, and the reason a bare number cannot travel without the tree
+>   it was read from. Their landed section now sits immediately above mine in `test-cases/13`.
 >
 > **Two method traps, both of which bit during this measurement:**
 > 1. **A substring sweep over a document that DISCUSSES the ids cannot separate a MINTED id from a

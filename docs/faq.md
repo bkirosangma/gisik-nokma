@@ -136,9 +136,9 @@ No, and this is a nasty one. The invitation shows as **accepted** and **they sta
 warns you and nothing warns them. A wrong answer delivered as a right one.
 
 **Where do I change somebody's role, or take them off?**
-Nowhere on screen. The People page lists everyone and shows each person's role, but that role is
-read-only — no remove, no change role. So you can let people in and see what they are, and you still
-cannot put them out. Combined with
+Nowhere on screen. The People page lists the people you can see and shows each person's role, but that
+role is read-only — no remove, no change role. So you can let people in and see what they are, and you
+still cannot put them out. Combined with
 the promotion problem above, a workspace's people list can drift out of step with reality with no way
 to fix it from the interface.
 

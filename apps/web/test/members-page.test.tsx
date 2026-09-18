@@ -517,9 +517,15 @@ describe('13.762 the monogram draws one capital, and does not repeat it to a scr
     const disc = row?.querySelector('.gn-members__initial');
     expect(disc).not.toBeNull();
     expect(disc).toHaveTextContent('🐧');
-    // Belt and braces, and it names the failure mode rather than trusting it
-    // away: the replacement glyph is what the split actually looked like.
-    expect(disc?.textContent ?? '').not.toContain('�');
+    // NO SECOND ASSERTION HERE, deliberately, and it was tried and REMOVED on
+    // review. A `not.toContain('�')` guard was written here to "name the
+    // failure mode"; it CANNOT FAIL for the mutation it looks like it names.
+    // Measured: the broken helper's `textContent` is the lone surrogate
+    // `"\ud83d"`, which does not contain U+FFFD at all — U+FFFD is what a
+    // BROWSER paints for an unpaired surrogate, not what the string holds. A
+    // guard that cannot fire reads as coverage and is worse than no guard. The
+    // whole-character assertion above is the control, and it is the only one
+    // that fires (mutation-verified: 2 failed / 21 passed).
   });
 
   /**
