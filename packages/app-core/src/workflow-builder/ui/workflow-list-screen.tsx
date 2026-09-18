@@ -46,7 +46,7 @@ import { ReadOnlyBanner } from './read-only-banner.js';
  * boundary disappears. That is a known family here and NOT a hypothetical: it is
  * the same defect fixed on `.gn-avatar` the same day, and the fix is the one
  * `.ticket-type-list__badge` already ships — keep the fill, add
- * `--gn-shadow-sunken-compact` under `[data-style="neo"]`. Case **13.884**
+ * `--gn-shadow-sunken-compact` under `[data-style="neo"]`. Case **13.920**
  * measures that boundary, because a rule that sets a colour is not a boundary
  * that reads.
  *

@@ -1413,7 +1413,7 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
 
 /**
  * The settings → workflows card grid's state chip and its category bar. Case
- * **13.884** (`test-cases/13-deployment-dogfooding.md`).
+ * **13.920** (`test-cases/13-deployment-dogfooding.md`).
  *
  * TWO MEASUREMENTS, and they are two because the chip and the bar answer
  * different questions.
@@ -1440,7 +1440,7 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
  * The roles are read OUT of `ui.css`, not named here, for the reason 13.732
  * gives: a case that hard-codes the role stays green through a repoint.
  */
-describe('13.884 — a workflow state chip keeps a boundary under neo, and its category bar clears 3:1 on the chip', () => {
+describe('13.920 — a workflow state chip keeps a boundary under neo, and its category bar clears 3:1 on the chip', () => {
   /** `src` over `dst` — the compositing `relativeLuminance` deliberately lacks. */
   const over = (src: string, dst: string): string => {
     const hex = (h: string, i: number): number => Number.parseInt(h.slice(i, i + 2), 16);

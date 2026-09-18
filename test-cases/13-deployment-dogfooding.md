@@ -11525,7 +11525,7 @@ sweep — each re-measured by the reviewer at the line it names, on copies, with
   reporter surfaced that as `total=7 passed=7 failed=0` with the broken file simply absent from the
   assertion list. **A mutation result of `failed=0` is not evidence unless the total equals the full
   suite's count**; the suite-level failure is in `testResults[].message`, not in `assertionResults`.
-## settings → workflows: the card grid, and a CSS family that did not exist (executor 1, 2026-09-18) — case `13.884`
+## settings → workflows: the card grid, and a CSS family that did not exist (executor 1, 2026-09-18) — case `13.920`
 
 Slice 1 of the `isWorkflows` port (`docs/superpowers/plans/…`, dispatch
 `CTL-DISPATCH-2026-09-18-settings-workflows.md`). The prototype block is
@@ -11541,7 +11541,7 @@ every `*.css` in the repo held exactly **one** `workflow-list` occurrence and it
 `.gn-button--primary`. The audit established the absence with a control — the same sweep finds 31
 `.ticket-type-list__` rules — so the instrument reaches CSS and this family was simply not in it.
 
-- ✅ **13.884 — the workflow card grid, its state chips and category bars, and the two absences the
+- ✅ **13.920 — the workflow card grid, its state chips and category bars, and the two absences the
   prototype draws and this product cannot back.** Two halves, in two files, split the way every styling
   case in this repo splits: `packages/app-core/test/workflow-builder/screens.test.tsx:165` proves the
   COMPONENT applies the classes, and `packages/ui/test/tokens.test.ts:1443` proves the classes DRAW

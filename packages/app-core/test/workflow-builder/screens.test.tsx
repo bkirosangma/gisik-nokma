@@ -150,7 +150,7 @@ describe('WorkflowListScreen', () => {
   });
 
   /**
-   * 13.884 — the card grid, the state chips and their category bars, and the
+   * 13.920 — the card grid, the state chips and their category bars, and the
    * TWO ABSENCES the prototype draws and this product cannot back.
    *
    * The bars are asserted by CLASS and the classes are asserted to carry the
@@ -162,7 +162,7 @@ describe('WorkflowListScreen', () => {
    * styling case in this repo uses: this file proves the component applies the
    * class, that file proves the class draws something).
    */
-  it('13.884 draws a card per workflow with a bar per state category, and invents neither absent element', async () => {
+  it('13.920 draws a card per workflow with a bar per state category, and invents neither absent element', async () => {
     const first = cloneTemplate(kanban);
     render(
       <WorkflowListScreen

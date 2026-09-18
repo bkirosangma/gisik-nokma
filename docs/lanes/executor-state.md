@@ -49,8 +49,8 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > |---|---|
 > | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it. Chain: `d8ccbf2e` (code) → 3 handoff commits → `00e8e3d8` (fix round) → `1fbc133b` (handoff) → **`e911a8f3` (review round)** → this commit. |
 > | base | merge-base with `origin/main` = **`a12c4018`**. **`main` has since moved to `21cdaa81` (#477), whose two commits touch only `docs/superpowers/plans/2026-09-18-settings-workflows-port.md` — a file this branch does not touch, so 0 overlap and no rebase was needed.** No rebase was done deliberately: it would move the frozen head away from the one the checks and the reviewer pass cover. |
-> | the change | 7 files. `workflow-list-screen.tsx` (the card grid), `ui.css` (the new `workflow-list__*` family, appended at EOF), `screens.test.tsx` (10.62 + case **13.884**), `tokens.test.ts` (13.884's measured half), `test-cases/13`, `Features.md`, this file. |
-> | case ids | **`13.884`**; `13.883` verified TAKEN on `main` (5 mentions). |
+> | the change | 7 files. `workflow-list-screen.tsx` (the card grid), `ui.css` (the new `workflow-list__*` family, appended at EOF), `screens.test.tsx` (10.62 + case **13.920**), `tokens.test.ts` (13.920's measured half), `test-cases/13`, `Features.md`, this file. |
+> | case ids | **`13.920`**; `13.883` verified TAKEN on `main` (5 mentions). |
 > | migration | **NONE.** Do not restart the server container. |
 > | suites | **app-core 1550/0** (94 files) · **ui 330/0** (5 files) · **web 520/0** (48 files) · **four typechecks EXIT 0, all logs 0 bytes**. Node v22.22.2. Run with `rtk proxy pnpm exec vitest run` (see the method note below). |
 > | seven checks | **all EXIT 0**: `tasks` · `env` · `runbook` · `help` · `citations` (file 13 = **658** cited / 0 uncited) · `db-tz` (**`DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma`** → `Asia/Kolkata`) · `check-case-ids` (**2348**, union == sum). |
@@ -69,7 +69,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | F3 | Important | **my own fix round's one-line insert shifted the three `ui.css` citations it had just corrected**, plus its own range | **fixed** — 4384 / 4394 / 4406-4408 / 4356-4410 |
 > | F1 | Important | **this change removes the non-text-contrast sweep's only reading above 15** | **recorded, RAISED, NOT fixed** |
 > | F4 | Minor | the mutation-restore SHA-256 is a fact about the revision it was measured at | **fixed** — the sentence now says so and gives the tip's hash |
-> | F5 | Minor | 13.884's title claims "a card per workflow" but nothing counted cards | **fixed** — the case now counts them |
+> | F5 | Minor | 13.920's title claims "a card per workflow" but nothing counted cards | **fixed** — the case now counts them |
 > | F6 | Minor | both absence guards were class-shaped, so a badge renamed `.gn-chip` or a second action as `<a className="gn-button">` would pass | **fixed** — both now checked by CONTENT and TAG as well |
 > | F7 | Minor | `.workflow-list__title` is 1rem where the prototype is 20px/25px — an unrecorded divergence | **recorded** in the catalogue as a named divergence, not changed |
 >
@@ -166,8 +166,8 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > |---|---|
 > | branch | `exec/settings-workflows`, merge-base with `origin/main` = **`a12c4018`**, **0 behind / 2 ahead**, **tree CLEAN**. Not pushed when this block was written; the PR opens ON the commit that carries it. |
 > | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it. |
-> | the change | 7 files: `workflow-list-screen.tsx` (the card grid), `ui.css` (the new `workflow-list__*` family, **appended at EOF**), `screens.test.tsx` (10.62 updated + case **13.884**), `tokens.test.ts` (13.884's measured half), `test-cases/13`, `Features.md`, this file |
-> | case ids | **`13.884`**. The dispatch said "next free `13.883`" — **that expired twice over**: this lane took `13.883` in **#473**, and main still carries it (**measured at `a12c4018`: 5 mentions**). Recounted by MARKER at this tip. |
+> | the change | 7 files: `workflow-list-screen.tsx` (the card grid), `ui.css` (the new `workflow-list__*` family, **appended at EOF**), `screens.test.tsx` (10.62 updated + case **13.920**), `tokens.test.ts` (13.920's measured half), `test-cases/13`, `Features.md`, this file |
+> | case ids | **`13.920`**. The dispatch said "next free `13.883`" — **that expired twice over**: this lane took `13.883` in **#473**, and main still carries it (**measured at `a12c4018`: 5 mentions**). Recounted by MARKER at this tip. |
 > | migration | **NONE.** Do not restart the server container. |
 > | suites | **app-core 1550/0** (94 files) · **ui 330/0** (5 files) · **web 520/0** (48 files) · **four typechecks EXIT 0, all logs 0 bytes** (`app-core` + `ui` `tsconfig.typecheck.json`, `web` `tsconfig.json` + `tsconfig.e2e.json`). Node v22.22.2. Run via `rtk proxy pnpm exec vitest run` — **the bare form is swallowed by the RTK vitest parser** (`[RTK:PASSTHROUGH] … All parsing tiers failed`), which returns a well-formed red with no test output. |
 > | seven checks | **all EXIT 0 at `09354fc7`**: `tasks` · `env` · `runbook` · `help` · `citations` (file 13 = **658** cited / 0 uncited) · `db-tz` (**`DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma`** → `Asia/Kolkata`; it exits **1** without it, by design) · `check-case-ids` (**2348**, union == sum, highest 15.34) |
@@ -250,8 +250,8 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | | |
 > |---|---|
 > | branch | `exec/settings-workflows`, cut from `origin/main` = `b14d3b9b`; **not rebased since**, and `main` had not moved at the time of writing. Re-measure before the PR. |
-> | the change | 6 files: `workflow-list-screen.tsx` (the card grid), `ui.css` (the new `workflow-list__*` family, **appended at EOF**), `screens.test.tsx` (10.62 updated + case **13.884**), `tokens.test.ts` (13.884's measured half), `test-cases/13`, `Features.md` |
-> | case ids | **`13.884`**. The dispatch said "next free `13.883`" — **that expired**: this lane took `13.883` in **#473** an hour later, so 13.884 was taken and the collision the previous task recorded was avoided by one. |
+> | the change | 6 files: `workflow-list-screen.tsx` (the card grid), `ui.css` (the new `workflow-list__*` family, **appended at EOF**), `screens.test.tsx` (10.62 updated + case **13.920**), `tokens.test.ts` (13.920's measured half), `test-cases/13`, `Features.md` |
+> | case ids | **`13.920`**. The dispatch said "next free `13.883`" — **that expired**: this lane took `13.883` in **#473** an hour later, so 13.920 was taken and the collision the previous task recorded was avoided by one. |
 > | migration | **NONE.** Do not restart the server container. |
 > | suites | **app-core 1550/0** (+1) · **ui 330/0** (+2) · **web 520/0** · app-core, ui and web typechecks 0. Node v22.22.2. |
 > | seven checks | **all EXIT 0**: `tasks` · `env` · `runbook` · `help` · `citations` (file 13 = **657** cited / 0 uncited) · `db-tz` · `check-case-ids` (**2347**, union == sum) |
