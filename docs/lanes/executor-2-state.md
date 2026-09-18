@@ -20,7 +20,121 @@
 
 ---
 
-## ▲ TOP BLOCK — the builder-unstyled-families dispatch is REFUTED at its base. **HOLDING for a ruling; no product code written.** (2026-09-18, night)
+## ▲ TOP BLOCK — `scripts/check-migration-order.mjs` BUILT. PR open against `main`. (2026-09-18, night)
+
+**Position: PR #487 IS OPEN, base `main`, MERGEABLE, awaiting the controller's merge.** Branch
+`exec2/migration-order-check`, cut from `origin/main` `2c62c01a`. Dispatch
+`CTL-DISPATCH-2026-09-18-migration-order-check.md` (owner ruling: *"build scripts/check-migration-order.mjs:
+yes"*). **FIRST ACTION ON A RESTART: `gh pr list --state open`.** If #487 is open it is at the controller's
+merge; **if it has MERGED, this block is history** and the controller's next dispatch is the position.
+
+### § 1 — WHAT SHIPPED
+
+| artefact | what |
+|---|---|
+| `scripts/check-migration-order.mjs` | the check + its own planted-defect self-test |
+| `scripts/check-migration-order.d.mts` | sibling declarations, so a test can import it (the repo's existing idiom) |
+| `apps/server/test/tooling/check-migration-order.test.ts` | 5 cases, `13.902`–`13.906`, in the normal test graph |
+| `package.json` | `check:migrations` |
+| `.github/workflows/ci.yml` | its own `check-migrations` job, `fetch-depth: 0` |
+| `Features.md` §13 | one `⚙️` bullet |
+| `test-cases/13-deployment-dogfooding.md` | the four cases + the incident record |
+
+### § 2 — THE RULE, AND WHY THE BASELINE IS THE BASE REF'S TIP
+
+A migration present now and absent from the base ref must carry a numeric prefix **strictly above the
+base ref's highest**. The incident is real and is in this repo's history: PR #459 added
+`1789300000000_proj-tickets-reopened-at.sql` while `1789400000000_workspace-settings-auto-close.sql` was
+already on main; commit `73c40ea3` renamed it to `1789500000000` and its own subject says why.
+
+**The baseline is `origin/main`'s TIP, not the merge base — deliberately.** The merge base cannot see the
+case that actually broke the stack: main gains a higher-numbered migration while a branch is open. That
+branch is above its own merge base and below the tip.
+
+### § 3 — THE FALSIFIABILITY PROOF (run on the REAL trees, not fixtures)
+
+`checkMigrationOrder` over the migrations directory at PR #459's fork point (`36ec6ae3`, base max
+`1789400000000`) vs the branch tip (`dc7be7d3`): **EXIT=1**, naming
+`1789300000000_proj-tickets-reopened-at.sql`. Same comparison vs `73c40ea3`: **EXIT=0**. Red before the
+fix, green after. Also run end-to-end through the shipped script: a real out-of-order file planted in
+`apps/server/migrations/`, refused naming the offender and the ceiling, then removed and re-run green.
+
+### § 4 — MUTATIONS, EACH KILLED AT ITS OWN SITE
+
+Disabling the 17-digit branch → `13.903`+`13.905`. Dropping the `^\..*` reader filter → `13.903`+`13.904`.
+Weakening `>` to `>=` → `13.903` alone. Restored byte-identically at sha256
+`0543ba334e4223b4d627739d4f5d52f9e4d851d8cf863dae41927342d348f055`.
+
+**One self-test fixture was WRONG and the run said so**: a prefix EQUAL to the base's highest trips two
+independent rules (duplicate + not-strictly-above), so the expected count is 2 for that case and is
+written per-case. The check was right; the fixture was corrected, not the check.
+
+### § 4b — THE REVIEW ROUND. ONE CRITICAL, ONE IMPORTANT, THREE MINOR — ALL FIXED.
+
+An independent reviewer ran at `4149ef4c` and re-derived every number rather than adopting it.
+
+1. **CRITICAL — the new CI job was not in `gate`'s `needs`.** A violating PR would have produced
+   `check-migrations: failure` *and* `gate: success`, and `gate` is the one name the auto-merge
+   precondition reads. My own comment claimed it ran "on the same terms as `check-tasks`", **which is in
+   that list** — the claim was false as written. Fixed; verified by parsing the YAML (`gate.needs` now
+   carries `check-migrations`).
+2. **IMPORTANT — a stacked branch was a real false accept.** Compared against `origin/main`, a migration
+   its own base already outranks is accepted, and both merge into the same out-of-order set.
+   **Reproduced in a scratch repo: the same tree gives `EXIT 0` against the parent's base and `EXIT 1`
+   against the parent branch.** CI now passes `--base origin/${{ github.base_ref || 'main' }}`. 14 of
+   the last 400 merges here were based on a non-main branch.
+3. **MINOR — `numericPrefix` diverged from the runner for a non-`\d+` prefix** (`1e99_sci.sql`): the
+   mirror returned 0 and REFUSED what the runner runs last. Now `Number(raw) || 0`, exactly the runner's
+   line, and the docblock's false claim of an exact mirror is corrected.
+4. **MINOR — `materializeRef` used `git ls-tree -r`** while the reader skips directories: a baseline
+   holding a subdirectory drew an uncaught ENOENT, and the `=== 0` guard was unreachable because
+   `ls-tree <ref>:<path>` exits 128 first. Both fixed; a missing path now prints the designed refusal
+   (verified: `EXIT 1` with git's own message) and a subdirectory baseline no longer crashes (verified:
+   `EXIT 0`).
+5. **MINOR — the reader's SORT is not load-bearing**, though my docblock presented it as the rottable
+   half. The FILTER is; the sort only mirrors the runner's order and is witnessed by the test suite, not
+   by the self-test. Docblock corrected to say exactly that.
+
+**The review also refuted itself once**, which is worth recording: it hypothesised `checkOrder` never
+fires (the repo passes no `--check-order`), then measured at the runner boundary —
+`bin/node-pg-migrate.js:422` is `CHECK_ORDER ??= true`, the `[default: true]` being help-only — and
+withdrew. **The premise this check rests on is confirmed at the runner, not at the parser.**
+
+**No second reviewer was dispatched.** The brief makes a scoped re-review conditional on a fix
+over-reaching its scope; every fix landed inside the reviewed subject, and each was verified by
+measurement (above) rather than by re-reading the diff.
+
+### § 5 — ⚠ ID-BLOCK COLLISION — MEASURED, REPORTED, NOT SILENTLY RENUMBERED
+
+The controller granted `13.890`–`13.919` and the dispatch said "next free `13.881`". **Both were stale.**
+Measured by case MARKER only, `13.890`–`13.901` are ALREADY MINTED in
+`test-cases/13-deployment-dogfooding.md`. **I used `13.902`–`13.906`** — inside the granted block, above
+the real high-water mark. This is the `shared-id-space-needs-blocks` recurrence's fourth appearance; the
+controller's own grant was the stale reading. **A bare number is a reading that expires.**
+
+### § 6 — TODAY'S DIRECTORY PASSES, MEASURED NOT ASSUMED
+
+27 files, all unique 13-digit prefixes, sorted order == numeric order, highest `1789500000000`,
+`0 new against origin/main`. **No pre-existing violation, and none waived** — the check has no skip list.
+
+### § 7 — CHECKS AT THIS HEAD (node v22.22.2 — a gate result names its Node)
+
+`check:env` 0 · `check:tasks` 0 · `check:db-tz` 0 · `check:runbook` 0 · `check:citations` 0 · `check:help` 0
+· **`check:migrations` 0** (new) · `node scripts/check-case-ids.mjs` 0 (2370 unique ids).
+`turbo run build` 11/11 · `turbo run typecheck` 17/17 · **server suite 153 files, 1563 passed, 5 skipped**.
+**The forced gate was NOT run** — the controller runs it.
+
+### § 8 — OPEN ITEMS
+
+| item | owner |
+|---|---|
+| `check:case-ids` still has no pnpm alias; `pnpm run check:case-ids` exits 1 with `ERR_PNPM_NO_SCRIPT`, indistinguishable in a log from a real red | **the controller** (one line in `package.json`) |
+| `docs/design/prototype-delta-2026-09-18.md:666` is still false (the previous block's finding) | **the controller** |
+| The four genuinely-unstyled families stay unstyled — controller ruling, 2026-09-18 | nobody; closed |
+
+---
+
+## ▼ SUPERSEDED TOP BLOCK — the builder-unstyled-families dispatch is REFUTED at its base. **RULING UPHELD; no product code written.** (2026-09-18, night)
 
 **Position: branch `exec2/builder-families-stale-premise`, cut from `origin/main` `4505cb6d`, one docs commit,
 no PR opened as a task.** Dispatch `CTL-DISPATCH-2026-09-18-builder-unstyled-families.md`. Full report:
@@ -94,7 +208,7 @@ reads exactly like a real one. Recording, not fixing. **Owner: the controller.**
 | Ruling: close this dispatch as already-delivered, and re-scope to the four families above (which needs its own ruling on inventing a treatment) | **the controller** |
 | `docs/design/prototype-delta-2026-09-18.md:666` is now FALSE and keeps spawning dispatches for finished work | **the controller** — deliberately NOT edited by me |
 | `check:case-ids` has no `package.json` alias, so `pnpm run check:case-ids` is a false red; one-line fix | **the controller** — deliberately NOT fixed by me |
-| Next free case id at this tip: **`13.902`** (`13.890`–`13.893`, `13.894`, `13.895`–`13.901`, `13.920`, `13.921` are spent; block `13.890`–`13.919` is NOT free from `13.894` on, as `ui.css`'s neighbour note claims) | whoever mints next |
+| Next free case id at this tip: **`13.907`** — `13.890`–`13.906` are all spent in `test-cases/13-deployment-dogfooding.md` (`13.902`–`13.906` by this branch) and the highest `13.*` anywhere is `13.920`. **Measured by case MARKER only.** The stale `13.902` this row used to carry was itself the fourth appearance of the shared-id-space collision — a number is a reading that expires, a block is the only form that stays true. | whoever mints next |
 
 ---
 

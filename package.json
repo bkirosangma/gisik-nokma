@@ -12,6 +12,7 @@
     "check:env": "node scripts/check-env-example.mjs",
     "check:tasks": "node scripts/check-task-ledger.mjs",
     "check:db-tz": "node scripts/check-db-timezone.mjs",
+    "check:migrations": "node scripts/check-migration-order.mjs",
     "test:e2e:stack": "pnpm --filter @gisik-nokma/web run test:e2e:stack",
     "dev:stack": "docker compose --env-file .env -f docker-compose.dev.yml -f docker-compose.hot.yml up -d server web",
     "check:runbook": "node scripts/check-runbook-commands.mjs",

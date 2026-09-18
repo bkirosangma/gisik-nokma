@@ -273,6 +273,48 @@ jobs:
           # improvement, not a requirement.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # ITS OWN JOB, on the same terms as `check-tasks` just above: it needs real
+  # git history AND a resolved base ref, which no other job here does.
+  #
+  # The hazard it guards is the one class of migration defect that every other
+  # gate is structurally blind to. A migration numbered below one already
+  # applied can never run -- node-pg-migrate's `checkOrder` refuses it as
+  # "preceding already run migration" -- but a FRESH database applies every
+  # migration cleanly in numerical order, so the full server suite passes on
+  # the broken tree. Measured, not reasoned: PR #459 added
+  # `1789300000000_proj-tickets-reopened-at.sql` while `1789400000000` was
+  # already on main, 1,548 tests stayed green, and the running stack went down
+  # until commit 73c40ea3 renamed it.
+  #
+  # `fetch-depth: 0` is required and is not incidental: the check compares
+  # today's migrations directory against the base ref's, and a shallow clone
+  # has no base ref to compare against. It FAILS LOUDLY rather than passing
+  # vacuously when the ref cannot be resolved, which is the whole reason the
+  # baseline is refetchable rather than assumed.
+  #
+  # THE BASE IS THE PULL REQUEST'S OWN, NOT `main` -- found by review, and the
+  # difference is a real false accept rather than a nicety. Measured in a
+  # scratch repo: a branch whose base adds `1790000000000` and which itself adds
+  # `1789600000000` is ACCEPTED against `origin/main` (max `1789500000000`) and
+  # REFUSED against its actual base. When both merge, the file set holds
+  # `1789600000000` while the applied list already holds `1790000000000`, so
+  # checkOrder throws at container start -- the exact outage this job exists to
+  # prevent. 14 of the last 400 merges here were based on a non-main branch, so
+  # the shape is used in this repo, not hypothetical. `github.base_ref` is set
+  # only for `pull_request`; on a `push` to main the fallback is the same ref
+  # being pushed, where the comparison is correctly empty.
+  check-migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: no migration may be numbered below one already on the base ref
+        run: node scripts/check-migration-order.mjs --base origin/${{ github.base_ref || 'main' }}
+
   # Builds every package once and persists turbo's cache for the jobs below.
   #
   # THE SAFETY PROPERTY THAT MAKES THIS OK, carried over unchanged: the
@@ -532,7 +574,7 @@ jobs:
   gate:
     if: always()
     needs:
-      [scope, check-env, check-runbook, check-citations, check-help, check-tasks, build, typecheck, server-tests, other-tests, e2e]
+      [scope, check-env, check-runbook, check-citations, check-help, check-tasks, check-migrations, build, typecheck, server-tests, other-tests, e2e]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-node@v4
