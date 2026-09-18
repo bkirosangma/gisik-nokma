@@ -4341,13 +4341,14 @@
    APPENDED AT THE END OF THE FILE rather than beside `.ticket-type-list__*`,
    where a reader would look for it, and the placement is PRICED rather than
    lazy: inserting a block this size at that point shifts every `ui.css:NNN`
-   citation below it, and 46 of the repo's 135 name a line past it. The two
-   families already sit 300 lines apart in this file, so the locality given up
-   is small and the citations kept are not. Move it if you are also prepared to
+   citation below it, and 45 of the repo's 134 name a line past it. The two
+   families sit 2,524 lines apart in this file — `.ticket-type-list__*`'s rules
+   at `:1740-1832`, this family's at `:4356-4409` — so the locality given up is
+   small and the citations kept are not. Move it if you are also prepared to
    sweep the citations.
 
    The chip fill is `--gn-surface-sunken`, which is the prototype's `--trayBg`
-   (`:3185`) on the product's role layer — and under `neo` that role is the SAME
+   (`:3184`) on the product's role layer — and under `neo` that role is the SAME
    hex as the `.gn-card` behind it, so the chip's only boundary would vanish.
    That is not hypothetical: it is the `.gn-avatar` defect fixed the same day,
    one screen over. The remedy is the one `.ticket-type-list__badge` already
@@ -4379,7 +4380,7 @@
 .workflow-list__states { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; }
 /* `position: relative` is the bar's containing block; the 0.8125rem left padding
    clears the 4px bar plus its own inset, which is the prototype's
-   `padding:3px 9px 3px 13px` (`:3185`) with the bar's width folded out. */
+   `padding:3px 9px 3px 13px` (`:3184`) with the bar's width folded out. */
 .workflow-list__state {
   position: relative;
   display: inline-flex;

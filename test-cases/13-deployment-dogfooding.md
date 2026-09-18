@@ -11558,7 +11558,7 @@ every `*.css` in the repo held exactly **one** `workflow-list` occurrence and it
   this repo keeps re-finding, so their absence is pinned in the test rather than left to the docblock.
 
   **The measurement half, and it is the same defect as the avatar's, one screen over.** The prototype
-  fills a chip with `--trayBg` (`:3185`) — `--gn-surface-sunken` here — and under `neo` that role is the
+  fills a chip with `--trayBg` (`:3184`) — `--gn-surface-sunken` here — and under `neo` that role is the
   SAME hex as the `.gn-card` behind it, so the chip composites to exactly the card's colour. Asserted as
   a fact about the palette (`toBe(card)`, both themes) with a **control** that under `hig`/`minimal` the
   two roles genuinely differ — so the claim is about `neo` rather than about the palette. That equality

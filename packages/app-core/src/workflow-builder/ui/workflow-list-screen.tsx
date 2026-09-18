@@ -39,7 +39,7 @@ import { ReadOnlyBanner } from './read-only-banner.js';
  *
  * ## The chip's fill is a DEPTH problem, not a colour choice
  *
- * The prototype fills a state chip with `--trayBg` (`:3185`), which maps to
+ * The prototype fills a state chip with `--trayBg` (`:3184`), which maps to
  * `--gn-surface-sunken`. Under `neo` — the shipped default — `surface`,
  * `surfaceRaised` and `surfaceSunken` are the SAME hex, so a chip filled with it
  * on a `.gn-card` is the same colour as the card behind it and the chip's only

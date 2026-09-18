@@ -1427,7 +1427,7 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
  * the same reasoning case 13.732 records for the avatar.
  *
  * **The chip's fill is a depth problem, and the measurement is what says so.**
- * The prototype fills a state chip with `--trayBg` (`desktop.dc.html:3185`),
+ * The prototype fills a state chip with `--trayBg` (`desktop.dc.html:3184`),
  * which is `--gn-surface-sunken` on this product's role layer — and under `neo`
  * `surface`, `surfaceRaised` and `surfaceSunken` are the SAME hex, so a chip on a
  * `.gn-card` composites to exactly the card's own colour and its fill draws no
