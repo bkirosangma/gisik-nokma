@@ -40,7 +40,7 @@ controller's next dispatch is the position.**
 | code head | **`20706a19`** — the FIX round, which is what ships. A block cannot name the commit that carries it: the HANDOFF commit sits above, so `rev-parse HEAD` at the tip is NOT the code head |
 | `origin/main` at recount | **`fa1c7242`** — moved while this branch was in flight (`#484`, a docs-only plan correction, **zero file overlap** with this change's 12) |
 | branch commits | **2** above `origin/main` |
-| files | **12** — count with `/usr/bin/git diff --name-only origin/main...HEAD`, **three dots** |
+| files | **13** — count with `/usr/bin/git diff --name-only origin/main...HEAD`, **three dots**. This row said **12** until the correction commit: the count was taken BEFORE the handoff commit added itself as the 13th file, which is the "a count is a reading, and a reading expires" trap. 12 is correct **about the code head `20706a19`**; 13 is correct about the branch tip. |
 | case ids | **`13.895`–`13.901`** — recounted AT THE TIP **by case MARKER only**; `13.895`–`13.918` were free repo-wide before minting, and 13.890–13.894 were spent by `#480`/`#482` |
 | tree | clean; pushed; `docker compose` NOT run; :3001 and :3021 NOT bound |
 
