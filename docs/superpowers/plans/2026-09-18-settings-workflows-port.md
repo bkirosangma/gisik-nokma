@@ -20,32 +20,43 @@ the one already taken rather than making a new one.
 
 ---
 
-## ⛔ READ THIS FIRST — FOUR HEADINGS BELOW ARE **HELD**, AND THIS PLAN DISPATCHED THEM IN ERROR
+## ✅ THE HOLD IS LIFTED — the owner answered all four headings on 2026-09-19
 
-`docs/lanes/owner-holds.md` **§1** holds the wire-gap screens, and in this cluster that is
-**`isTypes` | reorder and per-type counts** and **`isWorkflows` | a badge and a second action**. The
-register's own words: *"The owner did not pick any of them. **Do not dispatch one**, and do not treat 'the
-owner named a different wire-gap' as a precedent for the rest."*
+`docs/lanes/owner-holds.md` §1 held four items in this cluster. **The owner has now answered every one, row
+by row**, and the register records each ruling. **Three are approved to build; one is dropped.**
 
-**The controller wrote this plan and dispatched those tasks anyway**, then put them to the owner as
-"defaults" **without saying they were held**. An executor caught it, refused the held work, and flagged it
-in its PR title. **That is the correct behaviour and it is the reason this box exists.**
-
-| heading | held item | status |
+| heading | owner's answer | what it means |
 |---|---|---|
-| **Task 2** — the status badge | `isWorkflows`: *a badge* | **HELD — not built.** The ruling below ("drop it") happens to agree, but the item stays held until the owner names it |
-| **Task 3** — the second action | `isWorkflows`: *a second action* | **HELD — not built** |
-| **Task 7** — the ↑/↓ reorder buttons | `isTypes`: *reorder* | **HELD — not built.** The rest of Task 7 (zebra, strings, no Edit button) **shipped** in `#482` |
-| **Task 8** — the `"N tickets"` count | `isTypes`: *per-type counts* | **HELD — not built.** The `"Draft"` badge is separately ruled not-a-state; also not built |
+| **Task 2** — the `isWorkflows` status badge | **drop it** | **BUILD NOTHING.** Record it as a **named absence** in the docblock — not as an outstanding gap. The read serves only published workflows, so a field holding one value would be a badge that lies by omission |
+| **Task 3** — the `isWorkflows` second action | **yes** | **BUILD IT**, and **it is ONE decision with the version-history screen** — see the box below |
+| **Task 6 + 7** — the `isTypes` ↑/↓ reorder (wire + buttons) | **yes** | **BUILD BOTH.** `rank` already exists on `TicketTypeDef` and `rank.ts` computes the hierarchy implications, so expect **a route and a gateway method over data that already exists**, not a new concept |
+| **Task 8** — the `isTypes` `"N tickets"` count | **yes** | **BUILD IT, and it needs NEW server surface.** The only population read is pinned to one workflow (`WHERE workspace_id = $1 AND type_id = $2 AND workflow_id = $3`, `builder-reads.ts:408-414`) and the screen itself records that using it here prints a **wrong** number. The `"Draft"` badge stays a **named absence** — that half was separately ruled not-a-state |
 
-**Escalated to the owner by name** (`gisik-nokma-lanes/OWNER-QUESTION-2026-09-18-held-wire-gaps.md`), with
-one measurement passed on and explicitly marked as NOT lifting the hold: for the **reorder**, `rank` already
-exists on `TicketTypeDef` and `rank.ts` already computes the hierarchy implications, so it may be **a route
-over data that already exists** rather than new server surface — while the **count** genuinely needs server
-work, because the only population read is pinned to one workflow (`builder-reads.ts:408-414`).
+### ⚠ THE VERSION-HISTORY DECISION, in full, because it is the first of its kind here
 
-**Do not build any of the four until the owner names them.** Tasks **5, 6 and 9** are unaffected: Task 6 is
-the reorder's WIRE and is therefore held with Task 7; Tasks 5 and 9 proceed.
+The owner's **yes** covers **Task 3 (the second action) and the version-history screen as ONE task.** The
+measurement, verified at three lines:
+
+| | |
+|---|---|
+| the route takes it | `builder-reads.ts` — `version?: string` on `/v1/workspaces/:workspaceId/workflows/:workflowId` |
+| the query takes it | `packages/app-core/src/data-source.ts:146` — `getWorkflowDef(workspaceId, workflowId, version?: number)` |
+| the web adapter **drops it** | `apps/web/src/authoring/data-source-gateway.ts:224` — `getWorkflow: (workspaceId, workflowId) => …getWorkflowDef(workspaceId, workflowId)` |
+| history screens in `apps/web/app` | **0** |
+
+**So the chain is readable today and only the screen is missing — and the PROTOTYPE DOES NOT DRAW ONE**
+(its `View history` handler is a toast, `:3187`). **This is therefore the first port in this repo that
+draws a screen the prototype does not have**, and that is why it needed an owner answer rather than a
+ruling. **Build it with that stated in the docblock**, so a reader comparing the two finds the reason.
+
+### 🚩 SEQUENCING — the `test-cases/13` SPLIT LANDS FIRST
+
+The owner approved splitting `test-cases/13-deployment-dogfooding.md` (**104 commits touched it today
+across 71 merges**, and it conflicted on essentially every merge pair). **That split must land BEFORE any
+of the tasks above**, because every one of them appends cases to that file and would collide with a
+structural move underneath it. See `owner-holds.md`'s 2026-09-19 section for what the split must prove.
+
+**Tasks 5 and 9 shipped. Task 4 was already delivered by `#447`.**
 
 ---
 
