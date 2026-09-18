@@ -287,9 +287,24 @@ export default function MembersPage() {
    * A committed change re-reads the roster rather than setting local state: the
    * cell renders what the server holds, so an optimistic update would put a role
    * on screen that nothing has confirmed. And a REFUSAL is said out loud for
-   * the reason 3.138 gives about the withdrawal — the guard behind this write can
-   * genuinely say no (`last-owner`, `grant-owner-requires-owner`), and a
-   * swallowed answer would show the person their own intent as a fact.
+   * the reason 3.138 gives about the withdrawal: a swallowed answer would show
+   * the person their own intent as a fact.
+   *
+   * **Which refusals can actually reach here — corrected after the independent
+   * review challenged this paragraph's first version, which named the two rules
+   * plan-internally and was wrong about both.** `grant-owner-requires-owner`
+   * fires only on a payload granting `owner`
+   * (`apps/server/src/permissions/check-permission.ts:589`) and
+   * `EDITABLE_ROLE_OPTIONS` cannot build one, so it can NEVER fire from this
+   * control. `last-owner` fires only when the SERVER's row for that user holds
+   * `owner` (`packages/rule-engine/src/checks/membership.ts:128-135`) while the
+   * rendered row is editable, and `isEditableRole` suppresses the control on an
+   * owner's row — both halves reading `proj_memberships` — so it is reachable
+   * through a STALE roster read rather than in the ordinary case. The arm is
+   * here for that stale-read race, for the ordinary `permission.role` refusal
+   * when the actor's own authority changes under them, for a malformed payload,
+   * and for transport failures. Stated at this length because the first version
+   * would have had a reader budgeting for two refusals that cannot arrive.
    */
   const changeRole = (member: RosterMember, role: string): void => {
     setRoleRefusal(null);
@@ -450,9 +465,11 @@ export default function MembersPage() {
       {/* A refused role change, in the authority's own words — the rule and the
           engine's reason, exactly as the withdrawal below carries them. It sits
           under the roster and not in the invitations block, because that is
-          where the action was taken; the guard behind this write can genuinely
-          refuse (`last-owner`, `grant-owner-requires-owner`), and a screen that
-          said nothing would leave the person reading their own click as fact. */}
+          where the action was taken; a refused write is possible — see
+          `changeRole`'s docblock for which refusals can actually reach this
+          control, and for why "the two rules this plan added" is the wrong
+          answer to that — and a screen that said nothing would leave the person
+          reading their own click as fact. */}
       {roleRefusal !== null ? (
         <p role="alert" className="gn-refusal gn-refusal--server">
           {roleRefusal}

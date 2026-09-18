@@ -729,11 +729,26 @@ describe('13.766 the heading is Members, and nothing is counted before the roste
  *
  * `packages/ui/src/select/select.tsx:253` renders a `HiddenSelect` alongside the
  * visible trigger: a visually-hidden (not `display:none`) native `<select>` that
- * carries the same `aria-label`, and testing-library's `getByRole` does not
- * respect `aria-hidden`. That is why `getByLabelText` throws "Found multiple
- * elements" here and why `list-prefs-wiring.test.tsx:69` queries the trigger
- * `button` by name and then reads options out of the `listbox` — the pattern
- * copied below, which is also what a person does.
+ * carries the caller's `aria-label` too. **`getByRole` RESPECTS `aria-hidden`
+ * and therefore cannot see it** — `queries/role.js` defaults `hidden` to
+ * `config.defaultHidden` (false) and filters on `isInaccessible`, which returns
+ * true for `aria-hidden="true"` (`role-helpers.js:37`); react-aria wraps that
+ * subtree in `aria-hidden` (`react-aria@3.52.1`,
+ * `dist/private/select/HiddenSelect.mjs:58`). Which is precisely why the cases below query the
+ * trigger `button` by name and then read options out of the `listbox` (the
+ * pattern `list-prefs-wiring.test.tsx:69` established, and what a person does).
+ * The duplication that bites is `getByLabelText`, whose label association does
+ * NOT go through the accessibility tree: `HiddenSelect` wraps its native
+ * `<select>` in a `<label>` carrying the caller's text
+ * (`HiddenSelect.mjs:100`), so the label TEXT matches that `<select>` while the
+ * trigger's own `aria-label` matches the button — two elements, hence "Found
+ * multiple elements".
+ * **An earlier draft of this paragraph had the direction BACKWARDS** — it said
+ * `getByRole` ignores `aria-hidden`, which is the opposite of what the installed
+ * version does and of what this repo already states at `select.tsx:221-222`
+ * ("`getByText`, unlike `getByRole`, does not respect `aria-hidden`"). Corrected
+ * after the independent review measured it; the queries below never depended on
+ * the wrong version, but the sentence would have misled the next reader.
  *
  * ## EVERY NAME QUERY BELOW IS A REGEX, and that is a measurement, not a style
  *
