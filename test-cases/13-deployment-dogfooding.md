@@ -11234,7 +11234,7 @@ will collide again the next time both are dispatched from one — a BLOCK per ex
 id that stays true.
 
 - ✅ **13.886 — the invite form's two native fields wear the product's `.gn-field` pattern, and still
-  submit.** `apps/web/test/members-page.test.tsx:977`. Read through the LABEL association rather than by
+  submit.** `apps/web/test/members-page.test.tsx:988`. Read through the LABEL association rather than by
   id, because a label that no longer labels is the failure a wrapper causes; then the real path end to
   end — type, submit, read what the door was handed — because a wrapper that broke the value's route to
   the handler is the other one. Mutation-witnessed: removing `className="gn-field__input"` from the
@@ -11242,7 +11242,7 @@ id that stays true.
   bare pair reddens it alone as well.
 
 - ✅ **13.887 — the roster's zebra, on the rows the prototype actually tints.**
-  `apps/web/test/members-styling.test.ts:100`. FOUR claims, and each is there because a different defect
+  `apps/web/test/members-styling.test.ts:128`. FOUR claims, and each is there because a different defect
   satisfies the others: the even-child rule carries `--gn-fill-quaternary`; NO odd-child rule exists (odd
   beside even tints every row, which is a table with no zebra and no way to notice); **EXACTLY ONE rule in
   either stylesheet mentions `.gn-members__row` at all**; and an in-test witness that each plant LANDS
@@ -11262,7 +11262,7 @@ id that stays true.
   was 0 failed before, reddens 13.887 (2 failed / 37)**.
 
 - ✅ **13.888 — the four treatments that were already the prototype's, pinned as VALUES.**
-  `apps/web/test/members-styling.test.ts:58`. It asserts declarations — `0.8125rem`, `1.125rem`, `600`,
+  `apps/web/test/members-styling.test.ts:86`. It asserts declarations — `0.8125rem`, `1.125rem`, `600`,
   `var(--gn-surface-sunken)`, `0.6875rem 1.125rem`, `1.0625rem`, `51.25rem`, `var(--gn-radius-card)` —
   rather than that a rule exists, which is the distinction this repo has been bitten by repeatedly: a rule
   that is present and does nothing reads identically to one that works. It is a regression pin on four
