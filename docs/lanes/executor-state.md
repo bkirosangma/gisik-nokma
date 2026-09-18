@@ -41,6 +41,65 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~17:1x IST. **THE AVATAR PR IS MERGED (#469 → `cb1f3d16`) AND
+> # THE OWNER-DEMOTION GUARD IS BUILT, GREEN, REBASED AND AWAITING ITS PR.** `exec/owner-demotion-guard`,
+> # ONE PR, `--base main`, rebased onto `origin/main` (the union of my avatar work, exec 2's attention
+> # strip, and the rulings). **The queue is NOT empty** (order after this: members-styling,
+> # settings-workspace-tab, then migration-order-check; the controller dispatches to whichever executor
+> # frees first). **HOLD for that dispatch.**
+>
+> | | |
+> |---|---|
+> | branch | `exec/owner-demotion-guard`, cut from `origin/main` = `efc23e67`. **NOT rebased since** — the controller's next dispatch names the base; re-measure `origin/main` before the PR. |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it. |
+> | the change | 6 files: `apps/server/src/permissions/check-permission.ts` (the new pass + the sentence), `apps/server/test/permissions/check-role-permission.test.ts` (case **13.881** + the 13.820 repair), `packages/rule-engine/src/refusal-rules.ts` (the id), `packages/rule-engine/test/engine.test.ts` (the registry pin), `test-cases/13`, `Features.md` |
+> | case ids | **`13.881`**, free at this tip (measured). It is OUTSIDE every assigned block (`13.850`–`13.880` was the last) — the dispatch named it, so it is authorised rather than taken. |
+> | migration | **NONE.** Do not restart the server container for this. |
+> | suites | **rule-engine 331/0 · server 1558/0 (5 skipped)** — server is Task 8's 1557 **+1** for the new case. Node v22.22.2. |
+> | seven checks | **all EXIT 0**: `tasks` · `env` · `runbook` · `help` · `citations` (file 13 = **654** cited / 0 uncited) · `db-tz` · `check-case-ids` (**2344**, union == sum) |
+> | gate | **NOT RUN BY THIS LANE.** |
+>
+> ## ▣ WHAT THIS TASK SHIPS, AND THE HALF OF A CASE IT SUPERSEDES
+>
+> Changing any member's role **to or from `owner`** is now an OWNER-only act (`remove-owner-requires-owner`,
+> `check-permission.ts`'s second pass). An admin still moves members between admin/member/guest. The hole:
+> `grant-owner-requires-owner` covers GRANTING owner and `last-owner` covers ZERO owners, so an admin
+> demoting an owner **while another owner remained** was refused by neither — **measured on the real door
+> before the fix: it COMMITTED.**
+>
+> **IT SUPERSEDES HALF OF CASE 13.820, which shipped hours earlier.** That case's real-door control asserted
+> the same admin demotion **commits** once a second owner exists, and the catalogue called its batch arm
+> *"the one that pins the property"* — the only real-door witness that `countWorkspaceOwners` reads the
+> projection. An admin can no longer reach the engine's world-half at all, so the count-proof **moved** to
+> the one act the gate admits and the count alone decides: an OWNER demoting **themselves** out of the last
+> ownership. The batch arm's actor became an owner too, and it stays an owner for both events because the
+> second is the one refused. Both the test and the catalogue say so in place.
+>
+> **GUARD PROVED BY MUTATION, and the mutation reproduces the defect as its own before-state:** replacing
+> the new refusal's single `return` with `return null` makes the admin's demotion come back **`committed`**
+> — the live hole — and returns the 13.820 arms to `last-owner`. Restored → `check-permission.ts` SHA-256
+> back to `974313512fa0c0a6acd0c20f93f9b03e4f17d6b1a43aa57c7b30f66f62149fa5` byte for byte.
+>
+> **The UI half was decided by reading the code, not by repeating the prose:** `EDITABLE_ROLE_OPTIONS`
+> (`members/page.tsx:518-522`) omits `owner` and `:447` gates the `<Select>` on `isEditableRole`, so an
+> owner's row renders a chip. **The control cannot build such a payload; no narrowing was needed.**
+>
+> ## ▣ METHOD NOTES THIS TASK EARNED
+>
+> - **A cross-package source edit is invisible until the dependent package is REBUILT.** The server
+>   resolves `@gisik-nokma/rule-engine` by package name through `dist`, so adding the rule id to
+>   `refusal-rules.ts` left `tsc` reporting `Property 'removeOwnerRequiresOwner' does not exist` — the
+>   source was right and the build output was stale. `pnpm --filter @gisik-nokma/rule-engine run build`,
+>   then re-typecheck. This is the same trap the brief records for mutated `dist`; the fix is the same
+>   order of operations.
+> - **A carried-forward COUNT is a reading that expires.** I read the case-id total as "2344 before and
+>   2344 after adding a case" and briefly took the unchanged number as the finding. The 2344 I was
+>   comparing against came from the **avatar branch**, which carried `+13.732`; this branch's base is
+>   **2343**. Re-measured by SET DIFFERENCE against `origin/main` (added `13.881`, removed none) rather
+>   than by count. **Name the revision a number was measured at, or it will be inherited wrongly.**
+> - **A registry-pin test is a real gate, not an obstacle.** Adding the id reddened
+>   `engine.test.ts`'s `REFUSAL_RULES` equality — 22 entries against 23 — which is exactly what that
+>   test exists for. The id was added there; nothing was loosened.
 > # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~16:3x IST. **SECOND WAVE TASK 8 IS MERGED (#465 → `c2daa5b5`)
 > # AND THE AVATAR BUG DISPATCH IS BUILT, REVIEWED, FIXED, REBASED AND **OPEN AS PR #469 — MERGEABLE,
 > # AWAITING THE CONTROLLER'S MERGE.** NOTHING IS LEFT FOR THIS LANE TO DO ON IT.** The dispatch was
