@@ -41,7 +41,37 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~22:5x IST. **`hig-per-screen/7b` IS MERGED. THIS LANE HAS NO
+> # ⛔ `hig-per-screen/5b` IS NOT EXECUTABLE — MEASURED 2026-09-19. **DO NOT RE-TREAD IT.**
+>
+> A restarted executor reading the ledger WILL pick `5b`: its row says *"Stays todo until `13.304` is
+> restated or **witnessed**"*, and the catalogue's `13.304` row carries a restatement with a named
+> deliverable. That reading is wrong, and the controller said so first (*"needs a controller ruling"*).
+>
+> **Why no test can assert the List shrank in that harness, measured:**
+> - the control sets a **SERVER-side** filter — `page.tsx:321-324` builds
+>   `activeOnly ? { stateCategories: ['active'] } : {}`;
+> - the List's rows come from `source.query.getTickets(projectId, filter, 'flat')`
+>   (`packages/app-core/src/views/ticket-list.tsx:1196`), declared
+>   `getTickets(projectId, filter: FilterSpec, grouping: Grouping)`
+>   (`packages/app-core/src/data-source.ts:143`);
+> - **there is no client-side narrowing to fall back on** — `ticket-list.tsx`'s only `.filter(` calls are
+>   `.filter(Boolean)`, a column-id array and an `undefined` guard; `list-model.ts` exposes `countRows`,
+>   `recentlyAssignedRows`, `groupRows`, `nestRows` and none narrows by state category;
+> - **the harness's stub ignores all three arguments** — `board-narrowing.test.tsx:185` is
+>   `getTickets: async (): Promise<TicketListView> => ({ projectId: PROJECT_ID, rows })`.
+>
+> So ticking the control cannot change what the List receives; a case asserting "the List shrank" fails,
+> and making it pass means teaching the FAKE to narrow — this repo's signature failure. **`13.436`
+> (`board-narrowing.test.tsx:214-246`) already pins the negative arm** (the Board's count is not sourced
+> from the narrowed list), so the missing half is exactly the List-narrowing one.
+>
+> **RULING REQUESTED, with three priced options and a recommendation:**
+> `gisik-nokma-lanes/EXEC-RULING-REQUEST-2026-09-18-hig-5b-13304.md` — (a) teach the fake to narrow
+> (*asserts the fake* — advised against), (b) assert the **relay** via a `getTickets` spy (~1 h, but needs
+> `13.304` restated to say "relayed"), (c) a **real-door** case against real Postgres (~half a day; the
+> only one that witnesses the product). **HOLD. Do not cut a branch for `5b` until this is ruled on.**
+>
+> > # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~22:5x IST. **`hig-per-screen/7b` IS MERGED. THIS LANE HAS NO
 > # TASK IN FLIGHT AND IS HOLDING FOR THE NEXT DISPATCH.**
 > # **Supersedes the block below. That block says the PR awaited a merge — it has had one, and this one
 > # exists to stop a relaunched executor opening a PR that is already closed.**
