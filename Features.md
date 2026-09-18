@@ -527,7 +527,24 @@ reason on record, not an oversight:*
   so a partial claim can say nothing about the other knob — the upsert's
   `COALESCE(EXCLUDED.x, existing.x)` is the partial-update semantics itself, not defensiveness, and a
   stored default would be indistinguishable from a deliberate claim of 7. The reader coalesces on NULL
-  and never on falsiness, since `dueSoonDays: 0` is a legal claim. Blind last-writer-wins is safe here
+  and never on falsiness, since `dueSoonDays: 0` is a legal claim. **`auto_close_after_days` (second
+  wave, 2026-09-18, Task 6) is the one column here written with a `CASE` instead of that `COALESCE`,
+  and the reason is the whole task:** `autoCloseAfterDays` is `number | null`, where `null` is a CLAIM
+  ("turn auto-close off") and `undefined` is "this claim does not mention it". `COALESCE` cannot tell
+  those apart — the explicit `null` binds as NULL, the COALESCE falls through to the stored value, and
+  the claim is **silently ignored**: accepted by the door, committed to the ledger, its provenance
+  even updated, with no effect on the setting. So the projection writes
+  `auto_close_after_days = CASE WHEN $7 THEN $8 ELSE proj_workspace_settings.auto_close_after_days END`,
+  where `$7` is `payload.autoCloseAfterDays !== undefined` — a PRESENCE boolean computed from the
+  parsed payload, which is the only place the distinction still exists by the time SQL sees it (Zod
+  preserves it; `.optional()` alone would erase it). On INSERT there is no prior value, so the column
+  takes the value directly and a fresh row nobody mentioned stores NULL, which IS the default. **The
+  regression proof is a mutation and it is exact:** swapping the CASE for a `COALESCE` reddens case
+  13.714's clear-to-null assertion (`expected 30 to be null`) and **nothing else in the file** — 11 of
+  12 cases stay green. An earlier, cruder version of that mutation (CASE removed but `$7` still bound)
+  reddened 9 cases with `could not determine data type of parameter $7`, i.e. a plumbing error rather
+  than the semantics; it was discarded as a mutant that does not isolate its property. Blind
+  last-writer-wins is safe here
   for a stated reason rather than by luck: the table's key IS the workspace the events are filed
   against, so each key has exactly one totally-ordered writer and canonical replay order is that
   writer's own claim order. **Appended at registration — LAST until Task 6 put `proj_search` after it — and the append is a dependency decision rather than a
@@ -537,7 +554,73 @@ reason on record, not an oversight:*
   (`getWorkspaceSettings` is a read-time function), so neither adjacency is load-bearing.
   `apps/server/src/projections/workspace-settings.ts`,
   `apps/server/migrations/1788272876259_proj-workspace-settings.sql`,
+  `apps/server/migrations/1789400000000_workspace-settings-auto-close.sql`,
   `apps/server/src/projections/index.ts`
+- ✅ **Workspace settings tab: stale / due-soon / auto-close days** — backlog/closed spec §8, plan
+  ruling R5, second wave, 2026-09-18 (Task 6). A third tab on `/settings` (`?tab=workspace`, sidebar
+  link `Workspace`) holding all THREE `workspace.settings_set` knobs in one form — `Stale after` and
+  `Due soon within`, which had **no UI anywhere in the product** until now, beside the new
+  `Auto-close after`. R5's own reason for one form rather than a lone auto-close field: one form for
+  one event is smaller than a knob plus the settings tab it would need next. All three inputs are
+  `days`; **the auto-close input carries an `Off` checkbox**, because `null` is a claim a user has to
+  be able to MAKE and a blank number box cannot distinguish "off" from "not typed yet" — ticking it
+  disables the input and sends `null`. **ONE Save carrying ONLY the changed keys**, diffed against
+  what the server answered: Save is disabled when nothing changed (the schema's `.strict().refine`
+  refuses the empty claim, so an always-enabled Save would be a button whose only outcome is a
+  refusal notice), and `null` is compared by VALUE rather than falsiness — a truthiness check would
+  make "turn it off" invisible and the button would never fire, which is the same
+  present-versus-null defect the projection's CASE prevents, one layer up. Failures split three ways
+  per Ruling 27 (refusal in `gn-refusal--server` as `Refused by the server — <rule>: <reason>`,
+  silence, transport failure), the same shape `BacklogStartButton` established. **Non-admins see the
+  values read-only with `Only a workspace admin can change these.` and no Save control at all** —
+  the server's own gate is `check-permission.ts:582`, and this flag only decides whether the controls
+  are OFFERED; showing the values to someone who cannot change them is the honest rendering, a
+  disabled control is not. **It reads through a new additive `DataSourceQuery.getWorkspaceSettings`**
+  (see the next bullet). Cases 13.716. `apps/web/src/workspace-settings-form.tsx`,
+  `apps/web/app/settings/page.tsx`, `apps/web/test/settings-page.test.tsx`
+  **Fix round, after the independent review (2026-09-18).** The review found one **Important** defect
+  and three mutations that survived the whole suite. **The Important one was real, not a false
+  comment:** `onSaved`'s `settings.reload` gave the page new data, but the form's draft and `Off` box
+  are `useState` **initialisers** — React runs them once — so the form kept rendering the SUBMITTED
+  values, and the sentence promising that a clamped or engine-adjusted claim "becomes visible on this
+  screen" was false. Case 13.718 reproduced it (a second read answering `30` left the field on the
+  submitted `14`) and is its regression test; the fix, `adoptOnNextLoad`, re-derives the draft from
+  the next `settings` the form sees after **its own** successful save — deliberately not "adopt on
+  every change", since `useLiveQuery` refetches on every stream move and an unconditional adopt would
+  clobber a draft mid-typing. The three survivors each got a case and each case was proved to kill its
+  own mutant: **M9** (the `Off` branch claiming `null` unconditionally, live but unexercised because no
+  fixture was in the already-off state) dies on **13.719**; **M12** (the `invalid` gate removed from
+  both the guard and the button) dies on **13.720**; **M7** (the read door's non-object guard returning
+  defaults instead of refusing) dies on **13.721**, whose reachability is stated as a guard rather than
+  a witnessed behaviour because no production path to it was found. The same review measured that the
+  `invalid` gate's promised signal does not exist — the user sees a greyed-out button and nothing else
+  — so that docblock was **rewritten rather than left alone**, and a message naming the offending field
+  is recorded as a follow-on instead of implied. Cases 13.718–13.721
+- ⚙️ **`getWorkspaceSettings` on the client `DataSource`** — second wave, 2026-09-18 (Task 6), and a
+  **recorded deviation from the task plan** rather than a transcription of it. The plan told the
+  implementer to extend a `mapWorkspaceSettings` in `app-core/src/online/mappers.ts` and asserted the
+  attention strip's read "already carries" settings to the client. **Both claims were measurably
+  false on this tree:** no `mapWorkspaceSettings` existed anywhere (`/usr/bin/git log
+  -S'mapWorkspaceSettings' --all` returns only the plan commit that wrote the sentence), and
+  `mapAttention` reads `items` and returns `AttentionItem[]`, dropping the `settings` sibling the
+  server HAS sent since Plan 5. So the client could not see a workspace's settings at all. The
+  executor took the conservative additive ruling and flagged it as a scope change: **one new
+  `DataSourceQuery` method** (no shipped signature changed, so nothing that works today can break),
+  the client `WorkspaceSettings` view type in `view-types.ts` (where the plan put it), a new
+  `mapWorkspaceSettings` in `mappers.ts` (**the plan's own name**, so case 13.715 keeps its subject),
+  and an implementation that reads the SAME already `requireMember`-gated
+  `GET /v1/workspaces/:ws/attention` route — **no new server route**. **The over-fetch cost is named
+  in the source rather than hidden:** it fetches the attention body to read one key of it, accepted to
+  avoid standing up a second route; if `GET /v1/workspaces/:ws/settings` ever lands, this is a
+  one-line re-point and its cases do not move. **The shape is owner-confirmed, not a controller
+  default** — the executor ruled, the controller confirmed, and the owner confirmed in turn
+  (2026-09-18), and the docblock says so so a future reader reads it as a decided design rather than
+  an unanswered question. The replica marks it an absence with a named owner (no workspace-settings
+  fold exists locally, and answering the defaults would be indistinguishable from a workspace that
+  really claimed them). Cases 13.715, 13.717. `packages/app-core/src/data-source.ts`,
+  `packages/app-core/src/view-types.ts`, `packages/app-core/src/online/mappers.ts`,
+  `packages/app-core/src/online/online-data-source.ts`,
+  `packages/app-core/src/replica/replica-data-source.ts`
 - ⚙️ **`proj_search` — the full-text projection** — one row per ticket holding its title,
   description and comments as PLAIN TEXT, plus a `tsvector` GENERATED from all three and weighted
   A/B/C so ranking can prefer a title hit. Fed by `ticket.created` (title), `ticket.field_set`

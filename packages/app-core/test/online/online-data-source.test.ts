@@ -345,7 +345,7 @@ describe('3.40 the blocked methods refuse through the DataSource', () => {
       [`/v1/workspaces/${WORKSPACE}/attention`]: {
         workspaceId: WORKSPACE,
         generatedAt: 'g',
-        settings: { staleDays: 7, dueSoonDays: 7, provenance: null },
+        settings: { staleDays: 7, dueSoonDays: 7, autoCloseAfterDays: null, provenance: null },
         items: [],
       },
     });
@@ -934,5 +934,208 @@ describe('getTickets pages to exhaustion (ruling P41, Door B)', () => {
     const view = await source.query.getTickets(PROJECT, {}, 'flat');
     expect(view.rows.map((row) => row.ticketId)).toEqual(['t1']);
     expect(urls).toHaveLength(1);
+  });
+});
+
+/**
+ * Second wave, Task 6 — the settings READ DOOR (`getWorkspaceSettings`).
+ *
+ * The plan named a client-side settings read that did not exist: it said to
+ * extend a `mapWorkspaceSettings` (there was none) and asserted the attention
+ * strip's read "already carries" the settings to the client (`mapAttention`
+ * reads `items` and drops the `settings` sibling). The executor took the
+ * additive ruling — a new `DataSourceQuery` method reading the SAME already
+ * `requireMember`-gated `/v1/workspaces/:ws/attention` route — and it is
+ * owner-confirmed, not a controller default. See
+ * `EXEC-2026-09-18-t6-settings-read.md`.
+ *
+ * These cases pin the three things that shape could get wrong: which route it
+ * calls, that it maps the SIBLING rather than the items, and that it refuses
+ * loudly instead of rendering a form of defaults when the server stops sending
+ * that key.
+ */
+describe('13.717 getWorkspaceSettings — the workspace settings read door', () => {
+  function attentionBody(settings: unknown): unknown {
+    return { workspaceId: WORKSPACE, generatedAt: '2026-09-18T04:00:00.000Z', settings, items: [] };
+  }
+
+  /**
+   * 13.717 — the read calls the attention route and NOT a settings route that
+   * does not exist, and it maps the `settings` sibling: all three knobs arrive
+   * with `autoCloseAfterDays` as a NUMBER and the provenance named from the
+   * roster. Asserting the URL is the half that would otherwise pass on a wrong
+   * route, because `recordingFetch` 404s anything it was not given.
+   */
+  it('13.717 reads the attention route and maps its settings sibling', async () => {
+    const { fetchImpl, calls } = recordingFetch({
+      [`/v1/workspaces/${WORKSPACE}/attention`]: attentionBody({
+        staleDays: 3,
+        dueSoonDays: 14,
+        autoCloseAfterDays: 30,
+        provenance: {
+          actorId: ANSELMA,
+          clientTime: '2026-09-18T04:00:00.000Z',
+          serverTime: '2026-09-18T04:00:01.000Z',
+        },
+      }),
+      [`/v1/workspaces/${WORKSPACE}/members`]: MEMBERS,
+    });
+    const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
+
+    expect(await source.query.getWorkspaceSettings(WORKSPACE)).toEqual({
+      staleDays: 3,
+      dueSoonDays: 14,
+      autoCloseAfterDays: 30,
+      provenance: {
+        actorId: ANSELMA,
+        actorName: 'Anselma Marak',
+        clientTime: '2026-09-18T04:00:00.000Z',
+        serverTime: '2026-09-18T04:00:01.000Z',
+      },
+    });
+
+    const paths = calls.map((call) => call.input.replace(/^https?:\/\/[^/]+/, ''));
+    expect(paths).toContain(`/v1/workspaces/${WORKSPACE}/attention`);
+    expect(paths).toContain(`/v1/workspaces/${WORKSPACE}/members`);
+    // The positive control on the two lines above: this method did NOT reach
+    // for the contests read, and it did not invent a `/settings` path. A
+    // recording that contained either would mean the assertion above was
+    // satisfied by a different call.
+    expect(paths).not.toContain(`/v1/workspaces/${WORKSPACE}/settings`);
+    expect(paths.some((path) => path.startsWith('/v1/contests'))).toBe(false);
+  });
+
+  /**
+   * 13.717 — `autoCloseAfterDays: null` survives the round trip as `null`.
+   *
+   * This is the client half of the task's correctness core. The server sends
+   * `null` for "auto-close is off"; a read door (or mapper) that normalised it
+   * to `undefined`, dropped the key, or substituted a number would put the
+   * settings form one state away from the server on the ONE field whose whole
+   * design is the present-versus-null distinction. Asserted beside the number
+   * case in the same run, so `null` here is the field working rather than a
+   * mapper filling nothing.
+   */
+  it('13.717 carries autoCloseAfterDays: null through, and it is not the same as a number', async () => {
+    const off = recordingFetch({
+      [`/v1/workspaces/${WORKSPACE}/attention`]: attentionBody({
+        staleDays: 7,
+        dueSoonDays: 7,
+        autoCloseAfterDays: null,
+        provenance: null,
+      }),
+      [`/v1/workspaces/${WORKSPACE}/members`]: MEMBERS,
+    });
+    const offSource = createOnlineDataSource({ baseUrl: '', fetchImpl: off.fetchImpl });
+    const settings = await offSource.query.getWorkspaceSettings(WORKSPACE);
+    expect(settings.autoCloseAfterDays).toBeNull();
+    expect(Object.hasOwn(settings, 'autoCloseAfterDays')).toBe(true);
+    // `provenance: null` — nobody has ever claimed these, which is a different
+    // fact from "somebody chose 7".
+    expect(settings.provenance).toBeNull();
+
+    // The control: the SAME door on a body that DOES carry a number answers a
+    // number, so the assertion above is the null branch and not a door that
+    // hard-codes null.
+    const on = recordingFetch({
+      [`/v1/workspaces/${WORKSPACE}/attention`]: attentionBody({
+        staleDays: 7,
+        dueSoonDays: 7,
+        autoCloseAfterDays: 14,
+        provenance: null,
+      }),
+      [`/v1/workspaces/${WORKSPACE}/members`]: MEMBERS,
+    });
+    const onSource = createOnlineDataSource({ baseUrl: '', fetchImpl: on.fetchImpl });
+    expect((await onSource.query.getWorkspaceSettings(WORKSPACE)).autoCloseAfterDays).toBe(14);
+  });
+
+  /**
+   * 13.717 — a body whose `settings` key is GONE (or the wrong shape) is
+   * refused, not defaulted.
+   *
+   * The failure this prevents is the quiet one: a server that stopped sending
+   * `settings` would, under a lenient reader, render a settings screen showing
+   * 7 / 7 / Off — which is a plausible-looking screen full of values nobody
+   * chose, on the screen whose only job is to show what was chosen. The mapper
+   * refuses the missing knobs, and this pins that the door does not swallow it.
+   */
+  it('13.717 refuses a body without settings rather than rendering invented defaults', async () => {
+    const { fetchImpl } = recordingFetch({
+      [`/v1/workspaces/${WORKSPACE}/attention`]: {
+        workspaceId: WORKSPACE,
+        generatedAt: '2026-09-18T04:00:00.000Z',
+        items: [],
+      },
+      [`/v1/workspaces/${WORKSPACE}/members`]: MEMBERS,
+    });
+    const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
+    await expect(source.query.getWorkspaceSettings(WORKSPACE)).rejects.toThrow();
+
+    // And the control on the control: the SAME fixture with `settings` put back
+    // resolves, so the rejection above is caused by the missing key.
+    const restored = recordingFetch({
+      [`/v1/workspaces/${WORKSPACE}/attention`]: attentionBody({
+        staleDays: 7,
+        dueSoonDays: 7,
+        autoCloseAfterDays: null,
+        provenance: null,
+      }),
+      [`/v1/workspaces/${WORKSPACE}/members`]: MEMBERS,
+    });
+    const restoredSource = createOnlineDataSource({ baseUrl: '', fetchImpl: restored.fetchImpl });
+    await expect(restoredSource.query.getWorkspaceSettings(WORKSPACE)).resolves.toBeDefined();
+  });
+});
+
+/**
+ * Fix round, after the independent review. **The read door's non-object-body
+ * guard was pinned by nothing**: mutation M7 — replacing the `HttpError` with a
+ * return of the domain defaults — left all 29 cases green, because the 13.717
+ * "refuses a body without settings" case supplies a body that IS an object and
+ * merely lacks the key, so it refuses inside `mapWorkspaceSettings` for a
+ * different reason. A guard that can be deleted silently is the "silently
+ * returns a default where it should refuse" class this project keeps recording.
+ *
+ * **Reachability, stated honestly:** the reviewer could not establish a
+ * production path that feeds the route's body as a non-object, and neither could
+ * this session. This case therefore pins a GUARD rather than a witnessed
+ * server behaviour — which is worth doing precisely because the guard's whole
+ * job is to be the thing that fails if that ever changes, and nothing about a
+ * response shape is guaranteed by the type system at a network boundary.
+ */
+describe('13.721 getWorkspaceSettings refuses a body that is not an object', () => {
+  const MEMBERS_BODY = {
+    workspaceId: WORKSPACE,
+    members: [{ userId: ANSELMA, displayName: 'Anselma Marak', role: 'owner' }],
+  };
+
+  /**
+   * 13.721 — a 200 whose body is a STRING (not null, not an object) is refused
+   * rather than read for a `settings` key that cannot be there.
+   *
+   * The control is in the same run: the identical fixture with a real object
+   * body resolves, so the rejection is caused by the SHAPE and not by the
+   * fixture being broken.
+   */
+  it('13.721 rejects a non-object body, and the same fixture with an object resolves', async () => {
+    const bad = recordingFetch({
+      [`/v1/workspaces/${WORKSPACE}/attention`]: 'not-an-object',
+      [`/v1/workspaces/${WORKSPACE}/members`]: MEMBERS_BODY,
+    });
+    const badSource = createOnlineDataSource({ baseUrl: '', fetchImpl: bad.fetchImpl });
+    await expect(badSource.query.getWorkspaceSettings(WORKSPACE)).rejects.toBeInstanceOf(HttpError);
+
+    const good = recordingFetch({
+      [`/v1/workspaces/${WORKSPACE}/attention`]: {
+        workspaceId: WORKSPACE,
+        generatedAt: '2026-09-18T04:00:00.000Z',
+        settings: { staleDays: 7, dueSoonDays: 7, autoCloseAfterDays: null, provenance: null },
+        items: [],
+      },
+      [`/v1/workspaces/${WORKSPACE}/members`]: MEMBERS_BODY,
+    });
+    const goodSource = createOnlineDataSource({ baseUrl: '', fetchImpl: good.fetchImpl });
+    await expect(goodSource.query.getWorkspaceSettings(WORKSPACE)).resolves.toBeDefined();
   });
 });

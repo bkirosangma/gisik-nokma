@@ -34,6 +34,7 @@ import type {
   UserPreferences,
   WorkItem,
   WorkspaceRef,
+  WorkspaceSettings,
 } from '../view-types.js';
 
 /**
@@ -1875,6 +1876,62 @@ export function mapAttention(
     });
   });
   return items;
+}
+
+/**
+ * The attention response's `settings` sibling → the client's `WorkspaceSettings`.
+ *
+ * ## Why this mapper exists, and why it is not `mapAttention`'s business
+ *
+ * `AttentionResponse` has carried `settings: WorkspaceSettings` on the wire since
+ * Plan 5, and `mapAttention` reads `items` and drops it — correctly, because the
+ * strip renders reasons the SERVER already composed from those thresholds and the
+ * client has no use for the numbers. The `/settings` Workspace tab (second wave,
+ * Task 6) does need them, and there was no second reader.
+ *
+ * **This is the mapper the task plan named and the tree did not have.** The plan
+ * said to extend an existing `mapWorkspaceSettings`; there was none anywhere
+ * (`/usr/bin/git log -S'mapWorkspaceSettings' --all` finds only the plan commit
+ * that wrote the sentence). Recorded as a deviation, not smoothed over — see
+ * `EXEC-2026-09-18-t6-settings-read.md`.
+ *
+ * ## `autoCloseAfterDays` is nullable, and that is asserted rather than assumed
+ *
+ * `null` is a legal VALUE here — "auto-close is off" — and the one thing this
+ * mapper must not do is normalise it into `undefined` or drop the key, because
+ * every consumer downstream distinguishes "off" from "this build does not know
+ * the field". Both arms are checked explicitly: a `null` passes through, and
+ * anything that is neither `null` nor a number (a string from a sloppy
+ * serializer, an object, a boolean) is refused rather than coerced.
+ *
+ * The other two knobs are plain required numbers, so a missing one is a body
+ * this client does not understand. Substituting a default is exactly the mistake
+ * this screen exists to avoid: `/settings` shows what was CHOSEN, and a mapper
+ * that answered 7 for an absent `staleDays` would render a threshold with nobody
+ * behind it.
+ */
+export function mapWorkspaceSettings(
+  raw: unknown,
+  path: string,
+  roster: ReadonlyMap<string, string> = new Map(),
+): WorkspaceSettings {
+  const record = asRecord(raw, path);
+  const autoClose = record['autoCloseAfterDays'];
+  if (autoClose !== null && typeof autoClose !== 'number') {
+    throw new MappingError(`${path}.autoCloseAfterDays`, 'a number or null');
+  }
+  return {
+    staleDays: asNumber(record['staleDays'], `${path}.staleDays`),
+    dueSoonDays: asNumber(record['dueSoonDays'], `${path}.dueSoonDays`),
+    autoCloseAfterDays: autoClose,
+    // `provenance: null` is the server saying "nobody has ever claimed these"
+    // — a fact, not an absence of data — so it is carried through as null
+    // rather than replaced with an actor.
+    provenance:
+      record['provenance'] === null
+        ? null
+        : mapProvenance(record['provenance'], `${path}.provenance`, roster),
+  };
 }
 
 /**

@@ -432,7 +432,7 @@ describe('12.182-12.184 the replica-only surface, and what it confesses', () => 
 });
 
 describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
-  it('12.185 SEVEN methods refuse, enumerated by id rather than counted', async () => {
+  it('12.185 EIGHT methods refuse, enumerated by id rather than counted', async () => {
     const { ds } = await fixture();
     const refusals: Array<[string, () => Promise<unknown>]> = [
       ['getMyWorkspaces', () => ds.query.getMyWorkspaces()],
@@ -440,6 +440,11 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
       ['search', () => ds.query.search(WS, 'x')],
       ['getMyWork', () => ds.query.getMyWork(WS)],
       ['getAttention', () => ds.query.getAttention(WS)],
+      // Added by second wave Task 6. This list is enumerated rather than
+      // counted, and it is compared against `Object.keys(REPLICA_GAPS)` below,
+      // so adding the method to the replica WITHOUT adding it here reddens this
+      // case rather than passing quietly — which is how it announced itself.
+      ['getWorkspaceSettings', () => ds.query.getWorkspaceSettings(WS)],
       ['getPreferences', () => ds.query.getPreferences(WS)],
       ['putPreferences', () => ds.query.putPreferences(WS, { version: 1, projects: {}, savedFilters: [] })],
     ];

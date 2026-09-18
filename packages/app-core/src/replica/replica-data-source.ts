@@ -348,6 +348,31 @@ const ATTENTION_ABSENCES: readonly ReplicaAbsence[] = [
   },
 ];
 
+/**
+ * Second wave, Task 6. The local store DOES mirror the ledger the settings live
+ * in, so unlike the attention strip this is a real "could be built" rather than
+ * a "cannot be known" — which is exactly why the absence is spelled out rather
+ * than left to a default, and why the owner is named.
+ *
+ * The blocker is the fold, not the data: `workspace.settings_set` is a
+ * workspace-entity event, and this replica's local projections are ticket-shaped
+ * — nothing here reduces workspace events into a settings row, and
+ * `proj_workspace_settings`'s reader applies the domain's defaults where a value
+ * was never claimed. Reproducing that here means reproducing the defaults AND
+ * the present-versus-null distinction the column's CASE carries, which is a
+ * second implementation of the rule rather than a second reader of it. Answering
+ * `autoCloseAfterDays: null` for a workspace that claimed 30 would be a settings
+ * screen showing "off" for something that is on.
+ */
+const WORKSPACE_SETTINGS_ABSENCES: readonly ReplicaAbsence[] = [
+  {
+    field: 'WorkspaceSettings (all three knobs and the provenance)',
+    because:
+      'the local replica has no workspace-settings fold — `workspace.settings_set` is a workspace-entity event and every local projection here is ticket-shaped, so there is no row to read. Serving the defaults instead would be indistinguishable from a workspace that really claimed them, and `autoCloseAfterDays: null` is a CLAIM ("off") as well as the default, so a replica answering null would show "off" for a workspace that turned auto-close ON',
+    owner: 'Plan 10 — a local workspace-settings fold, deliberately not invented here',
+  },
+];
+
 const PREFERENCES_ABSENCES: readonly ReplicaAbsence[] = [
   {
     field: 'UserPreferences (the whole document)',
@@ -452,6 +477,7 @@ export const REPLICA_GAPS: Readonly<Record<string, readonly ReplicaAbsence[]>> =
   search: SEARCH_ABSENCES,
   getMyWork: MY_WORK_ABSENCES,
   getAttention: ATTENTION_ABSENCES,
+  getWorkspaceSettings: WORKSPACE_SETTINGS_ABSENCES,
   getPreferences: PREFERENCES_ABSENCES,
   putPreferences: PREFERENCES_ABSENCES,
 };
@@ -808,6 +834,8 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     getMembers: () => Promise.reject(new ReplicaGapError('getMembers', MEMBERS_ABSENCES)),
     getMyWork: () => Promise.reject(new ReplicaGapError('getMyWork', MY_WORK_ABSENCES)),
     getAttention: () => Promise.reject(new ReplicaGapError('getAttention', ATTENTION_ABSENCES)),
+    getWorkspaceSettings: () =>
+      Promise.reject(new ReplicaGapError('getWorkspaceSettings', WORKSPACE_SETTINGS_ABSENCES)),
     getPreferences: () => Promise.reject(new ReplicaGapError('getPreferences', PREFERENCES_ABSENCES)),
     putPreferences: () => Promise.reject(new ReplicaGapError('putPreferences', PREFERENCES_ABSENCES)),
     search: () => Promise.reject(new ReplicaGapError('search', SEARCH_ABSENCES)),

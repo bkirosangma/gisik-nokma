@@ -485,6 +485,30 @@ export type UserPreferences = {
 };
 
 /**
+ * A workspace's own thresholds and auto-close window (second wave, Task 6) —
+ * what `/settings`'s Workspace tab shows and what the attention strip's reasons
+ * are computed from server-side.
+ *
+ * `autoCloseAfterDays: number | null` is the whole reason this type exists as a
+ * client type rather than the domain's `WorkspaceSettings` being re-used
+ * directly: the field is a UNION of "a number of days" and "off", and `null` is
+ * a CLAIM rather than an absence. The settings form renders `null` as the `Off`
+ * checkbox being ticked — not as an empty input, and not as a zero — so a mapper
+ * that normalised it away would put the form one state behind the server.
+ *
+ * `provenance` is the DOMAIN's shape, whole: `null` means nobody has ever
+ * claimed these settings and the numbers above are defaults rather than choices,
+ * which is the distinction the server keeps (`provenance: null`) and which this
+ * client would destroy by substituting an actor.
+ */
+export type WorkspaceSettings = {
+  staleDays: number;
+  dueSoonDays: number;
+  autoCloseAfterDays: number | null;
+  provenance: ClaimProvenance | null;
+};
+
+/**
  * The stock arrangement's VALUES — what a view renders when the user has chosen
  * nothing. Split out from `DEFAULT_VIEW_PREFS` because the two are different
  * facts and fusing them is what let a default wear a user's authority: these
