@@ -41,7 +41,52 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ⛔ `hig-per-screen/5b` IS NOT EXECUTABLE — MEASURED 2026-09-19. **DO NOT RE-TREAD IT.**
+> # ⚠ `hig-per-screen/3b` IS CONTESTED, AND `3b` IS NOT THE ONLY STALE THING — measured 2026-09-19.
+>
+> **Do not re-tread this**: the rows below are the ones a restarted executor will pick up next, and each
+> has already been investigated once.
+>
+> ## `3b` — TWO DOCUMENTS DISAGREE, AND THE LEDGER SIDES WITH NEITHER
+>
+> **Executor 2's own handoff claims the work is done:** `docs/lanes/executor-2-state.md:2753-2757` —
+> *"Members + InviteAdmin. MERGED as PR #443 (`ba96a8d2`). **Makes the ledger's `hig-per-screen/3a` and
+> `/3b` true — except see the scope caveat.**"* Its § 3 caveat is about **3a** only (*"Four unbuildable
+> columns mean 3a is true only for the backed surface"*), and its § 2 rule 4 says *"`hig-per-screen/3a`
+> stays `todo`"*.
+>
+> **The measurements, all on `origin/main`:**
+> - the ledger still reads **`hig-per-screen/3b` = `todo`**;
+> - the plan (`docs/superpowers/plans/2026-09-08-hig-per-screen.md:834-852`) allocates **three
+>   STACK-SUITE cases, `13.295`–`13.297`**, plus a mutation and three catalogue rows;
+> - **those three ids exist only as PROSE** — `test-cases/13:7913` and the id-allocation note at `:43`.
+>   There is **no case row** for any of them, and `check-case-ids` does not count them;
+> - **there is no members spec in `apps/web/e2e-stack/`** (nor in `apps/web/e2e/`);
+> - **but the properties ARE witnessed by JSDOM cases** in `apps/web/test/members-page.test.tsx` —
+>   `:179` asserts the `ShellRefusal` refusal, `:318` asserts the dead-mint residue **verbatim**.
+>
+> **So `3b` is either done-but-uncatalogued or needs the three stack cases.** That is a ruling, not a
+> guess, and it is compounded by ownership: the row says *"Dispatched to executor 2"*. **RULING REQUESTED.**
+>
+> ## EXECUTOR 2 APPEARS IDLE — half the fleet, and the owner wanted two in parallel
+>
+> `gh pr list --state open` returns **only two PRs repo-wide**, both executor 1's (#495, #496). Executor 2's
+> worktree (`/Users/kiro/my_projects/gisik-nokma-exec2`) is parked on `exec2/settings-wf-task9` — **merged
+> as #492** — with a **clean tree** and a handoff refresh as its last commit. Nothing in flight.
+> **Do not conclude from this that `3b` is free to take:** the row says it was dispatched to executor 2, and
+> **cycle 7's own title mentions "two void dispatches" whose root cause it annotated** — this note does NOT
+> establish whether `3b`'s dispatch (`CTL-DISPATCH-2026-09-18-exec2-members-inviteadmin.md`, 18 Sep 08:27)
+> is one of them. **Owner: the controller.**
+>
+> ## A NEAR-MISS WORTH KEEPING, because it is this repo's favourite defect
+>
+> I was one step from reporting that `3b`'s dead-mint residue message **does not exist in the product**. The
+> sweep was empty and the conclusion was tidy. **It exists** — `members/page.tsx:836` — and my grep missed
+> it because **the product capitalises the leading word** (`No link behind this one…`) while the plan quotes
+> it mid-sentence in lowercase. A case-sensitive NULL that reads exactly like an absence, agreeing with a
+> hypothesis I wanted. It surfaced only on a shorter fragment (`link behind`). **Second instance in one
+> session; see [[search-string-can-silence-itself]]'s third disguise.**
+>
+> > # ⛔ `hig-per-screen/5b` IS NOT EXECUTABLE — MEASURED 2026-09-19. **DO NOT RE-TREAD IT.**
 >
 > A restarted executor reading the ledger WILL pick `5b`: its row says *"Stays todo until `13.304` is
 > restated or **witnessed**"*, and the catalogue's `13.304` row carries a restatement with a named
