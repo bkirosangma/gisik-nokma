@@ -41,36 +41,64 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~12:5x IST. **SECOND WAVE, TASK 5 (the Backlog tab's
-> # rank order, drag reorder, and Move up / Move down) IS DONE, REVIEWED, FIXED, AND THEN FIXED AGAIN
-> # UNDER AN OWNER RULING. **PR #450 OPEN ON BASE `main`, REBASED ONTO `origin/main` = `08bdd791`
-# (executor 2's Task 9, PR #449, merged while this was open), AWAITING THE CONTROLLER'S
-> # MERGE.** An independent
-> # review's four surviving mutants are all killed (below); the unranked-tail defect that same review
-> # found was HELD rather than shipped — the controller ruled a short hold cheaper than shipping it and
-> # correcting it in a second PR — and the OWNER THEN RULED **OPTION B**: rank the rows that have no key
-> # first, in their drawn order, then apply the move, in ONE ingest. It is implemented in the ruling
-> # commit, with the partial-batch cost the owner accepted handled explicitly rather than left implicit.
-> # This block is the position; everything below it is
-> # RECORD. **The queue after this task is NOT empty** — Task 6 of
-> # `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md` (`autoCloseAfterDays`: the
-> # setting, the projection, the wire, and the Workspace settings tab) is next, and it is **dispatched
-> # by the controller rather than started by reflex. HOLD for that dispatch.** A SECOND EXECUTOR IS LIVE
-> # on a disjoint workstream in `gisik-nokma-exec2`; branches are one-per-task and every PR is
-> # `--base main`.
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~13:0x IST. **SECOND WAVE, TASK 6
+> # (`autoCloseAfterDays` end to end, plus the Workspace settings tab) IS COMMITTED, GATE-GREEN, AND
+> # UNDER INDEPENDENT REVIEW. ONE COMMIT `e76efb7c`; NO PR OPENED YET** — a reviewer was dispatched
+> # FIRST, because the controller made "reviewer recorded in the PR body before it opens" a standing
+> # requirement rather than a reminder. **This block is the position; everything below it is RECORD.**
+> # **The queue after this task is NOT empty** — Tasks 7, 8 (`reopenedAt` + the auto-close sweep) and
+> # 9/10 (bulk close) remain in `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md`,
+> # and they are **dispatched by the controller rather than started by reflex. HOLD for that dispatch.**
+> # A SECOND EXECUTOR IS LIVE on a disjoint workstream in `gisik-nokma-exec2`; branches are
+> # one-per-task and every PR is `--base main`.
 >
 > | | |
 > |---|---|
-> | branch | `exec/second-wave-t5-backlog-rank`, cut from `origin/main` = **`488bfb2d`** (Task 4, PR #446). Not rebased since; no peer landed under it while it was open |
-> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha printed here names an ANCESTOR. SIX commits, ALL REWRITTEN BY THE REBASE: **`27ed717b`** (the task, 8 files, +1145/−67), **`22fd0608`** (the review fix round: four surviving mutants killed, three Minor fixes), **`baeb4b52`** (the grouping finding recorded as a measurement), **`3c237b15`** (option B, the owner’s ruling), **`7fabf8da`** (the PR number), **`9ac3dabe`** (the docblock’s ruling record). Plus the **handoff commit that carries this very block**, which cannot name itself. **THE PRE-REBASE SHAS `204cf374` / `8ec6d18b` / `7663ea4f` / `7621ea86` / `2987b95d` / `5747ff9b` ARE ORPHANED** — `git merge-base --is-ancestor` is false for each while `git cat-file` still answers `commit`, which is this file’s opening trap for the fifth task running |
-> | base | **`488bfb2d`** = `origin/main`, carrying second-wave Tasks 1 (#441), 2 (#442), 3 (#444), 4 (#446) and executor 2's Members+InviteAdmin (#443) |
+> | branch | `exec/second-wave-t6-autoclose`, cut from `origin/main` = **`8aff8843`** (Task 5, PR #450, MERGED) |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha printed here names an ANCESTOR. Currently **`e76efb7c`** (the task: 20 files changed, +1428/−26, one new migration and one new component). No rebase has happened; if the PR is rebased, every sha here is superseded and the pre-rebase one is ORPHANED — check with `git merge-base --is-ancestor`, never `git cat-file`, which resolves reflog-only commits and hands you pre-rebase content while looking like it worked |
+> | base | **`8aff8843`** = `origin/main`, carrying second-wave Tasks 1–5 (#441, #442, #444, #446, #450) and executor 2's Task 9 (#449) |
 > | PR base | **`main`** — `owner/workspace-edits` is retired and deleted |
-> | case ids | **`13.707`–`13.712`** — four from the task and two from the ruling fix — inside this executor's allocated block `13.700`–`13.759`; **`13.713`–`13.759` remain unminted**. **Recounted two independent ways at this tip and they agree:** over case MARKERS using `scripts/check-case-ids.mjs`'s own `ID_LINE` regex, the highest marker minted in the block was `13.706` (Task 4's); and `grep -rnE '13\.70[7-9]\|13\.710'` over `packages/`, `apps/` and `test-cases/` returned **no hits at all**, against a positive control over `13\.70[0-6]` (found in both) and a null control over `13\.999` (absent). The plan's own `13.622`–`13.625` were NOT used — the dispatch records them as taken |
-> | six checks | **all EXIT 0 at the ruling commit**, run through `pnpm run check:*` so no filename is guessed: `tasks` · `env` · `runbook` · `help` · `citations` (**ratchet holds exactly on every file**; file 13 = **584** cited / 0 uncited, up from Task 4's 561 by exactly this task's six ✅ cases) · `db-tz` **0 with `DATABASE_URL=postgres://gisik:gisik@localhost:54330/gisik_nokma`** (exits 2 without it, by design; note 54330, not the shared cross-lane test Postgres on 54329). Also `node scripts/check-case-ids.mjs` **EXIT 0** — **2274** unique ids (was 2251; +6 this task's, +17 executor 2's Task 9), union == sum so no duplicates, self-test passed |
-> | suites | **app-core 1528 · apps/web 470, zero failures**, both `--no-file-parallelism`, Node **v22.22.2**, re-run after the fix round and after the dist rebuild. Both figures reconcile against Task 4's, which is what makes them a positive control that the new cases are COLLECTED rather than merely written: app-core **1486 + 42 = 1528** (26 of this task’s, 16 of executor 2’s Task 9 which the rebase brought in) (20 cases in `backlog-rank.test.ts`, one added by the fix round) and apps/web **465 + 5 = 470** (the Task 5 describe blocks grew from 6 to 8 cases in the fix round; the file's pre-existing four are included in both numbers) |
-> | typechecks | **domain, app-core, ui and apps/web all EXIT 0** — run after rebuilding `packages/domain` and `packages/app-core` dist, which `apps/web` resolves through by package name |
-> | tree | clean at the frozen head; no `dist`, no `task-ledger.tsv`, no `.superpowers/` in the diff (checked by `git diff --name-only`) |
+> | case ids | **`13.713`–`13.717`**, five ids, inside this executor's block `13.700`–`13.759`; **`13.718`–`13.759` remain unminted**; executor 2's `13.760`–`13.819` untouched. **Recounted by case MARKER at this tip**, using `scripts/check-case-ids.mjs`'s own `ID_LINE` regex over `packages/` + `apps/` + `test-cases/`: the block's high-water was `13.712` (Task 5's) and `13.713` returned **false**, with `13.711`/`13.712` present as the positive control. **A plain substring sweep reported `13.713` as PRESENT and had to be discounted** — the only hit was this catalogue's own prose *saying* `13.713`–`13.759` were free. The mentioned-versus-minted trap, sixth occurrence |
+> | migration | **`apps/server/migrations/1789400000000_workspace-settings-auto-close.sql`** — the FIRST migration of the second wave. `ADD COLUMN auto_close_after_days integer NULL` + COMMENT; **Down drops it**. **The hot dev stack migrates ONLY at container start**, so after this merges the server container must be restarted or every route touching the column 500s — the failure already seen once today with `proj_tickets.rank`. The controller said it will do that restart; this lane ran **no compose action at all** |
+> | six checks | **all EXIT 0 at `e76efb7c`**, run through `pnpm run check:*` so no filename is guessed: `tasks` · `env` · `runbook` · `help` · `citations` (**ratchet holds exactly**: file 13 = **589** cited / 0 uncited, up from Task 5's 584 by exactly this task's five ✅ cases) · `db-tz` **0 with `DATABASE_URL=postgres://gisik:gisik@localhost:54330/gisik_nokma`** (**exits 2 without it, by design** — and that pair is the control that the check reads the env at all). Also `node scripts/check-case-ids.mjs` **EXIT 0** — **2279** unique ids (was 2274; +5, exactly this task's), union == sum so no duplicates, self-test passed. **A false RED was caught here**: `pnpm run check:citations` first returned EXIT 1 with `ERR_PNPM_UNSUPPORTED_ENGINE … Got: v24.11.1` because that one invocation had dropped the Node-22 PATH — the failure was the ENVIRONMENT, not the ratchet. **A check result is not evidence unless it names its Node** |
+> | suites | **app-core 1535 · apps/web 474 · server 1541 (5 skipped), zero failures**, `--no-file-parallelism`, Node **v22.22.2**, re-run after the dist rebuild. Both figures a reader can audit RECONCILE exactly against Task 5's, which is what makes them a control that the new cases are COLLECTED rather than merely written: app-core **1528 + 7 = 1535** (4 mapper cases at 13.715 + 3 read-door cases at 13.717) and apps/web **470 + 4 = 474** (the four 13.716 tab cases). The domain suite is 30 files / all green; the server's 151 files include the projection, route and integration suites |
+> | gate | **`pnpm turbo run build test typecheck` — 33/33 tasks successful, EXIT 0.** The first two runs were RED and both were diagnosed rather than re-rolled: run 1 failed app-core's workflow-builder/ticket-types files and run 2 failed `server/seed/seed-dev` and `server/attention 7.114`. **The app-core and seed-dev failures pass standalone (71/71, 8/8) and the failing set MOVED between runs — contention, not the change.** The attention failure was REAL and MINE: a THIRD whole-object `toEqual` on the settings body sat at `attention.test.ts:672` in multiline form, which a single-line grep could not see. Fixed, and a **multiline-aware re-sweep** (python, over `packages/` + `apps/`, matching any `{...}` naming both knobs) confirmed it was the only one — the sweep was the defect, not the edits |
+> | typechecks | **domain, app-core, web and everything the gate covers all EXIT 0**, run after rebuilding `packages/domain` and `packages/app-core` dist, which `apps/web` resolves through by package name |
+> | tree | clean at `e76efb7c`; **no `dist`, no `task-ledger.tsv`, no `.superpowers/`** in the diff (checked by `git diff --name-only origin/main...HEAD`) |
 > | dev stack | **no compose action was run at any point.** `curl -s localhost:3000/v1/auth/methods` still answers `{"google":true,"apple":false,"phone":false}` — the sign-in the 2026-09-09 env rule protects is intact |
+>
+> ## ▣ WHAT TASK 6 SHIPS, AND THE ONE THING IT EXISTS FOR
+>
+> **`autoCloseAfterDays` is `number | null`, where `null` is a CLAIM ("turn auto-close off") and
+> `undefined` is "this claim does not mention it" — and `COALESCE` cannot tell those apart.** The
+> neighbouring columns use `COALESCE(EXCLUDED.x, existing.x)` and that is correct for them because
+> their schema has no `null` case. Here it would make a claim that turns auto-close off **silently
+> ignored**: accepted by the door, committed to the ledger, its provenance even updated, no effect on
+> the setting. So the projection writes
+> `auto_close_after_days = CASE WHEN $7 THEN $8 ELSE proj_workspace_settings.auto_close_after_days END`,
+> `$7` being `payload.autoCloseAfterDays !== undefined` — the presence boolean, computed from the
+> parsed payload because Zod is the last layer where the two are still different values.
+>
+> **The mutation is run and it is clean: swapping the CASE for a self-consistent `COALESCE` reddens
+> exactly ONE case — 13.714's clear-to-null, `expected 30 to be null` — and 11 of 12 cases in that
+> file stay green.** An earlier, cruder mutant (CASE removed but `$7` still bound) reddened 9 cases
+> with `could not determine data type of parameter $7`: a plumbing error, not the semantics, so it was
+> **discarded rather than reported as a kill**.
+>
+> ## ▣ THE RECORDED DEVIATION — read this before touching the settings read
+>
+> The plan told the implementer to extend a `mapWorkspaceSettings` and asserted the attention strip's
+> read "already carries" settings to the client. **Both claims are measurably false on this tree**: no
+> `mapWorkspaceSettings` existed anywhere (`/usr/bin/git log -S'mapWorkspaceSettings' --all` returns
+> only the plan commit that wrote the sentence), and `mapAttention` reads `items` and returns
+> `AttentionItem[]`, dropping the `settings` sibling the server has sent since Plan 5. The executor
+> took the conservative additive ruling and **flagged it as a scope change rather than quietly
+> widening `getAttention`**: ONE new `DataSourceQuery.getWorkspaceSettings` (no shipped signature
+> changed), the client view type in `view-types.ts`, the mapper under **the plan's own name**, and an
+> implementation reading the SAME already `requireMember`-gated `/v1/workspaces/:ws/attention` route —
+> **no new server route**. The over-fetch cost is named in the source. **The CONTROLLER confirmed the
+> default and the OWNER confirmed it in turn (2026-09-18)**, so the docblock cites the owner, not a
+> controller default. Full account: `EXEC-2026-09-18-t6-settings-read.md`.
 >
 > ## ▣ WHAT TASK 5 SHIPS
 >
