@@ -32,7 +32,7 @@ yes"*). **The controller's next dispatch is the position** — this block is his
 |---|---|
 | `scripts/check-migration-order.mjs` | the check + its own planted-defect self-test |
 | `scripts/check-migration-order.d.mts` | sibling declarations, so a test can import it (the repo's existing idiom) |
-| `apps/server/test/tooling/check-migration-order.test.ts` | 4 cases, `13.902`–`13.905`, in the normal test graph |
+| `apps/server/test/tooling/check-migration-order.test.ts` | 5 cases, `13.902`–`13.906`, in the normal test graph |
 | `package.json` | `check:migrations` |
 | `.github/workflows/ci.yml` | its own `check-migrations` job, `fetch-depth: 0` |
 | `Features.md` §13 | one `⚙️` bullet |
@@ -67,11 +67,46 @@ Weakening `>` to `>=` → `13.903` alone. Restored byte-identically at sha256
 independent rules (duplicate + not-strictly-above), so the expected count is 2 for that case and is
 written per-case. The check was right; the fixture was corrected, not the check.
 
+### § 4b — THE REVIEW ROUND. ONE CRITICAL, ONE IMPORTANT, THREE MINOR — ALL FIXED.
+
+An independent reviewer ran at `4149ef4c` and re-derived every number rather than adopting it.
+
+1. **CRITICAL — the new CI job was not in `gate`'s `needs`.** A violating PR would have produced
+   `check-migrations: failure` *and* `gate: success`, and `gate` is the one name the auto-merge
+   precondition reads. My own comment claimed it ran "on the same terms as `check-tasks`", **which is in
+   that list** — the claim was false as written. Fixed; verified by parsing the YAML (`gate.needs` now
+   carries `check-migrations`).
+2. **IMPORTANT — a stacked branch was a real false accept.** Compared against `origin/main`, a migration
+   its own base already outranks is accepted, and both merge into the same out-of-order set.
+   **Reproduced in a scratch repo: the same tree gives `EXIT 0` against the parent's base and `EXIT 1`
+   against the parent branch.** CI now passes `--base origin/${{ github.base_ref || 'main' }}`. 14 of
+   the last 400 merges here were based on a non-main branch.
+3. **MINOR — `numericPrefix` diverged from the runner for a non-`\d+` prefix** (`1e99_sci.sql`): the
+   mirror returned 0 and REFUSED what the runner runs last. Now `Number(raw) || 0`, exactly the runner's
+   line, and the docblock's false claim of an exact mirror is corrected.
+4. **MINOR — `materializeRef` used `git ls-tree -r`** while the reader skips directories: a baseline
+   holding a subdirectory drew an uncaught ENOENT, and the `=== 0` guard was unreachable because
+   `ls-tree <ref>:<path>` exits 128 first. Both fixed; a missing path now prints the designed refusal
+   (verified: `EXIT 1` with git's own message) and a subdirectory baseline no longer crashes (verified:
+   `EXIT 0`).
+5. **MINOR — the reader's SORT is not load-bearing**, though my docblock presented it as the rottable
+   half. The FILTER is; the sort only mirrors the runner's order and is witnessed by the test suite, not
+   by the self-test. Docblock corrected to say exactly that.
+
+**The review also refuted itself once**, which is worth recording: it hypothesised `checkOrder` never
+fires (the repo passes no `--check-order`), then measured at the runner boundary —
+`bin/node-pg-migrate.js:422` is `CHECK_ORDER ??= true`, the `[default: true]` being help-only — and
+withdrew. **The premise this check rests on is confirmed at the runner, not at the parser.**
+
+**No second reviewer was dispatched.** The brief makes a scoped re-review conditional on a fix
+over-reaching its scope; every fix landed inside the reviewed subject, and each was verified by
+measurement (above) rather than by re-reading the diff.
+
 ### § 5 — ⚠ ID-BLOCK COLLISION — MEASURED, REPORTED, NOT SILENTLY RENUMBERED
 
 The controller granted `13.890`–`13.919` and the dispatch said "next free `13.881`". **Both were stale.**
 Measured by case MARKER only, `13.890`–`13.901` are ALREADY MINTED in
-`test-cases/13-deployment-dogfooding.md`. **I used `13.902`–`13.905`** — inside the granted block, above
+`test-cases/13-deployment-dogfooding.md`. **I used `13.902`–`13.906`** — inside the granted block, above
 the real high-water mark. This is the `shared-id-space-needs-blocks` recurrence's fourth appearance; the
 controller's own grant was the stale reading. **A bare number is a reading that expires.**
 
@@ -83,8 +118,8 @@ controller's own grant was the stale reading. **A bare number is a reading that 
 ### § 7 — CHECKS AT THIS HEAD (node v22.22.2 — a gate result names its Node)
 
 `check:env` 0 · `check:tasks` 0 · `check:db-tz` 0 · `check:runbook` 0 · `check:citations` 0 · `check:help` 0
-· **`check:migrations` 0** (new) · `node scripts/check-case-ids.mjs` 0 (2369 unique ids).
-`turbo run build` 11/11 · `turbo run typecheck` 17/17 · **server suite 153 files, 1562 passed, 5 skipped**.
+· **`check:migrations` 0** (new) · `node scripts/check-case-ids.mjs` 0 (2370 unique ids).
+`turbo run build` 11/11 · `turbo run typecheck` 17/17 · **server suite 153 files, 1563 passed, 5 skipped**.
 **The forced gate was NOT run** — the controller runs it.
 
 ### § 8 — OPEN ITEMS
@@ -171,7 +206,7 @@ reads exactly like a real one. Recording, not fixing. **Owner: the controller.**
 | Ruling: close this dispatch as already-delivered, and re-scope to the four families above (which needs its own ruling on inventing a treatment) | **the controller** |
 | `docs/design/prototype-delta-2026-09-18.md:666` is now FALSE and keeps spawning dispatches for finished work | **the controller** — deliberately NOT edited by me |
 | `check:case-ids` has no `package.json` alias, so `pnpm run check:case-ids` is a false red; one-line fix | **the controller** — deliberately NOT fixed by me |
-| Next free case id at this tip: **`13.902`** (`13.890`–`13.893`, `13.894`, `13.895`–`13.901`, `13.920`, `13.921` are spent; block `13.890`–`13.919` is NOT free from `13.894` on, as `ui.css`'s neighbour note claims) | whoever mints next |
+| Next free case id at this tip: **`13.907`** — `13.890`–`13.906` are all spent in `test-cases/13-deployment-dogfooding.md` (`13.902`–`13.906` by this branch) and the highest `13.*` anywhere is `13.920`. **Measured by case MARKER only.** The stale `13.902` this row used to carry was itself the fourth appearance of the shared-id-space collision — a number is a reading that expires, a block is the only form that stays true. | whoever mints next |
 
 ---
 

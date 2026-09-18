@@ -36,18 +36,35 @@
  *     BEFORE this branch existed — that is the base ref's own business, and it
  *     is the state the base ref's own run of this check reports.
  *
+ * THE BASELINE MUST BE THE BRANCH'S OWN BASE, and getting that wrong is a FALSE
+ * ACCEPT rather than a false refusal. Found by review and measured: a branch
+ * stacked on another branch that adds `1790000000000`, itself adding
+ * `1789600000000`, is ACCEPTED against `origin/main` (max `1789500000000`) and
+ * REFUSED against its actual base. When both merge the file set holds
+ * `1789600000000` while the applied list already holds `1790000000000`, so
+ * `checkOrder` throws — the exact outage this check exists to prevent. This is
+ * why the CI job passes `--base origin/${{ github.base_ref }}` rather than
+ * accepting the default; 14 of the last 400 merges here were based on a
+ * non-main branch, so the shape is used in this repo and not hypothetical.
+ *
  * THE BASELINE IS THE BASE REF'S TIP, NOT THE MERGE BASE. The merge base is the
  * tempting choice and it is the weaker one: it cannot see the case that actually
- * broke the stack, where `main` gains a higher-numbered migration while a branch
- * is open. That branch's migration is above its own merge base and below the
- * tip, and only the tip comparison refuses it — correctly, because the repo
+ * broke the stack, where the base gains a higher-numbered migration while a
+ * branch is open. That branch's migration is above its own merge base and below
+ * the tip, and only the tip comparison refuses it — correctly, because the repo
  * state after merge is two migrations out of order.
  *
  * The whole comparison is a property of the migrations DIRECTORY read through
  * one reader, so the self-test plants fixture DIRECTORIES rather than arrays:
  * a test that exercises a hand-built list proves the comparison and not the
- * reader, and the reader (`readdirSync` + the runner's own filter and sort) is
- * the half that silently rots.
+ * reader. **The reader's FILTER is the load-bearing half** — deleting the
+ * `^\..*` ignore pattern or the `isFile()` test is caught by the self-test. Its
+ * SORT is not load-bearing for any verdict (the ceiling is a max, the new set
+ * is a set difference, and the duplicate map is order-free); it mirrors the
+ * runner's order so that what this reports is what the runner will do, and it
+ * is witnessed by the test suite's explicit array assertion rather than by the
+ * self-test. Review measured that distinction — deleting the sort leaves this
+ * script's own self-test passing — and it is stated here rather than implied.
  */
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -74,9 +91,15 @@ const DEFAULT_BASE_REF = 'origin/main';
  * in fact sorts below everything. Planted defect 5 in the self-test is exactly
  * that file, and it is refused.
  *
- * A prefix the runner cannot parse yields 0 there (`Number(prefix) || 0`), so
- * it sorts ahead of every real migration; this returns the same 0 rather than
- * inventing a refusal the runner does not have.
+ * A prefix the runner cannot parse falls through to `Number(prefix) || 0`, so
+ * `backfill-tickets.sql` is 0 and sorts ahead of every real migration, while
+ * `1e99_sci.sql` is 1e99 and sorts last. **This mirrors that last line rather
+ * than returning a bare 0**, found by review: the earlier version returned 0 for
+ * every non-`\d+` prefix and so REFUSED `1e99_sci.sql`, which the runner would
+ * happily run last. That divergence could only ever have produced false
+ * refusals, never a false accept, but it made the docblock's own claim of an
+ * exact mirror false, and an instrument that refuses what the runner accepts is
+ * still an instrument that lies about the runner.
  */
 const SEPARATOR = '_';
 export function numericPrefix(fileName) {
@@ -92,7 +115,7 @@ export function numericPrefix(fileName) {
     }
     return Number(raw);
   }
-  return 0;
+  return Number(raw) || 0;
 }
 
 /**
@@ -313,14 +336,31 @@ function writeFixtureDir(root, label, names, fixtures) {
 
 /** Materialise a ref's migrations directory into a real directory of empty
  * files. Only NAMES matter, and going through a real directory is what keeps
- * the baseline on the same reader as the current tree. */
-function materializeRef(ref, dir) {
-  const out = execFileSync('git', ['ls-tree', '-r', '--name-only', `${ref}:${MIGRATIONS_REL}`], {
+ * the baseline on the same reader as the current tree.
+ *
+ * NOT `-r`, and blobs only, so this LISTING matches what `readMigrationNames`
+ * can see. Found by review: with `-r` a subdirectory under the baseline's
+ * migrations drew a `writeFileSync` ENOENT and an uncaught stack — loud, so
+ * never a false accept, but the designed "refusing to conclude" message never
+ * printed and the two halves disagreed about what a migration is. */
+export function materializeRef(ref, dir) {
+  const out = execFileSync('git', ['ls-tree', `${ref}:${MIGRATIONS_REL}`], {
     cwd: ROOT,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  const names = out.split('\n').filter(Boolean);
+  const names = out
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => {
+      const [meta = '', name = ''] = line.split('\t');
+      // `<mode> <type> <sha>\t<name>` — `blob` covers regular files AND
+      // symlinks, exactly what the reader's `isFile() || isSymbolicLink()`
+      // admits; `tree` is a subdirectory the reader skips.
+      return { type: meta.split(/\s+/)[1], name };
+    })
+    .filter((e) => e.type === 'blob')
+    .map((e) => e.name);
   for (const n of names) writeFileSync(join(dir, n), '');
   return names.length;
 }
@@ -399,7 +439,19 @@ if (executedDirectly) {
 
     const baseDir = join(scratch, 'real-base');
     mkdirSync(baseDir, { recursive: true });
-    const materialized = materializeRef(ref, baseDir);
+    let materialized;
+    try {
+      materialized = materializeRef(ref, baseDir);
+    } catch (err) {
+      // `git ls-tree <ref>:<path>` exits 128 for a path the ref does not hold,
+      // so this branch -- not the `=== 0` guard below -- is the one a moved or
+      // missing migrations directory actually reaches. Raw output is kept
+      // because it names the failing revision and path.
+      console.error(`check-migration-order: could not list ${ref}:${MIGRATIONS_REL}`);
+      console.error(`  ${String(err?.stderr ?? err?.message ?? err).trim()}`);
+      console.error('  Refusing to conclude: with no baseline there is no maximum to be above.');
+      process.exit(1);
+    }
     if (materialized === 0) {
       console.error(`check-migration-order: ${ref}:${MIGRATIONS_REL} materialised ZERO files.`);
       console.error('  Either the path moved or the ref is not what was expected; refusing to conclude.');

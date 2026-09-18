@@ -12171,6 +12171,28 @@ carry a unique 13-digit prefix, sorted order equals numeric order, and the highe
 the check reports `0 new against origin/main`. **No pre-existing violation was found, and none was
 waived** — the check has no skip list and skips nothing.
 
+- ✅ **13.906 — the baseline half of the path is witnessed too.** Review measured that `materializeRef`
+  and `resolveBaseRef` were covered by **no test at all** — which is the half a defect had just been
+  found in — so the part that turns a git ref into a directory is now exercised rather than assumed.
+  `materializeRef('HEAD', dir)` returns a non-empty count AND its output is read back by the same
+  `readMigrationNames` the real sweep uses, because a baseline on a different path from the tree it is
+  compared against is exactly the drift this guards. The throw case matters most: a ref the repo cannot
+  list must not silently materialise an **empty** baseline, which would make every migration "new" above
+  a maximum of none and report a clean sweep it had not earned. Deleting the throw reddens this case and
+  only this case.
+
 **Two honest non-coverage notes.** It does not refuse a migration *removed or renamed* from the base
 set (13.903 records a removal as accepted, deliberately). And it cannot see a lower-numbered migration
 that reached the base ref before the branch existed — that is the base ref's own run of this check.
+
+**Two defects the REVIEW round found in the first version, both fixed and both verified by measurement
+rather than by re-reading the diff.** (a) **The new CI job was not in `gate`'s `needs`** — so a
+violating PR would have produced `check-migrations: failure` *and* `gate: success`, and `gate` is the
+single check name the auto-merge precondition reads. The branch's own comment claimed it ran "on the
+same terms as `check-tasks`", which **is** in that list; the claim was false as written. (b) **A stacked
+branch was a real false accept**: compared against `origin/main` a migration that its own base already
+outranks is accepted, and both merge into the same out-of-order file set. Reproduced in a scratch repo —
+the same tree gives `EXIT 0` against the parent branch's *base* and `EXIT 1` against the parent branch —
+and the CI job now passes `--base origin/${{ github.base_ref || 'main' }}`, so a pull request is measured
+against the branch it will actually land on. **14 of the last 400 merges here were based on a non-main
+branch**, so the shape is used rather than hypothetical.

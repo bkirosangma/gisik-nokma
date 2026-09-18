@@ -291,6 +291,18 @@ jobs:
   # has no base ref to compare against. It FAILS LOUDLY rather than passing
   # vacuously when the ref cannot be resolved, which is the whole reason the
   # baseline is refetchable rather than assumed.
+  #
+  # THE BASE IS THE PULL REQUEST'S OWN, NOT `main` -- found by review, and the
+  # difference is a real false accept rather than a nicety. Measured in a
+  # scratch repo: a branch whose base adds `1790000000000` and which itself adds
+  # `1789600000000` is ACCEPTED against `origin/main` (max `1789500000000`) and
+  # REFUSED against its actual base. When both merge, the file set holds
+  # `1789600000000` while the applied list already holds `1790000000000`, so
+  # checkOrder throws at container start -- the exact outage this job exists to
+  # prevent. 14 of the last 400 merges here were based on a non-main branch, so
+  # the shape is used in this repo, not hypothetical. `github.base_ref` is set
+  # only for `pull_request`; on a `push` to main the fallback is the same ref
+  # being pushed, where the comparison is correctly empty.
   check-migrations:
     runs-on: ubuntu-latest
     steps:
@@ -301,7 +313,7 @@ jobs:
         with:
           node-version: 22
       - name: no migration may be numbered below one already on the base ref
-        run: node scripts/check-migration-order.mjs
+        run: node scripts/check-migration-order.mjs --base origin/${{ github.base_ref || 'main' }}
 
   # Builds every package once and persists turbo's cache for the jobs below.
   #
@@ -562,7 +574,7 @@ jobs:
   gate:
     if: always()
     needs:
-      [scope, check-env, check-runbook, check-citations, check-help, check-tasks, build, typecheck, server-tests, other-tests, e2e]
+      [scope, check-env, check-runbook, check-citations, check-help, check-tasks, check-migrations, build, typecheck, server-tests, other-tests, e2e]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-node@v4

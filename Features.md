@@ -2822,8 +2822,12 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   present**, which a bare `Number()` would read as `2.026e16` and wrongly accept. Two honest
   non-coverage notes: it does not refuse a migration removed or renamed from the base set (a rename of a
   not-yet-applied migration is legitimate and indistinguishable from this side), and it cannot see a
-  lower-numbered migration that reached the base ref before the branch existed. `scripts/check-migration-order.mjs`,
-  `package.json`, `.github/workflows/ci.yml`, cases 13.902–13.905
+  lower-numbered migration that reached the base ref before the branch existed. **The CI job passes the
+  pull request's own base** (`--base origin/${{ github.base_ref }}`), not `main`: review measured that a
+  branch stacked on another branch which outranks it is **accepted** against `main` and refused against
+  its real base, and that shape is used here — 14 of the last 400 merges were based on a non-main
+  branch. `scripts/check-migration-order.mjs`, `package.json`, `.github/workflows/ci.yml`, cases
+  13.902–13.906
 
 ## 14. MCP server
 

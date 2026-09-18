@@ -8,6 +8,7 @@ import {
   KNOWN_GOOD,
   PLANTED,
   checkMigrationOrder,
+  materializeRef,
   numericPrefix,
   readMigrationNames,
 } from '../../../../scripts/check-migration-order.mjs';
@@ -137,5 +138,26 @@ describe('check-migration-order', () => {
     expect(problems).toHaveLength(1);
     expect(problems[0]).toContain('20260101000000000_backfill.sql');
     expect(problems[0]).toContain('1767225600000');
+  });
+
+  /**
+   * 13.906 — the baseline half of the path is witnessed too. Review measured that `materializeRef`
+   * and `resolveBaseRef` were covered by NO test at all, which is the half a defect had just been
+   * found in, so the part that turns a git ref into a directory is now exercised rather than
+   * assumed. `HEAD` is used instead of `origin/main` because it resolves in any checkout, and the
+   * throw case is the one that matters most: a ref the repo cannot list must not silently
+   * materialise an EMPTY baseline, which would make every migration "new" above a maximum of none
+   * and report a clean sweep it had not earned.
+   */
+  it('13.906 — materialises a real ref into real files the reader can read, and THROWS for a ref it cannot list', () => {
+    const dest = join(scratch, 'materialised');
+    mkdirSync(dest, { recursive: true });
+    const names = materializeRef('HEAD', dest);
+    expect(names).toBeGreaterThan(0);
+    // The materialised output must be readable by the SAME reader the real sweep uses, or the
+    // baseline is on a different path from the tree it is compared against.
+    expect(readMigrationNames(dest)).toHaveLength(names);
+
+    expect(() => materializeRef('0'.repeat(40), join(scratch, 'never-written'))).toThrow();
   });
 });

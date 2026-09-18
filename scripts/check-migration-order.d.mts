@@ -9,6 +9,7 @@
  * 17 are `YYYYMMDDHHMMSSmmm` UTC, anything non-numeric is 0. */
 export function numericPrefix(fileName: string): number;
 export function readMigrationNames(dir: string): string[];
+export function materializeRef(ref: string, dir: string): number;
 export function checkMigrationOrder(input: { baseDir: string; currentDir: string }): {
   problems: string[];
   baseMax: number;
