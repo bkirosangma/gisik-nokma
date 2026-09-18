@@ -986,7 +986,9 @@ so it is visible from the declaration that causes it.
 ## The workflow builder's canvas drew into nothing — `min-height` is not a definite height (2026-09-19)
 
 **Owner-prioritised out of order.** ONE case, `13.911`, minted at the tip of `exec2/builder-canvas-collapse`
-over `origin/main` `ed4c992f` **by case MARKER only**: `13.890`–`13.910` are spent and `13.920`–`13.927`
+over `origin/main` `ed4c992f` — and **rebased onto `98ffab2a` when the catalogue split landed**, which is
+why this section lives in a part-file rather than at the foot of the index — **by case MARKER only**:
+`13.890`–`13.910` are spent and `13.920`–`13.927`
 belong to another lane, so this case takes the first free id of the dispatched block and **the next free
 in that block is `13.912`**.
 
