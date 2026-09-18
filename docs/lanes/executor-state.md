@@ -20,23 +20,86 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~06:xx IST. **STEP 2c-0 (THE PROTOTYPE DELTA AUDIT) IS
-> # DONE. PR #424 IS OPEN AGAINST `owner/workspace-edits`, AWAITING THE CONTROLLER'S MERGE.**
+> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~05:3x IST. **STEP 2c-1 (THE TOKEN LAYER) IS DONE, GATED,
+> # AND ITS PR IS OPEN AGAINST `owner/workspace-edits`. REVIEWER IN FLIGHT AT THE TIME OF WRITING.**
 >
-> Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-step2c0-prototype-delta-audit.md`.
-> Deliverable: `docs/design/prototype-delta-2026-09-18.md`. **Docs-only: no source, no `Features.md`, no
-> `test-cases/` change.** Independent reviewer ran (falsification brief) and its three findings are fixed.
+> Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-step2c1-tokens.md`. **The Step 2c-0 block further
+> down this file is the RECORD of a merged PR (#424, merged `3b8b8e5e`), NOT the position.** Nothing in it
+> is outstanding; do not start work from it.
 >
 > | | |
 > |---|---|
-> | branch | `exec/step2c0-prototype-delta-audit`, cut from `origin/owner/workspace-edits` at `3831bb49` |
-> | **PR** | **#424, base `owner/workspace-edits`** — never `main` |
-> | HEAD | `b784326b` (the reviewed head, before this handoff block) — **the PR is frozen there; the handoff update is the only commit after it** |
-> | PR base | `owner/workspace-edits` — NEVER `main` |
-> | gate | At `fce3f159`: six checks all EXIT 0 (`env`/`tasks`/`runbook`/`citations`/`help` via pnpm, `case-ids` via `node scripts/check-case-ids.mjs` — **there is no `check:case-ids` pnpm script**); `pnpm turbo run typecheck --force --concurrency=2` → **17/17, 0 cached, EXIT 0**, Node v22.22.2. Full forced gate is the controller's at the tip |
-> | subagents | A, B, C, D done · **E in flight** (isTypeEditor, isMcpTokens, isBuilder, isLegal, isNotFound) · reviewer not yet dispatched. **Serial, one at a time**; 5 workers + 1 reviewer = the cap of 6 |
+> | branch | `exec/step2c1-tokens`, cut from `origin/owner/workspace-edits` at `3b8b8e5e` |
+> | **PR** | base **`owner/workspace-edits`** — never `main` |
+> | HEAD at gate | `3a0ded41` — **the gate below was run at the tree this names** |
+> | merge-base | `3b8b8e5e` (= `origin/owner/workspace-edits` when the branch was cut) |
+> | tree | clean |
+> | gate | `corepack pnpm turbo run build test typecheck --force --concurrency=2` → **33/33 successful, 0 cached, EXIT 0**; `grep -c 'FAIL\|failed'` over the log = **0**; Node **v22.22.2**, pnpm **9.15.0**. Per package: domain 486 · **ui 322** · rule-engine 306 · editor 178 · sync-client 90 · **app-core 1454** · desktop 9 · mobile 29 · **web 430** · mcp-server 44 · **server 1534 / 5 skipped** |
+> | six checks | all **EXIT 0**: `env` · `tasks` · `runbook` · `citations` · `help` (via pnpm) and `case-ids` via **`node scripts/check-case-ids.mjs`** — there is still no `check:case-ids` pnpm script. `case-ids` reads **2196 unique ids** (2189 before this step's seven) |
 >
-> ## All 25 screens are decided. Final counts (26 rows = 25 blocks + the global TOKENS row)
+> ## ▣ THE SCOPE FINDING — the dispatch's T3/T4 premise does not hold for this product
+>
+> The dispatch asked to map "each prototype variable to the product's tint role by name". Measured: the
+> product has **exactly ONE tint role**, `tintWarning` (`TOKEN_ROLES`, and `grep -- '--gn-tint'` over the
+> repo). The export uses six. So **T3's product footprint is two primitives** (the warning wash's alpha in
+> each theme) and **T4 has NO counterpart at all** — no `tintAccent` role exists and there is no consumer
+> for one. The product declined the four other washes on measurement, and that refusal is already
+> recorded twice (`ui.css`'s "no `--gn-tint-purple` role exists or is added here"; `Features.md`). The
+> audit's sentence "every danger/warning/success wash — chips, pills, banners — is drawn from these" was
+> **true of the export and false of the product**, whose chips draw the fill ladder. Ruled conservative:
+> do not invent roles with no consumer. In the PR body as the mapping table.
+>
+> ## ▣ THE PRE-EXISTING FAILURE — `/help`'s tap-target ratchet, NOT caused by this change
+>
+> The viewport suite (`pnpm run test:e2e:viewport`, its own `next dev` on **3021**) is **28 passed, 2
+> skipped, 3 failed** at this head. All three failures are one case: `responsive.spec.ts:560` `help
+> (/help)`, a **tap-target ratchet** ("interactive targets under 44x44 at 390px rose above the recorded
+> baseline 10"), on all three viewports. **Verified pre-existing, not assumed:** the tree was reverted
+> wholesale to `origin/owner/workspace-edits`, rebuilt, and the same case run as a control — **it fails
+> identically at the base**, same message, same baseline, same three viewports. This change touches
+> colours and comments only; tap targets are geometry.
+>
+> **Two traps hit on the way there, both worth keeping:**
+> - **The suite reads `@gisik-nokma/ui` through `dist`.** Before `pnpm turbo run build`, case 13.362
+>   failed with `expected #f1eae3, received #ede4db` — the suite was serving the STALE dist while the
+>   source was correct. Rebuild first, then run. (28 passed after; 25 before.)
+> - **The committed `non-text-contrast-roster.json` carries TWO sanctioned waivers; `viewport.spec.ts`
+>   emits ONE.** The `gn-select__panel` entry was added by hand and no generator produces it, so
+>   re-running `test:e2e:stack` **silently DELETES it**. Not run, not fixed — named owner: whoever next
+>   touches that suite.
+>
+> ## ▣ WITNESSED LIVE (the owner's proof)
+>
+> On the hot web at **3001**, `data-style="neo"`, **`data-theme` ABSENT**:
+>
+> | | before | after |
+> |---|---|---|
+> | `--gn-accent` | `#3a6db0` | `#33629f` |
+> | `--gn-surface` | `#ede4db` | `#f1eae3` |
+> | `--gn-danger` | `#d70015` | `#9e2a20` |
+> | `--gn-contested` | `#d30f45` | `#9a3054` |
+> | `--gn-tint-warning` | `#f07c3433` | `#f07c341a` |
+>
+> Screenshots: `gisik-nokma-lanes/refs/2026-09-18-tokens-{before,after}.png`. **The `data-theme` absence is
+> itself the evidence for the selector refusal** — the light-neo tokens are present with no theme
+> attribute, which is exactly what porting the export's literal selector would have broken. `/v1/auth/methods`
+> still answers `"google":true`.
+>
+> ## Live anchors — measured at this block
+>
+> | | |
+> |---|---|
+> | merge-base | `3b8b8e5e` |
+> | HEAD | `3a0ded41` (before this handoff commit) |
+> | ahead of owner | the step's 5 commits |
+> | tree | clean |
+> | branch contains | `70ab0338` · `dbe1f721` · `cd008c00` · `1d269bab` · `3a0ded41` |
+>
+> ---
+>
+> # ↓ THE STEP 2c-0 RECORD — **MERGED. NOT THE POSITION. DO NOT START WORK FROM IT.** (#424, `3b8b8e5e`)
+>
+> ## All 25 screens were decided. Final counts (26 rows = 25 blocks + the global TOKENS row)
 >
 > | verdict | n | screens |
 > |---|---|---|
