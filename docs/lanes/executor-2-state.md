@@ -138,12 +138,13 @@ still reddens the predicate.
 ### Recorded, not fixed (out of scope, named owners)
 
 - **`.fields-editor__row`'s accessible names are not field-specific.**
-  `Remove field` is already the same on every row (`access.test.tsx:621` relies
-  on two of them), and the new toggle follows that convention ("Required" /
-  "Optional", static). A screen-reader user tabbing two fields hears the same
-  two names twice. **Owner: whoever next owns accessible names on this screen** —
-  fixing it here would diverge from the neighbouring control and is a row-wide
-  change, not this flag's.
+  `Remove field` is already the same on every row (`access.test.tsx:640` asserts
+  exactly two of them for an admin; `:621` asserts the member sees none), and the
+  new toggle follows that convention ("Required" / "Optional", static). A
+  screen-reader user tabbing two fields hears the same two names twice. **Owner:
+  whoever next owns accessible names on this screen** — fixing it here would
+  diverge from the neighbouring control and is a row-wide change, not this
+  flag's.
 - **The prototype's field kinds differ from the product's** (it offers
   Text/Date/Number/Attachment; `CUSTOM_FIELD_KINDS` is
   text/number/date/select/person). Pre-existing, untouched by this change.

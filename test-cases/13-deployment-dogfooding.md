@@ -9018,8 +9018,8 @@ taxonomy that admits the Field-type trigger and the icon choices — not a colle
 `Remove field`**, which is why showing it disabled is correct rather than hiding it: a member reading a
 type still learns which of its fields are required. The widening was proved not to have opened a hole by
 mutation: rendering `Remove field` for a member again **still** reddens the predicate
-(`access.test.tsx:615`, `expected false to be true`), and dropping the toggle's `disabled` reddens the
-per-button assertion beneath it.
+(`access.test.tsx:610-615`, `expected false to be true`, reported at `:615`), and dropping the toggle's
+`disabled` reddens the per-button assertion beneath it.
 
 **Recount, at this tip.** Nine ids are minted here (`13.776`–`13.784`), all inside the reserved block
 `13.760`–`13.819`; **the next free id inside this executor's block is `13.785`**. Measured by case MARKER
