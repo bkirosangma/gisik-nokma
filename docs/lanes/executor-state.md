@@ -41,11 +41,12 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~14:1x IST. **SECOND WAVE, TASK 7
-> # (`reopenedAt`, the reserved auto-close actor `SYSTEM_ACTOR_AUTO_CLOSE`, and `actorLabel`'s
-> # system-first precedence) IS BUILT, REVIEWED, FIXED, REBASED, AND FULLY GATE-GREEN.** The
-> # independent reviewer returned **CLEAN**; its five findings are closed or recorded below. **The PR IS
-> # THE ONLY THING NOT DONE.** This block is the position; everything below it is RECORD.
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~15:1x IST. **SECOND WAVE TASK 7 IS MERGED (#459, at
+> # `ae71b207`). THE LIVE WORK IS STEP 13 — THE MIGRATION-ORDER FIX — PR #462 at `73c40ea3`: Task 7's
+> # migration was numbered BELOW Task 6's, which merged first, so `checkOrder` refused it and
+> # `proj_tickets.reopened_at` could never be created on any long-lived database.** Task 7 itself was
+> # built, reviewed CLEAN, fixed, rebased and merged; its five review findings are closed or recorded
+> # below. This block is the position; everything below it is RECORD.
 > # **The queue after this task is NOT empty** — Tasks 8 (`reopenedAt` + the auto-close sweep) and
 > # 9/10 (bulk close) remain in `docs/superpowers/plans/2026-09-17-backlog-and-closed-second-wave.md`,
 > # and they are **dispatched by the controller rather than started by reflex. HOLD for that dispatch.**
@@ -54,18 +55,50 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >
 > | | |
 > |---|---|
-> | branch | `exec/second-wave-t7-reopened-at` |
-> | base | **`36ec6ae3`** = `origin/main`, carrying PR #458 (a **ledger-only** commit, `b793780b`) on top of #457 (executor 2's membership Task 1) and #456 (a plan fix). `--base main`. |
-> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha here names an ANCESTOR. The tip is THE COMMIT THAT CARRIES THIS BLOCK. Its ancestors are **`d89750dc`** (the first handoff), **`f1083126`** (the fix round), **`dc7be7d3`** (the task). **FOUR commits ahead of `origin/main`** with the ruling commit. **The LAST commit is post-review and post-ruling**: the controller ruled DROP on the dead `PROJ_TICKET_COLUMNS` entry and it was applied in that commit — the only change since the reviewer's `74b12565`, and it removes one line of a shared SQL constant plus one type member, with the server suite re-run green at 1548 afterwards. *(Every sha cited before the 14:0x rebase is ORPHANED: `cabf36bf`→`dc7be7d3`, `74b12565`→`dc7be7d3`, `5c975c21`→`f1083126`. Check with `git merge-base --is-ancestor`, never `cat-file`.)* |
+> | branch | `exec/t7-migration-order` (Task 7's own branch `exec/second-wave-t7-reopened-at` is MERGED and retired) |
+> | base | **`ae71b207`** = `origin/main` = the merge of PR #459. `--base main`. |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha here names an ANCESTOR. The tip is THE COMMIT THAT CARRIES THIS BLOCK. Its ancestors are **`73c40ea3`** (the migration rename) and, at the merged base, `82974423` — the reviewed-and-merged Task 7. **Task 7's chain is MERGED** (`ae71b207`): `dc7be7d3` task, `f1083126` fix round, `d89750dc` handoff, `82974423` ruling applied — **all reachable from `origin/main`**. *(Shas ORPHANED by the 14:0x rebase: `cabf36bf`→`dc7be7d3`, `74b12565`→`dc7be7d3`, `5c975c21`→`f1083126`. Check with `git merge-base --is-ancestor`, never `cat-file`.)* |
 > | reviewed sha | **`74b12565`** — the reviewer read THAT commit, not the tip. The rebase to `f1083126` was proved **source-neutral**: same 17 files, **0 blobs differ** pre/post, with a control showing the comparison is not trivially passing. A reader can reproduce the equivalence with `/usr/bin/git diff --name-only dda4c342...74b12565` vs `/usr/bin/git diff --name-only 36ec6ae3...f1083126` (both list the same 17 files). |
 > | case ids | **`13.722`–`13.726`**, FIVE ids, inside this executor's block `13.700`–`13.759`; **`13.727`–`13.759` remain unminted**; executor 2's `13.760`–`13.819` untouched. Recounted at the tip by case MARKER with `scripts/check-case-ids.mjs`'s own `ID_LINE` regex: the block's high-water was `13.721` (Task 6's), `13.722` returned **false** and `13.720`/`13.721` present as the positive control. `check-case-ids` at the tip: **2302 unique ids, union == sum** (was 2293; +5 this task, +4 from executor 2's merged `13.820`–`13.823`). |
-> | migration | **`apps/server/migrations/1789300000000_proj-tickets-reopened-at.sql`** — `ADD COLUMN reopened_at timestamptz NULL` + COMMENT; **Down drops it**. **The hot dev stack migrates ONLY at container start**, so after this merges the server container must be restarted or every route touching the column 500s. **The controller said it will do that; this lane ran NO compose action at all.** |
-> | seven checks | **all EXIT 0 at `f1083126`**, through `pnpm run check:*` so no filename is guessed: `tasks` · `env` · `runbook` · `help` · `citations` (**ratchet holds exactly**: file 13 = **612** cited / 0 uncited) · `db-tz` **0 with `DATABASE_URL=postgres://gisik:gisik@localhost:54330/gisik_nokma`** · `node scripts/check-case-ids.mjs` (**2302** unique, union == sum). |
+> | migration | **`apps/server/migrations/1789500000000_proj-tickets-reopened-at.sql`** — `ADD COLUMN reopened_at timestamptz NULL` + COMMENT; **Down drops it**. **RENAMED in step 13 from `1789300000000_…`, which was BELOW Task 6's `1789400000000_workspace-settings-auto-close` — and Task 6 merged first, so `checkOrder` refused it and the column could NEVER be created on any long-lived database.** The content is unchanged (blob `cb1d0a71…` at both paths, on-disk sha256 `71edb630…d615a`). **The hot dev stack migrates ONLY at container start**, so the column appears only after a server-container restart. **The controller does that; this lane ran NO compose action at all.** |
+> | seven checks | **all EXIT 0**, through `pnpm run check:*` so no filename is guessed: `tasks` · `env` · `runbook` · `help` · `citations` (**ratchet holds exactly**: file 13 = **612** cited / 0 uncited) · `db-tz` **0 with `DATABASE_URL=postgres://gisik:gisik@localhost:54330/gisik_nokma`** · `node scripts/check-case-ids.mjs` (**2302** unique, union == sum). Run at `f1083126` (Task 7) and re-run at `73c40ea3` (step 13, post-rename). |
 > | suites | **domain 514 · app-core 1549 · rule-engine 331 · ui 325 · server 1548 (5 skipped) · web 482 — zero failures**, Node **v22.22.2**, re-run after `pnpm turbo run build`. |
 > | typechecks | **17/17 tasks, EXIT 0.** |
 > | gate | **THIS LANE DID NOT RUN IT.** The controller made "do not run the forced gate" a standing rule for Task 7 (its gate waits for a peer's vitest pool). The evidence above is the full suite set run package-by-package instead. |
 > | tree | clean; **no `dist`, no `task-ledger.tsv`, no `.superpowers/`** in the diff. |
 > | dev stack | **no compose action was run at any point.** |
+>
+> ## ▣ STEP 13 — THE MIGRATION-ORDER FIX (PR #462 at `73c40ea3`)
+>
+> **The defect, and it is a class rather than a slip.** `node-pg-migrate`'s `checkOrder` refuses a
+> migration whose prefix is LOWER than one already applied. Task 6's is `1789400000000_…` and it merged
+> FIRST (#453); Task 7's was `1789300000000_…`. So `proj_tickets.reopened_at` could never be created on
+> any long-lived database — the owner's dev stack included — while every fresh test database applied
+> both cleanly. **The forced gate is structurally blind here: it migrates from scratch, where ascending
+> order is satisfied trivially.** The plan's File-structure table numbered the two migrations against
+> its own task order; the controller owns that.
+>
+> **Verified on the only shape that can show it**: a scratch DB on **54329**, everything except this
+> migration applied so `1789400000000_workspace-settings-auto-close` was the latest recorded row —
+> control under the old name **EXIT 1** with the controller's sentence byte-for-byte, then **EXIT 0**
+> under the new name, latest applied `1789500000000_proj-tickets-reopened-at`, and `information_schema`
+> reporting `proj_tickets.reopened_at`, `timestamptz`, nullable. Nothing hand-applied; **54330 was
+> never touched**; the scratch DB was dropped. The reviewer reproduced all three outcomes independently.
+>
+> **A prefix-vs-merge-order audit, with its own control:** all 27 migrations checked against the commit
+> time each was first added to `main`. **`ae71b207`: 1 violation** — exactly this file pair, named in
+> the right direction. **`73c40ea3`: 0.** The instrument fires exactly once on the known-bad revision,
+> which is what makes the null mean anything. **This was the only latent instance.**
+>
+> **THE GAP IS MEASURED, NOT ARGUED: NOTHING IN THE REPO PINS MIGRATION ORDER.** The reviewer lowered
+> the prefix back to `1789300000000` and ran the full server suite — **1548 passed / 0 failed**. A guard
+> would have to read the migrations DIRECTORY, which is a different kind of check from anything in the
+> suite today; it is NOT built, and that is a priced decision for the controller, not a silent gap.
+>
+> **Rule for the next migration: take the MAX existing prefix and go above it. Never trust a plan's
+> numbering.** This is the third fact of the same family that cost the dev stack a live 500 today —
+> the other two being the `rank`-named column's misleading aggregate error, and the fact that a
+> container migrates only at start.
 >
 > ## ▣ WHAT TASK 7 SHIPS, AND THE TWO THINGS IT EXISTS FOR
 >
