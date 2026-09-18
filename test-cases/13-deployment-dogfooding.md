@@ -8524,3 +8524,181 @@ test at all). The shape was written from scratch here rather than cited, and the
 read as evidence that the older migration is covered. (2) The plan's Interfaces line names `RANK_KEY_REGEX`
 for `mapRank`; `isRankKey` is used instead, for the reason above — this is the second time in this plan that
 a text-level "use the loose predicate" instruction was overtaken by the domain's own tighter one.
+
+## The workflow builder, fitted to the backend that exists (executor 2, 2026-09-18) — block `13.767`–`13.775`
+
+The owner's instruction for `isBuilder` was *"workflow-builder is there for design reference only. if the
+backend is already built, then make the design just fit for it."* That is a constraint in two halves, and
+the first was a measurement: **the backend is built.** The builder is `WorkflowBuilderScreen`
+(`packages/app-core/src/workflow-builder/ui/workflow-builder-screen.tsx:52`) at
+`/w/[workspaceId]/settings/workflows/[workflowId]`, ten plan-08 tasks deep, with a live validator, a
+publish path and its own role gate. What was NOT built is the design: `workflow-builder-screen*`,
+`state-inspector*`, `inspector-panel*` and `transition-inspector*` shipped with **zero CSS** — every
+element under all four rendering with user-agent defaults. Measured with a control, because "unstyled" is
+a claim about an instrument: the same sweep returns 7 rules for `.issues-panel`, 11 for
+`.publish-controls`, 15 for `.gn-state-node` and 40 for `.ticket-type-editor`.
+
+The second half is a refusal that was already recorded before this task:
+`docs/hig-reconciliation-audit.md:690-718` rules `SystemRulesPanel` and the whole rule-authoring
+subsystem — neither of which the prototype draws at all — as *"EXISTS AND THE PROTOTYPE OMITS IT. Keep
+and restyle; never delete"*, closing at `:718` with *"Both must be treated as requirements to preserve,
+not redesign away."* So the prototype's two-column layout is not adopted; three rails, preserving the
+left column. **The closing quote sits at `:718`, outside the `690-712` range this entry first cited** —
+corrected here, and the range widened rather than the quote moved, because a range that does not contain
+its own quotation is the thing a reader stops trusting.
+
+- ✅ **13.767 — the builder screen's four BEM families and the rules that style them are one fact spelled
+  in two packages, and nothing else ties the spellings.** The instrument is `saved-filters`' —
+  harvest the classes the stylesheet names and the classes the component renders, and compare the SETS —
+  applied across the `ui`/`app-core` boundary, where a rename on one side is invisible to both packages'
+  own gates and the failure it produces is the quiet kind: a screen that renders, and is unstyled. Six
+  arms are rendered into one union (loading, loaded, load-refused, and the inspector's no-selection,
+  state and transition selections), because a fixture that rendered only the loaded screen would leave
+  `__loading` and `__load-error` styled and unrendered, and the tempting repair is to weaken the equality
+  to a subset. **The exemption is a RULE, not a list:** `.workflow-builder-screen__add-state` carries no
+  rule of its own and should not — it sits on the shared `<Button>` — so an element is exempt exactly
+  when it ALSO carries a class from the shared component layer, and a separate case pins that the
+  exemption is exactly that one class, so it cannot grow by accident.
+  (`packages/app-core/test/workflow-builder/builder-css-binding.test.tsx:230`, `:277`)
+
+- ✅ **13.768 — the new block names no colour of its own and adds no role.** Every `var(--gn-*)` the block
+  references must already be referenced elsewhere in `ui.css`, harvested by SELECTOR rather than by
+  slicing from an offset to EOF (the positional read `saved-filters-css-binding.test.tsx` had to replace,
+  because a block that happens to be last works until the next task appends CSS after it). Eleven
+  distinct roles, all pre-existing: `surface-raised`/`shadow-raised`/`radius-card` are `.gn-card`'s three,
+  `fill-tertiary`/`text-accent` are `.gn-button`'s, `surface-sunken`/`shadow-sunken`/`fill-quaternary`/
+  `border` are `.gn-field__input`'s. `packages/ui/test/token-discipline.test.ts` refuses a hex anywhere
+  in client source; this case refuses the other half — a role invented for one screen.
+  (`packages/app-core/test/workflow-builder/builder-css-binding.test.tsx:328`)
+
+- ✅ **13.769 — the prototype's unbacked controls are absent, and the real ones keep their homes.** The
+  header's `wfStatus` line ("Draft · last saved 11:58") is asserted absent because it has no backing
+  state — `wfStatus`, `lastSaved` and `last saved` are 0 hits repo-wide — with the control that the
+  header really mounted and carries the two actions that ARE real. **The `Cancel` button's warrant is
+  NOT that measurement, and the first version of this entry wrongly said it was:** the prototype's
+  `isBuilder` block draws no Cancel at all (`:1013-1093` is breadcrumb, h1, `wfStatus`, Add state,
+  Publish); the Cancel this inherited comes from `docs/hig-reconciliation-audit.md:705`, describing a
+  header the drawing does not show. The assertion stays — it is a useful control that the header mounted
+  — but it is recorded as refusing something the reference itself does not have, rather than as a
+  backed-out claim. The
+  inspector's consolidated card — Category select, "Blocks the ticket" toggle, "Initial state" switch —
+  is the shape `hig-reconciliation-audit.md:703-708` already ruled *"SHOWN BUT DOES NOT EXIST. Do not
+  build"*, and the case's second half is what makes the first half mean something: the same two controls
+  are still rendered **by the canvas node**, one Category picker per state, so the absence is a
+  placement refusal and not a deletion.
+  (`packages/app-core/test/workflow-builder/builder-css-binding.test.tsx:392`)
+
+- ✅ **13.770 — the workflow name is the title, and stays a control.** The prototype draws an `h1`
+  (`desktop.dc.html@6d7b67c0a52c:1016`); the product's name is editable, so the design fit is the
+  prototype's TYPOGRAPHY on an `<input>` rather than an `h1` beside it — the name is already on screen
+  inside the field the person edits, so a heading would print the same words twice in one header. **The
+  reason recorded here was FALSE once and the correction is kept visible:** it first said a duplicate
+  heading "would make `getByText(name)` ambiguous for every later test", and the reviewer refuted it with
+  a probe — `getByText` matches text CONTENT, and an input's `value` is not text content, so `<h1>X</h1>`
+  beside `<input value="X">` matches exactly one node. **The heading gap is real and PRE-EXISTING** (the
+  base page had no `<h1>` either), recorded with an owner rather than fixed inside a design port. The
+  four metrics are asserted **against `.gn-page-title`'s own declarations**, read from
+  `apps/web/app/globals.css:127`, not restated from the prototype: that rule already carries the
+  `34px/41px/700/-0.4px` conversion, including the `-0.0118em` its docblock derives from -0.4px ÷ 34px,
+  and a second reading of the same four numbers is how two titles drift apart. The field BOUNDARY is
+  kept (`gn-field__input`'s fill/border/radius and the same `neo` override) because a control that looks
+  exactly like static text is not editable-looking — a deliberate deviation from the drawing, flagged in
+  the PR body.
+  (`packages/app-core/test/workflow-builder/builder-css-binding.test.tsx:443`, `:460`)
+
+- ✅ **13.771 — the declarations, which the name equality cannot see.** This case exists because the
+  equality above was **measured failing to catch a real deletion**: renaming
+  `.workflow-builder-screen__canvas` to `…__canvasRenamed` — which removes the card treatment and leaves
+  the class rendering unstyled — left every test in the file GREEN. A name-only equality cannot
+  distinguish "the rule is there" from "the name is mentioned somewhere", so the table names one
+  load-bearing declaration per rule — every rule in the block, after the first version sampled fourteen
+  and left `__load-error`, `__rules` and the two inspector titles unpinned. **THE MECHANISM RECORDED
+  HERE WAS WRONG, AND THE CORRECTION IS THE POINT.** It first said the survival was because the
+  `@media (max-width: 64rem)` rule still names `__canvas` in `{ order: -1 }`. It was not: the harvest
+  regex was `[a-z][a-z0-9_-]*`, which **stops at the first uppercase letter**, so `…__canvasRenamed`
+  matched only as far as `…__canvas` and the OLD name kept entering the set from the renamed rule
+  itself. The two are distinguishable — all-lowercase `…__canvasrenamed` reddens the equality, the
+  mixed-case rename reddens only the table — and both are now planted measurements. The regexes carry
+  `[A-Za-z]` as a result.
+  (`packages/app-core/test/workflow-builder/builder-css-binding.test.tsx:363`, `:100`)
+
+- ✅ **13.774 — the inspector's name field carries the shared `gn-field` classes it claims to inherit.**
+  A cross-prefix blind spot the equality is structurally unable to see: `.gn-field__input` belongs to the
+  shared layer, outside every prefix that case harvests. Measured by the reviewer: deleting
+  `className="gn-field__input"` from `state-inspector.tsx:53` survived all thirteen cases **and the whole
+  app-core package (1473 passing)** while silently reverting the field to a bare `<input>` with
+  user-agent defaults — the exact defect this change exists to fix — against a docblock claiming it
+  "'inherits the measured contrast pair and the `[data-style=\"neo\"]` sunken override for free". Read off
+  the rendered DOM, not grepped from source, because a source read passes against the class sitting on
+  the wrong element.
+  (`packages/app-core/test/workflow-builder/builder-css-binding.test.tsx:470`)
+
+- ✅ **13.775 — the inspectors' actions are the shared `Button`, danger-styled where they destroy.**
+  Same structural blindness: `.gn-button`/`.gn-button--danger` are outside every harvested prefix, so the
+  four controls that moved off bare `<button>`s could revert to user-agent defaults with every other test
+  in the repo green. Asserted by counting: two buttons in the state inspector, exactly one of them
+  `--danger` and it is the one whose text is `Delete state`; two danger buttons in the transition
+  inspector (`Remove rule`, `Delete transition`). Precedent for the variant is `fields-editor.tsx:64`.
+  (`packages/app-core/test/workflow-builder/builder-css-binding.test.tsx:497`)
+
+- ✅ **13.772 — the breadcrumb is on every arm of the builder route.** Not an addition to the design: it
+  is the element `apps/web/app/settings/page.tsx:94-96` already names as the reason the builder is the
+  only settings sub-screen NOT inlined into that shell — *"it carries its own breadcrumb back ('Settings ›
+  Workflows') instead"*. That sentence was true of the prototype and false of the product until this
+  change. It renders ABOVE the load states, not inside them, which is why all four arms are asserted
+  rather than the loaded one alone: "the way back" is exactly what a person needs when the read failed.
+  The loaded arm mounts the React Flow canvas under jsdom, which `apps/web`'s setup cannot do —
+  `ReferenceError: ResizeObserver is not defined` inside React Flow's own `<ZoomPane>`, measured, which
+  unmounts the root so the container comes back EMPTY rather than reporting anything. Shimmed LOCALLY in
+  this one file rather than in `apps/web/test/setup.ts`, so no other suite's jsdom changes and app-core's
+  measured 170-line block is not duplicated.
+  (`apps/web/test/builder-route.test.tsx:170`, `:203`)
+
+- ✅ **13.773 — the crumb is one link to the list, not two.** The prototype makes the whole crumb a single
+  `goWorkflows` target (`:1015`); rendering "Settings" and "Workflows" as two links would be a design
+  invented here, since both would land in the same place. The count is pinned, the href is asserted
+  against the real list route, and `aria-current` is asserted ABSENT because the crumb points at the
+  list and this page is the builder — with the control that the screen really mounted, so "one anchor"
+  cannot be satisfied by a page that rendered nothing.
+  (`apps/web/test/builder-route.test.tsx:222`, `:234`)
+
+**Recorded, not fixed, each with a named owner.** (1) **Four more families are still at zero CSS inside
+the very rail this change styled** — `add-rule-menu*`, `restrict-to-editor*`, `require-field-editor*`,
+`require-different-user-editor*` — proven in the DOM, plus `template-gallery*` on the sibling
+`/workflows/new` route. The prototype draws no rule-authoring UI at all (`Add rule`/`Remove rule`/
+`Restrict` = 0 hits), so there is no drawn design to fit them to; the audit's own `isBuilder` row named
+three families, not seven. **Owner: whoever next touches the rule editors** — the audit's *"keep and
+restyle"* (`:694`) is the warrant, and without it the rail still changes shape by selection one level
+down, which is the argument that justified styling both inspectors in the first place. (2)
+**`.advisories-panel__title` sets `color: var(--gn-warning)` on its `--gn-surface-sunken` tray,
+measuring 3.711 under `hig`/`minimal` light** — below the 4.5 that text owes, and *worse than the
+4.401 `danger`-as-text this change refused to add a sixth instance of* (`ui.css:1303`, pre-existing, six
+rules ship `--gn-warning` as text). The refusal stands; the neighbourhood is not clean, and saying so is
+the point.
+
+**Mutation evidence, and the two that did not count.** The name equality was mutation-tested rather than
+assumed: renaming the base `__canvas` and `__layout` rules, deleting the `__name:focus-visible` rule,
+removing the `neo` override and planting a hex literal in the block all redden — the last one against
+`packages/ui`'s own token-discipline suite. The route assertions were tested the same way: deleting the
+crumb, splitting it into two links, and pointing its href at the wrong route all redden. **Two mutations
+were run and correctly did NOT redden, and the distinction matters** — rewording the link text to the
+`&rsaquo;` ENTITY, and a first attempt aimed at `Settings › Workflows` that hit the docblock's copy of
+the string instead of the JSX, both leave the rendered output identical. A survivor with no explanation
+is either an unconstrained path or a mutation that never ran, and these were the second; re-aimed as a
+genuine text change, the same assertion reddens.
+
+**The review round found three survivors this change's own tests could not see, and all three now die.**
+Independently of the above: deleting `gn-field__input` from the inspector's input (→ 13.774); planting
+`var(--gn-ink-2)` inside the block, because the role sweep `var\((--gn-[a-z-]+)\)` is **digit-blind** and
+no shipped role contains a digit, so the hole was exactly one a future role would fall through (→ the
+class now carries `[a-z0-9-]`); and the mixed-case rename above, whose recorded cause was wrong (→ the
+`[A-Za-z]` harvest). Instrument fixes are the highest-value kind here because they are invisible until
+someone aims at the exact shape they cannot see.
+
+**Recount, at this tip.** Nine ids are minted here (`13.767`–`13.775`), all inside the reserved block
+`13.760`–`13.819`; **the next free id inside this executor's block is `13.776`**. Measured by case MARKER
+only, never by substring: the highest `13.*` marker in this file at this tip is `13.775`, and the highest
+`13.*` id anywhere in `packages/` + `apps/` is `13.775`. The whole block `13.767`–`13.819` was measured
+FREE before minting — the only hits were prose *mentions* of the block's own bounds, which is exactly the
+trap this file records: a substring sweep over a document that discusses the ids cannot separate a
+MINTED id from a MENTIONED one.
