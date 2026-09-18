@@ -70,13 +70,29 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > names no person. Requires no code.
 >
 > **Part 2 — the states-cases audit, the reserved block `13.301`–`13.315` resolved.** Fifteen verdicts,
-> **11 (a) pinned / 0 (b) / 4 (c) unwitnessed**, each derived from the plan's OWN sentence and then a
-> sweep of the tests for a witness of THAT sentence. The four ❌ are `13.304` (the plan's sentence is
+> **10 (a) pinned / 0 (b) / 5 (c) unwitnessed**, each derived from the plan's OWN sentence and then a
+> sweep of the tests for a witness of THAT sentence. The five ❌ are `13.304` (the plan's sentence is
 > **unsatisfiable** — `getBoard(projectId)` takes no filter, `data-source.ts:134`, so the control cannot
 > toggle the Board's count), `13.306` (nothing asserts the prototype's invented pair is absent),
 > `13.309` (the withheld-name fallback's **title text** is asserted nowhere; the id half is, at
 > `my-work.test.tsx`), `13.314` (no List-vs-Board count test, and the two views can legitimately
-> differ). Plus `13.319` 🚫, the mobile deferral, one line with its reason.
+> differ), and **`13.315`, CORRECTED FROM ✅ BY THE REVIEWER** — see below. Plus `13.319` 🚫, the mobile
+> deferral, one line with its reason.
+>
+> **The reviewer round earned its place, and the finding was mine.** `13.315` was first minted ✅ on a
+> "structural warrant" I wrote without reading the line it named — the claim that `board.tsx:415` and
+> `ticket-list.tsx:676` both read `stateCategory`, so the List's chip tone was the Board's by
+> construction. The reviewer read line 415: it is the **column header's** chip, reading
+> `column.category`, and `BoardCardView` (`board.tsx:745-762`) renders no state chip on a card at all —
+> so the plan's comparison half has **no referent**, and the verdict is ❌. The false sentence is quoted
+> and refuted in the catalogue row rather than deleted. **The reviewer also read `13.307` and `13.309`
+> against their sources: 13.309's ❌ upheld; 13.307 kept ✅ with the `<h3>`-vs-`aria-label` absence now
+> enumerated in the row.
+>
+> **`13.307`'s nuance, for the next reader:** its four sections are genuinely witnessed and the plan's
+> own mutation passes, so it is ✅ — but the plan's word is "headings", and the accessible name comes
+> from `aria-label` on `<section role="region">` while the `<h3 className="gn-my-work__heading">` sits
+> beside it. Deleting all four `<h3>`s leaves every assertion green.
 >
 > **Part 3 — the 7a/8a border measurement. The remedy was NOT applied, and that is a deliberate
 > deviation with evidence behind it.** Measured: **5 real border declarations remain across 2 of the

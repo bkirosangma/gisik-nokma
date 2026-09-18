@@ -7855,6 +7855,16 @@ known to exist in `board.tsx`). **A null result needs a positive control from th
 same trap then recurred once more in the re-run itself, which is why the row text below names the file
 and line rather than a count.
 
+**One verdict was corrected after an independent review, and the correction is in the row rather than
+in a follow-up.** `13.315` was first minted ✅ on a "structural warrant" — the claim that `board.tsx:415`
+and `ticket-list.tsx:676` both read `stateCategory`, so the List's tone was the Board's by construction.
+The reviewer read line 415: it is the **column header's** chip, reading `column.category`, and a Board
+**card** renders no state chip at all. The warrant was invented, the verdict is ❌, and the false
+sentence is quoted and refuted in the row. **The count is therefore 10 ✅ / 5 ❌, not 11 / 4.** The
+reviewer also read `13.307` and `13.309` against their primary sources; 13.309's ❌ was upheld, and
+13.307 kept its ✅ with an absence now enumerated in the row. *A verdict is only as good as the line it
+cites, and the first draft cited a line it had not read.*
+
 ### Verdict (a) — pinned. The case is minted ✅ and the witness now carries its id.
 
 - ✅ **13.301 — the reopen cause chip renders for a card whose `cause` is not null.** Witness: renders
@@ -7896,11 +7906,19 @@ and line rather than a count.
   mutation passes. Reported to the controller as a scope-changing finding.
   (`packages/app-core/test/contests.test.tsx`)
 
-- ✅ **13.307 — all four My Work section headings are present.** Witness: one case asserts three
-  regions by accessible name — `Assigned to me`, `My claims in transit`, `My contested claims` — and a
-  second asserts the fourth, `Shared with me`, as a region of its own with a row in it and without one.
-  The four are witnessed across two cases rather than in a single render; the property is "each heading
-  is present", and each is. (`packages/app-core/test/views/my-work.test.tsx`)
+- ✅ **13.307 — all four My Work sections are present, each under its own accessible name.** Witness:
+  one case asserts three regions by accessible name — `Assigned to me`, `My claims in transit`, `My
+  contested claims` — and a second asserts the fourth, `Shared with me`, as a region of its own with a
+  row in it and without one. The four are witnessed across two cases rather than in a single render.
+  **The plan's word is "headings", and that word is not witnessed — enumerated rather than glossed:**
+  each section is `<section role="region" aria-label="…">` with a SEPARATE
+  `<h3 className="gn-my-work__heading">…</h3>` (`my-work.tsx:63-64`, `74-75`, `85-86`, `104-105`), and
+  the accessible name comes from the `aria-label`, so **deleting all four `<h3>` elements leaves every
+  assertion in both My Work test files green**. `gn-my-work__heading` appears in no test and no
+  `getByRole('heading')` exists in the file. The verdict is ✅ because the plan's OWN mutation — delete
+  the `Shared with me` section → RED — passes, so the case guards what it is for; a reader who takes
+  "headings" literally is being told exactly where the gap is rather than left to find it.
+  (`packages/app-core/test/views/my-work.test.tsx`)
 
 - ✅ **13.308 — the four empty-state sentences render verbatim.** Witness: `No claims in transit.`;
   `Nothing has been shared with you.` and `Nothing assigned to you.` asserted together under a fixture
@@ -7936,13 +7954,13 @@ and line rather than a count.
   from the same types, so the label is tied to the row's own rank rather than to a fixed string.
   (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
 
-- ✅ **13.315 — List rows carry their state's `Chip tone`.** Witness: two rows are measured, and the
-  chip class tracks the row's state category — `gn-chip--active` for `Doing`, `gn-chip--terminal` for
-  `Done` — **with the negative arm** (`terminal` must not carry `active`), so the modifier is proven to
-  follow the row's category rather than to be one class hard-coded for every chip. **What this does NOT
-  assert is the comparison to the Board**, which is the plan's phrasing; that half is structural —
-  `board.tsx:415` and `ticket-list.tsx:676` both read `stateCategory` — and the row says so rather than
-  implying a test that does not exist. (`packages/app-core/test/views/ticket-list.test.tsx`)
+> One ✅ sits beside one ❌ here and the difference is worth stating, because both sentences name
+> something the assertions do not. The four SECTIONS in the row above are genuinely witnessed and that
+> case's own mutation passes; only the wording "headings" is unwitnessed. The ❌ below has a comparison
+> half with **no referent at all**, which is a different order of thing. (Written as a blockquote, not
+> a bullet: a bullet beginning with a status marker and a bold id is a CASE ROW to
+> `check-case-ids`, and this line named two ids in prose — it was parsed as a duplicate `13.307` and
+> the check went red, correctly.)
 
 ### Verdict (c) — unwitnessed. Minted ❌ with the deliverable named.
 
@@ -7991,6 +8009,23 @@ and line rather than a count.
   actually true and worth guarding — on an UNNARROWED project both views render the same ticket set —
   and witness that, rather than the plan's phrasing, which is false under narrowing by construction.
   (`packages/app-core/test/views/ticket-list.test.tsx`, `apps/web/test/board-narrowing.test.tsx`)
+
+- ❌ **13.315 — the plan's sentence has NO REFERENT for its second half, and this row is a CORRECTION:
+  it was minted ✅ in the first draft and an independent reviewer refuted the warrant.** The plan asks
+  for "List's rows carry the same `Chip tone` as their Board cards". The List half is genuinely
+  witnessed — two rows measured, `gn-chip--active` for `Doing` and `gn-chip--terminal` for `Done`, with
+  the negative arm, so the modifier follows the row's category rather than being one hard-coded class.
+  **But a Board CARD carries no state chip to be the same as.** `BoardCardView` (`board.tsx:745-762`)
+  renders exactly two chips: `tone="pending"` ("claim in transit") and `tone="active"` (the reopen-cause
+  chip). The chip the first draft cited as the structural warrant, `board.tsx:415`, is the **column
+  header's** chip reading `column.category` — a `BoardColumn` field — **not `stateCategory`**. So the
+  comparison cannot be made, let alone witnessed. **That draft asserted a structural justification
+  without reading the line it named; the reviewer read it and it was false.** The correction is kept in
+  the row rather than quietly overwritten, because "both sides read `stateCategory`" is exactly the
+  kind of true-sounding sentence a later reader would otherwise re-derive and believe.
+  **Deliverable:** state the List-side property the tests really pin, and either give the Board a state
+  chip to compare against or drop the comparison from the case.
+  (`packages/app-core/test/views/ticket-list.test.tsx`)
 
 ### Verdict from Part 1 — the mobile deferral, recorded with an owner
 

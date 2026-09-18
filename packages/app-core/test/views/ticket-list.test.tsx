@@ -1314,11 +1314,20 @@ describe('13.663 the title cell indents by depth, from the row’s own numbers',
   });
 });
 
-/* 13.315 — List rows carry their state's `Chip tone`: two categories measured,
- * with the negative arm (`terminal` must not carry `active`), so the modifier
- * follows the row's category rather than being one class hard-coded for every
- * chip. The comparison to the Board is structural (`stateCategory` on both
- * sides), not asserted here — the catalogue row says so. */
+/* 13.315 is ❌ in the catalogue, and this test is why it is only HALF of it.
+ * Two categories are measured, with the negative arm (`terminal` must not carry
+ * `active`), so the modifier follows the row's category rather than being one
+ * class hard-coded for every chip — the LIST half is genuinely pinned.
+ *
+ * The plan's sentence asks for "the same Chip tone as their Board cards", and
+ * that half has NO REFERENT: `BoardCardView` (`board.tsx:745-762`) renders only
+ * `tone="pending"` and `tone="active"` — a Board card carries no state chip at
+ * all. An earlier draft of the catalogue row claimed the comparison was
+ * structural because "board.tsx:415 and ticket-list.tsx:676 both read
+ * `stateCategory`"; an independent reviewer read line 415 and it is the COLUMN
+ * HEADER's chip reading `column.category`. Recorded here because this comment
+ * is where that claim was repeated, and a true-sounding warrant is likelier to
+ * be re-derived than a flagged one. */
 describe('13.664 the status pill renders the state’s name and its category dot', () => {
   it('shows `Doing` inside a chip carrying the active category’s own modifier, and `Done` under terminal’s', () => {
     render(<ControlledList initial={chose(['status'], 'flat')} />);
