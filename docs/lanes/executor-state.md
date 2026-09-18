@@ -55,6 +55,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | `origin/main` | `4b25f586` (#493, cycle 7 — docs only: `controller-state.md` and one ledger row that is NOT `7b`) |
 > | tree | clean at `cb07a669` |
 > | the change | `git diff --name-only origin/main...HEAD` → `Features.md`, `test-cases/13-deployment-dogfooding.md`, `packages/app-core/test/views/my-work.test.tsx` |
+> | PR | **#494**, `--base main`, `mergeable: MERGEABLE`, `UNSTABLE` (the CI billing blocker below, repo-wide). **The review and EVERY check below were measured at `ef0433ec`**, the fix-round commit; the commit carrying this table adds only this row. |
 > | ledger `hig-per-screen/7b` | **still `todo`, ON PURPOSE.** It is now PROMOTABLE — see below. The ledger is edited only on `main`, only by the controller. **I did not flip it.** |
 >
 > ## THE TASK, AND WHAT IT TURNED OUT TO BE
