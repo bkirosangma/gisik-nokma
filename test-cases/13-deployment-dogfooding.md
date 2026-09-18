@@ -10116,3 +10116,224 @@ list reaching an existing row to clear it; the timestamptz handling under a pinn
 database; that no other whole-`TicketState` literal was stale; that `task-ledger.tsv` is correctly
 untouched; and that the rebase union lost nothing (`comm -23` of the id sets is empty, additions are
 exactly `13.722`–`13.726`).
+## The members roster's role control, with `Owner` omitted (executor 2, 2026-09-18) — plan `2026-09-18-membership-role-guard` Task 2, ids `13.824`–`13.828`
+
+Block `13.820`–`13.849` is this executor's for this plan; Task 1 took `13.820`–`13.823`, so this section
+starts at `13.824`. Recounted at this tip **by case MARKER only** (the five headings below; `13.829` is the
+next free id in the block, and **no id was taken from the second-wave block `13.760`–`13.819`**). An earlier
+draft of this sentence said that block was "untouched by this change", which **as written was false**:
+`13.761` lives in it and this change REPOINTS that case, replacing its assertion (it also re-scopes `3.132`
+and `3.133`, which are outside both blocks). Saying "no id was taken" is the claim that was always true, and
+it is stated this way because the loose version was the kind of sentence a later reader would have caught me
+on — or worse, believed.
+
+- ✅ **13.824 — the control exists for an admin, and offers `admin`, `member` and `guest` — and NOT `owner`.**
+  The option list is the whole decision: the plan ruled `Owner` out because there is no ownership-transfer
+  flow, so minting an owner from a roster row would be a transfer with no door designed for it, and
+  `grant-owner-requires-owner` refuses the event server-side. The case opens the control and reads the
+  options out of the `listbox` rather than asserting a prop, because the prop is what a reader can already
+  see and the rendered list is what a person meets. **The prototype disagrees and that is why the case
+  exists**: it draws `Owner` as an option and gates the select on the viewer alone
+  (`design-system/interactive/desktop.dc.html:679-685`, data `:3061`).
+  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:518` (the option list), `:447` (the arm),
+  `:537` (the representability predicate), `apps/web/test/members-page.test.tsx:770`
+
+- ✅ **13.825 — changing a role ingests exactly ONE `membership.granted`, with the right entity, and re-reads
+  the roster.** Three claims, each of which a different defect would satisfy while the other two held: a
+  control that submitted on every render or batched would pass "something was sent"; an entity id that only
+  looks plausible would pass "an event was sent" while addressing a different row of the world; and a commit
+  that did not re-read would leave the old role on screen, a write the person cannot see land. The entity id
+  is `membershipId(workspaceId, userId)` — the key `proj-memberships.ts` upserts on and the id the guard
+  reads the target's CURRENT role through — and the payload restates the `userId`, because `parse-event.ts`
+  refuses an entity and a payload that disagree. **No new server route was added**: the write goes through
+  `POST /events`, the generic client batch every other claim on this shell uses.
+  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:309` (the change), `:303` (the entity id),
+  `:171` (the re-read), `apps/web/test/members-page.test.tsx:799`
+
+- ✅ **13.826 — a member sees the role as text and no control at all.** The gate is the page's EXISTING
+  signal and not a second role read — `adminGate.kind === 'admin'` is the server's own answer from
+  `GET .../invites`, which 403s for exactly the population the ingest door refuses, so a second client-side
+  answer could only drift from the door's. Both halves are asserted: the control is ABSENT **and** the role
+  is still said, because the absence alone passes on a page that draws no role at all. **The absence
+  assertion is UNANCHORED on purpose** — see the accessible-name measurement below, which is what made an
+  anchored pattern a check that could not fail.
+  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:447` (the viewer half of the predicate),
+  `apps/web/test/members-page.test.tsx:834`
+
+- ✅ **13.827 — a REFUSED role change is said out loud, and the cell does not move.** A swallowed answer
+  shows the person their own click as a fact — the same defect 3.138 pins for Withdraw on the same page.
+  **★ WHICH REFUSALS CAN ACTUALLY REACH THIS CONTROL, measured after the independent review challenged the
+  first version of this sentence, which named the two rules plan-internally and was wrong about both.**
+  `grant-owner-requires-owner` fires only when the payload grants `owner`
+  (`apps/server/src/permissions/check-permission.ts:589`), and this control's options
+  (`apps/web/app/w/[workspaceId]/members/page.tsx:518-522`) cannot build that payload, so **it can never fire from here**. `last-owner` fires
+  only when the SERVER's row for that user holds `owner`
+  (`packages/rule-engine/src/checks/membership.ts:139-146`) while the rendered row is editable — and
+  `isEditableRole` suppresses the control on an owner's row, both halves reading `proj_memberships`
+  (`routes/builder-reads.ts:247-252` for the roster; `engine-context.ts:124` `readMembershipState`, reached
+  from `getEntityState('membership')` at `:273`, for the guard — **an earlier version of this sentence cited
+  `:405-411`, which is `countWorkspaceOwners`, the COUNT `last-owner` compares against and not the read
+  behind it**), so **in the ordinary case it cannot fire
+  either**; it is reachable through a STALE roster read, which is a real race and not the common path. What
+  the arm is actually for: a stale-read `last-owner`, the ordinary `permission.role` refusal when the
+  actor's own authority changes under them, a malformed payload, and transport failures. **The assertion was
+  right and the reachability claim was overstated** — which is why the correction is here rather than in a
+  quiet edit: a reader pricing this control's failure modes from the old sentence would have budgeted for
+  two refusals that cannot arrive. Three
+  assertions, and the two beyond the alert are the ones that cost thought. The cell still says the role the
+  server holds — the control is driven by the roster rather than by local state, so a refused change cannot
+  leave the new role sitting on screen — and `rosterReads` stays at **1**, because a refused write must not
+  re-read either. That second half is not decoration: the mutation that reloads on every answer (M6 below)
+  reddens this case alone.
+  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:309` (the refusal arms), `:454` (the alert),
+  `apps/web/test/members-page.test.tsx:862`
+
+- ✅ **13.828 — an OWNER's row keeps the chip, because the control cannot state the value it would hold.**
+  This is the arm where this product's judgement and the prototype's do not compose, and the case carries
+  the measurement rather than the preference. The prototype's `canEditRole` is **viewer-scoped**
+  (`:3061`, `canEditRole: myRoleIsAdmin`) and its option list includes `Owner`, so its owner rows are
+  editable like any other; this product removed `Owner` from the options, and a `Select` whose `value`
+  matches no option renders its **placeholder** (`packages/ui/src/select/select.tsx:255`,
+  `selected ? selected.label : placeholder`) — so an owner's cell would read `Select…` beside the person who
+  owns the workspace, on the screen whose whole subject is who holds what. Offering the row a control would
+  also be a demotion door with no designed flow, the mirror of the promotion the plan refuses to add.
+  **This narrowing was a CONSERVATIVE DEFAULT taken by the executor, filed rather than assumed, and it has
+  since been RULED ON: the controller confirmed it on 2026-09-18**, answering
+  `gisik-nokma-lanes/EXEC2-2026-09-18-owner-row-editability.md`, which priced both readings. If that
+  decision is ever revisited, the predicate at `:447` and this case change together and nothing else does.
+  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:447`, `:537`,
+  `apps/web/test/members-page.test.tsx:910`
+
+**Mutations, each applied to a backed-up file, confirmed by sha256 to have CHANGED the file, run, then
+restored by `cp` with the sha256 matching the backup exactly (`b8b72fd1…`).** The two the plan names are
+M1 and M2; the other four exist because M1/M2 alone leave 13.825 and 13.827 unconstrained, and a case no
+mutation can redden is a case that has not been shown to check anything.
+
+1. **The viewer half of the predicate removed** (`adminGate.kind === 'admin' &&` dropped) — the control is
+   rendered for a member → reddens **exactly 13.826**, 27 green. *(The plan's own "render the select for a
+   non-admin viewer" mutation, and it kills precisely the case written for it.)*
+2. **`owner` ADDED to the option list** — reddens **three**: 13.824 (the list is no longer the three), and
+   **13.828 and 13.761**, because `isEditableRole('owner')` becomes true and the owner's row gains a control
+   the case asserts is absent. The plan predicted 13.824 only; the extra two are correct and are recorded
+   rather than edited away.
+3. **The representability predicate made always-true** (`isEditableRole` → `role !== '' || …`) — reddens
+   **13.828 and 13.761** and leaves 13.824 **green**. This is the mutation that separates the two halves
+   M2 moves together: it proves 13.824 pins the option LIST and 13.828 pins the GATE, so neither case is
+   carrying the other's property.
+4. **The entity id made the bare user id** (`membershipId(workspaceId, member.id)` → `member.id`) — reddens
+   **exactly 13.825**, 27 green.
+5. **The refusal SWALLOWED** (the `setRoleRefusal(...)` call deleted) — reddens **exactly 13.827**.
+6. **The reload moved before the status check** (`loadMembers()` called on every answer) — reddens
+   **exactly 13.827** again, by its `rosterReads === 1` half rather than by the alert. Two mutations with
+   different causes landing on the same case is the case doing its job, not a coincidence: it asserts three
+   things and each of these two breaks a different one.
+
+**★ TWO OVERCLAIMS IN MY OWN COMMIT MESSAGE (`19a5c3c9`), corrected here because a commit message cannot be
+edited without moving shas the review was run against.** Both were caught by the independent review.
+1. **"Six mutations, six distinct kill sets" is false — there are FIVE distinct kill sets.** M5 and M6 both
+   redden exactly `13.827` and nothing else; the table above says so, and the sentence contradicts its own
+   table. The correct phrasing is "six mutations, five distinct kill sets, and the two that share a set
+   break different assertions of the same case".
+2. **"web 28/28" reads as the package and was the FILE.** 28 is `test/members-page.test.tsx` alone; the
+   whole `apps/web` package is **487/487** (`test/` holds 45 files). The number was true of what had been
+   run at that moment and misleading about what it named — the same class of error as a sweep reported
+   without its universe, one level up.
+
+**★ THE MEASUREMENT THAT DECIDED EVERY NAME QUERY IN THIS BLOCK — and it is not a style choice.**
+**The shared `Select`'s trigger takes its accessible name from `<its current value> <the caller's
+aria-label>`** — for the second person's control, `member Role for Anselma Marak`. Measured by probing the
+rendered page: the exact strings `'Role for Anselma Marak'` and `'member'` each return **0**,
+`'member Role for Anselma Marak'` returns **1**, and `/Role/` returns **2**. The cause is `useSelect`'s own
+wiring: react-aria sets `aria-labelledby="<the value span's id> <the trigger's own id>"` on the trigger and
+the accessible-name algorithm resolves and concatenates those references, so the caller's `aria-label` is
+APPENDED to the value rather than being the name. Two consequences, and the second is the dangerous one.
+A case that queried the control by its exact `aria-label` fails against a control that is present and
+correct — which is how this was found, three cases red for a reason unrelated to what they named. And the
+mirror image: an ABSENCE assertion anchored to the start of that name (`/^Role for /`) **can never match**,
+so it holds whether or not the control is rendered. 13.826's absence arm is unanchored for exactly that
+reason, and it would have been a check that cannot fail.
+**Recorded rather than fixed, with a named owner:** this is `packages/ui/src/select/select.tsx`'s behaviour
+on every `Select` in the product, and changing it means changing that file and every call site written
+against the current names. **Owner: whoever next touches that file.** Not minted as a catalogue case here,
+because it is a property of a shared component that this task did not alter and whose repair is a different
+piece of work.
+
+**★ FOUR PLAN-TEXT AND TEST-TEXT DEFECTS, measured rather than assumed.**
+1. **The plan's Step 1 test code queries a `combobox` that does not exist.** Its three sample cases use
+   `findByRole('combobox', { name: /role for Kiro/i })`, `userEvent.selectOptions(...)` and
+   `getByText('Member')`. The shared `Select` renders a **`button`** trigger
+   (`packages/ui/src/select/select.tsx:254`), which is why the product's own cases query
+   `findByRole('button', { name: … })` and then read options from the `listbox`
+   (`apps/web/test/list-prefs-wiring.test.tsx:69` documents the same migration). A test transcribed from
+   the plan would be red against a correct implementation. **The cases were written against the rendered
+   control instead.**
+2. **The plan's sample cases name a control on `Kiro`'s row, and the fixture makes `Kiro` the OWNER** —
+   the signed-in user is `ROSTER[0]`, whose role is `owner`. Under this task's conservative default that
+   row has no control at all, so a transcribed case would be red for a third unrelated reason. Every case
+   in this block addresses `Anselma Marak`'s row and says why.
+3. **Capitalised labels were NOT adopted, and this is a deviation from the plan's sample rather than an
+   oversight.** The plan expects `['Admin', 'Member', 'Guest']`; the shipped control offers
+   `['admin', 'member', 'guest']`. Two reasons, and the second is decisive: the mint form on this same page
+   already ships the lowercase labels (`apps/web/app/w/[workspaceId]/members/page.tsx:688-690`, pinned by case 3.132), and the roster's chip
+   prints the wire's own token — case 13.761 pins that with the reasoning that a case expecting `'Owner'`
+   "would be asserting a mapping nobody wrote". A capitalised label here would be a display mapping living
+   in exactly one control; the mixed presentation it produces on one screen (a lower-case `owner` chip
+   beside capitalised selects) is the visible symptom of the same split.
+4. **13.761 was RE-POINTED, not weakened, and its old assertion is gone rather than quietly loosened.** It
+   ended with `queryByRole('combobox')`/`queryByRole('button')` both null — "NO control per row" — which was
+   true only while the guards did not exist. The absence was a PROXY for the property the case is actually
+   about (no role is prettified; nothing offers a change it cannot honour), so the proxy is replaced by the
+   property asserted directly in both arms at once: the owner's row chips the wire token, and the row the
+   control can edit announces itself and displays that same token. A capitalised label in either arm fails
+   that line now (`members-page.test.tsx:485-488`; `:474` is the comment that explains it, and an earlier
+   draft of this sentence cited that instead — a citation to the explanation rather than the assertion).
+   **And two PRE-EXISTING cases needed re-scoping as a consequence, both recorded rather than left to be
+   rediscovered.** `3.132` and `3.133` queried `findByRole('button', { name: /Role/ })`, which was
+   unambiguous only by accident: it worked while the mint form's picker was the page's only control whose
+   accessible name contained "Role". The roster's control is named `Role for Anselma Marak`, so the unscoped
+   regex now matches two elements and throws. Both queries are now scoped to the mint form itself, which is
+   what those cases are about — a tightening, not a repair of something they were testing.
+
+**★ THE FOLLOW-ON TASK 1 ASSIGNED TO THIS TASK — corrected by measurement rather than repeated.** Task 1's
+section above ends with a named follow-on: *"It goes live with the roster's role control, which wires
+exactly that event to the client ingest path. **Owner: that task — the one that makes it reachable.**"*
+This is that task, so the claim was checked rather than inherited, and **its stated reason is wrong though
+its concern is real.** Measured: `apps/web`'s `dataSource` is the ONLINE source — `dataSource.ingest` posts
+to `POST /events`, whose engine context implements `countWorkspaceOwners`, so the guard answers there
+exactly as Task 1 designed and **no throw is reachable from this control**. The replica's outbox is reached
+through `createReplicaDataSource` (defined at `packages/app-core/src/replica/replica-data-source.ts:653`),
+which is constructed in **SIX** places repo-wide, not the two an earlier draft of this paragraph named:
+`apps/desktop/src/app.tsx:56`, **`apps/mobile/src/app.tsx:40`**, the dual-client harness at
+`apps/server/test/dual-client/rig.ts:434` (the `:28` that draft cited is that file's IMPORT list, not a
+construction), and three inside the defining package's own test file —
+`packages/app-core/test/replica/replica-data-source.test.ts:194`, `:506` and `:605`.
+**★ The first corrected version of this sentence said "THREE", and that was a universe error of exactly the
+kind the paragraph below describes**: it counted apps and the harness while silently excluding the package
+that defines the function, which is the sort of scope a reader cannot see and would not think to widen. The
+number is only meaningful with its universe attached, so both are stated now. *Caught by the scoped
+re-review, i.e. by the same instrument that caught the truncation this paragraph is about — the lesson
+applied to itself is the only form in which it is worth writing down.* **★ That first draft said "not by `apps/web` (measured…)" and its sweep had been truncated
+by the author's own `sed -n '1,20p'`, which cut `apps/mobile` off the end of the output.** The claim's
+conclusion survived and its EVIDENCE did not: the universe was wrong in exactly the way a truncated sweep
+is always wrong — silently, and in the direction of the answer the author expected. Caught by the
+independent review, which re-ran the sweep untruncated. The lesson is the one this file keeps relearning:
+**a sweep is a fact about its own command line, and `| head`-shaped truncation is a change to the
+measurement, not a convenience applied to it.**
+So "the role control wires the event to the client ingest path" is true, and "the client ingest path is the
+replica's outbox" is not — `apps/web` does not construct a replica data source at all. **The follow-on
+stays open with a corrected trigger: it goes live when a REPLICA-BACKED client gains a screen that emits
+`membership.granted` or `membership.revoked`.** Measured: the only client in the repo that emits either
+today is this task's control (`apps/web/app/w/[workspaceId]/members/page.tsx:321`); `apps/desktop` is a `TicketList` shell and `apps/mobile` has
+`editor/`, `push/`, `screens/`, `storage/` and no members surface, so the throw remains latent on both. The
+finding itself (`outbox.ts:315` calls `evaluateEvent` with no `try`/`catch`) is **narrower than its first
+record and no less real**; the repair is still where a throwing evaluation is caught, and still not a
+counter invented in a context that cannot answer. Filed for the controller in the same message that carries
+this task's PR.
+
+**★ A RECORDED DEVIATION, and the arithmetic that makes it one: this task ships FIVE cases, not the plan's
+three.** `13.827` and `13.828` are additions within this executor's own block, and each is here because
+without it a property of the shipped change is unchecked: without 13.827 the refusal path (which Task 1's
+guard makes REACHABLE) would be unwitnessed, and without 13.828 the owner-row narrowing would exist as an
+implementation detail with nothing pinning it — M3 above shows 13.824 does not cover it. Both are within
+`13.820`–`13.849`; neither takes an id from any other block; the count is stated so that a later reader
+comparing this section against the plan's Step 6 sees five and does not read the difference as drift.

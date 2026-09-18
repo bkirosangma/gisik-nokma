@@ -47,8 +47,19 @@ import { ACCEPT, refuse } from './refusals.js';
  * through a replica-backed client aborts the enqueue instead of getting a
  * refusal, because `outbox.enqueue` evaluates unguarded and has no verdict to
  * return. Measured 2026-09-18; latent today only because no shipped client
- * emits `membership.granted` yet. It goes live with the roster's role control,
- * which is the change that wires that event to the client ingest path.
+ * emits `membership.granted` yet. **The trigger this paragraph first named —
+ * "the roster's role control, which is the change that wires that event to the
+ * client ingest path" — is WRONG, and it is corrected here rather than only in
+ * `test-cases/13`, because this file is where the next reader of the guard
+ * stands.** Corrected 2026-09-18 by the task that shipped that control: the
+ * roster's role control is in `apps/web`, whose `dataSource` is the ONLINE
+ * source, so it posts to `POST /events` and never touches this outbox — the
+ * server's engine context implements `countWorkspaceOwners`, so the guard
+ * ANSWERS there and nothing throws. The throw goes live when a REPLICA-BACKED
+ * client gains a screen that emits `membership.granted` or `membership.revoked`.
+ * Measured: the only client emitting either today is that online control, and
+ * `apps/desktop` (`src/app.tsx:56`) and `apps/mobile` (`src/app.tsx:40`) both
+ * construct `createReplicaDataSource` while neither has a members surface.
  *
  * The follow-on is recorded against that task in `test-cases/13` rather than
  * repaired here, and the reason is that the repair is not in this file: the

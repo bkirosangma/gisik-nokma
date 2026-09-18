@@ -20,7 +20,147 @@
 
 ---
 
-## ▲ TOP BLOCK — membership Task 1: the last-owner guard, in both layers (2026-09-18)
+## ▲ TOP BLOCK — membership Task 2: the roster's role control, with `Owner` omitted (2026-09-18)
+
+**Position: the change set is COMPLETE, the review round and its scoped re-review have both returned and
+are fully discharged, and the PR is opening against `main` with the reviewer recorded in its body.**
+Dispatch: `CTL-DISPATCH-2026-09-18-exec2-membership-t2.md`. Plan of record:
+`docs/superpowers/plans/2026-09-18-membership-role-guard.md` Task 2. One PR, `--base main`, branch
+**`exec2/membership-t2-role-control`**.
+
+**FIRST ACTION ON A RESTART: `gh pr list --state open`.** If a PR for this branch exists, the task is at
+the controller's merge and nothing below needs redoing. Then verify the anchors — do not trust the rows.
+
+### Anchors — verify these; do not trust the row
+
+| | |
+|---|---|
+| branch | `exec2/membership-t2-role-control` |
+| base | **`dda4c342`** = the `#457` merge I cut from. **`origin/main` has since moved to `36ec6ae3`** (`#458`, `ctl/ledger-wave2` — `docs/lanes/task-ledger.tsv` ONLY, 4 lines), so the branch is **2 behind and 0 conflicted**. **Do NOT rebase**: rebasing moves the head after the reviewer's pass and the only thing gained is a tidier graph. The controller's merge brings the ledger row with it. |
+| commits | `19a5c3c9` (the change set) · `b3eb8b80` (ruling recorded + 4 stale citations) · `fdc1e09f` (handoff) · **`526c9fbf` (FIX ROUND 1)** · **`ec4df6ec` (FIX ROUND 2 — every citation re-measured at this tip)** · `56095a02` (a double-prefixed citation my own sweep wrote) |
+| reviewed head | **`19a5c3c9`** by the full reviewer; **`526c9fbf`** by the scoped re-review |
+| frozen head | **`verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit that carries it; whatever is here is one MORE than the last commit below |
+| ahead / behind | recount, do not quote |
+| tree | clean |
+| bare `:NNN` below | Every bare `:NNN` citation in THIS block refers to `apps/web/app/w/[workspaceId]/members/page.tsx`, and every line number here was re-measured **at the tree that carries this file** — not at an earlier commit. That distinction is the whole of the scoped re-review's first finding: fix round 1 wrote citations measured at the reviewed head into a commit whose own insertions moved every line below them, so a reader verifying them landed on prose. **If you edit any file on this branch, re-measure these before committing.** |
+
+### THE REVIEW ROUND — no Critical, two Important, five Minor; ALL SEVEN ADDRESSED at `526c9fbf`
+
+The reviewer's sharpest finding was against a claim I had labelled **"measured"**: the follow-on paragraph's
+sweep had been **truncated by my own `sed -n '1,20p'`**, which cut `apps/mobile` off the end. Three
+construction sites, not two; the definition cited was an import line. Re-run untruncated. The other
+Important: the engine docblock still carried the trigger this change refuted — corrected **in
+`packages/rule-engine/src/checks/membership.ts`**, the one place the fix reached outside the reviewed diff
+(a comment), and the reason a scoped re-review was dispatched rather than assumed unnecessary. Minors:
+overstated refusal reachability, a **backwards** `aria-hidden` claim in the test docblock, a false "block
+untouched" sentence, a citation to an explanation rather than an assertion, and two overclaims in
+`19a5c3c9`'s own commit message (recorded in the catalogue, since a message cannot be edited without moving
+the reviewed shas).
+
+**THE SCOPED RE-REVIEW** confirmed the comment-only claim by reading the hunks and then found the one thing
+fix round 1 had done to itself: **a fix is a change like any other, and every citation round 1 wrote had
+been measured at the reviewed head rather than at its own tip** — `526c9fbf` added 17 lines to `page.tsx`
+that moved every line below them, so a reader verifying the new reachability claim landed on prose. It also
+found the corrected claim surviving **verbatim** in `Features.md:331` and the 13.827 test docblock, and
+"THREE places" counting a universe that silently excluded the package defining the function. **Fix round 2
+(`ec4df6ec`) addresses all of it**, and a read-back instrument (`/tmp/citecheck.py` in that session; every
+citation in the added lines with its target line printed) was written because eyeballing had failed twice.
+**No third review was run**: fix round 2 is prose and line numbers only, the reviewer had already named the
+defect and the criterion, and the instrument now checks it mechanically.
+
+### What shipped
+
+`apps/web/app/w/[workspaceId]/members/page.tsx` — the Role cell's second arm: a shared `Select` for an
+admin, on rows whose role the control can state (`:447`, predicate `:537`, options `:518`), a `changeRole`
+that submits `membership.granted` through the ordinary ingest door (`:309`, entity id `:320`), a
+`loadMembers` callback so a commit re-reads the roster (`:173`), and a refusal alert under the table
+(`:473`). The file docblock's role-control passage is **CORRECTED, not deleted** (`:58-107`). ·
+`apps/web/test/members-page.test.tsx` — cases **13.824–13.828**, plus 13.761 re-pointed and 3.132/3.133
+scoped to the mint form. · `Features.md` (the members bullet's ABSENT list corrected, the role control
+added, and the shared-`Select` bullet's call-site list gained its fourth `apps/web` site) · `test-cases/13`
+(a new section, five ✅ cases, the mutations, and the follow-on correction).
+
+**`task-ledger.tsv` untouched** — the controller flips `membership-role-guard` 2.
+
+### ★ FIVE PLAN-TEXT AND TEST-TEXT DEFECTS — measured, not assumed
+
+1. **The plan's Step 1 test code queries a `combobox` that does not exist.** The shared `Select`'s trigger
+   is a **`button`** (`packages/ui/src/select/select.tsx:254`).
+2. **Its sample cases name a control on `Kiro`'s row, and the fixture makes Kiro the OWNER** — the one row
+   this design leaves chipless.
+3. **Its expected labels are capitalised; the shipped ones are lowercase**, matching the mint form on the
+   same page (`page.tsx:688-690`) and 13.761's rule that the row prints the wire's own token.
+4. **EVERY name query had to be a REGEX, and that is a measurement.** The trigger's accessible name is
+   `<its value> <the caller's aria-label>` — `member Role for Anselma Marak` — because react-aria sets
+   `aria-labelledby` and the algorithm concatenates it. Exact-string queries return 0 against a correct
+   control; `/^Role for /` **can never match**, so 13.826's absence arm was unanchored for that reason. A
+   self-inflicted check-that-cannot-fail, caught before the PR. **Recorded, not fixed, owner: whoever next
+   touches `packages/ui/src/select/select.tsx`.**
+5. **Four of my OWN citations were stale and are fixed at `b3eb8b80`**: the mint form's options moved to
+   `:669-671` (I had left `:472-481`), and the owner-refusal sentence is `check-permission.ts:389`, not
+   `:373` — the line I had cited is a docblock about renaming workspaces.
+
+### Mutations — six, each sha256-confirmed to change the file and restored to the backup's sha exactly
+
+M1 viewer half dropped → **13.826 only** · M2 `owner` added to the options → **13.824, 13.828, 13.761** ·
+M3 representability predicate always-true → **13.828, 13.761, and NOT 13.824** (this is the one that
+separates the option LIST from the GATE) · M4 entity id → bare user id → **13.825 only** · M5 refusal
+swallowed → **13.827 only** · M6 reload on every answer → **13.827 only, by its `rosterReads` half**.
+
+### THE RULING — closed, do not reopen
+
+The owner-row narrowing was taken as a **conservative default** and filed as
+`gisik-nokma-lanes/EXEC2-2026-09-18-owner-row-editability.md`; **the controller confirmed it 2026-09-18
+("I am not reopening your PR for it")**. Owner rows keep the chip. Recorded in all four places that had
+said "not a ruling" — those sentences were true only until the answer came back.
+
+### ★ THE FOLLOW-ON TASK 1 ASSIGNED TO THIS TASK — its stated reason is WRONG, corrected not repeated
+
+Task 1's section ends: *"It goes live with the roster's role control… **Owner: that task.**"* Checked
+rather than inherited: **`apps/web`'s ingest is the ONLINE door**, whose engine context implements
+`countWorkspaceOwners`, so the guard answers and **nothing throws from this control**. The replica's outbox
+is reached only through `createReplicaDataSource` — `apps/desktop/src/app.tsx:56` and the dual-client
+harness, **not `apps/web`** (measured). Corrected trigger: it goes live when a REPLICA-BACKED client gains
+a members roster. The finding (`outbox.ts:315` calls `evaluateEvent` with no `try`/`catch`) is narrower
+than its first record and no less real.
+
+### THE PROSE-ONLY PARTITION — the reviewer ran while two edits landed
+
+The reviewer was dispatched against **`19a5c3c9`** and the tree moved under it. Measured with
+`git diff -U0 -- <the two code files>` and every changed line matching `^[+-]\s*(\*|//|$)`: **`b3eb8b80`
+changes ONLY comment lines in the code files**; the rest is `Features.md` and `test-cases/13`, which are
+prose by construction. No executable line moved, so the reviewed logic is intact.
+
+### Verification at `b3eb8b80` — recounted, not quoted
+
+**Re-run at `526c9fbf` after the fix round:** rule-engine **331/331** · members-page **28/28** · `tsc`
+exit **0** on rule-engine and web · **all seven checks raw 0**.
+**At `b3eb8b80`: web 487/487** (whole package, `--maxWorkers=1`) · **members-page 28/28** · **app-core 1544/1544** ·
+**`tsc --noEmit` on apps/web exit 0** · **SEVEN checks raw 0**: `check:env`, `check:tasks`,
+`check:db-tz` (needs `DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma`, prints
+`database timezone: Asia/Kolkata`), `check:runbook`, `check:citations` (2161 checked, 0 uncited;
+test-cases/13 is 612 cited / 0 uncited — a per-file ceiling of 0, so the five new ids being inside that
+count is the proof they are cited), `check:help`, and `scripts/check-case-ids.mjs` (2302 unique ids, no
+duplicates). **The dispatch says "six checks"; it is seven now** — `check-case-ids` was added after that
+sentence was written.
+
+### What a restart must NOT redo
+
+- **Do not re-run the mutations.** Six are recorded above and in `test-cases/13` with their kill sets.
+- **Do not re-derive the accessible-name behaviour.** The measurement is in the test docblock; the
+  conclusion is that every name query in this file is a regex and 13.826's absence arm is unanchored.
+- **Do not rebase onto `36ec6ae3`.** See the anchors row.
+- **Do not re-open the owner-row question.** Ruled, and recorded in four places.
+- **Do not "fix" the plan's Step 1 sample code in place.** The plan is the controller's document; the
+  defects are recorded here and in `test-cases/13` instead.
+- **Do not re-run the review round.** It returned no Critical; its two Importants and five Minors are all
+  addressed at `526c9fbf`, each verified at source, and the corrections name themselves in place. A scoped
+  re-review of that fix is the last outstanding step before the PR.
+- **If you re-run a sweep for any claim in this block, do NOT truncate it.** The one Important finding here
+  exists because the author's own `sed -n '1,20p'` cut an app off the end of a sweep and the sentence still
+  said "measured". Count the universe first.
+
+## ▼ PREVIOUS BLOCK — membership Task 1: the last-owner guard, in both layers (2026-09-18)
 
 **Position: the change set is COMPLETE, the review round is CLOSED and fully discharged, and the PR is
 opening against `main` with the reviewer recorded in its body.** Dispatch:
