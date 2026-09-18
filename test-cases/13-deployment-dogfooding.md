@@ -11525,3 +11525,72 @@ sweep — each re-measured by the reviewer at the line it names, on copies, with
   reporter surfaced that as `total=7 passed=7 failed=0` with the broken file simply absent from the
   assertion list. **A mutation result of `failed=0` is not evidence unless the total equals the full
   suite's count**; the suite-level failure is in `testResults[].message`, not in `assertionResults`.
+## settings → workflows: the card grid, and a CSS family that did not exist (executor 1, 2026-09-18) — case `13.884`
+
+Slice 1 of the `isWorkflows` port (`docs/superpowers/plans/…`, dispatch
+`CTL-DISPATCH-2026-09-18-settings-workflows.md`). The prototype block is
+`design-system/interactive/desktop.dc.html:841-869` at `@227434a5` — read from `main`, and the dispatch
+records why that matters: the primary checkout sits on a retired branch whose copy is **15 lines short**,
+so `isWorkflows` is at `826` there and `841` here. The audit's own row is
+`docs/design/prototype-delta-2026-09-18.md:68` (`wire-gap`, M).
+
+**THE UNSTYLED FAMILY WAS THE REAL DEFECT, and it was total.** `workflow-list__*` had **NO CSS AT ALL** —
+every `*.css` in the repo held exactly **one** `workflow-list` occurrence and it was a comment listing
+`.workflow-list__new` among *"unclassed-control offenders"* (`apps/web/app/globals.css:44`); there were
+**zero rules**. The primary action rendered as a bare `<button>` resolving to the UA default rather than
+`.gn-button--primary`. The audit established the absence with a control — the same sweep finds 31
+`.ticket-type-list__` rules — so the instrument reaches CSS and this family was simply not in it.
+
+- ✅ **13.884 — the workflow card grid, its state chips and category bars, and the two absences the
+  prototype draws and this product cannot back.** Two halves, in two files, split the way every styling
+  case in this repo splits: `packages/app-core/test/workflow-builder/screens.test.tsx:165` proves the
+  COMPONENT applies the classes, and `packages/ui/test/tokens.test.ts:1443` proves the classes DRAW
+  something. A rule that sets a colour is not a boundary that reads.
+
+  **The component half.** The prototype's own header sentence — *"Publishing records a version. Nothing
+  already recorded is rewritten."* (`:845`) — is asserted character for character; it had **0 hits** in
+  the product before this. One chip per state, one bar per chip, and the bar's class is asserted to be
+  `workflow-list__state-bar--<category>` for each state IN ORDER, with a set-equality arm proving the
+  fixture really carries all three categories, so the list is not satisfied by one class repeated. Every
+  bar is `aria-hidden` — the state's NAME is the accessible content. **Both absences are asserted rather
+  than assumed:** `.workflow-list__badge` must be `null` and the action row must hold exactly one button.
+  A badge that can only ever say `Published` and a second button with no gateway method are exactly what
+  this repo keeps re-finding, so their absence is pinned in the test rather than left to the docblock.
+
+  **The measurement half, and it is the same defect as the avatar's, one screen over.** The prototype
+  fills a chip with `--trayBg` (`:3185`) — `--gn-surface-sunken` here — and under `neo` that role is the
+  SAME hex as the `.gn-card` behind it, so the chip composites to exactly the card's colour. Asserted as
+  a fact about the palette (`toBe(card)`, both themes) with a **control** that under `hig`/`minimal` the
+  two roles genuinely differ — so the claim is about `neo` rather than about the palette. That equality
+  is what makes the `[data-style="neo"]` compact shadow *load-bearing* rather than decorative, and the
+  rule is asserted to take its shadow from the token layer rather than a literal. The three category bars
+  are DATA (`WorkflowState.category`, `packages/domain/src/workflow.ts:3`), so each is held to the 3:1
+  WCAG 1.4.11 floor **against the chip composite**, in all six style/theme combinations. **Measured
+  minimum 3.733** (`hig`/`minimal` light, `open`); the roles are read out of `ui.css` rather than named
+  in the test, so a repoint cannot pass.
+
+  **GUARD PROVED BY MUTATION, twice, each dying specifically.** Dropping the `neo` shadow reddens the
+  token-layer assertion by name. Repointing `.workflow-list__state-bar--open` from `--gn-category-open`
+  to `--gn-surface-sunken` reddens the ratio arm — **measured ratio 1.000**, the bar becoming invisible,
+  which is the exact defect the case exists for. Restored, `ui.css` returns to SHA-256
+  `99676339e7f3ae68498f82fd1fcc189454976b25ba5ea6871c89cd64a74c9e80` byte for byte.
+
+  **A RECORDED DEVIATION — the version stays, in the meta line.** The prototype writes the version into
+  the workflow's NAME (`"Delivery v4"`, `:3175`) because its data has no separate field. The product names
+  the workflow and its version separately, and case **10.62** asserts the version is shown, so dropping it
+  to match the drawing would lose a fact the screen already had. The meta line is therefore
+  `v7 · 3 states · 9 transitions` — the prototype's `"N states · N transitions"` plus the fact the row
+  list already carried. 10.62 was updated in the same change to build that string from the fixture rather
+  than typing today's numbers.
+
+  **PLACEMENT, priced rather than lazy.** The `workflow-list__*` rules are **appended at the end of
+  `ui.css`** instead of beside `.ticket-type-list__*` where a reader would look. Inserting a block that
+  size at line ~1832 shifts every `ui.css:NNN` citation below it, and **46** of the repo's 135 name a line
+  past that point; appending stales **0**, measured both ways. The two families already sit 300 lines
+  apart in that file, so the locality given up is small and the citations kept are not. The reasoning is
+  in the CSS comment, so the next reader can move it deliberately rather than wonder.
+
+  **Citations:** `packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx:112` (the grid),
+  `:118` (the chip), `:120` (the bar and its category), `:127` (the meta line), `:99` (the subtitle),
+  `:103` (the primary action on the shared variant), `packages/ui/src/ui.css:4383` (the chip fill),
+  `:4393` (the neo shadow), `:4405` (the bar roles)

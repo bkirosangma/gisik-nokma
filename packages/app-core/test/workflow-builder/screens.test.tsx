@@ -134,12 +134,71 @@ describe('WorkflowListScreen', () => {
       />,
     );
     expect(await screen.findByText('Simple kanban')).toBeInTheDocument();
-    expect(screen.getByText('v7')).toBeInTheDocument();
-    expect(screen.getByText('3 states')).toBeInTheDocument();
+    // The version, the state count and the transition count on ONE line, built
+    // from the fixture rather than typed out, so the assertion moves with the
+    // template instead of pinning today's numbers. The version stayed when the
+    // card grid replaced the row list — see the screen's docblock for why.
+    expect(
+      screen.getByText(
+        `v7 · ${first.states.length} states · ${first.transitions.length} transitions`,
+      ),
+    ).toBeInTheDocument();
     // 13.311 — the per-row open control's aria-label carries THAT row's name;
     // the expected name is hard-coded, so a lost interpolation cannot pass.
     await user.click(screen.getByRole('button', { name: 'Open Simple kanban' }));
     expect(onOpen).toHaveBeenCalledWith(first.id);
+  });
+
+  /**
+   * 13.884 — the card grid, the state chips and their category bars, and the
+   * TWO ABSENCES the prototype draws and this product cannot back.
+   *
+   * The bars are asserted by CLASS and the classes are asserted to carry the
+   * three category values the DOMAIN declares — a `switch` over
+   * `WorkflowState.category`, so a fourth category appearing in
+   * `stateCategorySchema` would leave a state with no bar rather than a
+   * silently mis-coloured one. The COLOUR itself is measured, not asserted for
+   * existence, in `packages/ui/test/tokens.test.ts` (the same split every
+   * styling case in this repo uses: this file proves the component applies the
+   * class, that file proves the class draws something).
+   */
+  it('13.884 draws a card per workflow with a bar per state category, and invents neither absent element', async () => {
+    const first = cloneTemplate(kanban);
+    render(
+      <WorkflowListScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={createFakeGateway({ workflows: [{ ...first, version: 3 }] })}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />,
+    );
+    expect(await screen.findByText('Simple kanban')).toBeInTheDocument();
+
+    // The prototype's own header sentence (`desktop.dc.html:845`), exact.
+    expect(
+      screen.getByText('Publishing records a version. Nothing already recorded is rewritten.'),
+    ).toBeInTheDocument();
+
+    // One chip per state, and one bar per chip carrying THAT state's category.
+    const bars = document.querySelectorAll('.workflow-list__state-bar');
+    expect(bars).toHaveLength(first.states.length);
+    expect([...bars].map((bar) => bar.className)).toEqual(
+      first.states.map((state) => `workflow-list__state-bar workflow-list__state-bar--${state.category}`),
+    );
+    // Every declared category, so the set above is not satisfied by one class.
+    expect(new Set(first.states.map((state) => state.category))).toEqual(
+      new Set(['open', 'active', 'terminal']),
+    );
+    // The bar is decorative: the state's NAME is the accessible content.
+    for (const bar of bars) expect(bar).toHaveAttribute('aria-hidden', 'true');
+
+    // THE TWO NAMED ABSENCES, asserted rather than assumed — a badge that can
+    // only ever say "Published" and a second button with no gateway method are
+    // exactly what this repo keeps re-finding, so their absence is pinned.
+    expect(document.querySelector('.workflow-list__badge')).toBeNull();
+    const actions = document.querySelector('.workflow-list__actions');
+    expect(actions?.querySelectorAll('button')).toHaveLength(1);
   });
 
   /**

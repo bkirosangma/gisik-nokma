@@ -1410,3 +1410,128 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
     }
   });
 });
+
+/**
+ * The settings → workflows card grid's state chip and its category bar. Case
+ * **13.884** (`test-cases/13-deployment-dogfooding.md`).
+ *
+ * TWO MEASUREMENTS, and they are two because the chip and the bar answer
+ * different questions.
+ *
+ * **The bar carries DATA, so it owes a ratio.** `WorkflowState.category` is
+ * `'open' | 'active' | 'terminal'` (`packages/domain/src/workflow.ts:3-7`) — the
+ * bar is the only thing on the chip that says WHICH category, so it is a
+ * non-text element conveying information and WCAG 1.4.11 holds it to 3:1
+ * against what it sits on. It is measured against the COMPOSITE, because the
+ * chip's own fill is alpha-free but its ground is not always what it looks like;
+ * the same reasoning case 13.732 records for the avatar.
+ *
+ * **The chip's fill is a depth problem, and the measurement is what says so.**
+ * The prototype fills a state chip with `--trayBg` (`desktop.dc.html:3185`),
+ * which is `--gn-surface-sunken` on this product's role layer — and under `neo`
+ * `surface`, `surfaceRaised` and `surfaceSunken` are the SAME hex, so a chip on a
+ * `.gn-card` composites to exactly the card's own colour and its fill draws no
+ * boundary at all. **That is asserted here as a fact about the palette**
+ * (1.0000, both themes, exactly as case 13.732 asserts it for the avatar), which
+ * is what makes the `[data-style="neo"]` shadow in `ui.css` load-bearing rather
+ * than decorative — the chip's boundary comes from the shadow under `neo` and
+ * from the fill under the other two styles.
+ *
+ * The roles are read OUT of `ui.css`, not named here, for the reason 13.732
+ * gives: a case that hard-codes the role stays green through a repoint.
+ */
+describe('13.884 — a workflow state chip keeps a boundary under neo, and its category bar clears 3:1 on the chip', () => {
+  /** `src` over `dst` — the compositing `relativeLuminance` deliberately lacks. */
+  const over = (src: string, dst: string): string => {
+    const hex = (h: string, i: number): number => Number.parseInt(h.slice(i, i + 2), 16);
+    const alpha = src.length === 9 ? hex(src, 7) / 255 : 1;
+    const channel = (i: number): number =>
+      Math.round(hex(src, i) * alpha + hex(dst, i) * (1 - alpha));
+    return `#${[1, 3, 5].map((i) => channel(i).toString(16).padStart(2, '0')).join('')}`;
+  };
+
+  const declarationsFor = (css: string, selector: string): string | null => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`^${escaped}\\s*\\{([^}]*)\\}`, 'm').exec(css)?.[1] ?? null;
+  };
+
+  const UI_CSS_TEXT = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
+
+  const declaredRole = (selector: string, declarations: string, property: 'background' | 'color'): TokenRole => {
+    const named = new RegExp(`(?:^|[\\s;])${property}:\\s*var\\(--gn-([a-z-]+)\\)`).exec(declarations)?.[1];
+    if (named === undefined) {
+      throw new Error(`${selector} declares no \`${property}: var(--gn-…)\`; it reads: ${declarations.trim()}`);
+    }
+    const role = TOKEN_ROLES.find((candidate) => cssVariableName(candidate) === `--gn-${named}`);
+    if (role === undefined) {
+      throw new Error(`${selector}'s ${property} names --gn-${named}, which is not a role in TOKEN_ROLES`);
+    }
+    return role;
+  };
+
+  const CATEGORY_BAR_SELECTORS = [
+    '.workflow-list__state-bar--open',
+    '.workflow-list__state-bar--active',
+    '.workflow-list__state-bar--terminal',
+  ] as const;
+
+  it('every category bar clears 3:1 against the chip composite, in every style and theme', () => {
+    const chipBody = declarationsFor(UI_CSS_TEXT, '.workflow-list__state');
+    if (chipBody === null) throw new Error('.workflow-list__state rule not found in ui.css');
+    const chipFill = declaredRole('.workflow-list__state', chipBody, 'background');
+
+    for (const selector of CATEGORY_BAR_SELECTORS) {
+      const body = declarationsFor(UI_CSS_TEXT, selector);
+      if (body === null) throw new Error(`${selector} rule not found in ui.css`);
+      const barRole = declaredRole(selector, body, 'background');
+
+      for (const style of STYLE_NAMES) {
+        for (const theme of THEME_NAMES) {
+          const card = colorOf(theme, 'surfaceRaised', style);
+          const chip = over(colorOf(theme, chipFill, style), card);
+          expect(
+            contrastRatio(colorOf(theme, barRole, style), chip),
+            `${style}/${theme}: ${selector}'s bar no longer clears 3:1 on the chip it sits on`,
+          ).toBeGreaterThanOrEqual(3);
+        }
+      }
+    }
+  });
+
+  it('the chip fill collapses onto the card under neo — which is why the neo rule supplies the boundary', () => {
+    const chipBody = declarationsFor(UI_CSS_TEXT, '.workflow-list__state');
+    if (chipBody === null) throw new Error('.workflow-list__state rule not found in ui.css');
+    const chipFill = declaredRole('.workflow-list__state', chipBody, 'background');
+
+    // The measured fact the shadow exists for, stated for BOTH themes rather
+    // than one, and asserted as equality so a future palette that separates the
+    // surface roles reddens here — which would be the signal to re-derive the
+    // rule rather than to keep a shadow that had stopped being needed.
+    for (const theme of THEME_NAMES) {
+      const card = colorOf(theme, 'surfaceRaised', 'neo');
+      expect(
+        over(colorOf(theme, chipFill, 'neo'), card),
+        `neo/${theme}: the chip fill no longer collapses onto the card, so this case's premise has moved`,
+      ).toBe(card);
+    }
+
+    // THE CONTROL, and it is the whole reason the paragraph above is a claim
+    // about `neo` rather than about the palette: under hig/minimal the two roles
+    // DO differ, so the same fill draws a boundary with no shadow at all.
+    for (const style of ['hig', 'minimal'] as const) {
+      const card = colorOf('light', 'surfaceRaised', style);
+      expect(
+        over(colorOf('light', chipFill, style), card),
+        `${style}/light now collapses too — the shadow is no longer the only boundary under neo`,
+      ).not.toBe(card);
+    }
+
+    // And the shadow is actually declared, on the token layer rather than as a
+    // literal — the half a palette measurement cannot see.
+    const neoBody = declarationsFor(UI_CSS_TEXT, '[data-style="neo"] .workflow-list__state');
+    if (neoBody === null) throw new Error('[data-style="neo"] .workflow-list__state rule not found in ui.css');
+    expect(neoBody, 'the neo override must take its shadow from the token layer').toMatch(
+      /box-shadow:\s*var\(--gn-shadow-[a-z-]+\)/,
+    );
+  });
+});
