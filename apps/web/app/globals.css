@@ -1843,7 +1843,7 @@ input, textarea, select { font-family: inherit; }
    .gn-field__input` already is (`packages/ui/src/ui.css`) reproduces that
    distinction rather than forcing the raised look everywhere. `--gn-surface`,
    not `--gn-fill-tertiary`, for the background: under `neo`, `surface` IS the
-   export's `--ctlBg` (`#EDE4DB`/`#1B2340`, the same hex the export gives
+   export's `--ctlBg` (`#F1EAE3`/`#1B2340`, the same hex the export gives
    `--surface` under this style). `--gn-shadow-raised` is the closest existing
    shadow role to the export's `--ctlShadow` — same dual-layer light/dark
    construction, a slightly larger geometry (this token system has no

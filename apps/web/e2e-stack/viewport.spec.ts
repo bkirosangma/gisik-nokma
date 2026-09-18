@@ -905,7 +905,14 @@ test('records non-text contrast across the signed-in surface, with a positive co
     {
       selector: '[data-style="neo"] .gn-field__input',
       sanctioned: true as const,
-      ratioLight: 1.24,
+      // UPDATED 2026-09-18 (Step 2c-1, T5): `neoPaper` moved `#ede4db` ->
+      // `#f1eae3`, and this shadow-edge ratio is measured against that surface,
+      // so it moved with it — `docs/neo-token-report.md`'s Rule (a) row for
+      // neo/light reads 1.24 -> 1.18 on the regenerated run. Cited rather than
+      // re-measured HERE for the reason the dark figure below already gives:
+      // this suite is light-theme-only and its own DOM check is what confirms
+      // the value when it runs.
+      ratioLight: 1.18,
       // UPDATED 2026-09-10: `neoNavySunken` was reverted to `neoNavy` itself
       // (owner: "revert to prototype's exact dark hex"), so `surface` and
       // `surfaceSunken` are now the IDENTICAL hex in neo/dark — the field's

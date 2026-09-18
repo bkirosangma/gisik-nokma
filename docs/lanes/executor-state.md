@@ -20,23 +20,128 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~06:xx IST. **STEP 2c-0 (THE PROTOTYPE DELTA AUDIT) IS
-> # DONE. PR #424 IS OPEN AGAINST `owner/workspace-edits`, AWAITING THE CONTROLLER'S MERGE.**
+> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~05:4x IST. **STEP 2c-1 (THE TOKEN LAYER) IS DONE, GATED,
+> # REVIEWED, AND ITS PR #426 IS OPEN AGAINST `owner/workspace-edits`, AWAITING THE CONTROLLER'S MERGE.**
 >
-> Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-step2c0-prototype-delta-audit.md`.
-> Deliverable: `docs/design/prototype-delta-2026-09-18.md`. **Docs-only: no source, no `Features.md`, no
-> `test-cases/` change.** Independent reviewer ran (falsification brief) and its three findings are fixed.
+> **The reviewer ran and its finding was REAL — and it was against me.** Details below; the short
+> version is that a sentence I wrote to justify a new test was false, the review falsified it, I
+> re-derived every number myself before acting, and the fix round is committed and re-gated.
+>
+> Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-step2c1-tokens.md`. **The Step 2c-0 block further
+> down this file is the RECORD of a merged PR (#424, merged `3b8b8e5e`), NOT the position.** Nothing in it
+> is outstanding; do not start work from it.
 >
 > | | |
 > |---|---|
-> | branch | `exec/step2c0-prototype-delta-audit`, cut from `origin/owner/workspace-edits` at `3831bb49` |
-> | **PR** | **#424, base `owner/workspace-edits`** — never `main` |
-> | HEAD | `b784326b` (the reviewed head, before this handoff block) — **the PR is frozen there; the handoff update is the only commit after it** |
-> | PR base | `owner/workspace-edits` — NEVER `main` |
-> | gate | At `fce3f159`: six checks all EXIT 0 (`env`/`tasks`/`runbook`/`citations`/`help` via pnpm, `case-ids` via `node scripts/check-case-ids.mjs` — **there is no `check:case-ids` pnpm script**); `pnpm turbo run typecheck --force --concurrency=2` → **17/17, 0 cached, EXIT 0**, Node v22.22.2. Full forced gate is the controller's at the tip |
-> | subagents | A, B, C, D done · **E in flight** (isTypeEditor, isMcpTokens, isBuilder, isLegal, isNotFound) · reviewer not yet dispatched. **Serial, one at a time**; 5 workers + 1 reviewer = the cap of 6 |
+> | branch | `exec/step2c1-tokens`, cut from `origin/owner/workspace-edits` at `3b8b8e5e` |
+> | **PR** | **#426**, base **`owner/workspace-edits`** — verified via `gh pr view --json baseRefName`, not assumed |
+> | HEAD at gate | **`4454f66c`** — the fix-round head; **the gate below was re-run at THIS sha** (the pre-review head was `eb153398`, `3a0ded41` before that) |
+> | merge-base | `3b8b8e5e` (= `origin/owner/workspace-edits` when the branch was cut) |
+> | tree | clean |
+> | gate | `corepack pnpm turbo run build test typecheck --force --concurrency=2` → **33/33 successful, 0 cached, EXIT 0**, twice (once pre-review, once at the fix-round head); `grep -c 'FAIL\|failed'` over each log = **0**; Node **v22.22.2**, pnpm **9.15.0**. Per package: domain 486 · **ui 322** · rule-engine 306 · editor 178 · sync-client 90 · **app-core 1454** · desktop 9 · mobile 29 · **web 430** · mcp-server 44 · **server 1534 / 5 skipped** |
+> | six checks | all **EXIT 0**: `env` · `tasks` · `runbook` · `citations` · `help` (via pnpm) and `case-ids` via **`node scripts/check-case-ids.mjs`** — there is still no `check:case-ids` pnpm script. `case-ids` reads **2196 unique ids** (2189 before this step's seven) |
 >
-> ## All 25 screens are decided. Final counts (26 rows = 25 blocks + the global TOKENS row)
+> ## ▣ THE SCOPE FINDING — the dispatch's T3/T4 premise does not hold for this product
+>
+> The dispatch asked to map "each prototype variable to the product's tint role by name". Measured: the
+> product has **exactly ONE tint role**, `tintWarning` (`TOKEN_ROLES`, and `grep -- '--gn-tint'` over the
+> repo). The export uses six. So **T3's product footprint is two primitives** (the warning wash's alpha in
+> each theme) and **T4 has NO counterpart at all** — no `tintAccent` role exists and there is no consumer
+> for one. The product declined the four other washes on measurement, and that refusal is already
+> recorded twice (`ui.css`'s "no `--gn-tint-purple` role exists or is added here"; `Features.md`). The
+> audit's sentence "every danger/warning/success wash — chips, pills, banners — is drawn from these" was
+> **true of the export and false of the product**, whose chips draw the fill ladder. Ruled conservative:
+> do not invent roles with no consumer. In the PR body as the mapping table.
+>
+> ## ▣ THE PRE-EXISTING FAILURE — `/help`'s tap-target ratchet, NOT caused by this change
+>
+> The viewport suite (`pnpm run test:e2e:viewport`, its own `next dev` on **3021**) is **28 passed, 2
+> skipped, 3 failed** at this head. All three failures are one case: `responsive.spec.ts:560` `help
+> (/help)`, a **tap-target ratchet** ("interactive targets under 44x44 at 390px rose above the recorded
+> baseline 10"), on all three viewports. **Verified pre-existing, not assumed:** the tree was reverted
+> wholesale to `origin/owner/workspace-edits`, rebuilt, and the same case run as a control — **it fails
+> identically at the base**, same message, same baseline, same three viewports. This change touches
+> colours and comments only; tap targets are geometry.
+>
+> **Two traps hit on the way there, both worth keeping:**
+> - **The suite reads `@gisik-nokma/ui` through `dist`.** Before `pnpm turbo run build`, case 13.362
+>   failed with `expected #f1eae3, received #ede4db` — the suite was serving the STALE dist while the
+>   source was correct. Rebuild first, then run. (28 passed after; 25 before.)
+> - **The committed `non-text-contrast-roster.json` carries TWO sanctioned waivers; `viewport.spec.ts`
+>   emits ONE.** The `gn-select__panel` entry was added by hand and no generator produces it, so
+>   re-running `test:e2e:stack` **silently DELETES it**. Not run, not fixed — named owner: whoever next
+>   touches that suite.
+>
+> ## ▣ WITNESSED LIVE (the owner's proof)
+>
+> On the hot web at **3001**, `data-style="neo"`, **`data-theme` ABSENT**:
+>
+> | | before | after |
+> |---|---|---|
+> | `--gn-accent` | `#3a6db0` | `#33629f` |
+> | `--gn-surface` | `#ede4db` | `#f1eae3` |
+> | `--gn-danger` | `#d70015` | `#9e2a20` |
+> | `--gn-contested` | `#d30f45` | `#9a3054` |
+> | `--gn-tint-warning` | `#f07c3433` | `#f07c341a` |
+>
+> Screenshots: `gisik-nokma-lanes/refs/2026-09-18-tokens-{before,after}.png`. **The `data-theme` absence is
+> itself the evidence for the selector refusal** — the light-neo tokens are present with no theme
+> attribute, which is exactly what porting the export's literal selector would have broken. `/v1/auth/methods`
+> still answers `"google":true`.
+>
+> ## ▣ THE REVIEW — it confirmed the derivation, then falsified MY OWN sentence
+>
+> Independent, read-only reviewer. It reproduced **all five** of my ratios exactly (7.0211 / 6.5235 /
+> 6.5659 / 5.0660 / 4.4247), all **198** `CONTRAST_PAIRS` checks (0 failures), the 33 count, **zero
+> `minimum` edits**, **9 of 9** prototype-vs-shipped hexes, and it *verified* the `--pink`/`--purple`
+> mapping from the export's own chip calls (`desktop.dc.html:2355/2357`) rather than accepting my
+> reasoning.
+>
+> **Then it found this, and it was right:**
+>
+> My new case 13.681 asserted `contested`/`restricted`/`customMarker` at **3:1**, justified by the
+> sentence *"they carry no text role — they are never a ground for text"*. **`contested` IS read text
+> today** — `.gn-sync-status-bar__failed { color: var(--gn-contested) }` on `background:
+> var(--gn-surface)` (`ui.css:2602`, consumed at `sync-status-bar.tsx:85`, 13.6px normal weight, so AA
+> wants **4.5**). It measures **4.3746 in `hig`/`minimal` light — a real AA failure**, pre-existing and
+> untouched by this change (`neo` light is 6.02, so T5 incidentally fixed it in the one style it
+> touched). Siblings, both **unnamed by any `CONTRAST_PAIRS` row**: `warning` on surface **4.2485**,
+> `danger` on surface **4.4013**.
+>
+> **Every one of those numbers was re-derived here with my own arithmetic before acting** — they
+> reproduce exactly. The case now **asserts the failing value** instead of blessing a too-low floor.
+> Nothing in the CSS was fixed. **Named owner: whoever next touches the sync status bar or the
+> `contested`/`warning`/`danger` roles.**
+>
+> **Also corrected in the fix round — all displaced by THIS change, all found by the same review:**
+> `tokens.ts`'s `textAccentLight` docblock (`#E3D8CD`→`#E7DDD4`, 5.311→5.596, 4.755→4.984) and its
+> `CONTRAST_PAIRS` docblock (the "smallest margin" claim — after T5 `warmPaper` at 5.453 is smallest,
+> not `neo`); the roster JSON's citation figure (1.242→1.182, which my own earlier edit had left
+> behind); and the 13.681 catalogue entry, which carried the same false justification as the test.
+> **Old values are kept visible beside the new ones in every case.**
+>
+> **A third named owner, recorded not fixed:** the calibration anchor itself is stale —
+> `tokens.ts`'s `green700` docblock gives `successText` ratios **4.40 / 5.40** computed against
+> **`white`**, but the shipped `successText` is `onColorWarmLight` **`#fbf7f3`** (moved off `white` in
+> owner round 4, 2026-09-16); live today they are **4.12 / 5.07**. Dated 2026-09-08, untouched here.
+> **It matters because it is the anchor a future reviewer is told to calibrate against.**
+>
+> ## Live anchors — measured at this block
+>
+> | | |
+> |---|---|
+> | merge-base | `3b8b8e5e` |
+> | HEAD | `4454f66c` (the fix-round head; this handoff commit sits on top of it) |
+> | pushed | `origin/exec/step2c1-tokens` — verified equal to local HEAD before this block was written |
+> | ahead of owner | the step's 6 commits |
+> | tree | clean |
+> | branch contains | `70ab0338` · `dbe1f721` · `cd008c00` · `1d269bab` · `3a0ded41` · `eb153398` · `4454f66c` |
+>
+> ---
+>
+> # ↓ THE STEP 2c-0 RECORD — **MERGED. NOT THE POSITION. DO NOT START WORK FROM IT.** (#424, `3b8b8e5e`)
+>
+> ## All 25 screens were decided. Final counts (26 rows = 25 blocks + the global TOKENS row)
 >
 > | verdict | n | screens |
 > |---|---|---|
