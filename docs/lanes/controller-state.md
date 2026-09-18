@@ -31,6 +31,35 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## ✅ FRIDAY 2026-09-18 ~16:2x IST — **TWO OWNER RULINGS LANDED, AND THEY ADD TWO WORK ITEMS TO THE QUEUE. THE QUEUE IS NOW FOUR, AND THE SECURITY FIX GOES FIRST.** `main` is `efc23e67` + this PR; **zero open PRs**; ledger **300 done / 0 claimed / 8 todo**.
+
+### The two rulings, verbatim
+1. **An admin may NOT demote a non-last owner** — *"may an admin demote a non-last owner: **no**."*
+2. **Build `scripts/check-migration-order.mjs`** — *"build scripts/check-migration-order.mjs: **yes**."*
+
+Full text and consequences in `docs/lanes/owner-holds.md` § "Ruled later the same day". **Both are decisions that CREATE work**, not holds.
+
+### THE QUEUE — dispatch in THIS order, to whichever executor frees first
+| # | work order | why here |
+|---|---|---|
+| 1 | **`CTL-DISPATCH-2026-09-18-owner-demotion-guard.md`** | a **live** authorization hole: an admin can demote one of two owners today. The guard plan's own principle is *guard first, and alone* |
+| 2 | **`…-members-styling.md`** (+ amendment) | previously queued |
+| 3 | **`…-settings-workspace-tab.md`** (+ amendment) | previously queued |
+| 4 | **`…-migration-order-check.md`** | a new repo check; self-contained |
+
+**Every one of the four needs an amendment before dispatch** — each carries a "used so far" id list stopping at `13.879`, and **`13.880` is taken**. Append an amendment file; **never rewrite a dispatch**.
+
+### `hig-per-screen/3a` — THE ELABORATION THE OWNER ASKED FOR
+**Short answer: it does not cleanly close, and the reason is that its plan text is a snapshot of markup `#443` replaced.** Task 3a (*"Members — surface"*, `docs/superpowers/plans/2026-09-08-hig-per-screen.md:815`) has three deliverables. Measured against `origin/main` today:
+
+| 3a's deliverable | measured on `main` |
+|---|---|
+| append `.gn-members`, `.gn-members__row`, `.gn-members__not-admin` | the CSS family **exists but is a different set** — `#443` wrote thirteen classes from scratch (`__cell/__empty/__head/__initial/__loading/__name/__person/__role/__summary/__table/__th/__th--person`) because the roster became a **`<table>`**. `.gn-members__row`: **0 occurrences** — the selector was written for the old `<ul>` and is moot. `.gn-members__not-admin`: **present** |
+| wrap the invite form's bare `<label>…<input>` in the `.gn-field` pattern | **NOT DONE.** `members/page.tsx` still carries `<label htmlFor="gn-invite-address">` + `<input>` at `:665-666` and `:699-700`. `.gn-field__input` appears in that route tree only in `app/w/[workspaceId]/page.tsx` |
+| stack suite run, 13.287 green | needs the full stack; **not re-measured this cycle** |
+
+**So one deliverable is satisfied by a different route, one is moot, and one is verifiably absent.** The absent one is entangled with the shared `Select` component's rollout, which is complete — so it is doing a small amount of real work, on a page a queued dispatch (`members-styling`) is **already** going to open. **The controller recommends: fold the `.gn-field` form work into `members-styling` and close 3a as superseded-by-`#443`, recording that the CSS family landed by a different route.** That is a **ledger STATUS change**, which this controller may not make — **the owner names it, or the row stays `todo`.** No work item waits on the answer.
+
 ## ✅ FRIDAY 2026-09-18 ~16:0x IST — **CYCLE 3 CLOSED: BOTH EXECUTOR PRs ARE ON `main` (`#465` → `c2daa5b5`, `#466` → `438b956c`), BOTH EXECUTORS RESTARTED AND DISPATCHED, AND ONE FALSE CLAIM IN A MERGED PR BODY IS REPORTED RATHER THAN FIXED.** `main` is `438b956c` + this PR; **zero open PRs**; ledger **300 done / 0 claimed / 8 todo**.
 
 ### If you are the DeepSeek controller reading this: your position, in five lines
