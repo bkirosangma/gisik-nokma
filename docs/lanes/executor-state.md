@@ -41,7 +41,199 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~19:4x IST. **SETTINGS → WORKFLOWS: REBASED ONTO #476,
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~22:0x IST. **TASK 5b REBASED ONTO `77aa906a` (#490):
+> # ONE FILE RESOLVED AS A UNION, A CITATION THAT RESOLVED TO A BLANK LINE FOUND AND CORRECTED,
+> # EVERY CHECK AND THE THREE AFFECTED SUITES GREEN AT THE NEW HEAD, PR #491 MEASURED MERGEABLE.
+> # AWAITING THE CONTROLLER'S MERGE.** `exec/task5b-not-ported-items`, ONE PR `--base main`.
+> # Supersedes the block below it; the block below is HISTORY.
+>
+> ## LIVE ANCHORS — measured with `/usr/bin/git` at the sha, not inherited
+>
+> | | |
+> |---|---|
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — no block can contain the commit that carries it. At writing: `f7ecf228` (the citation-correction commit; the handoff commit you are reading is its CHILD). |
+> | branch | `exec/task5b-not-ported-items` — REBASED and force-pushed with lease; `ls-remote` confirms the remote holds `f7ecf228`, not the old tip |
+> | `origin/main` | `77aa906a` — #490 (exec2's Task 12 closeout). **This is the new merge-base.** |
+> | pre-rebase tip | `b2bc7eba` — **ORPHANED. `git branch --contains b2bc7eba` is empty; `cat-file` still passes on it and lies.** |
+> | tree | clean at `f7ecf228` |
+> | the change | 19 files, membership unchanged by the rebase — `git diff --stat origin/main...HEAD` |
+> | PR #491 | `mergeable: MERGEABLE`, `mergeStateStatus: UNSTABLE` (checks pending, and see the CI finding below) |
+>
+> ## SHA MAPPING — every sha in every block BELOW this one is dead
+>
+> | old | new | what |
+> |---|---|---|
+> | `9ea1ddbd` | `c95f407d` | the code commit (the 5 NOT-ported items + the 147-citation sweep) |
+> | `86c4e293` | `305f7669` | handoff and catalogue |
+> | `b2bc7eba` | `2f42fe5f` | the review round |
+> | — | `f7ecf228` | NEW: the citation correction (below) |
+> | `c473c781` | — | the OLD base (#488's merge). No longer the merge-base. |
+>
+> ## THE REBASE — the controller dispatched it; the conflict was measured BEFORE it was resolved
+>
+> `git merge-tree --write-tree origin/main HEAD` → EXIT 1, **one file**: `test-cases/13-deployment-dogfooding.md`.
+> Main had moved 6 commits, and **none touched any SOURCE file this branch cites** — main's changed files
+> are exactly `Features.md`, `test-cases/13`, `executor-2-state.md`, and the backlog spec. **So no cited
+> source line moved**, and that is a measurement, not a hope.
+>
+> **RESOLUTION — two hunks, one paragraph, and the union of the right shape.** #490 did NOT edit the
+> paragraph the conflict sits in; it APPENDED three sections after it. Hunk 1 therefore takes this lane's
+> table in place of the five bullets and keeps main's appended sections; hunk 2 appends this lane's
+> `13.924`–`13.927` catalogue section at EOF, after main's.
+> **Built by SPLICE, not by eye**: the file was rebuilt from main's own blob plus this branch's block.
+> The prefix control **fails on purpose** (main's 41 swept citation lines differ) — which is why the
+> *diff* is the verification: `git diff origin/main resolved` prints **exactly** the paragraph swap,
+> 15 removed / 17 added, and nothing else. Then: 0 conflict markers, both sides' sections present,
+> `check-case-ids` union == sum.
+>
+> ## THE FINDING THE RE-CHECK PRODUCED — a citation that resolved to a BLANK LINE
+>
+> `Features.md:2251` cited `docs/hig-reconciliation-audit.md:690-718` for the ruling *"KEEP AND RESTYLE;
+> NEVER DELETE"*. **Line 690 is BLANK**; the ruling is at `:691`. (`:718`, the far end, IS correct.)
+> Written by `ee7ee37a` and **not shifted since** — the audit doc's only later edit (`a6d78c13`) touched
+> lines ~182-190, above the cited region, net-zero — so it was wrong when written. It sat on a line this
+> branch rewrites, where a reader would take it as swept by the 147-citation repair.
+> **Corrected to `:691-718`** by one single-occurrence replacement (count asserted == 1; byte backup
+> sha256 `5a93a9cd…`). It is **same-length**, so no line moved and no citation shifted.
+>
+> **Recorded, NOT fixed — three, each with an owner:**
+> 1. **The identical stale string at `test-cases/13-deployment-dogfooding.md:8587`**, in a region this
+>    branch does not touch. *Owner: whoever next edits that catalogue section.*
+> 2. **Two citations INTO this file were ALREADY stale before this rebase** — measured, not assumed.
+>    `docs/design/prototype-delta-2026-09-18.md:197` cites `executor-state.md:216` for the "Prototype
+>    delta" entry, but `:216` is the F1 control block; `plan10-adaptation-map.md:434` cites
+>    `executor-state.md:1979-1980` for the owner-set stop point, but those lines are the mutation /
+>    citation-ratchet note. **This file is append-only at the TOP, so every inbound line citation decays
+>    on every update** — the CLASS is the finding, not either instance. Inserting this block shifts both
+>    again by its own length. *Owner: whoever next reasons about citations into a top-inserted narrative.*
+> 3. **A citation the union DROPS: `packages/ui/src/ui.css:1203-1211`.** Main's side of the conflicted
+>    paragraph carried it (the `--gn-tint-warning` docblock documenting the role as a composite over its
+>    ground); this lane's table states the same fact as a measured result without re-citing it. The
+>    docblock is still at that line — nothing is stale, one pointer is simply no longer made. Recorded
+>    rather than re-added, because re-adding is a content change to an already-reviewed block.
+>
+> ## VERIFICATION AT `f7ecf228` — every number re-measured, none carried
+>
+> | check | result |
+> |---|---|
+> | `pnpm turbo run build` | **11/11** (`FULL TURBO` — content unchanged, so the cache hit is honest) |
+> | `pnpm turbo run typecheck` | **17/17, EXIT 0** |
+> | the seven repo checks | `tasks` · `env` · `runbook` · `help` · `citations` · `db-tz` · `migrations` — **all EXIT 0** |
+> | `check:citations` | `13-deployment-dogfooding.md`: **686 cited / 0 uncited**; ratchet exact on every file |
+> | `scripts/check-case-ids.mjs` | **2376 unique**, union == sum, highest `15.34` |
+> | `check:db-tz` | `Asia/Kolkata` (against `postgres://gisik:gisik@localhost:54329/gisik_nokma`) |
+> | `check:migrations` | 27 migrations, **0 new against origin/main** |
+> | app-core · ui · web suites | **1565 / 351 / 534 passed**, 0 failed (94 / 6 / 49 files) |
+> | node | `v22.22.2` (spawn-probed) |
+> | gate | **NOT run by this lane** — it is the controller's |
+>
+> **The line-count-neutrality claim was RE-MEASURED, not restated** (it is what saved the 102 repairs):
+> `git diff -U0 origin/main HEAD` → `ui.css` `@@ -1978,4 +1978,4 @@` **plus** a pure EOF append
+> (`@@ -4734,0 +4735,57 @@`); `globals.css` `@@ -153 +153 @@` plus an EOF append (`@@ -2686,0 +2687,44 @@`);
+> `tokens.ts` `@@ -344,6 +344,6 @@`. Each is a same-count replacement or an append at EOF, so no
+> existing citation moved. Each cited line was then opened and read.
+>
+> ## ⛔ CI IS RED REPO-WIDE FOR A REASON THAT IS NOT CODE — GitHub Actions is not running jobs
+>
+> **`gh run view 35367339608` (a run on `main` itself) reports, for every job:
+> *"The job was not started because recent account payments have failed or your spending limit needs to
+> be increased."*** The PR checks fail in ~3 s, which is the same fact: `scope`, `check-runbook`,
+> `check-citations`, `check-help`, `check-migrations` and `gate` are **FAILURE because nothing ran**,
+> while `build`/`typecheck`/`tests`/`e2e` are SKIPPED behind them. This is **not** attributable to any
+> branch: every run on `main` since at least `adaac40c` fails identically. **It is an OWNER action
+> (Actions billing / spending limit) and it blocks the standing auto-merge authorization's "independent
+> CI run green" condition for every PR in the repo.** The local instruments are green (table above);
+> the hosted ones cannot run at all.
+>
+> ## WHAT A RESTARTED EXECUTOR SHOULD DO
+>
+> **Nothing is half-done.** The conflict is resolved, the branch is pushed, the PR is MERGEABLE. Do not
+> re-resolve anything. **Do not use any sha in the blocks below this one** — they are pre-rebase and
+> orphaned; the mapping table above is the translation. A future push to this branch must be
+> `--force-with-lease` (the remote was rewritten). *The next task is the controller's to dispatch;
+> nothing is queued here.*
+>
+> ---
+>
+> # ▣ CURRENT POSITION — SUPERSEDED 2026-09-18 ~22:0x IST by the block above. **HISTORY — kept as record.**
+> # **TASK 5b: THE FIVE
+> # NOT-PORTED ITEMS OF `isTypeEditor`, EACH GIVEN A RULE. ALL GREEN, ONE PR OPEN
+> # — AWAITING THE CONTROLLER'S MERGE.** `exec/task5b-not-ported-items`, ONE PR `--base main`.
+>
+> ## LIVE ANCHORS — every one MEASURED with `/usr/bin/git` at the sha below, not inherited
+>
+> | | |
+> |---|---|
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it. At the time of writing: `9ea1ddbd0117ce96eb711a0db62f1d933e60ca7b` (the code commit; the handoff commit you are reading is its CHILD, and after any fix round it is not the tip). |
+> | branch | `exec/task5b-not-ported-items` |
+> | `origin/main` | `c473c78108d0e54ba7478b79eafb2e2a66ccfb92` — **the merge of PR #488, which is THIS lane's Task 5 partial.** |
+> | merge-base | `5ca51d8f68b5824ac36cb40d2e8203f08fcf59af` — that is #488's own tip, and `origin/main`'s tree is byte-equal to it (the merge added nothing). **So `git diff origin/main <tip>` with no path filter is the honest drop check here**: it prints exactly this branch's 19 files and nothing else. |
+> | ahead / behind | `1 / 1` at the code commit. **The `behind 1` is `c473c781` itself, an empty-of-content merge of this lane's previous branch** — not 275 peer commits, and not a stale branch. |
+> | tree | clean at the code commit. |
+> | the change | **19 files.** 3 components (`ticket-type-editor-screen.tsx`, `fields-editor.tsx`, `ticket-type-editor-pane.tsx`), 2 stylesheets (`packages/ui/src/ui.css`, `apps/web/app/globals.css`), `tokens.ts`, 2 test files, `Features.md`, `test-cases/13`, the delta audit, 3 plans, and 2 other lanes' handoffs (citation repairs only). |
+>
+> ## WHAT THE TASK WAS, AND WHAT EACH OF THE FIVE BECAME
+>
+> The dispatch (`gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-settings-wf-task5b.md`) gave each of the five a RULE. **Three were not mine to build.**
+>
+> | # | item | outcome |
+> |---|---|---|
+> | 1 | the header row (Cancel + Save in the h2 row at 22px) | **BUILT.** The row is the SCREEN's (`ticket-type-editor-screen.tsx:124`, `EditorHeader` at `:112`) because the screen owns `parsed`/`save`/`canAuthor`. The Save MOVED — `toHaveLength(1)` pins that. Case **13.924**. |
+> | 2 | the right-hand `--tintWarning` placement | **BUILT, measured first.** Case **13.925**. |
+> | 3 | the "Choose again" reopen control | **NOT BUILT.** No reopen door exists; recorded as an absence with an owner. Case **13.926**. |
+> | 4 | the prototype's state-naming | **NO CHANGE**, recorded at the button. |
+> | 5 | the field-kind vocabulary | **VOCABULARY UNCHANGED; the LABEL fixed.** Case **13.927**. |
+>
+> **`Attachment` is NOT in this PR** — it is a data-model question the controller is putting to the owner by name.
+>
+> ## THE MEASUREMENT THE DISPATCH ASKED FOR, AND WHICH WAY IT WENT
+>
+> `--gn-tint-warning` is an ALPHA role whose documented correctness is a condition on its GROUND. Measured over BOTH candidate grounds, all six style×theme combinations, BEFORE the move: over `surface` (where the notice now sits) `text` 10.51–11.94 and `textMuted` 8.23–12.08; over `surfaceRaised` (the ground the card it left sat on) `text` 9.79–11.91 and `textMuted` 8.45–10.74. **BOTH clear the 4.5 floor, so the placement does not depend on the measurement.** The controller believed the card sat on a raised surface; it does not, and saying so is part of the answer. Its 3px `--gn-warning` marker goes with the fill — a design choice, not a contrast change, and **no ledger row covers this element** (`hig-per-screen/7a`/`8a` rule on `.gn-attention` and `.gn-state-node`, both re-measured).
+>
+> ## THE FINDING THAT COST THE MOST, AND THE METHOD THAT AVOIDED IT
+>
+> **Swept before repairing: 147 citations into the changed files had drifted, across 28 files** — including other lanes' handoffs, the plans, `Features.md` and the delta audit. A stale citation still RESOLVES, so the reader is misled rather than corrected.
+>
+> **102 of them were pure SHIFT and were designed away rather than paid.** The CSS and token edits were rewritten LINE-COUNT-NEUTRAL — nine lines replacing nine, one replacing one — with the prose appended at EOF. That is this repo's own recorded rule (`ui.css`, the `workflow-list__*` family): *an append at EOF needs no census; a mid-file hunk needs one against an explicit shift map.* Verified after the rewrite by comparing the committed file to its parent line by line: **`ui.css` differs only at lines 1978–1981; `globals.css` only at 153; `tokens.ts` only at 344–349.** Copy that method; it is worth more than the 102 repairs it saved.
+>
+> The remaining 27 are in the three restructured components and were repaired against an explicit shift map, one file at a time, **each repaired citation asserted byte-identical to the line it replaced.** Four had NO successor line because the code genuinely moved; those are given their new homes by CONTENT rather than renumbered, and say so where they live.
+>
+> ## A DEFECT THE SWEEP FOUND THAT WAS NOT THIS LANE'S
+>
+> **Four citations (`fields-editor.tsx:99`, formerly `:64`, in `Features.md`, `test-cases/13`, `builder-css-binding.test.tsx` and `state-inspector.tsx`) mean the danger-variant Button precedent but pointed at a BLANK COMMENT LINE** — collateral from exec 2's `required` docblock landing after the delta audit was written. A content-preserving repair would have laundered them into looking maintained, so they were corrected to the real target (`:151`) and **the pre-existing staleness is recorded rather than absorbed.** *Owner: whoever next edits `fields-editor.tsx`'s docblock — the same shift will recur.*
+>
+> ## GATE COMPOSITION — RECOUNTED AT THIS SHA, NOT CARRIED
+>
+> `pnpm turbo run build test typecheck` → **32 of 33 tasks successful.** The one failure is `@gisik-nokma/server#test`, a **30 s timeout on `seedDevWorkspace > lands, and a re-run is a no-op`** (the first run of this task hit four of them, 30034 / 30402 / 30051 / 3554 ms; the count varies with machine load, which is itself the evidence). **This diff has ZERO `apps/server` files** (measured: `git status --porcelain | grep -c apps/server` → 0). Re-run in isolation at the same tree, twice: **`PASS (1563) FAIL (0) skipped (5)`, exit 0.** This is the recorded load-induced-timeout class, not a regression. Node `v22.22.2`.
+>
+> **All seven repo checks raw 0 at the code commit:** `tasks` · `env` · `runbook` · `help` · `citations` · `db-tz` · `migrations`. `check:case-ids` was NOT re-run by this lane; the case block is the controller's `13.920`–`13.949` and this change mints **13.924–13.927** (13.922/13.923 were spent by the merged Task 5 partial).
+>
+> **The forced gate is the controller's, not this lane's.** No `docker compose` was run; nothing bound :3001 or :3021.
+>
+> ## WHAT IS IN FLIGHT, AND WHAT A RESTARTED EXECUTOR SHOULD DO
+>
+> **Nothing is half-done. The review round RAN and its fixes are IN.** One per-task reviewer, dispatched to falsify, ran against `9ea1ddbd` and reported. It **survived every load-bearing claim** — the Save moved and not multiplied (a second Save added at the foot reddens 15 tests); the composite clears 4.5 on both grounds (re-derived independently from `tokens.ts`); the ground is genuinely `surface` (`body` is the only background above the notice); the line-count neutrality is EXACT (`git diff -U0` shows three hunks and no others); the class vocabulary is untouched; `.gn-type-editor-header .gn-page-title` was genuinely dead; and **no test was weakened** (zero removed lines containing `it(`/`expect(`/`.skip`).
+
+**What it broke, and what was done about each:**
+
+1. **THE ONE THAT MATTERS — 13.924's "they are ONE ROW" check passed for a reason unrelated to row-ness.** Deleting `display: flex` from `.gn-type-editor-header` left it GREEN, because "all three are inside `[data-testid="type-editor-header"]`" is satisfied by a block-layout STACK. Row-ness is a layout property and lives in a stylesheet the DOM assertion never reads. **Fixed** by reading `apps/web/app/globals.css` across the boundary `builder-css-binding.test.tsx` already crosses; re-running the same mutation now reddens exactly that case (`1 failed | 39 passed`).
+2. **Two claims were true by construction and pinned by nothing** — the heading tracking the LIVE name, and the header rendering in the LOADING arm. Both now have a case, and each kills exactly its own mutation.
+3. **Three citation defects this lane introduced**, all found by the reviewer and all now fixed: a range whose END was never remapped because the sweep's regex accepted only a HYPHEN and the citation used an **EN DASH** (`:357–264` → `:357–364`); a citation's **bare `(:NNN)` siblings** on a line whose filename-bearing half WAS repaired (invisible to a sweep keyed on `<file>:<line>`); and a **second bare citation** left beside one this change had repaired.
+4. **A mis-transcribed measurement** — the `surfaceRaised` `textMuted` range was quoted as `9.33–9.91`; the true range is **`8.45–10.74`** (the `neo` pair was omitted, and `neo` collapses both grounds to one hex). Corrected in five places: this file, `ui.css`, `Features.md` and `test-cases/13` (twice). **The floor is unaffected (8.23) and the verdict is unchanged**, but a quoted range that silently drops two of its six combinations is the shape this repo keeps punishing.
+   **The figure is still wrong in `9ea1ddbd`'s commit MESSAGE, and that is deliberate.** Rewriting it would orphan the sha the reviewer's pass is recorded against — the exact hazard this repo warns about with `git cat-file`. The next commit names and corrects it instead, so the correction is declared rather than hidden.
+5. **A dead prop** (`EditorHeader`'s `saving`) — removed.
+
+**A restore mistake worth recording, because it cost a file.** Mutating for the battery, this lane restored with `git checkout --`, which reverts to the last COMMIT and destroyed an uncommitted edit. The repo's rule is a checksum restore, not a git restore; the second and third mutations used a `/tmp` backup and verified `shasum` equality. **Use the backup.**
+
+The reviewer also flagged a PRE-EXISTING stale citation it did not attribute to this change (`Features.md:2251` cites `ui.css:1303` for a `danger`-as-text rule that is not there; the nearest are `:1327`/`:1337`/`:1381`/`:1462`). **Recorded, not fixed — owner: whoever owns the `danger`-as-text family.**
+
+Read the PR body, not this file, for the recorded pass.
+>
+> Opening rulings from this task, all recorded where they belong rather than here: (a) the heading's element LEVEL is the caller's, not the prototype's tag; (b) `Attachment` is the owner's; (c) "Choose again" is a rule with an owner.
+>
+> ---
+>
+> # ▣ CURRENT POSITION — SUPERSEDED 2026-09-18 ~21:3x IST. **HISTORY — settings→workflows Task 1 (`exec/settings-workflows`, PR #478). Kept as record.** **SETTINGS → WORKFLOWS: REBASED ONTO #476,
 > # RENUMBERED TO `13.920`, AND F1 RULED AND FIXED IN THE SAME CHANGE SET (the sweep's control is now
 > # PLANTED, case `13.921`). ALL GREEN, VERIFIED MERGEABLE, PR #478 OPEN — AWAITING THE CONTROLLER'S
 > # MERGE.** `exec/settings-workflows`, ONE PR `--base main`.
@@ -12198,7 +12390,7 @@ nothing about it looks broken. Corrected in the Batch C brief; `batch-d` never c
 
 ### T11's Critical: the move gate asked the wrong question, and the wrong question is answerable
 
-`ticket-type-editor-screen.tsx:249` gated an irreversible bulk migration on
+`ticket-type-editor-screen.tsx:355` gated an irreversible bulk migration on
 **`save.phase !== 'saved'`** — *"has this form ever been saved?"* — rather than on whether the
 **selected binding matches the saved one**. Both questions return "yes, allowed" in the common case,
 which is why it read as correct. **After saving a re-bind, an admin can re-point the combobox again

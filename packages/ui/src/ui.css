@@ -1975,10 +1975,10 @@
 .ticket-type-editor__invalid p { margin: 0 0 0.2rem; }
 
 .ticket-type-editor__divergence {
-  border-left: 3px solid var(--gn-warning);
-  border-radius: 6px;
-  background: var(--gn-surface-raised);
-  padding: 0.6rem 0.75rem;
+  /* the prototype's warning-tinted card — rationale at EOF, § DIVERGENCE */
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-tint-warning);
+  padding: 1.125rem;
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
@@ -4732,3 +4732,60 @@
    treatment as the hint it sits beside, because it is the same kind of
    sentence: a note under the buttons about the choice those buttons make. */
 .ticket-type-editor__divergence-note { margin: 0; font-size: 0.75rem; color: var(--gn-text-muted); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   § DIVERGENCE — `.ticket-type-editor__divergence`, Task 5b (2026-09-18).
+   APPENDED AT EOF ON PURPOSE, and the reason is the file's own recorded rule.
+
+   The rule above replaced nine lines with nine lines: **this change moves no
+   line number in this file.** A mid-file docblock of this size would have moved
+   every `ui.css:NNN` citation below it — 50 of them, measured before this was
+   rewritten, across 15 files including other lanes' handoffs and plans. The repo
+   has paid that bill once already (the `workflow-list__*` family, appended here
+   for the same reason) and recorded the rule: an append at EOF needs no census;
+   a mid-file hunk needs one taken against an explicit shift map.
+
+   WHAT MOVED. The notice left the Workflow card and became the prototype's own
+   card in the RIGHT column, above Implications
+   (`desktop.dc.html@6d7b67c0a52c:924-943`). Radius and padding are the
+   prototype's `--cardR`/18px, which is also what the sibling `Card`s in that
+   column carry, so the notice reads as one of them.
+
+   THE 3px `--gn-warning` MARKER IS GONE, AND IT IS NOT A CONTRAST CHANGE. The
+   prototype's own annotation for this block reads *"the bordered + left-ruled
+   box becomes a warning-tinted fill"* (`:923`), and the refreshed prototype
+   draws no border. **No ledger row covers this element**: `hig-per-screen/7a`
+   and `8a` rule on `.gn-attention` and `.gn-state-node`, and both were
+   re-measured for this change rather than assumed. The treatment matches
+   `.gn-invitations` and `.gn-attention`, which each took the wash and dropped
+   their inline-start rule — see `.gn-attention`'s block for the ruling that a
+   marker passing its floor may still be removed as a DESIGN choice.
+
+   THE GROUND IS RE-ESTABLISHED, NOT INHERITED. `--gn-tint-warning` is an ALPHA
+   role measured as a COMPOSITE (`packages/ui/test/tokens.test.ts`, the
+   `tintWarning` block), and that composite is the right ground only where the
+   consumer sits. This one sits in `.ticket-type-editor__aside`, which sets no
+   background, above a page whose ground is `--gn-surface` — the same ground the
+   invitations banner and the attention strip already measure. **Measured over
+   BOTH candidate grounds in all six style×theme combinations, before the move,
+   because the card it left sat on a raised one:**
+
+       ground          text            textMuted
+       surface         10.51 – 11.94   8.23 – 12.08
+       surfaceRaised    9.79 – 11.91   8.45 – 10.74
+
+   **Both clear the 4.5 floor, so the placement does not depend on the
+   measurement** — that is the finding, not a reassurance. No assertion was added
+   for this consumer: its ground is `surface`, which the `tintWarning` block in
+   `tokens.test.ts` already asserts both roles against in all six combinations,
+   so a third block measuring the same two pairs over the same ground would be a
+   check that cannot fail for a reason of its own (the shape case 11.213 was
+   retracted for).
+
+   "CHOOSE AGAIN" IS DELIBERATELY NOT BUILT. The prototype's `strandedDone` card
+   offers a control that re-opens a completed move (`:930`). **No reopen door
+   exists on `WorkflowAuthoringGateway`, and a button with no door is the defect
+   this repo keeps re-finding**, so the migrated branch stays terminal. Recorded
+   as an absence with an owner — whoever first adds a reopen route — not as an
+   empty slot. See the same note at the component.
+   ═══════════════════════════════════════════════════════════════════════ */

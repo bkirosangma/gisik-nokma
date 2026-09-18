@@ -456,7 +456,7 @@ wire-gap screens *"are NOT dispatched by default; the owner picks which are want
 prototype controls have no server behind them"*, and for the reorder that premise is **false**: the gateway
 declares no update op, but the editor already writes `rank` through the ONE existing door — `onSave`
 authors a `ticket-type.defined` carrying the whole definition and calls `gateway.submit`
-(`ticket-type-editor-screen.tsx:178-204`), with `rank: z.number().int().min(1)` on the schema
+(`ticket-type-editor-screen.tsx:283-309`), with `rank: z.number().int().min(1)` on the schema
 (`packages/domain/src/ticket-types.ts:98`). **If the hold lifts it is a render task, not the wire task the
 audit scoped it as** — which is what the plan's own Task 6 text anticipated. The **count is the opposite**
 and genuinely needs server surface: the only population read is pinned to one workflow and the route counts

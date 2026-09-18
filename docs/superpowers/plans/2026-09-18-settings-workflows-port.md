@@ -152,7 +152,7 @@ absence with the measurement that established it.
 
 ### Task 4 — `isTypeEditor`: field `required`, end to end  *(wire gap 6 — ALREADY RULED YES)*
 `customFieldDefSchema` (`packages/domain/src/ticket-types.ts:11-16`) gains `required`; it travels the wire
-(server read + mapper) and reaches `FieldsEditor` (`fields-editor.tsx:20-71`), which gains the toggle the
+(server read + mapper) and reaches `FieldsEditor` (`fields-editor.tsx:62-173`), which gains the toggle the
 prototype draws. **Carry it end to end in ONE task** — the repo's standing rule is that a wire field
 carried in two tasks gets dropped in the seam. **Acceptance:** a field created as required survives a
 round trip, and a case asserts the toggle's rendered state, not that a schema key exists.

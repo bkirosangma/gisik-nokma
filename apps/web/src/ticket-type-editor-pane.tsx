@@ -105,18 +105,24 @@ export function TicketTypeEditorPane({
       <p className="gn-breadcrumb">
         <Link href={listHref}>Ticket types</Link>
       </p>
-      <div className="gn-type-editor-header">
-        <Heading className="gn-page-title">{read.def.name === '' ? 'Untitled type' : read.def.name}</Heading>
-        <Link href={listHref} className="gn-button gn-button--ghost">
-          Cancel
-        </Link>
-      </div>
+      {/* The header row — the name, Cancel and Save — is the SCREEN's now, and
+          the pane hands it the two things only the pane knows: the element level
+          (`heading`, `h1` here because this route has no other level-1 heading,
+          `h2` under `/settings`) and the Cancel control itself. It stays a real
+          `<Link>` so it is keyboard- and screen-reader navigable rather than a
+          synthetic button; the screen renders whatever node it is given. */}
       <TicketTypeEditorScreen
         workspaceId={workspaceId}
         session={session}
         gateway={gateway}
         initialDef={read.def}
+        heading={heading}
         onSaved={() => router.push(listHref)}
+        cancel={
+          <Link href={listHref} className="gn-button gn-button--ghost">
+            Cancel
+          </Link>
+        }
       />
     </>
   );
@@ -151,14 +157,19 @@ export function NewTicketTypePane({
       <p className="gn-breadcrumb">
         <Link href={listHref}>Ticket types</Link>
       </p>
-      <div className="gn-type-editor-header">
-        <Heading className="gn-page-title">New ticket type</Heading>
-        <Link href={listHref} className="gn-button gn-button--ghost">
-          Cancel
-        </Link>
-      </div>
       {!canAuthorRole(session.role) ? (
         <>
+          {/* A non-author never reaches the screen, so this branch keeps its own
+              header — there is no Save for it to carry and nothing to put in a
+              row beside it. The author branch below gets the screen's header,
+              which is why this one is inside the `!canAuthor` arm rather than
+              above it: two headers would otherwise render for the same page. */}
+          <div className="gn-type-editor-header">
+            <Heading className="gn-type-editor-header__title">New ticket type</Heading>
+            <Link href={listHref} className="gn-button gn-button--ghost">
+              Cancel
+            </Link>
+          </div>
           <ReadOnlyBanner />
           <p>
             <a href={listHref}>Back to the ticket types</a> — you can read every one of them.
@@ -170,7 +181,14 @@ export function NewTicketTypePane({
           session={session}
           gateway={gateway}
           initialDef={null}
+          heading={heading}
+          untitledLabel="New ticket type"
           onSaved={() => router.push(listHref)}
+          cancel={
+            <Link href={listHref} className="gn-button gn-button--ghost">
+              Cancel
+            </Link>
+          }
         />
       )}
     </>

@@ -1,7 +1,42 @@
-import { newUlid, type CustomFieldDef } from '@gisik-nokma/domain';
+import { CUSTOM_FIELD_KINDS, newUlid, type CustomFieldDef } from '@gisik-nokma/domain';
 import { Button, Select } from '@gisik-nokma/ui';
 
-const FIELD_TYPES: readonly CustomFieldDef['type'][] = ['text', 'number', 'date', 'select', 'person'];
+/**
+ * The five kinds' DISPLAY names, and the rule for this file is that they are
+ * the ONLY thing that differs from the wire vocabulary.
+ *
+ * ## THE VOCABULARY IS NOT CHANGED, AND THE LABEL IS (Task 5b, item 5)
+ *
+ * The prototype offers `Text / Date / Number / Attachment` as capitalised pills
+ * (`desktop.dc.html@6d7b67c0a52c:902`) and the product rendered the wire values
+ * as raw lowercase labels — the delta audit recorded *"vocabulary AND casing
+ * differ"* and the two halves are NOT the same question:
+ *
+ * - **Vocabulary: unchanged, deliberately.** `CUSTOM_FIELD_KINDS`
+ *   (`packages/domain/src/ticket-types.ts:4`) `['text','number','date','select','person']`
+ *   is `customFieldDefSchema`'s `type` — a WIRE value, recorded in every
+ *   `ticket-type.defined` event ever written. Adding `attachment` is a
+ *   DATA-MODEL decision (it decides whether a custom field can hold a file),
+ *   not a label alignment, and it is with the owner. Nothing here renames,
+ *   adds or removes a member.
+ * - **Casing: fixed here, and it is a label change only.** `value` stays the
+ *   lowercase member; `label` is what a person reads. Pinned by case 13.927,
+ *   which asserts BOTH halves in one test precisely so a future rename cannot
+ *   pass by satisfying the first.
+ *
+ * `Record<kind, string>` rather than a `Partial` or a lookup with a fallback:
+ * the map is TOTAL over the vocabulary, so adding a sixth kind to the domain
+ * fails `turbo run typecheck` here rather than rendering `undefined` in the
+ * picker. That is the same "one source, spelled twice" argument the
+ * `_css-binding` tests make for classes.
+ */
+const FIELD_TYPE_LABELS: Record<(typeof CUSTOM_FIELD_KINDS)[number], string> = {
+  text: 'Text',
+  number: 'Number',
+  date: 'Date',
+  select: 'Select',
+  person: 'Person',
+};
 
 function parseOptions(raw: string): string[] | undefined {
   const lines = raw
@@ -83,7 +118,10 @@ export function FieldsEditor(props: {
             />
             <div className="fields-editor__type">
               <Select
-                options={FIELD_TYPES.map((fieldType) => ({ value: fieldType, label: fieldType }))}
+                options={CUSTOM_FIELD_KINDS.map((fieldType) => ({
+                  value: fieldType,
+                  label: FIELD_TYPE_LABELS[fieldType],
+                }))}
                 value={field.type}
                 onChange={(next) => updateField(index, { type: next as CustomFieldDef['type'] })}
                 disabled={props.disabled === true}

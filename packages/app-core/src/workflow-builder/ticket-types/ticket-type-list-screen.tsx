@@ -41,7 +41,7 @@ import { TypeIcon } from './icons.js';
  *   gateway declares no update op of any kind (`../gateway.ts:56-94`), but the
  *   door is not the gateway's: `onSave` authors a `ticket-type.defined` event
  *   carrying the whole definition — `rank` included
- *   (`ticket-type-editor-screen.tsx:178-204`) — and sends it through
+ *   (`ticket-type-editor-screen.tsx:283-309`) — and sends it through
  *   `gateway.submit`. `ticketTypeDefSchema` carries `rank: z.number().int().min(1)`
  *   (`packages/domain/src/ticket-types.ts:98`), so a reorder control would be
  *   *assign a different rank and submit*, which is what the editor's own

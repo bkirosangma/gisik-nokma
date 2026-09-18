@@ -16,7 +16,7 @@ export type BuiltinFieldId = (typeof BUILTIN_FIELD_IDS)[number];
  *
  * `z.boolean().optional()` follows the member directly above it: a `text` field
  * has no `options` key either, and `FieldsEditor` mints one as
- * `{id, name, type}` (`fields-editor.tsx:127`). A field definition says what it
+ * `{id, name, type}` (`fields-editor.tsx:165`). A field definition says what it
  * has to say and nothing more.
  *
  * The alternative — `z.boolean().default(false)` — was rejected for the reason

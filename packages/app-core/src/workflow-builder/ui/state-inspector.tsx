@@ -13,7 +13,7 @@ import { useBuilderEnv, useBuilderStore, useDraft } from './builder-context.js';
  * and `profile-section.tsx:40-46` use, so this input inherits the measured
  * contrast pair and the `[data-style="neo"]` sunken override for free) and
  * `<Button>` for the actions, with `variant="danger"` on the destructive one —
- * the precedent `fields-editor.tsx:64` set for exactly this action on the
+ * the precedent `fields-editor.tsx:151` set for exactly this action on the
  * sibling builder screen.
  *
  * ## What the prototype draws here that is NOT built

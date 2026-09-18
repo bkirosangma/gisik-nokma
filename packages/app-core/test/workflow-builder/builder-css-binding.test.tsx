@@ -484,7 +484,7 @@ describe('13.767 every class the builder screen renders is a class ui.css styles
    * are outside every harvested prefix, so the four controls that moved off bare
    * `<button>`s onto the component could revert to user-agent defaults with
    * every other test in this repo green. Precedent for the variant is
-   * `fields-editor.tsx:64`.
+   * `fields-editor.tsx:151`.
    */
   it('13.775 the inspector actions are the shared Button, danger-styled where they destroy', () => {
     const store = createDraftStore(draftFromTemplate(kanban));
