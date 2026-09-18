@@ -1,8 +1,8 @@
 {
   "belowCount": 0,
-  "totalClasses": 5,
-  "examined": 9,
-  "highestReading": 17.62,
+  "totalClasses": 1,
+  "examined": 3,
+  "highestReading": 3.54,
   "routes": [
     "/sign-in",
     "/workspaces",
@@ -14,48 +14,12 @@
   ],
   "roster": [
     {
-      "selector": "input",
-      "ratio": 3.81,
-      "border": "rgba(118,118,118,1)",
-      "backdrop": "rgb(241,234,227)",
-      "routes": [
-        "/members"
-      ]
-    },
-    {
       "selector": "select",
-      "ratio": 3.81,
+      "ratio": 3.54,
       "border": "rgba(118,118,118,1)",
-      "backdrop": "rgb(241,234,227)",
+      "backdrop": "rgb(235,226,218)",
       "routes": [
         "/members"
-      ]
-    },
-    {
-      "selector": "aside.gn-attention",
-      "ratio": 4.36,
-      "border": "rgba(178,80,0,1)",
-      "backdrop": "rgb(241,234,227)",
-      "routes": [
-        "/my-work"
-      ]
-    },
-    {
-      "selector": "button.workflow-list__new",
-      "ratio": 17.62,
-      "border": "rgba(0,0,0,1)",
-      "backdrop": "rgb(241,234,227)",
-      "routes": [
-        "/settings/workflows"
-      ]
-    },
-    {
-      "selector": "button",
-      "ratio": 17.62,
-      "border": "rgba(0,0,0,1)",
-      "backdrop": "rgb(241,234,227)",
-      "routes": [
-        "/settings/workflows"
       ]
     }
   ],
