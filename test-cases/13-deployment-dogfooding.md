@@ -8707,7 +8707,9 @@ tip (branch `exec/second-wave-t4-rowdrag`, cut from `origin/main` `fb346a9f`) ov
 NAMES only, never a substring sweep: the highest case MARKER minted inside this executor's block
 (`13.700`–`13.759`) is **`13.704`** (Task 3's third), and `13.705`–`13.759` are minted by nobody —
 `/usr/bin/git grep -nE '13\.70[56]' fb346a9f` returns **no hits at all**, against a positive control of the
-same command shape over `13\.70[0-4]` (14 files) and a null-control over the three lines that mention the
+same command shape over `13\.70[0-4]` (**13 files** — recounted by the reviewer and re-measured here after
+this block's first draft said 14; the count is `git grep -l | wc -l`, and the miscount was mine, not a
+measurement's) and a null-control over the three lines that mention the
 block as a RANGE in prose (`:8241`, `:8313`, `:8427` — the controller's allocation sentence, not a minted
 id). **The plan's own ids `13.621`/`13.621a` were NOT used**: the dispatch records them as taken, and the
 letter-suffixed half is invisible to `check-case-citations.mjs` by its own Global Constraint note, so the
@@ -8793,3 +8795,62 @@ targets on screen each claiming a part is the whole, when a drop on any of them 
 because `rowDrag` is `undefined` for every surface that does not reorder, the single zone is the whole of the
 change for them. (2) The plan's `13.621a` letter-suffixed id was not minted; see the id note above. Neither
 deviation changes an assertion.
+
+**Fix round (2026-09-18) — an independent review found two Important defects the battery above could not see,
+plus four Minor. Both Important were REPRODUCED here before being acted on, and both fixes are themselves
+mutation-verified.**
+
+**Important 1 — a foreign drag was NOT refused; any non-empty `text/plain` was forwarded as a ticket id.**
+`ticket-list.tsx` gated the drop on `moved === ''`, and the comment above it asserted the false premise that
+"a gesture that began outside this list carries no id". **It does.** `DRAG_TICKET_FORMAT` is plain
+`'text/plain'` — deliberately, so no allowlist has to be maintained — which is the UNIVERSAL drag format: a
+link, a text selection or a file dragged in from another application arrives NON-EMPTY and is not a ticket
+id. Measured: dropping `'https://example.com/some-link'` on a row called
+`onReorder('https://example.com/some-link', 'rd_a')`. The Board reads the same format and is safe only
+because it then looks the value up in a registry that answers `undefined` for a stranger; this component has
+no registry, so the equivalent check is membership in the set of rows it is showing (`draggableIds`), and it
+now applies at BOTH targets. **The 13.705 battery could not have caught this**: its `dataTransfer` stand-in,
+faithful to a browser, answers `''` only for a format nothing populated, so it is structurally incapable of
+producing the payload — the test named the property "a payload carrying no ticket id" while only ever
+exercising an EMPTY one, which is a different property. The new case drives both a foreign URL and a
+synthetic non-member id, with a positive control that one of the list's OWN ids still gets through. M9 and
+M10 (the membership check dropped from the row drop, and from the tail drop) both die on that case.
+
+**Important 2 — the drop marker went stale over the tail zone.** The tail `<div>` is a SIBLING of the
+sections, not an ancestor of any `<tr>`, so a browser stops firing `dragover` on whichever row the pointer
+came from the moment it crosses in; nothing cleared it, so that row kept `gn-list__row--drop-before` while
+the pointer sat on the target that means LAST — the user reads "insert before the last row", releases, and
+gets "place last", off by one, on the one affordance whose whole job is to say where the row will land.
+Reproduced (`dragstart` on a row, `dragover` on another, `dragover` on the tail — the first row still
+carried the marker) and fixed by clearing it in the tail's own `dragover`. M11 dies on the tail case. The
+`ui.css` paragraph that claimed the tail "takes the accent only while the gesture is over it" was FALSE — no
+rule did that — and is corrected to say what actually signals the target: the ROW marker going out.
+
+**Minor 1 — an assertion that could not fail.** The `no rowDrag` arm called
+`expect(onReorder).not.toHaveBeenCalled()` against a spy that was never placed in the tree, because that
+render passes no `rowDrag`. Deleted, with the reason written where it stood: the meaningful assertions there
+are `not.toHaveAttribute('draggable')` and the null tail zone, and a vacuous assertion reads as coverage of
+exactly the property those two measure.
+
+**Minor 2 — a pinned row paints `--dragging` on both its copies** (the marker is keyed on `ticketId`, and a
+row assigned to the viewer deliberately renders twice — once pinned, once in its section). Cosmetic and
+data-safe: both copies carry the same id and the self-drop guard refuses one onto the other. **Follow-on,
+owner: the first task that renders the drag on a surface where a row can legitimately appear twice** — the
+double-render is already accepted for `rowAction`, so this may be intended, and it is recorded rather than
+guessed at.
+
+**Minor 3 — prose corrected, three places.** The `ui.css` citation to `.gn-refusal--*` used PRE-insertion
+line numbers (`:1176`; the rules are at `:1203`/`:1204`/`:1209` after this task's 27 added lines) — now cited
+by SELECTOR, because a line number that is right in one revision is a false citation in the next. The
+`--gn-fill-quaternary` sentence described the zebra token as though the new rule painted it; the rule is
+`opacity` alone and names no colour, so the sentence now says that. The control's file count was 13, not 14.
+
+**Minor 4 — documented rather than guarded.** `Table.rowProps` spreads after `onClick`, so a caller's
+`onClick` would replace `onRowClick` rather than compose with it. No caller does this (`Table` has exactly
+one production consumer and it passes neither), so the docblock now states it instead of leaving it to be
+discovered; a guard would be a second decision point with nothing to decide.
+
+**Follow-on named by this fix round, not fixed: the tail zone has no drag-over state of its own.** What tells
+a user they are over it is the row marker going out. Styling the target itself is a fourth class, which the
+approved plan does not name — and a lit edge beside a still-lit "insert here" line was the worse of the two
+readings. Owner: the task that first reports the affordance as unclear.

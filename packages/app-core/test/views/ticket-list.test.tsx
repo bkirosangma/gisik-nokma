@@ -1649,6 +1649,21 @@ describe('13.705 the rowDrag slot: rows drag, the row reports itself as the befo
 
     const dataTransfer = fakeDataTransfer();
     fireEvent.dragStart(rowTr('rd_b'), { dataTransfer });
+
+    // MEASURED before it was fixed, and the reason the tail zone has a
+    // `dragover` handler that does more than cancel: the tail `<div>` is a
+    // SIBLING of the sections, not an ancestor of any `<tr>`, so a browser stops
+    // firing `dragover` on whichever row the pointer came from the moment it
+    // crosses in. With nothing clearing the marker, that row kept
+    // `gn-list__row--drop-before` while the pointer sat on the target that means
+    // LAST — the user reads "insert before the last row", releases, and gets
+    // "place last". Off by one, on the one affordance whose entire job is to say
+    // where the row will land.
+    fireEvent.dragOver(rowTr('rd_a'), { dataTransfer });
+    expect(rowTr('rd_a').className).toContain('gn-list__row--drop-before');
+    fireEvent.dragOver(tailZone(), { dataTransfer });
+    expect(rowTr('rd_a').className).not.toContain('gn-list__row--drop-before');
+
     fireEvent.drop(tailZone(), { dataTransfer });
 
     expect(onReorder).toHaveBeenCalledWith('rd_b', null);
@@ -1671,21 +1686,55 @@ describe('13.705 the rowDrag slot: rows drag, the row reports itself as the befo
     expect(onReorder).not.toHaveBeenCalled();
   });
 
-  it('without rowDrag nothing is draggable, no tail zone renders, and no handler is attached', () => {
+  it('a FOREIGN drag — a non-empty text/plain payload that is not a ticket id — is refused at both targets', () => {
     const onReorder = vi.fn();
+    render(<ControlledList rows={[ROW_A, ROW_B]} initial={chose([], 'flat')} rowDrag={{ onReorder }} />);
+
+    // MEASURED, and the reason "the payload is empty" was the WRONG refusal:
+    // `DRAG_TICKET_FORMAT` is plain `'text/plain'` — the universal format — so a
+    // link, a text selection or a file dragged in from another application
+    // arrives NON-EMPTY and is not a ticket id. Before this case existed, the
+    // drop forwarded it verbatim: `onReorder('https://example.com/some-link',
+    // 'rd_a')`, measured. `board.tsx` reads the same format and is safe only
+    // because it then looks the id up in a registry that answers `undefined` for
+    // a stranger; this component has no registry, so membership in its own rows
+    // is the equivalent check.
+    //
+    // The payload is set on the dataTransfer and NO `dragstart` is fired inside
+    // this list — which is exactly how a foreign drag presents: a populated
+    // format, and no source of ours.
+    for (const foreign of ['https://example.com/some-link', 'rd_not_in_this_list']) {
+      const dataTransfer = fakeDataTransfer();
+      dataTransfer.setData('text/plain', foreign);
+      fireEvent.drop(rowTr('rd_a'), { dataTransfer });
+      fireEvent.drop(tailZone(), { dataTransfer });
+    }
+    expect(onReorder).not.toHaveBeenCalled();
+
+    // POSITIVE CONTROL, in the same case: a payload that IS one of this list's
+    // ids still gets through both targets — so the refusals above are the
+    // membership check doing its job and not the callback being unreachable.
+    const own = fakeDataTransfer();
+    fireEvent.dragStart(rowTr('rd_b'), { dataTransfer: own });
+    fireEvent.drop(rowTr('rd_a'), { dataTransfer: own });
+    expect(onReorder).toHaveBeenCalledWith('rd_b', 'rd_a');
+  });
+
+  it('without rowDrag nothing is draggable and no tail zone renders', () => {
     render(<ControlledList rows={[ROW_A, ROW_B]} initial={chose([], 'flat')} />);
 
-    // The positive control for the two negatives below is the first test in
-    // this describe: the SAME query finds both on the rowDrag render.
+    // The positive control for both negatives is the FIRST test in this
+    // describe: the same queries find `draggable="true"` and the tail zone on
+    // the `rowDrag` render and neither here.
+    //
+    // There is deliberately NO `expect(onReorder).not.toHaveBeenCalled()` in
+    // this test. It was here, and it could not fail: this render passes no
+    // `rowDrag`, so no `onReorder` is ever placed in the tree and the spy has
+    // nothing that could call it. A vacuous assertion is worse than an absent
+    // one — it reads as coverage of "no handler is attached", which is the very
+    // property the two lines above actually measure.
     expect(rowTr('rd_a')).not.toHaveAttribute('draggable');
     expect(rowTr('rd_b')).not.toHaveAttribute('draggable');
     expect(document.querySelector('.gn-list__tail-drop')).toBeNull();
-
-    // The absence is the whole of the default: firing the gesture a wired
-    // list answers must reach the callback zero times.
-    const dataTransfer = fakeDataTransfer();
-    fireEvent.dragStart(rowTr('rd_b'), { dataTransfer });
-    fireEvent.drop(rowTr('rd_a'), { dataTransfer });
-    expect(onReorder).not.toHaveBeenCalled();
   });
 });

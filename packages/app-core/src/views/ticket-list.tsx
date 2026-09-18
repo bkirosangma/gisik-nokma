@@ -248,6 +248,29 @@ export function TicketList({
   const [dropBeforeId, setDropBeforeId] = useState<string | null>(null);
 
   /*
+    The ids this list may legitimately be asked to reorder — every ticket it is
+    showing, pinned and grouped alike (both are built from `rows`).
+
+    **This set is the whole reason a foreign drag is refused, and an empty-payload
+    check is NOT a substitute for it.** `DRAG_TICKET_FORMAT` is plain
+    `'text/plain'` (`board.tsx:179` — deliberately, so no allowlist has to be
+    maintained), which is the UNIVERSAL drag format: a link, a text selection or
+    a file dragged in from another application or another window arrives here as
+    a non-empty string that is not a ticket id. `board.tsx` reads the same format
+    and is safe only because it then looks the value up in its `moveRegistry` and
+    acts `if (attempt !== undefined)`; this component has no registry, so the
+    equivalent check is membership here.
+
+    Measured before it was written: dropping a `text/plain` payload of
+    `'https://example.com/some-link'` on a row called
+    `onReorder('https://example.com/some-link', <row id>)` — a contract violation,
+    since the prop promises a ticket id. The 13.705 battery could not see it: its
+    `dataTransfer` stand-in, faithful to a browser, answers `''` only for a format
+    nothing populated, so it is structurally incapable of producing this payload.
+  */
+  const draggableIds = useMemo(() => new Set(rows.map((row) => row.ticketId)), [rows]);
+
+  /*
     Every row's drag props, or `undefined` when no caller wired `rowDrag` — in
     which case `Table` spreads nothing and the rows render exactly as they did
     before this task.
@@ -290,11 +313,13 @@ export function TicketList({
               const moved = event.dataTransfer.getData(DRAG_TICKET_FORMAT);
               setDraggingId(null);
               setDropBeforeId(null);
-              // Nothing to reorder: a gesture that began outside this list
-              // carries no id, and one that began and ended on this row asks
-              // for a move to where it already is. Both are refused HERE
-              // rather than handed to a caller that would have to guess.
-              if (moved === '' || moved === id) return;
+              // Three gestures are refused HERE rather than handed to a caller
+              // that would have to guess: an empty payload; a drop of a row on
+              // itself (a move to where it already is); and — the one an empty
+              // check does NOT catch — a drag that began outside this list,
+              // which arrives as whatever text the other application put on the
+              // gesture. See `draggableIds` above for the measurement.
+              if (moved === '' || moved === id || !draggableIds.has(moved)) return;
               rowDrag.onReorder(moved, id);
             },
             className: [
@@ -622,16 +647,34 @@ export function TicketList({
         <div
           className="gn-list__tail-drop"
           aria-hidden="true"
-          onDragOver={(event) => event.preventDefault()}
+          onDragOver={(event) => {
+            event.preventDefault();
+            /*
+              The row marker is CLEARED here, and this line is the whole reason
+              the tail zone is not merely decorative. The tail `<div>` is a
+              sibling of the sections, not an ancestor of any `<tr>`, so a
+              browser stops firing `dragover` on whichever row the pointer came
+              from the moment it crosses into this target — and with nothing
+              clearing it, that row keeps `gn-list__row--drop-before` while the
+              pointer sits on the target that means LAST. The user would read
+              "insert before the last row" and release, and get "place last":
+              off by one, on the one affordance whose entire job is to say where
+              the row will land. Measured before it was fixed: `dragstart` on a
+              row, `dragover` on another, `dragover` on the tail — the first row
+              still carried the marker.
+            */
+            setDropBeforeId(null);
+          }}
           onDrop={(event) => {
             event.preventDefault();
             const moved = event.dataTransfer.getData(DRAG_TICKET_FORMAT);
             setDraggingId(null);
             setDropBeforeId(null);
-            // Same refusal as a row drop: a gesture that began outside this
-            // list carries no id, and `onReorder('')` would name a ticket that
-            // does not exist in the caller's order.
-            if (moved === '') return;
+            // Same three refusals as a row drop, and `draggableIds` matters here
+            // too: this handler takes no `id` of its own, so without it a
+            // foreign `text/plain` payload would be forwarded as a ticket id
+            // with nothing else in the path to stop it.
+            if (moved === '' || !draggableIds.has(moved)) return;
             rowDrag.onReorder(moved, null);
           }}
         />

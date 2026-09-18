@@ -50,6 +50,15 @@ export type TableProps<Row> = {
    * drag plumbing needs a fact about a ROW — `draggable`, the four drag
    * handlers, and a class naming which row is being dragged or hovered.
    *
+   * **`className` is the one key the built-ins keep; everything else a caller
+   * returns wins, `onClick` included.** That is the deliberate consequence of
+   * spreading after the built-ins, and it is stated here rather than left to be
+   * discovered: a caller returning `onClick` would REPLACE `onRowClick`, so the
+   * two cannot be composed by accident. No caller does this today — `Table` has
+   * exactly one production consumer and it passes neither — which is why this is
+   * a documented edge rather than a guarded one. A guard would be a second
+   * decision point with nothing to decide.
+   *
    * **`className` is the one key the built-ins keep, and it is APPENDED.**
    * A hook that replaced it would strip `gn-table__row` off a row the moment
    * a caller passed anything, and the shared stylesheet keys on that class —
