@@ -8702,3 +8702,203 @@ only, never by substring: the highest `13.*` marker in this file at this tip is 
 FREE before minting — the only hits were prose *mentions* of the block's own bounds, which is exactly the
 trap this file records: a substring sweep over a document that discusses the ids cannot separate a
 MINTED id from a MENTIONED one.
+**Task 4 (`Table`/`TicketList` row drag and the tail drop zone) — `13.705`–`13.706`.** Ids recounted at this
+tip (branch `exec/second-wave-t4-rowdrag`, cut from `origin/main` `fb346a9f`) over case MARKERS and test
+NAMES only, never a substring sweep: the highest case MARKER minted inside this executor's block
+(`13.700`–`13.759`) is **`13.704`** (Task 3's third), and `13.705`–`13.759` are minted by nobody —
+`/usr/bin/git grep -nE '13\.70[56]' fb346a9f` returns **no hits at all**, against a positive control of the
+same command shape over `13\.70[0-4]` (**13 files** — recounted by the reviewer and re-measured here after
+this block's first draft said 14; the count is `git grep -l | wc -l`, and the miscount was mine, not a
+measurement's) and a null-control over the three lines that mention the
+block as a RANGE in prose (`:8241`, `:8313`, `:8427` — the controller's allocation sentence, not a minted
+id). **The plan's own ids `13.621`/`13.621a` were NOT used**: the dispatch records them as taken, and the
+letter-suffixed half is invisible to `check-case-citations.mjs` by its own Global Constraint note, so the
+pair becomes two plain ids the citation script can see. The file's overall high-water mark is `13.766`, which
+is executor 2's parallel block (`13.760`–`13.819`) and collides with nothing here. `13.697`–`13.699` remain
+unallocated; this task did not touch them.
+
+**The task's whole surface is a wire that crosses a package boundary, and one measurement is why the plan's
+own mutation target could not be trusted as written.** The plan's Step 5 asks for `preventDefault()` to be
+dropped from `dragover` and expects "the drop case in 13.621" to fail, "exactly as a browser does". **It does
+not, and that was measured rather than assumed.** A real browser fires a `drop` only over a target whose
+`dragover` cancelled the event; jsdom does not model that, and `fireEvent.drop` dispatches unconditionally.
+Run directly: with `event.preventDefault()` deleted from `onDragOver`, **every `fireEvent`-driven case in
+13.705 stayed GREEN** (mutation M1 survived). The plan anticipated exactly this and named the fallback — so
+the drop read was mutated instead (**M2**, `getData(DRAG_TICKET_FORMAT)` → `''`, which reddens both drop
+cases), and the cancelled-event property is pinned separately, at the DISPATCH level, by reading
+`defaultPrevented` off a real `Event` with a control that the same dispatch against a list with no `rowDrag`
+is NOT cancelled. With that case added, **M1 dies** (re-run: exit 1). This is the same class the series keeps
+recording: a check that cannot fail for the property it names is worse than no check, because it reads as
+coverage.
+
+**The mutation battery — eight, each restored by `cp` and verified by sha256, each verified to have CHANGED
+the file before its result was read.** M1 `onDragOver` loses `preventDefault()` → **killed** by the
+dispatch-level case (survived the `fireEvent` cases, as above). M2 the drop reads no ticket id → killed.
+M3 the self-drop guard (`moved === id`) is removed → killed. M4 the tail zone renders regardless of `rowDrag`
+→ killed. M5 `onReorder`'s arguments are swapped → killed. M6 `Table` REPLACES `className` instead of
+appending it → killed. M7 `Table` drops the per-row spread → killed. M8 the dragged row never gets
+`gn-list__row--dragging` → **SURVIVED on the first run, and the survivor was the finding**: 13.705 pinned
+`--drop-before` but never `--dragging`, so the marker the component paints on the SOURCE had no witness at
+all. Two cases were added (the source is marked and only the source; an ABANDONED drag clears both markers on
+`dragend`, the one path no handler of ours runs for), after which **M8, M8b (`--drop-before` never applied)
+and M8c (`dragend` does not clear) all die**. Per the standing rule, a survivor is evidence about the TEST
+before it is evidence about the code, and this one was.
+
+**The cross-package resolution trap fired on the first GREEN run.** `app-core` imports `Table` as
+`'@gisik-nokma/ui'`, which resolves through `packages/ui/dist`, so a correct implementation still failed
+13.705 until `packages/ui` was rebuilt — the ui package's own suite, which imports `../src/components/table.js`
+by relative path, had already gone green. Recorded because the asymmetry is the documented one: the
+relative-path suite is the one that catches the change, and the by-package-name suite is the one that tests
+a stale `dist`.
+
+- ✅ **13.705 — with `rowDrag` every row drags and reports the row it landed on as the before-neighbour; the
+  tail zone means "last"; a drop on itself and a payload with no ticket id are both refused; and without
+  `rowDrag` nothing is draggable and no tail zone renders.** Rendered by `TicketList`, the drag mechanism is
+  four React props on each `<tr>` — the registry's absence is asserted rather than described: 13.534 recorded
+  the flake a passive `useEffect`-registered attempt map produced on the Board, and these handlers are
+  attached during the render that draws the row. The two controls are the point of the negative arm: the SAME
+  query that finds `draggable="true"` and `.gn-list__tail-drop` on a wired list finds neither on an unwired
+  one, and the gesture that calls back once on a wired list calls back never on an unwired one. The
+  `dataTransfer` stand-in answers only the format that was actually `setData`-populated, so the case can fail
+  for a format mismatch instead of papering over one, and one instance is passed to every event of a gesture
+  because a real browser hands the identical object to each. `preventDefault()` on `dragover` is pinned at
+  the dispatch level for the reason above.
+  `packages/app-core/src/views/ticket-list.tsx:189`, `:255`, `:298`, `:623`, `:635`,
+  `packages/app-core/test/views/ticket-list.test.tsx:1538`
+
+- ✅ **13.706 — `Table` spreads a row's own attributes onto its `<tr>` and APPENDS the caller's `className`
+  to the built-ins rather than replacing them.** `rowClassName` (Ruling 21) can say only one class for every
+  row, and the List's drag needs a fact about a ROW, so `rowProps?: (row) => HTMLAttributes<HTMLTableRowElement>`
+  is spread after the built-ins; `className` is the one key the built-ins keep, joined in the same
+  `[own, extra].filter(Boolean).join(' ')` shape `card.tsx:7` established and Ruling 21 applied to this
+  component's other three hooks. **Both halves are asserted because either alone passes against a hook that
+  is half-wrong**: presence kills the "replaced, not appended" mutant (M6), and the ORDER assertion — the
+  caller's class is last — is what makes "appended" a claim this case can fail on rather than a synonym for
+  "present". The control renders the same table with no `rowProps` and asserts no caller attribute appears,
+  while `rowClassName` still applies.
+  `packages/ui/src/components/table.tsx:66`, `:102`, `:114`,
+  `packages/ui/test/components.test.tsx:143`
+
+**The maximal fixture in 13.671's CSS-binding equality check had to grow, and it reddened first.** That case
+asserts, in both directions, that every class the List renders is a class `ui.css` styles and that no rule
+styles a class nothing renders. Adding three classes that only exist while a caller wired `rowDrag` — two of
+them only MID-GESTURE — left them styled and unrendered, which is precisely the defect the second direction
+exists to catch, so it failed and was right to. The fix is a fourth, DRIVEN render in `renderEverything()`
+(`dragstart` on the first row, `dragover` on the last, so the two markers land on two different rows and a
+component painting the wrong one would not pass a class-union scan) rather than a subtraction from the
+equality. `packages/app-core/test/views/ticket-list-css-binding.test.tsx:229`, `:267`
+
+**Two plan-text deviations, both named rather than silently taken.** (1) The plan puts the tail zone "after
+the table" and cites `ticket-list.tsx`'s `ListTable` mount; it is rendered ONCE in `TicketList`, after the
+sections, because a grouped list mounts one `ListTable` per SECTION and a zone per section would put N drop
+targets on screen each claiming a part is the whole, when a drop on any of them means the same order — and
+because `rowDrag` is `undefined` for every surface that does not reorder, the single zone is the whole of the
+change for them. (2) The plan's `13.621a` letter-suffixed id was not minted; see the id note above. Neither
+deviation changes an assertion.
+
+**Fix round (2026-09-18) — an independent review found two Important defects the battery above could not see,
+plus four Minor. Both Important were REPRODUCED here before being acted on, and both fixes are themselves
+mutation-verified.**
+
+**Important 1 — a foreign drag was NOT refused; any non-empty `text/plain` was forwarded as a ticket id.**
+`ticket-list.tsx` gated the drop on `moved === ''`, and the comment above it asserted the false premise that
+"a gesture that began outside this list carries no id". **It does.** `DRAG_TICKET_FORMAT` is plain
+`'text/plain'` — deliberately, so no allowlist has to be maintained — which is the UNIVERSAL drag format: a
+link, a text selection or a file dragged in from another application arrives NON-EMPTY and is not a ticket
+id. Measured: dropping `'https://example.com/some-link'` on a row called
+`onReorder('https://example.com/some-link', 'rd_a')`. The Board reads the same format and is safe only
+because it then looks the value up in a registry that answers `undefined` for a stranger; this component has
+no registry, so the equivalent check is membership in the set of rows it is showing (`draggableIds`), and it
+now applies at BOTH targets. **The 13.705 battery could not have caught this**: its `dataTransfer` stand-in,
+faithful to a browser, answers `''` only for a format nothing populated, so it is structurally incapable of
+producing the payload — the test named the property "a payload carrying no ticket id" while only ever
+exercising an EMPTY one, which is a different property. The new case drives both a foreign URL and a
+synthetic non-member id, with a positive control that one of the list's OWN ids still gets through. M9 and
+M10 (the membership check dropped from the row drop, and from the tail drop) both die on that case.
+
+**Important 2 — the drop marker went stale over the tail zone.** The tail `<div>` is a SIBLING of the
+sections, not an ancestor of any `<tr>`, so a browser stops firing `dragover` on whichever row the pointer
+came from the moment it crosses in; nothing cleared it, so that row kept `gn-list__row--drop-before` while
+the pointer sat on the target that means LAST — the user reads "insert before the last row", releases, and
+gets "place last", off by one, on the one affordance whose whole job is to say where the row will land.
+Reproduced (`dragstart` on a row, `dragover` on another, `dragover` on the tail — the first row still
+carried the marker) and fixed by clearing it in the tail's own `dragover`. M11 dies on the tail case. The
+`ui.css` paragraph that claimed the tail "takes the accent only while the gesture is over it" was FALSE — no
+rule did that — and is corrected to say what actually signals the target: the ROW marker going out.
+
+**Minor 1 — an assertion that could not fail.** The `no rowDrag` arm called
+`expect(onReorder).not.toHaveBeenCalled()` against a spy that was never placed in the tree, because that
+render passes no `rowDrag`. Deleted, with the reason written where it stood: the meaningful assertions there
+are `not.toHaveAttribute('draggable')` and the null tail zone, and a vacuous assertion reads as coverage of
+exactly the property those two measure.
+
+**Minor 2 — a pinned row paints `--dragging` on both its copies** (the marker is keyed on `ticketId`, and a
+row assigned to the viewer deliberately renders twice — once pinned, once in its section). Cosmetic and
+data-safe: both copies carry the same id and the self-drop guard refuses one onto the other. **Follow-on,
+owner: the first task that renders the drag on a surface where a row can legitimately appear twice** — the
+double-render is already accepted for `rowAction`, so this may be intended, and it is recorded rather than
+guessed at.
+
+**Minor 3 — prose corrected, three places.** The `ui.css` citation to `.gn-refusal--*` used PRE-insertion
+line numbers (`:1176`) — now cited by SELECTOR, because a line number that is right in one revision is a
+false citation in the next, **and this entry proved its own point twice over**: that fix first replaced the
+numbers with a fresh set (`:1203`/`:1204`/`:1209`, correct for `d28d609b`), and the fix round's own further
+edits to `ui.css` moved the rules again. A reviewer caught the second staleness, which is why the sentence
+you are reading names no line number at all. The
+`--gn-fill-quaternary` sentence described the zebra token as though the new rule painted it; the rule is
+`opacity` alone and names no colour, so the sentence now says that. The control's file count was 13, not 14.
+
+**Minor 4 — documented rather than guarded.** `Table.rowProps` spreads after `onClick`, so a caller's
+`onClick` would replace `onRowClick` rather than compose with it. No caller does this (`Table` has exactly
+one production consumer and it passes neither), so the docblock now states it instead of leaving it to be
+discovered; a guard would be a second decision point with nothing to decide.
+
+**Follow-on named by this fix round, not fixed: the tail zone has no drag-over state of its own.** What tells
+a user they are over it is the row marker going out. Styling the target itself is a fourth class, which the
+approved plan does not name — and a lit edge beside a still-lit "insert here" line was the worse of the two
+readings. Owner: the task that first reports the affordance as unclear.
+
+**Scoped re-review of the fix round (2026-09-18) — both Important fixes upheld, one Minor and one
+observation worth carrying.**
+
+**The most valuable finding of the whole task is that MY OWN MUTATION KILL WAS CONTINGENT.** This file's
+fix-round block above claims M9/M10 die on the foreign-drag case. The re-review showed that kill was
+contingent on a literal: `DRAG_TICKET_FORMAT` appeared in `ticket-list.test.tsx` **only inside comments** —
+the case hand-typed `'text/plain'`, the same value, so it passed. The reviewer ran a **paired experiment**,
+and it was reproduced here before the fix:
+
+| | change | exit | result |
+|---|---|---|---|
+| C | M9 alone, original format | **1** | killed on the FOREIGN case — a real kill |
+| A | `DRAG_TICKET_FORMAT` changed, code intact | **0** | the whole file is GREEN — it is format-agnostic once nothing agrees on the literal |
+| B | format changed **+** the membership check removed at both targets | **0** | **M9 SURVIVES** |
+
+**B is the finding.** With the constant drifted, the foreign payload reaches `getData` under a format the
+component no longer reads, comes back `''`, and is refused by the EMPTY clause instead — so the case stayed
+green while no longer testing the property in its name. The kill was real only because two hand-typed copies
+of `'text/plain'` happened to agree. **Fixed by importing the constant** (the test's own docblock at 13.705
+had asserted "imported, never re-spelled" and was FALSE — the sentence was written ahead of the code it
+described, which is this file's oldest recurring mistake). Re-verified after the fix: the drift experiment
+now leaves both the case and the mutant honest, because the test and the component read one value.
+
+**Finding 2 (Minor) — a sentence arguing against line numbers carried a stale line number.** The fix round
+replaced a stale `:1176` citation with `:1203`/`:1204`/`:1209`, correct for `d28d609b`; the fix round's own
+further edits then moved the rules again. Now cited by selector, with no number for a reader to chase.
+
+**Observation — a mutant with NO browser-visible effect reads as a kill here, and the kill count therefore
+overstates browser-observable coverage.** Deleting `setDraggingId(null)`/`setDropBeforeId(null)` from the
+**row** `onDrop` reddens 13.705's first case — yet in a browser it is behaviourally nil, because `dragend`
+always fires on the source after a drop and the component's own `onDragEnd` does byte-identical clearing.
+The suite proves that redundancy itself: the "ABANDONED drag clears both markers on `dragend`" case passes.
+The cause is that no case in this file fires `dragEnd` after a `drop`, so the post-drop marker state is
+pinned where a browser supplies it for free. **Not a defect in the code** (clearing on drop is deliberate:
+the component does not depend on a second event arriving), but it means this file's kill COUNT and its
+COVERAGE are not the same number. Recorded rather than papered over.
+
+**Two further things the re-review confirmed rather than merely accepted.** `rows` is the correct membership
+set — `sections` and `pinned` both derive from it, so rendered ids ⊆ `set(rows)` always, and a stale `rows`
+mid-reload refuses only rows that genuinely left the list, which is the conservative direction. And the
+choice of fix for the stale tail marker is the TESTABLE one: a container `dragleave` would have to be guarded
+against firing on every child boundary *and* is unverifiable in this harness, because jsdom never synthesises
+`dragenter`/`dragleave` from pointer movement — whereas the tail's `onDragOver` clear is driven by the same
+`fireEvent.dragOver` the cases already use.

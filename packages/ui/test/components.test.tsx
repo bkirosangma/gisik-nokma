@@ -122,6 +122,70 @@ describe('Table', () => {
   });
 });
 
+/**
+ * 13.706 — `Table`'s per-row hook (second wave Task 4, spec §8.1).
+ *
+ * `rowClassName` (Ruling 21) can only say ONE class for EVERY row, and the
+ * List's drag plumbing needs a fact about a row — `draggable`, the four drag
+ * handlers, and a class that names which row is being dragged or hovered.
+ * `rowProps` is that hook.
+ *
+ * **The composition rule is the whole of this case, and the negative is why.**
+ * A hook that REPLACED `className` would take `gn-table__row` off a row the
+ * moment a caller passed anything, and the shared stylesheet keys on that
+ * class — a silently unstyled row, not an override. So the extra class is
+ * APPENDED, in the same `[own, extra].filter(Boolean).join(' ')` shape
+ * `Card` has used since `card.tsx:7` and Ruling 21 applied to the rest of
+ * this component's hooks. The order assertion (the caller's class last) is
+ * what makes "appended" a claim this case can fail on rather than a synonym
+ * for "present".
+ */
+describe('13.706 the Table row hook appends a className and spreads per-row attributes', () => {
+  type Row = { id: string; title: string };
+  const columns: TableColumn<Row>[] = [{ id: 'title', header: 'Title', cell: (row) => row.title }];
+  const oneRow: Row[] = [{ id: 't1', title: 'File the GST return' }];
+
+  function bodyRow(): HTMLTableRowElement {
+    const tr = screen.getByText('File the GST return').closest('tr');
+    if (tr === null) throw new Error('no <tr> for the row');
+    return tr;
+  }
+
+  it('a data-* attribute lands on the <tr>, and a caller className is APPENDED to the built-ins rather than replacing them', () => {
+    render(
+      <Table
+        columns={columns}
+        rows={oneRow}
+        rowKey={(row) => row.id}
+        rowClassName="gn-list__table-row"
+        rowProps={(row) => ({ 'data-row': row.id, className: 'gn-list__row--dragging' })}
+      />,
+    );
+    const tr = bodyRow();
+    expect(tr).toHaveAttribute('data-row', 't1');
+    // Presence of all three is what kills "the caller's className replaced the
+    // built-ins" — the mutant would leave `gn-list__row--dragging` alone on the
+    // element and both of these would fail.
+    expect(tr).toHaveClass('gn-table__row', 'gn-list__table-row', 'gn-list__row--dragging');
+    // Order, not just presence: APPENDED means the caller's class comes last.
+    expect(tr.getAttribute('class')?.split(' ').at(-1)).toBe('gn-list__row--dragging');
+  });
+
+  it('CONTROL: with no rowProps the <tr> carries no caller attribute at all, and rowClassName still applies', () => {
+    render(
+      <Table
+        columns={columns}
+        rows={oneRow}
+        rowKey={(row) => row.id}
+        rowClassName="gn-list__table-row"
+      />,
+    );
+    const tr = bodyRow();
+    expect(tr).not.toHaveAttribute('data-row');
+    expect(tr).toHaveClass('gn-table__row', 'gn-list__table-row');
+  });
+});
+
 describe('SegmentedControl (13.288)', () => {
   it('13.288 renders role=tablist with one role=tab per option and aria-selected on exactly the chosen one', async () => {
     const onChange = vi.fn();

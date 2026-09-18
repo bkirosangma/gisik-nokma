@@ -1058,6 +1058,44 @@
   padding: 0.75rem 1rem 0.75rem 0;
   min-width: 16.25rem;
 }
+/* Second wave Task 4 (2026-09-18), spec §8.1 — the List's row drag. ONE
+   contiguous block of three classes, all three added by this task and no
+   other rule in this file touched; the file holding them is contended with a
+   peer workstream, so the block is kept together and its location named in
+   the PR body rather than scattered next to the nearest related selector.
+
+   Every colour is a token: `--gn-accent` for the drop marker (the one accent on
+   the screen during a gesture) and `--gn-border` for the tail zone's edge.
+
+   The drop marker reuses the `inset` shadow shape `.gn-refusal--server` already
+   established for a coloured edge on an element that has no border of its own
+   (same file, search `.gn-refusal--server`; cited by selector rather than by
+   line, because this block's own insertion moved every line number below it and
+   a number that is right in one revision is a false citation in the next).
+   `.gn-list__row--dragging` deliberately names NO colour: the dragged row keeps
+   whatever ground it already had — zebra included — and only recedes, which is
+   why the rule is `opacity` and not a fill. */
+/* The row being dragged. `opacity` and not a colour: the row keeps its own
+   ground and only recedes, which is also what keeps this rule from having to
+   know whether the row is odd (zebra) or hovered. */
+.gn-list__row--dragging { opacity: 0.5; }
+/* WHERE a drop would land, drawn on the row it would land BEFORE. An `inset`
+   shadow, so marking a row never changes its box and the list cannot reflow
+   mid-gesture — the failure mode a `border-top` here would have. */
+.gn-list__row--drop-before { box-shadow: inset 0 3px 0 0 var(--gn-accent); }
+/* The tail zone: "place last". An empty target with no text and no role (it is
+   `aria-hidden` in the markup), sized so it is reachable with a pointer rather
+   than a hairline.
+
+   Its edge is `--gn-border` and stays `--gn-border` — there is deliberately no
+   drag-over state rule here. What tells the user they are over this target is
+   the ROW marker going out (`ticket-list.tsx`'s tail `onDragOver` clears
+   `dropBeforeId`), not a colour appearing on this element: an affordance this
+   empty has nothing but its edge to light up, and a lit edge beside a still-lit
+   "insert here" line was the worse of the two readings. Styling this target's
+   own hover state is a named follow-on, not an omission — see the case
+   catalogue's Task 4 block. */
+.gn-list__tail-drop { height: 2.25rem; border-top: 2px solid var(--gn-border); }
 .gn-attention {
   border-left: 4px solid var(--gn-pending);
   border-radius: 8px;

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
 
 /**
  * Ruling 21 (coordinator, 2026-09-16) — `className`/`headerClassName`/
@@ -42,6 +42,37 @@ export type TableProps<Row> = {
   className?: string;
   /** Appended to every `<tr>` in `<tbody>`, alongside `gn-table__row`(`--clickable`). */
   rowClassName?: string;
+  /**
+   * Per-row attributes, resolved once per row and spread onto that row's
+   * `<tr>` AFTER the built-ins (second wave Task 4, 2026-09-18).
+   *
+   * `rowClassName` above can only say ONE class for EVERY row, and the List's
+   * drag plumbing needs a fact about a ROW — `draggable`, the four drag
+   * handlers, and a class naming which row is being dragged or hovered.
+   *
+   * **`className` is the one key the built-ins keep; everything else a caller
+   * returns wins, `onClick` included.** That is the deliberate consequence of
+   * spreading after the built-ins, and it is stated here rather than left to be
+   * discovered: a caller returning `onClick` would REPLACE `onRowClick`, so the
+   * two cannot be composed by accident. No caller does this today — `Table` has
+   * exactly one production consumer and it passes neither — which is why this is
+   * a documented edge rather than a guarded one. A guard would be a second
+   * decision point with nothing to decide.
+   *
+   * **`className` is the one key the built-ins keep, and it is APPENDED.**
+   * A hook that replaced it would strip `gn-table__row` off a row the moment
+   * a caller passed anything, and the shared stylesheet keys on that class —
+   * a silently unstyled row rather than an override. The extra class joins the
+   * same `[own, extra].filter(Boolean).join(' ')` composition `Card` has used
+   * since `card.tsx:7` and Ruling 21 applied to this component's other three
+   * hooks (13.706 pins the order, because "appended" and "present" are not the
+   * same claim).
+   *
+   * Optional and additive, like the rest of Ruling 21: a caller passing
+   * nothing gets BYTE-IDENTICAL output to before this prop existed, and
+   * `Table` still has exactly one production consumer (`ticket-list.tsx`).
+   */
+  rowProps?: (row: Row) => HTMLAttributes<HTMLTableRowElement>;
 };
 
 export function Table<Row>({
@@ -52,6 +83,7 @@ export function Table<Row>({
   caption,
   className,
   rowClassName,
+  rowProps,
 }: TableProps<Row>) {
   return (
     <div className="gn-table__scroll">
@@ -71,24 +103,33 @@ export function Table<Row>({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr
-              key={rowKey(row)}
-              className={[
-                onRowClick ? 'gn-table__row gn-table__row--clickable' : 'gn-table__row',
-                rowClassName,
-              ]
-                .filter(Boolean)
-                .join(' ')}
-              onClick={onRowClick ? () => onRowClick(row) : undefined}
-            >
-              {columns.map((column) => (
-                <td key={column.id} className={['gn-table__cell', column.cellClassName].filter(Boolean).join(' ')}>
-                  {column.cell(row)}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {rows.map((row) => {
+            // `className` is pulled OUT of the caller's attributes so the
+            // composed class list below is the only one this `<tr>` receives;
+            // everything else spreads after the built-ins, so a caller's own
+            // `draggable`/`onDrop`/`data-*` lands on the row unchanged.
+            const { className: callerClassName, ...callerAttributes } = rowProps?.(row) ?? {};
+            return (
+              <tr
+                key={rowKey(row)}
+                className={[
+                  onRowClick ? 'gn-table__row gn-table__row--clickable' : 'gn-table__row',
+                  rowClassName,
+                  callerClassName,
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                {...callerAttributes}
+              >
+                {columns.map((column) => (
+                  <td key={column.id} className={['gn-table__cell', column.cellClassName].filter(Boolean).join(' ')}>
+                    {column.cell(row)}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
