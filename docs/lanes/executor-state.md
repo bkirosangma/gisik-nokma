@@ -41,6 +41,89 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~17:5x IST. **SETTINGS → WORKFLOWS IS REBASED, GREEN AND AT THE
+> # REVIEWER; THE PR OPENS ON THIS HEAD.** This session was restarted and recovered the branch from the
+> # handoff below — the two commits survived, so nothing was redone. `exec/settings-workflows`,
+> # **REBASED onto `origin/main` = `a12c4018`** (0 behind / 2 ahead at the time of writing), ONE PR
+> # `--base main`. **The queue after this is NOT empty** (order: `…-attention-part2-heading.md` — exec 2's
+> # own continuation — then `…-settings-workspace-tab.md`, then `…-migration-order-check.md`; the controller
+> # dispatches to whichever executor frees first). **HOLD for that dispatch.**
+>
+> | | |
+> |---|---|
+> | branch | `exec/settings-workflows`, merge-base with `origin/main` = **`a12c4018`**, **0 behind / 2 ahead**, **tree CLEAN**. Not pushed when this block was written; the PR opens ON the commit that carries it. |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it. |
+> | the change | 7 files: `workflow-list-screen.tsx` (the card grid), `ui.css` (the new `workflow-list__*` family, **appended at EOF**), `screens.test.tsx` (10.62 updated + case **13.884**), `tokens.test.ts` (13.884's measured half), `test-cases/13`, `Features.md`, this file |
+> | case ids | **`13.884`**. The dispatch said "next free `13.883`" — **that expired twice over**: this lane took `13.883` in **#473**, and main still carries it (**measured at `a12c4018`: 5 mentions**). Recounted by MARKER at this tip. |
+> | migration | **NONE.** Do not restart the server container. |
+> | suites | **app-core 1550/0** (94 files) · **ui 330/0** (5 files) · **web 520/0** (48 files) · **four typechecks EXIT 0, all logs 0 bytes** (`app-core` + `ui` `tsconfig.typecheck.json`, `web` `tsconfig.json` + `tsconfig.e2e.json`). Node v22.22.2. Run via `rtk proxy pnpm exec vitest run` — **the bare form is swallowed by the RTK vitest parser** (`[RTK:PASSTHROUGH] … All parsing tiers failed`), which returns a well-formed red with no test output. |
+> | seven checks | **all EXIT 0 at `09354fc7`**: `tasks` · `env` · `runbook` · `help` · `citations` (file 13 = **658** cited / 0 uncited) · `db-tz` (**`DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma`** → `Asia/Kolkata`; it exits **1** without it, by design) · `check-case-ids` (**2348**, union == sum, highest 15.34) |
+> | gate | **NOT RUN BY THIS LANE** (the controller runs it). `pnpm turbo run build` was run for the post-rebase dist rebuild: **11 successful / 11 total**. |
+> | tree | clean. No `dist`, no `task-ledger.tsv` beyond main's, no `.superpowers/`. |
+>
+> ## ▣ WHAT THIS TASK SHIPS
+>
+> The settings → workflows screen moves from a flat `<ul>` of rows to the prototype's card grid.
+> **The real defect was not the layout: `workflow-list__*` had no CSS rules at all** — and the primary
+> action rendered as a bare `<button>` with no class, resolving to the UA default rather than
+> `.gn-button--primary`. The whole family is new, the action moved onto the shared `Button
+> variant="primary"`, and the three existing arms (empty / loading / failure) are untouched.
+> The badge and the second action are **named absences** with missing FIELDS behind them
+> (`PublishedWorkflowDef` has no status member; `WorkflowAuthoringGateway` has no duplicate/history
+> method), and the case asserts their absence rather than a docblock asserting itself.
+>
+> **The chip is the avatar's defect one screen over.** The prototype fills it with `--trayBg`
+> (`--gn-surface-sunken`), which under `neo` is the SAME hex as the `.gn-card` behind it — so the chip
+> would composite to the card's own colour and its only boundary would vanish. The remedy is the one
+> `.ticket-type-list__badge` already ships: keep the fill, add `--gn-shadow-sunken-compact` under
+> `[data-style="neo"]`.
+>
+> ## ▣ THE CONTROL THE DISPATCH CARRIED, RE-MEASURED WITH ITS UNIT PINNED
+>
+> The dispatch supports the absence with *"the same sweep finds **31** `.ticket-type-list__` rules"*.
+> **31 is the raw-mention count, and most of those mentions are COMMENTS** — the first three
+> `ticket-type-list__` hits in `ui.css` are docblock prose (`:98`, `:103`, `:361`). I re-ran it on a
+> selector-position pattern (a line whose selector begins with the family and opens a block) so both
+> families are measured in the same unit:
+>
+> | at `b14d3b9b`, in `packages/ui/src/ui.css` | selector-position rules | raw mentions |
+> |---|---|---|
+> | `ticket-type-list__` (the sibling precedent) | **16** | 31 |
+> | `workflow-list__` (the family in question) | **0** | 0 |
+>
+> **The conclusion is unchanged and slightly stronger — the family is absent in BOTH units** — but the
+> dispatch's "31 rules" is a count whose unit was not pinned, and a count is only evidence once the unit
+> is. The instrument fires on this file: the same sweep finds `.gn-card` (1 selector match). Recorded
+> rather than silently restated, because the next reader will otherwise quote 31 as a rule count.
+>
+> ## ▣ METHOD NOTES THESE TWO SESSIONS EARNED
+>
+> - **PLACEMENT IS A PRICED DECISION, and the price is measurable.** The new CSS family was **appended at
+>   the end of `ui.css`** rather than beside `.ticket-type-list__*` where a reader would look: inserting
+>   there stales **46** of the repo's 135 `ui.css:NNN` citations, appending stales **0**. Measured both
+>   ways BEFORE choosing.
+> - **The restarted session's first job is to re-verify, not to trust.** Everything above was re-measured
+>   at `09354fc7` after the rebase: the seven checks, the three suites, the four typechecks, the prototype
+>   citations (`:841` = `<sc-if value="{{ isWorkflows }}">`, `:845` = the subtitle sentence verbatim,
+>   `:849` = the `minmax(320px,1fr)` grid), and the CSS-absence control. The outgoing handoff's numbers
+>   were 2347 / 657 at the PRE-rebase tip; they are 2348 / 658 here **because main moved under the
+>   rebase** — a carried-forward count is a reading that expires.
+> - **`vitest` output is swallowed by the RTK proxy.** `pnpm exec vitest run` returned `EXIT=1` with no
+>   test output and `[RTK:PASSTHROUGH] vitest parser: All parsing tiers failed`; two packages even
+>   collided on one `~/Library/Application Support/rtk/tee/…` file. **`rtk proxy pnpm exec vitest run`
+>   is the form that works.** A red here is a fact about the proxy until proven otherwise.
+> - **`--concurrency=1` is not a vitest CLI flag.** The dispatch names it; vitest 3 rejects it outright
+>   (`CACError: Unknown option --concurrency`) and the run dies before collecting a single test. The
+>   package script is plain `vitest run`.
+> - **A rebase conflict can be entirely inside the handoff file.** The code commit and BOTH companion
+>   documents (`Features.md`, `test-cases/13`) auto-merged; only `executor-state.md` conflicted, because
+>   main and this branch had each appended a position block. Resolved newest-first, both sides kept.
+> - **`/usr/bin/cat` does not exist on this machine.** The shell-function proxy covers `cat` too; reading a
+>   file needs the Read tool or `/bin/cat`.
+>
+> ---
+>
+> # ▣ RECORD — the restarted session's predecessor, superseded by the block above.
 > # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~17:3x IST. **THREE ITEMS FROM THIS LANE, TWO OPEN PRs AND ONE
 > # AT REVIEW.** (1) **#469** the `.gn-avatar` under `neo` — **MERGED** as `cb1f3d16`. (2) **#473** the
 > # owner-demotion guard — **OPEN, MERGEABLE**, awaiting the controller's merge. (3) **The settings →
