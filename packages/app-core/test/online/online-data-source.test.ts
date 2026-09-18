@@ -267,8 +267,12 @@ describe('3.40 the four answerable reads, at the paths the server registers', ()
       },
     });
     const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
+    // `role` is asserted here now (case 13.760) because it is the field the
+    // mapper used to DROP: this call goes through the real HTTP client to the
+    // real `mapActors`, so it is the seam where a future drop reddens rather
+    // than a screen quietly losing a column.
     expect(await source.query.getMembers(WORKSPACE)).toEqual([
-      { id: ANSELMA, name: 'Anselma Marak' },
+      { id: ANSELMA, name: 'Anselma Marak', role: 'owner' },
     ]);
     expect(await source.query.getTicketHistory('t_1', 4, 20)).toEqual([]);
     expect((await source.query.getWorkflowDef(WORKSPACE, 'wf-errand', 2))?.version).toBe(2);

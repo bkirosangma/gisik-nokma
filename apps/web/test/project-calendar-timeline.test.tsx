@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Actor, ListRow, TicketListView } from '@gisik-nokma/app-core';
+import type { ListRow, RosterMember, TicketListView } from '@gisik-nokma/app-core';
 import type { TicketTypeDef } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
 import { istToday } from '../src/ist-today.js';
@@ -68,7 +68,12 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const MEMBERS: Actor[] = [{ id: 'user_kiro', name: 'Kiro' }];
+/**
+ * `role` is REQUIRED since 2026-09-18 (case 13.760) — `getMembers` answers
+ * `RosterMember[]`, because the route has always sent a role per person and the
+ * members screen draws it. These views read only the name.
+ */
+const MEMBERS: RosterMember[] = [{ id: 'user_kiro', name: 'Kiro', role: 'owner' }];
 
 function claim(value: unknown, actorId = 'user_kiro') {
   return {

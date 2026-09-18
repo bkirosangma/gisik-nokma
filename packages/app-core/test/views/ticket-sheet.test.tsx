@@ -55,9 +55,12 @@ function sheetSource(read: TicketRead, history: TicketHistoryEvent[] = []) {
   return createFakeDataSource({
     getTicket: async () => read,
     getWorkflowDef: async () => WF_ERRAND,
+    // `role` is present because the shaped read (`RosterMember`, case 13.760)
+    // requires one — a roster fixture without it would be a body the server
+    // cannot send. The sheet itself reads only the NAME out of this roster.
     getMembers: async () => [
-      { id: 'user_kiro', name: 'Kiro' },
-      { id: 'user_anselma', name: 'Anselma Marak' },
+      { id: 'user_kiro', name: 'Kiro', role: 'owner' },
+      { id: 'user_anselma', name: 'Anselma Marak', role: 'member' },
     ],
     getTicketHistory: async () => history,
   });

@@ -2,14 +2,17 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestResult, SubmittedEvent } from '@gisik-nokma/domain';
+import type { DataSourceQuery, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
 import { InviteAdminError, type PendingInvite } from '@gisik-nokma/app-core/online';
 import MembersPage, { COPY_IT_NOW } from '../app/w/[workspaceId]/members/page.js';
 import { Providers } from '../src/providers.js';
+import { clearWorkspaceNameCache } from '../src/use-workspace-name.js';
 import { stubServices, type GatewayStubs } from './helpers/stub-services.js';
 
 /**
- * The invite mint, the pending list, and the role gate (Plan 6 Task 15b, item
- * 2). Cases 3.129–3.136.
+ * The roster, the invite mint, the pending list, and the role gate (Plan 6
+ * Task 15b item 2 for everything from 3.129 down; 2026-09-18 for the roster
+ * surface, 13.761–13.766).
  *
  * The three doors these cases stand in for, each verified at source:
  * `GET /v1/workspaces/:workspaceId/members` (`routes/builder-reads.ts:547`),
@@ -35,10 +38,27 @@ vi.mock('../src/auth-client.js', () => ({
   },
 }));
 
-const ROSTER = [
-  { id: '01J9USER000000000000000000', name: 'Kiro' },
-  { id: '01J9USER000000000000000001', name: 'Anselma Marak' },
+/**
+ * The roster `GET /v1/workspaces/:id/members` serves — a `displayName` and a
+ * `role` per person (`routes/builder-reads.ts:247`), adapted to `RosterMember`
+ * by `mapActors`.
+ *
+ * `role` is REQUIRED on every row and that is not incidental: the members
+ * screen DRAWS it, so a fixture without one would be a body the server cannot
+ * send (case 13.760 asserts the mapper refuses exactly that). The roles here
+ * are the two the cases below read — one owner, one plain member — and 13.763
+ * mounts a different roster to show the summary line follows the data rather
+ * than a literal.
+ */
+const ROSTER: RosterMember[] = [
+  { id: '01J9USER000000000000000000', name: 'Kiro', role: 'owner' },
+  { id: '01J9USER000000000000000001', name: 'Anselma Marak', role: 'member' },
 ];
+
+/** A `WorkspaceRef` for the name lookup only — the summary line is its one caller here. */
+function workspaceRef(name: string): WorkspaceRef {
+  return { id: WS, name, role: 'owner', memberCount: 2, nameRestrictedProjectCount: 0, projects: [] };
+}
 
 const PENDING: PendingInvite = {
   inviteId: '01J9INVITE00000000000000AB',
@@ -70,8 +90,15 @@ function mount(
     seq: 1,
     serverTime: '2026-09-02T10:00:00.000Z',
   }),
+  /**
+   * Any other read a case needs, spread AFTER `getMembers` so it can also
+   * replace the roster. `getMyWorkspaces` is the one the roster cases use it
+   * for: it is what `useWorkspaceName` calls, and left un-stubbed it REJECTS by
+   * name — which is the null-name reading 13.764's second half needs.
+   */
+  query: Partial<DataSourceQuery> = {},
 ) {
-  const services = stubServices({ getMembers: async () => ROSTER }, { invitesAdmin });
+  const services = stubServices({ getMembers: async () => ROSTER, ...query }, { invitesAdmin });
   // ALWAYS replaced, whether or not a recorder was asked for. `stubServices`
   // hands back `ingest: async () => []`, and an empty results array is not a
   // commit — the page reports it as "the server returned no answer", which is
@@ -82,14 +109,22 @@ function mount(
     ingest?.(events);
     return events.map(answer);
   };
-  render(
+  return render(
     <Providers services={services}>
       <MembersPage />
     </Providers>,
   );
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  // `use-workspace-name.ts` caches SUCCESSFUL lookups in a module-scoped map
+  // that every case in this file shares, so a case that serves a name would
+  // otherwise hand it to the next one. Only successes are cached — a refused
+  // read is not a fact about the workspace's name — which is why 13.764 can
+  // rely on the un-stubbed default being `null`.
+  clearWorkspaceNameCache();
+});
 
 /**
  * 3.129 THE PLANTED DEFECT TASK 15b NAMES — a member sees the roster and no
@@ -103,6 +138,15 @@ beforeEach(() => vi.clearAllMocks());
  * `GET /v1/workspaces/:id/invites` already answers 403 to a non-admin because
  * an invitation's address is PII — so the pending read IS the role question,
  * asked of the one thing that knows.
+ *
+ * RE-READ 2026-09-18 against the roster table (`13.761`), because that change
+ * rewrote the markup this case asserted through: the roster went from a `<ul>`
+ * of names to a `<table>` with a Person and a Role column. Neither arm here was
+ * written against the OLD element shape — both read the person's name, the
+ * door's own sentence, and the ABSENCE of the invite machinery — so both still
+ * hold as they stand and neither was re-pointed or weakened. What changed in
+ * this file is the fixture: `ROSTER` carries a `role` per person now, because
+ * the widened `RosterMember` requires one (13.760).
  */
 describe('3.129 a member sees the roster and none of the invite machinery', () => {
   it('renders the people, and NO mint form, when the pending read answers 403', async () => {
@@ -379,5 +423,211 @@ describe('3.138 a refused withdrawal is said out loud, and the invitation stays 
     const row = (await screen.findByText('anselma@example.test')).closest('li');
     expect(row?.textContent).toContain('IST');
     expect(row?.textContent).not.toContain('2026-09-08T10:00:00.000Z');
+  });
+});
+
+/**
+ * 13.761 THE ROSTER TABLE (2026-09-18).
+ *
+ * Ported from `desktop.dc.html@6d7b67c0a52c:658-698`, and ported PARTIALLY on
+ * purpose: the prototype draws five columns (Person, Role, Project access,
+ * Assigned, Last seen) and the route serves three fields (`user_id`,
+ * `u."name"`, `role` — `routes/builder-reads.ts:247`). The four it draws with
+ * nothing behind them are named as deliberate absences in the page's own file
+ * docblock; this case is the other half of that statement — it pins what IS
+ * drawn, so "we left a column out" cannot quietly become "we left the table
+ * out".
+ *
+ * The role is asserted as the WIRE'S OWN TOKEN and not as a prettified label,
+ * because that is what the row carries: `role` is a plain `string` on
+ * `RosterMember` (see that type's docblock for why it is not `WorkspaceRole`),
+ * and a case that expected "Owner" would be asserting a mapping nobody wrote.
+ */
+describe('13.761 the roster is a table with a Person and a Role column', () => {
+  it('renders one row per person, each wearing the role the server spelled', async () => {
+    mount({ listPending: async () => [] });
+    const table = await screen.findByRole('table');
+    expect(within(table).getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
+      'Person',
+      'Role',
+    ]);
+    // The header is a row too, so two people are three rows in total.
+    const rows = within(table).getAllByRole('row');
+    expect(rows).toHaveLength(3);
+    expect(within(rows[1]!).getByText('Kiro')).toBeInTheDocument();
+    expect(within(rows[1]!).getByText('owner')).toBeInTheDocument();
+    expect(within(rows[2]!).getByText('Anselma Marak')).toBeInTheDocument();
+    expect(within(rows[2]!).getByText('member')).toBeInTheDocument();
+    // NO control per row. The prototype's role cell is an `<select>` under
+    // `canEditRole` (`:679-685`) and the product has no per-member role-change
+    // door: no route accepts one and `role` is written only at membership
+    // creation. A picker here would be a control that cannot be honoured.
+    expect(within(table).queryByRole('combobox')).toBeNull();
+    expect(within(table).queryByRole('button')).toBeNull();
+  });
+});
+
+/**
+ * 13.762 THE MONOGRAM, and the one accessibility trap in it.
+ *
+ * The prototype's disc repeats the person's first letter BESIDE their name
+ * (`:674-675`), so a cell read out loud would say "A Anselma Marak" unless the
+ * disc is hidden from assistive tech. Both halves are asserted: the letter IS
+ * drawn, and it is NOT part of the row's accessible name. Asserting only the
+ * first passes on a screen that reads the letter twice; asserting only the
+ * second passes on a screen that draws no disc at all — which is the whole
+ * port.
+ */
+describe('13.762 the monogram draws one capital, and does not repeat it to a screen reader', () => {
+  it('shows the person’s first letter, hidden from the row’s accessible name', async () => {
+    mount({ listPending: async () => [] });
+    const row = (await screen.findByText('Anselma Marak')).closest('tr');
+    expect(row).not.toBeNull();
+    const disc = row?.querySelector('.gn-members__initial');
+    expect(disc).not.toBeNull();
+    expect(disc).toHaveTextContent('A');
+    expect(disc).toHaveAttribute('aria-hidden', 'true');
+    // The positive half: the row IS reachable by the person's name.
+    expect(screen.getByRole('row', { name: /Anselma Marak/ })).toBeInTheDocument();
+    // And the negative half, which is what fails if the disc is ever unhidden:
+    // an accessible name that had swallowed the monogram would read "A Anselma
+    // Marak". The pattern cannot match the name on its own — "Anselma" does not
+    // contain "A Anselma".
+    expect(screen.queryByRole('row', { name: /A Anselma/ })).toBeNull();
+  });
+});
+
+/**
+ * 13.763 THE SUMMARY LINE IS DERIVED, and this case is built so that a
+ * hardcoded one cannot pass it.
+ *
+ * The prototype's own data (`desktop.dc.html@6d7b67c0a52c:3032`) is
+ * `` `${n} people in ${ws.name} · one owner, ${adminN} admins. Membership and
+ * roles are per workspace.` `` Two of its pieces are claims a client can only
+ * make with a qualification, and the page's `memberSummary` docblock carries
+ * the reasoning: "one owner" is COUNTED rather than asserted (the roster
+ * carries every visible person's role), and "N people" is VIEWER-SCOPED —
+ * `readMembers` hides guests from a non-admin caller, so this is the people
+ * THIS viewer may be told about, not the workspace's membership.
+ *
+ * The control is a SECOND mount with a different roster. A summary that were a
+ * constant, or that counted a fixture, passes the first assertion and fails the
+ * second; that is the pair's whole job.
+ */
+describe('13.763 the summary line is counted from the roster this viewer was served', () => {
+  it('counts people, owners and admins — and follows the roster, not a literal', async () => {
+    const first = mount({ listPending: async () => [] });
+    expect(
+      await screen.findByText(
+        'You can see 2 people · 1 owner, 0 admins. Membership and roles are per workspace.',
+      ),
+    ).toBeInTheDocument();
+    first.unmount();
+
+    mount({ listPending: async () => [] }, undefined, undefined, {
+      getMembers: async () => [
+        { id: 'u1', name: 'Kiro', role: 'owner' },
+        { id: 'u2', name: 'Anselma Marak', role: 'admin' },
+        { id: 'u3', name: 'Biren Sangma', role: 'guest' },
+      ],
+    });
+    // Three people, because a GUEST is still somebody this viewer can see; one
+    // admin, counted rather than assumed; and the guest is neither owner nor
+    // admin, so it lands in the total and in neither count.
+    expect(
+      await screen.findByText(
+        'You can see 3 people · 1 owner, 1 admin. Membership and roles are per workspace.',
+      ),
+    ).toBeInTheDocument();
+  });
+});
+
+/**
+ * 13.764 THE WORKSPACE NAME IS OPTIONAL, and the two readings are both true.
+ *
+ * `ws.name` comes from `GET /v1/me/workspaces`, and `getMyWorkspaces` REFUSES
+ * whole on this branch (`mapWorkspaceRefs` throws a `ServingGapError`) — so the
+ * name is genuinely unavailable far more often than it is missing. The product
+ * already has the handler: `useWorkspaceName` answers `string | null` and fails
+ * silently to `null`, "never the raw id or a stale guess".
+ *
+ * So the sentence is ADAPTED rather than filled: the `in <name>` clause is
+ * omitted, the rest of the prototype's wording stands, and the case asserts the
+ * whole string EXACTLY — which is what catches a placeholder (`undefined`,
+ * `in null`) that a substring assertion on the front half would sail past.
+ */
+describe('13.764 the summary names the workspace when it can, and omits the clause when it cannot', () => {
+  it('names the workspace once `getMyWorkspaces` serves it', async () => {
+    mount({ listPending: async () => [] }, undefined, undefined, {
+      getMyWorkspaces: async () => [workspaceRef('Convenience Corner')],
+    });
+    expect(
+      await screen.findByText(
+        'You can see 2 people in Convenience Corner · 1 owner, 0 admins. Membership and roles are per workspace.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('omits the clause rather than printing a placeholder or the raw workspace id', async () => {
+    // `stubServices` rejects an un-stubbed read BY NAME, and
+    // `getMyWorkspaces` is left un-stubbed here — which is the shape of the
+    // real refusal, not a stand-in for it.
+    mount({ listPending: async () => [] });
+    const summary = await screen.findByText(/You can see 2 people/);
+    expect(summary.textContent).toBe(
+      'You can see 2 people · 1 owner, 0 admins. Membership and roles are per workspace.',
+    );
+    expect(summary.textContent).not.toContain(WS);
+    expect(summary.textContent).not.toContain('undefined');
+  });
+});
+
+/**
+ * 13.765 THE EMPTY ROSTER IS TWO READINGS WEARING ONE SHAPE, and this is the
+ * case that keeps the screen from picking one.
+ *
+ * `online-data-source.ts` answers `[]` BOTH for a body whose `members` array is
+ * empty AND for the 404 this route sends a guest (`door(..., 'no-guests')`) —
+ * and since a workspace always has an owner, `[]` in practice means "you may
+ * not read this roster" rather than "nobody is here". "Nobody is in this
+ * workspace" would be a confident claim about the world drawn from an absence,
+ * so the page says "No members are listed here.", which is true either way.
+ *
+ * The second half is the count: no summary line is drawn over an empty roster,
+ * because "You can see 0 people" is a number nobody counted and the
+ * qualification that makes the non-empty line honest has nothing to qualify.
+ */
+describe('13.765 an empty roster says what is listed, not who exists', () => {
+  it('states the absence, and draws no table and no count over it', async () => {
+    mount({ listPending: async () => [] }, undefined, undefined, { getMembers: async () => [] });
+    expect(await screen.findByText('No members are listed here.')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByText(/You can see/)).toBeNull();
+  });
+});
+
+/**
+ * 13.766 THE HEADING AND THE LOADING STATE.
+ *
+ * The heading is the prototype's own `Members` (`:654`); this route's `<h1>`
+ * read `People` until 2026-09-18, and the rename is deliberate rather than a
+ * tidy-up — the prototype is the spec, and the nav item that reaches this page
+ * says Members too.
+ *
+ * The loading arm is asserted with a read that NEVER settles, which is the only
+ * way to hold the page in that state: with a resolved stub the assertion races
+ * the microtask queue. Both absence halves matter — a table or a summary drawn
+ * before the read answered would be a roster and a count nobody has been served
+ * yet.
+ */
+describe('13.766 the heading is Members, and nothing is counted before the roster answers', () => {
+  it('shows the heading and a loading line while the read is in flight, and no roster', () => {
+    mount({ listPending: async () => [] }, undefined, undefined, {
+      getMembers: () => new Promise<RosterMember[]>(() => undefined),
+    });
+    expect(screen.getByRole('heading', { level: 1, name: 'Members' })).toBeInTheDocument();
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByText(/You can see/)).toBeNull();
   });
 });

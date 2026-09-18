@@ -1382,6 +1382,172 @@ input, textarea, select { font-family: inherit; }
 
 .gn-invite__dead { color: var(--gn-text-muted); }
 
+/* ── `/w/[workspaceId]/members` — the roster (2026-09-18). ──────────────────
+   Ported from the prototype's `isMembers` screen
+   (`desktop.dc.html@6d7b67c0a52c:651-698`). Until this block existed every
+   class in the family carried NO rule at all — the page rendered as an
+   unstyled list of names beside a bare `<h1>`, which is what the delta doc
+   records (`docs/design/prototype-delta-2026-09-18.md`, `### isMembers`).
+
+   TRANSLATED, NOT TRANSCRIBED: the prototype's px become rem and its token
+   names become `--gn-*` roles (`--cardBg`→`surface-raised`,
+   `--cardShadow`→`shadow-raised`, `--cardR`→`radius-card`,
+   `--trayBg`→`surface-sunken`, `--label2`→`text-muted`,
+   `--fill4`→`fill-quaternary`, `--ctlR`→`radius-control`), per the mapping
+   table at
+   `docs/superpowers/plans/2026-09-16-board-prototype-port.md:33-52`. This file
+   is inside `packages/ui`'s token-discipline scan — `apps/web/app` is one of
+   its declared roots — so a colour literal here reddens that suite rather than
+   this one.
+
+   THE FOUR COLUMNS THE PROTOTYPE DRAWS AND THIS SCREEN DOES NOT are named, one
+   by one, in the page's own file docblock
+   (`app/w/[workspaceId]/members/page.tsx`), which is where a reader looking
+   for "Project access" will be; nothing below styles a cell for them. */
+.gn-members {
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  border-radius: var(--gn-radius-card);
+  /* The prototype's own (`:658`), and it is load-bearing rather than
+     decorative: the table below is 820px wide, so on a phone the CARD scrolls
+     and the document does not. Overflow on the page instead would have put
+     every route's sideways-scroll ratchet at risk for a table that only this
+     screen draws. */
+  overflow: auto;
+}
+
+/* The heading block. `margin-top` is the prototype's 26px (`:653`) and it
+   REPLACES `.gn-page-title`'s own 1.2rem at this one call site — the same
+   scoped reset `.gn-workspaces__head` makes, and for the same reason:
+   `.gn-page-title` is shared by every route that carries it and zeroing it
+   globally would collapse the heading spacing on all of them. */
+.gn-members__head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 1.625rem;
+}
+.gn-members__head .gn-page-title { margin: 0; }
+
+/* The prototype's summary line (`:655`): 17px/22px in `--label2`. */
+.gn-members__summary {
+  margin: 0;
+  font-size: 1.0625rem;
+  line-height: 1.375rem;
+  color: var(--gn-text-muted);
+}
+
+/* Loading and the empty roster are one muted register, and both are `<p>`s
+   whose UA `margin-block: 1em` would otherwise reappear on top of the shell's
+   own flow. */
+.gn-members__loading,
+.gn-members__empty {
+  margin: 1.25rem 0 0;
+  color: var(--gn-text-muted);
+}
+
+/* The prototype's `inviteAdminOnly` note (`:718-720`) — what a caller who is
+   NOT an owner or admin sees where the invite machinery would be. It is the
+   one FILLED element on the page rather than a line of muted text, which is
+   the prototype's own emphasis and the right one: this is the page's answer to
+   "why is there nothing here", not a footnote under something. `--fill4` maps
+   to `fill-quaternary`, `--ctlR` to `radius-control`. */
+.gn-members__not-admin {
+  margin: 1.25rem 0 0;
+  padding: 0.8125rem 1rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-quaternary);
+  color: var(--gn-text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+  text-wrap: pretty;
+}
+
+/* `min-width` is the prototype's own 820px (`:659`) — the width at which its
+   FIVE columns fit. Two columns do not need it; it is kept because it is what
+   the Person column's 34% and the card's `overflow` above were measured
+   against, and shrinking it would silently re-lay-out a screen nobody asked to
+   change.
+
+   The `font-size` is the prototype's 17px, declared ONCE here rather than on
+   the person cell where the prototype writes it, because the prototype's role
+   cell simply INHERITS its page's 17px. This product's `body` deliberately did
+   not port the prototype's 17px (see that rule's own comment near the top of
+   this file), so the size has to be named or the role chip lands at 16px. */
+.gn-members__table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 51.25rem;
+  font-size: 1.0625rem;
+}
+.gn-members__th {
+  text-align: left;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  font-weight: 600;
+  color: var(--gn-text-muted);
+  background: var(--gn-surface-sunken);
+  padding: 0.6875rem 1.125rem;
+}
+.gn-members__th--person { width: 34%; }
+/* `vertical-align: middle` is this family's own choice, not the prototype's:
+   its cells hold one child each so the question never arose there, and here a
+   36px disc sits beside a 13px chip. `.gn-table__cell` uses `top` for a
+   different job — that table's rows are multi-line prose. */
+.gn-members__cell { padding: 0.8125rem 1.125rem; vertical-align: middle; }
+
+.gn-members__person {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;      /* the prototype's 12px (`:673`) */
+  flex-wrap: nowrap;
+}
+
+/* The prototype's monogram disc (`:674`): 36px, fully round, one capital at
+   15px/600.
+
+   ITS FILL IS A DEPARTURE, named rather than made quietly. The prototype fills
+   it with `--fill1` — an alpha tint one step STRONGER than the `--fill4` the
+   mapping table sends to `fill-quaternary` — and this product has no role for
+   it. `fill-tertiary` is the nearest: it is the role the product's own chip and
+   badge fills already use for the same job (a soft surface raised off paper),
+   and it stays VISIBLE under all three styles.
+
+   `surface-sunken` was rejected although it is the role `.gn-avatar` declares,
+   because under `neo` — the shipped default — `surface`, `surface-raised` and
+   `surface-sunken` are the SAME `neoPaper` hex (`tokens.ts`), so a disc filled
+   with it disappears into the card it sits in; a boundary that is not drawn is
+   not a disc. `fillWarmNeo3` over `neoPaper` composites to `#E7DDD4`, the
+   measured value `tokens.ts`'s own fills comment names, which is a boundary a
+   reader can see. The letter reads either way — it is the disc that would not.
+
+   `flex: none` is the prototype's own (`:674`) and is what keeps a long name
+   from compressing the disc through flex's automatic minimum size, the same
+   failure `.gn-avatar--workspace` records in `ui.css`. */
+.gn-members__initial {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  background: var(--gn-fill-tertiary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  flex: none;
+}
+
+.gn-members__name { font-weight: 600; }
+
+/* The role chip is the SHARED `.gn-chip`: the mapping table sends the
+   prototype's `--chipBg`/`--chipShadow` to exactly the two roles `.gn-chip`
+   declares, and its 0.8125rem text is the prototype's own 13px. The `Chip`
+   COMPONENT is deliberately not used — it always renders a `.gn-chip__dot`,
+   and the prototype's non-editable role chip has none. The one thing the
+   shared rule does not carry is the prototype's `font-weight: 500`, which is
+   all this rule adds. */
+.gn-members__role { font-weight: 500; }
+
 /* `.gn-view-tabs button, .gn-view-tabs [role='tab'] { min-height: 2.75rem;
    padding-inline: 0.75rem; }` — DELETED (board-prototype-port Task 4,
    coordinator Ruling 7). It carried the 44px tap-target floor for the

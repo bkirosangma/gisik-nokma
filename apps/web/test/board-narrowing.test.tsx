@@ -9,6 +9,7 @@ import type {
   BoardView,
   ClaimProvenance,
   ListRow,
+  RosterMember,
   TicketListView,
 } from '@gisik-nokma/app-core';
 import { Providers } from '../src/providers.js';
@@ -425,7 +426,13 @@ describe('13.557 the search narrows the List tab, and the note that said otherwi
  * to `[]`) is still what that real path needs, reused by `13.560`/`13.561`
  * and `13.556b` (all below) as well.
  */
-const ROSTER: Array<{ id: string; name: string }> = [{ id: 'u1', name: 'Uma One' }];
+/**
+ * `role` is REQUIRED since 2026-09-18 (case 13.760): `getMembers` answers
+ * `RosterMember[]` now, because the route has always sent a `role` per person
+ * and the members screen DRAWS it — a roster fixture without one would be a
+ * body the server cannot send. The board itself reads only the name.
+ */
+const ROSTER: RosterMember[] = [{ id: 'u1', name: 'Uma One', role: 'owner' }];
 
 /**
  * Full `TicketTypeDef` shape (controller's resolution of 13.561's
