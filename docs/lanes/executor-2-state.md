@@ -22,9 +22,11 @@
 
 ## ▲ TOP BLOCK — `scripts/check-migration-order.mjs` BUILT. PR open against `main`. (2026-09-18, night)
 
-**Position: branch `exec2/migration-order-check`, cut from `origin/main` `2c62c01a`, `--base main`.** Dispatch
+**Position: PR #487 IS OPEN, base `main`, MERGEABLE, awaiting the controller's merge.** Branch
+`exec2/migration-order-check`, cut from `origin/main` `2c62c01a`. Dispatch
 `CTL-DISPATCH-2026-09-18-migration-order-check.md` (owner ruling: *"build scripts/check-migration-order.mjs:
-yes"*). **The controller's next dispatch is the position** — this block is history the moment the PR merges.
+yes"*). **FIRST ACTION ON A RESTART: `gh pr list --state open`.** If #487 is open it is at the controller's
+merge; **if it has MERGED, this block is history** and the controller's next dispatch is the position.
 
 ### § 1 — WHAT SHIPPED
 
