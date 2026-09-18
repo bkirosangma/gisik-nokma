@@ -20,9 +20,140 @@
 
 ---
 
-## ▲ TOP BLOCK — second wave Task 9: `BulkCloseDialog` (2026-09-18)
+## ▲ TOP BLOCK — second wave Task 10: `Close all (N)` on a terminal board column (2026-09-18)
 
-**Position: the change set is COMPLETE, the review round is CLOSED, its one Critical is FIXED and
+**Position: the change set is COMPLETE, the review round is DISPATCHED against the frozen commit,
+and the PR is NOT yet open.** Dispatch: `CTL-DISPATCH-2026-09-18-exec2-secondwave-t10.md`. One PR,
+`--base main`, branch **`exec2/secondwave-t10-board-closeall`**, cut from `origin/main` = `8aff8843`.
+
+**THE FIRST THING THIS SESSION FOUND, and the reason it re-read rather than trusted: the previous
+top block (Task 9) said "the PR is open awaiting the controller's merge". IT WAS ALREADY MERGED —
+PR #449, merge commit `08bdd791`.** The handoff's own Position line had expired. Verified, not
+assumed: `gh pr list --state all` shows #449 MERGED, and `81473e5f` (the Task 9 branch tip) is an
+ancestor of `origin/main` by `git merge-base --is-ancestor`. **A restart surface that says "open"
+about a merged PR is the "restart surface goes stale" mode, and it failed in the conservative
+direction — the direction nobody audits.** Check `gh pr list --state open` before acting on any
+Position line here.
+
+### Anchors — verify these; do not trust the row
+
+| | |
+|---|---|
+| branch | `exec2/secondwave-t10-board-closeall` |
+| base | **`8aff8843`** = `origin/main` = the `#450` merge (executor 1's Task 5) |
+| frozen head | **`25f385be`** — the commit the reviewer runs against |
+| `origin/main` | `8aff8843` at the last count — **recount; main moves without telling you** |
+| ahead | **1** commit at `25f385be`; **2** once this handoff's own commit lands (it carries this block, so it cannot be named here) |
+| behind | 0 |
+| tree | clean before the handoff edit |
+| HEAD | **verify with `/usr/bin/git rev-parse HEAD`.** A block cannot contain the commit carrying it |
+| PR | **NOT OPEN YET** — opens from this branch, `--base main`, reviewer recorded in the body BEFORE it opens |
+
+### What shipped
+
+`packages/app-core/src/views/board.tsx` (the column header action, the board-owned `bulkClose` state,
+the one dialog mount) + `packages/ui/src/ui.css` (`.gn-board__column-action`, a third selector in the
+EXISTING `.gn-board-card__close`/`.gn-row-action` rule body, not a copy) +
+`packages/app-core/test/views/board-close.test.tsx` (a fourth `describe` in that file, as the plan
+directs) + `Features.md` + `test-cases/13`. **`task-ledger.tsv` untouched. `packages/app-core/src/index.ts`
+untouched** — `BulkCloseDialog` was already exported by Task 9.
+
+### ★ THE CORRECTION THIS TASK CARRIES — read this before Task 11
+
+**The plan's text wires `onClosed` → `moves.onMoved()` and says nothing about dismissal. The task's
+dispatch then said to clear the board's `bulkClose` state in `onClosed`. BOTH TAKEN LITERALLY MEAN AN
+UNCONDITIONAL CLEAR — AND THAT SILENTLY DELETES HALF OF SPEC §8.3's Board bullet.**
+
+That bullet is ONE sentence carrying both halves:
+
+> *"Per-ticket refusals … **stay listed**; the rest close and the board reloads."*
+
+`onClosed` fires on a PARTIAL close too (the dialog calls it whenever at least one ticket committed),
+so an unconditional `setBulkClose(null)` unmounts the dialog and destroys the `Could not close` rows
+the same sentence requires it to keep on screen.
+
+**The clear is CONDITIONAL — `closedIds.length === tickets.length` — and the reload is
+UNCONDITIONAL**, because "the rest close and the board reloads" holds on both outcomes. Full success →
+the dialog leaves (the defect the dispatch was written to fix). Partial → the board still reloads and
+the dialog stays with the refusal listed. **Case 13.792 is the witness, and the mutation that
+reinstates the dispatch's literal reading reddens 13.792 and nothing else** — so the conditional is
+proven load-bearing, not decorative.
+
+**What Task 11 must still do — restated, because the controller is carrying it into that dispatch:**
+it must SNAPSHOT its tickets at click time AND keep its own open flag. Its plan text wires `onClosed` →
+`list.reload()` with the selection cleared on reload — the same unconditional-clears-it defect, and
+there it destroys the `Could not close` rows the moment a PARTIAL close reports. The dialog's own
+docblock already says Task 11 must not rely on `list.reload()` alone; **13.792 is now the precedent
+that shows what the failing shape looks like and how to witness it.**
+
+### Case ids — and a dispatch claim that is WRONG
+
+**Cases 13.789–13.792**, from THIS lane's block `13.760`–`13.819`. Recount at this tip: the highest
+catalogue marker in file 13 is `13.788`; `13.789`–`13.792` appeared nowhere in the repo before this
+task. **The next free id inside the block is `13.793`.**
+
+**The dispatch says "`13.644`–`13.646` are taken". THEY ARE NOT.** A marker sweep over `test-cases/`
+and a repo-wide sweep over quoted `*.ts`/`*.tsx`/`*.md` globs both find those three ids **only inside
+the plan file itself**, never as a catalogue marker and never in a test. The block allocation is what
+binds regardless, so the ids above are this lane's — but the stated reason is false and is recorded
+rather than repeated. (**Quote the globs**: an unquoted `--include=*.ts` is silently eaten by zsh and
+returns a well-formed empty answer, which is the recorded silent-empty mode.)
+
+### Verification at `25f385be`
+
+Suites: **app-core 1532/0 · ui 325/0**. Typechecks **0** (ui, app-core, **apps/web**). Builds **0**
+(ui, app-core). **Seven checks raw 0** (`check:env`, `check:tasks`, `check:db-tz` — with the
+documented `postgres://gisik:gisik@localhost:54329/gisik_nokma` it prints `database timezone:
+Asia/Kolkata` — `check:runbook`, `check:citations`, `check:help`, `check-case-ids`).
+**Three mutations killed**, each restored from a byte copy verified by sha256 (not `git checkout`,
+which errors on an untracked path) and each guarded by a replacement count of exactly 1:
+
+1. **The plan's own** (render the button regardless of category) → reddens **13.789**'s non-terminal
+   negative **and 13.790**.
+2. **The `cards.length > 0` term dropped** → reddens **13.790 and nothing else**.
+3. **`bulkClose` cleared UNCONDITIONALLY** (the dispatch's literal reading) → reddens **13.792 and
+   nothing else**. This is the control for the correction above.
+
+### The traps that cost time here, so the next lane does not pay again
+
+- **`rtk` swallows vitest output AND the summary line.** `| tail -3` on a redirected run gives
+  `PASS (9) FAIL (0)` at best; on a failure it gives `... +4 more failures` and the detail lives in
+  `~/Library/Application Support/rtk/tee/<ts>_vitest_run.log`, which is **a JSON blob, not text**.
+  Parse it (`python3` + `json.loads` on the first `{…}`) or re-run the file with
+  `--reporter=json --outputFile=/tmp/x.json`, which bypasses rtk's stdout filtering entirely. **The
+  JSON-reporter route is the one that works and it is what the mutation round used.**
+- **A missing destructuring is not a type error.** `BoardGroupWithMoves` gained `bulkCloseFor` in its
+  PROP TYPE but not in its destructuring; `tsc` was clean and all nine tests failed at RUNTIME with
+  `ReferenceError: bulkCloseFor is not defined`. **A prop type and a destructured binding are two
+  edits, and the compiler only checks the first.**
+- **`cd` inside a subshell is relative to the subshell's own cwd.** A `for p in …; do (cd $p && …)`
+  loop that changes directory inside the loop body fails on the second iteration with
+  `no such file or directory`. It failed LOUDLY here — but this is the family of wrong-directory
+  enumeration the brief's six silent-empty modes describe, so use absolute paths.
+- **Measure citations LAST.** Every `path:line` in the catalogue is a reading of a tree that your next
+  edit moves. The eight citations in this task's block were measured, then every one was OPENED and
+  read back before commit.
+
+### Recorded, not fixed (out of scope, named owners)
+
+- The dialog's `tickets` array is snapshotted at CLICK time, so a board reload during an open leaves
+  the dialog describing the pre-reload column. Deliberate (the alternative rewrites a dialog someone
+  is reading), and the same class the dialog's own docblock names as the consumer's to state rather
+  than guard. Owner: whoever next changes how a bulk surface opens the dialog.
+- `apps/web` passes the board no `bulkClose`-related prop and needs none — the button and the dialog
+  are both internal to `Board`. When the page gains a keyboard shortcut for bulk close (spec §9's
+  follow-on list), that is where it lands.
+
+---
+
+## ▼ PREVIOUS BLOCK — second wave Task 9: `BulkCloseDialog` (2026-09-18) — **MERGED, PR #449**
+
+> **This block's Position line was stale when a fresh session read it: it said "the PR is open
+> awaiting the controller's merge" and PR #449 had ALREADY MERGED** at `08bdd791`, verified by
+> `git merge-base --is-ancestor 81473e5f origin/main`. Kept below for its findings, not for its
+> position.
+
+**Position (as written): the change set is COMPLETE, the review round is CLOSED, its one Critical is FIXED and
 witnessed, and the PR is open awaiting the controller's merge.** Dispatch:
 `CTL-DISPATCH-2026-09-18-exec2-secondwave-t9.md`. One PR, `--base main`, branch
 `exec2/secondwave-t9-bulkclose`. Reassigned to executor 2 because the owner asked for two executors and
