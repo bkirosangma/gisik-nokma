@@ -32,10 +32,56 @@ import Link from 'next/link';
  *
  * No apology, no exclamation mark, no cartoon. The product's register is a
  * careful colleague telling you what it knows and what it does not.
+ *
+ * ## What the refreshed export changed here, and what it did NOT (2026-09-18)
+ *
+ * `design-system/interactive/desktop.dc.html@6d7b67c0a52c:1844-1862` is the
+ * `isNotFound` block. The audit that measured it
+ * (`docs/design/prototype-delta-2026-09-18.md`) reached a verdict worth keeping
+ * beside the code: **the export is THINNER than this page, not ahead of it.**
+ * It draws an icon tile, an h1, one lead, three action rows and one aside; this
+ * page carries the three causes, the "why it will not say" panel, and the
+ * closing aside the export has no counterpart for. So exactly three things are
+ * ported — the 72px icon tile, a third action link, and the heading's
+ * scale/measure — and nothing is removed to make the two look alike.
+ *
+ * **The copy is deliberately NOT ported.** The export says "This page isn't
+ * here" / "Nothing was deleted."; both strings have zero product hits, and the
+ * docblock above is the reason: the API answers the same 404 for absent and
+ * not-yours by design, so a lead that asserts "nothing was deleted" would
+ * answer a question this page exists to refuse. The export's thinner copy is
+ * only tenable because its own version omits the third cause.
+ *
+ * The third link is the manual. The export's own label is "Search the manual"
+ * and that is what is used, matching the two links either side of it, which
+ * were already transcribed from this block's own wording ("Go to your
+ * workspaces" / "Open your inbox"). `/help` is a real route reachable with no
+ * session, so this is a bounded addition rather than the wire gap the audit
+ * checked it against.
  */
 export default function NotFound() {
   return (
     <main className="gn-shell gn-notfound">
+      {/* The export's 72px rounded tile (`:1846`), glyph paths verbatim. The
+          whole tile is `aria-hidden`: it repeats what the h1 says, so a screen
+          reader announcing it would be reading the heading twice. That is also
+          why it adds nothing to the accessible-names sweep's counts. */}
+      <div className="gn-notfound__tile" aria-hidden="true">
+        <svg
+          width="34"
+          height="34"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10l2 2.5h6.5A1.5 1.5 0 0 1 20 8v10.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5Z" />
+          <path d="m9.5 11.5 5 5" />
+          <path d="m14.5 11.5-5 5" />
+        </svg>
+      </div>
       <h1 className="gn-notfound__title">This address does not match a page.</h1>
 
       <p className="gn-notfound__lead">
@@ -70,9 +116,16 @@ export default function NotFound() {
         &ldquo;5 of 6&rdquo;: the shape of what is hidden is itself information.
       </p>
 
+      {/* Three links, in the export's own order (`:1853-1855`). This page had
+          two; the manual is the one it omitted, and it is the only one of the
+          three that answers "I do not know how this works", which is a real
+          cause of landing here that the three-cause list above does not name. */}
       <p className="gn-notfound__actions">
         <Link className="gn-notfound__link" href="/workspaces">
           Go to your workspaces
+        </Link>
+        <Link className="gn-notfound__link" href="/help">
+          Search the manual
         </Link>
         <Link className="gn-notfound__link" href="/inbox">
           Open your inbox

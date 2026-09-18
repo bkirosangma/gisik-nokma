@@ -1898,12 +1898,153 @@ input, textarea, select { font-family: inherit; }
    left of its own line; only the gap under it needs stating. */
 .gn-legal__back { margin-bottom: 1rem; }
 
+/* ── The legal pair and the 404, to the REFRESHED export (2026-09-18) ───────
+   Everything from here to the blank line before `.gn-notfound__lead` is this
+   port. The source is `design-system/interactive/desktop.dc.html@6d7b67c0a52c`,
+   blocks `isLegal` (`:1720-1755`) and `isNotFound` (`:1844-1862`); the audit
+   that measured both is `docs/design/prototype-delta-2026-09-18.md`.
+
+   The heading scale is the export's own four numbers, taken verbatim rather
+   than converted: `34px / 41px / 700 / -0.4px` (`:1731`, `:1849`) with the
+   measure widened from 68ch to the export's `72ch`. BOTH screens take it,
+   because the export draws both headings identically — writing the numbers
+   twice is how one of them ends up a round behind. */
 .gn-notfound__title,
 .gn-legal__title {
-  max-width: 68ch;
+  max-width: 72ch;
   margin: 0 0 0.75rem;
-  font-size: 1.6rem;
-  line-height: 1.25;
+  font-size: 34px;
+  line-height: 41px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+
+/* In the head row the tab pair sits BESIDE the title, so the row owns the gap
+   between itself and the meta line and the title's own margin would double it. */
+.gn-legal__head .gn-legal__title { margin-bottom: 0; }
+
+/* The export's content measure: a 72ch column, centred inside `.gn-shell`'s
+   existing 80rem frame (`:1732`). `.gn-shell` still owns the outer width and
+   the page padding; this narrows only the prose, which is what the measure is
+   for. A block container rather than a flex column, deliberately: every child
+   below already carries its own bottom margin, and a `gap` would add a second
+   one on top of each — the spacing would be the sum of two rules, which is the
+   kind of thing a later edit to either one gets wrong. */
+.gn-legal__column { max-width: 72ch; margin-inline: auto; }
+
+/* Title left, tabs right, wrapping to two rows below the export's own break
+   (`:1730`, `flex-wrap:wrap`). */
+.gn-legal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+/* ── The segmented tab pair rides the SHARED control ───────────────────────
+   `.gn-segmented` / `.gn-segmented__item` (`packages/ui/src/ui.css:3373`) is
+   the product's own segmented control — the sign-in method picker, `/account`'s
+   appearance rows, `/help`'s Manual/FAQ switch and the ticket-type editor are
+   all on it. Reusing it rather than transcribing the export's `legalTabs` is
+   not a shortcut; it is what makes the four floors this repo already enforces
+   apply here without being restated, and restated floors are how two rules for
+   one control start disagreeing:
+
+     - the 2.75rem tap-target minimum (`:3386`), which `/privacy` and `/terms`
+       both hold at ZERO offenders in `tap-target-baseline.json` — a bespoke
+       segment at the export's own `padding: 2px` would have been ~24px tall
+       and turned that 0 into a red;
+     - `color: var(--gn-text)` on BOTH segments (`:3390`), so the inactive tab
+       is full-contrast text rather than the export's `--label2`. That is not
+       an approximation: this palette's nearest muted role measures 4.16 on
+       `surfaceSunken`, under the 4.5 text floor, which is why the shared
+       control marks selection with a background and a shadow rather than by
+       dimming the unselected half;
+     - `--gn-shadow-selected`, which carries all five of the export's own
+       `--segOnShadow` values including `neo`'s inset pair (`:3437`).
+
+   The two overrides below are the only ones: `flex: none` so the pair sizes to
+   its labels instead of sharing the row with the title, and horizontal padding,
+   which the shared item does not carry because every existing call site fills
+   its container. */
+.gn-legal__head .gn-segmented { flex: none; }
+.gn-legal__tabs .gn-segmented__item { flex: none; padding: 0 0.85rem; text-decoration: none; }
+
+/* ── The anchor row (`legalToc`, `:1738-1742`) ─────────────────────────────
+   2.75rem again, and here it is a DELIBERATE departure from the export, which
+   draws a compact 15px row with `gap:7px 20px`. A wrapped row of anchor links
+   is not a sentence, so the tap-target sweep's inline-in-prose exemption does
+   not apply to it and must not be borrowed: `display: inline-flex` plus the
+   44px floor is the honest reading, and `/privacy` and `/terms` both hold a
+   zero-offender baseline that this keeps. The row is taller than the export's
+   as a result — that is the trade, stated rather than hidden. */
+.gn-legal__toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin: 0 0 2rem;
+}
+.gn-legal__toc a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  color: var(--gn-text-accent);
+}
+
+/* The bar is sticky, so a jump to an anchor would land the heading underneath
+   it. Same offset the bar publishes for everything else that has to sit clear
+   of it (`--app-nav-offset`, defined above with `.gn-nav`). */
+.gn-legal__section { scroll-margin-top: var(--app-nav-offset); }
+
+/* ── The bar's own three pieces (`isLegal` `:1721-1730`) ───────────────────
+   The BAR is `.gn-nav`, the product's chrome — see `apps/web/src/legal-nav.tsx`
+   for why. Only the parts the export adds are styled here. */
+.gn-nav__brand { display: inline-flex; align-items: center; gap: 0.6rem; flex: none; }
+.gn-nav__brand-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  /* `--gn-accent` on `--gn-accent-text` is the pair `.gn-button--primary` and
+     `.gn-avatar--tint-0` already ship (`ui.css:72`), so this introduces no
+     unmeasured colour pair — the export's `--brand`/`--onColor` map onto it
+     one-for-one. */
+  background: var(--gn-accent);
+  color: var(--gn-accent-text);
+}
+.gn-nav__wordmark { font-size: 17px; line-height: 22px; font-weight: 600; }
+
+/* ── The 404's own two additions ────────────────────────────────────────────
+   `isNotFound` draws a centred 520px column (`:1845`) where this page used the
+   shell's full 80rem. Only the MEASURE moves; the three causes, the "why it
+   will not say" panel and the closing aside keep their left alignment, because
+   the export has no counterpart for any of them and centring four paragraphs
+   of reasoning would be a readability change dressed as a port. */
+.gn-notfound { max-width: 520px; margin-inline: auto; }
+
+/* The 72px rounded tile (`:1846`), glyph and radius verbatim. `surfaceRaised`
+   on `surface` under `--gn-shadow-raised` is `.gn-card`'s own pairing, so the
+   tile reads as one of the product's raised surfaces rather than as a new kind
+   of object. The icon is `--gn-text-muted`, the export's `--label3` — it is
+   `aria-hidden`, so it carries no contrast obligation, and the muted role is
+   what keeps a decorative mark from out-shouting the heading under it. */
+.gn-notfound__tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 1.5rem;
+  border-radius: 18px;
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  color: var(--gn-text-muted);
 }
 
 .gn-notfound__lead {
