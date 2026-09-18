@@ -87,6 +87,22 @@ controller flips them.
    not the rule-engine's two-argument one. A first cut of this work used the two-arg form, which would not
    compile. Recorded because the plan's line looks wrong and is not.
 
+### Bypasses I ruled OUT by measurement, so a restart need not redo them
+
+- **Invite acceptance does not bypass the actor half.** `apps/server/src/invites/acceptance.ts:166` does
+  push a `membership.granted`, and through the INTERNAL door, so the permission gate does not see it — but
+  `inviteSentPayload.role` is `z.enum(['admin','member','guest'])`
+  (`packages/domain/src/events/invites.ts:61`), a hand-written enum whose docblock says reusing
+  `workspaceRoleSchema` "would admit `owner`". No invite can confer ownership. **The engine half still runs
+  on that path**, which is a reason to have it in the engine rather than only in the gate.
+- **The founding grant is unaffected.** `bootstrap-workspace` appends `membership.granted {role:'owner'}`
+  for a founder who holds no membership yet, so `isCurrentlyOwner` is false and the guard accepts — which
+  the passing founding-sequence tests confirm rather than my reasoning.
+- **A batch cannot empty the workspace** — see the section above; now a pinned assertion.
+- **The count and `resolveEffectiveRole` cannot disagree on who is an owner.** `effective-role.ts` sets
+  `workspaceRole` from the `scope_kind === 'workspace'` row and null otherwise, so `workspaceRole === 'owner'`
+  holds for exactly the rows `countWorkspaceOwners` counts — one predicate, two spellings.
+
 ### Case ids — measured, not taken
 
 **Cases `13.820`–`13.823`**, the plan's block `13.820`–`13.849`; the rest stays free for Task 2.
