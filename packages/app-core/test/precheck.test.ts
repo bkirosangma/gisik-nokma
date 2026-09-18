@@ -113,6 +113,27 @@ function readyCache(ticket: Partial<TicketState> = {}, def: WorkflowDef = WF_ERR
 }
 
 /**
+ * `readyCache` with the workflow definition WITHHELD — the state a client is
+ * genuinely in between caching a ticket and caching its workflow, and the one a
+ * `workflow.defined` arriving on the stream produces for a ticket that survives
+ * it (`cache.ts:93` drops a workflow's whole version map; only a ticket-kind
+ * event drops rows).
+ *
+ * Every refusal whose reason SPELLS A STATE NAME reads the definition for that
+ * name and nothing else, so this is the branch where the name degrades to the
+ * bare state id. It is not a hypothetical: before this helper existed, the
+ * degraded-name expression on the precheck side was pinned by NOTHING — an
+ * independent reviewer replaced it with a different string and all forty cases
+ * in this file stayed green (mutation E, 2026-09-18), while the engine's mirror
+ * of the same expression was pinned by `rule-engine/test/rank.test.ts:70`.
+ */
+function cacheWithoutDef(ticket: Partial<TicketState> = {}): ClientStateCache {
+  const cache = createClientStateCache();
+  cache.upsertTicket(ticketStateSeed({ id: TICKET, stateId: 'doing', stateCategory: 'active', ...ticket }));
+  return cache;
+}
+
+/**
  * The rule a refusal names, or the kind it answered instead. Reporting the KIND
  * on a non-refusal keeps a failure legible: `expect(false).toBe('require-comment')`
  * says nothing about which property drifted.
@@ -397,6 +418,22 @@ describe('13.701 precheckEvent mirrors checks/rank.ts for ticket.ranked', () => 
       reason: 'Only a backlog ticket can be ranked; this one is in "To do".',
     });
   });
+
+  /**
+   * The DEGRADED-NAME branch, and the case every other row here misses: the
+   * definition is withheld, so the name must fall back to the bare state id.
+   * The refusal must still be a REFUSAL rather than a deferral — the definition
+   * is read for the NAME only, never for the verdict, which is the same
+   * division `checks/rank.ts:51-56` makes on its `def === null` side.
+   */
+  it('an uncached definition degrades the name to the bare state id, and still refuses', async () => {
+    const result = await precheckEvent(rankTicket(), cacheWithoutDef({ stateId: 'todo', stateCategory: 'open' }));
+    expect(result).toEqual({
+      kind: 'refused',
+      rule: REFUSAL_RULES.rankRequiresBacklog,
+      reason: 'Only a backlog ticket can be ranked; this one is in "todo".',
+    });
+  });
 });
 
 /**
@@ -489,6 +526,28 @@ describe('13.604 the close/reopen and rank refusal reasons agree, engine and pre
    */
   it('rank-requires-backlog: ranking a doing ticket', async () => {
     const { engineReason, clientReason } = await bothRefusalReasons(rankTicket(), readyCache());
+    expect(clientReason).toBe(engineReason);
+  });
+
+  /**
+   * The SAME refusal with the definition WITHHELD — the branch no other row
+   * reaches, because every one of them drives `readyCache()`, which always
+   * caches the def, so the comparison above only ever exercised the cached-def
+   * expression while the degraded fallback stood beside it unpinned.
+   *
+   * This row exists because an independent reviewer proved the gap rather than
+   * argued it: replacing the precheck's fallback (`precheck.ts:383`) with a
+   * different string left all forty cases in this file GREEN, while the same
+   * mutation in the engine's mirror (`checks/rank.ts:58`) killed its own case
+   * (mutations E and F, 2026-09-18). A reason string a user can be shown with
+   * nothing holding it is the defect this table exists to prevent, so the
+   * table now covers both branches the sentence can be produced on.
+   */
+  it('rank-requires-backlog with no cached definition: the degraded names agree too', async () => {
+    const { engineReason, clientReason } = await bothRefusalReasons(
+      rankTicket(),
+      cacheWithoutDef({ stateId: 'todo', stateCategory: 'open' }),
+    );
     expect(clientReason).toBe(engineReason);
   });
 

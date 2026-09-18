@@ -8283,3 +8283,20 @@ that gap touches the two ids below, which are inside this task's own block.
   the drift the two literals cannot, and the pre-check's own two cases hold their ground independently of
   the engine's copy. `packages/app-core/src/precheck.ts:372`, `:387`,
   `packages/app-core/test/precheck.test.ts:386`, `:490`
+
+  **FIX ROUND 1 (independent review, Important 1, 2026-09-18) — "cannot drift" was FALSE as first
+  written, for a reason worth keeping.** The sentence is produced by **two different expressions**, the
+  cached-definition name and the degraded fallback used when the reader holds no definition, and the
+  table as first shipped drove **only the first**: every row built its cache through `readyCache()`,
+  which always caches the def. So the fallback on the precheck side was pinned by **nothing** — the
+  reviewer replaced it with the string `SOMEWHERE-ELSE` and all forty cases in the file stayed GREEN
+  (mutation E), while the identical mutation in the engine's mirror, which IS pinned by
+  `rule-engine/test/rank.test.ts:70`, killed its own case (mutation F). **The branch is reachable, not
+  theoretical:** `cache.ts:93` drops a workflow's version map on a `workflow.defined` while ticket rows
+  survive, and `cache-feed.ts:22`/`:27` cache tickets and definitions on different reads, so "ticket
+  cached, definition not" is an ordinary state — and in it `precheckTicketRanked` REFUSES with the
+  degraded name rather than deferring, making the unpinned string user-visible. **Fixed** by a
+  `cacheWithoutDef()` helper plus a 13.701 case and a 13.604 row that drive both producers through the
+  withheld-definition branch; re-running mutation E now reddens exactly those two cases. The claim above
+  becomes true only because the table now covers both branches.
+  `packages/app-core/test/precheck.test.ts:130`, `:429`, `:546`
