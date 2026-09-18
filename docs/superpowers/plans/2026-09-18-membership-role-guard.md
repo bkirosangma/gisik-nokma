@@ -219,7 +219,13 @@ export async function checkMembershipGranted(env: EventEnvelope, ctx: EngineCont
     if (env.type === 'membership.granted') {
       const parsed = membershipGrantedPayload.safeParse(env.payload);
       if (parsed.success && parsed.data.role === 'owner' && role !== 'owner') {
-        return refuse(WORKSPACE_OWNER_GRANT_REASON);
+        // Emit the NEW id, not the file's local one-argument `refuse`, which
+        // injects PERMISSION_ROLE_RULE ('permission.role'). Step 3 declares
+        // `grantOwnerRequiresOwner`; a declared id emitted nowhere would be the
+        // catalogue's only dead entry. Ruled by the controller 2026-09-18 after
+        // the executor measured that all twenty existing ids are emitted
+        // somewhere and priced both readings.
+        return refuseWith(REFUSAL_RULES.grantOwnerRequiresOwner, WORKSPACE_OWNER_GRANT_REASON);
       }
     }
   }
