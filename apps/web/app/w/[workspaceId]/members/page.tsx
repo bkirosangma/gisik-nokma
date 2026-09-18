@@ -687,30 +687,56 @@ function MintForm({ workspaceId, onMinted }: { workspaceId: string; onMinted: ()
         />
       </label>
 
-      <span>Channel</span>
-      <Select
-        options={[
-          { value: 'email', label: 'email' },
-          { value: 'sms', label: 'sms' },
-          { value: 'whatsapp', label: 'whatsapp' },
-        ]}
-        value={channel}
-        onChange={setChannel}
-        aria-label="Channel"
-      />
+      {/* The two `Select` fields, ruled on 2026-09-18 (AMENDMENT 2): the LABEL
+          half of the field pattern, and NOT the native-control half.
 
-      <span>Role</span>
-      {/* No `owner`. The door refuses it and a picker offering it would lie. */}
-      <Select
-        options={[
-          { value: 'admin', label: 'admin' },
-          { value: 'member', label: 'member' },
-          { value: 'guest', label: 'guest' },
-        ]}
-        value={role}
-        onChange={setRole}
-        aria-label="Role"
-      />
+          The prototype wraps both in the same label-over-control pair it uses
+          for the text fields (`desktop.dc.html:752-753`, `:759`), so the label
+          scale is the field pattern's and belongs on them. What does NOT belong
+          is `.gn-field__input`: the Role and Channel pickers have been the
+          shared `Select` since 2026-09-14 (Phase 2 Wave A, cases 13.824–13.828)
+          and its trigger renders as a `role="button"`, not a control element —
+          so passing a native-control class would be a second, drifting way to
+          draw the same field. The ruling's words: *"label it inside `.gn-field`
+          … but pass no native-control class to it."*
+
+          A `<label>` ELEMENT rather than a `<div>`, matching the prototype and
+          the sibling form; it associates with nothing here, since a button is
+          not a labelable element, and the control's own name is its
+          `aria-label`, which is deliberately kept — every existing case on this
+          form queries the trigger by that name. The visible consequence is
+          recorded rather than fixed: these two rows show the shared `Select`'s
+          own 15px trigger beside two 17px inputs, which is a difference in the
+          COMPONENT's placement and not this page's to restyle — it is used at
+          fifteen call sites. */}
+      <label className="gn-field">
+        <span className="gn-field__label">Channel</span>
+        <Select
+          options={[
+            { value: 'email', label: 'email' },
+            { value: 'sms', label: 'sms' },
+            { value: 'whatsapp', label: 'whatsapp' },
+          ]}
+          value={channel}
+          onChange={setChannel}
+          aria-label="Channel"
+        />
+      </label>
+
+      <label className="gn-field">
+        <span className="gn-field__label">Role</span>
+        {/* No `owner`. The door refuses it and a picker offering it would lie. */}
+        <Select
+          options={[
+            { value: 'admin', label: 'admin' },
+            { value: 'member', label: 'member' },
+            { value: 'guest', label: 'guest' },
+          ]}
+          value={role}
+          onChange={setRole}
+          aria-label="Role"
+        />
+      </label>
 
       {role === 'guest' ? null : (
         <>

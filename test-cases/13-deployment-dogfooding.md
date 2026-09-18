@@ -11163,7 +11163,7 @@ superseded, the roster's `aside.gn-attention` entry re-measured (its `border` re
 `rgba(178,80,0,1)` **is** that left border and disappears with it), and the `tintWarning` single-consumer
 note updated. **Nothing in this change presupposes that answer.**
 
-## The members screen's styling, measured against the prototype (executor 2, 2026-09-18) — ids `13.886`–`13.888`
+## The members screen's styling, measured against the prototype (executor 2, 2026-09-18) — ids `13.886`–`13.889`
 
 The owner's instruction, verbatim: *"next task to queue up is the workspace members UI. check the prototype
 for the styling and fix it."*
@@ -11234,7 +11234,9 @@ as one. `13.999` and `13.632866` remain this file's
 documented truncation traps and are excluded by the `{3}` width. **The remedy is an allocation, not a
 number**, and it is on the report to the controller: two executors minting from a shared "next free" pointer
 will collide again the next time both are dispatched from one — a BLOCK per executor is the only form of an
-id that stays true.
+id that stays true. **`13.889` joined the set later in the same change set**, when AMENDMENT 2 (owner
+  approved, 2026-09-18) ruled the two `Select` fields' labels in — measured free on this tree, on
+  `origin/main` and on `exec/owner-demotion-guard` before it was minted, so the next free is `13.890`.
 
 - ✅ **13.886 — the invite form's two native fields wear the product's `.gn-field` pattern, and still
   submit.** `apps/web/test/members-page.test.tsx:988`. Read through the LABEL association rather than by
@@ -11288,6 +11290,26 @@ id that stays true.
   that is present and does nothing reads identically to one that works. It is a regression pin on four
   treatments this change does NOT alter; the fifth and sixth rows of the table above are 13.887 and a
   named absence respectively.
+
+- ✅ **13.889 — the two `Select` fields wear the field pattern's LABEL half, and stay the shared
+  `Select`.** `apps/web/test/members-page.test.tsx:1053`. RULED, not decided here: AMENDMENT 2
+  (owner-approved, 2026-09-18) — *"label it inside `.gn-field` … but pass no native-control class to
+  it."* Channel and Role are wrapped in `<label className="gn-field">` with a `.gn-field__label` span,
+  which is what the prototype draws (`desktop.dc.html:752-753`, `:759`), and no class is passed to the
+  `Select`. Mutation-witnessed against the real file, tree restored and sha256-verified: dropping the
+  `gn-field__label` class from the Channel label reddens 13.889 alone (1 failed / 38), and converting
+  that `Select` BACK to a native `<select>` reddens it alone as well (1 failed / 38).
+
+  **What the case deliberately does NOT assert, because either would be red against correct code.**
+  (a) The ABSENCE of `.gn-field__input` on the trigger — the shared component puts that class on its own
+  trigger (`packages/ui/src/select/select.tsx:254`), so it is on every `Select` in the product whatever
+  the caller does, and the ruling's instruction is about what THIS page passes. What the page controls,
+  and what the case asserts, is the label half. (b) The absence of a `<select>` element inside the
+  wrapper — the shared component renders a `HiddenSelect` (a visually hidden native `<select>`) on
+  purpose (`select.tsx:253`). The trigger's tag and class are the honest signal, and they are asserted.
+  **The visible residue is recorded rather than fixed**: these two rows show the shared `Select`'s 15px
+  trigger beside two 17px inputs, and that is the COMPONENT's placement, used at fifteen call sites — its
+  own task, not this one.
 
 ### The independent review, and what it forced
 
@@ -11352,6 +11374,15 @@ FIX rather than in the original change**:
 - **two Minor defects in this section**: the `13.88[345]` sweep sentence claimed a null where the sweep
   returns six lines of prose (and no case id), and the "37/37 passing with the zebra dead" figure was
   measured on the pre-fix 36-test tree.
+
+**AMENDMENT 2 arrived after both review rounds** (owner-approved, 2026-09-18): *"label it inside
+`.gn-field` … but pass no native-control class to it."* It settles the question round 1 raised and this
+change had left open — the two `Select` labels are now wrapped, with no class passed to the component —
+and it carries case 13.889 with its own two mutation witnesses. **It is a POST-FREEZE change to an open PR
+and is recorded as a new head rather than folded in as a footnote**; the frozen-head figures above are the
+pre-amendment ones and the PR body says which head carries what. The ruling's own caution is honoured:
+the shared `Select` is NOT restyled, and the role-change predicate is untouched — the row's role control
+was narrowed by a separate owner ruling the same day, a different task.
 
 **Confirmed, not merely agreed with:** the `isMembers` block's `:651-798`, the `memberRows` zebra and
 its 0-based index, the even-row parity, both odd-parity product zebras, the four already-aligned

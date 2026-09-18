@@ -56,13 +56,17 @@ shipped:
    prototype's parity (`i` is 0-based → even 1-indexed rows) and NOT the odd parity the product's two
    other zebras use (`packages/ui/src/ui.css:1088`, `:2612`). **The inversion in those two families is
    recorded at the rule with a named owner and NOT harmonised here.**
-2. **The invite form's two native fields wear the product's `.gn-field` pattern** (the amendment's
-   added deliverable), copied from `apps/web/app/w/[workspaceId]/page.tsx:812-821`. No handler, state or
-   conditional moved. **The `Channel` and `Role` fields are the shared `Select` and KEEP their bare
-   labels — and the reason first recorded for that was FALSE**, refuted by the review at the line: the
+2. **All FOUR invite fields now wear the product's `.gn-field` pattern** — the two native inputs
+   (Address, Projects) with `.gn-field__input` as amendment 1 asked, and **Channel and Role with the
+   LABEL half only, which AMENDMENT 2 ruled on 2026-09-18 (owner-approved)**: *"label it inside
+   `.gn-field` … but pass no native-control class to it."* The sibling shape is
+   `apps/web/app/w/[workspaceId]/page.tsx:812-821`; no handler, state or conditional moved. **The reason
+   first recorded for leaving the two Selects bare was FALSE** and the review refuted it at the line — the
    shared component puts `gn-field__input` on its OWN trigger (`packages/ui/src/select/select.tsx:254`,
-   `:231`, `:432`), so nothing needs inventing and nothing needs wrapping. **The honest verdict is
-   "alignable and NOT aligned"**, and it is on the report to the controller with a recommendation.
+   `:231`, `:432`) — **which is also why 13.889 asserts the label half and NOT the absence of that
+   class**: it is on every `Select` in the product either way, so an absence assertion would be red
+   against correct code. The component is NOT restyled and **the role-change predicate is untouched** (a
+   separate owner ruling this day, a different task).
 3. Cases `13.886`–`13.888`, `Features.md` and `test-cases/13` updated in the same change set.
 
 ### Mutation witnesses, all against the real files, tree restored and sha256-verified
@@ -71,6 +75,8 @@ shipped:
 - zebra fill swapped to `--gn-surface-sunken` → **2 failed / 37**, all 13.887.
 - **a higher-specificity override appended** (`.gn-members tbody .gn-members__row:nth-child(even) { background: transparent; }`) → **2 failed / 37**, all 13.887. **This one was 0 failed before the fix round** — the blind spot the review measured, now closed by 13.887's exactly-one-rule count.
 - `className="gn-field__input"` removed from the address input → **1 failed / 37**, 13.886 alone.
+- **A2-M1: the `gn-field__label` class dropped from the Channel label → 1 failed / 38, 13.889 alone.**
+- **A2-M2: the Channel `Select` converted BACK to a native `<select>` → 1 failed / 38, 13.889 alone.**
 - the projects field un-wrapped back to the bare pair → **1 failed / 37**, 13.886 alone.
 - `css` and `page.tsx` sha256 IDENTICAL before and after the whole sequence.
 
@@ -81,6 +87,13 @@ narrowed to the four genuinely rule-less elements; the page-container verdict co
 `privacy/page.tsx:176` — a route-scoped modifier beside the shared class, not a fork); four line-number
 defects fixed (`ui.css:2611`→`:2612`, `page.tsx:55-57`→`:52-53`, `812-818`→`812-821`, and a
 misattributed quotation credited to 13.284); and 13.887 strengthened with the cascade count.
+
+**AMENDMENT 2 (owner-approved, 2026-09-18) arrived after both review rounds and is a POST-FREEZE change
+to an open PR — a NEW HEAD, not a footnote.** It settles the question round 1 raised and this change had
+left open: the two `Select` labels are wrapped in `.gn-field` + `.gn-field__label`, no class passed to
+the component, case **`13.889`** minted (free on all three surfaces at the time; next free is now
+`13.890`). Two mutation witnesses, both killing 13.889 ALONE. The PR body names which head carries what,
+and the frozen-head check figures above belong to the PRE-amendment head.
 
 **ROUND 2, a scoped re-review: no Critical, and both Important findings were in the FIX, not the original.**
 (1) The cascade count it asked me to add could itself be defeated — a selector split across two lines, and

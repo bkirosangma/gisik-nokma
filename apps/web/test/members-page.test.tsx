@@ -1022,3 +1022,52 @@ describe('13.886 the invite form’s fields wear the shared .gn-field pattern', 
     expect(bodies[0]).toMatchObject({ address: 'anselma@example.test' });
   });
 });
+
+/**
+ * 13.889 THE TWO `Select` FIELDS WEAR THE FIELD PATTERN'S LABEL HALF — and no
+ * native-control class is passed to them (AMENDMENT 2, ruled 2026-09-18).
+ *
+ * The prototype wraps Channel and Role in the same label-over-control pair it
+ * uses for the text fields (`desktop.dc.html:752-753`, `:759`), so the label
+ * scale is the field pattern's and belongs on them. What the ruling withholds
+ * is `.gn-field__input`: those two pickers have been the shared `Select` since
+ * 2026-09-14 (Phase 2 Wave A, cases 13.824–13.828) and its trigger renders as a
+ * `role="button"`, not a control element.
+ *
+ * WHAT THIS CASE CAN AND CANNOT SEE, measured rather than assumed. It asserts
+ * the LABEL half — a `.gn-field` ancestor whose `.gn-field__label` reads the
+ * field's name — and that the control inside is still the shared component's
+ * trigger (`button.gn-select__trigger`) carrying its own `aria-label`, which is
+ * the "do not convert it back" half of amendment 1. **It does NOT assert the
+ * absence of `.gn-field__input` on the trigger, because that class is on every
+ * `Select` in the product: the shared component puts it there itself
+ * (`packages/ui/src/select/select.tsx:254`).** An absence assertion would be red
+ * against correct code, which is the failure mode this repo records most — so
+ * what the page controls, and what is asserted, is the label half.
+ *
+ * NOR does it assert that no `<select>` element is inside the wrapper: the shared
+ * component renders a `HiddenSelect` — a visually hidden native `<select>` — on
+ * purpose (`select.tsx:253`), so that assertion would be red against correct
+ * code too. The trigger's tag and class are the honest signal.
+ */
+describe('13.889 the Select fields are labelled by the field pattern, and stay the shared Select', () => {
+  it('13.889 Channel and Role sit inside a .gn-field label, and their triggers keep their names', async () => {
+    mount({ listPending: async () => [] });
+    const form = (await screen.findByRole('heading', { name: 'Invite somebody' })).closest('form');
+    expect(form).not.toBeNull();
+
+    for (const name of ['Channel', 'Role'] as const) {
+      // Scoped to the form: the roster's own role control also matches `/Role/`.
+      const labelSpan = within(form!).getByText(name, { selector: '.gn-field__label' });
+      const wrapper = labelSpan.closest('.gn-field');
+      expect(wrapper, `${name} is not inside a .gn-field`).not.toBeNull();
+
+      const trigger = wrapper!.querySelector('button.gn-select__trigger');
+      expect(trigger, `${name}'s control is no longer the shared Select`).not.toBeNull();
+      // The name every existing case on this form queries by — losing it would
+      // be an invisible accessibility regression that the role queries above
+      // would not notice.
+      expect(trigger!.getAttribute('aria-label')).toBe(name);
+    }
+  });
+});
