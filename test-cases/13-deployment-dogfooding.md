@@ -1822,6 +1822,29 @@ compute against one specific background — which is exactly why they are cases 
   not measuring anything, and that control stays honest at any future population.*
   *The instrument composites alpha, which `relativeLuminance` cannot — the checklist records that mode
   reading 11.87 where the truth is 1.85, a false GREEN. Every fill R1(c) introduces is `rgba()`.*
+- **13.921** ✅ The non-text-contrast sweep's positive control is **PLANTED**, so no styling change can
+  remove it. *It replaces `expect(bestSeen).toBeGreaterThan(15)`, which **until 2026-09-18 passed for a
+  reason unrelated to the property it named**: both readings above 15 (17.62, twice) were
+  `rgba(0,0,0,1)` — Chrome's own default border on two BARE `<button>`s on `/settings/workflows`. The
+  control was resting on an unstyled button, the exact defect class this day's work was removing.*
+  *Putting those buttons on `.gn-button` (`border: none`, `packages/ui/src/ui.css:60`) removed both
+  readings and the maximum fell to **3.81**, so the assertion went red — not because the instrument
+  broke, but because the defect it leaned on got fixed. `aside.gn-attention`'s 4.36 leaves by the same
+  door in the same week, which is why the repair could not lean on it either.*
+  *The `15` is NOT lowered and the assertion is NOT deleted. What changes is what it stands on: the
+  sweep is handed an element whose ratio is known to the decimal — black on an opaque white ground,
+  **21.0** — and must read it through the SAME `sweepBorders` path the measurement uses. A planted
+  fixture does not depend on the product happening to contain a high-contrast border, so it survives
+  every future styling change, and it asserts a property of the INSTRUMENT rather than of the product.*
+  *Verified end-to-end in Chromium rather than by arithmetic alone: on a bare page the sweep reads
+  **nothing** (`examined=0`), and after the plant it reads `div.non-text-contrast-control` at
+  `ratio 21`, `border rgba(0,0,0,1)`, `backdrop rgb(255,255,255)` — the empty BEFORE state being the
+  control that the reading came from the plant. The white ground is a real ANCESTOR rather than the
+  control's own background, because `backdropOf` walks to the PARENT; painting the control itself would
+  leave the ratio at the mercy of whatever the page's body is painted that day.*
+  *`bestSeen` remains the PRODUCT's own maximum and is still written as the roster's `highestReading` —
+  it is simply no longer load-bearing for a threshold it can never durably hold.* —
+  (`apps/web/e2e-stack/viewport.spec.ts`)
 - **13.284** ✅ A non-primary control is identifiable without a boundary — the affordance is fill plus an
   accent-coloured semibold label, and the case measures which of the two actually carries it.
   *Measured, because the ruling explicitly declined to assert it: **the FILL is 1.09–1.15 against every

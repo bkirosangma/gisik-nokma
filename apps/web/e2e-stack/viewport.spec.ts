@@ -786,6 +786,15 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
  * growing (case 13.343's finding) and looking like "nothing to disclose"
  * rather than "the owner accepted something outside what this can see".
  */
+/**
+ * The planted positive control's class. No product code uses it, so a reading
+ * under this signature can only be this fixture — which is the point: a control
+ * that depends on the product happening to contain a high-contrast border is a
+ * control that the next styling change can delete. It did exactly that on
+ * 2026-09-18; see the assertion site for the whole story.
+ */
+const PLANTED_CONTROL_SELECTOR = 'non-text-contrast-control';
+
 test('records non-text contrast across the signed-in surface, with a positive control', async ({
   page,
 }) => {
@@ -1016,6 +1025,69 @@ test('records non-text contrast across the signed-in surface, with a positive co
       'zero above means nothing',
   ).toBeGreaterThan(0);
 
-  // And it can still tell red from green in the ordinary range.
-  expect(bestSeen).toBeGreaterThan(15);
+  /*
+   * ## 13.921 — and it can still tell red from green in the ordinary range
+   * ## (case 13.283 is the sweep; this is its control) — but the thing it
+   * ## stands on had to change, because it was standing on a defect
+   *
+   * This read `expect(bestSeen).toBeGreaterThan(15)` and passed for a reason
+   * unrelated to the property it named. Both readings above 15 (17.62, twice)
+   * were `rgba(0,0,0,1)` — the UA's default border on two BARE `<button>`s on
+   * `/settings/workflows`. The control was resting on an unstyled button.
+   * Putting those buttons on `.gn-button` (`border: none`) removed both
+   * readings and the maximum fell to 3.81, so this went red: not because the
+   * instrument broke, but because the defect it leaned on got fixed. A control
+   * satisfied by a product defect is not a control.
+   *
+   * The 15 is NOT lowered and the assertion is NOT deleted. What changes is
+   * what it stands on: the sweep is handed an element whose ratio is known to
+   * the decimal — black on an opaque white ground, 21.0 — and must read it
+   * through the SAME `sweepBorders` path the measurement uses. A planted
+   * fixture cannot be removed by a styling change, so it survives every future
+   * one, and it asserts a property of the INSTRUMENT rather than a property of
+   * the product. `bestSeen` remains the PRODUCT's own maximum and is still
+   * recorded as the roster's `highestReading`; it is simply no longer load-
+   * bearing for a threshold it can never durably hold.
+   */
+  await page.evaluate((className) => {
+    const ground = document.createElement('div');
+    ground.setAttribute('data-planted-control', '');
+    /* The element's OWN background is never what `backdropOf` reads — it walks
+       to the PARENT — so the white ground has to be a real ancestor. Painting
+       the control itself white would leave the ratio at the mercy of whatever
+       the page's body happens to be painted that day. Off-screen and fixed: a
+       non-zero rect is all the sweep requires. */
+    ground.style.cssText =
+      'position:fixed;left:-9999px;top:0;width:32px;height:32px;background:rgb(255,255,255)';
+    const control = document.createElement('div');
+    control.className = className;
+    control.style.cssText =
+      'width:100%;height:100%;box-sizing:border-box;border:4px solid rgb(0,0,0)';
+    ground.appendChild(control);
+    document.body.appendChild(ground);
+  }, PLANTED_CONTROL_SELECTOR);
+
+  const plantedSweep = await sweepBorders(page);
+  const planted = plantedSweep.readings.find(
+    (r) => r.selector === `div.${PLANTED_CONTROL_SELECTOR}`,
+  );
+  expect(
+    planted,
+    'the planted control was not read at all — the sweep did not traverse it, so its ' +
+      'silence about the product means nothing either',
+  ).toBeDefined();
+  expect(
+    planted!.ratio,
+    'the sweep no longer reads a known 21:1 border, so it cannot tell red from green in ' +
+      'the ordinary range',
+  ).toBeGreaterThan(15);
+  /* The tighter half: not merely "high" but the number it must BE. Black on
+     opaque white is 21.0 to the decimal, so a compositing regression that
+     halved the reading would still clear 15 and fail here — which is the
+     direction a loose threshold cannot see. */
+  expect(planted!.ratio).toBeCloseTo(21, 1);
+
+  await page.evaluate(() => {
+    document.querySelector('[data-planted-control]')?.remove();
+  });
 });
