@@ -49,7 +49,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | | |
 > |---|---|
 > | branch | `exec/step5b-stack-suite-hot`, off `origin/owner/workspace-edits` |
-> | HEAD | `5aab0a9092898ca2a379d1e52cff17034a3db451` (3 ahead of the base) |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD` — DO NOT trust a sha printed here, because a block cannot contain the commit that carries it.** As written: the content tree is `5aab0a9092898ca2a379d1e52cff17034a3db451` (3 ahead of base), and `33557f1f5a6857829afb749340487d2607d10933` is its child, carrying this row. The branch tip is one of those two, never a third |
 > | base | `0d011791` = `origin/owner/workspace-edits` = the `#433` merge commit |
 > | `origin/main` | `6a8155fe` (moved during this step; the 5a landing) |
 > | tree | clean at the frozen head |
