@@ -734,18 +734,18 @@ describe('13.766 the heading is Members, and nothing is counted before the roste
  * `config.defaultHidden` (false) and filters on `isInaccessible`, which returns
  * true for `aria-hidden="true"` (`role-helpers.js:37`); react-aria wraps that
  * subtree in `aria-hidden` (`react-aria@3.52.1`,
- * `dist/private/select/HiddenSelect.mjs:58`). Which is precisely why the cases below query the
+ * `dist/private/select/react-aria/dist/private/select/HiddenSelect.mjs:58`). Which is precisely why the cases below query the
  * trigger `button` by name and then read options out of the `listbox` (the
- * pattern `list-prefs-wiring.test.tsx:69` established, and what a person does).
+ * pattern `apps/web/test/list-prefs-wiring.test.tsx:69` established, and what a person does).
  * The duplication that bites is `getByLabelText`, whose label association does
  * NOT go through the accessibility tree: `HiddenSelect` wraps its native
  * `<select>` in a `<label>` carrying the caller's text
- * (`HiddenSelect.mjs:100`), so the label TEXT matches that `<select>` while the
+ * (`react-aria/dist/private/select/HiddenSelect.mjs:100`), so the label TEXT matches that `<select>` while the
  * trigger's own `aria-label` matches the button — two elements, hence "Found
  * multiple elements".
  * **An earlier draft of this paragraph had the direction BACKWARDS** — it said
  * `getByRole` ignores `aria-hidden`, which is the opposite of what the installed
- * version does and of what this repo already states at `select.tsx:221-222`
+ * version does and of what this repo already states at `packages/ui/src/select/select.tsx:221-222`
  * ("`getByText`, unlike `getByRole`, does not respect `aria-hidden`"). Corrected
  * after the independent review measured it; the queries below never depended on
  * the wrong version, but the sentence would have misled the next reader.
@@ -914,11 +914,11 @@ describe('13.824 the roster’s role control, and the option it deliberately doe
   /**
    * 13.828 THE ARM THE PROTOTYPE DRAWS AND THIS PRODUCT CANNOT.
    *
-   * The prototype gates its select on the VIEWER alone (`:3061`,
+   * The prototype gates its select on the VIEWER alone (`desktop.dc.html:3061`,
    * `canEditRole: myRoleIsAdmin`) and offers `Owner` in the option list, so its
    * owner rows are editable like any other. This product removed `Owner` from
    * the options — and the two halves do not compose: a `Select` whose `value`
-   * matches no option renders its PLACEHOLDER (`select.tsx:255`,
+   * matches no option renders its PLACEHOLDER (`packages/ui/src/select/select.tsx:255`,
    * `selected ? selected.label : placeholder`), so an owner's cell would read
    * `Select…` — a cell that does not say what that person's role is, on the
    * screen whose whole subject is who holds what. Offering the row a control
