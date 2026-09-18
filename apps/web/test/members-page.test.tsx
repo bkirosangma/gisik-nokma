@@ -942,3 +942,72 @@ describe('13.824 the roster’s role control, and the option it deliberately doe
     expect(within(ownerRow).queryByRole('button')).toBeNull();
   });
 });
+
+/**
+ * 13.883 THE INVITE FORM'S TWO NATIVE FIELDS WEAR THE PRODUCT'S OWN FIELD
+ * PATTERN (executor 2, 2026-09-18).
+ *
+ * They were the screen's one place still rendering a bare `<label>` beside a
+ * UA-default `<input>` — a shape no other field in the product has — and the
+ * prototype draws the same pair the product's `.gn-field` ports: a label stacked
+ * over its control, `gap:7px`, label `13px/18px` in `--label2`, control
+ * `min-height:44px` (`desktop.dc.html:748-751`, `.gn-field` at
+ * `packages/ui/src/ui.css:3843-3875`). The wrapper is copied from the sibling
+ * that already wears it rather than invented (`page.tsx:812-818`).
+ *
+ * This case is deliberately about the WRAPPER AND NOT THE VALUES: the resolver
+ * over `.gn-members`'s own family lives in `members-styling.test.ts` (13.884,
+ * 13.885), because `globals.css` is not loaded here and a rendered reading could
+ * only restate classes. What THIS case has to catch is the way a wrapper breaks
+ * a form — a label that no longer labels, a value that stops reaching the
+ * handler — so it drives the real path end to end: type through the LABEL
+ * association, submit, and read what the door was handed.
+ *
+ * THE TWO SELECT FIELDS ARE DELIBERATELY UNTOUCHED, and this is the point the
+ * dispatch's amendment asked to be said out loud rather than resolved quietly.
+ * `Channel` and `Role` are the shared `Select` (migrated 2026-09-14, cases
+ * 13.824–13.828), and `.gn-field__input` is a class for NATIVE controls — a
+ * `Select` wears its own trigger and cannot take it. So those two keep their
+ * bare `<span>` label: wrapping them would mean either inventing a class for a
+ * non-native control or wrapping a `Select` in a class declared for native ones,
+ * and both are worse than the inconsistency. **Recorded as a question to the
+ * controller, not settled here** — the labels of those two fields therefore do
+ * not yet carry the prototype's 13px/18px label scale.
+ */
+describe('13.883 the invite form’s fields wear the shared .gn-field pattern', () => {
+  it('13.883 the address and projects fields are .gn-field/__label/__input, and still submit', async () => {
+    const bodies: unknown[] = [];
+    mount({
+      listPending: async () => [],
+      mintInvite: async (_workspaceId, request) => {
+        bodies.push(request);
+        return { inviteId: 'i_1', url: 'http://localhost:3001/invite/tok', expiresAt: 'later' };
+      },
+    });
+    const user = userEvent.setup();
+
+    // Read THROUGH the label association rather than by id: that is what the
+    // wrapper could break, and `getByLabelText` is the query a person's
+    // screen-reader path takes.
+    const address = await screen.findByLabelText('Address');
+    expect(address.tagName).toBe('INPUT');
+    expect(address.className).toContain('gn-field__input');
+    const addressWrap = address.closest('label');
+    expect(addressWrap?.className).toContain('gn-field');
+    expect(addressWrap?.querySelector('.gn-field__label')?.textContent).toBe('Address');
+
+    const projects = screen.getByLabelText(/^Projects/);
+    expect(projects.className).toContain('gn-field__input');
+    const projectsWrap = projects.closest('label');
+    expect(projectsWrap?.className).toContain('gn-field');
+    expect(projectsWrap?.querySelector('.gn-field__label')?.textContent).toBe(
+      'Projects (comma-separated ids, optional)',
+    );
+
+    // And the wrapper moves no behaviour: what was typed still reaches the door.
+    await user.type(address, 'anselma@example.test');
+    await user.click(screen.getByRole('button', { name: 'Send invitation' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ address: 'anselma@example.test' });
+  });
+});

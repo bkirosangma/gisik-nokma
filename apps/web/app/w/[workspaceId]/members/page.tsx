@@ -662,12 +662,30 @@ function MintForm({ workspaceId, onMinted }: { workspaceId: string; onMinted: ()
     <form className="gn-invite-mint" onSubmit={submit}>
       <h2 className="gn-invite-mint__heading">Invite somebody</h2>
 
-      <label htmlFor="gn-invite-address">Address</label>
-      <input
-        id="gn-invite-address"
-        value={address}
-        onChange={(event) => setAddress(event.target.value)}
-      />
+      {/* The product's own field shape, copied from the sibling that already
+          wears it (`page.tsx:812-818`, the founding form) rather than invented:
+          `.gn-field` wraps a `.gn-field__label` span and a `.gn-field__input`.
+          The prototype draws the same pair — a label stacked over its control,
+          `gap:7px`, label `13px/18px` in `--label2`, input `min-height:44px` —
+          and `.gn-field` is the port of it (`packages/ui/src/ui.css:3843-3875`),
+          so these two fields were the screen's one place still rendering a bare
+          `<label>` beside a UA-default `<input>`.
+
+          IT IS A WRAPPER AND NOT A RESTYLE: no handler, no state and no
+          condition moves with it, and the input keeps its border — `.gn-field__input`
+          declares `1px solid var(--gn-border)` under `hig`/`minimal` and the
+          ruled sunken, borderless arm under `neo` (owner ruling 2026-09-09,
+          case 13.339), which is the shared control's own treatment and not this
+          field's to fork. */}
+      <label className="gn-field" htmlFor="gn-invite-address">
+        <span className="gn-field__label">Address</span>
+        <input
+          id="gn-invite-address"
+          className="gn-field__input"
+          value={address}
+          onChange={(event) => setAddress(event.target.value)}
+        />
+      </label>
 
       <span>Channel</span>
       <Select
@@ -696,12 +714,15 @@ function MintForm({ workspaceId, onMinted }: { workspaceId: string; onMinted: ()
 
       {role === 'guest' ? null : (
         <>
-          <label htmlFor="gn-invite-projects">Projects (comma-separated ids, optional)</label>
-          <input
-            id="gn-invite-projects"
-            value={projectIds}
-            onChange={(event) => setProjectIds(event.target.value)}
-          />
+          <label className="gn-field" htmlFor="gn-invite-projects">
+            <span className="gn-field__label">Projects (comma-separated ids, optional)</span>
+            <input
+              id="gn-invite-projects"
+              className="gn-field__input"
+              value={projectIds}
+              onChange={(event) => setProjectIds(event.target.value)}
+            />
+          </label>
         </>
       )}
 
