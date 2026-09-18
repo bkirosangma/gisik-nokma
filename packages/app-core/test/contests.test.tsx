@@ -87,6 +87,55 @@ describe('ContestBanner', () => {
     expect(screen.getByRole('button', { name: /discard/i })).toBeTruthy();
   });
 
+  /* 13.306 — the shipped resolutions are EXACTLY three, and the prototype's
+   * invented pair is ABSENT.
+   *
+   * The absence is the deliverable; the EXACTNESS is what stops it being
+   * vacuous, and it is not decoration — the arm already in this file (12.193,
+   * cited as 13.305's witness) finds its third control with `/discard/i`, which
+   * the prototype's own third label **`Discard mine`** also satisfies. So the
+   * shipped set is pinned here by exact accessible name for the first time, and
+   * a rename to the prototype's wording reddens this case and not that one.
+   *
+   * THE FLAG, recorded rather than smoothed over: `ContestBanner` is mounted
+   * NOWHERE in the product (`docs/hig-reconciliation-audit.md:577`) and
+   * TicketSheet imports no contest component at all, so this is a
+   * **COMPONENT-level** guard. It cannot witness what the ticket surface
+   * renders — there is no such surface — and the ledger row must NOT be
+   * promoted as though it did.
+   *
+   * Why the guard earns its place anyway: the audit files the pair as *"I —
+   * SHOWN BUT DOES NOT EXIST. Do not build."* (`docs/hig-reconciliation-audit.md:307`)
+   * and the prototype still draws all three (`design-system/interactive/mobile.dc.html`),
+   * so a future port has a live source to copy from. Absence is currently a
+   * property of what nobody has written yet, which is exactly the state a guard
+   * exists to change.
+   */
+  it('13.306 — the shipped resolutions are exactly three, and the invented pair is absent', () => {
+    render(<ContestBanner contests={[contest()]} onResolve={() => undefined} onRedo={() => undefined} />);
+    const banner = screen.getByRole('alert');
+
+    // POSITIVE ARM — the anti-vacuity control. An "absent controls" assertion on
+    // a banner that rendered NOTHING would pass; these three make that
+    // impossible. Exact names, not regexes: `/discard/i` above would accept the
+    // prototype's `Discard mine`.
+    expect(screen.getByRole('button', { name: 'Redo legally' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Convert to comment' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Discard' })).toBeTruthy();
+
+    // NEGATIVE ARM — the deliverable. The prototype's pair, by the names it
+    // actually draws, as controls and in the rendered text.
+    expect(screen.queryByRole('button', { name: /keep mine/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /keep theirs/i })).toBeNull();
+    expect(banner.textContent).not.toContain('Keep mine');
+    expect(banner.textContent).not.toContain('Keep theirs');
+
+    // AND THE SET IS CLOSED. Without this, a control ADDED beside the three —
+    // the prototype's pair, or its `Discard mine` — leaves every assertion
+    // above green, because they only ever name what they expect.
+    expect(screen.getAllByRole('button')).toHaveLength(3);
+  });
+
   /**
    * 12.194 — THE BANNER'S DATE IS IST BECAUSE THE CODE SAYS SO, NOT BECAUSE
    * THE MACHINE IS ALREADY IN IST.

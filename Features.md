@@ -1998,6 +1998,17 @@ and leaves the head lying, which is how a contradiction survives a whole task.)*
   already contested, so re-sending it would idempotently re-answer `contested`. `resolveContest` refuses
   before it calls the door, which is why the banner's "Redo legally" button calls `onRedo` and never
   `onResolve`: the host seeds a NEW envelope from the contested one and only then resolves.
+- ✅ **The three contest resolutions, and the pair the prototype invented that the product does not
+  have** — `ContestBanner` renders exactly three controls, **`Redo legally` / `Convert to comment` /
+  `Discard`**, and an exactly-three guard (case 13.306) pins them **by exact accessible name** and
+  asserts the prototype's `Keep mine` / `Keep theirs` are ABSENT. The exactness is load-bearing rather
+  than tidy: the pre-existing arm finds the third control with `/discard/i`, which the prototype's own
+  third label **`Discard mine`** also satisfies, so a rename to the prototype's wording reddened
+  nothing until this guard existed. The audit files the pair as *"I — SHOWN BUT DOES NOT EXIST. Do not
+  build."* (`docs/hig-reconciliation-audit.md:307`) while the prototype still draws it, which is why a
+  guard exists at all. **`ContestBanner` is mounted nowhere in the product**
+  (`docs/hig-reconciliation-audit.md:577`), so this is a **component-level** guard and not a statement
+  about any screen. `packages/app-core/test/contests.test.tsx`
 - ⚙️ **A queued resolution is never laundered into an accepted one** — against the replica source
   `ingest` throws `OfflineAcceptError` for a claim it has only queued, and `resolveContest` deliberately
   does not catch it. Catching it and answering `ok: true` would put "the server accepted your discard"
