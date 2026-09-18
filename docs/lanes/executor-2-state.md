@@ -20,7 +20,82 @@
 
 ---
 
-## ▲ TOP BLOCK — the attention strip leaves the project page; the prototype restyle is measured and HELD (2026-09-18)
+## ▲ TOP BLOCK — the members screen's styling, measured against the prototype (2026-09-18, later the same day)
+
+**Position: the members-styling task is DONE and its PR is at the controller's merge.** Dispatches:
+`CTL-DISPATCH-2026-09-18-members-styling.md` **plus its AMENDMENT 1** (the `.gn-field` deliverable, and
+the id list). One branch, `exec2/members-styling`, **`--base main`**, cut from **`0e0dbff9`** — the tip
+the controller's own dispatch named, with the amendment's `7735b6ef` superseded by `#471`'s merge minutes
+later.
+
+**FIRST ACTION ON A RESTART: `gh pr list --state open`.** If this branch's PR is open it is at the
+controller's merge and nothing below needs redoing; if it has MERGED, this block is history and the
+controller's next dispatch is the position.
+
+### Anchors — verify these; do not trust the row
+
+| | |
+|---|---|
+| branch | `exec2/members-styling` |
+| cut from / base | **`0e0dbff9`** (`origin/main` after `#471` merged) |
+| frozen head | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit that carries it |
+| files | 7: `apps/web/app/w/[workspaceId]/members/page.tsx` · `apps/web/app/globals.css` · `apps/web/test/members-page.test.tsx` · **`apps/web/test/members-styling.test.ts` (new)** · `Features.md` · `test-cases/13-deployment-dogfooding.md` · this file |
+| ids minted | **`13.883`–`13.885`** — recounted at my tip BY MARKER (the amendment's "next free 13.881" was already stale: `#471` had minted 13.881/13.882) |
+| tree | clean; `docker compose` NOT run; :3001 and :3021 NOT bound |
+
+### What shipped, and the measurement that came first
+
+**The dispatch named five treatments it expected to be missing. Four are already the prototype's values
+and the fifth is a wire absence** — so the change set is smaller than the dispatch's shape implied, and
+the full prototype-versus-shipped table is in `test-cases/13`'s section for this change. What actually
+shipped:
+
+1. **THE ZEBRA — the one treatment the family really was missing.** It lives in the prototype's DATA
+   (`memberRows`, `desktop.dc.html:3077`) and attaches at `:671`, which is why a port driven by reading
+   the JSX never saw it. `.gn-members__row:nth-child(even)` now takes `--gn-fill-quaternary`, on the
+   prototype's parity (`i` is 0-based → even 1-indexed rows) and NOT the odd parity the product's two
+   other zebras use (`packages/ui/src/ui.css:1088`, `:2611`). **The inversion in those two families is
+   recorded at the rule with a named owner and NOT harmonised here.**
+2. **The invite form's two native fields wear the product's `.gn-field` pattern** (the amendment's
+   added deliverable), copied from `apps/web/app/w/[workspaceId]/page.tsx:812-818`. No handler, state or
+   conditional moved. **The `Channel` and `Role` fields are the shared `Select` and KEEP their bare
+   labels** — `.gn-field__input` is declared for native controls, and the amendment asked for that
+   ambiguity to be said out loud rather than settled: **it is on the report to the controller.**
+3. Cases `13.883`–`13.885`, `Features.md` and `test-cases/13` updated in the same change set.
+
+### Mutation witnesses, all against the real files, tree restored and sha256-verified
+
+- zebra parity flipped `even`→`odd` → **3 failed / 36**, all 13.884.
+- zebra fill swapped to `--gn-surface-sunken` → **2 failed / 36**, all 13.884.
+- `className="gn-field__input"` removed from the address input → **1 failed / 36**, 13.883 alone.
+- the projects field un-wrapped back to the bare pair → **1 failed / 36**, 13.883 alone.
+- `css` and `page.tsx` sha256 IDENTICAL before and after the whole sequence.
+
+**Instrument lesson, measured here and worth carrying:** the first attempt at the fourth mutation removed a
+`<label>`'s opening tag and left its closing one, so the file failed to TRANSFORM — and the JSON reporter
+showed that as **`total=7 passed=7 failed=0`**, the broken file simply absent from the assertion list.
+**`failed=0` is not evidence unless the total equals the full suite's count.**
+
+### Open items, with owners — none of them blocks the merge
+
+- **THE INVITATION HALF OF THIS SCREEN HAS NO CSS FAMILY AT ALL.** `.gn-invite-mint*` and
+  `.gn-invite-pending*` appear in `globals.css` exactly once (`__url`'s `font-family`), swept repo-wide
+  with a control that reaches `.gn-members` in the same run; the e2e-stack contrast roster agrees from a
+  real browser (`input`/`select` on `/members` wearing Chrome's UA border). **A family to PORT, not a
+  treatment to align — recorded, not fixed, because the amendment bounds the pass.** Owner: the controller,
+  for the next task on this screen.
+- **The contrast roster's `/members` entries are stale as of this change** (the wrapped fields are no
+  longer UA-default controls). The sweep needs the hot stack, which is executor 1's — **the file was NOT
+  hand-edited**, since a hand-edited generated record is partial. Owner: whoever next runs that sweep.
+- **Citation drift, measured:** the dispatch cites the prototype's `isMembers` block at `:647-783`; it
+  reads `:651-798` at this revision. `docs/design/prototype-delta-2026-09-18.md:524-542` still describes
+  the `<ul>` roster this screen has not had since `#443` and asserts the family is unstyled throughout.
+  Owner: the next change to that document.
+- **The `Select` labels question** above — asked of the controller in the report, not assumed.
+
+---
+
+## ▼ SUPERSEDED TOP BLOCK — the attention strip leaves the project page (2026-09-18). `#471` MERGED as `0e0dbff9`; nothing below needs redoing.
 
 **Position: THE PHASE IS CLOSED. `#471` is rebased, green, pushed, and at the controller's merge. Do NOT
 start anything else** — the dispatch says `members-styling` is queued behind an amendment and will be
