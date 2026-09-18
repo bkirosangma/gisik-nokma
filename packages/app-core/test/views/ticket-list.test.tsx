@@ -112,6 +112,11 @@ function ControlledList({
   // `draggable` rows, no tail zone), and 13.705's negative arm is the one
   // case that measures it.
   rowDrag,
+  // Second wave Task 11 — undefaulted for the same reason as the three above:
+  // the no-checkbox-column default is `TicketList`'s own, and defaulting it
+  // here would leave that default exercised by every case but measured by none.
+  selection,
+  controls,
 }: {
   rows?: ListRow[];
   initial?: ProjectViewPrefs;
@@ -121,6 +126,8 @@ function ControlledList({
   narrowing?: string;
   rowAction?: (row: ListRow) => ReactNode;
   rowDrag?: { onReorder: (movedTicketId: string, beforeTicketId: string | null) => void };
+  selection?: { selected: ReadonlySet<string>; onToggle: (ticketId: string) => void };
+  controls?: ReactNode;
 }) {
   const [prefs, setPrefs] = useState(initial);
   return (
@@ -138,6 +145,8 @@ function ControlledList({
       {...(narrowing === undefined ? {} : { narrowing })}
       {...(rowAction === undefined ? {} : { rowAction })}
       {...(rowDrag === undefined ? {} : { rowDrag })}
+      {...(selection === undefined ? {} : { selection })}
+      {...(controls === undefined ? {} : { controls })}
     />
   );
 }
@@ -1038,6 +1047,110 @@ describe('13.596 emptyCopy renders only when a caller passes one, over a zero-ro
   it('does not render emptyCopy once rows arrive', () => {
     render(<ControlledList rows={[OPEN_ROW]} initial={chose([], 'flat')} />);
     expect(screen.queryByTestId('list-empty')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 13.647 — the two `TicketList` additions Task 11 needs, and neither of them
+ * exclusive to the List tab: a leading row-checkbox column (`selection`) the
+ * `Close selected (N)` surface reads, and a slot for a caller's own control
+ * (`controls`) in the controls row it already renders.
+ *
+ * `selection` is a CONTROLLED pair, not a starting value: `selected` is the
+ * truth and `onToggle` reports the gesture upward, the same shape `prefs`/
+ * `onPrefsChange` and `rowDrag.onReorder` already use. A component that
+ * owned the checked set itself would be a second source of truth beside the
+ * caller's — and the caller is the one that has to clear the set when the
+ * list reloads, decide whether the selection is closeable at all, and hand
+ * the snapshot to the dialog. The case below asserts the controlled
+ * property directly: clicking an unchecked box calls `onToggle` and the box
+ * does NOT move, because `selected` did not.
+ *
+ * Both fixture rows carry `assignee: null` for the reason 13.597's docblock
+ * gives: a row assigned to `currentUserId` renders TWICE (pinned and
+ * sectioned), so `Select <title>` would be ambiguous and a page reading one
+ * checkbox per row would find two.
+ *
+ * THE COLUMN-COUNT INVARIANT is asserted here rather than assumed. This file
+ * carries the rule in `TicketList`'s own docblock — `Table` renders one
+ * `<th>` per entry in `columns`, so a mismatched count between `<thead>` and
+ * every `<tbody>` row is the bug, not the fix — and a leading column added
+ * by spread is exactly the kind of edit that can add one and not the other.
+ */
+describe('13.647 the selection checkbox column and the controls slot (packages/app-core/src/views/ticket-list.tsx)', () => {
+  it('with `selection`, every row carries a leading checkbox named `Select <title>`, checked per `selected`', async () => {
+    const onToggle = vi.fn();
+    const { container } = render(
+      <ControlledList
+        rows={[OPEN_ROW, CLOSED_ROW]}
+        initial={chose([], 'flat')}
+        selection={{ selected: new Set(['ra_open']), onToggle }}
+      />,
+    );
+    const openBox = screen.getByRole('checkbox', { name: 'Select Row one' });
+    const closedBox = screen.getByRole('checkbox', { name: 'Select Row two' });
+    expect(openBox).toBeChecked();
+    expect(closedBox).not.toBeChecked();
+
+    await userEvent.click(closedBox);
+    expect(onToggle).toHaveBeenCalledWith('ra_closed');
+    // CONTROLLED: the click reports and nothing more. `selected` is still
+    // `{ra_open}`, so the box is still unchecked — a component that flipped
+    // its own copy here would make the caller's answer unobservable, which
+    // is the one thing the delegated-clear fix depends on being visible.
+    expect(closedBox).not.toBeChecked();
+    expect(openBox).toBeChecked();
+
+    // The column is LEADING: the checkbox is the row's first cell.
+    const closedRow = screen.getByTestId('ticket-card-ra_closed').closest('tr');
+    if (closedRow === null) throw new Error('row <tr> not found');
+    expect(closedRow.querySelector('td')?.querySelector('input[type="checkbox"]')).not.toBeNull();
+
+    // `<thead>` and every `<tbody>` row agree on the width of the table.
+    const headerCells = container.querySelectorAll('thead th').length;
+    const rows = Array.from(container.querySelectorAll('tbody tr'));
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) expect(row.querySelectorAll('td')).toHaveLength(headerCells);
+    // The column really was ADDED, not swapped for one of the data columns.
+    expect(headerCells).toBeGreaterThan(1);
+  });
+
+  it('CONTROL: without `selection`, no checkbox renders anywhere — the pre-Task-11 default', () => {
+    const { container } = render(<ControlledList rows={[OPEN_ROW, CLOSED_ROW]} initial={chose([], 'flat')} />);
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    // …and the same table is a column NARROWER, so the negative above is not
+    // passing because some other prop suppressed the cell.
+    const headerCells = container.querySelectorAll('thead th').length;
+    for (const row of Array.from(container.querySelectorAll('tbody tr'))) {
+      expect(row.querySelectorAll('td')).toHaveLength(headerCells);
+    }
+    expect(headerCells).toBe(1);
+  });
+
+  it('`controls` renders inside the controls row, after the summary; absent, nothing renders', () => {
+    const { rerender } = render(
+      <ControlledList
+        rows={[OPEN_ROW]}
+        initial={chose([], 'flat')}
+        controls={<button type="button">Close selected (0)</button>}
+      />,
+    );
+    const controlsRow = document.querySelector('.gn-list__controls') as HTMLElement;
+    const button = screen.getByRole('button', { name: 'Close selected (0)' });
+    expect(controlsRow).toContainElement(button);
+    // AFTER the summary sentence, not before it: the count sentence names what
+    // the rows are, and the action that acts on them follows what it acts on.
+    const summary = screen.getByTestId('list-summary');
+    // `compareDocumentPosition` answers a BITMASK, and the sloppy form of this
+    // assertion is a false green: `& DOCUMENT_POSITION_FOLLOWING` is truthy
+    // when the button PRECEDES the summary too (that is `PRECEDING`, 2, also
+    // non-zero). Compare the masked bit to the constant, never to truthiness.
+    expect(summary.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+
+    rerender(<ControlledList rows={[OPEN_ROW]} initial={chose([], 'flat')} />);
+    expect(screen.queryByRole('button', { name: 'Close selected (0)' })).not.toBeInTheDocument();
   });
 });
 
