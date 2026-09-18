@@ -30,12 +30,37 @@ import { useEffect, useState } from 'react';
  * ## One place it DIVERGES from the sibling, and why
  *
  * The remembered PROJECT is keyed by user **and workspace**; the remembered
- * WORKSPACE cannot be, having no parent to be scoped to. A project id is unique
- * inside its workspace and meaningless outside it, so a record keyed by user
- * alone would resolve `p_1`'s name inside whichever workspace the viewer
- * happened to be standing in — naming a project from another workspace, or,
- * worse because it is silent, naming a DIFFERENT project that happens to share
- * the id. Case 13.853 is that property.
+ * WORKSPACE cannot be, having no parent to be scoped to.
+ *
+ * **CORRECTED 2026-09-18, after a reviewer attacked the reason this paragraph
+ * first gave — and the reason was wrong, not the keying.** It said a record
+ * keyed by user alone would resolve `p_1` inside whichever workspace the viewer
+ * was standing in, "naming a project from another workspace, or, worse because
+ * it is silent, naming a DIFFERENT project that happens to share that id". The
+ * second half is impossible: `proj_projects.project_id` is the PRIMARY KEY, and
+ * the migration's own comment says why — *"an entity id is a ULID and belongs
+ * to exactly one workspace, so a second workspace claiming the same id would be
+ * a collision to refuse rather than a row to add"*. Ids are globally unique, so
+ * nothing can collide and no collision can be silent. **The reviewer could not
+ * construct the case, and neither could I.**
+ *
+ * What the workspace half actually buys, so that the next author copies
+ * something true:
+ *
+ * - **It is part of the QUESTION.** This record answers "the last project you
+ *   opened IN THIS WORKSPACE". Drop the workspace and it answers a question
+ *   nobody asked, whose answer happens to coincide today only because the
+ *   caller looks the id up in one workspace's list.
+ * - **It does not depend on that lookup to reject a foreign id.** With the
+ *   guard, a record from another workspace is refused at the record; without
+ *   it, it is merely not found by a later `find` — the same outcome reached by
+ *   a route that has to stay correct for other reasons.
+ * - **It survives ids ceasing to be global.** That uniqueness is a property of
+ *   today's schema, not of this file, and the guard costs one comparison.
+ *
+ * Case 13.853 pins it, and its control reads the same bytes from the workspace
+ * they name — so the `none` cannot be a reader that failed for some unrelated
+ * reason.
  *
  * The TAB map, by contrast, is keyed by user alone. A project id already names
  * its workspace implicitly — the route that carries one carries both — so

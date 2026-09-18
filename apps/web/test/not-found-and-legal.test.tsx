@@ -19,7 +19,14 @@ import { describe, expect, it, vi } from 'vitest';
  * left in its plain form rather than deleted with its old comment.
  */
 const nav = { back: vi.fn(), push: vi.fn() };
-vi.mock('next/navigation', () => ({ usePathname: () => '/', useRouter: () => nav }));
+// `useParams` is required by `LastProjectNav` (via `AppNav`), which reads the
+// route's project id. A partial mock of a module a component calls is an
+// import-time throw, and this file mounts the nav through the legal chrome.
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/',
+  useRouter: () => nav,
+  useParams: () => ({}),
+}));
 
 import NotFound from '../app/not-found.js';
 import PrivacyPolicy from '../app/privacy/page.js';

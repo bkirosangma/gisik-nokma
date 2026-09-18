@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ListRow, RosterMember, TicketListView } from '@gisik-nokma/app-core';
 import type { TicketTypeDef } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
@@ -54,14 +54,29 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+/**
+ * MUTABLE, because case 13.880 has to put this page in the LOADING window and
+ * then let the session land — the transition is the whole of that case, and a
+ * frozen mock cannot produce it. Every other case in this file sees the
+ * signed-in value it always did, restored before each one.
+ */
+let mockSession: {
+  data: { user: { id: string; name: string } } | null;
+  isPending?: boolean;
+} = { data: { user: { id: 'user_kiro', name: 'Kiro' } } };
+
 vi.mock('../src/auth-client.js', () => ({
   authClient: {
-    useSession: () => ({ data: { user: { id: 'user_kiro', name: 'Kiro' } } }),
+    useSession: () => mockSession,
     signOut: async () => ({ data: {}, error: null }),
   },
 }));
 
 import ProjectPage from '../app/w/[workspaceId]/p/[projectId]/page.js';
+
+beforeEach(() => {
+  mockSession = { data: { user: { id: 'user_kiro', name: 'Kiro' } } };
+});
 
 afterEach(() => {
   push.mockClear();
@@ -569,6 +584,68 @@ describe('the roster is a convenience, never a gate', () => {
 });
 
 /**
+ * The nav item's project, witnessed at the PAGE level because that is where the
+ * defect this case forbids actually lives.
+ *
+ * `AppNav` is rendered INSIDE this page's JSX, so `LastProjectNav`'s effect is a
+ * DESCENDANT of `ProjectBoard`'s `useLastProject` write — and React commits
+ * passive effects CHILD-FIRST, which was measured here rather than taken from
+ * the docs: a probe rendering a parent with one child logged
+ * `["child","parent"]`. So the nav reads storage BEFORE the page writes the
+ * project it just opened, and without the route id the item names whatever was
+ * there before. It self-heals one navigation later, which is what makes it easy
+ * to miss: it is wrong exactly on the arrival that matters.
+ *
+ * The fixture is built so that the FALLBACK cannot produce the passing answer
+ * either — `p_other` is served FIRST, so an implementation that ignored both
+ * storage and the route would name Omega, and one that read only storage would
+ * name Omega too. Only reading the route names Alpha.
+ */
+describe('the nav item follows the route it is on', () => {
+  it('13.879 names the project in the route, not the one storage still holds', async () => {
+    window.localStorage.setItem(
+      'gn-last-project',
+      JSON.stringify({ userId: 'user_kiro', workspaceId: 'ws_1', projectId: 'p_other' }),
+    );
+
+    render(
+      <Providers
+        services={stubServices({
+          getBoard: async () => ({ projectId: 'p_1', groups: [] }),
+          getAttention: async () => [],
+          getMembers: async () => MEMBERS,
+          getTicketTypes: async () => [typeDef()],
+          getTickets: async (): Promise<TicketListView> => ({ projectId: 'p_1', rows: [row()] }),
+          getMyWorkspaces: async () => [
+            {
+              id: 'ws_1',
+              name: 'Convenience Corner',
+              role: 'owner',
+              memberCount: 1,
+              nameRestrictedProjectCount: 0,
+              projects: [
+                { id: 'p_other', name: 'Omega', archived: false, ticketCount: null, blockedCount: null },
+                { id: 'p_1', name: 'Alpha', archived: false, ticketCount: null, blockedCount: null },
+              ],
+            },
+          ],
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: 'Alpha' })).toHaveAttribute(
+        'href',
+        '/w/ws_1/p/p_1',
+      ),
+    );
+    expect(screen.queryByRole('link', { name: 'Omega' })).toBeNull();
+  });
+});
+
+/**
  * The remembered tab (owner, 2026-09-18): *"on click, open the project page
  * (save the last open tab as well)"*.
  *
@@ -695,6 +772,52 @@ describe('the remembered tab', () => {
         tabs: { p_other: 'timeline', p_1: 'list' },
       }),
     );
+  });
+
+  /**
+   * 13.880 — a tab chosen while the session is still LOADING is not reverted
+   * when the session lands.
+   *
+   * The rail is not gated on the session: the page's main return is
+   * unconditional and nothing between it and the tablist asks what
+   * `session.kind` is, so the tabs are clickable during the one network round
+   * trip the session read takes. In that window `tabUserId` is `null`, so
+   * `setView` writes nothing — and the seed effect, whose dependency
+   * `tabUserId` is, then RE-RUNS when the session resolves and applies the
+   * stored tab over the choice the person just made.
+   *
+   * The stored tab is deliberately a different one from the click: with
+   * `calendar` in storage, a click on List is reverted to Calendar by the
+   * resolving session, which is the visible half of this defect. The invisible
+   * half — the click's own write is dropped, because there is no user to key it
+   * by — is NOT fixed here and is recorded in the catalogue as a known
+   * limitation rather than papered over.
+   */
+  it('13.880 keeps a tab chosen while the session was still loading', async () => {
+    window.localStorage.setItem(
+      'gn-project-tabs',
+      JSON.stringify({ userId: 'user_kiro', tabs: { p_1: 'calendar' } }),
+    );
+    mockSession = { data: null, isPending: true };
+    const services = servedList([row()]);
+    const { rerender } = render(
+      <Providers services={services}>
+        <ProjectPage />
+      </Providers>,
+    );
+
+    await openTab('List');
+
+    // The session lands. `tabUserId` goes null -> 'user_kiro', which is the
+    // dependency that re-runs the seed.
+    mockSession = { data: { user: { id: 'user_kiro', name: 'Kiro' } } };
+    rerender(
+      <Providers services={services}>
+        <ProjectPage />
+      </Providers>,
+    );
+
+    await waitFor(async () => expect(await selectedTab()).toBe('List'));
   });
 
   /**

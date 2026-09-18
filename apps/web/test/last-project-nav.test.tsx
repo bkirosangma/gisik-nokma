@@ -316,6 +316,14 @@ describe('LastProjectNav — the dropdown', () => {
     renderNav(servicesFor([WS_1]));
     await screen.findByRole('link', { name: 'Gamma' });
 
+    // THE KEY IS REMOVED FIRST, and this line is the difference between a case
+    // and a decoration. `rememberProject('p_gamma')` above writes exactly the
+    // bytes asserted below, so without this the assertion was satisfied by the
+    // FIXTURE — deleting the trigger's `onClick` left it green, which a
+    // reviewer caught (M4). With the record gone, only the click's own write
+    // can produce it.
+    window.localStorage.removeItem(LAST_PROJECT_KEY);
+
     await userEvent.click(itemLink());
 
     expect(JSON.parse(window.localStorage.getItem(LAST_PROJECT_KEY) as string)).toEqual({

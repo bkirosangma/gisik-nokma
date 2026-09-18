@@ -66,6 +66,9 @@ const { query } = vi.hoisted(() => ({ query: { current: new URLSearchParams() } 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => query.current,
+  // Required by `LastProjectNav` (via `AppNav`), which reads the route's project
+  // id. A partial mock of a module a component calls is an import-time throw.
+  useParams: () => ({}),
 }));
 
 import SignInPage from '../app/sign-in/page.js';

@@ -36,6 +36,43 @@ import { useAppServices, useSessionStatus } from './providers.js';
  *
  * **Fails silently, and the failure is OMISSION, never the id.**
  */
+/**
+ * KEYED BY USER **AND** WORKSPACE, and the user half is not symmetry — it is
+ * the whole of case 13.878.
+ *
+ * `use-workspace-name.ts` keys its cache by workspace id alone and is right to:
+ * a workspace's NAME is the same for everyone who can see the workspace. A
+ * project LIST is not. The server serves a non-owner only the projects they
+ * hold a membership in (`apps/server/src/read/visible-projects.ts`: the owner
+ * gets the row set, everybody else gets it filtered by `eff.projects`), so one
+ * `workspaceId` is a DIFFERENT LIST for every viewer.
+ *
+ * Copying the name cache's key onto a viewer-filtered list serves one person's
+ * project names to the next. The sequence is ordinary rather than exotic: sign
+ * out (a CLIENT-SIDE navigation — `account-menu.tsx` pushes `/sign-in`, so
+ * module state survives it), sign in as someone with narrower access, and the
+ * nav's first paint names projects they cannot open. The window is a network
+ * round trip, and it is unbounded when that read is slow or failing, because
+ * the rejection arm deliberately does not evict.
+ *
+ * The two ids are serialised as a JSON ARRAY rather than joined with a
+ * separator, because a separator is a guess about what the ids cannot contain:
+ * `('a', 'b:c')` and `('a:b', 'c')` must not be able to spell one key, and no
+ * single character is safe without assuming something about the id format.
+ *
+ * **The first version used a NUL byte, and it was replaced because of a
+ * MEASURED consequence rather than a worry.** A NUL byte makes this file
+ * *binary* to `grep`, `diff` and every other line-oriented tool:
+ * `grep -n cacheKey use-workspace-projects.ts` printed `Binary file … matches`
+ * instead of the line. A source file the repo's own inspection tools silently
+ * refuse to search is a blind instrument — the precise failure this codebase
+ * spends the most effort avoiding — and it would have stayed invisible until
+ * someone needed a citation out of this file.
+ */
+function cacheKey(userId: string, workspaceId: string): string {
+  return JSON.stringify([userId, workspaceId]);
+}
+
 const projectsCache = new Map<string, ProjectRef[]>();
 
 /** Tests share one module, so they share this. Cleared between cases. */
@@ -46,7 +83,11 @@ export function clearWorkspaceProjectsCache(): void {
 export function useWorkspaceProjects(workspaceId: string | undefined): ProjectRef[] | null {
   const { dataSource } = useAppServices();
   const session = useSessionStatus();
-  const signedIn = session.kind === 'signed-in';
+  // The user is read HERE rather than passed in, because this hook already
+  // reads the session to gate the request — and because a caller that forgot to
+  // pass it would silently fall back to the width of the cache this exists to
+  // narrow.
+  const userId = session.kind === 'signed-in' ? session.user.id : null;
   const [projects, setProjects] = useState<ProjectRef[] | null>(
     // The remount's head start; `useState`'s initialiser runs once per mount.
     // MODULE-SCOPED for the reason `use-workspace-name.ts` records for its own
@@ -54,14 +95,21 @@ export function useWorkspaceProjects(workspaceId: string | undefined): ProjectRe
     // so it remounts on every client-side navigation, and without this the
     // project item would vanish for the tick it takes to read storage and then
     // come back — the flicker the owner reported for the workspace name.
-    () => (workspaceId === undefined ? null : (projectsCache.get(workspaceId) ?? null)),
+    //
+    // No session yet means no answer yet, NOT a cache hit: before the session
+    // resolves there is no user to have read a list FOR.
+    () =>
+      workspaceId === undefined || userId === null
+        ? null
+        : (projectsCache.get(cacheKey(userId, workspaceId)) ?? null),
   );
 
   useEffect(() => {
-    if (workspaceId === undefined || !signedIn) {
+    if (workspaceId === undefined || userId === null) {
       setProjects(null);
       return;
     }
+    const key = cacheKey(userId, workspaceId);
     let cancelled = false;
     dataSource.query.getMyWorkspaces().then(
       (rows) => {
@@ -77,8 +125,8 @@ export function useWorkspaceProjects(workspaceId: string | undefined): ProjectRe
         // projects is a served fact, and caching it is what stops the nav
         // re-asking on every navigation for a workspace it already knows is
         // empty.
-        if (found === null) projectsCache.delete(workspaceId);
-        else projectsCache.set(workspaceId, found);
+        if (found === null) projectsCache.delete(key);
+        else projectsCache.set(key, found);
         setProjects(found);
       },
       () => {
@@ -91,7 +139,7 @@ export function useWorkspaceProjects(workspaceId: string | undefined): ProjectRe
     return () => {
       cancelled = true;
     };
-  }, [dataSource, workspaceId, signedIn]);
+  }, [dataSource, userId, workspaceId]);
 
   return projects;
 }

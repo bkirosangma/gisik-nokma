@@ -220,7 +220,40 @@ function ProjectBoard() {
    * wants `null`.
    */
   const tabUserId = session.kind === 'signed-in' ? session.user.id : null;
+  /**
+   * A tab the person chose on THIS page outranks the memory, so the seed is
+   * applied at most once per project and never after a click — case 13.880,
+   * which a reviewer found and which the first version of this effect carried.
+   *
+   * The rail is not gated on the session. This page's main return is
+   * unconditional and nothing between it and the tablist asks what
+   * `session.kind` is, so the tabs are clickable during the one network round
+   * trip the session read takes. In that window `tabUserId` is `null`, so the
+   * click's own write goes nowhere — and because `tabUserId` is this effect's
+   * dependency, the session landing then RE-RAN it and put the stored tab back
+   * over the choice just made.
+   *
+   * Two refs rather than one, because they answer different questions:
+   * `seededForProject` is how a new project gets a fresh chance to be seeded,
+   * and `tabChosenHere` is what a click sets. Resetting the second when the
+   * FIRST changes is the whole of it — a person clicking in the loading window
+   * is not clicking "for" the project they navigated to next.
+   *
+   * **What this does NOT fix, stated rather than implied:** that click is still
+   * not written to the tab map, because there is no user id to key it by yet.
+   * The choice stands for as long as the page does and is forgotten on the next
+   * visit. Keying a write to a user the session has not named would be
+   * inventing one, and the window is a single round trip; recorded in the
+   * catalogue as a known limitation rather than papered over.
+   */
+  const seededForProject = useRef<string | null>(null);
+  const tabChosenHere = useRef(false);
   useEffect(() => {
+    if (seededForProject.current !== projectId) {
+      seededForProject.current = projectId;
+      tabChosenHere.current = false;
+    }
+    if (tabChosenHere.current) return;
     const rememberedTab = readProjectTab(projectId, tabUserId);
     if (rememberedTab !== null) setViewState(rememberedTab);
   }, [projectId, tabUserId]);
@@ -241,6 +274,8 @@ function ProjectBoard() {
    */
   const setView = useCallback(
     (tab: ProjectTab): void => {
+      // Read by the seed effect above, which must not undo this.
+      tabChosenHere.current = true;
       setViewState(tab);
       rememberProjectTab(projectId, tab, tabUserId);
     },

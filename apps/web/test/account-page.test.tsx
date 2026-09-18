@@ -6,6 +6,9 @@ import type { WorkspaceRef } from '@gisik-nokma/app-core';
 vi.mock('next/navigation', () => ({
   usePathname: () => '/account',
   useRouter: () => ({ push: vi.fn() }),
+  // Required by `LastProjectNav` (via `AppNav`), which reads the route's project
+  // id. A partial mock of a module a component calls is an import-time throw.
+  useParams: () => ({}),
 }));
 /**
  * `vi.hoisted`, not a bare `const` — `vi.mock` is hoisted above every

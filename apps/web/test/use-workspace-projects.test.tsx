@@ -205,6 +205,51 @@ describe('useWorkspaceProjects — the served project list for one workspace', (
    * fresh module would answer `null` there, which is what makes "not null"
    * meaningful rather than vacuous.
    */
+  /**
+   * 13.878 — the cache is keyed by USER as well, because this list is
+   * VIEWER-FILTERED and a workspace's name is not.
+   *
+   * `use-workspace-name.ts` keys its cache by workspace id alone and is right
+   * to: everyone who can see a workspace is told the same name. A project list
+   * is not that. The server serves a non-owner only the projects they hold a
+   * membership in (`apps/server/src/read/visible-projects.ts` — the owner gets
+   * the row set, everybody else gets it filtered by `eff.projects`), so one
+   * `workspaceId` is a different list for every viewer.
+   *
+   * The sequence this forbids is ordinary: sign out, sign in as someone with
+   * narrower access, and the nav's first paint names projects they cannot open
+   * — from the cache, before the fresh read lands, and indefinitely if that
+   * read is slow or failing. Sign-out is a CLIENT-SIDE navigation
+   * (`account-menu.tsx`'s `router.push('/sign-in')`), so module state survives
+   * it; the key is the only thing standing between the two viewers.
+   *
+   * The first frame IS the assertion — the settled value is Bob's either way,
+   * because the fresh read always wins eventually. Only a warm cache can make
+   * the second mount paint someone else's list.
+   */
+  it('13.878 does not serve one viewer the list cached for another', async () => {
+    const alice = await probe(
+      servicesFor([
+        workspace({ id: 'ws_1', projects: [project({ id: 'p_alice', name: 'Alice Only' })] }),
+      ]),
+      'ws_1',
+    );
+    // Control: the cache is warm for u_kiro, so a miss below is the KEY and not
+    // a cache that never held anything.
+    expect(settled(alice)).toHaveLength(1);
+
+    mockSessionUser = { id: 'u_bob', name: 'Bob', email: 'bob@example.com' };
+    const bob = await probe(
+      servicesFor([
+        workspace({ id: 'ws_1', projects: [project({ id: 'p_bob', name: 'Bob Only' })] }),
+      ]),
+      'ws_1',
+    );
+
+    expect(bob[0]).toBeNull();
+    expect(settled(bob)).toEqual([expect.objectContaining({ id: 'p_bob' })]);
+  });
+
   it('13.864 paints a previously-read list on the first frame of the next mount', async () => {
     const services = servicesFor([workspace({ id: 'ws_1', projects: [project({ id: 'p_1' })] })]);
 

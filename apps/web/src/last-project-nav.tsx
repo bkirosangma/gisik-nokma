@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useParams, usePathname } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { ProjectRef } from '@gisik-nokma/app-core';
 import {
@@ -84,12 +84,37 @@ export function LastProjectNav({
   userId: string | null;
 }) {
   const pathname = usePathname();
+  /**
+   * THE ROUTE IS AUTHORITY HERE TOO, and this is not symmetry with
+   * `useLastWorkspace` — it is the fix for a defect that a reviewer found and
+   * this file originally carried (case 13.879).
+   *
+   * The first version passed `undefined` and left the write to the project
+   * page, reasoning that the page has the project id and the nav does not. The
+   * reasoning was sound and the result was wrong, because of WHERE this
+   * component sits in the tree: `AppNav` is rendered inside the project page's
+   * own JSX, so this effect is a DESCENDANT of the page's writer effect — and
+   * **React commits passive effects CHILD-FIRST**. Measured, not read out of
+   * the docs: a probe rendering a parent with one child logged
+   * `["child","parent"]`.
+   *
+   * So on every arrival at a project page that is not through this item — a
+   * card, a bookmark, a pasted link — the order was: this effect reads storage
+   * and answers with the PREVIOUS project, then the page writes the new one.
+   * Nothing re-ran this effect (its dependencies do not change), so the item
+   * named the project you had left, and no in-page action corrected it. It
+   * self-healed one navigation later, which is exactly what would have made it
+   * survive a casual look.
+   *
+   * Taking the id from `useParams` makes the answer a function of the ROUTE
+   * rather than of who wrote storage first, so the ordering stops mattering.
+   * On a page with no project segment `useParams` yields `undefined` and the
+   * memory is the only source, exactly as before.
+   */
+  const params = useParams<{ projectId?: string }>();
+  const routeProjectId = typeof params.projectId === 'string' ? params.projectId : undefined;
   const projects = useWorkspaceProjects(workspaceId);
-  // `routeProjectId` is undefined HERE, and that is the design rather than an
-  // omission: this component is the memory's READER. The project PAGE passes
-  // its own id and is the writer, exactly as `useLastWorkspace` treats the
-  // route as authority one level up.
-  const remembered = useLastProject(workspaceId, undefined, userId);
+  const remembered = useLastProject(workspaceId, routeProjectId, userId);
 
   // `null` while the read is pending or refused — never `[]`, which would be a
   // claim that this workspace has no projects. See `useWorkspaceProjects`.

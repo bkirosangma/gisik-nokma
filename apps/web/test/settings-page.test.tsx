@@ -34,6 +34,12 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
   usePathname: () => '/settings',
   useSearchParams: () => query.current,
+  // `AppNav` mounts `LastProjectNav`, which reads the route's project id to
+  // know which project the bar is about (2026-09-18). A mock is a MODULE, not a
+  // subset: leaving a member the component calls off it throws
+  // `useParams is not a function` at render, which took all fourteen cases in
+  // this file down together rather than failing one of them.
+  useParams: () => ({}),
 }));
 
 vi.mock('../src/auth-client.js', () => ({
