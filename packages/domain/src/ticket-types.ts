@@ -7,12 +7,67 @@ export type CustomFieldKind = (typeof CUSTOM_FIELD_KINDS)[number];
 export const BUILTIN_FIELD_IDS = ['title', 'description', 'dueDate', 'startDate'] as const;
 export type BuiltinFieldId = (typeof BUILTIN_FIELD_IDS)[number];
 
+/**
+ * `required` — the author's declaration that this type expects a value for this
+ * field (owner ruling 2026-09-18, decision-list item 1: *"1 - yes"*, after the
+ * prototype delta recorded the toggle as a schema gap rather than a design one).
+ *
+ * ## OPTIONAL, not defaulted, and that is not the same choice as it looks
+ *
+ * `z.boolean().optional()` follows the member directly above it: a `text` field
+ * has no `options` key either, and `FieldsEditor` mints one as
+ * `{id, name, type}` (`fields-editor.tsx:127`). A field definition says what it
+ * has to say and nothing more.
+ *
+ * The alternative — `z.boolean().default(false)` — was rejected for the reason
+ * this plan has now paid for twice. A default is applied AT PARSE, so every
+ * `ticket-type.defined` ever recorded would come back saying `required: false`
+ * — a claim its author never made. That is the identical defect class as the
+ * `p.value ?? null` that folded an absent value into "a clearing nobody made"
+ * (`rule-engine/src/checks/fields.ts:77-83`, corrected in this plan), and the
+ * projection would then carry the invented claim forward as fact. Absence means
+ * *the definition never said*; `false` means *the definition said optional*.
+ * They are different states and the schema keeps them different.
+ *
+ * As a consequence this member needs NO MIGRATION. `ticketTypeDefSchema.parse`
+ * is called on read by the projection, the offline replica and the engine's
+ * memory context alike (`apps/server/src/projections/ticket-types.ts:56`,
+ * `sync-client/src/replica/replica.ts:295`,
+ * `rule-engine/src/memory-context.ts:136`); an optional member leaves every
+ * stored event parsing exactly as it did before, and the projector's
+ * `JSON.stringify(def.fields)` (`:79`) carries the key through verbatim once it
+ * survives the parse.
+ *
+ * ## NOTHING ENFORCES IT. That is a recorded absence, not an oversight.
+ *
+ * Measured 2026-09-18 at `d069fd94`, before the toggle was designed: no code
+ * path reads a type-level requirement, because none existed to read. The
+ * product's only `require-field` is EDGE-SCOPED — a workflow rule evaluated
+ * when a ticket crosses one transition (`rule-engine/src/rules/require-field.ts:5`,
+ * surfaced by `app-core/src/views/transition-dialog.tsx:216,220`) — which is a
+ * different question ("may this move happen?") from this one ("does this type
+ * expect a value?"). `checkTicketFieldSet` refuses a field that does not exist
+ * on the type and a value that does not fit its kind, and accepts a clear of any
+ * custom field unconditionally (`rule-engine/src/checks/fields.ts:148-155`).
+ * `ticket.created` reads no fields at all.
+ *
+ * Enforcement is therefore a capability, not a wiring job, and it is NOT this
+ * change's. Building it honestly would need the engine to answer "what did this
+ * type require when this ticket was created?" — and it cannot: the type
+ * projection is last-definition-wins BY DESIGN and keeps no superseded row
+ * (`apps/server/src/projections/ticket-types.ts:39-46`, which states that
+ * omission as deliberate). An admin toggling a field to Required would place
+ * every existing ticket of that type out of compliance, and no claim already
+ * recorded can be retroactively refused. Named absence, owner: the plan that
+ * takes up type-level field enforcement.
+ */
 export const customFieldDefSchema = z
   .object({
     id: z.string().min(1),
     name: z.string().min(1),
     type: z.enum(CUSTOM_FIELD_KINDS),
     options: z.array(z.string().min(1)).min(1).optional(),
+    required: z.boolean().optional(),
   })
   .superRefine((field, ctx) => {
     if (field.type === 'select' && field.options === undefined) {
