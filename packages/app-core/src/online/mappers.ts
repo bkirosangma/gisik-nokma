@@ -1571,15 +1571,26 @@ function mapTicketState(raw: unknown, path: string): TicketState {
     // unconditionally, and enumerating fields by hand is precisely how `closed`
     // went missing for a whole task (13.603).
     //
-    // **Tolerant, unlike `mapClosed`/`mapRank`, and the difference is
-    // deliberate.** An absent `closed` or `rank` is a visible product defect —
-    // a hidden badge, a reordered Backlog tab — so those throw. `reopenedAt` is
-    // a SWEEP INPUT (spec §8.2): no client surface renders it, its only reader
-    // is server-side, and its job here is that this mapped `TicketState` keep
-    // the same SHAPE as the one `replica-data-source.ts` folds locally from the
-    // shared reducer. An absent key reads as `null`, the same answer as an
-    // explicit null. The VALUE is still policed: `string | null` is the whole
-    // type, so a number is refused rather than coerced.
+    // **Tolerant, unlike `mapClosed`/`mapRank`, and the price is stated rather
+    // than argued away.** The plan's Task 7 Files line mandates this read
+    // ("`mapTicketState` reads `reopenedAt ?? null`"), so an absent key answers
+    // `null` — the same value as an explicit null, which is the distinction
+    // 13.724 asserts. What that costs is real and it is one thing: the
+    // tripwire. `mapClosed`/`mapRank` throw on an absent key because an absent
+    // key there means the SERVER stopped sending a field a surface renders, and
+    // 13.603 is what that costs when nobody notices. `reopenedAt` is a
+    // server-side sweep input, and that is measured rather than assumed:
+    // `reopenedAt` appears across `packages/*/src` and `apps/*/src` in exactly
+    // one producer — this line — and **no comparator exists between this
+    // mapper's output and a folded replica state** (the repo's two-sided rig
+    // compares the server PROJECTION against the replica, and neither side
+    // passes through this mapper). So a silent drop here would be invisible,
+    // and the tolerance spends a tripwire for a comparison nobody makes today.
+    // Recorded rather than left implied; if a surface ever renders this field,
+    // the read should become strict on `mapRank`'s rule.
+    //
+    // The VALUE is still policed: `string | null` is the whole type, so a
+    // number is refused rather than coerced (13.724's final arm).
     reopenedAt: mapOptionalInstant(record['reopenedAt'], `${path}.reopenedAt`),
   };
 }

@@ -635,7 +635,9 @@ reason on record, not an oversight:*
   column comparison instead of a per-candidate walk. Projected to `proj_tickets.reopened_at
   timestamptz NULL`, read unconditionally by `rowToTicketState`, and **deliberately absent from
   `TicketCard`/`ListRow`** — it is a SWEEP INPUT (Task 8's), not a card field, and putting it on the
-  card would change four routes' bodies for a value none of them shows. `SYSTEM_ACTOR_AUTO_CLOSE =
+  card would change the body of every card-serving route — FIVE route files call `assembleTicketCards`
+  (`attention`, `board`, `list`, `my-work`, `search`) — for a value none of them renders.
+  `SYSTEM_ACTOR_AUTO_CLOSE =
   '00000000000000000000SYS0AC'` is the id the sweep files its `ticket.closed` under: a ULID, because
   `submittedEventSchema` requires `actorId` to be one and a readable sentinel like `'system'` would be
   refused at the ingest door, so every auto-close would come back `refused` and the failure would

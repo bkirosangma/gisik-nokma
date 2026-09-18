@@ -9999,6 +9999,21 @@ constant. 13.722 pins the match with a negative control for exactly that reason.
   bind error. The fourth case pins `ULID_REGEX.test(SYSTEM_ACTOR_AUTO_CLOSE)` with a one-character
   negative control and the `SYSTEM_ACTOR_NAMES` entry, because a constant the ingest door refuses would
   turn every auto-close into a refusal.
+  **The fifth case is a review-round addition, and its history is the point** (see the review section
+  below): `state.reopenedAt ?? env.serverTime` — a first-write-wins stamp — **survived** all 514 domain
+  cases until this case existed, because the sweep's predicate is only "is it NULL" and nothing held
+  the field's documented meaning to the word *last*. **The first version of this case did not kill it
+  either**, and the reason is worth keeping: `??` differs from a plain stamp only when a
+  `ticket.reopened` arrives while `reopenedAt` is ALREADY set, and that version walked
+  `closed → reopened → transition → closed → reopened` — the transition clears the flag, so the mutant
+  read a null and behaved identically. **The discriminating path needs a second reopen with no
+  transition between, and the doors permit exactly that**: `ticket.reopened` clears `closed` and leaves
+  the ticket in its terminal state (§1.2), `checkTicketClosed` refuses only on `already-closed` +
+  `close-requires-terminal`, and `checkTicketReopened` refuses only on `not-closed` — so
+  `closed → reopened → closed → reopened` is accepted end to end, and at that second reopen the field
+  still holds the FIRST instant. The case asserts BOTH directions there (`toBe(second)` and
+  `not.toBe(first)`), because the first alone would also pass a stamp carrying both. Re-run after the
+  fix: **M4 dies on this case and nothing else** (1 failed, 513 passed of 514).
 - ✅ **13.723 — `proj_tickets.reopened_at` follows the state, all three arms.** One case in
   `apps/server/test/projections/tickets-closed.test.ts` (a sibling of 13.572, which owns the
   closed/reopened columns of this table). Real Postgres through `applyCommitted`; seeded along the real
@@ -10042,3 +10057,54 @@ constant. 13.722 pins the match with a negative control for exactly that reason.
   NOT on screen in the same render: a badge falling through to the honesty-contract-1 fallback would
   print the 26-character id and satisfy a `toContain('Auto-close')`-shaped check only by accident of
   the constant's own `SYS0AC` tail.
+
+## Task 7's review round — one independent reviewer, verdict CLEAN, and two surviving mutations
+
+One reviewer, dispatched before the PR opened, read the frozen tip `74b12565` (base `dda4c342`) and
+attacked every new test by mutation. **Verdict: CLEAN** — no defect that breaks behaviour or violates
+the Task 7 contract. Five findings, recorded here in full because **three of them were about claims
+rather than code, and the two surviving mutations are worth more than the kills**.
+
+- **Important — `t.reopened_at` in `PROJ_TICKET_COLUMNS` is dead selection, and pinned by nothing.**
+  The plan's Task 7 `Files:` line requires it; nothing reads it. `assembleTicketCards` never touches
+  `row.reopened_at`, the only consumer of the column is `rowToTicketState` (fed by `SELECT *`), and the
+  plan's own Task 8 Step 3 gives the sweep its own SQL, so no reader is waiting for the list to carry
+  it. **Mutation M3 (delete `, t.reopened_at` from the list) SURVIVES the entire server suite —
+  reproduced here, 1548 passed / 0 failed, byte-identical to baseline.** The line was kept because the
+  plan is the authority being audited against, and the alternative is priced rather than hidden: the
+  change is one string in `apps/server/src/read/ticket-cards.ts`, and dropping it would remove the
+  declared `ProjTicketRow.reopened_at` member too. **Flagged to the controller with both readings
+  rather than settled here.**
+- **Minor, FIXED — the tolerance's stated rationale was false.** `mapOptionalInstant` is right to be
+  tolerant (`?? null` is what the plan mandates, the value is policed, and no surface reads the field),
+  but the docblock justified it with "keeps the same SHAPE as the one `replica-data-source.ts` folds
+  locally" — **and no such comparison exists**: the repo's two-sided rig compares the server
+  PROJECTION against the replica, and neither side passes through this mapper. The comment now states
+  the real price (a spent tripwire for a comparison nobody makes) and says when the read should become
+  strict. A comment asserting a signal the product does not emit is the same defect class as a test
+  asserting a property nothing pins.
+- **Minor, recorded, belongs to Task 8 — `reopenedAt` survives a state move that is not a
+  `ticket.transitioned`.** Both `ticket.workflow_rebound` and `foldTicketToWorkflowVersion` move
+  `stateId` by spreading the state, so a ticket reopened and then rebound or folded into a terminal
+  state keeps the flag and Task 8's sweep would skip it forever. **The direction is safe** — a non-null
+  flag can only make the sweep skip more, never close what it should skip, so no false close is
+  reachable — and spec §8.2's clear rule is literally "cleared by any `ticket.transitioned`", so this
+  matches the spec's letter. Nothing pins either direction; Task 8 is where the sweep's semantics is
+  exercised.
+- **Minor, FIXED with a correction — "last reopened" was pinned by nothing.** Covered in 13.722 above;
+  the short version is that the first attempt at a pin walked a path where the mutant is
+  indistinguishable, and only the no-transition double reopen kills it.
+- **Minor, FIXED — "four routes' bodies" undercounted.** Measured: **five** route files call
+  `assembleTicketCards` (`attention`, `board`, `list`, `my-work`, `search`; `tickets.ts` imports the
+  module but never calls the assembler). The Features.md sentence now carries the measured number and
+  names the files. The sibling `four other routes` comment at `ticket-cards.ts:25` is pre-existing and
+  not this task's; recorded, not edited.
+
+**What the reviewer confirmed and could not fault:** the `actorLabel` precedence (system → roster → id,
+all fifteen call sites read); the `ULID_REGEX` match with a control genuinely outside the class;
+`newUlid()` cannot mint the constant and no client can forge it (`check-permission.ts` refuses
+`env.actorId !== ctx.sessionUserId`); the migration's Down as a true inverse; the `ON CONFLICT SET`
+list reaching an existing row to clear it; the timestamptz handling under a pinned Asia/Kolkata test
+database; that no other whole-`TicketState` literal was stale; that `task-ledger.tsv` is correctly
+untouched; and that the rebase union lost nothing (`comm -23` of the id sets is empty, additions are
+exactly `13.722`–`13.726`).

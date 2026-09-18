@@ -770,6 +770,64 @@ describe('13.722 ticket.reopened arms reopenedAt; any transition clears it', () 
     expect(rearmed.transitions.length).toBe(armed.transitions.length + 1);
   });
 
+  it('a SECOND reopen overwrites the stamp: the field is the LAST reopen, not the first', () => {
+    // **Pinned because nothing held the word to it.** `entity-state.ts`, the
+    // migration's COMMENT and this task's own prose all say *last* explicitly
+    // reopened, and a survivor proved that was unenforced: mutating the reopen
+    // arm to `state.reopenedAt ?? env.serverTime` — a first-write-wins stamp —
+    // left every other case in this file green. Nothing else here could catch
+    // it, because the sweep's predicate is only "is it NULL", so first and last
+    // are indistinguishable to every other case.
+    //
+    // **The path below is the ONLY one that discriminates, and it is
+    // reachable.** `?? ` differs from a plain stamp only when a
+    // `ticket.reopened` arrives while `reopenedAt` is ALREADY set. A transition
+    // clears the flag, so a reopen after any transition cannot tell the two
+    // apart — the first cut of this case walked that path and did not kill the
+    // mutant. What DOES tell them apart needs a second reopen with no
+    // transition in between, and the doors permit exactly that: `ticket.reopened`
+    // clears `closed` and leaves the ticket in its terminal state (§1.2), and
+    // `checkTicketClosed` refuses only on `already-closed` + `close-requires-
+    // terminal` — so closing again straight after a reopen is ACCEPTED, which
+    // makes the second reopen ACCEPTED. Neither `ticket.closed` nor
+    // `ticket.reopened` touches `reopenedAt`, so at the second reopen the field
+    // still holds the FIRST instant, and that is the state the mutant reads.
+    const firstReopen = makeEnvelope({
+      type: 'ticket.reopened',
+      entity: { kind: 'ticket', id: TICKET },
+      payload: {},
+      serverTime: '2026-08-20T09:00:00.100Z',
+    });
+    const secondReopen = makeEnvelope({
+      type: 'ticket.reopened',
+      entity: { kind: 'ticket', id: TICKET },
+      payload: {},
+      serverTime: '2026-08-27T09:00:00.100Z',
+    });
+    const once = fold([
+      createdWith({ start: 'focus' }),
+      transitioned('doing'),
+      transitioned('done'),
+      closedEvent(),
+      firstReopen,
+    ]);
+    expect(once.reopenedAt).toBe(firstReopen.serverTime);
+    const twice = fold([
+      createdWith({ start: 'focus' }),
+      transitioned('doing'),
+      transitioned('done'),
+      closedEvent(),
+      firstReopen,
+      closedEvent(),
+      secondReopen,
+    ]);
+    // The discriminating pair: `toBe(second)` alone is not enough (a stamp
+    // carrying both reopens' worth of state would pass it), so the FIRST being
+    // gone is asserted beside it. Together they fail a first-write-wins `??`.
+    expect(twice.reopenedAt).toBe(secondReopen.serverTime);
+    expect(twice.reopenedAt).not.toBe(firstReopen.serverTime);
+  });
+
   it('SYSTEM_ACTOR_AUTO_CLOSE is a ULID, so the ingest door can accept it as an actor', () => {
     // Load-bearing rather than tidy: the sweep files its `ticket.closed` under
     // this id, and `submittedEventSchema` requires `actorId` to be a ULID
