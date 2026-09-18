@@ -10135,8 +10135,8 @@ on — or worse, believed.
   see and the rendered list is what a person meets. **The prototype disagrees and that is why the case
   exists**: it draws `Owner` as an option and gates the select on the viewer alone
   (`design-system/interactive/desktop.dc.html:679-685`, data `:3061`).
-  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:499` (the option list), `:430` (the arm),
-  `:518` (the representability predicate), `apps/web/test/members-page.test.tsx:770`
+  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:518` (the option list), `:447` (the arm),
+  `:537` (the representability predicate), `apps/web/test/members-page.test.tsx:770`
 
 - ✅ **13.825 — changing a role ingests exactly ONE `membership.granted`, with the right entity, and re-reads
   the roster.** Three claims, each of which a different defect would satisfy while the other two held: a
@@ -10147,7 +10147,7 @@ on — or worse, believed.
   reads the target's CURRENT role through — and the payload restates the `userId`, because `parse-event.ts`
   refuses an entity and a payload that disagree. **No new server route was added**: the write goes through
   `POST /events`, the generic client batch every other claim on this shell uses.
-  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:292` (the change), `:303` (the entity id),
+  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:309` (the change), `:303` (the entity id),
   `:171` (the re-read), `apps/web/test/members-page.test.tsx:799`
 
 - ✅ **13.826 — a member sees the role as text and no control at all.** The gate is the page's EXISTING
@@ -10157,7 +10157,7 @@ on — or worse, believed.
   is still said, because the absence alone passes on a page that draws no role at all. **The absence
   assertion is UNANCHORED on purpose** — see the accessible-name measurement below, which is what made an
   anchored pattern a check that could not fail.
-  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:430` (the viewer half of the predicate),
+  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:447` (the viewer half of the predicate),
   `apps/web/test/members-page.test.tsx:834`
 
 - ✅ **13.827 — a REFUSED role change is said out loud, and the cell does not move.** A swallowed answer
@@ -10166,11 +10166,14 @@ on — or worse, believed.
   first version of this sentence, which named the two rules plan-internally and was wrong about both.**
   `grant-owner-requires-owner` fires only when the payload grants `owner`
   (`apps/server/src/permissions/check-permission.ts:589`), and this control's options
-  (`page.tsx:499-503`) cannot build that payload, so **it can never fire from here**. `last-owner` fires
+  (`page.tsx:518-522`) cannot build that payload, so **it can never fire from here**. `last-owner` fires
   only when the SERVER's row for that user holds `owner`
-  (`packages/rule-engine/src/checks/membership.ts:128-135`) while the rendered row is editable — and
+  (`packages/rule-engine/src/checks/membership.ts:139-146`) while the rendered row is editable — and
   `isEditableRole` suppresses the control on an owner's row, both halves reading `proj_memberships`
-  (`routes/builder-reads.ts:247-252`, `engine-context.ts:405-411`), so **in the ordinary case it cannot fire
+  (`routes/builder-reads.ts:247-252` for the roster; `engine-context.ts:124` `readMembershipState`, reached
+  from `getEntityState('membership')` at `:273`, for the guard — **an earlier version of this sentence cited
+  `:405-411`, which is `countWorkspaceOwners`, the COUNT `last-owner` compares against and not the read
+  behind it**), so **in the ordinary case it cannot fire
   either**; it is reachable through a STALE roster read, which is a real race and not the common path. What
   the arm is actually for: a stale-read `last-owner`, the ordinary `permission.role` refusal when the
   actor's own authority changes under them, a malformed payload, and transport failures. **The assertion was
@@ -10182,7 +10185,7 @@ on — or worse, believed.
   leave the new role sitting on screen — and `rosterReads` stays at **1**, because a refused write must not
   re-read either. That second half is not decoration: the mutation that reloads on every answer (M6 below)
   reddens this case alone.
-  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:292` (the refusal arms), `:454` (the alert),
+  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:309` (the refusal arms), `:454` (the alert),
   `apps/web/test/members-page.test.tsx:862`
 
 - ✅ **13.828 — an OWNER's row keeps the chip, because the control cannot state the value it would hold.**
@@ -10197,8 +10200,8 @@ on — or worse, believed.
   **This narrowing was a CONSERVATIVE DEFAULT taken by the executor, filed rather than assumed, and it has
   since been RULED ON: the controller confirmed it on 2026-09-18**, answering
   `gisik-nokma-lanes/EXEC2-2026-09-18-owner-row-editability.md`, which priced both readings. If that
-  decision is ever revisited, the predicate at `:430` and this case change together and nothing else does.
-  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:430`, `:518`,
+  decision is ever revisited, the predicate at `:447` and this case change together and nothing else does.
+  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:447`, `:537`,
   `apps/web/test/members-page.test.tsx:910`
 
 **Mutations, each applied to a backed-up file, confirmed by sha256 to have CHANGED the file, run, then
@@ -10271,7 +10274,7 @@ piece of work.
 3. **Capitalised labels were NOT adopted, and this is a deviation from the plan's sample rather than an
    oversight.** The plan expects `['Admin', 'Member', 'Guest']`; the shipped control offers
    `['admin', 'member', 'guest']`. Two reasons, and the second is decisive: the mint form on this same page
-   already ships the lowercase labels (`page.tsx:669-671`, pinned by case 3.132), and the roster's chip
+   already ships the lowercase labels (`page.tsx:688-690`, pinned by case 3.132), and the roster's chip
    prints the wire's own token — case 13.761 pins that with the reasoning that a case expecting `'Owner'`
    "would be asserting a mapping nobody wrote". A capitalised label here would be a display mapping living
    in exactly one control; the mixed presentation it produces on one screen (a lower-case `owner` chip
@@ -10299,10 +10302,17 @@ its concern is real.** Measured: `apps/web`'s `dataSource` is the ONLINE source 
 to `POST /events`, whose engine context implements `countWorkspaceOwners`, so the guard answers there
 exactly as Task 1 designed and **no throw is reachable from this control**. The replica's outbox is reached
 through `createReplicaDataSource` (defined at `packages/app-core/src/replica/replica-data-source.ts:653`),
-which is constructed in **THREE** places, not the two an earlier draft of this paragraph named:
-`apps/desktop/src/app.tsx:56`, **`apps/mobile/src/app.tsx:40`**, and the dual-client harness at
+which is constructed in **SIX** places repo-wide, not the two an earlier draft of this paragraph named:
+`apps/desktop/src/app.tsx:56`, **`apps/mobile/src/app.tsx:40`**, the dual-client harness at
 `apps/server/test/dual-client/rig.ts:434` (the `:28` that draft cited is that file's IMPORT list, not a
-construction). **★ That first draft said "not by `apps/web` (measured…)" and its sweep had been truncated
+construction), and three inside the defining package's own test file —
+`packages/app-core/test/replica/replica-data-source.test.ts:194`, `:506` and `:605`.
+**★ The first corrected version of this sentence said "THREE", and that was a universe error of exactly the
+kind the paragraph below describes**: it counted apps and the harness while silently excluding the package
+that defines the function, which is the sort of scope a reader cannot see and would not think to widen. The
+number is only meaningful with its universe attached, so both are stated now. *Caught by the scoped
+re-review, i.e. by the same instrument that caught the truncation this paragraph is about — the lesson
+applied to itself is the only form in which it is worth writing down.* **★ That first draft said "not by `apps/web` (measured…)" and its sweep had been truncated
 by the author's own `sed -n '1,20p'`, which cut `apps/mobile` off the end of the output.** The claim's
 conclusion survived and its EVIDENCE did not: the universe was wrong in exactly the way a truncated sweep
 is always wrong — silently, and in the direction of the answer the author expected. Caught by the
@@ -10313,7 +10323,7 @@ So "the role control wires the event to the client ingest path" is true, and "th
 replica's outbox" is not — `apps/web` does not construct a replica data source at all. **The follow-on
 stays open with a corrected trigger: it goes live when a REPLICA-BACKED client gains a screen that emits
 `membership.granted` or `membership.revoked`.** Measured: the only client in the repo that emits either
-today is this task's control (`page.tsx:306`); `apps/desktop` is a `TicketList` shell and `apps/mobile` has
+today is this task's control (`page.tsx:321`); `apps/desktop` is a `TicketList` shell and `apps/mobile` has
 `editor/`, `push/`, `screens/`, `storage/` and no members surface, so the throw remains latent on both. The
 finding itself (`outbox.ts:315` calls `evaluateEvent` with no `try`/`catch`) is **narrower than its first
 record and no less real**; the repair is still where a throwing evaluation is caught, and still not a

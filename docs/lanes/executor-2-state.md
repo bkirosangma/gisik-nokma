@@ -59,10 +59,10 @@ the reviewed shas).
 ### What shipped
 
 `apps/web/app/w/[workspaceId]/members/page.tsx` — the Role cell's second arm: a shared `Select` for an
-admin, on rows whose role the control can state (`:430`, predicate `:518`, options `:499`), a `changeRole`
-that submits `membership.granted` through the ordinary ingest door (`:292`, entity id `:303`), a
-`loadMembers` callback so a commit re-reads the roster (`:171`), and a refusal alert under the table
-(`:454`). The file docblock's role-control passage is **CORRECTED, not deleted** (`:58-107`). ·
+admin, on rows whose role the control can state (`:447`, predicate `:537`, options `:518`), a `changeRole`
+that submits `membership.granted` through the ordinary ingest door (`:309`, entity id `:320`), a
+`loadMembers` callback so a commit re-reads the roster (`:173`), and a refusal alert under the table
+(`:473`). The file docblock's role-control passage is **CORRECTED, not deleted** (`:58-107`). ·
 `apps/web/test/members-page.test.tsx` — cases **13.824–13.828**, plus 13.761 re-pointed and 3.132/3.133
 scoped to the mint form. · `Features.md` (the members bullet's ABSENT list corrected, the role control
 added, and the shared-`Select` bullet's call-site list gained its fourth `apps/web` site) · `test-cases/13`
@@ -77,7 +77,7 @@ added, and the shared-`Select` bullet's call-site list gained its fourth `apps/w
 2. **Its sample cases name a control on `Kiro`'s row, and the fixture makes Kiro the OWNER** — the one row
    this design leaves chipless.
 3. **Its expected labels are capitalised; the shipped ones are lowercase**, matching the mint form on the
-   same page (`page.tsx:669-671`) and 13.761's rule that the row prints the wire's own token.
+   same page (`page.tsx:688-690`) and 13.761's rule that the row prints the wire's own token.
 4. **EVERY name query had to be a REGEX, and that is a measurement.** The trigger's accessible name is
    `<its value> <the caller's aria-label>` — `member Role for Anselma Marak` — because react-aria sets
    `aria-labelledby` and the algorithm concatenates it. Exact-string queries return 0 against a correct

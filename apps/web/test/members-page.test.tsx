@@ -861,12 +861,22 @@ describe('13.824 the roster’s role control, and the option it deliberately doe
   });
 
   /**
-   * 13.827 THE REFUSAL, and this is the case the surface most needs. Task 1 put a
-   * guard behind this write that can say no (`last-owner`,
-   * `grant-owner-requires-owner`), and a control that swallowed the answer would
-   * show the click as having worked — the person reads their own intent as fact
-   * while the server holds the old role. That is the same defect 3.138 pins on
-   * Withdraw, on the same page.
+   * 13.827 THE REFUSAL, and this is the case the surface most needs. A control
+   * that swallowed the answer would show the click as having worked — the person
+   * reads their own intent as fact while the server holds the old role. That is
+   * the same defect 3.138 pins on Withdraw, on the same page.
+   *
+   * **This docblock first named `last-owner` and `grant-owner-requires-owner` as
+   * the refusals to expect, and an independent review showed both were wrong for
+   * THIS control** — `grant-owner-requires-owner` needs a payload granting
+   * `owner`, which the options cannot build, and `last-owner` needs the server's
+   * row to hold `owner` while the rendered row is editable, which the row
+   * predicate suppresses. The reachable refusals are a stale-read `last-owner`,
+   * the ordinary `permission.role`, a malformed payload, and transport
+   * failures; the page's `changeRole` docblock carries the full analysis. The
+   * CASE is unchanged by that correction — it drives a refusal through the stub
+   * and asserts the rendering — which is the point worth keeping: the assertion
+   * was never the part that was wrong.
    *
    * Both halves again, and the second is the one that is easy to lose: the
    * refusal is on screen, AND the cell still says the role the server actually

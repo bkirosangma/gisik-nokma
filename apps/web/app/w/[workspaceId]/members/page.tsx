@@ -85,7 +85,7 @@ export const COPY_IT_NOW = 'Copy it now — it is not stored and cannot be shown
  *
  * ## THE ROLE CONTROL IS OFFERED WHERE IT CAN STATE THE VALUE, which is narrower than the prototype
  *
- * The prototype gates the select on the VIEWER alone (`:3061`,
+ * The prototype gates the select on the VIEWER alone (`desktop.dc.html:3061`,
  * `canEditRole: myRoleIsAdmin`) and lists `Owner` among its options, so its
  * owner rows are editable like any other. This product omits `Owner` from the
  * options — the invite form's judgement, and the same one the plan records — and
@@ -297,7 +297,7 @@ export default function MembersPage() {
    * (`apps/server/src/permissions/check-permission.ts:589`) and
    * `EDITABLE_ROLE_OPTIONS` cannot build one, so it can NEVER fire from this
    * control. `last-owner` fires only when the SERVER's row for that user holds
-   * `owner` (`packages/rule-engine/src/checks/membership.ts:128-135`) while the
+   * `owner` (`packages/rule-engine/src/checks/membership.ts:139-146`) while the
    * rendered row is editable, and `isEditableRole` suppresses the control on an
    * owner's row — both halves reading `proj_memberships` — so it is reachable
    * through a STALE roster read rather than in the ordinary case. The arm is
@@ -415,7 +415,7 @@ export default function MembersPage() {
                         and the file docblock's role-control section.
 
                         The prototype gates its `<select>` on the VIEWER alone
-                        (`:3061`, `canEditRole: myRoleIsAdmin`) and offers
+                        (`desktop.dc.html:3061`, `canEditRole: myRoleIsAdmin`) and offers
                         `Owner` in the options, so its owner rows are editable
                         like any other. This product removed `Owner` from the
                         options, and the two halves do not compose: a `Select`
@@ -502,16 +502,16 @@ export default function MembersPage() {
 
 /**
  * The roles the roster's role control may SET — the invite form's own three
- * (`:669-671`), with the same omission and the same reason. `owner` is absent
+ * (`:688-690`), with the same omission and the same reason. `owner` is absent
  * because there is no ownership-transfer flow: the prototype offers it
- * (`:680-685`), `inviteSentPayload` refuses it, `check-permission.ts:389`
+ * (`desktop.dc.html:680-685`), `inviteSentPayload` refuses it, `apps/server/src/permissions/check-permission.ts:389`
  * records that the invite path "refuses `owner`, and stops there", and Task 1's
  * `grant-owner-requires-owner` now refuses it on the ingest door too. Promoting
  * somebody to owner is a task of its own, not an option in a dropdown.
  *
  * The LABELS are the wire's own tokens and not prettified, which is the
  * judgement the roster's chip already carries and case 13.761 pins: the mint
- * form on this same page ships `admin / member / guest` (`:669-671`), and a
+ * form on this same page ships `admin / member / guest` (`:688-690`), and a
  * capitalised label here would be a display mapping that exists in exactly one
  * control and nowhere else in the product.
  */
