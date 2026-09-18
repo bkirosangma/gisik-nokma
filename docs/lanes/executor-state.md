@@ -20,8 +20,12 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~05:3x IST. **STEP 2c-1 (THE TOKEN LAYER) IS DONE, GATED,
-> # AND ITS PR IS OPEN AGAINST `owner/workspace-edits`. REVIEWER IN FLIGHT AT THE TIME OF WRITING.**
+> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~05:4x IST. **STEP 2c-1 (THE TOKEN LAYER) IS DONE, GATED,
+> # REVIEWED, AND ITS PR #426 IS OPEN AGAINST `owner/workspace-edits`, AWAITING THE CONTROLLER'S MERGE.**
+>
+> **The reviewer ran and its finding was REAL — and it was against me.** Details below; the short
+> version is that a sentence I wrote to justify a new test was false, the review falsified it, I
+> re-derived every number myself before acting, and the fix round is committed and re-gated.
 >
 > Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-step2c1-tokens.md`. **The Step 2c-0 block further
 > down this file is the RECORD of a merged PR (#424, merged `3b8b8e5e`), NOT the position.** Nothing in it
@@ -30,11 +34,11 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | | |
 > |---|---|
 > | branch | `exec/step2c1-tokens`, cut from `origin/owner/workspace-edits` at `3b8b8e5e` |
-> | **PR** | base **`owner/workspace-edits`** — never `main` |
-> | HEAD at gate | `3a0ded41` — **the gate below was run at the tree this names** |
+> | **PR** | **#426**, base **`owner/workspace-edits`** — verified via `gh pr view --json baseRefName`, not assumed |
+> | HEAD at gate | **`4454f66c`** — the fix-round head; **the gate below was re-run at THIS sha** (the pre-review head was `eb153398`, `3a0ded41` before that) |
 > | merge-base | `3b8b8e5e` (= `origin/owner/workspace-edits` when the branch was cut) |
 > | tree | clean |
-> | gate | `corepack pnpm turbo run build test typecheck --force --concurrency=2` → **33/33 successful, 0 cached, EXIT 0**; `grep -c 'FAIL\|failed'` over the log = **0**; Node **v22.22.2**, pnpm **9.15.0**. Per package: domain 486 · **ui 322** · rule-engine 306 · editor 178 · sync-client 90 · **app-core 1454** · desktop 9 · mobile 29 · **web 430** · mcp-server 44 · **server 1534 / 5 skipped** |
+> | gate | `corepack pnpm turbo run build test typecheck --force --concurrency=2` → **33/33 successful, 0 cached, EXIT 0**, twice (once pre-review, once at the fix-round head); `grep -c 'FAIL\|failed'` over each log = **0**; Node **v22.22.2**, pnpm **9.15.0**. Per package: domain 486 · **ui 322** · rule-engine 306 · editor 178 · sync-client 90 · **app-core 1454** · desktop 9 · mobile 29 · **web 430** · mcp-server 44 · **server 1534 / 5 skipped** |
 > | six checks | all **EXIT 0**: `env` · `tasks` · `runbook` · `citations` · `help` (via pnpm) and `case-ids` via **`node scripts/check-case-ids.mjs`** — there is still no `check:case-ids` pnpm script. `case-ids` reads **2196 unique ids** (2189 before this step's seven) |
 >
 > ## ▣ THE SCOPE FINDING — the dispatch's T3/T4 premise does not hold for this product
@@ -85,15 +89,53 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > attribute, which is exactly what porting the export's literal selector would have broken. `/v1/auth/methods`
 > still answers `"google":true`.
 >
+> ## ▣ THE REVIEW — it confirmed the derivation, then falsified MY OWN sentence
+>
+> Independent, read-only reviewer. It reproduced **all five** of my ratios exactly (7.0211 / 6.5235 /
+> 6.5659 / 5.0660 / 4.4247), all **198** `CONTRAST_PAIRS` checks (0 failures), the 33 count, **zero
+> `minimum` edits**, **9 of 9** prototype-vs-shipped hexes, and it *verified* the `--pink`/`--purple`
+> mapping from the export's own chip calls (`desktop.dc.html:2355/2357`) rather than accepting my
+> reasoning.
+>
+> **Then it found this, and it was right:**
+>
+> My new case 13.681 asserted `contested`/`restricted`/`customMarker` at **3:1**, justified by the
+> sentence *"they carry no text role — they are never a ground for text"*. **`contested` IS read text
+> today** — `.gn-sync-status-bar__failed { color: var(--gn-contested) }` on `background:
+> var(--gn-surface)` (`ui.css:2602`, consumed at `sync-status-bar.tsx:85`, 13.6px normal weight, so AA
+> wants **4.5**). It measures **4.3746 in `hig`/`minimal` light — a real AA failure**, pre-existing and
+> untouched by this change (`neo` light is 6.02, so T5 incidentally fixed it in the one style it
+> touched). Siblings, both **unnamed by any `CONTRAST_PAIRS` row**: `warning` on surface **4.2485**,
+> `danger` on surface **4.4013**.
+>
+> **Every one of those numbers was re-derived here with my own arithmetic before acting** — they
+> reproduce exactly. The case now **asserts the failing value** instead of blessing a too-low floor.
+> Nothing in the CSS was fixed. **Named owner: whoever next touches the sync status bar or the
+> `contested`/`warning`/`danger` roles.**
+>
+> **Also corrected in the fix round — all displaced by THIS change, all found by the same review:**
+> `tokens.ts`'s `textAccentLight` docblock (`#E3D8CD`→`#E7DDD4`, 5.311→5.596, 4.755→4.984) and its
+> `CONTRAST_PAIRS` docblock (the "smallest margin" claim — after T5 `warmPaper` at 5.453 is smallest,
+> not `neo`); the roster JSON's citation figure (1.242→1.182, which my own earlier edit had left
+> behind); and the 13.681 catalogue entry, which carried the same false justification as the test.
+> **Old values are kept visible beside the new ones in every case.**
+>
+> **A third named owner, recorded not fixed:** the calibration anchor itself is stale —
+> `tokens.ts`'s `green700` docblock gives `successText` ratios **4.40 / 5.40** computed against
+> **`white`**, but the shipped `successText` is `onColorWarmLight` **`#fbf7f3`** (moved off `white` in
+> owner round 4, 2026-09-16); live today they are **4.12 / 5.07**. Dated 2026-09-08, untouched here.
+> **It matters because it is the anchor a future reviewer is told to calibrate against.**
+>
 > ## Live anchors — measured at this block
 >
 > | | |
 > |---|---|
 > | merge-base | `3b8b8e5e` |
-> | HEAD | `3a0ded41` (before this handoff commit) |
-> | ahead of owner | the step's 5 commits |
+> | HEAD | `4454f66c` (the fix-round head; this handoff commit sits on top of it) |
+> | pushed | `origin/exec/step2c1-tokens` — verified equal to local HEAD before this block was written |
+> | ahead of owner | the step's 6 commits |
 > | tree | clean |
-> | branch contains | `70ab0338` · `dbe1f721` · `cd008c00` · `1d269bab` · `3a0ded41` |
+> | branch contains | `70ab0338` · `dbe1f721` · `cd008c00` · `1d269bab` · `3a0ded41` · `eb153398` · `4454f66c` |
 >
 > ---
 >
