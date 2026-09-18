@@ -20,123 +20,95 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > pre-launch 6/7 were written on sibling branches off `main` that share no source files, so each wrote
 > its own entry here. Nothing below is stale; they describe different work.
 
-> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~05:4x IST. **STEP 2c-1 (THE TOKEN LAYER) IS DONE, GATED,
-> # REVIEWED, AND ITS PR #426 IS OPEN AGAINST `owner/workspace-edits`, AWAITING THE CONTROLLER'S MERGE.**
+> # ▣ CURRENT POSITION — THURSDAY 2026-09-18 ~06:1x IST. **STEP 2c-2 (THE LEGAL PAIR AND THE 404) IS
+> # DONE, GATED, REVIEWED, AND ITS PR IS OPEN AGAINST `owner/workspace-edits`.** This block is the
+> # position; everything below it is RECORD.
 >
-> **The reviewer ran and its finding was REAL — and it was against me.** Details below; the short
-> version is that a sentence I wrote to justify a new test was false, the review falsified it, I
-> re-derived every number myself before acting, and the fix round is committed and re-gated.
+> Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-step2c2-legal-notfound.md`. **The Step 2c-1 and
+> 2c-0 blocks further down are RECORDS of merged PRs (#426, #424), NOT the position.** Nothing in them
+> is outstanding; do not start work from them.
 >
-> Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-18-step2c1-tokens.md`. **The Step 2c-0 block further
-> down this file is the RECORD of a merged PR (#424, merged `3b8b8e5e`), NOT the position.** Nothing in it
-> is outstanding; do not start work from it.
+> **The frozen head is the commit that ADDS this block** — the handoff is committed BEFORE the freeze
+> line, not after it, which is the discipline the controller recorded after PR #426's head moved three
+> times. Nothing is pushed after it. The gate was re-run at this head and its result is in the PR body,
+> because a file cannot name the sha of the commit that contains it.
 >
 > | | |
 > |---|---|
-> | branch | `exec/step2c1-tokens`, cut from `origin/owner/workspace-edits` at `3b8b8e5e` |
-> | **PR** | **#426**, base **`owner/workspace-edits`** — verified via `gh pr view --json baseRefName`, not assumed |
-> | HEAD at gate | **`4454f66c`** — the fix-round head; **the gate below was re-run at THIS sha** (the pre-review head was `eb153398`, `3a0ded41` before that) |
-> | merge-base | `3b8b8e5e` (= `origin/owner/workspace-edits` when the branch was cut) |
+> | branch | `exec/step2c2-legal-notfound`, cut from `origin/owner/workspace-edits` at `ed225690` |
+> | **PR** | base **`owner/workspace-edits`** — verified via `gh pr view --json baseRefName`, not assumed |
+> | merge-base | `ed225690` (= `origin/owner/workspace-edits` when the branch was cut; it is PR #426's merge commit) |
 > | tree | clean |
-> | gate | `corepack pnpm turbo run build test typecheck --force --concurrency=2` → **33/33 successful, 0 cached, EXIT 0**, twice (once pre-review, once at the fix-round head); `grep -c 'FAIL\|failed'` over each log = **0**; Node **v22.22.2**, pnpm **9.15.0**. Per package: domain 486 · **ui 322** · rule-engine 306 · editor 178 · sync-client 90 · **app-core 1454** · desktop 9 · mobile 29 · **web 430** · mcp-server 44 · **server 1534 / 5 skipped** |
-> | six checks | all **EXIT 0**: `env` · `tasks` · `runbook` · `citations` · `help` (via pnpm) and `case-ids` via **`node scripts/check-case-ids.mjs`** — there is still no `check:case-ids` pnpm script. `case-ids` reads **2196 unique ids** (2189 before this step's seven) |
+> | gate | `corepack pnpm turbo run build test typecheck --force --concurrency=2` → **33/33 successful, 0 cached, EXIT 0**, twice (at `a0f6d172` and again at the frozen head); `grep -c 'FAIL\|failed'` over each log = **0**; interpreter probed from inside the toolchain — **node v22.22.2**, **pnpm 9.15.0** (NOT the v24 corepack that a bare `pnpm` on PATH resolves to). Per package: domain 486 · ui 322 · rule-engine 306 · editor 178 · sync-client 90 · app-core 1454 · desktop 9 · mobile 29 · **web 438** · mcp-server 44 · server 1534 / 5 skipped |
+> | six checks | all **EXIT 0**: `env` · `tasks` · `runbook` · `citations` · `help` (via pnpm) and `case-ids` via **`node scripts/check-case-ids.mjs`**. `case-ids` reads **2204 unique ids**, +8 for this block (2196 before) |
+> | viewport suite | `pnpm run test:e2e:viewport`, its own `next dev` on **3021** → **28 passed, 2 skipped, 3 failed**. All three failures are `/help`'s **pre-existing** tap-target ratchet — identical in count, baseline and viewports to the base control the 2c-1 session ran. **No failure names `/privacy`, `/terms` or the 404 probe**: the accessible-names, tap-target and type-scale ratchets all pass on the routes this step touched |
 >
-> ## ▣ THE SCOPE FINDING — the dispatch's T3/T4 premise does not hold for this product
+> ## ▣ WHAT LANDED, AND THE FOUR THINGS IT DELIBERATELY DID NOT
 >
-> The dispatch asked to map "each prototype variable to the product's tint role by name". Measured: the
-> product has **exactly ONE tint role**, `tintWarning` (`TOKEN_ROLES`, and `grep -- '--gn-tint'` over the
-> repo). The export uses six. So **T3's product footprint is two primitives** (the warning wash's alpha in
-> each theme) and **T4 has NO counterpart at all** — no `tintAccent` role exists and there is no consumer
-> for one. The product declined the four other washes on measurement, and that refusal is already
-> recorded twice (`ui.css`'s "no `--gn-tint-purple` role exists or is added here"; `Features.md`). The
-> audit's sentence "every danger/warning/success wash — chips, pills, banners — is drawn from these" was
-> **true of the export and false of the product**, whose chips draw the fill ladder. Ruled conservative:
-> do not invent roles with no consumer. In the PR body as the mapping table.
+> The export's `isLegal` (`:1720-1755`) and `isNotFound` (`:1844-1862`), three items each and no more:
+> a `.gn-nav` top bar with the brand tile, wordmark and a `Sign in` link; a segmented Privacy/Terms pair
+> on the shared `.gn-segmented` control; an anchor row built from each page's own headings; and, on the
+> 404, a 72px `aria-hidden` tile, a third action link to `/help`, and the export's heading scale in a
+> centred 520px column.
 >
-> ## ▣ THE PRE-EXISTING FAILURE — `/help`'s tap-target ratchet, NOT caused by this change
+> 1. **`BackButton` is REPLACED, and the file is DELETED.** The export draws no back affordance in
+>    `:1720-1755`; that absence was the dispatch's own condition on the replacement. `back-button.tsx`
+>    had no consumer left, so it and its `.gn-legal__back` rule left together. **The loss is real and is
+>    written down in three places**: the no-history branch went to `/sign-in` and the bar's `Sign in`
+>    link goes to the same route, so a reader who landed with no history still has a destination — the
+>    one-press return for a reader who HAS history does not. Cases 13.322/13.323 SUPERSEDED.
+> 2. **The 404's copy is NOT ported.** "This page isn't here" / "Nothing was deleted" would answer the
+>    question that page exists to refuse. The export is thinner than this page, not ahead of it.
+> 3. **The export's compact anchor row is NOT ported either** — its links take the 44px tap floor
+>    instead, because a wrapped row of anchors is not a sentence and must not borrow the
+>    inline-in-prose exemption. Both routes hold a zero-offender tap baseline that this keeps.
+> 4. **The phone's title downscale is NOT touched.** The export's heading scale replaced the base
+>    rule's `1.6rem`; the product's own `(max-width: 40rem)` rule still drops the title to `1.35rem`.
+>    The export is a desktop mockup and says nothing about 390px.
 >
-> The viewport suite (`pnpm run test:e2e:viewport`, its own `next dev` on **3021**) is **28 passed, 2
-> skipped, 3 failed** at this head. All three failures are one case: `responsive.spec.ts:560` `help
-> (/help)`, a **tap-target ratchet** ("interactive targets under 44x44 at 390px rose above the recorded
-> baseline 10"), on all three viewports. **Verified pre-existing, not assumed:** the tree was reverted
-> wholesale to `origin/owner/workspace-edits`, rebuilt, and the same case run as a control — **it fails
-> identically at the base**, same message, same baseline, same three viewports. This change touches
-> colours and comments only; tap targets are geometry.
+> ## ▣ THE DEFECT THIS STEP FOUND IN ITSELF — the fixed line-height
 >
-> **Two traps hit on the way there, both worth keeping:**
-> - **The suite reads `@gisik-nokma/ui` through `dist`.** Before `pnpm turbo run build`, case 13.362
->   failed with `expected #f1eae3, received #ede4db` — the suite was serving the STALE dist while the
->   source was correct. Rebuild first, then run. (28 passed after; 25 before.)
-> - **The committed `non-text-contrast-roster.json` carries TWO sanctioned waivers; `viewport.spec.ts`
->   emits ONE.** The `gn-select__panel` entry was added by hand and no generator produces it, so
->   re-running `test:e2e:stack` **silently DELETES it**. Not run, not fixed — named owner: whoever next
->   touches that suite.
+> The export pairs `34px` with a FIXED `41px`. Ported literally, that meant the phone's 21.6px title
+> inherited 41px of leading — a ratio of 1.9 — on the two pages a locked-out reader is most likely to
+> open. **The viewport suite caught it on all three viewports and nothing else would have**: no unit
+> test measures a cascade. The media block now restates `line-height: 1.25`, which is exactly what the
+> phone had before the port, and case 13.688 asserts the pair so deleting it is a red (mutation run:
+> reddens 13.688 alone, 1 failed / 16 passed).
+>
+> ## ▣ THE MUTATION TABLE (12 mutations, each reddening its own case)
+>
+> 13.685 ← label rename · 13.684 ← both tabs current · 13.684 ← no tab current · 13.683 ← hand-typed
+> anchor row · 13.683+13.685 ← row removed · 13.687 ← third link removed · 13.686 ← tile removed ·
+> 13.689 ← copy replaced · 13.688 ← heading size reverted · 13.688 ← 520px column removed ·
+> 13.682 ← bar removed · 13.682+13.685 ← `Back` control re-added · 13.688 ← phone line-height removed.
+> **The harness reported a mutation CLEAN on its first run and was wrong** — the mutation broke the
+> JSX, vitest printed `Tests  no tests`, and a parser that only looks for `FAIL` lines cannot tell
+> "nothing failed" from "nothing ran". It now requires the run's own summary line before it reports.
 >
 > ## ▣ WITNESSED LIVE (the owner's proof)
 >
-> On the hot web at **3001**, `data-style="neo"`, **`data-theme` ABSENT**:
+> The hot web container mounts **this worktree** (`docker inspect` on the mounts, not assumed), so
+> `http://localhost:3001/privacy`, `/terms` and any unknown path serve these changes. Read back by curl
+> at the frozen head: on both legal routes `gn-legal__toc` 1 · `gn-nav__signin` 1 · `gn-legal__tabs` 1 ·
+> `On this page` 1; on the 404 `gn-notfound__tile` 1 · `Search the manual` 1; and
+> `Back to the previous page` 0 everywhere. Six screenshots, one per route per style, taken with
+> `localStorage['gn-style']` set BEFORE the pre-paint script so each shows the real path (every run
+> asserted `data-style` matched what was asked, or it exits 1):
 >
-> | | before | after |
-> |---|---|---|
-> | `--gn-accent` | `#3a6db0` | `#33629f` |
-> | `--gn-surface` | `#ede4db` | `#f1eae3` |
-> | `--gn-danger` | `#d70015` | `#9e2a20` |
-> | `--gn-contested` | `#d30f45` | `#9a3054` |
-> | `--gn-tint-warning` | `#f07c3433` | `#f07c341a` |
+> - `gisik-nokma-lanes/refs/2026-09-18-legal-{hig,minimal,neo}.png`
+> - `gisik-nokma-lanes/refs/2026-09-18-notfound-{hig,minimal,neo}.png`
 >
-> Screenshots: `gisik-nokma-lanes/refs/2026-09-18-tokens-{before,after}.png`. **The `data-theme` absence is
-> itself the evidence for the selector refusal** — the light-neo tokens are present with no theme
-> attribute, which is exactly what porting the export's literal selector would have broken. `/v1/auth/methods`
-> still answers `"google":true`.
+> **Both were LOOKED AT, not merely produced.** The legal shots show the bar, the tabs with Privacy
+> raised, the 8-link row and the prose unchanged; the 404 shots show the tile, the larger heading and
+> all three links with "Search the manual" between workspaces and inbox.
 >
-> ## ▣ THE REVIEW — it confirmed the derivation, then falsified MY OWN sentence
+> ## ▣ THE NEXT STEP IS NOT NAMED HERE
 >
-> Independent, read-only reviewer. It reproduced **all five** of my ratios exactly (7.0211 / 6.5235 /
-> 6.5659 / 5.0660 / 4.4247), all **198** `CONTRAST_PAIRS` checks (0 failures), the 33 count, **zero
-> `minimum` edits**, **9 of 9** prototype-vs-shipped hexes, and it *verified* the `--pink`/`--purple`
-> mapping from the export's own chip calls (`desktop.dc.html:2355/2357`) rather than accepting my
-> reasoning.
->
-> **Then it found this, and it was right:**
->
-> My new case 13.681 asserted `contested`/`restricted`/`customMarker` at **3:1**, justified by the
-> sentence *"they carry no text role — they are never a ground for text"*. **`contested` IS read text
-> today** — `.gn-sync-status-bar__failed { color: var(--gn-contested) }` on `background:
-> var(--gn-surface)` (`ui.css:2602`, consumed at `sync-status-bar.tsx:85`, 13.6px normal weight, so AA
-> wants **4.5**). It measures **4.3746 in `hig`/`minimal` light — a real AA failure**, pre-existing and
-> untouched by this change (`neo` light is 6.02, so T5 incidentally fixed it in the one style it
-> touched). Siblings, both **unnamed by any `CONTRAST_PAIRS` row**: `warning` on surface **4.2485**,
-> `danger` on surface **4.4013**.
->
-> **Every one of those numbers was re-derived here with my own arithmetic before acting** — they
-> reproduce exactly. The case now **asserts the failing value** instead of blessing a too-low floor.
-> Nothing in the CSS was fixed. **Named owner: whoever next touches the sync status bar or the
-> `contested`/`warning`/`danger` roles.**
->
-> **Also corrected in the fix round — all displaced by THIS change, all found by the same review:**
-> `tokens.ts`'s `textAccentLight` docblock (`#E3D8CD`→`#E7DDD4`, 5.311→5.596, 4.755→4.984) and its
-> `CONTRAST_PAIRS` docblock (the "smallest margin" claim — after T5 `warmPaper` at 5.453 is smallest,
-> not `neo`); the roster JSON's citation figure (1.242→1.182, which my own earlier edit had left
-> behind); and the 13.681 catalogue entry, which carried the same false justification as the test.
-> **Old values are kept visible beside the new ones in every case.**
->
-> **A third named owner, recorded not fixed:** the calibration anchor itself is stale —
-> `tokens.ts`'s `green700` docblock gives `successText` ratios **4.40 / 5.40** computed against
-> **`white`**, but the shipped `successText` is `onColorWarmLight` **`#fbf7f3`** (moved off `white` in
-> owner round 4, 2026-09-16); live today they are **4.12 / 5.07**. Dated 2026-09-08, untouched here.
-> **It matters because it is the anchor a future reviewer is told to calibrate against.**
->
-> ## Live anchors — measured at this block
->
-> | | |
-> |---|---|
-> | merge-base | `3b8b8e5e` |
-> | HEAD | `4454f66c` (the fix-round head; this handoff commit sits on top of it) |
-> | pushed | `origin/exec/step2c1-tokens` — verified equal to local HEAD before this block was written |
-> | ahead of owner | the step's 6 commits |
-> | tree | clean |
-> | branch contains | `70ab0338` · `dbe1f721` · `cd008c00` · `1d269bab` · `3a0ded41` · `eb153398` · `4454f66c` |
->
+> `docs/design/prototype-delta-2026-09-18.md`'s queue is the authority, and guessing the next row is not
+> this file's job. 2c-2 consumed rows `isLegal` (2) and `isNotFound` (3). What the queue still owed at
+> this head was **not** recounted here — recount it from the audit at the tip rather than trusting this
+> sentence.
+
 > ---
 >
 > # ↓ THE STEP 2c-0 RECORD — **MERGED. NOT THE POSITION. DO NOT START WORK FROM IT.** (#424, `3b8b8e5e`)
