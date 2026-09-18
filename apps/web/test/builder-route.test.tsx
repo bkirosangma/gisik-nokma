@@ -77,6 +77,18 @@ import EditWorkflowPage from '../app/w/[workspaceId]/settings/workflows/[workflo
  *
  * If a later apps/web suite needs the canvas too, the honest move is to promote
  * this block into `apps/web/test/setup.ts` rather than copy it a third time.
+ *
+ * **THE ISOLATION THIS RESTS ON IS A VITEST DEFAULT WITH NO CONFIG KEY.**
+ * `apps/web/vitest.config.ts` sets `include`, `environment` and `setupFiles` and
+ * declares no `isolate`, `pool`, `poolOptions` or `singleFork`, so the safety of
+ * putting globals at module scope comes from vitest's `isolate: true`. Measured
+ * by the reviewer both ways: with the default, a probe file run alongside this
+ * one sees `ResizeObserver === undefined`; with `--no-isolate`, the two
+ * `globalThis` assignments leak and the probe sees `function`. So a one-line
+ * `isolate: false` — a common CI speedup — would republish canvas globals into
+ * every apps/web suite, which is exactly the outcome this file's placement was
+ * chosen to avoid. `getBBox` and `offsetWidth` do not leak (they are prototype
+ * writes, not globals).
  */
 if (typeof HTMLElement !== 'undefined') {
   class LocalResizeObserver {

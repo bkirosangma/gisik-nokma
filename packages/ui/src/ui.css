@@ -1815,11 +1815,20 @@
    instrument and not about the file: `workflow-builder-screen`, `state-inspector`,
    `inspector-panel` and `transition-inspector` each return **0** rules by
    `grep -rn --include='*.css' -F .<family>`, while the SAME command shape
-   returns 7 for `.issues-panel`, 11 for `.publish-controls`, 15 for
+   returned 7 for `.issues-panel`, 11 for `.publish-controls`, 15 for
    `.gn-state-node` and 40 for `.ticket-type-editor` — so the sweep does reach
    CSS rules and these four are genuinely absent from them. Every declaration
    below therefore replaces a user-agent default rather than restyling
    something that already existed.
+
+   **RE-RUNNING THAT COMMAND TODAY PRINTS DIFFERENT NUMBERS, AND THE DIFFERENCE
+   IS THIS PARAGRAPH.** The control counts are now 10 / 12 / 16 / 42: the extra
+   hits are these docblock's own prose naming those classes (three for
+   `.issues-panel`, two for `.ticket-type-editor`, one each for the others), not
+   a change to any file. The counts above are pre-write and are the honest ones.
+   The instrument is polluted BY the record it produced, which is why a sweep
+   whose subject is a document must be run against the document as it was, or
+   with comments stripped.
 
    NO NEW TOKEN ROLES, the same discipline the canvas and panel blocks above
    record. `surface-raised`/`shadow-raised`/`radius-card` are `.gn-card`'s own
@@ -1840,12 +1849,34 @@
    same distinction, and `hig-per-screen/8a` measured them and ruled they stay.
 
    THE PROTOTYPE'S TWO-COLUMN LAYOUT IS NOT ADOPTED EITHER, and that one is a
-   refusal recorded before this task: `docs/hig-reconciliation-audit.md:690-712`
+   refusal recorded before this task: `docs/hig-reconciliation-audit.md:690-718`
    rules `SystemRulesPanel` and the whole rule-authoring subsystem as "EXISTS AND
-   THE PROTOTYPE OMITS IT. Keep and restyle; never delete", closing with "both
-   must be treated as requirements to preserve, not redesign away". The drawing
-   has no left column at all, so adopting its grid would delete a shipped
-   capability. Three rails below, preserving it. */
+   THE PROTOTYPE OMITS IT. Keep and restyle; never delete", closing at `:718`
+   with "Both must be treated as requirements to preserve, not redesign away".
+   The drawing has no left column at all. **Precisely what adoption would cost,
+   since the first version of this paragraph overstated it:** the prototype's own
+   right rail already carries the issues card that this product keeps on the
+   left, so a two-column grid would have to MOVE `SystemRulesPanel` rather than
+   mechanically delete it — the capability is preserved either way, and what is
+   refused is the move, which would put the two non-authorable invariants behind
+   a selection or below the fold. Three rails below, preserving it as drawn.
+
+   TWO MORE THINGS THE DRAWING HAS THAT THIS BLOCK NEITHER ADOPTS NOR STYLES,
+   named here so the next reader does not have to rediscover them. (1) The
+   container carries `animation:gnFade .25s ease` (`:1014`). The product owns
+   that idiom already (`@keyframes gnFade` below, `.gn-help`'s
+   `animation: gnFade 250ms ease`, and the `prefers-reduced-motion` opt-out) —
+   a one-line adoption this block does not make, because a screen-level entrance
+   animation is a motion decision that belongs with the reduced-motion audit
+   rather than with a typography-and-surface port. (2) The `.transition-inspector`
+   card renders four MORE families that are still at zero CSS — `add-rule-menu*`,
+   `restrict-to-editor*`, `require-field-editor*`, `require-different-user-editor*`
+   — and `template-gallery*` is the same shape on the sibling `/workflows/new`
+   route. **Named as a gap with an owner, not fixed here:** the prototype draws
+   no rule-authoring UI at all (0 hits for `Add rule`/`Remove rule`/`Restrict`),
+   so there is no drawn design to fit them to, and the audit's own `isBuilder`
+   row named three families rather than seven. **Owner: whoever next touches the
+   rule editors, and the audit's "keep and restyle" (`:694`) is the warrant.** */
 
 .workflow-builder-screen { display: flex; flex-direction: column; gap: 1rem; }
 .workflow-builder-screen__loading { margin: 0; color: var(--gn-text-muted); }
@@ -1884,7 +1915,17 @@
    fill, border and radius, and the same `neo` override. A control that looks
    exactly like static text is not editable-looking, and this is the one title
    in the product a person can type into — so the prototype's h1 appearance is
-   adopted for the type and refused for the boundary. Flagged in the PR body. */
+   adopted for the type and refused for the boundary. Flagged in the PR body.
+
+   AN `<h1>` BESIDE IT WOULD PRINT THE NAME TWICE, and that is the whole reason
+   it is refused. The first version of this note gave a different reason — that a
+   duplicate heading would make `getByText(name)` ambiguous for later tests — and
+   an independent reviewer refuted it with a probe: `getByText` matches text
+   content, and an input's `value` is not text content, so the two do not
+   collide. Left recorded because the refuted reason is the kind a later author
+   inherits. The heading gap this leaves is real, **pre-existing** (the base page
+   had no `<h1>` either), and recorded with an owner rather than fixed inside a
+   design port. */
 .workflow-builder-screen__name {
   min-height: 2.5625rem;
   padding: 0 0.875rem;

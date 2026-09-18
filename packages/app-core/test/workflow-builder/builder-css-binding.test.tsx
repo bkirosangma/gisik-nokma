@@ -74,9 +74,18 @@ function stripComments(css: string): string {
   return css.replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
-/** Every class these four families are STYLED under, anywhere in the file. */
+/**
+ * Every class these four families are STYLED under, anywhere in the file.
+ *
+ * `[A-Za-z]`, NOT `[a-z]`, and the uppercase half is load-bearing rather than
+ * tidy. `saved-filters-css-binding.test.tsx` uses `[A-Za-z0-9_-]*` and this
+ * file first shipped without the capitals — which made the equality BLIND to a
+ * rename that introduced one: `.workflow-builder-screen__canvas` renamed to
+ * `…__canvasRenamed` matched only as far as `…__canvas`, so the old name kept
+ * being harvested and the set never changed. Measured both ways below.
+ */
 function styledClasses(css: string): string[] {
-  const hits = [...stripComments(css).matchAll(/\.([a-z][a-z0-9_-]*)/g)].flatMap(
+  const hits = [...stripComments(css).matchAll(/\.([A-Za-z][A-Za-z0-9_-]*)/g)].flatMap(
     (hit) => hit[1] ?? [],
   );
   return [...new Set(hits.filter(isOurs))].sort();
@@ -141,7 +150,7 @@ function declarationsFor(css: string, selector: string): string | null {
 /** Every class these families ring with a `:focus-visible` rule. */
 function focusVisibleClasses(css: string): string[] {
   const hits = [...stripComments(css).matchAll(/([^{}]+)\{([^{}]*)\}/g)].flatMap((rule) =>
-    [...(rule[1] ?? '').matchAll(/\.([a-z][a-z0-9_-]*):focus-visible/g)].flatMap(
+    [...(rule[1] ?? '').matchAll(/\.([A-Za-z][A-Za-z0-9_-]*):focus-visible/g)].flatMap(
       (hit) => hit[1] ?? [],
     ),
   );
@@ -280,6 +289,22 @@ describe('13.767 the builder screen is styled, and the scanners are proven befor
     ]);
   });
 
+  it('catches a rename that introduces an UPPERCASE letter — the hole this file first shipped with', () => {
+    // `[a-z][a-z0-9_-]*` stops at the first capital, so `…__canvasRenamed`
+    // harvested as `…__canvas` and a rename that deleted a rule's whole body
+    // stayed invisible. Both spellings, so the fix cannot regress to either
+    // half, and `declarationsFor`' own selector walk is checked against the
+    // same pair below.
+    expect(styledClasses('.workflow-builder-screen__canvasRenamed { box-shadow: x; }')).toEqual([
+      'workflow-builder-screen__canvasRenamed',
+    ]);
+    expect(styledClasses('.workflow-builder-screen__canvasrenamed { box-shadow: x; }')).toEqual([
+      'workflow-builder-screen__canvasrenamed',
+    ]);
+    expect(declarationsFor('.workflow-builder-screen__canvasRenamed { x: y; }', '.workflow-builder-screen__canvasRenamed')).toBe(' x: y; ');
+    expect(declarationsFor('.workflow-builder-screen__canvasRenamed { x: y; }', '.workflow-builder-screen__canvas')).toBeNull();
+  });
+
   it('reads classes off a rendered tree and ignores classes from other blocks', () => {
     const host = document.createElement('div');
     host.innerHTML =
@@ -346,33 +371,61 @@ describe('13.767 every class the builder screen renders is a class ui.css styles
    * hypothetical and it is not inherited: it was MEASURED against this file.
    * Renaming `.workflow-builder-screen__canvas` to `…__canvasRenamed` — which
    * deletes the card treatment and leaves the class rendering unstyled — left
-   * every test above GREEN, because the `@media (max-width: 64rem)` rule below
-   * still names `__canvas` in `{ order: -1 }`, so `styledClasses` went on
-   * harvesting the name. The same shape is why `saved-filters`' 11.119 exists.
+   * every test above GREEN.
+   *
+   * **THE CAUSE RECORDED HERE WAS WRONG ONCE, AND THE CORRECTION IS THE POINT.**
+   * It first said the survival was because the `@media (max-width: 64rem)` rule
+   * below still names `__canvas` in `{ order: -1 }`. That is not the mechanism.
+   * The mechanism is the HARVEST REGEX: `[a-z][a-z0-9_-]*` stops at the first
+   * uppercase letter, so `…__canvasRenamed` matched only as far as `…__canvas`
+   * and the OLD name kept entering the set from the renamed rule itself. The
+   * media-query mention was a second, redundant source of the same name. The
+   * two are distinguishable and were separated: `…__canvasrenamed`, all
+   * lowercase, DOES redden the equality (nothing truncates), while
+   * `…__canvasRenamed` reddens only this table. Both are asserted below.
+   *
+   * That distinction is why the regexes in this file now carry `[A-Za-z]`, and
+   * why the first case in this describe block is a planted measurement of it: a
+   * recorded mechanism that a one-line probe refutes is worse than no mechanism,
+   * because the next author writes against the wrong hazard.
    *
    * The table names one load-bearing declaration per top-level rule of the
    * block — the ones whose loss would be visible on screen — rather than
    * restating every declaration, which would be a copy of the stylesheet that
    * has to be updated twice.
    */
-  it('13.771 every top-level rule still carries the declaration that makes it do something', () => {
+  it('13.771 every rule in the block still carries the declaration that makes it do something', () => {
+    // EVERY selector the block styles, not a sample: the first version of this
+    // table named fourteen and left `__load-error`, `__rules`, `__rule-summary`
+    // and the two inspector titles unpinned, so emptying any of their bodies
+    // removed its treatment with all thirteen tests green — the same class of
+    // hole this case exists to close, at a smaller radius.
     const expected: [selector: string, declaration: string][] = [
       ['.workflow-builder-screen', 'display: flex'],
+      ['.workflow-builder-screen__loading', 'color: var(--gn-text-muted)'],
+      ['.workflow-builder-screen__load-error', 'color: var(--gn-text)'],
       ['.workflow-builder-screen__header', 'flex-direction: column'],
       ['.workflow-builder-screen__title-row', 'justify-content: space-between'],
       ['.workflow-builder-screen__actions', 'flex-wrap: wrap'],
       ['.workflow-builder-screen__name', 'font-size: 2.125rem'],
+      ['.workflow-builder-screen__name:focus-visible', 'var(--gn-focus-ring)'],
+      ['.workflow-builder-screen__name:disabled', 'var(--gn-surface-sunken)'],
       [
         '.workflow-builder-screen__layout',
         'grid-template-columns: minmax(0, 18rem) minmax(0, 1fr) minmax(0, 20rem)',
       ],
-      ['.workflow-builder-screen__canvas', 'box-shadow: var(--gn-shadow-raised)'],
       ['.workflow-builder-screen__left', 'flex-direction: column'],
       ['.workflow-builder-screen__right', 'flex-direction: column'],
+      ['.workflow-builder-screen__canvas', 'box-shadow: var(--gn-shadow-raised)'],
       ['.state-inspector', 'border-radius: var(--gn-radius-card)'],
+      ['.state-inspector__title', 'font-size: 0.9rem'],
       ['.state-inspector__actions', 'flex-wrap: wrap'],
       ['.transition-inspector', 'border-radius: var(--gn-radius-card)'],
+      ['.transition-inspector__title', 'font-size: 0.9rem'],
+      ['.transition-inspector__rules', 'flex-direction: column'],
       ['.transition-inspector__rule', 'border-left: 2px solid var(--gn-border)'],
+      ['.transition-inspector__rule-summary', 'font-size: 0.85rem'],
+      ['.transition-inspector__actions', 'flex-wrap: wrap'],
       ['.inspector-panel__hint', 'background: var(--gn-surface-raised)'],
     ];
     for (const [selector, declaration] of expected) {
@@ -381,6 +434,81 @@ describe('13.767 every class the builder screen renders is a class ui.css styles
         `${selector} lost "${declaration}"`,
       ).toContain(declaration);
     }
+    // And the neo override, which is a rule of its own and not reachable by the
+    // loop above (its selector is a compound starting with an attribute).
+    const neo =
+      /\[data-style="neo"\] \.workflow-builder-screen__name\s*\{([^}]*)\}/.exec(ALL_ROLES_IN_UI_CSS)?.[1] ?? '';
+    expect(neo).toContain('box-shadow: var(--gn-shadow-sunken)');
+  });
+
+  /**
+   * 13.774 — THE SHARED CLASS THE INSPECTOR'S INPUT MUST CARRY, WHICH NOTHING
+   * ELSE IN THIS FILE CAN SEE.
+   *
+   * The equality above is scoped to the four builder families, so it is
+   * structurally blind to `.gn-field__input` — a class from the shared layer,
+   * outside every prefix it harvests. Measured by an independent reviewer:
+   * deleting `className="gn-field__input"` from
+   * `state-inspector.tsx:53`'s `<input>` survives all thirteen cases above AND
+   * the whole app-core package (1473 passing), while silently reverting the
+   * field to a bare `<input>` with user-agent defaults — the exact defect this
+   * change exists to fix — and the docblock there claims it "inherits the
+   * measured contrast pair and the `[data-style=\"neo\"]` sunken override for
+   * free".
+   *
+   * Rendered and read off the DOM, not grepped from the source: a source read
+   * would pass against the class sitting on the wrong element.
+   */
+  it('13.774 the inspector name field carries the shared gn-field classes it claims to inherit', () => {
+    const store = createDraftStore(draftFromTemplate(kanban));
+    store.actions.select({ kind: 'state', stateId: 'doing' });
+    const { container } = renderPanel(store);
+
+    const field = container.querySelector('.state-inspector .gn-field');
+    expect(field).not.toBeNull();
+    expect(field?.querySelector('.gn-field__label')).not.toBeNull();
+    const input = container.querySelector<HTMLInputElement>('.state-inspector input');
+    expect(input).not.toBeNull();
+    expect([...(input?.classList ?? [])]).toContain('gn-field__input');
+    // CONTROL: the same render really produced the inspector, so a null above
+    // cannot be mistaken for "the field is correct".
+    expect(container.querySelector('.state-inspector__title')).not.toBeNull();
+    cleanup();
+  });
+
+  /**
+   * 13.775 — THE INSPECTORS' ACTIONS ARE THE SHARED BUTTON, AND THE DESTRUCTIVE
+   * TWO ARE THE SHARED DANGER VARIANT.
+   *
+   * Same structural blindness as 13.774: `.gn-button` and `.gn-button--danger`
+   * are outside every harvested prefix, so the four controls that moved off bare
+   * `<button>`s onto the component could revert to user-agent defaults with
+   * every other test in this repo green. Precedent for the variant is
+   * `fields-editor.tsx:64`.
+   */
+  it('13.775 the inspector actions are the shared Button, danger-styled where they destroy', () => {
+    const store = createDraftStore(draftFromTemplate(kanban));
+    store.actions.select({ kind: 'state', stateId: 'doing' });
+    const { container } = renderPanel(store);
+
+    const buttonClasses = [...container.querySelectorAll('.state-inspector button')].map((node) => [
+      ...node.classList,
+    ]);
+    expect(buttonClasses.length).toBe(2);
+    for (const classes of buttonClasses) expect(classes).toContain('gn-button');
+    // Exactly one is danger, and it is the one that deletes.
+    const danger = [...container.querySelectorAll('.state-inspector .gn-button--danger')];
+    expect(danger).toHaveLength(1);
+    expect(danger[0]?.textContent).toBe('Delete state');
+    cleanup();
+
+    const transitionStore = createDraftStore(draftFromTemplate(kanban));
+    transitionStore.actions.addRule(2, { kind: 'require-evidence' });
+    transitionStore.actions.select({ kind: 'transition', index: 2 });
+    const second = renderPanel(transitionStore).container;
+    // Remove rule, Delete transition — both destructive, both danger.
+    expect([...second.querySelectorAll('.transition-inspector .gn-button--danger')]).toHaveLength(2);
+    cleanup();
   });
 });
 
@@ -397,7 +525,7 @@ describe('13.768 the new block names no colour of its own and adds no role', () 
     // happens to be last works until the next task appends CSS after it.
     const rules = [...ALL_ROLES_IN_UI_CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
     const ruleNamesOurs = (selector: string): boolean =>
-      [...selector.matchAll(/\.([a-z][a-z0-9_-]*)/g)].some((hit) => isOurs(hit[1] ?? ''));
+      [...selector.matchAll(/\.([A-Za-z][A-Za-z0-9_-]*)/g)].some((hit) => isOurs(hit[1] ?? ''));
     const block = rules
       .filter((rule) => ruleNamesOurs(rule[1] ?? ''))
       .map((rule) => rule[2] ?? '')
@@ -408,8 +536,13 @@ describe('13.768 the new block names no colour of its own and adds no role', () 
       .join('\n');
 
     expect(block.length).toBeGreaterThan(0);
+    // `[a-z0-9-]`, NOT `[a-z-]`: no role this product ships contains a digit
+    // today, so the digit-free class is exactly blind to the case the check
+    // exists to refuse — a FUTURE role spelled `--gn-fill-2`. Measured: with
+    // `[a-z-]`, planting `color: var(--gn-ink-2)` inside the block stays GREEN
+    // while the identical `var(--gn-ink)` reddens.
     const used = [
-      ...new Set([...block.matchAll(/var\((--gn-[a-z-]+)\)/g)].flatMap((hit) => hit[1] ?? [])),
+      ...new Set([...block.matchAll(/var\((--gn-[a-z0-9-]+)\)/g)].flatMap((hit) => hit[1] ?? [])),
     ];
     // The floor is the count this block actually uses today (eleven distinct
     // roles), so a rule that silently stopped contributing declarations cannot
@@ -446,6 +579,14 @@ describe('13.769 the prototype’s unbacked controls are absent, and the real on
     // render and nothing to compute one from.
     expect(screen.queryByText(/last saved/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/^Draft/)).not.toBeInTheDocument();
+    // The Cancel button's warrant is DIFFERENT and is not the 0-hit measurement
+    // above, which does not cover it. The prototype's `isBuilder` block draws no
+    // Cancel at all (`:1013-1093` — breadcrumb, h1, `wfStatus`, Add state,
+    // Publish); the Cancel the first draft of this comment inherited comes from
+    // `docs/hig-reconciliation-audit.md:705`, which describes a header the
+    // drawing does not show. So this asserts the absence of something the
+    // reference itself does not have, which is worth pinning for a different
+    // reason: it is the control that the header really mounted.
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
     // CONTROL: the header is present and carries the two actions that ARE real,
     // so the absences above are not "the header failed to render".
@@ -496,11 +637,27 @@ describe('13.769 the prototype’s unbacked controls are absent, and the real on
  *
  * `isBuilder` draws an `h1` carrying the workflow name (`:1016`). The product's
  * name IS editable, so the design fit is the prototype's TYPOGRAPHY on an
- * `<input>` rather than a heading with a copy of the same string beside it —
- * two elements carrying one name would also make `getByText(name)` ambiguous
- * for every later test. The metrics asserted here are `.gn-page-title`'s, the
- * rule that already carries the prototype's `34px/41px/700/-0.4px` conversion;
- * a second derivation of the same four numbers is how two titles drift apart.
+ * `<input>` rather than an `<h1>` beside it. The metrics asserted here are
+ * `.gn-page-title`'s, the rule that already carries the prototype's
+ * `34px/41px/700/-0.4px` conversion; a second derivation of the same four
+ * numbers is how two titles drift apart.
+ *
+ * **THE FIRST RECORDED REASON FOR REFUSING THE `h1` WAS FALSE, and it is
+ * corrected rather than deleted.** It read: a heading carrying the same string
+ * "would make `getByText(name)` ambiguous for every later test". An independent
+ * reviewer probed it and refuted it — `getByText` matches TEXT CONTENT, and an
+ * input's `value` is not text content, so `<h1>Field ops v2</h1>` beside
+ * `<input value="Field ops v2">` matches exactly one node, the heading. The
+ * real reason is simpler and visual: the name is ALREADY on screen, inside the
+ * field the person edits, so an `<h1>` would print the same words twice in the
+ * same header. The probe is the reason this paragraph exists in this form — a
+ * refused design with a fabricated obstacle beside it is how a later author
+ * inherits a reason that is not true.
+ *
+ * **The heading gap this leaves is REAL and PRE-EXISTING, not created here.**
+ * This route renders no `<h1>` and its headings begin at `<h3>`; the base page
+ * had no `<h1>` either. Recorded with an owner rather than fixed inside a
+ * design port.
  */
 describe('13.770 the workflow name is the title and stays a control', () => {
   it('renders as a labelled text field, not as a heading', async () => {
