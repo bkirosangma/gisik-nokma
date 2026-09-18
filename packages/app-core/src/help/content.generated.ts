@@ -1496,11 +1496,11 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "There is no way to do either."
+                    "text": "You can see, and you cannot change."
                   },
                   {
                     "kind": "text",
-                    "text": " The People page shows a plain list of names — just names. No role next to each person, no \"remove\", no \"change role\"."
+                    "text": " The People page lists everyone in the workspace and names each person's role. That role is read-only: there is no \"remove\", and no \"change role\"."
                   }
                 ]
               },
@@ -6172,7 +6172,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Nowhere on screen. The People page is a list of names — no role next to each person, no remove, no change role. So you can let people in and you cannot see what they are or put them out. Combined with the promotion problem above, a workspace's people list can drift out of step with reality with no way to fix it from the interface."
+                    "text": "Nowhere on screen. The People page lists everyone and shows each person's role, but that role is read-only — no remove, no change role. So you can let people in and see what they are, and you still cannot put them out. Combined with the promotion problem above, a workspace's people list can drift out of step with reality with no way to fix it from the interface."
                   }
                 ]
               }

@@ -285,8 +285,8 @@ withdraw it and send a fresh one.
 
 ### Seeing and changing what people are
 
-**There is no way to do either.** The People page shows a plain list of names — just names. No role
-next to each person, no "remove", no "change role".
+**You can see, and you cannot change.** The People page lists everyone in the workspace and names each
+person's role. That role is read-only: there is no "remove", and no "change role".
 
 Combined with the re-invitation problem above, this means a workspace's people list can drift out of
 step with reality and give you no way on screen to fix it. If somebody's role has to change, or

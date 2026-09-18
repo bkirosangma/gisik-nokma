@@ -333,7 +333,16 @@ export default function MembersPage() {
  * rendering fault rather than as a monogram.
  */
 function initialOf(name: string): string {
-  return name.slice(0, 1).toUpperCase();
+  // `slice(0, 1)` is measured WRONG here, not merely unfashionable: it splits a
+  // surrogate pair. On Node v22.22.2, `'🐧 Penguin Team'.slice(0, 1)` returns a
+  // lone high surrogate, which renders as U+FFFD — a replacement glyph in the
+  // disc beside a real person's name. `Array.from` iterates by CODE POINT, so an
+  // emoji or any astral-plane character yields the whole character.
+  //
+  // `trimStart` for the same class of measured fault: a name typed with leading
+  // whitespace (`'  Kiro'`) took the space as its initial and rendered a BLANK
+  // disc. The monogram renders a name, and leading whitespace is not part of one.
+  return Array.from(name.trimStart())[0]?.toUpperCase() ?? '';
 }
 
 /**

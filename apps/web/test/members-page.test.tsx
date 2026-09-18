@@ -495,6 +495,51 @@ describe('13.762 the monogram draws one capital, and does not repeat it to a scr
     // contain "A Anselma".
     expect(screen.queryByRole('row', { name: /A Anselma/ })).toBeNull();
   });
+
+  /**
+   * The initial is taken by CODE POINT, and both halves of this were MEASURED
+   * against the shipped helper rather than reasoned about.
+   *
+   * `name.slice(0, 1)` splits a surrogate pair: on Node v22.22.2 it returns the
+   * LONE HIGH SURROGATE `'\ud83d'` for this input, which a browser renders as
+   * U+FFFD — a replacement glyph in the disc beside a real person's name. The
+   * assertion is written against the whole character, which is what makes it a
+   * control: a lone surrogate is a perfectly valid JS string, so a case that
+   * only asserted "some text is there" would pass on the broken helper.
+   */
+  it('takes the initial by code point, so an astral-plane name is not split in half', async () => {
+    mount({ listPending: async () => [] }, undefined, undefined, {
+      getMembers: async () => [
+        { id: '01J9USER000000000000000009', name: '🐧 Penguin Team', role: 'member' },
+      ],
+    });
+    const row = (await screen.findByText('🐧 Penguin Team')).closest('tr');
+    const disc = row?.querySelector('.gn-members__initial');
+    expect(disc).not.toBeNull();
+    expect(disc).toHaveTextContent('🐧');
+    // Belt and braces, and it names the failure mode rather than trusting it
+    // away: the replacement glyph is what the split actually looked like.
+    expect(disc?.textContent ?? '').not.toContain('�');
+  });
+
+  /**
+   * And the sibling fault on the same line: a name entered with leading
+   * whitespace took the SPACE as its initial and drew a blank disc. Measured —
+   * `initialOf('  Kiro')` returned `' '` before this was fixed. A blank disc is
+   * indistinguishable from a broken monogram, which is the reading the whole
+   * case exists to prevent.
+   */
+  it('does not take leading whitespace as a person’s initial', async () => {
+    mount({ listPending: async () => [] }, undefined, undefined, {
+      getMembers: async () => [
+        { id: '01J9USER00000000000000000A', name: '  Kiro', role: 'owner' },
+      ],
+    });
+    const row = (await screen.findByText('Kiro')).closest('tr');
+    const disc = row?.querySelector('.gn-members__initial');
+    expect(disc).not.toBeNull();
+    expect(disc).toHaveTextContent('K');
+  });
 });
 
 /**

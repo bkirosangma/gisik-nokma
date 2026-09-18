@@ -128,11 +128,38 @@ rows on the strength of this branch without reading § 2.
 > Anyone restarting from an older copy of this file must take the block above, not 13.700.
 
 **Recount the next free id at your own tip before minting** — the block floor is not automatically
-free. At `afbd361d` the whole block `13.760`–`13.819` measured free (swept across `test-cases/`,
-`docs/`, `packages/`, `apps/`), and the max id in use anywhere is `13.699` (which closes the Extras
-block `13.695`–`13.699`); `13.696`–`13.698` are free but inside that block. **`13.999` is a documented
-truncation trap in file 13, not an id** (`test-cases/13-deployment-dogfooding.md:23,2406,4680,7273`).
-If more than 60 ids are needed, **stop and ask** — do not run past the block.
+free. At `afbd361d` the whole block `13.760`–`13.819` measured free. If more than 60 ids are needed,
+**stop and ask** — do not run past the block.
+
+> **CORRECTION to a figure this file once carried, and to the method that produced it — and a second
+> correction to the correction.** This section used to say "the max id in use is `13.699`". **That was
+> WRONG.** A peer session then supplied `13.696` as the true high-water; **I measured that as wrong
+> too, and am recording only what I measured myself.**
+>
+> **Measured 2026-09-18 at `afbd361d` (the base, before this branch minted anything):**
+> - Highest case **MARKER** across every file in `test-cases/`: **`13.693`**.
+> - Highest `13.*` id in `packages/` + `apps/`: **`13.689`**.
+> - `13.696`–`13.699` **do not appear at all** in `test-cases/13` at base — neither as markers nor as
+>   prose. So both my `13.699` and the peer's `13.696` were unverified figures, in opposite directions.
+>
+> **Two method traps, both of which bit during this measurement:**
+> 1. **A substring sweep over a document that DISCUSSES the ids cannot separate a MINTED id from a
+>    MENTIONED one.** `13.694` is prose in that file ("the next free id is `13.694`") while `13.693` is
+>    a real marker — the sweep cannot tell them apart, and it fails silently in the over-estimating
+>    direction. `scripts/check-case-ids.mjs` already self-tests this exact trap ("prose citation
+>    excluded"); the tool knew and the hand sweep did not. **Count case MARKERS only**
+>    (`^- ✅ **13.…`), never a raw substring.
+> 2. **`git grep` with a pathspec of `'packages/*/test' 'apps/*/test'` returned EMPTY on a tree that
+>    has hundreds of matches** — an eaten glob, the silent-empty mode. It only showed up because an
+>    un-pathspec'd control fired on the same input (finding `13.686`–`13.689`). **Every sweep needs its
+>    positive control through the same invocation.**
+>
+> Consequence for the block rule: gaps below a stale high-water are free and belong to **neither**
+> block, so a wrong figure can leave a hole the next minter walks into. My own ids (`13.760`–`13.766`)
+> were in-block; nothing renumbered.
+
+**`13.999` is a documented truncation trap in file 13, not an id**
+(`test-cases/13-deployment-dogfooding.md:23,2406,4680,7273`).
 
 The existing `3.129`–`3.139` ids in `apps/web/test/members-page.test.tsx` are a **different numbering
 line** — leave them exactly as they are, never renumber them.
@@ -157,8 +184,43 @@ list does not ask for a viewport result.
 ## § 6 — Rules that bind this branch
 - **Never `docker compose`** (any subcommand) and **never bind `:3001`** — a peer's hot stack is there,
   mounted from executor 1's worktree. Viewport work uses **`:3021`**.
-- Test runs at `--concurrency=1`. **Do not run the forced gate** — the controller does.
+- Test runs at low concurrency — **but note `--concurrency` is NOT a vitest flag** (measured
+  2026-09-18: it exits 1 with `CACError: Unknown option`). The working flag is **`--maxWorkers=1`**.
+  **Do not run the forced gate** — the controller does.
 - **Do not edit `task-ledger.tsv`** — it is `main`'s; the controller flips rows after each merge.
 - `Features.md` and `test-cases/13-deployment-dogfooding.md` change in the **same commit** as the code.
 - **Never `AskUserQuestion`** in this topology. A question for the owner is a file plus a one-line
   pointer, then a hold.
+
+## § 7 — REVIEW PASS AND FIX ROUND (2026-09-18)
+
+An independent reviewer ran at the first frozen head `2ec10228` and **agreed with the commit** on both
+assigned questions. It answered **Q1 (the role question) independently from the wire** and produced
+better corroboration than my own: case **7.39** (`apps/server/test/routes/builder-reads.test.ts:283`)
+had asserted `role` on the members response **on `main` all along**, and the column is
+`NOT NULL CHECK (role IN ('owner','admin','member','guest'))` — so the field was never absent, only
+unread. It confirmed Q2 string-by-string, verified the four absences are real (every hit is a docblock
+comment, no fabricated markup), confirmed the CSS is token-only with no leakage, and re-measured the
+suites: app-core 91/1455, web 43/451, ui 5/322, all passing.
+
+**Two Important findings, both documentation drift this change set owns — both FIXED:**
+1. **The in-app help contradicted the screen.** `docs/manual.md` and `docs/faq.md` both said the People
+   page shows "no role next to each person". That is now false — there IS a Role column. Corrected in
+   both sources and **regenerated** (`node scripts/help-content.mjs`; `--check` passes, 224 entries).
+2. **`docs/hig-reconciliation-audit.md:186` was FALSE** and is where the wrong belief came from: it
+   listed the role pill under "SHOWN BUT DOES NOT EXIST. Do not build", claiming the roster "carries no
+   role field at all" — the same client-type/wire conflation the old mapper docblock made. Corrected in
+   place with a dated note, and the sibling initials-circle bullet was marked partly superseded (the
+   monogram is derived from `name`, which the wire does carry).
+
+**One Minor fixed:** `initialOf` used `name.slice(0, 1)`, which **splits a surrogate pair** — measured
+`'🐧 Penguin Team'` → the lone high surrogate `'\ud83d'`, which renders as U+FFFD beside a real
+person's name; and `'  Kiro'` → `' '`, a blank disc. Now `Array.from(name.trimStart())[0]?.toUpperCase()
+?? ''`. Case **13.762** gained two `it`s covering both, asserted against the whole character so a
+"some text is there" case could not pass on the broken helper.
+
+**One finding ESCALATED, not fixed (Minor, judgement):** the reviewer notes the `<h1>` change
+`People` → `Members` cites no owner ruling, and `docs/hig-reconciliation-audit.md:194` explicitly ruled
+*"Flag, never silently reword."* It was **not** silent — recorded in the commit message, the page
+docblock, `Features.md` and a test docblock — and it removes a real inconsistency (`app-nav.tsx` already
+said "Members"). **Flagged in the PR body for the controller/owner; the flag is the ruling's ask.**
