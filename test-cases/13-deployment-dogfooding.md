@@ -8090,11 +8090,20 @@ cites, and the first draft cited a line it had not read.*
   straight-quote grep could not have found the string even if a test had used it.
   **The dispatch's "the same gap exists on three other surfaces" is refuted, and measured rather than
   assumed:** `You have not been told this project’s name.` appears in exactly ONE SOURCE file repo-wide —
-  every `.ts`/`.tsx` searched, with a positive control matched in the same sweep — at `my-work.tsx:220`, and `/workspaces`, `/w/<id>`
-  and the members page carry a DIFFERENT withheld-name treatment — `nameRestrictedProjectCount` and its
-  `N projects · name restricted` line, which IS asserted (`apps/web/test/workspaces-cards.test.tsx:257`,
-  `:363`). The dispatch's three line citations (`workspaces/page.tsx:170`, `w/[workspaceId]/page.tsx:147`,
-  `members/page.tsx:41`) each resolve to prose ABOUT withholding rather than to a duplicated fallback.
+  every `.ts`/`.tsx` searched, with a positive control matched in the same sweep — at `my-work.tsx:220`.
+  **A SECOND withheld-name treatment does exist, and it is on TWO of the three surfaces, not three:**
+  `nameRestrictedProjectCount` and its `N projects · name restricted` line, consumed in exactly two files
+  (`apps/web/app/workspaces/page.tsx:250`, `apps/web/app/w/[workspaceId]/page.tsx:628`), and IS asserted
+  (`apps/web/test/workspaces-cards.test.tsx:257`, `:363`). **The members page carries NO withheld-name
+  treatment at all** — it names no `nameRestrictedProjectCount`, draws no restricted line, and its only
+  project-shaped control is an invitation form field hidden from a guest
+  (`apps/web/app/w/[workspaceId]/members/page.tsx:621`), which is a hidden control rather than a withheld
+  name. **Of the dispatch's three citations, two support the claim and one only appears to:**
+  `workspaces/page.tsx:170` and `w/[workspaceId]/page.tsx:147` are prose about withheld project names,
+  but `members/page.tsx:41` is about the withheld ROLE `<select>` — it contains the word "withheld" and
+  means something else, which is how a citation that RESOLVES misleads a reader who does not open it.
+  **The first draft of this row repeated the dispatch's three-surface claim; an independent review
+  measured it and this is the correction.**
   (`packages/app-core/test/views/my-work.test.tsx`)
 
 - ❌ **13.314 — "List renders the same tickets Board does, by count" is unwitnessed, and the product
@@ -8604,7 +8613,7 @@ a claim about an instrument: the same sweep returns 7 rules for `.issues-panel`,
 `.publish-controls`, 15 for `.gn-state-node` and 40 for `.ticket-type-editor`.
 
 The second half is a refusal that was already recorded before this task:
-`docs/hig-reconciliation-audit.md:690-718` rules `SystemRulesPanel` and the whole rule-authoring
+`docs/hig-reconciliation-audit.md:691-718` rules `SystemRulesPanel` and the whole rule-authoring
 subsystem — neither of which the prototype draws at all — as *"EXISTS AND THE PROTOTYPE OMITS IT. Keep
 and restyle; never delete"*, closing at `:718` with *"Both must be treated as requirements to preserve,
 not redesign away."* So the prototype's two-column layout is not adopted; three rails, preserving the

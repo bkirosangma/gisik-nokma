@@ -310,11 +310,16 @@ describe('3.58 MyWork — the in-transit section is empty because there is no ou
    * reason for existing.
    *
    * THE TRAP, recorded at the site because it is the task: the source spells
-   * this string with **U+2019**, and `test-cases/13` quotes it with a straight
-   * U+0027. A case copied out of this repo's own catalogue therefore compares
-   * the wrong character, fails, and fails in the shape of a MISSING FALLBACK
-   * rather than a wrong apostrophe. The two controls below are what make those
-   * two situations tellable apart.
+   * this string with **U+2019**, and the PLAN that specifies this screen spells it
+   * with a straight U+0027 (`docs/superpowers/plans/2026-09-08-hig-per-screen.md:902`,
+   * and `docs/hig-reconciliation-audit.md:729` after it). A case transcribed from
+   * either therefore compares the wrong character, fails, and fails in the shape of
+   * a MISSING FALLBACK rather than a wrong apostrophe. The two controls below are
+   * what make those two situations tellable apart.
+   *
+   * The catalogue row this case was minted from carried the straight form too, until
+   * this change corrected it on 2026-09-18 — so the row is no longer a source of the
+   * wrong character, and the plan still is.
    */
   it('13.309 the withheld-name fallback carries its exact title text', () => {
     const withheld: WorkItem = {
