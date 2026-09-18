@@ -43,7 +43,8 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 > # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~12:5x IST. **SECOND WAVE, TASK 5 (the Backlog tab's
 > # rank order, drag reorder, and Move up / Move down) IS DONE, REVIEWED, FIXED, AND THEN FIXED AGAIN
-> # UNDER AN OWNER RULING. PR OPEN ON BASE `main`, AWAITING THE CONTROLLER'S MERGE.** An independent
+> # UNDER AN OWNER RULING. **PR #450 OPEN ON BASE `main`, MERGEABLE, AWAITING THE CONTROLLER'S
+> # MERGE.** An independent
 > # review's four surviving mutants are all killed (below); the unranked-tail defect that same review
 > # found was HELD rather than shipped — the controller ruled a short hold cheaper than shipping it and
 > # correcting it in a second PR — and the OWNER THEN RULED **OPTION B**: rank the rows that have no key
@@ -60,7 +61,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | | |
 > |---|---|
 > | branch | `exec/second-wave-t5-backlog-rank`, cut from `origin/main` = **`488bfb2d`** (Task 4, PR #446). Not rebased since; no peer landed under it while it was open |
-> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha printed here names an ANCESTOR. FOUR commits: **`204cf374`** (the task, 8 files, +1145/−67), **`8ec6d18b`** (the review fix round: four surviving mutants killed, three Minor fixes), **`7663ea4f`** (the grouping finding recorded as a measurement), and a **ruling commit** implementing option B with its cases. Every earlier sha is an ANCESTOR of the head, never the head |
+> | HEAD | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot contain the commit that carries it, so any sha printed here names an ANCESTOR. FOUR commits: **`204cf374`** (the task, 8 files, +1145/−67), **`8ec6d18b`** (the review fix round: four surviving mutants killed, three Minor fixes), **`7663ea4f`** (the grouping finding recorded as a measurement), and a **ruling commit** implementing option B with its cases. Plus the **handoff commit that carries this very block** on top, which cannot name itself. Every sha listed is an ANCESTOR of the head, never the head |
 > | base | **`488bfb2d`** = `origin/main`, carrying second-wave Tasks 1 (#441), 2 (#442), 3 (#444), 4 (#446) and executor 2's Members+InviteAdmin (#443) |
 > | PR base | **`main`** — `owner/workspace-edits` is retired and deleted |
 > | case ids | **`13.707`–`13.712`** — four from the task and two from the ruling fix — inside this executor's allocated block `13.700`–`13.759`; **`13.713`–`13.759` remain unminted**. **Recounted two independent ways at this tip and they agree:** over case MARKERS using `scripts/check-case-ids.mjs`'s own `ID_LINE` regex, the highest marker minted in the block was `13.706` (Task 4's); and `grep -rnE '13\.70[7-9]\|13\.710'` over `packages/`, `apps/` and `test-cases/` returned **no hits at all**, against a positive control over `13\.70[0-6]` (found in both) and a null control over `13\.999` (absent). The plan's own `13.622`–`13.625` were NOT used — the dispatch records them as taken |
