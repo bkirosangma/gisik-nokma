@@ -422,8 +422,10 @@ everyone sees the same order.
   (`rank-requires-backlog`: "Only a backlog ticket can be ranked; this one is
   in \"${stateName}\"."); the schema refuses a key that is not a valid rank
   string.
-- **Server.** `proj_tickets.rank text NULL`; the list route orders rows with
-  `rank ASC NULLS LAST, ticket_id ASC`; `ListRow.rank`.
+- **Server.** `proj_tickets.rank text NULL`; every list row and every ticket
+  read carries `rank` on the wire; **the list route keeps its `ticket_id`
+  keyset order, and the Backlog tab sorts by `rank`** (amended 2026-09-18,
+  see Amendments — R1).
 - **UI.** The Backlog tab's rows are draggable with the board's own native
   DnD idiom (`dragstart` on the row, `drop` on a row = "place before this
   row", drop on the list's tail zone = "place last"; the dragged id in
@@ -997,3 +999,111 @@ with the file:line it would touch.
   2026-09-17); the fix is in `apps/server/src/read/list-cards.ts` (resolve
   `closed_by` through the same actor-name path `stateProvenance` uses)
   plus the wire type and `mapClosed` — Ruling 55.
+
+## Amendments during execution — second wave (2026-09-18)
+
+Rulings 1–55 above belong to earlier, unrelated plans. This section starts from the
+second-wave plan's own five (its `Global Constraints` names them R1–R5), then records
+every ruling made during the wave's execution. **One body sentence is rewritten in
+place**: §8.1's Server bullet, marked "(amended 2026-09-18, see Amendments — R1)".
+
+**R1 — the list route does NOT order by rank, and §8.1 said it did.** §8.1's own
+Server bullet claimed the list route orders rows with
+`rank ASC NULLS LAST, ticket_id ASC`. That ORDER BY would break the route's keyset
+cursor — `WHERE t.ticket_id > $cursor` (`apps/server/src/routes/list.ts:143-144`)
+with `ORDER BY t.ticket_id` (`:153`) — and the client already assembles the whole
+list by looping that cursor (Ruling P41). The deviation is therefore taken on the
+CLIENT side: the server carries `rank` on every list row and every ticket read, and
+the **Backlog tab** sorts by it. Unranked tickets sort after ranked ones, then by
+`ticketId` ascending.
+
+**R2 — ranking neighbours come from the rank-sorted FLAT order, not the displayed
+nesting.** The Backlog tab's rank order is the source of truth; `nestRows` may draw a
+backlog child under its backlog parent regardless of rank, and the rank still changes
+as asked. Grouping and nesting are display-only.
+
+**R3 — auto-close needs no permission door.** The Start edge is ungated (Ruling 41),
+so the sweep's `ticket.closed` is ungated too: the daemon writes through `ingestBatch`
+with `door: null` and a server origin, which is how seeds and invite acceptance
+already write. The engine's own refusals still apply, and the ledger still records who
+closed what.
+
+**R4 — the `Dialog` dismiss control is renamed.** `aria-label="Close"` →
+`aria-label="Close dialog"` (`packages/ui/src/components/dialog.tsx:51`). A bulk-close
+dialog whose confirm reads `Close N tickets` must not share an accessible name with
+its own dismiss glyph — Ruling 31's sibling. The blast radius was MEASURED rather than
+grepped, because every other `Dialog` consumer's dismiss name moves with it.
+
+**R5 — the `autoCloseAfterDays` surface is a new `Workspace` tab on `/settings`.**
+One form for one event, holding all THREE `workspace.settings_set` knobs
+(`staleDays`, `dueSoonDays`, `autoCloseAfterDays`); the first two had no UI before
+this. Admin-only, as the event's own gate already enforces
+(`apps/server/src/permissions/check-permission.ts:652`). The tab list on `/settings`
+is unchanged in COUNT — `ticket-types` and `workflows` were joined by exactly one.
+
+### Rulings recorded during the second wave's execution
+
+- **Creation does NOT write `rank` (executor, conservative default, Task 1).**
+  The plan's step text said "creation sets `rank: null`", and following it reddens
+  the gate: the dual-client rig compares the client's fold against `rowToTicketState`
+  with `toEqual`, and the `rank` column does not exist until Task 3. The field stays
+  ABSENT on both sides until the task that owns the column can move them together;
+  every reader spells `state.rank ?? null`, so absent and null are the same fact to
+  every consumer. Recorded rather than asked, and not fixed by hardcoding `null` into
+  the mapper — which would have been the "closed flag dead in production" failure the
+  plan's own Global Constraint exists to prevent.
+- **The payload door refines with `isRankKey`, not `RANK_KEY_REGEX` (Task 1's second
+  deviation).** The plan's schema admits keys — any ending in `0` — that
+  `rankBetween` cannot place between their neighbours: on prefix-adjacent neighbours
+  (`('a','a0')`) the real function never returns, growing the string until allocation
+  aborts. `ticketRankedPayload` therefore refines with `isRankKey`; no signature in
+  the plan's Interfaces block changed, and `RANK_KEY_REGEX` is still the first check
+  because its message names the alphabet.
+- **Option B on the unranked tail (OWNER RULING, 2026-09-18).** An independent review
+  found that moving an unranked row computed its neighbours from rank only, so the
+  move landed somewhere the user did not ask for. The defect was **HELD rather than
+  shipped** on the controller's instruction that a short hold is cheaper than
+  correcting it in a second PR; the owner then ruled **option B** — rank the row
+  first, then move it — and it is fixed in the same change (cases `13.711`, `13.712`).
+- **Task 7's review ruling: DROP (controller, 2026-09-18).** The reviewer checked the
+  two row types separately rather than together, and the ruling was to drop the claim
+  rather than the code.
+- **A plan-text defect: carry on with `refuseWith` (controller, 2026-09-18).** The
+  plan and the shipped code disagreed about how a refusal is spelled; the executor
+  filed it rather than settling it unilaterally, and the ruling was to carry on with
+  `refuseWith`.
+- **The client-door narrowing is CONFIRMED (controller, 2026-09-18).** A conservative
+  default taken by the executor — the client door checks less than the server's —
+  filed rather than assumed, and confirmed.
+- **The migration-ordering ruling (OWNER RULING, 2026-09-18).** Task 7's migration was
+  first numbered BELOW one already applied on the owner's dev stack, where
+  `node-pg-migrate`'s `checkOrder` refuses it: a migration numbered below an applied
+  one can never run, and a fresh database cannot see the problem because it applies
+  both in ascending order. `73c40ea3` renamed it above `1789400000000`. The
+  incident produced `scripts/check-migration-order.mjs` and its six cases
+  (`13.902`–`13.906`), which now refuse that shape in CI.
+
+## Follow-ons named during execution — second wave
+
+Cross-referenced from §9 rather than duplicated into its list: each is a real, scoped
+gap this wave found and chose not to close.
+
+- **Per-project `autoCloseAfterDays` override** — §9's own first entry. The setting is
+  workspace-scoped today; a project-level override would need a project settings
+  surface that does not exist.
+- **Ranking under grouping and nesting is DISPLAY-ONLY** — R2 above. The rank order is
+  flat; the Backlog tab's nesting can draw a child above a row it ranks below.
+- **The Board's `Close all (N)` and the List's `Close selected (N)` share one dialog,
+  one batch and one path, but there is NO keyboard shortcut for either.** Two surfaces,
+  one component, and no accelerator.
+- **`ListRow.closed.actorName` is still the core plan's follow-on, and this wave makes
+  it also name `Auto-close` — but only through `actorLabel`.** The auto-close actor is
+  reserved in the domain (`SYSTEM_ACTOR_AUTO_CLOSE`), has no `users` row and no
+  membership, so the roster join cannot resolve it; the sheet reads `Closed by
+  Auto-close on <date>` only because `packages/app-core/src/provenance.ts`'s
+  `actorLabel` knows the reserved actors. Any reader that joins the roster for a name
+  instead of going through `actorLabel` will render it blank.
+- **`isTypes` (reorder, per-type counts) and `isWorkflows` (a badge, a second action)
+  are HELD, not outstanding.** `docs/lanes/owner-holds.md` §1 lists both as
+  deliberately unbuilt and escalated to the owner. A hold is not a gap, and prose that
+  reads them as unbuilt scope is describing a decision, not a debt.
