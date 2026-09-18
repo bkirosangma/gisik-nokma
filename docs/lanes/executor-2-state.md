@@ -22,9 +22,9 @@
 
 ## ▲ TOP BLOCK — the attention strip leaves the project page; the prototype restyle is measured and HELD (2026-09-18)
 
-**Position: THE CHANGE SET IS COMMITTED AND GREEN, THE MUTATIONS RAN, and what remains is the reviewer
-round and the PR.** Dispatch: `CTL-DISPATCH-2026-09-18-attention-project-page.md` **plus its AMENDMENT 1**
-(read the amendment first — it corrects `main`'s sha and the id list). One PR, `--base main`, branch
+**Position: BOTH REVIEW ROUNDS ARE DISCHARGED AND THE PR IS THE ONLY THING LEFT.** Dispatch:
+`CTL-DISPATCH-2026-09-18-attention-project-page.md` **plus its AMENDMENT 1** (read the amendment first — it
+corrects `main`'s sha and the id list). One PR, `--base main`, branch
 **`exec2/attention-leaves-project-page`**.
 
 **FIRST ACTION ON A RESTART: `gh pr list --state open`.** If a PR for this branch exists it is at the
@@ -36,9 +36,12 @@ controller's merge and nothing below needs redoing. Then verify the anchors — 
 |---|---|
 | branch | `exec2/attention-leaves-project-page` |
 | cut from | **`438b956c`** = `origin/main` after `#466` merged — the amendment's sha |
-| change-set head | **`0da73557`** ("The attention strip leaves the project page"), 6 files, +235/−41 |
-| frozen head | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit that carries it; whatever is here is one MORE than the last commit below |
-| files | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` · `apps/web/test/page-refusals.test.tsx` · `apps/web/test/board-narrowing.test.tsx` · `apps/web/e2e-stack/non-text-contrast-roster.json` · `test-cases/13-deployment-dogfooding.md` · `Features.md` |
+| commit 1 | **`0da73557`** — "The attention strip leaves the project page" (6 files, +235/−41) |
+| commit 2 | **`4205f172`** — the first handoff. **The reviewer round ran against THIS head.** |
+| commit 3 | **`bb7ba7f7`** — the fix round. **The scoped re-review ran against THIS head.** |
+| commit 4 | the corrections commit that carries this handoff, so it is one MORE than `bb7ba7f7` |
+| frozen head | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit that carries it |
+| files | 11: `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` · `apps/web/test/page-refusals.test.tsx` · `apps/web/test/board-narrowing.test.tsx` · `apps/web/test/backlog-tab.test.tsx` · `apps/web/test/filters-sheet.test.tsx` · `apps/web/test/list-bulk-close.test.tsx` · `apps/web/test/project-calendar-timeline.test.tsx` · `apps/web/e2e-stack/non-text-contrast-roster.json` · `test-cases/13-deployment-dogfooding.md` · `Features.md` · this file |
 | ids minted | **`13.881`, `13.882`** — recounted at my tip BY MARKER; next free overall is `13.883` |
 | tree | clean |
 
@@ -82,6 +85,33 @@ banner — which is nonetheless a real precedent for exactly this conversion).
 
 **The full delta table, the recommendation, and a correction owed to the prototype-delta document are in
 `test-cases/13`'s section for this change.** Nothing in the change set presupposes the answer.
+
+### Reviews — two rounds, both discharged, both recorded in the PR body
+
+**Round 1, one reviewer, at `4205f172`.** Its one job was to confirm nothing else on the project page
+depended on the removed slice; it could not falsify that, and it independently reproduced **both**
+mutations in its own disposable clone with the same kill sets. No Critical, no Important code defect.
+Five findings, all fixed in `bb7ba7f7`: the `examined: 9` roster header, a wrong catalogue citation
+(`:106` → `:122`/`:169`), the undeclared handoff file, now-inert `getAttention` stubs across five
+`ProjectPage`-only fixtures, and — its sharpest — **my own claim that `.gn-project` "opens straight into
+the tab arms", which I asserted without reading what followed it.** It opens into the narrowing control
+and `gn-list-filter` (`page.tsx:1464`).
+
+**Round 2, scoped re-review, at `bb7ba7f7`** (the stub sweep went one file beyond round 1's finding).
+It confirmed the deletions are inert — four independent lines of attack, all failing to falsify, plus the
+structural proof that the read is never made and the `page-refusals.test.tsx:268` spy — and it verified
+each corrected prose claim against the line it cites. **It also caught a real error of mine: the count.**
+`board-narrowing`'s docblock said "eleven" stubs were swept; the true number is **18** (7 + 1 + 1 + 1 + 8),
+which is what you get when you sweep four files and forget the fifth — *a count that was not the number of
+the thing it counted*, the exact defect class the fix round was correcting. Corrected with the per-file
+breakdown, measured on the diff itself with the added side as the control. Its second finding (a "seven
+lines" count in the ratchet chain) was really a **unit disagreement**: the same range gave 7, 9 and 12
+depending on whether context lines are counted, so **the number was removed from the chain entirely** and
+the enumeration left as the claim.
+
+**Round 1's Important finding was NOT fixed, deliberately** — see the ratchet section above. The reviewer
+proposed hand-correcting the floor; this held, because lowering a floor is the direction that hides a
+loss. The disagreement is stated in the PR body and in `test-cases/13`, and it is the controller's call.
 
 ### What a restart must NOT redo
 

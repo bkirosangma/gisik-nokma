@@ -649,15 +649,21 @@ describe('13.556b the scope note names the LIST tab, not the board, when it rend
  * is on this page at all, and **the `getAttention: async () => []` overrides this
  * file used to carry are gone with it.** An override for a read a page never
  * makes is a fixture telling the next reader that it does — and 13.881 now
- * asserts that read is never made, so leaving them would leave eleven entries
- * the suite's own case contradicts. All eleven were swept in the same change:
- * seven here, and one or more each in `filters-sheet`, `backlog-tab`,
- * `list-bulk-close` and `project-calendar-timeline`, every one of them a
- * `ProjectPage`-only fixture. `my-work-open-shared` and `page-refusals` KEEP
- * theirs, because they mount `MyWorkPage`, where the strip still lives — the
- * distinction is which page the fixture mounts, not which file it is in. Nothing
- * else this page mounts (`AppNav`, `FiltersSheet` closed) renders a `<li>`
- * either.
+ * asserts that read is never made, so leaving them would leave entries the
+ * suite's own case contradicts.
+ *
+ * **All EIGHTEEN were swept in the same change**, measured on the fix round's own
+ * diff as `^- *getAttention: async \(\) => \[\],$` with the ADDED side returning
+ * 0 in the same invocation as the control: **7 here**, 1 each in `backlog-tab`,
+ * `filters-sheet` and `list-bulk-close`, and **8** in `project-calendar-timeline`.
+ * *(An earlier draft of this paragraph said "eleven" — the count you get from
+ * sweeping four of the five files and forgetting this one. It was caught in
+ * review, which is the second reason it is written out per-file here.)* Every one
+ * of the five is a `ProjectPage`-only fixture. **`my-work-open-shared` and
+ * `page-refusals` KEEP theirs**, because they mount `MyWorkPage`, where the strip
+ * still lives — the distinction is which page the fixture mounts, not which file
+ * it is in. Nothing else this page mounts (`AppNav`, `FiltersSheet` closed)
+ * renders a `<li>` either.
  */
 
 /** Two columns, two cards — the workflow this project's board is attached to before Task 8 ever runs. */

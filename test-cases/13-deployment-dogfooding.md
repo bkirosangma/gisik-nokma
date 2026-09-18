@@ -11059,11 +11059,18 @@ each link checkable, and the first three found independently by the reviewer and
 3. The strip verifiably rendered on `/p/:projectId` in that session: `AttentionStrip` returns `null` for an
    empty list (`:72`), and the non-text-contrast roster written by the same suite records
    `aside.gn-attention` **on `/p/:projectId`**, which it can only do for a selector it found rendered there.
+   *(Cite the record as it stood THAT RUN, not as the file reads now: the hand-correction above removed
+   `/p/:projectId` from that entry, so today the file no longer shows what this link rests on.)*
 4. Nothing else that gained or lost an `aria-label` between the baseline's own commit (`5aab0a90`) and this
-   branch's base is in the measured DOM — the reviewer diffed every `aria-label` line across
-   `apps/web/app`, `apps/web/src`, `packages/app-core/src` and `packages/ui/src` for that range (seven
-   lines) and showed each is on another route, another tab, or behind a closed disclosure. The sweep
-   navigates the project bare (`viewport.spec.ts:467`) with `DEFAULT_PROJECT_TAB = 'board'`.
+   branch's base is in the measured DOM — the reviewer enumerated every `aria-label` added or removed
+   across `apps/web/app`, `apps/web/src`, `packages/app-core/src` and `packages/ui/src` for that range and
+   showed each is on another route, another tab, or behind a closed disclosure. The sweep navigates the
+   project bare (`viewport.spec.ts:467`) with `DEFAULT_PROJECT_TAB = 'board'`.
+   **Deliberately NO count here**: the same range was counted three times in this review round and gave
+   three answers (a scoped re-review measured 9 changed lines over 7 files, the first reviewer said 7, and
+   a naive `git diff | grep -c aria-label` gives 12 because it also counts CONTEXT lines). The count was
+   never the claim — the enumeration is, and a number three instruments disagree on is decoration that
+   would invite someone to re-derive it instead of checking the substance.
 
 So the count is 66 → 65, `65 >= 66` is false, and the suite reddens with its own sentence naming the
 cause: *"13.287: /p/:projectId LOST ariaLabel: baseline 66, now 65."*
