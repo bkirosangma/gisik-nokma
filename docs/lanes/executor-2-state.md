@@ -20,7 +20,89 @@
 
 ---
 
-## ▲ TOP BLOCK — the nav's last-open project item, and the global tab memory (2026-09-18)
+## ▲ TOP BLOCK — the attention strip leaves the project page; the prototype restyle is measured and HELD (2026-09-18)
+
+**Position: THE CHANGE SET IS COMMITTED AND GREEN, THE MUTATIONS RAN, and what remains is the reviewer
+round and the PR.** Dispatch: `CTL-DISPATCH-2026-09-18-attention-project-page.md` **plus its AMENDMENT 1**
+(read the amendment first — it corrects `main`'s sha and the id list). One PR, `--base main`, branch
+**`exec2/attention-leaves-project-page`**.
+
+**FIRST ACTION ON A RESTART: `gh pr list --state open`.** If a PR for this branch exists it is at the
+controller's merge and nothing below needs redoing. Then verify the anchors — do not trust the rows.
+
+### Anchors — verify these; do not trust the row
+
+| | |
+|---|---|
+| branch | `exec2/attention-leaves-project-page` |
+| cut from | **`438b956c`** = `origin/main` after `#466` merged — the amendment's sha |
+| change-set head | **`0da73557`** ("The attention strip leaves the project page"), 6 files, +235/−41 |
+| frozen head | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit that carries it; whatever is here is one MORE than the last commit below |
+| files | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` · `apps/web/test/page-refusals.test.tsx` · `apps/web/test/board-narrowing.test.tsx` · `apps/web/e2e-stack/non-text-contrast-roster.json` · `test-cases/13-deployment-dogfooding.md` · `Features.md` |
+| ids minted | **`13.881`, `13.882`** — recounted at my tip BY MARKER; next free overall is `13.883` |
+| tree | clean |
+
+### What shipped
+
+**Part 1 — the removal.** Five sites leave `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`:
+the `AttentionStrip` / `useAttention` imports, the `useAttention` call, `attention.error` out of the
+expired-session list (**now three reads, not four** — the comment beside the notice said four and was
+corrected), and the whole render block. Three prose regions were corrected with them, because they
+described code that no longer exists. `AttentionStrip`, `useAttention`, `attention-strip.tsx` and
+`/my-work`'s mount are all untouched.
+
+**Cases.** `13.881` — the project page renders no strip **and never makes the read** (`getAttention`
+is stubbed to ANSWER, so a page that still called it fails). Its control is the board refusal, because
+both assertions are absences. `13.882` — `/my-work` still renders the strip.
+
+**Mutation-witnessed, both at the change-set head, each killing exactly ONE case:**
+- re-add the `useAttention` call alone (no render) → the ABSENCE stays **green**, only the spy at
+  `page-refusals.test.tsx:268` reddens. That is 13.881's docblock claim, measured.
+- remove My Work's strip render → only `13.882` reddens (1 failed / 13 passed).
+- Both files restored by `cp` with matching sha256 (`8dc7e7b9…`, `c818d396…`) and `git diff` empty.
+
+**Two stale records corrected beside the change**, neither of them mine to skip: `board-narrowing.test.tsx`'s
+docblock explained a strip that no longer mounts on that page (its inert `getAttention` overrides were
+left, deliberately — the helper shape is shared with fixtures that DO still mount the strip), and the
+`3.141` project-page case read *"one notice stands in for all four"* over five stubs of which the page
+makes three — `getAttention` dead by this change, `getPreferences` **already** dead before it.
+
+### ★ PART 2 IS HELD — this is the stop-and-ask, and it needs the controller
+
+The dispatch asked for the strip's styling to be checked against `desktop.dc.html:561-575`. It was
+checked; the delta is **structural, not CSS** — a tinted card, a visible *"Needs your attention"* heading
+with a warning icon, title-first rows, and the whole row as the click target. Taking the CSS-only rows
+(gap, row padding, the alert colour) alone would produce a treatment neither document draws.
+**Four of the deltas meet a record**, all cited in `test-cases/13`: the tint fill deletes the left border
+the controller **ruled to keep earlier the same day** (`hig-per-screen/7a`,`8a`); the heading's string
+differs from the shipped accessible name, which the copy rule says to FLAG not change;
+`docs/design/prototype-delta-2026-09-18.md:583-586` already gives `isMyWork` the port verdict `none`;
+and `--gn-tint-warning` is an alpha role with a documented single consumer (`tokens.ts`, the invitations
+banner — which is nonetheless a real precedent for exactly this conversion).
+
+**The full delta table, the recommendation, and a correction owed to the prototype-delta document are in
+`test-cases/13`'s section for this change.** Nothing in the change set presupposes the answer.
+
+### What a restart must NOT redo
+
+- **Do not re-run the mutations.** Both are recorded above with their kill sets.
+- **Do not re-run the full web suite to "check"** — it was 48 files / 520 tests / exit 0 at `0da73557`;
+  re-run only if a file changes.
+- **Do not hand-edit the roster again.** It is done and explained; the next sweep run overwrites it.
+- **Do not fold Part 2 into this PR.** It is held on purpose; the controller's ruling decides it.
+- **Do not run `docker compose` or bind :3001**, and do not run the forced gate — the controller's.
+
+### Gate evidence at `0da73557` (quoted raw, all zeros)
+
+`check:env` 0 · `check:tasks` 0 · `check:runbook` 0 · `check:citations` 0 · `check:help` 0 ·
+`check:db-tz` **0** with `DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma`, printing
+`database timezone: Asia/Kolkata` · `scripts/check-case-ids.mjs` 0 (*"2345 unique ids, highest 15.34"*).
+`pnpm turbo run typecheck` **0** — 17/17 tasks, 16 cache hits, `web` re-ran. Full web suite **exit 0**,
+48 files / 520 tests. **The forced gate was NOT run**; `docker compose` was NOT run and :3001 was not bound.
+
+---
+
+## ▼ PREVIOUS BLOCK — the nav's last-open project item, and the global tab memory (2026-09-18)
 
 **Position: THE CHANGE SET IS COMPLETE, THE REVIEWER ROUND AND ITS FIX ROUND ARE BOTH DISCHARGED, and the
 PR is opening against `main` with the reviewer recorded in its body.** Dispatch:
