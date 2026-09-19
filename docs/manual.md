@@ -468,6 +468,38 @@ If a job genuinely has no parent, it says **"At project root"** instead — a di
 two can never be confused. If there is a whole chain of hidden parents above, you are only ever told
 about the one directly above.
 
+### Seeing a job's children from its panel
+
+Open a job and its panel carries a **Subtasks** section, sitting between the progress line and the
+fields. It has four parts.
+
+**The heading** reads "Subtasks", and when the job has children it carries their progress on the same
+line — **"Subtasks · 3 of 5 done"**, with **"· 2 restricted"** added when some of them are not yours to
+see.
+
+**The children**, one line each, with **each child's own stage** beside it: *"Order the brochures ·
+To do"*. A subtask is a job in its own right — it gets a stage, an assignee, a date and a history of
+its own. If a job has no children at all, the section says so plainly rather than leaving you an empty
+space to interpret.
+
+**When a job is itself a subtask**, the heading also carries a chip naming its parent — **"Subtask of
+Rebrand for Kalita Tea"**. Press it and that parent's panel opens in place of the one you were reading.
+It names the parent directly above and never a whole chain: the parent's own panel draws its own chip in
+turn, so you walk a family tree one step at a time rather than being handed a path. If the parent is one
+you are not allowed to see, the chip reads **"Subtask of a restricted parent"** instead and is not
+pressable — see "Restricted parent — exists, but you can't see it" above.
+
+**The add row** at the bottom of the section takes a **New subtask title** and files the new child under
+the job you are looking at. It is the ordinary "adding a job" you already know (§5) with the parent
+filled in for you, so the new child starts in the first stage of its workflow and its title is held to
+the same rule as any other: blank, or spaces only, is refused. A refusal keeps what you typed, so you
+correct it rather than retype it.
+
+**One refusal worth knowing about.** The heading's count comes from the server; the list itself comes
+from a separate read. If those two ever disagree — the server counts five children you can see and only
+three could be read — the section **shows you no list at all** and says so in the server's own numbers.
+It will not quietly show you three and let you assume that is all of them.
+
 ### Adding work under a job that is already finished
 
 The product will not quietly tack an unfinished step onto a finished job. Instead it does the best
@@ -672,9 +704,12 @@ Turn it on and you get a note: *"the list, calendar and timeline are asking only
 > the default tab. So you can turn it on, read "done are excluded", and be looking at a Done column
 > full of done cards. The note exists precisely because of this.
 
-That is the only filter on the website. There is no filtering by person, by date, or by type, and
-there is no search box. (The product can do all of those underneath; nothing on any screen reaches
-them.)
+That switch is not the only filter on the website — beside it sits a **Filters** button, and above the
+tabs there is a **Search the board** box that narrows what the board shows you.
+
+What is still true is the other half: the deep search — the one that looks through every title,
+description and comment in the workspace at once — is on no screen at all. It is a finished engine with
+no steering wheel bolted on.
 
 ### Very large projects
 
@@ -735,8 +770,25 @@ a sixth kind.
 5. Something has been sitting in one stage too long — *"In Doing since 21 Aug — moved there by
    Anselma Marak"*
 
-**To mark something read: click the row.** That is it. If the marking fails, it reloads to show you
-the truth rather than leaving a fake "read" mark. Clicking also takes you to the job it is about.
+**To mark one thing read: click the row.** If the marking fails, it reloads to show you the truth
+rather than leaving a fake "read" mark. Clicking also takes you to the job it is about.
+
+**To mark a pageful read at once: the `Mark N read` button**, above the list, where **N** is how many
+rows on screen are actually unread. It marks exactly those — not your whole Inbox — which is why the
+button carries a number instead of the word "all", and why it is simply **not there** when nothing on
+screen is unread. A number you can check beats a word you have to take on trust.
+
+When it works, a message appears with an **Undo** beside it — *"3 notifications marked read"*. The Undo
+puts back exactly what that one action changed and nothing else, including correctly leaving alone any
+row that was already read before you pressed it. If nothing actually moved, no message appears at all,
+because there would be nothing to undo.
+
+**Three limits worth knowing.** The message clears itself after about fifteen seconds. Pressing
+`Mark N read` again replaces it, so once you start a second action the first one's Undo is gone — there
+is only ever one on screen. And one press carries at most a page of your Inbox: on a longer list the
+whole thing is refused and tells you so, rather than doing half the job and leaving you to work out
+which half went. The tabs — **All**, **Unread**, **Mentions** — are the way to make the page smaller
+when that happens.
 
 **The unread badge** on the Inbox link refreshes about once a minute. If a refresh fails it keeps the
 last number rather than resetting to nothing, and it shows nothing at all before the first answer
@@ -1070,9 +1122,12 @@ people list, the ordinary search, the standard My Work view, the "Needs your att
 reading and saving your preferences. Each one names what is missing rather than showing you an empty
 screen.
 
-**Searching offline:** the phone app's board screen has a search box — the only one in the product. With
-no signal it says "searching offline copy" underneath, so you know the results might be a little out of
-date.
+**Searching offline:** the phone app's board screen has a search box. With no signal it says "searching
+offline copy" underneath, so you know the results might be a little out of date.
+
+**That is no longer the only search box in the product.** The website's project board has one too,
+above the tabs and labelled **"Search the board"**. It cannot help you offline — the website is
+online-only — so it is named here only so you know it is there.
 
 ### The status strip
 

@@ -601,6 +601,14 @@ comes back — an absence, not a zero.
 Click the row. If the marking fails it reloads to show you the truth rather than leaving a fake "read"
 mark.
 
+**Can I mark a lot of them at once?**
+Yes — the **Mark N read** button above the list, where N is how many rows on screen are unread. It
+marks exactly those, not your whole Inbox, and it is absent when nothing on screen is unread. When it
+works you get a message with an **Undo** beside it, which puts back exactly what that one action
+changed. The message clears after about fifteen seconds, a second press replaces it and takes the
+first one's Undo with it, and one press carries at most a page of your Inbox — past that it refuses
+and says so rather than doing half the job.
+
 **My "Needs your attention" strip isn't showing.**
 If nothing needs attention, the strip does not appear at all — no box, no "all caught up" message,
 nothing. That is deliberate: an empty box headed "Needs your attention" reads like an all-clear you did not
@@ -685,7 +693,9 @@ when that person shares no project with you. **You can hide the work; you cannot
 ## Finding things
 
 **Where's the search box?**
-There isn't one on the website. Not on any screen.
+There is one on the website now: above the tabs on a project's board, labelled **"Search the board"**,
+and it narrows what the board shows you as you type. There is also one on the **phone app's board
+screen**. Neither of them is the deep search described below.
 
 **But it can search, surely?**
 The machinery is there and it is good. It searches titles, descriptions and comments across every
@@ -696,10 +706,13 @@ removing the hidden ones — so you get fifty things you can actually open, not 
 None of it is reachable. It is a finished engine with no steering wheel bolted on.
 
 **Is there a search anywhere at all?**
-On the **phone app's board screen**. When you are offline it says "searching offline copy" underneath.
-So the one place you can search is the app with the fewest screens.
+Two places, and both of them only narrow something already on screen. On the **phone app's board
+screen** — where, offline, it says "searching offline copy" underneath, so you know the results might
+be a little out of date. And on the **website's project board**, in the box above the tabs.
 
-**If search worked, what would catch me out?**
+Neither of those is the deep search described just above. That one is still on no screen.
+
+**If the deep search worked, what would catch me out?**
 Two things:
 
 - **It matches words exactly as typed.** Searching "licences" will not find "licence". No plurals, no
