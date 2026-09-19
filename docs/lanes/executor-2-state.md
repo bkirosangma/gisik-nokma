@@ -1,4 +1,129 @@
-## ▲ TOP BLOCK — **THE CLOSED-HIDE DEFAULT ON THE TWO DATE TABS, AND A TEST-CASE THAT QUOTED COPY THE PRODUCT NO LONGER SHIPS.** (2026-09-20, ~05:3x IST)
+## ▲ TOP BLOCK — **THE TWO COUNTS THE PRODUCT CONTRADICTS, AND THE TEN MORE THE SCAN FOUND.** (2026-09-20, ~07:xx IST)
+
+### § 1 — WHERE TO FIND IT
+
+- **Dispatch: the controller's "the manual's own counts, and one copy that contradicts its own screen" paste**
+  (2026-09-20 ~05:4x IST). **Base named as `main` = `84c35f5a`** (`#579`, merged).
+- **Branch `exec2/manual-counts`**, cut from `84c35f5a`. **CODE HEAD `53d3937f`** (amended twice while
+  correcting my own arithmetic — see § 7; the tree has not changed since the first commit).
+- **The PR opens as the last step of this dispatch.** If you are reading this from `main`, settle it in one
+  call: `gh pr list --state all --head exec2/manual-counts`.
+- **Docs only**: `docs/manual.md`, `docs/faq.md`, `packages/app-core/src/help/content.generated.ts`
+  (regenerated, never hand-edited). **No source file touched.**
+- ⚠ **`main`'s `task-ledger.tsv` is NOT ours to edit** — the controller flips rows after each merge.
+
+### § 2 — ANCHORS, RECOUNTED AT `53d3937f` (not carried forward)
+
+| anchor | value |
+|---|---|
+| `git merge-base origin/main HEAD` | `84c35f5a` |
+| `HEAD` | `53d3937f` |
+| ahead / behind `origin/main` | **1 / 0** |
+| tree | **clean** |
+| `node scripts/help-content.mjs --check` | **ok** — 2 documents, 29 sections, **231 entries** |
+| `check:env` / `check:tasks` / `check:runbook` / `check:citations` / `check:help` | **all exit 0** |
+| `check-case-ids` | ok — **2494** unique ids, highest `16.82` (**unchanged: no case id minted**) |
+| app-core `tsc --noEmit` | **clean** |
+| `vitest run test/help` (app-core) | **33 passed / 0 failed** |
+| **the forced gate** | **NOT RUN** — the controller's |
+| `check:db-tz` | **NOT RUN** — needs `DATABASE_URL`; it reads no docs |
+
+Entry delta: **predicted 230 → 231 before regenerating** (one new `###` entry), **measured 231.** Manual
+`###` 79 → 80; FAQ question-entries unchanged at 151. Diff: **3 files, +147/−50**; **13 hunks in the two
+docs.**
+
+### § 3 — WHAT WAS WRITTEN
+
+**(a) The empty-month sentence count.** The manual and the FAQ both said **four** sentences. The product
+ships **three** (`claim-labels.ts:70/91/108`, selected by three arms at `calendar-model.ts:372-378`). The
+dispatch asked me to settle whether the disjunction is **one sentence covering two of the manual's items or
+two sentences sharing a file** — different repairs. **One sentence**: a single `export const` whose wording
+names the narrowing set on purpose (`:101-106`). The manual's four *causes* were right; its count of
+*sentences* was wrong. Both texts now say three and name the disjunction.
+
+**(b) The tab count, and the finding underneath it.** `docs/manual.md:620` **at `84c35f5a`** said four tabs;
+the rail has **five**
+(`page.tsx:1756-1760`, Backlog first). The whole-document scan found **12 instances of the same framing — 11
+changed, 1 recorded** — and **the headline is not a count: `backlog` appeared nowhere in either document.**
+0 hits against a positive control ("timeline": 7 and 8 hits, same invocation), re-measured at `origin/main`
+through `git show`. **The wrong count was the symptom; the tab was absent from both documents.** So §8
+gained a `### Backlog` entry built only from measured facts: it is first; it lists jobs that have not begun;
+order is arranged by dragging a row or by `Move up`/`Move down` (`backlog-rank-controls.tsx:283-300`); each
+row has a `Start` button; it does **not** hide closed jobs (`page.tsx:842-845`); its empty copy is the
+product's own (`page.tsx:2202`).
+
+**(c) The closed-unaware empty month — MEASURED and PROPOSED, deliberately not written.** Full text in
+`gisik-nokma-lanes/EXEC-RULING-REQUEST-2026-09-20-calendar-fourth-empty-door.md`. The short version: four
+doors, three sentences; the model cannot see the fourth because the pruning is **upstream** (`dateInputs`
+from `datesNarrowing.rows`, `page.tsx:1135-1146`, passed with no `filter` prop, `:2027-2031` / `:2071`), so
+`calendar-model.ts:347-355` finds nothing removed. **The repair is not a sentence swap**: the narrowed copy
+says "a narrowing **you set**", and the closed-hide is a page *default* (`closedDefaultInForce`,
+`page.tsx:1369`) — reaching for it would be false at that door. Which of the four fixes is right **is the
+ruling asked for.**
+
+**(d) A third instance the dispatch did not name: the Phone tab, where the manual contradicted itself.** §0
+already says SMS is not configured here; §1's step 2 flatly said "you will see two tabs … The page opens on
+Phone". Measured: `/v1/auth/methods` → `{"google":true,"apple":false,"phone":false}`, and
+`sign-in/page.tsx:291` renders the tab control only when `phoneAvailable` (`:178`). Both paragraphs now name
+the condition — true whether or not SMS is ever configured.
+
+### § 4 — RECORDED, NOT FIXED, EACH WITH A NAMED OWNER (all in the PR body)
+
+1. **`test-cases/11-calendar-notifications.md:250` is stale against its own test** — case 11.160 says "all
+   **four** tabs"; `apps/web/test/project-calendar-timeline.test.tsx:196`,`:206` asserts **five** and titles
+   itself "offers all five tabs (Backlog first)". **Owner: whoever next sweeps `test-cases/11`.**
+2. **`test-cases/12-offline-sync-apps.md:2385`,`:2394`** — case 12.322's *"loses three of four tabs"*. The
+   rail has five; the refusal set is four. **Owner: whoever next sweeps `test-cases/12`.**
+3. **`docs/product-coverage-map.md:88` and `:210`** restate **both** wrong counts, `:88` as the *correction*
+   of a persona error. Outside this dispatch's file set. **Owner: whoever next owns the coverage map.**
+4. **`faq.md:500`** — "only the List, Calendar and Timeline"; the Backlog is narrowed too
+   (`page.tsx:831-835`), but that switch's scope is marked unowned **by the source itself**, so it is the
+   `clearAll` judgement. **Owner: the owner.**
+5. **`apps/web/src/board-search-scope.ts:197-198`** — docblock says the non-board tabs use `listNarrowing`'s
+   count; `page.tsx:1874` passes `datesNarrowing` for Calendar/Timeline since Task 11.
+6. **`docs/manual.md` §13's disputed-claim banner** — two unbacked claims: it bolds **"Discard it"** where
+   **both** hosts render **"Discard"** (`apps/mobile/src/screens/ticket-screen.tsx:121`,
+   `contest-banner.tsx:59`), and it promises a note no host offers (`ticket-screen.tsx:94-97`; the type
+   allows one at `contest-view-model.ts:54`, nothing supplies it). Trivial, deliberately not fixed — a label
+   audit is not this dispatch.
+7. **`ContestBanner` is exported (`index.ts:306`) but rendered by no app** — `apps/web` has zero `Contest`
+   references; `apps/mobile` reimplements the screen (`ticket-screen.tsx:119-121`).
+
+### § 5 — CASE IDS: **NONE MINTED**
+
+`16.45` stays free. `check-case-ids` is unchanged at **2494 / highest 16.82**. A prose-only change mints
+nothing.
+
+### § 6 — THE TWO METHODS THAT EARNED THEIR KEEP HERE
+
+1. **The scan's universe is the files you already edited — so go outside them.** Item (b) was dispatched as
+   a *count* fix. The count was the symptom; a **zero** for the whole word `backlog` was the disease. And
+   the same sweep found `test-cases/11`'s stale row only because I left `docs/manual.md` and `docs/faq.md`
+   and swept `Features.md`, `README.md`, `docs/product-coverage-map.md` and `test-cases/`. **Every null in
+   that sweep carried a positive control through the same invocation.**
+2. **A grep's universe is also a bug when the repo has four apps.** I nearly recorded *"ContestBanner is
+   rendered nowhere"* — measured over `apps/web` alone. It is rendered, by `apps/mobile`. **The host was one
+   directory outside my pattern.** Before recording an absence, name the directories the thing could live in
+   and sweep all of them.
+
+### § 7 — A DEFECT IN MY OWN ARTIFACTS, FIXED BEFORE THE PUSH
+
+The first two commit messages asserted a count I had **tallied from memory** ("nine places", then an
+arithmetic slip in "eleven more"), and one clause claimed a `faq.md` mirror of the tab count that **does not
+exist** — `grep "four tabs"` over both documents returns nothing. Both were caught before the push and
+corrected by amending, and the third message counts **from the diff**: 13 hunks, 11 findings, one finding
+spanning two hunks, one non-finding hunk. **A count is a reading; write it only after re-measuring, and
+never into a commit message from memory.**
+
+### § 8 — A WARNING THAT TRAVELS WITH THIS FILE
+
+**Shas in the narrative blocks below are unreliable — several are ORPHANED by rebases, and `git cat-file`
+will still pass on them and lie.** Verify reachability with
+`git merge-base --is-ancestor <sha> origin/main`, never with `cat-file`.
+
+---
+
+## ▼ PREVIOUS BLOCK — **THE CLOSED-HIDE DEFAULT ON THE TWO DATE TABS, AND A TEST-CASE THAT QUOTED COPY THE PRODUCT NO LONGER SHIPS.** (2026-09-20, ~05:3x IST)
 
 ### § 1 — WHERE TO FIND IT
 
