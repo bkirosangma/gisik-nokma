@@ -41,6 +41,50 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~22:0x IST. **DOOR G IS BUILT; ITS PR IS OPENING AT THIS
+> # HEAD. AND THIS LANE'S QUEUE IS NOW EMPTY.**
+> Branch **`exec/priority-due-type`**, cut from **`origin/main` = `5aa82743`**; code head **`11a525bf`**.
+> **Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-19-g-priority-due-type.md`.**
+> **Doors D and F are MERGED** (`c5bcd13f`, `dfe715da`) — a restart must not redo either.
+>
+> ## ⛔ THE LANE'S LIST IS EMPTY, AND THE QUEUE SAYS WHAT TO DO ABOUT THAT
+> **exec 1's order was B → A → D → F → G. All five are built; D, F and G are this session's.** The
+> queue is explicit: *"When your lane's list is empty, say so and hold — do not take the other lane's
+> doors."* **Executor 2 still has H and the inviter card.** Do not start them.
+>
+> ## ⛔ AND THIS LANE'S ID BLOCK IS EMPTY TOO
+> **`16.1`–`16.30` is fully spent** — D took `16.1`–`16.14`, F took `16.15`–`16.22`, G took `16.23`–`16.30`.
+> `16.31` is executor 2's. **Any further task on this lane needs a REALLOCATION from the controller**;
+> the queue's rule is to stop and ask rather than mint past the window or borrow a neighbour's.
+>
+> ## WHAT G DID, AND THE CLASSIFICATION IS THE PART TO KEEP
+> The sheet drew Priority, Due and Type **only when the ticket happened to carry them as custom fields**;
+> now it draws all three always, in the prototype's order. **The three are NOT alike, and that is the
+> finding:**
+> | field | bucket | the measurement |
+> |---|---|---|
+> | **Type** | **DOMAIN CONCEPT** | `TicketState.typeId`; the NAME comes from `getTicketTypes` (already shipped) |
+> | **Due** | **DOMAIN CONCEPT + BUILT-IN field** | `ticket-events.ts:66` names it among the built-ins; read via `dateClaimOf`, the declared single source of dates |
+> | **Priority** | **NEITHER — a CUSTOM-FIELD CONVENTION** | `priority` appears in **ZERO** files of `packages/domain`, vs 9 for `assignee` and 6 for `dueDate` in the same run |
+>
+> **No migration, no route, no new schema.** And **two of the prototype's three are EDITORS there** —
+> Priority a segmented control, Due a date input — so making them editable is a **SEPARATE DOOR, not
+> built**, and `16.29` asserts the read-only half.
+>
+> ## ANCHORS — re-take `origin/main` (it moves)
+> | | |
+> |---|---|
+> | base | `origin/main` = `5aa82743` at the cut |
+> | gate | **33/33, EXIT 0** under **Node `v22.22.2`** |
+> | checks | all **seven exit 0**. `check-case-ids` **2477, union == sum** — **exactly +8** on main's 2469. `16-remaining-doors.md` **31 cited / 0 uncited / 31** |
+> | the flake | ⚠ `seed-dev.test.ts` timed out at 30s on the FIRST gate run — **the FIFTH time today**; 2.4s alone, green on re-run |
+>
+> ## THE ONE TRAP G SET, FOR WHOEVER TOUCHES THIS FILE NEXT
+> **`state.fields['dueDate']` used to ride the generic field loop as `field-dueDate`.** Now that it has
+> its own row, the loop must **SKIP it** (`description`/`dueDate`/`priority`) or the sheet draws **two
+> rows for one claim** — and that duplication is INVISIBLE on any fixture whose ticket carries no such
+> field. Mutating the exclusion reddens `16.28` alone.
+>
 > # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~21:0x IST. **DOOR F IS BUILT; ITS PR IS OPENING AT THIS
 > # HEAD.** Branch **`exec/subtasks-section`**, cut from **`origin/main` = `92a3edb4`**; code head
 > # **`b6c88359`**. **Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-19-f-subtasks.md`.** **Door D is
