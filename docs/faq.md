@@ -516,8 +516,9 @@ Open the **Filters** button beside the "Only tickets in progress" switch and cli
 get one row per person, with their picture. Click once for *included* (only their jobs), twice for
 *excluded* (everything except theirs), and a third time to clear it. It takes effect at once; there is
 no Apply. The same sheet sets collaborators, type, state, closed and category the same way, and each one
-turns into a removable chip under the tabs. The one exception is **collaborators**: no tab applies it,
-and the strip says so on screen rather than pretending otherwise.
+turns into a removable chip under the tabs — except two, and both say so in words on screen rather than
+pretending otherwise. **Collaborators** is applied by no tab at all, and **closed** shows no chip on the
+Board, which never shows closed jobs in the first place.
 
 **Can I sort a list how I like?**
 Not by choosing. Lists come back in a fixed, repeatable order. You can choose the *grouping* (epic,

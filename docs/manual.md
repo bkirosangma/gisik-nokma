@@ -735,29 +735,32 @@ Every value is a single button, and each click moves it on one step:
 | a tick, and **included** in the button's name | only jobs with this value |
 | a slash through the circle, **excluded** in the name, and the name struck through | jobs with this value are hidden |
 
-A fourth click puts the empty circle back.
+A third click puts the empty circle back.
 
 Two of the six are not lists of your workspace's own values. **Closed** is a single control, so its
 three settings read *everything*, *closed only* and *not closed*. **Category** is always the same three
 words. The other four are built from what your workspace actually has.
 
-**If a list cannot be shown, the sheet says which.** A roster that has not loaded yet, a roster that
-could not be loaded, and a workspace with nobody in it are three different facts, and it keeps them
-apart rather than handing you an empty panel.
+**If the roster cannot be shown, the sheet says which of three things happened.** One that has not
+loaded yet, one that could not be loaded, and a workspace with nobody in it are three different facts,
+and it keeps them apart rather than handing you an empty panel.
 
-The footer has two buttons. **Clear all** empties every filter, the search box's own text included, and
-does not close the sheet — so you can see what it did. **Done** closes it and changes nothing else.
+The footer has two buttons. **Clear all** empties everything you have set, the search box's own text
+included, and does not close the sheet — so you can see what it did. **Done** closes it and changes
+nothing else.
 **Escape** also closes, and puts your keyboard focus back on the **Filters** button; clicking outside
 closes without moving your focus at all.
 
-**What you set appears under the tabs**, in the strip that counts how many jobs are showing, as a chip
-with an **×** that removes it. Removing a chip there and switching the value off in the sheet are the
-same act.
+**What you set appears under the tabs**, in the strip that counts how many jobs are showing, as a chip.
+Each chip carries an **×** that clears everything that one chip names — so if you included two
+assignees and they show as a single chip, the **×** takes both, not one.
 
-One value never becomes a chip. **Collaborators is the one thing no tab applies**, and the strip says
-so itself: *"Not applied on the board: collaborator."* You can set it and the filter keeps it, but
-nothing narrows by it — and that sentence is the product telling you, rather than quietly ignoring what
-you asked for.
+Two things never become a chip, and both say so in words instead. **Collaborators is the one thing no
+tab applies** — the strip's own sentence is *"Not applied on the board: collaborator."* You can set it
+and the filter keeps it, but nothing narrows by it. **Closed shows no chip on the Board either**,
+because the Board never shows closed jobs in the first place: there the sentence reads *"Not applied
+on the board: closed."*, while the other tabs do give it a chip. Both sentences are the product telling
+you, rather than quietly ignoring what you asked for.
 
 ### Very large projects
 

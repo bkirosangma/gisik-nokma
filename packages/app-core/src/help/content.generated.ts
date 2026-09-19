@@ -3611,7 +3611,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "A fourth click puts the empty circle back."
+                    "text": "A third click puts the empty circle back."
                   }
                 ]
               },
@@ -3669,11 +3669,11 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "If a list cannot be shown, the sheet says which."
+                    "text": "If the roster cannot be shown, the sheet says which of three things happened."
                   },
                   {
                     "kind": "text",
-                    "text": " A roster that has not loaded yet, a roster that could not be loaded, and a workspace with nobody in it are three different facts, and it keeps them apart rather than handing you an empty panel."
+                    "text": " One that has not loaded yet, one that could not be loaded, and a workspace with nobody in it are three different facts, and it keeps them apart rather than handing you an empty panel."
                   }
                 ]
               },
@@ -3690,7 +3690,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " empties every filter, the search box's own text included, and does not close the sheet — so you can see what it did. "
+                    "text": " empties everything you have set, the search box's own text included, and does not close the sheet — so you can see what it did. "
                   },
                   {
                     "kind": "bold",
@@ -3727,7 +3727,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", in the strip that counts how many jobs are showing, as a chip with an "
+                    "text": ", in the strip that counts how many jobs are showing, as a chip. Each chip carries an "
                   },
                   {
                     "kind": "bold",
@@ -3735,7 +3735,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " that removes it. Removing a chip there and switching the value off in the sheet are the same act."
+                    "text": " that clears everything that one chip names — so if you included two assignees and they show as a single chip, the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "×"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " takes both, not one."
                   }
                 ]
               },
@@ -3744,7 +3752,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "One value never becomes a chip. "
+                    "text": "Two things never become a chip, and both say so in words instead. "
                   },
                   {
                     "kind": "bold",
@@ -3752,7 +3760,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", and the strip says so itself: "
+                    "text": " — the strip's own sentence is "
                   },
                   {
                     "kind": "italic",
@@ -3760,7 +3768,23 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " You can set it and the filter keeps it, but nothing narrows by it — and that sentence is the product telling you, rather than quietly ignoring what you asked for."
+                    "text": " You can set it and the filter keeps it, but nothing narrows by it. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Closed shows no chip on the Board either"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", because the Board never shows closed jobs in the first place: there the sentence reads "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Not applied on the board: closed.\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", while the other tabs do give it a chip. Both sentences are the product telling you, rather than quietly ignoring what you asked for."
                   }
                 ]
               }
@@ -8332,15 +8356,23 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " (everything except theirs), and a third time to clear it. It takes effect at once; there is no Apply. The same sheet sets collaborators, type, state, closed and category the same way, and each one turns into a removable chip under the tabs. The one exception is "
+                    "text": " (everything except theirs), and a third time to clear it. It takes effect at once; there is no Apply. The same sheet sets collaborators, type, state, closed and category the same way, and each one turns into a removable chip under the tabs — except two, and both say so in words on screen rather than pretending otherwise. "
                   },
                   {
                     "kind": "bold",
-                    "text": "collaborators"
+                    "text": "Collaborators"
                   },
                   {
                     "kind": "text",
-                    "text": ": no tab applies it, and the strip says so on screen rather than pretending otherwise."
+                    "text": " is applied by no tab at all, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "closed"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " shows no chip on the Board, which never shows closed jobs in the first place."
                   }
                 ]
               }
