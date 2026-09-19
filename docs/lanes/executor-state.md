@@ -102,13 +102,27 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | gate | `pnpm turbo run build test typecheck --force --concurrency=2` → **33/33, 0 cached, EXIT 0, 1m18s**, Node **v22.22.2** (`pnpm exec node -v`, measured — the `pnpm` binary itself resolves under the v24 nvm dir while the node it runs is v22, so name the version, never the path) |
 > | checks | `tasks` · `citations` · `env` · `runbook` · `help` · `migrations` · `case-ids` (2494) — all EXIT 0. `check:db-tz` needs `DATABASE_URL`; run against the dev DB it reads `Asia/Kolkata`, EXIT 0 |
 > | `e2e-stack` | **5 passed / 3 failed** at the frozen head (was 2 / 6) |
-> | next | **open the PR, then take the next dispatch. The parity task's visual half is now unblocked — the suite reaches the sheet, which is what this was for.** |
+> | next | **PR #578 is OPEN and MERGEABLE (`--base main`, head `ea51de11`). Awaiting the tap-target ruling (below) and the next dispatch. ⛔ THE PARITY VISUAL HALF IS **NOT** UNBLOCKED — see the correction below; it is still owed to a rebuild.** |
 >
 > ## ⚠ THE RUNNING `:3001` IMAGE PREDATES `main`'s TIP — measured, and it bounds every reading
 > `#575` added `gn-members__identity`; the container's baked `.next` has ZERO references to it while
 > `gn-members__name` appears in three files. The web image was built `2026-09-19T18:55:47Z`
 > (2026-09-20 00:25 IST), before the `#575` merge at 03:11 IST. **No `docker compose` action was taken**;
 > `:3001` was never down and `curl -s localhost:3001/v1/auth/methods` still answers `{"google":true,…}`.
+>
+> ## ⛔ CORRECTION — AN EARLIER VERSION OF THIS BLOCK SAID THE PARITY VISUAL HALF WAS UNBLOCKED. IT IS NOT.
+> I wrote "the parity task's visual half is now unblocked — the suite reaches the sheet" from the dispatch's
+> framing instead of from a measurement. **Measured afterwards, and the image predates `#572` too.** `#572`
+> (merged 02:52:17 IST) introduces the CSS class `gn-sheet__full`, absent before it:
+> `git show faecf837^1:packages/ui/src/ui.css | grep -c gn-sheet__full` → **0**;
+> `git show faecf837:…` → **1**; `docker exec … grep -rl gn-sheet__full /app/apps/web/.next` → **0 files**.
+> (`gn-sheet__body` 3→4, `gn-ticket-sheet__tabs` 3→1, `gn-sheet__title` 1→3 are all present BOTH sides and
+> are NOT discriminators.)
+> **What survives:** the repaired suite reaches the authenticated board in ~2 s where before it never got
+> there, so it can screenshot the sheet AS THE IMAGE RENDERS IT. **What does not:** any witness of the
+> parity changes. **The parity visual half is still owed to a rebuild.** And before pricing one, note that
+> 13.176 records the SHEET is a refusal for EVERY viewer (`DataSource.getTicket` → `ServingGapError`), which
+> predates that change — so "screenshot the sheet" may not be a reachable step at all yet.
 >
 > ---
 >
