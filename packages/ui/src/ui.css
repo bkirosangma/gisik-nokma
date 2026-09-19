@@ -1936,6 +1936,7 @@
 .ticket-type-list__rank,
 .ticket-type-list__fields,
 .ticket-type-list__workflow,
+.ticket-type-list__tickets,
 .ticket-type-list__meta-sep { font-size: 0.75rem; color: var(--gn-text-muted); }
 
 .ticket-type-editor { display: flex; flex-direction: column; gap: 0.9rem; }

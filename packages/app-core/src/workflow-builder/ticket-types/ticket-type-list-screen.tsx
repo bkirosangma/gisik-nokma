@@ -85,7 +85,7 @@ import { TypeIcon } from './icons.js';
  *   own holds and it said LIFTED, so the register was followed and the dispatch's
  *   sentence was the error.** With the thing built, re-quoting the contradiction
  *   would be keeping an argument about a decision that has been made.
- * - **where the number comes from.** `getTicketCountsByType(workspaceId)` — ONE call
+ *   **Where the number comes from.** `getTicketCountsByType(workspaceId)` — ONE call
  *   for the whole list, answered by `GET /v1/workspaces/:id/ticket-counts-by-type`
  *   (`apps/server/src/routes/builder-reads.ts`). **Not
  *   `getTypeWorkflowPopulation`**, which answers *"how many are on THIS workflow"*:
