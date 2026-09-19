@@ -1,4 +1,258 @@
-## ▲ TOP BLOCK — **THE TWO COUNTS THE PRODUCT CONTRADICTS, AND THE TEN MORE THE SCAN FOUND.** (2026-09-20, ~07:xx IST)
+## ▲ TOP BLOCK — **THE README'S TWO WRONG COUNTS, AND THE FOUR OTHER PLACES THE SAME TWO CLAIMS SURVIVE.** (2026-09-20, ~08:xx IST)
+
+### § 1 — WHERE TO FIND IT
+
+- **Dispatch: the controller's "the README's two counts, and the pattern that is now this repo's own lesson"
+  paste** (2026-09-20 ~07:2x IST). **Base named as `main` = `92f3d93c`** (`#581`, mine, merged — verified
+  reachable with `git merge-base --is-ancestor`, not `cat-file`).
+- **Branch `exec2/readme-truths`**, cut from `92f3d93c`. **CODE HEAD `d4ddde41`** — `02740819` (the change)
+  + `0d4a86d9` (fix round 1: the two in-diff defects review 1 found)
+  + `d4ddde41` (fix round 2: the defect scoped re-review 2 found in fix round 1).
+- **The PR opens as the last step of this dispatch.** If you are reading this from `main`, settle it in one
+  call: `gh pr list --state all --head exec2/readme-truths`.
+- **Docs only**: `README.md`, plus this handoff. **No source file touched.** `content.generated.ts` did NOT
+  move — predicted 0 entries, measured 0 (`check:help` still 231; neither `manual.md` nor `faq.md` touched).
+- ⚠ **`main`'s `task-ledger.tsv` is NOT ours to edit** — the controller flips rows after each merge.
+
+### § 2 — ANCHORS, RECOUNTED AT `02740819` (not carried forward)
+
+| anchor | value |
+|---|---|
+| `git merge-base origin/main HEAD` | `92f3d93c` |
+| `HEAD` | `d4ddde41` |
+| ahead / behind `origin/main` (`92f3d93c`) | **3 / 0** — base and `origin/main` are the same sha, so there is no moved-`main` trap on this branch |
+| tree | **clean** |
+| diff vs `origin/main` (3-dot) | **1 file, +9/−7, 2 hunks** — `git diff --stat origin/main...HEAD` |
+| `check:help` | **ok** — 2 documents, 29 sections, **231 entries**, generated copy matches source |
+| `check:env` / `check:runbook` / `check:citations` / `check:tasks` | **all exit 0** |
+| `check-case-ids` | ok — **2494** unique ids, highest `16.82` (unchanged: **no case id minted**) |
+| **the forced gate** | **NOT RUN** — the controller's |
+
+⚠ **Two-dot warning, still live on this branch:** `git diff --stat origin/main HEAD` and the three-dot form
+**agree here only because base == `origin/main`**. The moment `main` moves, two dots will list the *peer's*
+files as mine — use `origin/main...HEAD`.
+
+### § 3 — WHAT WAS WRITTEN, AND WHY THE COUNT WAS NOT THE HARD PART
+
+**(a) The empty month: the README claimed four reasons and listed three; the product RENDERS two.**
+Enumerated from the product rather than counted: `calendar-model.ts:372-378` can **SELECT** three
+sentences, and only **two can RENDER**.
+
+| sentence | selected by | reachable? |
+|---|---|---|
+| `CALENDAR_EMPTY_MONTH_COPY` (`claim-labels.ts:70`) | the fallback arm (`:378`) | **yes** |
+| `CALENDAR_ALL_HIDDEN_COPY` (`:91`) | `hiddenInGrid` (`:325-331`), driven by the view's OWN legend state (`calendar-view.tsx:211-213`, `:223`) | **yes** |
+| `CALENDAR_NARROWED_MONTH_COPY` (`:108`) | `narrowedOutOfGrid` (`:347-355`) | **NO** |
+
+The third needs `opts.filter` or `opts.laneEpicId`; `calendar-view.tsx:220-221` forwards each **only when
+defined**, and the ONE production render site passes neither (`page.tsx:2027-2031`: `tickets`, `today`,
+`userName`, `onOpenTicket`). The only other `<CalendarView` in the repo is a test (`calendar-view.test.tsx:79`).
+**So one of the README's three listed members — "your filter removed everything" — is a door that cannot show
+its own message.** The filter prunes *upstream*: `datesNarrowing` (`page.tsx:706-713`) feeds `dateInputs`
+(`:1135-1146`), passed at `:2028` — so the model receives an already-filtered set, `visible === inputs`,
+`excluded` is `[]`, and a filtered month falls through to the FIRST sentence. The README now names the two
+kinds it can tell apart and says what a filtered month gets.
+
+**The fourth reason was never a fourth sentence.** There are **four doors and three sentences**: the
+disjunction in `CALENDAR_NARROWED_MONTH_COPY` names *filter, lane, legend* — and the legend has its own
+dedicated sentence. So the README was counting the code's doors while presenting them as the product's
+messages, and two of those doors cannot fire in any app.
+
+**(b) The views list named four and omitted the Backlog — the same defect as `#581`'s headline, one document
+up.** The rail is FIVE, Backlog first (`page.tsx:1756-1760`). It is now named, and described by what it
+**holds** rather than as a fifth rendering of the same work: `page.tsx:844` cuts to rows whose `stateId` is
+the universal `BACKLOG_STATE_ID` — where a job starts its life. `Features.md:85` already documents it as
+"a fifth tab … FIRST", so no catalogue update was owed; `Features.md` was read, not assumed.
+
+⚠ **The dispatch cites `README.md:23-25` and `:44`; those were the PRE-change lines. Post-change they are
+`:23-27` and `:46`** — the fix moved the lines the dispatch named, which is the ordinary course and the
+reason every citation below was re-measured against the edited file rather than carried.
+
+### § 3d — THE REVIEW ROUND, AND THE TWO DEFECTS THAT WERE IN MY OWN DIFF
+
+One independent reviewer ran against `02740819`, briefed to **falsify** the two claims rather than tick
+them. **Both survived** — it reproduced the three-arm selection itself, confirmed `narrowedOutOfGrid` is
+unreachable through props, and confirmed the Backlog is first. It also independently confirmed eight
+claims I had *not* touched (the two clocks, `one of three roles` against `EDITABLE_ROLE_OPTIONS`, the
+reporting-scope guard, the 54329 port, `5 of 8 done · 2 restricted`, and the reference tracker's own four
+views), so the unchanged surrounding text is not merely unreviewed.
+
+**It found two defects in prose this change writes or carries. Both were real; both are fixed in
+`0d4a86d9`; both were re-verified by me at the line before I touched them.**
+
+1. **MINE — "a backlog of jobs that have not begun".** `packages/domain/src/workflow.ts:72-75` builds a
+   `state → backlog` edge for EVERY declared non-terminal state (`sendBack`), and
+   `packages/app-core/src/views/board.tsx:1018-1021` records that since 13.582 `transitionOptions` offers
+   Send-to-backlog from every non-terminal state — the door is the sheet's own "Move to Backlog". So the
+   tab also lists work that began, advanced and was sent back. My phrase read as a *history* claim about a
+   tab that is a *state* claim. Reworded.
+2. **CARRIED — "with a strip at the top telling you what is blocked…".** False of this page.
+   `AttentionStrip` renders at exactly ONE site — `apps/web/app/w/[workspaceId]/my-work/page.tsx:67`
+   (control fired) — and `Features.md:79` records its removal from the project route on 2026-09-18 on the
+   owner's own instruction. **I had READ that `Features.md` line earlier in this same session and did not
+   connect it to the bullet I was editing.** Reading a fact is not the same as using it. The clause now
+   names **My work** as the page it is on.
+
+**And the instrument lesson, once more, in its recorded shape:** my README sweep for the empty-month
+wording used a pattern that could never reach *"There is no search box on the web"*. **The universe was
+right; the pattern was too narrow — again.** § 4's own table is what a too-narrow pattern leaves behind.
+The reviewer found it by *reading* the file instead of matching it, which is the only thing that has ever
+found this class here.
+
+### § 3e — SCOPED RE-REVIEW OF FIX ROUND 1, AND THE DEFECT **I** HAD ALREADY READ THE ANSWER TO
+
+A second, scoped reviewer ran against `0d4a86d9` — the fix round — as § 3d's own lesson requires. **It
+found a real Important defect in the prose fix round 1 had just written**, and it is the sharpest
+instance of a recorded failure mode in this whole dispatch.
+
+**`README.md:48` said the strip is "blocked, stale or due soon". It carries FOUR.** And I had the answer
+in hand and read past it:
+
+- `apps/server/src/routes/attention.ts:162-167` — *"Contested claims join this strip as a FOURTH, additive
+  item kind **once `claim.contested` events exist**"* — and that route builds three (`:212` blocked,
+  `:235` stale, `:259` due-soon). I read this and concluded "three".
+- **It is true of the SERVER's `/v1/workspaces/:id/attention` and false of the WEB strip.**
+  `online-data-source.ts:351-358` composes that route with `/v1/contests?workspaceId=…&open=true` and
+  hands BOTH to `mapAttention`, which pushes `{ kind: 'contested', … }` (`mappers.ts:2034-2044`) — and
+  the data source's own docblock, `:344-347`, says *"with the fourth kind included rather than silently
+  missing"*. `AttentionKind` declares four (`view-types.ts:476`); the chip label ships
+  (`attention-strip.tsx:29`).
+
+**This is "a reason is a reading that expires"**: I measured a fact on one route and carried it to the
+composed data source the page actually uses. **I also fixed it by DELETING the gloss rather than
+correcting it** — naming "contested" in a top-level README needs a definition that document has no place
+for, and an enumeration is what keeps being wrong in this file. Fixed in `d4ddde41`; the same commit
+corrects `**My work**` → `**My Work**` (the nav item, `app-nav.tsx:279`, and the page's own `<h1>`,
+`my-work/page.tsx:51`).
+
+**Two by-products of that review, both recorded rather than silently absorbed:**
+
+1. ⚠ **A NEW finding, and it reaches USERS.** `docs/manual.md:826` says the strip has *"three kinds of
+   thing"* and lists three — the same defect, in the manual, **and `content.generated.ts:4191` carries it
+   into the in-product help**. So a user who sees a Contested chip on My Work and opens the help is told
+   there are three kinds. `git blame` puts the sentence at `c1c4ccb1e` (2026-09-18), so it is **not**
+   `#581`'s. **Not fixed** — outside this dispatch's file set, and fixing it would move
+   `content.generated.ts`. **Owner: whoever next owns the manual — and this one is worth a dispatch of its
+   own, because it is the only finding here that a user reads inside the product.**
+2. **A defect in my OWN commit message**, left in place: `0d4a86d9`'s body attributes the door as the
+   sheet's *"Move to Backlog"*. The **button** is `Move…` (`ticket-sheet.tsx:1174`) and the dialog's
+   option reads `Backlog` (`transition-dialog.tsx:382-391`). The phrase is `board.tsx:1021`'s own wording
+   — a source comment I quoted as if it were a label. **Deliberately NOT amended:** `0d4a86d9` is the sha
+   the scoped review ran against, and a reviewed head is worth more than a tidy message. Corrected in the
+   PR body instead.
+
+### § 4 — THE SWEEP, WHICH IS THE POINT OF THE DISPATCH
+
+The two claims were swept for across the repository, not just inside the file the dispatch named. **The
+universe, measured (control: `git grep -c "claimed" -- '*.md'` fires on five test-case files in the same run):**
+
+| document | "N kinds of empty" | Backlog omitted from the views list |
+|---|---|---|
+| `README.md` | **FIXED** | **FIXED** |
+| `docs/manual.md:707-712` | already correct (`a8ae1073`, `#581`) | correct — `### Backlog` added by `#581` |
+| `docs/faq.md:556` | already correct (`a8ae1073`) | — |
+| `docs/product-coverage-map.md:210`, `:212` | **`"four different sentences for four kinds of empty"`** — survives | — |
+| `docs/product-coverage-map.md:88` | — | **`"the shipped page has four (Board, List, Calendar, Timeline)"`** — survives |
+
+**`README.md:94` links to that coverage map**, so a reader who follows the link lands on both wrong counts
+again. **Recorded, NOT fixed, owner named** — it is outside this dispatch's file set, and `#581` recorded the
+same two lines before me (its § 4 items 3 and 9). **Owner: whoever next owns the coverage map.**
+
+### § 5 — RECORDED, NOT FIXED — and this list grew because the review was allowed to sweep
+
+**The dispatch named two README defects. Two independent sweeps — mine (§ 4) and the reviewer's — found
+five more of the same class in the same file.** All five are **false statements about the product**, each
+measured by the reviewer AND re-verified by me at the line before being written here. **None is fixed**:
+the dispatch's file scope was the two it named, and the record-don't-fix mechanism is what produced this
+dispatch from `#581`'s own § 4. **Owner of all five: whoever next owns the README** — and they are worth
+one dispatch, not five.
+
+1. **`README.md:73-74` — "There is no search box on the web… The phone app's board screen has the only
+   search box in the product."** There IS one: `apps/web/…/page.tsx:1567-1573` renders
+   `<input type="search" className="gn-project__search" aria-label="Search the board" …>`, writing
+   `filter.text`. The route underneath (`/v1/search`, `apps/server/src/routes/search.ts:136`,
+   `websearch_to_tsquery`) is real and is called by the data source
+   (`packages/app-core/src/online/online-data-source.ts:312`) and by the MCP server — but by no web
+   screen. **This is the worst of the five**: it sits under *"Read it before you decide anything"* and
+   tells a reader the product cannot do something it does.
+2. **`README.md:79-80` — "The sign-in screen opens on the Phone tab and that tab is refused."** False
+   **unconditionally**, not merely here: `apps/server/src/auth/select-senders.ts:50-52` returns
+   `new NullOtpSender()` with no branch at all ("There is no SMS channel"), so `phone` is always false,
+   `phoneAvailable` (`sign-in/page.tsx:178`) is always false, and the page renders **no tab control** —
+   `method` is derived (`:180`). The reviewer's path is stronger than mine was: I recorded this as a
+   deployment fact; it is a fact about the product. **The README's sentence contradicts the manual `#581`
+   wrote yesterday** (`manual.md:17`, `:64-65`; `Features.md:80` round-2c carries the same measurement).
+3. **`README.md:131-132` — "plus four repository checks", naming four.** `.github/workflows/ci.yml`
+   defines **SIX** check jobs — `check-env` (`:155`), `check-runbook` (`:191`), `check-citations` (`:219`),
+   `check-help` (`:243`), `check-tasks` (`:257`), `check-migrations` (`:306`) — fanned in at `:577`. The
+   list omits **`check:help`** and **`check:migrations`**. (`check-tasks`/`check-migrations` invoke their
+   scripts directly, so a `pnpm check` grep finds only four of six; `check:db-tz` exists as a script and
+   runs in NO CI job. That near-miss is why everything here was enumerated by JOB, not by command.)
+4. **`README.md:110-121` — the package table lists six; there are seven.** `ls packages/` →
+   `app-core domain editor mcp-server rule-engine sync-client ui`. Missing: **`packages/mcp-server`**
+   (`@gisik-nokma/mcp-server`). `README.md` contains **zero** occurrences of `mcp` (grep exit 1, control
+   `packages/ui` fired).
+5. **`README.md:156` — "The generator (`tools/build_tracker.py`, 73 tests)".** Both halves are wrong.
+   There is no repo-root `tools/`; the real path is
+   `reference/convenience-corner-tracker/tools/build_tracker.py`, and **that file contains 0 `def test_`**
+   — the 73 are in its sibling `reference/convenience-corner-tracker/tools/test_build_tracker.py`
+   (measured: exactly 73). The number is right; its file and its path are not.
+
+**Two more, outside the README, unchanged from `#581`'s record:**
+
+6. **`docs/product-coverage-map.md:210`** — *"four different sentences for four kinds of empty"* — and
+   **`:88`** — *"the shipped page has four (Board, List, Calendar, Timeline)"*. **Both are the two
+   original defects, alive in a THIRD document — and `README.md:94` links to it.**
+7. **`Features.md:79`** — its parenthetical `(Board | List tabs, …)` is stale for the five-tab rail.
+   (`Features.md:85` is the authoritative Backlog entry and is correct.)
+
+### § 6 — CASE IDS: **NONE MINTED**
+
+`16.45` stays free. `check-case-ids` unchanged at **2494 / highest 16.82**. A README wording fix pins no
+product behaviour, so there is nothing for a case to cover.
+
+### § 7 — THE COPY THAT NAMES "the lane": MEASURED, PROPOSED, **NO SOURCE TOUCHED**
+
+Filed as `gisik-nokma-lanes/EXEC2-RULING-REQUEST-2026-09-20-lane-copy.md` — **a question for the owner,
+not a change I made.** The dispatch said to measure and propose and to STOP AND ASK if the honest fix is a
+source change. It is, so I stopped. The short version:
+
+- There are **TWO** such constants, not one: `CALENDAR_NARROWED_MONTH_COPY` (`claim-labels.ts:108-109`) and
+  `TIMELINE_NARROWED_COPY` (`:163-164`), both naming "the filter, **the lane**, or …".
+- **Neither can render in any app** — same prop door as § 3(a); `page.tsx:2070-2074` is the timeline's only
+  production render site and passes no `filter`/`laneEpicId`.
+- A sweep of all 237 `lane` hit lines in `*.ts`/`*.tsx` (control: `laneEpicId`, 43) found **every other hit
+  is a comment, an identifier, or a `docs/lanes/` path**. These two constants are the only user-visible
+  strings in the repository containing the word.
+- **`#581`'s handoff proposed adding a glossary entry for "lane". DROP THAT.** A word no screen can show has
+  no referent to document; the entry would send a reader looking for something they can never see.
+
+### § 8 — WHAT IS *NOT* COVERED, NAMED RATHER THAN IMPLIED
+
+- **No test covers any of this.** The README is not in the help-content pipeline (`check:help` reads
+  `docs/manual.md` and `docs/faq.md` only), and no check reads README prose for truth. A future drift of
+  these sentences will be silent. **A guard was considered and NOT built** — the dispatch is docs-only, and a
+  regex asserting prose is the shape this repo's own memory calls a check that cannot fail.
+- **`Features.md:79`'s parenthetical `(Board | List tabs, …)`** is stale for the five-tab rail — moved to
+  § 5 item 7, where the other recorded findings live.
+- **The README's view vocabulary is descriptive, not the product's labels** — it says "a table" where the
+  rail and `docs/manual.md:659` both say **List**. **Checked and judged NOT a defect:** the bullet's style
+  is deliberate and consistent ("a board", "a table", "a month calendar", "a week-by-week timeline"), the
+  List tab genuinely is a table, and this change preserved that style rather than mixing registers.
+  Recorded so a later reader knows it was seen and not missed.
+- **The attention strip is now named in the README but never described.** The bullet points at **My work**;
+  nothing explains what the four kinds (Blocked / Stale / Due soon / **Contested**,
+  `attention-strip.tsx:25-30`) mean. The manual owns that. Not a falsehood, so not fixed here.
+
+### § 9 — A WARNING THAT TRAVELS WITH THIS FILE
+
+**Shas in the narrative blocks below are unreliable — several are ORPHANED by rebases, and `git cat-file`
+will still pass on them and lie.** Verify reachability with
+`git merge-base --is-ancestor <sha> origin/main`, never with `cat-file`.
+
+---
+
+## ▼ PREVIOUS BLOCK — **THE TWO COUNTS THE PRODUCT CONTRADICTS, AND THE TEN MORE THE SCAN FOUND.** (2026-09-20, ~07:xx IST)
 
 ### § 1 — WHERE TO FIND IT
 
