@@ -524,7 +524,35 @@
   padding: 0.9rem 1.1rem;
 }
 .gn-dialog__title,
-.gn-sheet__title { font-size: 1.05rem; margin: 0; }
+/* The sheet's title, at the AUTHORITY'S type step — `font-size:22px;
+   line-height:28px;font-weight:600` (`desktop.dc.html@6d7b67c0a52c:1116`), where
+   it was 1.05rem with the heading's own weight. The prototype's heading is the
+   most prominent thing on the screen and ours was the same size as body text,
+   which is the "much stronger type hierarchy than ours" the parity dispatch
+   names.
+
+   ⚠ CSS-ONLY, AND IT MINTS NO CASE ID, which is this repo's own precedent for a
+   change nothing in a jsdom suite can see (the same treatment the four CSS-only
+   items in an earlier round got). jsdom loads no stylesheet, so a unit case could
+   only assert the class name — a check that would pass for reasons unrelated to
+   the property. The measurement is the viewport suite's, where the computed size
+   is real.
+
+   ⚠ And it is the TYPE only: the prototype draws this title as an `<input>` that
+   edits in place (`sc-camel-on-change="{{ setSheetTitle }}"`). Ours is a
+   read-only heading, and an inline title editor is a NEW EDITING AFFORDANCE
+   rather than a restyle — the same class the Priority and Due editors were
+   deferred as. Not built, and named here so its absence is a decision rather
+   than an omission.
+
+   No material tokens are involved — a type step is style-agnostic — so this is
+   correct in `hig`, `minimal` and `neo` without a per-style fork. */
+.gn-sheet__title {
+  font-size: 1.375rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+  margin: 0;
+}
 .gn-dialog__close,
 .gn-sheet__close {
   font: inherit;
