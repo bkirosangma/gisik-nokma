@@ -18,6 +18,14 @@ import type { InboxFilter, NotificationsGateway, NotificationsPage } from '../..
  * It lives in `test/` and not in `src/`: it is not package surface. The real
  * adapters are Task 14's (HTTP) and Plan 10's (replica).
  */
+/**
+ * The server's `MAX_LIMIT` on the bulk route (`apps/server/src/routes/notifications.ts`),
+ * restated rather than imported: this package must not depend on the server.
+ * It is the largest set one page of the inbox read can return, which is where
+ * the ruling put the bound.
+ */
+const BULK_LIMIT = 100;
+
 export class FakeNotificationsGateway implements NotificationsGateway {
   readonly listCalls: (string | null | undefined)[] = [];
   /**
@@ -28,6 +36,8 @@ export class FakeNotificationsGateway implements NotificationsGateway {
    */
   readonly listFilters: (InboxFilter | undefined)[] = [];
   readonly markReadCalls: string[] = [];
+  /** Every bulk write, so a case can assert WHAT was asked for and in WHICH direction. */
+  readonly setReadCalls: { ids: string[]; read: boolean }[] = [];
 
   private readonly rows: Notification[];
 
@@ -84,5 +94,41 @@ export class FakeNotificationsGateway implements NotificationsGateway {
     }
     row.read = true;
     return Promise.resolve();
+  }
+
+  /**
+   * The bulk write, mirrored from the route — **including the part that is easy
+   * to get wrong, which is the whole reason this fake is not the simpler
+   * version.**
+   *
+   * `changed` holds only the rows whose value ACTUALLY MOVED. The server gets
+   * that from `AND read IS DISTINCT FROM $1::boolean`; a fake that returned
+   * every id it was handed would let a page that discards the answer and
+   * un-reads its own request still pass its tests — and that page would
+   * un-read rows the forward call never touched, inventing unread
+   * notifications. This file's own docblock already records one instance of
+   * exactly this shape: a `markRead` that always resolved let the page's
+   * optimistic flip stand for a row the server never marked.
+   *
+   * The bound is the server's, stated here rather than imported because the
+   * fake must not depend on the server package — **if the two ever disagree,
+   * this line is the one to check.**
+   */
+  setRead(ids: readonly string[], read: boolean): Promise<string[]> {
+    this.setReadCalls.push({ ids: [...ids], read });
+    if (ids.length === 0 || ids.length > BULK_LIMIT) {
+      // The route's 400, refused WHOLE rather than truncated.
+      return Promise.reject(new Error('invalid_ids'));
+    }
+    const changed: string[] = [];
+    for (const id of ids) {
+      const row = this.rows.find((candidate) => candidate.id === id);
+      // Absent (not mine, or does not exist) and already-at-the-value are the
+      // SAME outcome here, as they are on the server: not in `changed`.
+      if (row === undefined || row.read === read) continue;
+      row.read = read;
+      changed.push(id);
+    }
+    return Promise.resolve(changed);
   }
 }

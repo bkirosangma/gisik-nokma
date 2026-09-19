@@ -1,4 +1,84 @@
-## ▲ TOP BLOCK — **C IS MEASURED AND BLOCKED ON A RULING. DO NOT START IT.** (2026-09-19, ~19:0x IST)
+## ▲ TOP BLOCK — **C IS BUILT: the inbox's bulk write and an honest Undo.** (2026-09-20, ~00:4x IST)
+
+**Position: DONE and PUSHED — `exec2/inbox-bulk-undo`, base `main`.** PR opens as the last step of this
+dispatch; **measure it rather than reading it here**: `gh pr list --head exec2/inbox-bulk-undo --state all`.
+
+### § 1 — THE RULING, AND THE WRITE THE ROW DID NOT NAME.
+
+Owner's ruling: **option A** — ONE bidirectional bulk route `POST /v1/me/notifications/read`, `{ ids, read }`,
+id-scoped and bounded to the list page's own size; the Undo's surface is a **shared `packages/ui` toast**;
+**dismiss after 15 seconds**; a non-id-scoped "mark all read" stays **OUT of scope**.
+
+The row named a `NEW ROUTE`, and the Undo needed a **write that did not exist** — `markNotificationRead` is
+one-way, so nothing could put a notification back. Measured with the control in the same invocation: the
+sweep for the write shape `SET read` finds **exactly one** hit (`store.ts:145`, so the sweep can see
+writes); the sweep for `SET read = false` in any spelling finds **none**. Asked before building, and the
+ruling came back in a dispatch file.
+
+### § 2 — ⚠ THE BUG THE TESTS CAUGHT, AND IT IS THE WHOLE TASK IN ONE LINE.
+
+`UPDATE … RETURNING id` reports **every row the `WHERE` MATCHED**, not every row whose value **CHANGED**.
+So an already-read row came back in `changed`, and **the Undo would have flipped it to UNREAD — inventing a
+notification nobody un-read**, with nothing recording who did it. Fixed with
+`AND read IS DISTINCT FROM $1::boolean`. **My first version was wrong and the case I wrote is what said
+so** — removing the clause reddens exactly the two arms that name the property.
+
+**The same shape nearly recurred in the tests:** six of seven cases failed with **401** because my helper
+omitted the `Authorization` header. Caught by reading the failure, not by assuming the route refused.
+
+### § 3 — WHAT SHIPPED.
+
+- **The route** — `{ ids, read }` → `{ changed }`, bounded at **`MAX_LIMIT` (100)**, this route file's own
+  ceiling on one page of the read, **refused WHOLE rather than truncated**.
+- **The unread write** — the same statement carrying the flag, NOT a flag on the per-id route.
+- **The CSRF registration**, plus its row in the security suite. **Witnessed THREE ways:** unregistering
+  the route reddens the 13.116 set-equality drift guard, the forged-Origin refusal, and the no-Origin
+  refusal. `HTTP_ORIGIN_PROTECTED_ROUTES` is an **exact-match `Set`** and the per-id neighbour string does
+  not cover the bulk route — the dispatch's named "most dangerous omission".
+- **The gateway** — `setRead(ids, read): Promise<string[]>` on the interface, the HTTP adapter, and the
+  fake, which mirrors the server **including** the changed-set semantics (a looser fake is this file's own
+  recorded failure).
+- **The page** — `Mark N read` over **exactly the drawn rows**, the toast carrying the **server's
+  `changed`**, Dismiss sending nothing, and a refused write reloading the truth.
+- **The shared `Toast`** — `packages/ui/src/components/toast.tsx`, the product's **first transient
+  surface** (swept: zero `toast` hits across `packages/ui/src`, `app-core/src`, `apps/web/src`,
+  `apps/web/app`; control 80 in the prototype). 15 s, pausable, `role="status"`, reduced-motion guarded.
+
+### § 4 — ⚠ ONE ADDITION TO THE RULING, FLAGGED RATHER THAN SMUGGLED.
+
+**The countdown PAUSES while the pointer or focus is inside the toast.** The ruled 15 s is the default and
+unchanged; the pause exists because a timer running down while somebody reads or **tabs toward the Undo**
+makes the control vanish mid-use, and WCAG 2.2.1 asks for a time limit a person can extend. **One effect,
+its own arm, vetoable.**
+
+Also departed from the prototype, for a reason: the control reads **`Mark N read`**, not *"Mark all read"*,
+because the ruling kept a non-id-scoped "mark all" out of scope — "all" would be a claim about the inbox
+for an action scoped to the page.
+
+### § 5 — GATE AND CHECKS.
+
+**33/33, `EXIT=0`, NODE=v22.22.2, 0 TS errors**; all seven checks EXIT=0; `check-case-ids` ok at **2485**
+(control: backticking the two new ids drops it to 2483 — **exactly +2**). The gate first failed on
+`@gisik-nokma/server#typecheck` with **19 errors, ALL in my own test file** — `payload: unknown` made the
+helper unassignable to Fastify's `InjectOptions`. **The cases ran GREEN under vitest, which strips types
+without checking them; only the gate caught it.** It then reddened once on the known `seed-dev` load timeout
+at **load 116** — **isolated 8/8 in 10.8 s**, and the box is genuinely busier than it has been all day.
+
+### § 6 — ID BUDGET.
+
+Block **`16.41`–`16.60`**; **`16.41` and `16.42` spent** (the bulk write; the Toast). **Next free: `16.43`.**
+Write the id line as a bullet with the id bolded ALONE — `- **16.N** ✅ …`.
+
+### § 7 — NEXT IN THIS LANE.
+
+**`H` (the sheet footer)** — ruled: *a HISTORY-RETAINING removal with undo, NOT a hard delete* — then the
+inviter card. **Read `CTL-QUEUE-2026-09-19-door-builds.md` with its Addenda before starting.** Note the
+toast now exists, which is the surface a history-retaining removal's undo would want — but **do not assume
+that is ruled**: H's own dispatch decides.
+
+---
+
+## ▼ PREVIOUS BLOCK — **C IS MEASURED AND BLOCKED ON A RULING. DO NOT START IT.** (2026-09-19, ~19:0x IST)
 
 **Position: NOTHING IN FLIGHT. `main` is `b9f80935`.** Both prior tasks landed: **#549** (the evidence
 upload) and **#554** (the id-guard docblock note, merged 13:20:58Z). **Zero open PRs from this lane.**

@@ -405,6 +405,71 @@
 @media (prefers-reduced-motion: reduce) {
   .gn-sheet { animation: none; }
 }
+/* THE TOAST — a transient, dismissible, optionally-undoable message at the foot
+   of the screen. The prototype's own, `desktop.dc.html:1864-1876`: the layer is
+   fixed and centred with `pointer-events:none` so it never eats a click meant
+   for the page beneath, and only the card takes them back.
+
+   Its entrance is `gnRise`, the SAME keyframe the centred dialog uses, at the
+   prototype's own `.22s cubic-bezier(.32,.72,0,1)` — the toast's value, not the
+   dialog's `.24s`. Nothing is faded, because the prototype fades nothing here.
+
+   Structural only in the sense the scanner enforces: every colour is a token,
+   and the tone is carried by the dot. */
+.gn-toast-layer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 1.5rem;
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  padding: 0 1rem;
+  /* The layer is a hit-testing hole; the card below re-opens it. Without this
+     a toast spanning the viewport width would swallow clicks on whatever it is
+     sitting over — which, at the bottom of a list, is the Load-more control. */
+  pointer-events: none;
+}
+.gn-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  max-width: 35rem;
+  padding: 0.75rem 0.75rem 0.75rem 1.125rem;
+  background: var(--gn-surface-raised);
+  border-radius: var(--gn-radius-card);
+  box-shadow: var(--gn-shadow-overlay);
+  animation: gnRise 220ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .gn-toast { animation: none; }
+}
+.gn-toast__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  border-radius: 50%;
+  background: var(--gn-text-accent);
+}
+.gn-toast[data-tone='success'] .gn-toast__dot { background: var(--gn-success); }
+.gn-toast[data-tone='warning'] .gn-toast__dot { background: var(--gn-warning); }
+.gn-toast[data-tone='danger'] .gn-toast__dot { background: var(--gn-danger); }
+.gn-toast__text { font-size: 0.9375rem; line-height: 1.25rem; color: var(--gn-text); }
+/* The prototype's own 44px floor on both controls — the repo's tap-target
+   ratchet applies to anything a person points at, and `min-width` on the glyph
+   is what keeps `×` from being a 12px target. */
+.gn-toast__dismiss {
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  flex: none;
+  border: none;
+  background: transparent;
+  color: var(--gn-text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
 .gn-dialog__header,
 .gn-sheet__header {
   display: flex;

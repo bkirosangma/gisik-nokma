@@ -177,5 +177,19 @@ export function createHttpNotificationsGateway(http: HttpClient): NotificationsG
     async markRead(id: string): Promise<void> {
       await http.post(`/v1/me/notifications/${encodeURIComponent(id)}/read`, undefined);
     },
+
+    /**
+     * The bulk write. `changed` is carried straight back rather than re-derived
+     * — see the interface's docblock: the Undo un-reads this set and nothing
+     * else, because an id that was already read is not in it.
+     *
+     * A 400 (over the bound, or a malformed body) throws through `send`'s
+     * method gate, the same way `markRead`'s 404 does, and the caller renders
+     * the refusal rather than assuming the write landed.
+     */
+    async setRead(ids: readonly string[], read: boolean): Promise<string[]> {
+      const body = await http.post('/v1/me/notifications/read', { ids, read });
+      return (body as { changed: string[] }).changed;
+    },
   };
 }

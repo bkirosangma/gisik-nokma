@@ -549,9 +549,20 @@ describe('POST /v1/me/notifications/read (bulk, both directions)', () => {
     return rows;
   }
 
-  /** Every authenticated call in this block goes through here, so a missing
-   *  `Authorization` header cannot be mistaken for a route that refuses. */
-  function asUser(token: string, payload: unknown) {
+  /**
+   * Every authenticated call in this block goes through here, so a missing
+   * `Authorization` header cannot be mistaken for a route that refuses.
+   *
+   * `payload: object` rather than `unknown`, and `method` is a LITERAL: an
+   * `unknown` payload makes the whole object unassignable to Fastify's
+   * `InjectOptions`, and a plain `method: 'POST'` infers as `string`, which is
+   * not one of its accepted members.
+   *
+   * ⚠ Neither matters to the RUNNER — vitest strips types without checking
+   * them, so these cases ran GREEN while `tsc` refused the file. Only the gate
+   * caught it, which is the argument for running one.
+   */
+  function asUser(token: string, payload: object) {
     return {
       method: 'POST' as const,
       url: '/v1/me/notifications/read',
@@ -659,7 +670,7 @@ describe('POST /v1/me/notifications/read (bulk, both directions)', () => {
 
   it('16.41 refuses malformed bodies by name, rather than reaching Postgres', async () => {
     const me = await signInWithPhone(app, otp, '+919999000027');
-    const cases: Array<[string, unknown]> = [
+    const cases: Array<[string, object]> = [
       ['ids omitted', { read: true }],
       ['ids empty', { ids: [], read: true }],
       ['ids not an array', { ids: newUlid(), read: true }],
