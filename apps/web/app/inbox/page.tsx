@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { InboxView, notificationTicketId, type NotificationsPage } from '@gisik-nokma/app-core';
+import {
+  InboxView,
+  notificationTicketId,
+  type InboxFilter,
+  type NotificationsPage,
+} from '@gisik-nokma/app-core';
+import { SegmentedControl } from '@gisik-nokma/ui';
 import type { Notification } from '@gisik-nokma/domain';
 import { AppNav } from '../../src/app-nav.js';
 import { ExpiredSessionNotice, useSignInOnExpiredSession } from '../../src/expired-session.js';
@@ -22,6 +28,51 @@ import { ticketSheetPath } from '../../src/ticket-location.js';
  * paraphrase of it.
  */
 export const EMPTY_INBOX_COPY = 'Nothing in your inbox. You will be told here when someone assigns you a ticket, mentions you, contests a claim, or a claimed day comes near.';
+
+/**
+ * The filter tabs (2026-09-19) — the prototype's `inboxTabs`, and the read each
+ * one asks for.
+ *
+ * **The tab name and the filter are kept apart on purpose.** `'mentions'` is a
+ * word that exists only on this screen; the read speaks the domain's terms
+ * (`kind: 'mention'`). Mapping one to the other in exactly one place is what
+ * stops a screen word reaching a query.
+ *
+ * **`All` asks for NOTHING rather than for a value**, so an unfiltered reader
+ * makes the identical request every caller made before this control existed —
+ * one spelling of "no filter", not two.
+ */
+type InboxTab = 'all' | 'unread' | 'mentions';
+
+const INBOX_TABS: ReadonlyArray<{ value: InboxTab; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'unread', label: 'Unread' },
+  { value: 'mentions', label: 'Mentions' },
+];
+
+const FILTER_OF: Record<InboxTab, InboxFilter> = {
+  all: {},
+  unread: { unreadOnly: true },
+  mentions: { kind: 'mention' },
+};
+
+/**
+ * The empty arms, and the reason the two filtered ones may NOT reuse the first.
+ *
+ * *"Nothing in your inbox"* is a claim about the WHOLE inbox, and under a filter
+ * it is false — the reader has messages, just not of the kind they asked for. A
+ * narrowed set presented as whole is the defect this repo names most often, and
+ * the fix costs one sentence. The prototype draws the same distinction and adds
+ * the reassurance its own empty arm carries: *"Nothing was deleted — this filter
+ * just has no matches."*
+ */
+const EMPTY_COPY: Record<InboxTab, string> = {
+  all: EMPTY_INBOX_COPY,
+  unread:
+    'Nothing unread. You have read everything sent to you — nothing was deleted, this filter just has no matches.',
+  mentions:
+    'No mentions. Nobody has named you in a comment — nothing was deleted, this filter just has no matches.',
+};
 
 /**
  * What the page says when it knows the ticket but the server will not place it.
@@ -110,6 +161,18 @@ export default function InboxPage() {
   const [pagingError, setPagingError] = useState<string | null>(null);
 
   /**
+   * The active filter tab. **Held as the TAB, not as the filter**, so the
+   * control's own vocabulary is the state and the domain's shape is derived —
+   * see `FILTER_OF`.
+   *
+   * Changing it re-runs the first read and REPLACES the rows, which is what the
+   * `loadFirstPage` dependency below does: a filter that appended to the rows
+   * already on screen would show matches and non-matches in one list.
+   */
+  const [tab, setTab] = useState<InboxTab>('all');
+  const filter = FILTER_OF[tab];
+
+  /**
    * Both reads and the mark-read write fail the same way, so the message is
    * extracted the same way. `HttpError`'s message is `HTTP ${status} for
    * ${path}` — the format `isExpiredSession` matches on — so a 401 anywhere on
@@ -121,7 +184,7 @@ export default function InboxPage() {
 
   const loadFirstPage = useCallback(async (): Promise<void> => {
     try {
-      setPage(await gateway.list());
+      setPage(await gateway.list(undefined, filter));
       setError(null);
       // A fresh first page REPLACES the rows, so a complaint about a second page
       // that no longer exists would be describing nothing on screen. Decided
@@ -131,7 +194,10 @@ export default function InboxPage() {
     } catch (cause) {
       setError(messageOf(cause));
     }
-  }, [gateway]);
+    // `filter` is a DEPENDENCY, not a captured value: changing the tab must
+    // re-run this read, and `FILTER_OF` is a module constant so the identity is
+    // stable per tab and the effect does not thrash.
+  }, [gateway, filter]);
 
   useEffect(() => {
     void loadFirstPage();
@@ -142,7 +208,10 @@ export default function InboxPage() {
   async function loadMore(): Promise<void> {
     if (page === null || page.nextCursor === null) return;
     try {
-      const next = await gateway.list(page.nextCursor);
+      // The SAME filter as the first page. A `loadMore` that dropped it would
+      // append unfiltered rows to a filtered list, which reads as the filter
+      // silently failing halfway down.
+      const next = await gateway.list(page.nextCursor, filter);
       // Appended to the rows already on screen. `page` is read from the closure
       // the click was rendered with, and a second click cannot race a first
       // because `onLoadMore` is withdrawn while `nextCursor` is null.
@@ -208,7 +277,26 @@ export default function InboxPage() {
   return (
     <main className="gn-shell">
       <AppNav />
-      <h1 className="gn-page-title">Inbox</h1>
+      {/*
+        The header ROW — title and filter beside each other, which is where the
+        prototype puts them. The bulk action ("Mark all read") shares that row in
+        the prototype and is NOT in this task: it needs a route the server does
+        not have.
+
+        The control is the SHARED `SegmentedControl`, not a local rule — the
+        repo refuses a hand-rolled segmented control by name, and this one
+        carries the `tablist`/`tab`/`aria-selected` roles the accessible-name
+        ratchet counts.
+      */}
+      <div className="gn-inbox__header">
+        <h1 className="gn-page-title">Inbox</h1>
+        <SegmentedControl
+          options={INBOX_TABS}
+          value={tab}
+          onChange={setTab}
+          aria-label="Filter notifications"
+        />
+      </div>
       <div className="gn-shell__main">
         {expired ? (
           <ExpiredSessionNotice />
@@ -225,7 +313,9 @@ export default function InboxPage() {
               <p role="status">Loading…</p>
             ) : page.notifications.length === 0 ? (
               <p role="status" className="gn-inbox__empty">
-                {EMPTY_INBOX_COPY}
+                {/* Filter-SPECIFIC, because the unfiltered sentence is a claim
+                    about the whole inbox and is false under a filter. */}
+                {EMPTY_COPY[tab]}
               </p>
             ) : (
               <>

@@ -1,5 +1,5 @@
 import type { Notification } from '@gisik-nokma/domain';
-import type { NotificationsGateway, NotificationsPage } from '../../src/inbox/gateway.js';
+import type { InboxFilter, NotificationsGateway, NotificationsPage } from '../../src/inbox/gateway.js';
 
 /**
  * A `NotificationsGateway` over an in-memory list, MIRRORING the server's
@@ -20,6 +20,13 @@ import type { NotificationsGateway, NotificationsPage } from '../../src/inbox/ga
  */
 export class FakeNotificationsGateway implements NotificationsGateway {
   readonly listCalls: (string | null | undefined)[] = [];
+  /**
+   * The FILTER each `list` was called with, recorded separately from the cursor
+   * because a case about the filter must be able to say which one was sent —
+   * `listCalls` alone would let a fake that ignores its second argument look
+   * identical to one that honours it.
+   */
+  readonly listFilters: (InboxFilter | undefined)[] = [];
   readonly markReadCalls: string[] = [];
 
   private readonly rows: Notification[];
@@ -32,8 +39,9 @@ export class FakeNotificationsGateway implements NotificationsGateway {
     this.rows = [...notifications].sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
   }
 
-  list(cursor?: string | null): Promise<NotificationsPage> {
+  list(cursor?: string | null, filter?: InboxFilter): Promise<NotificationsPage> {
     this.listCalls.push(cursor);
+    this.listFilters.push(filter);
     // The ROUTE'S OWN SPELLING, character for character
     // (`routes/notifications.ts`): `typeof raw.cursor === 'string' &&
     // raw.cursor.length > 0 ? raw.cursor : null`. An EMPTY STRING is a first
@@ -43,7 +51,17 @@ export class FakeNotificationsGateway implements NotificationsGateway {
     // fake was STRICTER than the server, so it hid no server bug, but the
     // docblock above claims mirroring and this is the one place it did not.
     const after = typeof cursor === 'string' && cursor.length > 0 ? cursor : null;
-    const matching = after === null ? this.rows : this.rows.filter((row) => row.id < after);
+    let matching = after === null ? this.rows : this.rows.filter((row) => row.id < after);
+    /**
+     * **The filter is applied BEFORE the page is cut, and that ordering IS the
+     * semantics.** `store.ts` puts it in the WHERE, so it narrows the set the
+     * page is taken from and the cursor walks the filtered rows. A fake that
+     * filtered AFTER slicing would return short pages and a `nextCursor` into a
+     * set the caller never asked for — the exact divergence this fake exists to
+     * prevent, in the one direction a paging test would not catch.
+     */
+    if (filter?.unreadOnly === true) matching = matching.filter((row) => !row.read);
+    if (filter?.kind !== undefined) matching = matching.filter((row) => row.kind === filter.kind);
     const lookahead = matching.slice(0, this.pageSize + 1);
     const page = lookahead.slice(0, this.pageSize);
     const last = page[page.length - 1];

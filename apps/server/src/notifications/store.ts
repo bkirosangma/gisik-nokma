@@ -1,4 +1,4 @@
-import { parseNotification, type Notification } from '@gisik-nokma/domain';
+import { parseNotification, type Notification, type NotificationKind } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 
 /**
@@ -80,6 +80,27 @@ export async function listNotifications(
      * every row and an empty list excludes nothing.
      */
     mutedKinds?: readonly string[];
+    /**
+     * The inbox's `Unread` tab (2026-09-19). `true` narrows to unread rows
+     * only; absent or `false` is the unfiltered read, so **every existing
+     * caller keeps the same answer** — the shape `mutedKinds` set.
+     *
+     * `read = false`, not `NOT read`: the column is `NOT NULL DEFAULT false`
+     * (`1788278094725`'s migration family), so the two spellings agree on
+     * every row that can exist, and this one says what it means.
+     */
+    unreadOnly?: boolean;
+    /**
+     * The inbox's `Mentions` tab sends `'mention'`. Typed with the domain's own
+     * union, which IS on the barrel (`index.ts:38` is `export * from
+     * './notifications.js'`; an earlier draft of this docblock claimed
+     * otherwise because a grep for the NAME could not see through the
+     * star-export, and the claim was wrong). **The ROUTE still validates the
+     * query string against `NOTIFICATION_KINDS`**, because a caller-supplied
+     * value is text until something checks it — this type bounds the internal
+     * callers, the route bounds the wire.
+     */
+    kind?: NotificationKind | null;
   },
 ): Promise<NotificationPage> {
   const limit = Math.min(Math.max(opts.limit ?? 30, 1), 100);
@@ -92,6 +113,13 @@ export async function listNotifications(
   if (opts.workspaceId) {
     params.push(opts.workspaceId);
     where += ` AND workspace_id = $${params.length}`;
+  }
+  if (opts.unreadOnly) {
+    where += ' AND read = false';
+  }
+  if (opts.kind) {
+    params.push(opts.kind);
+    where += ` AND kind = $${params.length}`;
   }
   params.push(opts.mutedKinds ?? []);
   where += ` AND NOT (kind = ANY($${params.length}::text[]))`;

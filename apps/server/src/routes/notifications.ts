@@ -1,4 +1,5 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
+import { NOTIFICATION_KINDS, type NotificationKind } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { getNotificationPreferences } from '../notification-preferences/store.js';
 import { listNotifications, markNotificationRead, unreadNotificationCount } from '../notifications/store.js';
@@ -48,13 +49,58 @@ export function registerNotificationRoutes(
   deps: { pool: Queryable },
   requireSession: preHandlerHookHandler,
 ): void {
-  app.get<{ Querystring: { cursor?: string; limit?: string; workspaceId?: string } }>(
+  app.get<{
+    Querystring: {
+      cursor?: string;
+      limit?: string;
+      workspaceId?: string;
+      unread?: string;
+      kind?: string;
+    };
+  }>(
     '/v1/me/notifications',
     { preHandler: requireSession },
     async (request, reply) => {
       const raw = request.query;
       const cursor = typeof raw.cursor === 'string' && raw.cursor.length > 0 ? raw.cursor : null;
       const workspaceId = typeof raw.workspaceId === 'string' && raw.workspaceId.length > 0 ? raw.workspaceId : null;
+
+      /**
+       * `unread=true`, refused LOUDLY on anything else (2026-09-19).
+       *
+       * Deliberately NOT `read=false`: a query string carries text, `'false'` is
+       * a truthy string, and the one spelling that cannot be misread is a flag
+       * whose PRESENCE means the narrow. Refusing rather than ignoring follows
+       * `invalid_limit` below — `unread=yes` is a caller who believes they
+       * narrowed and did not, which is the failure this read exists to prevent.
+       */
+      let unreadOnly = false;
+      // `length > 0`, the SAME rule `cursor` and `workspaceId` above use: an
+      // empty value is this route's spelling of "absent", so `?unread=` is the
+      // unfiltered read rather than a 400. Only a non-empty value that is not
+      // `true` is refused.
+      if (typeof raw.unread === 'string' && raw.unread.length > 0) {
+        if (raw.unread !== 'true') return reply.status(400).send({ error: 'invalid_unread' });
+        unreadOnly = true;
+      }
+
+      /**
+       * `kind` is validated against the domain's own list. An unknown kind is
+       * REFUSED rather than answered with an empty page: a caller who typed
+       * `kind=mentons` would otherwise see "nothing here" and conclude their
+       * inbox is empty.
+       */
+      let kind: NotificationKind | null = null;
+      if (typeof raw.kind === 'string' && raw.kind.length > 0) {
+        // The `includes` check IS the narrowing: it is what makes the assertion
+        // on the next line true rather than hopeful, and it is why an unknown
+        // kind is refused here instead of reaching a query that would match
+        // nothing and report an empty inbox.
+        if (!(NOTIFICATION_KINDS as readonly string[]).includes(raw.kind)) {
+          return reply.status(400).send({ error: 'invalid_kind' });
+        }
+        kind = raw.kind as NotificationKind;
+      }
 
       let limit: number | undefined;
       // `raw.limit !== undefined`, not a `typeof === 'string'` check: Fastify
@@ -74,7 +120,14 @@ export function registerNotificationRoutes(
       }
 
       const { mutedKinds } = await getNotificationPreferences(deps.pool, request.currentUserId);
-      return listNotifications(deps.pool, request.currentUserId, { cursor, limit, workspaceId, mutedKinds });
+      return listNotifications(deps.pool, request.currentUserId, {
+        cursor,
+        limit,
+        workspaceId,
+        unreadOnly,
+        kind,
+        mutedKinds,
+      });
     },
   );
 

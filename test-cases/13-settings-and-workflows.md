@@ -1356,3 +1356,61 @@ prototype draws **no history view**: its `View history` handler fires a toast (`
 navigates nowhere, and none of the block's ten `screen:` values is a history screen. There is therefore
 nothing to be faithful to, and a port cannot author a view. `WorkflowHistoryScreen`'s docblock states
 that in those words, so a reader comparing the two meets the reason rather than a silence.
+
+## The inbox filter tabs — cases `13.969`–`13.975` (2026-09-19)
+
+**Why these are here and not in §11.** Their subject is the inbox, whose home is
+`11-calendar-notifications.md`, but the minted block is **§13** — the shared id space is allocated in
+blocks and §11's was not this lane's to mint from. They sit in the §13 part-file that already carries
+the recent screen-level work (`13.928`–`13.955`) so a reader looking for it finds it in one place.
+
+**The door.** The prototype's header carries a segmented `All / Unread / Mentions`
+(`desktop.dc.html@6d7b67c0a52c:616`, data `:2999`). The audit measured that the route took only
+`cursor, limit, workspaceId, mutedKinds` — **no `read` and no `kind`** — so the tabs had nothing to
+ask. The read is an `ADDITIVE FIELD` on the existing route, and the gateway contract was **WIDENED**
+rather than ridden: `list(cursor?, filter?)`.
+
+**Widening it is the deliberate half, and the reason is citable.** Task 14 refused `limit` and
+`workspaceId` standing in this same signature, on two grounds — *"every parameter in it is one both
+implementations must honour"* (the replica has no page-size knob and no query string) and *"`/inbox`
+is a GLOBAL route … there is no workspace in scope to send"*. **Neither ground applies to a read/kind
+filter**: a replica holds the rows and narrows them trivially, and read/kind is not workspace-scoped.
+The alternative — a second method — is refused by name: two methods over one read are two places for
+paging to drift.
+
+- **13.969** ✅ `?unread=true` narrows to unread rows, and the case **pairs it with the unfiltered read
+  in the same run** — without that control a route that had simply stopped returning read rows would
+  pass. — (`apps/server/test/routes/notifications.test.ts`)
+  *Planted defect, run: removing BOTH filter clauses from the store's WHERE reddens **13.969, 13.970
+  and 13.973** and leaves 13.971/13.972 green — the two refusals test validation, not narrowing, so
+  their greenness is correct rather than a miss. **Zero `500` mentions in the log**, which is the
+  requirement: an earlier draft of this mutation pushed the parameter without a placeholder and
+  reddened a REFUSAL case with six 500s — a plumbing red proving the query broke, not the property.*
+- **13.970** ✅ `?kind=mention` narrows by kind — **the tab says `Mentions`, the read says the domain's
+  `'mention'`**, and that mapping lives in exactly one place so a screen word cannot reach a query.
+  Paired with the unfiltered control. — (`apps/server/test/routes/notifications.test.ts`)
+- **13.971** ✅ An `unread` value the route cannot honour is **refused 400 `invalid_unread`**, not
+  ignored — `unread=yes` is a caller who believes they narrowed and did not, and the failure mode is
+  concluding the inbox is empty. `?unread=` (empty) is the route's own "absent" spelling, the same
+  rule `cursor` uses. — (`apps/server/test/routes/notifications.test.ts`)
+- **13.972** ✅ An **unknown kind** is refused 400 `invalid_kind`, with the real kind accepted in the
+  same case as the control. `kind=mentons` would otherwise match no row and the page would render
+  *"No mentions"* — a false statement about the caller's whole inbox, made on the strength of a typo.
+  — (`apps/server/test/routes/notifications.test.ts`)
+- **13.973** ✅ The **cursor walks the FILTERED set** — the read row is inserted NEWEST on purpose, so a
+  cursor that walked the unfiltered set would hand it back on page two. — (`apps/server/test/routes/notifications.test.ts`)
+- **13.974** ✅ The control sends the tab you clicked as a **filter**, and `All` sends **none at all**.
+  — (`apps/web/test/inbox-page.test.tsx`)
+  *Planted defect, run: dropping the filter at the page's call site reddens **13.974 alone** —
+  `expected undefined to deeply equal {}`.*
+- **13.975** ✅ A **filtered empty does not claim the whole inbox is empty** — *"Nothing in your inbox"*
+  is a claim about the whole set and is false under a filter, so the filtered arms say
+  *"Nothing unread"* / *"No mentions"* instead. **The assertion that matters is the ABSENCE of the
+  unfiltered sentence**, because asserting only the filtered one would pass against a page rendering
+  both. — (`apps/web/test/inbox-page.test.tsx`)
+
+**The fake was extended, and that is load-bearing.** `FakeNotificationsGateway.list` ignored its
+second argument — it compiled, because an implementation may take fewer parameters — so every case
+driven through it would have passed against a page that sent no filter. It now **applies the filter
+BEFORE cutting the page**, mirroring `store.ts`, where the filter joins the WHERE and therefore narrows
+what the cursor walks. (`packages/app-core/test/inbox/fake-gateway.ts`)

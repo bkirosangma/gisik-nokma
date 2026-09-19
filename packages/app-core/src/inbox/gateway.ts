@@ -1,4 +1,4 @@
-import type { Notification } from '@gisik-nokma/domain';
+import type { Notification, NotificationKind } from '@gisik-nokma/domain';
 
 /**
  * The inbox's data contract — an INTERFACE and nothing else. No implementation
@@ -26,6 +26,27 @@ import type { Notification } from '@gisik-nokma/domain';
  * use. The cursor is the one parameter paging genuinely needs, and it is opaque
  * to the caller: it comes back from `nextCursor` and goes out unread.
  *
+ * ## The FILTER joined on 2026-09-19, and it passes the test the other two failed
+ *
+ * The inbox's `All / Unread / Mentions` tabs needed a `filter`. **`limit` and
+ * `workspaceId` stay refused, and the same two grounds are what let the filter
+ * in — which is the point rather than a loophole.**
+ *
+ * 1. **The interface's ground.** The test is *"every parameter in it is one both
+ *    implementations must honour"*. A replica holds the rows, so narrowing them
+ *    by `read` or by `kind` is a filter over data it already has — it does not
+ *    have to fake anything. `limit` and `workspaceId` failed that test because a
+ *    local reader has no page-size knob and no query string; `unreadOnly` and
+ *    `kind` pass it because every backing can answer them.
+ * 2. **This shell's ground.** Task 14's second reason was that `/inbox` is a
+ *    GLOBAL route with no workspace in scope. That is an argument about
+ *    `workspaceId` specifically, and it says nothing about a filter that is not
+ *    workspace-scoped.
+ *
+ * The alternative was a second method, `listFiltered`, and it is refused by
+ * name: two methods over one read are two places for paging to drift, and the
+ * repo's standing rule is that one thing gets one door.
+ *
  * `cursor` is `string | null | undefined` — the first page is expressible two
  * ways on purpose, because `list()` (no argument) and `list(page.nextCursor)`
  * on an exhausted page are the two spellings a caller actually writes, and a
@@ -43,10 +64,33 @@ import type { Notification } from '@gisik-nokma/domain';
  */
 export type NotificationsPage = { notifications: Notification[]; nextCursor: string | null };
 
+/**
+ * What the inbox's filter tab asks the read for, in the DOMAIN's terms rather
+ * than the tab strip's: the `Mentions` tab sends `kind: 'mention'`, not the word
+ * it prints. A tab name is a UI concept, and this type is shared with a backing
+ * that has no tabs.
+ *
+ * **`All` is the ABSENCE of a filter, not a value for one.** A caller rendering
+ * the `All` tab passes nothing, which is also what every caller wrote before
+ * this existed — so the unfiltered read is one spelling rather than two.
+ */
+export type InboxFilter = {
+  /** The `Unread` tab. `false`/absent is the unfiltered read. */
+  unreadOnly?: boolean;
+  /** The `Mentions` tab. Absent is every kind. */
+  kind?: NotificationKind;
+};
+
 /** Implemented by the web shell (Task 14) and by Plan 10's replica. */
 export interface NotificationsGateway {
-  /** One page, newest first. `undefined`/`null` asks for the first page. */
-  list(cursor?: string | null): Promise<NotificationsPage>;
+  /**
+   * One page, newest first. `undefined`/`null` asks for the first page.
+   *
+   * `filter` narrows the SAME read rather than adding a second one — see the
+   * docblock above for why it passes the test that keeps `limit` and
+   * `workspaceId` out.
+   */
+  list(cursor?: string | null, filter?: InboxFilter): Promise<NotificationsPage>;
   /** The viewer's own unread total — never a per-page count. */
   unreadCount(): Promise<number>;
   /** Idempotent: marking an already-read row of your own is not an error. */
