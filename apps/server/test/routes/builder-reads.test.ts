@@ -5,6 +5,7 @@ import {
   newUlid,
   type MemberListResponse,
   type StateOccupancyResponse,
+  type TicketCountsResponse,
   type TicketTypeListResponse,
   type TypePopulationResponse,
   type WorkflowListResponse,
@@ -622,6 +623,139 @@ describe('the admin gate — which admin-ness the three admin-only surfaces mean
  * answer, it leaks strictly less, and choosing the permissive reading on a
  * surface that re-homes other people's work is not a call to make silently.
  */
+/**
+ * Task 8 (settings → workflows) — the ticket-type list's `"N tickets"` count.
+ *
+ * ## Why this block sits HERE, between the pinned read and the migrate suites
+ *
+ * It has to run while the world is PRISTINE, and that is a measured constraint
+ * rather than a taste. The very first thing this file's migrate suite does is
+ * REBIND `chore` onto `wf-errands` (`:699-700` assert the move), and `chore` is
+ * the whole distinguishing fixture below: before that rebind its one ticket is
+ * on `wf-second`, so the type's own count is 1 while the pinned read for
+ * `wf-errands` is 0 — and after the rebind both are 1 and the case proves
+ * nothing. Written at the end of the file it failed exactly there.
+ *
+ * The seeded world this asserts against is the same one `7.44` above measures,
+ * read at the same point in the file: `task` 5 on `wf-errands`, `epic` 1 on
+ * `wf-errands`, `chore` 1 on `wf-second`.
+ */
+describe('GET /v1/workspaces/:workspaceId/ticket-counts-by-type', () => {
+  it('13.948 answers each type’s own count across the WORKSPACE — a different question from the pinned population', async () => {
+    const body = await okJson<TicketCountsResponse>('owner', '/ticket-counts-by-type');
+
+    // The seeded world, counted with no workflow predicate. These three are the
+    // same numbers `7.44` asserts a few describes up, reached by a different
+    // route — the sum over workflows rather than one workflow's slice.
+    expect(body.workspaceId).toBe(read.world.workspaceId);
+    expect(body.counts['task']).toBe(5);
+    expect(body.counts['epic']).toBe(1);
+
+    // THE DISTINGUISHING PAIR, and the reason this case exists. `chore` is bound
+    // to `wf-second` and its one ticket sits there, so the TYPE's own count is 1
+    // while the PINNED read for `wf-errands` is 0.
+    expect(body.counts['chore']).toBe(1);
+    const pinnedElsewhere = await okJson<TypePopulationResponse>(
+      'owner',
+      '/ticket-types/chore/population?workflowId=wf-errands',
+    );
+    expect(pinnedElsewhere.count).toBe(0);
+    // POSITIVE CONTROL for that pair, in the same invocation: the pinned read
+    // DOES hold a number for the workflow the ticket is actually on, so the 0
+    // above is the workflow predicate speaking rather than a route that answers
+    // 0 to everything. A wide read that was secretly the pinned read for
+    // `wf-errands` fails the line above; one that was secretly the pinned read
+    // for `wf-second` passes here and fails `epic`'s 1 — `epic`'s ticket is on
+    // `wf-errands`, and `wf-second` holds none of it.
+    const pinnedHere = await okJson<TypePopulationResponse>(
+      'owner',
+      '/ticket-types/chore/population?workflowId=wf-second',
+    );
+    expect(pinnedHere.count).toBe(1);
+  });
+
+  it('13.949 reports a type the workspace DEFINES but has never given a ticket as 0 — and `count(*)` would say 1', async () => {
+    // The fixture this case exists for. On the LEFT JOIN a ticket-less type has
+    // exactly one row — the left row itself — so `count(*)` answers 1 for every
+    // empty type: a wrong number that reads exactly like a right one. Nothing
+    // else in the suite can tell the two spellings apart, because the shared
+    // world has no ticket-less type — `epic`, `chore` and `task` all hold work.
+    const typeId = 'countless-type';
+    const { rows: seqRows } = await db.pool.query<{ ws_seq: number | null }>(
+      'SELECT max(workspace_seq) AS ws_seq FROM events WHERE workspace_id = $1',
+      [read.world.workspaceId],
+    );
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        workspaceId: read.world.workspaceId,
+        actorId: read.userIds.owner,
+        entity: { kind: 'ticket-type', id: typeId },
+        type: 'ticket-type.defined',
+        workspaceSeq: (seqRows[0]?.ws_seq ?? 0) + 1,
+        payload: { id: typeId, name: 'Countless', icon: 'inbox', rank: 9, workflowId: 'wf-errands', fields: [] },
+      }),
+    ]);
+
+    const body = await okJson<TicketCountsResponse>('owner', '/ticket-counts-by-type');
+    expect(body.counts[typeId]).toBe(0);
+    // POSITIVE CONTROL, same read and same invocation: a type that DOES hold
+    // tickets is not collapsed to the same value, so a route answering 0 for
+    // every type cannot pass this case either.
+    expect(body.counts['task']).toBe(5);
+    // And a type this workspace has never heard of is ABSENT rather than 0 —
+    // the difference the LEFT JOIN's left side is what buys.
+    expect(body.counts['no-such-type-anywhere']).toBeUndefined();
+  });
+
+  it('13.950 is admin-only on the pinned read’s exact terms — members, guests and strangers get the same 404', async () => {
+    expect((await get('owner', '/ticket-counts-by-type')).statusCode).toBe(200);
+
+    const refusals: InjectResponse[] = [];
+    for (const role of ['member', 'guest', 'outsider', 'stranger'] as const) {
+      const response = await get(role, '/ticket-counts-by-type');
+      expect([role, response.statusCode]).toEqual([role, 404]);
+      expect(response.json()).toEqual(READ_NOT_FOUND_BODY);
+      refusals.push(response);
+    }
+    // Every refusal is byte-identical to every other — no role can tell "not for
+    // you" from "nothing here", which is the whole point of the door answering
+    // 404 rather than 403 on this surface.
+    for (const refusal of refusals) {
+      expect(comparableHeaders(refusal)).toEqual(comparableHeaders(refusals[0]!));
+    }
+    // And an unauthenticated read is refused EARLIER, on the session gate, with
+    // no workspace resolved — the same 401 every surface here answers.
+    const anonymous = await read.app.inject({ method: 'GET', url: '/v1/workspaces/x/ticket-counts-by-type' });
+    expect([anonymous.statusCode, anonymous.json()]).toEqual([401, UNAUTHENTICATED_BODY]);
+  });
+
+  it('13.951 counts only the caller’s own workspace, and a neighbour’s id answers the tenancy 404', async () => {
+    // The neighbour reads their OWN workspace and gets their own number —
+    // `nb-task` holds the one ticket `7.86`'s positive control counts.
+    const own = await okJson<TicketCountsResponse>(
+      'neighbour',
+      '/ticket-counts-by-type',
+      read.neighbour.workspaceId,
+    );
+    expect(own.workspaceId).toBe(read.neighbour.workspaceId);
+    expect(own.counts['nb-task']).toBe(1);
+    // The two workspaces' type sets are disjoint: this workspace's types are
+    // ABSENT from the neighbour's answer rather than sitting there at 0. A read
+    // that dropped `t.workspace_id` would merge the two sets.
+    expect(own.counts['task']).toBeUndefined();
+    expect(own.counts['chore']).toBeUndefined();
+
+    // Neither direction resolves across the tenancy, and both are the same 404
+    // an unauthorised caller gets.
+    expect((await get('owner', '/ticket-counts-by-type', read.neighbour.workspaceId)).statusCode).toBe(404);
+    expect((await get('neighbour', '/ticket-counts-by-type')).statusCode).toBe(404);
+    // POSITIVE CONTROL: the entitled caller still gets a 200 in their own
+    // workspace, so the two 404s are the tenancy answering and not a route that
+    // refuses everyone.
+    expect((await get('owner', '/ticket-counts-by-type')).statusCode).toBe(200);
+  });
+});
+
 describe('POST /v1/workspaces/:workspaceId/ticket-types/:typeId/migrate', () => {
   function migrate(
     role: ReadRole,
