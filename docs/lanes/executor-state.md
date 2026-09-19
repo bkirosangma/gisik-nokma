@@ -41,6 +41,81 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SATURDAY 2026-09-19 ~12:5x IST. **TASKS 6+7 ARE MERGED. THIS LANE HAS NO TASK IN
+> # FLIGHT — the next one (`settings` Task 8) is GATED ON TWO THINGS, neither of them mine. HOLDING.**
+> # **Supersedes the block below.** That block says the PR *"awaits the controller"* — **it has had one**,
+> # and this block exists to stop a relaunched executor re-doing the reorder or hunting for a PR that is
+> # already closed. **Read the block below for WHAT was built (still accurate); read this one for WHERE
+> # you are.** The file's own `7b` block, further down, carries the identical sentence about the identical
+> # failure — which is the argument for reading the top block first, every time.
+>
+> ## THE MERGE — VERIFIED WITH `/usr/bin/git`, NOT INHERITED
+>
+> | | |
+> |---|---|
+> | merged as | **`2f5c2c3f`** — a **real merge commit**, not a squash. `rev-list --parents -n 1` → parents `f6b16cbb` (main) + `7dc9347e` (this lane). |
+> | reachability | `git merge-base --is-ancestor 7dc9347e origin/main` → **true**. `branch -r --contains` names `origin/main` and `origin/exec/isTypes-reorder`; neither is orphaned. |
+> | **the strongest check** | **tree identity is EXACT** — `7dc9347e^{tree}` and `2f5c2c3f^{tree}` are both `43d9286705ce1cc2892b17d7db06bf2055e967ba`, and `git diff origin/main HEAD` prints **nothing**. Nothing dropped, nothing re-derived. |
+> | `origin/main` here | **`2f5c2c3f`**, fetched with `--prune` at the time of writing. |
+> | open PRs repo-wide | **ONE** — `#506` (exec 2, settings Task 3), **`CONFLICTING`**. |
+> | this lane's branch | `exec/isTypes-reorder` is **fully contained** in `origin/main` (`rev-list --left-right --count` → `1 0`). Do not re-open it. |
+>
+> ## THE NEXT TASK IS GATED — DO NOT START IT, AND DO NOT READ THE LEDGER AS OFFERING IT
+>
+> **`settings` Task 8 (the `"N tickets"` count) is the last lifted task and it is NOT startable.** Two
+> independent conditions, both named by `CTL-DISPATCH-2026-09-19-lifted-settings-tasks.md`: *"It goes to
+> whichever executor frees first, **after Task 3 lands**, with its own dispatch. **Do not start it.**"*
+>
+> 1. **Its own dispatch has not been written** — measured, not assumed. The newest file in
+>    `gisik-nokma-lanes/` addressed to this lane is still the `lifted-settings-tasks` brief. The brief that
+>    *does* cover Task 8, `CTL-DISPATCH-2026-09-18-settings-wf-task78.md`, **carries a `⛔ SUPERSEDED
+>    2026-09-19 — DO NOT EXECUTE THIS DISPATCH AS WRITTEN` banner at its own head** — it predates the lift
+>    and would have recorded an *absence* where the owner now wants the thing built.
+> 2. **Task 3 has not landed.** Both tasks touch `gateway.ts` — one at a time. Task 3 is `#506` and it is
+>    **not merged** (see the measurement below).
+>
+> **The ledger offers nothing either.** Its seven `todo` rows are exactly the known set: `3b` (contested
+> between two documents — ruling requested), `5b` (**HOLD** — its plan sentence is unsatisfiable; ruling
+> requested), `6b` / `7b` / `backlog-and-closed-second-wave/12` (**merged, ancestor-verified work whose rows
+> are stale — the owner's one word flips them**), `10` (blocked on wire gaps), and `board-prototype-port/1`
+> (**STRUCK — never implement**). **None of the seven is an instruction.** Holding is the correct action,
+> and it is a *ruling request*, not idleness.
+>
+> ## A MEASUREMENT FOR THE UNBLOCKING — here rather than in a message, because it outlives the message
+>
+> `#506` being `CONFLICTING` is what holds Task 3, and Task 3 is what holds Task 8. **The conflict is ONE
+> FILE.** Measured with `git merge-tree --write-tree --name-only origin/main origin/exec2/workflow-version-history`
+> (exit **1**, which is the conflict, and the only line outside the auto-merge chatter):
+>
+> ```
+> 0dfe17b3ecffe4f07cff41015ae4409d3f18307b
+> test-cases/13-settings-and-workflows.md
+>
+> Auto-merging Features.md
+> Auto-merging test-cases/13-settings-and-workflows.md
+> CONFLICT (content): Merge conflict in test-cases/13-settings-and-workflows.md
+> ```
+>
+> **`Features.md` auto-merges.** The single conflict is an append-vs-append on the §13 part-file both lanes
+> appended their cases to — and **the blocks do not overlap** (`13.928`–`13.937` are this lane's per the
+> dispatch's block table; `13.938`–`13.945` are exec 2's per its own report), so it is **a UNION, mechanically**.
+> **NOT resolved here, deliberately:** it is exec 2's branch to rebase, and an executor does not push to a
+> peer's branch. Recorded so the rebase is a known quantity rather than an investigation.
+>
+> ## OPEN RULINGS FROM THIS LANE — unchanged, none of them mine to settle
+>
+> 1. **`owner-holds.md:44` and the plan's lift box still call the `isTypes` reorder *"a route and a gateway
+>    method"*.** The plan's own Task 6 section refutes it (**⛔ DO NOT ADD A ROUTE**) and this lane shipped
+>    the refutation. The dispatch calls the stale rows **a controller matter for the owner**.
+> 2. **The three stale ledger rows** (`6b` → `ed4c992f`, `7b` → `7f9329cc`, `/12` → `77aa906a`): merged,
+>    ancestor-verified, still `todo`. **The owner names them and they flip.** `pnpm check:tasks` will not
+>    flag any of them.
+> 3. **`5b` and `3b`** — both investigated once, at cost; the conclusions are in
+>    `EXEC-RULING-REQUEST-2026-09-18-hig-5b-13304.md` and the `3b` block below. **Do not re-derive either.**
+
+> # ⬛ SUPERSEDED BY THE BLOCK ABOVE — kept verbatim as the record of what was built. It says the PR
+> # "awaits the controller"; that is HISTORY, not state.
+>
 > # ▣ CURRENT POSITION — SATURDAY 2026-09-19 ~midday IST. **TASKS 6+7 (the `isTypes` ↑/↓ reorder) ARE
 > # BUILT, and the PR awaits the controller. THE §13 SPLIT IS MERGED AND THE BOARD HAS DRAINED.**
 > # **Supersedes the block below.** That one says the split awaits merge — **it merged as `b1a8d7ed`
