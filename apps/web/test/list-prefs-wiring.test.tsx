@@ -16,9 +16,13 @@ import { EMPTY_PREFERENCES, stubServices } from './helpers/stub-services.js';
  * clicks vanish, with nothing on screen saying so. The plan's project page does
  * not pass it. This shell does, and this is the file that keeps it passed.
  *
- * The stubs here are the reason both directions are reachable at all: against
- * the real server `getTickets` refuses, so no list ever renders and neither
- * state of the control could be observed.
+ * The stubs here are the reason both directions are reachable at all. **⚠
+ * CORRECTED 2026-09-20:** the reason given for them read *"against the real server
+ * `getTickets` refuses, so no list ever renders and neither state of the control
+ * could be observed."* `getTickets` answers — ruling P25 clause 1 (`c86c4b5c`,
+ * 2026-09-06) served it, and the register has been empty since 2026-09-19 — so
+ * that particular obstruction is gone. The stubs stay, because a unit test of this
+ * wiring should not depend on a live read in either direction.
  */
 
 const EMPTY_LIST: TicketListView = { projectId: '01J9PROJECT000000000000000', rows: [] };

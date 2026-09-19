@@ -153,8 +153,9 @@ export function AttentionStrip({ items, onOpenTicket }: AttentionStripProps) {
  *
  * **The error is NOT swallowed here, and that outlived the claim above it.**
  * "`getAttention` REFUSES today" has EXPIRED — it composes two live reads
- * and `SERVING_GAPS` carries one key, `search`, so **the condition is now a
- * FAILED read** rather than a permanent gap. A hook returning `[]` would
+ * and `SERVING_GAPS` is EMPTY (`search`, its last key, was served 2026-09-19;
+ * this read "carries one key, `search`" until corrected 2026-09-20) — so **the
+ * condition is now a FAILED read** rather than a permanent gap. A hook returning `[]` would
  * still render the strip's most dangerous lie: an emptiness read as an all-clear.
  */
 export function useAttention(

@@ -36,17 +36,24 @@ export function refuse(method: keyof typeof SERVING_GAPS): () => Promise<never> 
 
 /**
  * A `DataSource` in the state the SHIPPED server actually puts this shell in:
- * the FOUR refusing reads refuse, and everything a case has not deliberately
- * stubbed rejects by name. Deliberate: a stub that answered `[]` or `null` for
- * an un-stubbed read would let a page under test render an invented blank and
- * call it a pass.
+ * **no read refuses for a serving reason any more**, and everything a case has
+ * not deliberately stubbed rejects by name. Deliberate: a stub that answered `[]`
+ * or `null` for an un-stubbed read would let a page under test render an invented
+ * blank and call it a pass.
  *
- * **It was six.** `getTickets` and `getTicket` refused here until ruling P25
+ * **⚠ CORRECTED 2026-09-20.** This read *"the FOUR refusing reads refuse"*, and
+ * *"**It was six.** `getTickets` and `getTicket` refused here until ruling P25
  * clause 1's buildable subset landed and their absence lists were deleted from
- * `SERVING_GAPS`. They are `unstubbed` now rather than answering something: this
- * helper's whole rule is that a read a case did not stub must fail loudly, and a
- * served read is no more entitled to a default `[]` than a refusing one was —
- * the reason `getTicketTypes` is unstubbed too, which is stated below.
+ * `SERVING_GAPS`."* The count kept falling after that — 4 at P25 clause 1
+ * (`c86c4b5c`, 2026-09-06), 3 at P32/P38, 1 at P39/P40, and **0 on 2026-09-19**
+ * when `search` was served — so every read below is `unstubbed` rather than
+ * refusing. **`refuse()` above now has NO callers**, and cannot succeed if given
+ * one: it throws whenever `SERVING_GAPS` carries no entry for the method, which is
+ * every method, the register being empty. It is kept because it is the check that
+ * ANNOUNCED each closing, one gate run at a time — a served read is no more
+ * entitled to a default `[]` than a refusing one was, the reason `getTicketTypes`
+ * is unstubbed too, stated below. *Owner for removing it: whoever next touches this
+ * helper.*
  */
 /**
  * The four gateways beside `DataSource`, in the state a case has not stubbed

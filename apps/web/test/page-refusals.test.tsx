@@ -9,12 +9,20 @@ import { stubServices } from './helpers/stub-services.js';
 /**
  * ## THE ADAPTATION THIS FILE EXISTS TO PROVE
  *
- * FOUR of the THIRTEEN `DataSourceQuery` methods answer with a `ServingGapError`
- * — six until ruling P25 clause 1 served `getTickets`' and `getTicket`'s gaps
- * that ENUMERATES the facts the shipped routes do not serve. Four of the six —
- * `getMyWorkspaces`, `getMyWork`, `getAttention`, `getTickets` — are called by
- * pages in this shell, and the plan text (written before those refusals
- * existed) renders each of them as `data === null ? <p>Loading…</p> : …`, with
+ * **⚠ CORRECTED 2026-09-20.** This read *"FOUR of the THIRTEEN `DataSourceQuery`
+ * methods answer with a `ServingGapError` — six until ruling P25 clause 1 served
+ * `getTickets`' and `getTicket`'s gaps — that ENUMERATES the facts the shipped
+ * routes do not serve. Four of the six — `getMyWorkspaces`, `getMyWork`,
+ * `getAttention`, `getTickets` — are called by pages in this shell…"*. **The
+ * count is now ZERO** — 6 → 4 at ruling P25 clause 1 (`c86c4b5c`, 2026-09-06) → 3
+ * at P32/P38 → 1 at P39/P40 → 0 when `search` was served on 2026-09-19 — so no
+ * read refuses for a serving reason, and the list was already self-contradictory
+ * when written (it named `getTickets` among the four in the same sentence that
+ * said P25 had served it). **What this file PROVES is unchanged:** the refusals
+ * its cases stub are now constructed rather than inherited, and the rendering path
+ * they cover is the same one a served read still takes when it FAILS. The plan
+ * text (written before those refusals existed) renders each read as
+ * `data === null ? <p>Loading…</p> : …`, with
  * the attention strip as `items={attention.data ?? []}`. Both spellings put a
  * FALSE CLAIM on screen against the server that ships today:
  *

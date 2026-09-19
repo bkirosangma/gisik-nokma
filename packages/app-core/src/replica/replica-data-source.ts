@@ -109,9 +109,13 @@ export type LocalIngestResult = IngestResult | { status: 'pending'; eventId: str
  * `IngestResult` for "queued", so this method returns none.
  *
  * Refusing loudly on an ordinary path is this package's shipped pattern, not a
- * departure from it: six of thirteen ONLINE query methods throw
- * `ServingGapError` on their normal path (`online/mappers.ts`), and three views
- * cite that refusal by name. `results` is index-aligned with the submitted
+ * departure from it — though **the count this sentence used to carry is now
+ * ZERO**. It read *"six of thirteen ONLINE query methods throw `ServingGapError`
+ * on their normal path (`online/mappers.ts`), and three views cite that refusal
+ * by name."* **⚠ CORRECTED 2026-09-20:** the number fell 6 → 4 (P25 clause 1
+ * served `getTickets`/`getTicket`) → 3 (P32/P38) → 1 (P39/P40) → **0** when
+ * `search` was served on 2026-09-19, and `SERVING_GAPS` is now empty. This class
+ * is therefore the LAST holder of that pattern, not one instance of it. `results` is index-aligned with the submitted
  * batch, so a caller that catches this learns per-claim what happened — the
  * refusals keep their rule and reason, and the accepted ones name the ids now
  * queued.

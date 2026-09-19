@@ -98,11 +98,15 @@ type Failure = { headline: string | null; refusal: Refusal; origin: RefusalOrigi
  * Building the offer needs two facts about the PARENT that no prop carries: the
  * state it is sitting in, and the workflow whose non-terminal states are the
  * options. `parentCandidates` supplies the title; the rest comes from
- * `DataSource.query.getTicket`, and against the shipped server that method
- * REFUSES today (`ServingGapError`, six of thirteen query methods — the route
- * answers a `proj_visibility` row with no `TicketState`, no title and no
- * provenance). So online, this flow reaches the refusal and then cannot build
- * the offer.
+ * `DataSource.query.getTicket`. **⚠ CORRECTED 2026-09-20 — this read *"against the
+ * shipped server that method REFUSES today (`ServingGapError`, six of thirteen
+ * query methods — the route answers a `proj_visibility` row with no `TicketState`,
+ * no title and no provenance). So online, this flow reaches the refusal and then
+ * cannot build the offer."* Ruling P25 clause 1 (`c86c4b5c`, 2026-09-06) served
+ * `getTicket`'s three absences, and the register has been EMPTY since 2026-09-19,
+ * so online the offer BUILDS.** The refusal branch below is kept and is still
+ * correct: a read can fail for ordinary reasons, and the property it guards is the
+ * flow's behaviour when a read it needs does not answer, whatever the cause.
  *
  * What it does then is what Task 12's `TicketSheet` does with the same gap:
  * renders the refusal it actually has, says plainly that the offer could not be
@@ -333,10 +337,13 @@ export function CreateTicketFlow({
   };
 
   /**
-   * Every rejection out of the two async paths lands here. `getTicket` refuses
-   * with a `ServingGapError` today and `ingestOne` throws when a one-claim batch
-   * comes back with no answer in it; either way the honest report is the thrown
-   * message, not a swallowed promise and not an invented outcome.
+   * Every rejection out of the two async paths lands here. `getTicket` can reject
+   * — it no longer refuses permanently, and this read "refuses with a
+   * `ServingGapError` today" until 2026-09-20, when ruling P25 clause 1
+   * (`c86c4b5c`, 2026-09-06) was found to have served its absences — and
+   * `ingestOne` throws when a one-claim batch comes back with no answer in it;
+   * either way the honest report is the thrown message, not a swallowed promise
+   * and not an invented outcome.
    */
   const report = (error: unknown): void => {
     setReopenPrompt(null);

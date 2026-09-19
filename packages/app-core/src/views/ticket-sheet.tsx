@@ -225,8 +225,10 @@ export type TicketSheetProps = {
  *
  * **This section used to say `getTicket` REFUSES PERMANENTLY** — a
  * `proj_visibility` row with no `title`, no provenance and no `TicketState`.
- * **Ruling P25 deleted that absence from `SERVING_GAPS`**, which now carries
- * ONE key, `search`; `getTicket` maps through `mapTicketRead`
+ * **Ruling P25 deleted that absence from `SERVING_GAPS`** — which has since gone
+ * EMPTY, `search` having been its last key and served 2026-09-19 (this read
+ * "which now carries ONE key, `search`", corrected 2026-09-20);
+ * `getTicket` maps through `mapTicketRead`
  * (`mappers.ts:1672`). So it answers, a failure is ordinary and a retry can
  * clear it. **Why the branch exists did NOT change:** `data` is null on a
  * failure AND on a real absence, and an error must never render as an absence.
@@ -1559,14 +1561,19 @@ export function TicketSheet({
           <AttachmentList entries={attachments ?? []} />
 
           {/*
-            Spec §6's audience section. It is mounted here and it is DARK
-            against the shipped server: this component returns its refusal
-            branch above whenever `getTicket` rejects, and `getTicket` refuses
-            today (`mapTicketRead`, one of the six serving gaps). So nobody
-            reaches this line in production until that read is served — which is
-            why the editor's own behaviour is proven in
+            Spec §6's audience section. **⚠ CORRECTED 2026-09-20.** This read: "It
+            is mounted here and it is DARK against the shipped server: this
+            component returns its refusal branch above whenever `getTicket`
+            rejects, and `getTicket` refuses today (`mapTicketRead`, one of the six
+            serving gaps). So nobody reaches this line in production until that
+            read is served — which is why the editor's own behaviour is proven in
             `test/views/visibility-editor.test.tsx`, driving the component
-            directly, rather than through a fabricated successful read here.
+            directly, rather than through a fabricated successful read here."
+            Ruling P25 clause 1 (`c86c4b5c`, 2026-09-06) served that read, so a
+            person DOES reach this line and the section is not dark. Whether this
+            mount should now be proven HERE rather than only in the editor's own
+            suite is a test-design decision this correction does not take: *owner,
+            whoever next touches either file.*
           */}
           <VisibilityEditor
             dataSource={dataSource}
@@ -1695,7 +1702,9 @@ export function TicketSheet({
  * expired.** It said `getTicket` REFUSES against the shipped server *"for
  * good"*, making that branch a permanent refusal with nothing to retry. **Both
  * reads answer now** — **ruling P25 deleted `getTicket`'s absence from
- * `SERVING_GAPS`**, which carries one key, `search` — so a rejection here is the
+ * `SERVING_GAPS`, and the register has since gone EMPTY** (`search` was its last
+ * key, served 2026-09-19; this read "which carries one key, `search`", corrected
+ * 2026-09-20) — so a rejection here is the
  * ordinary failure of one read and MAY succeed on a retry. **⚠ The distinct
  * word and class were chosen to state a difference in KIND that no longer
  * exists: they may still be right, but that is a different reason and nobody

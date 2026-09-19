@@ -16,13 +16,18 @@ import type { Actor } from '../../src/view-types.js';
  * These cases drive the component DIRECTLY rather than through `TicketSheet`,
  * and that is deliberate rather than convenient.
  *
- * The sheet returns its refusal branch before the details body renders whenever
- * `getTicket` rejects, and `getTicket` REFUSES against the shipped server
- * (`mapTicketRead`, one of the six serving gaps). A sheet test that fabricated a
- * successful ticket read in order to reach this section would be exercising a
- * line unreachable in production and reporting the result as coverage — the
- * UNREACHABLE vacuity. The component is the unit; the mount is asserted once,
- * as a mount, in `ticket-sheet.test.tsx`.
+ * **⚠ CORRECTED 2026-09-20.** This read *"The sheet returns its refusal branch
+ * before the details body renders whenever `getTicket` rejects, and `getTicket`
+ * REFUSES against the shipped server (`mapTicketRead`, one of the six serving
+ * gaps). A sheet test that fabricated a successful ticket read in order to reach
+ * this section would be exercising a line unreachable in production and reporting
+ * the result as coverage — the UNREACHABLE vacuity."* **Ruling P25 clause 1
+ * (`c86c4b5c`, 2026-09-06) served that read, and the register has been empty since
+ * 2026-09-19, so the section IS reachable through the sheet and that argument has
+ * expired.** Driving the component directly is still the narrower unit, and
+ * whether the sheet should now prove this mount is a test-design decision this
+ * comment correction does not take. The component is the unit; the mount is
+ * asserted once, as a mount, in `ticket-sheet.test.tsx`.
  *
  * Cases 3.104–3.111 (`test-cases/03-foundation-ledger.md`).
  */

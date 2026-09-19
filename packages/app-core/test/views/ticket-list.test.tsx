@@ -645,12 +645,18 @@ describe('3.52 TicketList — one clock, named, and not the device’s', () => {
 
 /**
  * A SANCTIONED MOCKED-CONTRACT SEAM. `createFakeDataSource` stands in for the
- * `DataSource` this hook consumes; it is NOT the contract. The online source is
- * `src/online/`, where SIX of the thirteen query methods — `getTickets` among
- * them — deliberately THROW a `ServingGapError` because the shipped routes do
- * not carry `typeRank`, `epicId`, `stateName`, `assignedProvenance` or
- * `hasRestrictedParent`. Everything below is proven about the hook; the rows it
- * is proven on are not yet obtainable from a server.
+ * `DataSource` this hook consumes; it is NOT the contract. **⚠ CORRECTED
+ * 2026-09-20:** this read *"The online source is `src/online/`, where SIX of the
+ * thirteen query methods — `getTickets` among them — deliberately THROW a
+ * `ServingGapError` because the shipped routes do not carry `typeRank`, `epicId`,
+ * `stateName`, `assignedProvenance` or `hasRestrictedParent`. Everything below is
+ * proven about the hook; the rows it is proven on are not yet obtainable from a
+ * server."* **Both halves are false now:** `getTickets` answers — ruling P25
+ * clause 1 (`c86c4b5c`, 2026-09-06) served all five of those fields, the register
+ * has been empty since 2026-09-19, and rows carrying them ARE obtainable from a
+ * server. The seam is kept, and is still sanctioned, because a HOOK test should
+ * not depend on a live read: the rows below are fixtures by choice, not by
+ * necessity.
  *
  * The preferences fixtures key by `PROJECT`, a real ULID, and not by the plan's
  * `prj_1`: ruling P24 names that literal as one of the three ways the shipped

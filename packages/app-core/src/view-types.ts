@@ -286,10 +286,14 @@ export type ListRow = {
    * renders". An offline list is the surface where a queued claim is most
    * common, so the half that was missing is the half that needed it most.
    * Ruling P30 permits this one widening for that reason — it mirrors a shipped
-   * field rather than inventing one, and the ONLINE mapper's answer was already
-   * written and already correct: `online/mappers.ts` refuses `getTickets`
-   * outright, and an online-only shell has no outbox, so nothing is ever in
-   * transit for it.
+   * field rather than inventing one. **⚠ CORRECTED 2026-09-20:** this sentence read
+   * *"the ONLINE mapper's answer was already written and already correct:
+   * `online/mappers.ts` refuses `getTickets` outright, and an online-only shell has
+   * no outbox, so nothing is ever in transit for it."* `getTickets` does **not**
+   * refuse — ruling P25 clause 1 (`c86c4b5c`, 2026-09-06) served it, and the
+   * register has been empty since 2026-09-19 — so the first half is gone. The
+   * surviving half is the one that does the work: an online-only shell has no
+   * outbox, so nothing is ever in transit for it.
    */
   pending: boolean;
   /**

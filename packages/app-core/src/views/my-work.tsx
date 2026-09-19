@@ -41,14 +41,19 @@ export type MyWorkProps = {
  * a single card (see `board.tsx`), not a queue.
  *
  * **`contested` empty is only ever shown when contested was actually computed.**
- * The distinction is reachability, not wording: `getMyWork` REFUSES today
- * (`ServingGapError` — `ContestedClaim.title` is on no contest row and
+ * **⚠ CORRECTED 2026-09-20 — the premise this paragraph rested on has expired.**
+ * It read: *"The distinction is reachability, not wording: `getMyWork` REFUSES
+ * today (`ServingGapError` — `ContestedClaim.title` is on no contest row and
  * `ContestedClaim.claim.serverTime` is an instant the system never recorded,
  * because a refused claim was never committed and so never stamped), and
  * `useLiveQuery` surfaces that rejection as `error` with `data` left null — so
- * this component does not render at all. The only worlds in which
- * `contested: []` reaches here are worlds where somebody computed it, and there
- * "No contested claims." is the true and useful answer. Suppressing the section
+ * this component does not render at all."* **Rulings P39 and P40 served that read
+ * and `getMyWork` answers; the register has been empty since 2026-09-19.** The
+ * reachability argument is therefore no longer available on those terms, and what
+ * replaces it is a product claim this correction deliberately does NOT take:
+ * `contested: []` can now arrive from a real answer, and whether the sentence
+ * below still holds is an open question with a named owner — *whoever next
+ * touches this component.* The sentence itself is kept rather than deleted. Suppressing the section
  * when empty would lose that.
  *
  * That asymmetry with `AttentionStrip` — which renders NOTHING when it has

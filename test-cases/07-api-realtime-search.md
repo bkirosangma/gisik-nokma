@@ -292,7 +292,12 @@ gap** (the server does not have the fact — a product decision).
 
 **What is new in this block, and why it could not live in `app-core`.** Plan 6 Task 7 shipped the
 online `DataSource`, and six of its thirteen query methods REFUSE rather than returning a view built
-from facts the server did not send. Each refusal enumerates its absences as data —
+from facts the server did not send. **⚠ CORRECTED 2026-09-20: that count is now ZERO.** It fell
+6 → 4 (ruling P25 clause 1, `c86c4b5c`, 2026-09-06) → 3 (P32/P38) → 1 (P39/P40) → **0 on 2026-09-19**,
+when the owner ruled the search QUERY must derive `matchedIn`; `SERVING_GAPS` is empty, so no mapper
+refuses outright and no `/v1` body can be missing a fact a refusal names. The paragraph below is kept
+because it is the design this block's cases MEASURED while it held, and the mechanism it describes —
+each refusal enumerating its absences as data — is what made the last four closures announce themselves. Each refusal enumerates its absences as data —
 `{field, wireKey, wireRoute, because, owner}` — in `packages/app-core/src/online/mappers.ts`. A test in
 `app-core` can prove the refusal fires (3.39) but can only go red when somebody edits that file,
 because nothing in that package has ever seen a server. So the *other* half is pinned here: this file
@@ -303,8 +308,13 @@ serving one of those facts, the case reddens and somebody has to delete a refusa
 true** — which is the outcome "recorded with a named owner" is supposed to produce and, as ruling P25
 observed of Plan 5, usually does not.
 
-**FOUR refusing methods, five `expectStillUnserved` calls below (one each at 7.202, 7.204 and 7.205, two inside
-7.208) — the count is not a typo.** `/v1/contests` closes two of the six methods' absences at once
+**⚠ CORRECTED 2026-09-20 — this sentence is now doubly stale, and both halves are named rather than
+silently dropped. It read: *"FOUR refusing methods, five `expectStillUnserved` calls below (one each
+at 7.202, 7.204 and 7.205, two inside 7.208) — the count is not a typo."* **There are ZERO refusing
+methods now** (`SERVING_GAPS` empty since 2026-09-19), **and `expectStillUnserved` has NO callers**: it
+is still defined at `apps/server/test/integration/client-contract.test.ts:371`, and every other mention
+of it in the repo is a comment. The 7.202/7.204/7.205/7.208 cross-checks below that INVERTED — asserting
+the fields are carried rather than that they are absent — are the live form of this block.** `/v1/contests` closes two of the six methods' absences at once
 (`getMyWork`'s `contested` share and `getAttention`'s fourth item kind), so 7.208 cross-checks it
 twice against the same body, once per absence register (`MAP_MY_WORK_ABSENCES`, then
 `MAP_ATTENTION_ABSENCES`) — one route, two registers, five calls over four refusing methods.

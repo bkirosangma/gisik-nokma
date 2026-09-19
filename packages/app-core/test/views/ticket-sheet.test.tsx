@@ -683,11 +683,13 @@ describe('TicketSheet — the History tab: loading, failed and empty are three d
   });
 
   it('PLANTED DEFECT: the failure is an ERROR, not a serving gap — different words AND a different class', async () => {
-    // `getTicketHistory` is one of the six methods the online source ANSWERS
-    // (`src/online/online-data-source.ts:151`), so its rejection is a failure of
-    // one read that may answer on a retry — not the permanent gap `getTicket`
-    // refuses with. Wearing `gn-ticket-sheet__refusal` would put a false claim
-    // in the CSS, and the sheet body's own refusal class must stay unused here.
+    // ⚠ CORRECTED 2026-09-20. `getTicketHistory` ANSWERS — as, since 2026-09-19,
+    // does every method (`SERVING_GAPS` is empty); this read "one of the six
+    // methods the online source ANSWERS (`src/online/online-data-source.ts:151`)".
+    // The distinction the case draws survives that correction, and is why it is
+    // kept: its rejection is a failure of one read that MAY answer on a retry,
+    // not a permanent gap. Wearing `gn-ticket-sheet__refusal` would put a false
+    // claim in the CSS, and the sheet body's own refusal class must stay unused.
     const read = ticketRead();
     const source = createFakeDataSource({
       getTicket: async () => read,
@@ -822,11 +824,15 @@ describe('TicketSheet — a truncated ledger says it is truncated', () => {
  * The editor's own behaviour — the two pinned sentences, the lockout warning
  * that changes nothing, the payload spellings, the refusal rendering — is
  * proven in `visibility-editor.test.tsx`, driving the component directly. It is
- * NOT proven here, and the reason is worth stating rather than assumed: every
- * case in this file feeds a fabricated successful `getTicket`, and `getTicket`
- * refuses against the shipped server (`mapTicketRead`), so this whole details
- * body is DARK in production today. Asserting the editor's behaviour through
- * this harness would be reporting coverage of a line nobody can reach.
+ * NOT proven here. **⚠ CORRECTED 2026-09-20 — the reason this paragraph gave read
+ * *"every case in this file feeds a fabricated successful `getTicket`, and
+ * `getTicket` refuses against the shipped server (`mapTicketRead`), so this whole
+ * details body is DARK in production today. Asserting the editor's behaviour
+ * through this harness would be reporting coverage of a line nobody can reach."*
+ * Ruling P25 clause 1 (`c86c4b5c`, 2026-09-06) served that read and the register
+ * has been empty since 2026-09-19, so the details body renders and the DARK
+ * premise is gone; whether this harness should now assert more than the mount is
+ * a test-design decision, not this correction's.**
  */
 describe('3.116 TicketSheet — the "Who can see this" section is mounted', () => {
   it('renders the section, and the owner-disclosure sentence inside it', async () => {

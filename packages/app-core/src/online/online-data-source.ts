@@ -77,25 +77,31 @@ export function listQueryString(filter: FilterSpec, grouping: Grouping): string 
 /**
  * The online implementation of amendment 10's `DataSource`: HTTP + WS.
  *
- * ## FOUR of the THIRTEEN query methods REFUSE, and that is the design
+ * ## ZERO of the THIRTEEN query methods REFUSE — the register is the record
  *
- * They refuse in `mappers.ts`, with a `ServingGapError` that ENUMERATES the
- * facts the shipped routes do not serve and names who closes each. The
- * alternative — returning a `TicketListView` whose `stateName` is the state id,
- * or a `MyWorkView` whose `contested` is `[]` — would put a view on screen that
- * is indistinguishable from an answer. See the coordination doc's "Step 11 (Plan
- * 6 remainder) — the `DataSource` register, re-derived, and RULING REQUEST P25".
+ * **⚠ CORRECTED 2026-09-20.** This heading read *"FOUR of the THIRTEEN query
+ * methods REFUSE, and that is the design"*, and the paragraph under it named the
+ * four: `getMyWorkspaces`, `getMyWork`, `search` and `getAttention`. The number
+ * fell to zero one ruling at a time — **4** after ruling P25 clause 1
+ * (`c86c4b5c`, 2026-09-06) served `getTickets` and `getTicket` (the list route
+ * grew `typeRank`, `epicId`, `stateName`, `assignedProvenance` and
+ * `hasRestrictedParent`; the single read grew the domain `TicketState`, the title,
+ * the state provenance and the visible parent's title); **3** after P32/P38 served
+ * `getMyWorkspaces`; **1** after P39/P40 served `getMyWork` and `getAttention`;
+ * and **0** on 2026-09-19, when the owner ruled that the search QUERY must derive
+ * `matchedIn` rather than the client guess it. `SERVING_GAPS` (`mappers.ts`) is
+ * therefore EMPTY, and its own test pins that (3.39).
  *
- * **It was six until ruling P25 clause 1's buildable subset landed.**
- * `getTickets` and `getTicket` answer now: the list route serves `typeRank`,
- * `epicId`, `stateName`, `assignedProvenance` and `hasRestrictedParent`, and the
- * single read serves the domain `TicketState`, the title, the state provenance
- * and the visible parent's title. The four that remain are `getMyWorkspaces` and
- * `getMyWork` (both HELD with the owner — serving them means deciding what a
- * project-scoped guest sees of a workspace's other projects, and there is no
- * shipped project-list read at all), `search` (a data gap: `routes/search.ts`
- * destroys which column matched inside the query) and `getAttention` (whose
- * fourth item kind needs a title `GET /v1/contests` does not carry).
+ * What survives the count, and is why this section is kept rather than deleted:
+ * while a method refused, it refused in `mappers.ts` with a `ServingGapError` that
+ * ENUMERATED the facts the shipped routes did not serve and named who closed each,
+ * because the alternative — returning a `TicketListView` whose `stateName` is the
+ * state id, or a `MyWorkView` whose `contested` is `[]` — would put a view on
+ * screen that is indistinguishable from an answer. **An empty register is not a
+ * claim that no read is missing:** it says no MAPPER in `mappers.ts` refuses
+ * outright, and a refusal that MOVES has its own home (`replica-data-source.ts`).
+ * See the coordination doc's "Step 11 (Plan 6 remainder) — the `DataSource`
+ * register, re-derived, and RULING REQUEST P25".
  *
  * ## Three methods take a `workspaceId` the plan's signature did not have
  *
