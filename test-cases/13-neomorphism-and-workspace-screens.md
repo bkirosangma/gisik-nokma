@@ -1981,3 +1981,91 @@ rather than merely re-passing the full file in its usual order.
 Neither case ID changes: 13.431 and 13.432 still name the same two behaviours, now proven true
 independent of run order and with the DOM shape the metrics table actually describes.
 
+
+## The ticket sheet's scrim and entrance, matched to the prototype's MOTION (executor 2, 2026-09-19) — case `13.961`
+
+**The owner:** *"gn-sheet__scrim. the surface that shows when you open a ticket. check with the
+prototype and match it."*
+
+**THE COLOUR WAS NOT THE MISMATCH, and that is worth stating first because it is where the work is not.**
+All four style × theme combinations already matched the prototype exactly — `--gn-surface-overlay`'s four
+primitives against the prototype's `--overlay`, read from both sides and again rendered (hig light
+`0.341`/`0.34`, hig dark `0.620`/`0.62`, neo light `0.451`/`0.45`, neo dark `0.600`/`0.6`). **One trap cost
+an eyeball error before it was measured: the prototype's default body state is `data-style="hig"` while the
+running app is `neo`**, so the two scrims LOOK different — cool blue against warm tan — while both being
+correct. A style difference is not a defect, and "fixing" it would have broken a value that was already
+right.
+
+**THE MISMATCH WAS MOTION. The prototype animates; the product did not.** `.gn-sheet__scrim` computed to
+`animation: none 0s`, `.gn-sheet` had no animation at all, and `gnSlide` appeared nowhere in
+`packages/ui/src` or `apps/web/app` — the sheet snapped open.
+
+- ✅ **13.961 — the scrim fades and the panel slides, at the prototype's own timings and behind the
+  repo's own reduced-motion idiom.** `packages/ui/test/sheet-motion.test.ts`.
+  **The values are the prototype's, unchanged** (`desktop.dc.html@6d7b67c0a52c`): `gnFade .2s ease` on the
+  scrim (`@keyframes` at `:96`; carried by all four of its scrims — `:1384`, `:1436`, `:1570` and the
+  ticket sheet's own `sheetScrimStyle` at `:3396`) and `gnSlide .26s cubic-bezier(.32,.72,0,1)` over a
+  `translateX(28px)` on the panel (`:95`). **The 28px is checked against OUR width rather than copied
+  blind**: the prototype's sheet is `min(660px,100%)` (`:3399`) and this one is `min(40rem, 94vw)` = 640px
+  — twenty pixels apart, not a difference a travel distance can be wrong for — and both panels sit against
+  the same right edge, so a positive `translateX` is a slide IN on both sides rather than the wrong way on
+  one.
+  **ALL THREE PANELS ARE GUARDED**, each by a `@media (prefers-reduced-motion: reduce)` block setting
+  `animation: none` on its own selector. A reader who asked for less motion gets none of this. *(The count
+  is stated as it is: this shape — `animation: none` — was used **once** in this stylesheet before this
+  change, by `.gn-help`; the file's other guards cover `transition`. An earlier version of this entry said
+  "three times" and was wrong.)*
+  **The scrim's fade is on the SHARED `.gn-dialog__scrim, .gn-sheet__scrim` rule, AND THE PROTOTYPE DOES
+  DECIDE IT — the first version of this entry said the opposite and was wrong.** It claimed *"all four of
+  its scrims are side panels and it draws no centred dialog anywhere"*. A grep for the scrims'
+  `background:var(--overlay)` returns four hits, and **three** are side panels: the fourth,
+  `desktop.dc.html:1570`, is the scrim of a **CENTRED** dialog whose container (`:1569`) is
+  `align-items:center;justify-content:center` and whose panel (`:1571`) carries
+  `animation:gnRise .24s cubic-bezier(.32,.72,0,1)`. `mobile.dc.html:1206-1208` draws the same pair.
+  ***The grep was run; the step that would have falsified the reading — checking each hit's CONTAINER
+  rather than the hit itself — was not.*** So `.gn-dialog` now RISES on the reference's own values, its
+  panel guard lands with it, and the justification for animating the shared scrim rule is the reference
+  rather than our own structure alone. Leaving the dialog unanimated would also have shipped a modal whose
+  scrim faded while its panel snapped — an inconsistency this change would have introduced rather than
+  found.
+  **`ui.css`'s `gnFade` comment was corrected in the same change**, as its own reasoning required: it said
+  the keyframes lived at the foot of the Help section *"rather than in a shared block"* because `gnFade`
+  was **the only animation in this stylesheet**. Adding `gnSlide` made that false, so both keyframes moved
+  to a shared block at the head of the file and the sentence now says why.
+  **NO UNIT TEST CAN SEE ANY OF THIS** — jsdom has no layout engine and no animation timeline — so the case
+  is a **source scan over the declared values**, in the idiom `13.893` established, and its docblock states
+  its own blind spots. **The motion itself was watched in a REAL browser**: Chromium via Playwright,
+  driving the same bytes of `ui.css` with the `Sheet` component's own markup — eleven checks, including a
+  mid-animation transform, a settled `transform: none`, the scrim's `0 → 1` opacity, and
+  `prefers-reduced-motion: reduce` **emulated at the engine level** (both animations read `none`). A
+  screenshot at t=130ms shows the scrim mid-fade and the panel mid-slide at its 640px width.
+  **FIVE MUTATIONS, four of which are named here and one of which is a lesson.** Removing the scrim's
+  animation, removing the panel's animation, changing the panel's timing, and changing the keyframe's
+  `translateX(28px)` → `14px` each redden this case. **The FIRST attempt at the fourth mutated nothing**:
+  the pattern matched the first `translateX(28px)` in the file, which is inside this change's own prose
+  comment QUOTING the value, so the keyframe was untouched and the case correctly stayed green. *A
+  mutation result of `passed` is not evidence unless the mutation is confirmed to have fired* — the same
+  distinction this catalogue records for survivors at `13.744`.
+  **And the case's own first draft was broken in a way that made three of its five assertions pass for the
+  wrong element:** the block scanner captured a rule's preceding doc comment as part of its "selector", so
+  the two commented rules this case is about were invisible and the only block that matched was the
+  reduced-motion guard's. Comments are stripped before any scan now, and the reason is in the file.
+  (`packages/ui/src/ui.css`, `packages/ui/test/sheet-motion.test.ts`)
+
+### What is NOT covered, named rather than implied
+
+- **The prototype's "Full screen" mode is a named GAP, not built.** Its ticket sheet carries
+  `sheetFullLabel` (`:1119`) whose mode turns the scrim into `var(--surface)` — a solid surface — and makes
+  the panel full-bleed (`width:100%;height:100%`, body `max-width:860px` centred). **This product has no
+  full-screen ticket mode at all.** That is a feature, not a scrim value, and the owner asked about the
+  scrim; recorded with the prototype's lines so the next reader does not have to re-derive it.
+- ~~**The prototype draws a third keyframe, `gnRise`** (`:97`, `translateY(14px)`), which this stylesheet
+  does not define and nothing uses.~~ **STRUCK — this bullet was wrong, and it was wrong in the same way as
+  the paragraph above it.** `gnRise` IS used here now: it is the **centred dialog's** entrance
+  (`desktop.dc.html:1571`), so it was never an idle third keyframe awaiting a consumer — it was the one key
+  for the modal shape this change had mis-read as absent. The bullet is struck rather than deleted so a
+  reader who remembers reading it can see what it became, and the error is named in `ui.css`'s own SHARED
+  KEYFRAMES block where the keyframe now lives.
+- **No `e2e-viewport` case covers this route.** The real-browser evidence above is a Playwright harness
+  against the stylesheet and the component's markup, **not** the running app's `/p/:projectId?ticket=<id>`
+  route; the viewport suite does not visit it, and this case does not claim otherwise.

@@ -2,6 +2,53 @@
    variable from tokens.ts (the one origin). No literal colours here: the
    token-discipline test scans this file. */
 
+/* ── SHARED KEYFRAMES ───────────────────────────────────────────────────────
+   These live here, at the top, because **each is used at more than one distance
+   in this file** and a keyframe defined beside its first consumer is a keyframe
+   the next consumer has to go looking for. `gnFade` is the clearest case — the
+   overlay scrims near the top and `.gn-help` far below. `gnRise` is here on the
+   same grounds even though it has ONE consumer today (`.gn-dialog`), because it
+   is the prototype's centred-dialog entrance and the next modal shape to want
+   an entrance will want this one.
+
+   That is a CHANGE OF REASON, not a change of address. `gnFade` used to sit at
+   the foot of the Help section with a comment saying it lived there *"rather
+   than in a shared block"* because it was **the only animation in this
+   stylesheet**. The overlay work made that sentence false. The comment's own
+   reasoning — one animation, one place — is what moved the keyframes, so the
+   sentence is corrected rather than left to be discovered.
+
+   All three are the prototype's own, values unchanged
+   (`desktop.dc.html@6d7b67c0a52c` `:95`/`:96`/`:97`): the sheet's travel is its
+   `translateX(28px)`, the dialog's is its `translateY(14px)`, and the timings
+   below are the ones its own overlays carry.
+
+   ⚠ **AN EARLIER VERSION OF THIS BLOCK SAID `gnRise` WAS "NOT DEFINED AND USED
+   BY NOTHING HERE", and called it a non-port rather than a miss. That was
+   FALSE, and the error is worth leaving visible because of how it was made.**
+   It rested on a grep for the scrims' `background:var(--overlay)`, which
+   returns four hits — and every one of those four was then read as a SIDE
+   PANEL. Three are. **The fourth, `:1570`, is the scrim of a CENTRED dialog**
+   whose container (`:1569`) is `align-items:center;justify-content:center`, and
+   whose panel (`:1571`) carries exactly this keyframe,
+   `animation:gnRise .24s cubic-bezier(.32,.72,0,1)`. *The grep was run; the
+   step that would have falsified the conclusion — reading each hit's CONTAINER
+   rather than the hit — was not.* `mobile.dc.html:1206-1208` draws the same
+   pair. `gnRise` is therefore the centred-dialog entrance, and it is defined
+   here because this file now uses it. */
+@keyframes gnFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes gnSlide {
+  from { transform: translateX(28px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+@keyframes gnRise {
+  from { transform: translateY(14px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
 /* `min-height: 2.75rem` = 44px, WCAG 2.5.5's enhanced target size and the floor
    this product already used for its 404 recovery links and the MCP code input.
    Measured at 390px before this: `340x38` — the shared button was SIX PIXELS
@@ -259,6 +306,32 @@
 .gn-avatar--tint-2 { background: var(--gn-warning); color: var(--gn-warning-text); }
 .gn-avatar--tint-3 { background: var(--gn-danger); color: var(--gn-danger-text); }
 
+/* The scrim FADES IN, at the prototype's own `.2s ease`.
+   `desktop.dc.html@6d7b67c0a52c` draws four scrims and EVERY ONE of them carries
+   `animation:gnFade .2s ease` — `:1384`, `:1436` and the ticket sheet's own
+   `sheetScrimStyle` at `:3396` (all three side panels, container
+   `justify-content:flex-end`), and **`:1570`, the scrim of a CENTRED dialog**
+   whose container `:1569` is `align-items:center;justify-content:center`.
+
+   ANIMATED ON THE SHARED SELECTOR, and **the prototype does decide it** — our
+   `.gn-dialog__scrim` is the same shape as that fourth scrim and the reference
+   gives it the same fade. This paragraph previously said the opposite, on the
+   strength of a grep whose four hits were all read as side panels; three were.
+   *The grep was run; the step that would have falsified the reading — checking
+   each hit's CONTAINER — was not.* The file's own structure agrees and is the
+   second reason: the two scrims share ONE rule because they are the same surface
+   (same `inset: 0`, same `--gn-surface-overlay`, same z-index, same job of
+   obscuring the page), and splitting the rule to fade one and snap the other
+   would invent a difference the product does not have.
+
+   THE PANEL ENTRANCES ARE PER-ELEMENT, because the reference's two are. The
+   sheet slides in (`.gn-sheet`, `gnSlide`, below) and the DIALOG RISES
+   (`.gn-dialog`, `gnRise`, below) — both the prototype's own
+   (`:3399` and `:1571`). **An earlier version of this comment said `.gn-dialog`
+   "gets no entrance" and defended it by claiming the prototype "offers no
+   centred-dialog evidence". That was false**, and leaving it would also have
+   shipped a dialog whose scrim faded while its panel snapped — an inconsistency
+   this change would have introduced rather than found. */
 .gn-dialog__scrim,
 .gn-sheet__scrim {
   position: fixed;
@@ -266,6 +339,11 @@
   background: var(--gn-surface-overlay);
   display: flex;
   z-index: 40;
+  animation: gnFade 200ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gn-dialog__scrim,
+  .gn-sheet__scrim { animation: none; }
 }
 .gn-dialog__scrim { align-items: center; justify-content: center; }
 .gn-sheet__scrim { justify-content: flex-end; }
@@ -283,14 +361,49 @@
   flex-direction: column;
   max-height: 90vh;
 }
+/* The dialog RISES IN, at the prototype's own `.24s cubic-bezier(.32,.72,0,1)`
+   and over its `translateY(14px)` — `desktop.dc.html@6d7b67c0a52c:1571`, the
+   centred "New ticket" modal, whose own scrim carries the same
+   `gnFade .2s ease` the rule above gives ours. `mobile.dc.html:1208` draws the
+   same pair for the bottom-sheet form of it.
+
+   This is a RISE and not a slide, and that is the reference distinguishing the
+   two modal shapes rather than a taste call: a panel docked to an edge enters
+   from that edge, a panel centred in the viewport has no edge to enter from, so
+   it lifts. Our widths differ from the prototype's on both (`min(34rem, 92vw)`
+   here against its `min(560px,100%)`), which is not a difference a 14px lift
+   can be wrong for. */
 .gn-dialog {
   border-radius: var(--gn-radius-card);
   width: min(34rem, 92vw);
+  animation: gnRise 240ms cubic-bezier(0.32, 0.72, 0, 1);
 }
+@media (prefers-reduced-motion: reduce) {
+  .gn-dialog { animation: none; }
+}
+/* The panel SLIDES IN, at the prototype's own `.26s cubic-bezier(.32,.72,0,1)`
+   and over its `translateX(28px)`.
+
+   **The 28px is checked against OUR width rather than copied blind**, and it
+   carries over because the two panels are nearly the same size: the prototype's
+   ticket sheet is `width:min(660px,100%)` (`:3399`) and this one is
+   `min(40rem, 94vw)` = `640px` — 20px apart, which is not a difference a travel
+   distance can be wrong for. The direction is the same too: both panels sit
+   against the RIGHT edge (`justify-content: flex-end` on the scrim), so the
+   prototype's positive `translateX` is a slide IN from off-edge on both sides
+   rather than a slide the wrong way on ours.
+
+   `ease` would also have been defensible and is not what the reference says: the
+   curve is doing real work here — it is fast at the start and settles, which is
+   what stops a 28px move from reading as a snap at this duration. */
 .gn-sheet {
   width: min(40rem, 94vw);
   height: 100%;
   max-height: none;
+  animation: gnSlide 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .gn-sheet { animation: none; }
 }
 .gn-dialog__header,
 .gn-sheet__header {
@@ -3115,15 +3228,14 @@
    sidebar's own 1.75rem, the column's 1.75rem), because they do not start at
    the same line — the sidebar's tabs sit level with the `h1`.
 
-   The entrance animation is the reference's own (`animation:gnFade .25s
-   ease` on this element), and it is the only animation in this stylesheet —
-   hence the keyframes living here rather than in a shared block. Guarded
-   with everything else at the foot of this section for readers who asked
-   for less motion. */
-@keyframes gnFade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
+   The entrance animation is the reference's own (`animation:gnFade .25s ease`
+   on this element). **The keyframes no longer live here** — this comment used to
+   say they did because `gnFade` was *"the only animation in this stylesheet"*,
+   and the ticket sheet's entrance (`gnSlide`, and `gnFade` again on the overlay
+   scrims) made that sentence false. Both keyframes are now at the head of the
+   file; see the SHARED KEYFRAMES block there, which carries the corrected
+   reasoning. Guarded with everything else at the foot of this section for
+   readers who asked for less motion. */
 /*
 
    BOTH APPS GET THIS. `apps/desktop` mounts the same component
