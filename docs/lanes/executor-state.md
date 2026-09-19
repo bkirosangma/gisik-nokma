@@ -183,7 +183,8 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > ## ANCHORS (verify every one; a block cannot name its own sha)
 > | | |
 > |---|---|
-> | `origin/main` | **`3f37ffc4`** — the `#578` merge, `baseRefName: main`, `headRefOid 42783c53` |
+> | `origin/main` | **`92f3d93c`** — it MOVED while this branch was open (`#580`, `#581`; was `3f37ffc4` at cut). My base is still an ANCESTOR, **no file is touched by both**, so the merge is clean and I have deliberately NOT rebased — a rebase would invalidate both the gate and the reviewer pass for no gain |
+> | scope, corrected | **37 files · 76 hunks · +563 / −219** via `origin/main...HEAD`. **My first figures used TWO dots (`git diff origin/main`), which compares TIPS and reported executor 2's `docs/manual.md` and `content.generated.ts` as mine** — 42 files / +644 / −675. Three dots is the measurement; this is the second recorded instance of that trap in this lane |
 > | my branch | `exec/falsified-claim-sweep` — cut FROM `3f37ffc4`, **`--base main`** |
 > | code head | **`45b657db`** (Round 2) on **`95470afb`** (Round 1); the handoff commit sits on top of both |
 > | prior branch | `exec/e2e-stack-repair` @ `42783c53` — **fully contained in `origin/main`** (`git branch -r --contains` lists it; `origin/main...HEAD` diff is empty) |
