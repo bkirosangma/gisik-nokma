@@ -13,8 +13,15 @@ leaving it outside, so the section was opened.
 
 | lane | block |
 |---|---|
-| **exec 1** | `16.1`–`16.30` |
-| **exec 2** | `16.31`–`16.60` |
+| **exec 1** | `16.1`–`16.30`, **then `16.32`–`16.40`** (taken 2026-09-19 late for `/v1/search`) |
+| **exec 2** | **`16.41`–`16.60`** (`16.31` spent on the evidence upload; `16.32`–`16.40` reallocated to exec 1) |
+
+**⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** It read `exec 2: 16.31–16.60` for about forty
+minutes on 2026-09-19 and was wrong for that whole time, because the controller reallocated in a message
+rather than in this file — **and a table a minting session trusts is exactly the artifact that must not
+be corrected only in prose elsewhere.** A number is a reading; a block lasts longer; **a block still
+expires when the controller reallocates.** Re-read it before minting, and **if your own allocation
+changes, change it HERE in the same action** — not only in a handoff, a queue note or a message.
 
 **When your block is empty, STOP AND ASK.** Do not mint from the tip and do not borrow a neighbour's —
 that is the rule whose breach made §13 go red twice.
