@@ -20,10 +20,12 @@ or when somebody wants to know who marked a job finished. Then it is the whole p
 
 The same instinct runs through the rest of it. If a job has eight sub-jobs and two of them are hidden
 from you, it says **"5 of 8 done · 2 restricted"** rather than quietly showing you a smaller, tidier,
-wrong number. If a calendar month is empty, it tells you *which kind* of empty — nothing has a claimed
-date, or your filter removed everything, or you switched a date off in the legend — because "nothing
-here" is a useless message when there are four reasons for it. A file linked from Google Drive is
-always described as **unknown**, never "still fine", because the product genuinely does not know.
+wrong number. If a calendar month is empty, it tells you *which kind* of empty, and it claims only the
+two kinds it can tell apart: nothing has a claimed date, or every claim in it is behind a date field
+you switched off in the legend. A month your filter emptied gets the first sentence, not a third —
+once the grid is drawn, a claim the filter removed and a claim nobody made look the same. A file linked
+from Google Drive is always described as **unknown**, never "still fine", because the product genuinely
+does not know.
 
 If you have spent twenty years with spreadsheets that lie to you confidently, this will feel unusual.
 It would rather tell you it does not know.
@@ -41,9 +43,9 @@ speed.
   fingerprint/face unlock. There is no password anywhere in the product.
 - **Set up your business** — create a workspace, invite people into it with one of three roles, and
   design your own set of stages for work to move through, with rules on the moves between them.
-- **Follow work** — a board, a table, a month calendar and a week-by-week timeline, all of one
-  project, with a strip at the top telling you what is blocked, what has gone stale, and what is due
-  soon.
+- **Follow work** — a backlog of work that has not started, and of work sent back to it, then a
+  board, a table, a month calendar and a week-by-week timeline of one project's work. What needs your
+  attention is on **My Work**, not on a project's tabs.
 - **Move work along** — open a job, press Move, pick the next stage. Your rules decide what is
   offered and what it asks for first.
 - **Control who sees what** — per job, down to a named list of people, with sub-jobs inheriting from
