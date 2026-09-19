@@ -52,6 +52,34 @@ to one thing" and a widened route that answers a different question — **so eac
 requires the DOOR to be measured and, where it is a new route, a migration, or destructive surface,
 RULED before it is built.** The lift removes the hold; it does not pre-approve an interface.
 
+#### THE DOORS, RULED — owner, 2026-09-19 late: _go with all recommended_
+
+**Measured first, by a read-only reconnaissance across all five screens**
+(`gisik-nokma-lanes/EXEC-RECON-2026-09-19-five-doors.md`), whose headline was that **three of the five
+starting rows in the 2026-09-18 audit did not survive re-measurement.** The owner then approved the
+recommended set in one word, and **the table below is the authority for what may be built on these five
+screens.** Fifteen items: **eight BUILD, three DECLINED, one HELD, one RE-MEASURE, two already built.**
+
+| screen | item | ruling | the door |
+|---|---|---|---|
+| `isWorkspace` | **description** | **BUILD** | `MIGRATION` — `projectCreatedPayload` is `.strict()`, so payload, projection, read and render move together, and **every `ProjectRef` construction site must carry it** or the field arrives `undefined` on some route |
+| `isWorkspace` | **rename** | **BUILD** | **NO NEW DOOR** — `workspace.renamed` already exists in the vocabulary with **zero client UI**. The cheapest item in the reconnaissance |
+| `isWorkspace` | **delete** | **DECLINED** | destructive, and **the prototype refuses it itself** — its own button is a no-op toast: *"that is irreversible, so it is disabled here"*. Building it would **exceed** the design, not implement it |
+| `isInbox` | **filter** | **BUILD** | `ADDITIVE FIELD` on the existing read; `workspaceId` is the precedent |
+| `isInbox` | **bulk + Undo** | **BUILD** | `NEW ROUTE` + CSRF registration — and the audit was **WRONG** here: `markRead` is one-way, so there is **no unread door at all** and the prototype's Undo has nothing behind it |
+| `isMcpTokens` | **row name** | **BUILD** | `MIGRATION` + a new owner-scoped write. **The ruled-out issue-time flow is NOT required** — the name is set *afterwards*; `mcp_tokens` has no `name` column and both insert paths confirm it |
+| `isMcpTokens` | **Revoked badge** | **NOT NOW** | it implies **soft-delete** — revoke is a hard `DELETE` today. A behaviour change, not a display change |
+| `isInvite` | **expiry** | **BUILD** | `ADDITIVE FIELD` — and it is **already in hand**: `openableInvite` reads `expires_at` and throws it away |
+| `isInvite` | **decline** | **BUILD** | `NEW ROUTE` against `invite_tokens.status` |
+| `isInvite` | **inviter identity** | **HELD — AWAITING ELABORATION** | a **DISCLOSURE**, not a field: the prototype's inviter card carries an **email**, the same class of leak the *"never the invited address"* guard exists to prevent |
+| `isInvite` | **member count** | **RE-MEASURE FIRST** | the reconnaissance's own least-confident item — it was **not** established that a member count is reachable by a **token-holder who is not yet a member** |
+| `isMcpAuth` | **deny** | **BUILD** | `NEW ROUTE`, a sibling of approve — **do not extend approve with a `deny` flag**; that is one route answering two questions |
+| `isMcpAuth` | **scopes** | **DECLINED** | it **contradicts the shipped consent model** — the file's own docblock: what is granted is *"a credential that acts AS this person"*, not a scope, and no scope column exists |
+| `isMcpAuth` | **displayed code** | **DECLINED** | it **inverts who holds the code** — the browser would receive a credential-adjacent secret it deliberately never sees |
+
+**A DECLINE here is a decision, not a hold** — the same distinction §3 draws for the legal copy. These
+are settled product positions, and **a later session must not surface them as gaps to close.**
+
 #### The 2026-09-19 rulings, verbatim, and what each means
 
 | item | owner's answer | effect |
