@@ -22,7 +22,11 @@
 
 ## ▲ TOP BLOCK — `hig-per-screen/5b`: **`13.304` IS WITNESSED AT THE REAL DOOR.** The door was measured first and needed NO widening; the case is mutation-witnessed; the gate is green. (2026-09-19, ~14:4x IST)
 
-**Position: the dispatch is DONE and its PR is open — branch `exec2/hig-5b-real-door`, base `main`.** Cut from
+**Position: the dispatch is DONE and the branch is PUSHED — `exec2/hig-5b-real-door`, base `main`.** The PR
+for this head is opened as the last step of the dispatch that wrote this block, so **measure it rather than
+reading it here: `gh pr list --head exec2/hig-5b-real-door --state all`.** This sentence first read *"its PR is
+open"* while no PR yet existed — a reviewer caught it, and it is the same failure this file corrects 200 lines
+below, so the line now tells its reader to measure. Cut from
 a freshly fetched `origin/main` **`6cee248d`** (cycle 10's close). **The frozen head is the commit carrying
 this block** — every sha here measured with `/usr/bin/git`, never `rtk`, whose `git log` ignores its revision
 argument.
@@ -73,11 +77,15 @@ failure, so a control placed after the assertion it protects could not be shown 
 ### § 3 — THE MUTATION, AND WHAT IT PROVES.
 
 **Deleted `apps/server/src/read/compile-filter.ts:104`** — the `stateCategory` clause. **The case reddens
-ALONE at its narrowing assertion** (`list-narrowing-roundtrip.test.ts:339`) and **NOT by 500-ing**: the
+ALONE *within its own file* at its narrowing assertion** (`list-narrowing-roundtrip.test.ts:339`) and **NOT by
+500-ing**: the
 failure is `expected [3 ids] to deeply equal [1 id]` — the query ran fine and simply stopped narrowing. That
 is the distinction the dispatch named: *a mutation must change the PROPERTY, not just the source.* Restored,
 then verified with `git diff -- apps/server/src/read/compile-filter.ts` → **empty** and
-`git status --porcelain` → only the new untracked test file.
+`git status --porcelain` → only the new untracked test file. (That was a fact about the WORKING TREE at that
+moment, and it stopped being true the moment the catalogue and handoff edits landed beside it. The claim that
+survives at the head is the one to re-measure: `git diff 6cee248d..HEAD -- apps/server/src/read/compile-filter.ts`
+→ **empty**, i.e. the mutation is not in the frozen head.)
 
 ### § 4 — THE ID: NO NEW ID WAS MINTED, AND THAT IS A REFUTATION OF THE RECON.
 
@@ -98,7 +106,7 @@ been the wrong move.
 ### § 5 — WHAT IS *NOT* DONE, NAMED RATHER THAN IMPLIED.
 
 - **The Board half is NOT softened by this flip.** `getBoard(projectId: string)` still takes no filter
-  (`data-source.ts:134`), so the Board's `N of M` is the complete total under every value of `activeOnly`. The
+  (`data-source.ts:142`), so the Board's `N of M` is the complete total under every value of `activeOnly`. The
   case asserts the Board's card count **UNMOVED** in the same case, at the real door. `13.436` pins the same
   claim in jsdom and remains the negative arm — **the two are a pair and each names the other.**
 - **`13.301`–`13.303` were NOT re-pinned.** Nothing in the real door changed them.
@@ -120,11 +128,45 @@ in.** The gate's `@gisik-nokma/web:test` / `#typecheck` lines read `/Users/kiro/
 cache key is input-based, so the hit is valid. But a reader auditing *"did the tests run in my worktree"* from
 those lines would conclude the opposite of the truth.
 
+### § 7 — THE REVIEW ROUND, AND WHAT IT FOUND THAT I COULD NOT.
+
+An independent reviewer ran at the frozen head. It **CONFIRMED all seven claims it was asked to refute** —
+including reproducing the mutation (exact failing line 339, 3 ids vs 1), and separately proving the CONTROL
+falsifiable by mutating line 104 to an unconditional `stateCategory = 'open'`, which reddened the control at
+`:314`. Then it found **four real defects in my own prose**, every one of which I re-measured myself before
+accepting:
+
+1. **"Three suites click the checkbox" was wrong twice.** Only **two** click it (`board-narrowing.test.tsx:232`
+   and `page-refusals.test.tsx:528,563`), and one of those two — `page-refusals.test.tsx:497-503` — **DOES read
+   the filter**: its stub re-implements the narrowing. So "all three drive a stub that ignores the filter" was
+   false, and the true statement is both stronger and stranger: the two suites fail to witness this in
+   **opposite** ways. Corrected in the test docblock and the catalogue row.
+2. **`data-source.ts:134` was the wrong line** — it is a bare `/**`; `getBoard(projectId: string)` is at
+   **`:142`**. Pre-existing drift, carried forward from the ❌ row into three places I wrote. Corrected in all three.
+3. **The Board assertion was over-credited.** It was called "the negative arm that makes the narrowing real
+   rather than claimed"; a `getBoard` read cannot fail for the hazard named — a future implementer sourcing the
+   **rendered** `N of M` from the narrowed rows — because it never observes the page. It is a **supporting
+   wire-level fact**; **the negative arm is `13.436`.** Corrected in the docblock and the catalogue row. The
+   over-credit is precisely the "a check passing for a reason unrelated to the property it names" shape.
+4. **"ALONE" was unscoped.** The deletion reddens this file alone but is **not** alone repo-wide —
+   `apps/server/test/read/compile-filter.test.ts` pins the clause directly and reddens with it. Scoped in both places.
+
+It also caught **three defects in this file** — the "its PR is open" line while no PR existed, the
+"only the new untracked test file" moment-in-time claim, and a rule reading "do not run the forced gate" that
+contradicted § 5. All three corrected in place, with the correction visible rather than silently overwritten.
+
+**The lesson, and it is the one this file keeps paying for:** every one of the four prose defects was in text I
+had written *about my own work*, and three of them were citations that **resolved** while pointing at the wrong
+thing. **A citation that resolves is not a citation that is true.**
+
 ### Rules that bind this branch
 - **Never `docker compose`** — the stack is served from the main folder now and is the owner's.
 - **Do not edit `task-ledger.tsv`** — the controller flips rows after each merge.
 - **Never `AskUserQuestion`.** A question is a file in `gisik-nokma-lanes/` plus a one-line pointer, then a hold.
-- **Do not run the forced gate** — the controller does.
+- **Do not run the forced gate — that is the gate the CONTROLLER runs to decide a merge.** (Running
+  `pnpm turbo run build test typecheck` yourself before freezing is a different thing, and the dispatch
+  requires it; § 5 above records that run. This rule previously read "do not run the forced gate" with no
+  scope word, which contradicted § 5 a few lines above it.)
 - **Never pipe a test run into `head`.** No orphans at the freeze: the `ppid=1` vitest sweep returned empty.
 
 ---

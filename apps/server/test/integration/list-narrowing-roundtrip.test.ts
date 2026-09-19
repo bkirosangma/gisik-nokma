@@ -18,15 +18,24 @@ import { signInWithPhone } from '../helpers/session.js';
  * `13.304` was minted ❌ as *"the plan's sentence is UNSATISFIABLE as written,
  * and the half that is true is unwitnessed"*. The unsatisfiable half is the
  * Board's: `getBoard(projectId: string)` takes no filter at all
- * (`packages/app-core/src/data-source.ts:134`), so the Board's `N of M` is the
+ * (`packages/app-core/src/data-source.ts:142`), so the Board's `N of M` is the
  * complete total under EVERY value of `activeOnly`. The half that is true and was
  * witnessed NOWHERE is this one — the control narrows the **List's server read**,
  * and no test ticked the control and then asserted the List's row set shrank.
  *
- * Three suites click the checkbox. None of them can make this claim, because all
- * three drive a stub that ignores the filter: `board-narrowing.test.tsx:185` takes
- * `getTickets(projectId, filter, grouping)` and uses none of the three arguments.
- * **A stub that ignores its arguments cannot witness a narrowing.** The owner's
+ * **Two suites click the checkbox — three click sites across two files**
+ * (`board-narrowing.test.tsx:232`, `page-refusals.test.tsx:528` and `:563`), and
+ * neither can make this claim. They fail it in **opposite** ways, which is why the count
+ * is stated per file and not as "three places". `board-narrowing.test.tsx:185` declares
+ * `getTickets: async (): Promise<TicketListView> => ({ projectId: PROJECT_ID, rows })` —
+ * **no parameters at all**, so a filter cannot reach it. `page-refusals.test.tsx:497-503`
+ * DOES read `filter.stateCategories` and narrows — but it narrows **inside the stub**: the
+ * fake re-implements the server's narrowing and then asserts its own copy of the rule.
+ * **Neither is evidence about the server** — one cannot see the filter, the other answers
+ * from a hand-written version of it, and a rule copied into a fake is exactly the thing
+ * that stops the server from having to exist. (A third file, `new-ticket-dialog.test.tsx`,
+ * mentions the control in a docblock and passes `parentCandidatesNarrowing` as a prop; it
+ * never clicks it, so it is not a suite that clicks.) The owner's
  * ruling (2026-09-19, `controller-state.md` "📌 THE OWNER'S RULINGS", item 4) chose
  * option **"c"** — the real-door case — and rejected the alternative of restating
  * the case down to what a stub can express.
@@ -67,10 +76,17 @@ import { signInWithPhone } from '../helpers/session.js';
  *
  * Delete `apps/server/src/read/compile-filter.ts:104` — the `stateCategory` clause.
  * The filter is then silently IGNORED: the query does not fail, it answers with
- * every row, and the narrowed assertion below reddens ALONE and for the property
- * it names. A mutation that instead left a parameter unbound would kill this case
+ * every row, and the narrowed assertion below reddens for the property it names.
+ * A mutation that instead left a parameter unbound would kill this case
  * by 500-ing the route, which proves the query broke rather than the narrowing
  * happened — *a mutation must change the PROPERTY, not just the source.*
+ *
+ * **"Alone" is scoped, and the scope is measured:** this deletion reddens THIS file
+ * alone — the control above still passes — but it is NOT alone repo-wide.
+ * `apps/server/test/read/compile-filter.test.ts` already pins the clause directly and
+ * reddens with it, which is correct and is why this file does not also assert the
+ * clause text. The claim here is only that this case dies for its own property rather
+ * than as collateral of a broken query.
  *
  * ## The prohibition
  *
@@ -346,14 +362,20 @@ describe('13.304 — the List narrows at the real door when the checkbox is tick
     expect(narrowedCalls).toHaveLength(1);
     expect(decodeURIComponent(narrowedCalls[0] ?? '')).toContain('"stateCategory":"active"');
 
-    // ─── THE NEGATIVE ARM, in the same case, as the case text asks ────────────
-    // `getBoard(projectId)` takes NO filter (`data-source.ts:134`), so the
-    // Board's own count is the complete total under every value of `activeOnly`.
-    // This is why the plan's sentence was unsatisfiable as written; asserting it
-    // here is the half that keeps a future implementer from moving the Board's
-    // count into the List's narrowing and shipping a page that claims a
-    // narrowing it does not perform. `13.436` pins the same claim in jsdom
-    // against the primary source; this one pins it at the door.
+    // ─── THE BOARD READ IS UNNARROWED — a SUPPORTING fact, NOT the negative arm ─
+    // `getBoard(projectId)` takes NO filter (`data-source.ts:142`), so the Board's
+    // own count is the complete total under every value of `activeOnly`. Driving it
+    // through the SAME client, in the same session as the narrowed read above, shows
+    // the narrowing does not leak into the Board's read.
+    //
+    // WHAT THIS DOES **NOT** PROVE, said plainly because the case text over-credits
+    // it: this read cannot fail for the hazard the docblock above names — a future
+    // implementer sourcing the RENDERED `N of M` from the List's narrowed rows. That
+    // hazard lives in the page, and this assertion never observes the page. **The real
+    // negative arm is `13.436`** (`apps/web/test/board-narrowing.test.tsx:214-246`),
+    // which renders and asserts the count reads the board's total rather than the
+    // list-sourced one. What is pinned here is the wire-level half only: the read the
+    // Board is built from takes no filter, so it cannot have narrowed.
     const board = await source.query.getBoard(projectId);
     const boardCards = board.groups.flatMap((group) =>
       group.columns.flatMap((column) => column.cards),

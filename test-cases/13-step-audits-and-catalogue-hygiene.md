@@ -315,7 +315,7 @@ cites, and the first draft cited a line it had not read.*
   the row this audit minted ❌, and it is upgraded IN PLACE so its verdict and its outcome stay readable
   together.** The ❌ was a two-part verdict and **only ONE part moved.** The Board half stands exactly as
   the audit filed it and is NOT softened by this flip: `getBoard(projectId: string)` takes no filter at
-  all (`packages/app-core/src/data-source.ts:134`), so the Board's `N of M` is the complete board total
+  all (`packages/app-core/src/data-source.ts:142`), so the Board's `N of M` is the complete board total
   under every value of `activeOnly` — `board-narrowing.test.tsx:26-52` measures this against the primary
   source and records it, and `13.436` pins it. The recorded impossibility is part of the deliverable, not
   a note about it: a future reader who implements the plan's sentence literally will move the Board's
@@ -324,10 +324,18 @@ cites, and the first draft cited a line it had not read.*
   List's row set shrank — and the owner ruled option "c" for it** (2026-09-19, `controller-state.md`
   "📌 THE OWNER'S RULINGS", item 4: *"the real-door case: real server, real Postgres, the List genuinely
   shrinks … the only option that witnesses the PRODUCT"*), rejecting the alternative of restating the
-  case down to what a stub can express. Three suites click the checkbox and none could make this claim:
-  all three drive a stub that **ignores the filter entirely**
-  (`apps/web/test/board-narrowing.test.tsx:185` takes `getTickets(projectId, filter, grouping)` and uses
-  none of the three arguments), and a stub that ignores its arguments cannot witness a narrowing.
+  case down to what a stub can express. **Two suites click the checkbox — three click sites across two
+  files** (`apps/web/test/board-narrowing.test.tsx:232`, `apps/web/test/page-refusals.test.tsx:528` and
+  `:563`) — and neither can make this claim, failing it in **opposite** ways.
+  `apps/web/test/board-narrowing.test.tsx:185` declares
+  `getTickets: async (): Promise<TicketListView> => ({ projectId: PROJECT_ID, rows })` — **no parameters at
+  all**, so a filter cannot reach it. `apps/web/test/page-refusals.test.tsx:497-503` DOES read
+  `filter.stateCategories` and narrows — but it narrows **inside the stub**, so the fake re-implements the
+  server's rule and then asserts its own copy of it. **Neither is evidence about the server:** one cannot see
+  the filter, the other answers from a hand-written version of it, and a rule copied into a fake is exactly
+  what stops the server from having to exist. (A third file,
+  `packages/app-core/test/views/new-ticket-dialog.test.tsx`, mentions the control in a docblock and passes
+  `parentCandidatesNarrowing` as a prop; it never clicks it, so it is not counted.)
   **The witness** is `apps/server/test/integration/list-narrowing-roundtrip.test.ts` — the REAL
   `createOnlineDataSource` over the REAL `GET /v1/projects/:projectId/tickets`, against REAL Postgres,
   **zero `vi.mock`**. The world is built through the shipped doors only (`POST /v1/workspaces`,
@@ -336,8 +344,12 @@ cites, and the first draft cited a line it had not read.*
   because a fixture holding only `active` and `terminal` rows could not tell *narrowed to the active
   category* from *narrowed to non-terminal*, and would pass for the wrong reason. **The control runs
   FIRST** (the unfiltered read asserts all three, with their categories read off the wire), then the
-  narrowed read asserts EXACTLY the `doing` row, and the Board's own count is asserted UNMOVED in the
-  same case — the negative arm that makes the narrowing real rather than claimed.
+  narrowed read asserts EXACTLY the `doing` row. The Board's read is asserted UNNARROWED in the same case,
+  and that is a **supporting wire-level fact, NOT the negative arm** — a `getBoard` read cannot fail for the
+  hazard the ❌ above names (a future implementer sourcing the RENDERED `N of M` from the List's narrowed
+  rows), because it never observes the page. **The negative arm is `13.436`**
+  (`apps/web/test/board-narrowing.test.tsx:214-246`, catalogued in `13-board-prototype-port.md`), which
+  renders and asserts the count reads the board's total rather than the list-sourced one.
   **The door was MEASURED before it was used and needed no widening and no new route**: the filter is
   already carried end to end by shipped code — `page.tsx:321-324` builds it, `ticket-list.tsx:1196`
   passes it, `mappers.ts:910` singularises it to `stateCategory`, `filter-spec.ts:125` validates it,
