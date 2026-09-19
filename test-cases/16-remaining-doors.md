@@ -544,6 +544,19 @@ Recorded here so the next reader does not take the sentence the other way and bu
   regardless, because this page's audience is whoever holds the URL, which `routes/invites.ts` records
   *"may have been forwarded"*.
 
+## `hig-per-screen/3b` — Members states (executor 1, 2026-09-20) — cases `16.61`–`16.80`
+
+**The dispatch's decisive question, already answered before this branch opened:** *is `role` on the server's members
+response and merely dropped by the mapper, or absent from the wire entirely?* — **on the wire, and already carried**
+(`readMembers` selects `m.role`; `mapActors` maps it, case `13.760`). So the "carry it end to end in ONE task" half
+was done long before this row, and the remaining work is the surface.
+
+**Both changes the audit recorded for this screen are also already in the product**: the **conditional role cell**
+(`adminGate === 'admin' && isEditableRole` → `Select`, else the chip) and the **invitation panel's gate** (the door's
+own 403, argued in the page's docblock). Neither was re-built.
+
+- **16.61** ✅ **The Person cell carries the address on a second line — and ONLY when the label is not already the address.** Two arms, because the line is honest in one of them: a person whose NAME is the label gets the address beneath it (`:675`), and a phone-only member — labelled *by* their address — gets one string, not two. **Mutation-witnessed:** drawing the line unconditionally reddens **2** (this case's second arm and the pre-existing nameless-roster case); never drawing it reddens **1**.
+
 ## Sheet prototype parity (executor 1, 2026-09-20) — cases `16.81`–`16.99`
 
 **Owner: _"make our build like the prototype."_** **The authority is

@@ -434,7 +434,27 @@ export default function MembersPage() {
                       <span className="gn-members__initial" aria-hidden="true">
                         {initialOf(label)}
                       </span>
-                      <span className="gn-members__name">{label}</span>
+                      {/* THE AUTHORITY'S TWO-LINE IDENTITY (`:675`): the name
+                          at weight 600 over the address at 13px/18px in
+                          `label2`. Our cell had the name ONLY, with the address
+                          kept as a fallback — so a member who has a name never
+                          showed one, and the prototype draws both.
+
+                          ⚠ DRAWN ONLY WHEN THE LABEL IS NOT ALREADY THE ADDRESS.
+                          `memberLabel` falls back name → email → id, so a
+                          phone-only member (whose `displayName` IS the number)
+                          and a magic-link sign-up with no name are LABELLED by
+                          their address; a second line for them would print one
+                          string twice inside one cell. `email` is also absent
+                          for the phone population by the server's own decision
+                          (`WorkspaceMember.email`), which is why the test is
+                          `!== undefined` rather than truthiness. */}
+                      <span className="gn-members__identity">
+                        <span className="gn-members__name">{label}</span>
+                        {member.name.trim() !== '' && member.email !== undefined ? (
+                          <span className="gn-members__email">{member.email}</span>
+                        ) : null}
+                      </span>
                     </span>
                   </td>
                   <td className="gn-members__cell">
