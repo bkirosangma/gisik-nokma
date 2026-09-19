@@ -29,7 +29,7 @@ by row**, and the register records each ruling. **Three are approved to build; o
 |---|---|---|
 | **Task 2** — the `isWorkflows` status badge | **drop it** | **BUILD NOTHING.** Record it as a **named absence** in the docblock — not as an outstanding gap. The read serves only published workflows, so a field holding one value would be a badge that lies by omission |
 | **Task 3** — the `isWorkflows` second action | **yes** | **BUILD IT**, and **it is ONE decision with the version-history screen** — see the box below |
-| **Task 6 + 7** — the `isTypes` ↑/↓ reorder (wire + buttons) | **yes** | **BUILD BOTH.** `rank` already exists on `TicketTypeDef` and `rank.ts` computes the hierarchy implications, so expect **a route and a gateway method over data that already exists**, not a new concept |
+| **Task 6 + 7** — the `isTypes` ↑/↓ reorder | **yes** | **BUILD BOTH — AS A RENDER TASK. ⛔ NO ROUTE AND NO GATEWAY OP.** This row's original prediction — *"expect a route and a gateway method over data that already exists"* — was **refuted on 2026-09-19 by this plan's own Task 6 section, which is authoritative over this row.** The door already exists: `onSave` authors a `ticket-type.defined` event carrying `rank` through `gateway.submit` |
 | **Task 8** — the `isTypes` `"N tickets"` count | **yes** | **BUILD IT, and it needs NEW server surface.** The only population read is pinned to one workflow (`WHERE workspace_id = $1 AND type_id = $2 AND workflow_id = $3`, `builder-reads.ts:408-414`) and the screen itself records that using it here prints a **wrong** number. The `"Draft"` badge stays a **named absence** — that half was separately ruled not-a-state |
 
 ### ⚠ THE VERSION-HISTORY DECISION, in full, because it is the first of its kind here
@@ -148,18 +148,26 @@ scope decision — not left as an empty slot for a later reader to fill in. `Fea
 `test-cases/13` record it the same way.
 **Depends on:** nothing. Folds into Task 1's PR if that has not yet opened.
 
-### Task 3 — `isWorkflows`: the second action  *(wire gap 2)* — **RULED: `View history` IF the data is already there; otherwise no button**
-**The owner ruled on 2026-09-18, approving the controller's recommendation.**
+### Task 3 — `isWorkflows`: the second action  *(wire gap 2)* — **CORRECTED 2026-09-19: THE CONDITION IS MET — BUILD IT, as ONE task with the version-history screen**
+**The owner ruled on 2026-09-18, approving the controller's recommendation — CONDITIONALLY.**
+**The owner resolved that condition on 2026-09-19: `yes`, and it is ONE decision with the version-history
+screen.** So the conditional below **resolves to BUILD**, and *"build no button / record the absence"* is
+**no longer a live outcome — do not execute that branch.**
+**The measurement the condition asked for was taken, and the answer is "it is there"**, at three lines:
+
+| | |
+|---|---|
+| the route takes it | `builder-reads.ts` — `version?: string` on `/v1/workspaces/:workspaceId/workflows/:workflowId` |
+| the query takes it | `packages/app-core/src/data-source.ts:146` — `getWorkflowDef(workspaceId, workflowId, version?: number)` |
+| the web adapter **drops it** | `apps/web/src/authoring/data-source-gateway.ts:224` |
+
 Of the three candidates (`"Duplicate"` / `"Discard draft"` / `"View history"`, `:3174-3188`), only
 **`View history`** has a plausible door: version history is what `PublishedWorkflowDef.version` and
-`stateMapping` already imply.
-**The task is therefore a MEASUREMENT first:** establish whether the version chain is readable from an
-existing read. **If it is — build the button and its gateway method. If it is not — build no button**, and
-record the absence in the docblock beside Task 2's. `"Duplicate"` and `"Discard draft"` are **not** built
-under any reading: neither has a door, and a button with no door behind it is the exact defect this repo
-keeps re-finding.
-**Acceptance:** either a working `View history` with a case asserting the rendered history, or a named
-absence with the measurement that established it.
+`stateMapping` already imply. `"Duplicate"` and `"Discard draft"` are **not** built under any reading:
+neither has a door, and a button with no door behind it is the exact defect this repo keeps re-finding.
+**Acceptance:** a working `View history` opening a history view that renders a **REAL version chain**, with
+a case asserting the **RENDERED** history — a superseded version visible **with its content**; plus the
+absence of the other two candidates named in the docblock, with the reason.
 
 ### Task 4 — `isTypeEditor`: field `required`, end to end  *(wire gap 6 — ALREADY RULED YES)*
 `customFieldDefSchema` (`packages/domain/src/ticket-types.ts:11-16`) gains `required`; it travels the wire
