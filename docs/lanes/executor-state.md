@@ -45,6 +45,49 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # AND ITS PR IS THE FIXED POINT.** Branch **`exec/members-states`** @ **`e35dc161`** — **ON THE REMOTE**
 > # (verified `git ls-remote` == `git rev-parse HEAD`; the controller's "local only" reading predates the push).
 >
+> # ▣ **THE FIXED POINT — `3b`'s PR IS OPEN.** `#575`, head **`e1e70b43`**, `--base main`, verified against
+> # `git rev-parse` before it was reported. Branch **`exec/members-states`** @ `e1e70b43`, **pushed**.
+>
+> ## WHAT `3b` TURNED OUT TO BE, AND WHY IT WAS SMALL
+> **Re-measuring before writing is the reason.** The dispatch's decisive question was already answered (`role` IS
+> on the wire, `mapActors` carries it, case `13.760`) and **both changes the audit recorded for this screen were
+> already in the product** — the conditional role cell and the invitation panel's 403 gate. Neither was rebuilt.
+> **The one buildable gap was the Person cell's two-line identity** (`:675`), drawn only when the label is not
+> already the address — the nameless population is LABELLED by their address, so a second line would print one
+> string twice. `16.61` has two arms for that reason; `16.62` witnesses the COLUMN that stacks them, which is the
+> only instrument that can see it (jsdom has no layout engine and no browser case reaches `/members` for geometry).
+>
+> ## ⚠ THE REVIEW ROUND FOUND FIVE THINGS, THREE OF THEM MINE — the pattern is worth more than the list
+> 1. **A FALSE REASON, PROPAGATED TO FOUR FILES.** "A phone-only member is labelled by their address" — and, two
+>    clauses later in the same comment, "the address is absent for the phone population". `memberLabel`'s own
+>    docblock settles it: a phone sign-up's name IS the phone. **The wrong version named a population that reads
+>    plausible**, which is why nothing caught it until a second reader did.
+> 2. **I CLAIMED IMMUNITY FROM A FAILURE I HAD NOT WITNESSED.** Deleting `flex-direction: column` left every
+>    instrument green while the cell would render `Anselma Marakanselma@example.test` — the exact shape the
+>    subtask rows shipped. `16.62` now asserts it, with its own deletion witness.
+> 3. **MY OWN COMMIT FALSIFIED ITS FILE'S DOCBLOCK** — a heading counting "THREE things … NOT here" and a bullet
+>    saying "still unported", sixteen lines above the JSX that had just started drawing it. This is the
+>    catalogued class and **no check can catch it**.
+> Plus: the predicate was loose where it mirrors `memberLabel` (blank address), and a comment claimed an ellipsis
+> where the family declares none.
+>
+> ## 📌 AN OMISSION THE REVIEW FOUND, RECORDED WITH AN OWNER RATHER THAN BUILT
+> The authority draws a **pending-invitations HEADING** (`desktop.dc.html@6d7b67c0a52c:725`,
+> `"Pending invitations · " + invites.length`) and the product renders none — while `pending.length` is already in
+> state, so it needs no read. It appears in **neither** the page's absent-list docblock **nor** the audit's gap
+> list: an **unrecorded omission**, not a scope decision. **Owner: the controller, for a dispatch.** Three smaller
+> invite-half absences (the pending row's project scope, the minted card's `Copy link`/`Done`, four static
+> sentences) are recorded beside it in §16.
+>
+> ## ANCHORS
+> | | |
+> |---|---|
+> | `origin/main` | **`faecf837`** (the `#572` merge) |
+> | `#575` | head **`e1e70b43`**, `--base main`, OPEN, awaiting the controller's gate |
+> | gate at this head | **33/33 EXIT 0** · Node `v22.22.2` · seven checks exit 0 · `check-case-ids` **2492, highest `16.62`** · §16 **46/0/46** |
+> | ids | parity `16.81`–`16.82` SPENT (merged) · `3b` `16.61`–`16.62` spent · **`16.63`–`16.80` free** · `§17` is the controller's at `16.99` |
+> | next | **this is the fixed point.** The controller restarts me here; the outstanding item on my lane is the parity VISUAL HALF, owed to the next rebuild |
+
 > ## PARITY — MERGED, `#572` = **`faecf837`**
 > Three items: the sheet's sections as ONE segmented control on the shared component (`16.81`), `Full screen`
 > with the authority's three-part treatment (`16.82`), and the title's type step (CSS-only, no id by precedent).
