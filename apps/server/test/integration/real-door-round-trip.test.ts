@@ -788,6 +788,20 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — the single read'
         serverTime: 'SERVER-TIME',
         cause: null,
       },
+      // The claim behind `ticketState.assigneeId`, added 2026-09-19 with the
+      // sheet's editable assignee — the reader the LIST has always used, called
+      // once more on this route. This world assigned the child through
+      // `POST /v1/events` (`ticket.assigned`, actor `member`), so the claim is
+      // that actor's and both clocks are the server's.
+      assignedProvenance: {
+        actorId: member.userId,
+        clientTime: 'CLIENT-TIME',
+        serverTime: 'SERVER-TIME',
+        // THREE fields, where `StateProvenance` beside it has four: there is no
+        // `cause` on `AssignmentProvenance`, because a move can be caused by a
+        // reopened child and an assignment cannot be caused by anything. Asserted
+        // by the absence of the key, which `toEqual` on the whole body enforces.
+      },
       parent: {
         kind: 'ticket',
         id: parentId,

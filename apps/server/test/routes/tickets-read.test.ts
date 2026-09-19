@@ -583,3 +583,62 @@ describe('every door on this surface requires a session', () => {
     }
   });
 });
+
+/**
+ * **13.962 — the single read serves the assignment's PROVENANCE, and the two
+ * absences stay two.**
+ *
+ * The ticket sheet's assignee became editable, and every sibling row on that
+ * sheet already carries `set by {actor} on {date}` — an edited field that does
+ * not say who set it is the one row there which cannot be trusted. The LIST has
+ * served `assignedProvenance` on every card since it existed; the single read was
+ * the one place it did not, which is why the sheet had no claim to render.
+ *
+ * **This is a widening, not a second door.** It is one more call to the reader
+ * the list already uses (`read/assigned-provenance.ts`), batched by the same
+ * `DISTINCT ON` shape as `stateProvenanceFor` on the line above it, on the route
+ * that already answers `stateProvenance`. No route is added.
+ */
+describe('13.962 the single read carries the assignee’s provenance', () => {
+  it('carries who assigned the ticket and when; an UNASSIGNED ticket answers null', async () => {
+    const ws = newUlid();
+    const prj = newUlid();
+    const { userId, headers } = await signedIn();
+    const assignee = await signedIn();
+    await seedMember(db.pool, ws, userId, 'member', [{ projectId: prj }]);
+
+    const assignedId = newUlid();
+    const bareId = newUlid();
+    // `seedTicket` writes the `ticket.assigned` event itself when handed an
+    // `assigneeId`, so the claim under test is a real ledger row and not a
+    // column somebody set.
+    await seedTicket(db.pool, {
+      workspaceId: ws,
+      projectId: prj,
+      ticketId: assignedId,
+      assigneeId: assignee.userId,
+      createdBy: userId,
+    });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: bareId, createdBy: userId });
+
+    const assigned = await get(`/v1/workspaces/${ws}/tickets/${assignedId}`, headers);
+    expect(assigned.statusCode).toBe(200);
+    const body = assigned.json() as {
+      ticketState: { assigneeId: string | null };
+      assignedProvenance: Record<string, unknown> | null;
+    };
+    expect(body.ticketState.assigneeId).toBe(assignee.userId);
+    // The actor is whoever wrote the event — `seedTicket` names the CREATOR —
+    // and both clocks are the server's own, so a route that invented a claim
+    // would have to invent these too.
+    expect(body.assignedProvenance).toMatchObject({ actorId: userId });
+    expect(typeof body.assignedProvenance?.['serverTime']).toBe('string');
+
+    // THE CONTROL, same viewer and same route: a ticket nobody assigned answers
+    // `null`, which is the whole truth rather than a missing key. Without it, a
+    // route that answered `null` for EVERY ticket would pass the arm above.
+    const bare = await get(`/v1/workspaces/${ws}/tickets/${bareId}`, headers);
+    expect(bare.statusCode).toBe(200);
+    expect((bare.json() as { assignedProvenance: unknown }).assignedProvenance).toBeNull();
+  });
+});

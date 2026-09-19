@@ -171,6 +171,9 @@ describe('withCacheFeed — the decorator that keeps the cache fed from ordinary
         ticket: ticketStateSeed({ id: TICKET, stateId: 'doing' }),
         title: 'File the GST return',
         stateProvenance: claim(),
+        // This fixture's ticket has never been assigned, so there is no claim
+        // behind an assignee: `null` is the whole truth (`read/assigned-provenance.ts`).
+        assignedProvenance: null,
         parent: null,
         rollup: null,
       }),
@@ -237,6 +240,9 @@ describe('withCacheFeed — the cache is never rendered as truth', () => {
           ticket: ticketStateSeed({ id: TICKET, stateId: 'waiting', stateCategory: 'active' }),
           title: 'File the GST return',
           stateProvenance: claim(),
+          // This fixture's ticket has never been assigned, so there is no claim
+          // behind an assignee: `null` is the whole truth (`read/assigned-provenance.ts`).
+          assignedProvenance: null,
           parent: null,
           rollup: null,
         }),

@@ -1160,7 +1160,15 @@ describe('GET /v1/workspaces/:ws/tickets/:id vs TicketRead', () => {
     // rollup}` and none of the three was on the wire. Ruling P25 clause 1 closed
     // all three. A deleted case would leave nothing to notice the day they
     // regress, so what it pins now is the agreement.
+    // **AND IT GAINED A SEVENTH KEY, 2026-09-19 — `assignedProvenance`** — which
+    // is what an exact key set is FOR: the sheet's assignee became editable and
+    // every sibling row there already says who set it, so the single read had to
+    // serve the claim behind `ticketState.assigneeId`. That is a WIDENING by one
+    // more call to the reader the list already uses (`read/assigned-provenance.ts`),
+    // not a second door. This case caught it, which is the point of pinning the
+    // set rather than counting it.
     expect(Object.keys(body).sort()).toEqual([
+      'assignedProvenance',
       'parent',
       'rollup',
       'stateProvenance',

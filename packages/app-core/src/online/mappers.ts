@@ -1675,6 +1675,14 @@ export function mapTicketRead(raw: unknown, roster: ReadonlyMap<string, string> 
     ticket: mapTicketState(record['ticketState'], 'ticket.ticketState'),
     title: asString(record['title'], 'ticket.title'),
     stateProvenance: mapProvenance(record['stateProvenance'], 'ticket.stateProvenance', roster),
+    // Mapped exactly as the list's card maps it, including the `=== null` arm:
+    // the route throws rather than serving an assigned ticket without a claim, so
+    // a null here cannot mean "assigned by somebody unknown" — it means nobody is
+    // assigned (see `TicketRead.assignedProvenance`).
+    assignedProvenance:
+      record['assignedProvenance'] === null
+        ? null
+        : mapProvenance(record['assignedProvenance'], 'ticket.assignedProvenance', roster),
     parent: mapParentRef(record['parent'], 'ticket.parent'),
     rollup: mapRollup(record['rollup'], 'ticket.rollup'),
   };

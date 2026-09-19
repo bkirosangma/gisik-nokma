@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { statesWithBacklog, type SubmittedEvent } from '@gisik-nokma/domain';
-import { Button, Chip, Sheet } from '@gisik-nokma/ui';
+import { Button, Chip, Select, Sheet } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
@@ -313,6 +313,44 @@ export function TicketSheet({
   };
 
   /**
+   * THE ASSIGNEE — the owner's ruling (*"assignee should not be read only"*), on
+   * the door that already exists.
+   *
+   * **`ticket.assigned` carries `{ assigneeId: string | null }`, and an
+   * UNASSIGNMENT is the SAME EVENT carrying `null`** — there is no separate
+   * `ticket.unassigned` type, and `read/assigned-provenance.ts` establishes that
+   * by enumerating the event set from the reducer rather than guessing a second
+   * one. So clearing the assignee is this same submission with `null` and not a
+   * second path through the door.
+   *
+   * The same `make`/`ingest`/result idiom `submitTransition` uses above,
+   * **including the refusal**: a `refused` carries the rule and reason the engine
+   * wrote and an `invalid` the door's own code and message, both rendered
+   * verbatim. This control is deliberately NOT gated client-side — the sheet's
+   * standing position is that the authority which knows is the ingest door, and
+   * a control that hid itself would leave a refusal unreachable and therefore
+   * unrendered.
+   */
+  const submitAssignee = async (assigneeId: string | null): Promise<void> => {
+    const event = make({
+      workspaceId,
+      entity: { kind: 'ticket', id: ticketId },
+      type: 'ticket.assigned',
+      payload: { assigneeId },
+    });
+    const results = await dataSource.ingest([event]);
+    const failed = results.find((result) => result.status !== 'committed');
+    if (failed === undefined) {
+      setServerRefusal(null);
+      read.reload();
+      history.reload();
+      return;
+    }
+    if (failed.status === 'refused') setServerRefusal({ rule: failed.rule, reason: failed.reason });
+    else setServerRefusal({ rule: failed.code, reason: failed.message });
+  };
+
+  /**
    * Close / Reopen — the same `make`/`ingest`/result idiom `submitTransition`
    * uses above, collapsed to the one-event case: `ticket.closed` and
    * `ticket.reopened` both carry `payload: {}` (spec §1.2, 2026-09-17), the
@@ -424,6 +462,97 @@ export function TicketSheet({
   // OPTIONAL on `TicketState` (441 fixtures predate it, spec §1.2,
   // 2026-09-17); every reader spells the same `?? null`.
   const closed = state.closed ?? null;
+
+  /**
+   * THE ASSIGNEE ROW — a control, a claim line, and FOUR arms for the candidate
+   * list. The owner's ruling is *"assignee should not be read only"*.
+   *
+   * ## The candidate list was already here, and the dispatch did not know it
+   *
+   * The dispatch priced this task as *"a picker needs a roster, which is a
+   * SEVENTH thing to pass"*, measured from a six-prop mount. **The sheet already
+   * reads the roster itself**, twelve lines above the ticket it reads the same
+   * way — `useLiveQuery(dataSource, workspaceId, workspaceId, () =>
+   * dataSource.query.getMembers(workspaceId))` — and already uses it for
+   * `nameOf` and for `VisibilityEditor`. Nothing is passed and nothing new is
+   * read; the picker's candidates were in the component before this task.
+   *
+   * ## The arms, and why there are four rather than one
+   *
+   * The page this sheet is opened from already distinguishes `members === null`
+   * from `membersError !== null` from an empty roster, and its own docblock names
+   * the defect of not doing so: *"`null` while the roster has not been read —
+   * never `[]`, which would claim this workspace has no members."* **This sheet
+   * was doing exactly that** — `members={members.data ?? []}` at the
+   * `VisibilityEditor` below, with `members.error` read nowhere in the file. An
+   * assignee picker that rendered a REFUSED roster as an empty list would assert
+   * that nobody can be assigned, which is a worse lie than a filter's.
+   *
+   * The fourth arm is the one the members page's role control established: **a
+   * control must be able to STATE its current value.** `Select` renders its
+   * placeholder when its `value` matches no option (`select.tsx:255`), and the
+   * roster this sheet reads HIDES GUESTS FROM A NON-ADMIN CALLER — so a ticket
+   * assigned to a guest would give a member a picker reading `Select…` beside a
+   * ticket that has an assignee. So the picker is drawn only when the current
+   * assignee is among the options, and the row falls back to saying what it is.
+   */
+  const UNASSIGNED = '__unassigned__';
+  const assigneeRow = ((): { control: ReactNode; claim: string } => {
+    const claim =
+      ticketRead.assignedProvenance === null
+        ? // `null` is the whole truth for BOTH "never assigned" and "assigned,
+          // then cleared" — the server's own reader says why they cannot be told
+          // apart (there is no claim without an actor), so this sentence claims
+          // only what it can: whether anybody is assigned now.
+          state.assigneeId === null
+            ? 'nobody is assigned'
+            : 'assigned'
+        : `set by ${nameOf(ticketRead.assignedProvenance.actorId)} on ${formatDate(ticketRead.assignedProvenance.serverTime)}`;
+    const readOnly = <span>{state.assigneeId === null ? '—' : nameOf(state.assigneeId)}</span>;
+
+    if (members.error !== null) {
+      return {
+        control: (
+          <span className="gn-ticket-sheet__assignee-refusal">
+            This workspace’s roster could not be loaded, so the assignee cannot be changed here.
+          </span>
+        ),
+        claim,
+      };
+    }
+    if (members.data === null) {
+      return {
+        control: <span className="gn-ticket-sheet__assignee-refusal">The workspace roster has not loaded yet.</span>,
+        claim,
+      };
+    }
+    const people = members.data;
+    if (state.assigneeId !== null && !people.some((member) => member.id === state.assigneeId)) {
+      // Assigned to somebody this viewer's roster does not list — a guest, to a
+      // non-admin caller. The row says the name it can and offers no control,
+      // rather than offering one that cannot state the value.
+      return { control: readOnly, claim: `${claim} — not in the roster you can see` };
+    }
+    return {
+      control: (
+        <Select
+          aria-label="Assignee"
+          options={[
+            // The unassigned arm is an OPTION and not the absence of one:
+            // `ticket.assigned` with `null` is a legal state the control must be
+            // able to express, and a picker with no way back to it cannot.
+            { value: UNASSIGNED, label: 'Unassigned' },
+            ...people.map((member) => ({ value: member.id, label: member.name })),
+          ]}
+          value={state.assigneeId ?? UNASSIGNED}
+          onChange={(next) => {
+            void submitAssignee(next === UNASSIGNED ? null : next);
+          }}
+        />
+      ),
+      claim,
+    };
+  })();
 
   return (
     <Sheet open title={ticketRead.title} onClose={onClose}>
@@ -571,7 +700,13 @@ export function TicketSheet({
           <dl className="gn-ticket-sheet__fields">
             <div className="gn-ticket-sheet__field" data-testid="field-assignee">
               <dt>Assignee</dt>
-              <dd>{state.assigneeId === null ? '—' : nameOf(state.assigneeId)}</dd>
+              <dd>
+                {assigneeRow.control}
+                {/* The SAME `gn-ticket-sheet__claim` span every field row below
+                    carries — an edited field that does not say who set it is the
+                    one row on this sheet that cannot be trusted. */}
+                <span className="gn-ticket-sheet__claim">{assigneeRow.claim}</span>
+              </dd>
             </div>
             {Object.entries(state.fields).map(([fieldId, fieldClaim]) => (
               <div key={fieldId} className="gn-ticket-sheet__field" data-testid={`field-${fieldId}`}>

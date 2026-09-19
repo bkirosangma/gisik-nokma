@@ -20,7 +20,87 @@
 
 ---
 
-## ▲ TOP BLOCK — the ticket sheet's **scrim and entrance now MOVE**, at the prototype's own values and behind the repo's own reduced-motion idiom. (2026-09-19, ~15:4x IST)
+## ▲ TOP BLOCK — the **Assignee row is EDITABLE**, on the door that already exists, and two dispatch premises measured false. (2026-09-19, ~16:0x IST)
+
+**Position: the dispatch is DONE and the branch is PUSHED — `exec2/assignee-editable`, base `main`, cut
+from `origin/main` `045b9cac`.** The PR opens as this dispatch's last step; **measure it rather than reading
+it here**: `gh pr list --head exec2/assignee-editable --state all`.
+
+**Owner's ruling:** *"assignee should not be read only."* Dispatch:
+`CTL-DISPATCH-2026-09-19-assignee-editable.md`.
+
+### § 1 — TWO PREMISES IN THE DISPATCH ARE FALSE, AND THE SECOND IS A REAL DEFECT
+
+1. **"A picker needs a roster, which is a SEVENTH thing to pass" — NO.** `TicketSheet` **already reads the
+   roster itself** (`ticket-sheet.tsx:209-210`, `useLiveQuery(dataSource, workspaceId, workspaceId, () =>
+   dataSource.query.getMembers(workspaceId))`) and already uses it for `nameOf` and `VisibilityEditor`. The
+   six-prop mount at `page.tsx:2346` is not a constraint. **Nothing is passed; nothing new is read.**
+2. **And the sheet was collapsing a REFUSED roster into an empty one.** `members={members.data ?? []}` at
+   `:617`, with **`members.error` read nowhere in the file** — the value `page.tsx:2495` names as the defect:
+   *"never `[]`, which would claim this workspace has no members."* The page and its Filters sheet tell
+   refused / not-loaded / empty apart (`:2657-2665`); **the picker now does too, plus a fourth arm.**
+
+### § 2 — A WIDENING, NOT A SECOND DOOR.
+
+The dispatch requires the provenance line (*"an edited field that does not say who set it is the one row on
+that sheet which cannot be trusted"*), and `TicketRead` had **no** `assignedProvenance` — the field lives on
+`ListCard`. So `routes/tickets.ts` gained **one more call to the reader the list already uses**
+(`assignedProvenanceFor`), batched by the same `DISTINCT ON` shape as the `stateProvenanceFor` call on the
+line above it, on the route that already answers `stateProvenance`. **No route is added**, so the dispatch's
+*"if you find yourself adding a route, stop and ask"* is not reached. The client maps it exactly as the card
+does; the replica supplies `claims.assigned`, the value its own local list already serves.
+
+### § 3 — WHAT SHIPPED.
+
+`routes/tickets.ts` (+1 call, +1 field, and the projection/ledger disagreement thrown rather than served) ·
+`ticket-sheet.tsx` (`submitAssignee`, the four-arm row, the claim line) · `view-types.ts`
+(`TicketRead.assignedProvenance`) · `mappers.ts` · `replica-data-source.ts` · three test files each gaining a
+fixture default · `Features.md` · `test-cases/13-second-wave-board-actions.md`.
+
+### § 4 — MUTATIONS: FOUR, ALL KILLING THE CASE THEY NAME.
+
+| mutation | kills |
+|---|---|
+| the server drops the field from its response | `13.962` |
+| the mapper drops the mapping | `13.963` |
+| `submitAssignee` never ingests | `13.964` |
+| **a refused roster collapsed back into `[]`** — the sheet's own OLD behaviour | `13.964`'s refusal arm |
+
+Every run printed the file's sha before and after, so a mutation that failed to fire could not be read as a
+survivor — the trap this lane was bitten by earlier today on the sheet-motion case.
+
+### § 5 — WHAT IS *NOT* DONE.
+
+- **The State dropdown and the description are untouched**, both excluded by the dispatch in terms.
+- **The refuse-and-render path is not driven end to end from this control.** It follows the sheet's existing
+  `serverRefusal` idiom, but no case makes the server refuse a `ticket.assigned`.
+- **No browser run** — every arm is reachable in jsdom and the control's accessible behaviour is the shared
+  `Select`'s, already covered.
+
+### § 6 — CASES `13.962`–`13.964`, SKIPPING THREE.
+
+`13.961` is held by the **open** sheet-motion PR (`#529`) and `13.958`–`13.960` by `#525`, which is merged.
+Swept with a control in the same invocation. **Veto if a block was allocated elsewhere.**
+
+### § 7 — A GREEN THAT DID NOT MEAN WHAT IT LOOKED LIKE, RECORDED BECAUSE IT NEARLY GOT THROUGH.
+
+An early run of `apps/server/test/routes/tickets.test.ts` reported **`PASS (17)`** — **but that file does not
+exist.** The suite that actually covers the read I changed is `tickets-read.test.ts`, and the green came from
+the sibling argument alone. **The run looked like coverage of the changed route and was not.** It was caught
+only by listing the directory before writing the case. *A suite's name is not evidence it ran.*
+
+### Rules that bind this branch
+- **Never `docker compose`**; **do not edit `task-ledger.tsv`**; **never `AskUserQuestion`**.
+- **Do not run the forced gate — that is the controller's.** Run it yourself before freezing.
+- **A red on a 30 s timeout at high load has been the environment every time today.** Isolate the file alone
+  before believing it.
+- **Never pipe a test run into `head`.**
+
+---
+
+## ▼ PREVIOUS BLOCK — the members **name fallback is BUILT** on that branch, and its PR is **`#525`** (now MERGED). (2026-09-19, ~15:1x IST)
+
+## ▼ PREVIOUS BLOCK — the sheet and its scrim ANIMATE, and that PR is **MERGED as `#529`** (`2a8a326e`). (2026-09-19, ~15:4x IST)
 
 **Position: the dispatch is DONE and the branch is PUSHED — `exec2/sheet-scrim-motion`, base `main`, cut
 from `origin/main` `db52f911`.** The PR opens as the last step of this dispatch, so **measure it rather than
