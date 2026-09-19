@@ -136,22 +136,22 @@ export type TicketSheetProps = {
  *    refetches.
  * 3. **The ledger payload is the SHIPPED spelling.** See `submitTransition`.
  *
- * ## What this sheet does when the read REFUSES
+ * ## What this sheet does when the read FAILS
  *
- * `getTicket` refuses today against the real server (`ServingGapError`, six of
- * thirteen query methods): the shipped route answers a `proj_visibility` row
- * wrapped in `{ticket, parent, rollup}`, which carries no `title`, no
- * provenance block and no `TicketState`. `useLiveQuery` surfaces that rejection
- * as `error` with `data` left null, and this component then renders the REFUSAL
- * — its own text, under its own class — and not a sheet. It is deliberately a
- * different branch from "loading": a permanent serving gap rendered under the
- * word "Loading…" is a wait that never ends dressed as a wait that will.
+ * `useLiveQuery` surfaces a failed read as `error` with `data` left null, and
+ * this renders its own text, under its own class, and not a sheet. Deliberately
+ * a different branch from "loading": a failure drawn under the word "Loading…"
+ * is a wait that never ends dressed as a wait that will.
  *
- * `HistoryTab` (below) applies the SAME three-way distinction to the ledger tab,
- * where the earlier single `history.data ?? []` drew an empty `<ol>` for a
- * pending read, a failed read and a real absence alike. Its error branch is
- * worded and classed differently on purpose: `getTicketHistory` ANSWERS, so its
- * rejection is an ordinary failure rather than a permanent gap. See its docblock.
+ * **This section used to say `getTicket` REFUSES PERMANENTLY** — a
+ * `proj_visibility` row with no `title`, no provenance and no `TicketState`.
+ * **Ruling P25 deleted that absence from `SERVING_GAPS`**, which now carries
+ * ONE key, `search`; `getTicket` maps through `mapTicketRead`
+ * (`mappers.ts:1672`). So it answers, a failure is ordinary and a retry can
+ * clear it. **Why the branch exists did NOT change:** `data` is null on a
+ * failure AND on a real absence, and an error must never render as an absence.
+ *
+ * `HistoryTab` (below) applies the SAME three-way distinction to the ledger tab.
  */
 export function TicketSheet({
   dataSource,
@@ -819,17 +819,17 @@ export function TicketSheet({
  * there; the trade is taken deliberately — rows the client cannot vouch for
  * being current are worse under a ledger heading than a named failure.
  *
- * ## The error branch is an ERROR, not a serving gap, and says so
+ * ## The error branch is an ERROR, and says so
  *
- * The asymmetry with the sheet body matters. `getTicket` REFUSES against the
- * shipped server for good (`ServingGapError`, one of the six in
- * `src/online/mappers.ts`), so its branch is a REFUSAL: permanent, nothing to
- * retry, and dressing it as a wait would be a wait that never ends.
- * `getTicketHistory` is one of the six that ANSWERS (`online-data-source.ts:151`
- * maps the shipped `/v1/tickets/:id/history`), so a rejection here is an
- * ordinary failure of one read and MAY succeed on a retry. Different fact,
- * different word, and a different class — reusing `gn-ticket-sheet__refusal`
- * would put a false claim in the CSS.
+ * **This section used to draw an ASYMMETRY between the two reads, and it has
+ * expired.** It said `getTicket` REFUSES against the shipped server *"for
+ * good"*, making that branch a permanent refusal with nothing to retry. **Both
+ * reads answer now** — **ruling P25 deleted `getTicket`'s absence from
+ * `SERVING_GAPS`**, which carries one key, `search` — so a rejection here is the
+ * ordinary failure of one read and MAY succeed on a retry. **⚠ The distinct
+ * word and class were chosen to state a difference in KIND that no longer
+ * exists: they may still be right, but that is a different reason and nobody
+ * has ruled it. Owner: the controller.**
  *
  * ## What the empty branch is allowed to say
  *

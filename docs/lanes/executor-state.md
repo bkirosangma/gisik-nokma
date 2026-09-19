@@ -41,6 +41,10 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~17:1x IST. **THE TWO POST-FREEZE BLEMISHES ARE RE-AIMED
+> # AND THE PR IS OPEN.** Branch **`exec/refusal-docblocks`**, cut from **`origin/main` = `3aca76ab`**;
+> # the controller's small queued item. **Door B is also open as PR `#536`** (`exec/inbox-filter`) — a
+> # restart must not redo either, and must not confuse them: **this branch is docblocks only.**
 > # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~16:4x IST. **DOOR B — THE INBOX FILTER — IS BUILT AND ITS
 > # PR IS OPEN.** Branch **`exec/inbox-filter`**, cut from `origin/main` and **rebased onto `5c5dd920`**;
 > # dispatch `CTL-QUEUE-2026-09-19-door-builds.md` §B. **Doors before it are MERGED** (rename `0f0cc398`,
@@ -49,6 +53,52 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > ## VERIFIED ANCHORS
 > | | |
 > |---|---|
+> | base | **`origin/main` = `3aca76ab`** — **it moves; re-take it** |
+> | tree | **clean** at the handoff commit; every change is on the branch |
+> | gate | **33/33, EXIT 0, `33.786s`**, run by THIS lane. **Node runtime `v22.22.2`** |
+> | checks | all **8 exit 0**. **NO cases minted** — see below |
+>
+> ## WHY THIS NEEDED NO CASES, AND THAT IS A JUDGEMENT WORTH CHECKING
+> The change is **docblocks only** — four sentences re-aimed at what is true now — so **there is no
+> behaviour for a test to cover.** A case here would assert prose. The controller's instruction was
+> "cases from your block if any are needed"; **none are.**
+>
+> ## THE FOUR SITES, AND WHAT MADE EACH FALSE
+> All four claimed a read REFUSES. **`SERVING_GAPS` (`mappers.ts:2079`) carries ONE key, `search`**,
+> and the cause is citable: `apps/web/test/helpers/stub-services.ts:44` records that
+> **ruling P25 clause 1 deleted `getTicket`'s and `getTickets`' absence lists from the register** —
+> *"It was six."* The docblocks were written before that and did not move.
+>
+> | site | the claim | what is true |
+> |---|---|---|
+> | `ticket-sheet.tsx:139-154` | `getTicket` refuses (six of thirteen) | maps through `mapTicketRead` (`:1672`); **P25 deleted the absence** |
+> | `ticket-sheet.tsx:822-832` | the `getTicket`↔`getTicketHistory` **ASYMMETRY** | **both answer now, so the asymmetry is gone** — flagged as a CODE question, not just prose |
+> | `attention-strip.tsx:59-64` | the strip "cannot contain a contested claim at all" | `mapAttention` (`mappers.ts:1935-1945`) maps a contest's `title` |
+> | `attention-strip.tsx:154-158` | `getAttention` refuses | it composes two live reads; the condition is now a FAILED read |
+>
+> **The reasoning is kept in every one** — the rule survives, its old *second* justification is named as
+> expired. **And `ticket-sheet.tsx:822` is the one that leaves a question about the CODE:** the distinct
+> word and class were chosen to state a difference in KIND that no longer exists. They may still be
+> right, but for a different reason nobody has ruled. **Owner: the controller.**
+>
+> ## ⚠ BOTH EDITS ARE LINE-NEUTRAL, AND THAT WAS THE POINT
+> `ticket-sheet.tsx` **889 → 889**, `attention-strip.tsx` **165 → 165**. The first draft added +20 and
+> +24 lines and **would have moved ~25 citations** into those two files (`docs/hig-*`, four
+> `test-cases/`, `packages/editor`, `Features.md`). Rewriting them to the exact original line counts
+> means **no citation moves and no sweep is owed** — the same technique `13.693` used, and worth
+> reaching for FIRST whenever a docblock fix is proposed in a heavily-cited file.
+>
+> ## THE GATE REDDENED ON LOAD AND IT WAS THE KNOWN FLAKE
+> `test/seed/seed-dev.test.ts` failed with **`Test timed out in 30000ms`**; run **alone it is 8/8 in
+> 2.32 s**. A docblock change cannot reach a seed test. Re-run alone, then the full gate went
+> **33/33 EXIT 0**. **The dispatch's own warning, exercised rather than repeated.**
+>
+> ## NEXT IN THIS LANE'S QUEUE
+> **A (`isWorkspace` description) → D (`isMcpTokens` row name) → F (subtasks) → G (Priority/Due/Type).**
+> **⚠ Block is `13.969`–`13.980` and door B used `969`–`975`, so only `13.976`–`13.980` (five) remain**
+> — **A, D, F and G cannot fit and need a reallocation from the controller.**
+>
+> ## ⚠ SHAS IN THIS FILE ARE UNRELIABLE — including mine
 > | base | rebased onto **`origin/main` = `5c5dd920`** — **it moves; re-take it** |
 > | tree | **clean** at the handoff commit; every change is on the branch, nothing unpushed |
 > | gate | **33/33, EXIT 0, `1m13.504s`** post-rebase. **Node runtime `v22.22.2`** |
