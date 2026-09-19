@@ -745,7 +745,7 @@ path-qualified citations still carry an old number.
 
 **Already-stale citations, left as written and named here rather than silently repaired.** A handful of the
 wave's citations were imprecise *at birth* — the line they named did not carry the fact even then (the
-`13.703` mapper set `mappers.ts:1277`/`:1339`/`:1518` and `mappers.test.ts:1389` are the clearest: those
+`13.703` mapper set `mappers.ts:1277`/`:1339`/`:1518` and `mappers.test.ts:1398` are the clearest: those
 three name the mapper FILE's neighbourhoods, not the `rank: mapRank(…)` sites, which were `:1370`/`:1549`
 at birth and are `:1388`/`:1567` now). Ruling 30's method corrects DRIFT, not a claim that never matched;
 re-pointing those to the fact-bearing lines would be guessing at an intent rather than restoring one, so
