@@ -316,7 +316,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "Near the top you will see two tabs: "
+                      "text": "Where SMS delivery is configured the page shows two tabs — "
                     },
                     {
                       "kind": "bold",
@@ -332,11 +332,11 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ". The page opens on Phone. "
+                      "text": " — and opens on Phone. It is not configured on this deployment, so there are no tabs and the page is already on the email box. Either way: "
                     },
                     {
                       "kind": "bold",
-                      "text": "Click \"Email link\"."
+                      "text": "use \"Email link\"."
                     }
                   ],
                   [
@@ -390,7 +390,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Under the tabs there are two more buttons:"
+                    "text": "Below the email box there are two more buttons:"
                   }
                 ]
               },
@@ -448,7 +448,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "If you type a phone number and press "
+                    "text": "Where SMS delivery is configured, the sign-in page offers a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Phone"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " tab and opens on it. Type a phone number there and press "
                   },
                   {
                     "kind": "bold",
@@ -456,7 +464,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", no code will arrive. The product answers with a message saying sign-in is by email. Nothing is broken on your end and there is nothing to wait for."
+                    "text": " and no code will arrive: the product answers with a message saying sign-in is by email. Nothing is broken on your end and there is nothing to wait for."
                   }
                 ]
               },
@@ -465,7 +473,23 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "This is worth knowing because it is the tab the screen opens on, so it is the very first thing a new person tries."
+                    "text": "It is worth knowing because it is the tab such a page opens on, so it is the very first thing a new person tries. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "This deployment does not configure SMS, so the tab is not offered at all"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — see "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "Before you start"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", item 1."
                   }
                 ]
               },
@@ -1658,7 +1682,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Open a job by clicking it from the Board, List or Calendar. You get a panel with two tabs: "
+                    "text": "Open a job by clicking it on any of the job tabs — the Backlog, Board, List, Calendar or Timeline. You get a panel with two tabs: "
                   },
                   {
                     "kind": "bold",
@@ -2931,7 +2955,15 @@ export const HELP_CONTENT: HelpContent = [
             "spans": [
               {
                 "kind": "text",
-                "text": "A project has four tabs: "
+                "text": "A project has five tabs: "
+              },
+              {
+                "kind": "bold",
+                "text": "Backlog"
+              },
+              {
+                "kind": "text",
+                "text": ", "
               },
               {
                 "kind": "bold",
@@ -2963,12 +2995,64 @@ export const HELP_CONTENT: HelpContent = [
               },
               {
                 "kind": "text",
-                "text": ". Board is what you get by default."
+                "text": ". Board is what a project opens on the first time you look at it; after that it remembers the tab you were last on in that project and opens there."
               }
             ]
           }
         ],
         "entries": [
+          {
+            "id": "backlog",
+            "title": "Backlog",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The first tab, and where a new job starts its life. It lists the jobs that have not begun, in an order you arrange — drag a row, or use the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Move up"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Move down"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " buttons on it. Each row also has a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Start"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button that moves that job into its workflow."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "It does not leave closed jobs out, unlike the Calendar and the Timeline below. When it is empty it says so: "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Nothing in the backlog — new tickets land here.\""
+                  }
+                ]
+              }
+            ]
+          },
           {
             "id": "board",
             "title": "Board",
@@ -3248,7 +3332,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " The Calendar and the Timeline both leave closed work out; the List does not, and the Board never shows them at all. So a month can look emptier than the project really is."
+                    "text": " The Calendar and the Timeline both leave closed work out; the List and the Backlog do not, and the Board never shows them at all. So a month can look emptier than the project really is."
                   }
                 ]
               },
@@ -3358,15 +3442,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", it tells you "
+                    "text": ", it says either "
                   },
                   {
                     "kind": "italic",
-                    "text": "which kind"
+                    "text": "\"No claimed dates fall in this month\""
                   },
                   {
                     "kind": "text",
-                    "text": " of empty in four different sentences: nothing in this month has a claimed date at all; your filter removed everything; the grouping removed everything; or you switched a date field off in the legend. Read the sentence — it is telling you something."
+                    "text": ", or — when the only thing hiding your claims is a date field you switched off in the legend — a sentence saying so."
                   }
                 ]
               },
@@ -3375,11 +3459,11 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "And this is the one empty month the sentences above get wrong."
+                    "text": "And the first of those two is wrong more often than it looks."
                   },
                   {
                     "kind": "text",
-                    "text": " When hiding closed jobs is the only thing that emptied the month, the calendar still says "
+                    "text": " A month emptied by your own filter, or by closed jobs being hidden, still gets "
                   },
                   {
                     "kind": "italic",
@@ -3387,15 +3471,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — which is not what happened. Trust the count in the strip instead: "
+                    "text": ". Trust the count in the strip instead: "
                   },
                   {
                     "kind": "italic",
-                    "text": "\"0 of 12 shown\""
+                    "text": "\"8 of 12 shown\""
                   },
                   {
                     "kind": "text",
-                    "text": " means the jobs are there and something is hiding them."
+                    "text": " means four jobs are there and something is hiding them."
                   }
                 ]
               }
@@ -3504,7 +3588,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — and the Board is the default tab. So you can turn it on, read \"done are excluded\", and be looking at a Done column full of done cards. The note exists precisely because of this."
+                    "text": " — and a project opens on the Board the first time you look at it. So you can turn it on, read \"done are excluded\", and be looking at a Done column full of done cards. The note exists precisely because of this."
                   }
                 ]
               },
@@ -4012,7 +4096,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "List, Calendar and Timeline all refuse"
+                    "text": "Backlog, List, Calendar and Timeline all refuse"
                   },
                   {
                     "kind": "text",
@@ -6715,7 +6799,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "That is the fallback message shown when the server did not explain itself. Usually it means the address was mistyped, or you are on the Phone tab. Switch to Email link and check the address carefully."
+                    "text": "That is the fallback message shown when the server did not explain itself. Usually it means the address was mistyped. Where the Phone tab is offered, it can also mean you are on it rather than on Email link. Check the address carefully either way."
                   }
                 ]
               }
@@ -6730,7 +6814,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "That is just the example text in the box. But it points at something real: the whole product runs on Indian time for everybody. See "
+                    "text": "Where the Phone tab is offered, that is just the example text in the box. But it points at something real: the whole product runs on Indian time for everybody. See "
                   },
                   {
                     "kind": "link",
@@ -8466,7 +8550,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "the Board is the default tab."
+                    "text": "a project opens on the Board the first time you look at it."
                   },
                   {
                     "kind": "text",
@@ -8679,7 +8763,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ". Past it the List, Calendar and Timeline all refuse rather than showing you part of a project pretending to be the whole one — and "
+                    "text": ". Past it the Backlog, List, Calendar and Timeline all refuse rather than showing you part of a project pretending to be the whole one — and "
                   },
                   {
                     "kind": "bold",
@@ -8711,15 +8795,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Read the sentence — it tells you "
-                  },
-                  {
-                    "kind": "italic",
-                    "text": "which kind"
-                  },
-                  {
-                    "kind": "text",
-                    "text": " of empty, in four different wordings: nothing in this month has a claimed date at all (\"Undated work is absent, not estimated\"); your filter removed everything; the grouping removed everything; or you switched that date field off with the legend switch. Four situations, four sentences."
+                    "text": "It says either \"No claimed dates fall in this month\" (\"Undated work is absent, not estimated\"), or — when the only thing hiding your claims is a date field you switched off with the legend switch — a sentence saying so. And the first one is wrong more often than it looks: a month emptied by your own filter, or by closed jobs being hidden, still gets it. Trust the count in the strip instead — if it shows fewer jobs than the project holds, something is hiding them."
                   }
                 ]
               }
@@ -8772,7 +8848,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Not by default, and neither does the Timeline. Both leave closed work out until you ask for it; the List does not, and the Board never shows them at all. There are two ways to get them back, and only two. You can set Closed to "
+                    "text": "Not by default, and neither does the Timeline. Both leave closed work out until you ask for it; the List and the Backlog do not, and the Board never shows them at all. There are two ways to get them back, and only two. You can set Closed to "
                   },
                   {
                     "kind": "italic",

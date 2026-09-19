@@ -46,12 +46,13 @@ already sitting there, and the part that keeps you signed in is kept where web p
 
 **It says "Sign-in failed. Try again." Now what?**
 That is the fallback message shown when the server did not explain itself. Usually it means the
-address was mistyped, or you are on the Phone tab. Switch to Email link and check the address
-carefully.
+address was mistyped. Where the Phone tab is offered, it can also mean you are on it rather than on
+Email link. Check the address carefully either way.
 
 **The phone number box shows "+91…". Is this India-only?**
-That is just the example text in the box. But it points at something real: the whole product runs on
-Indian time for everybody. See [Time](#time-safety-and-the-state-of-it).
+Where the Phone tab is offered, that is just the example text in the box. But it points at something
+real: the whole product runs on Indian time for everybody. See
+[Time](#time-safety-and-the-state-of-it).
 
 **Does signing out really sign me out?**
 Yes, immediately — the next thing you try on that device is refused straight away, not "at some point
@@ -498,8 +499,8 @@ as an open question rather than a no.
 
 **Why doesn't the "Only tickets in progress" switch change the Board?**
 Because it does not narrow the Board — only the List, Calendar and Timeline. There is a note on screen
-saying so, and the note is important, because **the Board is the default tab.** So you can turn it on,
-read "done are excluded", and be looking at a Done column full of done cards.
+saying so, and the note is important, because **a project opens on the Board the first time you look at
+it.** So you can turn it on, read "done are excluded", and be looking at a Done column full of done cards.
 
 **Is that really the only filter?**
 Not any more. It was when this answer was written — one switch, and nothing else on any screen. Now
@@ -543,7 +544,7 @@ They come in pages of fifty with a "load more" that picks up exactly where the l
 repeats, no gaps.
 
 **What happens on a really big project?**
-There is a ceiling of **2,000 jobs**. Past it the List, Calendar and Timeline all refuse rather than
+There is a ceiling of **2,000 jobs**. Past it the Backlog, List, Calendar and Timeline all refuse rather than
 showing you part of a project pretending to be the whole one — and **the "New ticket" button
 disappears too**, because it reads from the same place. So a project that grows past the ceiling
 becomes one you cannot add to.
@@ -552,10 +553,11 @@ The way out is the "Only tickets in progress" switch, which is deliberately plac
 still reach it from the refusing screen. The Board keeps working throughout.
 
 **My calendar is empty. Is it broken?**
-Read the sentence — it tells you *which kind* of empty, in four different wordings: nothing in this
-month has a claimed date at all ("Undated work is absent, not estimated"); your filter removed
-everything; the grouping removed everything; or you switched that date field off with the legend
-switch. Four situations, four sentences.
+It says either "No claimed dates fall in this month" ("Undated work is absent, not estimated"), or — when
+the only thing hiding your claims is a date field you switched off with the legend switch — a sentence
+saying so. And the first one is wrong more often than it looks: a month emptied by your own filter, or by
+closed jobs being hidden, still gets it. Trust the count in the strip instead — if it shows fewer jobs
+than the project holds, something is hiding them.
 
 **A job's start date is after its due date and the calendar looks odd.**
 It is showing you the contradiction rather than quietly fixing it — two separate markers and no bar
@@ -569,14 +571,14 @@ heading saying which of five reasons it is there for.
 
 **Does the Calendar show closed jobs?**
 Not by default, and neither does the Timeline. Both leave closed work out until you ask for it; the List
-does not, and the Board never shows them at all. There are two ways to get them back, and only two. You
-can set Closed to *closed only* in the Filters sheet, or you can leave Closed alone and remove the chip
-the strip is showing that says **Closed: hidden** — that is the one that means "hidden, and here is the
-way back". Setting Closed to *everything* does *not* do it, because *everything* and *never touched it*
-are the same setting, which is the whole reason the chip is there. And be careful with it: set Closed to
-*not closed* and you get a chip with the same name whose **×** only clears your own setting, so the
-closed jobs stay hidden. There is also one case where the calendar's own empty-month note gets this
-wrong — see the manual's Calendar section.
+and the Backlog do not, and the Board never shows them at all. There are two ways to get them back, and
+only two. You can set Closed to *closed only* in the Filters sheet, or you can leave Closed alone and
+remove the chip the strip is showing that says **Closed: hidden** — that is the one that means "hidden,
+and here is the way back". Setting Closed to *everything* does *not* do it, because *everything* and
+*never touched it* are the same setting, which is the whole reason the chip is there. And be careful with
+it: set Closed to *not closed* and you get a chip with the same name whose **×** only clears your own
+setting, so the closed jobs stay hidden. There is also one case where the calendar's own empty-month note
+gets this wrong — see the manual's Calendar section.
 
 **Where's the burndown chart? The velocity? Sprint reports?**
 There are none, and that is a deliberate decision rather than an oversight — there is a check in the
