@@ -10,6 +10,31 @@
 // styles coexisted in one file and every existing check that matched only
 // one of them passed clean.
 //
+// WHAT COUNTS AS A DECLARATION. The line-head rule is a decision, not an
+// accident of the pattern, and it is written down here because the boundary
+// cannot be inferred from the text:
+//
+//   1. A DECLARATION IS A BULLET WITH THE ID AT THE HEAD -- `- <marker?>
+//      <bold?>id <the case's own words>`. That is the only shape counted.
+//   2. TABLE ROWS AND PROSE ARE CITATIONS BY DESIGN. Recounted 2026-09-19 over
+//      the 24 files this script scans, counting any line containing `\d+\.\d+`:
+//      **62 table rows, 1,853 prose lines and 51 headings, against 2,490 bullet
+//      lines.** Almost none of those declare anything -- they are mutation
+//      tables, block-allocation notes and cross-references ("see 13.585",
+//      "3.72's arms"). **No regex is asked to tell a citation from a declaration
+//      in running text, because none can:** `- `13.439`/`13.444` retired` and a
+//      real declaration differ only in what the author MEANT. Counting that
+//      population would manufacture thousands of ids no case owns -- the
+//      inventing direction, which this file has now produced twice.
+//   3. HEADINGS ARE DELIBERATELY NOT COUNTED. A `##` heading declares a case
+//      about as often as it names a RANGE of them -- `test-cases/
+//      07-api-realtime-search.md:204` reads `## The integration checkpoint —
+//      Step 10 Task B (7.163–7.198)` -- and no convention separates the two yet.
+//      So the boundary is STATED here rather than guessed at in a pattern.
+//      **A case whose id appears only in a heading is not declared:** give it a
+//      bullet of its own, or this checker will not see it, and a duplicate
+//      against it will go unreported. That is exactly how `13.969` collided.
+//
 // THE SELF-TEST BELOW IS NOT DECORATION. A matcher that returns zero
 // results on every real file looks IDENTICAL, from the outside, to a
 // matcher that never fires at all -- both print "0 duplicates" and exit 0.
