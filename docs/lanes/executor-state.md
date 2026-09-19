@@ -43,11 +43,12 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 > # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~10:1x IST. **THE FALSIFIED-CLAIM SWEEP IS BUILT, PROVEN
 > # COMMENTS-ONLY, AND GATED GREEN.** Branch **`exec/falsified-claim-sweep`**, cut from
-> # `origin/main` = **`3f37ffc4`** (the `#578` merge). **The CODE head is `45b657db`** — Round 2, on top of
-> # Round 1's `95470afb`; this handoff commit sits above both. An earlier draft read *"the handoff commit
-> # sits ON TOP of the code head"* while the two were still one commit, and the split was made so that the
-> # sentence is true: a commit cannot name its own sha, so the block names the head beneath it, which is
-> # the reading that survives a restart.
+> # `origin/main` = **`3f37ffc4`** (the `#578` merge) at cut, **`92f3d93c`** now — it MOVED. **The CODE head
+> # is `28418c5f`** (Round 3, on `45b657db` Round 2, on `95470afb` Round 1); **PR #583 is open against it,
+> # `--base main`, `MERGEABLE`.** This handoff commit sits above all three. An earlier draft read *"the
+> # handoff commit sits ON TOP of the code head"* while the two were still one commit, and the split was
+> # made so that the sentence is true: a commit cannot name its own sha, so the block names the head
+> # beneath it, which is the reading that survives a restart.
 >
 > ## THE DISPATCH, AND THE ONE THING IT GOT WRONG IN MY FAVOUR
 > The controller sent me to `apps/web/src/ticket-location.ts:26` — a docblock asserting
@@ -227,7 +228,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | prior branch | `exec/e2e-stack-repair` @ `42783c53` — **fully contained in `origin/main`** (`git branch -r --contains` lists it; `origin/main...HEAD` diff is empty) |
 > | falsifiers | `c86c4b5c` (P25 clause 1, 2026-09-06) · `42fb2f2c` (search served, 2026-09-19). Both REACHABLE from `origin/main` |
 > | `:3001` | **untouched.** No `docker compose` action taken; the owner's stack was not bound or taken down |
-> | next | **Round 2 is pushed. A SCOPED RE-REVIEW runs** (the fix round was large enough to warrant one), its result goes in the PR BODY, and only then does the PR open |
+> | next | **PR #583 is OPEN, `--base main`, `MERGEABLE`, `headRefOid 28418c5f` == this branch's local HEAD (verified, not assumed). THREE rounds are in it: two full reviewer passes plus a scoped re-review. NOTHING FURTHER IS PUSHED except this handoff commit. The controller gates the tip and merges.** |
 >
 > # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~09:0x IST. **THE `e2e-stack` REPAIR IS BUILT AND PUSHED; ITS PR
 > # HAS BEEN REVIEWED AND SENT BACK ONCE; THE FIX ROUND IS PUSHED. THE CODE HEAD IS `2e02ddac`.** Branch
