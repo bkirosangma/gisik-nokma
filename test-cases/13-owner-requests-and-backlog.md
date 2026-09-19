@@ -1483,6 +1483,28 @@ not in the catalogue yet, so no duplicate id existed to trip `check-case-ids`. I
 than left because the second wave would otherwise mint twelve tasks on top of these rows, and a plan's
 reservation is a reservation. The allocation note at the top of this file now carries the rule.
 
+> ## ⛔ SUPERSEDED 2026-09-19 — the eight cases below describe HOT-RELOAD MODE, which no shipped command
+> ## reaches any more. **Kept, not deleted, not renumbered, and no id freed.**
+>
+> The owner removed hot reload: *"no more hot reloads. rebuilt once they hit the main, is fine. that means
+> the servers are to be run from the main folder instead of from the executor's branch."* `pnpm dev:stack`
+> now composes **`docker-compose.dev.yml` alone**, so the stack serves BUILT images from
+> `/Users/kiro/my_projects/gisik-nokma`, and `docker-compose.hot.yml` is kept without being composed by
+> anything. The replacement case is **`13.946`**, at the foot of this block.
+>
+> **Read the rows below as the record of a mode, not as cases that can run.** They are kept because their
+> measurements are facts about this machine's Docker Desktop mount and about compose's own behaviour —
+> each cost real time to take and each is cited by the live documents: the rename-over save shape that
+> never crosses the mount and permanently kills a `tsx watch`; `node --watch --import tsx` measured failing
+> even on an in-container write; busybox `kill -0` succeeding on an exited-but-unreaped child; compose v2
+> shell-word-splitting a string-form `command`. `docker-compose.hot.yml`'s own header is retained for the
+> same reason, and the runbook's hot half now sits under a `RETIRED` banner pointing here.
+
+> **A note on this block's ids, since it is the one place in this file where a renumber ever happened:**
+> the four original ids (`13.613`–`13.616`) collided with a plan's reservation and were re-minted as
+> `13.650`–`13.653` by controller ruling on 2026-09-18. That is history and is **not** a licence to
+> renumber now — the supersession above renumbers nothing.
+
 - 🧪 **13.650 — the hot `server` comes up from the worktree and serves the BRANCH's source, not a
   baked image.** `docker compose --env-file .env -f docker-compose.dev.yml -f docker-compose.hot.yml
   up -d --build server` run from the executor's worktree: cold build **94 s**, container healthy
@@ -1688,6 +1710,52 @@ on this machine, at the head of this change's PR — readings, not guarantees.
   caveat on the instrument:** the FIRST attempt at that build was killed by the engine restart above, and the
   background wrapper reported `exit code 0` while its own log said `EXIT=1` — the log is the reading.
   (`docker-compose.hot.yml`, `apps/web/Dockerfile`, `package.json`)
+
+- ✅ **13.946 — the dev stack serves the BUILT image, and the rebuild rule keeps it equal to `main`.**
+  This replaces the hot-mode block above, which no shipped command can reach any more. Five assertions,
+  each the property the retirement turns on. **(1) BOTH stack scripts** — `dev:stack` AND
+  `dev:stack:rebuild` — compose **`docker-compose.dev.yml` alone**, asserted on the scripts' own text:
+  the whole change is that the hot override stops being reachable by the command a reader types by
+  reflex, and a script that silently still composed it would leave every other instrument green while the
+  stack served somebody's worktree. **The first version of this case checked only `dev:stack` — a review
+  caught that `dev:stack:rebuild` is the script the runbook actually tells a reader to type, so the
+  unguarded one was the load-bearing one.** **(2)** `dev:stack:rebuild` carries **`--build`** — a
+  post-merge script that merely re-upped an existing image IS the stale-serving shape the rule exists to
+  close, and it would read as success. **(3)** neither `server` nor `web` bind-mounts anything under
+  `apps/` or `packages/`. **(4)** neither names a **build `target:`** — the invariant this change made
+  load-bearing, since with `target: dev` gone from the compose path the LAST stage is what every shipped
+  build produces, and no test asserted it before (a review found that gap). **(5)** the runbook names the
+  post-merge command **and the exact directory** — pinned as the whole line
+  `cd /Users/kiro/my_projects/gisik-nokma && pnpm dev:stack:rebuild`, because the first version asserted
+  the bare path and **that is a PREFIX of `…/gisik-nokma-exec2`**: a runbook edited to `cd
+  …/gisik-nokma-exec2 && …`, the exact coupling this change removes, would have passed.
+  **The control that makes (3) trustworthy, and it runs in the same case:** the SAME predicate is run
+  over `docker-compose.hot.yml`, which is full of exactly those mounts. **Measured: 20 mounts (9 on
+  `server`, 11 on `web`), of which an apps-only variant of the predicate would still find 6** — so the
+  threshold is **15**, above the degraded value, and the case additionally requires that both the
+  `apps/` and the `packages/` alternatives matched. A bare `> 5` sat one below a live degraded count and
+  would have kept the control green while assertion (3) went blind to 14 of the 20 mounts.
+  (`apps/server/test/deploy/compose-dev-contract.test.ts`)
+  **The price of the rebuild, measured rather than estimated, because the next reader's first question is
+  "how expensive is this?":** `docker compose --env-file .env -f docker-compose.dev.yml build web`, run
+  from `/Users/kiro/my_projects/gisik-nokma` on 2026-09-19, took **841 s — 14 minutes 1 second** — exit 0,
+  on a **10-core** machine whose load average was **11.94 / 18.56 / 16.87** before it started and
+  **8.54 / 8.10 / 10.78** after. **The long step is inside the image's own `turbo run build` + Next's
+  trace collection,** not the layer export: the RUN step's last output landed at `304 s`, and the CLI then
+  printed nothing for **301.3 s — five minutes and one second —** before exporting. **A watcher of that
+  silence will read a working build as hung** — during this run I sampled it and saw a byte-identical log,
+  and concluded it had stalled; it had finished normally. **So: per-merge rebuilds are minutes, not
+  seconds. And the owner accepted the trade BEFORE this number existed** — the caution on record was the
+  *shape* of the risk (*"a full `next build` in Docker is a multi-minute, multi-core operation"*), not a
+  measurement, so the trade was made on a prediction. **The number now exists, and it is the owner's to
+  re-weigh rather than mine to defend.**
+  **One caveat the rebuild rule must carry, found while measuring:** the main folder's **branch label is
+  not the check**. Measured 2026-09-19 it was labelled `owner/workspace-edits` — a branch retired and
+  deleted from origin — while its HEAD was **exactly `origin/main`** (`rev-list --left-right --count
+  origin/main...HEAD` → `0 0`, `git diff origin/main` empty). A build from *behind* `main` bakes older
+  code and looks fresh; a build from a *feature branch* reinstates by hand the coupling the owner removed.
+  The runbook now says to compare the SHA.
+  `docker-compose.dev.yml`, `package.json`, `docs/runbook.md`, `docker-compose.hot.yml` (retired; kept)
 
 **Block 13.658 — the interactive prototype refresh, 2026-09-18.** 🧪, for the block's usual reason: the
 property under test is that an UNPACK is faithful, and there is no test runner on either side of it. The

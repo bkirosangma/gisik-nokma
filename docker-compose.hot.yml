@@ -1,3 +1,44 @@
+# ============================================================================
+# ⛔ RETIRED 2026-09-19. NOT COMPOSED BY ANY SHIPPED COMMAND. DO NOT REACH FOR
+# IT REFLEXIVELY.
+# ============================================================================
+#
+# **The owner removed hot reload.** Verbatim: *"no more hot reloads. rebuilt once
+# they hit the main, is fine. that means the servers are to be run from the main
+# folder instead of from the executor's branch. bring up the server once the hot
+# reload is removed."*
+#
+# What that retired, mechanically: `pnpm dev:stack` (root `package.json`) used to
+# compose this file. **It no longer does** — it now names `docker-compose.dev.yml`
+# alone, so the stack serves the BUILT images from `/Users/kiro/my_projects/gisik-nokma`.
+# `pnpm dev:stack:rebuild` is the same stack with `--build`, and is the command the
+# runbook's rebuild rule names after every merge to `main`.
+#
+# **WHY THIS FILE IS KEPT RATHER THAN DELETED.** Not sentiment: it is the only
+# record of a set of measurements that cost real time to take and would otherwise
+# have to be re-derived from scratch, and each one is a fact about this machine's
+# Docker Desktop mount rather than about a feature:
+#   - the rename-over save shape does not cross the mount at all, and on
+#     `tsx watch` the first miss is PERMANENT (chokidar loses the watch);
+#   - `node --watch --import tsx` was measured and does NOT work here, and not
+#     for the mount reason — it misses writes made INSIDE the container too;
+#   - busybox `kill -0` succeeds on an exited-but-unreaped child, so a liveness
+#     supervisor for a backgrounded watcher cannot fire (a guard that cannot fire
+#     is worse than none, which is why the runbook carries an operator check);
+#   - compose v2 shell-word-SPLITS a string-form `command`, so `sh -c` is
+#     load-bearing rather than decorative;
+#   - the settled `docker stats` prices of polling versus not.
+# **A deleted file takes its reasons with it.** Read the body below as the
+# record it is, not as a mode to restore.
+#
+# The `:3001` ownership rule this file's header states ("for the serial executor,
+# `/Users/kiro/my_projects/gisik-nokma-exec`") is ALSO retired — see the note at
+# that paragraph, and the runbook. There is no executor-owned stack any more.
+#
+# ============================================================================
+# ORIGINAL HEADER, 2026-09-18, unedited below this line except where marked.
+# ============================================================================
+#
 # Hot-reload dev mode for the compose `server` and `web` services.
 #
 # NOT usable on its own. It is an OVERRIDE, always composed with the base file:
@@ -8,7 +49,9 @@
 # `docker-compose.dev.yml` is deliberately UNCHANGED by this file's introduction
 # — the prod-parity image path and the compose contract suite keep reading it
 # exactly as before, and the prod images are still the un-targeted builds.
-# `pnpm dev:stack` (root package.json) is that command.
+# `pnpm dev:stack` (root package.json) WAS that command. **[FALSE SINCE
+# 2026-09-19 — see the retirement banner at the head of this file. `dev:stack`
+# now names `docker-compose.dev.yml` alone and does NOT compose this file.]**
 #
 # What changes here: the `server` and `web` containers run the branch's SOURCE
 # from bind mounts instead of the baked artifacts, with watchers that reload them
@@ -17,6 +60,15 @@
 # in the checkout this file is invoked from: for the serial executor,
 # `/Users/kiro/my_projects/gisik-nokma-exec`, on whatever branch that worktree is
 # on.
+#
+# [CORRECTED 2026-09-19 — the sentence above is history, and the RULE it assumed
+# is gone.] "which checkout this file is invoked from" was the whole point of hot
+# mode and it is exactly what the owner retired: the stack is now served from
+# `/Users/kiro/my_projects/gisik-nokma` (the MAIN folder) as built images, so no
+# executor's branch is ever live. Two consequences a reader here must not carry
+# forward: **there is no executor-owned stack**, and **no one binds :3001 to an
+# executor's tree** — the :3001 ownership rule that existed *because* the
+# container mounted exec 1's branch died with the mounting.
 #
 # THE `web` HALF ARRIVED SECOND, and it retires a sentence this header used to
 # carry. Until it did, ":3001" was the owner's own `next dev` and the only live

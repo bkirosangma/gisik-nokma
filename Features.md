@@ -2659,60 +2659,41 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   travelling through the web container's proxy and being answered by the server, live — nothing
   automated brings the stack up and makes that round trip; it is a hand-run case. `docker-compose.dev.yml`,
   `apps/server/test/deploy/compose-dev-contract.test.ts`
-- ⚙️ **Hot-reload dev mode for the compose `server` (`docker-compose.hot.yml`)** — the dev `server`
-  container runs the checkout's SOURCE instead of the baked `dist`, bind-mounted and watched, so an
-  edit on the host is live on the API origin without a rebuild or a restart. It exists because the
-  alternative was measured failing: the running `server` image was built **2026-09-09T12:32Z** and the
-  first `closed` fold reached `apps/server/src/read/ticket-cards.ts` on **2026-09-17**, so the owner's
-  Backlog tab read cards with no `closed` key from a server eight days behind the client, and the
-  mapper refused it (`list.groups[0].cards[0].closed: expected an object`). The mapper's refusal stays
-  strict — a `closed` that defaults to `null` when absent is what hid case 13.603 the first time.
-  **`docker-compose.dev.yml` is UNCHANGED** and the prod image path is untouched: hot mode is an
-  override composed on top of it, and the Dockerfile's new `dev` stage sits **before** `runtime`
-  because Docker builds the LAST stage when no target is named, so an appended stage would have
-  silently become the production image. Rebuilds are rare rather than never: the manifest-then-
-  `pnpm fetch` pair keys that layer on the lockfile plus the eleven workspace manifests plus
-  `turbo.json` — `--offline` is what makes a cache-key miss fail loudly instead of reaching the
-  network. Source edits need no rebuild; a new migration needs a `restart`.
-  Runs from the checkout whose code should be live — for the serial executor, its own worktree — via
-  the root `pnpm dev:stack` script. That script passes `--env-file .env`, and what that buys was
-  MEASURED rather than assumed: compose auto-loads `.env` from the project directory anyway, so the
-  flag does not change the substituted values (`GOOGLE_CLIENT_ID` renders its full 72 characters with
-  the flag omitted) — it converts a **missing** `.env` from a silent empty substitution into a hard
-  stop, which is the shape that once brought the server up looking healthy with Google sign-in OFF.
-  **Since 2026-09-18 the `web` is hot too**: the same override carries a `web` service on :3001, the port a
-  browser actually talks to, and `apps/web/Dockerfile` gained its own `dev` stage before `runtime` for the
-  same last-stage reason. Both origins are now the checkout. **The web's watcher is not the server's** —
-  measured, Next's webpack watcher sees BOTH save shapes (in-place 1.2–1.5 s, rename-over 1.6 s), with a
-  59.4 s outlier recorded rather than smoothed over.
-  **The server's watcher now POLLS (`CHOKIDAR_USEPOLLING=true`, `CHOKIDAR_INTERVAL=1000`), and the reason is
-  a measured defect rather than caution.** `tsx watch` did not merely miss the rename-over save — the shape
-  the assistant's own edit tool produces, its host inode changing on every edit — it **permanently lost its
-  watch on that file**, so the live API served stale code while `/healthz` answered 200 and the mounted file
-  was correct: the 2026-09-09 incident's shape, reachable with no rebuild at all. `node --watch --import tsx`
-  was measured first and is closed (it did not restart even on a write made inside the container, where no
-  mount is involved). Polling was previously rejected on the evidence then available — that in-place writes
-  cross the mount — which stopped being sufficient once the writer that matters turned out to be a rename.
-  Cost, settled in one session: CPU **6.05–6.47 % polling on versus 2.39–3.73 % off**, memory unchanged.
-  **The PACKAGE watchers inside each hot container are a THIRD watcher, and they carried the same inode
-  blindness — fixed 2026-09-18 with `TSC_WATCHFILE=UseFsEventsOnParentDirectory` on BOTH services.** Each
-  container runs its own `tsc -p tsconfig.json --watch` per package, and `tsc`'s default strategy
-  (`UseFsEvents`) watches the FILE, so a rename-over save left it watching an inode that no longer existed
-  at that path — the 80 s stale revert case 13.656 caught. The strategy now set watches the parent
-  DIRECTORY instead. Witnessed in both containers in one run with no restart between the halves: a
-  rename-over Edit of a marker reached both `dist` copies in **~1 s**, an in-place append that followed
-  (host inode verified unchanged) also reached both in **~1 s**, and the revert returned both to zero.
-  Cost of the settled pair: `server` **3.99–6.69 %** CPU / 1.266 GiB, `web` **1.55–1.69 %** / 1.332 GiB.
-  **The deployed-stack E2E suite runs against THIS stack** (Step 5b, 2026-09-18): the hot pair holds
-  :3000 and :3001 permanently from the worktree, so the "wait for a stack window" constraint the Task 12
-  pause recorded no longer exists. Its seed step is now shape-aware for exactly that reason — see the
-  Deployed-stack E2E bullet below.
-  `docker-compose.hot.yml`, `apps/server/Dockerfile`, `apps/web/Dockerfile`, `package.json`,
-  `docs/runbook.md`,
-  `test-cases/13-deployment-dogfooding.md` (Step 1's witness record is **13.650–13.653**, re-minted from
-  13.613–13.616, which a plan had reserved first; **this step's block is 13.654–13.657** — the web coming up
-  hot and taking :3001 over, both save shapes at the web, a package edit reaching the served HTML through
-  `dist`, and the un-hot path proven unchanged by checksum; see each block's note),
+- ⚙️ **The dev stack serves BUILT images, rebuilt on every merge to `main`** — `pnpm dev:stack` brings it
+  up, `pnpm dev:stack:rebuild` rebuilds and brings it up. The stack is `docker-compose.dev.yml` **alone**:
+  `web` on :3001, `server` on :3000, real Postgres on 54330, MinIO, Mailpit. **There is no bind-mounted
+  source and no watcher**, so the served code equals `main` exactly as of the last build. It is run from
+  `/Users/kiro/my_projects/gisik-nokma` — the MAIN folder — because the images bake `SERVER_ORIGIN` and
+  `NEXT_PUBLIC_SERVER_URL` as BUILD args and `next build` serialises them into `.next`: **an image is a
+  snapshot of the tree it was built from.**
+  **The rebuild rule is the load-bearing part, and its failure shape is this repo's recorded
+  stale-serving class.** Merge to `main` and skip `pnpm dev:stack:rebuild`, and the app keeps serving the
+  PREVIOUS build while `/healthz` answers 200, both containers are `Up`, and `:3001` returns its usual
+  307 — every signal green, the code older than `main`. With the watchers gone the rebuild is the only
+  thing that closes it, and no health check can tell you. `--env-file .env` (which both scripts pass) is
+  what converts a MISSING `.env` from a silent empty substitution — server healthy, **Google sign-in
+  OFF** — into a hard stop.
+  **HOT-RELOAD MODE WAS RETIRED HERE ON 2026-09-19** by owner instruction: *"no more hot reloads. rebuilt
+  once they hit the main, is fine. that means the servers are to be run from the main folder instead of
+  from the executor's branch."* No executor's branch is ever live any more, which also retires the
+  ":3001 belongs to executor 1" rule that existed only because the container mounted that worktree.
+  `docker-compose.hot.yml` is **kept and deliberately no longer composed by anything**, because a deleted
+  file takes its reasons with it — the rename-over save shape not crossing the Docker Desktop mount;
+  `tsx watch` losing its watch **permanently** on the first such save; `node --watch --import tsx` measured
+  failing even on a write made INSIDE the container; busybox `kill -0` succeeding on an exited-but-unreaped
+  child, so a liveness supervisor cannot fire; `compose` v2 shell-word-splitting a string-form `command`.
+  **The incident that motivated hot mode is why the rebuild rule is written in this register**: the running
+  server image was built **2026-09-09T12:32Z** while the first `closed` fold reached
+  `apps/server/src/read/ticket-cards.ts` on **2026-09-17**, so the owner's Backlog tab read cards with no
+  `closed` key from a server eight days behind the client, and the mapper refused it
+  (`list.groups[0].cards[0].closed: expected an object`). The mapper's refusal stays strict — a `closed`
+  that defaults to `null` when absent is what hid case 13.603 the first time.
+  `docker-compose.dev.yml`, `docker-compose.hot.yml` (retired; kept for its measurements), `package.json`,
+  `apps/server/Dockerfile`, `apps/web/Dockerfile` (both keep `dev` stages that no shipped command targets
+  any more, and both stage comments now say so; **their `dev` stage's position is still load-bearing** —
+  see the rebuild rule), `docs/runbook.md`,
+  `test-cases/13-owner-requests-and-backlog.md` (**13.946** is the replacement case; hot mode's witness
+  record **13.650–13.657** is superseded in place rather than deleted),
   `docs/lanes/executor-state.md`
 - ✅ **Deployed-stack E2E — Playwright against the running compose stack, and the sign-in defect it
   found** — three specs drive the REAL stack (a Next container proxying to a real API server, real

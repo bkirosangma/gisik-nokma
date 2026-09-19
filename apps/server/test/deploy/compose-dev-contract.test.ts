@@ -304,3 +304,114 @@ describe('docker-compose.dev.yml env contract', () => {
     });
   });
 });
+
+/**
+ * ## 13.946 — the dev stack serves the BUILT image, and no source is bind-mounted any more
+ *
+ * Owner, 2026-09-19: *"no more hot reloads. rebuilt once they hit the main, is fine. that means the
+ * servers are to be run from the main folder instead of from the executor's branch."*
+ *
+ * The change is mechanical — `dev:stack` stops composing `docker-compose.hot.yml` — and **that is exactly
+ * why it needs a case.** A script that silently still composed the override would leave the stack serving
+ * somebody's worktree, and every other instrument would stay green: the containers come up, `/healthz`
+ * answers, `:3001` returns its usual 307. This repo keeps re-finding checks that pass for a reason
+ * unrelated to the property they name, and *"the stack is built, not mounted"* is a property of FILES, so
+ * files are what it is asserted against.
+ *
+ * **The third assertion is the control, and it is why the others can be trusted.** `docker-compose.hot.yml`
+ * is full of exactly the mounts the second assertion forbids. Running the same predicate over it and
+ * requiring a NON-EMPTY result is what proves the predicate can fire — without it, a predicate that had
+ * quietly stopped matching anything (a renamed key, a `volumes` shape change) would report the new stack
+ * as clean forever, which is this file's own stated failure mode one description up.
+ */
+describe('13.946 the dev stack serves the built image, and no source is bind-mounted', () => {
+  const ROOT = resolve(import.meta.dirname, '../../../..');
+  const HOT_PATH = resolve(ROOT, 'docker-compose.hot.yml');
+  const RETIRED_OVERRIDE = 'docker-compose.hot.yml';
+  const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')) as {
+    scripts: Record<string, string>;
+  };
+
+  /** Every bind mount, on either service, whose source the built image already carries. */
+  function sourceMounts(compose: Record<string, any>): string[] {
+    const found: string[] = [];
+    for (const name of ['server', 'web']) {
+      for (const entry of compose.services?.[name]?.volumes ?? []) {
+        const spec =
+          typeof entry === 'string' ? entry : `${entry?.source ?? ''}:${entry?.target ?? ''}`;
+        if (/\/(apps|packages)\//.test(spec)) found.push(`${name}: ${spec}`);
+      }
+    }
+    return found;
+  }
+
+  it('NEITHER stack script composes the retired override, and the rebuild script rebuilds', () => {
+    // BOTH SCRIPTS, and the first version of this case checked only `dev:stack` — a review caught that
+    // the unguarded one is the script the runbook actually tells a reader to type. A
+    // `dev:stack:rebuild` carrying `-f docker-compose.hot.yml` would have been fully green here while
+    // re-instating exactly the coupling this change removes.
+    for (const name of ['dev:stack', 'dev:stack:rebuild']) {
+      const script = pkg.scripts[name];
+      expect(script, `the root ${name} script must exist`).toBeTruthy();
+      expect(script, `${name} must not compose the retired hot override`).not.toContain(RETIRED_OVERRIDE);
+      // Naming the base file as well keeps "delete the script" from satisfying the line above.
+      expect(script, `${name} composes the base stack`).toContain('docker-compose.dev.yml');
+    }
+    // The post-merge command must REBUILD. A script that merely re-ups an existing image is the
+    // stale-serving shape the rebuild rule exists to close, and it would read as success.
+    expect(
+      pkg.scripts['dev:stack:rebuild'],
+      'the runbook names this as the command to run after every merge to main',
+    ).toContain('--build');
+  });
+
+  it('neither server nor web bind-mounts apps/ or packages/ source', () => {
+    expect(sourceMounts(readCompose())).toEqual([]);
+  });
+
+  it('neither server nor web names a build target — the LAST stage is what ships', () => {
+    // THE INVARIANT THIS CHANGE MADE LOAD-BEARING. While hot mode shipped, `target: dev` selected the
+    // `dev` stage and the untargeted default was merely the production path's own concern. With the
+    // override gone, EVERY build this repo ships is un-targeted, so "the last stage in the Dockerfile
+    // is `runtime`" is now the only thing standing between `dev:stack:rebuild` and a production image
+    // that is not production. No test asserted it before this change; a review found that gap.
+    for (const name of ['server', 'web']) {
+      const target = readCompose().services?.[name]?.build?.target;
+      expect(
+        target,
+        `${name} must NOT name a build target: the last stage must stay the one a bare build produces`,
+      ).toBeUndefined();
+    }
+  });
+
+  it('CONTROL — the predicate fires on the retired override, and fires at its full width', () => {
+    const mounts = sourceMounts(readCompose(HOT_PATH));
+    // Two properties, because a bare `> 0` would have been satisfied by a predicate that had lost
+    // HALF its alternatives. Measured here: the full predicate finds **20** mounts on the retired
+    // override (9 on `server`, 11 on `web`); an apps-only variant finds **6**. The previous threshold
+    // of `> 5` therefore sat one below a live DEGRADED value, so a predicate that had quietly stopped
+    // matching `packages/` would have kept the control green while the assertion above went blind to
+    // 14 of the 20 mounts. 15 is above the degraded value and below the true one.
+    expect(mounts.length, 'the predicate has stopped matching altogether').toBeGreaterThan(0);
+    expect(
+      mounts.length,
+      `the control must be above the apps-only degraded count (6); got ${mounts.length}`,
+    ).toBeGreaterThan(15);
+    // Both halves of the regex must be represented, named rather than left to the count.
+    expect(mounts.some((m) => m.includes('/apps/')), 'no apps/ mount matched').toBe(true);
+    expect(mounts.some((m) => m.includes('/packages/')), 'no packages/ mount matched').toBe(true);
+  });
+
+  it('the runbook names the post-merge command AND the exact directory, not a prefix of it', () => {
+    // The directory half was a rubber stamp in the first version: it asserted the STRING
+    // `/Users/kiro/my_projects/gisik-nokma`, which is a PREFIX of `…/gisik-nokma-exec2` — so a runbook
+    // edited to say `cd /Users/kiro/my_projects/gisik-nokma-exec2 && pnpm dev:stack:rebuild`, the exact
+    // coupling this change removes, would still have passed. Pin the whole command line instead.
+    const runbook = readFileSync(resolve(ROOT, 'docs/runbook.md'), 'utf8');
+    expect(runbook).toContain('pnpm dev:stack:rebuild');
+    expect(
+      runbook,
+      'the rebuild rule must name the MAIN folder exactly — a prefix also matches an executor worktree',
+    ).toContain('cd /Users/kiro/my_projects/gisik-nokma && pnpm dev:stack:rebuild');
+  });
+});

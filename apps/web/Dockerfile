@@ -60,8 +60,15 @@ RUN pnpm turbo run build --filter=@gisik-nokma/web...
 RUN mkdir -p apps/web/public
 
 # ---------------------------------------------------------------------------
-# HOT-RELOAD DEV STAGE — `docker-compose.hot.yml` targets this, the same way it
-# targets the `server` Dockerfile's own `dev` stage.
+# ⛔ RETIRED 2026-09-19 — HOT-RELOAD DEV STAGE. `docker-compose.hot.yml` targetED
+# this; NO SHIPPED COMMAND NAMES IT ANY MORE (the owner removed hot reload, and
+# `pnpm dev:stack` composes `docker-compose.dev.yml` alone, whose build names no
+# `target:`).
+#
+# **THE INVARIANT BELOW IS STILL LIVE AND IS NOW THE ONLY THING STANDING BETWEEN
+# `dev:stack:rebuild` AND A PRODUCTION IMAGE THAT IS NOT PRODUCTION** — with
+# `target: dev` gone from the compose path, the LAST stage wins for every build
+# this repo ships. Same shape as the `server` Dockerfile's stage.
 #
 # **THIS STAGE MUST SIT BEFORE `runtime`.** Docker builds the LAST stage when no
 # target is named, and neither `docker-compose.dev.yml` nor `docker-compose.yml`
@@ -72,12 +79,13 @@ RUN mkdir -p apps/web/public
 #   docker build -f apps/web/Dockerfile -q .
 #   docker image inspect --format '{{.Config.Cmd}}' <that image>   # node apps/web/server.js
 #
-# What this stage is FOR: the container runs the branch's SOURCE — bind-mounted
-# from the checkout at compose time, not baked — so an edit on the host is live
-# on :3001 without a rebuild or a restart.
+# What this stage WAS for (FALSE SINCE 2026-09-19 — hot mode is retired, so no
+# container runs a branch's source): the container ran the branch's SOURCE —
+# bind-mounted from the checkout at compose time, not baked — so an edit on the
+# host was live on :3001 without a rebuild or a restart.
 #
 # NO `next build` HERE, deliberately. The production path above bakes a
-# standalone server at build time and that is exactly what hot mode replaces:
+# standalone server at build time and that is exactly what hot mode replaced:
 # `next dev` compiles on demand, per route, and watches the source itself. A
 # `next build` in this stage would be paid for on every image rebuild and then
 # never read.

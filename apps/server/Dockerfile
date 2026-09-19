@@ -42,8 +42,17 @@ RUN pnpm deploy --prod --filter=@gisik-nokma/server /out
 RUN rm -rf /out/src /out/test
 
 # ---------------------------------------------------------------------------
-# HOT-RELOAD DEV STAGE — `docker-compose.hot.yml` targets this. It is the source
-# of the `server` container the owner watches on :3001.
+# ⛔ RETIRED 2026-09-19 — HOT-RELOAD DEV STAGE. `docker-compose.hot.yml` targetED
+# this, and NO SHIPPED COMMAND NAMES IT ANY MORE: the owner removed hot reload
+# (*"no more hot reloads. rebuilt once they hit the main, is fine"*) and
+# `pnpm dev:stack` now composes `docker-compose.dev.yml` alone, whose build
+# names no `target:` — so what it builds is the un-targeted default.
+#
+# **THE INVARIANT BELOW IS STILL LIVE AND IS NOW THE ONLY THING STANDING
+# BETWEEN `dev:stack:rebuild` AND A PRODUCTION IMAGE THAT IS NOT PRODUCTION.**
+# With the `target: dev` gone from the compose path, the LAST stage wins for
+# every build this repo ships — so this stage's position is load-bearing even
+# though nothing selects it. Verify it after any edit here.
 #
 # **THIS STAGE MUST SIT BEFORE `runtime`.** Docker builds the LAST stage when no
 # target is named, and neither `docker-compose.dev.yml` nor `docker-compose.yml`
@@ -54,10 +63,11 @@ RUN rm -rf /out/src /out/test
 #   docker build -f apps/server/Dockerfile -q .
 #   docker image inspect --format '{{.Config.Cmd}}' <that image>   # node dist/index.js
 #
-# What this stage is FOR: the container runs the branch's SOURCE — bind-mounted
-# from the checkout at compose time, not baked — so an edit on the host is live
-# without a rebuild or a restart. The image is rebuilt only when the LOCKFILE
-# changes, which is what the manifest-then-fetch pair below buys.
+# What this stage WAS for (FALSE SINCE 2026-09-19 — hot mode is retired, so no
+# container runs a branch's source): the container ran the branch's SOURCE —
+# bind-mounted from the checkout at compose time, not baked — so an edit on the
+# host was live without a rebuild or a restart. The manifest-then-fetch pair
+# below still applies to the stage; what changed is that nothing composes it.
 #
 # The MANIFEST COPY is deliberate and is not interchangeable with `COPY . .`:
 # `pnpm fetch` reads the lockfile alone, so this layer's cache key is the
