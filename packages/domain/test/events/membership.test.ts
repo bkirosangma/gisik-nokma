@@ -80,6 +80,68 @@ describe('projectCreatedPayload', () => {
       message: 'Expected object, received null',
     });
   });
+
+  /**
+   * Door A, 2026-09-19 — the project description.
+   *
+   * **This payload is `.strict()`, and that is what makes OPTIONAL safe:** the
+   * key cannot arrive by accident, so "absent" can only mean a caller that did
+   * not mention one.
+   */
+  it('13.976 — accepts an optional description, and an absent one parses unchanged', () => {
+    expect(projectCreatedPayload.parse({ name: 'Delivery', description: 'Sprint work' })).toEqual({
+      name: 'Delivery',
+      description: 'Sprint work',
+    });
+    // THE COMPATIBILITY HALF. Every `project.created` in the ledger written
+    // before this field existed carries no description, and all of them must
+    // still parse — the rule this repo applies to every additive wire field.
+    expect(projectCreatedPayload.parse({ name: 'Delivery' })).toEqual({ name: 'Delivery' });
+    // ...and the key is genuinely ABSENT rather than present-and-undefined. A
+    // `.optional()` that left `description: undefined` on the parsed object
+    // would read as "mentioned, value unknown" to anything using `in`.
+    expect('description' in projectCreatedPayload.parse({ name: 'Delivery' })).toBe(false);
+    // The CONTROL for the line above, same call shape: a key that IS sent is
+    // present. Without it, `'description' in ...` would also pass on an object
+    // that dropped every optional key.
+    expect('description' in projectCreatedPayload.parse({ name: 'D', description: 'x' })).toBe(true);
+  });
+
+  it('13.977 — refuses a blank description and one over the bound, and does not trim one that has content', () => {
+    expect(
+      rejectionIssues(projectCreatedPayload.safeParse({ name: 'Delivery', description: '' })),
+    ).toContainEqual({
+      path: ['description'],
+      message: 'String must contain at least 1 character(s)',
+    });
+    // A description of ONLY SPACES reads as a description everywhere it is
+    // displayed while describing nothing — `displayName`'s refusal, one field
+    // over.
+    expect(
+      rejectionIssues(projectCreatedPayload.safeParse({ name: 'Delivery', description: '   ' })),
+    ).toContainEqual({
+      path: ['description'],
+      message: 'must not be blank — a description of only spaces describes nothing',
+    });
+    expect(
+      rejectionIssues(
+        projectCreatedPayload.safeParse({ name: 'Delivery', description: 'x'.repeat(501) }),
+      ),
+    ).toContainEqual({
+      path: ['description'],
+      message: 'String must contain at most 500 character(s)',
+    });
+    // The bound is INCLUSIVE, asserted on the boundary itself rather than one
+    // either side of it.
+    expect(
+      projectCreatedPayload.parse({ name: 'Delivery', description: 'x'.repeat(500) }).description,
+    ).toHaveLength(500);
+    // AS TYPED, not trimmed — the ledger stores the claim as it was made.
+    expect(
+      projectCreatedPayload.parse({ name: 'Delivery', description: '  Sprint work  ' })
+        .description,
+    ).toBe('  Sprint work  ');
+  });
 });
 
 describe('membershipGrantedPayload', () => {

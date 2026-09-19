@@ -106,13 +106,17 @@ export async function seedProject(
   workspaceId: string,
   projectId: string,
   name = `Project ${projectId}`,
+  description?: string,
 ): Promise<void> {
   await applyAll(pool, [
     testEnvelope({
       workspaceId,
       entity: { kind: 'project', id: projectId },
       type: 'project.created',
-      payload: { name },
+      // ABSENT when there is none, so a fixture that does not mention a
+      // description founds a project nobody has described — the same shape
+      // `foundingSeeds` builds when the form's box is left untouched.
+      payload: { name, ...(description === undefined ? {} : { description }) },
       actorId: SEED_ACTOR,
     }),
   ]);

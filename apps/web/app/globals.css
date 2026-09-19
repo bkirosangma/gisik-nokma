@@ -1164,6 +1164,24 @@ input, textarea, select { font-family: inherit; }
 }
 .gn-project-card__head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .gn-project-card__name { font-size: 1.25rem; line-height: 1.5625rem; font-weight: 600; }
+/* The project's description (door A, 2026-09-19). Transcribed from the
+   prototype — `desktop.dc.html:264` draws `p.desc` at
+   `font-size:15px;line-height:20px;color:var(--label2)`, and this file's own
+   token table (below at `.gn-field`) records `--label2`→`--gn-text-muted`.
+
+   The two numbers are NOT re-derived here: `.gn-workspace-card__projects` is
+   already an exact 15px/20px muted line, so this takes its values rather than
+   writing a second pair that could drift from the first. `overflow-wrap:
+   anywhere` because the field is bounded at 500 characters by the domain
+   schema and a long unbroken word would otherwise widen the card.
+   `margin: 0` because the door is a flex column whose `gap` already spaces it. */
+.gn-project-card__description {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+  color: var(--gn-text-muted);
+  overflow-wrap: anywhere;
+}
 .gn-project-card__chips { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.25rem; }
 /* `position: relative` + `z-index` lift this strip above the door's stretched
    `::after` — without it the transparent overlay would cover Archive/Restore

@@ -1,7 +1,27 @@
 import type { EffectiveRole } from '../permissions/effective-role.js';
 import type { Queryable } from '../db/queryable.js';
 
-export type VisibleProject = { projectId: string; name: string; archived: boolean };
+export type VisibleProject = {
+  projectId: string;
+  name: string;
+  archived: boolean;
+  /**
+   * **`null` is NOT DESCRIBED, and it is not `''`** (door A, 2026-09-19).
+   *
+   * The column is nullable for the reason the migration states: `''` would be
+   * the CLAIM "this project has no description" — a fact about the project —
+   * while NULL is the absence of any claim, which is what a project nobody has
+   * described actually has. A reader that collapsed the two would put a claim
+   * in the render that no event ever made, which is the same
+   * withheld-vs-empty distinction `ticketCount` draws one field over.
+   *
+   * **It rides with the NAME, exactly as `archived` does.** `visibleProjects`
+   * filters ROWS and not columns, so a caller who is not on a project receives
+   * no row and therefore no description: the disclosure decision was already
+   * made by the filter, and this column introduces no new rule of its own.
+   */
+  description: string | null;
+};
 
 /**
  * The projects a viewer may be told the NAME of, in one workspace.
@@ -54,8 +74,13 @@ export async function visibleProjects(
   workspaceId: string,
 ): Promise<VisibleProject[]> {
   if (eff.workspaceRole === null) return [];
-  const { rows } = await db.query<{ project_id: string; name: string; archived: boolean }>(
-    `SELECT project_id, name, archived FROM proj_projects
+  const { rows } = await db.query<{
+    project_id: string;
+    name: string;
+    archived: boolean;
+    description: string | null;
+  }>(
+    `SELECT project_id, name, archived, description FROM proj_projects
       WHERE workspace_id = $1
       ORDER BY project_id`,
     [workspaceId],
@@ -68,6 +93,10 @@ export async function visibleProjects(
     projectId: row.project_id,
     name: row.name,
     archived: row.archived,
+    // Passed through as the column holds it. `?? ''` here would be the same
+    // mistake the projection refuses one layer down, one layer closer to the
+    // render.
+    description: row.description,
   }));
   if (eff.workspaceRole === 'owner') return visible;
   return visible.filter((project) => eff.projects.has(project.projectId));

@@ -1109,6 +1109,47 @@ function withheldOrNumber(
 }
 
 /**
+ * A nullable text column where **the KEY is required and the VALUE may be null**
+ * (door A, 2026-09-19).
+ *
+ * **The refusal on an absent key is the point of this helper, not a side
+ * effect.** `withheldOrNumber` above reads an absent key as a WITHHOLDING,
+ * because for a count that is exactly what the server did — it decided not to
+ * count for this caller. A description has no withholding state: the route
+ * always sends the key, spelling "nobody has described this project" as `null`.
+ * So an absent key here can only mean a construction site that did not carry
+ * the field, and the two failures this closes are the ones this repo keeps
+ * paying for:
+ *
+ * - **Silently arriving `undefined` on a route nobody tested.** `undefined` on
+ *   the client means NOT DESCRIBED (`view-types.ts`), so a forgotten site would
+ *   render as a correct-looking card with no description — a wrong answer that
+ *   is indistinguishable from the right one.
+ * - **A test that agrees with the bug**, because its fixture was built from the
+ *   same shape the mapper was reading.
+ *
+ * A throw names the path, so the failure says which row on which route omitted
+ * it rather than surfacing as a blank line in a UI.
+ */
+function describedText(
+  record: Record<string, unknown>,
+  key: string,
+  path: string,
+): string | undefined {
+  if (!Object.prototype.hasOwnProperty.call(record, key)) {
+    throw new MappingError(
+      path,
+      'a project description key — every project row must state its description, ' +
+        'spelling "not described" as null rather than omitting the key',
+    );
+  }
+  const value = record[key];
+  // null -> undefined, the ONE thing that produces NOT DESCRIBED on the client.
+  if (value === null) return undefined;
+  return asString(value, path);
+}
+
+/**
  * `GET /v1/me/workspaces` → `WorkspaceRef[]`. **ANSWERS** since rulings P32/P38.
  *
  * It REFUSED, and the reason it gave was right: "a nav rendering workspaces with
@@ -1215,10 +1256,25 @@ export function mapWorkspaceRefs(raw: unknown): WorkspaceRef[] {
       projects: asArray(workspace['projects'], `${path}.projects`).map((project, projectIndex) => {
         const projectPath = `${path}.projects[${projectIndex}]`;
         const row = asRecord(project, projectPath);
+        // Read BEFORE the object literal so the spread below can leave the key
+        // out entirely rather than writing it as `undefined`.
+        const description = describedText(row, 'description', `${projectPath}.description`);
         return {
           id: asString(row['projectId'], `${projectPath}.projectId`),
           name: asString(row['name'], `${projectPath}.name`),
           archived: asBoolean(row['archived'], `${projectPath}.archived`),
+          // Required key, nullable value — see `describedText`. A row that
+          // omits it is a construction site that forgot the field, not a
+          // project without a description, and the two must not read alike.
+          //
+          // SPREAD rather than written as `description: <string | undefined>`,
+          // so NOT DESCRIBED is a genuinely absent key on the client and
+          // `'description' in ref` answers the same question as
+          // `ref.description === undefined`. The type's docblock claims absence,
+          // and a key that is present-and-undefined would make that claim false
+          // for anyone who tested it with `in` — the difference `13.976`
+          // asserts on the domain payload for exactly the same reason.
+          ...(description === undefined ? {} : { description }),
           ticketCount: withheldOrNumber(row, 'ticketCount', `${projectPath}.ticketCount`),
           blockedCount: withheldOrNumber(row, 'blockedCount', `${projectPath}.blockedCount`),
         };

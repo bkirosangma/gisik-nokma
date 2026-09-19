@@ -148,3 +148,64 @@ describe('6.138-6.142 visibleProjects — a project NAME is a disclosure', () =>
     expect((await namesFor(owner)).sort()).toEqual(['Aisles', 'Payroll']);
   });
 });
+
+/**
+ * 13.979-13.980 (door A, 2026-09-19) — the project DESCRIPTION this read now
+ * carries.
+ *
+ * **Both cases assert the served half and the withheld half in ONE run.** A
+ * description is a new column on a read whose whole job is a disclosure
+ * decision, so the interesting question is not "does it arrive" but "does it
+ * arrive to the same callers the NAME arrives to, and to no others" — and a
+ * fixture containing only the described project cannot answer that.
+ */
+describe('13.979-13.980 visibleProjects carries a description, scoped as the name is', () => {
+  let db: TestDatabase;
+  const ws = newUlid();
+  const described = newUlid();
+  const undescribed = newUlid();
+
+  beforeAll(async () => {
+    db = await createTestDatabase();
+    await seedProject(db.pool, ws, described, 'Delivery', 'Sprint work for the rollout');
+    await seedProject(db.pool, ws, undescribed, 'Site readiness');
+  });
+
+  afterAll(async () => {
+    await db.drop();
+  });
+
+  async function projectsFor(userId: string) {
+    const eff = await resolveEffectiveRole(db.pool, userId, ws);
+    return visibleProjects(db.pool, eff, ws);
+  }
+
+  it('13.979 — a described project carries its prose; an undescribed one carries NULL, not an empty string', async () => {
+    const owner = newUlid();
+    await seedMember(db.pool, ws, owner, 'owner', []);
+    const byId = new Map((await projectsFor(owner)).map((p) => [p.projectId, p]));
+
+    expect(byId.get(described)!.description).toBe('Sprint work for the rollout');
+    expect(byId.get(undescribed)!.description).toBeNull();
+    // Controls, same run. `toBeNull` alone also passes against a read that
+    // stopped selecting the column, so the first line proves the query can
+    // return a value at all; the second names the specific wrong value this
+    // case exists to catch.
+    expect(byId.get(described)!.description).not.toBeNull();
+    expect(byId.get(undescribed)!.description).not.toBe('');
+  });
+
+  it('13.980 — the description is scoped EXACTLY as the name is: no row, no description', async () => {
+    const member = newUlid();
+    await seedMember(db.pool, ws, member, 'member', [{ projectId: described }]);
+
+    const rows = await projectsFor(member);
+    // Both halves in one run: the project they ARE on arrives with its
+    // description, and the other project's description is unreachable for the
+    // only reason the name is — no row was served at all. Asserting only the
+    // absence would pass against a read that returned nothing to anyone.
+    expect(rows.map((p) => p.projectId)).toEqual([described]);
+    expect(rows[0]!.description).toBe('Sprint work for the rollout');
+    expect(rows.some((p) => p.projectId === undescribed)).toBe(false);
+  });
+});

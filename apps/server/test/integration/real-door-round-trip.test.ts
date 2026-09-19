@@ -247,7 +247,11 @@ beforeAll(async () => {
     workspaceId,
     entity: { kind: 'project', id: projectId },
     type: 'project.created',
-    payload: { name: 'Shop floor' },
+    // The description rides the REAL door (door A, 2026-09-19), so the exact
+    // wire assertion below is a witness of the whole path — typed here, parsed
+    // by the domain schema, written by the projection, selected by the read and
+    // spelled by the route — rather than a witness of the route alone.
+    payload: { name: 'Shop floor', description: 'Sprint work for the rollout' },
     actorId: member.userId,
   }, 1);
   // The founder owns the workspace but is not on the project until this lands;
@@ -458,8 +462,21 @@ describe('GET /v1/me/workspaces — the directory', () => {
           // workspace's named set — which is the tenancy failure case 13.382
           // seeds directly.
           nameRestrictedProjectCount: 0,
+          // 13.987 (door A, 2026-09-19). The description is asserted HERE, in
+          // the exact shape, because the value was authored over the real wire
+          // in this same run: this line is the end of a path that began at the
+          // `project.created` above, and it goes red if ANY link drops the
+          // field — the schema refusing it, the projection not writing it, the
+          // read not selecting it, or the route not spelling it.
           projects: [
-            { projectId, name: 'Shop floor', archived: false, ticketCount: 2, blockedCount: 0 },
+            {
+              projectId,
+              name: 'Shop floor',
+              archived: false,
+              description: 'Sprint work for the rollout',
+              ticketCount: 2,
+              blockedCount: 0,
+            },
           ],
         },
       ],

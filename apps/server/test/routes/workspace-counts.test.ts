@@ -525,7 +525,22 @@ describe('13.371 the shape the directory already served is unchanged', () => {
       // member is on the only project seeded, so there is nothing they hold the
       // id of and may not name.
       nameRestrictedProjectCount: 0,
-      projects: [{ projectId, name: 'Shop operations', archived: false, ticketCount: 0, blockedCount: 0 }],
+      // `description: null` joined this exact shape with door A (2026-09-19),
+      // and the EDIT IS THE POINT: `toEqual` here is what makes a new field on
+      // this route impossible to add by accident, so a reader arriving after a
+      // red test finds the change named rather than guessed. `null` because
+      // `seedProject` above founded this project without one — and it is an
+      // always-present key rather than an omitted one, which 13.981 pins.
+      projects: [
+        {
+          projectId,
+          name: 'Shop operations',
+          archived: false,
+          description: null,
+          ticketCount: 0,
+          blockedCount: 0,
+        },
+      ],
     });
   });
 });
@@ -667,5 +682,52 @@ describe('13.382 nameRestrictedProjectCount counts what the caller already holds
 
     const entry = await entryFor(member.headers, workspaceId);
     expect(entry['nameRestrictedProjectCount']).toBe(1);
+  });
+});
+
+/**
+ * 13.981 (door A, 2026-09-19) — a project row on `GET /v1/me/workspaces` states
+ * its description, and states it as a KEY THAT IS ALWAYS PRESENT.
+ *
+ * **This is the half-witnessed-contract case, and it is a test rather than a
+ * convention on purpose.** The client's mapper refuses a row whose
+ * `description` key is missing (13.983) — but that refusal can only fire
+ * against a body some route actually produced, so the route's own obligation
+ * needs a witness here. If a future refactor drops the field from this
+ * construction site, this case reddens at the route rather than the failure
+ * surfacing as a card that quietly says nothing.
+ *
+ * `null` is the spelling for a project nobody has described, and it is NOT an
+ * omission: an omitted key is indistinguishable from a route that never
+ * carried the field, which is precisely the confusion that makes a
+ * half-witnessed contract invisible.
+ */
+describe('13.981 a project row states its description as an always-present key', () => {
+  it('carries a served description, and carries null rather than omitting the key', async () => {
+    const owner = await signedIn();
+    const workspaceId = await found(owner.headers, 'Described Corner');
+    const described = newUlid();
+    const undescribed = newUlid();
+    await seedProject(db.pool, workspaceId, described, 'Delivery', 'Sprint work for the rollout');
+    await seedProject(db.pool, workspaceId, undescribed, 'Site readiness');
+
+    const entry = await entryFor(owner.headers, workspaceId);
+    const withDescription = projectOf(entry, described);
+    const withoutDescription = projectOf(entry, undescribed);
+
+    expect(withDescription['description']).toBe('Sprint work for the rollout');
+
+    // THE PROPERTY THIS CASE IS NAMED FOR — presence, asserted with `in` rather
+    // than by reading the value, because `toBeNull()` is satisfied by a mapper
+    // that never saw the key either.
+    expect('description' in withoutDescription).toBe(true);
+    expect(withoutDescription['description']).toBeNull();
+
+    // Controls, same run, same body: the described project's row carries the
+    // key too, so the presence above is not this project's accident; and the
+    // undescribed value is not the empty string, which is the specific wrong
+    // spelling the column exists to avoid.
+    expect('description' in withDescription).toBe(true);
+    expect(withoutDescription['description']).not.toBe('');
   });
 });

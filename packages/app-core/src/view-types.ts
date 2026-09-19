@@ -73,6 +73,23 @@ export type ProjectRef = {
   id: string;
   name: string;
   archived: boolean;
+  /**
+   * A short prose description, or **absent for a project nobody has described**
+   * (door A, owner ruling 2026-09-19).
+   *
+   * **`undefined` means NOT DESCRIBED — never "show an empty string".** That is
+   * `RosterMember.email`'s rule above, on a different field: a consumer must
+   * treat the absence as *nothing to show*, not as an empty value to render.
+   * The server's column is nullable and the wire spells both of its states
+   * explicitly (`string` or `null`), so this type's `undefined` is produced by
+   * exactly one thing — a `null` on the wire — and the mapper refuses a wire row
+   * that omits the key entirely rather than letting a forgotten construction
+   * site read as "not described".
+   *
+   * Bounded at 500 characters by the domain schema, because the card renders it
+   * on one line.
+   */
+  description?: string;
   /** null = withheld (guest); a number is a count of what THIS caller may see. */
   ticketCount: number | null;
   /** null = withheld (guest). Counted by the same rule `FilterSpec.blocked` uses. */

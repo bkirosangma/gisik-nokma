@@ -799,6 +799,130 @@ describe('13.394 the home\'s new-project form is a raised card, not the workspac
 });
 
 /**
+ * 13.984-13.985 (door A, 2026-09-19) — the project card draws the description,
+ * and draws NOTHING when the project has none.
+ *
+ * The prototype draws `p.desc` as a muted 15px line inside the card's own click
+ * target (`desktop.dc.html:264`). The second case is the one worth having: the
+ * failure mode is not a missing line, it is an EMPTY line — a card that renders
+ * a description slot for a project nobody described is claiming something no
+ * event ever said, and it looks identical to a correct card.
+ */
+describe('13.984-13.985 the project card draws the description, and draws nothing when there is none', () => {
+  it('13.984 — draws it inside the card’s own door', async () => {
+    mount([
+      [
+        workspaceAs('member', {
+          projects: [
+            {
+              id: 'p1',
+              name: 'Delivery',
+              archived: false,
+              ticketCount: 2,
+              blockedCount: 0,
+              description: 'Sprint work for the rollout',
+            },
+          ],
+        }),
+      ],
+    ]);
+
+    const card = await screen.findByTestId('project-row-p1');
+    expect(within(card).getByText('Sprint work for the rollout')).toBeInTheDocument();
+    // INSIDE THE DOOR, as the prototype draws it — asserted by containment
+    // rather than by presence, because a description placed outside the anchor
+    // would be text that looks right and cannot be clicked through.
+    const drawn = card.querySelector('.gn-project-card__description');
+    expect(drawn).not.toBeNull();
+    expect(card.querySelector('.gn-project-card__door')?.contains(drawn!)).toBe(true);
+  });
+
+  it('13.985 — a project nobody described draws no description element, while its sibling draws one', async () => {
+    mount([
+      [
+        workspaceAs('member', {
+          projects: [
+            { id: 'p1', name: 'Delivery', archived: false, ticketCount: 2, blockedCount: 0 },
+            {
+              id: 'p2',
+              name: 'Site readiness',
+              archived: false,
+              ticketCount: 1,
+              blockedCount: 0,
+              description: 'Pre-visit checks per site',
+            },
+          ],
+        }),
+      ],
+    ]);
+
+    const undescribed = await screen.findByTestId('project-row-p1');
+    // NO ELEMENT AT ALL — not an empty one. `toBeNull` on the query, rather
+    // than a text assertion, because an empty `<span>` has no text to assert
+    // against and would therefore pass any check written on content.
+    expect(undescribed.querySelector('.gn-project-card__description')).toBeNull();
+
+    // THE CONTROL, same page, same render: the sibling card DOES carry one, so
+    // the null above is this card's answer and not a class that never renders.
+    const described = await screen.findByTestId('project-row-p2');
+    expect(described.querySelector('.gn-project-card__description')?.textContent).toBe(
+      'Pre-visit checks per site',
+    );
+  });
+});
+
+/**
+ * 13.986 (door A, 2026-09-19) — the OPTIONAL description input on the
+ * New-project form. Owner ruling, verbatim: *"New-project form gains an
+ * optional description input: go with this."*
+ *
+ * **Two submissions in one case, and the second is the important one.** The
+ * schema has no `''` spelling for "no description" — `min(1)` refuses it — so an
+ * untouched box must produce a payload with the key ABSENT. A form that sent
+ * `description: ''` would be refused by the domain for a field the person
+ * deliberately left alone, and the create form would be unusable without a
+ * description.
+ */
+describe('13.986 the new-project form authors an optional description', () => {
+  const created = (events: SubmittedEvent[]) =>
+    events.find((event) => event.type === 'project.created')!;
+
+  it('sends the description as typed, and OMITS the key when the box is left untouched', async () => {
+    const events: SubmittedEvent[] = [];
+    mount([[workspaceAs('admin')]], { ingest: (sent) => events.push(...sent) });
+
+    await userEvent.type(await screen.findByPlaceholderText('e.g. Phase 2 rollout'), 'Delivery');
+    await userEvent.type(
+      screen.getByPlaceholderText('e.g. Sprint work for the rollout'),
+      'Sprint work for the rollout',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Create project' }));
+    await waitFor(() => expect(events.some((e) => e.type === 'project.created')).toBe(true));
+
+    expect(created(events).payload).toEqual({
+      name: 'Delivery',
+      description: 'Sprint work for the rollout',
+    });
+
+    // SECOND SUBMISSION — the description box left untouched. The form clears
+    // both fields on success, so only the name is typed this time.
+    events.length = 0;
+    await userEvent.type(await screen.findByPlaceholderText('e.g. Phase 2 rollout'), 'Site readiness');
+    await userEvent.click(screen.getByRole('button', { name: 'Create project' }));
+    await waitFor(() => expect(events.some((e) => e.type === 'project.created')).toBe(true));
+
+    const payload = created(events).payload as Record<string, unknown>;
+    expect(payload['name']).toBe('Site readiness');
+    // ABSENT, asserted with `in`. `toEqual({name})` would NOT catch this: a
+    // `description: undefined` left on the object compares equal to a missing
+    // key, so the shape this case exists to forbid would pass the obvious
+    // assertion and fail only on the server, as a refusal of a field the person
+    // never filled in.
+    expect('description' in payload).toBe(false);
+  });
+});
+
+/**
  * The branch a workspace id nobody is a member of takes. Not one of the six
  * allocated ids — it is the negative control that keeps 13.384 honest, because
  * "the list is empty" and "this is not your workspace" are different facts and

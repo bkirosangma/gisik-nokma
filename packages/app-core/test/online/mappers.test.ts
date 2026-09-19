@@ -1945,6 +1945,84 @@ describe('13.357 mapWorkspaceRefs reads role, the server field the client used t
 });
 
 /**
+ * Door A, 2026-09-19 — the project description across the wire.
+ *
+ * **Two states, and the mapper must not let a third one in.** The route always
+ * sends the key: a `string` for a described project, `null` for one nobody has
+ * described. On the client those become a `string` and an ABSENT key. A row
+ * that carries no key at all is a construction site that forgot the field, and
+ * `13.983` is what stops it from arriving as "not described" — which is the
+ * half-witnessed-contract failure this repo has been bitten by, because a wrong
+ * answer that renders as a correct-looking card is invisible to every
+ * assertion that only reads the card.
+ */
+describe('13.982-13.983 mapWorkspaceRefs reads the project description', () => {
+  function row(extra: Record<string, unknown>): Record<string, unknown> {
+    return { projectId: 'p1', name: 'Delivery', archived: false, description: null, ...extra };
+  }
+  function body(projects: Record<string, unknown>[]): { workspaces: unknown[] } {
+    return {
+      workspaces: [
+        {
+          workspaceId: 'ws1',
+          name: 'Meghalaya Rollout',
+          role: 'member',
+          nameRestrictedProjectCount: 0,
+          projects,
+        },
+      ],
+    };
+  }
+
+  it('13.982 — a served description maps through, and a null becomes an ABSENT key', () => {
+    const [ref] = mapWorkspaceRefs(
+      body([
+        row({ description: 'Sprint work for the rollout' }),
+        row({ projectId: 'p2', name: 'Site readiness', description: null }),
+      ]),
+    );
+
+    expect(ref!.projects[0]!.description).toBe('Sprint work for the rollout');
+    // NOT DESCRIBED is the ABSENCE of the key — asserted with `in`, not with
+    // `toBeUndefined()`, which a mapper writing `description: undefined` would
+    // also satisfy. The type's docblock claims absence and this is the line
+    // that holds it to that word.
+    expect('description' in ref!.projects[1]!).toBe(false);
+    // THE CONTROL, same body, same run: one project in it IS described, so the
+    // absent key above is this mapper's answer about that row and not a body
+    // that carried no descriptions at all.
+    expect('description' in ref!.projects[0]!).toBe(true);
+    // `''` is the specific wrong value the absence must never be collapsed to —
+    // the client renders `undefined` as nothing and `''` as an empty line.
+    expect(ref!.projects[1]!.description).not.toBe('');
+  });
+
+  it('13.983 — REFUSES a project row that omits the description key, naming its path', () => {
+    const orphan = row({});
+    delete orphan['description'];
+
+    expect(() => mapWorkspaceRefs(body([orphan]))).toThrow(MappingError);
+    // The path, so the failure says WHICH row on WHICH route forgot it. A bare
+    // `toThrow(MappingError)` would also pass on any other mapping failure in
+    // the same body, which is the shape-rather-than-subject mistake.
+    expect(() => mapWorkspaceRefs(body([orphan]))).toThrow(/projects\[0\]\.description/);
+    // **AND THE GUARD'S OWN SENTENCE, which is what makes this case specific.**
+    // The path alone does NOT identify the property: with the presence check
+    // deleted, `asString(undefined, path)` still throws a `MappingError` at the
+    // SAME path — so the two assertions above would both stay green while the
+    // refusal they exist for had been removed entirely. Only the message
+    // separates "the key is missing" from "the value is not a string", so the
+    // tail of this one is load-bearing rather than decorative.
+    expect(() => mapWorkspaceRefs(body([orphan]))).toThrow(/omitting the key/);
+
+    // CONTROL: the identical row WITH the key parses. Without it, the two
+    // assertions above would also pass if `mapWorkspaceRefs` refused this body
+    // for an unrelated reason.
+    expect(() => mapWorkspaceRefs(body([row({})]))).not.toThrow();
+  });
+});
+
+/**
  * 13.372 — Task 16's counts across the mapper, where ABSENT and `0` must stay
  * two different claims.
  *
@@ -1955,7 +2033,14 @@ describe('13.357 mapWorkspaceRefs reads role, the server field the client used t
  */
 describe('13.372 mapWorkspaceRefs distinguishes a WITHHELD count from a counted zero', () => {
   function project(extra: Record<string, unknown>): Record<string, unknown> {
-    return { projectId: 'p1', name: 'Shop operations', archived: false, ...extra };
+    // `description: null` belongs to the WIRE'S DEFAULT SHAPE, not to this
+    // case's subject. The route always sends the key, spelling "nobody has
+    // described this project" as `null`, and the mapper REFUSES a row that
+    // omits it (13.983) — so a fixture built without it no longer describes a
+    // body the server can produce, and every case below would fail on the
+    // missing key rather than on the count it is actually about. `...extra`
+    // spreads LAST, so a case can still override it.
+    return { projectId: 'p1', name: 'Shop operations', archived: false, description: null, ...extra };
   }
   function withProjects(
     workspace: Record<string, unknown>,
