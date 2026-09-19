@@ -41,6 +41,61 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~15:2x IST. **THE `isMcpAuth` DENIAL DOOR IS BUILT; THE PR IS
+> # OPEN AND THIS LANE IS WAITING ON THE CONTROLLER.** Branch **`exec/mcpauth-deny`**, cut from
+> # **`origin/main` = `c2a80620`**; dispatch `CTL-DISPATCH-2026-09-19-mcpauth-deny.md`. **The list-filter
+> # move is MERGED as `a4483917`** — superseded below, and a restart must not redo either.
+>
+> ## VERIFIED ANCHORS — re-measured with `/usr/bin/git`
+> | | |
+> |---|---|
+> | base | `origin/main` = **`c2a80620`** when this branch was cut — **it has moved since; re-take it** |
+> | tree | **clean** at the handoff commit; every change is on the branch, nothing unpushed |
+> | gate | **`pnpm turbo run build test typecheck` — 33 successful, 33 total, EXIT 0, `1m16.624s`**, run by THIS lane at its own tree. **Node runtime `v22.22.2`** |
+> | checks | all **8 exit 0**; `check-case-ids` **2415** (was 2406 — exactly the nine new cases), union == sum |
+>
+> ## THE TWO SECURITY-SHAPED MUSTS, AND WHAT EACH TURNED OUT TO BE
+> 1. **CSRF registration — done, and it is not pattern-covered.** `HTTP_ORIGIN_PROTECTED_ROUTES` now
+>    carries `/v1/mcp/device/deny` beside `approve`. **`MUTATING_METHODS` is `{'POST','PUT','PATCH','DELETE'}`
+>    (`http-origin.ts:207`), so the POST is covered once the path is registered** — verified, not assumed.
+> 2. **The "route-count test" question is SETTLED, and the answer is not a route count.** There is
+>    **no** test asserting the NUMBER of routes on `mcp-device.ts` or anywhere else (seven targeted
+>    greps — `app.hasRoute`, `.routes`, `fastify.routes`, `routeTable`, `ROUTES.length`, `pluginRoutes`,
+>    `PROTECTED_ROUTES.size` — all zero). What DOES exist is stronger and in a different place:
+>    **`security-middleware.test.ts`'s `13.116` set-equality drift guard**, which compares a `PROTECTED`
+>    table against `HTTP_ORIGIN_PROTECTED_ROUTES` **exactly, in both directions**. **Protecting the route
+>    without adding a row there reddens it, and adding the row without the protection reddens it too.**
+>    So the route SET is pinned precisely even though the count is not.
+>
+> ## FOUR MUTATIONS, FOUR KILLS — none by a 500
+> | # | mutation | result |
+> |---|---|---|
+> | M1 | `DELETE … AND approved_user_id IS NULL` | **RED on 14.105 ALONE** (`expected 404 to be 200`). 14.104 stayed green — that is what shows the mutation moved only the approved-state property |
+> | M2 | the deny route's path relocated (handler gone) | **RED on 14.104/105/106/107b**, every failure a clean status mismatch, **zero `500` mentions in the log** — the dispatch's explicit requirement. 14.107 stayed green, which shows that case tests the REGISTRY, not the route |
+> | M3 | `/v1/mcp/device/deny` removed from the CSRF set | **RED on FIVE**: 14.107 (`false` vs `true`), 14.107b (`401` vs `403`), both `it.each` probe loops for the new row (`400` vs `403`), **and the `13.116` drift guard** (`…(9)` vs `…(8)`) |
+> | M4 | the UI's Deny posts to `approve` | **RED on 14.108 ALONE** (`expected '/v1/mcp/device/approve' to be '/v1/mcp/device/deny'`); 14.109 green |
+> All four restored and verified by `git hash-object` against pre-mutation hashes.
+>
+> ## THE REFUSAL, ANSWERABLE IN BOTH STATES — the dispatch's item 3
+> `denyDeviceCode` is a **DELETE of the grant row with NO predicate on `approved_user_id`**, so it covers
+> both states in one statement, and that is why the ruling's `NEW ROUTE` classification holds with **no
+> migration**: `mcp_device_codes` has exactly one state column. **14.104** denies an unapproved code (which
+> can then be neither approved nor exchanged) and **14.105** denies an already-approved one (so no
+> credential is ever issued) — two cases because a denial that silently does nothing is the "button that
+> lies" defect class. Every downstream answer is `unknown_code`, **deliberately not a distinct "denied"
+> state**, which would confirm to whoever holds a guessed user code that it had been real; it is also the
+> shape `approveDeviceCode` already gives a second approver.
+>
+> ## SCOPE — two DECLINES that are settled, not deferred
+> `owner-holds.md`'s doors table records `scopes` and `displayed code` as **DECLINED** on this screen, and
+> the table's own words are that *"a later session must not surface them as gaps to close."* **Neither was
+> built and neither was prepared for.** `scopes` contradicts the shipped consent model (the file's own
+> docblock: what is granted is *"a credential that acts AS this person"*, and no scope column exists);
+> `displayed code` inverts who holds the code.
+>
+> ## ⚠ SHAS IN THIS FILE ARE UNRELIABLE — including mine
+> `c2a80620` was `origin/main` when this branch was cut. **Re-take every reading before acting on it.**
+
 > # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~15:1x IST. **THE LIST-FILTER CONTROL HAS MOVED INTO THE
 > # HEADER AND IS THE SHARED `Switch`; THE PR IS OPEN AND THIS LANE IS WAITING ON THE CONTROLLER.**
 > Branch **`exec/list-filter-move`**, cut from **`origin/main` = `7daa7ab0`**; dispatch

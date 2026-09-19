@@ -16,7 +16,8 @@ file's then-highest id rather than renumbering, exactly as §13 records doing fo
 one exception a reader will otherwise trip on: **`14.100` is Task 5's manual end-to-end case**, minted
 out of band when a Task 5/Task 6 id collision was fixed. The `last_used` column added on the owner's
 2026-09-08 ruling therefore sits at `14.102–14.103`, not `14.100–14.101`. That collision was caught by
-`check-case-ids`, not by reading. **Next free: `14.104`.***
+`check-case-ids`, not by reading. **Next free: `14.112`** — recounted 2026-09-19 after the denial
+door took `14.104`–`14.111`.***
 
 ## Task 1 — configuration (`packages/mcp-server`)
 
@@ -104,6 +105,25 @@ which is the door that requires identity, and therefore the door that needs CSRF
   *Planted defect, run: deleting the route from `HTTP_ORIGIN_PROTECTED_ROUTES` fails **both** 14.27 and
   14.27b — 2 failed / 7 passed. Two failures and not one is the requirement; if only 14.27 had failed,
   14.27b would not be testing what it claims. Restored and verified by SHA-256 against `HEAD`.*
+
+### 2026-09-19 — the DENIAL door (`14.104`–`14.111`)
+
+*Added with the owner's doors ruling (`docs/lanes/owner-holds.md`, "THE DOORS, RULED": `isMcpAuth` **deny** → **BUILD**, a `NEW ROUTE` sibling of approve). **`scopes` and `displayed code` are DECLINED on that same table and are settled product positions — a later session must not surface them as gaps to close.***
+
+- **14.104** ✅ Denies an UNAPPROVED code, which can then be neither approved nor exchanged — the deny answers `{ denied: true }`, a later approve answers 404, and the CLI's exchange answers 404. The last two are the point: the first alone would pass against a route that merely recorded a flag. — (`apps/server/test/mcp/device-flow.test.ts`)
+  *Planted defect, run: predicating the `DELETE` on `approved_user_id IS NULL` reddens **14.105 alone** — 1 failed / 13 passed, `expected 404 to be 200` at the deny call. 14.104 stays green, which is what shows the mutation moved only the already-approved property and not the route.*
+- **14.105** ✅ Denies an ALREADY-APPROVED code, so no credential is ever issued — the state the dispatch named explicitly, and the one that would quietly mint a token if that predicate were ever added back. — (`apps/server/test/mcp/device-flow.test.ts`)
+- **14.106** ✅ Needs a session (`401 { error: 'unauthenticated' }`), and an unknown code is refused with the body approve already uses — `404 { error: 'unknown_code' }`, deliberately not a distinct "denied" answer, which would confirm to whoever holds a guessed user code that it had been real. — (`apps/server/test/mcp/device-flow.test.ts`)
+- **14.107** ✅ `/v1/mcp/device/deny` is in `HTTP_ORIGIN_PROTECTED_ROUTES`. The attack is the MIRROR of 14.27's and no less real for being a refusal rather than a grant. — (`apps/server/test/mcp/device-flow.test.ts`)
+- **14.107b** ✅ A cookie-carrying DENIAL with a forged `Origin` is refused 403 `forbidden_origin`, and the SAME denial bearer-authenticated succeeds — doing double duty: it proves the 403 is about the ORIGIN rather than a route that refuses everything, and because it answers 200 rather than 404 it also proves the forged call really did nothing. — (`apps/server/test/mcp/device-flow.test.ts`)
+  *Planted defect, run: removing the route from `HTTP_ORIGIN_PROTECTED_ROUTES` reddens **five** cases — 14.107 (`false` vs `true`), 14.107b (`401` vs `403`), both `it.each` probe loops in `security-middleware.test.ts` for the new row (`400` vs `403`), and **the `13.116` set-equality drift guard**, which reports the two sets as `…(9)` and `…(8)`. That guard fires in BOTH directions by design: protect the route and forget its row, or add the row and drop the protection.*
+- **14.108** ✅ The Deny control sits BESIDE Approve on `/mcp/authorize` and posts to the DENIAL door — `/v1/mcp/device/deny` with `{ userCode }`, asserted on the URL rather than on "something was sent", because a `deny: true` flag posted to approve is the one-route-two-questions shape this repo refuses by name. — (`apps/web/test/mcp-authorize.test.tsx`)
+  *Planted defect, run: posting both controls to `/v1/mcp/device/approve` reddens **14.108 alone** (`expected '/v1/mcp/device/approve' to be '/v1/mcp/device/deny'`); 14.109 stays green.*
+- **14.109** ✅ Approve still posts to `/v1/mcp/device/approve` — the positive control proving the two doors really are two. — (`apps/web/test/mcp-authorize.test.tsx`)
+- **14.110** ✅ Both controls are disabled until a code is present, so neither can be pressed into an empty POST. — (`apps/web/test/mcp-authorize.test.tsx`)
+- **14.111** ✅ A refusal on DENY is rendered as a sentence naming BOTH possibilities ("not recognised … already been used"), and the form returns rather than sticking in a sending state. — (`apps/web/test/mcp-authorize.test.tsx`)
+
+*The accessible names on this screen are asserted **by string** (`getByRole('button', { name: 'Deny' })`), because `e2e-viewport`'s sweep counts `aria-label` ATTRIBUTES and cannot tell one name from another — and **neither accessible-names baseline carries a `/mcp/authorize` key** (measured 2026-09-19), so nothing else in the suite is watching these strings.*
 
 > **A defect in this task's own specified test, worth keeping because of how it was caught.** The plan's
 > Step 4 says the file must go entirely red and that any pass at that point means a test "is testing

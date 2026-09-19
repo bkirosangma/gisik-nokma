@@ -2527,7 +2527,8 @@ input, textarea, select { font-family: inherit; }
   font-size: 1rem;
 }
 
-.gn-mcp-authorize__granted {
+.gn-mcp-authorize__granted,
+.gn-mcp-authorize__denied {
   margin: 0 0 0.6rem;
   font-weight: 600;
   color: var(--gn-text);
@@ -2542,6 +2543,17 @@ input, textarea, select { font-family: inherit; }
 .gn-mcp-authorize__revoke { color: var(--gn-text-muted); }
 
 .gn-mcp-authorize__signed-out { margin: 0; }
+
+/* The two consent controls, side by side and of equal weight — the question
+   this screen asks has two answers and the layout should not imply a favourite.
+   `flex-wrap` because 390px cannot hold "Approve this assistant" and "Deny" on
+   one line, and this row sits last, after the hint, so a wrap costs nothing. */
+.gn-mcp-authorize__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
 
 /* A refusal is a first-class rendering, not an error state — the same shape
    `.gn-shell__refusal` uses. `--gn-danger` on the RULE only, never as the text

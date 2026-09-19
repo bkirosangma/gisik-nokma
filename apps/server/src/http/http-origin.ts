@@ -173,6 +173,12 @@ export const HTTP_ORIGIN_PROTECTED_ROUTES: ReadonlySet<string> = new Set([
   // A cookie-authenticated POST that MINTS A CREDENTIAL — the same category as
   // the invite route three lines up, and the reason that one is here.
   '/v1/mcp/device/approve',
+  // Its DENIAL sibling, added 2026-09-19. The attack is the MIRROR of the one
+  // above and no less real for being a refusal rather than a grant: without
+  // this entry, a page the victim visits can kill a grant out from under
+  // whoever was mid-approval. A sibling PATH rather than a `deny` flag on
+  // approve — see the route's own note for why that shape is refused.
+  '/v1/mcp/device/deny',
 ]);
 
 /**

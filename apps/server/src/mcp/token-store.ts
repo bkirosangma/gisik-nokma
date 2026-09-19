@@ -82,6 +82,50 @@ export async function approveDeviceCode(
 }
 
 /**
+ * The browser's OTHER half, and the one the consent panel implied all along.
+ *
+ * Denial is a DELETE rather than a new column, and that is a ruling-driven
+ * choice rather than a shortcut. The doors table records deny as a **NEW
+ * ROUTE** and not a MIGRATION, and the shape of `mcp_device_codes` is what makes
+ * that possible: `approved_user_id` is the only state column, so removing the
+ * row answers BOTH questions in one statement —
+ *
+ *   - a grant that is NOT yet approved can no longer be approved, and
+ *   - a grant that IS already approved but not yet collected can no longer be
+ *     exchanged, because `exchangeDeviceCode` finds no row and answers
+ *     `unknown`.
+ *
+ * **Both fall to `unknown_code`, deliberately rather than for want of
+ * resolution.** A distinct "denied" answer would confirm to whoever holds a
+ * random user code that the code was real — the one thing the unknown arm
+ * exists to avoid — and it is the shape `approveDeviceCode` already uses, where
+ * a grant somebody else approved also falls through to `unknown` rather than
+ * naming a second state. The CLI's poll therefore answers `unknown_code`, which
+ * the device flow already reads as "ask for a new one".
+ *
+ * There is NO predicate on `approved_user_id`, and that is the point: deny has
+ * to work in both states, so it deletes whatever row that user code names.
+ */
+export async function denyDeviceCode(
+  db: Queryable,
+  userCode: string,
+  now: Date,
+): Promise<'denied' | 'unknown' | 'expired'> {
+  const { rowCount } = await db.query(
+    'DELETE FROM mcp_device_codes WHERE user_code = $1 AND expires_at > $2',
+    [userCode, now],
+  );
+  if ((rowCount ?? 0) > 0) return 'denied';
+  const { rows } = await db.query<{ expires_at: Date }>(
+    'SELECT expires_at FROM mcp_device_codes WHERE user_code = $1',
+    [userCode],
+  );
+  const row = rows[0];
+  if (row === undefined) return 'unknown';
+  return row.expires_at <= now ? 'expired' : 'unknown';
+}
+
+/**
  * The CLI's half, and the place single-use is enforced.
  *
  * The grant row is DELETED in the same statement that reads it
