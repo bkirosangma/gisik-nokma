@@ -25,3 +25,12 @@ This sentence cites 13.99 in prose, mid-sentence, and must NOT be counted -- onl
   lines and manufactured three DUPLICATE ids (13.439, 13.447, 13.517) in a measured simulation. A
   marker AND bold must both be present, so a prose bullet that merely begins with a quoted id is not an
   id line. Without this line, loosening the rule again would pass this self-test.
+
+- 📌 **`13.97`'s six new arms** -- a POSSESSIVE CITATION, not a declaration, and it must NOT be counted.
+  This is executor 2's line from `test-cases/16-remaining-doors.md:96`, verbatim in shape, and it is
+  here because it went RED ON MAIN: it satisfies "marker AND bold AND a backticked id" exactly, so the
+  first version of the backticked rule read it as a declaration of `13.97` and reported a DUPLICATE
+  against that id's real entry elsewhere. The rule now requires WHITESPACE after the closing backtick --
+  a declaration reads `` **`id` — the case's own words``, the id standing alone as the bullet's subject,
+  whereas a possessive reads `` **`id`'s …``. Without this line the next loosening passes the
+  self-test and turns a lane's gate red instead, which is precisely what happened the first time.
