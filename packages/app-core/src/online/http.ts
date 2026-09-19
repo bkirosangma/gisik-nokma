@@ -40,8 +40,11 @@ export class HttpError extends Error {
    * thing a caller could put on screen was this class's own message, `HTTP 422
    * for /v1/workspaces`, which is the shell paraphrasing a refusal it never
    * read — the exact failure `src/shell-refusal.tsx` in `apps/web` exists to
-   * prevent for the refusing READS — six of them until ruling P25
-   * clause 1 served two, four since.
+   * prevent for the refusing READS. **⚠ CORRECTED 2026-09-20:** this read *"— six of
+   * them until ruling P25 clause 1 served two, four since."* The count is now
+   * **ZERO** — it emptied on 2026-09-19 — so this class no longer stands beside a
+   * serving gap; it stands beside the ordinary failures, which it was always also
+   * for.
    *
    * It is `unknown`, not a refusal type: the doors send at least three
    * different shapes (`{error,message}`, `{error,rule,message}`, an

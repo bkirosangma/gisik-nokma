@@ -41,6 +41,207 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~10:1x IST. **THE FALSIFIED-CLAIM SWEEP IS BUILT, PROVEN
+> # COMMENTS-ONLY, AND GATED GREEN.** Branch **`exec/falsified-claim-sweep`**, cut from
+> # `origin/main` = **`3f37ffc4`** (the `#578` merge) at cut, **`92f3d93c`** now — it MOVED. **The CODE head
+> # is `28418c5f`** (Round 3, on `45b657db` Round 2, on `95470afb` Round 1); **PR #583 is open against it,
+> # `--base main`, `MERGEABLE`.** This handoff commit sits above all three. An earlier draft read *"the
+> # handoff commit sits ON TOP of the code head"* while the two were still one commit, and the split was
+> # made so that the sentence is true: a commit cannot name its own sha, so the block names the head
+> # beneath it, which is the reading that survives a restart.
+>
+> ## THE DISPATCH, AND THE ONE THING IT GOT WRONG IN MY FAVOUR
+> The controller sent me to `apps/web/src/ticket-location.ts:26` — a docblock asserting
+> `DataSource.getTicket` **refuses** — false since ruling P25 clause 1 (`c86c4b5c`, 2026-09-06) served its
+> three absences, which `#537` had swept past. The dispatch's rule was the whole task: **the sweep's
+> universe must not be the files I had already opened.**
+>
+> ## THE UNIVERSE, DEFINED BEFORE I LOOKED (frozen to `/tmp/falsified-sweep-universe.txt` first)
+> Tokens `getTicket` / `getTickets` / `mapTicketRead` / `ServingGapError` across `apps/ packages/ scripts/
+> docs/ test-cases/`, excluding `node_modules`, `dist`, `.next`. **162 files.** Control, same invocation:
+> `getTicket` lines — **1090** whole-universe, **751** code-only. **The controller's 747 is the code-only
+> figure; the disagreement was SCOPE, reconciled by decomposition, not a swallowed query.**
+>
+> **⚠ THE DISPATCH'S ROOT LIST HAD A HOLE, AND IT IS WHERE THE BEST CARRIERS WERE.** `Features.md` lives at
+> the **repo root**, which the list (`apps/ packages/ scripts/ docs/ test-cases/`) omits. It carries
+> **5 falsified claims**. I swept the root separately (`CLAUDE.md`, `Features.md`, `README.md` — 23 token
+> hits) and folded them in. **A universe is not a pattern, and neither is a root list.**
+>
+> ## A SILENT-EMPTY MODE FIRED FIRST — the reason the control exists
+> My per-root loop used `command rg`, which **returned 0 for every root**. There is no real ripgrep binary
+> here, only a shell **function** wrapper; `command rg` is a silent no-op. It would have read as "no
+> carriers anywhere". The same query through the wrapper and through `grep -r` agrees. **(A control that
+> traverses the same path is not optional.)**
+>
+> ## WHAT I FOUND: TWO CLASSES, NOT ONE
+> **Class 1 — a read asserted to REFUSE that answers.** `getTicket`, `getTickets`, and (undispatched)
+> `getMyWork`. The dispatch named one; there were **six more in source/test docblocks and five in
+> `Features.md`**.
+> **Class 2 — the COUNT of refusing methods, in the same sentences.** The register went 6 → 4 (P25 clause
+> 1) → 3 (P32/P38) → 1 (P39/P40) → **0** when `search` was served on 2026-09-19 (`42fb2f2c`).
+> **MEASURED AT THIS SHA: `Object.keys(SERVING_GAPS)` is EMPTY** (`mappers.ts:2189` — **it was `:2179` when
+> this line was first written, and THIS BRANCH'S OWN ROUND-2 EDIT to that file moved it**; the same
+> self-inflicted shift caught `:828`→`:838` and `online-data-source.ts:247`→`:253`. **Three citations in
+> one handoff, all invalidated by the sweep that wrote them** — see the ROUND 2 block's method note),
+> pinned green by 3.39.
+> So *"FOUR of the THIRTEEN query methods REFUSE, and that is the design"* — the canonical docblock of
+> `online-data-source.ts` — was itself false, along with every "one of the six serving gaps".
+>
+> **Consequences recorded, not fixed (named owners, per the rule):** `refuse()` in `stub-services.ts` now
+> has **NO callers** and throws for every method; `expectStillUnserved` in `client-contract.test.ts` is
+> **defined and callerless**. Both are dead instruments that were correct while they mattered.
+>
+> ## SCOPE — measured, and the left-ones are named
+> | | |
+> |---|---|
+> | files changed | **22** (`git diff --name-only \| wc -l`) |
+> | hunks / edit sites | **40** (31 code+test, 9 markdown) |
+> | diffstat | **+250 / −137** — measured, never remembered |
+> | **PROVEN comments-only** | esbuild `--minify` (strips comments) over HEAD and worktree: **18/18 files byte-identical**, two controls in the same run (a code change is caught; a comment-only change reads identical) |
+>
+> **DELIBERATELY LEFT, and why — 4 categories:**
+> 1. **The `LIST_PAGE_CAP` refusal is REAL and current** (`online-data-source.ts:253` (was `:247`), `ticket-list.tsx:98`,
+>    `app/…/p/[projectId]/page.tsx:287`, `Features.md:82`, `:407`). **Not corrected**, and checked.
+> 2. **`FILTER_BLOCKED_ABSENCE`** (`mappers.ts:838` (was `:828`), `preferences-gateway.ts:78`) — a live throw. Left.
+> 3. **`docs/lanes/*` and `docs/superpowers/plans|specs/*`** — logs and superseded specs. Rewriting a log's
+>    history destroys the record the sweep's own marking convention exists to keep. Left, all of it.
+> 4. **`expectStillUnserved`'s failure-message string** — inside a callerless function, and a string literal
+>    in a test file is closer to an assertion than to a comment. Left for the controller.
+>
+> **No case id minted.** `16.83` stays free: a comment correction pins no product behaviour, per the dispatch.
+>
+> ## ROUND 2 — THE REVIEWER FOUND THAT ROUND 1'S UNIVERSE WAS THE BUG, AT THE LEVEL OF PATTERN
+> The first reviewer pass returned **(A) comments-only PASS, (B) corrections true PASS, (C) MISSED
+> CARRIERS FAIL, (D) no false new claim**. Its finding is the one that matters and it is exactly the
+> dispatch's own rule, fixed at the file level in Round 1 and NOT at the pattern level:
+>
+> > **The falsified claim is carried in prose that contains NONE of the four tokens.** "refuses whole",
+> > "cannot be answered", "N of the thirteen", "ONE remaining REFUSAL", "DARK", "still refuse".
+>
+> Round 1 swept token-bearing **files** and was structurally blind to the sentences. **A universe is not
+> a pattern, and neither is a pattern's token list** — the same lesson as the root-list hole, one level
+> down. Round 2 re-swept on phrases; the reviewer supplied the control (the same phrasing must find the
+> Round-1 instances already marked `⚠ CORRECTED 2026-09-20`), and it does.
+>
+> **The four Critical carriers Round 1 left, all confirmed at the line before being changed:**
+> - **`Features.md:77`** — the canonical entry for the whole mapper module: *"its ONE remaining REFUSAL
+>   (…one since P39 and P40)"*, and further along *"ONE method refuses rather than returning a plausible
+>   view: `search`"*. Both false.
+> - **`test-cases/03:46`** — case **3.39** itself, whose assertion now proves the opposite.
+> - **`packages/app-core/src/online/mappers.ts:59, :61`** — **the register's OWN FILE**, a heading
+>   reading *"Why several mappers below are nothing but a refusal"* and *"Four of the thirteen … cannot
+>   be answered"*. Round 1 grepped this file for `ServingGapError` and never opened this region.
+> - **`mappers.ts:212`** — *"the standing fact that the register carries `search` alone"*. **⚠ The sentence
+>   is at `:219-220`; `:212` is the section heading above it.** The citation was correct when written and
+>   **this branch's own Round-2 edit to that file moved it** — the fifth self-shifting citation in this
+>   task (`mappers.ts:2179→:2189`, `:828→:838`, `online-data-source.ts:247→:253`,
+>   `mappers.test.ts:953→:957`).
+>
+> **Round 2 changed ~30 more carriers across 14 more files**, including a whole class Round 1 never saw:
+> **`getMyWorkspaces`** ("refuses whole — `mapWorkspaceRefs` throws a `ServingGapError`") in
+> `builder-wiring.tsx`, `data-source-gateway.ts`, `members/page.tsx` (×2), `members-page.test.tsx` (×2),
+> `founding.test.tsx`, `stub-services.ts`, `invites-admin.test.ts`, `workspaces/page.tsx` (×3),
+> `test-cases/12` (12.185) and `test-cases/13-second-wave-board-actions.md` (×2) — **none of those files
+> contains any of Round 1's four tokens.**
+>
+> **Two things the reviewer caught that were mine and not the repo's:**
+> 1. **A wrong citation that predates the sweep** — `builder-wiring.tsx` cited
+>    `online/mappers.ts:906` for `mapWorkspaceRefs`; it is `:1225`, and `:906` is inside
+>    `toServerFilterSpec`. A stale citation still RESOLVES, so the reader is misled, not corrected.
+> 2. **`my-work.tsx` under-claimed.** Round 1 flagged the `contested: []` conclusion as an open question
+>    with an owner. It is not open: `mapMyWork` reads `asArray(record['contested'], …)`
+>    (`mappers.ts:1890`) and `asArray` **throws** (`:261`), so the key is REQUIRED on the wire and
+>    `[]` can only come from a real answer. **Re-derived at the line and recorded as such** — a
+>    conclusion kept because it was re-proved, not because the sentence that carried it survived.
+>
+> ## ROUND 3 — the scoped re-review: Q2/Q3 PASS, **Q1 NOT fully swept**, and one finding REFUTED
+> The scoped pass accepted the four Critical fixes and confirmed the Round-2 claims I could not take on
+> trust — that the empty arm **is** reachable (`mapWorkspaceRefs` answers, `routes/workspaces.ts:157`
+> returns an ordinary 200), that `contested` **is** REQUIRED (`asArray` throws at `:261`), and that every
+> count Round 2 wrote is correct. It re-verified comments-only independently (14/15 byte-identical, and
+> **`data-source.ts` is the ONLY zero-output file in the whole changed set**, which is the check I asked
+> for because an unmeasured file would pass silently). It judged the owner flags legitimate rather than
+> evasions.
+>
+> **But it found Q1 was not swept to the end**, and the shape is the worst one: **`Features.md:334`** and
+> **`test-cases/03:105`** each sit *in a file this branch had already edited*, and `:105` sits **one line
+> below** a line Round 2 corrected. Plus `Features.md:76` ("twelve of thirteen"), `Features.md:1994`
+> ("the online source's seven" — a number the register never held; peak six), `test-cases/13-neomorphism…
+> :963`, and `apps/web/src/app-nav.tsx:374`. **A correction that stops one line short of its own
+> paragraph is how a same-file contradiction is born** — and `Features.md:334` contradicted this
+> branch's own corrected `:77` in the same file.
+>
+> **One reviewer finding was REFUTED by measurement, and it is recorded as refuted rather than obeyed:**
+> the reviewer reported `Features.md:407` as a wrong citation for the `LIST_PAGE_CAP` text, saying that
+> line is the subtasks bullet. It is the subtasks bullet's *headline*, and the `LIST_ROW_CAP` cap text is
+> on that same long line — so the citation resolves to the right content. **A peer's finding is a claim.**
+>
+> **Recorded for the controller, NOT fixed** — a different claim class from this dispatch: the six
+> `ingest` call-site citations in the `Features.md` replica bullet are **4 of 6 wrong**
+> (`ticket-sheet.tsx:276`, `visibility-editor.tsx:176`, `members/page.tsx:137`,
+> `data-source-gateway.ts:296`; the real sites are `:501/:543/:585/:705/:868`, `:189`, `:249/:342`,
+> `:327`). Pre-existing, not authored here — but **this branch re-emitted that line**, so a reader would
+> attribute them to it. *Owner: the controller.*
+>
+> ## ROUND 4 — found by re-sweeping AFTER the PR opened, and it is a class nobody had looked for
+> Every prior round found more than the round before it, so **stopping was an assumption, not a
+> measurement**. Re-running the narrowed sweep against the current tree gave 127 lines, most legitimately
+> different (the replica's own `ReplicaGapError`s, past tense, quoted history, real current refusals such
+> as `mapTicketRead`'s `assignedProvenance`). **Four were live**, and they are the same falsification
+> **one abstraction down** — not *a read* refusing, but *the mapper* refusing over the contested kind's
+> missing title:
+> `apps/web/e2e/smoke.spec.ts:24` · `attention-strip.test.tsx:22` · `:119` · `my-work.test.tsx:157`.
+> **`attention-strip.tsx:63-66` had ALREADY recorded that expiry** — *"this rule used to rest on a SECOND
+> fact that has expired"* — three files away. **That is the shape of a sweep that reads the corrected
+> sentence and stops.**
+>
+> ## ⛔ THE ROUND-2 METHOD NOTE — the failure that recurred THREE TIMES IN ONE TASK
+> **Every citation this branch wrote was invalidated by this branch's own later edits to the same file.**
+> 1. `client-contract.test.ts:371` → `:375` (my Round-1 docblock sits above the function).
+> 2. `Features.md` `c86c4b5c` citations — safe, but only by luck: that file's edits are all prose.
+> 3. **`mappers.ts:2179` → `:2189`, `mappers.ts:828` → `:838`, `online-data-source.ts:247` → `:253`** —
+>    all three written into the handoff and the PR body, all three moved by Round 2's own edits.
+> **On a branch whose purpose is editing files, a line citation is invalidated by the next edit to that
+> file. Cite the SYMBOL with the line, or measure citations LAST.** This is the third instance in one
+> task of the same shape, and the reason it kept happening is that each round's citations were written
+> before the next round's edits.
+>
+> **One finding recorded rather than fixed, with an owner — a check that cannot fail:**
+> `client-contract.test.ts`'s **7.209** still asserts `expect([...named].sort()).toEqual(EXERCISED)` where
+> the code above it is `const EXERCISED: string[] = []; for (const constName of [] as string[])` — so its
+> main assertion is **`[] toEqual []`**, and only the complement loop at the end does real work. **NOT
+> fixed here: a test assertion is outside "comments and docblocks only".** *Owner: the controller.*
+> Similarly `mappers.test.ts:957`'s `describe('3.39 the blocked methods refuse, …')` is now a false
+> label — **left, because changing it changes test code**, and named here rather than quietly kept.
+> **⚠ The citation itself was wrong for an hour:** this line and the Round-2 commit message both said
+> `:953`, which was correct at `95470afb` and was moved to `:957` by Round 2's own edit to that file —
+> the fifth self-shifting citation in this task. The commit message cannot be amended without rewriting
+> a reviewed head, so the correction lives here and in the PR body, which is the half that can be fixed.
+>
+> ## GATE — run at the code head, not transferred
+> `pnpm turbo run build test typecheck` → **EXIT 0 · 33/33 successful · 17 cached · 1m12.4s** at Round 1
+> and **EXIT 0 · 33/33 · 17 cached · 1m10.7s** at Round 2 (`45b657db`), Node **v22.22.2**
+> (`pnpm exec node -v`; the `pnpm` binary resolves under a v24 nvm dir while the node it runs is v22 —
+> name the version, never the path). Server suite 154 files / 1620 passed / 5 skipped.
+> **`check:citations` EXIT 0** (ratchet holds exactly on every file) · **`check:tasks` EXIT 0** ·
+> **`check:case-ids` EXIT 0** at Round 2 — `2494 unique ids, highest 16.82, 24 files scanned`, with
+> per-file id-line counts **SAME on both sides** (03: 125/125, 07: 263/263, 12: 347/347) — the branch
+> adds and removes no case-id line.
+> **⛔ THE FORCED GATE IS THE CONTROLLER'S.** 17 tasks were cached here; a `--force` run at the landing
+> tree is the controller's to take.
+>
+> ## ANCHORS (verify every one; a block cannot name its own sha)
+> | | |
+> |---|---|
+> | `origin/main` | **`92f3d93c`** — it MOVED while this branch was open (`#580`, `#581`; was `3f37ffc4` at cut). My base is still an ANCESTOR, **no file is touched by both**, so the merge is clean and I have deliberately NOT rebased — a rebase would invalidate both the gate and the reviewer pass for no gain |
+> | scope, corrected | **37 files · 76 hunks · +563 / −219** via `origin/main...HEAD`. **My first figures used TWO dots (`git diff origin/main`), which compares TIPS and reported executor 2's `docs/manual.md` and `content.generated.ts` as mine** — 42 files / +644 / −675. Three dots is the measurement; this is the second recorded instance of that trap in this lane |
+> | my branch | `exec/falsified-claim-sweep` — cut FROM `3f37ffc4`, **`--base main`** |
+> | code head | **`45b657db`** (Round 2) on **`95470afb`** (Round 1); the handoff commit sits on top of both |
+> | prior branch | `exec/e2e-stack-repair` @ `42783c53` — **fully contained in `origin/main`** (`git branch -r --contains` lists it; `origin/main...HEAD` diff is empty) |
+> | falsifiers | `c86c4b5c` (P25 clause 1, 2026-09-06) · `42fb2f2c` (search served, 2026-09-19). Both REACHABLE from `origin/main` |
+> | `:3001` | **untouched.** No `docker compose` action taken; the owner's stack was not bound or taken down |
+> | next | **PR #583 is OPEN, `--base main`, `MERGEABLE`.** Rounds 1–4 are in it. **#583 opened at `28418c5f`; round 4 landed after it, so the head is `581a5e5e` plus this handoff commit — a NEW HEAD, not a footnote. Gate the TIP.** Nothing further is pushed: the controller gates and merges. |
+>
 > # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~09:0x IST. **THE `e2e-stack` REPAIR IS BUILT AND PUSHED; ITS PR
 > # HAS BEEN REVIEWED AND SENT BACK ONCE; THE FIX ROUND IS PUSHED. THE CODE HEAD IS `2e02ddac`.** Branch
 > # **`exec/e2e-stack-repair`**, cut from `origin/main` =

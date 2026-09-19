@@ -19,7 +19,11 @@ import { WS, claim } from '../helpers/seed.js';
  *
  * `CONTESTED_REASON` is NOT the server's, and is marked so rather than left to
  * look like the other three: no route composes it, because the contested kind
- * is Plan 10's and `mapAttention` refuses over it today.
+ * is Plan 10's. **⚠ CORRECTED 2026-09-20: this continued "and `mapAttention`
+ * refuses over it today" — it does not, and rulings P39/P40 served that read, the
+ * register having been empty since 2026-09-19. The reason `CONTESTED_REASON` is
+ * constructed is narrower than the one given here and it is the FIRST half of the
+ * sentence: no route composes this string.**
  *
  * Note what the due-soon reason names: `2026-08-30`, the raw claimed day, not
  * `30 Aug 2026`. That is the server's spelling and it is rendered as sent.
@@ -116,9 +120,12 @@ describe('3.56–3.57 AttentionStrip — computed, never authored (spec §7)', (
  * given rather than one it chose.
  *
  * `AttentionKind` is a four-member union and the shipped route emits three.
- * The fourth — `contested` — is what `mapAttention` REFUSES over: an
- * `AttentionItem` needs a `title` and no contest row carries one. So a strip
- * built from the three shipped kinds must show three rows and say nothing
+ * The fourth — `contested` — **was** what `mapAttention` REFUSED over: an
+ * `AttentionItem` needs a `title` and no contest row carried one. **⚠ CORRECTED
+ * 2026-09-20: the tense is the correction — rulings P39/P40 served it, and
+ * `mappers.ts` maps a contest's `title` today (`attention-strip.tsx:63-66` records
+ * the same expiry). The property below is unchanged and is why the case stays:
+ * a strip built from the three shipped kinds must show three rows and say nothing
  * whatever about the fourth. The failure being closed is not a crash; it is a
  * "Contested (0)" heading, or an empty fourth section, either of which tells a
  * user that nothing is contested — the one thing this client cannot know.
@@ -413,11 +420,16 @@ describe('3.61 AttentionStrip — one clock, and it is not the viewer’s laptop
 });
 
 /**
- * `getAttention` REFUSES today, and the strip is the surface where a swallowed
- * refusal is most dangerous: its emptiness IS its message. This drives the
- * REAL `ServingGapError` with the REAL absence register out of
- * `online/mappers.ts` rather than a stand-in `Error`, so the assertion pins the
- * refusal that actually ships and goes stale the day the register changes.
+ * **⚠ CORRECTED 2026-09-20: this read *"`getAttention` REFUSES today*, and the
+ * strip is the surface where a swallowed refusal is most dangerous: its emptiness
+ * IS its message."*** `getAttention` ANSWERS — rulings P39/P40 served it, and the
+ * register has been empty since 2026-09-19. **The property is unchanged, and so is
+ * the fixture's shape:** the refusal is now CONSTRUCTED rather than inherited, and
+ * what the cases below measure is the strip's behaviour when a read it needs does
+ * not answer, whatever the cause. This still drives the REAL `ServingGapError`
+ * class rather than a stand-in `Error`, so the assertion still pins the shape that
+ * ships. **The original promise that the assertion "goes stale the day the register
+ * changes" was kept to the letter:** it went stale, and this is that day.
  */
 describe('3.60 useAttention — a refusal is an error, never an empty strip', () => {
   function Harness({ source }: { source: ReturnType<typeof createFakeDataSource> }) {

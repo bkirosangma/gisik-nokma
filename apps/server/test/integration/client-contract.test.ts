@@ -121,14 +121,18 @@ import { fakeSocket } from '../helpers/stream-socket.js';
  *
  * ## The refusals are cross-checked HERE, and that is new (Plan 6 Task 7)
  *
- * The online `DataSource` refuses six `DataSourceQuery` methods rather than
- * returning a view built from facts the server did not send, and each refusal
- * ENUMERATES its absences as data in `packages/app-core/src/online/mappers.ts`.
- * A test in `app-core` can only prove the refusal fires. `expectStillUnserved`
- * below proves the refusal is still TRUE: every `wireKey` a refusal names is
- * checked against the real `/v1` body in the same run. That is what makes a
- * recorded gap go red when its route finally closes it, instead of outliving
- * the thing it described.
+ * **⚠ CORRECTED 2026-09-20: this section opened *"The online `DataSource` refuses
+ * six `DataSourceQuery` methods rather than returning a view built from facts the
+ * server did not send"*, and the count is now ZERO.** It fell 6 → 4 (ruling P25
+ * clause 1, `c86c4b5c`, 2026-09-06) → 3 (P32/P38) → 1 (P39/P40) → 0 when `search`
+ * was served on 2026-09-19, so `SERVING_GAPS` is empty and every absence list this
+ * mechanism read has been deleted — `expectStillUnserved` below now has NO
+ * callers. It is kept, definition and all, because it is the instrument that made
+ * each closure go red rather than outlive the thing it described: while a refusal
+ * existed it ENUMERATED its absences as data in
+ * `packages/app-core/src/online/mappers.ts`, and every `wireKey` a refusal named
+ * was checked against the real `/v1` body in the same run. 7.209 below is the
+ * surviving half and asserts the same end from the other side.
  */
 
 let db: TestDatabase;

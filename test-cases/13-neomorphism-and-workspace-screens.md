@@ -960,7 +960,7 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   keep mutation-witnessable at all: widening the condition to drop the project check reddens the "with a
   workspace, no project" arm alone, because it is the one shape whose expected set has no Board entry
   while a workspace is present. The workspace-name item OMITS while its read is pending or fails — never
-  the raw id — because `getMyWorkspaces` is one of this product's refusing reads and a name that might be
+  the raw id — because `getMyWorkspaces` was one of this product's refusing reads (**⚠ CORRECTED 2026-09-20: rulings P32/P38 served it and the register emptied on 2026-09-19; the name is now unavailable only when it is genuinely missing, which makes this fallback more load-bearing rather than less**) and a name that might be
   wrong is worse than a name not yet shown. **KNOWN FAILURE (whole-branch review, deferred item 11,
   recorded 2026-09-16): this case is currently RED at `app-nav.test.tsx:238` (the "no workspace selected"
   scope-note assertion). It predates the workspaces-prototype-port branch — the last commit to touch nav

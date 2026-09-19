@@ -154,8 +154,11 @@ describe('3.59 MyWork — assigned, in transit, contested (spec §7)', () => {
  * pass the day the read broke.
  *
  * The register agrees, and that is the falsifiable half of the claim rather
- * than a comment restating it: `mapMyWork` refuses over `contested` and
- * deliberately does NOT list `inTransit` as a serving gap.
+ * than a comment restating it: `mapMyWork` **used to** refuse over `contested` —
+ * **⚠ CORRECTED 2026-09-20: rulings P39/P40 served it, and the register has been
+ * empty since 2026-09-19. The surviving half of this sentence is the second one,
+ * which was always the load-bearing part: `inTransit` is deliberately NOT listed
+ * as a serving gap** — and deliberately does NOT list `inTransit` as such.
  */
 describe('3.58 MyWork — the in-transit section is empty because there is no outbox, not because a read was empty', () => {
   /* 13.308 — `No claims in transit.` verbatim. Noted in the catalogue: the four
@@ -529,8 +532,11 @@ describe('3.61 MyWork — the due DAY CLAIM does not move with the viewer’s la
 });
 
 /**
- * `getMyWork` REFUSES today, over `contested`. The refusal must reach the
- * surface as an error — a `MyWorkView` with three empty sections is
+ * **⚠ CORRECTED 2026-09-20: this read *"`getMyWork` REFUSES today*, over
+ * `contested`."*** `getMyWork` ANSWERS — rulings P39/P40 served it and the register
+ * has been empty since 2026-09-19 — so the refusal below is CONSTRUCTED rather than
+ * inherited. **The property is unchanged:** a read that does not answer must reach
+ * the surface as an error, because a `MyWorkView` with three empty sections is
  * indistinguishable from a person who has nothing to do.
  */
 describe('3.60 useMyWork — a refusal is an error, never three empty sections', () => {

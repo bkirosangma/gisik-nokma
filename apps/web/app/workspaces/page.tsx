@@ -67,11 +67,14 @@ export default function WorkspacesPage() {
             </p>
           ) : null}
         </div>
-        {/* Error before data, everywhere in this shell. `getMyWorkspaces` is one
-            of the refusing reads (four of them since ruling P25 clause 1; this is
-            still one), so `workspaces === null` is its NORMAL
-            resting state against the shipped server and a bare "Loading…" here
-            would be a spinner that never stops. */}
+        {/* Error before data, everywhere in this shell. ⚠ CORRECTED 2026-09-20: this
+            read "`getMyWorkspaces` is one of the refusing reads (four of them since
+            ruling P25 clause 1; this is still one), so `workspaces === null` is its
+            NORMAL resting state against the shipped server". It is NOT refusing —
+            rulings P32/P38 served it and the register has been empty since
+            2026-09-19 — and `workspaces === null` is now the ordinary LOADING state.
+            The ORDERING is unchanged and still right: `error` is checked before
+            `data`, because a read that FAILS must not render as a spinner. */}
         {expired ? (
           <ExpiredSessionNotice />
         ) : error !== null ? (
@@ -92,18 +95,26 @@ export default function WorkspacesPage() {
         )}
 
         {/*
-          OUTSIDE the list's three branches, and deliberately so. `getMyWorkspaces`
-          is one of the refusing reads — four of them since ruling P25
-          clause 1, and this is still one — so `error` is its NORMAL resting state
-          against the shipped server — and a founding form nested inside the
-          `workspaces.length === 0` arm would be a form nobody could ever reach.
+          OUTSIDE the list's three branches, and deliberately so. ⚠ CORRECTED
+          2026-09-20: this read "`getMyWorkspaces` is one of the refusing reads —
+          four of them since ruling P25 clause 1, and this is still one — so `error`
+          is its NORMAL resting state against the shipped server — and a founding
+          form nested inside the `workspaces.length === 0` arm would be a form
+          nobody could ever reach." It no longer refuses (rulings P32/P38; the
+          register has been empty since 2026-09-19), **so the empty arm IS reachable
+          and the placement's stated reason has expired. The placement is NOT moved
+          here** — relocating a form is a product decision, not a comment
+          correction's: *owner, whoever next touches this page.*
           A person who cannot be told which workspaces they are in can still found
           one, and that is exactly the person who most needs to.
         */}
         {/*
           OUTSIDE the list's five branches too, and beside the founding form for
-          the SAME reason it is: `getMyWorkspaces` refusing is this page's normal
-          resting state, and a person with a pending invitation and no workspace
+          the SAME reason it is. ⚠ CORRECTED 2026-09-20: this read "…for the SAME
+          reason it is: `getMyWorkspaces` refusing is this page's normal resting
+          state" — the refusal is gone (rulings P32/P38; register empty since
+          2026-09-19), so the reason it names has expired; the PLACEMENT is kept
+          and the owner is named above, at the founding form's block. A person with a pending invitation and no workspace
           yet is precisely the one the banner exists for — nesting it in the
           `length === 0` arm would hide it from everyone whose list failed to
           load, and nesting it inside the list would hide it from the person who

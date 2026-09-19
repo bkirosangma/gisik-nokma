@@ -48,8 +48,9 @@ export type VisibilityEditorProps = {
   currentUserId: string;
   /**
    * The workspace roster, for the people picker and for naming the actor behind
-   * the standing claim. `getMembers` is one of the six methods that ANSWERS, so
-   * this arrives filled in practice.
+   * the standing claim. `getMembers` ANSWERS (as, since 2026-09-19, does every
+   * method in `SERVING_GAPS`' own register — it is empty), so this arrives filled
+   * in practice.
    */
   members: Actor[];
   /**
@@ -94,8 +95,12 @@ type Submission = { kind: 'idle' } | { kind: 'sending' } | { kind: 'refused'; ru
  *   visibility;
  * - `GET /v1/workspaces/:ws/tickets/:ticketId` answers a `proj_visibility` row
  *   wrapped in `{ticket, parent, rollup}` — `mapTicketRead`'s absence table
- *   records that "the wrapper carries no provenance block at all", which is why
- *   `getTicket` REFUSES rather than mapping;
+ *   records that "the wrapper carries no provenance block at all". **This clause
+ *   ended "...which is why `getTicket` REFUSES rather than mapping", and that half
+ *   is corrected 2026-09-20: ruling P25 clause 1 (`c86c4b5c`, 2026-09-06) served
+ *   that absence and `getTicket` maps.** The bullet's CONCLUSION is untouched —
+ *   the wrapper still carries no provenance block, and `TicketRead` has no
+ *   visibility field either;
  * - so nothing anywhere can hand this component a `VisibilityClaim`.
  *
  * The response is a prop that admits `null` and an absence sentence behind it,
@@ -109,14 +114,22 @@ type Submission = { kind: 'idle' } | { kind: 'sending' } | { kind: 'refused'; ru
  * through the ordinary `DataSource.ingest` door, which is the same door,
  * refusal and attribution every other claim gets.
  *
- * ## Its mount point in the ticket sheet is DARK against the shipped server
+ * ## Its mount point in the ticket sheet: it WAS dark, and it is not any more
  *
- * `TicketSheet` returns its refusal branch before the details body renders, and
- * `getTicket` refuses today — so a person cannot reach this component through
- * the sheet until that read is served. That is stated here, and it is why this
- * component's tests drive it DIRECTLY: a sheet test that fabricated a
- * successful `getTicket` in order to see this section would be exercising a
- * line unreachable in production and reporting the result as coverage.
+ * **⚠ CORRECTED 2026-09-20.** This section read: *"`TicketSheet` returns its
+ * refusal branch before the details body renders, and `getTicket` refuses today —
+ * so a person cannot reach this component through the sheet until that read is
+ * served."* Ruling P25 clause 1 (`c86c4b5c`, 2026-09-06) served that read, so the
+ * sheet's refusal branch no longer fires on a healthy read and the details body —
+ * this section included — renders. **What is deliberately NOT corrected here is
+ * this component's own tests.** The sentence they were justified by read: *"this
+ * component's tests drive it DIRECTLY: a sheet test that fabricated a successful
+ * `getTicket` in order to see this section would be exercising a line unreachable
+ * in production and reporting the result as coverage."* Driving it directly is
+ * still the narrower unit, but the UNREACHABLE-vacuity argument has expired with
+ * the refusal, and whether the sheet should now prove this mount is a test-design
+ * decision a comment correction does not get to take. *Owner: whoever next
+ * touches this file.*
  *
  * ## The payload spellings are the domain's, and both refusals are honoured
  *

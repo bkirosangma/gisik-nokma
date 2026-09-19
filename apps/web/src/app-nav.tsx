@@ -371,7 +371,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
 
             The cost, stated rather than hidden: when a workspace IS remembered
             but its name never resolves (you were removed from it, it was
-            deleted, or `getMyWorkspaces` refused), neither the scoped links nor
+            deleted, or `getMyWorkspaces` failed), neither the scoped links nor
             this note render. That is deliberate. The alternative is to clear the
             memory when the name fails, which would throw away a valid workspace
             on a TRANSIENT read failure — destroying state on a network blip, to

@@ -21,7 +21,11 @@ import { expect, test, type Page } from '@playwright/test';
  * The plan's stub for `/v1/me/workspaces` answers
  * `{workspaces:[{id, name, projects:[…]}]}`. The shipped route answers
  * `{workspaces:[{workspaceId, name, role}]}` and carries no projects at all —
- * which is one of the reasons `mapWorkspaceRefs` REFUSES. Shapes here are taken
+ * which is one of the reasons `mapWorkspaceRefs` **used to** REFUSE. **⚠ CORRECTED
+ * 2026-09-20: this was present tense, and the refusal is gone — rulings P32/P38
+ * served `getMyWorkspaces` and the register has been empty since 2026-09-19.** The
+ * route still carries no `projects`, which is why the STUB below still has to
+ * supply them. Shapes here are taken
  * from `packages/domain/src/read-models.ts` and the route handlers.
  */
 const SESSION = {

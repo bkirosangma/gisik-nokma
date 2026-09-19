@@ -132,9 +132,12 @@ beforeEach(() => {
  *
  * The gate is the server's 403 and not a client-side role read, and that is an
  * ADAPTATION rather than a shortcut: 15b feature-gates on the caller's role
- * "from `/v1/me/workspaces`", but `getMyWorkspaces` refuses whole
- * (`mapWorkspaceRefs`), so no client on this branch can read that role, and a
- * role-only mapper over the same route would be routing around a refusal.
+ * "from `/v1/me/workspaces`". **⚠ CORRECTED 2026-09-20:** this read *"but
+ * `getMyWorkspaces` refuses whole (`mapWorkspaceRefs`), so no client on this branch
+ * can read that role, and a role-only mapper over the same route would be routing
+ * around a refusal."* `getMyWorkspaces` ANSWERS — rulings P32/P38 served it and the
+ * register has been empty since 2026-09-19 — so there is no refusal to route
+ * around. **The decision below is unchanged:** the gate is the server's 403.
  * `GET /v1/workspaces/:id/invites` already answers 403 to a non-admin because
  * an invitation's address is PII — so the pending read IS the role question,
  * asked of the one thing that knows.
@@ -671,9 +674,12 @@ describe('13.763 the summary line is counted from the roster this viewer was ser
 /**
  * 13.764 THE WORKSPACE NAME IS OPTIONAL, and the two readings are both true.
  *
- * `ws.name` comes from `GET /v1/me/workspaces`, and `getMyWorkspaces` REFUSES
- * whole on this branch (`mapWorkspaceRefs` throws a `ServingGapError`) — so the
- * name is genuinely unavailable far more often than it is missing. The product
+ * `ws.name` comes from `GET /v1/me/workspaces`. **⚠ CORRECTED 2026-09-20:** this
+ * read *"and `getMyWorkspaces` REFUSES whole on this branch (`mapWorkspaceRefs`
+ * throws a `ServingGapError`) — so the name is genuinely unavailable far more often
+ * than it is missing."* It does not refuse (rulings P32/P38; register empty since
+ * 2026-09-19), so the name is now unavailable only when it is genuinely missing —
+ * which makes the OPTIONALITY below more load-bearing, not less. The product
  * already has the handler: `useWorkspaceName` answers `string | null` and fails
  * silently to `null`, "never the raw id or a stale guess".
  *

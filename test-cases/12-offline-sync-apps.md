@@ -1324,7 +1324,7 @@ failure this bucket has recorded before, caught here by a compiler instead of by
   with `TS2322 … Type '{ status: "pending"; eventId: string; }' is not assignable to type
   'IngestResult'`. That is return-type covariance refusing the fourth member, which is the mechanism
   ruling P30 names, measured rather than quoted.*
-- 12.178 ✅ **`getTickets` fills all FIVE fields `online/mappers.ts` refuses `getTickets` over**, as
+- 12.178 ✅ **`getTickets` fills all FIVE fields `online/mappers.ts` refused `getTickets` over** (tense corrected 2026-09-20 — this read "refuses"; ruling P25 clause 1, `c86c4b5c`, 2026-09-06, served all five and the ONLINE mapper no longer refuses, its register having been empty since 2026-09-19. The case is unaffected: it is about the REPLICA source filling them locally), as
   rows and not as "five": `typeRank` 3 (the local ticket-type roster), `epicId` the epic's id (the
   workspace's OWN rank-1 types, which is the server's `rank = EPIC_RANK` rule rather than
   `isBuiltinEpicType`'s narrower built-in-id test — the roster is local, so this client can agree with
@@ -1369,9 +1369,12 @@ failure this bucket has recorded before, caught here by a compiler instead of by
   compared against `Object.keys(REPLICA_GAPS)` so the registry and the behaviour cannot drift:
   `getMyWorkspaces`, `getMembers`, `search`, `getMyWork`, `getAttention`, `getPreferences`,
   `putPreferences`. **NOT the online source's SIX**, and the difference is enumerated rather than
-  characterised, because "nearly disjoint" was written here first and is false. Online refuses
-  `getMyWorkspaces`, `getTickets`, `getTicket`, `search`, `getMyWork`, `getAttention`. FOUR are
-  refused by both (`getMyWorkspaces`, `search`, `getMyWork`, `getAttention`); TWO are refused online
+  characterised, because "nearly disjoint" was written here first and is false. Online **used to refuse** — **⚠ CORRECTED 2026-09-20: the tense is the correction. The online source
+  refuses NONE of the six now; `SERVING_GAPS` emptied on 2026-09-19, and each of the six is pinned
+  SERVED rather than dropped from a list. The CONTRAST this bullet draws is kept, and its live half is
+  the replica's own refusals, which are real and unchanged.**
+  `getMyWorkspaces`, `getTickets`, `getTicket`, `search`, `getMyWork`, `getAttention`. FOUR were
+  refused by both (`getMyWorkspaces`, `search`, `getMyWork`, `getAttention`); TWO were refused online
   and ANSWERED here (`getTickets`, `getTicket` — the replica holds the `TicketState` and the raw
   events the wire does not carry); THREE are answered online and refused here (`getMembers`,
   `getPreferences`, `putPreferences` — a roster and amendment-14 rows, neither of which is replicated).

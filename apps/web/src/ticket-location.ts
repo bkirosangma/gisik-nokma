@@ -23,12 +23,17 @@ import type { HttpClient } from '@gisik-nokma/app-core/online';
  *
  * ## Deliberately NOT a `DataSource` method, and not `getTicket`
  *
- * `DataSource.getTicket` exists and **refuses**: `mapTicketRead` throws
- * `ServingGapError` because a `TicketRead` wants a `title`, a `stateProvenance`
- * and a domain `TicketState`, and the route answers a snake_case
- * `proj_visibility` row with none of them (`online/mappers.ts`). Those absences
- * are real and this file does not paper over them — it asks a strictly SMALLER
- * question, one the route answers completely: *which project is this ticket in?*
+ * **⚠ CORRECTED 2026-09-20 — this paragraph read *"`DataSource.getTicket` exists
+ * and **refuses**: `mapTicketRead` throws `ServingGapError` because a `TicketRead`
+ * wants a `title`, a `stateProvenance` and a domain `TicketState`, and the route
+ * answers a snake_case `proj_visibility` row with none of them (`online/mappers.ts`)."*
+ * That was true when written (`e09666ce`, 2026-09-04) and was falsified two days
+ * later by ruling P25 clause 1 (`c86c4b5c`, 2026-09-06), which served all three:
+ * `getTicket` maps through `mapTicketRead` and answers.** The superseded wording is
+ * kept rather than deleted because the DECISION below outlives the reason it was
+ * first given — `getTicket` answers a WHOLE ticket read, and this file asks a
+ * strictly SMALLER question, one the route answers completely: *which project is
+ * this ticket in?*
  * `project_id` is a column of the row the route already serves, so nothing is
  * derived, defaulted or reconstructed here. A gateway beside `DataSource` is the
  * shape this shell already uses for a one-shot action no replica serves offline

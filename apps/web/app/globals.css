@@ -2138,10 +2138,15 @@ input, textarea, select { font-family: inherit; }
 .gn-sign-in__hint,
 .gn-sign-in__legal { margin: 0; text-align: center; font-size: 1rem; color: var(--gn-text-muted); }
 
-/* A refusal is a first-class rendering, not an error state: six of the twelve
-   `DataSourceQuery` methods answer with a `ServingGapError` naming the facts the
-   shipped routes do not serve, and this is where the shell shows those words
-   rather than a spinner that never stops. */
+/* A refusal is a first-class rendering, not an error state. ⚠ CORRECTED
+   2026-09-20: this read "six of the twelve `DataSourceQuery` methods answer with a
+   `ServingGapError` naming the facts the shipped routes do not serve, and this is
+   where the shell shows those words rather than a spinner that never stops." The
+   count fell 6 → 4 (P25 clause 1, c86c4b5c) → 3 (P32/P38) → 1 (P39/P40) → 0 when
+   `search` was served 2026-09-19, and `SERVING_GAPS` is empty, so no read refuses
+   for a serving reason any more. The class STAYS: a served read can still FAIL (a
+   transport error, a 404 turned back into an exception, a `MappingError`) and this
+   is still where the shell shows those words rather than a spinner. */
 .gn-shell__refusal { margin: 0; padding: 0.75rem 0.9rem; border-radius: var(--gn-radius-control); color: var(--gn-text-muted); background: var(--gn-fill-secondary); box-shadow: inset 4px 0 0 var(--gn-danger); }
 .gn-shell__refusal-what { display: block; font-weight: 600; color: var(--gn-text); }
 .gn-shell__expired { margin: 0; padding: 0.75rem 0.9rem; border-radius: var(--gn-radius-control); color: var(--gn-text); background: var(--gn-fill-secondary); box-shadow: inset 4px 0 0 var(--gn-warning); }
