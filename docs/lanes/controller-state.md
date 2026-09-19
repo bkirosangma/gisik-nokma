@@ -31,6 +31,34 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 SUNDAY 2026-09-20 ~02:4x IST — **CYCLE 15: SEVEN PRs MERGED OVERNIGHT, ZERO OPEN, TWO LANES WORKING, AND ONE NEW RULING REQUEST FOR THE MORNING.** `main` is `57a7593f`.
+
+### Position — read this instead of the older tables, which this supersedes
+| lane | task | status |
+|---|---|---|
+| exec 1 | **sheet prototype parity** — the headline: "make our build like the prototype" | **IN FLIGHT** — `exec/sheet-prototype-parity`, block `16.81`–`16.99` |
+| exec 1 | **`hig-per-screen/3b`** (Members states) | **QUEUED behind parity**, local branch `exec/members-states` @ `b4664bd4` — **NOT pushed to origin**, so it cannot be handed to the other lane without losing exec 1's work. Not a stop-and-ask: `role` IS on the wire (case `13.760`) |
+| exec 2 | **the manual and FAQ sentence** (`#530` falsified it; exec 2 refused to swap one unmeasured sentence for another, correctly) | **IN FLIGHT** — measure the mobile + web assignee behaviour, then correct both docs |
+| exec 2 | **the `Delete` door** | ⛔ **HELD — NEW RULING REQUEST FOR THE OWNER.** See below |
+**Merged overnight:** `#561` `#562` `#564` `#565` `#566` `#567` `#568`. **Zero open PRs.** Ledger **306 done / 2 todo** (one is permanently struck, `board-prototype-port/1`).
+
+### ⛔ THE NEW RULING REQUEST — door `H`'s `Delete` half has NO DOOR
+**The owner ruled "The footer: Delete and ‹ Previous / Next ›: build it." `‹ Previous / Next ›` is BUILT (`#565`, case `16.43`, as a PROP — the caller passes neighbour ids). `Delete` is NOT, and the reason is a measurement:**
+- **The ticket vocabulary has no word for it** — eleven events (`created`, `assigned`, `field_set`, `ranked`, `reparented`, `transitioned`, `closed`, `reopened`, `collaborator_added`, `collaborator_removed`, `workflow_rebound`). **None is a removal.**
+- **Controlled sweep, same path:** `ticket.deleted` → **0**, `ticket.removed` → **0**, `ticket.archived` → **0**, against **`ticket.closed` → 110**. The zeros are real.
+- **`archived` is PROJECT-scoped** (`project.archived`/`restored`); nothing equivalent exists for a ticket, and `proj_tickets` carries no removal column.
+- The prototype's `deleteTicket` is a **pure client filter** with no server behind it — **the same finding door C's measurement reached about the Undo.**
+**So building it means a new event, a projection tombstone, a read filter AND a route — doors the table does not name.** The full request with three options is `gisik-nokma-lanes/EXEC2-RULING-REQUEST-2026-09-20-h-delete-door.md`. **Nothing asserts anything about Delete; its slot in the footer is simply empty.**
+
+### ⚠ AND A SECOND STALE DOOR, CLOSED BY MEASUREMENT — the fifth of its kind
+**The doors table's `isInvite inviter identity` row read `BUILD` and the build had shipped BEFORE the ruling** — `/workspaces` renders the prototype's own sentence, landed in `#400` (`d3d0abdd`), with `invitedByName` resolved by a `LEFT JOIN "user"` on `proj_invites.invited_by`. **That is the FIFTH row on that table written from a recommendation rather than a measurement**; the decline row sits four lines away leaving exactly that lesson. Flipped to **ALREADY BUILT** in `#566`. **A stale "known gap" is pre-authorised work that no longer needs doing — the most dangerous kind.**
+
+### THE NIGHT'S NEW LESSON, and it cost seven merge cycles
+**A lane's handoff file is a shared resource, and two PRs from one lane collide on it every time.** `#568` conflicted with `#567` on `docs/lanes/executor-2-state.md` exactly as `#563` had conflicted with `#562` on `test-cases/16-remaining-doors.md`. **`merge-tree --write-tree` reports it as three stages on one file, and it is now part of the bar.** Sequence a lane's PRs one at a time, and expect the second to need a rebase.
+
+### Instrument debts PAID this cycle
+- **`seed-dev`'s 30 s red is the test's OWN WORK**, not the limit and not the database — `#567`, measured and mutation-witnessed.
+- **The gate's pre-run test-db sweep named a container that does not exist** (`gisik-nokma-exec-postgres-1`) and so **swept nothing while reading exactly like a clean sweep** — `#568`, now discovering the container instead of naming it.
 ## 🔄 SUNDAY 2026-09-20 ~02:0x IST — **CYCLE 14: THE OVERNIGHT RUN CONTINUES. THREE PRs MERGED SINCE THE CYCLE-13 ANCHOR, BOTH LANES WORKING, ZERO OPEN PRs.** `main` is `fdbb7fc8`.
 
 ### Position
