@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { readWorkspaceId } from './helpers/board.js';
 import { measureCanvas } from './helpers/canvas-box.js';
 import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
 
@@ -62,10 +63,12 @@ test('the builder canvas is a measured box with a node drawn inside it', async (
 
   await signIn(page, OWNER_EMAIL);
 
+  // Through the helper rather than a private copy of it. A reviewer found this read standing
+  // standalone, which is how a second definition of "which workspace" drifts from the first — and a
+  // positional read here would silently follow a workspace founded through the UI. `readWorkspaceId`
+  // names the seeded workspace and returns a `string`.
   await page.goto('/workspaces', { waitUntil: 'networkidle' });
-  const workspaceHref = await page.locator('a[href^="/w/"]').first().getAttribute('href');
-  const workspaceId = /^\/w\/([^/]+)/.exec(workspaceHref ?? '')?.[1];
-  expect(workspaceId, `could not read a workspace id out of ${workspaceHref}`).toBeDefined();
+  const workspaceId = await readWorkspaceId(page);
 
   await page.goto(`/w/${workspaceId}/settings/workflows`, { waitUntil: 'networkidle' });
   const open = page.locator('.workflow-list__open').first();

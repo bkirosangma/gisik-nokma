@@ -1,7 +1,7 @@
 {
-  "belowCount": 0,
-  "totalClasses": 1,
-  "examined": 3,
+  "belowCount": 1,
+  "totalClasses": 2,
+  "examined": 13,
   "highestReading": 3.54,
   "routes": [
     "/sign-in",
@@ -13,6 +13,15 @@
     "/settings/workflows"
   ],
   "roster": [
+    {
+      "selector": "button.ticket-type-list__move",
+      "ratio": 1.41,
+      "border": "rgba(118,118,118,0.3)",
+      "backdrop": "rgb(241,234,227)",
+      "routes": [
+        "/settings/ticket-types"
+      ]
+    },
     {
       "selector": "select",
       "ratio": 3.54,

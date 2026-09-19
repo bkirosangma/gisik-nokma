@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { newUlid } from '@gisik-nokma/domain';
+import { openSeededBoard } from './helpers/board.js';
 import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
 import { WEB as WEB_ORIGIN } from './helpers/stack.js';
 
@@ -35,15 +36,27 @@ test('sign in through the real stack, reach the seeded board, and see the guarde
   // The workspaces list SERVES (ruling P38 — a guest sees a partial workspace,
   // and that is the correct answer). Navigation through it is live again; the
   // pre-flight note that said otherwise aged out and was re-measured.
+  //
+  // Asserted HERE rather than inside the walk below, because a card that never
+  // rendered would otherwise surface as a 15 s timeout inside the helper, which
+  // reads as a navigation defect instead of what it is.
   await page.goto('/workspaces');
   await expect(page.getByText('Convenience Corner')).toBeVisible({ timeout: 20_000 });
 
-  // NOTE: the workspace name is an <h2>, not a link — clicking it is a no-op.
-  // The project link is already on /workspaces, and clicking THAT is what
-  // navigates. Said plainly because the first version of these lines described
-  // a two-step navigation that does not happen.
-  await expect(page.getByText('Shop operations')).toBeVisible({ timeout: 20_000 });
-  await page.getByText('Shop operations').click();
+  // ⚠ THE NAVIGATION BELOW WAS WRONG FOR AS LONG AS ROUND 19c HAD BEEN IN, and it failed in the
+  // most expensive available direction. These lines used to click the TEXT `Shop operations` here,
+  // on the stated belief that "the project link is already on /workspaces, and clicking THAT is
+  // what navigates". Round 19c made the whole card ONE `<Link>` to `/w/<id>` and left the project
+  // names as plain text inside it — so the click navigated to the WORKSPACE, and the assertion
+  // below then waited 20 s for a `board-column-*` on a page that has none. That reads exactly like
+  // a broken board, which is why it was carried as one.
+  //
+  // Measured on the live stack, not inferred: the text node's `closest('a')` is `/w/<id>`, and the
+  // page after the click renders the workspace home. `helpers/board.ts` now holds the one
+  // definition of this path and names the project instead of taking a position — the helper starts
+  // from `/workspaces` itself, so the `goto` two lines up is a no-op navigation and is kept only
+  // because the assertion belongs on that page.
+  await openSeededBoard(page);
 
   // The board rendered from real projections, not a fixture.
   await expect(page.locator('[data-testid^="board-column-"]').first()).toBeVisible({
@@ -66,9 +79,9 @@ test('the guarded door: the cookie-carrying POST reaches the server and is answe
   browser,
 }) => {
   await signIn(page, OWNER_EMAIL);
-  await page.goto('/workspaces');
-  // The workspace name is an <h2>; the project link is already on /workspaces.
-  await page.getByText('Shop operations').click();
+  // Same walk as the smoke above, and the same repair: the project names on `/workspaces` are text
+  // inside the card's single door link, so a text click reaches the workspace. `helpers/board.ts`.
+  await openSeededBoard(page);
 
   const firstCard = page.locator('[data-testid^="ticket-card-"]').first();
   await expect(firstCard).toBeVisible({ timeout: 20_000 });

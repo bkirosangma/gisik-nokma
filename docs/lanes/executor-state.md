@@ -41,6 +41,95 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~09:0x IST. **THE `e2e-stack` REPAIR IS BUILT AND PUSHED; ITS PR
+> # HAS BEEN REVIEWED AND SENT BACK ONCE; THE FIX ROUND IS PUSHED. THE CODE HEAD IS `2e02ddac`.** Branch
+> # **`exec/e2e-stack-repair`**, cut from `origin/main` =
+> # `cc59ce8f` (the `#575` merge). **The handoff commit sits ON TOP of that head** — a commit cannot name its
+> # own sha, so this block names the CODE head it was pushed at, which is the reading that survives.
+>
+> ## WHAT THE DISPATCH ASKED FOR, AND THE ONE PREMISE THAT WAS FALSE
+> **The dispatch's stated root cause does not exist.** It asked for "the root cause of the sign-in / seed
+> failure" and warned that `global-setup.ts` "refuses loudly rather than seeding wrongly — so read which
+> refusal fires." **No refusal fires. There is no sign-in or seed failure.** The run's own output:
+> `[e2e-stack] stack verified, deploy sha dev` · `server image shape: dist` ·
+> `Convenience Corner seed: 0 committed, 123 already present, 23 errand tickets, guest configured.`
+> `globalSetup` passes, sign-in completes, the browser lands authenticated on `/workspaces`. The board was
+> never **reached**, not never **rendered**.
+>
+> ## FOUR SUITE DEFECTS FIXED, EACH MEASURED — `6 failed / 2 passed` → `3 failed / 5 passed`
+> 1. **`smoke.spec.ts` `:30` and `:64`** — clicked the TEXT `Shop operations` on `/workspaces` while its own
+>    comment claimed "the project link is already on /workspaces". Round 19c made the whole card ONE `<Link>`
+>    to `/w/<id>`; measured, the text node's `closest('a')` is `/w/0TZSS5W6…`, so the click went to the
+>    WORKSPACE and the spec waited 20 s for a `board-column-*` its own navigation had made impossible.
+> 2. **`/p/:projectId` resolved `.first()` — a POSITION, not a project.** The live dev DB has held a second
+>    project since **2026-09-10** (`gggg`, real web UI, 1 ticket, 3 columns) and it sorts ahead of the seeded
+>    `Shop operations` (26 tickets, 8 columns). Swept with the suite's own instrument: `gggg` =
+>    `{ariaLabel 9, role 9}`; `Shop operations` = `{ariaLabel 65, role 14}` vs the recorded `{66, 14}`.
+>    **`role` matching exactly is what identifies the recorded page.** So `LOST ariaLabel: baseline 66, now 9`
+>    was never an accessibility regression. `gggg` appears ZERO times in the repo.
+> 3. **`visibility.spec.ts` `:26`** — the positive control was a `My Work` link, and Round 19c made `AppNav`
+>    contextual, so `/workspaces` with no workspace selected has none. The rule held; the sibling moved.
+>
+> `apps/web/e2e-stack/helpers/board.ts` is NEW and is the one definition of how you reach the seeded board.
+> It **names** the project and **refuses to fall back to a neighbour** — the property a mutation tests: a
+> non-existent name turns both smoke tests red in 16.7 s with the helper's own refusal.
+>
+> ## THE THREE REDS LEFT STANDING, ALL TRUE
+> - **`button.ticket-type-list__move` at 1.41:1** — ⛔ **NOT a contrast defect: the class has NEVER had a CSS
+>   rule.** `git log -S` over `packages/ui/src/ui.css` finds nothing for it or its `ticket-type-list__reorder`
+>   wrapper (control: `ticket-type-list__row` → 5 commits). The ↑ ↓ buttons render as raw UA chrome —
+>   `borderStyle: outset`, `background: rgba(239,239,239,0.3)`, `display: inline-block`, `font-size: 16px`.
+>   Screenshot confirms grey OS buttons in a neumorphic page. **RECORDED, NOT FIXED** (out of scope; owner
+>   needed). jsdom has no layout engine, so no unit test could see it.
+> - **Tap targets 6 → 11, and EVERY offender is at exactly h:24** — 9 `.gn-attention__title` + 2
+>   `.gn-my-work__title`, none below 24. `ui.css:1506-1522` holds the repo's own ruling that dense in-list
+>   controls get 24; the sweep bars at 44 and cannot express it, so its count tracks seeded data volume.
+>   **NOT re-baselined and NOT redesigned — RULING REQUESTED** (the same `measureTapTargets` serves the
+>   unauthed suite).
+> - **`66 → 65` on the seeded board** — one `aria-label` genuinely lost since 2026-09-18, unattributed.
+>
+> ## TWO THINGS FOUND BY RUNNING, NOT READING
+> `click()` resolves before a Next `<Link>`'s `pushState` moves the URL, so `page.url()` on the next line
+> reports the page the click was made FROM (the helper now WAITS for the route). And the inline workspace-id
+> read left the id `string | undefined`, which typechecks through a template literal and only fails when
+> passed to a typed function — **the gate caught that, not a reviewer.**
+>
+> ## ANCHORS (verify every one; a block cannot name its own sha)
+> | | |
+> |---|---|
+> | `origin/main` | **`cc59ce8f`** (the `#575` merge) |
+> | my branch | `exec/e2e-stack-repair` @ **`2e02ddac`** (the CODE head — the review round; pushed) |
+> | base | `origin/main`, `--base main` |
+> | gate | `pnpm turbo run build test typecheck --force --concurrency=2` → **33/33, 0 cached, EXIT 0, 1m18s**, Node **v22.22.2** (`pnpm exec node -v`, measured — the `pnpm` binary itself resolves under the v24 nvm dir while the node it runs is v22, so name the version, never the path) |
+> | checks | `tasks` · `citations` · `env` · `runbook` · `help` · `migrations` · `case-ids` (2494) — all EXIT 0. `check:db-tz` needs `DATABASE_URL`; run against the dev DB it reads `Asia/Kolkata`, EXIT 0 |
+> | `e2e-stack` | **5 passed / 3 failed** at the code head (was 2 / 6) — unchanged by the review round |
+> | next | **PR #578 is OPEN and MERGEABLE (`--base main`). ONE independent reviewer ran and is RECORDED IN THE BODY; it returned two Important findings and BOTH ARE FIXED in `2e02ddac`.** ⛔ **THE PARITY VISUAL HALF IS NOT UNBLOCKED** — still owed to a rebuild. **The sheet-reachability measurement is DONE and reported** (`EXEC-2026-09-20-sheet-reachability.md`): **`13.176` is the wrong one — the sheet OPENS, for the owner and for a guest on a shared errand.** Controller DECIDED: FOLD IT IN — done in the commit below (`test-cases/13-plan11-seams-and-scheduler.md`), docs-only, so the gate at `2e02ddac` stands for the landing tree (measured: NOTHING in apps/, packages/ or scripts/ READS `test-cases/`; every hit is a comment citation). **The controller gates the tip and merges. Nothing further is pushed.** |
+>
+> ## ⚠ THE RUNNING `:3001` IMAGE PREDATES `main`'s TIP — measured, and it bounds every reading
+> `#575` added `gn-members__identity`; the container's baked `.next` has ZERO references to it while
+> `gn-members__name` appears in three files. The web image was built `2026-09-19T18:55:47Z`
+> (2026-09-20 00:25 IST), before the `#575` merge at 03:11 IST. **No `docker compose` action was taken**;
+> `:3001` was never down and `curl -s localhost:3001/v1/auth/methods` still answers `{"google":true,…}`.
+>
+> ## ⛔ CORRECTION — AN EARLIER VERSION OF THIS BLOCK SAID THE PARITY VISUAL HALF WAS UNBLOCKED. IT IS NOT.
+> I wrote "the parity task's visual half is now unblocked — the suite reaches the sheet" from the dispatch's
+> framing instead of from a measurement. **Measured afterwards, and the image predates `#572` too.** `#572`
+> (merged 02:52:17 IST) introduces the CSS class `gn-sheet__full`, absent before it:
+> `git show faecf837^1:packages/ui/src/ui.css | grep -c gn-sheet__full` → **0**;
+> `git show faecf837:…` → **1**; `docker exec … grep -rl gn-sheet__full /app/apps/web/.next` → **0 files**.
+> (`gn-sheet__body` 3→4, `gn-ticket-sheet__tabs` 3→1, `gn-sheet__title` 1→3 are all present BOTH sides and
+> are NOT discriminators.)
+> **What survives:** the repaired suite reaches the authenticated board in ~2 s where before it never got
+> there, so it can screenshot the sheet AS THE IMAGE RENDERS IT. **What does not:** any witness of the
+> parity changes. **The parity visual half is still owed to a rebuild.** And before pricing one, note that
+> 13.176 records the SHEET is a refusal for EVERY viewer (`DataSource.getTicket` → `ServingGapError`), which
+> predates that change — so "screenshot the sheet" may not be a reachable step at all yet.
+>
+> ---
+>
+> # ▣ SUPERSEDED — the block below was current at ~05:0x IST and is kept for its reasoning only.
+> # `#575` HAS SINCE MERGED as `cc59ce8f`. Do not act on its position lines.
+> #
 > # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~05:0x IST. **`#575` IS REBASED, BOTH SENDBACK DEFECTS ARE
 > # FIXED, AND THE CODE HEAD IS `b5d2b0af`.** Branch **`exec/members-states`**; **the handoff commit sits ON TOP
 > # of that head** — a commit cannot name its own sha, so this block names the CODE head it was pushed at, which
