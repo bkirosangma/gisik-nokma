@@ -1,4 +1,4 @@
-import type { NotificationsGateway, NotificationsPage } from '../inbox/gateway.js';
+import type { InboxFilter, NotificationsGateway, NotificationsPage } from '../inbox/gateway.js';
 import type { HttpClient } from './http.js';
 import { parseNotification } from '@gisik-nokma/domain';
 
@@ -117,12 +117,22 @@ export function createHttpNotificationsGateway(http: HttpClient): NotificationsG
   }
 
   return {
-    async list(cursor?: string | null): Promise<NotificationsPage> {
-      // `cursor` is opaque: it comes back from `nextCursor` and goes out unread.
-      // Encoded because it is a row id from the server, not because this file
-      // knows what is in it.
-      const query =
-        cursor === undefined || cursor === null ? '' : `?cursor=${encodeURIComponent(cursor)}`;
+    async list(cursor?: string | null, filter?: InboxFilter): Promise<NotificationsPage> {
+      // Built as a LIST and joined, rather than as nested ternaries. With one
+      // parameter the ternary was readable; with three independent ones it has
+      // eight arms and one of them is wrong in a way no test names.
+      //
+      // `cursor` is opaque — it comes back from `nextCursor` and goes out
+      // unread — and `URLSearchParams` encodes it without this file needing to
+      // know it is a row id.
+      const params = new URLSearchParams();
+      if (cursor !== undefined && cursor !== null) params.set('cursor', cursor);
+      // `unread=true`, NOT `read=false`: the server refuses any other spelling
+      // (`invalid_unread`) precisely because `'false'` is a truthy string, and
+      // this side must send the one it accepts.
+      if (filter?.unreadOnly === true) params.set('unread', 'true');
+      if (filter?.kind !== undefined) params.set('kind', filter.kind);
+      const query = params.size === 0 ? '' : `?${params.toString()}`;
       const path = `/v1/me/notifications${query}`;
       const body = listEnvelope(path, await read(path));
       /**

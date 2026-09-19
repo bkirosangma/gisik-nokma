@@ -369,3 +369,161 @@ describe('POST /v1/me/notifications/:id/read', () => {
     }
   });
 });
+
+/**
+ * The inbox FILTER (2026-09-19) — cases 13.969–13.973.
+ *
+ * The prototype's header carries `All / Unread / Mentions`; until this change
+ * the route took no `read` and no `kind`, so the tabs had nothing to ask.
+ *
+ * **The two refusals (13.971, 13.972) are the half worth reading.** `unread=yes`
+ * and `kind=mentons` are a caller who believes they narrowed and did not, and
+ * the failure mode is a person concluding their inbox is empty — which is a
+ * claim about their whole inbox made on the strength of a typo. Both are
+ * REFUSED, following the `invalid_limit` precedent beside them.
+ */
+describe('GET /v1/me/notifications — the filter (13.969–13.973)', () => {
+  const listOf = (body: unknown): string[] =>
+    (body as { notifications: { id: string }[] }).notifications.map((n) => n.id);
+
+  it('13.969 narrows to UNREAD rows, and the unfiltered read still returns both', async () => {
+    const me = await signInWithPhone(app, otp, '+919999200001');
+    const unread = sample(me.userId);
+    const read = sample(me.userId, { read: true });
+    await insertNotification(db.pool, unread);
+    await insertNotification(db.pool, read);
+
+    const filtered = await app.inject({
+      method: 'GET',
+      url: '/v1/me/notifications?unread=true',
+      headers: { authorization: `Bearer ${me.token}` },
+    });
+    expect(filtered.statusCode).toBe(200);
+    expect(listOf(filtered.json())).toEqual([unread.id]);
+
+    // **The control, and it is not decoration.** A route that had simply stopped
+    // returning read rows — a broken WHERE, a dropped column — would pass the
+    // assertion above. This is what says the FIRST result is a filter rather
+    // than a loss.
+    const all = await app.inject({
+      method: 'GET',
+      url: '/v1/me/notifications',
+      headers: { authorization: `Bearer ${me.token}` },
+    });
+    expect(listOf(all.json()).sort()).toEqual([unread.id, read.id].sort());
+  });
+
+  it('13.970 narrows by KIND — the tab says `Mentions`, the read says `kind=mention`', async () => {
+    const me = await signInWithPhone(app, otp, '+919999200002');
+    const assigned = sample(me.userId);
+    const mentioned = mentionSample(me.userId);
+    await insertNotification(db.pool, assigned);
+    await insertNotification(db.pool, mentioned);
+
+    const filtered = await app.inject({
+      method: 'GET',
+      url: '/v1/me/notifications?kind=mention',
+      headers: { authorization: `Bearer ${me.token}` },
+    });
+    expect(filtered.statusCode).toBe(200);
+    expect(listOf(filtered.json())).toEqual([mentioned.id]);
+
+    // The control again: the assignment is still there without the filter.
+    const all = await app.inject({
+      method: 'GET',
+      url: '/v1/me/notifications',
+      headers: { authorization: `Bearer ${me.token}` },
+    });
+    expect(listOf(all.json()).sort()).toEqual([assigned.id, mentioned.id].sort());
+  });
+
+  it('13.971 refuses an `unread` value it cannot honour, rather than ignoring it', async () => {
+    const me = await signInWithPhone(app, otp, '+919999200003');
+    await insertNotification(db.pool, sample(me.userId, { read: true }));
+
+    // `'false'` is a truthy STRING, which is why the parameter is spelled
+    // `unread=true` rather than `read=false` — and why anything else is refused
+    // instead of read as absent. Silently ignoring it would answer the
+    // UNFILTERED page to a caller who asked for the unread one.
+    for (const bad of ['yes', 'false', '1', '']) {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/v1/me/notifications?unread=${bad}`,
+        headers: { authorization: `Bearer ${me.token}` },
+      });
+      // `''` is the exception: an empty value is the route's own "absent"
+      // spelling (`cursor` uses the same rule), so it is the unfiltered read.
+      if (bad === '') {
+        expect(response.statusCode, 'empty means absent').toBe(200);
+      } else {
+        expect(response.statusCode, `unread=${bad}`).toBe(400);
+        expect(response.json(), `unread=${bad}`).toEqual({ error: 'invalid_unread' });
+      }
+    }
+  });
+
+  it('13.972 refuses an unknown KIND, rather than answering an empty page', async () => {
+    const me = await signInWithPhone(app, otp, '+919999200004');
+    await insertNotification(db.pool, mentionSample(me.userId));
+
+    // The failure this prevents: `kind=mentons` would match no row, and the page
+    // would render "No mentions" — which under this filter's own copy means
+    // "nobody has named you", a false statement about the caller's whole inbox.
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/me/notifications?kind=mentons',
+      headers: { authorization: `Bearer ${me.token}` },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: 'invalid_kind' });
+
+    // The control: the REAL kind is accepted, so the refusal above is about the
+    // spelling and not about `kind` being rejected outright.
+    const ok = await app.inject({
+      method: 'GET',
+      url: '/v1/me/notifications?kind=mention',
+      headers: { authorization: `Bearer ${me.token}` },
+    });
+    expect(ok.statusCode).toBe(200);
+  });
+
+  it('13.973 the cursor walks the FILTERED set — paging and filtering compose', async () => {
+    const me = await signInWithPhone(app, otp, '+919999200005');
+    /**
+     * **The ids are EXPLICIT, and an earlier draft's were not — which reddened
+     * this case under load and only under load.** It used three `newUlid()`
+     * calls, whose ids share a millisecond prefix when the machine is busy;
+     * ULID ordering falls to the RANDOM TAIL within one millisecond, so
+     * "created second" does not imply "sorts higher". The case passed alone and
+     * failed in the full gate with two ids differing only past `01M2WN1XC1B`.
+     *
+     * The property under test is the ORDER the cursor walks, and a fixture that
+     * relies on the clock to supply that order is testing the clock. These sort
+     * by construction: `…01` < `…02` < `…03`.
+     */
+    const first = sample(me.userId, { id: '01J9ZZ00000000000000000001' });
+    const second = sample(me.userId, { id: '01J9ZZ00000000000000000002' });
+    const read = sample(me.userId, { id: '01J9ZZ00000000000000000003', read: true });
+    // `read` is the NEWEST by id, so a cursor that walked the UNFILTERED set
+    // would hand it back on page two and this case would redden naming it.
+    for (const row of [first, second, read]) await insertNotification(db.pool, row);
+
+    const pageOne = await app.inject({
+      method: 'GET',
+      url: '/v1/me/notifications?unread=true&limit=1',
+      headers: { authorization: `Bearer ${me.token}` },
+    });
+    const bodyOne = pageOne.json() as { notifications: { id: string }[]; nextCursor: string | null };
+    expect(listOf(bodyOne)).toEqual([second.id]);
+    expect(bodyOne.nextCursor).not.toBeNull();
+
+    const pageTwo = await app.inject({
+      method: 'GET',
+      url: `/v1/me/notifications?unread=true&limit=1&cursor=${encodeURIComponent(bodyOne.nextCursor!)}`,
+      headers: { authorization: `Bearer ${me.token}` },
+    });
+    const bodyTwo = pageTwo.json() as { notifications: { id: string }[] };
+    // `first`, NOT `read` — the filter narrows the set the cursor walks.
+    expect(listOf(bodyTwo)).toEqual([first.id]);
+  });
+});

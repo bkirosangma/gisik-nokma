@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { InboxFilter } from '@gisik-nokma/app-core';
 import { HttpError } from '@gisik-nokma/app-core/online';
 import type { Notification } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
@@ -462,5 +463,88 @@ describe('/inbox — four states, because the plan’s two collapse the one that
     // And the reloaded row is on screen, so the notice went away with its subject
     // rather than with the whole page.
     expect(screen.getByRole('button', { name: /Restock the cold shelf/ })).toBeInTheDocument();
+  });
+});
+
+/**
+ * The inbox FILTER TABS (2026-09-19) — cases 13.974–13.975.
+ *
+ * The prototype's header carries `All / Unread / Mentions`. These two cases pin
+ * the CONTROL half: that it asks the read for the right thing, and that an empty
+ * answer under a filter is not reported as an empty inbox.
+ */
+describe('the inbox filter tabs (13.974–13.975)', () => {
+  it('13.974 sends the tab you clicked as a FILTER, and `All` sends none at all', async () => {
+    const asked: (InboxFilter | undefined)[] = [];
+    render(
+      <Providers
+        services={stubServices(
+          {},
+          {
+            notifications: {
+              list: async (_cursor?: string | null, filter?: InboxFilter) => {
+                asked.push(filter);
+                return { notifications: [], nextCursor: null };
+              },
+            },
+          },
+        )}
+      >
+        <InboxPage />
+      </Providers>,
+    );
+
+    // The first read is `All`, and it sends **no filter** — the identical
+    // request every caller made before this control existed, so "all" is one
+    // spelling rather than a value that happens to mean the same.
+    await waitFor(() => expect(asked.length).toBe(1));
+    expect(asked[0]).toEqual({});
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Unread' }));
+    await waitFor(() => expect(asked.length).toBe(2));
+    expect(asked[1]).toEqual({ unreadOnly: true });
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Mentions' }));
+    await waitFor(() => expect(asked.length).toBe(3));
+    // **The tab's word and the filter's differ on purpose**: the control says
+    // `Mentions`, the read says the domain's `'mention'`. A screen word reaching
+    // a query is what this mapping exists to prevent.
+    expect(asked[2]).toEqual({ kind: 'mention' });
+
+    await userEvent.click(screen.getByRole('tab', { name: 'All' }));
+    await waitFor(() => expect(asked.length).toBe(4));
+    expect(asked[3]).toEqual({});
+  });
+
+  it('13.975 a FILTERED empty does not claim the whole inbox is empty', async () => {
+    render(
+      <Providers
+        services={stubServices(
+          {},
+          { notifications: { list: async () => ({ notifications: [], nextCursor: null }) } },
+        )}
+      >
+        <InboxPage />
+      </Providers>,
+    );
+
+    // Under `All`, the unfiltered sentence is the true one.
+    expect(await screen.findByText(EMPTY_INBOX_COPY)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Unread' }));
+    /**
+     * **The assertion that matters is the ABSENCE.** "Nothing in your inbox" is
+     * a claim about the whole inbox; under a filter it is false — the reader has
+     * messages, just not unread ones — and a narrowed set presented as whole is
+     * the defect this repo names most often. The filtered sentence must be on
+     * screen AND the unfiltered one must be gone; asserting only the first would
+     * pass against a page that rendered both.
+     */
+    await waitFor(() => expect(screen.queryByText(EMPTY_INBOX_COPY)).not.toBeInTheDocument());
+    expect(screen.getByText(/Nothing unread/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Mentions' }));
+    await waitFor(() => expect(screen.getByText(/No mentions/)).toBeInTheDocument());
+    expect(screen.queryByText(EMPTY_INBOX_COPY)).not.toBeInTheDocument();
   });
 });

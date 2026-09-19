@@ -2804,3 +2804,24 @@ input, textarea, select { font-family: inherit; }
   align-items: center;
   gap: 0.75rem;
 }
+
+/* The inbox's header ROW — the title and the filter tabs, which the prototype
+   puts on one line (its bulk action shares the row and is not built yet).
+   `flex-wrap` because 390px cannot hold "Inbox" and a three-segment control
+   side by side; `align-items: center` because the segment track is shorter than
+   the title.
+
+   HERE and not in `ui.css` with the rest of the `.gn-inbox` family, and that is
+   a rule rather than a filing mistake: `ui.css` is the stylesheet for what
+   `packages/app-core` renders, and `app-core`'s `11.95` asserts SET EQUALITY
+   between those classes and its rules. This header belongs to the PAGE —
+   `apps/web/app/inbox/page.tsx` owns both the title and the filter — so a rule
+   for it in `ui.css` would be, in that case's own words, "a rule written for a
+   class no component renders". It reddened there on the first run. */
+.gn-inbox__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}

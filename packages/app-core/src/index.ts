@@ -230,7 +230,7 @@ export { TimelineView, type TimelineViewProps } from './timeline/timeline-view.j
 // they are the DOMAIN's declarations and re-exporting them here would give the
 // vocabulary a second path, which is the drift the calendar and timeline blocks
 // above refuse for `FilterSpec` and `IsEpicType`.
-export type { NotificationsGateway, NotificationsPage } from './inbox/gateway.js';
+export type { InboxFilter, NotificationsGateway, NotificationsPage } from './inbox/gateway.js';
 export {
   notificationBody,
   notificationHeadline,

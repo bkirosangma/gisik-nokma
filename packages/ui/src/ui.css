@@ -2962,6 +2962,15 @@
   background: var(--gn-surface);
   color: var(--gn-text);
 }
+/* `.gn-inbox__header` is NOT here, and that is a RULE rather than an omission:
+   11.95's set equality — the classes these components render versus the rules
+   `ui.css` styles — caught it in this exact spot on the first run. `ui.css` is
+   the stylesheet for what `packages/app-core` renders; the header row belongs
+   to the PAGE (`apps/web/app/inbox/page.tsx`, which owns the title and the
+   filter), so its rule lives in `apps/web/app/globals.css` beside the other
+   page-owned families, exactly as `.gn-workspace-home__*` does. Put it back
+   here and 11.95 reddens with "a rule written for a class no component
+   renders". */
 .gn-inbox__list { list-style: none; margin: 0; padding: 0; }
 .gn-inbox__item { }
 .gn-inbox__row {

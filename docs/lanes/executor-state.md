@@ -41,6 +41,62 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~16:4x IST. **DOOR B — THE INBOX FILTER — IS BUILT AND ITS
+> # PR IS OPEN.** Branch **`exec/inbox-filter`**, cut from `origin/main` and **rebased onto `5c5dd920`**;
+> # dispatch `CTL-QUEUE-2026-09-19-door-builds.md` §B. **Doors before it are MERGED** (rename `0f0cc398`,
+> # denial `db52f911`) — a restart must not redo any.
+>
+> ## VERIFIED ANCHORS
+> | | |
+> |---|---|
+> | base | rebased onto **`origin/main` = `5c5dd920`** — **it moves; re-take it** |
+> | tree | **clean** at the handoff commit; every change is on the branch, nothing unpushed |
+> | gate | **33/33, EXIT 0, `1m13.504s`** post-rebase. **Node runtime `v22.22.2`** |
+> | checks | all **8 exit 0**; `check-case-ids` **2433**, union == sum |
+>
+> ## WHAT LANDED — and the one decision the dispatch asked me to state
+> **The gateway contract was WIDENED**, not ridden: `list(cursor?, filter?)`. Task 14 refused `limit`
+> and `workspaceId` standing in that exact signature on two grounds, and **both are why the filter is
+> allowed in rather than a loophole around them** — *"every parameter in it is one both
+> implementations must honour"* (a replica holds the rows and narrows them trivially, where it has no
+> page-size knob and no query string), and *"`/inbox` is a GLOBAL route … there is no workspace in
+> scope to send"* (an argument about `workspaceId` specifically). A second method was the alternative
+> and is refused by name: two methods over one read are two places for paging to drift.
+>
+> Server: `unread=true` and `kind=mention` join the store's WHERE, **both refusals loud** (`400
+> invalid_unread` / `invalid_kind`), because `unread=yes` is a caller who believes they narrowed and
+> did not — and the failure mode is concluding your inbox is empty. Client: the shared
+> `SegmentedControl`; the tab's word and the filter's kept apart in one mapping; `All` sends no filter
+> at all. **A filtered empty never reuses the unfiltered sentence.** Cases `13.969`–`13.975`.
+>
+> ## TWO THINGS THAT WERE WRONG AND ARE FIXED HERE
+> 1. **`.gn-inbox__header` lives in `globals.css`, not `ui.css`, and `11.95` is why.** That case
+>    asserts SET EQUALITY between the classes `app-core` renders and the rules `ui.css` styles; the
+>    header belongs to the PAGE, so a rule for it there is *"a rule written for a class no component
+>    renders"*. It reddened on the first run and both files now record the split.
+> 2. **13.973's fixture relied on the clock.** Three `newUlid()`s, assuming creation order implies id
+>    order — ULID ordering falls to the **random tail within one millisecond**, so it passed alone and
+>    failed in the full gate with two ids differing only past `01M2WN1XC1B`. **Ids are explicit now.**
+>    A case about the order a cursor walks must not be testing the clock.
+>
+> ## ⚠ A STALE BRANCH LOOKED LIKE A REAL FAILURE, AND THE FIX WAS A REBASE
+> `check-case-ids` was **EXIT 1** on this branch with `13.962`–`13.964` duplicated across two files —
+> the collision the queue's ADDENDUM 1 describes, where two branches each minted the same ids from
+> their own recount of "the next free". **Measured rather than assumed: `origin/main` (`5c5dd920`)
+> reads EXIT 0, so the renumber had already landed and my branch was simply cut before it.** A rebase
+> cleared it. **The lesson for the next lane: when a check reddens with a defect you do not recognise,
+> measure the SAME check on `origin/main` before diagnosing your own diff** — a stale base and a real
+> defect produce the identical report.
+>
+> ## ⚠ SHAS IN THIS FILE ARE UNRELIABLE — including mine
+> `5c5dd920` was `origin/main` at the rebase. **Re-take every reading before acting.**
+>
+> ## NEXT IN THIS LANE'S QUEUE
+> **A (`isWorkspace` description) → D (`isMcpTokens` row name) → F (subtasks) → G (Priority/Due/Type).**
+> Plus the controller's separate small item: **re-aim the two post-freeze blemish docblocks**
+> (`attention-strip.tsx:60-62, :154`, `ticket-sheet.tsx:141, :825`) — reasoning kept, naming the
+> condition if the refusal is still right conditionally.
+
 > # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~16:2x IST. **THE `isWorkspace` RENAME CONTROL IS BUILT AND
 > # ITS PR IS OPEN.** Branch **`exec/workspace-rename`**, cut from **`origin/main` = `2a8a326e`**; dispatch
 > # `CTL-DISPATCH-2026-09-19-workspace-rename.md`. **The denial door is MERGED** (PR #524, `db52f911`) and
