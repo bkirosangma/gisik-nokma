@@ -20,18 +20,103 @@
 
 ---
 
-## ▲ TOP BLOCK — Task 3: the history screen, and it is the FIRST screen here the prototype does not draw. (2026-09-19)
+## ▲ TOP BLOCK — Task 3 **MERGED**; the owner's rulings are in; and this lane is **DISPATCHED on the no-hot-reload change**. (2026-09-19)
 
-**Position: DONE and verified; the PR is opened in the same change set as this block** — branch
-**`exec2/workflow-version-history`**, cut from a freshly fetched `origin/main` **`f6b16cbb`**. Dispatch:
-`CTL-DISPATCH-2026-09-19-lifted-settings-tasks.md`, EXEC 2 section.
+**Position: the no-hot-reload dispatch is DONE and its PR is OPEN — `#512`, branch
+`exec2/drop-hot-reload`, frozen head `c8cb3395` (two commits: the change, then the review round).**
+Replaces the "DISPATCHED" this block said an hour ago; the work landed in the same change set as this line.
 
-**FIRST ACTION ON A RESTART: `gh pr list --state open`.** If a PR for this branch is open it is at the
-controller's merge; **if it has MERGED, this block is history** and the next dispatch is the position;
-**if neither, the work is in this branch and uncommitted or unpushed — check `git status` before
-concluding anything**, because the first version of this block said "PR open" while nothing was committed
-and the review caught it. **Both of this lane's earlier PRs are MERGED** — #501 (the canvas) and #502 (the
-roster) — and neither needs redoing.
+**`CTL-DISPATCH-2026-09-19-drop-hot-reload.md`.** The headline finding, because it is the number the
+dispatch existed to produce: **a full `docker compose --env-file .env -f docker-compose.dev.yml build web`
+takes 841 s — 14 minutes 1 second — on this 10-core box**, and it is SILENT for 301.3 s of that, so a
+watcher reads a working build as hung. The stack now serves built images from
+`/Users/kiro/my_projects/gisik-nokma`, rebuilt after every merge to `main`.
+
+Task 3 is merged (`#506`). The owner answered **all eight** owner-gated items at ~12:5x IST; the block to
+read is `docs/lanes/controller-state.md`'s **"📌 THE OWNER'S RULINGS"**, which is **the newest authority in
+that file and supersedes the "not answered yet" framing everything above it carries**. **What this lane did
+next was NOT one of them** — the controller dispatched the hot-reload removal separately and said in terms
+that **`5b`(c) and `13.693` are NOT being dispatched yet, "one thing at a time."** Two rulings still shape
+the queue below:
+
+- **item 4 — `hig-per-screen/5b`: `"c"`.** The real-door case: real server, real Postgres, the List
+  genuinely shrinks. **That ANSWERS exec 1's three-option ruling request** (their option (c)) and accepts
+  the ~½-day price. **It is NOT this lane's next task: the controller is holding it, "one thing at a time",
+  and has said so in terms.** The ruling removes the *ambiguity*, not the *sequencing* — do not read the
+  ledger row and self-dispatch it, which is exactly what an earlier version of this block did.
+- **item 6 — `"lift em"`: the five held wire-gap screens are no longer held** (`isInbox`, `isMcpTokens`,
+  `isInvite`, `isMcpAuth`, `isWorkspace`). That unblocks `hig-per-screen/10`'s `isMcpTokens` half.
+
+**Two earlier warnings still stand and are why this block was rewritten rather than extended:** an earlier
+version of this lane took `5b` from the bare ledger row **before** the ruling existed, built exec 1's
+option (a), and deleted it — see the 5b row below, and do not repeat it.
+
+**Verify these before adopting them.** Measured at `origin/main` **`22a8e7c3`**, every one with
+`/usr/bin/git` — not `rtk`, whose `git log` ignores its revision argument. **`main` has since moved to
+`ed6c1585`** (cycle 9's anchor, `#509`), and the move is *why the recount survives it*: the only file it
+changed is `docs/lanes/controller-state.md`, so `git diff 22a8e7c3 origin/main -- docs/lanes/task-ledger.tsv`
+returns **empty** — the ledger is byte-identical between the two, measured rather than assumed.
+
+| | |
+|---|---|
+| Task 3 (`exec2/workflow-version-history`) | **MERGED — `#506`** |
+| containment | `git merge-base --is-ancestor a6167b69 origin/main` → **exit 0** (not `cat-file`, which passes on reflog-only commits) |
+| the LANDED branch vs main | of **`exec2/workflow-version-history`** (not the branch you are standing on): `git rev-list --left-right --count origin/main...a6167b69` → **9 0** — nothing of this lane's is unmerged |
+| that branch, local == remote | `rev-parse origin/exec2/workflow-version-history` = **`a6167b69`**, the merge point. **`rev-parse HEAD` is NOT this** unless you are on that branch — the handoff branch itself moves |
+| open PRs | **NOT a fact to read off a table — MEASURE IT.** A repo-wide count cannot tell this lane's PR from a peer's, and a count written here expires faster than the block: **`#509` merged 18 seconds after this block's own commit-time, and this lane's branch was pushed by that same commit** — so an earlier version of this row was false in both directions at the head it shipped in, and a re-review caught it. **Ask instead: is a PR open whose head is `exec2/handoff-post-506`?** |
+| this file's own branch | `exec2/handoff-post-506`, cut from `origin/main` `22a8e7c3` |
+| earlier PRs | **#501** (canvas), **#502** (roster), **#506** (Task 3) — all MERGED, none needs redoing |
+| **this lane's OPEN PRs** | **TWO, and they are independent branches** — **`#510`** (this handoff, branch `exec2/handoff-post-506`) and **`#512`** (the no-hot-reload change, branch `exec2/drop-hot-reload`, head `c8cb3395`). **They do not conflict: `#510` touches only this file.** Next action is the controller's on both; do not open a third for either |
+
+**FIRST ACTION ON A RESTART: THREE commands, because no single one answers the question.**
+`gh pr list --head exec2/handoff-post-506 --state all` · `git log origin/main..exec2/handoff-post-506 --oneline` ·
+`git status --short`. **A repo-wide `gh pr list --state open` cannot help** — it cannot tell this lane's PR
+from a peer's, and the state it reports expires within seconds of being written (see the row above). Two
+earlier versions of this paragraph asked the wrong question; both were caught by review, which is the only
+reason it is written out.
+
+- **A PR exists with head `exec2/handoff-post-506`, and it is OPEN** → it is at the controller's merge;
+  that is this block's own PR, and nothing of this lane's follows it.
+- **That PR is MERGED** — or there is no PR and the `git log` above prints **nothing** → **this lane is
+  genuinely free.** Read the newest cycle in `docs/lanes/controller-state.md` *and its owner-rulings block*,
+  then **do not re-derive the ledger table below** — it was measured at the sha named, and re-deriving it
+  is how a free lane burns a turn.
+- **No PR, and that `git log` is NON-EMPTY** → the work is committed on this branch, **pushed or not, and
+  never PR'd.** `git ls-remote origin 'refs/heads/exec2/handoff-post-506'` tells you which. **This is the
+  state this very block shipped in**, so it is a likely one rather than a hypothetical.
+- **A DIRTY tree, in any state above** → those edits are uncommitted. **`git status` alone is NOT the
+  check, and this is the bullet a third review is owed for**: in the non-empty-log state it reports a
+  modified file and thereby *confirms* the false reading that the branch is uncommitted, when its commit
+  is already pushed. **Read the log first, then `git status` for the remainder.**
+
+### The ledger's remainder, recounted at `22a8e7c3` — 7 non-`done` rows, and only three are work
+
+| row | measured status | needs |
+|---|---|---|
+| `hig-per-screen/6b` | **MERGED** — `ed4c992f` = *"Merge pull request #496 … exec/hig-6b-13306-resolution-pair"*, ancestor-verified | owner names it → flips. **Not work.** |
+| `hig-per-screen/7b` | **MERGED** — `7f9329cc` = *"Merge pull request #494 … exec/hig-7b-13309-withheld-title"*, ancestor-verified | owner names it → flips. **Not work.** |
+| `backlog-and-closed-second-wave/12` | **MERGED** — `77aa906a` = *"Merge pull request #490 … exec2/secondwave-closeout"*, ancestor-verified (this lane's) | owner names it → flips. **Not work.** |
+| `board-prototype-port/1` | **STRUCK 2026-09-16, DO NOT IMPLEMENT** — those words are in the row's NOTE column. **The literal `FLAG:` prefix occurs on exactly ONE line of the whole 340-line ledger** (`hig-per-screen/6b`'s), so a reader parsing for it would miss this row — and calling it a sibling convention would be a plural built from n=1 | nothing. **Never work.** |
+| `hig-per-screen/3b` | open — `docs/lanes/owner-holds.md:173-174` (the sentence **spans both lines**; citing `:173` alone quotes a fragment): *"`3b` was **not** covered by that ruling and stays `todo`"* | **a ruling** |
+| `hig-per-screen/5b` | **RULED `"c"` BY THE OWNER, 2026-09-19 ~12:5x IST — the real-door case.** The row reads EXECUTABLE and, after that ruling, it **is**; nothing about it is a guess. **HELD by the controller, NOT dispatched to this lane.** ⛔ **Do NOT rebuild exec 1's option (a): this lane did, before the ruling, and deleted it — a fixture that honours the spec makes the case assert the FAKE.** The measurement is banked at `gisik-nokma-lanes/EXEC2-2026-09-19-5b-option-a-measurement.patch` and the controller has asked for it to be KEPT for exactly that reason | **ruled; awaiting its turn.** Exec 1's three-option request is answered by the rulings block, item 4 |
+| `hig-per-screen/10` | open; its `isMcpTokens` half is a wire gap (`docs/design/prototype-delta-2026-09-18.md:103` — `name`+`badge` absent from `apps/server/src/mcp/token-store.ts:154-167`, where the row variable is `r` and **not** the `t` the delta audit writes from the UI side). **The HOLD on it is gone** — owner item 6, `"lift em"`, lifted `isMcpTokens` among five screens | **a scope ruling, NOT a hold** — a `name` needs a naming door and a migration, which is new server surface |
+
+**This lane's id block is exhausted except `13.946`–`13.947`** (minted through `13.945`; Task 8 holds
+`13.948`–`13.957`). **Any new screen task needs a fresh block from the controller** — a bare tip is a
+reading that expires, and this catalogue has already paid for that twice in one afternoon.
+**Do not flip the three merged rows** — the owner **named** them on 2026-09-19 (rulings item 1, *"flip em"*),
+so they are no longer waiting on anyone's word; **the flip itself is the controller's to make, not an
+executor's.** The register and the ledger are documents other documents assert against, which is why this
+lane records the ruling rather than acting on it.
+
+---
+
+## ▼ SUPERSEDED — Task 3: the history screen, and it is the FIRST screen here the prototype does not draw. **MERGED as `#506`.** (2026-09-19)
+
+**Position: DONE and MERGED. The "the PR is opened" this heading used to say was true when it was written
+and false the moment `#506` merged.** Branch **`exec2/workflow-version-history`**, cut from a freshly
+fetched `origin/main` **`f6b16cbb`**, rebased onto **`2f5c2c3f`**, frozen head **`a6167b69`** — the local
+and remote tip at the merge. Dispatch: `CTL-DISPATCH-2026-09-19-lifted-settings-tasks.md`, EXEC 2 section.
 
 ### § 1 — WHAT SHIPPED
 
