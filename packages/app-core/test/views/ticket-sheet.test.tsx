@@ -1147,7 +1147,7 @@ describe('TicketSheet — Close, Reopen and the badge (backlog/closed spec §5.3
 });
 
 /**
- * **13.964 — the Assignee row is EDITABLE, on the door that already exists.**
+ * **13.968 — the Assignee row is EDITABLE, on the door that already exists.**
  *
  * The owner's ruling: *"assignee should not be read only."* It is a surface on a
  * plane already wired end to end — `ticket.assigned` is projected, read, fanned
@@ -1172,7 +1172,7 @@ describe('TicketSheet — Close, Reopen and the badge (backlog/closed spec §5.3
  *    *"never `[]`, which would claim this workspace has no members."* Over a
  *    refused roster an empty picker asserts that nobody can be assigned.
  */
-describe('13.964 the Assignee row is editable, and a refused roster is not an empty one', () => {
+describe('13.968 the Assignee row is editable, and a refused roster is not an empty one', () => {
   async function openAssigneeList(): Promise<HTMLElement> {
     const row = screen.getByTestId('field-assignee');
     await userEvent.click(within(row).getByRole('button'));

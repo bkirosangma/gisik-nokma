@@ -585,7 +585,7 @@ describe('every door on this surface requires a session', () => {
 });
 
 /**
- * **13.962 — the single read serves the assignment's PROVENANCE, and the two
+ * **13.966 — the single read serves the assignment's PROVENANCE, and the two
  * absences stay two.**
  *
  * The ticket sheet's assignee became editable, and every sibling row on that
@@ -599,7 +599,7 @@ describe('every door on this surface requires a session', () => {
  * `DISTINCT ON` shape as `stateProvenanceFor` on the line above it, on the route
  * that already answers `stateProvenance`. No route is added.
  */
-describe('13.962 the single read carries the assignee’s provenance', () => {
+describe('13.966 the single read carries the assignee’s provenance', () => {
   it('carries who assigned the ticket and when; an UNASSIGNED ticket answers null', async () => {
     const ws = newUlid();
     const prj = newUlid();

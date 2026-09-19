@@ -1852,15 +1852,15 @@ constant. 13.722 pins the match with a negative control for exactly that reason.
   the constant's own `SYS0AC` tail.
 
 
-## The Assignee row becomes editable, on the door that already exists (executor 2, 2026-09-19) — cases `13.962`–`13.964`
+## The Assignee row becomes editable, on the door that already exists (executor 2, 2026-09-19) — cases `13.966`–`13.968`
 
 **The owner's ruling, verbatim:** *"assignee should not be read only."* The controller's reconnaissance read it
 as **SERVER EXISTS → SURFACE**, and that is what it turned out to be — with one correction to the dispatch's
 own cost model, below.
 
-**Id block `13.962`–`13.964`**, minted on the tip instruction and deliberately skipping **`13.961`, which the
+**Id block `13.966`–`13.968`**, minted on the tip instruction and deliberately skipping **`13.961`, which the
 open sheet-motion PR holds**, and `13.958`–`13.960`, which `#525` owns. Swept with a control in the same
-invocation (`13.955`=5; `13.962`–`13.964` = 0 before these cases were written). **Veto if a block was
+invocation (`13.955`=5; `13.966`–`13.968` = 0 before these cases were written). **Veto if a block was
 allocated elsewhere.**
 
 ### ⚠ THE DISPATCH'S HARD HALF RESTED ON A PREMISE THAT IS FALSE
@@ -1883,7 +1883,7 @@ with them.
 
 ### The cases
 
-- ✅ **13.962 — the single read serves the assignee's PROVENANCE.** `apps/server/test/routes/tickets-read.test.ts`.
+- ✅ **13.966 — the single read serves the assignee's PROVENANCE.** `apps/server/test/routes/tickets-read.test.ts`.
   **A WIDENING, NOT A SECOND DOOR:** one more call to the reader the list already uses
   (`read/assigned-provenance.ts`), batched by the same `DISTINCT ON` shape as the `stateProvenanceFor` call on
   the line above it, on the route that already answers `stateProvenance`. **No route is added**, and the
@@ -1891,13 +1891,13 @@ with them.
   asserts the claim's actor and serverTime for an assigned ticket **and, as the control, that an unassigned
   ticket answers `null`** — without which a route answering `null` for everything would pass.
   **Mutation-witnessed:** deleting the field from the response reddens it.
-- ✅ **13.963 — `mapTicketRead` carries it, and REFUSES a body that omits the key.**
+- ✅ **13.967 — `mapTicketRead` carries it, and REFUSES a body that omits the key.**
   `packages/app-core/test/online/mappers.test.ts`. **Absent is not `null`, and the two arms are the case:**
   `null` is a real answer (nobody is assigned, and the server's reader establishes there is no claim to carry
   — there is no such thing as a claim with no actor), while an ABSENT key is a body this client cannot read,
   because the route always emits it. Mapping that to `null` would turn a malformed payload into "nobody is
   assigned". **Mutation-witnessed:** dropping the mapping reddens it.
-- ✅ **13.964 — the row is editable, and a refused roster is not an empty one.**
+- ✅ **13.968 — the row is editable, and a refused roster is not an empty one.**
   `packages/app-core/test/views/ticket-sheet.test.tsx`. Four arms, each of which would otherwise pass for
   another: the roster the sheet **already reads** plus an explicit `Unassigned`; the submission going through
   the ordinary `dataSource.ingest` as `ticket.assigned`; **unassigning as the SAME event carrying `null`**
