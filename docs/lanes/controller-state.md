@@ -31,6 +31,35 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 SATURDAY 2026-09-19 ~17:0x IST — **CYCLE 12: ONE PR MERGED, THE GATE IS GREEN, BOTH EXECUTORS RESTARTED CLEAN AND FRESH, AND ONE RULING IS OPEN.** `main` is `9b88f9b4`; **zero open PRs**; ledger **305 done / 0 claimed / 0 in-flight / 3 todo** — unchanged, nothing was owed a flip.
+
+### If you are the next controller reading this: your position, in six lines
+1. **`main` = `9b88f9b4`** — `#541`, exec 2's handoff correction, merged this cycle. Tree identity **exact** against the pre-merge prediction `03bc3808`; reachable by API; drop check empty **with its positive control firing in the same invocation**.
+2. **THE FORCED GATE AT `9b88f9b4` IS GREEN** — `Tasks: 33 successful, 33 total`, `Cached: 0 cached, 33 total`, **`NODE=v22.22.2`**, `2m12.182s`, `GATE_EXIT=0`, no orphaned vitest workers. Read at `/tmp/gate-9b88f9b4.log`.
+3. **BOTH EXECUTORS WERE RESTARTED FROM THEIR BRIEFS THIS CYCLE** — exec 1 at Ctx **7 %** and exec 2 at Ctx **9 %**, both verified running on `deepseek-flash[1m]` in `gisik:1` / `gisik:2`.
+4. **EXEC 2 IS WORKING** the ticket-sheet description dispatch (`CTL-DISPATCH-2026-09-19-description-editable.md`). It **caught a defect in that dispatch in its first message** — the submission composer's path is `packages/editor/…`, not `packages/app-core/src/views/…` — and is proceeding. Read its pane before assuming it is stuck.
+5. **EXEC 1 IS HOLDING, AND THAT IS DELIBERATE** — door A is blocked on an owner ruling (below). It is parked at 7 % context with its handoff pushed at `5c318405`, **not** burning context on a guess.
+6. **⛔ THE ONE OPEN RULING, and it is exec 1's own question:** **where is a project description AUTHORED?** See below. Until it is answered, door A is not dispatched.
+
+### ⛔ THE OPEN RULING — door A (`isWorkspace` description): where does a description get AUTHORED?
+**Measured by exec 1, handoff pushed at `5c318405`.** The door is ruled **BUILD as a `MIGRATION`**: `proj_projects` has no description column, and `projectCreatedPayload` is `.strict()`, so payload → projection → read → render move together. **But the prototype's "New project" form takes a NAME ONLY and hard-codes `desc: "No tickets yet"`**, and its card renders `desc` read-only. Its seed data carries real prose, so a description is *modelled* — **yet nothing in the prototype ever authors one.** So a literal build ships a column nothing writes. **This is the shape the cycle-11 entry predicted: a product decision the code itself refuses to take.** The controller recommended *the create form gains an optional description input* — it rides the existing `project.created` event, so it is not a second door — and **did not act on it.** Three options on the record: (1) create-form input *(recommended, no new door)*; (2) set-after-create, which needs a **new event = a new door the table does not name**; (3) build the field with no authoring surface, which ships it dead.
+
+### ⚠ A DOCUMENT CONTRADICTS A MEASUREMENT — the cycle-11 heading's clock is ~4 h 30 m FAST
+Its heading reads **"SATURDAY 2026-09-19 ~21:2x IST"**. Measured by API: **`#539` (that very anchor) merged `2026-09-19T11:17:57Z` = `16:47:57 IST`**, `#540` at `16:48:39 IST`, and this cycle's `#541` at `16:54:35 IST`. **Cycle 11 was written at ~16:4x, not 21:2x.** The heading is prose, not an anchor, so nothing downstream is wrong — but **a reader ordering these entries by their stamped clock would put cycle 11 four and a half hours after the work it describes.** Recorded, not corrected: the fix is one word and belongs to whoever next edits that heading.
+
+### INSTRUMENTS THAT LIED THIS CYCLE, ALL CAUGHT — carry these
+1. **`sweep-test-dbs.sh` NAMES A CONTAINER THAT DOES NOT EXIST.** It hardcodes `CONTAINER=gisik-nokma-exec-postgres-1`; the live one is **`gisik-nokma-postgres-1`**. The gate's pre-run sweep therefore prints *"Postgres is not accepting connections — skipping (not a failure)"* and **sweeps nothing**, while `:54329` is open the whole time (verified two ways: host `nc`, and a query inside the container). **A skipped sweep reads exactly like a clean one.** The gate is still valid — the DB suites ran — but the sweep is not doing its job.
+2. **A FAILED CHECK AND A MISSING TOOL PRINT THE SAME THING.** `pnpm run --silent check:tasks` **exits 1 with an empty log** when `node` is not on `PATH` — which reads as a red check, not a missing binary. The same check in the same tree exits **0** once `PATH` carries node 22. **Put node on `PATH` before running any check, and never conclude "the tree is red" from a bare exit code.**
+3. **A TMUX VERSION DIFFERENCE BROKE THE DOCUMENTED LAUNCH COMMAND.** The briefs prescribe `tmux load-buffer -b <buf> <file>`. **On tmux 3.7c that form fails with "too few arguments"** and misleads you twice: the *load* fails while a later bare `CR` paste succeeds, so the pane looks alive and empty. **`tmux load-buffer -b <buf> - < file` is the form that works here**, and a pasted command file with a **trailing newline** self-submits — which is how both executors were actually launched this cycle.
+4. **A CONTROL MUST TRAVERSE THE SAME PATH AS THE MEASUREMENT.** The drop check `git diff --name-only origin/main <tip>` returned **0 files**; its positive control, `git diff --stat origin/main origin/main~3`, returned **6 files changed** **in the same invocation**. Zero from a command never watched to produce non-zero is not evidence.
+
+### WHAT THE NEXT CONTROLLER SHOULD DO FIRST
+1. **Answer or chase the door-A ruling**, then restart exec 1 at the fixed point and dispatch door A. **Do not dispatch it before the ruling** — a column nothing writes is the failure the question exists to prevent.
+2. **Capture both panes** (`gisik:1`, `gisik:2`) and read exec 2's handoff from `main`. Exec 2 is mid-task; exec 1 is holding by design.
+3. **Re-measure every anchor above** at the sha you report. Do not carry a gate composition, a task count or an open-PR count forward.
+4. **The owner's primary checkout is 4 commits behind `origin/main`** (`7beccab4` vs `9b88f9b4`) — they were told to `git pull`.
+5. **Case-id blocks stand as cycle 11 left them:** exec 1 `13.976`–`13.987`, exec 2 `13.988`–`13.999`. Exec 2 has spent `13.988`. **An empty block is a STOP-AND-ASK** — the next id is a section-structure decision.
+
 ## 🔄 SATURDAY 2026-09-19 ~21:2x IST — **CYCLE 11, HANDED OVER AT 81 % CONTEXT: 28 PRs MERGED, THE OWNER CLEARED THE WHOLE DOOR QUEUE, AND TWO LANES ARE WORKING.** `main` is `25c2a883` **plus this anchor**; **zero open PRs**; ledger **305 done / 3 todo** — unchanged, nothing was owed a flip.
 
 ### If you are the next controller reading this: your position, in six lines
