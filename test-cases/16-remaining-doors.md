@@ -459,3 +459,50 @@ ours — it is a pure CLIENT snapshot restore (`desktop.dc.html:3029`) and the p
 - **No browser run.** The dispatch asks for one; a routed `/inbox` needs a real session this lane cannot
   reach, and jsdom has no layout engine — it cannot tell a toast drawn at the foot of the screen from one
   drawn into nothing.
+
+## The sheet footer's `‹ Previous / Next ›` — and the half that is HELD (executor 2, 2026-09-20)
+
+**The owner's ruling, verbatim (`controller-state.md:79`): _"The footer: Delete and ‹ Previous / Next ›:
+build it."_** `CTL-QUEUE:131` rules the `Delete` half *a HISTORY-RETAINING removal with undo, NOT a hard
+delete.*
+
+### ⛔ HALF OF THIS ROW IS HELD, and it is held on a MEASUREMENT: a history-retaining removal has no door
+
+- **The vocabulary has no word for it.** The ticket events are eleven — `created`, `assigned`, `field_set`,
+  `ranked`, `reparented`, `transitioned`, `closed`, `reopened`, `collaborator_added`,
+  `collaborator_removed`, `workflow_rebound`. **None is a removal.**
+- **Controlled sweep, control traversing the same path:** `ticket.deleted` → **0**, `ticket.removed` →
+  **0**, `ticket.archived` → **0**, while **`ticket.closed` → 110**. The zeros are real; the sweep can see
+  ticket events.
+- **`archived` is PROJECT-scoped** — `project.archived` / `project.restored`
+  (`apps/server/src/projections/proj-projects.ts:77`). Nothing equivalent exists for a ticket.
+- **`proj_tickets` carries no removal column** —
+  `apps/server/migrations/1787961800000_proj-tickets.sql:73-89`.
+
+So the toast's *"its history is retained"* has nothing to point at, and the prototype proves nothing about
+ours: its `deleteTicket` is a pure **client** filter (`desktop.dc.html:3795`) in a prototype that has no
+server — the same finding `C`'s door measurement reached about the Undo. **Building it means a new event, a
+projection tombstone, a read filter and a route — doors the table does not name**, so it is held for a
+ruling rather than guessed: `gisik-nokma-lanes/EXEC2-RULING-REQUEST-2026-09-20-h-delete-door.md`.
+
+### What IS built: the navigation half, which is a PROP and not a door
+
+- **16.43** ✅ — **the footer walks the visible list.** `packages/app-core/test/views/ticket-sheet.test.tsx`.
+  **The list is the CALLER's** (`TicketSheetProps.navigation`), because the sheet opens on one `ticketId`
+  and no read model knows its neighbours — the same argument `onOpenTicket` makes for not resolving the
+  parent's project locally. **An end is a DISABLED button, never an absent one**, so the row's layout is
+  identical at every position and the control cannot vanish from under a reader who has just reached the
+  end; and **a step resets the open tab to `details`**, as the prototype does (`:3809-3810` sets
+  `sheetTab: "details"` alongside the new `sheetId`).
+  **Mutation-witnessed twice, each killing exactly ONE arm** — the property, not the plumbing: making the
+  end `disabled={false}` reddens the *GREYS rather than removing* arm alone, and deleting
+  `setTab('details')` reddens the *resets the tab* arm alone. A third arm asserts that **no `navigation`
+  means no footer at all**, on `onOpenTicket`'s precedent: a caller that cannot say what its list is gets
+  no control rather than two buttons that guess at one.
+
+**⚠ ONE DELIBERATE DEPARTURE, recorded rather than smuggled.** The prototype grounds this strip in
+`--fill4` and runs it to the sheet's edges. It is drawn as a separator rule instead, because `Sheet` mounts
+**every** child inside `.gn-sheet__body` (`padding: 1rem 1.1rem`), so reaching the edge means hard-coding
+that inset as a negative margin — a **second copy of a value that lives in another rule and that nothing
+would keep in sync**. The structure is the prototype's; the fill and the full-bleed inset belong with the
+complete footer, alongside `Delete`.

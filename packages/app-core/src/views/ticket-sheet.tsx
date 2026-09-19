@@ -134,6 +134,40 @@ export type TicketSheetProps = {
    * the same fork from the other side).
    */
   onOpenTicket?: (ticketId: string) => void;
+  /**
+   * The footer's `‹ Previous` / `Next ›`, which walk the visible ticket list —
+   * the prototype's footer (`desktop.dc.html:1370-1373`, handlers `:3809-3810`).
+   *
+   * ## Why the LIST is the caller's and not this sheet's
+   *
+   * The sheet is opened on ONE ticket (`ticketId` above) and the read behind it
+   * says nothing about its neighbours — there is no "the ticket next to this
+   * one" in any read model. The list these buttons walk is the CALLER's, and
+   * this sheet must not reconstruct it: two answers to "what is in this list"
+   * are free to drift, which is exactly the argument `onOpenTicket` above makes
+   * for not resolving the parent's project here. So the caller passes the two
+   * neighbour IDs it already knows and the callback that moves.
+   *
+   * ## `null` is a DISABLED button, absent is NO footer
+   *
+   * **`null` on a neighbour means "there is no such ticket"**, and that is the
+   * disabled arm rather than an absent one, because the prototype draws both
+   * buttons at all times and greys the one that cannot move
+   * (`sheetAtStart: sheetIdx <= 0`; `sheetAtEnd: sheetIdx < 0 || sheetIdx >=
+   * vis.length - 1`; both styled `opacity:0.4;cursor:not-allowed`). **A control
+   * that disappears at the end of a list makes the footer's layout jump on every
+   * step** — the reader loses the button under their pointer at exactly the
+   * moment they reach the end.
+   *
+   * **Absent means no footer is drawn at all**, on `onOpenTicket`'s and
+   * `canSetVisibility`'s precedent: a caller that cannot say what its list is
+   * does not get two buttons that guess at it.
+   */
+  navigation?: {
+    previousTicketId: string | null;
+    nextTicketId: string | null;
+    onNavigate: (ticketId: string) => void;
+  };
 };
 
 /**
@@ -201,6 +235,7 @@ export function TicketSheet({
   visibility,
   canSetVisibility = true,
   onOpenTicket,
+  navigation,
 }: TicketSheetProps) {
   const EditorSlot = editorSlot ?? PlainTextEditorSlot;
   const [tab, setTab] = useState<'details' | 'history'>('details');
@@ -1477,6 +1512,52 @@ export function TicketSheet({
       ) : (
         <HistoryTab result={history} nameOf={nameOf} />
       )}
+
+      {/* The prototype's footer. **Only the navigation half is built.** `Delete`
+          is NOT, and deliberately so: measured, a history-retaining removal has
+          no door in this product — no `ticket.deleted` event (the vocabulary's
+          eleven events contain no removal; control: `ticket.closed` = 110
+          hits), `archived` is project-scoped only, and `proj_tickets` carries no
+          removal column. It is held for a ruling rather than guessed at, and its
+          slot here is simply empty so it can land without moving the nav.
+
+          The row is the prototype's `justify-content:space-between`
+          (`desktop.dc.html:1371`) with only its right-hand child built, and
+          `.gn-ticket-sheet__nav`'s `margin-left:auto` is what keeps the buttons
+          where the prototype puts them in the meantime. */}
+      {navigation !== undefined ? (
+        <footer className="gn-ticket-sheet__footer">
+          <div className="gn-ticket-sheet__nav">
+            <button
+              type="button"
+              disabled={navigation.previousTicketId === null}
+              onClick={() => {
+                if (navigation.previousTicketId === null) return;
+                // The prototype resets the open tab on every step — `:3809-3810`
+                // sets `sheetTab: "details"` alongside the new `sheetId` — so
+                // walking the list can never leave a reader on one ticket's
+                // History while a different ticket's sheet is open. The guard
+                // above is also what narrows the union for `onNavigate`.
+                setTab('details');
+                navigation.onNavigate(navigation.previousTicketId);
+              }}
+            >
+              ‹ Previous
+            </button>
+            <button
+              type="button"
+              disabled={navigation.nextTicketId === null}
+              onClick={() => {
+                if (navigation.nextTicketId === null) return;
+                setTab('details');
+                navigation.onNavigate(navigation.nextTicketId);
+              }}
+            >
+              Next ›
+            </button>
+          </div>
+        </footer>
+      ) : null}
 
       {workflow.data != null ? (
         <TransitionDialog

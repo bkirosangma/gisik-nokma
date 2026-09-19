@@ -1958,3 +1958,100 @@ describe('G — Priority, Due and Type as rows', () => {
     }
   });
 });
+
+/**
+ * 16.43 — the sheet footer's `‹ Previous / Next ›` (the prototype's footer row,
+ * `desktop.dc.html:1370-1373`, handlers `:3809-3810`).
+ *
+ * **`Delete` is NOT built** — measured, a history-retaining removal has no door
+ * in this product (no `ticket.deleted` in the eleven-event vocabulary, no
+ * removal column on `proj_tickets`) and is held for a ruling rather than guessed
+ * at. Nothing below asserts anything about it.
+ *
+ * The property these arms are built around: **the list these buttons walk is the
+ * CALLER's**, so the sheet never invents a neighbour — and **an end is a
+ * DISABLED button, not an absent one**, because the prototype greys the control
+ * it cannot move past (`sheetAtStart: sheetIdx <= 0`) and a button that vanished
+ * would jump the row's layout at exactly the moment a reader reaches the end.
+ */
+describe('16.43 — the sheet footer walks the visible list', () => {
+  it('16.43 sends the caller the neighbour IT was given, and never invents one', async () => {
+    const user = userEvent.setup();
+    const onNavigate = vi.fn();
+    renderSheet(ticketRead(), undefined, {
+      navigation: { previousTicketId: 'TICKET_PREV', nextTicketId: 'TICKET_NEXT', onNavigate },
+    });
+    await settled();
+
+    await user.click(screen.getByRole('button', { name: 'Next ›' }));
+    expect(onNavigate).toHaveBeenCalledWith('TICKET_NEXT');
+
+    await user.click(screen.getByRole('button', { name: '‹ Previous' }));
+    expect(onNavigate).toHaveBeenCalledWith('TICKET_PREV');
+    // Two calls, two DIFFERENT ids: a sheet that resolved its own neighbours
+    // would have to invent them, and both of these come from the caller.
+    expect(onNavigate).toHaveBeenCalledTimes(2);
+  });
+
+  it('16.43 GREYS the end it cannot move past rather than removing it', async () => {
+    const user = userEvent.setup();
+    const onNavigate = vi.fn();
+    renderSheet(ticketRead(), undefined, {
+      navigation: { previousTicketId: null, nextTicketId: 'TICKET_NEXT', onNavigate },
+    });
+    await settled();
+
+    // PRESENT is the assertion that matters — a `toBeDisabled()` on its own
+    // would also pass for a control that had been dropped from the tree and
+    // re-found somewhere else.
+    const previous = screen.getByRole('button', { name: '‹ Previous' });
+    expect(previous).toBeInTheDocument();
+    expect(previous).toBeDisabled();
+    // The other end is untouched by its neighbour's state.
+    expect(screen.getByRole('button', { name: 'Next ›' })).toBeEnabled();
+
+    await user.click(previous);
+    expect(onNavigate).not.toHaveBeenCalled();
+  });
+
+  it('16.43 with no neighbour at the far end, NEXT is the greyed one', async () => {
+    const user = userEvent.setup();
+    const onNavigate = vi.fn();
+    renderSheet(ticketRead(), undefined, {
+      navigation: { previousTicketId: 'TICKET_PREV', nextTicketId: null, onNavigate },
+    });
+    await settled();
+
+    const next = screen.getByRole('button', { name: 'Next ›' });
+    expect(next).toBeInTheDocument();
+    expect(next).toBeDisabled();
+    await user.click(next);
+    expect(onNavigate).not.toHaveBeenCalled();
+  });
+
+  it('16.43 walking the list resets the open tab to Details', async () => {
+    const user = userEvent.setup();
+    renderSheet(ticketRead(), undefined, {
+      navigation: { previousTicketId: 'TICKET_PREV', nextTicketId: 'TICKET_NEXT', onNavigate: vi.fn() },
+    });
+    await settled();
+
+    await user.click(screen.getByRole('tab', { name: 'History' }));
+    expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'Next ›' }));
+    // The prototype sets `sheetTab: "details"` alongside the new `sheetId`
+    // (`:3809-3810`), so a step can never leave one ticket's History standing
+    // under another ticket's sheet.
+    expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('16.43 with NO `navigation` there is no footer at all', async () => {
+    // The `onOpenTicket` precedent: a caller that cannot say what its list is
+    // gets no control, rather than two buttons that guess at one.
+    renderSheet(ticketRead());
+    await settled();
+    expect(screen.queryByRole('button', { name: 'Next ›' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '‹ Previous' })).toBeNull();
+  });
+});
