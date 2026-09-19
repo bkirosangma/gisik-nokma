@@ -9,6 +9,7 @@ import {
   TICKET_NOT_VISIBLE_REASON,
   VISIBILITY_AUTHORITY_REASON,
   VISIBILITY_CLAIM_MISMATCH_REASON,
+  WORKSPACE_RENAME_REASON,
 } from '../../src/permissions/check-permission.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { testEnvelope } from '../helpers/envelope.js';
@@ -324,13 +325,24 @@ describe('check 4 — acting on a ticket you cannot see', () => {
     });
   });
 
-  it('check 1: an event about something other than a ticket is not examined here', async () => {
-    // The entity-kind filter, and the boundary of what Task 9 closes. A
-    // workspace-entity event from a member who can see no ticket at all passes
-    // this pass untouched — `workspace.renamed` is admitted, including for a
-    // guest, and nothing in this module asks who may rename a workspace. That
-    // is recorded as an open absence in check-permission.ts rather than closed
-    // here on this task's own authority.
+  /**
+   * **THIS CASE USED TO ASSERT THE OPPOSITE, AND ITS INVERSION IS THE RULING.**
+   *
+   * It read: *"a workspace-entity event from a member who can see no ticket at
+   * all passes this pass untouched — `workspace.renamed` is admitted, including
+   * for a guest, and nothing in this module asks who may rename a workspace.
+   * That is recorded as an open absence in `check-permission.ts` rather than
+   * closed here on this task's own authority."*
+   *
+   * **Every word of that was measured and true**, and the entry it cites is
+   * still in `check-permission.ts` — struck through, with the closure recorded
+   * beside it rather than deleted. The owner ruled on 2026-09-19 that **a
+   * member's or a guest's rename must be refused**. So the assertion inverts,
+   * and the case is kept here rather than moved because the reason it exists is
+   * unchanged: **it is the pin that makes the ruling loud.** A future edit that
+   * re-opens the absence has to come through this test.
+   */
+  it('the rename ruling: a MEMBER is refused, and the refusal names the act', async () => {
     const workspaceId = newUlid();
     const member = newUlid();
     await seedMember(db.pool, workspaceId, member, 'member');
@@ -342,7 +354,56 @@ describe('check 4 — acting on a ticket you cannot see', () => {
       payload: { name: 'Renamed' },
       actorId: member,
     });
-    expect(await gate(renamed, member)).toBeNull();
+    expect(await gate(renamed, member)).toEqual({
+      refused: true,
+      rule: PERMISSION_ROLE_RULE,
+      // By CONSTANT, not by string: the ruling closed a measured absence, and
+      // pinning the sentence here is what stops a later edit from changing what
+      // the refusal SAYS while every test stays green.
+      reason: WORKSPACE_RENAME_REASON,
+    });
+  });
+
+  it('the rename ruling refuses a GUEST too — the case the absence was originally measured on', async () => {
+    const workspaceId = newUlid();
+    const guest = newUlid();
+    // `seedGuest`, not `seedMember(…, 'guest')`: the latter's role union is
+    // `'owner' | 'admin' | 'member'`, and the gate here caught an earlier draft
+    // that tried it. A guest is seeded by its own helper because a guest's
+    // reach comes from `visibility.set` lists rather than from a project row.
+    await seedGuest(db.pool, workspaceId, guest);
+
+    const renamed = testEnvelope({
+      workspaceId,
+      entity: { kind: 'workspace', id: workspaceId },
+      type: 'workspace.renamed',
+      payload: { name: 'Renamed' },
+      actorId: guest,
+    });
+    expect(await gate(renamed, guest)).toEqual({
+      refused: true,
+      rule: PERMISSION_ROLE_RULE,
+      reason: WORKSPACE_RENAME_REASON,
+    });
+  });
+
+  it('an ADMIN renames freely — the control the two refusals above need', async () => {
+    // Without this, a gate that refused `workspace.renamed` outright — for
+    // everyone, including the owner — would pass both cases above. That is the
+    // same shape as `ticket.created`'s pair: the refusals say what is refused
+    // only if something alongside them says what is not.
+    const workspaceId = newUlid();
+    const admin = newUlid();
+    await seedMember(db.pool, workspaceId, admin, 'admin');
+
+    const renamed = testEnvelope({
+      workspaceId,
+      entity: { kind: 'workspace', id: workspaceId },
+      type: 'workspace.renamed',
+      payload: { name: 'Renamed' },
+      actorId: admin,
+    });
+    expect(await gate(renamed, admin)).toBeNull();
   });
 });
 

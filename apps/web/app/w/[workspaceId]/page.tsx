@@ -646,6 +646,48 @@ function WorkspaceHome({
       : `${workspace.memberCount} ${workspace.memberCount === 1 ? 'member' : 'members'} · `;
   const meta = `${memberClause}${live.length} ${live.length === 1 ? 'active project' : 'active projects'} · you're ${viewer.clause}`;
 
+  /**
+   * The rename ruling, 2026-09-19.
+   *
+   * `workspace.renamed` has existed in the vocabulary since Plan 1 and has had
+   * **no client UI at all** — and until the ruling the server asked nobody who
+   * may emit it, so a workspace GUEST could rename the container they were
+   * invited into. That absence is now closed server-side
+   * (`check-permission.ts`'s `WORKSPACE_RENAME_REASON`), and this control agrees
+   * with it **by construction rather than by transcription**: `mayAdminister` is
+   * `role === 'owner' || role === 'admin'` and the server's `isWorkspaceAdmin`
+   * is the same expression, so the two cannot drift apart without one of them
+   * being edited.
+   *
+   * **The control is not the enforcement and must not be read as it.** A hidden
+   * button stops nobody; what makes this honest is that the server refuses the
+   * same act, and the control exists so a person learns that before typing a
+   * name — the same relationship the Archive control below has with
+   * `project.archived`.
+   */
+  const [renaming, setRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+
+  const onRename = (event: React.FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    const name = nameDraft.trim();
+    // Refused HERE and not sent, for the reason the `submit` helper above gives:
+    // `displayName`'s own refine refuses a blank name, so sending one would
+    // spend a round trip to be told what this form already knows.
+    if (name === '') return;
+    onSubmit(
+      () => [
+        {
+          workspaceId: workspace.id,
+          entity: { kind: 'workspace', id: workspace.id },
+          type: 'workspace.renamed',
+          payload: { name },
+        },
+      ],
+      () => setRenaming(false),
+    );
+  };
+
   return (
     <>
       <div className="gn-workspace-home__header">
@@ -659,6 +701,44 @@ function WorkspaceHome({
               a dedicated class, not a structural selector — see that class's
               rule in globals.css for why. */}
           <p className="gn-workspace-list__role gn-workspace-list__role--pinned">{meta}</p>
+          {isAdmin ? (
+            renaming ? (
+              <form className="gn-workspace-home__rename" onSubmit={onRename}>
+                <label className="gn-field__label" htmlFor="workspace-rename">
+                  New workspace name
+                </label>
+                <input
+                  id="workspace-rename"
+                  className="gn-field__input"
+                  value={nameDraft}
+                  onChange={(event) => setNameDraft(event.target.value)}
+                  autoFocus
+                />
+                <Button variant="primary" type="submit" disabled={busy || nameDraft.trim() === ''}>
+                  Save name
+                </Button>
+                <Button type="button" disabled={busy} onClick={() => setRenaming(false)}>
+                  Cancel
+                </Button>
+              </form>
+            ) : (
+              /* The accessible name carries the WORKSPACE, for the reason the
+                 archive control below gives: a page of identically-named
+                 buttons tells a screen-reader user nothing about which one
+                 renames what. */
+              <Button
+                type="button"
+                aria-label={`Rename ${workspace.name}`}
+                disabled={busy}
+                onClick={() => {
+                  setNameDraft(workspace.name);
+                  setRenaming(true);
+                }}
+              >
+                Rename
+              </Button>
+            )
+          ) : null}
         </div>
         {/* NO Members/Settings buttons here (Round 21, owner: "remove the
             members and settings button, not the nav bar item, but the buttons
@@ -666,7 +746,18 @@ function WorkspaceHome({
             remain reachable and neither is orphaned: Members is one of the
             section cards below AND a nav item once a workspace is open, and
             Settings is the nav's own workspace-scoped item (Round 21 item 6).
-            The header is now the monogram and the titles, nothing else. */}
+
+            **The `Rename` control beside the titles does not re-open that
+            ruling, and the distinction is why it is a rename rather than one of
+            those two buttons returning.** Round 21 removed two NAVIGATION
+            affordances because each already had a destination elsewhere on the
+            page; a rename has no other route in the product at all —
+            `workspace.renamed` had no client UI before 2026-09-19 — so there is
+            nothing here for it to duplicate. **What the sentence above used to
+            say, "the header is now the monogram and the titles, nothing else",
+            is amended rather than deleted**: it remains true of the two buttons
+            it removed, and this control is a workspace ACT, not a way to
+            somewhere else. */}
       </div>
 
       {/* Round 20: the heading and its toggle sit in a BARE row above the grid,

@@ -815,3 +815,82 @@ describe('a workspace the directory does not name is not rendered as an empty on
     expect(screen.queryByText(/No projects you can open/)).toBeNull();
   });
 });
+
+/**
+ * The rename ruling, 2026-09-19 — cases 13.962–13.965.
+ *
+ * `workspace.renamed` has been in the vocabulary since Plan 1 and has had **no
+ * client UI at all**; until the ruling the server asked nobody who may emit it,
+ * so a workspace GUEST was admitted — measured at Task 9 and pinned until today
+ * in `check-visibility-permission.test.ts`, whose case has now been inverted by
+ * the ruling. These cases pin the CONTROL side of the same change.
+ *
+ * **The paired-role shape is this file's own rule**, stated in its header above:
+ * a control asserted PRESENT for an admin proves nothing about a member. Every
+ * gate assertion below is therefore paired with its absence on another role, on
+ * the same fixture, in the same file.
+ */
+describe('the rename control (13.962–13.965)', () => {
+  it('13.962 is offered to an owner and an admin, and to NOBODY else', async () => {
+    for (const role of ['owner', 'admin']) {
+      cleanup();
+      mount([[workspaceAs(role)]]);
+      expect(await screen.findByRole('button', { name: /^Rename / })).toBeInTheDocument();
+    }
+    // The other half, and the reason the loop above is not sufficient alone. It
+    // is also the half the ORIGINAL absence was measured on: a guest could
+    // rename, and this control must now say so by not being there.
+    for (const role of ['member', 'guest']) {
+      cleanup();
+      mount([[workspaceAs(role)]]);
+      // The NAME still renders — this asserts the control's absence, not that
+      // the workspace is hidden from them.
+      expect(await screen.findByText('Convenience Corner')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Rename / })).toBeNull();
+    }
+  });
+
+  it('13.963 submits workspace.renamed through the ordinary ingest door, carrying the typed name', async () => {
+    const sent: SubmittedEvent[] = [];
+    mount([[workspaceAs('admin')]], { ingest: (events) => void sent.push(...events) });
+
+    await userEvent.click(await screen.findByRole('button', { name: /^Rename / }));
+    const input = screen.getByLabelText('New workspace name');
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Corner HQ');
+    await userEvent.click(screen.getByRole('button', { name: 'Save name' }));
+
+    // The event, the entity and the payload — not merely "something was sent".
+    // `workspace.renamed` is filed against the WORKSPACE, which is what
+    // `workspace-name.ts` folds to decide the directory's answer.
+    await waitFor(() => expect(sent.length).toBe(1));
+    expect(sent[0]?.type).toBe('workspace.renamed');
+    expect(sent[0]?.entity).toEqual({ kind: 'workspace', id: WORKSPACE });
+    expect(sent[0]?.payload).toEqual({ name: 'Corner HQ' });
+  });
+
+  it('13.964 will not send a BLANK name — the schema refuses it, so the round trip would teach the form nothing', async () => {
+    const sent: SubmittedEvent[] = [];
+    mount([[workspaceAs('admin')]], { ingest: (events) => void sent.push(...events) });
+
+    await userEvent.click(await screen.findByRole('button', { name: /^Rename / }));
+    await userEvent.clear(screen.getByLabelText('New workspace name'));
+
+    // Both halves on purpose: a form that disabled the button but still
+    // submitted on Enter would pass the first assertion alone.
+    expect(screen.getByRole('button', { name: 'Save name' })).toBeDisabled();
+    expect(sent).toEqual([]);
+    // And the whitespace case, which is the one `displayName`'s refine names in
+    // its own words: "a name of only spaces names nothing".
+    await userEvent.type(screen.getByLabelText('New workspace name'), '   ');
+    expect(screen.getByRole('button', { name: 'Save name' })).toBeDisabled();
+    expect(sent).toEqual([]);
+  });
+
+  it('13.965 the control names the WORKSPACE, so the page is not a column of identical buttons', async () => {
+    mount([[workspaceAs('owner')]]);
+    expect(
+      await screen.findByRole('button', { name: 'Rename Convenience Corner' }),
+    ).toBeInTheDocument();
+  });
+});
