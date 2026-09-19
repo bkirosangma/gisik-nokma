@@ -58,7 +58,7 @@ RULED before it is built.** The lift removes the hold; it does not pre-approve a
 (`gisik-nokma-lanes/EXEC-RECON-2026-09-19-five-doors.md`), whose headline was that **three of the five
 starting rows in the 2026-09-18 audit did not survive re-measurement.** The owner then approved the
 recommended set in one word, and **the table below is the authority for what may be built on these five
-screens.** Fifteen items: **nine BUILD, three DECLINED, one RE-MEASURE, two already built — and NOTHING HELD.** Every one is settled; the last (`isInvite` inviter identity) was ruled on elaboration the same evening.
+screens.** Fifteen items: **nine BUILD, four DECLINED, one NOT NOW, two already built — NOTHING HELD, and nothing awaiting anything.** Every item is settled; the last two (`isInvite` inviter identity, then its member count) were ruled the same evening, the second after being measured.
 
 | screen | item | ruling | the door |
 |---|---|---|---|
@@ -72,7 +72,7 @@ screens.** Fifteen items: **nine BUILD, three DECLINED, one RE-MEASURE, two alre
 | `isInvite` | **expiry** | **BUILD** | `ADDITIVE FIELD` — and it is **already in hand**: `openableInvite` reads `expires_at` and throws it away |
 | `isInvite` | **decline** | **BUILD** | `NEW ROUTE` against `invite_tokens.status` |
 | `isInvite` | **inviter identity** | **BUILD — name + role, AUTHENTICATED ONLY** | ruled by the owner on elaboration, 2026-09-19 late: **the inviter's name and role, shown only to an authenticated recipient** on the accept path — **never on the session-less token page, and NO email anywhere.** `proj_invites.invited_by` already records the inviter; note `invite.sent`'s payload carries **no inviter**, so it comes from the event's **ENVELOPE ACTOR** |
-| `isInvite` | **member count** | **RE-MEASURE FIRST** | the reconnaissance's own least-confident item — it was **not** established that a member count is reachable by a **token-holder who is not yet a member** |
+| `isInvite` | **member count** | **DECLINED** | measured, then refused by the owner. **No door exists:** `visibleMemberCount` (`read/workspace-counts.ts:146`) takes a resolved `EffectiveRole` and returns `null` when there is none — and the invite page has **NO SESSION**, so a count there would be a **NEW anonymous read**, not an additive field. **And that same function returns `null` for a GUEST** (`:151-153`): building this would disclose more to an unauthenticated holder of a forwardable URL than the product discloses to an authenticated person **inside** the workspace. The page already gives a link-holder the workspace **name** and the **role offered** — those are about the OFFER; a count is a fact about the workspace's SIZE, on a bearer URL |
 | `isMcpAuth` | **deny** | **BUILD** | `NEW ROUTE`, a sibling of approve — **do not extend approve with a `deny` flag**; that is one route answering two questions |
 | `isMcpAuth` | **scopes** | **DECLINED** | it **contradicts the shipped consent model** — the file's own docblock: what is granted is *"a credential that acts AS this person"*, not a scope, and no scope column exists |
 | `isMcpAuth` | **displayed code** | **DECLINED** | it **inverts who holds the code** — the browser would receive a credential-adjacent secret it deliberately never sees |
