@@ -1,10 +1,63 @@
-## ▲ TOP BLOCK — **THE INVITER CARD: ALREADY BUILT. What was missing was a TEST, and it is pinned now.** (2026-09-20, ~05:0x IST)
+## ▲ TOP BLOCK — **THE INSTRUMENT DEBTS. Task 1 (the seed-dev load red) is DONE; Task 2 (the sweep that sweeps nothing) is NEXT.** (2026-09-20, ~07:0x IST)
 
 ### § 1 — WHERE TO FIND IT. Read this before anything else.
 
-- **Branch `exec2/invite-inviter-absent`**, cut from **`main` = `df7eb820`**, pushed to origin. **One PR,
-  base `main`, prefix `exec2/`** — measure it; **a head is a reading and this block cannot carry it.**
-- ⚠ **This lane's id block is `16.41`–`16.60`; `16.41`–`16.44` are SPENT, so next free is `16.45`.**
+- **Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-20-instrument-debts.md`. TWO PRs, one per task.**
+- **TASK 1 — branch `exec2/seed-dev-load`**, cut from **`main` = `cefc9c91`**, pushed. One PR, base `main`.
+- **TASK 2 starts only once Task 1's PR is open** — the dispatch's own rule, not a preference.
+- ⚠ **This lane's id block is `16.41`–`16.60`; `16.41`–`16.44` are SPENT, next free `16.45`** — but
+  **Task 1 minted NO case id, deliberately**: no behaviour changed, and the dispatch says a tooling fix
+  that needs none should say so rather than invent one.
+
+### § 2 — TASK 1: the diagnosis, and the measured answer is NONE of the three as posed
+
+The dispatch asked which of three it is. Measured, it is **the second — the test does work it does not
+need — and the other two are FALSE:**
+
+- **NOT "the limit is too tight".** The test took **1690 ms** under `vitest.config.ts`'s `testTimeout:
+  30_000` — ~**18x** of headroom. Breaching it needs an 18x latency amplification, which is exactly what
+  the shared Postgres does at load average 201.
+- **NOT "the same database name".** `createTestDatabase` makes a `gisik_test_<uuid>` **per file** and drops
+  it; only the Postgres *server* is shared, and one server is not something a test can isolate from.
+- **IT IS "the test does work it does not need".** It seeded the **real** series — **359 events** in one
+  `ingestClientBatch` (`seed-dev-workspace.ts:171`) — **TWICE**, to assert `committed > 0`,
+  `committed === 0` on a re-run and `skippedExisting === first.committed`. **Not one of those is a fact
+  about corpus SIZE**, and the real corpus's *shape* is a different property that stays pinned elsewhere.
+
+**The fix, and the assertion got STRONGER rather than weaker.** A two-plan / three-task fixture:
+**359 → 13 events, 1690 ms → 101 ms (16.3x)**, whole file 2.37 s → 0.76 s — and `committed` is now asserted
+for its VALUE (`toBe(13)`) where it was `toBeGreaterThan(0)`, which a seed committing a single event would
+satisfy. **The real corpus's SHAPE stays pinned by the `buildDevSeedEvents` cases in the same file** (in
+memory, over the real series), and the real-database end-to-end path by `seed-dev-cli.test.ts`. Neither
+moved; the accounting is in `test-cases/13-deploy-and-ops.md` at case `13.100`.
+
+**Mutation-witnessed TWICE, each killing ONLY the target test, both by assertion rather than timeout:**
+making the seed's ids non-deterministic reddens it on *the re-run was not a no-op* (the engine refuses a
+re-founded workspace and the seed throws loudly); shrinking the fixture reddens it with
+`expected 11 to be 13`. Both mutations reverted byte-identically — `git diff origin/main` over
+`seed-dev-workspace.ts` is **empty**.
+
+### § 3 — TASK 2, NOT YET STARTED, and its claim is the DISPATCH'S until I measure it
+
+`docs/lanes/gate-lock/sweep-test-dbs.sh` is said to hardcode `CONTAINER=gisik-nokma-exec-postgres-1`,
+which **does not exist**, so it prints *"Postgres is not accepting connections — skipping (not a
+failure)"* and **sweeps nothing while reading exactly like a clean sweep**. The fix is to **DISCOVER** the
+container rather than name it, or **fail loudly** — a skip that reads as success is the whole defect.
+
+---
+
+## ▼ PREVIOUS BLOCK — **THE INVITER CARD: ALREADY BUILT, merged as #566 (`cefc9c91`).** (2026-09-20)
+
+### § 1 — WHERE IT LANDED
+
+- **PR #566**, `exec2/invite-inviter-absent` → `main`, merge commit **`cefc9c91`**.
+- **The finding:** the doors-table row carried the inviter card as an outstanding `BUILD`, and **`#400`
+  (`d3d0abdd`) had shipped it before the ruling** — the banner renders the prototype's own sentence
+  (`desktop.dc.html:216`) and `workspaces-invitation-banner.test.tsx:176` asserts it verbatim. **The row is
+  flipped to ALREADY BUILT and the queue's Addendum 5 is closed.** It is the **FIFTH** row on that table
+  written from a recommendation rather than a measurement.
+- **What was actually missing was the ruling's negative half, as a TEST:** *never on the session-less token
+  page* was true but unpinned. Case `16.44` pins it, mutation-witnessed.
 
 ### § 2 — THE FINDING, AND IT IS THE SHAPE THIS REGISTER KEEPS PRODUCING
 
