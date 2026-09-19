@@ -63,9 +63,11 @@ first and the surfaces were never wired.
   ticket, driving the **REAL** dialog. First assertion is an **ABSENCE** (the dead-end sentence), second
   follows the upload to the shipped door asserting `/v1/attachments`, `POST`, and **`ticketId` = the open
   ticket**. **Mutation-witnessed:** deleting the prop from `page.tsx` reddens both arms.
-- **`3.72`'s three new arms** — the refused upload, the unreachable one, and **evidence carrying across
-  moves**. **Mutation-witnessed:** deleting the `.catch` reddens the first two; deleting the per-move
-  reset reddens the third. Files restored byte-identical, sha printed before and after.
+- **`3.72`'s SIX new arms**, every one named `13.990` so a grep finds all witnesses. **First pass, three:**
+  the refused upload, the unreachable one, and **evidence carrying across moves**. **Review round, three
+  more** — see § 9. **Mutation-witnessed, one per arm:** deleting the `.catch` reddens the first two,
+  deleting the `[toStateId]` reset the third, and § 9's three redden their own. Files restored
+  byte-identical, sha printed before and after, on every one.
 
 **⚠ WHY THE DIALOG'S OWN SUITE COULD NOT HAVE CAUGHT THIS, and it is the whole lesson:**
 `transition-dialog.test.tsx` already covered BOTH branches and **both were green while the defect was
@@ -122,6 +124,35 @@ are done, so **next is `C` (`isInbox` bulk + Undo)**, then `H` (sheet footer), t
 **⛔ BLOCK `13.988`–`13.999`: three spent (`13.988` = E, `13.989` = description, `13.990` = this), NINE
 LEFT.** Keep the `{3}` width. **Write the id line as a bullet with NO backticks** (§ 4) or it will not
 register.
+
+---
+
+### § 9 — INDEPENDENT REVIEW, RUN AND RECORDED BEFORE THE PR OPENED. SIX FINDINGS, ALL CONFIRMED, ALL ACTED ON.
+
+**Three of them were holes the first pass left, and one was a committed file corruption. This is the
+round that earned its cost.**
+
+| # | finding | disposition |
+|---|---|---|
+| 1 | **An upload IN FLIGHT when the destination changed re-armed the new move.** The `[toStateId]` reset clears the id, but the upload was already running and its `.then` set it again unconditionally — defeating the exact carry-over the reset exists to close. The sibling pre-check effect had the guard (`let cancelled` / `if (!cancelled`); this handler did not. | A monotonic **attempt token**; a resolving upload applies only if it is still the latest. New arm + mutation. |
+| 2 | **`Features.md` — THE REPO-ROOT FILE — carried COMMITTED CONFLICT MARKERS**, so the branch's own catalogue update existed only inside `<<<<<<< HEAD`. **`grep -rln '^<<<<<<< '` over `apps packages docs test-cases` returned ZERO**, because my sweep's universe listed those four directories and `Features.md` is at the root. **The sweep universe was the bug, for the fourth time in this project.** | Resolved to this branch's side; verified the diff against `main` is only the intended sentence. Markers now swept with **no path allow-list**. |
+| 3 | **The instant pre-check could not carry the evidence id**, so attaching a file to a `require-evidence` move left the preview insisting *"none was provided"* beside a button that had just become ENABLED — a refusal printed next to the control it contradicts. | `precheck` widened to `(toStateId, evidenceAttachmentId?)`; both call sites build the candidate with the id; the effect re-runs on it. Same class as the `ticketId` widening in § 2 — **a contract that cannot carry a fact its caller holds.** New arm + mutation. |
+| 4 | **The per-move reset was catalogued nowhere and its test wore an id describing different behaviour**; the catalogue said "two arms" where the file had six. | Catalogue rewritten to name all six and what each mutation kills. |
+| 5 | **A stale citation: `transition-dialog.tsx:270`** — the line *moved by this very change* and now reads `cancelled = true;`. A stale citation still RESOLVES, so a reader is misled rather than corrected. | Re-measured to `:377`, with the old number recorded. |
+| 6 | **The reset did not fire on close/reopen.** `Dialog` returns `null` while hidden but `TransitionDialog` stays MOUNTED at the sheet's mount, so `toStateId` and the evidence survived — reopen and Move is ENABLED with **no file visible anywhere** (the input remounts empty). | Cleared on CLOSE, where the attempt is abandoned. New arm + mutation. |
+
+**What the reviewer checked and found SOUND**, recorded so the coverage is legible: **the `err.name`
+split is live, not a check that cannot fail** (`upload.ts:22` really does set the name verbatim, so both
+tones are reachable) · **`MoveArrows` binds the right ticket**, proven from `submitFromDialog`'s own
+entity rather than from the field's name · **the whole path works with no `attachment.added`** (the gate
+admits on the `attachments` row alone, the route writes it with the ticket, and the client's field name
+matches the one the route reads) · **the dead end is gone from the web**, with exactly two
+`TransitionDialog` mounts and both supplied · **the rebase lost nothing in code**, and conflict markers
+existed in that one file only · the case-id and citation checkers.
+
+**One finding recorded, not fixed:** the help module is compiled ONCE and rendered by mobile, which has
+no move control — so the manual now tells a phone user to do something the phone cannot. Owner: whoever
+next touches the help content's platform story. Recorded in the catalogue, not papered over.
 
 ---
 

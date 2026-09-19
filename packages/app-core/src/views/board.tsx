@@ -1567,13 +1567,23 @@ function MoveArrows({
   }, [registerAttempt, card.ticketId, attemptMove]);
 
   /** Mirrors `TicketSheet.precheck` exactly — `cache` optional, absence answers `not-evaluated` rather than manufacturing `passed`. */
-  const precheck = async (toStateId: string): Promise<PrecheckResult> => {
+  const precheck = async (
+    toStateId: string,
+    evidenceAttachmentId?: string | null,
+  ): Promise<PrecheckResult> => {
     if (moves.cache === undefined) return { kind: 'not-evaluated', why: 'missing-local-state' };
+    // Same reason as `TicketSheet`'s twin: the candidate carries what the
+    // submission will carry, or `require-evidence` refuses a move the person
+    // has just satisfied. See `TransitionDialogProps.precheck`.
+    const payload: Record<string, unknown> = { to: toStateId };
+    if (evidenceAttachmentId !== undefined && evidenceAttachmentId !== null) {
+      payload['evidenceAttachmentId'] = evidenceAttachmentId;
+    }
     const candidate = make({
       workspaceId: moves.workspaceId,
       entity: { kind: 'ticket', id: card.ticketId },
       type: 'ticket.transitioned',
-      payload: { to: toStateId },
+      payload,
     });
     return precheckEvent(candidate, moves.cache);
   };

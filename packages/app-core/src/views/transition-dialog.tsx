@@ -120,8 +120,27 @@ export type TransitionDialogProps = {
   ticketFields: Record<string, FieldClaim>;
   onClose: () => void;
   onSubmit: (submission: TransitionSubmission) => void;
-  /** Instant named-reason preview, advisory only (Task 6's `precheckEvent`, wired by the sheet). */
-  precheck: (toStateId: string) => Promise<PrecheckResult>;
+  /**
+   * Instant named-reason preview, advisory only (Task 6's `precheckEvent`,
+   * wired by the sheet).
+   *
+   * ⚠ **IT TAKES THE EVIDENCE ID, AND IT DID NOT UNTIL INDEPENDENT REVIEW
+   * FOUND THE CONSEQUENCE.** The pre-check builds a candidate
+   * `ticket.transitioned` and runs the real engine over it, so a rule that
+   * needs a fact the candidate cannot carry is evaluated as REFUSED. With a
+   * `(toStateId) => …` signature the candidate could only ever say `{ to }`,
+   * and `evaluateRequireEvidence` reads `payload.evidenceAttachmentId` — so
+   * attaching a file to a `require-evidence` move left the preview insisting
+   * *"none was provided"* beside a Move button that had just become **enabled**.
+   * A refusal printed next to the control it contradicts, telling the person
+   * the move was still blocked when it was not.
+   *
+   * This is the same class of omission as `BoardMoveCapability.uploadEvidence`
+   * needing a `ticketId`: **a contract that cannot carry a fact its caller
+   * holds.** Advisory still — it decides nothing — but it must be able to see
+   * what the submission will actually carry.
+   */
+  precheck: (toStateId: string, evidenceAttachmentId?: string | null) => Promise<PrecheckResult>;
   /** The authority's answer, shown VERBATIM whenever present. */
   serverRefusal: { rule: string; reason: string } | null;
   /**
@@ -263,13 +282,16 @@ export function TransitionDialog({
     setPreview(null);
     if (toStateId === '') return;
     let cancelled = false;
-    void precheckRef.current(toStateId).then((result) => {
+    void precheckRef.current(toStateId, evidenceAttachmentId).then((result) => {
       if (!cancelled) setPreview(result);
     });
     return () => {
       cancelled = true;
     };
-  }, [toStateId]);
+    // `evidenceAttachmentId` is a dependency because it CHANGES THE ANSWER:
+    // `require-evidence` is evaluated against the candidate, and attaching a
+    // file between two runs of the same destination must re-ask.
+  }, [toStateId, evidenceAttachmentId]);
 
   /**
    * ⚠ **EVIDENCE IS PER-MOVE, AND THE CLAIM IS NOW REACHABLE FOR THE FIRST TIME.**
@@ -288,10 +310,52 @@ export function TransitionDialog({
    * different move. The upload error goes with it, because a sentence about an
    * attempt for the previous move is a claim about a move no longer selected.
    */
+  /**
+   * ⚠ **AN UPLOAD IN FLIGHT MUST NOT OUTLIVE THE MOVE IT WAS FOR.** Clearing
+   * the state when the destination changes is not enough on its own: the
+   * upload that was already running resolves AFTERWARDS and calls
+   * `setEvidenceAttachmentId` unconditionally, re-arming the very carry-over
+   * the reset exists to close. Independent review found this, and it is the
+   * sibling pre-check effect above that shows the guard — `let cancelled =
+   * false` / `if (!cancelled)` — which this handler lacked.
+   *
+   * A monotonic token rather than a boolean, because there is more than one
+   * way for an attempt to be superseded (a different destination, the dialog
+   * closing) and a stale attempt must lose to all of them. Every superseding
+   * event bumps it; a resolving upload applies only if it is still the latest.
+   */
+  const uploadAttemptRef = useRef(0);
+
   useEffect(() => {
+    uploadAttemptRef.current += 1;
     setEvidenceAttachmentId(null);
     setUploadError(null);
   }, [toStateId]);
+
+  /**
+   * ⚠ AND THE SAME HOLE ONE LAYER OUT — closing and reopening. `Dialog` returns
+   * `null` while hidden (`packages/ui/src/components/dialog.tsx:15`) but this
+   * component STAYS MOUNTED at the sheet's mount (`ticket-sheet.tsx`, `open={moveOpen}`),
+   * so `toStateId` and the evidence both survive. Before this change nothing
+   * could set an id, so the carry-over was unreachable; with an uploader it is
+   * not: attach a file, press Cancel, reopen — the destination is still chosen
+   * and Move is ENABLED with no file visible anywhere in the dialog, because
+   * the `<input type="file">` remounts empty. Invisible state the user cannot
+   * see, silently satisfying a rule.
+   *
+   * Cleared on CLOSE rather than on open, so the abandoned attempt is discarded
+   * at the moment it is abandoned. **The comment and the field values still
+   * persist across a reopen — pre-existing behaviour, left alone deliberately:**
+   * typing into a dialog and losing it to a stray Cancel is a real cost, and
+   * unlike an attachment id it is visible in the reopened dialog.
+   */
+  useEffect(() => {
+    if (!open) {
+      uploadAttemptRef.current += 1;
+      setEvidenceAttachmentId(null);
+      setUploadError(null);
+    }
+  }, [open]);
 
   const blocked =
     selected === null ||
@@ -362,12 +426,18 @@ export function TransitionDialog({
                 // never point at a file this attempt did not produce.
                 setEvidenceAttachmentId(null);
                 setUploadError(null);
+                const attempt = (uploadAttemptRef.current += 1);
                 void uploadEvidence(file)
                   .then(({ attachmentId }) => {
+                    // Superseded while this was in flight — by a different
+                    // destination, or by the dialog closing. Applying it now
+                    // would re-arm evidence for a move nobody chose.
+                    if (uploadAttemptRef.current !== attempt) return;
                     setEvidenceAttachmentId(attachmentId);
                     setUploadError(null);
                   })
                   .catch((err: unknown) => {
+                    if (uploadAttemptRef.current !== attempt) return;
                     // The refused/hung split, WITHOUT importing the client's
                     // error class: `packages/app-core` must not depend on
                     // `@gisik-nokma/editor` (amendment 12 — app-core never

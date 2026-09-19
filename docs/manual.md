@@ -912,8 +912,10 @@ Boxes and arrows are not hard. It is the vocabulary around them that trips peopl
 Exactly five, and no more:
 
 1. **Require a comment** — must explain the move.
-2. **Require evidence (attachment)** — must attach a file. **This does not work; see §7. Do not use
-   it.**
+2. **Require evidence (attachment)** — must attach a file. The person moving the job picks the file
+   on the job screen; the move stays blocked until the server has stored it. (See §7. **Until
+   2026-09-19 this did not work and the advice here was not to use it** — an evidence rule made a
+   move impossible for everybody. That is fixed.)
 3. **Require a field to be set** — must have filled in a particular field first. You pick the field
    from a list, including the built-in ones.
 4. **Require a different user (four eyes)** — whoever made an earlier named move cannot make this one.

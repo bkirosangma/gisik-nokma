@@ -2021,6 +2021,7 @@ measures another.**
   branch is what the mutation kills.
 - **No browser run yet.** The dispatch asks for one (*"a typed change survives a reload … the
   `set by {actor} on {date}` line moves"*) and it is owed.
+
 ## The evidence upload — the rule that permanently blocked a move (executor 2, 2026-09-19) — case `13.990`
 
 **Owner's ruling: build it.** Dispatch `CTL-DISPATCH-2026-09-19-evidence-upload.md`. **This one was a
@@ -2037,7 +2038,9 @@ Swept in one invocation with `13.989` as its control.
    refuses when it is blank (`packages/rule-engine/src/rules/require-evidence.ts:9-15`).
 2. **The payload field already existed.** `ticketTransitionedPayloadSchema` carries it
    (`packages/domain/src/workflow.ts:186`), the sheet already forwards it (`ticket-sheet.tsx`), and the
-   dialog already sets it (`transition-dialog.tsx:270`).
+   dialog already sets it (`transition-dialog.tsx:377`). **⚠ This citation read `:270` until independent
+   review re-measured it: the line moved by this very change, and the pointer resolved to
+   `cancelled = true;`. A stale citation still RESOLVES, so a reader is misled rather than corrected.**
 3. **⚠ THE DEAD END WAS ONE `undefined`.** `transition-dialog.tsx` renders the file input when
    `uploadEvidence !== undefined` and the dead-end sentence when it is not — **the whole upload path was
    already built.** The web simply never passed the prop, exactly as it never passed `editorSlot`.
@@ -2072,9 +2075,18 @@ Swept in one invocation with `13.989` as its control.
   page — and the second follows the upload to the **shipped door**: `/v1/attachments`, `POST`, and a
   form carrying **`ticketId` = the ticket the sheet is open on**. **Mutation-witnessed:** deleting the
   prop from the page reddens both arms.
-- ✅ **`3.72`'s two new arms** — `packages/app-core/test/views/transition-dialog.test.tsx`: a refused
-  upload states the server's reason and keeps the move blocked; an upload that never reached a server says
-  that instead and never claims a verdict. **Mutation-witnessed:** deleting the `.catch` reddens both.
+- ✅ **`3.72`'s SIX new arms** — `packages/app-core/test/views/transition-dialog.test.tsx`, every one of
+  them named `13.990` so a grep for the case finds all of its witnesses. **Three were added in the first
+  pass**: a refused upload states the server's reason and keeps the move blocked; an upload that never
+  reached a server says that instead and never claims a verdict (**mutation-witnessed:** deleting the
+  `.catch` reddens both); and **evidence attached for one move does not satisfy another**
+  (**mutation-witnessed:** deleting the `[toStateId]` reset reddens it). **Three more were added by the
+  review round**, each one a hole the first pass left: an upload **still in flight** when the destination
+  changes must not re-arm the new move (deleting the attempt token reddens it); the instant check
+  **re-asks once evidence lands**, instead of printing a refusal beside the button it contradicts
+  (dropping the id from the `precheck` call reddens it); and **closing and reopening drops the
+  evidence**, rather than re-arming it invisibly behind an empty file input (deleting the `!open` effect
+  reddens it). Files restored byte-identical, sha printed before and after, on every mutation.
 
 #### ⚠ Why the dialog's own suite could not have caught the defect
 
@@ -2098,3 +2110,11 @@ only place this defect was ever visible.
 - **The Drive-reference refusal is not exercised.** The gate refuses a Drive reference as evidence
   (`attachment.evidence-drive-reference`); the transition dialog offers a plain file input, so no Drive
   reference can reach it from here.
+- **⚠ THE IN-APP MANUAL NOW DESCRIBES A CONTROL THE PHONE DOES NOT HAVE.** The manual and FAQ are
+  compiled once (`packages/app-core/src/help/content.generated.ts`) and **rendered by mobile too**
+  (`apps/mobile/src/screens/help-screen.tsx`) — but `apps/mobile/src/screens/ticket-screen.tsx` has no
+  move control at all. So *"The person moving the job picks the file on the job screen"* is true on the
+  web and unreachable on the phone, where the sentence it replaced (*"It does not work"*) was true
+  everywhere. **Found by independent review, recorded rather than fixed:** the fix is a platform
+  qualifier in the help text, and the help system has no per-platform variant today — that is a bigger
+  decision than this task. **Owner: whoever next touches the help content's platform story.**

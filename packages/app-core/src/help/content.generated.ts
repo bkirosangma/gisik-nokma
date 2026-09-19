@@ -4276,11 +4276,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — must attach a file. "
+                      "text": " — must attach a file. The person moving the job picks the file on the job screen; the move stays blocked until the server has stored it. (See §7. "
                     },
                     {
                       "kind": "bold",
-                      "text": "This does not work; see §7. Do not use it."
+                      "text": "Until 2026-09-19 this did not work and the advice here was not to use it"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — an evidence rule made a move impossible for everybody. That is fixed.)"
                     }
                   ],
                   [
