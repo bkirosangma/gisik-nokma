@@ -82,7 +82,7 @@ on — or worse, believed.
   exists**: it draws `Owner` as an option and gates the select on the viewer alone
   (`design-system/interactive/desktop.dc.html:679-685`, data `:3061`).
   **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:538` (the option list), `:467` (the arm),
-  `:537` (the representability predicate), `apps/web/test/members-page.test.tsx:770`
+  `:565` (the representability predicate, `isEditableRole`), `apps/web/test/members-page.test.tsx:770`
 
 - ✅ **13.825 — changing a role ingests exactly ONE `membership.granted`, with the right entity, and re-reads
   the roster.** Three claims, each of which a different defect would satisfy while the other two held: a
@@ -146,8 +146,8 @@ on — or worse, believed.
   **This narrowing was a CONSERVATIVE DEFAULT taken by the executor, filed rather than assumed, and it has
   since been RULED ON: the controller confirmed it on 2026-09-18**, answering
   `gisik-nokma-lanes/EXEC2-2026-09-18-owner-row-editability.md`, which priced both readings. If that
-  decision is ever revisited, the predicate at `:447` and this case change together and nothing else does.
-  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:447`, `:537`,
+  decision is ever revisited, the predicate at `:475` (`isEditableRole(member.role)` in the arm) and this case change together and nothing else does.
+  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:475`, `:546`,
   `apps/web/test/members-page.test.tsx:910`
 
 **Mutations, each applied to a backed-up file, confirmed by sha256 to have CHANGED the file, run, then
@@ -1254,9 +1254,11 @@ lives in the prototype's DATA rather than its markup.
 | page container: `padding:0 32px 24px`, `flex`, `gap:20px`, `animation:gnFade .25s ease` (`:652`) | `.gn-shell` (`padding:0 1.25rem 3rem`, block flow) | **the padding is reachable and NOT reached; the flex/`gap` half is not reachable without a restructure** — see below |
 
 **The two-line Person cell is the dispatch's explicit "named absence" branch, and the page docblock
-already carries it** (`apps/web/app/w/[workspaceId]/members/page.tsx:52-53`): the prototype's second line
-is the person's EMAIL, and `readMembers` selects `user_id`, `u."name"` and `role` and nothing else
-(`apps/server/src/routes/builder-reads.ts:247`). Drawing a second line from any other field would be
+already carries it** (`apps/web/app/w/[workspaceId]/members/page.tsx:53`): the prototype's second line
+is the person's EMAIL, and `readMembers` selected `user_id`, `u."name"` and `role` and nothing else
+(`apps/server/src/routes/builder-reads.ts:254` — this read *"selects … and nothing else (`:247`)"* until
+2026-09-19, when the name fallback added `u."email"` to the SELECT and moved it; the field the prototype's
+line needed was the one this branch recorded as missing). Drawing a second line from any other field would be
 inventing one. **Recorded, not asked**: the dispatch pre-answered this branch in its own text.
 
 ### The zebra, and why the JSX never showed it
@@ -1538,7 +1540,7 @@ edge case, they were the ordinary email population.
 `getTempName: (phone) => phone`, so a phone sign-up's name *is* the phone. Its address, meanwhile, is
 synthesised from the same phone (`getTempEmail`, `<digits>@phone.gisik-nokma.invalid`).
 
-**The two populations therefore cannot overlap, and that is what makes the instruction coherent rather than
+**The two populations therefore cannot overlap AS THIS PRODUCT CREATES THEM, and that is what makes the instruction coherent rather than
 risky: the fallback fires exactly for genuine addresses and never for synthetic ones.** It is also what
 makes withholding the synthetic address free — those rows always have a name, so they never reach the
 fallback this field exists to serve.
@@ -1590,7 +1592,7 @@ fallback this field exists to serve.
 - **No viewport or browser run.** The suite that would cover this screen starts its own `next dev` on
   `:3021`; the members route is not in `responsive.spec.ts`, and a viewport run would prove nothing about
   a label's text.
-- **`memberLabel`'s third step (`?? member.id`) is unreachable through the shipped doors** and is asserted
+- **`memberLabel`'s third step (`?? member.id`) is reachable only by a magic-link sign-up on the SYNTHETIC domain** — accepted by better-auth's `z.email()`, measured — and is asserted
   nowhere. It is there so that a future population with neither a name nor an address degrades to the id
   rather than to an empty cell — the same convention `actorLabel` uses. Its absence from the cases is
   deliberate and is recorded in the function's own docblock.

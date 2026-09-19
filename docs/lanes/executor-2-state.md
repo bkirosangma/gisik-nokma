@@ -139,7 +139,16 @@ arithmetic, because the insertions are not uniform:
 | `builder-reads.ts` | `export async function readMembers` | 242 | **243** |
 | `builder-reads.ts` | the roster `SELECT` | 248 | **254** |
 | `builder-reads.ts` | the MEMBERS route's `no-guests` door | 647 | **664** |
-| `members/page.tsx` | insertion points | — | `+11` at `:357`, then `+1` at `:419`, `:424`, `:427`, `:429`, `:472`, and `+44` at `:582` |
+| `members/page.tsx` | `EDITABLE_ROLE_OPTIONS` | 518 | **546** |
+| `members/page.tsx` | the `isEditableRole` arm | 447 | **475** |
+| `members/page.tsx` | the role `aria-label` | 461 | **480** |
+| `members/page.tsx` | `memberLabel` | — (new) | **636** |
+| `members/page.tsx` | the project-field docblock bullet | 621 | **693** |
+
+**DELTAS ARE NOT UNIFORM IN THAT FILE, and the row that used to sit here said they were.** It read
+*"`+11` at `:357`, then `+1` each at `:419`…"*, which is wrong twice: those five are 1-for-1
+SUBSTITUTIONS carrying the same `+11` as everything after `:357`, and the file's own later edits (this
+change's own docblock corrections) moved things a second time. **Use the rows above; do not compute.**
 
 **Owner: the next change to any of the five files.** Deliberately NOT mechanically rewritten here: a blank
 `+16` applied to a citation that was already approximate (several were, and `mappers.ts:438` named the `id`

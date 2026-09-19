@@ -1666,8 +1666,8 @@ half is the same act read backwards, and it was open.
 
   **THE UI HALF, DECIDED BY READING THE CODE RATHER THAN REPEATING A CLAIM:** an admin is **not** offered a
   role change that removes `owner`, and no narrowing was needed. `EDITABLE_ROLE_OPTIONS`
-  (`apps/web/app/w/[workspaceId]/members/page.tsx:518-522`) is `admin`/`member`/`guest` — `owner` is absent
-  — and line `:447` renders the `<Select>` only when `isEditableRole(member.role)`, so **an owner's row
+  (`apps/web/app/w/[workspaceId]/members/page.tsx:546-550`) is `admin`/`member`/`guest` — `owner` is absent
+  — and line `:475` renders the `<Select>` only when `isEditableRole(member.role)`, so **an owner's row
   renders the `.gn-chip` instead of a control**. The control therefore cannot build such a payload from
   either side. Recorded as measured, because the same file's prose claims the prototype's version *does*
   list `Owner` and that "the two halves do not compose" — the claim was worth re-deriving, and it holds.

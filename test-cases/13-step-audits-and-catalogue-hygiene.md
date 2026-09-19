@@ -438,7 +438,7 @@ cites, and the first draft cited a line it had not read.*
   (`apps/web/test/workspaces-cards.test.tsx:257`, `:363`). **The members page carries NO withheld-name
   treatment at all** — it names no `nameRestrictedProjectCount`, draws no restricted line, and its only
   project-shaped control is an invitation form field hidden from a guest
-  (`apps/web/app/w/[workspaceId]/members/page.tsx:621`), which is a hidden control rather than a withheld
+  (`apps/web/app/w/[workspaceId]/members/page.tsx:693`), which is a hidden control rather than a withheld
   name. **Of the dispatch's three citations, two support the claim and one only appears to:**
   `workspaces/page.tsx:170` and `w/[workspaceId]/page.tsx:147` are prose about withheld project names,
   but `members/page.tsx:41` is about the withheld ROLE `<select>` — it contains the word "withheld" and

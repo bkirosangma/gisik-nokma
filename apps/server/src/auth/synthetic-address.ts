@@ -18,9 +18,12 @@
  *
  * The roster read is the first consumer that had to decide about it, and the
  * owner's instruction (*"if the name is absent, show the email instead"*) is
- * coherent only because the two populations do not overlap: a phone sign-up's
- * `name` is the phone itself (`auth.ts`'s `getTempName`), so a row with a
- * synthetic address **always has a name and never reaches the fallback**. The
+ * coherent because the two populations **as this product creates them** do not
+ * overlap: a phone sign-up's `name` is the phone itself (`auth.ts`'s
+ * `getTempName`), so a row with a synthetic address **always has a name and never
+ * reaches the fallback**. (A magic-link sign-up on that domain is accepted by
+ * better-auth's `z.email()` and does reach it — measured, benign, and the reason
+ * this says "as this product creates them" rather than "always".) The
  * omission this module enables therefore costs no behaviour — and it is made
  * deliberately, in one named predicate, so that the next read to carry an
  * address has a sentence to find rather than rediscovering the reasoning.
@@ -47,12 +50,17 @@ export function syntheticPhoneEmail(phone: string): string {
 /**
  * Is this address one this product invented?
  *
- * Compared on the domain taken from the LAST `@`, not with `endsWith('@' + domain)`:
- * the latter also matches an address carrying the synthetic domain as a
- * sub-domain (`someone@phone.gisik-nokma.invalid.example.com` would not match,
- * but a malformed `a@b@phone.gisik-nokma.invalid` would), and this predicate's
- * answer decides whether a phone number goes onto the wire. Case-insensitively,
- * because the domain half of an address is case-insensitive.
+ * Compared on the domain taken from the LAST `@`, case-insensitively, because the
+ * domain half of an address is case-insensitive. **Measured against the
+ * `endsWith('@' + domain)` alternative rather than argued from it:** the two are
+ * equivalent on every input EXCEPT case-folding — both withhold a malformed
+ * `a@b@phone.gisik-nokma.invalid`, and neither withholds
+ * `someone@phone.gisik-nokma.invalid.example.com`. An earlier version of this
+ * sentence claimed they differed on the first of those, which they do not; the
+ * predicate was always at least as strict as it claimed, and only the prose was
+ * wrong. What actually decides the choice is case: `PHONE.GISIK-NOKMA.INVALID` is
+ * a domain this product would have minted, and this predicate's answer decides
+ * whether a phone number goes onto the wire.
  */
 export function isSyntheticPhoneEmail(email: string): boolean {
   const at = email.lastIndexOf('@');

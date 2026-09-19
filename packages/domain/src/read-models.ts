@@ -565,7 +565,11 @@ export type WorkspaceMember = {
    * The member's address, **present only when it is a real one.**
    *
    * The owner's instruction is *"if the name is absent, show the email instead"*,
-   * and the product has two populations that do not overlap: a phone-only sign-up
+   * and the product has two populations that do not overlap **as it creates
+   * them** — a magic-link sign-up on the synthetic domain is accepted by
+   * better-auth's `z.email()` and drifts the label to the member's id, which is
+   * benign but is why this is stated as a fact about minting rather than an
+   * invariant: a phone-only sign-up
    * gets a **synthetic** address (`phone.gisik-nokma.invalid`, whose local part is
    * the phone number) but a `displayName` that IS the phone, while an email
    * sign-up gets a real address and — because better-auth's magic-link plugin

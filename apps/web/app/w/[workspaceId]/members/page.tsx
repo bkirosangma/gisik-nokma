@@ -42,15 +42,23 @@ export const COPY_IT_NOW = 'Copy it now — it is not stored and cannot be shown
  * right.)
  *
  * - **Project access, Assigned and Last seen columns** (`:664-666`, `:691-693`).
- *   `readMembers` selects `user_id`, `u."name"` and `role` and nothing else
- *   (`routes/builder-reads.ts:247`), so none of the three has a wire field.
+ *   `readMembers` selects `user_id`, `u."name"`, `role` and `u."email"` and
+ *   nothing else (`routes/builder-reads.ts:254`), so none of the three has a wire
+ *   field — and the fourth has one only since 2026-09-19.
  * - **The "Ticket-only access" panel and its "Add to workspace" button**
  *   (`:700-718`). It is built from `ticketOnlyPeople` (data `:3034`), a join of
  *   the workspace's TICKETS against a people directory — no product read
  *   computes that set, and the button behind it writes a membership the product
  *   has no door for.
- * - **`Email`**, which the prototype renders inside the Person cell (`:675`) and
- *   which is not on this wire either.
+ * - **`Email` as a LINE OF ITS OWN**, which the prototype renders inside the
+ *   Person cell (`:675`). **This bullet read *"which is not on this wire either"*
+ *   until 2026-09-19 and that is no longer true** — `readMembers` carries the
+ *   address now and the cell DOES show it, but as the NAME FALLBACK when a name
+ *   is absent rather than as a second line beside one. The prototype's line is
+ *   therefore still unported and the wire gap is closed; see `memberLabel` below
+ *   for what replaced it. The sentence is corrected rather than deleted because
+ *   the reason it gave — that the line needed a wire field which did not exist —
+ *   is exactly the reason the field was added.
  *
  * What IS here and was already here — the invite panel and its 403 gate — is
  * unchanged. Its strings are load-bearing and match the prototype verbatim.
@@ -606,15 +614,24 @@ function initialOf(name: string): string {
  * The address is RARELY the second step in practice, and that is the point:
  * `email` is absent only for a phone-only sign-up, and those rows have the phone
  * itself as their `displayName` (`auth.ts`'s `getTempName`), so they never reach
- * the fallback at all. The two populations do not overlap — which is why
- * carrying a real address here discloses nothing the roster does not already
- * show, and why the server can withhold the synthetic one at no cost.
+ * the fallback at all. **The two populations the product CREATES do not
+ * overlap** — which is why carrying a real address here discloses nothing the
+ * roster does not already show, and why the server can withhold the synthetic
+ * one at no cost.
+ *
+ * **The overlap is a fact about what this product MINTS, not an invariant, and
+ * the difference is reachable.** better-auth's magic-link request schema is
+ * `z.email()`, whose pattern ACCEPTS `fake@phone.gisik-nokma.invalid` (measured),
+ * and the sign-in page passes the address straight through. A person who signs in
+ * by magic link on the synthetic domain gets `name === ''` AND a withheld
+ * address, so the third step below is what names them. The consequence is benign
+ * — the id is a fact the server sent — but the step is not unreachable, and an
+ * earlier version of this paragraph said it was.
  *
  * Blank strings are treated as ABSENT at both steps rather than rendered: a
  * whitespace-only name is not a name, and an empty address is not an address.
- * The third step is unreachable through the shipped doors and is here so that a
- * future population — one with neither — degrades to the id rather than to an
- * empty cell and a nameless control.
+ * The third step is here so that a row with neither degrades to the id rather
+ * than to an empty cell and a nameless control.
  */
 function memberLabel(member: RosterMember): string {
   if (member.name.trim() !== '') return member.name;

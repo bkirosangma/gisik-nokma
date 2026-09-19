@@ -4,7 +4,7 @@ export type Actor = { id: string; name: string };
 /**
  * A roster entry from `GET /v1/workspaces/:workspaceId/members`, as this client
  * holds it: `Actor` plus the `role` the server has always sent
- * (`routes/builder-reads.ts:247` selects it; `:259` returns it).
+ * (`routes/builder-reads.ts:254` selects it; `:266` returns it).
  *
  * ## Why a SEPARATE type rather than a third field on `Actor`
  *
@@ -46,7 +46,7 @@ export type Actor = { id: string; name: string };
  * The owner's instruction — *"on the member's page, member list, if the name is
  * absent, show the email instead"* — is a decision about the ROSTER screen, and
  * the argument above applies to it word for word. `Actor` is also a ticket's
- * `assignee` (`:151`, `:240`), produced on a replica by `actorOf`'s synthesised
+ * `assignee` (`:167`, `:256`), produced on a replica by `actorOf`'s synthesised
  * `{id, name: id}` from a ledger that holds no addresses at all — so a required
  * `email` on `Actor` would oblige an offline device to invent one, and would put
  * an address inside a value whose only claim is "this is who moved the ticket".
