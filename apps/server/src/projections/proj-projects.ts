@@ -94,10 +94,21 @@ export const projProjects: Projection = {
     }
     const payload = projectCreatedPayload.parse(event.payload);
     await tx.query(
-      `INSERT INTO proj_projects (project_id, workspace_id, name, created_by, created_at)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO proj_projects (project_id, workspace_id, name, description, created_by, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (project_id) DO NOTHING`,
-      [event.entity.id, event.workspaceId, payload.name, event.actorId, event.serverTime],
+      [
+        event.entity.id,
+        event.workspaceId,
+        payload.name,
+        // `?? null`, and NULL is the right value rather than a convenience: an
+        // event that never carried a description describes nothing, which is
+        // the absence this column stores. `?? ''` would write the CLAIM "no
+        // description" for every project founded before this field existed.
+        payload.description ?? null,
+        event.actorId,
+        event.serverTime,
+      ],
     );
   },
 

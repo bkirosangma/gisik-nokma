@@ -46,7 +46,41 @@ export type WorkspaceCreatedPayload = z.infer<typeof workspaceCreatedPayload>;
 export const workspaceRenamedPayload = z.object({ name: displayName }).strict();
 export type WorkspaceRenamedPayload = z.infer<typeof workspaceRenamedPayload>;
 
-export const projectCreatedPayload = z.object({ name: displayName }).strict();
+/**
+ * A project description: prose a person reads on the project card (door A,
+ * 2026-09-19).
+ *
+ * **REFUSES a blank, for `displayName`'s own reason above** — `'   '` reads as a
+ * description everywhere it is displayed while describing nothing. **Does NOT
+ * trim**, also for that reason: the ledger stores the claim as it was made.
+ *
+ * **BOUNDED at 500 because the card renders it on one line**, and 500 is
+ * `searchTermSchema`'s bound rather than a second number invented here.
+ */
+const descriptionText = z
+  .string()
+  .min(1)
+  .max(500)
+  .refine(
+    (value) => value.trim() !== '',
+    'must not be blank — a description of only spaces describes nothing',
+  );
+
+export const projectCreatedPayload = z.object({
+  name: displayName,
+  /**
+   * **OPTIONAL, and `.strict()` is what makes that safe.** The key cannot arrive
+   * by accident, and every `project.created` written before this field existed
+   * parses unchanged — which is the compatibility rule this repo applies to
+   * every additive wire field.
+   *
+   * Absent means NOT DESCRIBED. There is deliberately no `null` spelling here:
+   * the column is nullable because a LATER edit may clear a description, but a
+   * create event either carries one or says nothing about one, and two ways to
+   * spell "none" is how a reader ends up unable to say which happened.
+   */
+  description: descriptionText.optional(),
+}).strict();
 export type ProjectCreatedPayload = z.infer<typeof projectCreatedPayload>;
 
 /**
