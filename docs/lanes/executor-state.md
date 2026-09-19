@@ -41,6 +41,268 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SATURDAY 2026-09-19 ~02:0x IST. **THE §13 CATALOGUE SPLIT IS BUILT, REVIEWED
+> # AND PUSHED: PR #498 AWAITS THE CONTROLLER'S MERGE. THIS LANE HAS NOTHING ELSE IN FLIGHT.**
+> # **Supersedes every block under it.** Those blocks describe `7b`'s PR as open (`#494` — merged
+> # `7f9329cc`), `6b` as unbuilt (built and MERGED as `ed4c992f`, PR `#496`), and the file-split mission as
+> # unstarted (done; see below). Read this block first.
+>
+> ## WHAT MOVED WHILE THIS SESSION WAS RUNNING — the reason to recount, not inherit
+>
+> | | |
+> |---|---|
+> | `origin/main` when the session began | `a00c1c9e` |
+> | `origin/main` now | **`ed4c992f`** |
+> | `#496` (`6b`) | **MERGED** — my first `gh pr list --state open` this session showed it **open**; that reading was minutes stale and I nearly acted on it. **A cached PR list is a reading, not a fact.** |
+> | `#495` (`docs/handoff-after-494`) | still **OPEN**, still this lane's, still the controller's |
+>
+> ## THE TASK — `CTL-DISPATCH-2026-09-19-split-test-cases-13.md`
+>
+> **Shape:** `test-cases/13-deployment-dogfooding.md` **keeps its path** and becomes the INDEX (the id-block
+> allocation header, plus a part-file table and a shift map); the 97 sections moved into **eleven
+> `13-<topic>.md` part-files**. Chosen over the rename because **151 lines across `scripts/`, `packages/`,
+> `apps/`, `Features.md`, `docs/` and `test-cases/` name that path** and a rename breaks all of them at
+> once. The dispatch said 142; the directory says 151. It also said 12,700 lines / 715 ids — the file is
+> **12,722 lines and 775 ids**. Its "seven line-precise references" was **right**.
+>
+> | | |
+> |---|---|
+> | branch | `exec/split-test-cases-13`, cut from `origin/main` (`ed4c992f`) |
+> | the commit | **`8d144483`** — one commit, **18 files: 7 modified, 11 new** |
+> | PR | **`#498`**, `--base main`, `MERGEABLE`, `UNSTABLE` (the repo-wide Actions billing blocker) |
+> | forced gate | **not run — the controller's** |
+>
+> **Proven by SET DIFFERENCE, not by count** (a loss and a gain cancel in a count): case-id multiset
+> **775 → 775, 0 lost, 0 gained**; catalogue **2380 → 2380**; ✅ **692 → 692** under the repo's extractor
+> and **707 → 707** under the reviewer's suffix-aware one; catalogue-wide ✅ **2241 → 2241**. The body
+> **reconstructed from the committed blobs** diffs against `origin/main` at **exactly one line** — the
+> forced `:5424` citation re-point. All eleven claimed line ranges tile the body exactly.
+>
+> **Seven citations re-pointed** (`23`→`:84`, `274`, `2406`, `4680`, `5424`, `7273`, `8638`), each verified
+> byte-identical to the line it named. Two left alone on purpose: the `:1-3` range (still resolves — the
+> header stayed) and a **quoted `check-case-citations.mjs` run** in `13-owner-requests-and-backlog.md`
+> whose `: 485 cited` is a count the checker printed, **not a citation**. My sweeps said eight, nine, then
+> twelve line-precise references; every extra was a number belonging to the instrument, not the text.
+>
+> **Reviewed:** one independent reviewer, told to falsify, verdict **CLEAN**. It found one defect in my own
+> prose (an earlier draft called the move wholly "verbatim" without naming the one changed line) — fixed —
+> and one pre-existing defect it was not asked about, below.
+>
+> **⚠ The one fragile row.** `23 → 13-deployment-dogfooding.md:84` is the only mapping that moves when the
+> *index's own prose* changes length. It moved twice during this task and the row carries its own
+> re-measure instruction. If you edit the index block, re-measure it before trusting it.
+>
+> ## ⛔ TWO FINDINGS THAT OUTLIVE THIS TASK — both need a floor or an owner, neither is fixed here
+>
+> 1. **A lost catalogue file is invisible to BOTH gates.** Renaming `13-deploy-and-ops.md` (104 ids, 87 ✅)
+>    aside leaves `check-case-ids` at **EXIT 0** (*"sum 2276, union 2276, 22 files scanned"*) and
+>    `check-case-citations` at **EXIT 0** (*"ratchet holds exactly on every file"*). Neither has a floor on
+>    files or ids, and `checkRatchet` reads an **absent** file's uncited count as `0` — equal to a `0`
+>    baseline, so the per-file ceiling cannot fire. **The split makes this newly reachable: 23 files where
+>    there were 12.** Measured by renaming the file aside, running both, restoring sha256-identical.
+> 2. **`check-case-citations.mjs`'s `extractCheckedIds` silently drops every letter-suffixed id.** `ID_HEAD`
+>    matches `13.520`, then the trailing `a**` reads as the status token, so the ✅ never attaches and the
+>    line lands in **neither** bucket, with no `malformed` entry. **Fifteen ids** in
+>    `13-owner-requests-and-backlog.md` plus `14.27b`/`14.88b` in `14-mcp-server.md` **escape the citation
+>    ratchet entirely**. The script is **byte-identical to `origin/main`** — pre-existing, not a regression
+>    of this split — and it is reported because this change re-keyed that ratchet.
+>
+> Also reported, not fixed: the pre-split `:274` citation was **already stale** (it resolves to `13.11`'s
+> case line, not the truncation prose it is cited for), and a **duplicate `## ` heading** at old line
+> 12,589 (a superseded "settings → workflows Task 9" heading, `13.907–13.909`, above the corrected
+> `13.907–13.910`). Both are in PR #498's body.
+>
+> ## STILL THE CONTROLLER'S, UNCHANGED
+>
+> **THREE ledger rows read `todo` for merged work**, recounted at `ed4c992f` and each verified with
+> `/usr/bin/git merge-base --is-ancestor` against `origin/main` — the ledger's own `done` rule:
+> `hig-per-screen/6b` → **`ed4c992f`** (#496) · `hig-per-screen/7b` → **`7f9329cc`** (#494) ·
+> `backlog-and-closed-second-wave/12` → **`77aa906a`** (#490). The first two also still say `13.306 is ❌`
+> and `13.309 is ❌`; **on `main` both are witnessed.** The `/12` row's own note already says *"THIS TASK HAS
+> MERGED"* and ends *"OWNER: flip this row, or direct the controller to."* **I flipped none of them** — the
+> ledger is edited only on `main`, only by the controller. `pnpm check:tasks` reports 301 done / 7 todo, so
+> it will not flag any of it. `3b` remains held by the owner, `5b` and `6b` still want rulings, `10` is
+> blocked on wire gaps, and `board-prototype-port/1` is STRUCK.
+>
+> ## ⛔ `prewarm-web-routes` IS ON HOLD — DO NOT START IT (controller ruling, 2026-09-19)
+>
+> **`CTL-DISPATCH-2026-09-19-prewarm-web-routes.md` is HELD, not pending.** Read this before picking it up:
+> it modifies the hot `next dev` command in `docker-compose.hot.yml`, and **the owner's newest instruction is
+> to REMOVE the hot compile and rebuild on each merge** — if that lands there is no cold compile to pre-warm
+> and the brief is **retired, not deferred**. It also forbids `docker compose` and binding `:3001` while its
+> own proof demands first-visit times *"on a cold container"*, i.e. restarting the hot web that **exec 2 is
+> live against**. Both blockers were measured; **the second is the one that decides it.**
+>
+> **The read-only measurement that brief asks for was taken anyway:** **7 `tsc --watch` workers in the web
+> container + 7 in the server = FOURTEEN**, holding **~4.8 GiB RAM** and **~21 % of a core at idle** on this
+> 10-core / 16 GB box. Its premise — *"983 of ~991 compiles under 1 second"* — **did not reproduce**: the
+> reachable log holds 86 compile lines over ~23 h, **48 of them in whole seconds, worst 106.5 s**. That
+> figure should be re-derived before any work is built on it.
+>
+> **THOSE RULINGS ARE RECORDED HERE AS OF THIS COMMIT** — folded in verbatim from PR **`#495`**
+> (`docs/handoff-after-494`) on the controller's ruling of 2026-09-19, after which `#495` was closed. The
+> next block down is `#495`'s own, unedited. The 5b analysis is also a standalone file:
+> `gisik-nokma-lanes/EXEC-RULING-REQUEST-2026-09-18-hig-5b-13304.md`. **Do not re-derive `5b` or `3b` from
+> scratch** — both were investigated once, at cost, and the conclusions are below.
+>
+> **A note the controller asked for, because it is the lesson of this task:** the number that carried the
+> split's proof **was never the count**. The controller's independent check reported **720** unique `13.x`
+> ids where this lane measures **775**; `13\.[0-9]{3}` gives **700** and `13\.[0-9]+` gives **803**. **Every
+> one of those readings has an empty set difference in both directions** — which is the invariant — and the
+> total is extractor-dependent, exactly as the old file's own header warns at its `13.3333px` / `13.9999`
+> trap. **Report the set difference; say which extractor produced any total you quote.**
+
+> # ⚠ `hig-per-screen/3b` IS CONTESTED, AND `3b` IS NOT THE ONLY STALE THING — measured 2026-09-19.
+>
+> **Do not re-tread this**: the rows below are the ones a restarted executor will pick up next, and each
+> has already been investigated once.
+>
+> ## `3b` — TWO DOCUMENTS DISAGREE, AND THE LEDGER SIDES WITH NEITHER
+>
+> **Executor 2's own handoff claims the work is done:** `docs/lanes/executor-2-state.md:2753-2757` —
+> *"Members + InviteAdmin. MERGED as PR #443 (`ba96a8d2`). **Makes the ledger's `hig-per-screen/3a` and
+> `/3b` true — except see the scope caveat.**"* Its § 3 caveat is about **3a** only (*"Four unbuildable
+> columns mean 3a is true only for the backed surface"*), and its § 2 rule 4 says *"`hig-per-screen/3a`
+> stays `todo`"*.
+>
+> **The measurements, all on `origin/main`:**
+> - the ledger still reads **`hig-per-screen/3b` = `todo`**;
+> - the plan (`docs/superpowers/plans/2026-09-08-hig-per-screen.md:834-852`) allocates **three
+>   STACK-SUITE cases, `13.295`–`13.297`**, plus a mutation and three catalogue rows;
+> - **those three ids exist only as PROSE** — `test-cases/13:7913` and the id-allocation note at `:43`.
+>   There is **no case row** for any of them, and `check-case-ids` does not count them;
+> - **there is no members spec in `apps/web/e2e-stack/`** (nor in `apps/web/e2e/`);
+> - **but the properties ARE witnessed by JSDOM cases** in `apps/web/test/members-page.test.tsx` —
+>   `:179` asserts the `ShellRefusal` refusal, `:318` asserts the dead-mint residue **verbatim**.
+>
+> **So `3b` is either done-but-uncatalogued or needs the three stack cases.** That is a ruling, not a
+> guess, and it is compounded by ownership: the row says *"Dispatched to executor 2"*. **RULING REQUESTED.**
+>
+> ## EXECUTOR 2 APPEARS IDLE — half the fleet, and the owner wanted two in parallel
+>
+> `gh pr list --state open` returns **only two PRs repo-wide**, both executor 1's (#495, #496). Executor 2's
+> worktree (`/Users/kiro/my_projects/gisik-nokma-exec2`) is parked on `exec2/settings-wf-task9` — **merged
+> as #492** — with a **clean tree** and a handoff refresh as its last commit. Nothing in flight.
+> **Do not conclude from this that `3b` is free to take:** the row says it was dispatched to executor 2, and
+> **cycle 7's own title mentions "two void dispatches" whose root cause it annotated** — this note does NOT
+> establish whether `3b`'s dispatch (`CTL-DISPATCH-2026-09-18-exec2-members-inviteadmin.md`, 18 Sep 08:27)
+> is one of them. **Owner: the controller.**
+>
+> ## A NEAR-MISS WORTH KEEPING, because it is this repo's favourite defect
+>
+> I was one step from reporting that `3b`'s dead-mint residue message **does not exist in the product**. The
+> sweep was empty and the conclusion was tidy. **It exists** — `members/page.tsx:836` — and my grep missed
+> it because **the product capitalises the leading word** (`No link behind this one…`) while the plan quotes
+> it mid-sentence in lowercase. A case-sensitive NULL that reads exactly like an absence, agreeing with a
+> hypothesis I wanted. It surfaced only on a shorter fragment (`link behind`). **Second instance in one
+> session; see [[search-string-can-silence-itself]]'s third disguise.**
+>
+> > # ⛔ `hig-per-screen/5b` IS NOT EXECUTABLE — MEASURED 2026-09-19. **DO NOT RE-TREAD IT.**
+>
+> A restarted executor reading the ledger WILL pick `5b`: its row says *"Stays todo until `13.304` is
+> restated or **witnessed**"*, and the catalogue's `13.304` row carries a restatement with a named
+> deliverable. That reading is wrong, and the controller said so first (*"needs a controller ruling"*).
+>
+> **Why no test can assert the List shrank in that harness, measured:**
+> - the control sets a **SERVER-side** filter — `page.tsx:321-324` builds
+>   `activeOnly ? { stateCategories: ['active'] } : {}`;
+> - the List's rows come from `source.query.getTickets(projectId, filter, 'flat')`
+>   (`packages/app-core/src/views/ticket-list.tsx:1196`), declared
+>   `getTickets(projectId, filter: FilterSpec, grouping: Grouping)`
+>   (`packages/app-core/src/data-source.ts:143`);
+> - **there is no client-side narrowing to fall back on** — `ticket-list.tsx`'s only `.filter(` calls are
+>   `.filter(Boolean)`, a column-id array and an `undefined` guard; `list-model.ts` exposes `countRows`,
+>   `recentlyAssignedRows`, `groupRows`, `nestRows` and none narrows by state category;
+> - **the harness's stub ignores all three arguments** — `board-narrowing.test.tsx:185` is
+>   `getTickets: async (): Promise<TicketListView> => ({ projectId: PROJECT_ID, rows })`.
+>
+> So ticking the control cannot change what the List receives; a case asserting "the List shrank" fails,
+> and making it pass means teaching the FAKE to narrow — this repo's signature failure. **`13.436`
+> (`board-narrowing.test.tsx:214-246`) already pins the negative arm** (the Board's count is not sourced
+> from the narrowed list), so the missing half is exactly the List-narrowing one.
+>
+> **RULING REQUESTED, with three priced options and a recommendation:**
+> `gisik-nokma-lanes/EXEC-RULING-REQUEST-2026-09-18-hig-5b-13304.md` — (a) teach the fake to narrow
+> (*asserts the fake* — advised against), (b) assert the **relay** via a `getTickets` spy (~1 h, but needs
+> `13.304` restated to say "relayed"), (c) a **real-door** case against real Postgres (~half a day; the
+> only one that witnesses the product). **HOLD. Do not cut a branch for `5b` until this is ruled on.**
+>
+> > # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~22:5x IST. **`hig-per-screen/7b` IS MERGED. THIS LANE HAS NO
+> # TASK IN FLIGHT AND IS HOLDING FOR THE NEXT DISPATCH.**
+> # **Supersedes the block below. That block says the PR awaited a merge — it has had one, and this one
+> # exists to stop a relaunched executor opening a PR that is already closed.**
+>
+> ## THE MERGE — VERIFIED, NOT TRUSTED
+>
+> | | |
+> |---|---|
+> | merged as | **`7f9329cc`** — `Merge pull request #494`, a **real merge commit**, not a squash. Parents `1fc65c8f` (main) + `794c5fc6` (this lane). |
+> | reachability | **all three commits are ancestors of `origin/main`** — `cb07a669`, `ef0433ec`, `794c5fc6` each pass `git merge-base --is-ancestor`. (`git branch --contains` empty is the orphan test; none is orphaned.) |
+> | **the strongest check** | **the merge commit's tree is `fce64956…` — byte-identical to the tree this lane PREDICTED with `git merge-tree` and inspected BEFORE the merge.** So every pre-merge finding transfers exactly: 12700 lines, each new marker appearing exactly once, exec2's appended block intact, and the corrected citation on **line 8616**. |
+> | content | `my-work.test.tsx`, `Features.md` and this file are **IDENTICAL** between the branch tip and merged `main`; `test-cases/13` differs by exactly exec2's **+112-line EOF append**, which is the only difference it should have. |
+> | on `main` now | catalogue `13.309` = `✅`, the audit tally is **`11 ✅ / 4 ❌`**, the old "is unwitnessed" sentence appears **0** times, and the witness is in the tree. |
+>
+> ## ⛔ ONE THING ON `main` IS STALE, AND IT IS NOT THIS LANE'S TO EDIT
+>
+> **The ledger row `hig-per-screen/7b` still reads `todo`, and its note still says `13.309 is ❌`.** Both
+> are false on `main` at `7f9329cc` — the case is witnessed and merged. **Owner: the controller.** The
+> ledger is edited only on `main`, only by the controller, which is exactly why this lane did not flip
+> it. **Reported, not fixed** — the instinct to fix what you find is the one that hides compounds.
+>
+> ## WHAT THE NEXT EXECUTOR INHERITS — read before starting anything
+>
+> - **DO NOT REDO `13.309`.** It is witnessed by `13.309 the withheld-name fallback carries its exact
+>   title text` in `packages/app-core/test/views/my-work.test.tsx`, merged at `7f9329cc`.
+> - **Remaining non-done rows on `origin/main`, and every one of them needs a DECISION, not an
+>   implementer:** `3b` (HELD — the owner reviews sign-in first) · `5b` (needs a controller ruling:
+>   its plan sentence is unsatisfiable) · **`6b` — see the CORRECTION below, it is a ruling too** ·
+>   `7b` (merged; the row is the stale item above) · `10` (**McpAuthorize and McpTokens are wire-gap
+>   per the delta audit, so it cannot be finished as transcription**) · plus `board-prototype-port/1`
+>   (**STRUCK — do not implement**) and `backlog-and-closed-second-wave` (rows 1–4 done).
+> - **This lane's shift map still holds:** the `test-cases/13` insertions are **+29 below base line
+>   8080**, confirmed against the merged file (`base :8587 → merged :8616`).
+> - **The gate is contention-flaky on this machine.** An earlier full run at the *identical source* was
+>   red on four timeouts (app-core `workflow-builder/access`×2 + `publish`×1 at the 5 s default, server
+>   `seed-dev` at 30 s); every one passes alone and the next full run at the same code exited 0.
+>   **Re-run a red timeout alone before reading it as a defect.**
+> - **Hosted CI is red repo-wide and NO JOB RUNS** — `gh run view 35371155543` reports, verbatim, *"The
+>   job was not started because recent account payments have failed or your spending limit needs to be
+>   increased."* The standing auto-merge authorization's *"independent CI run green"* condition **cannot
+>   be met by any PR until the owner restores Actions billing.** It is an owner action, not a code one.
+> - **`pnpm`'s path is not its runtime.** A turbo failure line prints `…/node/v24.11.1/bin/pnpm run
+>   test`; that is the pnpm BINARY's location. `pnpm exec node -e "process.version"` answers
+>   `v22.22.2`. Do not record that v24 string as a gate-environment finding.
+>
+> ## ⚠ CORRECTION — `6b` is NOT the nearest executable task, and the first version of this block said it was
+>
+> An earlier draft of this block described `hig-per-screen/6b` as *"the closest analogue to `7b`"*. **That
+> was wrong**, and the error is worth keeping because of its shape: I read the ledger row's NOTE and not
+> its FLAG. The row carries:
+>
+> > *"FLAG: `ContestBanner` is mounted nowhere in the product (`docs/hig-reconciliation-audit.md:577`,
+> > re-measured), so the surface 6b presumes does not render; not promotable as though it did."*
+>
+> **Re-measured here, three independent ways:** `ContestBanner` appears only as a definition
+> (`packages/app-core/src/contests/contest-banner.tsx:25`), a barrel export (`src/index.ts:306`), a built
+> `dist/`, and in **tests** — there is **no mount site in any app**; the audit states the same at `:577`;
+> and the shipped resolutions are **`Redo legally` / `Convert to comment` / `Discard`**, not the
+> prototype's `Keep mine` / `Keep theirs`.
+>
+> **Why that makes it a ruling rather than a task:** `13.306`'s named deliverable is a case asserting the
+> ticket surface renders no `Keep mine`/`Keep theirs` control. **On a sheet that mounts no contest
+> component at all, that assertion passes because nothing renders — not because the product refuses the
+> pair.** It is the "check that cannot fail" class, and what it needs is a decision about what the case
+> SHOULD assert, not an implementer.
+>
+> **So the honest position of this lane is: no executable row.** `3b` is held by the owner, `5b` and `6b`
+> need rulings, `7b` is merged, `10` is blocked on wire gaps, and `board-prototype-port/1` is struck.
+> **That is a ruling request, not idleness.**
+>
+> ## OPEN RULINGS
+>
+> **None from `7b`.** The one open item is the stale ledger row above, and it is the controller's.
+>
+
 > # ▣ CURRENT POSITION — FRIDAY 2026-09-18 ~23:4x IST. **`hig-per-screen/6b` IS BUILT: CASE `13.306` IS
 > # WITNESSED. NO TASK IN FLIGHT AFTER THIS; HOLDING FOR THE CONTROLLER.**
 > # **Supersedes the block below it.** That block says the `7b` PR awaited a merge — **it has had one:
