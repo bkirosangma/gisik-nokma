@@ -31,6 +31,49 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔴 SATURDAY 2026-09-19 ~14:1x IST — **CYCLE 10, STOPPED AND HANDED BACK: THE MACHINE REBOOTED, `start-all.sh` LAUNCHED *BOTH* EXECUTORS FROM A CORRUPTED BRIEF, TWO PRs ARE MERGED, AND THE FORCED GATE IS RED FOR A REASON THAT IS NOT THE CODE.** `main` is `7123bb9e` **plus this anchor**; open PRs **`#512`** (exec 2, no-hot-reload) and this anchor. Ledger **304 done / 4 todo** — **unchanged, nothing flipped this cycle, and no row was owed one.**
+
+### If you are the next controller reading this: your position, in five lines
+1. **`main` = `7123bb9e`.** This cycle merged **`#510`** (exec 2's handoff) → `217c1b73`, then **`#513`** (exec 1, Task 8, the `"N tickets"` count) → `7123bb9e`. Both with `gh pr merge --merge`, **both with tree identity EXACT against a `merge-tree --write-tree` prediction taken before the merge**, both reachable by API. **A fifth PR, the anchor, carries this entry.**
+2. **`#512` (exec 2's no-hot-reload change) is OPEN, MERGEABLE, reviewed, and its own checks are green — but its forced gate was never run, because no gate can run on this box right now.** See the red below. **Do not merge it without a gate.**
+3. **THE FORCED GATE AT `7123bb9e` IS RED AND THE CAUSE IS THE ENVIRONMENT, NOT THE CODE — proved by a control, not argued.** `Tasks: 25 successful, 33 total · Cached: 0 · Failed: @gisik-nokma/server#test`, and the log's dominant error is **`ECONNREFUSED 127.0.0.1:54329`**. **The shared cross-lane TEST Postgres (root `docker-compose.yml`, `54329:5432`) is not running** — the reboot took it down and **`start-all.sh` never starts it.**
+4. **BOTH EXECUTORS ARE PARKED AND HOLDING, AND THEIR SESSIONS WERE LAUNCHED FROM A CORRUPTED BRIEF.** They confirmed the hold in their panes and mutated nothing. **They must be relaunched, not resumed** — and *not* with `start-all.sh` until its bug is fixed.
+5. **Rulings I could not make, and did not:** (a) **whether to start the test Postgres on 54329** — a `docker compose up`, which this controller's launch override forbids it to run unprompted; (b) **whether to fix `start-all.sh`**; (c) exec 2's **`.env` / dev-stack question**, which is the owner's environment. All three are written out below.
+
+### ⛔ THE GATE RED, AND THE CONTROL THAT SETTLES IT — do not re-derive this, and do not conclude "main is red"
+Run by the controller at `7123bb9e` via `docs/lanes/gate-lock/gate.sh`, `--concurrency=1`, node 22 on PATH. **The `Tasks:` line is present, so the gate genuinely ran** and this is not a wrong command. It is still **not a code verdict**, and three measurements say so:
+
+| the reading | what it shows |
+|---|---|
+| the failure text | **`ECONNREFUSED 127.0.0.1:54329` ×4** and `ECONNREFUSED 127.0.0.1:1` ×82. Port **1** is the parse artifact of an unset URL; port **54329** is named outright. |
+| the failing suites | `dual-client/socket-cut`, `determinism`, `dual-client/scenarios`, `dual-client/grant-backfill`, `auto-close/sweep` — **all DB-backed integration suites.** |
+| **the control** | `git diff --name-only 217c1b73 7123bb9e` is exactly the 14 files of #513. **Every one of those failing suites is `changed-by-this-merge=0`, and none of them imports `builder-reads`** — the only server file #513 touched. |
+
+**So the tree is not implicated and the environment is.** `apps/server/test/helpers/db.ts:10` defaults to `TEST_DATABASE_ADMIN_URL ?? postgres://gisik:gisik@localhost:54329/postgres`; measured with `lsof`, **nothing listens on 54329** while the dev stack's 54330 is open. **A gate run after the reboot that reads "red" on the DB suites is the instrument, not the code** — the same shape as the recorded `ECONNREFUSED` precedent. **The fix is one command (`docker compose up -d` from the main folder, root compose), and it is the owner's to authorise, not mine.**
+**Also note the two recorded instruments held:** turbo spawned the failing child from `node/v24.11.1/bin/pnpm` (a PATH, **not** a runtime — the pnpm binary's location, per memory), and **8 of 33 tasks never ran** because turbo stops the graph at the first failure. **`NEVER conclude "typecheck is clean" from this log.**
+
+### ⛔ `start-all.sh` HAS TWO DEFECTS, ONE OF WHICH BROKE BOTH EXECUTORS — measured, not inferred
+The machine **rebooted at ~13:30**, and the topology came back through `gisik-nokma-lanes/start-all.sh` at **13:39:04**. The controller (`gisik:0`) came up correctly. **Both executors did not.**
+
+1. **`start-all.sh:84-85` pass the brief's TEXT where a PATH belongs.**
+   ```
+   E1_P=$(cat "$EXEC_PROMPT")      # ← CONTENT
+   launch 1 "… bypassPermissions \"\$(cat '$E1_P')\""   # → cat '<the whole brief>'
+   ```
+   The controller line (`:83`) uses `mkprompt`, which returns a **path** — **that is the whole reason `gisik:0` was fine and only the two executors were damaged.** The pasted command therefore read `"$(cat 'You are the **serial executor** …')"`; zsh opened `dquote cmdsubst` and **the rest of the brief was swallowed as continuation input.** The pane shows it verbatim: `cat: You are the **serial executor** …: No such file or directory`. **Consequences, all observed:** both sessions ran on a **fragment** of their orders with **inline-code spans stripped**; exec 2 reported *"Your message came through truncated — the actual ask is missing from the top"*; both spent their first minutes on an **unplanned** `.env` / Google-sign-in investigation that **no one dispatched**, because the fragment that survived was the dev-stack env rule. **The fix is `E1_P="$EXEC_PROMPT"` / `E2_P="$EXEC2_PROMPT"` (or `mkprompt`), and it is the owner's call to make.**
+2. **It never starts the TEST Postgres.** All three of its compose calls are `-f docker-compose.dev.yml` (dev stack, **54330**). The gate's DB suites need **54329**, which only the **root `docker-compose.yml`** provides. **So every gate run after a reboot through this path is red for a reason that has nothing to do with the code** — which is exactly what happened here.
+3. *(cosmetic, same file's family)* **`.exec-prompt-restart-2026-09-19-exec2.md:4` names `…/gisik-nokma-exec`** — executor 1's worktree — while its own body at `:406-413` says in terms *"You are EXECUTOR 2"*, worktree `…-exec2`, and the tmux window's cwd is `-exec2`. The correct table wins, but a session reading line 4 first would `cd` into its peer's tree.
+
+### WHAT WAS NOT DONE, AND WHY — so the next reader does not re-do it or mistake it for an oversight
+- **`#512` was NOT merged.** Its machinery is complete (independent review with six findings closed, eight mutations, its own checks all green) but **the forced gate is the controller's and it cannot run.** *A gate that cannot run is not a gate that passed.*
+- **The executors were NOT relaunched.** They are **parked and holding on an explicit controller instruction** — the safe state — and relaunching them into a box that cannot run a test suite would burn a cycle for nothing. **They are not silently stalled; they answered.**
+- **The dev stack was NOT touched.** It is **UP** and serving from the main folder, and **Google sign-in is ON** — verified **inside** the container (`GOOGLE_CLIENT_ID` len 72, `GOOGLE_CLIENT_SECRET` len 35) and on the route (`/v1/auth/methods` → `{"google":true,"apple":false,"phone":false}`). **The `.env` hazard did not bite.** It is, however, **MIXED-ORIGIN, confirmed independently here**: `web` and `server` carry `working_dir=/Users/kiro/my_projects/gisik-nokma`, while `postgres`, `minio` and `mailpit` still carry `…/gisik-nokma-exec`. The project name is the same, so an `up` from the main folder reconciles all five — **but "which directory is this stack from" has no single answer, and the project name will not tell you.**
+- **The web image is now stale relative to `main`** (it was built before this cycle's merges). `#512`'s own rebuild rule: *the served app equals `main` only as of the last build*, and with the watchers gone **the rebuild is the only thing that closes it.** A rebuild is measured at **841 s / 14 min 01 s** and is silent for its last **301.3 s**, so a watcher reads a working build as hung. **`build` is safe for this controller; `up` is not. Not run.**
+
+### The two questions this controller wrote to the owner and held on
+1. **May the shared test Postgres be started** — `docker compose up -d` from `/Users/kiro/my_projects/gisik-nokma` (root compose → 54329)? **Without it no gate can be green, so `#512` cannot be merged under the merge bar, and no executor can verify anything.**
+2. **Should `start-all.sh` be fixed** (defects 1, 2 and 3 above)? It is machine-local and outside the repo, so no commit can carry the fix and every future reboot re-inherits all three.
+
 ## ✅ SATURDAY 2026-09-19 ~12:4x IST — **CYCLE 9: FOUR PRs MERGED, ONE GATE RED THAT THE EXECUTOR'S OWN CHECKS COULD NOT SEE, AND A PLAN THAT STILL TOLD TWO READERS TO BUILD A SECOND DOOR.** `main` is `22a8e7c3`; **zero open PRs**; ledger **301 done / 0 claimed / 7 todo**.
 
 ### If you are the DeepSeek controller reading this: your position, in five lines
