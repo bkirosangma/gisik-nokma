@@ -557,7 +557,31 @@ export type TicketTypeListResponse = { workspaceId: string; ticketTypes: TicketT
  * with no name is not something this read may produce: see `readMembers`, which
  * states what it does when the join finds nothing.
  */
-export type WorkspaceMember = { userId: string; displayName: string; role: WorkspaceRole };
+export type WorkspaceMember = {
+  userId: string;
+  displayName: string;
+  role: WorkspaceRole;
+  /**
+   * The member's address, **present only when it is a real one.**
+   *
+   * The owner's instruction is *"if the name is absent, show the email instead"*,
+   * and the product has two populations that do not overlap: a phone-only sign-up
+   * gets a **synthetic** address (`phone.gisik-nokma.invalid`, whose local part is
+   * the phone number) but a `displayName` that IS the phone, while an email
+   * sign-up gets a real address and — because better-auth's magic-link plugin
+   * creates the user with `name: name || ""` and the sign-in page sends no name —
+   * an **empty** `displayName`. So the fallback fires exactly for genuine
+   * addresses.
+   *
+   * **OPTIONAL, and the absence is the declaration rather than a gap:** the server
+   * WITHHOLDS the synthetic address (`readMembers`), so a phone member's row
+   * carries no `email` key at all rather than a key whose value is a phone number
+   * in disguise. Absent is not `''`, for the same reason a withheld count is not
+   * `0` on `WorkspaceRef` — a renderer that treats them alike would print an empty
+   * string where the product decided to say nothing.
+   */
+  email?: string;
+};
 
 export type MemberListResponse = { workspaceId: string; members: WorkspaceMember[] };
 

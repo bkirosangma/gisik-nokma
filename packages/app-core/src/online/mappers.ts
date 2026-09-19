@@ -397,8 +397,11 @@ export function mapRollup(raw: unknown, path = 'rollup'): RollupToViewer | null 
 /**
  * `GET /v1/workspaces/:workspaceId/members` → `RosterMember[]`.
  *
- * `{userId, displayName, role}` → `{id, name, role}` is a rename plus the role
- * CARRIED rather than dropped.
+ * `{userId, displayName, role, email?}` → `{id, name, role, email?}` is a rename
+ * plus the role CARRIED rather than dropped, plus the address carried **only
+ * when the server sent one** — the field it withholds for a phone member is a
+ * phone number wearing an invalid domain, and the reasoning is stated once, in
+ * `WorkspaceMember` (`@gisik-nokma/domain`).
  *
  * ## The docblock this replaces, and why its argument was wrong HERE
  *
@@ -434,10 +437,24 @@ export function mapActors(raw: unknown): RosterMember[] {
   const record = asRecord(raw, 'members');
   return asArray(record['members'], 'members.members').map((entry, index) => {
     const member = asRecord(entry, `members.members[${index}]`);
+    const email = member['email'];
     return {
       id: asString(member['userId'], `members.members[${index}].userId`),
       name: asString(member['displayName'], `members.members[${index}].displayName`),
       role: asString(member['role'], `members.members[${index}].role`),
+      // `email` is the ONE field here whose ABSENCE is the server's decision
+      // rather than a malformed body (`WorkspaceMember.email`), so it passes
+      // through as absent instead of being defaulted — a `?? ''` would convert
+      // "the product decided not to say" into "the product says nothing", which
+      // is the same mistake a withheld count read as `0` would be.
+      //
+      // Present-but-not-a-string still THROWS, which is the point of routing it
+      // through `asString` rather than a truthiness check: `null` is not this
+      // field's spelling of absent, and a body that sends one is a body this
+      // client cannot read.
+      ...(email === undefined
+        ? {}
+        : { email: asString(email, `members.members[${index}].email`) }),
     };
   });
 }

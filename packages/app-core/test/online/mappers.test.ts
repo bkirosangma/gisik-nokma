@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_VIEW_PREFS } from '../../src/view-types.js';
+import { DEFAULT_VIEW_PREFS, type RosterMember } from '../../src/view-types.js';
 import type {
   AttentionResponse,
   BoardResponse,
@@ -187,6 +187,76 @@ describe('13.760 mapActors carries `role`, and refuses a member that has none', 
     // nobody serves.
     expect(() =>
       mapActors({ workspaceId: 'w', members: [{ userId: ANSELMA, displayName: 'Anselma Marak' }] }),
+    ).toThrow(MappingError);
+  });
+});
+
+/**
+ * **The roster's second carried field — and the first whose ABSENCE is a
+ * decision rather than a defect.**
+ *
+ * `role` is REQUIRED and refused when missing, because the route always sends it
+ * and a body without one is a body this client cannot read. `email` is the
+ * opposite: the server WITHHOLDS it for a phone-only member, whose address is
+ * synthesised from the phone number under an invalid domain
+ * (`apps/server/src/auth/synthetic-address.ts` carries the measurement). So a
+ * missing key here is the product saying "nothing to show", not a lost field.
+ *
+ * **`toStrictEqual` and not `toEqual`, and that is the case's whole spine:**
+ * `toEqual` IGNORES a key whose value is `undefined`, so a mapper that spread
+ * `email: undefined` onto every withheld member would pass an `toEqual`
+ * assertion written about the same body. The distinction this case exists to
+ * protect — *absent* versus *present and empty* — is exactly the one `toEqual`
+ * is blind to.
+ */
+describe('13.959 mapActors carries `email` when the server sent one, and passes its ABSENCE through untouched', () => {
+  const roster: MemberListResponse = {
+    workspaceId: '01J9GWS0000000000000000000',
+    members: [
+      // A magic-link sign-up: a REAL address and an EMPTY name, which is the
+      // population the owner's fallback exists for.
+      { userId: ANSELMA, displayName: '', role: 'owner', email: 'anselma@example.test' },
+      // A phone-only sign-up: the address was withheld, and the name is the
+      // phone itself, so this row never reaches the fallback.
+      { userId: BIREN, displayName: '+919000700001', role: 'member' },
+    ],
+  };
+
+  it('carries the address for the member that has one, and leaves the withheld member with NO `email` key', () => {
+    const mapped = mapActors(roster);
+
+    expect(mapped).toStrictEqual([
+      { id: ANSELMA, name: '', role: 'owner', email: 'anselma@example.test' },
+      { id: BIREN, name: '+919000700001', role: 'member' },
+    ]);
+    // The property, stated in the form `toEqual` cannot check: the key is ABSENT,
+    // not present-and-`undefined`. **The claim above is MEASURED, not assumed** —
+    // under the very mutation that sets `email: undefined` on the withheld row,
+    // `toStrictEqual` fails and a `toEqual` written over the SAME body passes.
+    // The two matchers differ on exactly this shape, and this is the only shape in
+    // this file where the difference decides anything.
+    expect('email' in (mapped[0] as RosterMember)).toBe(true);
+    expect('email' in (mapped[1] as RosterMember)).toBe(false);
+  });
+
+  it('REFUSES a present-but-not-a-string address, rather than coercing or dropping it', () => {
+    // The positive control runs FIRST through the SAME path: an absent key is
+    // accepted (above), so a refusal here cannot be about the key being missing.
+    expect(() =>
+      mapActors({
+        workspaceId: 'w',
+        members: [{ userId: ANSELMA, displayName: 'A', role: 'owner', email: null }],
+      }),
+    ).toThrow(/members\.members\[0\]\.email: expected a string/);
+    // `null` is deliberately NOT this field's spelling of absent. Absent is the
+    // server withholding; `null` is a body this client cannot read, and letting
+    // the two look alike is how a malformed payload starts rendering as a
+    // person with no address.
+    expect(() =>
+      mapActors({
+        workspaceId: 'w',
+        members: [{ userId: ANSELMA, displayName: 'A', role: 'owner', email: null }],
+      }),
     ).toThrow(MappingError);
   });
 });

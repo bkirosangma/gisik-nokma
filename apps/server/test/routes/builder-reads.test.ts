@@ -13,6 +13,10 @@ import {
 } from '@gisik-nokma/domain';
 import { UNAUTHENTICATED_BODY } from '../../src/auth/require-session.js';
 import { READ_NOT_FOUND_BODY } from '../../src/read/membership.js';
+import {
+  SYNTHETIC_PHONE_EMAIL_DOMAIN,
+  isSyntheticPhoneEmail,
+} from '../../src/auth/synthetic-address.js';
 import { INVALID_VERSION_BODY } from '../../src/routes/builder-reads.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -378,6 +382,70 @@ describe('GET /v1/workspaces/:workspaceId/members', () => {
     // And a non-guest member still gets the roster, so the 404 is about being a
     // guest and not about the route.
     expect((await get('member', '/members')).statusCode).toBe(200);
+  });
+
+  it('13.958 the roster carries a REAL address and WITHHOLDS a synthesised one — in the same answer', async () => {
+    // ─── The two populations, made to coexist ────────────────────────────────
+    // Every user this harness creates signs in by PHONE (`read-app.ts`'s
+    // `PHONES`), so every address in the world is one better-auth synthesised.
+    // That makes the withholding trivially true, and would let a route that
+    // dropped `email` from every row pass this case — so ONE member is moved
+    // onto a real address and the assertions below become about WHICH addresses
+    // travel rather than about whether any do.
+    //
+    // `"user"` is better-auth's vendor table, not a projection: it is derived
+    // from no event and written by no ledger row, which is why a test may set a
+    // column on it exactly as the case above already SELECTs from it. The
+    // original value is restored at the foot of this case, because the world is
+    // shared with every other case in this file.
+    const original = (
+      await db.pool.query<{ email: string }>('SELECT email FROM "user" WHERE id = $1', [read.userIds.owner])
+    ).rows[0]?.email;
+    const realAddress = 'anselma@example.test';
+    await db.pool.query('UPDATE "user" SET email = $1 WHERE id = $2', [realAddress, read.userIds.owner]);
+
+    try {
+      // THE CONTROL, and it runs BEFORE the assertion it protects. The vendor
+      // column really does hold an address for every member, and the ones that
+      // are not the real address really are synthetic. Without this, "no `email`
+      // key in the response" would be equally consistent with a column nobody
+      // ever populated — which is the shape of a check that cannot fail.
+      const ids = Object.values(read.userIds);
+      const { rows } = await db.pool.query<{ id: string; email: string }>(
+        'SELECT "id", "email" FROM "user" WHERE "id" = ANY ($1::text[])',
+        [ids],
+      );
+      const vendorByUser = Object.fromEntries(rows.map((row) => [row.id, row.email]));
+      expect(vendorByUser[read.userIds.owner]).toBe(realAddress);
+      const synthetic = ids
+        .filter((id) => id !== read.userIds.owner)
+        .map((id) => vendorByUser[id] ?? '');
+      expect(synthetic.length).toBeGreaterThan(0);
+      expect(synthetic.every((address) => isSyntheticPhoneEmail(address))).toBe(true);
+
+      const body = await okJson<MemberListResponse>('owner', '/members');
+
+      // The address travels for the member who has a real one...
+      expect(body.members.find((m) => m.userId === read.userIds.owner)?.email).toBe(realAddress);
+
+      // ...and is ABSENT — the key is not there at all — for every member whose
+      // address this product invented. Asserted with `in` and not `=== undefined`:
+      // a route that sent `email: undefined` would satisfy the latter and would be
+      // the wrong shape, since absent is the declaration the wire type documents.
+      const others = body.members.filter((m) => m.userId !== read.userIds.owner);
+      expect(others.length).toBeGreaterThan(0);
+      for (const member of others) {
+        expect([member.userId, 'email' in member]).toEqual([member.userId, false]);
+      }
+
+      // The strongest form of the claim, and the reason the field is withheld
+      // rather than blanked: the synthetic domain appears NOWHERE in the bytes.
+      // A phone-only member's address has the phone number as its local part, so
+      // this is a phone number that is not on the wire, not merely unrendered.
+      expect(JSON.stringify(body)).not.toContain(SYNTHETIC_PHONE_EMAIL_DOMAIN);
+    } finally {
+      await db.pool.query('UPDATE "user" SET email = $1 WHERE id = $2', [original, read.userIds.owner]);
+    }
   });
 });
 

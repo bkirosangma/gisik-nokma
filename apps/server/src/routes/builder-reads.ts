@@ -15,6 +15,7 @@ import type {
   WorkspaceMember,
 } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
+import { isSyntheticPhoneEmail } from '../auth/synthetic-address.js';
 import type { ClientIngest } from '../ingest/ingest-service.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
 import { getWorkflowDefFromProjection } from '../projections/workflows.js';
@@ -244,8 +245,13 @@ export async function readMembers(
   workspaceId: string,
   includeGuests: boolean,
 ): Promise<WorkspaceMember[]> {
-  const { rows } = await db.query<{ user_id: string; display_name: string; role: WorkspaceMember['role'] }>(
-    `SELECT m.user_id, u."name" AS display_name, m.role
+  const { rows } = await db.query<{
+    user_id: string;
+    display_name: string;
+    email: string;
+    role: WorkspaceMember['role'];
+  }>(
+    `SELECT m.user_id, u."name" AS display_name, u."email", m.role
        FROM proj_memberships m
        JOIN "user" u ON u."id" = m.user_id
       WHERE m.workspace_id = $1
@@ -258,6 +264,17 @@ export async function readMembers(
     userId: row.user_id,
     displayName: row.display_name,
     role: row.role,
+    // THE SYNTHETIC ADDRESS IS WITHHELD, and withheld is ABSENT rather than `''`.
+    //
+    // The owner's instruction is *"if the name is absent, show the email
+    // instead"*. Carrying every address verbatim would satisfy it and would also
+    // put a phone number on the wire: a phone-only sign-up's address is
+    // `<digits-phone.gisik-nokma.invalid>`, so its local part IS the phone. It
+    // costs nothing to withhold, because a phone sign-up's `displayName` is the
+    // phone itself (`auth.ts`'s `getTempName`) — so a row with a synthetic
+    // address always has a name and never reaches the fallback this field exists
+    // to serve. The predicate and the reasoning live in `auth/synthetic-address.ts`.
+    ...(isSyntheticPhoneEmail(row.email) ? {} : { email: row.email }),
   }));
 }
 

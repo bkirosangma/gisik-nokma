@@ -1079,3 +1079,86 @@ describe('13.889 the Select fields are labelled by the field pattern, and stay t
     }
   });
 });
+
+/**
+ * THE NAME FALLBACK — the owner's instruction, and the three sites that were all
+ * reading the same possibly-empty string.
+ *
+ * *"on the member's page, member list, if the name is absent, show the email
+ * instead."*
+ *
+ * ## "Absent" is the ORDINARY case for an email sign-up, not an edge case
+ *
+ * better-auth's magic-link plugin creates the user with `name: name || ""` and
+ * this product's sign-in page sends no name (`app/sign-in/page.tsx`), so **an
+ * email sign-up has `name === ''`**. Before this change that row rendered an
+ * empty cell, a BLANK monogram disc, and a control whose accessible name was
+ * `"Role for "` — a name that identifies nobody. All three read `member.name`
+ * independently, which is how they came to be broken together.
+ *
+ * ## Two populations, and neither can be inferred from the other
+ *
+ * The fixture holds both, because a case with only the first would not notice a
+ * fallback that fired unconditionally:
+ *
+ * - **An email sign-up** — an EMPTY name and a REAL address. The fallback fires.
+ * - **A phone sign-up** — a non-empty name (the phone itself, `getTempName`)
+ *   and **no `email` key**, because the server withholds the synthetic address
+ *   (`apps/server/src/auth/synthetic-address.ts` carries the measurement). The
+ *   fallback must NOT fire, and there is nothing for it to fall back TO.
+ *
+ * The `aria-label` is asserted through the ATTRIBUTE rather than by role name,
+ * and that is deliberate: the control's accessible name is a CONCATENATION (its
+ * own value text plus this label — measured in this file's `13.828`), so an
+ * exact-string `getByRole` would fail for a reason unrelated to this case.
+ */
+describe('13.960 the roster shows the address when the name is absent, and names the control after the same label', () => {
+  const NAMELESS: RosterMember[] = [
+    { id: '01J9USER000000000000000001', name: '', role: 'member', email: 'anselma@example.test' },
+    { id: '01J9USER000000000000000002', name: '+919000700001', role: 'member' },
+  ];
+
+  it('one resolved label reaches the cell, the monogram and the accessible name', async () => {
+    mount({ listPending: async () => [] }, undefined, undefined, {
+      getMembers: async () => NAMELESS,
+    });
+
+    const rows = await screen.findAllByRole('row');
+    // rows[0] is the header; the roster follows it in fixture order.
+    const emailRow = rows[1]!;
+    const phoneRow = rows[2]!;
+
+    // ─── THE FALLBACK: the address is what the person is shown AS ────────────
+    expect(within(emailRow).getByText('anselma@example.test')).toBeInTheDocument();
+    // The monogram is no longer a blank disc: it is the first code point of the
+    // SAME resolved label (the rule `initialOf` already documented, applied to
+    // the label instead of to a name that may be empty).
+    expect(
+      within(emailRow).getByText('A', { selector: '.gn-members__initial' }),
+    ).toBeInTheDocument();
+
+    // ─── THE DEFECT: the control names the person, in both populations ───────
+    expect(within(emailRow).getByRole('button').getAttribute('aria-label')).toBe(
+      'Role for anselma@example.test',
+    );
+    // The phone member keeps their name — the fallback is conditional, and this
+    // is the arm that reddens if it ever stops being.
+    expect(within(phoneRow).getByText('+919000700001')).toBeInTheDocument();
+    expect(within(phoneRow).getByRole('button').getAttribute('aria-label')).toBe(
+      'Role for +919000700001',
+    );
+
+    // The form of the defect itself, asserted directly rather than by example:
+    // NO control on this screen announces the fragment. `"Role for "` with an
+    // empty tail is what an absent name produced, and it is a well-formed
+    // accessible name — which is why nothing else notices it.
+    for (const row of [emailRow, phoneRow]) {
+      const label = within(row).getByRole('button').getAttribute('aria-label') ?? '';
+      expect([label, label.startsWith('Role for '), label.slice('Role for '.length).trim() !== '']).toEqual([
+        label,
+        true,
+        true,
+      ]);
+    }
+  });
+});

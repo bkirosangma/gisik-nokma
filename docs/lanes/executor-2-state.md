@@ -20,7 +20,123 @@
 
 ---
 
-## ▲ TOP BLOCK — `hig-per-screen/5b`: **`13.304` IS WITNESSED AT THE REAL DOOR.** The door was measured first and needed NO widening; the case is mutation-witnessed; the gate is green. (2026-09-19, ~14:4x IST)
+## ▲ TOP BLOCK — the members **name fallback is BUILT**: an address on the roster wire, withheld where it is synthetic, and ONE resolved label for all three sites. (2026-09-19, ~15:1x IST)
+
+**Position: the dispatch is DONE and the branch is PUSHED — `exec2/members-name-fallback`, base `main`,
+cut from `origin/main` `1bfa6804`.** The PR for this head opens as the last step of the dispatch that wrote
+this block, so **measure it rather than reading it here**:
+`gh pr list --head exec2/members-name-fallback --state all`. Every sha below measured with `/usr/bin/git`.
+
+**Dispatch:** `CTL-DISPATCH-2026-09-19-members-name-fallback.md` → stop-and-ask at
+`EXEC2-RULING-REQUEST-2026-09-19-members-name-fallback.md` → **ruled verbatim at
+`CTL-RULING-2026-09-19-members-name-fallback.md`.** The owner's instruction: *"on the member's page, member
+list, if the name is absent, show the email instead."*
+
+### § 1 — THE FINDING THAT CHANGED THE SIZE OF THE QUESTION (and it is the PR body's headline)
+
+**`user.name` is `NOT NULL`, but an EMPTY name is the ORDINARY case for an email sign-up.** better-auth's
+magic-link request schema has `name` as `optional()` and stores it verbatim (`ctx.body.name`); on verification
+it creates the user with **`name: name || ""`**; and **our sign-in page passes no name**
+(`apps/web/app/sign-in/page.tsx:383` — `.magicLink({ email, callbackURL })`). So **every magic-link member has
+`name === ''` today**: an empty cell, a BLANK monogram disc, and a control announcing `"Role for "`.
+
+**The phone path is the mirror and the two cannot overlap:** `auth.ts`'s `getTempName: (phone) => phone`, so a
+phone sign-up's name IS the phone — and its address is synthesised from the same digits
+(`getTempEmail`, `<digits>@phone.gisik-nokma.invalid`). **So the fallback fires exactly for genuine addresses
+and never for synthetic ones**, which is what makes the instruction coherent AND what makes withholding the
+synthetic address free.
+
+### § 2 — THE RULING, AND WHAT IT DECIDED.
+
+1. **`email` goes on `RosterMember`, NEVER on `Actor`.** `Actor` is also a ticket's `assignee` on every
+   `BoardCard`/`ListRow`, and `actorOf` synthesises `{id, name: id}` on a device with no addresses at all —
+   `view-types.ts`'s own docblock already writes that argument for `role`. **The door needed no new route and
+   no widened signature:** one `SELECT` term on a table the roster's `JOIN` already reaches.
+2. **The synthetic address is OMITTED, and the omission is GUARDED rather than incidental** —
+   `apps/server/src/auth/synthetic-address.ts` is the ONE spelling of the domain, used by `auth.ts` to build
+   it and by `readMembers` to refuse it. A second literal could drift in the one direction that matters: an
+   address that stops being recognised as synthetic starts being sent.
+3. **The accessible-name fix rides in the same change, all three sites off ONE resolved label** (`memberLabel`).
+   The controller accepted this lane's correction that the fix's *text*, not just its *shape*, was what the
+   ruling decided.
+
+**⚠ Disclosed, not decided, by this lane:** the roster's door is **`no-guests`, NOT admin-only**
+(`builder-reads.ts:664`), so the address is visible **workspace-wide to every non-guest member**. The
+controller put that breadth to the owner explicitly and invited reversal in a word; **build proceeded on the
+ruling** as instructed.
+
+### § 3 — WHAT SHIPPED.
+
+| file | what |
+|---|---|
+| `apps/server/src/auth/synthetic-address.ts` | **new** — the domain constant, the builder, and `isSyntheticPhoneEmail` |
+| `apps/server/src/auth/auth.ts` | uses the shared builder; the shape is unchanged |
+| `apps/server/src/routes/builder-reads.ts` | `SELECT u."email"`; the key is **omitted**, not blanked, when synthetic |
+| `packages/domain/src/read-models.ts` | `WorkspaceMember.email?: string`, with the two-population measurement in its docblock |
+| `packages/app-core/src/view-types.ts` | `RosterMember = Actor & { role: string; email?: string }` |
+| `packages/app-core/src/online/mappers.ts` | `mapActors` carries it; **absence passes through as absence**, present-but-not-a-string still throws |
+| `apps/web/app/w/[workspaceId]/members/page.tsx` | `memberLabel` — name → email → id — feeding the monogram, the cell and the `aria-label` |
+| `Features.md`, `test-cases/13-second-wave-{roles-and-navigation,board-actions}.md` | the records, including the corrected "deliberately ABSENT" list |
+
+### § 4 — MUTATIONS. Four run, and the two that matter most are named.
+
+1. **Withholding removed** (`email: row.email`) → **13.958 reddens ALONE** (`1 failed | 33 passed`) at the
+   `'email' in member` assertion — `[id, true]` vs `[id, false]` — while the control and the real-address arm
+   stay green.
+2. **`memberLabel`'s fallback removed** → **13.960 reddens** at the cell.
+3. **ONLY the `aria-label` site reverted to `member.name`** → **13.960 reddens INDEPENDENTLY** at `:1141` with
+   `expected 'Role for ' to be 'Role for anselma@example.test'` — **the failure message IS the defect**, and
+   this run exists because a mutation that breaks only the first arm cannot prove the later arms.
+4. **Mapper sets `email: undefined` instead of omitting the key** → **13.959 reddens** (`{…(4)}` vs `{…(3)}`).
+   **And the claim in that case's docblock was MEASURED rather than asserted:** under the same mutation a
+   `toEqual` written over the same body **PASSES**. `toEqual` is blind to a key whose value is `undefined`,
+   which is exactly the distinction the case protects.
+
+### § 5 — THE CASE IDS, AND AN HONEST CAVEAT.
+
+**`13.958`–`13.960`, minted on the standing "recount at the tip" instruction rather than allocated by name.**
+`EXEC2-ASK-2026-09-19-case-id-block.md` was filed and **had not been answered when the build finished**, so the
+ids were taken after a recount by TWO instruments that agree (marker sweep and test-file citation sweep both
+put the highest used at `13.955`; `13.956`–`13.957` are exec 1's *"left UNUSED"* tail, so they are skipped
+deliberately; `13.958`–`13.965` measure 0 repo-wide with a control in the same run). **The controller is asked
+to veto the numbers if a block was allocated elsewhere** — they appear in three test names and the catalogue
+and are trivially changed before merge.
+
+### § 6 — THE GATE WENT RED ONCE, AND IT WAS THE ENVIRONMENT — with the control.
+
+The first `pnpm turbo run build test typecheck` returned **`32/33`, `Failed: @gisik-nokma/server#test`**, on
+`test/seed/seed-dev.test.ts > lands, and a re-run is a no-op` — **`Error: Test timed out in 30000ms`**, an
+unrelated file. **The control: the same file passes in isolation in 1.7 s** (`8 passed`). Measured cause:
+**`load average: 91.01`** on a 10-core box from peer `claude` sessions, Docker's VM and Adobe CC — **and no
+orphaned vitest workers** (the `ppid=1` sweep returned empty, so this was not this lane's own leak). The
+re-run was **33/33, `EXIT=0`**. **`@gisik-nokma/server:test` was `cache miss, executing` in the green run**, so
+the new cases genuinely ran inside it — a cached pass is not a pass of new code.
+
+### § 7 — DRIFT THIS CHANGE CAUSED, and what was done about it.
+
+Editing five source files moved lines that other documents cite. **Fixed in the files this lane authored or
+edited** (all four citation sites in the `Features.md` roster entry; the roster row in
+`13-second-wave-board-actions.md`; the two most-cited `members/page.tsx` sites in
+`13-second-wave-roles-and-navigation.md`). **Every corrected citation carries its correction visibly rather
+than being silently renumbered** — and one of them (`mappers.ts:438` naming the `role` read) was **already
+wrong before this change**: it pointed at the `id` read, so it was corrected rather than shifted.
+
+**Recorded rather than rewritten, with a named owner — the remaining pre-existing citations into
+`members/page.tsx`** (its insertion points are `+11` at `:357`, then `+1` each at `:419`, `:424`, `:427`,
+`:429`, `:472`, and `+44` at `:582`, so arithmetic alone is unsafe and each site needs content-verification).
+**Owner: the next change to `13-second-wave-roles-and-navigation.md`.**
+
+### Rules that bind this branch
+- **Never `docker compose`** — the stack is served from the main folder and is the owner's.
+- **Do not edit `task-ledger.tsv`** — the controller flips rows after each merge.
+- **Never `AskUserQuestion`.** A question is a file in `gisik-nokma-lanes/` plus a one-line pointer, then a hold.
+- **Do not run the forced gate — that is the gate the CONTROLLER runs to decide a merge.** Running
+  `pnpm turbo run build test typecheck` yourself before freezing is a different thing and the dispatch requires it.
+- **Never pipe a test run into `head`.** No orphans at the freeze.
+
+---
+
+## ▼ SUPERSEDED — `hig-per-screen/5b`: **`13.304` IS WITNESSED AT THE REAL DOOR** — and it is **MERGED as `#517`**. (2026-09-19, ~14:4x IST)
 
 **Position: the dispatch is DONE and the branch is PUSHED — `exec2/hig-5b-real-door`, base `main`.** The PR
 for this head is opened as the last step of the dispatch that wrote this block, so **measure it rather than

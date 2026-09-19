@@ -12,6 +12,7 @@ import {
   type SocialProviderConfig,
   type SocialProviderName,
 } from './social-providers.js';
+import { syntheticPhoneEmail } from './synthetic-address.js';
 
 /**
  * The web origin, as better-auth may safely be told it. Normalised the same way
@@ -326,7 +327,13 @@ export function createAuth(deps: AuthDeps) {
           await deps.otpSender.send(phone, code);
         },
         signUpOnVerification: {
-          getTempEmail: (phone) => `${phone.replace(/[^0-9]/g, '')}@phone.gisik-nokma.invalid`,
+          // The domain lives in `synthetic-address.ts`, not here, because the
+          // roster read has to RECOGNISE these addresses to withhold them
+          // (`routes/builder-reads.ts`). A second literal would be a second
+          // statement of the same fact, free to drift in the one direction that
+          // matters: an address that stops being recognised as synthetic starts
+          // being sent. The shape is unchanged.
+          getTempEmail: (phone) => syntheticPhoneEmail(phone),
           getTempName: (phone) => phone,
         },
       }),
