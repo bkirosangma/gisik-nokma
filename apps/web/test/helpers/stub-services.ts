@@ -183,6 +183,7 @@ export function stubServices(
       listMembers: unstubbedGateway('authoring.listMembers'),
       getStateOccupancy: unstubbedGateway('authoring.getStateOccupancy'),
       getTypeWorkflowPopulation: unstubbedGateway('authoring.getTypeWorkflowPopulation'),
+      getTicketCountsByType: unstubbedGateway('authoring.getTicketCountsByType'),
       migrateTypeToWorkflow: unstubbedGateway('authoring.migrateTypeToWorkflow'),
       submit: unstubbedGateway('authoring.submit'),
       ...gateways.authoring,

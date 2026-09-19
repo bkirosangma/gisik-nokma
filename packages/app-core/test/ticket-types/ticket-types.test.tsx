@@ -579,6 +579,137 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
   });
 });
 
+describe('TicketTypeListScreen — the `"N tickets"` segment (Task 8, built 2026-09-19)', () => {
+  const invoice: TicketTypeDef = {
+    id: 'invoice-type',
+    name: 'Invoice',
+    icon: 'receipt',
+    rank: 5,
+    workflowId: kanbanPublished.id,
+    fields: [],
+  };
+
+  function renderWithCounts(seed: FakeGatewaySeed = {}) {
+    const gateway = createFakeGateway({
+      workflows: [kanbanPublished],
+      ticketTypes: [...builtins, invoice],
+      ...seed,
+    });
+    const { container } = render(
+      <TicketTypeListScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={gateway}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />,
+    );
+    return { gateway, container };
+  }
+
+  /** One row's meta line as text — the line a reader sees, not a node lookup. */
+  function metaOf(container: HTMLElement, name: string): string {
+    const row = Array.from(container.querySelectorAll('.ticket-type-list__rows > li')).find(
+      (li) => li.querySelector('.ticket-type-list__name')?.textContent === name,
+    );
+    return row?.querySelector('.ticket-type-list__meta')?.textContent ?? '';
+  }
+
+  /**
+   * 13.952 — the segment renders the type's OWN count, and the seed makes the two
+   * reads DISAGREE so that "which one is on screen" is the question.
+   *
+   * `invoice-type` is seeded as pinned 7 tickets to the workflow it is bound to,
+   * while its workspace-wide count is 3. A screen that rendered the pinned number
+   * passes any assertion written against a seed where the two agree — which is
+   * why they do not agree here. The seed fields being separate is the fake's own
+   * design note (`fake-gateway.ts`, `typeCounts`): deriving one from the other
+   * would make this case impossible to write.
+   */
+  it('13.952 renders the type’s own workspace-wide count — not the number pinned to its workflow — and renders it last', async () => {
+    const { container } = renderWithCounts({
+      typePopulation: { 'invoice-type': { [kanbanPublished.id]: 7 } },
+      typeCounts: { 'invoice-type': 3 },
+    });
+    await screen.findByText('Invoice');
+    await waitFor(() => {
+      expect(metaOf(container, 'Invoice')).toContain('3 tickets');
+    });
+    // The pinned number is nowhere on the screen.
+    expect(metaOf(container, 'Invoice')).not.toContain('7 tickets');
+    // And the segment is LAST, after the workflow name — the prototype's own
+    // order (`desktop.dc.html:3156`, `fields · wf · N tickets`).
+    expect(metaOf(container, 'Invoice').trimEnd().endsWith('3 tickets')).toBe(true);
+  });
+
+  /**
+   * 13.953 — a failed read says so in words. The assertion that matters is the
+   * NEGATIVE one: `0 tickets` is a real answer for a type that holds nothing,
+   * and a screen that printed it here would be inventing a number on the
+   * strength of a request that never came back. This is the same refusal the
+   * editor screen's `divergenceBody` makes, and the reason the gateway's
+   * docblock says the caller must not substitute a zero.
+   */
+  it('13.953 a failed count read renders “tickets unavailable” — never a 0 — and the list still renders', async () => {
+    const { container } = renderWithCounts({ typeCountsError: true });
+    await screen.findByText('Invoice');
+    await waitFor(() => {
+      expect(metaOf(container, 'Invoice')).toContain('tickets unavailable');
+    });
+    expect(metaOf(container, 'Invoice')).not.toContain('0 tickets');
+    // The list is not collateral: the counts are one segment of one meta line,
+    // and their read is a separate promise precisely so a failure cannot take
+    // the screen down to "Loading ticket types…" for ever.
+    expect(screen.queryByText('Loading ticket types…')).toBeNull();
+    expect(screen.getByText('Invoice')).toBeTruthy();
+    // The rest of the meta line is untouched by the failure.
+    expect(metaOf(container, 'Invoice')).toContain('rank 5');
+    expect(metaOf(container, 'Invoice')).toContain('0 fields');
+  });
+
+  /**
+   * 13.954 — the two edges the count can land on: exactly one, and a type the
+   * read does not mention at all.
+   *
+   * `builtins` are in the list but absent from the seeded `typeCounts` map, so
+   * they exercise the `?? 0` path — and `0 tickets` there is a real answer,
+   * unlike the `unavailable` of 13.953. The singular is the prototype's own
+   * omission (`used + " tickets"`), and this screen already handles singular for
+   * fields, so it handles it here rather than writing "1 tickets".
+   */
+  it('13.954 says “1 ticket”, says “0 tickets” for a type the read omits, and holds no segment while the read is in flight', async () => {
+    const { container } = renderWithCounts({ typeCounts: { 'invoice-type': 1 } });
+    await screen.findByText('Invoice');
+    await waitFor(() => {
+      expect(metaOf(container, 'Invoice')).toContain('1 ticket');
+    });
+    expect(metaOf(container, 'Invoice')).not.toContain('1 tickets');
+    // Absent from the map is a REAL zero, not an unknown: the type is in the
+    // list, so the screen knows it exists and knows it holds nothing.
+    expect(metaOf(container, builtins[0]!.name)).toContain('0 tickets');
+
+    // And while the read is in flight the segment is ABSENT rather than showing
+    // a number nobody has yet — or a `·` with nothing after it.
+    const stalled = createFakeGateway({
+      workflows: [kanbanPublished],
+      ticketTypes: [...builtins, invoice],
+    });
+    const never = { ...stalled, getTicketCountsByType: () => new Promise<Record<string, number>>(() => {}) };
+    const pending = render(
+      <TicketTypeListScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={never}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />,
+    );
+    await screen.findByText('Invoice');
+    expect(metaOf(pending.container, 'Invoice')).toContain('rank 5');
+    expect(metaOf(pending.container, 'Invoice')).not.toContain('ticket');
+  });
+});
+
 describe('TicketTypeEditorScreen — creating a custom type', () => {
   it('builds and submits ticket-type.defined from the filled form', async () => {
     const user = userEvent.setup();
