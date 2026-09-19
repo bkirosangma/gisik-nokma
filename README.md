@@ -67,13 +67,16 @@ This is the part a marketing page would leave out. Read it before you decide any
   a job on a person.
 - **You cannot set a due date.** The calendar, the timeline and the whole "due soon" list are built
   around claimed dates, and there is no control that claims one.
-- **You cannot write a description or leave a comment on the web.** The writing box — formatting,
-  mentions, attachments, all of it — is built and is not connected to the job screen. The phone app
-  can post a comment; the full website cannot.
-- **Nothing searches inside a job's description or its comments.** The search that does — it reads
-  titles, descriptions and comments together — is built and reaches no screen. What you get instead is
-  a **Search the board** box on a project's board, which matches the titles of the cards already
-  loaded there, and the help's own search over this manual and the FAQ.
+- **You cannot leave a comment on the web, and you cannot attach a file.** The description *is*
+  writable: the writing box handles formatting and mentions and is connected to the job screen, though
+  a file dropped into it is refused rather than quietly lost. A comment is different — nothing on the
+  web takes one, and nothing on the web lists one. The phone app can post a comment; the full website
+  cannot.
+- **No screen on the web or the desktop searches inside a job's description or its comments.** The
+  full-text search that does exists — the phone app's offline search reads comment bodies, and an MCP
+  client's `search_tickets` reads titles, descriptions and comments. What the web itself offers is a
+  **Search the board** box on a project's board, which matches card titles only, and the help's own
+  search over this manual and the FAQ.
 - **Nothing links to the settings screens.** The stage builder and the job-type editor — the screens
   that make the product yours — can only be reached by typing their address into the browser.
 - **Notifications never leave the app.** No email, no text message, no push. The only email Gisik
@@ -133,9 +136,10 @@ pnpm install
 pnpm turbo run build test
 ```
 
-The gate is `pnpm turbo run build test typecheck`, plus six repository checks, each its own job in
+The gate is `pnpm turbo run build test typecheck`, plus six repository-check jobs in
 `.github/workflows/ci.yml` — `check:env`, `check:runbook`, `check:citations`, `check:help`,
-`check:tasks` and `check:migrations`.
+`check:tasks` and `check:migrations`. Two more checks ride inside `check:env`:
+`check:skipif-coverage` and `check:case-ids`.
 
 **If `pnpm install` exits 1 with no output at all, check `node -v` first.** `engine-strict=true` makes
 the declared Node range binding, and pnpm's refusal under a wrong version is completely silent — the

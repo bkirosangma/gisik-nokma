@@ -207,9 +207,9 @@ component's other mode, which the web does not use.
 
 | # | L | Bullet | Verdict | Where |
 |---|---|---|---|---|
-| 88 | 1780 | Calendar view | Covered | P§8 (drawn only from claimed days; bar for two dates, single marker for one, two markers and no bar for a contradiction; undated work absent; three sentences, of which only two can render — the third needs a `filter` or a lane that no screen passes), R§8 |
+| 88 | 1780 | Calendar view | Covered | P§8 (drawn only from claimed days; bar for two dates, single marker for one, two markers and no bar for a contradiction; undated work absent; the sentences for the kinds of empty), R§8. The shipped model selects three of those sentences and only two can render — the third needs a `filter` or a lane that no screen passes |
 | 89 | 1781 | Custom date fields on Calendar and Timeline | Covered | R§8 is the clearer ("a start date, a due date, or a custom date field your business set up"); P§8 covers claimed dates generally |
-| 90 | 1782 | Claimed-date-field legend | Covered *(thin)* | P§8 names the legend switch as one of the two things an empty calendar can say, and describes one switch per custom date field; neither document mentions the count each row carries |
+| 90 | 1782 | Claimed-date-field legend | Covered *(thin)* | P§8 lists the legend switch among the reasons a calendar can be empty; neither describes it as a per-field control that is named and counted |
 | 91 | 1783 | Timeline view | Covered | P§8 (four weeks at a time; a side list with a heading naming which of five reasons a job is not drawn as a bar), R§8 |
 | 92 | 1790 | Inbox | Covered | P§9 (exactly five kinds and the vocabulary is closed; the badge refreshing about once a minute and keeping its last number rather than resetting; click to mark read; the empty message that doubles as an explanation; Load more; a message that outlives your access to what it is about), R§8 |
 
