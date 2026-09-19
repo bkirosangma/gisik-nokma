@@ -2121,3 +2121,78 @@ case beside it. A consequence worth stating because it was not obvious when the 
 > **A rename duplicates nothing** — it had no route in the product at all — so the control does not
 > re-open it. The header comment's closing sentence (*"the header is now the monogram and the titles,
 > nothing else"*) is **amended rather than deleted**, and remains true of the two buttons it removed.
+
+## The rename moves onto the NAME itself (executor 2, 2026-09-19) — case `13.969`
+
+**The owner, verbatim:** *"have the rename be there right on the header. THE CLICK TO RENAME."* The ruling
+picked this reading from a list of four, and named the trap it must not fall into in the same breath.
+
+**Id `13.969`, minted at the tip and FLAGGED FOR THE CONTROLLER.** The allocated-block rule (the door-build
+queue's addendum 1) says a block, not a tip; **this task was dispatched without one**, and `13.966`–`13.968`
+were consumed by the renumber that fixed the red main, so the next free id in the remaining space was taken.
+The space is nearly gone — `13.994` is the highest in use — and **this lane asks for a block before its next
+task**, which is the description field.
+
+### What changed, and what deliberately did not
+
+- **The workspace NAME in the header is now the control.** It is a **real `<button>` inside the `<h1>`** —
+  not a bare button replacing the heading, and **not an `h1` carrying an `onClick`**. Both of those are
+  wrong for a stated reason: the first costs the page its only first-level heading, and the second is
+  reachable by pointer only — not focusable, not in the tab order, and announced as a heading rather than as
+  something that does anything. **The property being preserved is one the previous control already had**
+  (it was focusable and it moved focus into the input), so this is a preservation rather than a new claim.
+- **The separate `Rename` button is GONE.** The name does the job, so there is no longer a second control in
+  this header — which is the strongest available form of the argument that comment was already making.
+- **Escape cancels**, and **Enter commits** (a form with a submit button does that natively). The handler is
+  on the `<form>` rather than the input, because focus may be on Save or Cancel by the time a reader changes
+  their mind.
+- **The accessible name still carries the WORKSPACE** (`Rename Convenience Corner`), unchanged, for the
+  reason the removed button's own comment gave.
+- **UNCHANGED, and worth saying because they are the parts that matter:** the authority (owner + admin,
+  server-enforced by `WORKSPACE_RENAME_REASON`) and the door (`workspace.renamed` through the ordinary
+  ingest). `mayAdminister` is still the same expression as the server's `isWorkspaceAdmin`, so the two
+  cannot drift.
+
+### The comment, re-aimed in the same change set
+
+The header comment's operative clause read *"the `Rename` control **beside the titles**"* — which named a
+separate button standing next to the name, and therefore **named a thing the page no longer had the moment
+the name became the control**. It is re-aimed at the new shape and **the Round 21 argument is kept intact**:
+this is still a workspace ACT and not a navigation affordance, and the reason it does not re-open that
+ruling is unchanged.
+
+### The cases, and why the four that already existed were not enough
+
+**`13.962`–`13.965` all still hold of the new shape** — they query `button[name^="Rename "]`, which the
+name-control carries — and **not one of them would notice the shape changing**, because every property they
+assert is also true of a separate button labelled `Rename` standing beside the title. `13.969` is the three
+arms that discriminate:
+
+1. **the visible text IS the name** — a control labelled `Rename` passes all four and fails this;
+2. **it is focusable** — `.focus()` and `document.activeElement`, which an `h1` with an `onClick` fails;
+3. **exactly ONE rename control exists**, and no bare `Rename` survives — the old shape had two.
+
+plus **Escape cancels**, which nothing above covered (13.963 covers commit, 13.964 the blank guard).
+
+**Mutation-witnessed three times, each killing the case:** the control's visible text changed to `Rename`
+(arm 1) · the `<button>` swapped for a `<span>` carrying the same `onClick` — *the trap the ruling names*
+(arm 2) · the Escape handler neutered (arm 4). Each run printed the file's sha before and after.
+
+### A REGRESSION THIS CHANGE INTRODUCED AND THE PEER'S CASES CAUGHT
+
+The restructure that moved the form into the heading's slot **deleted the header's meta line** — the
+`N active projects · you're a …` paragraph — because it sat between the two anchors the edit spanned. It was
+**`13.395`** (`the header reads only served numbers`) that failed, not any rename case, and it failed with
+`Unable to find an element with the text: 1 active project · you're a guest`. **A case about a neighbouring
+line is what caught an edit that was about a different one**, and it is recorded because the sweep that
+would have missed it is a sweep of the files the change was *about*.
+
+### What is NOT covered
+
+- **The browser verification is recorded in the PR body, not here.** jsdom cannot show that the name still
+  READS as a control when pointed at — the hover colour and the focus ring are CSS, and the suite loads no
+  stylesheet. The `:hover` affordance in particular is a judgement about how a control should look, and no
+  assertion here or anywhere makes it.
+- **No accessible-name baseline was re-run.** The control's accessible name is UNCHANGED in count and in
+  string on this route (one `Rename <workspace>` before, one after — the second button never carried one),
+  so the ratchet should not move; that is a prediction, not a measurement.

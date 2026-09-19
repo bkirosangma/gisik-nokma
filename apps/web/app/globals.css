@@ -584,6 +584,38 @@ input, textarea, select { font-family: inherit; }
    `line-height` at all — `inherit` reproduces that (see the `.gn-page-title +
    .gn-workspace-list__role` rule above for the identical reasoning). */
 .gn-workspace-home__restricted { margin-top: 0.55rem; font-size: 0.8rem; line-height: inherit; }
+
+/* THE NAME IS THE RENAME'S CONTROL (owner, 2026-09-19). A `<button>` that has to
+   read as the title it replaced, so it takes every one of the `h1`'s
+   declarations and strips ONLY the control chrome — `font: inherit` is what
+   carries the 34px/700 face down, because a button does not inherit type by
+   default.
+
+   **IT MUST STILL READ AS A CONTROL WHEN POINTED AT.** Without the hover colour
+   it is a name that silently does something, which is the "a control that looks
+   exactly like static text is not editable-looking" trap the workflow-name
+   field's docblock names elsewhere in this product. The focus ring is the same
+   `--gn-focus-ring` pair every other focusable thing here wears, and it is
+   `:focus-visible` rather than `:focus` so a pointer click does not leave a ring
+   behind. */
+.gn-workspace-home__rename-trigger {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--gn-radius-control);
+}
+.gn-workspace-home__rename-trigger:hover:not(:disabled) { color: var(--gn-text-accent); }
+.gn-workspace-home__rename-trigger:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+.gn-workspace-home__rename-trigger:disabled { cursor: default; }
 .gn-account ul { margin: 0.4rem 0 1rem; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.3rem; }
 
 /* ── `/account` — ported from the DESKTOP prototype's `isAccount` screen

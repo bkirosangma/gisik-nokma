@@ -894,3 +894,70 @@ describe('the rename control (13.962–13.965)', () => {
     ).toBeInTheDocument();
   });
 });
+
+/**
+ * **13.969 — THE NAME ITSELF IS THE RENAME'S CONTROL, and nothing stands beside it.**
+ *
+ * The owner, 2026-09-19: *"have the rename be there right on the header. THE
+ * CLICK TO RENAME."* The four cases above (13.962–13.965) all still hold of the
+ * new shape — they query `button[name^="Rename "]`, which the name-control
+ * carries — but **not one of them would notice the shape changing**, because
+ * every property they assert is also true of a separate button labelled
+ * `Rename` standing beside the title. These three do.
+ *
+ * ## What each arm is the only witness of
+ *
+ * 1. **The visible text is the NAME.** A control labelled `Rename` passes
+ *    13.962–13.965 and fails this, which is exactly the discrimination the
+ *    change needs.
+ * 2. **It is a real `<button>` and not an `h1` carrying an `onClick`** — the
+ *    trap this shape invites, and the reason the ruling says so in terms. A
+ *    heading with a click handler is reachable by pointer only: not focusable,
+ *    not in the tab order, and announced as a heading rather than as something
+ *    that does anything. The `.focus()` arm below is what fails for it.
+ * 3. **There is exactly ONE rename control.** The old shape had two — the name
+ *    and a button meaning the same thing — which is the duplication this
+ *    header's own comment argues against.
+ * 4. **Escape cancels**, which nothing above covers: 13.963 covers commit and
+ *    13.964 covers the blank guard.
+ */
+describe('13.969 the NAME is the rename’s control', () => {
+  it('13.969 the control a person clicks IS the workspace name, and it is focusable', async () => {
+    mount([[workspaceAs('admin')]]);
+    const control = await screen.findByRole('button', { name: 'Rename Convenience Corner' });
+
+    // THE VISIBLE TEXT IS THE NAME. This is the change: a control whose label
+    // were the word "Rename" would satisfy every case above and fail here.
+    expect(control).toHaveTextContent('Convenience Corner');
+
+    // AND IT IS A REAL BUTTON. An `h1` with an `onClick` cannot take focus, so
+    // this arm is what distinguishes the ruling's shape from the trap it names.
+    control.focus();
+    expect(document.activeElement).toBe(control);
+  });
+
+  it('13.969 exactly ONE rename control exists in the header — the second button is gone', async () => {
+    mount([[workspaceAs('admin')]]);
+    await screen.findByRole('button', { name: /^Rename / });
+    expect(screen.getAllByRole('button', { name: /^Rename / })).toHaveLength(1);
+    // ...and no bare `Rename` control survives anywhere on the page.
+    expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull();
+  });
+
+  it('13.969 ESCAPE cancels the edit, and the name is the heading again', async () => {
+    mount([[workspaceAs('admin')]]);
+    await userEvent.click(await screen.findByRole('button', { name: /^Rename / }));
+    const input = screen.getByLabelText('New workspace name');
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Discarded');
+    await userEvent.keyboard('{Escape}');
+
+    // The field is gone and the name is back — with the DRAFT discarded rather
+    // than committed: nothing was sent, which is the half a "the input closed"
+    // assertion would miss.
+    expect(screen.queryByLabelText('New workspace name')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Rename Convenience Corner' })).toHaveTextContent(
+      'Convenience Corner',
+    );
+  });
+});
