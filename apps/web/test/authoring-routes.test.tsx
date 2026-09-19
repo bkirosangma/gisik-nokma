@@ -1,7 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { PublishedWorkflowDef, WorkspaceMember } from '@gisik-nokma/app-core';
+import type { WorkspaceMember } from '@gisik-nokma/app-core';
+import type { PublishedWorkflowDef } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
 import { AuthoringReadRefused } from '../src/authoring/data-source-gateway.js';
 import { stubServices } from './helpers/stub-services.js';

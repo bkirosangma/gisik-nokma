@@ -130,6 +130,31 @@ files it touches.**
 `mapWorkflowDef`'s return, and `:508` is `mapAssignee`'s closing brace (`mapWorkflowDef` is at `:668`).
 Pre-existing, outside this change's files. **Owner: whoever next touches that seam.**
 
+### § 4c — `turbo run typecheck` WAS MISSING FROM MY OWN CHECK SET, and it found a real error
+
+**The controller caught this, and it is worth recording as a process failure rather than a footnote.** My
+first check table quoted `turbo run build` and `vitest run` — **neither is `turbo run typecheck`** — and the
+forced gate is the only thing that runs it. So the table was accurate about what I ran and **silent about a
+class it never covered**, on a task that changed TypeScript in three places (a new route, a gateway
+signature, a screen's props).
+
+**Run at this head, it failed immediately:**
+
+```
+test/authoring-routes.test.tsx(4,15): error TS2305: Module '"@gisik-nokma/app-core"'
+  has no exported member 'PublishedWorkflowDef'.
+```
+
+**Neither of the two things I DID run could have caught it, and that is the lesson rather than the typo.**
+`vitest` transpiles with esbuild and **strips types without checking them**, so `13.944`/`13.945` passed
+while importing a member the barrel does not export; and `apps/web`'s `next build` type-checks the APP, not
+`test/**`. **A green build and a green suite are not a typecheck**, and my table read as though they were.
+
+Fixed by importing the type from `@gisik-nokma/domain`, where it is declared. **`turbo run typecheck` then
+returned 17/17 with exit 0**, and it is now in the check set below — along with the note that the `apps/web`
+typecheck task resolves to **node v24.11.1's pnpm** while this shell's node is **v22.22.2**, because a gate
+result that does not name its Node is not evidence.
+
 ### § 5 — ANCHORS, verify rather than trusting the row
 
 | | |
@@ -163,7 +188,8 @@ wrong** — the `rtk` proxy's known shape — so it was re-measured with the out
 
 **Re-verified at `5e21f1a5`:** `pnpm turbo run build` **0** (11/11), app-core `test/workflow-builder`
 **210 pass**, `apps/web` **550 pass**, and the six checks + `check:migrations` + both scanners all raw
-**0** (2397 unique ids — 2389 here plus exec 1's 8).
+**0** (2397 unique ids — 2389 here plus exec 1's 8). **`turbo run typecheck` was NOT in this list and
+belongs in it — see § 4c.**
 
 ---
 
