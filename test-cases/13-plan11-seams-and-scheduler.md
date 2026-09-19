@@ -416,10 +416,31 @@ that carries this file.** The auth cases below are ordinary `vitest` server case
   guest reaching a real errand in a real browser — this suite is structurally off the local gate (13.177)
   and GitHub Actions has had no green run since 2026-09-06, so a spec added now would execute once, by
   hand, and never again; deliberately NOT written, because an unrunnable spec landing beside verified
-  work is how a 🧪 becomes a believed ✅. (2) OPENING a shared errand into a ticket sheet is still not
+  work is how a 🧪 becomes a believed ✅. (2) ~~OPENING a shared errand into a ticket sheet is still not
   possible — `DataSource.getTicket` refuses with `ServingGapError` for EVERY viewer, not only a guest — the
   route answers a snake_case `proj_visibility` row with no title, no `stateProvenance` and no domain
-  `TicketState` — so the SHEET is a refusal for everybody on every surface, which predates this change.
+  `TicketState` — so the SHEET is a refusal for everybody on every surface, which predates this change.~~
+  **⚠ FALSE, AND CORRECTED RATHER THAN DELETED (2026-09-20).** The struck text is kept because it is a
+  **superseded claim, not a wrong conclusion**: it was true when written and the read it describes closed
+  later. **Decided by what it RESOLVES to, and measured on the running stack three ways.** (a) The single
+  read answers **200** with exactly the seven keys `mapTicketRead` reads — `ticket`, `ticketState`,
+  `title`, `stateProvenance`, `assignedProvenance`, `parent`, `rollup`. (b) A board card click opens the
+  sheet (`?ticket=…`, `.gn-sheet` rendered, the ticket's own title, the `Details | History` pair, and
+  **`stateProvenance` drawn on screen** as *"marked To do by Kiro on 6 Sep 2026"* — one of the three fields
+  this sentence said was unavailable). (c) **A GUEST opens a sheet for an errand explicitly shared with
+  them**, with its real title. **The refusal is on the READ, not on the sheet**, and it is two-sided: a
+  ticket NOT shared with the viewer answers **404** and opens a sheet carrying the generic title `Ticket`
+  and no content — the same answer a non-existent id gets, which is the frozen 404 doing its job.
+  **This closes reason (2); the 🟡 above now rests on (1) alone**, because the witness is a hand-run
+  measurement and not a committed spec.
+  **⚠ THE CAUSE, which is the durable half of this correction:** the belief came from
+  `apps/web/src/ticket-location.ts:26`, whose docblock states `DataSource.getTicket` *"exists and
+  **refuses**"*. **It was TRUE when written** (`e09666ce`, 2026-09-04) and **falsified two days later**,
+  when ruling **P25 clause 1** discharged the buildable subset (`c86c4b5c`, 2026-09-06). The 2026-09-19
+  sweep that existed to catch exactly this class (`01a24a9d`, PR `#537`, *"Four docblocks claimed a read
+  refuses. Ruling P25 deleted that absence."*) **fixed two files carrying it — `attention-strip.tsx` and
+  `ticket-sheet.tsx` — and not this one: a sweep whose universe was the files it had already opened.**
+  **That docblock is a product-side stale claim in source and is NOT corrected here; the owner has it.**
   **A claim that stood here and was FALSE is corrected rather than deleted:** this said a guest "gets 404
   from" the project page, and `routes/board.ts` says in writing that a workspace member who is not on the
   project *"passes the gate and gets 200 with whatever their visibility yields"*. A guest IS a workspace
