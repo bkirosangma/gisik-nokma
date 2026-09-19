@@ -502,10 +502,23 @@ saying so, and the note is important, because **the Board is the default tab.** 
 read "done are excluded", and be looking at a Done column full of done cards.
 
 **Is that really the only filter?**
-On the website, yes. One switch. The product can filter by person, status, date range, type, blocked
-and custom field values underneath, and there is a whole saved-filters feature built — a named filter
-you can save, pick from a menu and delete, up to fifty of them, private to you per workspace. **None of
-it is connected to any screen.**
+Not any more. It was when this answer was written — one switch, and nothing else on any screen. Now
+there is a **Filters** button beside it, which opens a sheet that sets an assignee, a collaborator, a
+type, a state, closed, and a category, each one either included or excluded; and a **Search the board**
+box above the tabs, which narrows the board as you type.
+
+Still connected to nothing: the saved-filters feature — a named filter you can save, pick from a menu
+and delete, up to fifty of them, private to you per workspace. There is no menu for it on any screen.
+The date-range and custom-field filtering the engine can do has no control either.
+
+**How do I narrow a project down to one person?**
+Open the **Filters** button beside the "Only tickets in progress" switch and click **Assignee** — you
+get one row per person, with their picture. Click once for *included* (only their jobs), twice for
+*excluded* (everything except theirs), and a third time to clear it. It takes effect at once; there is
+no Apply. The same sheet sets collaborators, type, state, closed and category the same way, and each one
+turns into a removable chip under the tabs — except two, and both say so in words on screen rather than
+pretending otherwise. **Collaborators** is applied by no tab at all, and **closed** shows no chip on the
+Board, which never shows closed jobs in the first place.
 
 **Can I sort a list how I like?**
 Not by choosing. Lists come back in a fixed, repeatable order. You can choose the *grouping* (epic,
