@@ -866,7 +866,20 @@ describe('GET /v1/search vs SearchHit', () => {
   /**
    * 7.191 — DATA GAP: `SearchHit.matchedIn` is on no hit and at no depth; the server cannot compute it.
    */
-  it('DATA GAP — `matchedIn` is on no hit, and the server cannot compute it', async () => {
+  it('`matchedIn` IS on every hit now — the DATA GAP this case named is CLOSED, and the claim is INVERTED', async () => {
+    // **THIS CASE STOOD THE OTHER WAY UP AND ITS ID IS KEPT** (7.189's
+    // precedent, which this file applies elsewhere): it read *"DATA GAP —
+    // `matchedIn` is on no hit, and the server cannot compute it."* That was
+    // true and its reasoning is worth keeping: the server's `SearchHit` was
+    // `{card, snippet}`, and `ts_headline` was given
+    // `title || ' — ' || description || ' — ' || comments` as ONE string
+    // (`routes/search.ts`), so the server never learned which of the three
+    // matched. **The owner ruled the QUERY must derive it (2026-09-19), and the
+    // route now asks one `@@` per column.**
+    //
+    // A divergence that closes can silently RE-OPEN, so the case is inverted
+    // rather than deleted — and the arity control (`not.toHaveProperty`) is kept
+    // below, because it is what the next reader of this diff needs.
     const res = await app.inject({
       method: 'GET',
       url: `/v1/search?workspaceId=${workspaceId}&q=aisle`,
@@ -877,30 +890,31 @@ describe('GET /v1/search vs SearchHit', () => {
     expect(body.hits).toHaveLength(1);
     const hit = body.hits[0] as Record<string, unknown>;
 
-    // `view-types.ts:175-181` — `SearchHit = {ticketId, projectId, title,
-    // snippet, matchedIn}` where `matchedIn: 'title'|'description'|'comment'`.
-    // The server's `SearchHit` is `{card, snippet}`, and `matchedIn` is a DATA
-    // gap: `ts_headline` is given `title || ' — ' || description || ' — ' ||
-    // comments` as ONE string (`routes/search.ts`), so the server never learns
-    // which of the three matched.
-    expect(allKeys(body)).not.toContain('matchedIn');
-    expect(hit).not.toHaveProperty('matchedIn');
+    // THE FACT THAT WAS ABSENT IS NOW SERVED, on the hit itself.
+    expect(hit).toHaveProperty('matchedIn');
+    expect(['title', 'description', 'comment']).toContain(hit['matchedIn']);
+    // ...and it is the RIGHT one: both needled words are in the card's TITLE
+    // (the fixture's ticket), so the derivation must say `title` — a constant
+    // would pass a membership check, and this is what a constant fails.
+    expect(hit['matchedIn']).toBe('title');
+
+    // The two facts that were always adaptable are STILL on the card and NOT
+    // hoisted onto the hit — the contract `7.204` rested on, unchanged by the
+    // field joining it.
     expect(hit).not.toHaveProperty('ticketId');
     expect(hit).not.toHaveProperty('title');
-    // Controls, same object, same run: what IS there, populated.
-    expect(hit).toHaveProperty('snippet');
-    expect(hit['snippet']).toContain('**aisle**');
     expect(hit).toHaveProperty('card');
     expect((hit['card'] as Record<string, unknown>)['ticketId']).toBe(ticketId);
 
+    // Controls, same object, same run: the snippet is still populated.
+    expect(hit).toHaveProperty('snippet');
+    expect(hit['snippet']).toContain('**aisle**');
+
     // And the response WRAPS the hits, where `search()` returns `SearchHit[]`.
     expect(Object.keys(body).sort()).toEqual(['hits', 'query', 'workspaceId']);
-
-    // 7.204 — the refusal, cross-checked. `matchedIn` is the ONLY thing
-    // blocking `search`: `ticketId`, `projectId` and `title` are all on
-    // `hit.card` and are adaptable, which is why the refusal names one field
-    // and not four.
-    expectStillUnserved('MAP_SEARCH_HITS_ABSENCES', body, 'hits', '/v1/search');
+    // `matchedIn` is on the HIT and not on the response — the field answers a
+    // question about one row, and hoisting it would be a claim about the query.
+    expect(allKeys(body)).not.toContain('matchedIn');
   });
 });
 
@@ -1601,9 +1615,12 @@ describe('GET /v1/contests vs the two contested refusals', () => {
     // file still fetches both — the cases above assert what they now serve — so
     // a route dropping out of this set is not the same claim as a route
     // dropping out of the file, and the two are kept apart on purpose.
-    const EXERCISED = ['/v1/search'];
+    const EXERCISED: string[] = [];
     const named = new Set<string>();
-    for (const constName of ['MAP_SEARCH_HITS_ABSENCES']) {
+    // EMPTY SINCE 2026-09-19. `MAP_SEARCH_HITS_ABSENCES` was the last list, and
+    // it is deleted rather than emptied — see the complement below, which is
+    // where this case still does real work.
+    for (const constName of [] as string[]) {
       for (const absence of mapperAbsences(constName)) {
         // A `wireKey` with no `wireRoute` is a key nothing can ever measure.
         expect(
@@ -1614,12 +1631,19 @@ describe('GET /v1/contests vs the two contested refusals', () => {
       }
     }
     expect([...named].sort()).toEqual(EXERCISED);
-    // The complement, in the same run: the two deleted lists are GONE from the
-    // source rather than emptied. `mapperAbsences` throws on a `const` it cannot
-    // find and throws again on one that parses to zero entries, so an entry
-    // hollowed to `[]` fails this the same way a surviving one does — which is
-    // what stops a closed gap from leaving a refusal nobody can read behind it.
-    for (const deleted of ['MAP_LIST_VIEW_ABSENCES', 'MAP_TICKET_READ_ABSENCES']) {
+    // The complement, in the same run: **every** deleted list is GONE from the
+    // source rather than emptied — and this is the half of the case that is NOT
+    // vacuous now that the set above is empty. `mapperAbsences` throws on a
+    // `const` it cannot find and throws again on one that parses to zero
+    // entries, so an entry hollowed to `[]` fails this the same way a surviving
+    // one does. That is what stops a closed gap from leaving a refusal nobody
+    // can read behind it — and the three assertions below are the reason an
+    // empty `EXERCISED` is a fact rather than a hole.
+    for (const deleted of [
+      'MAP_LIST_VIEW_ABSENCES',
+      'MAP_TICKET_READ_ABSENCES',
+      'MAP_SEARCH_HITS_ABSENCES',
+    ]) {
       expect(() => mapperAbsences(deleted), deleted).toThrow(/no `const/);
     }
   });

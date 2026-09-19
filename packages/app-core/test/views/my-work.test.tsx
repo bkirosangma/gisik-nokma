@@ -203,7 +203,15 @@ describe('3.58 MyWork — the in-transit section is empty because there is no ou
     const register = Object.entries(SERVING_GAPS)
       .flatMap(([method, absences]) => absences.map((a) => `${method}: ${a.field} :: ${a.because}`))
       .join('\n');
-    expect(register.length, 'the register must be non-empty or this proves nothing').toBeGreaterThan(0);
+    // **THIS CONTROL'S PRECONDITION IS GONE, and it said so rather than passing.**
+    // It read: *"the register must be non-empty or this proves nothing"* — and
+    // the register HAS become empty (2026-09-19: `search`, the last entry, is
+    // served now), so the assertion below it proves nothing and the control
+    // failed loudly instead of measuring nothing. **What does the real work is
+    // the line above**, over a served read: `inTransit` is `[]` because there is
+    // no outbox, not because a read was empty. The emptiness of the register is
+    // the honest replacement.
+    expect(SERVING_GAPS).toEqual({});
     expect(
       register,
       'no absence may be about inTransit — it is structurally empty for an online-only client',

@@ -987,6 +987,12 @@ describe('GET /v1/search', () => {
           // got, and a `toContain('crates')` would pass for a snippet that had
           // silently started blobbing another ticket's text into this one.
           snippet: 'Count the **crates** \u2014  \u2014 ',
+          // WHICH COLUMN MATCHED (2026-09-19). `crates` is in this ticket's
+          // TITLE and nowhere else \u2014 the description and comments segments of
+          // the snippet above are both empty \u2014 so the derivation must answer
+          // `title`, and the exact `toEqual` is what makes this line notice a
+          // route that started answering a constant instead.
+          matchedIn: 'title',
         },
       ],
     });

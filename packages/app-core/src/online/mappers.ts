@@ -27,6 +27,7 @@ import type {
   RollupToViewer,
   RosterMember,
   SavedFilter,
+  SearchHit,
   TicketHistoryEvent,
   TicketListView,
   TicketRead,
@@ -1744,28 +1745,71 @@ export function mapTicketRead(raw: unknown, roster: ReadonlyMap<string, string> 
   };
 }
 
-const MAP_SEARCH_HITS_ABSENCES: readonly Absence[] = [
-  {
-    field: 'SearchHit.matchedIn',
-    wireKey: 'matchedIn',
-    wireRoute: '/v1/search',
-    because:
-      'proj_search stores title, description and comments as three independently weighted columns and routes/search.ts concatenates them before one ts_headline, so which one matched is destroyed in the query rather than absent from the store',
-    owner:
-      'recorded for whoever builds the search surface — it is NOT in P25 clause 1, because no Plan 6 view consumes it',
-  },
-];
+/**
+ * `GET /v1/search` → `SearchHit[]`. **THIS MAPPER USED TO REFUSE, and the
+ * refusal is closed by the owner's ruling of 2026-09-19 — _change the query so
+ * `matchedIn` is derivable_ — not by this client deciding to guess.**
+ *
+ * ## What it refused over, kept because the reasoning is still the rule
+ *
+ * The old text, verbatim: *"`ticketId`, `projectId` and `title` are all on
+ * `hit.card` and are adaptable; the wrapper is adaptable. `matchedIn` is the
+ * whole of it — and a hit that claimed `matchedIn: 'title'` because that is the
+ * commonest case would be this client inventing the answer to the one question
+ * the field asks."*
+ *
+ * **That reasoning has not been repealed, it has been SATISFIED.** The route now
+ * derives `matchedIn` from three per-column match predicates
+ * (`routes/search.ts`), so the value arrives from the server that knows rather
+ * than from a default chosen here — and this mapper still REFUSES anything that
+ * is not one of the three words, because a fourth spelling would be a wire
+ * change this client has not agreed to read.
+ *
+ * ## The absence that used to be listed here
+ *
+ * `MAP_SEARCH_HITS_ABSENCES` recorded `SearchHit.matchedIn` as unavailable, and
+ * named its cause precisely: *"proj_search stores title, description and
+ * comments as three independently weighted columns and routes/search.ts
+ * concatenates them before one ts_headline, so which one matched is destroyed in
+ * the query rather than absent from the store."* **That was a QUERY defect, not
+ * a missing capability — the distinction has been in the data all along — and it
+ * is fixed in the query, which is why the entry is gone rather than emptied.**
+ */
+export function mapSearchHits(raw: unknown): SearchHit[] {
+  const record = asRecord(raw, 'search');
+  return asArray(record['hits'], 'search.hits').map((hit, index) => {
+    const path = `search.hits[${index}]`;
+    const entry = asRecord(hit, path);
+    const card = asRecord(entry['card'], `${path}.card`);
+    return {
+      ticketId: asString(card['ticketId'], `${path}.card.ticketId`),
+      projectId: asString(card['projectId'], `${path}.card.projectId`),
+      title: asString(card['title'], `${path}.card.title`),
+      snippet: asString(entry['snippet'], `${path}.snippet`),
+      matchedIn: matchedInOf(entry['matchedIn'], `${path}.matchedIn`),
+    };
+  });
+}
+
+/** The three columns `matchedIn` may name, in the PRECEDENCE the route applies. */
+const MATCHED_IN_VALUES = ['title', 'description', 'comment'] as const;
 
 /**
- * `GET /v1/search` → `SearchHit[]`. REFUSED.
+ * `matchedIn`, refused if it is not one of the three.
  *
- * `ticketId`, `projectId` and `title` are all on `hit.card` and are adaptable;
- * the wrapper is adaptable. `matchedIn` is the whole of it — and a hit that
- * claimed `matchedIn: 'title'` because that is the commonest case would be this
- * client inventing the answer to the one question the field asks.
+ * **A closed union is refused rather than coerced**: a server that sent a
+ * fourth word would be answering a question this client did not ask, and
+ * narrowing it to the nearest known value here is the invention the whole
+ * refusal above exists to prevent. The parameter is `unknown` and NOT
+ * `string | undefined`, so an absent key is `undefined` and refuses too.
  */
-export function mapSearchHits(_raw: unknown): never {
-  throw new ServingGapError('search', MAP_SEARCH_HITS_ABSENCES);
+function matchedInOf(value: unknown, path: string): SearchHit['matchedIn'] {
+  const text = asString(value, path);
+  const found = MATCHED_IN_VALUES.find((candidate) => candidate === text);
+  if (found === undefined) {
+    throw new MappingError(path, `one of ${MATCHED_IN_VALUES.map((v) => `'${v}'`).join(' | ')}`);
+  }
+  return found;
 }
 
 /**
@@ -2133,5 +2177,15 @@ function mapAttentionItem(
  * no join closes it and no ruling can. `SearchHit.matchedIn` is the field.
  */
 export const SERVING_GAPS: Readonly<Record<string, readonly Absence[]>> = {
-  search: MAP_SEARCH_HITS_ABSENCES,
+  // EMPTY SINCE 2026-09-19, and the emptiness is the record. `search` was the
+  // last entry: `mapSearchHits` refused over `matchedIn`, the owner ruled the
+  // QUERY must derive it, and the route now does. **An entry claiming a method
+  // refuses ALWAYS is false the moment it maps** — so it is deleted rather than
+  // emptied, and the reasoning it carried lives on the mapper's own docblock,
+  // where the next reader of that method will meet it.
+  //
+  // This record being empty is NOT a claim that no read is missing: it means no
+  // mapper in this file refuses outright. A refusal that MOVES has its own home
+  // (`replica-data-source.ts`), and a view with nothing to render says so where
+  // it renders rather than here.
 };

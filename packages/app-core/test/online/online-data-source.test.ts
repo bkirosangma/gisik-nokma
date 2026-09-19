@@ -350,8 +350,14 @@ describe('3.40 the blocked methods refuse through the DataSource', () => {
       },
     });
     const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
+    // **EMPTY SINCE 2026-09-19.** Every row that ever stood here has been served,
+    // in the order the rulings landed: `getTickets`/`getTicket` (P25 clause 1),
+    // `getMyWork`/`getAttention` (P39/P40) and now `search`. **The loop below
+    // therefore has no rows and can observe nothing** — its last positive control
+    // moved to the SERVED list, where the comment it carries already said it would
+    // go. Stated rather than deleted: an empty table here is a fact about the
+    // product, and a future entry appearing in it is a deliberate act.
     const expected: ReadonlyArray<[string, () => Promise<unknown>, string]> = [
-      ['search', () => source.query.search(WORKSPACE, 'q'), 'SearchHit.matchedIn'],
     ];
     for (const [method, call, field] of expected) {
       await expect(call(), method).rejects.toBeInstanceOf(ServingGapError);
@@ -382,6 +388,12 @@ describe('3.40 the blocked methods refuse through the DataSource', () => {
       // reason this block exists: a refusal that stops refusing has to be
       // pinned as SERVED, or the only record it ever refused is a shorter array.
       ['getMyWorkspaces', () => source.query.getMyWorkspaces()],
+      // MOVED HERE 2026-09-19, and its own comment named the condition: *"`search`
+      // is now the only row left up there — which is also the positive control on
+      // this list."* The owner ruled the search query must derive `matchedIn`, the
+      // route does, and `mapSearchHits` answers — so the control moved rather than
+      // vanishing, and the refusals loop above is now EMPTY of rows.
+      ['search', () => source.query.search(WORKSPACE, 'q')],
     ];
     for (const [method, call] of nowServed) {
       const outcome = await call().then(

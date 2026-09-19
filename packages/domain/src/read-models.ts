@@ -339,7 +339,28 @@ export type ListResponse = {
   nextCursor: string | null;
 };
 
-export type SearchHit = { card: TicketCard; snippet: string };
+export type SearchHit = {
+  card: TicketCard;
+  snippet: string;
+  /**
+   * **Which of the three indexed columns matched** (owner ruling, 2026-09-19:
+   * *"change the query so `matchedIn` is derivable"*).
+   *
+   * This is the ONE fact the route could not previously answer. `proj_search`
+   * has always stored `title`, `description` and `comments` as three separately
+   * weighted columns — the distinction was in the data the whole time — and the
+   * query destroyed it by concatenating them into a single `ts_headline` before
+   * anything could ask which one matched. The route now derives it with one
+   * `@@` per column.
+   *
+   * **It is a SINGLE value, not a list, and the precedence is `title` →
+   * `description` → `comment`** — the order the `tsv` weights already imply
+   * (A, B, C). A query that matches two columns is answered by the first of
+   * them, stated here so the order is a rule rather than an accident of how the
+   * CASE happened to be written.
+   */
+  matchedIn: 'title' | 'description' | 'comment';
+};
 
 export type SearchResponse = { workspaceId: string; query: string; hits: SearchHit[] };
 

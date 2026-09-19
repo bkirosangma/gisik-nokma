@@ -288,3 +288,59 @@ sentence is about the DATE and the claim line is about the ACTOR.
 - **The two editors are NOT built.** Priority and Due are read-only rows here; making them editable — Priority as a segmented control, Due as a date input with its note line — is a separate door, named and not taken. `16.29` asserts the absence rather than describing it.
 - **The CSS is not measured.** jsdom loads no stylesheet.
 - **`pendingFieldIds` is empty.** `ClientStateCache` exposes no pending surface (measured), so the Due row does not badge an in-flight claim. The sheet's other field rows do not badge one either — this is stated because an empty list is a value, not a placeholder.
+## Door — `/v1/search`: `matchedIn` becomes derivable (executor 1, 2026-09-19) — cases `16.32`–`16.37`
+
+**The owner's ruling, verbatim: _change the query so `matchedIn` is derivable._**
+
+**The door.** `GET /v1/search` squashed three columns into one headline —
+`ts_headline(cfg, s.title || ' — ' || s.description || ' — ' || s.comments, …) AS snippet` — so **which field
+matched was not recoverable**, and the client REFUSED the answer rather than invent it
+(`mapSearchHits(_raw): never`, registered in `SERVING_GAPS`). **⚠ And the distinction was in the data all
+along:** `proj_search` stores the three columns separately and its generated `tsv` already weights them apart
+(`setweight(… 'A') || setweight(… 'B') || setweight(… 'C')`). **No column, no migration — the SELECT was
+throwing away what the projection had kept.**
+
+**The derivation, and why this one:** **one `@@` per column, in a `CASE`.** Three `ts_headline` calls would
+answer the same question at three times the cost and three ways for the snippet to disagree with the field;
+one predicate per column asks exactly "did THIS column match" and nothing else. `setweight(…) @@ q` is
+equivalent to `to_tsvector(…) @@ q` — weights affect RANKING, never MATCHING — so the three predicates
+partition the very vector the `WHERE` already tested, and `ELSE` is a floor rather than a case (`16.37`).
+
+**⚠ `matchedIn` IS ONE VALUE, SO THE PRECEDENCE IS A DECISION: title → description → comment.** That is the
+order the weights already imply (A, B, C), and it is stated in the `CASE` so it is a rule rather than an
+accident of how the expression was written. `16.34` and `16.35` measure both rungs.
+
+**⚠ AND THE SNIPPET IS STILL COMBINED — deliberately.** Narrowing the headline to the matched column would
+have been the easy way to make `matchedIn` "obvious", and it strips a comment's words out of the window,
+which is the feature's reason to exist: a comment is where people put what they would not put in a title.
+`16.36` is the case that would redden if someone narrowed it.
+
+- **16.32** ✅ A description-only match answers `description` — and the word is in **no title anywhere**, so a constant answer fails it.
+- **16.33** ✅ **The derivation is PER ROW**: one `quokka` query answers `title` for one hit and `comment` for another, in one run.
+- **16.34** ✅ **PRECEDENCE rung one**: a ticket matching in TITLE **and** DESCRIPTION answers `title`.
+- **16.35** ✅ **PRECEDENCE rung two**: a ticket matching in DESCRIPTION **and** COMMENT answers `description`.
+- **16.36** ✅ **The snippet stays COMBINED**: a comment match still shows its comment's words, and a title match its own.
+- **16.37** ✅ **The partition has no gap**: every hit of a broad query carries a value from the closed union, and all of them are `title` for a title-indexed word.
+
+**Mutation witnesses, run and recorded rather than predicted.** Inverting the `CASE`'s precedence reddens
+**16.34 alone** (`expected 'description' to be 'title'`). Making the answer a constant reddens **16.32, 16.33
+and 16.35** — exactly the three cases that name a non-title column — while `16.34`, `16.36` and `16.37`
+correctly stay green, because a constant `'title'` satisfies them.
+
+**⚠ TWO EXISTING CASES WERE INVERTED RATHER THAN DELETED** (7.189's rule, which this repo applies): the app
+core unit case `3.39` (*"search refuses, naming 1 absent fact"*) and the server contract case
+(*"DATA GAP — `matchedIn` is on no hit"*). Both read the opposite way and now assert the field ARRIVES —
+**and `3.39`'s register assertion became `[]`, because `search` was the last entry in `SERVING_GAPS`.** No
+new ids were minted for that half: the property is `matchedIn` being served, and it is asserted where it was
+already asserted.
+
+**⚠ AND THE DOMAIN'S OWN `SearchHit` WAS MISSING THE FIELD.** `read-models.ts` declared
+`{card, snippet}` — so the route would have served a key its own wire type did not name. **TypeScript did not
+catch it**: `rows.map(…)` is not a fresh object literal in that position, so no excess-property check
+applied. Declaring the field there is what made the compiler check the route's value, and typing the SQL
+column as the union is what made the two agree.
+
+### What is NOT covered
+
+- **The client's presentation of a hit is not built.** This change makes the fact DERIVABLE and maps it; no view renders a search result yet, so nothing here shows `matchedIn` on a screen.
+- **`description` and `comment` precedence is asserted through the two planted fixtures only** — a ticket matching all THREE columns is not in the seed, and the first rung's answer implies the third.

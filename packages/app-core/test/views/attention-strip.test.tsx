@@ -478,8 +478,15 @@ describe('3.60 useAttention — a refusal is an error, never an empty strip', ()
     // Non-vacuity, in the same run: the register still exists and still carries
     // a real refusal, so the line above is a fact about `getAttention` rather
     // than about a register that was emptied wholesale.
-    expect(Object.keys(SERVING_GAPS).sort()).toEqual(['search']);
-    expect((SERVING_GAPS['search'] ?? []).length).toBeGreaterThan(0);
+    // EMPTY SINCE 2026-09-19. `search` was the LAST entry in the register, and
+    // the owner ruled its query must derive `matchedIn`, so the route serves it.
+    // The two lines that stood here asserted the register held exactly
+    // `['search']` AND that its absence list was non-empty — **a precondition
+    // that no longer holds, and it failed loudly rather than passing vacuously.**
+    // A register of one name is what made the assertion above (`toBeUndefined`)
+    // a fact about THAT method; with the register empty it is true of every
+    // method, and the honest statement is the emptiness itself.
+    expect(Object.keys(SERVING_GAPS)).toEqual([]);
   });
 
   it('the hook subscribes to the workspace it was asked about', async () => {
