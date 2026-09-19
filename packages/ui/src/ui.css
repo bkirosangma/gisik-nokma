@@ -467,6 +467,58 @@
   background: transparent;
   color: var(--gn-text-muted);
   font-size: 1.1rem;
+}
+
+/* FULL SCREEN — the prototype's own three-part treatment
+   (`desktop.dc.html:3396-3400`), and all three parts are here because any one
+   alone makes a "full screen" that is not one: the scrim goes OPAQUE
+   (`--surface`, so the page behind is covered rather than dimmed), the panel
+   fills the viewport with no radius, and the body becomes a centred column,
+   capped at the prototype's own 860px.
+
+   TOKENS ONLY, deliberately. The style axis (`hig` / `minimal` / `neo`) is
+   runtime — `<html data-style>` — so a rule written in hexes here would be
+   correct in `hig` and wrong in two of the three the user can pick. Every value
+   below is a role that each style already declares, which is what makes the
+   treatment carry across all three without a per-style fork.
+
+   Placed AFTER the `.gn-sheet` rules on purpose: same specificity, so source
+   order is what decides, and a modifier that lost to the base rule would be a
+   control that toggles a class and changes nothing. */
+.gn-sheet__scrim--full { background: var(--gn-surface); justify-content: center; }
+.gn-sheet--full {
+  width: 100%;
+  max-width: none;
+  border-radius: 0;
+  background: var(--gn-surface);
+  box-shadow: none;
+}
+.gn-sheet__body--full { max-width: 53.75rem; width: 100%; margin: 0 auto; }
+
+/* The `Full screen` pill itself, transcribed from the prototype's control
+   (`desktop.dc.html:1119`): 32px minimum height, 12px padding, fully round,
+   the control-surface fill and its shadow, accent ink at 13px/600, and a 7px
+   gap to its icon. */
+.gn-sheet__full {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  /* ⚠ 44px, NOT the prototype's 32px, and the divergence is deliberate: this
+     repo enforces the 44px tap-target floor on every `button` (WCAG 2.5.5, and
+     `tap-targets.ts` measures them), while the prototype draws 32px. An
+     independent reviewer found the first cut at `2rem` — an offender the
+     moment a sweep renders the sheet, which none does today, so it would have
+     been found by the post-merge verification instead of here. */
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-accent);
+  box-shadow: var(--gn-shadow-raised);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
 }
 
@@ -478,8 +530,49 @@
   gap: 1rem;
   padding: 0.9rem 1.1rem;
 }
+/* ⚠ THE DIALOG'S TITLE KEEPS ITS OLD STEP, and this comment exists because the FIRST version of
+   this change took it away without saying so. The rule below was a SHARED one —
+   `.gn-dialog__title, .gn-sheet__title { font-size: 1.05rem; margin: 0; }` — and the first cut
+   inserted this block's comment BETWEEN the two selectors. A comment is legal inside a selector
+   list, so the compiled rule quietly applied the sheet's new type step to EVERY DIALOG HEADING
+   too (`Dialog` renders `<h2 class="gn-dialog__title">`), which no comment and no commit message
+   claimed. An independent reviewer found it by reading the emitted bundle. The shared rule is
+   restored to its own values and the sheet's step is declared on its own selector, below. */
 .gn-dialog__title,
-.gn-sheet__title { font-size: 1.05rem; margin: 0; }
+.gn-sheet__title {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+/* The sheet's title, at the AUTHORITY'S type step — `font-size:22px;
+   line-height:28px;font-weight:600` (`desktop.dc.html@6d7b67c0a52c:1116`), where
+   it was 1.05rem with the heading's own weight. The prototype's heading is the
+   most prominent thing on the screen and ours was the same size as body text,
+   which is the "much stronger type hierarchy than ours" the parity dispatch
+   names.
+
+   ⚠ CSS-ONLY, AND IT MINTS NO CASE ID, which is this repo's own precedent for a
+   change nothing in a jsdom suite can see (the same treatment the four CSS-only
+   items in an earlier round got). jsdom loads no stylesheet, so a unit case could
+   only assert the class name — a check that would pass for reasons unrelated to
+   the property. The measurement is the viewport suite's, where the computed size
+   is real.
+
+   ⚠ And it is the TYPE only: the prototype draws this title as an `<input>` that
+   edits in place (`sc-camel-on-change="{{ setSheetTitle }}"`). Ours is a
+   read-only heading, and an inline title editor is a NEW EDITING AFFORDANCE
+   rather than a restyle — the same class the Priority and Due editors were
+   deferred as. Not built, and named here so its absence is a decision rather
+   than an omission.
+
+   No material tokens are involved — a type step is style-agnostic — so this is
+   correct in `hig`, `minimal` and `neo` without a per-style fork. */
+.gn-sheet__title {
+  font-size: 1.375rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+}
+
 .gn-dialog__close,
 .gn-sheet__close {
   font: inherit;
@@ -1482,20 +1575,12 @@
 .gn-my-work__reason { margin: 0; width: 100%; }
 .gn-my-work__claim { color: var(--gn-text-muted); font-size: 0.85rem; }
 
-.gn-ticket-sheet__tabs { display: flex; gap: 0.4rem; margin-bottom: 0.9rem; }
-.gn-ticket-sheet__tabs [role='tab'] {
-  font: inherit;
-  background: var(--gn-surface-sunken);
-  color: var(--gn-text-muted);
-  border-radius: 6px 6px 0 0;
-  padding: 0.3rem 0.8rem;
-  cursor: pointer;
-}
-.gn-ticket-sheet__tabs [role='tab'][aria-selected='true'] {
-  background: var(--gn-surface-raised);
-  color: var(--gn-text);
-  border-bottom-color: var(--gn-surface-raised);
-}
+/* The three `.gn-ticket-sheet__tabs*` rules that stood here are DELETED, by the
+   change that orphaned them: the sheet's tabs now render the shared
+   `SegmentedControl` (`.gn-segmented*`), and an independent reviewer confirmed
+   the class had no other reference anywhere in the repo — its only remaining
+   mentions were the rules themselves. Dead CSS is a reader's trap: it looks like
+   the live treatment and is not. */
 /* The sheet's footer row — the prototype's `‹ Previous / Next ›` bar
    (`desktop.dc.html:1371`: `padding:16px 24px;background:var(--fill4);
    justify-content:space-between`, whose left-hand `Delete` is NOT built — see

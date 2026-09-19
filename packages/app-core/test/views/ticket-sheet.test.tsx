@@ -1823,6 +1823,113 @@ describe('the `Subtask of {parent}` chip', () => {
  * door.** `16.29` asserts the READ-ONLY half so that making them editable later
  * is a decision rather than a drift — the same shape as F's `16.22`.
  */
+/**
+ * SHEET PROTOTYPE PARITY, 2026-09-20 — cases `16.81`–`16.99`.
+ *
+ * Owner: *"make our build like the prototype."* **The authority is
+ * `design-system/interactive/desktop.dc.html`** — NOT
+ * `design-system/prototypes/TicketSheet.dc.html`, which nothing in the repo cites
+ * and which matches our build much more closely, so comparing against it
+ * concludes "we are nearly there".
+ *
+ * **Every comparison is style-matched.** The prototype is drawn in the flat
+ * language, so `data-style="hig"` comes first; at the app's default (`neo`) our
+ * screens are neumorphic and appear to be a different design entirely. This suite
+ * cannot see styles at all — jsdom loads no stylesheet and has no layout engine —
+ * so what it asserts is STRUCTURE and ROLES. The visual half is the viewport
+ * run's, which is part of this task rather than an extra.
+ */
+describe('sheet prototype parity', () => {
+  it('16.81 the sections are ONE segmented control — the tablist roles kept, and a NAME it never had', async () => {
+    const read = ticketRead();
+    renderSheet(read, sheetSource(read, [], []));
+    await settled();
+
+    // The authority draws the three tabs as one segmented control
+    // (`desktop.dc.html@6d7b67c0a52c:1134-1140`); this build drew two bordered
+    // buttons. The swap is onto the SHARED `SegmentedControl`, whose docblock
+    // says it exists to replace exactly those bordered buttons.
+    const tablist = screen.getByRole('tablist', { name: 'Ticket sections' });
+    const tabs = within(tablist).getAllByRole('tab');
+    expect(tabs.map((t) => t.textContent)).toEqual(['Details', 'History']);
+
+    // TWO, and the count is an assertion rather than a description: the
+    // authority's third tab is `Attachments` (`:3589`), which is a READ behind a
+    // surface. Drawing it here would be inventing a tab the dispatch says to ask
+    // about, so its ABSENCE is pinned until that question is answered.
+    expect(tabs).toHaveLength(2);
+
+    // ⚠ The name is NEW. `role="tablist"` on this sheet carried no accessible
+    // name at all before this change, and the shared component REQUIRES one — so
+    // this is a ratchet RISE (13.285/13.287), which is the allowed direction, and
+    // it is asserted so a future rename cannot pass as the same thing.
+    expect(tablist).toHaveAccessibleName('Ticket sections');
+
+    // And the control still WORKS: `aria-selected` moves with the click, which
+    // is the property the two buttons carried and the component has to keep.
+    expect(within(tablist).getByRole('tab', { selected: true })).toHaveTextContent('Details');
+    await userEvent.click(within(tablist).getByRole('tab', { name: 'History' }));
+    expect(within(tablist).getByRole('tab', { selected: true })).toHaveTextContent('History');
+  });
+
+  it('16.82 Full screen moves the SCRIM, the PANEL and the BODY together — and says which way it goes', async () => {
+    const read = ticketRead();
+    renderSheet(read, sheetSource(read, [], []));
+    await settled();
+
+    // The authority's control (`desktop.dc.html@6d7b67c0a52c:1119-1120`) is a
+    // pill carrying a LABEL as well as an icon, and the label is the whole point:
+    // a control that only says "Full screen" while it is already full screen is
+    // one a person cannot tell the way out of.
+    const enter = screen.getByRole('button', { name: 'Full screen' });
+    expect(enter).toHaveTextContent('Full screen');
+
+    // THE THREE PARTS MOVE TOGETHER, and that is the property this case exists
+    // for rather than three separate assertions: the prototype's own treatment
+    // (`:3396-3400`) changes the scrim's fill, the panel's geometry AND the
+    // body's cap. A "full screen" that did one or two of them is a panel that
+    // grew while the page behind it stayed visible — the half-done version this
+    // repo would otherwise ship, because each part alone looks plausible.
+    const iconPath = (): string | null | undefined =>
+      screen.getByTestId('sheet-scrim').querySelector('.gn-sheet__full path')?.getAttribute('d');
+    const scrim = screen.getByTestId('sheet-scrim');
+    const panel = scrim.querySelector('.gn-sheet');
+    const body = scrim.querySelector('.gn-sheet__body');
+    expect(scrim.className).not.toContain('--full');
+    expect(panel?.className).not.toContain('--full');
+    expect(body?.className).not.toContain('--full');
+
+    const enterIcon = iconPath();
+    expect(enterIcon).toBeTruthy();
+
+    await userEvent.click(enter);
+
+    // The label turns around...
+    const exit = screen.getByRole('button', { name: 'Exit full screen' });
+    expect(exit).toHaveTextContent('Exit full screen');
+    // ...AND SO DOES THE ICON, which an independent reviewer found asserted
+    // NOWHERE: the record claimed "an icon and a label that BOTH change", and
+    // freezing the path left this case GREEN. The two paths are the prototype's
+    // own (`:3402`), and the property is that the rendered `d` MOVES — "an icon
+    // exists" would pass for a constant, which is the shape that was unwitnessed.
+    expect(iconPath()).not.toBe(enterIcon);
+    // ...and so does every part of the sheet.
+    expect(screen.getByTestId('sheet-scrim').className).toContain('gn-sheet__scrim--full');
+    expect(screen.getByTestId('sheet-scrim').querySelector('.gn-sheet')?.className).toContain(
+      'gn-sheet--full',
+    );
+    expect(
+      screen.getByTestId('sheet-scrim').querySelector('.gn-sheet__body')?.className,
+    ).toContain('gn-sheet__body--full');
+
+    // And it goes BACK: a one-way control would strand the reader in a mode the
+    // prototype explicitly offers a way out of.
+    await userEvent.click(screen.getByRole('button', { name: 'Exit full screen' }));
+    expect(screen.getByRole('button', { name: 'Full screen' })).toBeInTheDocument();
+    expect(screen.getByTestId('sheet-scrim').className).not.toContain('--full');
+  });
+});
+
 describe('G — Priority, Due and Type as rows', () => {
   /** A ticket claiming NOTHING, so every absence copy is exercised. */
   const bare = (): TicketRead => ticketRead({ ticket: ticketStateSeed({ fields: {} }) });

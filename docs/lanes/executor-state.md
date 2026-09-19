@@ -41,6 +41,79 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~03:0x IST. **THE CHIP PR IS OPEN (#562, AWAITING THE
+> # CONTROLLER'S MERGE) AND THE PARITY TASK IS OPENED ON ITS OWN BRANCH.** Cycle 13's order is
+> # authoritative and it is **chip → parity → `3b`**.
+> Branch **`exec/sheet-prototype-parity`**, cut from **`origin/main` = `e4d36f11`** (`#561`, the cycle-13
+> anchor). **Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-20-sheet-prototype-parity.md`.** Block
+> **`16.81`–`16.99`**, added to §16's table as this branch's first action.
+>
+> ## WHAT IS IN FLIGHT, EXACTLY
+> **#562** (`exec/subtask-parent-chip`, head `33f2dc70`, `--base main`, MERGEABLE) — the chip, Door F's
+> **separator defect**, cases `16.38`–`16.40`, `16.22` flipped, the orphaned-sha correction. **AWAITING
+> MERGE; do not redo it.** Its handoff block lives on THAT branch, which is why this one restates it: a
+> restart must not have to know which branch is checked out to learn the PR's state.
+> Gate measured **32/33** — the one red is `server#test` timing out at 30 s under **load average 201**
+> (exec 2's `next build` + the Docker VM), and **that task alone is 154 files / 1610 passed / EXIT 0 at
+> the same content**; **zero orphaned vitest workers**. All seven checks exit 0; `check-case-ids` **2486
+> (+3)**, §16 citations **40/0/40 (+3)**. An independent reviewer ran before the PR opened and found
+> **five defects in it**, all fixed — including a **stale authority** (6.66's "no table stores a ticket
+> title" is false since `proj_tickets` landed).
+>
+> ## ⛔ THE PARITY TASK'S THREE TRAPS, ALL NAMED BY THE ANCHOR — READ THEM BEFORE MEASURING
+> 1. **`data-style="hig"` FIRST.** The prototype is drawn in the flat language; at the app's default
+>    (`neo`) every comparison measures the style axis, not the build. **The controller has already been
+>    wrong once this way.**
+> 2. **TWO PROTOTYPE FILES AND ONE IS A TRAP.** The authority is
+>    `design-system/interactive/desktop.dc.html` (mtime 2026-09-18, cited by eight+ docs).
+>    **`design-system/prototypes/TicketSheet.dc.html` (2026-09-09) is cited by NOTHING** and matches our
+>    build much more closely, so comparing against it concludes "we are nearly there". Believing the older
+>    file should win is a **product call — stop and ask.**
+> 3. **A viewport run is part of the task, not an extra.** The subtask defect above was invisible to every
+>    test and every green gate and was found by LOOKING AT THE PAGE. Viewport work is on **`:3021`**, never
+>    `:3001`. **Screenshot the sheet in `hig` and compare before calling it done.**
+>
+> ## THE TWO THINGS THAT MUST NOT BE ASSUMED
+> - **Structure vs styling is the dispatch's own split**, and the PR body must say which list each item is
+>   on. **Anything needing a route, a migration or a disclosure the table does not name is a STOP AND ASK** —
+>   an Attachments TAB is a read and may be a door; a tabs CONTROL is a surface. Say which.
+> - **`3b` is QUEUED BEHIND THIS ONE** (cycle 13's table), parked on `exec/members-states` @ `b4664bd4`.
+>   Its decisive measurement is **done and it is not a stop-and-ask**: `role` is on the wire and the mapper
+>   carries it (case `13.760`), so its `mappers.ts:405-408` citation is stale and the work is the surface.
+>
+> ## ⛔ THE VISUAL HALF CANNOT BE MEASURED — BOTH INSTRUMENTS ARE BLOCKED, AND ONE IS A STALE PREMISE
+> **1. `e2e-stack` is RED ON MAIN, settled by measurement rather than argument.** On this branch it fails
+> **6/8**; run at **`origin/main`** in the same stack it fails **identically** — the same six tests *by
+> name and line*, the same 6/2, and the same **`LOST ariaLabel: baseline 66, now 9`**. So **nothing in the
+> run is this branch's**, my predicted **+2 aria-labels was never tested**, and the suite fails *before it
+> reaches the sheet* (sign-in/the seeded board), which is why it cannot serve the parity task. **The
+> controller is putting this red-on-main finding to the owner** — do not absorb it here.
+> **2. ⚠ A SUITE SIDE EFFECT:** running it **WRITES a tracked file** — `e2e-stack/non-text-contrast-roster.json`
+> (`belowCount 0→1`, `examined 3→13`). Reverted; anyone running this suite dirties their tree, and a PR cut
+> afterwards would carry a machine-written roster.
+> **3. A REAL PRE-EXISTING DEFECT it recorded:** `button.ticket-type-list__move` at **1.41** against the
+> 3:1 non-text floor on `/settings/ticket-types`. Main's committed roster says `belowCount: 0`, so this is
+> a live contrast regression nobody has closed. Not this lane's surface; also going to the owner.
+> **4. ⛔ THE HAND-DRIVEN ROUTE IS BLOCKED TOO, BY THE BRIEF'S OWN STALE PREMISE.** The brief says the
+> `:3001` stack is *"mounted from YOUR worktree"*. **Measured: it is not.** `docker inspect
+> gisik-nokma-dev-web-1` shows **NO bind mounts** and the container runs **`node apps/web/server.js`** — a
+> BAKED IMAGE. And `trustedOrigins` is built from `WEB_ORIGIN`, which is **`:3001` only**, so a dev server
+> on any other port cannot even sign in (**"Invalid origin"**, measured on `:3031`). **Consequence: this
+> branch's rendering cannot be seen in a browser without rebuilding the image — a docker action, and not
+> mine.** What the hand-driven session DID produce is the **"before" state**: the shipping sheet in `hig`,
+> screenshotted, which visually confirmed the classified deltas (two bordered tab buttons, no Full screen,
+> no breadcrumb) rather than merely reading them.
+> **5. AND A REBASE LESSON THAT COST A RED BUILD.** Resolving the `ui.css` conflict kept both sides but cut
+> one brace — main's `.gn-toast__dismiss` was left unclosed, and `@gisik-nokma/web#build` caught it at
+> 462:1. **A clean tree and zero conflict markers say nothing about whether the merged text is valid.**
+>
+> ## ANCHORS
+> | | |
+> |---|---|
+> | base | `origin/main` = **`e4d36f11`** (the cycle-13 anchor landed while the chip PR was open) |
+> | ids | chip `16.38`–`16.40` SPENT · **parity `16.81`–`16.99`** · `3b` `16.61`–`16.80` · **`§17` is the controller's to open at `16.99`** |
+> | the three styles | `hig` (the prototype's language) · `minimal` · `neo` — **every rule must be right in all three** |
+
 > # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~02:0x IST. **THE `Subtask of {parent}` CHIP IS BUILT; ITS PR IS
 > # OPENING. `3b` IS PARKED ON ITS OWN BRANCH, AND A SEPARATOR DEFECT IN DOOR F IS FIXED IN THIS SAME PR.**
 > Branch **`exec/subtask-parent-chip`**, cut from **`origin/main` = `ad6dc515`**; code head **`68def392`**.
