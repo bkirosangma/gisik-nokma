@@ -2683,9 +2683,11 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   (`list.groups[0].cards[0].closed: expected an object`). The mapper's refusal stays strict — a `closed`
   that defaults to `null` when absent is what hid case 13.603 the first time.
   `docker-compose.dev.yml`, `docker-compose.hot.yml` (retired; kept for its measurements), `package.json`,
-  `docs/runbook.md`,
-  `test-cases/13-owner-requests-and-backlog.md` (hot mode's witness record **13.650–13.657**, superseded
-  in place rather than deleted),
+  `apps/server/Dockerfile`, `apps/web/Dockerfile` (both keep `dev` stages that no shipped command targets
+  any more, and both stage comments now say so; **their `dev` stage's position is still load-bearing** —
+  see the rebuild rule), `docs/runbook.md`,
+  `test-cases/13-owner-requests-and-backlog.md` (**13.946** is the replacement case; hot mode's witness
+  record **13.650–13.657** is superseded in place rather than deleted),
   `docs/lanes/executor-state.md`
 - ✅ **Deployed-stack E2E — Playwright against the running compose stack, and the sign-in defect it
   found** — three specs drive the REAL stack (a Next container proxying to a real API server, real

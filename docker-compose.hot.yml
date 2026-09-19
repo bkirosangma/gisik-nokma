@@ -49,7 +49,9 @@
 # `docker-compose.dev.yml` is deliberately UNCHANGED by this file's introduction
 # — the prod-parity image path and the compose contract suite keep reading it
 # exactly as before, and the prod images are still the un-targeted builds.
-# `pnpm dev:stack` (root package.json) is that command.
+# `pnpm dev:stack` (root package.json) WAS that command. **[FALSE SINCE
+# 2026-09-19 — see the retirement banner at the head of this file. `dev:stack`
+# now names `docker-compose.dev.yml` alone and does NOT compose this file.]**
 #
 # What changes here: the `server` and `web` containers run the branch's SOURCE
 # from bind mounts instead of the baked artifacts, with watchers that reload them

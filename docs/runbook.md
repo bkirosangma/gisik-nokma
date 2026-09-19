@@ -287,6 +287,12 @@ Two consequences worth stating where they will be read:
 - **`SERVER_ORIGIN` is a BUILD arg and must be the compose service name.** With `http://localhost:3000`
   the proxied path returns **500 after a 30-second hang** while everything else looks fine; the base
   compose file's `web` section records the measurement.
+- **A NEW MIGRATION needs the rebuild too, and for a different reason than code does.** Migrations run
+  **once, as the container command's first step, at start** — nothing watches `apps/server/migrations`, and
+  a container that is already up will not notice a file added under it. `pnpm dev:stack:rebuild` recreates
+  the container and therefore covers this; `restart server` covers it without the 14-minute build. **This
+  is the one case where a code change needs no rebuild but a migration does** — under hot mode it was the
+  only such case, and it survives the mode.
 
 ### What the stack is
 
@@ -446,11 +452,21 @@ correctly would read a false alarm. Bracket the first character and the self-mat
 `[t]ypescript/bin/tsc` → **7**, `[t]sconfig.json --watch` → **9** (the second number is why the paragraph above
 tells you to count the first pattern: the near-miss also matches the recursive parent process).
 
-### The `web` half — :3001, and where it differs from the server
+#### The `web` half — :3001, and where it differs from the server
 
 `pnpm dev:stack` brings up **both** containers: `web` on the host's **:3001** and `server` on **:3000**. The
 browser talks to :3001, and the `web` container proxies `/v1/*` and `/api/auth/*` to `server:3000` over the
 compose network. Both serve the source of the checkout the command ran from.
+
+> **[FALSE SINCE 2026-09-19 — the sentence above describes hot mode, which the section's opening banner
+> retires.]** `pnpm dev:stack` no longer serves "the checkout the command ran from": it serves the **built
+> image**, and the folder it is built from is pinned by the rebuild rule's SHA check. **This paragraph and
+> everything down to the next `##` are the HOT-MODE record, not current advice** — including the take-over
+> sequence, the compile-line reads, the polling figures, and the package-watcher checks. They were demoted
+> from `###` to `####` here for exactly that reason: as a sibling heading under a `###` banner, 84 lines of
+> superseded advice read as current, which a review caught.
+
+The paragraph above was true until 2026-09-19. Everything below in this subsection measured hot mode.
 
 **Taking :3001 over.** The `web` container binds the host's 3001, so whatever already holds it must go first,
 and the order that keeps the owner's view alive longest is: build the image, then stop theirs, then
