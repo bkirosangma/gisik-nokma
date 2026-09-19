@@ -104,7 +104,9 @@ with **no status**; `"Published"` is derivable but `"Superseded"` is not. (2) **
 (`packages/app-core/src/workflow-builder/gateway.ts:56-94`).
 
 **`isTypes`** — (3) **reorder**: no rank/reorder op on the gateway and **no reorder route**
-(`apps/server/src/routes/builder-reads.ts`, zero hits). (4) **the `"Draft"` badge**: `TicketTypeDef` is
+(`apps/server/src/routes/builder-reads.ts`, zero hits). ⚠ **BOTH FACTS ARE TRUE AND NEITHER IS A GAP** —
+**CORRECTED 2026-09-19: this is NOT wire work, and adding a route would be a second door to a thing that
+already has one. Read Task 6's section before acting on this item.** (4) **the `"Draft"` badge**: `TicketTypeDef` is
 `{id,name,icon,rank,workflowId,fields}` (`packages/domain/src/ticket-types.ts:27-51`) with no draft flag.
 (5) **the `"N tickets"` segment**: the only population call is
 `getTypeWorkflowPopulation(workspaceId, typeId, workflowId)` — **pinned to ONE workflow**
