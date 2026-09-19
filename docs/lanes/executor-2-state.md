@@ -3,7 +3,11 @@
 ### § 1 — WHERE TO FIND IT
 
 - **Dispatch: the controller's `#570` follow-up**, in the restart paste. Base named as `main` = `4de03f03`.
-- **Branch `exec2/manual-gaps`**, cut from `4de03f03`. **HEAD `9506f643`**, one commit, **ahead 1**.
+- **Branch `exec2/manual-gaps`**, cut from `4de03f03`. **Content head `30cd911c`** — three commits:
+  `9506f643` (the corrections), `445a29fe` (this handoff's earlier draft), `30cd911c` (a phrasing fix to
+  §8 found by reading my own diff). **This handoff commit sits on top of those.**
+- **Do not carry the ahead-count forward** — it moves with every commit. Count from the directory:
+  `/usr/bin/git rev-list --count origin/main..HEAD`.
 - ⚠ **`origin/main` has since moved to `ce153f97`** — the controller's own `docs/lanes/controller-state.md`
   and nothing else (`#571`, the cycle-16 anchor). **No overlap with this branch's files.** These notes sit
   *behind 2*, which is not a conflict and needs no rebase.
@@ -76,7 +80,28 @@ exist on origin. Corrected here rather than left to mislead a third time.
 section) already pin every behaviour involved. Minting one to look thorough is the failure the dispatch
 names by name.
 
-### § 5 — IN FLIGHT, AND IT IS ONE SHORT STEP
+### § 5 — THE REVIEWER PASS, RECORDED BEFORE THE PR OPENED (the freeze-line rule)
+
+One reviewer, dispatched adversarially against `9506f643`/`30cd911c` and told to report **only** failures.
+**Verdict: no numbered claim is false or unsupported — all 23 hold.** Two precision caveats came back, and
+**one was a real defect in my prose**:
+
+- **⚠ THE BOUND WAS WRONG AND THE REVIEWER FOUND IT.** I had written *"one press carries at most a page of
+  your Inbox"*. Measured: the route refuses when `ids.length > MAX_LIMIT` (`routes/notifications.ts:199`),
+  `MAX_LIMIT = 100` (`:51`), and **the inbox client never sends a `limit`** (`online/notifications.ts:48-49`)
+  — so a server *page* is 30 while `loadMore` **appends**, and a drawn-unread set of **31–100 is ACCEPTED,
+  not refused**. "A page" is ambiguous between 30 and 100 and would have misled exactly the reader that
+  sentence existed for. **Corrected to name 100**, in `manual.md` and `faq.md` both, and swept afterwards
+  with a same-invocation control (`'a page of your'` → **0**, `'Mark N read'` → **2/1**).
+- **Caveat 2, recorded not fixed:** `git log -S'the only one in the product'` returns **two** commits, not
+  one — `396828e4` (2026-09-07, adds) and the correction commit itself (removes). `-S` necessarily lists the
+  commit that changed the count, so the membership statement and its 9-day inference both stand.
+
+**The reviewer's own first sweep used `\.search\b`, which BSD grep does not honour, and returned a false
+zero.** It re-ran with a literal paren and found the single interface declaration. Recorded because it is
+this machine's sixth silent-empty mode and the exact reason a null needs a control in the same invocation.
+
+### § 6 — IN FLIGHT, AND IT IS ONE SHORT STEP
 
 **Nothing is blocked.** `9506f643` is on `exec2/manual-gaps`; the next act is the push, then the PR against
 `main`. Its **listed-not-fixed** section carries two items:
@@ -90,7 +115,7 @@ names by name.
 **Open ruling, explicitly non-blocking:** the footer coverage request above. It does not hold the PR, and
 the PR body records the same finding so the controller can rule on it either way.
 
-### § 6 — A WARNING THAT TRAVELS WITH THIS FILE
+### § 7 — A WARNING THAT TRAVELS WITH THIS FILE
 
 **Shas in the narrative blocks below are unreliable — several are ORPHANED by rebases, and `git cat-file`
 will still pass on them and lie.** Verify reachability with
