@@ -52,7 +52,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > |---|---|
 > | base | `origin/main` = **`6cee248d`**, and `merge-base --is-ancestor` confirms this branch was cut from it |
 > | tree | **clean** at the handoff commit; every change is on the branch, nothing unpushed |
-> | gate | **`pnpm turbo run build test typecheck` — 33 successful, 33 total · Cached: 15 · 1m23.067s, zero failures**, run by THIS lane at its own tree. **Node runtime `v22.22.2`**, proved by `lsof` on a live vitest worker — *not* by `which pnpm`, which resolves the LAUNCHER under `node/v24.11.1/bin` and says nothing about the runtime |
+> | gate | **`pnpm turbo run build test typecheck` — 33 successful, 33 total, zero failures**, run by THIS lane at its own tree **twice**: `1m23.067s` (cached 15) before the review fix round, and **`1m44.389s`, EXIT 0, no cache at all** after it. **Node runtime `v22.22.2`**, proved by `lsof` on a live vitest worker — *not* by `which pnpm`, which resolves the LAUNCHER under `node/v24.11.1/bin` and says nothing about the runtime |
 > | checks | all **8 exit 0**: env-example · task-ledger · migration-order · case-citations · runbook-commands · skipif-coverage · help · db-tz (`Asia/Kolkata`) |
 >
 > ## WHAT LANDED (Task A) — four files, and the line-neutrality is the load-bearing part
@@ -85,14 +85,31 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > function of the ground, and any mutation of that ground is caught by the guard above it. Recorded rather
 > than dressed up.
 >
-> ## ONE FINDING I DID **NOT** FIX — recorded with a named owner, per the repo's rule
-> `tokens.ts:680` and `:1270` both say `accent`'s Round-2d hexes cleared **"5.25+"** as a fill against
-> `accentText`. That is `#3A6DB0` vs **pure white** (5.2575); on the shipped ground it is **4.9321** — and
-> `:672`, in the SAME docblock family, already states the correct before/after (5.26 → 4.93). **Left
-> unfixed deliberately:** those hexes are RETIRED (T1 moved light `accent` to `#33629f` on 2026-09-18), so
-> the sentence is a historical record with an unstated ground rather than a live mis-calibration of the
-> kind `13.693` described — and the dispatch bounded Task A to two claims. **Owner: the controller**, for a
-> one-line follow-up if it wants the consistency; the file is self-inconsistent until then.
+> ## ⚠ THE FIRST SWEEP WAS INCOMPLETE, AND A REVIEW CAUGHT IT — all of it is fixed now
+> This is the most important paragraph in this block, because it is a near-miss on the exact defect the
+> task exists to remove. The first pass measured the four moved roles, wrote the numbers into the case
+> entry as *proof the sweep ran* — **and then left the pure-white figure standing for one of them.**
+>
+> | | |
+> |---|---|
+> | **A** | `dangerText` on `danger` is **5.0511** on the shipped ground; the pure-white **5.38** survived in **four** present-tense places — `Features.md`, `apps/web/app/globals.css`, `test-cases/13-neomorphism-and-workspace-screens.md`, `packages/app-core/src/account/sessions-section.tsx`. All four corrected |
+> | **B** | case `13.281`'s text (`13-hig-per-screen.md`) still said 4.40 / 5.40 **and** `4.395`, while the test beside it had just been retitled to 4.1233. Corrected, line-neutrally |
+> | **C** | the `brand` tile's **2.87** survived in two more catalogue copies. Corrected to 2.69 |
+> | **D** | `docs/lanes/owner-holds.md` said `tokens.ts` "**record**[s]" 4.40 / 5.40 and "the catalogue rows stay ❌" — both falsified by this change. Register updated, `13.693` recorded CLOSED |
+> | **E** | `tokens.ts:680` / `:1270` quoted a bare **"5.25+"** naming **no ground at all** — which IS the 13.693 defect, not an exemption from it. **I had recorded this as a deliberate non-fix; the review's rebuttal was right and I was wrong**, so it is fixed: 5.26 against the then-white `accentText`, 4.93 on today's warm ground |
+> | **F** | residue: the test's own docblock said "not as a shipped 4.40" three lines above the title this change had just changed; the block heading "recorded as cases rather than fixed" was falsified; `toBeCloseTo(4.12, 1)` was far looser than the 4-decimal title it sat under |
+>
+> **The transferable lesson, and it is the same one this repo keeps re-learning:** the first sweep's
+> universe was *the list of roles the case named*, not *the places those figures live*. It measured
+> `dangerText` correctly and never grepped for where `dangerText`'s number was written down. A figure
+> you have just corrected in one file is a claim you now owe the whole repository.
+>
+> **Flagged, NOT fixed — different cause, so a different owner:** the `danger`-as-text-on-`surfaceRaised`
+> figure `4.29` is stale for a *different* reason — T5 (2026-09-18) lightened `neoPaper` `#ede4db` →
+> `#f1eae3`, so `red600` on it went 4.2872 → **4.5173** and now PASSES 4.5, inverting a documented
+> failure. That is a neo-surface move, not the round-4 ground move, and it is outside this dispatch.
+> Sites named by the reviewer: `Features.md:278`, `globals.css:858/871/874`, `13-neomorphism…md:1183/1188`,
+> `sessions-section.tsx:80`. **Owner: the controller**, for its own dispatch.
 >
 > ## TASK B — ANSWERED, READ-ONLY, NO PR (this is the whole deliverable; do not rebuild anything)
 > **`hig-per-screen/3b` (Members — states) is ON `main`, and the alert is refuted on BOTH counts.**
