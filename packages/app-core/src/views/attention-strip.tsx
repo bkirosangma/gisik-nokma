@@ -57,11 +57,11 @@ export type AttentionStripProps = {
  *    a judgement the ledger never recorded.
  *
  * 3. **An empty strip renders NOTHING — not an empty container, not a "nothing
- *    needs attention" line.** The strip's contract is "what needs attention
- *    now", and it cannot presently contain a contested claim at all
- *    (`mapAttention` refuses: `AttentionItem.title` is on no contest row). A
- *    reassuring empty state on a surface that is structurally incapable of
- *    showing one whole kind is a fabricated all-clear.
+ *    needs attention" line.** The contract is "what needs attention now", and
+ *    an empty list is the honest rendering of that. **This rule used to rest
+ *    on a SECOND fact that has expired** — that the strip "cannot presently
+ *    contain a contested claim at all (`mapAttention` refuses …)"; where
+ *    `mappers.ts:1935-1945` maps a contest's `title` today, so it can.
  *
  * The list is FLAT rather than sectioned per kind for the same reason: a
  * sectioned strip has to decide what to draw under a heading with no rows, and
@@ -151,11 +151,11 @@ export function AttentionStrip({ items, onOpenTicket }: AttentionStripProps) {
  * leave the previous workspace's strip on screen under the new workspace's
  * heading until an unrelated stream frame happened to arrive.
  *
- * `getAttention` REFUSES today (`ServingGapError`, `online/mappers.ts`): the
- * contested kind's `title` is on no route. The refusal surfaces as
- * `LiveQueryResult.error` and is NOT swallowed here — see the test. A hook that
- * caught it and returned `[]` would render the strip's most dangerous lie, an
- * emptiness the user reads as an all-clear.
+ * **The error is NOT swallowed here, and that outlived the claim above it.**
+ * "`getAttention` REFUSES today" has EXPIRED — it composes two live reads
+ * and `SERVING_GAPS` carries one key, `search`, so **the condition is now a
+ * FAILED read** rather than a permanent gap. A hook returning `[]` would
+ * still render the strip's most dangerous lie: an emptiness read as an all-clear.
  */
 export function useAttention(
   source: DataSource,
