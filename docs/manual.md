@@ -61,8 +61,9 @@ almost certainly a one-time code.
 ### The way that works: an email link
 
 1. Go to the sign-in page.
-2. Near the top you will see two tabs: **Phone** and **Email link**. The page opens on Phone.
-   **Click "Email link".**
+2. Where SMS delivery is configured the page shows two tabs — **Phone** and **Email link** — and opens
+   on Phone. It is not configured on this deployment, so there are no tabs and the page is already on
+   the email box. Either way: **use "Email link".**
 3. Type your email address into the box.
 4. Press **Send magic link**.
 5. The screen will say to check your inbox — the link in the email signs you in.
@@ -71,7 +72,7 @@ almost certainly a one-time code.
 
 ### The other two ways that work
 
-Under the tabs there are two more buttons:
+There are two more buttons, under **Or continue with**:
 
 - **Continue with Google** — the obvious choice if your business email is already on Google.
 - **Sign in with a passkey** — this is the fingerprint or face unlock your phone or laptop already
@@ -82,11 +83,12 @@ the one they will recognise.
 
 ### The way that does not work: the Phone tab
 
-If you type a phone number and press **Send code**, no code will arrive. The product answers with a
-message saying sign-in is by email. Nothing is broken on your end and there is nothing to wait for.
+Where SMS delivery is configured, the sign-in page offers a **Phone** tab and opens on it. Type a phone
+number there and press **Send code** and no code will arrive: the product answers with a message saying
+sign-in is by email. Nothing is broken on your end and there is nothing to wait for.
 
-This is worth knowing because it is the tab the screen opens on, so it is the very first thing a new
-person tries.
+It is worth knowing because it is the tab such a page opens on, so it is the very first thing a new
+person tries. **This deployment does not configure SMS, so the tab is not offered at all** — §0, item 1.
 
 > **Treat your sign-in link like a password.** Anyone who has that link can get into your account.
 > Do not forward it and do not paste it into a group chat. The same goes for invitation links (§4).
@@ -320,8 +322,8 @@ words are kept exactly as you typed them, so check what you typed if you are fus
 
 ### What you can change afterwards
 
-Open a job by clicking it from the Board, List or Calendar. You get a panel with two tabs:
-**Details** and **History**.
+Open a job by clicking it on any of the job tabs — the Backlog, Board, List, Calendar or Timeline. You
+get a panel with two tabs: **Details** and **History**.
 
 On the Details tab you can do **two things**:
 
@@ -617,8 +619,17 @@ product guessing, and it tells you it is stranded.
 
 ## §8 — Looking at the work
 
-A project has four tabs: **Board**, **List**, **Calendar** and **Timeline**. Board is what you get by
-default.
+A project has five tabs: **Backlog**, **Board**, **List**, **Calendar** and **Timeline**. Board is what
+you get by default.
+
+### Backlog
+
+The first tab, and where a new job starts its life. It lists the jobs that have not begun, in an order
+you arrange — drag a row, or use the **Move up** and **Move down** buttons on it. Each row also has a
+**Start** button that moves that job into its workflow.
+
+It does not leave closed jobs out, unlike the Calendar and the Timeline below. When it is empty it says
+so: *"Nothing in the backlog — new tickets land here."*
 
 ### Board
 
@@ -681,8 +692,8 @@ There is a legend with one switch per custom date field that actually claimed a 
 are looking at. Switching one off only hides it from view; it changes nothing about the job.
 
 **Closed jobs are hidden here until you ask for them.** The Calendar and the Timeline both leave closed
-work out; the List does not, and the Board never shows them at all. So a month can look emptier than
-the project really is.
+work out; the List and the Backlog do not, and the Board never shows them at all. So a month can look
+emptier than the project really is.
 
 There are two ways to get them back, and only two: set **Closed** to *closed only* in the Filters
 sheet, or leave Closed alone and remove the **Closed: hidden** chip that the strip shows while this
@@ -691,10 +702,11 @@ name* whose **×** only undoes your own setting — the default takes over again
 hidden. *Everything* on the Closed control is not a third way back, because *everything* and *never
 touched it* are the same setting here; that is why the chip exists at all.
 
-**If the calendar looks empty**, it tells you *which kind* of empty in four different sentences:
-nothing in this month has a claimed date at all; your filter removed everything; the grouping removed
-everything; or you switched a date field off in the legend. Read the sentence — it is telling you
-something.
+**If the calendar looks empty**, it tells you *which kind* of empty in three different sentences:
+nothing in this month has a claimed date at all; every claim in the month is behind a narrowing you
+set; or every claim in it belongs to a date field you switched off in the legend. The middle one is a
+single sentence that names the filter, the grouping and the legend together, because narrowings stack —
+so it answers for more than one of them at once. Read the sentence — it is telling you something.
 
 **And this is the one empty month the sentences above get wrong.** When hiding closed jobs is the only
 thing that emptied the month, the calendar still says *"No claimed dates fall in this month"* — which is
@@ -787,8 +799,8 @@ you, rather than quietly ignoring what you asked for.
 
 ### Very large projects
 
-There is a ceiling of **2,000 jobs in a project**. Past it, the **List, Calendar and Timeline all
-refuse** rather than showing you part of a project pretending to be the whole one. **The "New ticket"
+There is a ceiling of **2,000 jobs in a project**. Past it, the **Backlog, List, Calendar and Timeline
+all refuse** rather than showing you part of a project pretending to be the whole one. **The "New ticket"
 button disappears too**, because it reads from the same place — so a project that grows past the
 ceiling becomes one you cannot add to.
 
