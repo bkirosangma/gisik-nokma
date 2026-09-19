@@ -9,6 +9,7 @@ import {
   type NotificationsPage,
 } from '@gisik-nokma/app-core';
 import { Button, SegmentedControl, Toast } from '@gisik-nokma/ui';
+import { HttpError } from '@gisik-nokma/app-core/online';
 import type { Notification } from '@gisik-nokma/domain';
 import { AppNav } from '../../src/app-nav.js';
 import { ExpiredSessionNotice, useSignInOnExpiredSession } from '../../src/expired-session.js';
@@ -83,6 +84,24 @@ const EMPTY_COPY: Record<InboxTab, string> = {
  * ruling is that a delivered message is the reader's own; what is unavailable is
  * the ticket behind it, and this says exactly that and nothing more.
  */
+/**
+ * What the page says when the bulk write is REFUSED, and the two arms are two
+ * different facts — the same split the toast's own slots keep.
+ *
+ * **⚠ THIS COPY EXISTS BECAUSE THE FIRST VERSION OF THIS ACTION FAILED
+ * SILENTLY.** The catch reloaded the page and set no state at all: a reader
+ * whose inbox held more rows than one batch could click `Mark 120 read`, watch
+ * nothing happen, watch the list snap back, and be told nothing. The adapter's
+ * own docblock asserted the opposite — *"the caller renders the refusal rather
+ * than assuming the write landed"* — so this is that promise being kept, found
+ * by independent review.
+ */
+export const BULK_REFUSED_COPY =
+  'Those notifications were not marked read — one go can carry at most a page of your inbox, and this list is longer. Mark a page at a time, or narrow the tab first.';
+/** The other arm: nobody adjudicated, so it must not read as a refusal. */
+export const BULK_UNREACHED_COPY =
+  'Those notifications were not marked read — the server could not be reached. What is on screen has been reloaded.';
+
 export const CANNOT_OPEN_COPY =
   'That ticket cannot be opened from here — it may have been removed, or it is no longer visible to you. The message itself is yours and stays.';
 
@@ -152,6 +171,8 @@ export default function InboxPage() {
   const [page, setPage] = useState<NotificationsPage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openFailure, setOpenFailure] = useState<string | null>(null);
+  /** The bulk write's own outcome — a refusal or a silence, rendered rather than swallowed. */
+  const [bulkFailure, setBulkFailure] = useState<string | null>(null);
   /**
    * The ids the last bulk write actually CHANGED, held only while the Undo is
    * still offered. `null` means there is nothing to take back, and the toast is
@@ -279,6 +300,9 @@ export default function InboxPage() {
   function markAllRead(): void {
     const ids = drawnUnreadIds;
     if (ids.length === 0) return;
+    // A new attempt clears the last attempt's outcome — a refusal sentence left
+    // standing while a second attempt succeeds would describe something over.
+    setBulkFailure(null);
     setPage((current) =>
       current === null
         ? current
@@ -293,10 +317,27 @@ export default function InboxPage() {
         // Nothing moved: no toast, because there is nothing to undo.
         if (changed.length > 0) setUndoable({ changed });
       })
-      // A refusal (over the bound, or a malformed body) or a transport failure
-      // reloads the truth rather than leaving rows drawn as read that the
-      // server never marked — `markRead`'s own arm, at bulk scale.
-      .catch(() => loadFirstPage());
+      /**
+       * ⚠ A REFUSAL IS RENDERED, NOT SWALLOWED, AND THE TWO FAILURES ARE TOLD
+       * APART BY STATUS. The first version of this catch reloaded and said
+       * NOTHING: a reader over the bound saw a click do nothing and the list
+       * snap back, with no sentence anywhere.
+       *
+       * `HttpError.status === 400` is the server's own refusal — over the bound
+       * or a malformed body — and gets the bound's sentence. Anything else did
+       * not reach a server that judged it, and must not read as a refusal: the
+       * same server/transport split the dialog's refusal slots and the toast's
+       * tones keep.
+       *
+       * The reload stays on BOTH arms: the optimistic flip has to be reverted
+       * by the truth either way, or rows stay drawn as read that nothing marked.
+       */
+      .catch((cause: unknown) => {
+        setBulkFailure(
+          cause instanceof HttpError && cause.status === 400 ? BULK_REFUSED_COPY : BULK_UNREACHED_COPY,
+        );
+        loadFirstPage();
+      });
   }
 
   /** The Undo: exactly the ids the forward call reported, and nothing else. */
@@ -391,6 +432,11 @@ export default function InboxPage() {
           <ExpiredSessionNotice />
         ) : (
           <>
+            {bulkFailure !== null ? (
+              <p role="status" className="gn-inbox__bulk-failure">
+                {bulkFailure}
+              </p>
+            ) : null}
             {openFailure !== null ? (
               <p role="status" className="gn-inbox__open-failure">
                 {openFailure}
@@ -438,6 +484,20 @@ export default function InboxPage() {
         toast rendered inside the loaded arm would vanish with it.
       */}
       <Toast
+        /**
+         * ⚠ **THE KEY IS LOAD-BEARING, NOT A REACT NICETY.** The toast stays
+         * MOUNTED between actions (`open` only toggles its render), so a second
+         * `Mark N read` within the first toast's window would otherwise inherit
+         * the FIRST one's remaining time — measured at 5 s rather than the ruled
+         * 15 — and would inherit its `paused` flag too. Keying on the changed
+         * set makes a new action a NEW toast: fresh window, fresh state.
+         *
+         * The cost, recorded rather than hidden: the previous action's Undo is
+         * no longer reachable once a second action runs. That is the toast's
+         * one-slot design, and the prototype's is the same — a second toast
+         * replaces the first there too.
+         */
+        key={undoable === null ? 'none' : undoable.changed.join(',')}
         open={undoable !== null}
         message={
           undoable === null

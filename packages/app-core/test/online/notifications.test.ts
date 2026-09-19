@@ -35,10 +35,24 @@ import { createHttpNotificationsGateway } from '../../src/online/notifications.j
  */
 
 function scriptedHttp(routes: Record<string, { status: number; body?: unknown }>) {
-  const seen: Array<{ method: string; path: string; hadBody: boolean }> = [];
+  /**
+   * `bodyJson` as well as `hadBody`, added 2026-09-20 with the bulk write.
+   * `hadBody` was enough while every POST this gateway made had NO body — it is
+   * the whole content of 11.137's assertion. The bulk route takes one, and
+   * **the thing most likely to drift is the KEYS**: a client sending
+   * `{ ids, isRead }` would still POST to the right path with a body, so a case
+   * that cannot read the body cannot see the drift — which is what independent
+   * review found, that nothing in this repo exercised this method at all.
+   */
+  const seen: Array<{ method: string; path: string; hadBody: boolean; bodyJson: unknown }> = [];
   const fetchImpl: FetchLike = async (input, init) => {
     const method = init?.method ?? 'GET';
-    seen.push({ method, path: input, hadBody: init?.body !== undefined });
+    seen.push({
+      method,
+      path: input,
+      hadBody: init?.body !== undefined,
+      bodyJson: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
+    });
     const scripted = routes[`${method} ${input}`];
     if (scripted === undefined) throw new Error(`this case scripted no ${method} ${input}`);
     return new Response(
@@ -182,6 +196,50 @@ describe('createHttpNotificationsGateway — against the routes that actually se
     // optimistic flip stand for a row the server never marked.
     await expect(
       createHttpNotificationsGateway(http).markRead('n_theirs'),
+    ).rejects.toBeInstanceOf(HttpError);
+  });
+
+  it('16.41 setRead POSTs the ids and the flag to the bulk route, and returns the changed set VERBATIM', async () => {
+    const { http, seen } = scriptedHttp({
+      'POST /v1/me/notifications/read': {
+        status: 200,
+        body: { changed: ['n_1', 'n_3'] },
+      },
+    });
+    const changed = await createHttpNotificationsGateway(http).setRead(['n_1', 'n_2', 'n_3'], true);
+
+    expect(seen[0]).toEqual({
+      method: 'POST',
+      path: '/v1/me/notifications/read',
+      hadBody: true,
+      // ⚠ THE KEYS ARE THE ASSERTION. `{ ids, isRead }` would POST to this same
+      // path with a body and be refused by the route for it — and nothing else
+      // in this repo would notice, because every other test of this method
+      // injects a hand-written stub that never touches the wire.
+      bodyJson: { ids: ['n_1', 'n_2', 'n_3'], read: true },
+    });
+    // VERBATIM, not re-derived: the page's Undo un-reads exactly this, and a
+    // gateway that echoed its own argument back would un-read rows the forward
+    // call never changed. Two of the three here.
+    expect(changed).toEqual(['n_1', 'n_3']);
+  });
+
+  it('16.41 setRead carries `read: false` for the Undo — the same route, the other direction', async () => {
+    const { http, seen } = scriptedHttp({
+      'POST /v1/me/notifications/read': { status: 200, body: { changed: ['n_1'] } },
+    });
+    await createHttpNotificationsGateway(http).setRead(['n_1'], false);
+    expect(seen[0]!.bodyJson).toEqual({ ids: ['n_1'], read: false });
+  });
+
+  it('16.41 setRead THROWS on the route’s 400 rather than resolving — the refusal reaches the caller', async () => {
+    const { http } = scriptedHttp({
+      'POST /v1/me/notifications/read': { status: 400, body: { error: 'invalid_ids', max: 100 } },
+    });
+    // The page's `.catch` renders THIS. A gateway that swallowed it would leave
+    // the page with nothing to say and rows drawn as read that nothing marked.
+    await expect(
+      createHttpNotificationsGateway(http).setRead(Array.from({ length: 101 }, (_, i) => `n_${i}`), true),
     ).rejects.toBeInstanceOf(HttpError);
   });
 

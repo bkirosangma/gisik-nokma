@@ -174,3 +174,70 @@ describe('11.94 the fake mirrors the route’s cursor spelling, including the em
     expect((await gateway.list('')).notifications).toHaveLength(2);
   });
 });
+
+/**
+ * **16.41 — the fake's BULK write, which had no caller until this block.**
+ *
+ * `FakeNotificationsGateway.setRead` shipped mirroring the route — the
+ * changed-set semantics, the bound, the empty-list rejection — and **nothing
+ * called it**, so none of that witnessed anything. Independent review found it
+ * by sweeping for a call site and finding none. The prose credited the fake
+ * with catching a page that discards `changed`; the case that actually catches
+ * that is `apps/web/test/inbox-bulk.test.tsx`'s, and this block is what makes
+ * THIS file's copy true rather than decorative.
+ */
+describe('16.41 the fake mirrors the bulk route, not a convenient version of it', () => {
+  function gatewayOf(count: number) {
+    const rows = Array.from({ length: count }, () => notificationOf('assignment'));
+    return { gateway: new FakeNotificationsGateway(rows, 50), rows };
+  }
+
+  it('16.41 returns only the ids whose value MOVED — the already-read row is absent', async () => {
+    const { gateway, rows } = gatewayOf(3);
+    const [a, b, c] = rows as [Notification, Notification, Notification];
+    // One row is already read, the shape the server's `IS DISTINCT FROM $1`
+    // excludes and a naive `WHERE`-only RETURNING would include.
+    await gateway.markRead(c.id);
+
+    const changed = await gateway.setRead([a.id, b.id, c.id], true);
+
+    expect([...changed].sort()).toEqual([a.id, b.id].sort());
+    expect(changed).not.toContain(c.id);
+  });
+
+  it('16.41 the UNDO round trip leaves an untouched row read — the property the page depends on', async () => {
+    const { gateway, rows } = gatewayOf(3);
+    const [a, b, c] = rows as [Notification, Notification, Notification];
+    await gateway.markRead(c.id);
+    const changed = await gateway.setRead([a.id, b.id, c.id], true);
+
+    await gateway.setRead(changed, false);
+
+    // `a` and `b` are unread again; `c`, which the forward call never touched,
+    // is STILL READ. A fake that un-read its whole argument would make this
+    // false — and it would also make a page that did the same pass.
+    const listed = (await gateway.list()).notifications;
+    const byId = new Map(listed.map((n) => [n.id, n.read]));
+    expect(byId.get(a.id)).toBe(false);
+    expect(byId.get(b.id)).toBe(false);
+    expect(byId.get(c.id)).toBe(true);
+  });
+
+  it('16.41 rejects an over-long list WHOLE — the route’s 400, not a truncation', async () => {
+    const { gateway } = gatewayOf(1);
+    await expect(
+      gateway.setRead(Array.from({ length: 101 }, () => 'n'), true),
+    ).rejects.toThrow('invalid_ids');
+  });
+
+  it('16.41 records the direction it was asked for, so a case can tell the two apart', async () => {
+    const { gateway, rows } = gatewayOf(2);
+    const [id] = (rows as Notification[]).map((n) => n.id);
+    await gateway.setRead([id!], true);
+    await gateway.setRead([id!], false);
+    expect(gateway.setReadCalls).toEqual([
+      { ids: [id!], read: true },
+      { ids: [id!], read: false },
+    ]);
+  });
+});

@@ -45,13 +45,23 @@ export const TOAST_DEFAULT_DURATION_MS = 15_000;
  * ## Why this is in `packages/ui` and not in the screen that first needed it
  *
  * It was built for the inbox's bulk action, whose Undo had nowhere to live —
- * the product had **no transient surface of any kind** (swept 2026-09-20: zero
- * `toast` hits across `packages/ui/src`, `packages/app-core/src`, `apps/web/src`
- * and `apps/web/app`, against a positive control of 80 in the prototype). The
- * prototype's own toast serves **66 call sites** — invites, tokens, tickets,
+ * the product had **no transient surface of any kind** — nothing that ships
+ * renders a transient message, and no toast component existed. The prototype's
+ * own toast serves **66 call sites** — invites, tokens, tickets,
  * members, types — so the owner ruled it a SHARED component, and this file is
  * the shared one: **the inbox is its only caller today**, and the rest are
  * other tasks' to wire, not this one's.
+ *
+ * ⚠ **AND THE SWEEP THAT SAID "ZERO" WAS WRONG, IN A WAY WORTH KEEPING.**
+ * Its first version read *"zero `toast` hits across …"*, and independent review
+ * reproduced the real population: **five hits in three files**
+ * (`workflow-list-screen.tsx:69,71,132`, `workflow-history-screen.tsx:14`, and the
+ * workflow-history page), every one a COMMENT about the prototype's toast. The
+ * sweep that produced the zero carried a `grep -viE` filter intended to skip
+ * comments, **and that filter ate exactly the hits that existed** — a silent empty
+ * produced by the searcher, which is this repo's oldest failure mode wearing a new
+ * hat. **The material claim survives and is the one that matters: nothing that
+ * SHIPS renders a transient message, and none of the five is a component.**
  *
  * ## The countdown pauses while the pointer or the keyboard is in it
  *
@@ -86,6 +96,27 @@ export function Toast(props: ToastProps): ReactElement | null {
   useEffect(() => {
     if (!open) {
       remainingRef.current = null;
+      /**
+       * ⚠ **AND THE PAUSE IS CLEARED HERE, WHICH IS NOT TIDINESS — IT IS THE
+       * BUG THAT MADE THE RULED 15 s DEAD.**
+       *
+       * `paused` is set by `mouseenter`/`focus`. **Every way of closing this
+       * toast puts the pointer or the focus INSIDE it** — you cannot click Undo
+       * or Dismiss without hovering the card, and you cannot press Enter on
+       * them without focusing them — so `paused` was true at the moment the
+       * toast closed, and a REMOVED NODE FIRES NO `mouseleave` AND NO `blur`.
+       * The flag survived to the next `open`, the effect's `|| paused` early
+       * return never reached `setTimeout`, and **every toast after the first
+       * stayed on screen forever.**
+       *
+       * Found by independent review, which reproduced it: `mouseover` → close →
+       * reopen, then 60 s of fake timers, `onDismiss` called **0** times. The
+       * component's own suite could not see it because every case mounts a
+       * FRESH toast — the state that leaks is the state between two of them,
+       * and only a caller that keeps one mounted across a close and a reopen
+       * has two.
+       */
+      setPaused(false);
       return;
     }
     if (durationMs === null || paused) return;

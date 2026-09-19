@@ -41,8 +41,10 @@ omitted the `Authorization` header. Caught by reading the failure, not by assumi
 - **The page** — `Mark N read` over **exactly the drawn rows**, the toast carrying the **server's
   `changed`**, Dismiss sending nothing, and a refused write reloading the truth.
 - **The shared `Toast`** — `packages/ui/src/components/toast.tsx`, the product's **first transient
-  surface** (swept: zero `toast` hits across `packages/ui/src`, `app-core/src`, `apps/web/src`,
-  `apps/web/app`; control 80 in the prototype). 15 s, pausable, `role="status"`, reduced-motion guarded.
+  surface** — **nothing that ships renders a transient message and no toast component existed.
+  ⚠ The "zero `toast` hits" first written here was FALSE: there are five, in three files, all comments
+  about the prototype's toast, and the sweep's own `grep -viE` comment filter ate them — a silent empty
+  made by the searcher.** 15 s, pausable, `role="status"`, reduced-motion guarded.
 
 ### § 4 — ⚠ ONE ADDITION TO THE RULING, FLAGGED RATHER THAN SMUGGLED.
 
@@ -69,6 +71,23 @@ at **load 116** — **isolated 8/8 in 10.8 s**, and the box is genuinely busier 
 Block **`16.41`–`16.60`**; **`16.41` and `16.42` spent** (the bulk write; the Toast). **Next free: `16.43`.**
 Write the id line as a bullet with the id bolded ALONE — `- **16.N** ✅ …`.
 
+### § 7b — INDEPENDENT REVIEW: NINE FINDINGS, ALL CONFIRMED, ALL ACTED ON. ONE WAS SEVERE AND MINE.
+
+| # | finding | disposition |
+|---|---|---|
+| **1** | **THE RULED 15 s WAS DEAD FROM THE SECOND TOAST ON, and my own pause addition caused it.** `paused` is set by `mouseenter`, and **every way of closing the toast puts the pointer or focus inside it** — you cannot click Undo or Dismiss without hovering. A removed node fires no `mouseleave`, so the flag survived to the next `open`, the effect's `|| paused` early return never reached `setTimeout`, and every later toast stayed on screen forever. The reviewer reproduced it: `mouseover` → close → reopen → 60 s → `onDismiss` **0** times. | Cleared on close. **New arm that keeps ONE toast mounted across a close and a reopen — which no case in the file did**, because the bug lives between two toasts and every other arm mounts a fresh one. Mutation-witnessed. |
+| **2** | **The >bound refusal was SILENT and DISCARDED LOADED PAGES.** The catch reloaded and set no state: a reader with 120 drawn rows clicked `Mark 120 read`, nothing was marked, nothing was said, and the list snapped back to 30. **The adapter's own docblock asserted the opposite** — *"the caller renders the refusal rather than assuming the write landed."* | A `bulkFailure` state rendered in the page's existing `role="status"` idiom, split on `HttpError.status === 400` (the server adjudicated) vs anything else (nobody did). Three arms; mutation-witnessed. |
+| **3** | **The HTTP adapter's `setRead` was exercised by NO test** — the page's suite injects a hand-written stub, so the path and the BODY KEYS could drift with every suite green. | Three adapter cases in `test/online/notifications.test.ts`, and the scripted-fetch helper now records `bodyJson` — `hadBody` alone cannot see a key renamed to `isRead`. |
+| **4** | **The fake's carefully mirrored `setRead` was dead code** — no test called it, so its changed-set semantics and bound witnessed nothing. | Four cases in `test/inbox/gateway.test.ts`. |
+| **5** | The route file's docblock said **"Three routes"**; it registers four. | Corrected. |
+| **6** | **⚠ MY "ZERO `toast` HITS" SWEEP WAS FALSE.** There are **five, in three files**, all comments about the prototype's toast — and the sweep carried a `grep -viE` filter meant to skip comments **that ate exactly the hits that existed**. | Corrected in **all five** places it was written, quoting what it used to say. **The material claim (nothing SHIPS a transient message) survives; the measurement did not.** |
+| **7** | A second bulk action **inherited the first toast's remaining time** (5 s, not 15) and dropped its Undo. | The page now keys the Toast on the changed set, so a new action is a new toast. The dropped Undo is the toast's one-slot design, and the prototype's is the same — recorded, not fixed. |
+| **8** | `markNotificationsRead`'s `if (ids.length === 0) return []` was **unreachable** — the route refuses empty first. | Removed; the route's validation is the one place, and the fake mirrors the ROUTE. |
+| **9** | Two **present-tense counts** this change moved: `http-origin.ts`'s "the eight routes in the set" (eleven now, and a DELETE since 2026-09-08), and the catalogue's "exactly one `SET read` hit" (two now). | Both made **count-free**: the http-origin paragraph states the property and says why the arithmetic is deliberately absent from a comment about a past decision. |
+
+**What the reviewer found SOUND:** the Undo's honesty end to end (SQL → response → gateway → page), with **no path where the page un-reads an id the forward call did not change** · the bound is the read's true ceiling and the refusal is a boundary, not a broken route · the CSRF registration is present, the drift guard genuinely bidirectional, and the forged-Origin arms cover it · **the toast's remaining-time arithmetic is correct and an inline `onDismiss` does NOT reset the clock** · the label is accurate in every state · the fake is faithful to the store and route · `check-case-ids` at 2485.
+
+---
 ### § 7 — NEXT IN THIS LANE.
 
 **`H` (the sheet footer)** — ruled: *a HISTORY-RETAINING removal with undo, NOT a hard delete* — then the

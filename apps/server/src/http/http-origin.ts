@@ -245,9 +245,17 @@ export function httpOriginRefused(input: {
   // session gate, which answered 401 for the wrong reason and would have read as
   // a refusal to anyone not looking closely.
   //
-  // This change refuses nothing that was previously admitted: every one of the
-  // eight routes in the set is reached by POST alone, so widening the method
-  // gate alters behaviour for exactly one route — the new one.
+  // This change refuses nothing that was previously admitted: when it was made,
+  // every route in the set was reached by POST alone, so widening the method
+  // gate altered behaviour for exactly one route — the new one.
+  //
+  // ⚠ **THE COUNT IS DELIBERATELY ABSENT, and it was removed rather than
+  // updated.** This paragraph read "the eight routes in the set"; the set holds
+  // more than that now and has held a DELETE since 2026-09-08, so the number was
+  // a reading that had already expired. **A count in a comment about a PAST
+  // decision has no maintainer** — nothing fails when it drifts — so the honest
+  // form states the property (all-POST-when-widened) and leaves the arithmetic
+  // to whoever next measures the set.
   if (!MUTATING_METHODS.has(input.method)) return false;
   if (input.routeUrl === undefined) return false;
   if (!HTTP_ORIGIN_PROTECTED_ROUTES.has(input.routeUrl)) return false;

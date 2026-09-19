@@ -10,7 +10,8 @@ import {
 } from '../notifications/store.js';
 
 /**
- * `/v1/me/notifications` — the inbox. Three routes, all session-gated with
+ * `/v1/me/notifications` — the inbox. **Four routes** (the read, the unread count, the per-id write,
+ * and the BULK write added 2026-09-20), all session-gated with
  * the same preHandler-by-parameter convention every `/v1/me/*` route on this
  * branch uses (`my-work.ts`, `preferences.ts`, `workspaces.ts`): a route that
  * reads `request.currentUserId` cannot be assembled without the thing that

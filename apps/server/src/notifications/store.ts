@@ -181,7 +181,6 @@ export async function markNotificationsRead(
   ids: readonly string[],
   read: boolean,
 ): Promise<string[]> {
-  if (ids.length === 0) return [];
   /**
    * ⚠ `AND read IS DISTINCT FROM $1` IS NOT AN OPTIMISATION — THE WHOLE
    * CONTRACT RESTS ON IT, and the first version of this statement did not have

@@ -432,8 +432,11 @@ ours — it is a pure CLIENT snapshot restore (`desktop.dc.html:3029`) and the p
   no-Origin refusal — `HTTP_ORIGIN_PROTECTED_ROUTES` is an **exact-match `Set`**, so the per-id neighbour
   string does not cover the bulk route.
 - **16.42** ✅ — **the shared `Toast`.** `packages/ui/test/toast.test.tsx`. The product had **no transient
-  surface at all** before this (zero `toast` hits across `packages/ui/src`, `app-core/src`, `apps/web/src`
-  and `apps/web/app`, control 80 in the prototype). Covers the ruled 15 s window **at the boundary**
+  surface at all** before this. ⚠ **The "zero `toast` hits across …" first written here was FALSE** —
+  there are **five, in three files, all comments about the prototype's toast**, and the sweep's own
+  `grep -viE` comment filter ate exactly the hits that existed: **a silent empty produced by the
+  searcher.** The material claim (nothing SHIPS a transient message) survives; the quoted measurement
+  did not, and is corrected rather than deleted. Covers the ruled 15 s window **at the boundary**
   (not-yet at `-1 ms`, fired at `+1 ms`), `null` meaning no timer, the Undo and Dismiss being two
   different calls, and the absence of an Undo button when none is offered. **Mutation-witnessed:** removing
   the timer reddens the two arms that name it. ⚠ **ONE ADDITION TO THE RULING, flagged rather than

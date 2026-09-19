@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Notification } from '@gisik-nokma/domain';
+import { HttpError } from '@gisik-nokma/app-core/online';
 import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
 
@@ -34,7 +35,7 @@ vi.mock('../src/auth-client.js', () => ({
   },
 }));
 
-import InboxPage from '../app/inbox/page.js';
+import InboxPage, { BULK_REFUSED_COPY, BULK_UNREACHED_COPY } from '../app/inbox/page.js';
 
 afterEach(() => {
   push.mockClear();
@@ -181,19 +182,62 @@ describe('16.41 the inbox bulk action and its Undo', () => {
     expect(calls).toHaveLength(1);
   });
 
-  it('16.41 a REFUSED bulk write reloads the truth rather than leaving rows drawn as read', async () => {
+  it('16.41 a REFUSED bulk write SAYS SO, and reloads rather than leaving rows drawn as read', async () => {
+    /**
+     * ⚠ **THE SENTENCE IS THE ASSERTION, AND IT WAS MISSING FROM THE FIRST
+     * VERSION OF THIS ARM.** That version checked only that the control came
+     * back — which a page that swallowed the failure entirely would also do.
+     * Independent review reproduced the real behaviour: over the bound, a click
+     * marked nothing, said nothing, and snapped the list back from 120 rows to
+     * 30. The adapter's own docblock promised *"the caller renders the refusal
+     * rather than assuming the write landed"*, so this arm is that promise.
+     */
     let attempts = 0;
     renderInbox(THREE_UNREAD, async () => {
       attempts += 1;
-      throw new Error('invalid_ids');
+      // The route's own refusal, with the status the page distinguishes on.
+      throw new HttpError(400, 'POST /v1/me/notifications/read', { error: 'invalid_ids', max: 100 });
     });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Mark 3 read' }));
 
-    // The optimistic flip is rolled back by a reload, so the control returns —
-    // the same arm `markRead`'s own `.catch` provides, at bulk scale.
+    expect(await screen.findByText(BULK_REFUSED_COPY)).toBeInTheDocument();
+    // And it is NOT the transport sentence — the server adjudicated, and saying
+    // it could not be reached would be a different, false fact.
+    expect(screen.queryByText(BULK_UNREACHED_COPY)).toBeNull();
+    // The optimistic flip is rolled back by a reload, so the control returns.
     await waitFor(() => expect(attempts).toBe(1));
     expect(await screen.findByRole('button', { name: 'Mark 3 read' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
+  });
+
+  it('16.41 a bulk write that never reached a server says THAT instead, never a refusal', async () => {
+    renderInbox(THREE_UNREAD, async () => {
+      throw new TypeError('Failed to fetch');
+    });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Mark 3 read' }));
+
+    expect(await screen.findByText(BULK_UNREACHED_COPY)).toBeInTheDocument();
+    expect(screen.queryByText(BULK_REFUSED_COPY)).toBeNull();
+  });
+
+  it('16.41 a second attempt CLEARS the first attempt’s refusal', async () => {
+    let first = true;
+    renderInbox(THREE_UNREAD, async (ids) => {
+      if (first) {
+        first = false;
+        throw new HttpError(400, 'POST /v1/me/notifications/read', { error: 'invalid_ids', max: 100 });
+      }
+      return [...ids];
+    });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Mark 3 read' }));
+    expect(await screen.findByText(BULK_REFUSED_COPY)).toBeInTheDocument();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Mark 3 read' }));
+    // The sentence described the FIRST attempt; leaving it standing while the
+    // second succeeds would describe something that is over.
+    await waitFor(() => expect(screen.queryByText(BULK_REFUSED_COPY)).toBeNull());
   });
 });

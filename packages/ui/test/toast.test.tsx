@@ -6,10 +6,12 @@ import { Toast, TOAST_DEFAULT_DURATION_MS } from '../src/components/toast.js';
  * **16.42 — the shared toast: it dismisses itself on the ruled window, it can
  * be dismissed by hand, and its countdown yields to a person using it.**
  *
- * The product had no transient surface at all before this (swept 2026-09-20:
- * zero `toast` hits across `packages/ui/src`, `apps/web/src` and `apps/web/app`,
- * against a positive control of 80 in the prototype), so there is no existing
- * behaviour to inherit — every arm here is the first statement of one.
+ * The product had no transient surface at all before this — nothing that ships
+ * renders a transient message — so there is no existing behaviour to inherit
+ * and every arm here is the first statement of one. (⚠ A "zero `toast` hits"
+ * sweep was written here first and was FALSE: there are five, in three files,
+ * all comments about the prototype's toast, and the sweep's own comment filter
+ * ate them.)
  */
 describe('16.42 Toast', () => {
   beforeEach(() => {
@@ -138,6 +140,39 @@ describe('16.42 Toast', () => {
     // But it is always dismissible: a toast nobody can leave is worse than one
     // nobody can undo.
     expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
+  });
+
+  it('16.42 ⚠ a toast REOPENED after closing while paused STILL ARMS ITS TIMER', async () => {
+    /**
+     * **THIS IS THE CASE THE REST OF THIS FILE STRUCTURALLY COULD NOT WRITE.**
+     * Every other arm mounts a FRESH toast, and the bug independent review found
+     * was in the state BETWEEN two of them: `paused` is set by `mouseenter`, and
+     * **every way of closing this toast puts the pointer or focus inside it** —
+     * you cannot click Undo or Dismiss without hovering the card. A removed node
+     * fires no `mouseleave`, so `paused` stayed true, the effect's early return
+     * never reached `setTimeout`, and **every toast after the first never
+     * dismissed itself** — the owner-ruled 15 s dead from the second action on.
+     *
+     * So this arm keeps ONE toast mounted across a close and a reopen, which is
+     * what the page does and what no other case did.
+     */
+    const onDismiss = vi.fn();
+    const view = render(<Toast open message="3 notifications marked read" onDismiss={onDismiss} />);
+    // The pointer enters, as it must to click anything in the card…
+    act(() => {
+      view.container.querySelector('.gn-toast')!.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    });
+    // …and the toast closes with the pointer still inside.
+    view.rerender(<Toast open={false} message="3 notifications marked read" onDismiss={onDismiss} />);
+    expect(onDismiss).not.toHaveBeenCalled();
+
+    // A second action opens it again.
+    view.rerender(<Toast open message="3 notifications marked read" onDismiss={onDismiss} />);
+    act(() => {
+      vi.advanceTimersByTime(TOAST_DEFAULT_DURATION_MS);
+    });
+    // WITHOUT the fix this is 0, and the toast sits on screen forever.
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
   it('16.42 the whole message is rendered — no truncation of a refusal reason', () => {
