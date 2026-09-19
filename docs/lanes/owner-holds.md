@@ -16,26 +16,41 @@ revisit them."*
 
 ## Held
 
-### 1. The wire-gap screens — **PARTLY LIFTED 2026-09-19.** Read the per-row status.
+### 1. The wire-gap screens — **ALL SEVEN LIFTED, 2026-09-19 LATE.** Nothing here is held any more.
 
 Seven screens from the 2026-09-18 prototype delta audit whose prototype controls have no server
 behind them. Each is server + mapper work, i.e. the most expensive category in the queue.
 
-**The owner answered all seven, row by row, on 2026-09-19.** **Four rows are now LIFTED and three remain
-HELD — do not dispatch a `HELD` row, and do not treat a lifted row as licence for a held one.**
+**THIS SECTION DISAGREED WITH ITSELF UNTIL 2026-09-19 ~15:5x IST, AND WITH THE RULINGS BLOCK — recorded
+rather than tidied away, because the disagreement is the reason a whole tranche sat still.** Its intro
+said *"Four rows are now LIFTED and three remain HELD"* while its own table showed one lifted, one
+split and five held; and **`docs/lanes/controller-state.md`'s rulings block (item 6) had already
+recorded the owner saying the other five were no longer held.** The table above the disagreement was
+never updated from the owner's later sitting. **The owner resolved it directly on 2026-09-19 late,
+shown the five screens running: _lift all 5 and queue them up_.** That is the authority for every
+`LIFTED` in the table below.
 
 | Screen | What is missing | status |
 |---|---|---|
-| `isInbox` | the filter and the bulk actions | **HELD** |
-| `isTypes` | reorder and per-type counts | **LIFTED 2026-09-19 — both halves approved** |
-| `isWorkflows` | a badge and a second action | **SPLIT: the badge is DROPPED (not held, not to be built); the second action is LIFTED with version history (§9.1) as ONE decision** |
-| `isMcpTokens` | row names (the issue-token flow itself is separately ruled out) | **HELD** |
-| `isInvite` | three read fields | **HELD** |
-| `isMcpAuth` | scopes, client, and the deny route | **HELD** |
-| `isWorkspace` | project description, chips, delete | **HELD** |
+| `isInbox` | the filter and the bulk actions | **LIFTED 2026-09-19 late — owner: "lift all 5 and queue them up"** |
+| `isTypes` | reorder and per-type counts | **LIFTED 2026-09-19 — both halves approved, and both BUILT (Tasks 6/7 `#505`, Task 8 `#513`)** |
+| `isWorkflows` | a badge and a second action | **SPLIT: the badge is DROPPED (not held, not to be built); the second action is LIFTED with version history (§9.1) as ONE decision — BUILT (`#506`)** |
+| `isMcpTokens` | row names (the issue-token flow itself is separately ruled out) | **LIFTED 2026-09-19 late — owner: "lift all 5 and queue them up"** |
+| `isInvite` | three read fields | **LIFTED 2026-09-19 late — owner: "lift all 5 and queue them up"** |
+| `isMcpAuth` | scopes, client, and the deny route | **LIFTED 2026-09-19 late — owner: "lift all 5 and queue them up"** |
+| `isWorkspace` | project description, chips, delete | **LIFTED 2026-09-19 late — owner: "lift all 5 and queue them up"** |
 
-**The rule this section was written for still stands for the three HELD rows**: the owner picked them
-individually, so do not generalise from the lifted ones.
+**The old rule that stood here — *"the owner picked them individually, so do not generalise from the
+lifted ones"* — is DISCHARGED, and it is kept only as the record of why the five sat still.** It was
+written when the lifting was per-row. **The owner has now lifted the remainder as a group, by name, so
+there is nothing left to generalise FROM.** What still binds is the per-screen scope: **`isMcpTokens`
+excludes the issue-token flow (separately ruled out), and `isWorkflows`' badge is DROPPED, not
+deferred.** A lifted row is a licence to build **that row's column and nothing beside it.**
+
+**A lift is not a door.** These are server + mapper changes, and this repo refuses both "a second door
+to one thing" and a widened route that answers a different question — **so each screen's dispatch
+requires the DOOR to be measured and, where it is a new route, a migration, or destructive surface,
+RULED before it is built.** The lift removes the hold; it does not pre-approve an interface.
 
 #### The 2026-09-19 rulings, verbatim, and what each means
 
@@ -53,16 +68,26 @@ decides whether a custom field can hold a file. **Recorded as a deliberate absen
 `packages/domain/src/ticket-types.ts`'s docblock and in the ticket-type editor's — a reader comparing the two
 must find the reason, not a silence.
 
-### 2. `McpAuthorize` and `McpTokens` — HELD (owner, 2026-09-18)
+### 2. `McpAuthorize` and `McpTokens` — ~~HELD (owner, 2026-09-18)~~ **LIFTED 2026-09-19 late**
 
 The last two screens of `hig-per-screen/10`, both wire-gap by the same audit. This is why that ledger
-row cannot close: Help, Legal and NotFound all ship, and these two do not. Same hold as §1.
+row could not close: Help, Legal and NotFound all ship, and these two did not. Same hold as §1 —
+**and it is lifted with §1's, by the same words** (*"lift all 5 and queue them up"*, the owner shown
+both screens running). **The `hig-per-screen/10` ledger row is now blocked only by the work, not by a
+hold** — `isMcpTokens`' row names still need a naming door and a migration, which is a door ruling and
+not part of the lift.
 
-### 3. The legal copy placeholders — HELD (owner, 2026-09-18)
+### 3. The legal copy placeholders — ~~HELD (owner, 2026-09-18)~~ **A DECIDED STATE, 2026-09-19**
 
 `/privacy` and `/terms` ship with bracketed placeholder text where the real legal wording goes. Step
-2c-2 (#428) ported the chrome and deliberately left the copy untouched. This is a content gap only the
-owner can close; the owner's instruction was **"9 - hold these for now."**
+2c-2 (#428) ported the chrome and deliberately left the copy untouched. The owner's 2026-09-18
+instruction was **"9 - hold these for now."**
+
+**This is no longer a hold. On 2026-09-19 the owner closed it as a decision: _"leave the legal copies as
+is."_** The distinction matters and is the reason the original sentence is kept above rather than
+struck: **a hold is work waiting on an owner; a decided state is a settled product position.** Nothing
+here is outstanding, nothing is owed, and **no future session should surface it as blocked or as a gap
+to close.** The placeholders stay, deliberately, and the code comments that explain them stay with them.
 
 ### 4. The contrast debts — HELD (owner, 2026-09-18)
 
@@ -180,7 +205,16 @@ ruling and stays `todo`.
 The owner answered **all seven** questions the controller put by name, in one message. **Six are recorded
 above** (§1's table and the `Attachment` ruling). The seventh is not a hold and is recorded here:
 
-### `test-cases/13-deployment-dogfooding.md` is to be **SPLIT** — **yes** (2026-09-19)
+### `test-cases/13-deployment-dogfooding.md` is to be **SPLIT** — **yes** (2026-09-19) — ✅ **LANDED**
+
+> **DONE, and this section described it as outstanding for ~17 hours.** The split landed at **`8d144483`**
+> (2026-09-19 01:18:44 IST, *"The catalogue's §13 bucket is one index and eleven part-files, not one
+> file"*). `13-deployment-dogfooding.md` is now a **145-line index** over **eleven part-files**, with a
+> **shift map** re-pointing all seven line-precise citations; **no id was renumbered and exactly one of
+> 12,638 moved lines differs** (a citation re-point, forced by the move). Both readers were updated and
+> the counts are reconciled — `check-case-ids.mjs` reports **23 files scanned, 2406 unique ids, union ==
+> sum**. **The shape chosen was per-section, not per-task.** Everything below is kept as the ruling's own
+> record of what was required; **do not re-do it.**
 
 **The measured need:** that single file was touched by **104 commits today** across 71 merges, and it
 conflicted on essentially every merge *pair* — including both merges the controller made in the final
