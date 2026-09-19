@@ -46,6 +46,10 @@ function ticketRead(overrides: Partial<TicketRead> = {}): TicketRead {
     }),
     title: 'File the GST return',
     stateProvenance: claim(),
+    // Never assigned unless a case overrides it — `null` is the whole truth for
+    // "nobody is assigned" (`read/assigned-provenance.ts`), and a case that wants
+    // an assignment claim passes one through `overrides`.
+    assignedProvenance: null,
     parent: { kind: 'ticket', id: PARENT, title: 'Registrations' },
     rollup: null,
     ...overrides,
@@ -1139,5 +1143,117 @@ describe('TicketSheet — Close, Reopen and the badge (backlog/closed spec §5.3
     expect(screen.queryByText(/close-requires-terminal/)).toBeNull();
     expect(document.querySelector('.gn-refusal--server')).toBeNull();
     await waitFor(() => expect(closeButton).toBeEnabled());
+  });
+});
+
+/**
+ * **13.964 — the Assignee row is EDITABLE, on the door that already exists.**
+ *
+ * The owner's ruling: *"assignee should not be read only."* It is a surface on a
+ * plane already wired end to end — `ticket.assigned` is projected, read, fanned
+ * out, synced and already written by the MCP `assign_ticket` tool — so this case
+ * asserts the SHEET's half and nothing about a route: **no new door is added and
+ * the submission goes through the ordinary `dataSource.ingest`.**
+ *
+ * ## Three arms, and each is the one that would otherwise pass for the others
+ *
+ * 1. **The candidate list already existed.** The dispatch priced this as *"a
+ *    picker needs a roster, which is a SEVENTH thing to pass"*; the sheet has
+ *    read the roster itself all along, for `nameOf` and for `VisibilityEditor`.
+ *    The listbox assertion is what says so.
+ * 2. **Unassigning is the SAME event carrying `null`** — there is no
+ *    `ticket.unassigned` type (`read/assigned-provenance.ts` enumerates the event
+ *    set from the reducer rather than guessing a second one). A picker with no
+ *    way back to unassigned cannot express a state the ledger allows, so the
+ *    Unassigned option is asserted by the payload it produces.
+ * 3. **A REFUSED roster is not an empty one.** This sheet was collapsing both
+ *    into `[]` (`members={members.data ?? []}`, with `members.error` read
+ *    nowhere), which is the value `page.tsx`'s own docblock names as the defect:
+ *    *"never `[]`, which would claim this workspace has no members."* Over a
+ *    refused roster an empty picker asserts that nobody can be assigned.
+ */
+describe('13.964 the Assignee row is editable, and a refused roster is not an empty one', () => {
+  async function openAssigneeList(): Promise<HTMLElement> {
+    const row = screen.getByTestId('field-assignee');
+    await userEvent.click(within(row).getByRole('button'));
+    return screen.findByRole('listbox');
+  }
+
+  it('offers the roster the sheet ALREADY reads, plus an explicit Unassigned', async () => {
+    renderSheet(ticketRead());
+    await settled();
+    const row = screen.getByTestId('field-assignee');
+    // The control STATES the current value rather than showing a placeholder —
+    // the same rule the members page's role control settled (`select.tsx:255`
+    // renders the placeholder when the value matches no option).
+    expect(within(row).getByRole('button')).toHaveTextContent('Anselma Marak');
+    const listbox = await openAssigneeList();
+    expect(within(listbox).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Unassigned',
+      'Kiro',
+      'Anselma Marak',
+    ]);
+  });
+
+  it('submits `ticket.assigned` with the chosen id, through the ordinary ingest door', async () => {
+    const source = renderSheet(ticketRead());
+    await settled();
+    await userEvent.click(
+      within(await openAssigneeList()).getByRole('option', { name: 'Kiro' }),
+    );
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    expect(source.ingested[0]![0]).toMatchObject({
+      type: 'ticket.assigned',
+      payload: { assigneeId: 'user_kiro' },
+    });
+  });
+
+  it('UNASSIGNING is the same event carrying `null`, not a second path', async () => {
+    const source = renderSheet(ticketRead());
+    await settled();
+    await userEvent.click(
+      within(await openAssigneeList()).getByRole('option', { name: 'Unassigned' }),
+    );
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    // `toEqual` and not `toMatchObject`: the payload must be EXACTLY this, so a
+    // control that sent `{assigneeId: ''}` or dropped the key would be a
+    // different event and would fail here.
+    expect(source.ingested[0]![0]!.payload).toEqual({ assigneeId: null });
+  });
+
+  it('a REFUSED roster renders a refusal, never an empty list that claims nobody can be assigned', async () => {
+    const read = ticketRead();
+    const refused = createFakeDataSource({
+      getTicket: async () => read,
+      getWorkflowDef: async () => WF_ERRAND,
+      getMembers: async () => {
+        throw new Error('the roster door refused this caller');
+      },
+      getTicketHistory: async () => [],
+    });
+    renderSheet(read, refused);
+    await settled();
+    const row = screen.getByTestId('field-assignee');
+    // NO control at all — and the absence is the assertion, because a picker
+    // holding only "Unassigned" would be a control that lies about the world.
+    expect(within(row).queryByRole('button')).toBeNull();
+    expect(within(row).getByText(/roster could not be loaded/i)).toBeInTheDocument();
+  });
+
+  it('names who assigned the ticket, in the sibling rows’ own shape', async () => {
+    renderSheet(
+      ticketRead({
+        assignedProvenance: {
+          actorId: 'user_kiro',
+          actorName: 'Kiro',
+          clientTime: '2026-08-19T09:58:12.000Z',
+          serverTime: '2026-08-19T10:00:00.000Z',
+        },
+      }),
+    );
+    await settled();
+    expect(
+      within(screen.getByTestId('field-assignee')).getByText('set by Kiro on 19 Aug 2026'),
+    ).toBeInTheDocument();
   });
 });

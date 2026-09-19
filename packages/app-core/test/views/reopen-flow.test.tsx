@@ -90,6 +90,9 @@ const PARENT_READ: TicketRead = {
   ticket: parentState({ stateId: 'done', stateCategory: 'terminal' }),
   title: 'Registrations',
   stateProvenance: claim(),
+  // This fixture's ticket has never been assigned, so there is no claim
+  // behind an assignee: `null` is the whole truth (`read/assigned-provenance.ts`).
+  assignedProvenance: null,
   parent: null,
   rollup: null,
 };
@@ -108,6 +111,9 @@ const CLOSED_PARENT_READ: TicketRead = {
   }),
   title: 'Registrations',
   stateProvenance: claim(),
+  // This fixture's ticket has never been assigned, so there is no claim
+  // behind an assignee: `null` is the whole truth (`read/assigned-provenance.ts`).
+  assignedProvenance: null,
   parent: null,
   rollup: null,
 };

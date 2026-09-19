@@ -3,6 +3,7 @@ import type { TicketRollup, TicketState } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { getTicketStateFromDb } from '../projections/tickets.js';
 import { stateProvenanceFor } from '../read/state-provenance.js';
+import { assignedProvenanceFor } from '../read/assigned-provenance.js';
 import { canSee } from '../visibility/can-see.js';
 import { rollupFor, type RollupView } from '../visibility/rollup.js';
 import { listVisibleTickets } from '../visibility/visible-tickets.js';
@@ -420,11 +421,41 @@ export function registerTicketRoutes(
         );
       }
 
+      /**
+       * WHO ASSIGNED THIS TICKET, and when — the SAME reader the list already
+       * uses (`read/assigned-provenance.ts`, batched by the same `DISTINCT ON`
+       * shape as `stateProvenanceFor` directly above), called here because the
+       * ticket SHEET can now edit the assignee and an edited field that does not
+       * say who set it is the one row on that sheet which cannot be trusted.
+       *
+       * **This widening is deliberate and it is NOT a second door:** it is one
+       * more call to an existing reader, on the existing route, beside the
+       * existing call — the list route has served this field on every card since
+       * it existed (`read-models.ts`'s `TicketCard.assignedProvenance`), and the
+       * single read was the one place it did not.
+       *
+       * The two absences the reader leaves to its CALLER (see its docblock) are
+       * answered the way `assembleListCards` answers them, so the two reads
+       * cannot disagree: an unassigned ticket answers `null` — which is the
+       * whole truth for "nobody is assigned, and nobody ever was" AND for "the
+       * last claim was a `null` unassignment" — while an assignee with NO
+       * `ticket.assigned` behind it is a projection/ledger disagreement and
+       * throws rather than serving an unattributed assignment.
+       */
+      const assigned = await assignedProvenanceFor(deps.pool, [ticketId]);
+      const assignedProvenance = assigned.get(ticketId) ?? null;
+      if (state.assigneeId !== null && assignedProvenance === null) {
+        throw new Error(
+          `readTicket: ticket ${ticketId} carries assignee ${state.assigneeId} with no ticket.assigned behind it — proj_tickets and the ledger disagree`,
+        );
+      }
+
       return {
         ticket: toTicketView(ticket),
         ticketState: state,
         title: titleOf(state),
         stateProvenance,
+        assignedProvenance,
         parent,
         rollup,
       };

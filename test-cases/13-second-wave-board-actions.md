@@ -1851,3 +1851,74 @@ constant. 13.722 pins the match with a negative control for exactly that reason.
   print the 26-character id and satisfy a `toContain('Auto-close')`-shaped check only by accident of
   the constant's own `SYS0AC` tail.
 
+
+## The Assignee row becomes editable, on the door that already exists (executor 2, 2026-09-19) — cases `13.962`–`13.964`
+
+**The owner's ruling, verbatim:** *"assignee should not be read only."* The controller's reconnaissance read it
+as **SERVER EXISTS → SURFACE**, and that is what it turned out to be — with one correction to the dispatch's
+own cost model, below.
+
+**Id block `13.962`–`13.964`**, minted on the tip instruction and deliberately skipping **`13.961`, which the
+open sheet-motion PR holds**, and `13.958`–`13.960`, which `#525` owns. Swept with a control in the same
+invocation (`13.955`=5; `13.962`–`13.964` = 0 before these cases were written). **Veto if a block was
+allocated elsewhere.**
+
+### ⚠ THE DISPATCH'S HARD HALF RESTED ON A PREMISE THAT IS FALSE
+
+The dispatch priced this task as *"the web mounts `TicketSheet` … with six props and NONE of the four optional
+ones … **A picker needs a roster, which is a SEVENTH thing to pass**"*. **Measured: there is no seventh thing
+to pass.** `ticket-sheet.tsx` **already reads the roster itself** — `useLiveQuery(dataSource, workspaceId,
+workspaceId, () => dataSource.query.getMembers(workspaceId))` — and already uses it for `nameOf` and for
+`VisibilityEditor`. The candidate list was in the component before this task; nothing new is passed and
+nothing new is read.
+
+### ⚠ AND THE SHEET WAS HANDLING AN ABSENT ROSTER THE WAY THIS REPO'S OWN RULE FORBIDS
+
+`members={members.data ?? []}` collapsed **refused** and **not-yet-loaded** into `[]`, and `members.error`
+was read **nowhere** in the file. That is precisely the value `page.tsx`'s own docblock names as the defect:
+*"`null` while the roster has not been read — **never `[]`, which would claim this workspace has no
+members**"*. An assignee picker offering an empty list over a REFUSED roster asserts that nobody can be
+assigned, which is a worse lie than a filter's. **The new control tells the three apart**, and a fourth arm
+with them.
+
+### The cases
+
+- ✅ **13.962 — the single read serves the assignee's PROVENANCE.** `apps/server/test/routes/tickets-read.test.ts`.
+  **A WIDENING, NOT A SECOND DOOR:** one more call to the reader the list already uses
+  (`read/assigned-provenance.ts`), batched by the same `DISTINCT ON` shape as the `stateProvenanceFor` call on
+  the line above it, on the route that already answers `stateProvenance`. **No route is added**, and the
+  dispatch's own prohibition (*"if you find yourself adding a route, stop and ask"*) is not reached. The case
+  asserts the claim's actor and serverTime for an assigned ticket **and, as the control, that an unassigned
+  ticket answers `null`** — without which a route answering `null` for everything would pass.
+  **Mutation-witnessed:** deleting the field from the response reddens it.
+- ✅ **13.963 — `mapTicketRead` carries it, and REFUSES a body that omits the key.**
+  `packages/app-core/test/online/mappers.test.ts`. **Absent is not `null`, and the two arms are the case:**
+  `null` is a real answer (nobody is assigned, and the server's reader establishes there is no claim to carry
+  — there is no such thing as a claim with no actor), while an ABSENT key is a body this client cannot read,
+  because the route always emits it. Mapping that to `null` would turn a malformed payload into "nobody is
+  assigned". **Mutation-witnessed:** dropping the mapping reddens it.
+- ✅ **13.964 — the row is editable, and a refused roster is not an empty one.**
+  `packages/app-core/test/views/ticket-sheet.test.tsx`. Four arms, each of which would otherwise pass for
+  another: the roster the sheet **already reads** plus an explicit `Unassigned`; the submission going through
+  the ordinary `dataSource.ingest` as `ticket.assigned`; **unassigning as the SAME event carrying `null`**
+  (there is no `ticket.unassigned` — the reader enumerates the event set from the reducer rather than guessing
+  a second type), asserted with `toEqual` so `{assigneeId: ''}` or a dropped key would fail; and a **refused
+  roster rendering a refusal with NO control at all**, because a picker holding only `Unassigned` is a control
+  that lies about the world. A fourth arm — not a case, a branch — covers an assignee **not in the roster you
+  can see** (the read hides guests from a non-admin): the row says the name it can and offers no control,
+  following the rule the members page's role control settled, that **a control must be able to STATE its
+  current value** (`select.tsx:255` renders the placeholder otherwise).
+  **Mutation-witnessed twice:** `submitAssignee` never ingesting reddens it, and collapsing a refused roster
+  back into `[]` — the sheet's own old behaviour — reddens it too.
+
+### What is NOT covered, named rather than implied
+
+- **No browser run for this change.** Every arm above is reachable in jsdom, and the control's accessible
+  behaviour is the shared `Select`'s, already covered by its own cases; nothing here claims a rendered-truth
+  reading it did not take.
+- **The refuse-and-render path is not driven end to end from this control.** The sheet's existing position is
+  that the ingest door is the authority and its words are rendered verbatim; this control follows that
+  (`submitAssignee` carries `refused`/`invalid` through the same `serverRefusal` the siblings use), but no
+  case here makes the server refuse a `ticket.assigned`.
+- **`fields-editor`-style per-field authority is not consulted** — deliberately: gating the control
+  client-side would leave a door refusal unreachable and therefore unrendered.

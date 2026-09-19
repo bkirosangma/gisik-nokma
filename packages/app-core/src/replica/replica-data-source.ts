@@ -1042,7 +1042,18 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
               // ticket itself.
               { kind: 'restricted', id: state.parentId };
       }
-      return { ticket: state, title: titleOf(state), stateProvenance: claims.state, parent, rollup: null };
+      // `claims.assigned` is the SAME field the local list already serves on every
+      // card (`:763`), so the two reads cannot disagree about who assigned a
+      // ticket — which is the property the online pair gets from calling one
+      // reader twice.
+      return {
+        ticket: state,
+        title: titleOf(state),
+        stateProvenance: claims.state,
+        assignedProvenance: claims.assigned,
+        parent,
+        rollup: null,
+      };
     },
 
     async getTicketHistory(ticketId: string, afterSeq?: number, limit?: number): Promise<TicketHistoryEvent[]> {

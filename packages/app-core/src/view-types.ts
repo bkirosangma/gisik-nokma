@@ -312,6 +312,25 @@ export type TicketRead = {
   ticket: TicketState;
   title: string;
   stateProvenance: ClaimProvenance;
+  /**
+   * Who assigned the ticket, and when — the claim behind `ticket.assigneeId`,
+   * or `null` when nobody is assigned.
+   *
+   * **The SAME field `ListCard` has carried since the list existed** (`:257`),
+   * and it reached this read only when the sheet gained an editable assignee:
+   * an edited field that does not say who set it is the one row on that sheet
+   * which cannot be trusted, and every sibling row there already carries its
+   * own `set by {actor} on {date}`.
+   *
+   * `null` is the whole truth for TWO different situations and they are not
+   * telling-apart-able here, deliberately and by the server's own decision
+   * (`read/assigned-provenance.ts`): never assigned, and assigned-then-cleared
+   * by a `ticket.assigned` carrying `null`. Both leave `assigneeId === null`,
+   * and a claim with no actor does not exist — so there is nothing to hang the
+   * second on. The claim itself survives in the ledger and in this sheet's own
+   * history tab.
+   */
+  assignedProvenance: ClaimProvenance | null;
   parent: ParentRef;
   rollup: RollupToViewer | null;
 };

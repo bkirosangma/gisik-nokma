@@ -1833,6 +1833,13 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     closed: unknown = null,
     rank: unknown = null,
     reopenedAt: unknown = null,
+    /**
+     * Who assigned the ticket, or `null` — and `null` is the DEFAULT because the
+     * route always emits the key and answers `null` for an unassigned ticket
+     * (`read/assigned-provenance.ts`: there is no claim without an actor). A case
+     * that wants an assignment claim passes one.
+     */
+    assignedProvenance: unknown = null,
   ): Record<string, unknown> {
     return {
       // The `proj_visibility` row the route still serves. The client reads
@@ -1889,6 +1896,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
         serverTime: '2026-08-19T10:00:00.000Z',
         cause: null,
       },
+      assignedProvenance,
       parent,
       rollup,
     };
@@ -2155,5 +2163,84 @@ describe('13.715 mapWorkspaceSettings — the workspace settings read', () => {
         roster,
       ),
     ).toThrow(MappingError);
+  });
+});
+
+/**
+ * **13.963 — `mapTicketRead` carries the assignment's provenance, and REFUSES a
+ * body that omits it.**
+ *
+ * The single-ticket read gained `assignedProvenance` when the sheet's assignee
+ * became editable: an edited field that does not say who set it is the one row on
+ * that sheet which cannot be trusted, and `read/assigned-provenance.ts` exists to
+ * answer exactly that. The list has served the same field on every card since it
+ * existed (`TicketCard.assignedProvenance`); the single read was the one place it
+ * did not, which is why the sheet had no claim to render.
+ *
+ * **ABSENT is not `null`, and the two arms below are the whole case.** `null` is
+ * a real answer — nobody is assigned, and the server's own reader establishes
+ * that there is no claim to carry (`read/assigned-provenance.ts`: there is no such
+ * thing as a claim with no actor). An ABSENT key is a body this client cannot
+ * read, because the route always emits it; mapping that to `null` would turn a
+ * malformed payload into "nobody is assigned".
+ */
+describe('13.963 mapTicketRead carries assignedProvenance, and refuses a body without it', () => {
+  const claim = {
+    actorId: ANSELMA,
+    clientTime: '2026-08-19T09:58:12.000Z',
+    serverTime: '2026-08-19T10:00:00.000Z',
+    cause: null,
+  };
+
+  /** The route's body, complete: the same shape `ticketReadBody` builds above. */
+  function body(assignedProvenance: unknown): Record<string, unknown> {
+    return {
+      ticket: { ticket_id: '01J9GTKA000000000000000000', own_mode: 'inherit', seq: 4 },
+      ticketState: {
+        kind: 'ticket',
+        id: '01J9GTKA000000000000000000',
+        workspaceId: '01J9GWS0000000000000000000',
+        projectId: '01J9GPRJ000000000000000000',
+        typeId: 'task',
+        parentId: 'parent-1',
+        workflowId: 'wf-errand',
+        workflowVersion: 2,
+        stateId: 'doing',
+        stateCategory: 'active',
+        assigneeId: ANSELMA,
+        collaboratorIds: [BIREN],
+        fields: {},
+        transitions: [],
+        closed: null,
+        rank: null,
+        reopenedAt: null,
+      },
+      title: 'File the GST return',
+      stateProvenance: claim,
+      assignedProvenance,
+      parent: null,
+      rollup: null,
+    };
+  }
+
+  it('carries the claim the server sent, with the actor resolved through the roster', () => {
+    const mapped = mapTicketRead(body(claim), new Map([[ANSELMA, 'Anselma Marak']]));
+    expect(mapped.assignedProvenance?.actorId).toBe(ANSELMA);
+    expect(mapped.assignedProvenance?.actorName).toBe('Anselma Marak');
+    expect(mapped.assignedProvenance?.serverTime).toBe('2026-08-19T10:00:00.000Z');
+  });
+
+  it('answers `null` for the wire`s null — nobody is assigned — rather than throwing', () => {
+    // The positive control for the refusal below runs FIRST and through the SAME
+    // path: this body differs only in this one key, so a throw there cannot be
+    // about the fixture.
+    expect(mapTicketRead(body(null)).assignedProvenance).toBeNull();
+  });
+
+  it('REFUSES a body that OMITS the key — absent is not the same answer as null', () => {
+    const omitted = body(null);
+    delete omitted['assignedProvenance'];
+    expect(() => mapTicketRead(omitted)).toThrow(/ticket\.assignedProvenance: expected an object/);
+    expect(() => mapTicketRead(omitted)).toThrow(MappingError);
   });
 });
