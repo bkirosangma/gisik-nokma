@@ -173,3 +173,59 @@ describe('3.122 the invite page — a refused acceptance', () => {
     expect(alert.textContent?.trim()).not.toBe('');
   });
 });
+
+/**
+ * 16.44 — the token page names NO inviter, and that is half of the ruling.
+ *
+ * `owner-holds.md:74` rules the inviter's identity **BUILD — name + role,
+ * AUTHENTICATED ONLY** … **NEVER on the session-less token page.** Both halves
+ * are real, and they are about different surfaces:
+ *
+ * - **The authenticated half is BUILT** — `/workspaces`' invitation banner,
+ *   `#400` (`d3d0abdd`), which renders the prototype's own sentence
+ *   (`desktop.dc.html:216` — *"Anjali invited you to Garo Hills Logistics as a
+ *   member."*) and is asserted verbatim at
+ *   `workspaces-invitation-banner.test.tsx:176`. **Nothing is owed there.**
+ * - **This file's half is the ABSENCE**, and nothing pinned it: the whole file
+ *   did not contain the word "inviter" until this case existed.
+ *
+ * ## The fixture carries an inviter ON PURPOSE, because otherwise this cannot fail
+ *
+ * A summary with no inviter field would make the assertion below unfalsifiable —
+ * a page that rendered `summary.invitedByName` would pass anyway, because the
+ * fixture never supplied one. **So the fixture supplies a field the CONTRACT does
+ * not carry** (`InviteSummary` is `{workspaceId, workspaceName, role}`) and the
+ * case asserts it stays off the screen: *the reading that must not appear is
+ * present in the input.* A future implementer who wants to show it must first add
+ * it to the type — at which point this fixture already carries it and this case
+ * goes red, which is the point.
+ *
+ * ## And the SIGNED-IN branch is the one that matters
+ *
+ * A visitor holding a session is exactly the reader an implementer would
+ * reasonably decide is entitled to know who asked; the ruling says no
+ * regardless, because this page's audience is **whoever holds the URL**, which
+ * the server's own docblock records *"may have been forwarded"*. Asserting the
+ * absence on the branch that was most likely to leak it is what makes adding the
+ * inviter later a DECISION rather than a drift.
+ */
+describe('16.44 the token page names no inviter, in any branch', () => {
+  const WITH_INVITER = { ...SUMMARY, invitedByName: 'Rukhang' } as unknown as typeof SUMMARY;
+
+  it('16.44 a SIGNED-IN visitor sees the workspace and the role, and no inviter', async () => {
+    session = { isPending: false, data: { user: { id: '01J9USER000000000000000000', name: 'Kiro' } } };
+    mount({ getInvite: async () => WITH_INVITER });
+    expect(await screen.findByText(/invited to join/)).toBeInTheDocument();
+    // The JOIN button is the proof that this is the signed-in branch, so the
+    // absence below is asserted against the reader most likely to be shown it.
+    expect(screen.getByRole('button', { name: /^Join / })).toBeInTheDocument();
+    expect(screen.queryByText(/Rukhang/)).toBeNull();
+  });
+
+  it('16.44 a SIGNED-OUT visitor gets no inviter either', async () => {
+    session = { isPending: false };
+    mount({ getInvite: async () => WITH_INVITER });
+    expect(await screen.findByText(/invited to join/)).toBeInTheDocument();
+    expect(screen.queryByText(/Rukhang/)).toBeNull();
+  });
+});
