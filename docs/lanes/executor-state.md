@@ -41,6 +41,91 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~10:1x IST. **THE FALSIFIED-CLAIM SWEEP IS BUILT, PROVEN
+> # COMMENTS-ONLY, AND GATED GREEN.** Branch **`exec/falsified-claim-sweep`**, cut from
+> # `origin/main` = **`3f37ffc4`** (the `#578` merge). **The CODE head is `95470afb`** — the sweep commit,
+> # which pushed before this one. An earlier draft of this block read *"the handoff commit sits ON TOP of
+> # the code head"* while the two were still one commit, and the split was made so that the sentence is
+> # true: a commit cannot name its own sha, so the block names the head beneath it, which is the reading
+> # that survives a restart.
+>
+> ## THE DISPATCH, AND THE ONE THING IT GOT WRONG IN MY FAVOUR
+> The controller sent me to `apps/web/src/ticket-location.ts:26` — a docblock asserting
+> `DataSource.getTicket` **refuses** — false since ruling P25 clause 1 (`c86c4b5c`, 2026-09-06) served its
+> three absences, which `#537` had swept past. The dispatch's rule was the whole task: **the sweep's
+> universe must not be the files I had already opened.**
+>
+> ## THE UNIVERSE, DEFINED BEFORE I LOOKED (frozen to `/tmp/falsified-sweep-universe.txt` first)
+> Tokens `getTicket` / `getTickets` / `mapTicketRead` / `ServingGapError` across `apps/ packages/ scripts/
+> docs/ test-cases/`, excluding `node_modules`, `dist`, `.next`. **162 files.** Control, same invocation:
+> `getTicket` lines — **1090** whole-universe, **751** code-only. **The controller's 747 is the code-only
+> figure; the disagreement was SCOPE, reconciled by decomposition, not a swallowed query.**
+>
+> **⚠ THE DISPATCH'S ROOT LIST HAD A HOLE, AND IT IS WHERE THE BEST CARRIERS WERE.** `Features.md` lives at
+> the **repo root**, which the list (`apps/ packages/ scripts/ docs/ test-cases/`) omits. It carries
+> **5 falsified claims**. I swept the root separately (`CLAUDE.md`, `Features.md`, `README.md` — 23 token
+> hits) and folded them in. **A universe is not a pattern, and neither is a root list.**
+>
+> ## A SILENT-EMPTY MODE FIRED FIRST — the reason the control exists
+> My per-root loop used `command rg`, which **returned 0 for every root**. There is no real ripgrep binary
+> here, only a shell **function** wrapper; `command rg` is a silent no-op. It would have read as "no
+> carriers anywhere". The same query through the wrapper and through `grep -r` agrees. **(A control that
+> traverses the same path is not optional.)**
+>
+> ## WHAT I FOUND: TWO CLASSES, NOT ONE
+> **Class 1 — a read asserted to REFUSE that answers.** `getTicket`, `getTickets`, and (undispatched)
+> `getMyWork`. The dispatch named one; there were **six more in source/test docblocks and five in
+> `Features.md`**.
+> **Class 2 — the COUNT of refusing methods, in the same sentences.** The register went 6 → 4 (P25 clause
+> 1) → 3 (P32/P38) → 1 (P39/P40) → **0** when `search` was served on 2026-09-19 (`42fb2f2c`).
+> **MEASURED AT THIS SHA: `Object.keys(SERVING_GAPS)` is EMPTY** (`mappers.ts:2179`), pinned green by 3.39.
+> So *"FOUR of the THIRTEEN query methods REFUSE, and that is the design"* — the canonical docblock of
+> `online-data-source.ts` — was itself false, along with every "one of the six serving gaps".
+>
+> **Consequences recorded, not fixed (named owners, per the rule):** `refuse()` in `stub-services.ts` now
+> has **NO callers** and throws for every method; `expectStillUnserved` in `client-contract.test.ts` is
+> **defined and callerless**. Both are dead instruments that were correct while they mattered.
+>
+> ## SCOPE — measured, and the left-ones are named
+> | | |
+> |---|---|
+> | files changed | **22** (`git diff --name-only \| wc -l`) |
+> | hunks / edit sites | **40** (31 code+test, 9 markdown) |
+> | diffstat | **+250 / −137** — measured, never remembered |
+> | **PROVEN comments-only** | esbuild `--minify` (strips comments) over HEAD and worktree: **18/18 files byte-identical**, two controls in the same run (a code change is caught; a comment-only change reads identical) |
+>
+> **DELIBERATELY LEFT, and why — 4 categories:**
+> 1. **The `LIST_PAGE_CAP` refusal is REAL and current** (`online-data-source.ts:247`, `ticket-list.tsx:98`,
+>    `app/…/p/[projectId]/page.tsx:287`, `Features.md:82`, `:407`). **Not corrected**, and checked.
+> 2. **`FILTER_BLOCKED_ABSENCE`** (`mappers.ts:828`, `preferences-gateway.ts:78`) — a live throw. Left.
+> 3. **`docs/lanes/*` and `docs/superpowers/plans|specs/*`** — logs and superseded specs. Rewriting a log's
+>    history destroys the record the sweep's own marking convention exists to keep. Left, all of it.
+> 4. **`expectStillUnserved`'s failure-message string** — inside a callerless function, and a string literal
+>    in a test file is closer to an assertion than to a comment. Left for the controller.
+>
+> **No case id minted.** `16.83` stays free: a comment correction pins no product behaviour, per the dispatch.
+>
+> ## GATE — run at the code head, not transferred
+> `pnpm turbo run build test typecheck` → **EXIT 0 · 33/33 successful · 17 cached · 1m12.4s**, Node
+> **v22.22.2** (`pnpm exec node -v`; the `pnpm` binary resolves under a v24 nvm dir while the node it runs
+> is v22 — name the version, never the path). Server suite 154 files / 1620 passed / 5 skipped.
+> **`check:citations` EXIT 0** (ratchet holds exactly on every file) · **`check:tasks` EXIT 0** ·
+> **`check:case-ids` EXIT 0** with per-file id-line counts **SAME on both sides** (03: 125/125,
+> 07: 263/263, 12: 347/347) — the diff adds and removes no case-id line.
+> **⛔ THE FORCED GATE IS THE CONTROLLER'S.** 17 tasks were cached here; a `--force` run at the landing
+> tree is the controller's to take.
+>
+> ## ANCHORS (verify every one; a block cannot name its own sha)
+> | | |
+> |---|---|
+> | `origin/main` | **`3f37ffc4`** — the `#578` merge, `baseRefName: main`, `headRefOid 42783c53` |
+> | my branch | `exec/falsified-claim-sweep` — cut FROM `3f37ffc4`, **`--base main`** |
+> | code head | **`95470afb`** — the sweep commit; the handoff commit sits on top of it |
+> | prior branch | `exec/e2e-stack-repair` @ `42783c53` — **fully contained in `origin/main`** (`git branch -r --contains` lists it; `origin/main...HEAD` diff is empty) |
+> | falsifiers | `c86c4b5c` (P25 clause 1, 2026-09-06) · `42fb2f2c` (search served, 2026-09-19). Both REACHABLE from `origin/main` |
+> | `:3001` | **untouched.** No `docker compose` action taken; the owner's stack was not bound or taken down |
+> | next | reviewer pass runs BEFORE the PR opens; its result goes in the PR BODY |
+>
 > # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~09:0x IST. **THE `e2e-stack` REPAIR IS BUILT AND PUSHED; ITS PR
 > # HAS BEEN REVIEWED AND SENT BACK ONCE; THE FIX ROUND IS PUSHED. THE CODE HEAD IS `2e02ddac`.** Branch
 > # **`exec/e2e-stack-repair`**, cut from `origin/main` =
