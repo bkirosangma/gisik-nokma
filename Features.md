@@ -277,7 +277,7 @@ The invitation banner's restyle (flat `--gn-tint-warning` wash, no shadow, no ac
   version was built and then removed: measured in a real browser across all six theme x style
   combinations, `danger` text on `surfaceSunken` is **3.84:1** and on `surfaceRaised` **4.29:1**
   (light/`neo`), both under the 4.5 this 0.9375rem label owes, while the shared solid `Button
-  variant="danger"` pairs `dangerText on danger` at **5.38:1** and is the only one of the three that
+  variant="danger"` pairs `dangerText on danger` at **5.0511:1** and is the only one of the three that
   `CONTRAST_PAIRS` declares and gates — `danger`-as-TEXT is declared nowhere in this product. So the
   solid button stays and no class was added. **Two PRE-EXISTING findings that measurement turned up,
   named rather than rediscovered and NOT fixed here** (both are product-wide palette decisions, not

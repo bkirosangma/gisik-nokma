@@ -107,7 +107,7 @@ run's own summary line before it will report anything, which is the same rule th
 
 ---
 
-## Three contrast debts and one stale calibration, recorded as cases rather than fixed (Step 4b, 2026-09-18) — block `13.690`–`13.693`
+## Three contrast debts and one stale calibration, recorded as cases rather than fixed — one since closed (Step 4b, 2026-09-18) — block `13.690`–`13.693`
 
 Block `13.690`–`13.693`, allocated by `CTL-DISPATCH-2026-09-18-step4b-ledger-evidence.md`. Unlike every
 other block in this file these four were **`❌` by construction**: no commit performed the work, and each
@@ -166,16 +166,24 @@ diverge only in `radii`/`shadows`), so each measurement below is stated once for
   fact. **Closed 2026-09-19.** `:36-38` now reads 4.1233 / 5.0662 *on the shipped `onColorWarmLight`
   ground*, names 4.40 / 5.40 as the pure-white figures it used to carry, and `:117` carries 4.1233 and
   `#fbf7f3`. Both substitutions are LINE-NEUTRAL — `tokens.ts` is 1493 lines before and after — so no
-  citation into that file moved. The sweep this entry asked for ran and took `Features.md`'s two stale
-  clauses with it (`successText` 4.40 / 5.40 → 4.1233 / 5.0662; the pairless `brand` tile —
-  `textInverted` on it — 2.87 → **2.69**). Proof: every figure above, re-derived 2026-09-19 from the
-  shipped role→primitive map using the suite's own WCAG helpers, on an instrument calibrated against
-  eight ratios this repo had already pinned elsewhere — 4.3953, 5.4004, 4.3746, 4.2485, 4.4013, 4.876,
-  and `accentText`-on-`accent`'s recorded 5.26 / 4.93 — every one reproduced to four decimals. The moved
+  citation into that file moved. **A review then found the first sweep INCOMPLETE** — it had measured
+  `dangerText` on `danger` at **5.0511** and then left the pure-white **5.38** standing in four
+  present-tense places, which is this same defect recurring on a role this very entry names. The fix
+  round closed that and the rest it surfaced: `Features.md` (`dangerText`) and
+  `13-neomorphism-and-workspace-screens.md` (the `brand` tile, 2.87 → **2.69**, in two more copies),
+  `13-hig-per-screen.md`'s 13.281 text (4.40 / 5.40 → 4.1233 / 5.0662, plus its `4.395`),
+  `apps/web/app/globals.css`, `packages/app-core/src/account/sessions-section.tsx`, the 13.281 test
+  title and its own docblock sentence, and the two `tokens.ts` accents that quoted a bare **"5.25+"**
+  naming no ground at all (`:680`, `:1270` — now 5.26 against the then-white `accentText`, 4.93 on
+  today's warm ground). Proof: every figure above, re-derived 2026-09-19 from the shipped
+  role→primitive map using the suite's own WCAG helpers, on an instrument calibrated against eight
+  ratios this repo had already pinned elsewhere — 4.3953, 5.4004, 4.3746, 4.2485, 4.4013, 4.876, and
+  `accentText`-on-`accent`'s recorded 5.26 / 4.93 — every one reproduced to four decimals. The moved
   roles came back sound: `accentText` on `accent` **5.8139**, `dangerText` on `danger` **5.0511**,
   `warningText` on `warning` **4.8758**, `successText` on `success` **5.0662**, all against 4.5, and the
   light roster's 33 declared rows report zero failures.
-  (`packages/ui/src/tokens.ts`, `Features.md`)
+  (`packages/ui/src/tokens.ts`, `Features.md`, `apps/web/app/globals.css`,
+  `packages/app-core/src/account/sessions-section.tsx`)
 
 ---
 

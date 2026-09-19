@@ -500,7 +500,7 @@ describe('HIG adoption — the deliberate departures', () => {
    * ruled on 2026-09-08 to keep the incumbent. This asserts the ARITHMETIC
    * behind that ruling rather than the ruling itself, so the day someone
    * "completes" the palette the failure arrives as a red test naming the pair,
-   * not as a shipped 4.40.
+   * not as a shipped 4.1233.
    */
   it('keeps green700 because Apple’s increased-contrast green fails successText at 4.1233', () => {
     expect(primitives.green700).toBe('#1e7a34');
@@ -515,7 +515,7 @@ describe('HIG adoption — the deliberate departures', () => {
     // prototype's warm `onColorWarmLight` (`#fbf7f3`), which is darker than
     // `#ffffff` — so this counterfactual against Apple's green moved too
     // (4.40 → 4.12). Re-measured, not assumed; still clears "less than 4.5".
-    expect(withApple).toBeCloseTo(4.12, 1);
+    expect(withApple).toBeCloseTo(4.1233, 3);
   });
 
   /**

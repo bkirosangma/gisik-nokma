@@ -316,7 +316,7 @@ require, at zero extra cost — see `tokens.ts`'s `textAccentLight`/`textAccentD
 derivation and margins). `blue600`/`blue300` are retired in place to the new hexes (`focusRing`/
 `categoryActive` share them and are re-verified at their own 3:1 floor). A new pairless `brand` role
 (`brandOrange` `#ee7733`) fills the sign-in icon tile with the prototype's one fixed hue, exempted from a
-`CONTRAST_PAIRS` row with the measured number recorded rather than hidden (2.87 light, `textInverted` on
+`CONTRAST_PAIRS` row with the measured number recorded rather than hidden (2.69 light, `textInverted` on
 `brand` — below even 3:1, for a purely decorative `aria-hidden="true"` glyph the export itself renders the
 same way).
 
@@ -391,7 +391,7 @@ same way).
   waiver: this round adds no new sub-3:1 pairing the roster's own instrument can see (`sweepBorders` reads
   only `border-{side}-*`, and none of this round's changes touch a border). **This is narrower than "no
   new sub-3:1 pairing exists" — case 13.358 records one this instrument cannot see**: the page-header
-  icon's `textInverted`-on-`brand` measures 2.87 in light, an exempted decorative-glyph pairing with no
+  icon's `textInverted`-on-`brand` measures 2.69 in light, an exempted decorative-glyph pairing with no
   `CONTRAST_PAIRS` row and no box/border for the roster to sweep. Recorded as an open item with an owner
   (this catalogue entry), not silently absorbed into "the roster is unchanged". See the live-run note
   below for the measured roster diff.
@@ -1181,7 +1181,7 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   **(e) The per-device Sign out button stays SOLID, refusing the prototype's tint on a MEASUREMENT.**
   Measured in a real browser across all six theme x style combinations: `danger` on `surfaceSunken`
   is 3.84:1 and `danger` on `surfaceRaised` is 4.29:1 (light/`neo`), both under the 4.5 a 0.9375rem
-  label owes, against `dangerText on danger` at 5.38:1 — the only one of the three `CONTRAST_PAIRS`
+  label owes, against `dangerText on danger` at 5.0511:1 — the only one of the three `CONTRAST_PAIRS`
   declares and gates. A tinted class was written and then DELETED on that reading, which is the case
   worth recording: the prototype is the reference for shape, not an override on accessibility. The
   same sweep found TWO PRE-EXISTING failures outside this change set and left them alone —
