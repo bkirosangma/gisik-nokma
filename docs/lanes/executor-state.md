@@ -41,6 +41,62 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~19:1x IST. **DOOR A IS MERGED AND CLOSED. THIS LANE IS
+> # HOLDING, AND THE HOLD IS A RULING, NOT AN IDLE.**
+> **Door A merged as PR #545 → `origin/main` = `ed455768`** (verified with `merge-base --is-ancestor
+> d1291cf8 origin/main`, not `cat-file`). Branch `exec/workspace-description`. **Nothing in flight; no open
+> PR in this lane; worktree clean.**
+>
+> ## ⛔ WHY THIS LANE IS HOLDING — READ THIS BEFORE MINTING ANYTHING
+> **§13 IS FULL, AND THE SECTION DECISION IS WITH THE OWNER.** The controller ruled (2026-09-19) that the
+> next id after this window is a section-structure decision, with a recommendation to open **§16** rather
+> than spend §13's last ids — the next id is four digits, against a repo that already documents `13.9999`
+> as a truncation trap that has fooled a count. **The controller also refused, correctly, to reassign ids
+> between lanes: it is ZERO-SUM.** Giving door D every remaining id would leave executor 2 with none, which
+> moves which lane is stranded rather than unblocking one.
+> **Therefore: do NOT mint, do NOT borrow exec 2's block, do NOT start D, F or G.** The lane order they
+> stand in is **D (`isMcpTokens` row name) → F (subtasks) → G (Priority/Due/Type)**.
+>
+> **The verified count on this tree: `check-case-ids` = 2445, union == sum** (measured on `origin/main`'s
+> own tree, byte-identical to it — see item 4 below for why the tree matters).
+>
+> ## DOOR D IS MEASURED AND FIRST IN LINE — do not re-derive it
+> | | |
+> |---|---|
+> | the column | `mcp_tokens` is `token_hash, user_id, created_at, last_used` — **no `name`** (confirmed) |
+> | the read | `listMcpTokens` returns `{id, createdAt, lastUsedAt}` |
+> | the inserts | **ONE production path** (`mcp/token-store.ts:164`) plus a test literal (`test/mcp/require-session-pat.test.ts:115`). ⚠ The queue's row D says "both insert paths" — the conclusion holds, the count does not |
+> | the prototype | `McpTokens.dc.html:100-112` — a BOLD NAME (`Claude Desktop — Anjali`), then `gnmcp_live_9f2c…f130 · created today`, an Active pill, `Used 4 min ago`, Revoke |
+> | **prop or route?** | **NO PROP EXISTS.** There is no existing write that could carry a name, so a new owner-scoped mutating route is genuinely required — and per queue row C it is **NOT covered by the pattern-keyed `HTTP_ORIGIN_PROTECTED_ROUTES`** and must be registered there or it ships CSRF-unprotected |
+> | migration number | `1789700000000` — **verified free across BOTH lanes** (swept every remote branch: none carries a migration above `1789600000000`) |
+> | cases | **none minted** — this is the blocked resource. ~9 cases needed |
+>
+> ## ⚠ FOUR THINGS RECORDED, NONE FIXED HERE. THE FIRST TWO ARE THE CONTROLLER'S; THE LAST TWO ARE METHOD.
+> **1. `13.969` NAMES TWO CASES.** Door B's inbox filter holds it as an id line
+> (`13-settings-and-workflows.md:1381`); executor 2's rename claims it in a heading
+> (`13-neomorphism-and-workspace-screens.md:2125`) and contributes no id line. Re-verified on `origin/main`.
+> **2. Executor 2's rename doc claims *"`13.994` is the highest in use"*.** It is not — `13.994` appears
+> nowhere as an id.
+> **3. `check-case-ids` counts id LINES ONLY, and there are THREE spellings it cannot see**: a markdown
+> **table** (twelve of this lane's cases written that way left the sweep at 2433 — UNCHANGED — and `ok`);
+> a `##` **heading** with the id in prose (`13.988`, `13.969`); and a **backticked** id inside the bold —
+> `- ✅ **`13.989` — …` — which *looks* exactly like a proper id line and does not match the regex, because
+> it demands a DIGIT after the asterisks and the backtick stops it.
+> **INDEPENDENT CONFIRMATION, from the checker's own arithmetic rather than from a regex reading:** this
+> tree read **2445 before `#544` merged** and reads **2445 on `origin/main` after** — so `#544` added
+> `13.989` and moved the count by **ZERO**. Exactly one such line exists in the catalogue (measured), so
+> the blind spot is bounded; but it means the guard could not have caught the very id the controller had to
+> catch by HAND.
+> **4. ⚠ A SWEEP IS A FACT ABOUT A *TREE*, AND FOR A SHARED ID SPACE THE ONLY TREE THAT COUNTS IS
+> `origin/main`.** This lane reported a "free set" of nine ids and one of them — `13.989` — was already
+> gone: it landed on `main` via `#544` **after this branch's base**, so a grep over the worktree
+> structurally could not see it. Two independent causes, and they were reported as ONE fact: **(a) the
+> wrong tree**, and **(b) a regex too narrow to see the line on ANY tree** (`^- \*\*13\.N` matches the bold
+> style only, so a marker-first id was invisible even to a correct sweep). **The count survived while the
+> membership did not.** Before quoting any id-space number, sweep `origin/main` — `/usr/bin/git grep <id>
+> origin/main -- test-cases/` — search the id in ANY form, and confirm the count MOVED by exactly what was
+> added rather than accepting `ok`.
+>
 > # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~18:0x IST. **DOOR A IS BUILT; ITS PR IS OPENING AT THIS
 > # HEAD.** Branch **`exec/workspace-description`**, cut from **`origin/main` = `123560a8`**; code head
 > # **`1036fb0e`**, pushed. **Dispatch: the controller's resume of `CTL-QUEUE-2026-09-19-door-builds.md` §A
