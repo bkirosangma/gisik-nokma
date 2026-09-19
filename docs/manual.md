@@ -21,8 +21,8 @@ Read these five. They are the ones that catch everybody.
    way. (§3)
 3. **You cannot put a job on a person, and you cannot set a due date.** The product shows both of
    these in several places, and offers no control that sets either. (§5)
-4. **You cannot write a description or leave a comment on the website.** The job screen shows the
-   description but gives you nothing to type into. (§5)
+4. **You cannot leave a comment on the website.** The job screen shows the description and lets you
+   write one; there is no box for a comment. (§5)
 5. **Every date in the product is on Indian time**, wherever you are. "Today" changes over at midnight
    in India — which is early evening in the UK and late morning on the American west coast. (§14)
 
@@ -338,12 +338,15 @@ This is the honest list. Each one is an absence, not a hidden button.
   changes it. Not on the website, not on the phone app.
 - **You cannot set a due date or a start date.** (See the box below for the one thing that comes
   close, and why it is not a substitute.)
-- **You cannot write or edit the description.** The panel shows whatever is there, or a note saying
-  there is none. There is nothing to type into. The writing box — with formatting, mentions and
-  file attachments — is built and is not connected to this screen.
-- **You cannot leave a comment.** Same reason. **The phone app has a Comment button on a job and the
-  website does not.**
-- **You cannot attach a file.** For the same reason as the two above.
+- **The description is no longer on this list — you can write it now.** It is kept here, rather than
+  deleted, so a reader who remembers it as an absence finds the correction where they last saw it.
+  Type into the description on the job panel and save it; the panel reads back who set it and when.
+  The same box handles formatting and mentions; dropping a file into it is refused rather than
+  quietly lost.
+- **You cannot leave a comment.** The writing box takes a description and not a comment, and nothing
+  on the web lists comments. **The phone app has a Comment button on a job and the website does
+  not.**
+- **You cannot attach a file.**
 - **You cannot rename a job.**
 - **You cannot delete a job.** If your stages include a "won't do" or "cancelled" stage, moving it
   there is the nearest thing available.

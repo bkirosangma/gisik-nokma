@@ -177,10 +177,35 @@ export type TypeScale = {
    * `.gn-mcp-authorize__input`'s own); and — the second typeface, added
    * 2026-09-15 with the prototype's fonts — two MONO rules, `.gn-help__code` in
    * `ui.css` and `.gn-invite-mint__url` in `globals.css`. Neither mono site is
-   * examined here: `code` is skipped by the `closest()` guard above, and
-   * `editor.css` is loaded only inside the RN webview this suite never opens. A
-   * second SANS typeface in a LABEL position would still need this widened to a
-   * set, and would still fail loudly here first.
+   * examined here: `code` is skipped by the `closest()` guard above.
+   *
+   * **⚠ `editor.css` IS NOW LOADED IN THIS APP, AND THIS PARAGRAPH USED TO SAY
+   * THE OPPOSITE.** Its sentence read *"`editor.css` is loaded only inside the
+   * RN webview this suite never opens"* and was true until 2026-09-19, when
+   * `apps/web/app/layout.tsx` began importing it so the ticket sheet's real
+   * editor renders its CONTENT styled rather than bare.
+   *
+   * **⚠ "Its content" is the precise claim, and the first draft of this note
+   * said "the composer mounts unstyled" instead — which an independent review
+   * measured as an OVERSTATEMENT.** `editor.css` styles the editor's document
+   * and its furniture (images, mention nodes, the picker popup, upload chips,
+   * attachment and evidence items). It does **not** style `.editor-slot` or
+   * `.editor-slot__submit`, the wrapper and the Save control
+   * `TicketEditorSlot.tsx:199/218` emit: `grep -rn '\.editor-slot' --include='*.css'`
+   * over `packages/` and `apps/` returns **nothing**, so both fall back to
+   * user-agent styling. That is a real gap and it is recorded rather than
+   * implied away; it is simply not this import's doing.
+   *
+   * **The equality above still holds,
+   * and that was MEASURED rather than assumed:** that stylesheet declares
+   * `font: inherit` in three rules (`.mention-popup__item`,
+   * `.image-wrap-menu__option`, `.image-wrap-menu__alt`) — INHERITANCE, never a
+   * `font-family` of its own — so it introduces no second typeface and cannot
+   * put a non-inherited family into this list. It also adds no element this
+   * suite visits: the first two selectors need the mention popup and the image
+   * wrap menu open, and the third is inside that same menu. A second SANS
+   * typeface in a LABEL position would still need this widened to a set, and
+   * would still fail loudly here first.
    *
    * ITS FALSE-GREEN MODE, AND WHY `bodyFamily` IS REPORTED BELOW. This compares
    * each element to `body` and never to the product. Since 2026-09-15 `body`'s

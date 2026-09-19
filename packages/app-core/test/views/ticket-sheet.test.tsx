@@ -6,6 +6,7 @@ import { SYSTEM_ACTOR_AUTO_CLOSE } from '@gisik-nokma/domain';
 import { createClientStateCache } from '../../src/cache.js';
 import { ServingGapError, SERVING_GAPS } from '../../src/online/mappers.js';
 import type { AttachmentListEntry } from '../../src/views/attachment-list.js';
+import type { EditorSlotComponent } from '../../src/views/editor-slot.js';
 import type { TicketHistoryEvent, TicketRead } from '../../src/view-types.js';
 import { HISTORY_PAGE_LIMIT, TicketSheet } from '../../src/views/ticket-sheet.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
@@ -1255,5 +1256,206 @@ describe('13.968 the Assignee row is editable, and a refused roster is not an em
     expect(
       within(screen.getByTestId('field-assignee')).getByText('set by Kiro on 19 Aug 2026'),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * **13.989 — the description is EDITABLE, on the door that already exists.**
+ *
+ * The owner's ruling: *"description should be editable."* The dispatch named
+ * the cause as a missing prop — *"the editor never mounts at all … the answer
+ * is a missing prop at the call site"* — and that is HALF of it. Measuring the
+ * reducer rather than the sheet found the other half, and it is the half that
+ * would have made the fix look done while changing almost nothing:
+ *
+ *   `ticket.created` writes `fields: { title: claim(p.title, env) }` and
+ *   NOTHING else (`packages/domain/src/ticket-state.ts:150`), and nothing else
+ *   writes a description except an explicit `ticket.field_set`. The row lived
+ *   INSIDE the `Object.entries(state.fields)` loop, so on every ticket nobody
+ *   had described there was no row for an editor to mount into.
+ *
+ * So these arms pin the row's EXISTENCE, not just its editability. `ticketRead()`
+ * carries title and dueDate and no description — a fresh ticket's exact shape —
+ * and the first arm asserts that shape before asserting anything about it.
+ *
+ * ## Why the slot here is a FAKE, and where the real one is proven
+ *
+ * `packages/editor` is not a dependency of `packages/app-core` and must not
+ * become one (amendment 12 keeps ProseMirror JSON opaque outside it), so the
+ * real `TicketEditorSlot` is unreachable from this file by design. The seam is
+ * `EditorSlotComponent`, and what is under test is the SHEET's half of it. The
+ * real component's the other half — its assignability to that contract, and the
+ * end-to-end mount the editor package recorded as OWED — is proven in
+ * `apps/web`, the one app that depends on both.
+ */
+describe('13.989 the description is editable, on the door that already exists', () => {
+  /**
+   * A stand-in composer. It reports the `readOnly` it was handed — the sheet's
+   * only observable claim about editability — and can either submit a real
+   * description claim or surface an editor-side failure.
+   */
+  /**
+   * A ticket SOMEBODY HAS ALREADY DESCRIBED — the other side of the row's two
+   * arms. Shared by the two cases that need the claim present, so neither can
+   * drift into asserting against a fixture the other does not have.
+   */
+  function withDescription(): TicketRead {
+    return ticketRead({
+      ticket: ticketStateSeed({
+        fields: {
+          title: {
+            value: 'File the GST return',
+            actorId: 'user_kiro',
+            clientTime: '2026-08-18T07:59:00.000Z',
+            serverTime: '2026-08-18T08:00:00.000Z',
+          },
+          description: {
+            value: { type: 'doc', content: [] },
+            actorId: 'user_anselma',
+            clientTime: '2026-08-18T08:04:00.000Z',
+            serverTime: '2026-08-18T08:05:00.000Z',
+          },
+        },
+      }),
+    });
+  }
+
+  function fakeEditorSlot(seen: { readOnly: boolean[] }): EditorSlotComponent {
+    return function FakeEditorSlot(props) {
+      seen.readOnly.push(props.readOnly);
+      return (
+        <div data-testid="fake-editor">
+          <button
+            type="button"
+            onClick={() =>
+              void props.submit?.({
+                type: 'ticket.field_set',
+                payload: { fieldId: 'description', value: { type: 'doc', content: [] } },
+              })
+            }
+          >
+            Save description
+          </button>
+          <button
+            type="button"
+            onClick={() => props.onError?.(new Error('Attachments are unavailable here.'))}
+          >
+            Paste an image
+          </button>
+        </div>
+      );
+    };
+  }
+
+  it('draws the row, and mounts the editor, on a ticket that has NEVER carried a claim', async () => {
+    // The control for the whole case: the fixture really is a fresh ticket, so
+    // the arm below is not passing because a description claim happened to be
+    // lying around.
+    expect(ticketRead().ticket.fields['description']).toBeUndefined();
+
+    const seen = { readOnly: [] as boolean[] };
+    renderSheet(ticketRead(), undefined, { editorSlot: fakeEditorSlot(seen) });
+    await settled();
+
+    const row = screen.getByTestId('field-description');
+    expect(within(row).getByTestId('fake-editor')).toBeInTheDocument();
+    // Handed an EDITABLE flag — the row is not read-only-by-default any more.
+    //
+    // Asserted as a PROPERTY and not as a render count, which is the first
+    // thing this arm got wrong: a function component re-runs on every pass, so
+    // the observer sees one entry per render and `toEqual([false])` failed with
+    // `[false, false]` while the code was right. A count here would also have
+    // been keyed to how many times React happened to re-render — the number
+    // moves for reasons that have nothing to do with editability.
+    expect(seen.readOnly.length).toBeGreaterThan(0);
+    expect(seen.readOnly).not.toContain(true);
+    // And the claim line states the truth about a field nobody has claimed,
+    // rather than inventing an actor for it.
+    expect(within(row).getByText('no description yet')).toBeInTheDocument();
+  });
+
+  it('draws the row ONCE — the field loop does not render a second one', async () => {
+    // ⚠ THIS FIXTURE MUST CARRY A DESCRIPTION CLAIM, and the first draft of this
+    // arm did not. With only `title`/`dueDate` in `fields`, the loop below never
+    // sees a `description` key, the dedup guard is never reached, and
+    // `toHaveLength(1)` passes whether the guard is there or not — a check that
+    // cannot fail, on the one property it was written to name. Measured by
+    // deleting the guard from the component: this arm stayed GREEN and a
+    // different arm caught it, incidentally, on a duplicate-testid error.
+    renderSheet(withDescription(), undefined, { editorSlot: fakeEditorSlot({ readOnly: [] }) });
+    await settled();
+    expect(screen.getAllByTestId('field-description')).toHaveLength(1);
+    expect(screen.getAllByTestId('fake-editor')).toHaveLength(1);
+  });
+
+  it('submits `ticket.field_set` for the description, through the ordinary ingest door', async () => {
+    const source = renderSheet(ticketRead(), undefined, {
+      editorSlot: fakeEditorSlot({ readOnly: [] }),
+    });
+    await settled();
+    await userEvent.click(screen.getByRole('button', { name: 'Save description' }));
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    // `toEqual` on the payload, not `toMatchObject`: the envelope must carry
+    // EXACTLY the editor's composition, so a sheet that re-spelled the fieldId
+    // or dropped `value` would be a different claim and would fail here.
+    expect(source.ingested[0]![0]!.type).toBe('ticket.field_set');
+    expect(source.ingested[0]![0]!.payload).toEqual({
+      fieldId: 'description',
+      value: { type: 'doc', content: [] },
+    });
+  });
+
+  it('moves the claim line onto the actor who wrote it', async () => {
+    renderSheet(withDescription(), undefined, { editorSlot: fakeEditorSlot({ readOnly: [] }) });
+    await settled();
+    expect(
+      within(screen.getByTestId('field-description')).getByText(
+        'set by Anselma Marak on 18 Aug 2026',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('with NO editorSlot the fallback renders — and offers nothing to type into', async () => {
+    renderSheet(ticketRead());
+    await settled();
+    const row = screen.getByTestId('field-description');
+    // The fallback is CORRECT BEHAVIOUR for a build that wired no editor; it is
+    // not the defect. The defect was that the real one was never available. The
+    // absence of a control is the assertion — a build with no composer must not
+    // offer one that silently discards what is typed.
+    expect(within(row).queryByTestId('fake-editor')).toBeNull();
+    expect(within(row).queryByRole('button')).toBeNull();
+    // It still states the absence, and still tells the truth about the claim.
+    expect(within(row).getByText('No description yet')).toBeInTheDocument();
+    expect(within(row).getByText('no description yet')).toBeInTheDocument();
+  });
+
+  it('a SUCCESSFUL save clears the editor-error slot, so the sheet never asserts a failure that is over', async () => {
+    const source = renderSheet(ticketRead(), undefined, {
+      editorSlot: fakeEditorSlot({ readOnly: [] }),
+    });
+    await settled();
+    await userEvent.click(screen.getByRole('button', { name: 'Paste an image' }));
+    expect(await screen.findByText('Attachments are unavailable here.')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save description' }));
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    // The other two slots clear on `committed`; the third must too, or a save
+    // that just succeeded leaves the sheet asserting a current failure. Caught
+    // by independent review: this slot was set and rendered but never cleared.
+    await waitFor(() =>
+      expect(screen.queryByText('Attachments are unavailable here.')).toBeNull(),
+    );
+  });
+
+  it("the editor's own failure reaches an alert, and is never swallowed", async () => {
+    renderSheet(ticketRead(), undefined, { editorSlot: fakeEditorSlot({ readOnly: [] }) });
+    await settled();
+    expect(screen.queryByText('Attachments are unavailable here.')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Paste an image' }));
+    // Nothing was sent to the server, so neither the server-refusal sentence nor
+    // the transport one is true of it — it gets its own slot and its own tone.
+    expect(await screen.findByText('Attachments are unavailable here.')).toBeInTheDocument();
+    expect(screen.queryByText(/Refused by the server/)).toBeNull();
   });
 });

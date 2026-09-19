@@ -1,4 +1,171 @@
-## ▲ TOP BLOCK — **CYCLE 11 POSITION: E IS MERGED, AND THE NEXT TASK IS THE DESCRIPTION FIELD — not addendum 5.** (2026-09-19, ~21:4x IST)
+## ▲ TOP BLOCK — **THE DESCRIPTION IS EDITABLE, AND THE ROW IT LIVES IN DID NOT EXIST.** (2026-09-19, ~22:5x IST)
+
+**Position: DONE and PUSHED — `exec2/description-editable`, base `main`, cut from `origin/main` `9b88f9b4`.**
+The PR opens as this dispatch's last step; **measure it rather than reading it here**:
+`gh pr list --head exec2/description-editable --state all`.
+
+**`main` was `9b88f9b4` (= *"Merge pull request #541 from bkirosangma/exec2/handoff-cycle11"*, this lane's own
+handoff PR) and ZERO PRs were open when this branch was cut.** ⚠ **`main` then advanced to `123560a8`
+(`#542` the cycle-12 anchor, `#543` exec 1's door-A WIP handoff) while this branch was open — both
+DOCS-ONLY, touching `docs/lanes/controller-state.md` and `docs/lanes/executor-state.md` and nothing else,
+so there is no collision with this branch and no rebase was needed.** Verified by
+`git diff --stat 9b88f9b4..origin/main`, and the intersection with this branch's own file list is empty.
+Every sha here was read with `/usr/bin/git`; the ahead-count and tree state were recounted at this
+branch's head, not carried.
+
+**The cycle-12 anchor also confirms this lane's work independently** (`controller-state.md` cycle 12,
+item 4): exec 2 is on this dispatch and *"caught a defect in that dispatch in its first message — the
+submission composer's path is `packages/editor/…`, not `packages/app-core/src/views/…`"*. **That defect is
+real and is corrected in this branch's PR body.**
+
+**Owner's ruling, verbatim: _«"description should be editable."»_** Dispatch:
+`CTL-DISPATCH-2026-09-19-description-editable.md`. Classified `SERVER EXISTS → SURFACE` — **and the fix
+turned out to be a PROP *and* a ROW, not a prop alone.**
+
+### § 1 — THE DISPATCH'S CAUSE WAS HALF RIGHT, AND THE OTHER HALF IS THE ONE THAT MATTERED.
+
+The dispatch said the editor never mounts because `page.tsx` passes six props and none of the four
+optional ones. True. **But enabling the composer alone would have changed almost nothing**, and the
+measurement is in the reducer rather than the sheet:
+
+> `ticket.created` writes `fields: { title: claim(p.title, env) }` and **NOTHING else**
+> (`packages/domain/src/ticket-state.ts:150`); no other path writes a description except an explicit
+> `ticket.field_set` (`create-ticket-flow.tsx:209` submits `ticket.created` alone).
+
+The description row lived **inside** the `Object.entries(state.fields)` loop, so on any ticket nobody had
+described there was **no row at all** — no `description` key, nothing for an editor to mount into. It is
+now drawn unconditionally on the **assignee row's precedent** (the same `#530` shape, one row up in the
+same `<dl>`), and the loop skips `description` so it is drawn once.
+
+### § 2 — TWO MORE THINGS THE DISPATCH DID NOT NAME, BOTH REQUIRED FOR THE MOUNT TO BE REAL.
+
+- **The web loaded no editor stylesheet.** `packages/editor/src/styles/editor.css` was imported ONLY by
+  `packages/editor/src/webview/entry.tsx` (the RN webview bundle) and had no `exports` entry. Now exported
+  (`"./editor.css"`, mirroring `packages/ui`'s `"./ui.css"`) and imported by `apps/web/app/layout.tsx`.
+  **Without it the editor's CONTENT — the document, images, mention nodes, the picker popup, upload
+  chips, attachment and evidence items — renders bare. ⚠ The first draft of this line said "the composer
+  mounts unstyled", and an independent review measured that as an OVERSTATEMENT: `.editor-slot` and
+  `.editor-slot__submit` (the wrapper and the Save control, `TicketEditorSlot.tsx:199/218`) have **no CSS
+  rule anywhere in the repo** and fall back to user-agent styling. That is a real gap, recorded with an
+  owner below — it is just not this import's doing.**
+- **⚠ `apps/web/e2e-viewport/type-scale.ts` asserted the opposite**, in the paragraph excusing two mono
+  rules from its font equality: *"`editor.css` is loaded only inside the RN webview this suite never
+  opens."* True until this change, false after — corrected in the same change set, with the equality
+  **re-measured rather than assumed** (that stylesheet declares `font: inherit` in three rules and no
+  `font-family` of its own). **The stale sentence was in a file this change is not about**, which is the
+  sweep's whole point.
+
+The branch adds the dependency edge **`apps/web` → `@gisik-nokma/editor`**. That is Plan 6's own declared
+arrangement (`docs/superpowers/plans/2026-08-20-06-web-client.md:5667`: *"`apps/web` passes it into
+`TicketSheet` — no mount point changes"*), and it is what case **9.61** was waiting on. **Cost, recorded
+rather than discovered later:** `/p/[projectId]`'s first-load JS went from the ~361 kB its sibling routes
+ship to **519 kB**.
+
+### § 3 — WHAT SHIPPED.
+
+`apps/web/package.json` (+dep) · `packages/editor/package.json` (+`./editor.css`) · `apps/web/app/layout.tsx`
+· `packages/app-core/src/views/ticket-sheet.tsx` (`submitDescription`, `queryUsers`, a third
+`gn-refusal--editor` error slot, the lifted row) · `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`
+(`editorSlot={TicketEditorSlot}`) · `packages/ui/src/ui.css` · **prose corrected in nine more files**
+(`Features.md`, `docs/product-coverage-map.md` C3 + bullet 4, `docs/faq.md`, `docs/manual.md` + regenerated
+help, `test-cases/09-editor-attachments.md` 9.61 ❌→✅, `test-cases/03-foundation-ledger.md`,
+`packages/app-core/src/views/editor-slot.tsx`, `packages/editor/src/components/TicketEditorSlot.tsx`,
+`packages/editor/test/ticket-editor-slot.test.tsx`) · two test files.
+
+**Cases: `13.989`** (app-core, six arms) and the same id in **`apps/web/test/description-editable.test.tsx`**
+(the REAL editor inside the REAL sheet). **Mutation-witnessed six times**, each killing the arm it names:
+mount-only-when-a-claim-exists · `readOnly` hardcoded · `submit` dropped · `onError` dropped · the dedup
+guard deleted · and (in `apps/web`) `submit` dropped **and rebuilt into `dist`**. Every run printed the
+file's sha before and after.
+
+### § 4 — ⚠ ONE MUTATION SURVIVED, AND IT WAS THE INSTRUMENT RATHER THAN THE CHECK.
+
+Dropping `submit` from the sheet and running `apps/web`'s test **passed** — because `apps/web` resolves
+`@gisik-nokma/app-core` **by package name → `dist`**, so the mutation never reached the code under test.
+Rebuilt, it kills the arm. **The sha guard has to be on the DIST as well as the src**, or a mutation that
+never ran reads as a survivor and condemns a check that is fine.
+
+### § 5 — GATE AND CHECKS.
+
+**33/33, `WRAPPER_EXIT=0`, node v22.22.2, 0 TS errors.** All seven checks EXIT=0. The FIRST gate run was
+red on `@gisik-nokma/web#typecheck` **under node v24.11.1** — a real error of mine (`event.payload` is
+`unknown`), not the drift; fixed. The second was red ONLY on `test/seed/seed-dev.test.ts` timing out at
+30004ms at load 42 — **isolated 8/8 in 2.60s**, the same load red this lane has hit on three tasks.
+**Viewport suite: 28 passed, 2 skipped, 3 failed — all three on `/help`, all three PRE-EXISTING AND
+MEASURED.** See § 6.
+
+### § 6 — PRE-EXISTING REDS AND STALE CLAIMS, MEASURED AND ***NOT*** FIXED.
+
+- **`/help`'s tap-target ratchet and 13px eyebrows are red on `main` too.** Control run with
+  `origin/main`'s help content swapped in: **identical offender populations — 107 selectors, 20
+  `gn-help__nav-link`, 41 `gn-help__pager-link`, 15 `gn-help__group-toggle`** in both runs. Baselines
+  `phone-390|/help` = 10, `tablet-768`/`desktop-1512` = 16; the run finds more. **Not this change's.**
+  Already recorded in claude-mem (id=49071).
+- **⚠ `docs/manual.md` LIES ABOUT THE ASSIGNEE, and has since `#530`.** Its five-item list says *"You
+  cannot put a job on a person"* and its "things you cannot do" list repeats it — but `#530` made the
+  assignee editable yesterday and **touched neither `docs/manual.md` nor `docs/faq.md`** (`git diff --stat`
+  on that merge, read). **NOT FIXED HERE, deliberately:** correcting it properly needs a measurement of the
+  **phone app**'s assignee control that this task did not make, and asserting it unmeasured would swap one
+  false sentence for another. **Owner: whoever next touches the manual's job-panel section.**
+- **`docs/lanes/owner-holds.md`'s THE TICKET SHEET, RULED table and its `:142` are now stale** — they
+  describe the description as `readOnly` with the editor never mounting. **That file is the controller's
+  register, not this lane's, so it was not edited.** Owner: the controller.
+- **No browser run of the ROUTED app.** `/p/:projectId?ticket=` needs a real session; phone sign-in is off
+  on this stack and Google needs the owner's account — the same wall the rename task hit. The `apps/web`
+  case mounts the real page components in jsdom instead, with **two jsdom polyfills**
+  (`Range.getClientRects`, `document.elementFromPoint`) that are themselves the reason **nothing in that
+  file may be read as a layout check**: jsdom has no layout engine, so a composer drawing into a 0px box
+  would pass every arm. **The visible half is OWED** and the dispatch asked for it.
+
+### § 7 — NEXT IN THIS LANE.
+
+**The lane order is `E → description → evidence upload → C → H → the inviter card`**
+(`controller-state.md`'s CYCLE 11 entry). E is merged and the description is this PR — **so the next task
+is the EVIDENCE UPLOAD, then `C` (`isInbox` bulk + Undo), then `H` (sheet footer), then the inviter card.**
+**Read `CTL-QUEUE-2026-09-19-door-builds.md` with its Addenda 1–5 before starting any of them**, and
+`owner-holds.md` §1's `THE DOORS, RULED` — the table is the authority.
+
+**⛔ CASE-ID BLOCK STATUS:** this lane holds **`13.988`–`13.999`**. `13.988` = E, **`13.989` = this task**.
+**Next free: `13.990` — TEN IDS LEFT, then `§13` is full**, and the next id after that is a
+section-structure decision that belongs to the owner. **Keep the `{3}` width**, and know it truncates
+`13.9999` (a pixel value, already a named trap that fooled a count today).
+
+### § 8 — INDEPENDENT REVIEW, RUN AND RECORDED BEFORE THE PR OPENED (freeze-line ruling, 2026-09-18).
+
+**Four findings, all CONFIRMED and all acted on; the reviewer's verdict on what it checked is at the foot
+of this block.** It was dispatched after the branch was pushed and before the PR was opened, per
+`PR freeze-line discipline`. It left the tree clean.
+
+| # | finding | what was done |
+|---|---|---|
+| 1 | **`apps/web/test/description-editable.test.tsx` asserted `.editor-slot--plain`, and the fallback's class is `gn-editor-slot--plain`** — a selector that matches nothing either way. **A check that cannot fail**, in this very change set, caught by the reviewer and not by me. | Fixed to the real class; the arm is now live (mutation in `submit` kills it). |
+| 2 | **`editorError` was set and rendered but never cleared.** After a pasted-file refusal, a successful description save cleared the other two slots and left the amber alert up for the life of the sheet. | `setEditorError(null)` added to `submitDescription`'s `committed` branch. |
+| 3 | **`packages/ui/test/components.test.tsx`'s refusal roster (`13.290`) listed only `--preview` and `--server`.** `--transport` had been missing since Ruling 27 added it; `--editor` was missing because this change added it. | Roster widened to all four variants — it passes, so this **widens** the check rather than relaxing it. |
+| 4 | **⚠ MY OWN CLAIM WAS AN OVERSTATEMENT.** I wrote that importing `editor.css` is what stops the composer mounting "unstyled". `editor.css` styles the editor's CONTENT and furniture; **`.editor-slot` and `.editor-slot__submit` have no CSS rule anywhere in the repo** and fall back to UA styling. | The claim is narrowed to what is true, in this file, in `type-scale.ts`, and in the commit message. |
+
+**⚠ NEW GAP, FOUND BY FIX 4, MOUNTED AND UNSTYLED — owner: whoever next touches the composer's chrome.**
+`.editor-slot__submit` is the button a person clicks to save a description on the web, and it is drawn by
+the browser default because no stylesheet anywhere names it. `editor.css` is STRUCTURAL-ONLY by its own
+header (no colour of any kind), so the fix cannot live there without breaking that file's scanner contract
+— it belongs in `packages/ui/src/ui.css` beside the other controls, or in the slot's own component. **This
+change makes that button reachable for the first time, which is what put it in view; it does not fix it.**
+
+**What the reviewer checked and found SOUND**, recorded so a reader knows the coverage: the
+`queryUsers`/`NO_MENTIONS` justification (the cited lines and the `'No people match'` string are exact);
+`canEditDescription` against `canSetVisibility` and the assignee row; **that `packages/app-core/dist`
+matches `src` at this head**, which is what the § 4 survivor needed; the `ticket.created` writes-title-only
+premise; row geometry (no double render, no stale key, no other `field-description` reference, no
+snapshots anywhere); that the global `editor.css` import is colourless, collides with no class name, and
+keeps every `font-size` at or above the 12px floor; the help freshness gate and that the help section/entry
+titles are byte-identical to `main` (255 titles both sides), which is why the `/help` offender populations
+could not have moved; and the one-way dependency edge.
+
+**Not reproduced by the reviewer, named rather than implied:** the full turbo gate, the mutation battery
+(its dist state was verified instead), and the browser/viewport run.
+
+---
+
+## ▼ PREVIOUS BLOCK — **CYCLE 11 POSITION: E IS MERGED, AND THE NEXT TASK IS THE DESCRIPTION FIELD — not addendum 5.** (2026-09-19, ~21:4x IST)
 
 **`main` is `7beccab4` (= *"Merge pull request #540 from bkirosangma/exec2/invite-expiry"*), ZERO open PRs,
 and every PR this lane opened today has landed.** Verified with `/usr/bin/git` and `gh pr list`; the numbers

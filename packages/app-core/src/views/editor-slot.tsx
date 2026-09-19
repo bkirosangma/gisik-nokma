@@ -58,16 +58,23 @@ import { docToPlainText } from '@gisik-nokma/domain';
  * payload satisfies a slot promising the narrower one — so the host stays free
  * of ProseMirror types.
  *
- * WHAT IS STILL OWED, and by whom: nothing yet mounts `TicketEditorSlot` here.
- * Today's compile-time proof lives on the editor side, as an assignment against
- * a TRANSCRIBED copy of the declaration below
- * (`packages/editor/test/ticket-editor-slot.test.tsx`), guarded by a test that
- * reads THIS file and fails if its `doc` stops saying `unknown`. A transcription
- * is not the real thing. The real proof is an actual
- * `<TicketSheet editorSlot={TicketEditorSlot} />` in an app that legitimately
- * depends on both packages — `apps/web` depends on app-core but NOT on
- * `@gisik-nokma/editor` as of 2026-09-03 — and it belongs to Plan 6 step 12,
- * whose boundary this is.
+ * **THE OWED PROOF IS NO LONGER OWED, and this note is what said so.** Until
+ * 2026-09-19 this paragraph read *"WHAT IS STILL OWED … nothing yet mounts
+ * `TicketEditorSlot` here"* and named the real proof as *"an actual `<TicketSheet
+ * editorSlot={TicketEditorSlot} />` in an app that legitimately depends on both
+ * packages — `apps/web` depends on app-core but NOT on `@gisik-nokma/editor` as
+ * of 2026-09-03"*. **`apps/web` is now that app**: it takes the dependency edge,
+ * imports `TicketEditorSlot`, and passes it to `TicketSheet`'s `editorSlot` prop
+ * (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`), which Plan 6 declared
+ * as the arrangement all along (`docs/superpowers/plans/2026-08-20-06-web-client.md:5667`:
+ * *"`apps/web` passes it into `TicketSheet` — no mount point changes"*).
+ *
+ * The transcription on the editor side still stands and is still worth having —
+ * it is what fails loudly under `strictFunctionTypes` if these two declarations
+ * drift apart, and it is faster than a build. It is no longer the ONLY proof.
+ *
+ * The reverse direction is still barred, unchanged: `packages/editor` must never
+ * import this file.
  */
 export type EditorSlotSubmission =
   | { type: 'comment.added'; payload: { body: unknown } }

@@ -1922,3 +1922,102 @@ with them.
   case here makes the server refuse a `ticket.assigned`.
 - **`fields-editor`-style per-field authority is not consulted** — deliberately: gating the control
   client-side would leave a door refusal unreachable and therefore unrendered.
+
+## The description becomes editable, and the row that was never there (executor 2, 2026-09-19) — case `13.989`
+
+**Owner's ruling, verbatim: _«"description should be editable."»_** Dispatch:
+`CTL-DISPATCH-2026-09-19-description-editable.md`. Classified `SERVER EXISTS → SURFACE`, and it is —
+no route, no migration, no new door. **Id `13.989`**, from this lane's allocated block
+`13.988`–`13.999` (`13.988` spent on the invite expiry). Swept with the control in the same
+invocation: `13.988` found at 3 sites in `apps/server/test/routes/invites.test.ts`, `13.989` at none.
+
+### ⚠ THE DISPATCH'S CAUSE WAS HALF RIGHT, AND THE OTHER HALF IS WHY THE ROW WAS NEVER THERE
+
+The dispatch said *"the editor never mounts at all … the answer is a missing prop at the call site"* —
+and `page.tsx:2346-2353` did pass six props and none of the four optional ones, so that is true.
+**But enabling the composer alone would have changed almost nothing**, and the measurement that shows
+it is the reducer, not the sheet:
+
+> `ticket.created` writes `fields: { title: claim(p.title, env) }` and NOTHING else
+> (`packages/domain/src/ticket-state.ts:150`). No other path writes a description except an explicit
+> `ticket.field_set` — `create-ticket-flow.tsx:209` submits `ticket.created` alone.
+
+The description row lived **inside** the `Object.entries(state.fields)` loop, so on any ticket nobody
+had described there was no `description` key, no row, and nowhere for an editor to mount. The row is
+now lifted out and drawn unconditionally, on the **assignee row's precedent** (one row up in the same
+`<dl>`, which is unconditional and whose claim line states what is known), and the loop skips
+`description` so it is drawn exactly once.
+
+### TWO MORE THINGS THE DISPATCH DID NOT NAME, BOTH REQUIRED FOR THE MOUNT TO BE REAL
+
+- **The web loaded no editor stylesheet.** `packages/editor/src/styles/editor.css` was imported only
+  by `packages/editor/src/webview/entry.tsx` — the RN webview bundle — and the package's `exports` map
+  had no entry for it. Mounting the composer without it renders unstyled, so the stylesheet is now
+  exported (`"./editor.css"`, mirroring `packages/ui`'s `"./ui.css"`) and imported by
+  `apps/web/app/layout.tsx`.
+- **⚠ `apps/web/e2e-viewport/type-scale.ts` asserted the opposite**, in the paragraph explaining why
+  two mono rules are exempt from its font equality: *"`editor.css` is loaded only inside the RN webview
+  this suite never opens"*. That sentence was true and this change makes it false — corrected in the
+  same change set, with the equality **re-measured** rather than assumed: the stylesheet declares
+  `font: inherit` in three rules and no `font-family` of its own, so it introduces no second typeface
+  and reaches no element this suite visits. This is the sweep's whole point — **the stale sentence was
+  in a file the change is not about.**
+
+### THE DOOR
+
+`composeEditorSubmission('description', doc)` →
+`{ type: 'ticket.field_set', payload: { fieldId: 'description', value: doc } }`
+(`packages/editor/src/attachments/compose-editor-submission.ts:14,29`). The sheet hands the editor's own
+composition straight to the envelope and does **not** re-spell the payload — a second
+`{ fieldId: 'description' }` beside the composer that guarantees it is the duplication
+`submitTransition` already warns about. No route is added. ⚠ **The dispatch's path for this file,
+`packages/app-core/src/views/compose-editor-submission.ts`, does not exist**; the recon had it right.
+
+### The case
+
+- ✅ **`13.989` — the description is editable on the door that already exists.**
+  `packages/app-core/test/views/ticket-sheet.test.tsx`, six arms. It draws the row **on a ticket that
+  has never carried a claim** (with a control asserting the fixture really has none, so the arm cannot
+  pass on a ticket that happened to have one); it draws it **once**; the submission reaches
+  `dataSource.ingest` as `ticket.field_set` with the payload asserted by `toEqual`, not `toMatchObject`;
+  the claim line **moves** onto the actor who wrote it; **with no `editorSlot` the fallback renders and
+  offers nothing to type into**; and the editor's own failure reaches an alert instead of being
+  swallowed.
+  **Mutation-witnessed five times, each killing the arm it names:** mounting the editor only when a
+  claim exists (kills arm 1, plus four siblings that share the no-claim fixture — expected for a
+  structural mutation); `readOnly` hardcoded true (arm 1); `submit` dropped (arm 3); `onError` dropped
+  (arm 6); the loop's dedup guard deleted (arm 2). Every run printed the file's sha before and after,
+  and the file was restored byte-identical.
+
+#### ⚠ One arm was written as a check that could not fail, and the mutation is what caught it
+
+The dedup arm's first fixture carried only `title`/`dueDate` — **no description claim** — so the loop
+never saw a `description` key, the guard was never reached, and `toHaveLength(1)` passed with the guard
+deleted. It stayed GREEN while a *different* arm caught the mutation incidentally on a duplicate-testid
+error. The fixture now carries a claim, and the guard's deletion reddens the arm that names it.
+**A case whose fixture cannot reach the branch it is about is a case that reports one thing and
+measures another.**
+
+### What is NOT covered, named rather than implied
+
+- **Attachment paste inside the composer is refused, not wired.** The editor's upload capability
+  (`uploadAttachment`/`emitAttachmentAdded`) is NOT supplied, so a dropped file is refused through
+  `onError` with the editor's own sentence and rendered in a new `gn-refusal--editor` slot — the third
+  distinct fact, given its own slot for the reason Ruling 27 gives the other two (`--server` = the
+  authority adjudicated; `--transport` = nothing came back; `--editor` = nothing was sent). **This
+  depends on case 9.59's open client half** (`uploadAttachmentHttp`, zero coverage) and does not close
+  it. The `attachments` list and the visibility editor are untouched, per the dispatch.
+- **A REFUSED roster makes `@` say "No people match".** `queryUsers` is wired off the roster the sheet
+  already reads, and `mention-popup.ts:100` renders a count from whatever comes back — so over a
+  refused or not-yet-loaded roster the popup states a falsehood about the workspace, **the same
+  collapse the assignee row was built to refuse (#530)**. It is kept deliberately: leaving `queryUsers`
+  unwired reaches the identical `[]` through the slot's own `NO_MENTIONS`, so `@` would say it on every
+  keystroke instead. **Named owner: whoever next widens `EditorSlotProps.queryUsers`** — the interface
+  has no way to express "the roster is unavailable".
+- **`canEditDescription` is not an authority check, and must not become one.** It answers one question
+  — *is a real composer mounted* — because the ingest door is the only party that knows who may write
+  (the argument `canSetVisibility` states at length). **The `readOnly` it produces in the fallback
+  branch is unobservable by construction**, since `PlainTextEditorSlot` ignores every prop; the true
+  branch is what the mutation kills.
+- **No browser run yet.** The dispatch asks for one (*"a typed change survives a reload … the
+  `set by {actor} on {date}` line moves"*) and it is owed.

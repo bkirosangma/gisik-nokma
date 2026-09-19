@@ -56,10 +56,15 @@ export type EditorSlotUpload = UploadResult;
  *
  * **Edit both or neither.** A type-level transcription of app-core's half, and
  * a check that its `doc` field still reads `unknown`, live in
- * `test/ticket-editor-slot.test.tsx`. The end-to-end proof — an actual
- * `<TicketSheet editorSlot={TicketEditorSlot} />` — is owed by whoever wires
- * the two packages together (Plan 6 step 12); nothing here can stand in for it
- * without creating the dependency edge this whole arrangement exists to avoid.
+ * `test/ticket-editor-slot.test.tsx`.
+ *
+ * **THE END-TO-END PROOF LANDED 2026-09-19, and this paragraph used to say it
+ * was owed.** *"An actual `<TicketSheet editorSlot={TicketEditorSlot} />`"* was
+ * the test this note set, and `apps/web` now is that app: it takes the
+ * dependency edge, imports this component, and passes it to the sheet's
+ * `editorSlot` prop. **This package still cannot import app-core** — the edge
+ * runs one way and that is the whole point of the arrangement — so the proof
+ * necessarily lives in the app, not here.
  */
 export type EditorSlotProps = {
   /** Which ledger event a submit becomes. */

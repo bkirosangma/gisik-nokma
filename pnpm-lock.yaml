@@ -233,6 +233,9 @@ importers:
       '@gisik-nokma/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@gisik-nokma/editor':
+        specifier: workspace:*
+        version: link:../../packages/editor
       '@gisik-nokma/ui':
         specifier: workspace:*
         version: link:../../packages/ui
