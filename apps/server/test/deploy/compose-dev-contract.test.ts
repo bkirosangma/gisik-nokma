@@ -304,3 +304,81 @@ describe('docker-compose.dev.yml env contract', () => {
     });
   });
 });
+
+/**
+ * ## 13.946 — the dev stack serves the BUILT image, and no source is bind-mounted any more
+ *
+ * Owner, 2026-09-19: *"no more hot reloads. rebuilt once they hit the main, is fine. that means the
+ * servers are to be run from the main folder instead of from the executor's branch."*
+ *
+ * The change is mechanical — `dev:stack` stops composing `docker-compose.hot.yml` — and **that is exactly
+ * why it needs a case.** A script that silently still composed the override would leave the stack serving
+ * somebody's worktree, and every other instrument would stay green: the containers come up, `/healthz`
+ * answers, `:3001` returns its usual 307. This repo keeps re-finding checks that pass for a reason
+ * unrelated to the property they name, and *"the stack is built, not mounted"* is a property of FILES, so
+ * files are what it is asserted against.
+ *
+ * **The third assertion is the control, and it is why the others can be trusted.** `docker-compose.hot.yml`
+ * is full of exactly the mounts the second assertion forbids. Running the same predicate over it and
+ * requiring a NON-EMPTY result is what proves the predicate can fire — without it, a predicate that had
+ * quietly stopped matching anything (a renamed key, a `volumes` shape change) would report the new stack
+ * as clean forever, which is this file's own stated failure mode one description up.
+ */
+describe('13.946 the dev stack serves the built image, and no source is bind-mounted', () => {
+  const ROOT = resolve(import.meta.dirname, '../../../..');
+  const HOT_PATH = resolve(ROOT, 'docker-compose.hot.yml');
+  const RETIRED_OVERRIDE = 'docker-compose.hot.yml';
+  const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')) as {
+    scripts: Record<string, string>;
+  };
+
+  /** Every bind mount, on either service, whose source the built image already carries. */
+  function sourceMounts(compose: Record<string, any>): string[] {
+    const found: string[] = [];
+    for (const name of ['server', 'web']) {
+      for (const entry of compose.services?.[name]?.volumes ?? []) {
+        const spec =
+          typeof entry === 'string' ? entry : `${entry?.source ?? ''}:${entry?.target ?? ''}`;
+        if (/\/(apps|packages)\//.test(spec)) found.push(`${name}: ${spec}`);
+      }
+    }
+    return found;
+  }
+
+  it('dev:stack composes docker-compose.dev.yml alone, and dev:stack:rebuild actually rebuilds', () => {
+    const up = pkg.scripts['dev:stack'];
+    expect(up, 'the root dev:stack script must exist').toBeTruthy();
+    // The whole change, in one assertion: the override must not be reachable by the command a reader
+    // types by reflex. Naming the base file as well keeps "delete the script" from satisfying it.
+    expect(up, 'the retired hot override must not be composed any more').not.toContain(RETIRED_OVERRIDE);
+    expect(up, 'the base stack is what is served').toContain('docker-compose.dev.yml');
+    // The post-merge command must REBUILD. A script that merely re-ups an existing image is the
+    // stale-serving shape the rebuild rule exists to close, and it would read as success.
+    expect(
+      pkg.scripts['dev:stack:rebuild'],
+      'the runbook names this as the command to run after every merge to main',
+    ).toContain('--build');
+  });
+
+  it('neither server nor web bind-mounts apps/ or packages/ source', () => {
+    expect(sourceMounts(readCompose())).toEqual([]);
+  });
+
+  it('CONTROL — the predicate fires on the retired override, which is full of these mounts', () => {
+    const mounts = sourceMounts(readCompose(HOT_PATH));
+    expect(
+      mounts.length,
+      `the retired override is expected to carry many source mounts; if this is 0 the predicate has ` +
+        `stopped matching and the assertion above passed for the wrong reason`,
+    ).toBeGreaterThan(5);
+  });
+
+  it('the runbook names the post-merge command AND the directory it must be run from', () => {
+    // Both halves or neither: the command without the directory is the instruction that gets run from
+    // an executor's worktree, which is the coupling this change removed; the directory without the
+    // command is a fact with no action attached.
+    const runbook = readFileSync(resolve(ROOT, 'docs/runbook.md'), 'utf8');
+    expect(runbook).toContain('pnpm dev:stack:rebuild');
+    expect(runbook).toContain('/Users/kiro/my_projects/gisik-nokma');
+  });
+});

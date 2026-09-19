@@ -234,7 +234,77 @@ worth stating because the mistake is easy to repeat:
   `reference/` *is* present in the DEV container — via a host mount App Platform has no equivalent of.
   Checking inside a running dev container answers a different question than checking the image.
 
-## Dev stack — hot-reload mode
+## Dev stack — the built image, rebuilt on every merge to `main`
+
+**The stack serves BUILT images. There is no bind-mounted source and no watcher.** The owner removed hot
+reload on 2026-09-19, verbatim: *"no more hot reloads. rebuilt once they hit the main, is fine. that means
+the servers are to be run from the main folder instead of from the executor's branch. bring up the server
+once the hot reload is removed."*
+
+    pnpm dev:stack            # bring the stack up from the built images
+    pnpm dev:stack:rebuild    # REBUILD, then bring it up — this is the post-merge command
+
+**Run both from `/Users/kiro/my_projects/gisik-nokma` — the MAIN folder.** That is not a preference, it is
+what the mechanics require: the images bake `SERVER_ORIGIN` and `NEXT_PUBLIC_SERVER_URL` as BUILD args, and
+`next build` serialises them (plus all the app code) into `.next`, so **an image is a snapshot of the tree
+it was built from.** A stack built from an executor's worktree would serve that worktree's code whatever
+`main` says — which is exactly the coupling the owner removed.
+
+### THE REBUILD RULE — after every merge to `main`
+
+    cd /Users/kiro/my_projects/gisik-nokma && pnpm dev:stack:rebuild
+
+**Know what you are building before you build it — and the folder's BRANCH LABEL is not the check.**
+Measured 2026-09-19: the main folder was labelled `owner/workspace-edits` (a branch that was **retired and
+deleted from origin** the day before) while its HEAD was **exactly `origin/main`** — `git rev-list
+--left-right --count origin/main...HEAD` → `0 0`, and `git diff origin/main` empty. So a reader who checked
+the label would have concluded the folder was serving a retired branch, and would have been wrong; and a
+reader who trusted the label in the other direction — "it's on some branch, close enough" — would have no
+check at all. **Compare the SHA, every time:**
+
+    git -C /Users/kiro/my_projects/gisik-nokma fetch origin
+    git -C /Users/kiro/my_projects/gisik-nokma rev-parse HEAD origin/main    # these must be equal
+
+Two risks ride on this and they point opposite ways. **Behind `main`**, and the rebuild bakes older code
+into the image — the stale-serving shape below, with the rebuild *itself* as the thing that made it look
+fresh. **On a feature branch**, and you have reinstated by hand the exact coupling the owner removed: an
+executor's branch live on `:3001`. Neither is visible from a health check.
+
+**Why this rule exists, and it is the failure shape to name rather than discover.** The served application
+equals `main` only as of the last build. Merge to `main` and skip this, and **the app keeps serving the
+previous build while every health signal reads green**: `/healthz` answers 200, both containers are `Up`,
+`GET :3001/` returns its usual 307, and the code being served is simply older than `main`. **That is this
+repo's recorded stale-serving class** — the 2026-09-09 incident, and the `tsx` watcher that lost its watch
+and kept serving old code — and with the watchers gone, the rebuild is the *only* thing that closes it.
+A green signal cannot tell you; only the build can.
+
+Two consequences worth stating where they will be read:
+
+- **`.env` must exist in that folder.** It is gitignored and per-checkout, so a fresh clone has none, and
+  it is what supplies the Google OAuth pair. A missing `.env` brings the stack up **looking healthy with
+  Google sign-in OFF** — measured, and exactly the 2026-09-09 incident. Passing `--env-file .env` (which
+  both scripts do) converts that silent substitution into a hard stop: `Couldn't find env file`, exit 1.
+- **`SERVER_ORIGIN` is a BUILD arg and must be the compose service name.** With `http://localhost:3000`
+  the proxied path returns **500 after a 30-second hang** while everything else looks fine; the base
+  compose file's `web` section records the measurement.
+
+### What the stack is
+
+`docker-compose.dev.yml` **alone** — no override. `web` on the host's **:3001**, `server` on **:3000**,
+`postgres` on **54330** (NOT 54329 — that is the shared test Postgres five lanes run against), `minio` on
+:9000/:9001, `mailpit` on :8025/:1025. The browser talks to :3001 and the `web` container proxies `/v1/*`
+and `/api/auth/*` to `server:3000` over the compose network.
+
+**`pnpm test:e2e:stack` runs against this stack.** Its seed step reads which image shape the `server`
+container is and picks the matching command, so the built image is a valid target.
+
+### RETIRED 2026-09-19 — hot mode, kept below as history
+
+The rest of this section describes **hot-reload mode**, which no shipped command reaches any more. It is
+kept because its measurements are facts about this machine's Docker Desktop mount and about compose's own
+behaviour, not about a feature — each cost real time and would otherwise have to be re-derived. **Read it
+as a record, not as a mode to restore.** The full narrative, including the parts this section summarises,
+lives in `docker-compose.hot.yml`'s header, which is retained for the same reason.
 
 The dev `server` normally runs the image built by `apps/server/Dockerfile`, which bakes `dist` at
 build time. **Hot mode replaces that with the branch's SOURCE**: the container bind-mounts the source
