@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { newUlid } from '@gisik-nokma/domain';
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -26,6 +29,67 @@ const plansDir = new URL('../../../../docs/superpowers/plans', import.meta.url).
 const ownerUserId = newUlid();
 const resolveUserId = async (email: string): Promise<string | null> =>
   email === 'kiro@example.com' ? ownerUserId : null;
+
+/**
+ * A corpus the END-TO-END seed test can afford, and the measurement that chose it.
+ *
+ * ## The instrument, not a flake
+ *
+ * `seedDevWorkspace`'s test used to run the **real** plan series — **359 events**
+ * through one `ingestClientBatch` (`seed-dev-workspace.ts:171`) — TWICE, taking
+ * **1690 ms** under `vitest.config.ts`'s `testTimeout: 30_000`. That is real work:
+ * the limit is breached only when per-event latency amplifies ~18x, which is what
+ * the shared Postgres does on a loaded box (measured red at load average 201, and
+ * green on the next gate once the box went quiet).
+ *
+ * So the controller's question — *is the limit too tight, does the test do work it
+ * does not need, or does it share a resource* — has a measured answer:
+ *
+ * - **the test does ~27.6x more work than the property it asserts requires.** Its
+ *   claims are `committed > 0`, `committed === 0` on a re-run, and
+ *   `skippedExisting === first.committed` — **not one of which is a fact about
+ *   corpus SIZE.** The real corpus's *shape* is a different property and stays
+ *   pinned (below).
+ * - **the database is NOT shared** — `createTestDatabase` makes a
+ *   `gisik_test_<uuid>` per file and drops it, so there is no name collision to
+ *   isolate away. Only the Postgres *server* is shared, and one server is not
+ *   something a test can isolate from.
+ * - **the limit is not too tight at rest** — 1690 ms under 30 000 ms is ~18x of
+ *   headroom — so raising it would buy the flake away without the red ever being
+ *   about the code, which is the trade this project refuses.
+ *
+ * ## What still proves what, because shrinking a corpus can silently drop coverage
+ *
+ * - **The real corpus's SHAPE stays pinned, in this same file and for free.** The
+ *   `buildDevSeedEvents` describe above reads `plansDir` — the real series — and
+ *   asserts its invariants *in memory*: one epic per plan with titles verbatim, no
+ *   date claims, no transitions, `origin: 'web'`, membership strictly before the
+ *   first `ticket.created`, no duplicate ids.
+ * - **The real-database end-to-end path is pinned separately**, by
+ *   `seed-dev-cli.test.ts`, which drives this same `seedDevWorkspace` against a real
+ *   database through the CLI (with its own one-plan fixture).
+ * - **And this fixture ADDS assertion strength.** 13 events is a number the test can
+ *   name exactly, so `committed` is asserted for its VALUE — `toBeGreaterThan(0)`
+ *   passes for a seed that committed a single event.
+ */
+const plansDirWithTwoPlans = (): string => {
+  const dir = mkdtempSync(join(tmpdir(), 'gn-plans-load-'));
+  // Three things `readPlanSeries` requires, each documented at the same fixture in
+  // `seed-dev-cli.test.ts`: the `NNNN-NN-NN-NN-*.md` shape; a plan number that is
+  // NOT `00` (that is the coordination document, skipped on purpose); and inside the
+  // file an H1, a `**Goal:**` line and at least one `### Task N:` heading.
+  const plan = (n: number, tasks: number[]): string =>
+    [
+      `# Plan ${n}`,
+      '',
+      '**Goal:** give the seed enough structure to prove its accounting.',
+      '',
+      ...tasks.flatMap((t) => [`### Task ${t}: do the thing`, '']),
+    ].join('\n');
+  writeFileSync(join(dir, '2026-08-20-01-first.md'), plan(1, [1, 2]));
+  writeFileSync(join(dir, '2026-08-20-02-second.md'), plan(2, [1]));
+  return dir;
+};
 
 describe('buildDevSeedEvents — the calendar stays empty', () => {
   const docs = readPlanSeries(plansDir);
@@ -104,6 +168,8 @@ describe('buildDevSeedEvents — the calendar stays empty', () => {
 
 describe('seedDevWorkspace', () => {
   let db: TestDatabase;
+  /** The FIXTURE, not the real series — see `plansDirWithTwoPlans` for the measurement. */
+  const fixtureDir = plansDirWithTwoPlans();
   beforeAll(async () => {
     db = await createTestDatabase();
   }, 60_000);
@@ -131,7 +197,7 @@ describe('seedDevWorkspace', () => {
     await expect(
       seedDevWorkspace(
         { ...makeDeps(), resolveUserId: async () => null },
-        { plansDir, ownerEmail: 'nobody@example.com' },
+        { plansDir: fixtureDir, ownerEmail: 'nobody@example.com' },
       ),
     ).rejects.toThrowError(/sign in once/);
   });
@@ -142,9 +208,20 @@ describe('seedDevWorkspace', () => {
    * refusal test above).
    */
   it('lands, and a re-run is a no-op', async () => {
-    const first = await seedDevWorkspace(makeDeps(), { plansDir, ownerEmail: 'kiro@example.com' });
-    expect(first.committed).toBeGreaterThan(0);
-    const second = await seedDevWorkspace(makeDeps(), { plansDir, ownerEmail: 'kiro@example.com' });
+    const first = await seedDevWorkspace(makeDeps(), {
+      plansDir: fixtureDir,
+      ownerEmail: 'kiro@example.com',
+    });
+    // The fixture's WHOLE event count, asserted for its value rather than as
+    // `toBeGreaterThan(0)`: `buildDevSeedEvents` yields `workspace.created` +
+    // `project.created` + `project.member_added` + five `ticket.created` (two
+    // epics, three tasks) + five `ticket.field_set`. A `> 0` would pass for a
+    // seed that committed exactly one event; this cannot.
+    expect(first.committed).toBe(13);
+    const second = await seedDevWorkspace(makeDeps(), {
+      plansDir: fixtureDir,
+      ownerEmail: 'kiro@example.com',
+    });
     expect(second.committed).toBe(0);
     expect(second.skippedExisting).toBe(first.committed);
   });
