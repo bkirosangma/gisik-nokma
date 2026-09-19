@@ -10,17 +10,20 @@ import { ReadOnlyBanner } from './read-only-banner.js';
  * card grid (prototype `design-system/interactive/desktop.dc.html:841-869`,
  * `@227434a5`).
  *
- * ## WHAT IS DRAWN, and the two things that are NOT — both of them RULED
+ * ## WHAT IS DRAWN, and the one thing that is NOT — a RULING
  *
  * The prototype draws a `repeat(auto-fit,minmax(320px,1fr))` grid of cards, each
  * with a name, a status badge, a row of per-state chips carrying a 4px category
  * bar, a meta line and two actions. The card, the chips, the meta line, the
- * header subtitle and the primary action are all drawn here. **The badge and the
- * second action are ABSENT, and each is a DECISION rather than an omission** —
- * the owner ruled on each on 2026-09-18, approving the controller's
- * recommendation. This block records what was decided and what was measured, so
- * a reader comparing this screen to the prototype meets a ruling rather than a
- * silence that reads as an oversight.
+ * header subtitle and both actions are drawn here. **The badge is ABSENT, and it
+ * is a DECISION rather than an omission** — the owner ruled on it on 2026-09-18,
+ * approving the controller's recommendation. This block records what was decided
+ * and what was measured, so a reader comparing this screen to the prototype
+ * meets a ruling rather than a silence that reads as an oversight.
+ *
+ * **The second action WAS the second absence and is no longer one** (2026-09-19);
+ * its bullet below carries both the original reasoning and the lift, because the
+ * reasoning is what the lift resolved rather than what it discarded.
  *
  * The VERSION rides in the meta line (`v7 · 3 states · 9 transitions`) rather
  * than in the name. The prototype writes it into the name itself (`"Delivery
@@ -37,11 +40,17 @@ import { ReadOnlyBanner } from './read-only-banner.js';
  *   no status anywhere on the wire; `"Published"` is derivable from the read
  *   itself, and the prototype's other two badge values (`"Superseded"`,
  *   `"Draft · N issues"`, `:3175-3178`) are not.
- * - **the second action — RULED: NOT BUILT.** `"Duplicate"` and `"Discard
- *   draft"` are built under NO reading: neither has a door. `"View history"` was
- *   given the conditional ruling — build it **if the version chain is readable
- *   from an existing read** — and the measurement below is what decided it.
- *   **It is not built.**
+ * - **the second action — BUILT 2026-09-19, and two of its three candidates are
+ *   still absent.** `"View history"` was given the conditional ruling — build it
+ *   **if the version chain is readable from an existing read** — and the
+ *   measurement below established that it is. The owner lifted the hold on
+ *   2026-09-19 and ruled it **one decision with the screen it opens**, so the
+ *   action and `WorkflowHistoryScreen` are one task: `onHistory` navigates to
+ *   `/w/[workspaceId]/settings/workflows/[workflowId]/history`. **It sits on
+ *   every card**, not on a superseded one, because this screen renders one card
+ *   per workflow id — the measurement's point 2, which is why the prototype's
+ *   placement could not be copied. `"Duplicate"` and `"Discard draft"` are built
+ *   under **no** reading and that has not changed: neither has a door.
  *
  * ### The `"View history"` measurement, because the ruling turned on it
  *
@@ -82,18 +91,22 @@ import { ReadOnlyBanner } from './read-only-banner.js';
  *    `GET /v1/workspaces/:workspaceId/workflows/:workflowId?version=N` serves any
  *    single version (`apps/server/src/routes/builder-reads.ts:517-546`, numeric
  *    branch at `apps/server/src/projections/workflows.ts:116-120`).
- *    `WorkflowAuthoringGateway` (`../gateway.ts:56-94`) is version-BLIND — neither
- *    `listWorkflows` nor `getWorkflow(workspaceId, workflowId)` takes a version —
- *    but the adapter that implements it DROPS an argument that already exists one
- *    layer down (`apps/web/src/authoring/data-source-gateway.ts:224`, whose own
- *    seam docblock names the member as `getWorkflowDef(workspaceId, workflowId,
- *    v?)` at `:26`). Versions are contiguous **by server-side ENFORCEMENT**, not
- *    by convention: the engine refuses a first version that is not 1, and any
- *    later version that is not `latest + 1`
+ *    `WorkflowAuthoringGateway` was version-BLIND when this measurement was taken —
+ *    neither `listWorkflows` nor `getWorkflow(workspaceId, workflowId)` took a
+ *    version — and the adapter that implemented it DROPPED an argument that
+ *    already existed one layer down
+ *    (`apps/web/src/authoring/data-source-gateway.ts:233`, whose own seam
+ *    docblock names the member as `getWorkflowDef(workspaceId, workflowId, v?)`
+ *    at `:26`). **THE OWNER'S 2026-09-19 LIFT IS WHAT CLOSED IT: `getWorkflow`
+ *    now takes `version?` and that adapter passes it through**, which is why this
+ *    paragraph reads in the past tense — it is the record of why the ruling
+ *    turned on a *parameter* rather than on missing data. Versions are contiguous
+ *    **by server-side ENFORCEMENT**, not by convention: the engine refuses a first
+ *    version that is not 1, and any later version that is not `latest + 1`
  *    (`packages/rule-engine/src/workflow-defined.ts:53-58`, `:63-68`, rule
  *    `workflowVersion` at `refusal-rules.ts:18`) — so `1..N` is walkable from the
- *    `N` the list already returns. **What is missing is an exposed parameter, not
- *    a read.**
+ *    `N` the list already returns. **What was missing was an exposed parameter,
+ *    not a read.**
  *
  * **What the measurement does NOT say, recorded because it is the strongest
  * argument the other way.** The chain is not missing from the product. Every
@@ -122,7 +135,13 @@ import { ReadOnlyBanner } from './read-only-banner.js';
  * rules cannot both be honoured, and only the owner can pick between them:
  * ESCALATED to the controller as a ruling, not decided here.** Building it means
  * designing the view and choosing where the button lives, and inventing a screen
- * is the one thing a measurement cannot authorise.
+ * is the one thing a measurement cannot authorise. **The owner answered on
+ * 2026-09-19 — `yes`, as ONE decision with the screen — so the collision is
+ * resolved the first rule's way, with the view authored by the owner rather than
+ * by this change.** The escalation paragraphs above are kept as the record of
+ * *why* an answer was needed; the answer itself is in the bullet at the top and
+ * in `WorkflowHistoryScreen`'s docblock, which is where a reader comparing this
+ * product to the prototype will find why there is nothing to compare it to.
  *
  * Both absences are named in the catalogue entry rather than left as empty slots
  * here, and case 13.920 pins both at the RENDERED node — a class-shaped guard
@@ -154,6 +173,7 @@ export function WorkflowListScreen(props: {
   session: BuilderSession;
   gateway: WorkflowAuthoringGateway;
   onOpen(workflowId: string): void;
+  onHistory(workflowId: string): void;
   onNew(): void;
 }) {
   const [workflows, setWorkflows] = useState<PublishedWorkflowDef[] | null>(null);
@@ -225,6 +245,18 @@ export function WorkflowListScreen(props: {
                   onClick={() => props.onOpen(workflow.id)}
                 >
                   Open
+                </Button>
+                {/* Task 3's second action, LIFTED by the owner 2026-09-19. It
+                    sits on EVERY card rather than on a superseded one, because
+                    this screen renders one card per workflow id — the
+                    prototype's superseded card has no counterpart here, and the
+                    docblock above records that rather than assuming it. */}
+                <Button
+                  className="workflow-list__history"
+                  aria-label={`View history of ${workflow.name}`}
+                  onClick={() => props.onHistory(workflow.id)}
+                >
+                  View history
                 </Button>
               </div>
             </Card>

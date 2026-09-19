@@ -86,7 +86,12 @@ describe('the three reads and the one write that Plan 6’s DataSource already s
     const gateway = createWebAuthoringGateway({ dataSource, http });
 
     expect(await gateway.getWorkflow('ws', 'wf-flow')).toEqual(WORKFLOW);
-    expect(dataSource.query.getWorkflowDef).toHaveBeenCalledWith('ws', 'wf-flow');
+    // The version is passed THROUGH rather than omitted, so an omitting caller
+    // still reaches the latest definition (the query's own default) and the
+    // three-argument shape is what this seam now speaks. **This line used to
+    // read `toHaveBeenCalledWith('ws', 'wf-flow')` — the two-argument call WAS
+    // the dropped version**, which is the gap Task 3 closed.
+    expect(dataSource.query.getWorkflowDef).toHaveBeenCalledWith('ws', 'wf-flow', undefined);
 
     expect(await gateway.listTicketTypes('ws')).toEqual([]);
     expect(dataSource.query.getTicketTypes).toHaveBeenCalledWith('ws');
@@ -99,6 +104,27 @@ describe('the three reads and the one write that Plan 6’s DataSource already s
 
     // Printed, not counted: a failure names the request that should not exist.
     expect(seen).toEqual([]);
+  });
+
+  /**
+   * 13.942 — **the argument that was dropped.** Task 3's own measurement named
+   * this line as the whole of the gap: the route serves `?version=`, the online
+   * adapter sends it, `DataSourceQuery` declares it, and this adapter called the
+   * query with two arguments — so no screen could read a version chain and the
+   * ruling's conditional half was decided by a missing parameter rather than by
+   * missing data.
+   *
+   * The assertion is on the ARGUMENT the query receives, because that is the
+   * thing that was absent. A case asserting only that `getWorkflow` returns a
+   * definition passes on the version-blind wiring — it did, for the whole life
+   * of the seam.
+   */
+  it('a version argument reaches the query, which is what makes the chain readable', async () => {
+    const dataSource = fakeDataSource();
+    const { http } = scriptedHttp({});
+    const gateway = createWebAuthoringGateway({ dataSource, http });
+    expect(await gateway.getWorkflow('ws', 'wf-flow', 2)).toEqual(WORKFLOW);
+    expect(dataSource.query.getWorkflowDef).toHaveBeenCalledWith('ws', 'wf-flow', 2);
   });
 });
 

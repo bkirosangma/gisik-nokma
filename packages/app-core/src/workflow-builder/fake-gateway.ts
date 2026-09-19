@@ -84,8 +84,24 @@ export function createFakeGateway(
     submitted,
     migrations,
     listWorkflows: async () => seed.workflows ?? [],
-    getWorkflow: async (_workspaceId, workflowId) =>
-      (seed.workflows ?? []).find((workflow) => workflow.id === workflowId) ?? null,
+    /**
+     * Version-aware since Task 3 (lifted 2026-09-19): omitted answers the
+     * HIGHEST seeded version for that id, which is what the real read's
+     * `ORDER BY version DESC LIMIT 1` branch does, and a number answers exactly
+     * that version or null. Before this the fake answered the first match in
+     * seed order, so a test could not tell "the latest" from "the first one you
+     * listed" — a distinction the history screen exists to make.
+     */
+    getWorkflow: async (_workspaceId, workflowId, version) => {
+      const versions = (seed.workflows ?? []).filter((workflow) => workflow.id === workflowId);
+      if (version !== undefined) {
+        return versions.find((workflow) => workflow.version === version) ?? null;
+      }
+      return versions.reduce<PublishedWorkflowDef | null>(
+        (newest, current) => (newest === null || current.version > newest.version ? current : newest),
+        null,
+      );
+    },
     listTicketTypes: async () => seed.ticketTypes ?? [],
     listMembers: async () => seed.members ?? [],
     getStateOccupancy: async (_workspaceId, workflowId) => {

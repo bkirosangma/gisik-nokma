@@ -31,10 +31,16 @@ every `*.css` in the repo held exactly **one** `workflow-list` occurrence and it
   the product before this. One chip per state, one bar per chip, and the bar's class is asserted to be
   `workflow-list__state-bar--<category>` for each state IN ORDER, with a set-equality arm proving the
   fixture really carries all three categories, so the list is not satisfied by one class repeated. Every
-  bar is `aria-hidden` — the state's NAME is the accessible content. **Both absences are asserted rather
+  bar is `aria-hidden` — the state's NAME is the accessible content. **Both absences were asserted rather
   than assumed:** `.workflow-list__badge` must be `null` and the action row must hold exactly one button.
   A badge that can only ever say `Published` and a second button with no gateway method are exactly what
-  this repo keeps re-finding, so their absence is pinned in the test rather than left to the docblock.
+  this repo keeps re-finding, so their absence was pinned in the test rather than left to the docblock.
+  **THE SECOND HALF WAS SUPERSEDED ON 2026-09-19 (Task 3, lifted; cases `13.938`–`13.942`).** The badge
+  is still `null` and is still pinned. **The action row now holds TWO buttons and the count is no longer
+  the assertion** — `screens.test.tsx` pins them **by name and by order**
+  (`Open <name>`, `View history of <name>`), because a count of two would pass two `Open` buttons. The
+  old arm is quoted here rather than deleted: a reader comparing the two versions should meet the reason
+  the count became the weaker check, not a silent swap.
 
   **The measurement half, and it is the same defect as the avatar's, one screen over.** The prototype
   fills a chip with `--trayBg` (`:3184`) — `--gn-surface-sunken` here — and under `neo` that role is the
@@ -160,7 +166,7 @@ deliverable. Two facts, each read rather than inferred:
    (`packages/app-core/src/workflow-builder/gateway.ts:56-94`) **is** version-BLIND — neither
    `listWorkflows` nor `getWorkflow(workspaceId, workflowId)` takes a version — but the adapter that
    implements it **DROPS an argument that already exists one layer down**
-   (`apps/web/src/authoring/data-source-gateway.ts:224`, whose own seam docblock names the member as
+   (`apps/web/src/authoring/data-source-gateway.ts:233`, whose own seam docblock names the member as
    `getWorkflowDef(workspaceId, workflowId, v?)` at `:26`). Versions are contiguous **by server-side
    ENFORCEMENT**, not by convention: the engine refuses a first version that is not 1, and any later
    version that is not `latest + 1` (`packages/rule-engine/src/workflow-defined.ts:53-58`, `:63-68`, rule
@@ -1143,3 +1149,99 @@ control that silently does nothing is indistinguishable from one that worked.
 
 **Ids `13.936`–`13.937` are left UNUSED** in this block — no case was written for them, and the rule is
 that a minted id is never renumbered down.
+## `settings → workflows`: the version history — the FIRST screen this repo authors rather than ports (executor 2, 2026-09-19) — cases `13.938`–`13.942`
+
+**Task 3, lifted by the owner on 2026-09-19, and it is ONE task with the screen its action opens.** The
+plan's Task 3 was DATA-conditional (*"build it if the version chain is readable from an existing read"*),
+and the screen's own docblock had escalated the collision rather than deciding it — building the button
+meant designing a view **the prototype does not draw**. The owner's answer resolved both at once.
+
+**Ids recounted at this branch's tip BY MARKER only.** `13.938`–`13.945` are minted here; **the next free
+in this block is `13.946`**. `13.920`'s now-superseded arm is corrected in place above rather than
+renumbered. **`13.943`–`13.945` were minted by the review rather than by the plan** — each closes a
+mutation that SURVIVED the first version of this change set, which is the reason they are listed with the
+mutation they kill.
+
+**Files:** `packages/app-core/src/workflow-builder/ui/workflow-history-screen.tsx` ·
+`packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx` ·
+`packages/app-core/src/workflow-builder/gateway.ts` · `apps/web/src/authoring/data-source-gateway.ts` ·
+`apps/web/app/w/[workspaceId]/settings/workflows/[workflowId]/history/page.tsx` ·
+`packages/ui/src/ui.css` · tests in `packages/app-core/test/workflow-builder/history.test.tsx`,
+`screens.test.tsx`, and `apps/web/test/data-source-gateway.test.ts`.
+
+- ✅ **13.938 — the second action renders on every card and opens the history for THAT workflow.**
+  `packages/app-core/test/workflow-builder/history.test.tsx`. The button's accessible name is
+  `View history of <name>` and clicking it calls `onHistory` with that workflow's id — asserted on the
+  **RENDERED** control, with a control arm proving the click did not simply fire any handler
+  (`onOpen` was not called). **The two doorless candidates are asserted ABSENT rather than assumed:**
+  querying by `/Duplicate/` and `/Discard draft/` returns `null`. Neither has a route behind it under any
+  reading — no operation duplicates a workflow, and this product has no draft state — so a button for
+  either would be the affordance-with-no-door this repo keeps re-finding. The reason is in the screen's
+  docblock, where a reader comparing the product to the prototype meets it.
+
+- ✅ **13.939 — the chain renders newest-first, with the current version marked.**
+  Same file. The rendered order is asserted by reading `data-version` off the rendered list items
+  (`['2','1']`) rather than by trusting the sort the screen performed — a `reverse()` that ran twice
+  leaves both cards present and the reading wrong. `Current` appears on the newest card and `Superseded`
+  on the older one, **and the newest card is asserted NOT to say `Superseded`**, so the marker is a fact
+  about each card rather than a word somewhere on the page. The current version is marked twice, and only
+  one of the two is colour (`--gn-accent`'s leading edge plus the word), because the screen's whole
+  subject is which version you are looking at.
+
+- ✅ **13.940 — a superseded version renders WITH ITS CONTENT, not as a version number.**
+  Same file. This is the acceptance's load-bearing half. The fixture's two versions carry **different
+  definitions**: `v1` has a `Review` state and two transitions through it, `v2` dropped `Review` and
+  carries a `stateMapping`. The case asserts `Review` renders **inside v1's card** and is **absent from
+  v2's** — so a screen that drew one definition under two headings passes every count in `13.939` and
+  fails here. **Its control is v2's own content** (`To do`, `Done` render), which keeps the absence from
+  being an empty card, and the content is not only state names: `2 transitions` on v1 against
+  `1 transition` and `maps 1 state` on v2.
+
+- ✅ **13.941 — a hole in the chain is NAMED rather than shown as a shorter list.** Same file. When the
+  read answers `v2` and not `v1`, the screen says *"1 version in this workflow's range did not answer…"*.
+  A screen that silently rendered the versions it happened to receive would display a chain shorter than
+  the workflow has, with nothing on screen to say which.
+
+- ✅ **13.942 — the version argument reaches the query at the web seam.** `apps/web/test/data-source-gateway.test.ts`.
+  Task 3's own measurement named this line as the whole of the gap: the route serves `?version=`, the
+  online adapter sends it, and `DataSourceQuery` declared it — while the web adapter called the query
+  with **two** arguments, so no screen could read a chain. The case asserts the **argument** the query
+  receives (`('ws', 'wf-flow', 2)`), because that is the thing that was absent; an assertion that
+  `getWorkflow` merely returns a definition passes on the version-blind wiring, which it did for the
+  whole life of the seam. The pre-existing delegation arm is corrected in the same change set — it read
+  `toHaveBeenCalledWith('ws','wf-flow')`, **and the two-argument call WAS the dropped version**.
+
+### Three cases the REVIEW added, each killing a mutation that had survived
+
+An independent review mutated this change set and found three survivors. Each is now killed by a case, so
+they are recorded with the mutation they close rather than as extra coverage:
+
+- ✅ **13.943 — a workflow that answers nothing says *"No published versions to show."* rather than
+  loading forever.** `packages/app-core/test/workflow-builder/history.test.tsx`. **Mutation killed:**
+  replacing the missing-workflow branch with a bare `return` left **all four** history cases green, because
+  nothing asserted the state a stale `workflowId` in the URL reaches — the shell would claim an answer was
+  on its way, permanently. Its control asserts the loading line is GONE, so the sentence is the answered
+  state and not a caption beside a spinner that never stops. *(The `load-error` branch — a rejection rather
+  than a null — stays uncovered; said here rather than implied.)*
+- ✅ **13.944 — the action's DESTINATION.** `apps/web/test/authoring-routes.test.tsx`. **Mutation
+  killed:** pointing `onHistory` at the BUILDER's path left **548 `apps/web` tests green**, because
+  `13.938` proves the handler is called with the right id and nothing proved the id became the right URL.
+  The case renders the shipped list PAGE and asserts `push` received
+  `/w/<workspace>/settings/workflows/<id>/history` — with the builder path as its negative, which is
+  exactly the mutation.
+- ✅ **13.945 — the history ROUTE renders a real chain**, through the page the product ships: wiring,
+  gateway and screen. **Mutation killed:** nothing rendered this route at all, so its seven-deep relative
+  imports and its `useBuilderWiring` arm were compiler-checked only. Asserts both version markers and
+  `Review` — `v1`'s dropped state — arriving through the real page.
+
+**And one arm strengthened rather than added: `13.939` now pins the current-version MARKER's class.**
+**Mutation killed:** deleting the `--current` class left every case green, so the accent leading edge could
+vanish silently while the word `Current` still printed. The screen's own claim that the marker is *"two
+things, and only one of them is colour"* is now half-measured rather than half-asserted; the colour half is
+**not** measured by anything (no browser case walks this route), and that is stated rather than implied.
+
+**Why this needed an owner and not a ruling, recorded because it is the first of its kind here.** The
+prototype draws **no history view**: its `View history` handler fires a toast (`desktop.dc.html:3187`) and
+navigates nowhere, and none of the block's ten `screen:` values is a history screen. There is therefore
+nothing to be faithful to, and a port cannot author a view. `WorkflowHistoryScreen`'s docblock states
+that in those words, so a reader comparing the two meets the reason rather than a silence.
