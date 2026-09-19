@@ -175,3 +175,147 @@ describe('the approval route is CSRF-protected, because it mints a credential', 
     expect(honest.statusCode).toBe(200);
   });
 });
+
+/**
+ * The DENIAL door, added 2026-09-19 on the owner's ruling (*"go with all
+ * recommended"*, the doors table in `docs/lanes/owner-holds.md`).
+ *
+ * **The refusal has to be ANSWERABLE, which is why 14.104 and 14.105 are two
+ * cases rather than one.** The dispatch's own words: *"a refusal that silently
+ * does nothing is the same defect class as the button that lies."* So each case
+ * denies in ONE state and then asserts on the paths that state could have left
+ * open — a code that can no longer be approved, and a code that must never
+ * collect a credential.
+ */
+describe('POST /v1/mcp/device/deny — the refusal consents implies', () => {
+  it('14.104 denies an UNAPPROVED code, which can then be neither approved nor exchanged', async () => {
+    const { app, otp } = buildTestApp(db);
+    const user = await signInWithPhone(app, otp, '+911100000005');
+    const minted = (await app.inject({ method: 'POST', url: '/v1/mcp/device/code', payload: {} })).json() as { deviceCode: string; userCode: string };
+
+    const deny = await app.inject({
+      method: 'POST', url: '/v1/mcp/device/deny',
+      headers: { authorization: `Bearer ${user.token}` },
+      payload: { userCode: minted.userCode },
+    });
+    expect(deny.statusCode).toBe(200);
+    expect(deny.json()).toEqual({ denied: true });
+
+    // Both halves matter. The first would pass against a route that merely
+    // recorded a flag somewhere; the second and third are what prove the row is
+    // GONE rather than marked.
+    const laterApprove = await app.inject({
+      method: 'POST', url: '/v1/mcp/device/approve',
+      headers: { authorization: `Bearer ${user.token}` },
+      payload: { userCode: minted.userCode },
+    });
+    expect(laterApprove.statusCode).toBe(404);
+    expect(laterApprove.json()).toEqual({ error: 'unknown_code' });
+
+    const exchange = await app.inject({
+      method: 'POST', url: '/v1/mcp/device/token', payload: { deviceCode: minted.deviceCode },
+    });
+    expect(exchange.statusCode).toBe(404);
+    expect(exchange.json()).toEqual({ error: 'unknown_code' });
+  });
+
+  /**
+   * 14.105 — the state the dispatch named explicitly: a code ALREADY approved
+   * but not yet collected by the CLI. This is the case that quietly ships a
+   * credential if the delete were predicated on `approved_user_id IS NULL`, so
+   * it is the one that makes that predicate impossible to add back.
+   */
+  it('14.105 denies an ALREADY-APPROVED code, so no credential is ever issued', async () => {
+    const { app, otp } = buildTestApp(db);
+    const user = await signInWithPhone(app, otp, '+911100000006');
+    const minted = (await app.inject({ method: 'POST', url: '/v1/mcp/device/code', payload: {} })).json() as { deviceCode: string; userCode: string };
+
+    const approve = await app.inject({
+      method: 'POST', url: '/v1/mcp/device/approve',
+      headers: { authorization: `Bearer ${user.token}` },
+      payload: { userCode: minted.userCode },
+    });
+    expect(approve.statusCode).toBe(200);
+
+    const deny = await app.inject({
+      method: 'POST', url: '/v1/mcp/device/deny',
+      headers: { authorization: `Bearer ${user.token}` },
+      payload: { userCode: minted.userCode },
+    });
+    expect(deny.statusCode).toBe(200);
+    expect(deny.json()).toEqual({ denied: true });
+
+    const exchange = await app.inject({
+      method: 'POST', url: '/v1/mcp/device/token', payload: { deviceCode: minted.deviceCode },
+    });
+    expect(exchange.statusCode).toBe(404);
+    expect(exchange.json()).toEqual({ error: 'unknown_code' });
+  });
+
+  it('14.106 needs a session, and an unknown code is refused with the body approve already uses', async () => {
+    const { app, otp } = buildTestApp(db);
+    const user = await signInWithPhone(app, otp, '+911100000007');
+    const minted = (await app.inject({ method: 'POST', url: '/v1/mcp/device/code', payload: {} })).json() as { userCode: string };
+
+    const anonymous = await app.inject({
+      method: 'POST', url: '/v1/mcp/device/deny', payload: { userCode: minted.userCode },
+    });
+    expect(anonymous.statusCode).toBe(401);
+    expect(anonymous.json()).toEqual({ error: 'unauthenticated' });
+
+    // The same 404 body approve answers, deliberately: a DISTINCT "denied"
+    // answer would confirm to whoever holds a guessed user code that it was
+    // real, which is the one thing the unknown arm exists to avoid.
+    const unknown = await app.inject({
+      method: 'POST', url: '/v1/mcp/device/deny',
+      headers: { authorization: `Bearer ${user.token}` },
+      payload: { userCode: 'ZZZZ-ZZZZ' },
+    });
+    expect(unknown.statusCode).toBe(404);
+    expect(unknown.json()).toEqual({ error: 'unknown_code' });
+  });
+
+  it('14.107 /v1/mcp/device/deny is in HTTP_ORIGIN_PROTECTED_ROUTES', () => {
+    // The attack here is the MIRROR of 14.27's and no less real for being a
+    // refusal: without this entry, a page the victim visits can kill a grant
+    // out from under whoever was mid-approval. The set is also compared for
+    // exact equality against the table in `security-middleware.test.ts`
+    // (case 13.116), so protecting the route and forgetting its row there
+    // reddens that guard in the other direction.
+    expect(HTTP_ORIGIN_PROTECTED_ROUTES.has('/v1/mcp/device/deny')).toBe(true);
+  });
+
+  it('14.107b a cookie-carrying DENIAL with a forged Origin is refused, and the honest one still denies', async () => {
+    const { app, otp } = buildTestApp(db, {
+      security: { webOrigin: TEST_WEB_ORIGIN, rateLimit: null, trustProxy: false },
+    });
+    const user = await signInWithPhone(app, otp, '+911100000008');
+    const minted = (await app.inject({ method: 'POST', url: '/v1/mcp/device/code', payload: {} })).json() as { userCode: string };
+
+    const forged = await app.inject({
+      method: 'POST',
+      url: '/v1/mcp/device/deny',
+      headers: {
+        cookie: 'better-auth.session_token=whatever',
+        origin: 'https://attacker.example',
+      },
+      payload: { userCode: minted.userCode },
+    });
+    expect(forged.statusCode).toBe(403);
+    expect(forged.json()).toEqual({ error: 'forbidden_origin' });
+
+    // The control, and it does double duty: the SAME denial, bearer-
+    // authenticated (nothing ambient to forge), succeeds — proving the 403 is
+    // about the ORIGIN and not a route that refuses everything. And because it
+    // answers 200 rather than 404, it also proves the forged call really did
+    // nothing: had it landed, the row would already be gone.
+    const honest = await app.inject({
+      method: 'POST',
+      url: '/v1/mcp/device/deny',
+      headers: { authorization: `Bearer ${user.token}` },
+      payload: { userCode: minted.userCode },
+    });
+    expect(honest.statusCode).toBe(200);
+    expect(honest.json()).toEqual({ denied: true });
+  });
+});

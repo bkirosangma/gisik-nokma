@@ -2,6 +2,7 @@ import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import type { Queryable } from '../db/queryable.js';
 import {
   approveDeviceCode,
+  denyDeviceCode,
   DEVICE_CODE_TTL_SEC,
   exchangeDeviceCode,
   mintDeviceCode,
@@ -17,7 +18,7 @@ export const EXPIRED_CODE_BODY = { error: 'expired_code' } as const;
 export const INVALID_BODY = { error: 'invalid' } as const;
 
 /**
- * The device-authorization flow, in three doors.
+ * The device-authorization flow, in four doors.
  *
  * ## Why two of them are unauthenticated, and why that is not a hole
  *
@@ -29,17 +30,20 @@ export const INVALID_BODY = { error: 'invalid' } as const;
  * session has approved that exact grant. The credential is created by the
  * APPROVAL, which is the door that requires identity.
  *
- * ## Why the approval is the CSRF-sensitive one
+ * ## Why the approval AND the denial are the CSRF-sensitive ones
  *
- * It is a cookie-authenticatable POST that mints a credential, which is the
- * exact category `HTTP_ORIGIN_PROTECTED_ROUTES` exists for and the reason
- * `/v1/workspaces/:workspaceId/invites` is already in it. Without that
- * membership, a page the victim visits can POST an approval for the ATTACKER's
- * device code with the victim's ambient cookie, and the attacker polls a token
- * for the victim's account. `SameSite=Lax` does not close it — `http-origin.ts`
- * records at length that the product and API are same-site siblings of one
- * registrable domain, so the origin check is not defence in depth here, it is
- * the defence.
+ * Both are cookie-authenticatable POSTs, which is the exact category
+ * `HTTP_ORIGIN_PROTECTED_ROUTES` exists for and the reason
+ * `/v1/workspaces/:workspaceId/invites` is already in it. For the APPROVAL:
+ * without that membership, a page the victim visits can POST an approval for
+ * the ATTACKER's device code with the victim's ambient cookie, and the attacker
+ * polls a token for the victim's account. For the DENIAL the attack is the
+ * mirror — a forged deny kills a grant out from under whoever was mid-approval
+ * — and a refusal forged by a third party is no less an act on the victim's
+ * account than a grant would be. `SameSite=Lax` does not close either —
+ * `http-origin.ts` records at length that the product and API are same-site
+ * siblings of one registrable domain, so the origin check is not defence in
+ * depth here, it is the defence.
  *
  * ## Bucket
  *
@@ -99,6 +103,57 @@ export function registerMcpDeviceRoutes(
       if (outcome === 'expired') return reply.code(410).send(EXPIRED_CODE_BODY);
       if (outcome === 'unknown') return reply.code(404).send(UNKNOWN_CODE_BODY);
       return reply.code(200).send({ approved: true });
+    },
+  );
+
+  /**
+   * The refusal that consents implies.
+   *
+   * ## A sibling of approve, NOT a flag on it
+   *
+   * The obvious shortcut is `POST /approve { userCode, deny: true }`, and it is
+   * refused by name: approval and denial answer DIFFERENT QUESTIONS about the
+   * same code, and the closed body schema at the approve route above
+   * (`additionalProperties: false`) is the structure that makes overloading it
+   * loud rather than silent. One route answering two questions is the defect
+   * this repo names most often, so this is a second door.
+   *
+   * ## Authenticated, and CSRF-registered, for the same reason approve is
+   *
+   * It is a cookie-authenticatable mutating POST. Without its membership in
+   * `HTTP_ORIGIN_PROTECTED_ROUTES`, a page the victim visits could deny a grant
+   * out from under whoever was mid-approval — the mirror of the attack the
+   * approve entry closes, and no less real for being a refusal rather than a
+   * grant. `MUTATING_METHODS` covers the POST once the path is registered.
+   *
+   * ## What it answers, in each state
+   *
+   * `denyDeviceCode` deletes the row without regard to `approved_user_id`, so
+   * it covers both a grant nobody has approved yet and one approved but not yet
+   * collected by the CLI. Every downstream answer is then `unknown_code`,
+   * including the CLI's next poll — which is the same answer `approve` gives a
+   * second approver, and deliberately not a distinct "denied" state that would
+   * confirm a guessed user code had been real. See the store's own docblock.
+   */
+  app.post(
+    '/v1/mcp/device/deny',
+    {
+      preHandler: requireSession,
+      schema: {
+        body: {
+          type: 'object',
+          required: ['userCode'],
+          additionalProperties: false,
+          properties: { userCode: { type: 'string', minLength: 1 } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { userCode } = request.body as { userCode: string };
+      const outcome = await denyDeviceCode(deps.pool, userCode.trim().toUpperCase(), now());
+      if (outcome === 'expired') return reply.code(410).send(EXPIRED_CODE_BODY);
+      if (outcome === 'unknown') return reply.code(404).send(UNKNOWN_CODE_BODY);
+      return reply.code(200).send({ denied: true });
     },
   );
 

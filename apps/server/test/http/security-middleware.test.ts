@@ -205,6 +205,14 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
     // precisely what that guard is for. A cookie-authenticated POST that mints
     // a credential, so it belongs to the same category as the invite MINT.
     ['the MCP device APPROVAL', '/v1/mcp/device/approve', '/v1/mcp/device/approve', 'POST'],
+    // Added 2026-09-19 with the DENIAL route. It needs its OWN row rather than a
+    // share of approve's, because the drift guard below compares the table and
+    // `HTTP_ORIGIN_PROTECTED_ROUTES` for SET EQUALITY in both directions — so
+    // protecting the route without a row here reddens 13.116, and a row without
+    // the protection reddens it too. That guard is what this dispatch asked to
+    // have settled, and this is the answer: the route COUNT is not pinned
+    // anywhere, but the route SET is, exactly.
+    ['the MCP device DENIAL', '/v1/mcp/device/deny', '/v1/mcp/device/deny', 'POST'],
     // MCP plan Task 12, and the FIRST non-POST row. It is what found
     // `httpOriginRefused`'s `method !== 'POST'` early return: the forged-Origin
     // DELETE sailed past the hook to `requireSession`, which answered 401 —

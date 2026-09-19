@@ -76,21 +76,37 @@ function AuthorizeScreen(): React.JSX.Element {
   // typed by hand when it could not. Both paths reach the same input, so there
   // is one code path to get right rather than two.
   const [code, setCode] = useState(params.get('code') ?? '');
-  const [state, setState] = useState<'idle' | 'sending' | 'approved'>('idle');
+  const [state, setState] = useState<
+    'idle' | 'approving' | 'denying' | 'approved' | 'denied'
+  >('idle');
   const [refusal, setRefusal] = useState<string | null>(null);
 
-  const approve = (): void => {
+  /**
+   * ONE handler for both doors, because the two differ only in their verb.
+   *
+   * `POST /v1/mcp/device/deny` is a SIBLING of approve, not a flag on it —
+   * deliberately, since one route answering two questions is the shape this
+   * repo refuses by name — and the pair answers the SAME three refusals, so the
+   * mapping below is shared rather than copied. What differs is the success
+   * state and one sentence of the catch-all.
+   */
+  const submit = (action: 'approve' | 'deny'): void => {
     setRefusal(null);
-    setState('sending');
+    setState(action === 'approve' ? 'approving' : 'denying');
     const http = createHttpClient('', (input, init) => fetch(input, init));
-    void http.post('/v1/mcp/device/approve', { userCode: code.trim().toUpperCase() }).then(
-      () => setState('approved'),
+    void http.post(`/v1/mcp/device/${action}`, { userCode: code.trim().toUpperCase() }).then(
+      () => setState(action === 'approve' ? 'approved' : 'denied'),
       (cause: unknown) => {
         setState('idle');
         // A PRESENTATION of the server's single-key refusal, not a paraphrase
         // of a rule: the server says `{error:'unknown_code'}` and this is the
         // one place in the product where that is rendered as a sentence a
         // person can act on. Every branch ends in something to DO.
+        //
+        // The 404 arm carries extra weight on the DENY path: it is what a
+        // person sees when the code was already spent or already denied, which
+        // is why the sentence names both possibilities rather than assuming
+        // the code never existed.
         if (cause instanceof HttpError && cause.status === 410) {
           setRefusal('That code has expired. Ask for a new one and try again.');
           return;
@@ -102,7 +118,9 @@ function AuthorizeScreen(): React.JSX.Element {
           return;
         }
         setRefusal(
-          'That approval could not be completed, and the server did not say why. Ask for a new code and try again.',
+          action === 'approve'
+            ? 'That approval could not be completed, and the server did not say why. Ask for a new code and try again.'
+            : 'That denial could not be completed, and the server did not say why. Ask for a new code and try again.',
         );
       },
     );
@@ -135,6 +153,20 @@ function AuthorizeScreen(): React.JSX.Element {
             <p className="gn-mcp-authorize__revoke">
               This lasts until you revoke it. You can close this page; the assistant already has
               what it needs.
+            </p>
+          </div>
+        ) : state === 'denied' ? (
+          /* The counterpart the consent panel implied: a screen that says what
+             approving MEANS, and offers no way to say no, is not asking. The
+             sentence is careful about what actually happened — the grant row is
+             deleted, so the code is spent in BOTH directions and the CLI's next
+             poll answers `unknown_code`, which is a real thing it can act on. */
+          <div data-testid="mcp-authorize-denied" role="status">
+            <p className="gn-mcp-authorize__denied">Denied. The assistant was not connected.</p>
+            <p className="gn-mcp-authorize__what">
+              The code is spent — it cannot be approved later, and it cannot collect a credential.
+              Your assistant&rsquo;s next check will tell it the code is no longer recognised, so ask
+              it for a new one if you change your mind.
             </p>
           </div>
         ) : (
@@ -177,13 +209,29 @@ function AuthorizeScreen(): React.JSX.Element {
               Eight characters, shown as two groups of four. Upper or lower case both work.
             </span>
 
-            <Button
-              data-testid="mcp-authorize-submit"
-              onClick={approve}
-              disabled={state === 'sending' || code.trim() === ''}
-            >
-              {state === 'sending' ? 'Approving…' : 'Approve this assistant'}
-            </Button>
+            {/* Two controls of EQUAL WEIGHT, because this screen is asking a
+                question rather than recommending an answer. Deny is therefore
+                NOT `variant="danger"`: the product reserves that variant for
+                the destructive actions it names (`revoke`, `delete`), and this
+                page's own docblock already records why alarm-dressing a normal
+                decision trains people to click through alarms. */}
+            <div className="gn-mcp-authorize__actions">
+              <Button
+                data-testid="mcp-authorize-submit"
+                onClick={() => submit('approve')}
+                disabled={state !== 'idle' || code.trim() === ''}
+              >
+                {state === 'approving' ? 'Approving…' : 'Approve this assistant'}
+              </Button>
+              <Button
+                variant="ghost"
+                data-testid="mcp-authorize-deny"
+                onClick={() => submit('deny')}
+                disabled={state !== 'idle' || code.trim() === ''}
+              >
+                {state === 'denying' ? 'Denying…' : 'Deny'}
+              </Button>
+            </div>
           </>
         )}
 
