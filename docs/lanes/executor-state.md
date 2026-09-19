@@ -41,6 +41,69 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~18:0x IST. **DOOR A IS BUILT; ITS PR IS OPENING AT THIS
+> # HEAD.** Branch **`exec/workspace-description`**, cut from **`origin/main` = `123560a8`**; code head
+> # **`1036fb0e`**, pushed. **Dispatch: the controller's resume of `CTL-QUEUE-2026-09-19-door-builds.md` §A
+> # row A, after the owner ruled the authoring question.**
+>
+> ## THE OWNER'S RULING, WHICH WAS THE ONE THING BLOCKING THIS DOOR
+> Verbatim: *"New-project form gains an optional description input: go with this."* So the description
+> **rides `project.created`** — no new event, no second door — and the New-project form gained the input.
+> The scope question the previous session stopped on is **CLOSED**; do not re-open it.
+>
+> ## WHAT IS BUILT (16 files, +744/−15) — the seven items the old block listed, all done
+> | | |
+> |---|---|
+> | the migration | `1789600000000_proj-projects-description.sql`, `text NULL` |
+> | the payload | `projectCreatedPayload` gains an OPTIONAL `description` (`.strict()` already) |
+> | the projection | writes `payload.description ?? null` — **never `''`** |
+> | the read | `visibleProjects` selects and carries it |
+> | the wire | `routes/workspaces.ts` sends it **always present**, `string \| null` |
+> | the mapper | `describedText` — **refuses a row that OMITS the key**, `null` → absent |
+> | the type | `ProjectRef.description?: string`, `undefined` = NOT DESCRIBED |
+> | the render | the card draws it inside the door, transcribed from `desktop.dc.html:264` |
+> | the form | the owner's ruling: an optional description input |
+> | cases | **`13.976`–`13.987`**, all twelve minted from this lane's block |
+>
+> ## ⚠ THE ONE DESIGN DECISION A REVIEWER SHOULD AIM AT FIRST
+> **The route always sends the key and the mapper REFUSES its absence.** The queue's warning was that every
+> `ProjectRef` construction site must carry the field "or it arrives `undefined` on some route" — and
+> `undefined` on the client MEANS "not described", so a forgotten site would render as a correct-looking
+> card that says nothing. Enumerated rather than spot-checked: **two production sites** (`routes/workspaces.ts`,
+> `mappers.ts`); every other hit is a consumer; MCP's `read-tools.ts` builds its own inline `{projectId, name}[]`,
+> a different type. The refusal converts the silent failure into a loud one. **Mutation-witnessed:**
+> mutating that guard into the `withheldOrNumber` shape reddens **13.983 alone** (77 green); `?? null` → `?? ''`
+> reddens **13.978 alone** (7 green).
+>
+> ## ANCHORS — verified at the head, RE-TAKE `origin/main` (it moves)
+> | | |
+> |---|---|
+> | base | `origin/main` = **`123560a8`**; branch is **0 behind / 1 ahead** of it before the handoff commit |
+> | gate | **33/33, EXIT 0** under **Node `v22.22.2`** (32 cached at the same tree — only the flaked task re-ran) |
+> | checks | all **seven exit 0**. `check-case-ids` **2445, union == sum**. `check-migrations` **1 new, above `1789500000000`** |
+> | the one red | `seed-dev.test.ts` timed out at 30s on the FIRST run under load; **2.1 s alone**; green in the re-run |
+>
+> ## ⚠ TWO DEFECTS FOUND OUTSIDE THIS ROW'S SCOPE — RECORDED, NOT FIXED. **OWNER: THE CONTROLLER.**
+> 1. **`13.969` NAMES TWO CASES.** Door B's inbox filter holds it as an **id line**
+>    (`13-settings-and-workflows.md:1381`); executor 2's rename claims it in a **HEADING**
+>    (`13-neomorphism-and-workspace-screens.md:2125`) and has **no id line at all** — which is exactly why
+>    `check-case-ids` reports 2445 unique and sees nothing: **it counts id LINES, and a heading is not one.**
+>    Executor 2's own text calls it *"minted at the tip and FLAGGED FOR THE CONTROLLER"*.
+> 2. **Executor 2's rename doc states *"`13.994` is the highest in use"*.** It is not — `13.994` appears
+>    nowhere as an id. Measured: across `13.966`–`13.999` the ids in use are `966`–`975`, `988`, and the two
+>    truncation-trap citations. The queue's window still holds.
+>
+> ## ⚠ AND A LESSON THAT COST A ROUND HERE — CARRY IT
+> **A catalogue entry written as a markdown TABLE is INVISIBLE to `check-case-ids`.** Twelve case ids
+> written that way left the sweep at **2433 — unchanged — and `ok`.** Rewritten as id lines it reads 2445.
+> *Prefer the check whose failure is loud*, and when adding cases, **confirm the id count MOVED by exactly
+> what you added** — a guard that cannot see the thing it guards returns a comfortable green.
+>
+> ## NEXT IN THIS LANE'S QUEUE
+> **D (`isMcpTokens` row name) → F (subtasks) → G (Priority/Due/Type).** ⚠ **Door A used `13.976`–`13.987`.
+> THIS LANE'S BLOCK IS NOW EMPTY.** The queue's rule is *"when your block is empty, STOP AND ASK — do not
+> mint past `13.999`, and do not borrow a neighbour's"*: **D, F and G cannot fit and need a reallocation.**
+>
 > # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~17:4x IST. **DOOR A IS PART-BUILT AND STOPPED AT A
 > # RESTART REQUEST. NO PR. THIS IS A WIP BRANCH.** Branch **`exec/workspace-description`**, cut from
 > # **`origin/main` = `7beccab4`** (main has since moved to `9b88f9b4`); head **`3b6cf2a1`**, pushed.
