@@ -80,6 +80,34 @@ screens.** Fifteen items: **nine BUILD, four DECLINED, one NOT NOW, two already 
 **A DECLINE here is a decision, not a hold** — the same distinction §3 draws for the legal copy. These
 are settled product positions, and **a later session must not surface them as gaps to close.**
 
+#### THE TICKET SHEET, RULED — owner, 2026-09-19 late
+
+**Raised by the owner's own correction.** The controller had compared the ticket sheet's *container*
+(`.gn-sheet__scrim`) and called it a match; the owner said *"not just the container. the entire. how the
+ticket is displayed. how the fields description etc are."* The follow-up reconnaissance is
+`gisik-nokma-lanes/EXEC-RECON-2026-09-19-ticket-sheet.md`, and **it refuted half the controller's own
+headline**, which is why it is worth reading in full.
+
+| item | ruling | evidence |
+|---|---|---|
+| **Assignee** | **BUILD — editable.** Owner: *"assignee should not be read only."* | `SERVER EXISTS → SURFACE`. `ticket.assigned` is wired end to end — payload `events/ticket-events.ts:50` (an UNASSIGNMENT is the same event with `null`), projected `projections/tickets.ts:436,466`, a read `read/assigned-provenance.ts`, fan-out `notifications/fanout.ts:225`, synced `sync/snapshot-writer.ts:95`, and an MCP write tool `mcp/write-tools.ts:167-173`. **The web renders it read-only at `ticket-sheet.tsx:573`.** |
+| **Description** | **AN OMISSION, NOT YET RULED** | The door exists (`compose-editor-submission.ts:14,29`), the sheet already submits `ticket.field_set` (`:284`), the editor has both modes — and **nothing in `ticket-sheet.tsx` records a decision either way.** The FAQ states the consequence to users. |
+| **State dropdown** | **REFUSED — no second door** | The chip + "Move…" and a dropdown are **two presentations of the same legal-transition set**. A restyle, not a gap. |
+
+**⚠ THE FINDING THAT EXPLAINS MOST OF THE SHEET, and it is one line:** the web mounts `TicketSheet` at
+`page.tsx:2346-2353` with **six props and NONE of the four optional ones** — no `editorSlot` (so the real
+editor never mounts and the description falls back to `readOnly`), no `attachments` (so `<AttachmentList>`
+renders empty), no `uploadEvidence`, no `visibility`. **One mount, four gaps.**
+
+**⚠ THE COMMENTS CORRECTION — the controller's own headline was WRONG and is recorded wrong here.**
+`comment.added` is fully wired on the server (vocabulary `:195`, state machine, projections, search index,
+mention fan-out, sync, and a `require-comment` seed rule). But the claim *"no UI anywhere"* is **false**:
+**mobile has a Comment button** (`apps/mobile/src/screens/ticket-screen.tsx:44`), the MCP server has a
+comment tool, and both contest banners can resolve as `converted-to-comment`. **The accurate position is:
+fully supported on the server; the WEB has no composer; and no screen anywhere renders a comment THREAD**
+(`<EditorSlot>` is mounted in exactly one place repo-wide, the read-only description). **The product's own
+FAQ already says so in the user's words — `docs/faq.md:415-421` — and calls it backwards.**
+
 #### The 2026-09-19 rulings, verbatim, and what each means
 
 | item | owner's answer | effect |
