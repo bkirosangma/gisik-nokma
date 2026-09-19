@@ -544,3 +544,17 @@ Recorded here so the next reader does not take the sentence the other way and bu
   implementer would most reasonably decide is entitled to know who asked, and the ruling says no
   regardless, because this page's audience is whoever holds the URL, which `routes/invites.ts` records
   *"may have been forwarded"*.
+
+## Sheet prototype parity (executor 1, 2026-09-20) — cases `16.81`–`16.99`
+
+**Owner: _"make our build like the prototype."_** **The authority is
+`design-system/interactive/desktop.dc.html`** — NOT `design-system/prototypes/TicketSheet.dc.html`, which nothing in
+the repo cites and which matches our build much more closely, so comparing against it concludes "we are nearly
+there". **Every comparison is style-matched:** the prototype is drawn in the flat language, so `data-style="hig"`
+comes first — at the app's default (`neo`) our screens are neumorphic and look like a different design.
+
+**The work splits in two, and the split is the task's own rule:** *styled differently* is a restyle; *structured
+differently* is a feature. The PR body must say which list each item is on, and anything needing a route, a
+migration or a disclosure the table does not name is a **STOP AND ASK**.
+
+- **16.81** ✅ The sheet's sections are **ONE segmented control** — the authority's shape (`:1134-1140`) — rendered by the SHARED `SegmentedControl`, carrying the same `tablist` / `tab` / `aria-selected` roles the two bordered buttons had, **plus a `aria-label` the tablist never carried** (a ratchet RISE). **Two tabs exactly**: `Attachments` is a read, and its absence is pinned so inventing it cannot pass. Mutation-witnessed: an empty label reddens it, and adding a third tab reddens it.

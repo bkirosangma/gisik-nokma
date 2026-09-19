@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { newUlid, statesWithBacklog, type SubmittedEvent } from '@gisik-nokma/domain';
-import { Button, Chip, Select, Sheet } from '@gisik-nokma/ui';
+import { Button, Chip, SegmentedControl, Select, Sheet } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
@@ -1021,24 +1021,33 @@ export function TicketSheet({
 
   return (
     <Sheet open title={ticketRead.title} onClose={onClose}>
-      <div role="tablist" className="gn-ticket-sheet__tabs">
-        <button
-          role="tab"
-          type="button"
-          aria-selected={tab === 'details'}
-          onClick={() => setTab('details')}
-        >
-          Details
-        </button>
-        <button
-          role="tab"
-          type="button"
-          aria-selected={tab === 'history'}
-          onClick={() => setTab('history')}
-        >
-          History
-        </button>
-      </div>
+      {/* ONE SEGMENTED CONTROL, the way the authority draws them
+          (`desktop.dc.html@6d7b67c0a52c:1134-1140`): a `var(--segBg)` track at
+          `border-radius:9px`, 2px padding and 2px gap, the selected tab on
+          `--segOnBg` + `--segOnShadow` at weight 600. This build drew two
+          bordered buttons instead.
+
+          The shared `SegmentedControl` IS that port — its own docblock says it
+          replaced the bordered `.gn-view-tabs` buttons for exactly this reason —
+          and it carries the `tablist` / `tab` / `aria-selected` roles this markup
+          already had, so the accessible-name ratchet (13.285/13.287) sees no
+          loss. **It also ADDS something: this `role="tablist"` had no name at
+          all, and the component REQUIRES an `aria-label`**, so a ratchet RISE is
+          the expected direction rather than a surprise.
+
+          ⚠ The authority's THIRD tab is not drawn. `Attachments` (`:3589`) is a
+          READ behind that tab, not a surface, and the dispatch's rule for this
+          task is to say which and not to assume it — the question is with the
+          controller. Two tabs, one control, no invented tab. */}
+      <SegmentedControl
+        options={[
+          { value: 'details', label: 'Details' },
+          { value: 'history', label: 'History' },
+        ]}
+        value={tab}
+        onChange={setTab}
+        aria-label="Ticket sections"
+      />
 
       {tab === 'details' ? (
         <div className="gn-ticket-sheet__details">

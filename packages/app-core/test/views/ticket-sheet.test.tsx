@@ -1823,6 +1823,56 @@ describe('the `Subtask of {parent}` chip', () => {
  * door.** `16.29` asserts the READ-ONLY half so that making them editable later
  * is a decision rather than a drift — the same shape as F's `16.22`.
  */
+/**
+ * SHEET PROTOTYPE PARITY, 2026-09-20 — cases `16.81`–`16.99`.
+ *
+ * Owner: *"make our build like the prototype."* **The authority is
+ * `design-system/interactive/desktop.dc.html`** — NOT
+ * `design-system/prototypes/TicketSheet.dc.html`, which nothing in the repo cites
+ * and which matches our build much more closely, so comparing against it
+ * concludes "we are nearly there".
+ *
+ * **Every comparison is style-matched.** The prototype is drawn in the flat
+ * language, so `data-style="hig"` comes first; at the app's default (`neo`) our
+ * screens are neumorphic and appear to be a different design entirely. This suite
+ * cannot see styles at all — jsdom loads no stylesheet and has no layout engine —
+ * so what it asserts is STRUCTURE and ROLES. The visual half is the viewport
+ * run's, which is part of this task rather than an extra.
+ */
+describe('sheet prototype parity', () => {
+  it('16.81 the sections are ONE segmented control — the tablist roles kept, and a NAME it never had', async () => {
+    const read = ticketRead();
+    renderSheet(read, sheetSource(read, [], []));
+    await settled();
+
+    // The authority draws the three tabs as one segmented control
+    // (`desktop.dc.html@6d7b67c0a52c:1134-1140`); this build drew two bordered
+    // buttons. The swap is onto the SHARED `SegmentedControl`, whose docblock
+    // says it exists to replace exactly those bordered buttons.
+    const tablist = screen.getByRole('tablist', { name: 'Ticket sections' });
+    const tabs = within(tablist).getAllByRole('tab');
+    expect(tabs.map((t) => t.textContent)).toEqual(['Details', 'History']);
+
+    // TWO, and the count is an assertion rather than a description: the
+    // authority's third tab is `Attachments` (`:3589`), which is a READ behind a
+    // surface. Drawing it here would be inventing a tab the dispatch says to ask
+    // about, so its ABSENCE is pinned until that question is answered.
+    expect(tabs).toHaveLength(2);
+
+    // ⚠ The name is NEW. `role="tablist"` on this sheet carried no accessible
+    // name at all before this change, and the shared component REQUIRES one — so
+    // this is a ratchet RISE (13.285/13.287), which is the allowed direction, and
+    // it is asserted so a future rename cannot pass as the same thing.
+    expect(tablist).toHaveAccessibleName('Ticket sections');
+
+    // And the control still WORKS: `aria-selected` moves with the click, which
+    // is the property the two buttons carried and the component has to keep.
+    expect(within(tablist).getByRole('tab', { selected: true })).toHaveTextContent('Details');
+    await userEvent.click(within(tablist).getByRole('tab', { name: 'History' }));
+    expect(within(tablist).getByRole('tab', { selected: true })).toHaveTextContent('History');
+  });
+});
+
 describe('G — Priority, Due and Type as rows', () => {
   /** A ticket claiming NOTHING, so every absence copy is exercised. */
   const bare = (): TicketRead => ticketRead({ ticket: ticketStateSeed({ fields: {} }) });
