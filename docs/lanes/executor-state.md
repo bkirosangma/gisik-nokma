@@ -41,11 +41,32 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~13:0x IST. **TASK 8 IS BUILT. THIS LANE HAS NOTHING IN
-> # FLIGHT AND IS WAITING ON THE CONTROLLER** — branch `exec/isTypes-count`, PR open, base `main`.
+> # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~13:4x IST. **TASK 8 IS BUILT AND ITS PR IS OPEN. THIS LANE
+> # HAS NOTHING IN FLIGHT AND IS WAITING ON THE CONTROLLER** — branch `exec/isTypes-count`, **PR `#513`**,
+> # base `main`, head `3db69d91`, `MERGEABLE` with a clean `merge-tree` against `7e8af098`.
 > # **Supersedes the block below**, which says this lane *"IS TAKING IT"* — it has taken it, built it, and
 > # is holding. Read the block below for the dispatch's two decisions; read this one for what shipped and
 > # for the one thing a restart must not redo.
+> #
+> # **REVIEWED, AND THE REVIEW REFUTED FOUR THINGS — all fixed in `3db69d91`, a POST-REVIEW head, disclosed
+> # rather than folded in.** It reproduced **eleven** mutations and confirmed every claimed one kills its
+> # named case. Two of its findings are the ones to carry:
+> # 1. **A mutation claim that was overstated.** `Features.md` said dropping the left side's workspace
+> #    predicate kills "all four" cases; as literally applied `$1` goes unbound and all four die of a
+> #    **500** — a plumbing red proving the QUERY broke, not the property. Keep the parameter bound and
+> #    only THREE die, because `13.950` never reads a count. **A mutation must change the property, not
+> #    just the source.** The same sentence's split was also inverted (five server/four UI; it is four
+> #    and five).
+> # 2. **Three citations into the screen that no instrument could catch** — the row-door `<button>` cited
+> #    at `:311-337` and actually at `:387-416`, in files this change TOUCHES, so by this repo's own rule
+> #    they were re-points and not records. **The sweep had listed other sites and missed these: its
+> #    universe was the files already edited.** Same defect the catalogue's own note describes catching
+> #    four times before, and it recurred anyway.
+> #
+> # `apps/server/src/routes/builder-reads.ts` moved **+62**, so its version-route citation went
+> # `:517-546` → **`:579-608`**, verified by content. Every other citation into that file is **recorded
+> # with the controller as owner**, and the record says which are actually wrong (`:247`/`:408-414` sit
+> # before the insertion and are correct; `:444`/`:448` were already wrong at `origin/main`).
 >
 > | | |
 > |---|---|
