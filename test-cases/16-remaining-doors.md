@@ -13,8 +13,7 @@ leaving it outside, so the section was opened.
 
 | lane | block |
 |---|---|
-| **exec 1** | `16.1`–`16.30`, **then `16.32`–`16.40`** (taken 2026-09-19 late for `/v1/search`), **then `16.81`–`16.99`** (taken 2026-09-20 for the sheet prototype parity) |
-| **exec 2** | **`16.41`–`16.60`** (`16.31` spent on the evidence upload; `16.32`–`16.40` reallocated to exec 1) |
+| **exec 1** | `16.1`–`16.30`, **then `16.32`–`16.40`** (taken 2026-09-19 late for `/v1/search`), **then `16.61`–`16.80`** (taken 2026-09-20 for `hig-per-screen/3b`), **then `16.81`–`16.99`** (taken 2026-09-20 for the sheet prototype parity) || **exec 2** | **`16.41`–`16.60`** (`16.31` spent on the evidence upload; `16.32`–`16.40` reallocated to exec 1) |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** It read `exec 2: 16.31–16.60` for about forty
 minutes on 2026-09-19 and was wrong for that whole time, because the controller reallocated in a message
