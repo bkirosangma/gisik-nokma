@@ -198,13 +198,22 @@ export async function exchangeDeviceCode(
 export async function listMcpTokens(
   db: Queryable,
   userId: string,
-): Promise<{ id: string; createdAt: string; lastUsedAt: string | null }[]> {
-  const { rows } = await db.query<{ token_hash: string; created_at: Date; last_used: Date | null }>(
-    'SELECT token_hash, created_at, last_used FROM mcp_tokens WHERE user_id = $1 ORDER BY created_at DESC',
+): Promise<{ id: string; name: string | null; createdAt: string; lastUsedAt: string | null }[]> {
+  const { rows } = await db.query<{
+    token_hash: string;
+    name: string | null;
+    created_at: Date;
+    last_used: Date | null;
+  }>(
+    'SELECT token_hash, name, created_at, last_used FROM mcp_tokens WHERE user_id = $1 ORDER BY created_at DESC',
     [userId],
   );
   return rows.map((r) => ({
     id: r.token_hash,
+    // `null` is NOT NAMED and it is not `''` — door D. The prototype leads each
+    // row with a bold name; a token nobody has named carries the absence rather
+    // than an empty label, and the screen draws nothing where the name would be.
+    name: r.name,
     createdAt: r.created_at.toISOString(),
     lastUsedAt: r.last_used === null ? null : r.last_used.toISOString(),
   }));
@@ -227,6 +236,42 @@ export async function revokeMcpToken(db: Queryable, userId: string, id: string):
   const { rows } = await db.query<{ token_hash: string }>(
     'DELETE FROM mcp_tokens WHERE token_hash = $1 AND user_id = $2 RETURNING token_hash',
     [id, userId],
+  );
+  return rows.length === 1;
+}
+
+/**
+ * Name a token the caller already holds (door D, 2026-09-19).
+ *
+ * ## Scoped IN THE STATEMENT, exactly as the revoke above is
+ *
+ * `user_id = $2` is part of the UPDATE's own WHERE, so a stranger's row is never
+ * read on the way to refusing them — there is no window in which it is fetched
+ * and then rejected. A token that is not this caller's matches zero rows and the
+ * route answers the SAME 404 it answers for one that never existed, which is the
+ * probe-resistance `revokeMcpToken`'s own docblock argues for one function up:
+ * distinguishing the two would turn this into an oracle for which token hashes
+ * exist.
+ *
+ * ## `name` is written verbatim, INCLUDING a value the schema would refuse
+ *
+ * The route parses before calling, so nothing reaches here that
+ * `mcpTokenNameSchema` rejects. This function deliberately does NOT re-check:
+ * two validators, one of which nobody reads when the rule changes, is how the
+ * two disagree — and there is exactly one caller.
+ *
+ * @returns true when a row was updated, false when the token is not this
+ * caller's or does not exist — the two are the same answer ON PURPOSE.
+ */
+export async function nameMcpToken(
+  db: Queryable,
+  userId: string,
+  id: string,
+  name: string,
+): Promise<boolean> {
+  const { rows } = await db.query<{ token_hash: string }>(
+    'UPDATE mcp_tokens SET name = $3 WHERE token_hash = $1 AND user_id = $2 RETURNING token_hash',
+    [id, userId, name],
   );
   return rows.length === 1;
 }
