@@ -13,7 +13,7 @@ leaving it outside, so the section was opened.
 
 | lane | block |
 |---|---|
-| **exec 1** | `16.1`–`16.30`, **then `16.32`–`16.40`** (taken 2026-09-19 late for `/v1/search`) |
+| **exec 1** | `16.1`–`16.30`, **then `16.32`–`16.40`** (taken 2026-09-19 late for `/v1/search`), **then `16.81`–`16.99`** (taken 2026-09-20 for the sheet prototype parity) |
 | **exec 2** | **`16.41`–`16.60`** (`16.31` spent on the evidence upload; `16.32`–`16.40` reallocated to exec 1) |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** It read `exec 2: 16.31–16.60` for about forty
