@@ -41,6 +41,38 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~23:0x IST. **`/v1/search` IS BUILT; ITS PR IS OPENING AT
+> # THIS HEAD.** Branch **`exec/search-matchedin`**, cut from **`origin/main` = `5aa82743`**; code head
+> # **`5e76257e`**. **Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-19-search-matchedin.md`.**
+> **Door G is NOT merged** (PR #557) — do not confuse it with this; this branch does not carry it.
+>
+> ## ⛔ FIRST, A CORRECTION THAT MATTERS TO EVERY RESTART: **THE LANE WAS NOT EMPTY**
+> The previous block here said exec 1's order was **B → A → D → F → G**, "all built", and held. **That list
+> is the queue file's top-of-file LANE ASSIGNMENT, which is STALE** — it predates three addenda. The
+> authority is **`CTL-QUEUE-2026-09-19-door-builds.md` Addendum 4**: *"exec 1 takes it [`/v1/search`] after
+> **B**; it is server + mapper work and it blocks nothing else."* **Take the addenda over the header,
+> always.** A reading is a fact about the moment it was taken, and that header had expired.
+>
+> ## WHAT IS BUILT — `matchedIn` derived in the SELECT
+> `GET /v1/search` now answers WHICH column matched, with **one `@@` per column in a `CASE`**. **No column,
+> no migration** — `proj_search` had stored the three separately and weighted them apart (A/B/C) all along;
+> the SELECT was discarding it. **Precedence title → description → comment**, the order the weights imply.
+> **The snippet stays COMBINED on purpose** (narrowing it strips a comment's words, the feature's reason to
+> exist). `mapSearchHits` answers, **`SERVING_GAPS` is EMPTY**, and the domain's `SearchHit` gained the field
+> — a real gap this change found (see below).
+>
+> ## ⚠ THREE TRAPS THIS TASK SET, ALL RECORDED
+> 1. **An empty `SERVING_GAPS` breaks things that key on it, loudly.** `apps/web`'s stub built
+>    `refuse('search')`, which THROWS when the gap disappears — **311 tests down in one run**, and its own
+>    docblock says that is the mechanism working. Four NON-VACUITY CARRIERS also failed, each asserting the
+>    register was non-empty so its neighbour could not pass by measuring nothing — **`reopen-flow.test.tsx`'s
+>    comment predicted this exact change by name.** Every one was updated, none deleted.
+> 2. **The domain's wire type was missing the field.** `read-models.ts` declared `SearchHit = {card, snippet}`,
+>    so the route served a key its own type did not name — and **TypeScript did not catch it**, because
+>    `rows.map(…)` is not a fresh object literal in that position. **When you add a wire field, declare it in
+>    `packages/domain` or the compiler will not check you.**
+> 3. **A backtick inside a template literal closes it.** The SQL comment documenting the change used
+>    backticks; the route's query is a template literal, so the file stopped parsing. 14 of them.
 > # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~22:0x IST. **DOOR G IS BUILT; ITS PR IS OPENING AT THIS
 > # HEAD. AND THIS LANE'S QUEUE IS NOW EMPTY.**
 > Branch **`exec/priority-due-type`**, cut from **`origin/main` = `5aa82743`**; code head **`11a525bf`**.
@@ -74,8 +106,14 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > ## ANCHORS — re-take `origin/main` (it moves)
 > | | |
 > |---|---|
-> | base | `origin/main` = `5aa82743` at the cut |
+> | base | **rebased onto `origin/main` = `abba46e1`** — door G (#557) and the block reallocation landed while this branch was in flight |
 > | gate | **33/33, EXIT 0** under **Node `v22.22.2`** |
+> | checks | all **seven exit 0**. `check-case-ids` **2475, union == sum** — **exactly +6** on main's 2469. `16-remaining-doors.md` **29 cited / 0 uncited / 29** |
+> | the flake | ⚠ `seed-dev.test.ts` timed out at 30s again — **the SIXTH time today**; 2.4s alone, green on re-run |
+>
+> ## NEXT: THE REST OF THIS LANE'S WORK, AND THE ID BLOCK
+> ⚠ **Block `16.32`–`16.40` has `16.38`–`16.40` left (THREE).** Any further task needs a reallocation before
+> it can mint. **#557 (door G) IS MERGED** — its cases `16.23`–`16.30` are in THIS file now, above this block.
 > | checks | all **seven exit 0**. `check-case-ids` **2477, union == sum** — **exactly +8** on main's 2469. `16-remaining-doors.md` **31 cited / 0 uncited / 31** |
 > | the flake | ⚠ `seed-dev.test.ts` timed out at 30s on the FIRST gate run — **the FIFTH time today**; 2.4s alone, green on re-run |
 >
