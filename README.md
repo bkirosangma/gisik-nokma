@@ -71,8 +71,9 @@ This is the part a marketing page would leave out. Read it before you decide any
 - **There is no comment thread on the web.** The description *is* writable — the writing box handles
   formatting and mentions and is connected to the job screen, though a file dropped into it is refused
   rather than quietly lost. A comment is different: the writing box takes a description and not a
-  comment, and nothing on the web renders a comment back. A Move can *require* a comment, and that is
-  recorded on the Move. The phone app has a Comment button on a job and the website does not.
+  comment, and a Move's *required* comment is recorded on the Move. A comment can still reach you — an
+  Inbox row quotes the opening of the comment or description that mentioned you, and that is the whole
+  of it. The phone app has a Comment button on a job and the website does not.
 - **No screen on the web or the desktop searches inside a job's description or its comments.** The
   full-text search that does exists — the phone app's offline search reads comment bodies, and an MCP
   client's `search_tickets` reads titles, descriptions and comments. What the web itself offers is a
