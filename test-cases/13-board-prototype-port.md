@@ -1546,17 +1546,47 @@ exported in the first place).
   **The sentence itself was also generalised, and deliberately does not say "the board only":** a
   `filter` set to only a `boardUnappliedAxes` entry (`collaboratorIds`/`dueBefore`/`dueAfter`/`fields`)
   narrows nothing on the board either, so claiming "the board only" would overclaim exactly there — the
-  new copy, "Filters set here are not applied on this tab.", names only what the page can know for
-  certain under every combination that trips the gate.
+  copy this wave shipped, "Filters set here are not applied on this tab.", named only what the page
+  could know for certain under every combination that trips the gate. **That copy is HISTORY, and so is
+  the assertion in the next sentence — both are corrected with measurements at the end of this entry.**
   Drives the REAL path — the Filters sheet's own Assignee checkbox, not a `setFilter` shortcut — on the
-  List tab, and asserts the List tab's own render is untouched (the axis has no control anywhere else,
-  which is precisely why the note is the only disclosure available). **Mutation-witnessed**: reverting
+  List tab, and asserted the List tab's own render was untouched (the axis had no control anywhere else,
+  which was precisely why the note was the only disclosure available). **Mutation-witnessed**: reverting
   the gate to the old `chip.key === 'text'` check reddened `13.517` alone — `13.439`/`13.444` (both
   driven by a real search TERM, which still trips the old gate) stayed green — confirming the new case
   discriminates rather than merely existing. Reverted with a targeted `Edit`, confirmed byte-identical by
   SHA-256 checksum (not `git diff` — this repo has a recorded case of `git diff` reporting identical for
   differing files). — (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`,
   `apps/web/test/board-narrowing.test.tsx`)
+  **CORRECTED 2026-09-20 — two claims above expired the day after they were written, and BOTH the
+  wording and the behaviour moved.**
+  *(1) The quoted copy exists nowhere in source.* A case-insensitive repo-wide sweep
+  (`git grep -i -E "not applied on this tab|Filters set here"`) returns **no hit in any source tree**.
+  Every match is non-source: the history quote above; **THIS paragraph's own grep pattern**, which is
+  why the sweep is not quoted here as a fixed count — it matches itself, so any figure written down
+  expires on the next run; a lane handoff quoting it; and a PLAN
+  (`docs/superpowers/plans/2026-09-17-filter-exclude-all-tabs.md:2277`) instructing the edit that
+  removed it — an instruction already carried out, since `Features.md:106` carries its replacement text.
+  The positive control in the same invocation, `git grep -n "Not applied on the"`, fires on the shipped
+  string at `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2013`. `4837a56c` (2026-09-17) retired
+  the mirror note; `a02c717c` (Task 10 fix round 1, the same day) made the scope note name its tab and
+  its unapplied axes: *"Not applied on the `{tabNoun}`: `{unapplied.join(', ')}`."* — the `TAB_NOUN`
+  record at `page.tsx:1911-1917`, and the docblock at `:2000-2010` recording that
+  `describeUnappliedListAxes` (`apps/web/src/board-search-scope.ts:17-19`) can only ever return
+  `collaborator`, so on List/Calendar/Timeline the sentence names one axis. **`13.556b`** — *"the scope
+  note names the LIST tab, not the board, when it renders there"* — asserts the shipped form as
+  `/not applied on the list/i` plus `/collaborator/i`
+  (`apps/web/test/board-narrowing.test.tsx:571`, assertions at `:602-604`). **This is a superseded
+  quote, not a wrong conclusion** — the reasoning above survived intact, in a stronger form: the shipped
+  sentence is the same "name only what the page can know" rule with its two vague halves made explicit
+  per tab.
+  *(2) `13.517` was FLIPPED 2026-09-17.* "The List tab's own render is untouched" was true of `13.517`
+  as written and false from the next day: the exclude-mode work (`4837a56c`) made the sheet's Assignee
+  axis NARROW the List, and the case now asserts exactly that —
+  `describe('13.517 (flipped 2026-09-17) an assignee picked in the Filters sheet narrows the List tab')`
+  at `board-narrowing.test.tsx:460`, with the flip and its reason in that file's own docblock at
+  `:414-428`. **Both movements point the same way: the product gained the reach the note had been
+  apologising for, so the note and the assertion that depended on it both went.**
 
 **Finding 2 — 34 stale line-number citations swept**, all introduced by this branch's own edits shifting
 content the citations pointed at. Six in shipped source (`page.tsx:342`, `board-search-scope.ts:59`,

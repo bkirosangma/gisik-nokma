@@ -567,6 +567,17 @@ weeks at a time. Both draw a bar only when a job has **both** a start and a need
 Timeline, anything with only one date, no dates, or a contradiction goes into a side list with a
 heading saying which of five reasons it is there for.
 
+**Does the Calendar show closed jobs?**
+Not by default, and neither does the Timeline. Both leave closed work out until you ask for it; the List
+does not, and the Board never shows them at all. There are two ways to get them back, and only two. You
+can set Closed to *closed only* in the Filters sheet, or you can leave Closed alone and remove the chip
+the strip is showing that says **Closed: hidden** — that is the one that means "hidden, and here is the
+way back". Setting Closed to *everything* does *not* do it, because *everything* and *never touched it*
+are the same setting, which is the whole reason the chip is there. And be careful with it: set Closed to
+*not closed* and you get a chip with the same name whose **×** only clears your own setting, so the
+closed jobs stay hidden. There is also one case where the calendar's own empty-month note gets this
+wrong — see the manual's Calendar section.
+
 **Where's the burndown chart? The velocity? Sprint reports?**
 There are none, and that is a deliberate decision rather than an oversight — there is a check in the
 product that stops those words being added. It will show you what people claimed and when. It will not

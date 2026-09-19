@@ -680,10 +680,26 @@ own name.
 There is a legend with one switch per custom date field that actually claimed a day in the month you
 are looking at. Switching one off only hides it from view; it changes nothing about the job.
 
+**Closed jobs are hidden here until you ask for them.** The Calendar and the Timeline both leave closed
+work out; the List does not, and the Board never shows them at all. So a month can look emptier than
+the project really is.
+
+There are two ways to get them back, and only two: set **Closed** to *closed only* in the Filters
+sheet, or leave Closed alone and remove the **Closed: hidden** chip that the strip shows while this
+default is on. **Watch that chip.** Set **Closed** to *not closed* and you get a chip with the *same
+name* whose **×** only undoes your own setting — the default takes over again and closed jobs stay
+hidden. *Everything* on the Closed control is not a third way back, because *everything* and *never
+touched it* are the same setting here; that is why the chip exists at all.
+
 **If the calendar looks empty**, it tells you *which kind* of empty in four different sentences:
 nothing in this month has a claimed date at all; your filter removed everything; the grouping removed
 everything; or you switched a date field off in the legend. Read the sentence — it is telling you
 something.
+
+**And this is the one empty month the sentences above get wrong.** When hiding closed jobs is the only
+thing that emptied the month, the calendar still says *"No claimed dates fall in this month"* — which is
+not what happened. Trust the count in the strip instead: *"0 of 12 shown"* means the jobs are there and
+something is hiding them.
 
 ### Timeline
 
@@ -691,6 +707,9 @@ The same idea stretched sideways over weeks, moving four weeks at a time with **
 **Later**. A bar again needs both a start and a needed-by. Anything with only one date, no dates, or a
 contradiction goes into a side list beside the chart, with a heading saying which of five reasons it
 is there for.
+
+**Closed jobs are hidden here too, on the same terms as the Calendar** — the two ways back, and the
+chip it is easy to mistake, are described in that section above.
 
 ### The one filter
 
@@ -740,6 +759,10 @@ A third click puts the empty circle back.
 Two of the six are not lists of your workspace's own values. **Closed** is a single control, so its
 three settings read *everything*, *closed only* and *not closed*. **Category** is always the same three
 words. The other four are built from what your workspace actually has.
+
+On the **Calendar** and the **Timeline**, *everything* is not enough to get closed jobs back — those
+two tabs hide them until you either remove the **Closed: hidden** chip the strip is showing or set
+*closed only*. See the Calendar section above.
 
 **If the roster cannot be shown, the sheet says which of three things happened.** One that has not
 loaded yet, one that could not be loaded, and a workspace with nobody in it are three different facts,
