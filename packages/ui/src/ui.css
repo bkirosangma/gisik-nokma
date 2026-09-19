@@ -1384,8 +1384,24 @@
    category colours, blocked ring, accent, border and surface roles this
    canvas needs already exist (categoryOpen/Active/Terminal, blocked, accent,
    border, surface*, text*), so it reuses them rather than adding duplicates
-   (design decision "one colour origin"). */
-.gn-workflow-canvas { width: 100%; height: 100%; min-height: 480px; }
+   (design decision "one colour origin").
+
+   `display: grid` IS LOAD-BEARING, not a layout preference. React Flow's own
+   stylesheet gives `.react-flow` `height: 100%`, and a percentage height cannot
+   resolve against a parent whose height comes only from `min-height` — the rule
+   below is `height: 100%` + `min-height: 480px`, so the parent's height is
+   content-based, the child's `100%` computes to `auto`, and the canvas rendered
+   at **0px**. MEASURED ON THE RUNNING APP before this line: `.react-flow`
+   `0px` / `getBoundingClientRect().height` `0`, while four nodes sat in the DOM
+   — the builder drew into nothing and every DOM-presence check in the suite
+   passed. A grid track gives the child a definite height to fill; the same
+   measurement after this one declaration reads `.react-flow` **480px**, with
+   the graph and its edges drawn.
+
+   **Do not remove `min-height: 480px` below** — it is what the narrow-screen
+   layout depends on, and the grid track resolves against it. The pair is the
+   fix; either half alone restores the bug. */
+.gn-workflow-canvas { display: grid; width: 100%; height: 100%; min-height: 480px; }
 
 .gn-state-node {
   background: var(--gn-surface-raised);

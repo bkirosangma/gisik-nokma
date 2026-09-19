@@ -20,7 +20,167 @@
 
 ---
 
-## ▲ TOP BLOCK — `settings → workflows` **TASK 9** DONE. PR open against `main`. (2026-09-18, night)
+## ▲ TOP BLOCK — the builder's canvas was 0px tall; FIXED, WITNESSED, PR OPEN. (2026-09-19, small hours)
+
+**Position: DONE and verified in both directions. PR open against `main` on branch
+`exec2/builder-canvas-collapse`**, cut from `origin/main` **`ed4c992f`**. Dispatch:
+`CTL-DISPATCH-2026-09-19-builder-canvas-collapse.md`, owner-prioritised out of order ahead of the
+non-text-contrast roster.
+
+**FIRST ACTION ON A RESTART: `gh pr list --state open`.** If the PR is open it is at the controller's
+merge; **if it has MERGED, this block is history** and the controller's next dispatch is the position.
+
+### § 1 — WHAT SHIPPED (5 artefacts, plus this file; one declaration and its witnesses)
+
+| artefact | what |
+|---|---|
+| `packages/ui/src/ui.css` | `.gn-workflow-canvas` gains **`display: grid`**; the trap is recorded inline. `min-height: 480px` untouched |
+| `apps/web/e2e-stack/builder-canvas.spec.ts` | **new** — case `13.911`, one test, with its planted control |
+| `apps/web/e2e-stack/helpers/canvas-box.ts` | **new** — the measurement, parameterised by root so the control runs the SAME code |
+| `test-cases/13-settings-and-workflows.md` | the section for `13.911`, at the foot of the part-file |
+| `Features.md` | the canvas bullet amended (`:2263`) |
+
+**Ids: `13.911` minted, recounted at this tip BY CASE MARKER.** `13.890`–`13.910` were already spent and
+`13.920`–`13.927` belong to another lane, so **the next free in this block is `13.912`**.
+
+### § 2 — THE MEASUREMENTS (all in a real browser; jsdom cannot answer this)
+
+| property | broken (`main`) | fixed |
+|---|---|---|
+| `.react-flow` rect height | **0** | **480** |
+| `.gn-workflow-canvas` rect height | 480 | 480 |
+| FIRST node's height / width, and the node count | 75.27 / 91.98 / 4 | 75.27 / 91.98 / 4 |
+| first node ∩ `.react-flow` box (area) | **0px²** | **6923px²** |
+| planted pre-fix control → `.react-flow` | **0** † | **0** |
+
+**The middle rows are the dispatch's own suggested assertion and they do not discriminate** — the
+dispatch proposed "a node's rendered height is non-zero", and the first node measures 75.27 on the broken
+tree because React Flow sizes it intrinsically inside a container that draws none of it. All four are
+non-zero (the independent review's probe confirmed it node by node). The case asserts the two bold rows.
+
+**† The control reads 0 in both states, but the `broken` column is NOT something the case measured in
+that run** — the case aborts at its first assertion on the broken tree, so the control block never
+executes there. The 0 was measured out-of-band, by a probe and again by the review. The control's job is
+to license the *green* run, and it does: on the fixed tree it executes and reads 0 while the product
+reads 480. Its non-vacuity was proved the other way — the review applied `display: grid` to the PLANTED
+element and it went to **480**, so it reads 0 because the pre-fix cascade is reproduced and not because
+the element is unstyled or off-screen.
+
+### § 3 — THE TWO RUNS THAT PROVE IT, AND THE ONE THAT DOES NOT EXIST
+
+- **RED on the broken tree**, natively: the case run against the hot stack (which serves `main`) fails
+  printing `.react-flow 0px · 4 node(s) · inside 0px²`.
+- **GREEN on the fixed tree**: the same measurement, through the same helper, against a `next dev` on
+  **`:3021`** from this worktree (after `pnpm turbo run build`) reads **`flowHeight 480 ·
+  nodeAreaInsideFlow 6923`**, control **0**.
+- **A caveat that is a fact about the server, not about the fix:** the case cannot sign in on `:3021`
+  because `auth.ts`'s `trustedOrigins` is the single configured web origin (`:3001`). The `:3021` run
+  signs in on `:3001` and navigates across — cookies are host-scoped, not port-scoped. That is a
+  verification arrangement for a lane's own tree; **the committed case runs natively in CI**, where the
+  stack is built from the branch.
+
+### § 4 — THE SWEEP, REPORTED NOT FIXED
+
+`ui.css` + `globals.css` swept for `min-height` rules with percentage-height children, **using
+`.gn-workflow-canvas` as the positive control** (the sweep finds the known instance, so a null would have
+been a failed sweep rather than a clean result). Three other `height: 100%` sites, **no second invisible
+canvas**: `.gn-sheet` (`ui.css:292`) resolves against `.gn-sheet__scrim`, which is `position: fixed;
+inset: 0` and therefore definite; `.gn-workspace-card` (`globals.css:378`) and `.gn-project-card`
+(`globals.css:1070`) have intrinsic content height, so a failed percentage costs them equal-height, not
+visibility. The trap needs both halves — a `min-height` parent **and** a child with no intrinsic height.
+
+### § 5 — PARKED: the non-text-contrast roster (dispatched first, superseded by owner priority)
+
+**No roster was regenerated and none should be assumed.** Two full suite runs, both 1 passed / 6 failed,
+where the six are the four known reds (`smoke:30`, `smoke:64`, `viewport:93`, `visibility:26`) plus
+`viewport:247` (the ruled accessible-name red) and **`viewport:798` — the roster writer — which never
+reached its `writeFileSync`.** The committed roster's mtime is still `2026-09-18 16:42`.
+
+**The cause is measured, from the web container's own log, and it is not the assertion:**
+`/members` compiled in **75.9s** and served in **95421ms**; `/p/[projectId]` served in **54418ms**;
+`/settings/ticket-types` was **still compiling at 89.5s** when the test gave up. The dev server is
+compiling routes cold *mid-run* and the suite's eight navigations cannot fit any per-test budget — raising
+it to 240s changed nothing. **This needs the stack to be quiet, or a warm server, before it can be
+re-run; it is not blocked on a ruling.** Run 2 was launched with `--timeout=240000`, which is a deviation
+from the dispatch's plain command and is disclosed here for that reason.
+
+**A hazard fired again and is worth recording:** `rtk` rewrote `pnpm exec playwright test` into
+`rtk playwright test … --reporter=json`, then failed to parse its own output (`[RTK:PASSTHROUGH] All
+parsing tiers failed`, truncated 34003 → 2000 chars). The full log survives in `rtk`'s tee dir. **Invoke
+the runner as `node node_modules/@playwright/test/cli.js test …` to bypass the proxy** — that is how both
+canvas runs were made.
+
+### § 5b — THE REVIEW: 0 Critical, 0 Important, 3 Minor — all three closed in a prose-only fix round
+
+One independent reviewer, read-only, over the first frozen head. It re-ran the case **against the hot
+stack** and quoted the failure (`.react-flow 0px · 4 node(s) · inside 0px²`, red at the first assertion),
+wrote its own probe to measure the broken tree node by node, and swept every `file:line` in the diff by
+content. **What it proved that the author had only argued:** the control is not vacuous — applying
+`display: grid` to the **planted** element takes it to **480**, so it reads 0 because the pre-fix cascade
+is reproduced and not because the element is unstyled or off-screen; and the one-declaration fix cannot
+re-flow a second child, because `workflow-canvas.tsx` renders React Flow as its **only** child.
+
+Its three Minors were all accuracy defects in prose the author wrote, and all three are closed: the
+"5 files" heading (the diff carries 6, the sixth being this file), the table row that read as every
+node's height when it is the **first** node's, and the control's `0 | 0` row not distinguishing *measured
+in both states* from *measured out-of-band in one* — see † above.
+
+**It could not verify the GREEN direction end-to-end** and said so: it confirmed the declaration's effect
+by in-page injection rather than by building and serving this worktree. The `:3021` run in § 3 is the
+author's own evidence for that half, and the review's injection reproduces the same two numbers.
+
+**THE FIX ROUND INTRODUCED ONE OF ITS OWN, and the scoped re-review caught it** — the shape is worth
+recording because it is the one this repo keeps re-finding. Correcting § 1's heading left § 6's anchor row
+still reading `| files | 5 (see § 1) |`: a stale cross-reference whose entire job is to point the reader at § 1, and
+therefore a false sentence in the very round that fixed the count. **A tally the fix moves is not near the
+edit.** Closed on the second pass, and this sentence exists so the next reader knows the round's own
+summary was overstated until it was. The re-review also confirmed the round mechanically: `ui.css`'s blob
+is byte-identical across it (`24f4a625a90cae4e5a43cfefd479d49a60e48f65`) and every changed line in the two
+code-shaped files is inside a block comment (zero non-comment `+`/`-` lines survive the filter).
+
+**Recorded, not fixed — outside this change's scope, with a named owner.** `apps/web/app/sign-in/page.tsx:46`
+cites `apps/server/src/auth/auth.ts:83` for `trustedOrigins`; line 83 is inside a docblock and the
+declaration is at `auth.ts:112`. It resolves to the right **file** and reads plausibly, so it misleads
+rather than corrects — the `stale-citation` shape. **Owner: whoever next touches the sign-in page.** (The
+author's own § 3 caveat cites `auth.ts:112` and was verified by the review.)
+
+### § 5c — THE REBASE ONTO THE SPLIT `main` (2026-09-19, ~03:0x)
+
+`main` moved `ed4c992f` → **`98ffab2a`** while this branch was in review: **the test-cases split landed**
+(#498, `8d144483`), and `test-cases/13-deployment-dogfooding.md` is now an **index** with eleven
+part-files. This branch is rebased onto it. **One conflict, resolved to the split's own rule** —
+*"Where a new case goes. Into the part-file whose topic it belongs to — not here."* — so case `13.911`'s
+section lives at the foot of **`test-cases/13-settings-and-workflows.md`**, the part-file whose range held
+the old file's tail where the section had been appended, and **not** in the index. No id was renumbered
+and no case text changed. `13.911` is still free on the new main: markers there run to `13.910` and then
+jump to another lane's `13.920`–`13.927`.
+
+**The rebase compressed the catalogue moves into the first commit**: the fix-round commits' edits to that
+section were already folded into the text that moved, so replaying them against the index is a no-op and
+their diffs no longer carry the relabel. The final tree is what the review passed; the history is not —
+and this sentence exists so a reader of commit 2 is not surprised by a message describing an edit its diff
+does not show.
+
+**Re-verified at the rebased head:** `13.911` appears twice in the part-file and zero times in the index;
+`ui.css:1404` still reads `display: grid`; and every `file:line` in the section points at **source**, not
+at the catalogue, so the split's shift map does not reach it.
+
+### § 6 — ANCHORS, verify these rather than trusting the row
+
+| | |
+|---|---|
+| branch | `exec2/builder-canvas-collapse` |
+| cut from | `origin/main` **`ed4c992f`** |
+| base | `main` — the old `owner/workspace-edits` integration branch is RETIRED |
+| frozen head | **verify with `/usr/bin/git rev-parse HEAD`** — a block cannot name the commit carrying it |
+| files | **5 artefacts + this file** (6 in the diff) — see § 1 |
+| tree | clean after the commit |
+| checks | at the frozen head: `check:env` 0 · `check:tasks` 0 · `check:db-tz` 0 **with `DATABASE_URL`** (2 without it — `DATABASE_URL is required`; it has no fallback) · `check:runbook` 0 · `check:citations` 0 · `check:help` 0 · `check:migrations` 0 · `node scripts/check-case-ids.mjs` 0 (**2381** unique) · `node scripts/check-case-citations.mjs` 0 · `pnpm turbo run build` 0 (11/11) · `@gisik-nokma/ui` test 0 · app-core `test/workflow-builder` **PASS 205 / FAIL 0** · `tsc -p tsconfig.e2e.json` 0 |
+| NOT run | the forced gate — the controller's, by the dispatch's own rule |
+
+---
+
+## ▼ SUPERSEDED — `settings → workflows` **TASK 9** DONE. Merged as `#492`. (2026-09-18, night)
 
 **Position: the work is DONE, the review is RECORDED and ACTED ON, and the PR is being opened with
 `--base main`.** Branch **`exec2/settings-wf-task9`**, cut from `origin/main` **`77aa906a`**. Dispatch:
