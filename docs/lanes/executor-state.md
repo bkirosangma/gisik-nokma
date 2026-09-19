@@ -41,6 +41,48 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~13:0x IST. **TASK 8 IS BUILT. THIS LANE HAS NOTHING IN
+> # FLIGHT AND IS WAITING ON THE CONTROLLER** — branch `exec/isTypes-count`, PR open, base `main`.
+> # **Supersedes the block below**, which says this lane *"IS TAKING IT"* — it has taken it, built it, and
+> # is holding. Read the block below for the dispatch's two decisions; read this one for what shipped and
+> # for the one thing a restart must not redo.
+>
+> | | |
+> |---|---|
+> | the read | `GET /v1/workspaces/:id/ticket-counts-by-type` — admin-only, `readTicketCounts`, a LEFT JOIN from `proj_ticket_types` counting `k.ticket_id`. **Not** a widening of the pinned route: that one answers 400 without a `workflowId` on purpose, and one door answering two questions is the defect this repo refuses by name. |
+> | the client | `getTicketCountsByType`, the fake's `typeCounts` (a SEPARATE seed field, so the two reads can disagree), the web adapter, and the `"N tickets"` meta segment — **last** in the line, the prototype's own order. |
+> | cases | **`13.948`–`13.955`**. `13.947` and `13.956`–`13.957` deliberately unused. |
+> | rebase | cut from `cc4b84bf`, **rebased onto `ed6c1585`** after `#506`, `#508` and cycle 9 landed. **One conflict, in `Features.md`**, resolved as a union: main's newer `workflow-list` bullet + this branch's `ticket-type management` bullet. Everything else auto-merged, including the case catalogue. |
+>
+> ## NINE MUTATIONS, ALL KILLED — AND TWO OF THEM SURVIVED THE FIRST DRAFT
+>
+> **That is the part worth carrying, not the green.** The first draft of the server cases passed while
+> **dropping the join's cross-workspace correlation** and while **counting each type's tickets on the
+> workflow the type is BOUND TO** — the second being precisely the defect this task exists to prevent.
+> Both are invisible without a fixture, because every fixed id in the neighbour tenancy is `nb-`prefixed
+> and the shared world has no re-pointed type. **Two fixtures now exist for those two mutations alone**,
+> and both live in a `beforeAll` that runs AFTER the cases they could disturb. A survivor with no
+> explanation is the thing to chase; here it had one, and chasing it wrote the case.
+>
+> ## THE GATE — GREEN, WITH ONE NAMED FLAKE
+>
+> `build` **0** · `typecheck` **0** · all nine checks **0** (case ids **2405** unique, union == sum) and
+> `turbo run test` green **except `test/seed/seed-dev.test.ts`, timing out at 38.6 s under load** —
+> re-run ALONE it is **8/8 in 12.4 s**, and this diff touches no seed file. **This is the second
+> occurrence of the flake `7b`'s block already names.** Re-run a red timeout alone before reading it as a
+> defect. **The forced gate was NOT run** — that is the controller's.
+>
+> ## A CITATION SWEEP, DONE THE WAY THIS REPO ALREADY RULED
+>
+> The docblock edit added 71 lines at the top of `ticket-type-list-screen.tsx`, so citations INTO that
+> file moved. This change followed the rule the catalogue already wrote down for exactly this situation
+> rather than inventing one: **re-point a citation whose other end is in the same change set** —
+> `ticket-types.test.tsx` `:38-54`→`:43-59`, `Features.md` `:130-145`→`:331-351` — **and record the rest
+> with a named owner.** Owner: the controller. `workspace-settings-form.tsx:94`, the plan's `:195` and
+> `:113`/`:234`, all five delta-audit rows, and `docs/lanes/controller-state.md:53`. **One of those rows
+> is not merely shifted but CLOSED** — the delta audit's `"N tickets"` row says no `countTicketsOfType`
+> exists and the pinned number would be wrong here, and both halves are now false.
+
 > # ▣ CURRENT POSITION — SATURDAY 2026-09-19, revised ~12:15 IST. **TASKS 6+7 ARE MERGED, AND TASK 8's
 > # DISPATCH ARRIVED AT `12:11:23` WHILE THIS BLOCK WAS BEING CORRECTED. THIS LANE IS TAKING IT** — branch
 > # `exec/isTypes-count`, per `gisik-nokma-lanes/CTL-DISPATCH-2026-09-19-task8-isTypes-count.md`.
