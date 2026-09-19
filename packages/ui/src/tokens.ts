@@ -33,10 +33,10 @@ export type StyleName = 'hig' | 'minimal' | 'neo';
  *
  * * **`green700` `#1e7a34` is KEPT** (owner ruling, 2026-09-08). Apple's
  *   increased-contrast green `#248A3D` is the **single pair in the whole roster
- *   that still fails**: `successText` on `success` measures **4.40 against
- *   4.5**, missing by 0.10. The incumbent measures **5.40** and sits within a
- *   hair of Apple's hue, so the cheapest correct answer was to not move it.
- *   Verified both ways here rather than taken on trust.
+ *   that still fails**: on the shipped `onColorWarmLight` `#fbf7f3` ground it
+ *   measures **4.1233 against 4.5** (missing by 0.3767); the incumbent
+ *   measures **5.0662** and sits within a hair of Apple's hue, so not moving it
+ *   stays cheapest. 4.40 / 5.40 were the pure-white figures. Verified both ways.
  * * **`line` / `lineStrong` / `seam` / `seamStrong` are UNTOUCHED**, and that is
  *   a sequencing decision, not an oversight. Ruling R1 dropped borders in favour
  *   of fill, which means the `border` role must be remapped to a grey that
@@ -114,7 +114,7 @@ export const primitives = {
   amber700: '#b25000',
   amber300: '#ffb340',
   amberInk: '#241a00',
-  /** KEPT over Apple's `#248A3D`, which fails `successText` at 4.40 vs 4.5. */
+  /** KEPT over Apple's `#248A3D`, which fails `successText` at 4.1233 vs 4.5 on `#fbf7f3`. */
   green700: '#1e7a34',
   green300: '#30db5b',
   greenInk: '#05230e',

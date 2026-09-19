@@ -502,7 +502,7 @@ describe('HIG adoption — the deliberate departures', () => {
    * "completes" the palette the failure arrives as a red test naming the pair,
    * not as a shipped 4.40.
    */
-  it('keeps green700 because Apple’s increased-contrast green fails successText at 4.40', () => {
+  it('keeps green700 because Apple’s increased-contrast green fails successText at 4.1233', () => {
     expect(primitives.green700).toBe('#1e7a34');
     const shipped = contrastRatio(colorOf('light', 'successText'), colorOf('light', 'success'));
     expect(shipped).toBeGreaterThanOrEqual(4.5);
@@ -1997,5 +1997,49 @@ describe('13.899–13.901 — the shared switch and the info tip, as declaration
         /<input[^>]*type=['"]checkbox['"]/,
       );
     }
+  });
+});
+
+/**
+ * 13.693 — the `green700` calibration is stated on the ground the light theme SHIPS.
+ *
+ * `tokens.ts:36-38` and the `green700` primitive's own line (`:117`) recorded
+ * 4.40 / 5.40 for a long time. Those are the figures you get against PURE
+ * WHITE, and white was the right ground until owner round 4 (2026-09-16)
+ * repointed `successText` to `onColorWarmLight` `#fbf7f3`. Against the ground
+ * the product actually ships the same two hexes measure 4.1233 and 5.0662.
+ *
+ * The conclusion never moved — Apple's green still fails 4.5, `green700` is
+ * still the correct keeper — which is exactly why the arithmetic drifted
+ * unnoticed: whoever quoted it forward got a plausible number, not an error.
+ * This pins both grounds so the next reader inherits a measured pair rather
+ * than a transcribed one.
+ */
+describe('13.693 — the green700 calibration is computed on the shipped ground', () => {
+  it('13.693 pins successText on success at 5.0662 and Apple green at 4.1233, both on #fbf7f3', () => {
+    // The ground IS the claim. Assert it first, or the ratios below could be
+    // the white-ground figures and this test would still pass.
+    expect(themes.light.successText).toBe('onColorWarmLight');
+    expect(primitives.onColorWarmLight).toBe('#fbf7f3');
+
+    const ground = colorOf('light', 'successText');
+    expect(ground).toBe('#fbf7f3');
+
+    const shipped = contrastRatio(ground, colorOf('light', 'success'));
+    expect(shipped).toBeCloseTo(5.0661792, 6);
+    expect(shipped).toBeGreaterThanOrEqual(4.5);
+
+    const withApple = contrastRatio(ground, '#248a3d');
+    expect(withApple).toBeCloseTo(4.1233220, 6);
+    expect(withApple).toBeLessThan(4.5);
+
+    // The stale pair, computed rather than quoted, so the size of the drift is
+    // visible here: pure white sits a whole 0.33 apart on the counterfactual.
+    expect(contrastRatio('#ffffff', colorOf('light', 'success'))).toBeCloseTo(5.4003956, 6);
+    expect(contrastRatio('#ffffff', '#248a3d')).toBeCloseTo(4.3953380, 6);
+
+    // Neither ground flips the DECISION — which is the whole reason this is a
+    // documentation defect rather than a contrast one.
+    expect(shipped).toBeGreaterThan(withApple);
   });
 });
