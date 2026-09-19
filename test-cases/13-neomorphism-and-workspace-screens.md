@@ -2196,3 +2196,64 @@ would have missed it is a sweep of the files the change was *about*.
 - **No accessible-name baseline was re-run.** The control's accessible name is UNCHANGED in count and in
   string on this route (one `Rename <workspace>` before, one after — the second button never carried one),
   so the ratchet should not move; that is a prediction, not a measurement.
+
+## The project description (door A, 2026-09-19) — cases `13.976`–`13.987`
+
+**The door.** The workspace home's project card carries a description. The prototype has one —
+`{ name: "Delivery", desc: "Sprint work for the rollout" }` (`desktop.dc.html:2160-2172`) — drawn
+READ-ONLY at `:264` as a muted 15px line **inside the card's own click target**, between the name row and
+the chips. **Nothing lets a person author one:** the prototype's `addProject` takes a name only and
+hard-codes `desc: "No tickets yet"`.
+
+**The owner's ruling, verbatim:** *"New-project form gains an optional description input: go with this."*
+So the description rides `project.created` — no new event, no second door — and the New-project form
+gains the input. `projectCreatedPayload` is `.strict()`, so the payload, the projection, the read, the
+route and the render all moved in one change set.
+
+**The column, and the decision inside it.** `proj_projects.description` is `text NULL`. NULL is the
+ABSENCE of a claim — "nobody has described this project" — where `''` would be the CLAIM "this project
+has no description". It is the same distinction `ProjectRef.ticketCount` draws with `null`, and the
+reason the projection writes `payload.description ?? null` rather than `?? ''`. **`13.978` is the case
+that holds that line**, and its mutation witness is `?? null` → `?? ''`.
+
+**⚠ The half-witnessed contract is CLOSED, not promised.** The queue's own text warns that *"every
+`ProjectRef` construction site must carry it or the field arrives `undefined` on some route"*.
+Enumerated rather than spot-checked: **two production sites** — `apps/server/src/routes/workspaces.ts`
+(the wire object) and `packages/app-core/src/online/mappers.ts` (the client type's one construction
+site). Every other hit in the tree is a consumer, and `packages/mcp-server/src/tools/read-tools.ts`
+builds its own inline `{projectId, name}[]`, which is a different type. Rather than trusting two sites to
+stay in step: **the route ALWAYS sends the key** (`string | null`, never omitted) **and the mapper
+REFUSES a row that omits it**, so a third site that forgot the field fails loudly at the mapper instead
+of arriving `undefined` and rendering as a correct-looking card with no description. `13.981` witnesses
+the route's half; `13.983` witnesses the mapper's.
+
+- **13.976** ✅ `projectCreatedPayload` accepts an optional `description`; a payload **without** one parses unchanged (the compatibility half) and genuinely lacks the key, asserted with `in`.
+- **13.977** ✅ Refuses `''`, refuses a description of only spaces, refuses over 500; accepts exactly 500; **does not trim** one that has content.
+- **13.978** ✅ The projection stores a served description verbatim, and writes **NULL — not `''`** — where the event made no claim.
+- **13.979** ✅ `visibleProjects` carries the description; an undescribed project reads NULL, never `''`.
+- **13.980** ✅ The description is scoped **exactly as the NAME is** — a viewer outside the project is served no row, so no description; the viewer ON the project gets both.
+- **13.981** ✅ Every project row on `GET /v1/me/workspaces` carries `description` as an **always-present key**, `null` for a project nobody described.
+- **13.982** ✅ The mapper passes a string through and turns `null` into an **ABSENT key** — not `''`, not `null`.
+- **13.983** ✅ The mapper **refuses** a project row that omits the key, naming its path *and* the guard's own sentence.
+- **13.984** ✅ The project card draws the description **inside its own door**.
+- **13.985** ✅ A project nobody described draws **no element at all** — not an empty one.
+- **13.986** ✅ The New-project form sends the description as typed, and **omits the key** when the box is left untouched (so an optional field left alone is never refused).
+- **13.987** ✅ End to end through the REAL door: a description authored over the wire reaches the exact served body — the full `project.created` → projection → read → route path in one assertion.
+
+**Mutation witnesses, run and recorded rather than predicted.** `13.978` — changing the projection's
+`?? null` to `?? ''` reddens **13.978 alone** (`expected '' to be null`), the other 7 in that file green.
+`13.983` — replacing the presence guard with the `withheldOrNumber` shape (an absent key read as "not
+described") reddens **13.983 alone** (`expected function to throw an error, but it didn't`), 77 green.
+
+### What is NOT covered
+
+- **The CSS is verified in the PR body, not here.** jsdom loads no stylesheet, so no assertion here can
+  show that the description's muted 15px/20px line, its wrap, or its placement between the name and the
+  chips RENDERS as the prototype draws it. The class and its containment in the door are asserted;
+  the appearance is a judgement no test in this repo makes.
+- **The accessible-name ratchet was not moved by this change** — the card's `aria-label` is untouched and
+  the new form input is labelled by association, not by `aria-label`. That is a prediction about the
+  sweep, and the sweep is its own check.
+- **The 500-character bound is asserted at the schema, not at the input.** The form carries no
+  `maxLength` (deliberately, matching the name field), so an over-long description is refused by the
+  domain on submission rather than prevented while typing. No case drives that path from the browser.

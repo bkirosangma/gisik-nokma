@@ -208,6 +208,17 @@ export function registerWorkspaceRoutes(
             // Served to every viewer who is told the project's NAME, guests
             // included — see `read/visible-projects.ts`. It is not a count.
             archived: project.archived,
+            // **ALWAYS PRESENT, and `null` is its "not described" spelling**
+            // (door A, 2026-09-19). Deliberately NOT an omitted key, unlike
+            // `ticketCount`/`blockedCount` below: those omit to express a
+            // WITHHOLDING, which is a decision the server made about this
+            // caller. A project nobody has described is not a withholding — it
+            // is an answer — and the difference is load-bearing one layer up:
+            // the mapper REFUSES a payload whose project row has no
+            // `description` key, so a construction site that forgets this field
+            // fails loudly instead of arriving `undefined` and rendering as
+            // "not described" on a route nobody tested.
+            description: project.description,
             // `counts === null` is the WITHHOLDING, decided once in
             // `visibleProjectCounts` and never re-asked here. Inside a served
             // map, a project with no row is an honest 0 — the aggregation

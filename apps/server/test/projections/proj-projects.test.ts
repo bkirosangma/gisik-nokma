@@ -34,12 +34,19 @@ beforeEach(async () => {
 
 const WS = newUlid();
 
-function projectCreated(projectId: string, workspaceId = WS, name = 'First project') {
+function projectCreated(
+  projectId: string,
+  workspaceId = WS,
+  name = 'First project',
+  description?: string,
+) {
   return testEnvelope({
     workspaceId,
     entity: { kind: 'project', id: projectId },
     type: 'project.created',
-    payload: { name },
+    // ABSENT when there is none — the same spread `foundingSeeds` uses, so the
+    // fixture cannot accidentally test a shape the product never builds.
+    payload: { name, ...(description === undefined ? {} : { description }) },
     actorId: newUlid(),
   });
 }
@@ -57,7 +64,7 @@ async function apply(...events: ReturnType<typeof projectCreated>[]): Promise<vo
 
 async function rowsFor(projectId: string) {
   const { rows } = await db.pool.query(
-    'SELECT project_id, workspace_id, name, created_by, created_at FROM proj_projects WHERE project_id = $1',
+    'SELECT project_id, workspace_id, name, description, created_by, created_at FROM proj_projects WHERE project_id = $1',
     [projectId],
   );
   return rows;
@@ -121,6 +128,45 @@ describe('projProjects — what a founding records', () => {
       client.release();
     }
     expect(await rowsFor(projectId)).toHaveLength(0);
+  });
+
+  /**
+   * 13.978 (door A, 2026-09-19) — the row carries the description, and an event
+   * that never made one writes NULL rather than `''`.
+   *
+   * **The two halves are one property, and the second is the one worth a test.**
+   * `''` is a CLAIM about the project — "this project has no description" —
+   * while NULL is the absence of any claim, which is what an event that said
+   * nothing about a description actually leaves behind. A projection writing
+   * `payload.description ?? ''` would put a claim in the table that no event
+   * ever made, and every reader above it would faithfully serve that claim.
+   *
+   * **Mutation that must redden this, for this property and not by erroring:**
+   * change the projection's `?? null` to `?? ''`. The first assertion stays
+   * green (a served description is unaffected) and the second goes red naming
+   * the empty string it found.
+   */
+  it('13.978 — stores a served description verbatim, and NULL where the event made no claim', async () => {
+    const described = newUlid();
+    const undescribed = newUlid();
+    await apply(
+      projectCreated(described, WS, 'Delivery', 'Sprint work for the rollout'),
+      projectCreated(undescribed, WS, 'Site readiness'),
+    );
+
+    const [withDescription] = await rowsFor(described);
+    expect(withDescription.description).toBe('Sprint work for the rollout');
+
+    const [withoutDescription] = await rowsFor(undescribed);
+    expect(withoutDescription.description).toBeNull();
+    // THE CONTROL, and it is not decoration: `toBeNull()` alone also passes if
+    // the column were not selected at all, or if `rowsFor` had stopped reading
+    // it. This asserts the same query shape can return a non-null value, so the
+    // null above is the projection's answer rather than the fixture's silence.
+    expect(withDescription.description).not.toBeNull();
+    // `''` is the specific wrong value this case exists to catch, and `toBeNull`
+    // does distinguish it — asserted separately so the failure message names it.
+    expect(withoutDescription.description).not.toBe('');
   });
 
   it('reset empties the table it declares', async () => {

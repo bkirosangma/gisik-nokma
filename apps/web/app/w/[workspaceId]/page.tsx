@@ -73,13 +73,24 @@ export function foundingSeeds(
   projectId: string,
   name: string,
   founderUserId: string,
+  description?: string,
 ): EnvelopeSeed[] {
   return [
     {
       workspaceId,
       entity: { kind: 'project', id: projectId },
       type: 'project.created',
-      payload: { name },
+      payload: {
+        name,
+        // **ABSENT when there is none** — the key is spread in rather than
+        // written as `description: undefined`, so the envelope the ledger
+        // receives genuinely lacks it and a test can assert the absence with
+        // `'description' in payload`. That is the contract `projectCreatedPayload`
+        // states: an absent key is not-described, and there is deliberately no
+        // `''` spelling, because `''` fails `min(1)` and the schema refuses a
+        // description of only spaces.
+        ...(description === undefined ? {} : { description }),
+      },
     },
     {
       workspaceId,
@@ -392,6 +403,24 @@ function ProjectCard({
             <span className="gn-project-card__name">{project.name}</span>
             {project.archived ? <Chip tone="neutral">Archived</Chip> : null}
           </span>
+          {/* The prototype draws `p.desc` here — a 15px/20px muted line between
+              the name row and the chips, inside the card's own click target
+              (`desktop.dc.html:264`), and its data carries real prose
+              (`{ name: "Delivery", desc: "Sprint work for the rollout" }`).
+
+              **`undefined` renders NOTHING, not an empty line** — the rule
+              `ProjectRef.description` states, and the reason this is an equality
+              test against `undefined` rather than a truthiness check: `''` is
+              not a value the domain schema can produce (it refuses a blank), so
+              the only thing a falsy test would additionally catch is a bug it
+              would then hide. The prototype's own hidden-project row carries
+              `desc: "You are not named on this project"` as a PLACEHOLDER, and
+              that is deliberately NOT transcribed: our `visibleProjects` filters
+              ROWS, so a caller not on a project receives no row to draw at all —
+              there is no card here for a placeholder to sit on. */}
+          {project.description === undefined ? null : (
+            <span className="gn-project-card__description">{project.description}</span>
+          )}
           <span className="gn-project-card__chips">
             {/* The SAME gate the role sentence reads, and the SAME rule the card
                 on `/workspaces` keeps: `null` is WITHHELD and it is not `0`. A
@@ -926,6 +955,7 @@ function NewProjectForm({
   onSubmit: (build: (actorId: string) => EnvelopeSeed[], whenDone: () => void) => void;
 }) {
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
 
   const send = (event: FormEvent): void => {
     event.preventDefault();
@@ -943,8 +973,27 @@ function NewProjectForm({
     // refusal is a new project, not a second attempt at an id the ledger may
     // already hold.
     onSubmit(
-      (actorId) => foundingSeeds(workspaceId, newUlid(), name, actorId),
-      () => setName(''),
+      (actorId) =>
+        foundingSeeds(
+          workspaceId,
+          newUlid(),
+          name,
+          actorId,
+          // `''` is the input UNTOUCHED, and an optional field left untouched
+          // makes no claim — so it is passed as `undefined`, which
+          // `foundingSeeds` turns into an ABSENT key rather than an empty
+          // string. Anything else goes AS TYPED, exactly as the name does and
+          // for the same reason: a whitespace-only description reaches the
+          // domain schema and is refused there with its own sentence, rather
+          // than being silently repaired here into "no description" — which
+          // would make that refusal unreachable from the one form that can
+          // produce a description at all.
+          description === '' ? undefined : description,
+        ),
+      () => {
+        setName('');
+        setDescription('');
+      },
     );
   };
 
@@ -958,6 +1007,33 @@ function NewProjectForm({
           placeholder="e.g. Phase 2 rollout"
           value={name}
           onChange={(event) => setName(event.target.value)}
+        />
+      </label>
+      {/* The owner's ruling of 2026-09-19 — *"New-project form gains an optional
+          description input"* — and it is the ONLY place a description is
+          authored: the prototype's `addProject` takes a name and hard-codes
+          `desc`, so without this control the column would be written only by
+          events the product never sends.
+
+          `New project` stays the row's primary label and this one says
+          "(optional)": the name is required and the schema refuses a blank one,
+          so a reader who did not know which box they could skip would find out
+          by being refused.
+
+          No `maxLength` here, matching the name input beside it: the domain
+          schema owns the 500-character bound, and an attribute that silently
+          stopped the typing would make that refusal unreachable from the form. */}
+      <label
+        className="gn-field gn-project-founding__field"
+        htmlFor="gn-new-project-description"
+      >
+        <span className="gn-field__label">Description (optional)</span>
+        <input
+          id="gn-new-project-description"
+          className="gn-field__input"
+          placeholder="e.g. Sprint work for the rollout"
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
         />
       </label>
       <Button variant="primary" type="submit" disabled={busy}>
