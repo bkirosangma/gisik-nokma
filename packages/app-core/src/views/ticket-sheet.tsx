@@ -1093,8 +1093,11 @@ export function TicketSheet({
           and it carries the `tablist` / `tab` / `aria-selected` roles this markup
           already had, so the accessible-name ratchet (13.285/13.287) sees no
           loss. **It also ADDS something: this `role="tablist"` had no name at
-          all, and the component REQUIRES an `aria-label`**, so a ratchet RISE is
-          the expected direction rather than a surprise.
+          all, and the component REQUIRES an `aria-label`.**
+
+          ⚠ AND THE RATCHET CANNOT SEE IT, which an earlier version of this sentence got wrong by calling it "a ratchet RISE".
+          Measured by an independent reviewer: NO suite renders the sheet — the accessible-name sweeps navigate `/p/:projectId` WITHOUT `?ticket=`, and the sheet mounts only when that parameter is present — so the number cannot move in EITHER direction today.
+          The witness is the unit assertion (`toHaveAccessibleName('Ticket sections')`), and the rise would be exactly one `ariaLabel` the day something renders it.
 
           ⚠ The authority's THIRD tab is not drawn. `Attachments` (`:3589`) is a
           READ behind that tab, not a surface, and the dispatch's rule for this

@@ -1890,6 +1890,8 @@ describe('sheet prototype parity', () => {
     // body's cap. A "full screen" that did one or two of them is a panel that
     // grew while the page behind it stayed visible — the half-done version this
     // repo would otherwise ship, because each part alone looks plausible.
+    const iconPath = (): string | null | undefined =>
+      screen.getByTestId('sheet-scrim').querySelector('.gn-sheet__full path')?.getAttribute('d');
     const scrim = screen.getByTestId('sheet-scrim');
     const panel = scrim.querySelector('.gn-sheet');
     const body = scrim.querySelector('.gn-sheet__body');
@@ -1897,11 +1899,20 @@ describe('sheet prototype parity', () => {
     expect(panel?.className).not.toContain('--full');
     expect(body?.className).not.toContain('--full');
 
+    const enterIcon = iconPath();
+    expect(enterIcon).toBeTruthy();
+
     await userEvent.click(enter);
 
     // The label turns around...
     const exit = screen.getByRole('button', { name: 'Exit full screen' });
     expect(exit).toHaveTextContent('Exit full screen');
+    // ...AND SO DOES THE ICON, which an independent reviewer found asserted
+    // NOWHERE: the record claimed "an icon and a label that BOTH change", and
+    // freezing the path left this case GREEN. The two paths are the prototype's
+    // own (`:3402`), and the property is that the rendered `d` MOVES — "an icon
+    // exists" would pass for a constant, which is the shape that was unwitnessed.
+    expect(iconPath()).not.toBe(enterIcon);
     // ...and so does every part of the sheet.
     expect(screen.getByTestId('sheet-scrim').className).toContain('gn-sheet__scrim--full');
     expect(screen.getByTestId('sheet-scrim').querySelector('.gn-sheet')?.className).toContain(
