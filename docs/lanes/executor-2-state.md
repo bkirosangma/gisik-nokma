@@ -1,99 +1,72 @@
-## ▲ TOP BLOCK — **C IS BUILT: the inbox's bulk write and an honest Undo.** (2026-09-20, ~00:4x IST)
+## ▲ TOP BLOCK — **C: BUILT AND PUSHED, NO PR OPEN. NEXT SESSION: OPEN THE PR.** (2026-09-20, ~01:0x IST)
 
-**Position: DONE and PUSHED — `exec2/inbox-bulk-undo`, base `main`.** PR opens as the last step of this
-dispatch; **measure it rather than reading it here**: `gh pr list --head exec2/inbox-bulk-undo --state all`.
+### § 1 — WHERE TO FIND IT. Read this before anything else.
 
-### § 1 — THE RULING, AND THE WRITE THE ROW DID NOT NAME.
+- **Branch `exec2/inbox-bulk-undo`**, base `main`, **head `dd22eb81`**, pushed to origin.
+- **NO PR IS OPEN** — the controller halted this session at 82% context with instructions to
+  push and stop. **`gh pr view --json headRefOid` against that branch will say "no pull requests";
+  that is correct, not a failure.** **Your first act is to open the PR**, body drafted below.
+- Everything is committed. The tree is clean at that sha.
 
-Owner's ruling: **option A** — ONE bidirectional bulk route `POST /v1/me/notifications/read`, `{ ids, read }`,
-id-scoped and bounded to the list page's own size; the Undo's surface is a **shared `packages/ui` toast**;
-**dismiss after 15 seconds**; a non-id-scoped "mark all read" stays **OUT of scope**.
+### § 2 — WHAT IS BUILT, AND IT IS ALL OF C.
 
-The row named a `NEW ROUTE`, and the Undo needed a **write that did not exist** — `markNotificationRead` is
-one-way, so nothing could put a notification back. Measured with the control in the same invocation: the
-sweep for the write shape `SET read` finds **exactly one** hit (`store.ts:145`, so the sweep can see
-writes); the sweep for `SET read = false` in any spelling finds **none**. Asked before building, and the
-ruling came back in a dispatch file.
+**The ruling applied:** owner's **option A** — ONE bidirectional route `POST /v1/me/notifications/read`
+taking `{ ids, read }`; id-scoped and **bounded at `MAX_LIMIT` (100)**, this route file's own ceiling on
+one page of the read, **refused WHOLE rather than truncated**; the Undo's surface is a **shared
+`packages/ui` Toast**; **dismiss after 15 s**; a non-id-scoped "mark all read" is **OUT of scope**.
 
-### § 2 — ⚠ THE BUG THE TESTS CAUGHT, AND IT IS THE WHOLE TASK IN ONE LINE.
-
-`UPDATE … RETURNING id` reports **every row the `WHERE` MATCHED**, not every row whose value **CHANGED**.
-So an already-read row came back in `changed`, and **the Undo would have flipped it to UNREAD — inventing a
-notification nobody un-read**, with nothing recording who did it. Fixed with
-`AND read IS DISTINCT FROM $1::boolean`. **My first version was wrong and the case I wrote is what said
-so** — removing the clause reddens exactly the two arms that name the property.
-
-**The same shape nearly recurred in the tests:** six of seven cases failed with **401** because my helper
-omitted the `Authorization` header. Caught by reading the failure, not by assuming the route refused.
-
-### § 3 — WHAT SHIPPED.
-
-- **The route** — `{ ids, read }` → `{ changed }`, bounded at **`MAX_LIMIT` (100)**, this route file's own
-  ceiling on one page of the read, **refused WHOLE rather than truncated**.
-- **The unread write** — the same statement carrying the flag, NOT a flag on the per-id route.
-- **The CSRF registration**, plus its row in the security suite. **Witnessed THREE ways:** unregistering
-  the route reddens the 13.116 set-equality drift guard, the forged-Origin refusal, and the no-Origin
-  refusal. `HTTP_ORIGIN_PROTECTED_ROUTES` is an **exact-match `Set`** and the per-id neighbour string does
-  not cover the bulk route — the dispatch's named "most dangerous omission".
-- **The gateway** — `setRead(ids, read): Promise<string[]>` on the interface, the HTTP adapter, and the
-  fake, which mirrors the server **including** the changed-set semantics (a looser fake is this file's own
-  recorded failure).
-- **The page** — `Mark N read` over **exactly the drawn rows**, the toast carrying the **server's
-  `changed`**, Dismiss sending nothing, and a refused write reloading the truth.
-- **The shared `Toast`** — `packages/ui/src/components/toast.tsx`, the product's **first transient
-  surface** — **nothing that ships renders a transient message and no toast component existed.
-  ⚠ The "zero `toast` hits" first written here was FALSE: there are five, in three files, all comments
-  about the prototype's toast, and the sweep's own `grep -viE` comment filter ate them — a silent empty
-  made by the searcher.** 15 s, pausable, `role="status"`, reduced-motion guarded.
-
-### § 4 — ⚠ ONE ADDITION TO THE RULING, FLAGGED RATHER THAN SMUGGLED.
-
-**The countdown PAUSES while the pointer or focus is inside the toast.** The ruled 15 s is the default and
-unchanged; the pause exists because a timer running down while somebody reads or **tabs toward the Undo**
-makes the control vanish mid-use, and WCAG 2.2.1 asks for a time limit a person can extend. **One effect,
-its own arm, vetoable.**
-
-Also departed from the prototype, for a reason: the control reads **`Mark N read`**, not *"Mark all read"*,
-because the ruling kept a non-id-scoped "mark all" out of scope — "all" would be a claim about the inbox
-for an action scoped to the page.
-
-### § 5 — GATE AND CHECKS.
-
-**33/33, `EXIT=0`, NODE=v22.22.2, 0 TS errors**; all seven checks EXIT=0; `check-case-ids` ok at **2485**
-(control: backticking the two new ids drops it to 2483 — **exactly +2**). The gate first failed on
-`@gisik-nokma/server#typecheck` with **19 errors, ALL in my own test file** — `payload: unknown` made the
-helper unassignable to Fastify's `InjectOptions`. **The cases ran GREEN under vitest, which strips types
-without checking them; only the gate caught it.** It then reddened once on the known `seed-dev` load timeout
-at **load 116** — **isolated 8/8 in 10.8 s**, and the box is genuinely busier than it has been all day.
-
-### § 6 — ID BUDGET.
-
-Block **`16.41`–`16.60`**; **`16.41` and `16.42` spent** (the bulk write; the Toast). **Next free: `16.43`.**
-Write the id line as a bullet with the id bolded ALONE — `- **16.N** ✅ …`.
-
-### § 7b — INDEPENDENT REVIEW: NINE FINDINGS, ALL CONFIRMED, ALL ACTED ON. ONE WAS SEVERE AND MINE.
-
-| # | finding | disposition |
+| piece | where | state |
 |---|---|---|
-| **1** | **THE RULED 15 s WAS DEAD FROM THE SECOND TOAST ON, and my own pause addition caused it.** `paused` is set by `mouseenter`, and **every way of closing the toast puts the pointer or focus inside it** — you cannot click Undo or Dismiss without hovering. A removed node fires no `mouseleave`, so the flag survived to the next `open`, the effect's `|| paused` early return never reached `setTimeout`, and every later toast stayed on screen forever. The reviewer reproduced it: `mouseover` → close → reopen → 60 s → `onDismiss` **0** times. | Cleared on close. **New arm that keeps ONE toast mounted across a close and a reopen — which no case in the file did**, because the bug lives between two toasts and every other arm mounts a fresh one. Mutation-witnessed. |
-| **2** | **The >bound refusal was SILENT and DISCARDED LOADED PAGES.** The catch reloaded and set no state: a reader with 120 drawn rows clicked `Mark 120 read`, nothing was marked, nothing was said, and the list snapped back to 30. **The adapter's own docblock asserted the opposite** — *"the caller renders the refusal rather than assuming the write landed."* | A `bulkFailure` state rendered in the page's existing `role="status"` idiom, split on `HttpError.status === 400` (the server adjudicated) vs anything else (nobody did). Three arms; mutation-witnessed. |
-| **3** | **The HTTP adapter's `setRead` was exercised by NO test** — the page's suite injects a hand-written stub, so the path and the BODY KEYS could drift with every suite green. | Three adapter cases in `test/online/notifications.test.ts`, and the scripted-fetch helper now records `bodyJson` — `hadBody` alone cannot see a key renamed to `isRead`. |
-| **4** | **The fake's carefully mirrored `setRead` was dead code** — no test called it, so its changed-set semantics and bound witnessed nothing. | Four cases in `test/inbox/gateway.test.ts`. |
-| **5** | The route file's docblock said **"Three routes"**; it registers four. | Corrected. |
-| **6** | **⚠ MY "ZERO `toast` HITS" SWEEP WAS FALSE.** There are **five, in three files**, all comments about the prototype's toast — and the sweep carried a `grep -viE` filter meant to skip comments **that ate exactly the hits that existed**. | Corrected in **all five** places it was written, quoting what it used to say. **The material claim (nothing SHIPS a transient message) survives; the measurement did not.** |
-| **7** | A second bulk action **inherited the first toast's remaining time** (5 s, not 15) and dropped its Undo. | The page now keys the Toast on the changed set, so a new action is a new toast. The dropped Undo is the toast's one-slot design, and the prototype's is the same — recorded, not fixed. |
-| **8** | `markNotificationsRead`'s `if (ids.length === 0) return []` was **unreachable** — the route refuses empty first. | Removed; the route's validation is the one place, and the fake mirrors the ROUTE. |
-| **9** | Two **present-tense counts** this change moved: `http-origin.ts`'s "the eight routes in the set" (eleven now, and a DELETE since 2026-09-08), and the catalogue's "exactly one `SET read` hit" (two now). | Both made **count-free**: the http-origin paragraph states the property and says why the arithmetic is deliberately absent from a comment about a past decision. |
+| the bulk route | `apps/server/src/routes/notifications.ts` | ✅ built, 12 arms in its own suite |
+| **the unread write** (did not exist) | `apps/server/src/notifications/store.ts` | ✅ built |
+| **the CSRF registration** + its suite row | `apps/server/src/http/http-origin.ts`, `test/http/security-middleware.test.ts` | ✅ built; **triple-witnessed** |
+| the gateway (`setRead`) + HTTP adapter + fake | `packages/app-core/src/inbox/gateway.ts`, `online/notifications.ts`, `test/inbox/fake-gateway.ts` | ✅ built, all three tested |
+| the page: `Mark N read`, the Undo, the refusal | `apps/web/app/inbox/page.tsx` | ✅ built |
+| the shared **`Toast`** (the product's first transient surface) | `packages/ui/src/components/toast.tsx` + `ui.css` | ✅ built |
 
-**What the reviewer found SOUND:** the Undo's honesty end to end (SQL → response → gateway → page), with **no path where the page un-reads an id the forward call did not change** · the bound is the read's true ceiling and the refusal is a boundary, not a broken route · the CSRF registration is present, the drift guard genuinely bidirectional, and the forged-Origin arms cover it · **the toast's remaining-time arithmetic is correct and an inline `onDismiss` does NOT reset the clock** · the label is accurate in every state · the fake is faithful to the store and route · `check-case-ids` at 2485.
+**Cases `16.41`** (the bulk write, route and call site) and **`16.42`** (the Toast), both as id lines in
+`test-cases/16-remaining-doors.md`. **Block `16.41`–`16.60`: `16.41` and `16.42` spent, next free
+`16.43`.** `check-case-ids` ok at **2485**; control-verified as exactly +2 (backticking the two ids
+drops it to 2483).
 
----
-### § 7 — NEXT IN THIS LANE.
+### § 3 — ⚠ THE THING TO READ BEFORE TRUSTING ANY OF IT: A REVIEW ROUND OF NINE, ONE SEVERE.
 
-**`H` (the sheet footer)** — ruled: *a HISTORY-RETAINING removal with undo, NOT a hard delete* — then the
-inviter card. **Read `CTL-QUEUE-2026-09-19-door-builds.md` with its Addenda before starting.** Note the
-toast now exists, which is the surface a history-retaining removal's undo would want — but **do not assume
-that is ruled**: H's own dispatch decides.
+Independent review ran before the halt. **Nine findings, all confirmed, all fixed in `dd22eb81`.**
+The severe one was MINE and it broke the ruling:
+
+> **THE RULED 15 s WAS DEAD FROM THE SECOND TOAST ON.** `paused` is set by `mouseenter`, and every way of
+> closing the toast puts the pointer or focus inside it — you cannot click Undo or Dismiss without
+> hovering. A removed node fires no `mouseleave`, so the flag survived to the next `open`, the effect's
+> `|| paused` early return never reached `setTimeout`, and **every later toast stayed on screen forever.**
+
+And one worth carrying: **my own "zero `toast` hits" sweep was FALSE** — there are five, in three files,
+all comments about the prototype's toast, and **the sweep's own `grep -viE` comment filter ate exactly
+the hits that existed.** Corrected in all five places it was written.
+
+The other seven: the >bound refusal was **silent** and discarded loaded pages; the HTTP adapter's
+`setRead` was **exercised by no test**; the fake's `setRead` was **dead code**; the route file said
+"Three routes" where it registers four; a second action inherited the first toast's remaining time; an
+unreachable empty guard; two present-tense counts the change moved.
+
+### § 4 — WHAT IS LEFT.
+
+1. **OPEN THE PR.** Not done. `--base main`, one PR, you do not merge.
+2. **The forced gate is the controller's.** The last run at this head: **`33/33` tasks, `0` TS errors**,
+   with `@gisik-nokma/server` reddening on **one** test — `test/seed/seed-dev.test.ts`'s 30 s timeout at
+   **load 89–97** — which is the **known load red this lane has isolated 8/8 twice today** and is not
+   this change. **`NODE=v22.22.2`.** All seven checks EXIT=0.
+3. **After C lands: `H` (the sheet footer)** — ruled *a HISTORY-RETAINING removal with undo, NOT a hard
+   delete*. Then the inviter card. **Note the Toast now exists, which is the surface such an undo would
+   want — but do NOT assume that is ruled: H's own dispatch decides.**
+
+### § 5 — THE TWO DEPARTURES FROM THE RULING/ PROTOTYPE, BOTH FLAGGED FOR A VETO.
+
+1. **The countdown PAUSES on hover/focus** — my addition. The ruled 15 s is the default and unchanged;
+   the pause is because a timer running down while somebody **tabs toward the Undo** makes the control
+   vanish mid-use (WCAG 2.2.1). **This addition is what caused finding #1 above; it is now correct and
+   its own arm guards the reopen path.**
+2. **The label reads `Mark N read`, not the prototype's "Mark all read"** — the ruling kept a
+   non-id-scoped "mark all" out of scope, so "all" would claim the inbox for an action scoped to the page.
 
 ---
 
