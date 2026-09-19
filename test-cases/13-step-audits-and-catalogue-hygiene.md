@@ -200,7 +200,7 @@ in a follow-up.** `13.315` was first minted ✅ on a "structural warrant" — th
 and `ticket-list.tsx:676` both read `stateCategory`, so the List's tone was the Board's by construction.
 The reviewer read line 415: it is the **column header's** chip, reading `column.category`, and a Board
 **card** renders no state chip at all. The warrant was invented, the verdict is ❌, and the false
-sentence is quoted and refuted in the row. **The count was therefore 10 ✅ / 5 ❌, not 11 / 4 — and it is 12 ✅ / 3 ❌ as of 2026-09-18, because `13.309` was witnessed by `hig-per-screen/7b` and `13.306` by `hig-per-screen/6b`, each marked ✅ IN PLACE in the list below rather than moved out of it.** The
+sentence is quoted and refuted in the row. **The count was therefore 10 ✅ / 5 ❌, not 11 / 4 — and it is 13 ✅ / 2 ❌ as of 2026-09-19: `13.309` was witnessed by `hig-per-screen/7b` and `13.306` by `hig-per-screen/6b`, both on 2026-09-18, and `13.304` by `hig-per-screen/5b` on 2026-09-19 (the owner's option "c", the real-door case) — each marked ✅ IN PLACE in the list below rather than moved out of it.** The
 reviewer also read `13.307` and `13.309` against their primary sources; 13.309's ❌ was upheld, and
 13.307 kept its ✅ with an absence now enumerated in the row. *A verdict is only as good as the line it
 cites, and the first draft cited a line it had not read.*
@@ -304,26 +304,62 @@ cites, and the first draft cited a line it had not read.*
 
 ### Verdict (c) — unwitnessed. Minted ❌ with the deliverable named.
 
-> **Two rows in this list are no longer ❌.** `13.309` was witnessed on 2026-09-18 (`hig-per-screen/7b`)
-> and `13.306` by `hig-per-screen/6b`; both are marked ✅ IN PLACE below, so the audit's verdict and its
-> outcome stay side by side. **The other three are unwitnessed exactly as minted.** One row here is a
-> verdict the WITNESS could not move on its own — `13.306` — and its own row says which half moved and
+> **Three rows in this list are no longer ❌.** `13.309` was witnessed on 2026-09-18 (`hig-per-screen/7b`),
+> `13.306` by `hig-per-screen/6b`, and `13.304` on 2026-09-19 by `hig-per-screen/5b` — the owner's option
+> "c", the real-door case; all three are marked ✅ IN PLACE below, so the audit's verdict and its outcome
+> stay side by side. **The other two are unwitnessed exactly as minted.** Two rows here are verdicts the
+> WITNESS could not move on its own — `13.306` and `13.304` — and each row says which half moved and
 > which half did not.
 
-- ❌ **13.304 — the `Only tickets in progress` checkbox "exists and toggles the rendered count": the
-  plan's sentence is UNSATISFIABLE as written, and the half that is true is unwitnessed.** The checkbox
-  exists and is clicked in three suites. It cannot toggle the count the plan means, and the reason is
-  a type: `getBoard(projectId: string)` takes no filter at all
-  (`packages/app-core/src/data-source.ts:134`), so the Board's `N of M` is the complete board total
-  under every value of `activeOnly` — `board-narrowing.test.tsx:26-52` measures this against the
-  primary source and records it. What the control really narrows is the LIST's server read, and **that
-  half is asserted nowhere**: no test ticks the control and then asserts the List's row set shrank.
-  Deliverable: a case that ticks the control and asserts the narrowed List (and, in the same case, that
-  the Board's own count is UNMOVED — the negative arm is the part that makes the narrowing real rather
-  than claimed). The recorded impossibility is part of the deliverable, not a note about it: a future
-  reader who implements the plan's sentence literally will move the Board's count into the list's
-  narrowing and produce a page that claims a narrowing it does not perform.
-  (`apps/web/test/board-narrowing.test.tsx`, `apps/web/src/…/page.tsx`)
+- ✅ **13.304 — the `Only tickets in progress` checkbox's LIST half, witnessed at the REAL DOOR — this is
+  the row this audit minted ❌, and it is upgraded IN PLACE so its verdict and its outcome stay readable
+  together.** The ❌ was a two-part verdict and **only ONE part moved.** The Board half stands exactly as
+  the audit filed it and is NOT softened by this flip: `getBoard(projectId: string)` takes no filter at
+  all (`packages/app-core/src/data-source.ts:142`), so the Board's `N of M` is the complete board total
+  under every value of `activeOnly` — `board-narrowing.test.tsx:26-52` measures this against the primary
+  source and records it, and `13.436` pins it. The recorded impossibility is part of the deliverable, not
+  a note about it: a future reader who implements the plan's sentence literally will move the Board's
+  count into the list's narrowing and produce a page that claims a narrowing it does not perform.
+  **What the audit could not move was the LIST half — that no test ticks the control and then asserts the
+  List's row set shrank — and the owner ruled option "c" for it** (2026-09-19, `controller-state.md`
+  "📌 THE OWNER'S RULINGS", item 4: *"the real-door case: real server, real Postgres, the List genuinely
+  shrinks … the only option that witnesses the PRODUCT"*), rejecting the alternative of restating the
+  case down to what a stub can express. **Two suites click the checkbox — three click sites across two
+  files** (`apps/web/test/board-narrowing.test.tsx:232`, `apps/web/test/page-refusals.test.tsx:528` and
+  `:563`) — and neither can make this claim, failing it in **opposite** ways.
+  `apps/web/test/board-narrowing.test.tsx:185` declares
+  `getTickets: async (): Promise<TicketListView> => ({ projectId: PROJECT_ID, rows })` — **no parameters at
+  all**, so a filter cannot reach it. `apps/web/test/page-refusals.test.tsx:497-503` DOES read
+  `filter.stateCategories` and narrows — but it narrows **inside the stub**, so the fake re-implements the
+  server's rule and then asserts its own copy of it. **Neither is evidence about the server:** one cannot see
+  the filter, the other answers from a hand-written version of it, and a rule copied into a fake is exactly
+  what stops the server from having to exist. (A third file,
+  `packages/app-core/test/views/new-ticket-dialog.test.tsx`, mentions the control in a docblock and passes
+  `parentCandidatesNarrowing` as a prop; it never clicks it, so it is not counted.)
+  **The witness** is `apps/server/test/integration/list-narrowing-roundtrip.test.ts` — the REAL
+  `createOnlineDataSource` over the REAL `GET /v1/projects/:projectId/tickets`, against REAL Postgres,
+  **zero `vi.mock`**. The world is built through the shipped doors only (`POST /v1/workspaces`,
+  `POST /v1/events`) and holds **one ticket in each of the three state categories** —
+  `todo`/`open`, `doing`/`active`, `done`/`terminal` (`packages/domain/src/simple-kanban.ts:24-26`) —
+  because a fixture holding only `active` and `terminal` rows could not tell *narrowed to the active
+  category* from *narrowed to non-terminal*, and would pass for the wrong reason. **The control runs
+  FIRST** (the unfiltered read asserts all three, with their categories read off the wire), then the
+  narrowed read asserts EXACTLY the `doing` row. The Board's read is asserted UNNARROWED in the same case,
+  and that is a **supporting wire-level fact, NOT the negative arm** — a `getBoard` read cannot fail for the
+  hazard the ❌ above names (a future implementer sourcing the RENDERED `N of M` from the List's narrowed
+  rows), because it never observes the page. **The negative arm is `13.436`**
+  (`apps/web/test/board-narrowing.test.tsx:214-246`, catalogued in `13-board-prototype-port.md`), which
+  renders and asserts the count reads the board's total rather than the list-sourced one.
+  **The door was MEASURED before it was used and needed no widening and no new route**: the filter is
+  already carried end to end by shipped code — `page.tsx:321-324` builds it, `ticket-list.tsx:1196`
+  passes it, `mappers.ts:910` singularises it to `stateCategory`, `filter-spec.ts:125` validates it,
+  `routes/list.ts:136` compiles it, and `read/compile-filter.ts:104` emits the clause. That is also why
+  the wire spelling is SINGULAR: asserting the client's plural `stateCategories` against the route would
+  400 rather than narrow.
+  **Mutation-witnessed** by deleting the `compile-filter.ts:104` clause: the filter is then silently
+  IGNORED — the query does not fail, it answers with every row — and this case reddens **alone at its
+  narrowing assertion**, for the property it names rather than because the query broke.
+  (`apps/server/test/integration/list-narrowing-roundtrip.test.ts`, `packages/domain/src/simple-kanban.ts`)
 
 - ✅ **13.306 — the prototype's invented resolution pair, witnessed as ABSENT, with the shipped set pinned
   EXACTLY and each control wired to its own resolution KIND.** The audit files the pair as *"I — SHOWN BUT

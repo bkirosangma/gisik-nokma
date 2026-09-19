@@ -20,11 +20,163 @@
 
 ---
 
-## ▲ TOP BLOCK — Task 3 **MERGED**; the owner's rulings are in; and this lane is **DISPATCHED on the no-hot-reload change**. (2026-09-19)
+## ▲ TOP BLOCK — `hig-per-screen/5b`: **`13.304` IS WITNESSED AT THE REAL DOOR.** The door was measured first and needed NO widening; the case is mutation-witnessed; the gate is green. (2026-09-19, ~14:4x IST)
 
-**Position: the no-hot-reload dispatch is DONE and its PR is OPEN — `#512`, branch
-`exec2/drop-hot-reload`, frozen head `c8cb3395` (two commits: the change, then the review round).**
-Replaces the "DISPATCHED" this block said an hour ago; the work landed in the same change set as this line.
+**Position: the dispatch is DONE and the branch is PUSHED — `exec2/hig-5b-real-door`, base `main`.** The PR
+for this head is opened as the last step of the dispatch that wrote this block, so **measure it rather than
+reading it here: `gh pr list --head exec2/hig-5b-real-door --state all`.** This sentence first read *"its PR is
+open"* while no PR yet existed — a reviewer caught it, and it is the same failure this file corrects 200 lines
+below, so the line now tells its reader to measure. Cut from
+a freshly fetched `origin/main` **`6cee248d`** (cycle 10's close). **The frozen head is the commit carrying
+this block** — every sha here measured with `/usr/bin/git`, never `rtk`, whose `git log` ignores its revision
+argument.
+
+**Dispatch: `CTL-DISPATCH-2026-09-19-5b-real-door.md`.** The owner's ruling (item 4 of
+`controller-state.md`'s "📌 THE OWNER'S RULINGS") chose option **"c"**, the real-door case. **The ruling
+removed the ambiguity, not the measuring.**
+
+### § 1 — THE DOOR WAS MEASURED FIRST, AND NO NEW DOOR WAS NEEDED.
+
+The dispatch required the door be measured BEFORE it was built, and that I STOP AND ASK if it needed a NEW
+route or a widened pinned signature. **It needed neither** — a measurement, not a judgement. The filter the
+checkbox needs is already carried end to end by shipped code:
+
+| step | where |
+|---|---|
+| the page builds the CLIENT filter | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:321-324` |
+| the List passes it to the read | `packages/app-core/src/views/ticket-list.tsx:1196` |
+| the mapper translates plural → SINGULAR | `packages/app-core/src/online/mappers.ts:910` |
+| `filterSpecSchema` already carries the term | `packages/domain/src/filter-spec.ts:125` |
+| the LIST route validates the query against it | `apps/server/src/routes/list.ts:536` |
+| ...and compiles it | `apps/server/src/routes/list.ts:136` |
+| the compiler already emits the clause | `apps/server/src/read/compile-filter.ts:104` |
+
+**No surface was added.** The wire spelling is SINGULAR (`stateCategory`) because `mappers.ts:910`
+singularises it — asserting the client's plural against the route would 400 rather than narrow.
+
+### § 2 — WHAT SHIPPED.
+
+| artefact | what |
+|---|---|
+| `apps/server/test/integration/list-narrowing-roundtrip.test.ts` | **new** — the positive arm, zero `vi.mock` |
+| `test-cases/13-step-audits-and-catalogue-hygiene.md` | **`13.304` flipped ❌ → ✅ IN PLACE**, the three-row blockquote, the `13 ✅ / 2 ❌` tally |
+
+**Real `createOnlineDataSource` → real `GET /v1/projects/:projectId/tickets` → real Postgres.** The world is
+built through the shipped doors only (`POST /v1/workspaces`, `POST /v1/events`): no `applyCommitted`, no
+`insertEvent`, no INSERT into any `proj_*` table.
+
+**The fixture holds one ticket in EACH of the three state categories** — `todo`/`open`, `doing`/`active`,
+`done`/`terminal` (`packages/domain/src/simple-kanban.ts:24-26`). **Load-bearing, not tidiness:** a fixture
+holding only `active` and `terminal` rows cannot tell *narrowed to the active category* from *narrowed to
+non-terminal*, and would pass for the wrong reason. The category `active` is the `doing` state **alone**.
+
+**The control runs FIRST** — the unfiltered read asserts all three rows *with their categories read off the
+wire* — and only then does the narrowed read assert exactly the `doing` row. The runner stops at the first
+failure, so a control placed after the assertion it protects could not be shown capable of failing.
+
+### § 3 — THE MUTATION, AND WHAT IT PROVES.
+
+**Deleted `apps/server/src/read/compile-filter.ts:104`** — the `stateCategory` clause. **The case reddens
+ALONE *within its own file* at its narrowing assertion** (`list-narrowing-roundtrip.test.ts:339`) and **NOT by
+500-ing**: the
+failure is `expected [3 ids] to deeply equal [1 id]` — the query ran fine and simply stopped narrowing. That
+is the distinction the dispatch named: *a mutation must change the PROPERTY, not just the source.* Restored,
+then verified with `git diff -- apps/server/src/read/compile-filter.ts` → **empty** and
+`git status --porcelain` → only the new untracked test file. (That was a fact about the WORKING TREE at that
+moment, and it stopped being true the moment the catalogue and handoff edits landed beside it. The claim that
+survives at the head is the one to re-measure: `git diff 6cee248d..HEAD -- apps/server/src/read/compile-filter.ts`
+→ **empty**, i.e. the mutation is not in the frozen head.)
+
+### § 4 — THE ID: NO NEW ID WAS MINTED, AND THAT IS A REFUTATION OF THE RECON.
+
+**`EXEC-RECON-2026-09-19-5b-option-c.md` step 5 instructed minting a new case id at the tip. I did not, and
+the instruction is wrong.** The repo's own precedent is explicit at
+`test-cases/13-step-audits-and-catalogue-hygiene.md:203`: `13.309` and `13.306` were witnessed *"each marked
+✅ IN PLACE in the list below rather than moved out of it"* — **same id, status flipped.** The branch names
+agree: `exec/hig-6b-13306-resolution-pair`, `exec/hig-7b-13309-withheld-title` — both named for the ORIGINAL
+case. **So `13.304` is flipped in place.** The recon's own closing line — *"Recount at the tip — do not trust
+this note's arithmetic"* — is what licenses the correction.
+
+**Measured, because the recon's id landscape had shifted under it:** `13.912` is the settings block's own
+recorded *"next free"* (`13-settings-and-workflows.md:1049`); `13.936`–`13.937` are exec 1's block tail *"left
+UNUSED"*; and **`13.947` is *"deliberately left unused so no block boundary moves"*** (`executor-state.md:169`).
+**Every near-tip id is bound by another block's boundary convention** — a second reason a minted id would have
+been the wrong move.
+
+### § 5 — WHAT IS *NOT* DONE, NAMED RATHER THAN IMPLIED.
+
+- **The Board half is NOT softened by this flip.** `getBoard(projectId: string)` still takes no filter
+  (`data-source.ts:142`), so the Board's `N of M` is the complete total under every value of `activeOnly`. The
+  case asserts the Board's card count **UNMOVED** in the same case, at the real door. `13.436` pins the same
+  claim in jsdom and remains the negative arm — **the two are a pair and each names the other.**
+- **`13.301`–`13.303` were NOT re-pinned.** Nothing in the real door changed them.
+- **The forced gate is the controller's.** I ran `pnpm turbo run build test typecheck` myself: **33/33,
+  `EXIT=0`, node `v22.22.2`**; server `154 files / 1573 passed (5 skipped)`, web `50 / 552`, desktop `3 / 9`,
+  mobile `5 / 29`. **`@gisik-nokma/server:test` and `#typecheck` were `cache miss, executing` in THIS
+  worktree** — checked in the log, because a cached pass is not a pass of new code.
+- **All seven checks green.** `check:db-tz` needs `DATABASE_URL` (documented at `.env.example:67`); the DB
+  answers `Asia/Kolkata`.
+- **`Features.md` was NOT edited — a measurement, not an omission:** `:79` already documents this feature
+  *including* the claim *"applied server-side by `compileFilterSpec`"*, which this case now **witnesses**
+  rather than leaves asserted. No feature was added, removed or changed.
+
+### § 6 — A READING THAT LOOKS LIKE EVIDENCE AND IS NOT.
+
+**A turbo cache HIT replays the ORIGINAL run's log, so the replayed lines name the directory that run happened
+in.** The gate's `@gisik-nokma/web:test` / `#typecheck` lines read `/Users/kiro/my_projects/gisik-nokma/apps/web`
+— **the primary checkout, where this lane's work does not live.** Nothing ran there: it is a replay, and the
+cache key is input-based, so the hit is valid. But a reader auditing *"did the tests run in my worktree"* from
+those lines would conclude the opposite of the truth.
+
+### § 7 — THE REVIEW ROUND, AND WHAT IT FOUND THAT I COULD NOT.
+
+An independent reviewer ran at the frozen head. It **CONFIRMED all seven claims it was asked to refute** —
+including reproducing the mutation (exact failing line 339, 3 ids vs 1), and separately proving the CONTROL
+falsifiable by mutating line 104 to an unconditional `stateCategory = 'open'`, which reddened the control at
+`:314`. Then it found **four real defects in my own prose**, every one of which I re-measured myself before
+accepting:
+
+1. **"Three suites click the checkbox" was wrong twice.** Only **two** click it (`board-narrowing.test.tsx:232`
+   and `page-refusals.test.tsx:528,563`), and one of those two — `page-refusals.test.tsx:497-503` — **DOES read
+   the filter**: its stub re-implements the narrowing. So "all three drive a stub that ignores the filter" was
+   false, and the true statement is both stronger and stranger: the two suites fail to witness this in
+   **opposite** ways. Corrected in the test docblock and the catalogue row.
+2. **`data-source.ts:134` was the wrong line** — it is a bare `/**`; `getBoard(projectId: string)` is at
+   **`:142`**. Pre-existing drift, carried forward from the ❌ row into three places I wrote. Corrected in all three.
+3. **The Board assertion was over-credited.** It was called "the negative arm that makes the narrowing real
+   rather than claimed"; a `getBoard` read cannot fail for the hazard named — a future implementer sourcing the
+   **rendered** `N of M` from the narrowed rows — because it never observes the page. It is a **supporting
+   wire-level fact**; **the negative arm is `13.436`.** Corrected in the docblock and the catalogue row. The
+   over-credit is precisely the "a check passing for a reason unrelated to the property it names" shape.
+4. **"ALONE" was unscoped.** The deletion reddens this file alone but is **not** alone repo-wide —
+   `apps/server/test/read/compile-filter.test.ts` pins the clause directly and reddens with it. Scoped in both places.
+
+It also caught **three defects in this file** — the "its PR is open" line while no PR existed, the
+"only the new untracked test file" moment-in-time claim, and a rule reading "do not run the forced gate" that
+contradicted § 5. All three corrected in place, with the correction visible rather than silently overwritten.
+
+**The lesson, and it is the one this file keeps paying for:** every one of the four prose defects was in text I
+had written *about my own work*, and three of them were citations that **resolved** while pointing at the wrong
+thing. **A citation that resolves is not a citation that is true.**
+
+### Rules that bind this branch
+- **Never `docker compose`** — the stack is served from the main folder now and is the owner's.
+- **Do not edit `task-ledger.tsv`** — the controller flips rows after each merge.
+- **Never `AskUserQuestion`.** A question is a file in `gisik-nokma-lanes/` plus a one-line pointer, then a hold.
+- **Do not run the forced gate — that is the gate the CONTROLLER runs to decide a merge.** (Running
+  `pnpm turbo run build test typecheck` yourself before freezing is a different thing, and the dispatch
+  requires it; § 5 above records that run. This rule previously read "do not run the forced gate" with no
+  scope word, which contradicted § 5 a few lines above it.)
+- **Never pipe a test run into `head`.** No orphans at the freeze: the `ppid=1` vitest sweep returned empty.
+
+---
+
+## ▼ SUPERSEDED — Task 3 **MERGED**; the owner's rulings are in; and the no-hot-reload change is **MERGED as `#512`**. (2026-09-19)
+
+**Position: the no-hot-reload dispatch is DONE and `#512` is MERGED** — branch `exec2/drop-hot-reload`,
+head `c8cb3395`, merged as `752ace59` (two commits: the change, then the review round). This paragraph
+read *"its PR is OPEN"* for one cycle; it was true when written and false at the head it shipped in, and
+it is corrected rather than left as the restart surface's own stale "open" line.
 
 **`CTL-DISPATCH-2026-09-19-drop-hot-reload.md`.** The headline finding, because it is the number the
 dispatch existed to produce: **a full `docker compose --env-file .env -f docker-compose.dev.yml build web`
