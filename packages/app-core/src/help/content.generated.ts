@@ -2256,6 +2256,158 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
+            "id": "seeing-a-job-s-children-from-its-panel",
+            "title": "Seeing a job's children from its panel",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Open a job and its panel carries a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Subtasks"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " section, sitting between the progress line and the fields. It has four parts."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "The heading"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " reads \"Subtasks\", and when the job has children it carries their progress on the same line — "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "\"Subtasks · 3 of 5 done\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", with "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "\"· 2 restricted\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " added when some of them are not yours to see."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "The children"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", one line each, with "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "each child's own stage"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " beside it: "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Order the brochures · To do\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". A subtask is a job in its own right — it gets a stage, an assignee, a date and a history of its own. If a job has no children at all, the section says so plainly rather than leaving you an empty space to interpret."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "When a job is itself a subtask"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", the heading also carries a chip naming its parent — "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "\"Subtask of Rebrand for Kalita Tea\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Press it and that parent's panel opens in place of the one you were reading. It names the parent directly above and never a whole chain: the parent's own panel draws its own chip in turn, so you walk a family tree one step at a time rather than being handed a path. If the parent is one you are not allowed to see, the chip reads "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "\"Subtask of a restricted parent\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " instead and is not pressable — see \"Restricted parent — exists, but you can't see it\" above."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "The add row"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " at the bottom of the section takes a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "New subtask title"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and files the new child under the job you are looking at. It is the ordinary \"adding a job\" you already know (§5) with the parent filled in for you, so the new child starts in the first stage of its workflow and its title is held to the same rule as any other: blank, or spaces only, is refused. A refusal keeps what you typed, so you correct it rather than retype it."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "One refusal worth knowing about."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " The heading's count comes from the server; the list itself comes from a separate read. If those two ever disagree — the server counts five children you can see and only three could be read — the section "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "shows you no list at all"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and says so in the server's own numbers. It will not quietly show you three and let you assume that is all of them."
+                  }
+                ]
+              }
+            ]
+          },
+          {
             "id": "adding-work-under-a-job-that-is-already-finished",
             "title": "Adding work under a job that is already finished",
             "blocks": [
@@ -3209,7 +3361,32 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "That is the only filter on the website. There is no filtering by person, by date, or by type, and there is no search box. (The product can do all of those underneath; nothing on any screen reaches them.)"
+                    "text": "That switch is not the only filter on the website — beside it sits a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Filters"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button, and above the tabs there is a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Search the board"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " box that narrows what the board shows you."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The deep search is a different thing again: the one that looks through every title, description and comment in the workspace at once is on no screen at all. It is a finished engine with no steering wheel bolted on."
                   }
                 ]
               }
@@ -3487,11 +3664,94 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "To mark something read: click the row."
+                    "text": "To mark one thing read: click the row."
                   },
                   {
                     "kind": "text",
-                    "text": " That is it. If the marking fails, it reloads to show you the truth rather than leaving a fake \"read\" mark. Clicking also takes you to the job it is about."
+                    "text": " If the marking fails, it reloads to show you the truth rather than leaving a fake \"read\" mark. Clicking also takes you to the job it is about."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "To mark a pageful read at once: the `Mark N read` button"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", above the list, where "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "N"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " is how many rows on screen are actually unread. It marks exactly those — not your whole Inbox — which is why the button carries a number instead of the word \"all\", and why it is simply "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "not there"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " when nothing on screen is unread. A number you can check beats a word you have to take on trust."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "When it works, a message appears with an "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Undo"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " beside it — "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"3 notifications marked read\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". The Undo puts back exactly what that one action changed and nothing else, including correctly leaving alone any row that was already read before you pressed it. If nothing actually moved, no message appears at all, because there would be nothing to undo."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Three limits worth knowing."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " The message clears itself after about fifteen seconds. Pressing "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "Mark N read"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " again replaces it, so once you start a second action the first one's Undo is gone — there is only ever one on screen. And a single press carries at most "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "100"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " notifications: past that the whole press is refused and tells you so, rather than marking some of them and leaving you to work out which ones went."
                   }
                 ]
               },
@@ -4949,7 +5209,28 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " the phone app's board screen has a search box — the only one in the product. With no signal it says \"searching offline copy\" underneath, so you know the results might be a little out of date."
+                    "text": " the phone app's board screen has a search box. With no signal it says \"searching offline copy\" underneath, so you know the results might be a little out of date."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "That is no longer the only search box in the product."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " The website's project board has one too, above the tabs and labelled "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "\"Search the board\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". It cannot help you offline — the website is online-only — so it is named here only so you know it is there."
                   }
                 ]
               }
@@ -7975,6 +8256,37 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
+            "id": "can-i-mark-a-lot-of-them-at-once",
+            "title": "Can I mark a lot of them at once?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Yes — the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Mark N read"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button above the list, where N is how many rows on screen are unread. It marks exactly those, not your whole Inbox, and it is absent when nothing on screen is unread. When it works you get a message with an "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Undo"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " beside it, which puts back exactly what that one action changed. The message clears after about fifteen seconds, a second press replaces it and takes the first one's Undo with it, and a single press carries at most 100 — past that it refuses the whole thing and says so, rather than marking some of them."
+                  }
+                ]
+              }
+            ]
+          },
+          {
             "id": "my-needs-your-attention-strip-isn-t-showing",
             "title": "My \"Needs your attention\" strip isn't showing.",
             "blocks": [
@@ -8276,7 +8588,23 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "There isn't one on the website. Not on any screen."
+                    "text": "There is one on the website now: above the tabs on a project's board, labelled "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "\"Search the board\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", and it narrows what the board shows you as you type. There is also one on the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "phone app's board screen"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Neither of them is the deep search described below."
                   }
                 ]
               }
@@ -8323,7 +8651,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "On the "
+                    "text": "Two places, and both of them only narrow something already on screen. On the "
                   },
                   {
                     "kind": "bold",
@@ -8331,15 +8659,32 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ". When you are offline it says \"searching offline copy\" underneath. So the one place you can search is the app with the fewest screens."
+                    "text": " — where, offline, it says \"searching offline copy\" underneath, so you know the results might be a little out of date. And on the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "website's project board"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", in the box above the tabs."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Neither of those is the deep search described just above. That one is still on no screen."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "if-search-worked-what-would-catch-me-out",
-            "title": "If search worked, what would catch me out?",
+            "id": "if-the-deep-search-worked-what-would-catch-me-out",
+            "title": "If the deep search worked, what would catch me out?",
             "blocks": [
               {
                 "kind": "paragraph",

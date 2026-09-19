@@ -1,4 +1,129 @@
-## ▲ TOP BLOCK — **THE MANUAL SAID YOU CANNOT ASSIGN A JOB — TRUE ON THE APPS, FALSE ON THE WEB SINCE `#530`.** (2026-09-20, ~11:0x IST)
+## ▲ TOP BLOCK — **THE MANUAL'S THREE GAPS CLOSED; AND THE FOOTER IS BUILT BUT NOT SHIPPED, SO IT IS NOT DOCUMENTED.** (2026-09-20, ~03:3x IST)
+
+### § 1 — WHERE TO FIND IT
+
+- **Dispatch: the controller's `#570` follow-up**, in the restart paste. Base named as `main` = `4de03f03`.
+- **Branch `exec2/manual-gaps`**, cut from `4de03f03`. **Content head `30cd911c`** — three commits:
+  `9506f643` (the corrections), `445a29fe` (this handoff's earlier draft), `30cd911c` (a phrasing fix to
+  §8 found by reading my own diff). **This handoff commit sits on top of those.**
+- **Do not carry the ahead-count forward** — it moves with every commit. Count from the directory:
+  `/usr/bin/git rev-list --count origin/main..HEAD`.
+- ⚠ **`origin/main` has since moved to `ce153f97`** — the controller's own `docs/lanes/controller-state.md`
+  and nothing else (`#571`, the cycle-16 anchor). **No overlap with this branch's files.** These notes sit
+  *behind 2*, which is not a conflict and needs no rebase.
+- ⚠ **THE PR IS NOT OPEN AS OF THE COMMIT THAT CARRIES THIS BLOCK.** If you are reading this from `main`,
+  settle it in one call before doing anything: `gh pr list --state all --head exec2/manual-gaps`.
+
+### § 2 — ANCHORS, RECOUNTED AT `9506f643` (not carried forward)
+
+| anchor | value |
+|---|---|
+| `git merge-base origin/main HEAD` | `4de03f03` |
+| `HEAD` | `9506f643` |
+| ahead / behind `origin/main` | **1 / 2** |
+| tree | **clean** |
+| `pnpm turbo run build` | **11/11 tasks, exit 0** |
+| `pnpm turbo run test` | **17/17 tasks** — 154 server files, **1620 passed / 5 skipped** |
+| `pnpm turbo run typecheck` | **17/17 tasks, exit 0** |
+| `check:help` | **ok** — 2 documents, 29 sections, **227 entries**, generated copy matches source |
+| `check:tasks` / `check:citations` / `check:env` / `check:runbook` | **all exit 0** |
+
+**The generated entry count moved 225 → 227, and that is exactly what was added** — one new `###` in
+`manual.md` and one new FAQ entry. Prose edits *inside* existing entries do not move it (that is the trap:
+a count is evidence only once its unit is pinned). Both the pinned Node 22.22.2 and the machine's Node 24
+render a **byte-identical** `content.generated.ts` (`cmp` clean).
+
+### § 3 — THE DISPATCH'S CITED LINES HAD DRIFTED, AND THE DRIFT PREDATES `#570`
+
+`731` → **`738`**; `1064` → **`1073`**. Measured, and the mechanism identified rather than guessed: at
+`57a7593f` the lines are **exactly** `731`/`1064`; at `7270bba4` they are already `738`/`1073`. So the
+numbers were right when written and **`#570`'s own prose edits moved them** (net +7 before `738`, +2 more
+in between — which is why the two errors differ). Neither item was fixed by the drift; both were still open.
+
+### § 4 — WHAT WAS DONE, AND THE ONE THING THAT WAS NOT
+
+**Done — three items, `docs/manual.md` + `docs/faq.md` + the generated copy, one change set:**
+
+1. **`manual.md:738`** — "That is it" is gone. The bulk **`Mark N read`**, its **Undo**, the ~15 s window,
+   the one-slot replacement and the one-page bound are all named. Mirrored as a new FAQ entry. The Undo is
+   the part a reader can only find by acting, so it is the part most worth telling.
+2. **`manual.md:1073`** — **provenance measured in both directions, with controls.** The sentence was
+   written in `396828e4` (**2026-09-07**); the website's board box was **added** in `b1dda062`
+   (**2026-09-16**, `+` hunks confirmed; `-S` control: the placeholder → **1** commit, a string that never
+   existed → **0**). So it **was true when written and became false nine days later** — repaired as "no
+   longer the only one", *not* as an error that was always there. The same claim stood in **three more
+   places** and all three are corrected: `manual.md` §8 and both FAQ answers.
+3. **`manual.md` §6** — a new subsection for the subtasks panel: the heading with its rollup, the children
+   with their own stages, the parent chip (both arms), the add row, and the count-mismatch refusal.
+
+**NOT done — the footer, and this is the finding. The dispatch's item 3 says "all three are shipped". Two
+are.** The sheet footer is **built and drawn by nobody**: no production caller passes `navigation`
+(`previousTicketId` → only `ticket-sheet.tsx` and its own test; `navigation={` → **0 repo-wide**; the web
+mount at `page.tsx:2417-2470` passes nine props and not that one; **control: `onOpenTicket` → 6 in that same
+file**; the desktop app does not mount `TicketSheet` at all). Its gate is
+`{navigation !== undefined ? <footer …> : null}`, so it renders `null`. **Case `16.43` is green and proves
+the component *can* render a footer — not that a person can see one.** That is this repo's signature
+failure, and it is the shape of the 0px-canvas defect: a count of elements in the DOM is not a claim about
+what a human sees. Writing manual coverage would tell a reader about two buttons they cannot reach, which
+is the failure this repo refuses by name. Full request:
+**`gisik-nokma-lanes/EXEC2-RULING-REQUEST-2026-09-20-manual-footer-coverage.md`**.
+
+**⚠ AND THE BLOCK BELOW IS PART OF HOW THIS HAPPENED.** Its heading reads *"The footer's NAVIGATION
+**shipped**"* while its own table correctly says "✅ built, case `16.43`". The word "shipped" was wrong; the
+manual dispatch inherited it. A **third** document agrees with the measurement, not the word —
+`CTL-DISPATCH-2026-09-20-sheet-prototype-parity.md:31` lists the footer as something **"the authority draws
+and we do not"**, assigned to exec 1's block `16.81`–`16.99`, and `exec/sheet-prototype-parity` does not
+exist on origin. Corrected here rather than left to mislead a third time.
+
+**NO CASE ID IS MINTED.** The block's next free stays **`16.45`**. A prose correction pins nothing, and
+`16.41`/`16.42`/`16.43` (the bulk write, the Toast, the footer list) plus `16.15`/`16.20` (the subtasks
+section) already pin every behaviour involved. Minting one to look thorough is the failure the dispatch
+names by name.
+
+### § 5 — THE REVIEWER PASS, RECORDED BEFORE THE PR OPENED (the freeze-line rule)
+
+One reviewer, dispatched adversarially against `9506f643`/`30cd911c` and told to report **only** failures.
+**Verdict: no numbered claim is false or unsupported — all 23 hold.** Two precision caveats came back, and
+**one was a real defect in my prose**:
+
+- **⚠ THE BOUND WAS WRONG AND THE REVIEWER FOUND IT.** I had written *"one press carries at most a page of
+  your Inbox"*. Measured: the route refuses when `ids.length > MAX_LIMIT` (`routes/notifications.ts:199`),
+  `MAX_LIMIT = 100` (`:51`), and **the inbox client never sends a `limit`** (`online/notifications.ts:48-49`)
+  — so a server *page* is 30 while `loadMore` **appends**, and a drawn-unread set of **31–100 is ACCEPTED,
+  not refused**. "A page" is ambiguous between 30 and 100 and would have misled exactly the reader that
+  sentence existed for. **Corrected to name 100**, in `manual.md` and `faq.md` both, and swept afterwards
+  with a same-invocation control (`'a page of your'` → **0**, `'Mark N read'` → **2/1**).
+- **Caveat 2, recorded not fixed:** `git log -S'the only one in the product'` returns **two** commits, not
+  one — `396828e4` (2026-09-07, adds) and the correction commit itself (removes). `-S` necessarily lists the
+  commit that changed the count, so the membership statement and its 9-day inference both stand.
+
+**The reviewer's own first sweep used `\.search\b`, which BSD grep does not honour, and returned a false
+zero.** It re-ran with a literal paren and found the single interface declaration. Recorded because it is
+this machine's sixth silent-empty mode and the exact reason a null needs a control in the same invocation.
+
+### § 6 — IN FLIGHT, AND IT IS ONE SHORT STEP
+
+**Nothing is blocked.** `9506f643` is on `exec2/manual-gaps`; the next act is the push, then the PR against
+`main`. Its **listed-not-fixed** section carries two items:
+
+- **The footer** (above) — not documented, on purpose.
+- **The Filters sheet has no manual coverage at all.** Found while correcting §8, which claimed it did not
+  exist: `Filters` appears **once** in `manual.md` (`:665`) and nowhere else, while the button is real
+  (`page.tsx:1696-1698`) and the sheet sets four board-blind axes (`page.tsx:395-411`). §8's paragraph is
+  now true — it no longer denies the button — but the *sheet itself* is undocumented. A fourth gap.
+
+**Open ruling, explicitly non-blocking:** the footer coverage request above. It does not hold the PR, and
+the PR body records the same finding so the controller can rule on it either way.
+
+### § 7 — A WARNING THAT TRAVELS WITH THIS FILE
+
+**Shas in the narrative blocks below are unreliable — several are ORPHANED by rebases, and `git cat-file`
+will still pass on them and lie.** Verify reachability with
+`git merge-base --is-ancestor <sha> origin/main`, never with `cat-file`.
+
+---
+
+## ▼ PREVIOUS BLOCK — **THE MANUAL SAID YOU CANNOT ASSIGN A JOB — TRUE ON THE APPS, FALSE ON THE WEB SINCE `#530`.** (2026-09-20, ~11:0x IST)
 
 ### § 1 — WHERE TO FIND IT. Read this before anything else.
 
