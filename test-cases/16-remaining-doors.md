@@ -506,3 +506,41 @@ ruling rather than guessed: `gisik-nokma-lanes/EXEC2-RULING-REQUEST-2026-09-20-h
 that inset as a negative margin — a **second copy of a value that lives in another rule and that nothing
 would keep in sync**. The structure is the prototype's; the fill and the full-bleed inset belong with the
 complete footer, alongside `Delete`.
+
+## The inviter card — ALREADY BUILT, and the half that was missing was the ABSENCE (executor 2, 2026-09-20)
+
+**Queue Addendum 5; the doors-table row at `owner-holds.md:74`.** ⚠ **That row was carried as an
+outstanding `BUILD`, and it is the FIFTH on that table written from a recommendation rather than a
+measurement** — the `isInvite` decline row sits four lines above it, leaving exactly that lesson. **The
+build had shipped before the ruling.**
+
+### The half that WAS built, and it was built by `#400`
+
+`apps/web/app/workspaces/page.tsx:507-515` renders
+
+> `` `${inviter} invited you to ${workspace} ${ROLE_SENTENCE[invitation.role]}.` ``
+
+— the prototype's own sentence (`desktop.dc.html:216`, *"Anjali invited you to Garo Hills Logistics as a
+member."*), landed in **`d3d0abdd` — "Task 17: caller-scoped pending invitations + Accept/Decline
+(#400)"**, with `invitedByName` resolved by the `LEFT JOIN "user"` on `proj_invites.invited_by`
+(`apps/server/src/routes/my-invitations.ts:140-144`). **Already tested verbatim** at
+`workspaces-invitation-banner.test.tsx:176`.
+
+⚠ **AND `name + role` means the inviter's NAME plus the role OFFERED — settled by the design authority,
+not by grammar.** The prototype draws *"…as a member"*, the role being offered, so **the inviter's own
+workspace role is NOT built** — that reading would be a third-party disclosure the ruling does not name.
+Recorded here so the next reader does not take the sentence the other way and build it.
+
+### The half that was missing, and it was a TEST rather than code
+
+- **16.44** ✅ — **the session-less token page names NO inviter, in ANY branch.**
+  `apps/web/test/invite-page.test.tsx`. Before this case the file did not contain the word `inviter`
+  anywhere, so the ruling's negative half was **true but unpinned**: a later edit could have put the
+  inviter on the token page and nothing would have objected. ⚠ **The fixture supplies an inviter the
+  CONTRACT does not carry** (`InviteSummary` is `{workspaceId, workspaceName, role}`) — without one the
+  assertion could not fail, because a page rendering `summary.invitedByName` would pass against a fixture
+  that never supplied it. **Mutation-witnessed:** rendering the inviter on the page reddens **both `16.44`
+  arms and nothing else**. The **signed-in** branch is asserted deliberately — that is the reader an
+  implementer would most reasonably decide is entitled to know who asked, and the ruling says no
+  regardless, because this page's audience is whoever holds the URL, which `routes/invites.ts` records
+  *"may have been forwarded"*.
