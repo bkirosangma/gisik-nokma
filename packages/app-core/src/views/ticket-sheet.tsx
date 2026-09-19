@@ -63,6 +63,17 @@ import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
  */
 export const HISTORY_PAGE_LIMIT = 200;
 
+/**
+ * The prototype's two `sheetFullIcon` paths (`desktop.dc.html@6d7b67c0a52c:3402`),
+ * carried verbatim: a set of corner arrows pointing OUT while the sheet is a
+ * panel, and IN once it fills the screen. Transcribed rather than redrawn —
+ * an icon is the one thing on this sheet nobody can check by reading.
+ */
+const SHEET_ENTER_PATH =
+  'M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4';
+const SHEET_EXIT_PATH =
+  'M9 3H5a2 2 0 0 0-2 2v4M15 3h4a2 2 0 0 1 2 2v4M9 21H5a2 2 0 0 1-2-2v-4M15 21h4a2 2 0 0 0 2-2v-4';
+
 export type TicketSheetProps = {
   dataSource: DataSource;
   cache?: ClientStateCache;
@@ -239,6 +250,12 @@ export function TicketSheet({
 }: TicketSheetProps) {
   const EditorSlot = editorSlot ?? PlainTextEditorSlot;
   const [tab, setTab] = useState<'details' | 'history'>('details');
+  /**
+   * Full screen (sheet prototype parity, 2026-09-20). Local state, like `tab`:
+   * it is a way of LOOKING at this sheet rather than anything the server holds,
+   * and nothing outside `Sheet` needs to know.
+   */
+  const [sheetFull, setSheetFull] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
   const [serverRefusal, setServerRefusal] = useState<{ rule: string; reason: string } | null>(null);
   /**
@@ -1020,7 +1037,51 @@ export function TicketSheet({
   };
 
   return (
-    <Sheet open title={ticketRead.title} onClose={onClose}>
+    <Sheet
+      open
+      title={ticketRead.title}
+      onClose={onClose}
+      full={sheetFull}
+      /*
+        THE AUTHORITY'S `Full screen` CONTROL (`desktop.dc.html:1119-1120`): a
+        pill in the header, 32px minimum height, fully round, the control-surface
+        fill and shadow, accent ink at 13px/600, an icon and a LABEL that both
+        change with the state.
+
+        The label goes on the visible text AND on `aria-label`, which is what the
+        prototype does; the accessible name is therefore the visible words, so a
+        screen reader and a sighted reader are told the same thing — including
+        the half that matters, that pressing it again EXITS rather than entering.
+
+        `full` is passed rather than handled here because the scrim, the panel
+        and the body all move together, and all three belong to `Sheet`.
+      */
+      headerActions={
+        <button
+          type="button"
+          className="gn-sheet__full"
+          aria-label={sheetFull ? 'Exit full screen' : 'Full screen'}
+          onClick={() => setSheetFull((was) => !was)}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            {/* The prototype's own two paths (`:3402`): arrows pointing OUT while
+                the sheet is a panel, and IN once it fills the screen. */}
+            <path d={sheetFull ? SHEET_EXIT_PATH : SHEET_ENTER_PATH} />
+          </svg>
+          {sheetFull ? 'Exit full screen' : 'Full screen'}
+        </button>
+      }
+    >
       {/* ONE SEGMENTED CONTROL, the way the authority draws them
           (`desktop.dc.html@6d7b67c0a52c:1134-1140`): a `var(--segBg)` track at
           `border-radius:9px`, 2px padding and 2px gap, the selected tab on

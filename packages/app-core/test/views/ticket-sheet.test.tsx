@@ -1871,6 +1871,52 @@ describe('sheet prototype parity', () => {
     await userEvent.click(within(tablist).getByRole('tab', { name: 'History' }));
     expect(within(tablist).getByRole('tab', { selected: true })).toHaveTextContent('History');
   });
+
+  it('16.82 Full screen moves the SCRIM, the PANEL and the BODY together — and says which way it goes', async () => {
+    const read = ticketRead();
+    renderSheet(read, sheetSource(read, [], []));
+    await settled();
+
+    // The authority's control (`desktop.dc.html@6d7b67c0a52c:1119-1120`) is a
+    // pill carrying a LABEL as well as an icon, and the label is the whole point:
+    // a control that only says "Full screen" while it is already full screen is
+    // one a person cannot tell the way out of.
+    const enter = screen.getByRole('button', { name: 'Full screen' });
+    expect(enter).toHaveTextContent('Full screen');
+
+    // THE THREE PARTS MOVE TOGETHER, and that is the property this case exists
+    // for rather than three separate assertions: the prototype's own treatment
+    // (`:3396-3400`) changes the scrim's fill, the panel's geometry AND the
+    // body's cap. A "full screen" that did one or two of them is a panel that
+    // grew while the page behind it stayed visible — the half-done version this
+    // repo would otherwise ship, because each part alone looks plausible.
+    const scrim = screen.getByTestId('sheet-scrim');
+    const panel = scrim.querySelector('.gn-sheet');
+    const body = scrim.querySelector('.gn-sheet__body');
+    expect(scrim.className).not.toContain('--full');
+    expect(panel?.className).not.toContain('--full');
+    expect(body?.className).not.toContain('--full');
+
+    await userEvent.click(enter);
+
+    // The label turns around...
+    const exit = screen.getByRole('button', { name: 'Exit full screen' });
+    expect(exit).toHaveTextContent('Exit full screen');
+    // ...and so does every part of the sheet.
+    expect(screen.getByTestId('sheet-scrim').className).toContain('gn-sheet__scrim--full');
+    expect(screen.getByTestId('sheet-scrim').querySelector('.gn-sheet')?.className).toContain(
+      'gn-sheet--full',
+    );
+    expect(
+      screen.getByTestId('sheet-scrim').querySelector('.gn-sheet__body')?.className,
+    ).toContain('gn-sheet__body--full');
+
+    // And it goes BACK: a one-way control would strand the reader in a mode the
+    // prototype explicitly offers a way out of.
+    await userEvent.click(screen.getByRole('button', { name: 'Exit full screen' }));
+    expect(screen.getByRole('button', { name: 'Full screen' })).toBeInTheDocument();
+    expect(screen.getByTestId('sheet-scrim').className).not.toContain('--full');
+  });
 });
 
 describe('G — Priority, Due and Type as rows', () => {

@@ -467,6 +467,51 @@
   background: transparent;
   color: var(--gn-text-muted);
   font-size: 1.1rem;
+
+/* FULL SCREEN — the prototype's own three-part treatment
+   (`desktop.dc.html:3396-3400`), and all three parts are here because any one
+   alone makes a "full screen" that is not one: the scrim goes OPAQUE
+   (`--surface`, so the page behind is covered rather than dimmed), the panel
+   fills the viewport with no radius, and the body becomes a centred column,
+   capped at the prototype's own 860px.
+
+   TOKENS ONLY, deliberately. The style axis (`hig` / `minimal` / `neo`) is
+   runtime — `<html data-style>` — so a rule written in hexes here would be
+   correct in `hig` and wrong in two of the three the user can pick. Every value
+   below is a role that each style already declares, which is what makes the
+   treatment carry across all three without a per-style fork.
+
+   Placed AFTER the `.gn-sheet` rules on purpose: same specificity, so source
+   order is what decides, and a modifier that lost to the base rule would be a
+   control that toggles a class and changes nothing. */
+.gn-sheet__scrim--full { background: var(--gn-surface); justify-content: center; }
+.gn-sheet--full {
+  width: 100%;
+  max-width: none;
+  border-radius: 0;
+  background: var(--gn-surface);
+  box-shadow: none;
+}
+.gn-sheet__body--full { max-width: 53.75rem; width: 100%; margin: 0 auto; }
+
+/* The `Full screen` pill itself, transcribed from the prototype's control
+   (`desktop.dc.html:1119`): 32px minimum height, 12px padding, fully round,
+   the control-surface fill and its shadow, accent ink at 13px/600, and a 7px
+   gap to its icon. */
+.gn-sheet__full {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-accent);
+  box-shadow: var(--gn-shadow-raised);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
 }
 
