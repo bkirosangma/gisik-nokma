@@ -41,6 +41,77 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~15:1x IST. **THE LIST-FILTER CONTROL HAS MOVED INTO THE
+> # HEADER AND IS THE SHARED `Switch`; THE PR IS OPEN AND THIS LANE IS WAITING ON THE CONTROLLER.**
+> Branch **`exec/list-filter-move`**, cut from **`origin/main` = `7daa7ab0`**; dispatch
+> `CTL-DISPATCH-2026-09-19-list-filter-move.md`. **`13.693` is MERGED as `7daa7ab0`** — superseded below,
+> and a restart must not redo either.
+>
+> ## VERIFIED ANCHORS — re-measured with `/usr/bin/git`, not inherited
+> | | |
+> |---|---|
+> | base | `origin/main` = **`7daa7ab0`**, and this branch was cut from it |
+> | tree | **clean** at the handoff commit; every change is on the branch, nothing unpushed |
+> | gate | **`pnpm turbo run build test typecheck` — 33 successful, 33 total, EXIT 0, `1m14.52s`**, run by THIS lane at its own tree. **Node runtime `v22.22.2`** |
+> | checks | all **8 exit 0**; `check-case-ids` **2406 unique ids, union == sum, 23 files** — unchanged |
+> | web suite | **552 tests, 50 files, all passing, with the pinned suites UNCHANGED** (see below) |
+>
+> ## THE REACHABILITY PROPERTY — CONFIRMED AT THE LINES, which is what the dispatch required
+> The docblock at `page.tsx:1443-1462` recorded that the control sits above the tab arms and OUTSIDE
+> `list.error === null`, because past the pagination cap those arms render a refusal — *"reachable by
+> everyone EXCEPT the person who needs it"*, with PR #270's `createRegion` as the precedent.
+> **Measured: the four `list.error` gates are at `:1953` (calendar), `:1996` (timeline), `:2082`
+> (backlog) and `:2199` (ticket list), each INSIDE a `view === X ?` arm; `.gn-project__header` is a
+> plain unconditional sibling that closes before all four, so moving the control into it PRESERVES the
+> property.** The docblock was re-aimed at the new position rather than deleted, and keeps PR #270.
+>
+> ## THREE STARTING CLAIMS DID NOT SURVIVE RE-MEASUREMENT — all three are in the PR body
+> 1. **`.gn-switch-row` does NOT carry `justify-content: space-between`.** The dispatch cited
+>    `globals.css:789`, which is a **comment** explaining that `space-between` is the one thing the
+>    shared row could **not** keep; the declaration is `.gn-account__notification-row { justify-content:
+>    space-between }` at `:794`. `ui.css:4617`'s `.gn-switch-row` is `display:flex; align-items:center;
+>    gap:0.75rem` and **no `justify-content` at all** — the `Switch`'s own docblock records that an
+>    earlier claim to the contrary was false and corrected on 2026-09-18. So the switch sits directly
+>    after its label in a horizontal row, which is correct here.
+> 2. **`.gn-list-filter` HAS NO CSS ANYWHERE, so there was nothing to reconcile or delete.** The three
+>    class names appear in exactly four files — one JSX and three plans/specs — and
+>    `git log -S 'gn-list-filter' -- '*.css' --all` is **empty**: no CSS file ever contained it.
+>    **The dispatch's instruction 3 assumes a rule that does not exist.**
+> 3. **The note was re-scoped rather than deleted.** `gn-project__scope-note` already exists
+>    (`ui.css:4168`, muted small print) and is **live** — its sibling `board-scope-note` uses it at
+>    `page.tsx:1947`. The note moves onto that rule, so it gains the treatment it should always have
+>    had, the orphan `gn-list-filter__note` element class goes, and **no new rule is added**.
+>    `data-testid="list-filter-note"` is the contract and is unchanged.
+>
+> ## WHAT ELSE THE MOVE FALSIFIED, AND WAS FIXED IN THE SAME CHANGE SET
+> The repo's rule is that the act of fixing a thing invalidates the description of that thing, and the
+> move invalidated **four** descriptions: the `page.tsx` docblock (re-aimed), `Features.md:79`'s
+> *"The control sits ABOVE the tab arms"* (re-aimed, property kept), and the **in-app manual and FAQ**
+> — `docs/manual.md` said *"Above the tabs there is a single tick box"* and `docs/faq.md` said "tick
+> box" five times, both now **"switch"**, with `content.generated.ts` **regenerated** (`check:help`
+> exit 0). The ticket-type editor's *"blocked tick box"* is a different control and was left alone.
+>
+> ## THE RATCHETS — measured, not assumed
+> - **Tap targets: NOT in range.** `measureTapTargets` is called **once**, in the `/my-work` block; the
+>   tap-target baseline holds only `stack-phone-390|/my-work`. The shared `.gn-switch` is 51×**31**,
+>   under the suite's 44px floor — **but `/p/:projectId` is never tap-swept**, so that geometry is not
+>   this change's to answer for. Worth knowing: it is the SHARED switch's geometry, unchanged.
+> - **Accessible names: `/p/:projectId` IS swept** (`stack-phone-390|/p/:projectId`,
+>   `{ariaLabel:66, role:14, ariaSelected:5, ariaDescribedby:0, rawMatches:452}`). The sweep counts
+>   `hasAttribute` over every element (`accessible-names.ts:46-58`), and `rawMatches` is **not
+>   ratcheted**. The swap removes `<div><label><input>` and adds `<label><input><span>` — **net-zero
+>   elements, and none carries any of the four ratcheted attributes** (`Switch` deliberately has no
+>   `aria-label`). **All four counts are therefore unchanged.**
+> - **The strongest evidence is behavioural:** all 552 web tests pass with `board-narrowing` and
+>   `page-refusals` **untouched**. `getByLabelText('Only tickets in progress')` and
+>   `getByRole('checkbox', { name: 'Only tickets in progress' })` both still resolve — the accessible
+>   name and the role survived the conversion with no test edit, which is the property the dispatch
+>   said the ratchet would redden if I got it wrong.
+>
+> ## ⚠ SHAS IN THIS FILE ARE UNRELIABLE — including mine
+> `7daa7ab0` was `origin/main` when this branch was cut and **has almost certainly moved.** Re-take
+> every reading before acting on it.
+
 > # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~14:3x IST. **DISPATCH TAKEN: `13.693` (TASK A) IS BUILT AND
 > # ITS PR IS OPEN; TASK B IS A READ-ONLY MEASUREMENT, ALREADY ANSWERED HERE.** Branch
 > # **`exec/13693-calibration-lift`**, cut from **`origin/main` = `6cee248d`**; dispatch
