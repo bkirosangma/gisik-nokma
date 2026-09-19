@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { IngestResult, WorkflowDef } from '@gisik-nokma/domain';
@@ -1542,6 +1542,22 @@ describe('F — the subtasks section', () => {
     // "a subtask is a ticket of its own", asserted rather than described.
     expect(within(section).getByText('Done')).toBeInTheDocument();
     expect(within(section).getByText('To do')).toBeInTheDocument();
+
+    // AND THE ROW READ AS A ROW — the half this case was missing, which is why
+    // the defect below reached a browser instead of stopping here.
+    //
+    // The two assertions above query each SPAN's own text, so both pass while
+    // the row renders `Order the brochuresTo do`: adjacent inline spans with no
+    // text between them are one run of glyphs on screen and in the accessible
+    // name, and NOTHING above this line reads the row as anything but two
+    // independent strings. The controller's browser pass found it on 2026-09-20
+    // ("HSN codes for the real catalogueWaiting"). Found by a person looking at
+    // a rendered page because a jsdom case cannot look at one: no stylesheet and
+    // no layout engine, so `textContent` is the strongest claim a unit case can
+    // make about what a reader sees — and it is strong enough for THIS defect,
+    // where the missing thing is a character rather than a pixel.
+    expect(within(section).getByTestId('subtask-tkt-s1').textContent).toBe('Order the brochures · To do');
+    expect(within(section).getByTestId('subtask-tkt-s2').textContent).toBe('Book the venue · Done');
   });
 
   it('16.16 says what a subtask IS when there are none', async () => {
@@ -1665,13 +1681,13 @@ describe('F — the subtasks section', () => {
     expect(screen.getByTestId('sheet-subtask-title')).toHaveValue('   ');
   });
 
-  it('16.22 does NOT draw the prototype’s `Subtask of {parent}` chip', async () => {
-    // The prototype's SECOND direction (`desktop.dc.html:1240`) — a chip on a
-    // ticket that is ITSELF a subtask, with a control to open the parent. It is
-    // not in the dispatch's row, and the standing rule is the row's scope and
-    // nothing else. This case exists so that adding it later is a decision
-    // rather than a drift, and the fixture IS a child (its parent is set), so
-    // the chip would have something to say.
+  it('16.22 DRAWS the prototype’s `Subtask of {parent}` chip — the absence it asserted is now a decision', async () => {
+    // FLIPPED 2026-09-20, NOT deleted. Until then this case asserted the chip's
+    // ABSENCE (`desktop.dc.html:1240`) so that adding it later would be a
+    // decision rather than a drift; the owner ruled it IN and the same id now
+    // records the decision, which is the whole reason it existed in that form.
+    // The fixture is unchanged — still a child (its parent is set), which is the
+    // input the chip exists for.
     const read = ticketRead({
       parent: { kind: 'ticket', id: PARENT, title: 'Registrations' },
       rollup: null,
@@ -1680,7 +1696,115 @@ describe('F — the subtasks section', () => {
     await settled();
 
     await screen.findByTestId('sheet-subtasks');
-    expect(screen.queryByText(/Subtask of/)).toBeNull();
+    expect(screen.getByTestId('sheet-parent-chip')).toHaveTextContent('Subtask of Registrations');
+
+    // AND THE OTHER ARM, which is the same property rather than a second one:
+    // the chip is drawn EXACTLY when there is a parent to name. The prototype's
+    // own test does this in one expression (`sheetIsSub: !!(sheet &&
+    // sheet.parentId)`, `:3605`), and asserting only the child arm would leave a
+    // chip drawn for a ROOT ticket unconstrained — it would name nobody while
+    // the sheet's own parent row, eight lines above, says `At project root`.
+    const root = ticketRead({ parent: null });
+    cleanup();
+    renderSheet(root, sheetSource(root, [], []));
+    await settled();
+    await screen.findByTestId('sheet-subtasks');
+    expect(screen.queryByTestId('sheet-parent-chip')).toBeNull();
+    expect(screen.queryByTestId('sheet-parent-chip-restricted')).toBeNull();
+  });
+});
+
+/**
+ * THE `Subtask of {parent}` CHIP, 2026-09-20 — cases `16.38`–`16.40`.
+ *
+ * Door F's inverse: F lists a ticket's CHILDREN, and this names a ticket's
+ * PARENT and offers the way to it (`desktop.dc.html@6d7b67c0a52c:1237-1241`).
+ * The prototype draws it beside the section heading and only for a ticket that
+ * is itself a subtask (`sheetIsSub`, `:3605`).
+ *
+ * **The restricted arm is the one that took a ruling**, and the ruling is what
+ * `16.40` measures. `ParentRef` is a discriminated union whose restricted arm
+ * structurally cannot carry a title (`apps/server/src/routes/tickets.ts:144-168`),
+ * and the parent's title is read INSIDE the `canSee` branch that arm never
+ * reaches (`:353-372`) — the authorities are `7.212` and `6.14`, which pin the
+ * existence-versus-title contrast in both directions. **This paragraph cited
+ * 6.66's "no table stores a ticket title", true when 6.66 was written and stale
+ * now that `proj_tickets` exists; the conclusion never rested on it.** The
+ * prototype's own label fallback — `p ? p.title : sheet.parentId` (`:3609`) —
+ * would print an ID where a name belongs. So the arm names the RESTRICTION
+ * instead of the ticket, as a pill and never a control.
+ */
+describe('the `Subtask of {parent}` chip', () => {
+  it('16.38 names the parent and opens it — and is a control ONLY when it can be honoured', async () => {
+    const onOpenTicket = vi.fn();
+    const read = ticketRead();
+    renderSheet(read, sheetSource(read, [], []), { onOpenTicket });
+    await settled();
+
+    const chip = await screen.findByTestId('sheet-parent-chip');
+    // The prototype's own label with its own operand (`:1240` literal,
+    // `sheetParentTitle` at `:3606` — the parent's TITLE, not its id).
+    expect(chip.textContent).toBe('Subtask of Registrations');
+    expect(chip.tagName).toBe('BUTTON');
+
+    await userEvent.click(chip);
+    // The IMMEDIATE parent's id: not this ticket's own, which is the mistake a
+    // chip that remembered where it stood instead of what it names would make.
+    expect(onOpenTicket).toHaveBeenCalledTimes(1);
+    expect(onOpenTicket).toHaveBeenCalledWith(PARENT);
+
+    // THE SECOND ARM IS INSIDE THIS CASE, not beside it under the same id.
+    // Two `it`s sharing one id is invisible to `check-case-ids` — it counts id
+    // LINES in the catalogue, and the catalogue lists `16.38` once — so that
+    // collision would have been found by a reader, never by a guard. One case,
+    // one id, one `it`: the SAME read and the SAME label with one prop absent,
+    // which is the arm a caller that cannot navigate gets. It is deliberately
+    // still the name, and not a button that would do nothing when pressed.
+    cleanup();
+    renderSheet(read, sheetSource(read, [], []));
+    await settled();
+    const pill = await screen.findByTestId('sheet-parent-chip');
+    expect(pill.textContent).toBe('Subtask of Registrations');
+    expect(pill.tagName).toBe('SPAN');
+  });
+
+  it('16.39 is ONE HOP — it names the immediate parent and never a chain', async () => {
+    // The prototype draws the chip on ANY subtask and its `openParent` swaps
+    // the OPEN SHEET in place (`:3611`), so a chain is walked one sheet per
+    // click and no traversal lives in the chip to loop. Asserted as an EXACT
+    // label rather than a substring: a chain would have to append a second
+    // name to it, and there is exactly one chip on the page to do it with.
+    const read = ticketRead({ parent: { kind: 'ticket', id: PARENT, title: 'Registrations' } });
+    renderSheet(read, sheetSource(read, [], []), { onOpenTicket: vi.fn() });
+    await settled();
+
+    const chips = await screen.findAllByTestId('sheet-parent-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0]?.textContent).toBe('Subtask of Registrations');
+  });
+
+  it('16.40 a restricted parent wears a NON-CONTROL pill — the restriction named, the ticket not', async () => {
+    const onOpenTicket = vi.fn();
+    const read = ticketRead({ parent: { kind: 'restricted', id: 'secret-parent' } });
+    renderSheet(read, sheetSource(read, [], []), { onOpenTicket });
+    await settled();
+
+    const pill = await screen.findByTestId('sheet-parent-chip-restricted');
+    expect(pill.textContent).toBe('Subtask of a restricted parent');
+    // NOT a control: the restricted arm carries no project and no title, so
+    // there is nothing to open and nothing to name — and case 6.14 asserts a
+    // direct read of that parent 404s.
+    expect(pill.tagName).toBe('SPAN');
+    // The arm EXISTS rather than being omitted, and that is the ruling's second
+    // half: an absent chip reads as "no parent", which is a different claim
+    // from "a parent you may not see" — the same distinction `16.22`'s sibling
+    // cases draw between a restricted parent and `At project root`.
+    expect(screen.queryByText('At project root')).toBeNull();
+    // The id the read DID send is not rendered here. 3.73 owns this property on
+    // the sheet's own parent row; asserted again because this chip is a SECOND
+    // surface for the same fact, and a second surface is where a leak recurs.
+    expect(document.body.textContent).not.toContain('secret-parent');
+    expect(onOpenTicket).not.toHaveBeenCalled();
   });
 });
 

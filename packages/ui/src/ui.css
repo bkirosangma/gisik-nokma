@@ -1435,6 +1435,38 @@
 .gn-ticket-sheet__provenance { color: var(--gn-text-muted); font-size: 0.85rem; }
 .gn-ticket-sheet__parent { margin: 0.6rem 0; color: var(--gn-text-muted); }
 .gn-ticket-sheet__restricted { color: var(--gn-restricted); }
+/* The subtasks section's header row, and the `Subtask of {parent}` chip that
+   shares it with the heading — the prototype's own row, not an invention
+   (`desktop.dc.html:1237`, `align-items:baseline;gap:10px;flex-wrap:wrap`) — the
+   row's own line, NOT `:1238`, which is the heading `<p>` it contains.
+
+   The chip itself IS `.gn-chip` above, unmodified. That class is this
+   product's port of this very element, so the prototype's per-INSTANCE ink and
+   size (`:1240` — `font-size:12px;font-weight:600;color:var(--accent)`) are NOT
+   re-declared here: a second metric set for one chip is the display mapping
+   that exists in exactly one place, which is what the invite role labels and
+   `.gn-members__role` both refused. Two of the three are already reconciled the
+   other way by `.gn-chip`'s own docblock (13px/18px) and its fill.
+
+   The reset is scoped to the BUTTON arm alone, and that scoping is the point: a
+   `.gn-chip` `<span>` is not a control, so giving it `cursor: pointer` would
+   advertise an affordance neither the restricted arm nor the no-callback arm
+   has. Only `button.gn-ticket-sheet__parent-chip` needs the UA's border and
+   font-family undone — `.gn-chip` already wins the background and padding.
+
+   ⚠ THE REST OF THIS SECTION HAS NO RULE IN EITHER STYLESHEET — heading, list,
+   empty state, add form and the refusal all render on UA defaults. Measured
+   2026-09-20 with its own control in the same sweep (`gn-ticket-sheet__fields`
+   returns 1 from the same grep, and it is a rule): **until this change**, the string
+   `subtask` APPEARED in NO rule in `ui.css` or `globals.css`. **Written in the past
+   tense on purpose** — the three rules below are the first `subtask` matches
+   either file has ever had, so a present-tense version of this sentence was
+   falsified by the very commit that wrote it. Door F recorded this in the weaker
+   form ("the CSS is not measured", which is about jsdom having no layout
+   engine); the shape it actually shipped is unstyled markup. Named here, not
+   widened — this change is the chip. */
+.gn-ticket-sheet__subtasks-head { display: flex; align-items: baseline; gap: 0.625rem; flex-wrap: wrap; }
+button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family: inherit; }
 .gn-ticket-sheet__progress { margin: 0.4rem 0; color: var(--gn-text-muted); }
 .gn-ticket-sheet__loading { color: var(--gn-text-muted); margin: 0; }
 .gn-ticket-sheet__refusal { color: var(--gn-danger); margin: 0; }

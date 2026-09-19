@@ -104,6 +104,36 @@ export type TicketSheetProps = {
    * that acquires a real read passes `false` and the controls go.
    */
   canSetVisibility?: boolean;
+  /**
+   * Opens ANOTHER ticket's sheet — the parent, from the subtasks section's
+   * `Subtask of {parent}` chip (the prototype's `openParent`,
+   * `desktop.dc.html@6d7b67c0a52c:3611`, which swaps the open sheet in place).
+   *
+   * ## Why this prop exists rather than the sheet opening it itself
+   *
+   * A ticket's sheet URL needs its PROJECT — `ticketSheetPath` is the shell's
+   * one spelling of that URL — and the read this chip is built from does not
+   * carry one: `ParentRef` is `{kind, id, title}` for a parent the viewer may
+   * see (`view-types.ts`), the id and the name and nothing else. That is the
+   * whole reason `TicketLocator` exists — *"Where a ticket lives, so the inbox
+   * can open it"* — and it answers `null` rather than guessing when the server
+   * will not place a ticket for this viewer.
+   *
+   * A parent may also sit in ANOTHER PROJECT (case 6.57 — nothing refuses it),
+   * so this cannot reuse the calling page's own `openTicket`, which pushes the
+   * CURRENT project's path and is correct only for rows in that project's list.
+   *
+   * ## Absent means the chip is NOT a control, and that is the honest arm
+   *
+   * Optional, like `canSetVisibility` and `uploadEvidence`: making it required
+   * would force every existing mount to pass one. With no callback the chip
+   * renders as the plain pill — the element that already carries the restricted
+   * arm — so a caller that cannot open anything still gets the parent's name
+   * rather than a button that does nothing. **A control that cannot be honoured
+   * is the failure this repo refuses by name** (`canSetVisibility` above argues
+   * the same fork from the other side).
+   */
+  onOpenTicket?: (ticketId: string) => void;
 };
 
 /**
@@ -170,6 +200,7 @@ export function TicketSheet({
   attachments,
   visibility,
   canSetVisibility = true,
+  onOpenTicket,
 }: TicketSheetProps) {
   const EditorSlot = editorSlot ?? PlainTextEditorSlot;
   const [tab, setTab] = useState<'details' | 'history'>('details');
@@ -732,6 +763,20 @@ export function TicketSheet({
   const subtasksIncomplete = ticketRead.rollup !== null && subtaskRows.length !== subtaskExpected;
 
   /**
+   * The chip's two inputs, bound ONCE and outside the JSX.
+   *
+   * `parent` is bound so the discriminated union narrows: `ticketRead.parent`
+   * read twice inside a ternary does not carry `kind === 'ticket'` into the
+   * click closure below, where the compiler cannot see that the arm it was
+   * narrowed in is the arm the closure runs in. `openParentSheet` is bound for
+   * the same reason one step further on — the `undefined` test that decides
+   * between a button and a pill must survive into the `onClick` that only the
+   * button branch creates.
+   */
+  const parent = ticketRead.parent;
+  const openParentSheet = onOpenTicket;
+
+  /**
    * Add a subtask (door F, 2026-09-19) — the ordinary `ticket.created` with a
    * parent, through the ingest the sheet already uses. **No route, no
    * migration**: `ticketCreatedPayload` has carried `parentId` since it was
@@ -1101,16 +1146,81 @@ export function TicketSheet({
               children, an empty state that names what a subtask IS, and the add
               row. Ours drew only the count, which is why this section exists.
 
-              ⚠ The prototype's SECOND direction — a `Subtask of {parent}` chip
-              on a ticket that is itself a subtask, with a control to open the
-              parent (`:1240`) — is deliberately NOT built. It is not in the
-              dispatch's row, and the standing rule is the row's scope and
-              nothing else. */}
+              ⚠ The prototype's SECOND direction — the `Subtask of {parent}`
+              chip (`:1240`) — was deliberately NOT built with this section, so
+              that adding it later would be a DECISION rather than a drift. That
+              decision came on 2026-09-20 (owner ruling, via the controller) and
+              the chip is below; case 16.22 asserted its absence and now asserts
+              what it does instead, updated rather than deleted. */}
           <section className="gn-ticket-sheet__subtasks" data-testid="sheet-subtasks">
-            <p className="gn-ticket-sheet__subtasks-heading">
-              Subtasks
-              {ticketRead.rollup === null ? '' : ` · ${formatRollup(ticketRead.rollup)}`}
-            </p>
+            {/* The CHIP, and the prototype draws it BESIDE the heading in one
+                flex row (`align-items:baseline;gap:10px;flex-wrap:wrap`,
+                `:1237-1241`) rather than as a row of its own — so the wrapper
+                is the prototype's, not an invention.
+
+                THREE ARMS, and the third is the one that took a ruling:
+
+                - **no parent** — nothing is drawn, which is the prototype's own
+                  `sheetIsSub` test (`:3605`).
+                - **a parent this viewer may see** — the prototype's chip: a
+                  control naming the parent, `Subtask of {title}`, that opens it
+                  through `onOpenTicket`. ONE HOP, as the prototype's `openParent`
+                  does (`:3611`): the chip names the IMMEDIATE parent and never a
+                  chain, and the parent's own sheet draws its own chip in turn,
+                  so a nesting or a cycle is walked sheet by sheet and no
+                  traversal lives here to loop.
+                  With no `onOpenTicket` it is a PILL and not a control — see
+                  that prop's docblock.
+                - **a parent this viewer may NOT see** — a PILL, never a
+                  control, and it names the restriction instead of the ticket:
+                  `Subtask of a restricted parent`. The controller ruled this on
+                  2026-09-20 after the alternative was priced: the read is a
+                  discriminated union whose restricted arm *structurally cannot*
+                  carry a title (`routes/tickets.ts:144-168`), the parent's title is
+                  read INSIDE the `canSee` branch the restricted arm never reaches
+                  (`routes/tickets.ts:353-372`, the code's own words at `:354-356`),
+                  and cases `7.212` and `6.14` pin the existence-versus-title
+                  contrast in both directions. **⚠ THE REASON FIRST RECORDED HERE WAS
+                  WRONG, and it is corrected rather than deleted:** it cited 6.66's
+                  "no table stores a ticket title", which was true when 6.66 was
+                  written and is stale now — `proj_tickets` exists
+                  (`migrations/1787961800000_proj-tickets.sql`) and the visible arm
+                  serves `title: titleOf(parentState)` out of it. The conclusion
+                  never rested on it. And the
+                  prototype's own label fallback — `p ? p.title : sheet.parentId`
+                  (`:3609`) — would have put an ID where a name belongs and made
+                  the chip a control pointing at a ticket this viewer's own read
+                  404s (case 6.14). The pill re-words a disclosure the sheet
+                  already makes eight lines above it; it does not widen one.
+                  **It must not read as "no parent"** — a root is a different
+                  fact — which is why the arm exists rather than being omitted. */}
+            <div className="gn-ticket-sheet__subtasks-head">
+              <p className="gn-ticket-sheet__subtasks-heading">
+                Subtasks
+                {ticketRead.rollup === null ? '' : ` · ${formatRollup(ticketRead.rollup)}`}
+              </p>
+              {parent === null ? null : parent.kind === 'restricted' ? (
+                <span
+                  className="gn-chip gn-ticket-sheet__parent-chip"
+                  data-testid="sheet-parent-chip-restricted"
+                >
+                  Subtask of a restricted parent
+                </span>
+              ) : openParentSheet === undefined ? (
+                <span className="gn-chip gn-ticket-sheet__parent-chip" data-testid="sheet-parent-chip">
+                  {`Subtask of ${parent.title}`}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="gn-chip gn-ticket-sheet__parent-chip"
+                  data-testid="sheet-parent-chip"
+                  onClick={() => openParentSheet(parent.id)}
+                >
+                  {`Subtask of ${parent.title}`}
+                </button>
+              )}
+            </div>
             {subtasksIncomplete ? (
               // THE RECONCILIATION, rendered rather than swallowed. A short list
               // here is the one failure this section could hide, so it is said
@@ -1132,6 +1242,26 @@ export function TicketSheet({
                 {subtaskRows.map((row) => (
                   <li key={row.ticketId} data-testid={`subtask-${row.ticketId}`}>
                     <span className="gn-ticket-sheet__subtask-title">{row.title}</span>
+                    {/* THE SEPARATOR IS TEXT, NOT A GAP, and that is a decision
+                        rather than a preference.
+
+                        Two adjacent inline spans are ONE RUN OF GLYPHS — there is
+                        no text between them — so the row rendered
+                        `Order the brochuresTo do` on screen AND in the accessible
+                        name. The controller's browser pass caught it on
+                        2026-09-20 in this section, and the unit cases could not:
+                        `16.15` queries each span's own text, which passes while
+                        the row itself reads as one word.
+
+                        A CSS `gap` would have fixed the screen and left the name
+                        joined, and it would have been UNMEASURABLE here — this
+                        section declares no stylesheet rule at all and jsdom has
+                        no layout engine, so no case could tell the fix from its
+                        absence. That is the same shape as the defect: a check
+                        passing for a reason unrelated to what a person reads.
+                        Text is the one treatment both surfaces, and the case,
+                        can see. */}
+                    <span className="gn-ticket-sheet__subtask-sep">{' · '}</span>
                     {/* The child's OWN state, spelled from the served row — the
                         empty state's sentence claims a subtask gets a state, so
                         the list has to show one or the claim is decoration. */}
