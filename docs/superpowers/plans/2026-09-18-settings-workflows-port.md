@@ -178,10 +178,34 @@ control has no counterpart, and the prototype names a **state** where the produc
 **Note:** the divergence card is the same `--tintWarning` treatment Task 2 of the attention work touches —
 if that lands first, follow its precedent for the composite condition.
 
-### Task 6 — `isTypes`: the reorder wire  *(wire gap 3)*
-The gateway op and the server route. `rank` already exists on `TicketTypeDef` and
-`packages/app-core/src/workflow-builder/ticket-types/rank.ts` already computes hierarchy implications, so
-**this may be a route over existing data rather than a new concept** — measure before designing.
+### Task 6 — `isTypes`: the reorder — **CORRECTED 2026-09-19: A RENDER TASK, NOT A WIRE TASK**
+
+**⛔ DO NOT ADD A ROUTE OR A GATEWAY OP.** This plan, the delta audit (**"wire gap 3"**) and
+`owner-holds.md`'s lift row **all scoped this as wire work, and all three are wrong.** The product says so
+in a docblock that cites the code — `packages/app-core/src/workflow-builder/ticket-types/ticket-type-list-screen.tsx:35-56`,
+measured 2026-09-18:
+
+> *"**the hold is NOT about a missing door.** The gateway declares no update op of any kind, but the door
+> is not the gateway's: `onSave` authors a `ticket-type.defined` event carrying the whole definition —
+> `rank` included — and sends it through `gateway.submit`. `ticketTypeDefSchema` carries
+> `rank: z.number().int().min(1)`, so a reorder control would be **assign a different rank and submit**…
+> **No new route and no new projection — so if the hold lifts, this is a render task, not the wire task
+> the delta audit scoped it as.**"*
+
+**Re-verified on `main` 2026-09-19, three ways:** `rank: z.number().int().min(1)` is in the schema
+(`packages/domain/src/ticket-types.ts:98`); the gateway declares **no** reorder or rank op (**0 hits**);
+and built-ins are **rank-locked server-side** (`packages/rule-engine/src/checks/ticket-type.ts:60-62`
+refuses `type.builtin-rank`). **Adding a route would be a second door to a thing that already has one** —
+the exact defect this repo refuses by name in this same file, for the Edit button.
+
+**So Task 6 is:** build the ↑/↓ controls (Task 7's half), have them **assign a rank and submit through the
+existing door**, and carry three things the prototype does not model:
+1. **A swap that moves a BUILT-IN is REFUSED server-side** (`type.builtin-rank`), so the control must
+   anticipate a refusal rather than assume a swap always lands.
+2. **The prototype's rank is its array index** (`rank: String(i+1)`); the product's is a **stored number
+   nothing enforces uniqueness on.**
+3. **The docblock above still records this as HELD** and the owner lifted it on **2026-09-19** — **update
+   it in the same change set**, or a reader meets a recorded hold for approved work.
 
 ### Task 7 — `isTypes`: the port — **RULED: no Edit button; row-as-door stands**
 The ↑/↓ buttons (disabled at the ends), the zebra row surface, and three strings (`"New type"` vs
