@@ -3386,7 +3386,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "What is still true is the other half: the deep search — the one that looks through every title, description and comment in the workspace at once — is on no screen at all. It is a finished engine with no steering wheel bolted on."
+                    "text": "The deep search is a different thing again: the one that looks through every title, description and comment in the workspace at once is on no screen at all. It is a finished engine with no steering wheel bolted on."
                   }
                 ]
               }

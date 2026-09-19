@@ -707,9 +707,9 @@ Turn it on and you get a note: *"the list, calendar and timeline are asking only
 That switch is not the only filter on the website — beside it sits a **Filters** button, and above the
 tabs there is a **Search the board** box that narrows what the board shows you.
 
-What is still true is the other half: the deep search — the one that looks through every title,
-description and comment in the workspace at once — is on no screen at all. It is a finished engine with
-no steering wheel bolted on.
+The deep search is a different thing again: the one that looks through every title, description and
+comment in the workspace at once is on no screen at all. It is a finished engine with no steering wheel
+bolted on.
 
 ### Very large projects
 
