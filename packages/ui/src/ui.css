@@ -467,6 +467,7 @@
   background: transparent;
   color: var(--gn-text-muted);
   font-size: 1.1rem;
+}
 
 /* FULL SCREEN — the prototype's own three-part treatment
    (`desktop.dc.html:3396-3400`), and all three parts are here because any one
