@@ -527,3 +527,150 @@ describe('GET /v1/me/notifications — the filter (13.969–13.973)', () => {
     expect(listOf(bodyTwo)).toEqual([first.id]);
   });
 });
+
+/**
+ * **16.41 — the BULK write, in both directions, on one route.**
+ *
+ * The ruled Undo is what shapes every assertion below. A bulk action marks a
+ * set of rows read; the Undo must put back **exactly the rows the bulk call
+ * changed** — not the rows the client asked about. Those differ whenever a
+ * requested id was ALREADY read: flipping it to unread on undo would invent an
+ * unread row out of an action that never touched it, and nothing on screen
+ * would say so.
+ *
+ * That is why the route answers with `changed` rather than 204, and the
+ * "already read" arm below is the case that makes the distinction visible —
+ * without it, a route that returned every requested id would pass.
+ */
+describe('POST /v1/me/notifications/read (bulk, both directions)', () => {
+  async function insertMany(userId: string, count: number, read = false): Promise<Notification[]> {
+    const rows = Array.from({ length: count }, () => sample(userId, { read }));
+    for (const row of rows) await insertNotification(db.pool, row);
+    return rows;
+  }
+
+  /** Every authenticated call in this block goes through here, so a missing
+   *  `Authorization` header cannot be mistaken for a route that refuses. */
+  function asUser(token: string, payload: unknown) {
+    return {
+      method: 'POST' as const,
+      url: '/v1/me/notifications/read',
+      headers: { authorization: `Bearer ${token}` },
+      payload,
+    };
+  }
+
+  it('401s without a session', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/me/notifications/read',
+      payload: { ids: [newUlid()], read: true },
+    });
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual(UNAUTHENTICATED_BODY);
+  });
+
+  it('16.41 marks the named rows read and answers with EXACTLY the ids that changed', async () => {
+    const me = await signInWithPhone(app, otp, '+919999000021');
+    const [a, b, already] = await insertMany(me.userId, 3);
+    await app.inject({
+      method: 'POST',
+      url: `/v1/me/notifications/${already!.id}/read`,
+      headers: { authorization: `Bearer ${me.token}` },
+    });
+
+    const response = await app.inject(asUser(me.token, { ids: [a!.id, b!.id, already!.id], read: true }));
+
+    expect(response.statusCode).toBe(200);
+    // ⚠ `already` is NOT here, and that absence is the whole point: the Undo
+    // un-reads precisely this set, so including a row the call did not change
+    // would create an unread row that nobody un-read.
+    expect([...response.json().changed].sort()).toEqual([a!.id, b!.id].sort());
+  });
+
+  it("16.41 does not change someone else's row, and does not say whether it exists", async () => {
+    const me = await signInWithPhone(app, otp, '+919999000022');
+    const other = await signInWithPhone(app, otp, '+919999000023');
+    const mine = sample(me.userId);
+    const theirs = sample(other.userId);
+    const missing = newUlid();
+    await insertNotification(db.pool, mine);
+    await insertNotification(db.pool, theirs);
+
+    const response = await app.inject(asUser(me.token, { ids: [mine.id, theirs.id, missing], read: true }));
+
+    expect(response.statusCode).toBe(200);
+    // Both ids that are not mine answer IDENTICALLY — absent. A caller cannot
+    // learn, one bulk call at a time, which ids exist elsewhere in the
+    // deployment; the same indistinguishability the per-id 404 keeps.
+    expect(response.json().changed).toEqual([mine.id]);
+  });
+
+  it('16.41 UNDO: `read: false` puts back exactly the rows the forward call changed', async () => {
+    const me = await signInWithPhone(app, otp, '+919999000024');
+    const [a, b, already] = await insertMany(me.userId, 3);
+    await app.inject({
+      method: 'POST',
+      url: `/v1/me/notifications/${already!.id}/read`,
+      headers: { authorization: `Bearer ${me.token}` },
+    });
+
+    const forward = await app.inject(asUser(me.token, { ids: [a!.id, b!.id, already!.id], read: true }));
+    const changed = forward.json().changed as string[];
+
+    const undo = await app.inject(asUser(me.token, { ids: changed, read: false }));
+
+    expect(undo.statusCode).toBe(200);
+    expect([...undo.json().changed].sort()).toEqual([...changed].sort());
+
+    // The round trip left the inbox as it started: `a` and `b` unread again,
+    // and `already` — which the forward call never touched — STILL READ. An
+    // undo that had sent every requested id would have made it unread, and
+    // that is the lie this arm exists to catch.
+    const rows = await db.pool.query('SELECT id, read FROM notifications WHERE user_id = $1', [me.userId]);
+    const byId = new Map((rows.rows as { id: string; read: boolean }[]).map((r) => [r.id, r.read]));
+    expect(byId.get(a!.id)).toBe(false);
+    expect(byId.get(b!.id)).toBe(false);
+    expect(byId.get(already!.id)).toBe(true);
+  });
+
+  it('16.41 REFUSES more ids than a page can hold, whole — never truncating', async () => {
+    const me = await signInWithPhone(app, otp, '+919999000025');
+    const ids = Array.from({ length: 101 }, () => newUlid());
+
+    const response = await app.inject(asUser(me.token, { ids, read: true }));
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: 'invalid_ids', max: 100 });
+  });
+
+  it('16.41 accepts exactly the bound — the control that makes the refusal a boundary, not a broken route', async () => {
+    const me = await signInWithPhone(app, otp, '+919999000026');
+    const ids = Array.from({ length: 100 }, () => newUlid());
+
+    const response = await app.inject(asUser(me.token, { ids, read: true }));
+
+    // No rows exist for these ids, so nothing changed — but the request was
+    // ACCEPTED. Without this arm, a route that refused everything would pass
+    // the case above.
+    expect(response.statusCode).toBe(200);
+    expect(response.json().changed).toEqual([]);
+  });
+
+  it('16.41 refuses malformed bodies by name, rather than reaching Postgres', async () => {
+    const me = await signInWithPhone(app, otp, '+919999000027');
+    const cases: Array<[string, unknown]> = [
+      ['ids omitted', { read: true }],
+      ['ids empty', { ids: [], read: true }],
+      ['ids not an array', { ids: newUlid(), read: true }],
+      ['an id not a string', { ids: [newUlid(), 7], read: true }],
+      ['an id empty', { ids: [''], read: true }],
+      ['read omitted', { ids: [newUlid()] }],
+      ['read not a boolean', { ids: [newUlid()], read: 'true' }],
+    ];
+    for (const [label, payload] of cases) {
+      const response = await app.inject(asUser(me.token, payload));
+      expect(response.statusCode, label).toBe(400);
+    }
+  });
+});

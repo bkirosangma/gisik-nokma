@@ -2,7 +2,12 @@ import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import { NOTIFICATION_KINDS, type NotificationKind } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { getNotificationPreferences } from '../notification-preferences/store.js';
-import { listNotifications, markNotificationRead, unreadNotificationCount } from '../notifications/store.js';
+import {
+  listNotifications,
+  markNotificationRead,
+  markNotificationsRead,
+  unreadNotificationCount,
+} from '../notifications/store.js';
 
 /**
  * `/v1/me/notifications` — the inbox. Three routes, all session-gated with
@@ -149,6 +154,61 @@ export function registerNotificationRoutes(
         return reply.status(404).send({ error: 'not_found' });
       }
       return reply.status(204).send();
+    },
+  );
+
+  /**
+   * THE BULK WRITE — one route, BOTH directions, and the reasons it is shaped
+   * this way are all measured rather than preferred.
+   *
+   * `read` is a FIELD rather than two routes or a flag on the per-id route.
+   * The ruling asked for one bidirectional route: the inbox's bulk action sends
+   * `true`, its Undo sends `false` **for exactly the ids the bulk call changed**
+   * — which is why this answers with `changed` rather than 204. Two routes
+   * would be two doors to one resource, and a `read` flag on
+   * `/v1/me/notifications/:id/read` would be one door answering two questions.
+   * Neither is this repo's shape.
+   *
+   * ⚠ **THE `ids` BOUND IS `MAX_LIMIT`, AND IT IS REFUSED, NOT TRUNCATED.**
+   * `MAX_LIMIT` is this file's own ceiling on a page of the read above — "the
+   * ceiling `listNotifications` already clamps to" — so the bound is the largest
+   * set one page of this resource can return, rather than a number invented
+   * here. An unbounded id list on a bulk mutating route is a write-amplification
+   * surface, and truncating an over-long list would silently under-apply an
+   * action the caller believes was complete. This file's list route already
+   * settles the question the same way for `limit`: refuse an out-of-range value
+   * with 400 rather than silently clamping or defaulting it.
+   *
+   * ⚠ **AND THIS ROUTE MUST BE REGISTERED IN `HTTP_ORIGIN_PROTECTED_ROUTES`**
+   * (`apps/server/src/http/http-origin.ts`) — that set is matched by EXACT
+   * `routeUrl`, so a new mutating route is CSRF-unprotected until its own
+   * string is added. The per-id write above is registered; this one is not,
+   * by default, and shipping without it is the most dangerous omission
+   * available in this task.
+   */
+  app.post<{ Body: { ids?: unknown; read?: unknown } }>(
+    '/v1/me/notifications/read',
+    { preHandler: requireSession },
+    async (request, reply) => {
+      const body = request.body ?? {};
+      const ids = body.ids;
+      if (!Array.isArray(ids) || ids.some((id) => typeof id !== 'string' || id.length === 0)) {
+        return reply.status(400).send({ error: 'invalid_ids' });
+      }
+      if (ids.length === 0 || ids.length > MAX_LIMIT) {
+        // Named, bounded, and refused WHOLE — see the docblock.
+        return reply.status(400).send({ error: 'invalid_ids', max: MAX_LIMIT });
+      }
+      if (typeof body.read !== 'boolean') {
+        return reply.status(400).send({ error: 'invalid_read' });
+      }
+      const changed = await markNotificationsRead(
+        deps.pool,
+        request.currentUserId,
+        ids as string[],
+        body.read,
+      );
+      return { changed };
     },
   );
 }

@@ -162,6 +162,16 @@ export const HTTP_ORIGIN_PROTECTED_ROUTES: ReadonlySet<string> = new Set([
   '/v1/workspaces', // creates a workspace and appends its founding events
   '/v1/workspaces/:workspaceId/ticket-types/:typeId/migrate', // admin bulk migration, envelope-origin 'web'
   '/v1/me/notifications/:id/read', // per-user write
+  // The BULK form of the line above, and it is registered separately because
+  // that is the whole hazard this set has: `has(input.routeUrl)` is an EXACT
+  // match on the string, so `/v1/me/notifications/:id/read` does NOT cover
+  // `/v1/me/notifications/read` and the new route would have shipped
+  // CSRF-unprotected while the list above LOOKED complete. Same category as the
+  // three the note above records as missing from the first cut — a
+  // cookie-authenticatable mutation, writable by a page the victim visits.
+  // Found by MEASURING rather than by reading: the ruling on this task named it
+  // as the omission to watch for, and the string below is the fix.
+  '/v1/me/notifications/read', // per-user BULK write, both directions
   // A cookie-authenticatable mutation that DESTROYS a credential. The same
   // category as the approve POST that mints one, and it needs the control for
   // the mirror-image reason: without it, a page the victim visits can revoke

@@ -147,6 +147,71 @@ export async function markNotificationRead(db: Queryable, userId: string, id: st
 }
 
 /**
+ * THE BULK WRITE, and with it the UNREAD direction — which did not exist before
+ * this. `markNotificationRead` above is one-way, so the only edit this table
+ * could take was read-ward; nothing in the product could put a notification
+ * back. That is the gap a bulk action's Undo needs closed, and it is closed by
+ * the same statement carrying the flag rather than by a second statement with
+ * the `true` changed to `false`.
+ *
+ * **One statement for both directions, on purpose.** Two functions would be two
+ * answers to "what does setting the flag do", free to drift; the flag is a
+ * PARAMETER here, so there is nothing to drift from. Note that this did NOT
+ * extend the per-id route with a flag — that route answers "mark THIS one read"
+ * and stays as it was; a route that answered both would be one door answering
+ * two questions, which this repo refuses by name.
+ *
+ * ## It RETURNS THE IDS IT CHANGED, and the client's Undo depends on it
+ *
+ * `RETURNING id` is not a convenience. The ruled Undo must send `read: false`
+ * **for exactly the ids the bulk call changed** — not for the ids the client
+ * asked about, which may include rows that were already read and that a
+ * blanket un-read would therefore WRONGLY flip. The prototype happens to agree:
+ * its `markAllRead` counts `s.notifs.filter((x) => !x.read).length`
+ * (`desktop.dc.html:3027-3029`), i.e. the rows that actually changed, and the
+ * toast prints that number.
+ *
+ * Scoped to the caller's own rows by `user_id` in the same statement — an id
+ * belonging to somebody else is not an error, it is simply not among the rows
+ * returned, so a caller cannot learn whether it exists by watching the count.
+ */
+export async function markNotificationsRead(
+  db: Queryable,
+  userId: string,
+  ids: readonly string[],
+  read: boolean,
+): Promise<string[]> {
+  if (ids.length === 0) return [];
+  /**
+   * ⚠ `AND read IS DISTINCT FROM $1` IS NOT AN OPTIMISATION — THE WHOLE
+   * CONTRACT RESTS ON IT, and the first version of this statement did not have
+   * it.
+   *
+   * `UPDATE … RETURNING id` reports every row the `WHERE` **matched**, not
+   * every row whose value **changed**. A row that was already read matches
+   * `id = ANY(…) AND user_id = $3` and comes back in `RETURNING` identically to
+   * one that flipped — so the caller is told it changed something it did not.
+   * For the forward call that is a lying count; **for the Undo it is worse: the
+   * client un-reads "exactly what changed", so an already-read row would be
+   * flipped to unread by an action that never touched it**, inventing an unread
+   * notification on screen with nothing recording who did it.
+   *
+   * Measured rather than reasoned: the case that asserts the Undo leaves an
+   * already-read row READ failed against the unqualified statement, and names
+   * this. `IS DISTINCT FROM $1::boolean` restricts the update to the rows whose
+   * value actually moves — which is also what makes `changed.length` the count
+   * the prototype prints (`desktop.dc.html:3027-3029`).
+   */
+  const result = await db.query(
+    `UPDATE notifications SET read = $1
+      WHERE id = ANY($2::text[]) AND user_id = $3 AND read IS DISTINCT FROM $1::boolean
+      RETURNING id`,
+    [read, ids, userId],
+  );
+  return (result.rows as { id: string }[]).map((row) => row.id);
+}
+
+/**
  * `mutedKinds` (account/help-screens plan, Task 5) defaults to `[]`, so
  * every existing caller keeps compiling and reading the same count as
  * before — the exclusion is opt-in per call, not a behaviour change nobody
