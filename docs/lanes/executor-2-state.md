@@ -1,11 +1,53 @@
-## ▲ TOP BLOCK — **H IS HALF-BUILT AND HALF-HELD: the footer's NAVIGATION ships, `Delete` waits on a door ruling.** (2026-09-20, ~03:0x IST)
+## ▲ TOP BLOCK — **THE INVITER CARD: ALREADY BUILT. What was missing was a TEST, and it is pinned now.** (2026-09-20, ~05:0x IST)
 
 ### § 1 — WHERE TO FIND IT. Read this before anything else.
 
-- **Branch `exec2/sheet-footer`**, cut from **`main` = `fdbb7fc8`**, pushed to origin. **One PR, base
-  `main`, prefix `exec2/`** — measure it with `gh pr view --head exec2/sheet-footer`; **the head is a
-  reading and this block cannot carry it.**
-- Everything is committed; the tree is clean.
+- **Branch `exec2/invite-inviter-absent`**, cut from **`main` = `df7eb820`**, pushed to origin. **One PR,
+  base `main`, prefix `exec2/`** — measure it; **a head is a reading and this block cannot carry it.**
+- ⚠ **This lane's id block is `16.41`–`16.60`; `16.41`–`16.44` are SPENT, so next free is `16.45`.**
+
+### § 2 — THE FINDING, AND IT IS THE SHAPE THIS REGISTER KEEPS PRODUCING
+
+**The inviter card was carried as an outstanding `BUILD` and it had already shipped.** `#400`
+(`d3d0abdd`) renders the prototype's own sentence on `/workspaces`, and
+`workspaces-invitation-banner.test.tsx:176` asserts it verbatim. **It is the FIFTH row on the doors table
+written from a recommendation rather than a measurement** — the `isInvite` decline row sits four lines
+above it, leaving exactly that lesson. The row is flipped to **"ALREADY BUILT — NOTHING TO BUILD"** and the
+queue's Addendum 5 is closed, because **a stale "known gap" is pre-authorised work that no longer needs
+doing** — the most dangerous kind.
+
+**⚠ AND ONE READING IS NOW SETTLED, so a later session does not take it the other way: `name + role` means
+the inviter's NAME plus the role OFFERED.** The **design authority** settles it, not grammar —
+`desktop.dc.html:216` draws *"Anjali invited you to Garo Hills Logistics **as a member**."* **The inviter's
+own workspace role is NOT built and should not be**: that reading is a third-party disclosure the ruling
+does not name.
+
+### § 3 — WHAT WAS ACTUALLY MISSING: THE RULING'S NEGATIVE HALF, AS A TEST
+
+*Never on the session-less token page* was **true but unpinned** — the word `inviter` appeared **nowhere**
+in `apps/web/test/invite-page.test.tsx`. **Case `16.44` pins it**, on the **signed-in** branch deliberately
+(the reader an implementer would most reasonably decide is entitled to know who asked), **with the fixture
+supplying an inviter the CONTRACT does not carry** — because without one the assertion could not fail.
+**Mutation-witnessed: rendering the inviter reddens both `16.44` arms and nothing else.**
+
+### § 4 — STATE
+
+Seven checks `EXIT=0`; `check-case-ids` **`2490`, highest `16.44`**; gate **33/33 `EXIT=0` on the FIRST
+run** — no load flake this time. **Both of this lane's queue items are now closed:** `H` merged as **#565**
+with `Delete` ruled **not to be built** by the controller (it is going to the owner), and this one closed
+as already built. **Nothing is in flight and no ruling is outstanding from this lane.**
+
+---
+
+## ▼ PREVIOUS BLOCK — **H LANDED: merged as #565.** The footer's NAVIGATION shipped; `Delete` was held on a measurement and the controller ruled it **NOT to be built**. (2026-09-20)
+
+### § 1 — WHERE IT LANDED
+
+- **PR #565**, `exec2/sheet-footer` → `main`, head `e8ebcfdd`, merge commit **`df7eb820`** — reachability
+  verified, not assumed: `git merge-base --is-ancestor e8ebcfdd origin/main` is **true**.
+- **The controller's ruling on the held half: my `Delete` hold was CORRECT, it is going to the owner, and
+  it is NOT to be built.** Recorded in `owner-holds.md`'s register as waiting on the owner rather than on a
+  session.
 
 ### § 2 — WHAT IS BUILT, AND WHAT IS DELIBERATELY NOT
 
