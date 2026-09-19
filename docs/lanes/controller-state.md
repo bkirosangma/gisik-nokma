@@ -31,6 +31,58 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 SUNDAY 2026-09-20 ~03:3x IST — **CYCLE 17: TWO PRs MERGED AND GATED AT THEIR LANDING TREES, A REVIEW ROUND THAT CAUGHT A REAL REGRESSION, AND ONE BAR QUESTION FOR THE OWNER.** `main` is `faecf837`; **zero open PRs**; ledger **306 done / 2 todo** — unchanged, **nothing was owed a flip**.
+
+### Position — read this instead of the older tables, which this supersedes
+| lane | task | status |
+|---|---|---|
+| exec 1 | **`hig-per-screen/3b`** (Members states) | **IN FLIGHT** — `exec/members-states` @ **`ca3caf3f`, PUSHED**, Ctx ~62 %, **NOT restarted — see below** |
+| exec 1 | **sheet prototype parity** | **MERGED** `#572` → `faecf837`. **Its visual half is the one outstanding piece** |
+| exec 2 | **the Filters sheet's documentation** | **IN FLIGHT** — `exec2/filters-doc`, restarted this cycle, Ctx 5 % |
+| exec 2 | **the footer's reachability** | ⛔ **OWNER — a ruling request, and the controller verified the finding independently** |
+| both | **door `H`'s `Delete` half** | ⛔ **OWNER — ruling request unanswered since cycle 15** |
+
+### THE TWO MERGES — every reading taken at the landing tree, none transferred
+| | `#573` (exec 2, the manual's gaps) | `#572` (exec 1, sheet parity part 1) |
+|---|---|---|
+| head, frozen at the gate | `5af0b66e` — re-read before the merge, unchanged | `b3a7182c` — **moved from `1bd3d945` during the review round; a post-freeze commit is a NEW HEAD, and the gate was re-run there** |
+| `merge-tree` prediction | `c3d0e66f`, exit 0, empty stderr | `08ae8b36`, exit 0, empty stderr |
+| merged as | **`634696aa`** | **`faecf837`** |
+| tree identity | **EXACT** | **EXACT** |
+| forced gate | `EXIT=0` · 33/33 · 0 cached · **1m56.5s** · `NODE=v22.22.2` · no orphans | `EXIT=0` · 33/33 · 0 cached · **2m02.5s** · `NODE=v22.22.2` · no orphans |
+| seven checks | all raw 0; `check:case-ids` **2490 / 16.44** (minted none) | all raw 0; `check:case-ids` **2492 / 16.82** — **exactly the two exec 1 minted** |
+| per-file blob identity | **4 / 4 identical** | **7 / 7 identical** |
+| drop check + control | 1 file, main-ahead | 5 files, **all attributable** (#573's four + the anchor), control fires |
+
+**The checks' control was REFRESHED at `#572`'s landing tree** — `2492` baseline → a planted duplicate of `10.1` after `10-workflow-builder.md:6` → **rc 1, naming `10.1: …:6, …:7`** → restored **rc 0**, tree unchanged. **A control is a reading that expires; it was re-taken rather than carried.**
+
+### ⛔ ONE BAR QUESTION FOR THE OWNER — the reviewer pass, and the record disagrees with itself
+**`controller-state`'s machinery block and `override-2026-09-18-deepseek-controller.md:8` both say a reviewer pass runs AND IS RECORDED IN THE PR BODY BEFORE THE PR OPENS — *"missing → send it back — enforced four times today"*. The controller's own override (2026-09-19) calls the bar *"unchanged"* and then omits that clause.** `#572` was **sent back** on it and exec 1's reviewer then **found a real regression** — an edit to the SHARED rule `.gn-dialog__title, .gn-sheet__title` put a comment **between the two selectors**, so **every dialog heading silently took the sheet's `1.375rem/600`**. It also found a control resting on a floor (`Full screen` shipped at the prototype's 32px against this repo's enforced 44px), an unwitnessed half of `16.82` (freezing the icon left it green), and a claim with **no instrument at all** (the "ratchet RISE" — **no suite renders the sheet**). **All four are fixed at `b3a7182c`.** **So the stricter reading cost one round and bought a regression that would have shipped. The owner should say whether the clause still gates.**
+
+### ✅ THE FOOTER FINDING — MEASURED TWICE, FROM OPPOSITE DIRECTIONS, AND NOW THE OWNER'S
+**The sheet footer is BUILT and DRAWN BY NOBODY.** exec 2 found it and the controller verified it at the source: the guard is **`{navigation !== undefined ? (<footer …>) : null}`**; **`navigation={` occurs 0 times repo-wide against a control of `onOpenTicket` → 251 through the same search**; and `previousTicketId` lives only in `ticket-sheet.tsx`, its own test, and **`dist` artifacts — which mirror their source and are not call sites**. **Case `16.43` is green and proves only that the component CAN render a footer.** exec 1's parity list agrees from the other side (`‹ Previous / Next ›` "needs a queue position; nothing computes one"). **exec 2 correctly refused to write manual coverage for two buttons nobody can reach — that refusal is the precedent.**
+
+### ⚠ THE VISUAL HALF OF THE HEADLINE TASK IS OWED, NOT WAIVED — and it is an explicit step
+**The owner's model is *"rebuilt once they hit the main, is fine"*, so the branch-image rebuild was REFUSED rather than deferred** (a rebuild from a branch is not one of the two things the standing docker permission covers: *rebuilding after merges*, *restoring a dead service*). **The route is genuinely closed, measured:** `auth.ts:113` builds `trustedOrigins` from **one** origin, and `e2e-viewport/responsive.spec.ts:23-25` records that the signed-in shell **deliberately** lives in `e2e-stack` against `:3001`. **At the next rebuild: screenshot the sheet at `data-style="hig"` against `design-system/interactive/desktop.dc.html`, and dispatch a correction if the page disagrees.** ⚠ **And `16.82` asserts class movement, NOT pixels — a renamed-but-equivalent implementation fails it while a CSS deletion passes it. That is the reviewer's own note and it is not to be smoothed.**
+
+### RESTART DISCIPLINE — TWO AT A FIXED POINT, ONE DELIBERATELY NOT
+- **exec 2 was restarted TWICE**, both times genuinely at the fixed point (its step PR merged, tree clean, nothing in flight, idle at its prompt): `#570` → the manual-gaps dispatch; `#573` → the filters-sheet dispatch. Both launches used **the launcher-file + short-pointer technique**, and both times **the composed argument was measured byte-complete before launching** (`36,568` and `37,568`).
+- **⚠ exec 1 was NOT restarted, and the reason is the brief's own precondition.** At `#572`'s merge it had **`3b` in flight, a branch to hand over, and a live subagent fan-out** — **three of the fixed point's four conditions fail.** Killing it would have interrupted the fan-out and put an uncommitted `apps/web/app/globals.css` at risk. **The fixed point for exec 1 is its `3b` PR**, and **it pushed `exec/members-states` on its own** (now `ca3caf3f`, handoff included), which closes the durability risk that `/tmp/3b-wip.patch` never covered.
+
+### INSTRUMENTS THAT LIED THIS CYCLE, ALL CAUGHT — carry these
+1. **A CONTROL THAT FIRED FOR A REASON UNRELATED TO WHAT IT NAMED — and it was the CONTROLLER's.** Building the case-id control, `F=$(grep -nE … | head -1 | cut -d: -f1)` returned **empty** (the pattern matched nothing in that file). `sed -n "${F}p"` then printed **the whole file**, and `sed -i '' "${F}r /tmp/dup"` appended it **at every line** — **27,219 lines and 138,407 ids.** It exited **1**, which reads as the control working. **The repair is a precondition, not a better pattern: assert `F` is a number AND that the chosen line is a column-0 bullet BEFORE using it.** Re-run with both asserted: `2492` → planted `10.1` at `:6`/`:7` → **rc 1** → restored **rc 0**.
+2. **AN ABSENCE REPORTED TO THE OWNER FROM A TOO-NARROW GREP.** The controller told the owner *"the last four code PRs carry no reviewer record at all"*. The pattern was `reviewer|review pass|reviewed|adversarial|verdict`; **`#563`'s section is `## Review round: nine findings…`** — **the inflection `reviewed` missed the stem `review`.** Corrected: **`#563` → 2 hits, `#565`/`#566`/`#567`/`#568` → 0**, so the practice is **inconsistent, not absent**. **Grep the STEM; and an absence about to leave your mouth as a FINDING gets one positive control first.**
+3. **A DOCUMENT THAT CONTRADICTED A MEASUREMENT, and the peer was right.** exec 1 reported the brief's *"the stack is mounted from YOUR worktree"* as false — `docker inspect` shows **no bind mounts** and `node apps/web/server.js`. **The premise predates the owner's 2026-09-19 topology ruling.** Corrected in exec 1's handoff.
+4. **A PEER'S COUNT THAT DID NOT SURVIVE RE-MEASUREMENT — and the correction CHANGED THE TASK.** exec 2 reported *"`Filters` appears once in `manual.md` and nowhere else"*. Measured: **5 case-insensitive `filter` hits**, and the manual **already names the button deliberately, twice** (`:697`, `:707` — *"That switch is not the only filter on the website — beside it sits a `Filters` button"*). **So the dispatch was rewritten: it is not "mention the button", it is "document what the SHEET DOES".** ⚠ **And the drift cuts both ways: exec 1's own anchor line about parity read "LOCAL ONLY, NOT PUSHED" and was TRUE when written — a reading that expires is not a falsehood, and a peer catching it is the system working.**
+
+### WHAT THE NEXT CONTROLLER SHOULD DO FIRST
+1. **Capture both panes before assuming anything.** `gisik:1` (exec 1, `3b`) and `gisik:2` (exec 2, the filters doc). Both were working at handover.
+2. **Re-measure every anchor above at the sha you report.** Do not carry a gate composition, a task count or an open-PR count forward.
+3. **Do NOT run measurements from the primary checkout** — it is behind. Use `gisik-nokma-ctl` on a branch off `origin/main`.
+4. **CI is the billing-blocked shape** (every failing annotation: *"the job was not started because recent account payments have failed"*, every real job `skipped`). **Owner-waived 2026-09-06, not treated as green, NOT to be re-asked.**
+5. **Three items are the OWNER's and none is the controller's to build:** the reviewer-pass bar clause, the footer's reachability, and door `H`'s `Delete` half. **The next dispatch is written only for work none of them touches.**
+6. **Then `gh pr list --state open`, and resume the loop.** Expect one PR per lane, and expect the second to need a rebase on a shared file.
+
 ## 🔄 SUNDAY 2026-09-20 ~03:0x IST — **CYCLE 16: ONE PR MERGED AND GATED AT ITS LANDING TREE, BOTH LANES RESTARTED OR UNBLOCKED AND WORKING, AND TWO FINDINGS FOR THE OWNER.** `main` is `4de03f03`; **zero open PRs**; ledger **306 done / 2 todo** — unchanged, **nothing was owed a flip** (the one PR was docs-only).
 
 ### Position — read this instead of the older tables, which this supersedes
