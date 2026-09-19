@@ -13,7 +13,7 @@ leaving it outside, so the section was opened.
 
 | lane | block |
 |---|---|
-| **exec 1** | `16.1`–`16.30`, **then `16.32`–`16.40`** (taken 2026-09-19 late for `/v1/search`), **then `16.81`–`16.99`** (taken 2026-09-20 for the sheet prototype parity) |
+| **exec 1** | `16.1`–`16.30`, **then `16.32`–`16.40`** (taken 2026-09-19 late for `/v1/search`), **then `16.61`–`16.80`** (taken 2026-09-20 for `hig-per-screen/3b`), **then `16.81`–`16.99`** (taken 2026-09-20 for the sheet prototype parity) |
 | **exec 2** | **`16.41`–`16.60`** (`16.31` spent on the evidence upload; `16.32`–`16.40` reallocated to exec 1) |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** It read `exec 2: 16.31–16.60` for about forty
@@ -544,6 +544,37 @@ Recorded here so the next reader does not take the sentence the other way and bu
   implementer would most reasonably decide is entitled to know who asked, and the ruling says no
   regardless, because this page's audience is whoever holds the URL, which `routes/invites.ts` records
   *"may have been forwarded"*.
+
+## `hig-per-screen/3b` — Members states (executor 1, 2026-09-20) — cases `16.61`–`16.80`
+
+**The dispatch's decisive question, already answered before this branch opened:** *is `role` on the server's members
+response and merely dropped by the mapper, or absent from the wire entirely?* — **on the wire, and already carried**
+(`readMembers` selects `m.role`; `mapActors` maps it, case `13.760`). So the "carry it end to end in ONE task" half
+was done long before this row, and the remaining work is the surface.
+
+**Both changes the audit recorded for this screen are also already in the product**: the **conditional role cell**
+(`adminGate === 'admin' && isEditableRole` → `Select`, else the chip) and the **invitation panel's gate** (the door's
+own 403, argued in the page's docblock). Neither was re-built.
+
+- **16.62** ✅ **The identity cell STACKS, and exactly one rule says so.** A source scan of `apps/web/app/globals.css` asserting the column's three declarations, plus the uniqueness claim (the class is named by exactly one rule) so a higher-specificity override cannot kill it silently. **Witnessed by deleting `flex-direction: column`** — which reddens this case and nothing else. **It is the ONLY instrument that can see the structure**: jsdom has no layout engine (two inline spans here render as one run of glyphs — the shape the subtask rows shipped), and the only real-browser instrument over `/members` measures colour, not geometry.
+- **16.61** ✅ **The Person cell carries the address on a second line — and ONLY when the label is not already the address.** Two arms, because the line is honest in one of them: a person whose NAME is the label gets the address beneath it (`:675`), and the nameless population — a magic-link sign-up with no name, labelled *by* their address — gets one string, not two. **Mutation-witnessed:** drawing the line unconditionally reddens **2** (this case's second arm and the pre-existing nameless-roster case); never drawing it reddens **1**.
+
+### What is NOT covered, and one omission the review FOUND
+
+The reviewer re-read the authority's `isInviteAdmin` block against the page and confirmed both changes this row
+was sent for are present and untouched. It also found a **thing the authority draws, that we do not, and that the
+data already serves** — so it is named here with an owner rather than built on this row:
+
+- **The pending-invitations HEADING.** The authority draws `<p>{{ inviteHeading }}</p>` at `:725` —
+  `"Pending invitations · " + s.invites.length` (data `:3096`) — and **the product renders no heading for the
+  pending list at all** (`PendingList` emits only the empty `<p>` or the `<ul>`; the page's only `<h2>` is
+  `Invite somebody`). `pending.length` is already in state, so this is buildable with no read. **It is in neither
+  the page's absent-list docblock nor the audit's gap list — an unrecorded omission rather than a scope
+  decision.** Owner: the controller, for a dispatch.
+- Also drawn and absent, in decreasing order of how data-backed they are: the pending row's **project scope**
+  (`:731-732`; `PendingInvite.projectIds` is served, project *names* are not), the minted card's **`Copy link` and
+  `Done`** (`:788-789`; the product renders the URL as inert text), and four static sentences the authority
+  carries (`:726`, `:778`, `:780`, `:793`).
 
 ## Sheet prototype parity (executor 1, 2026-09-20) — cases `16.81`–`16.99`
 

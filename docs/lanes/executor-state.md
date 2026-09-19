@@ -41,6 +41,144 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~05:0x IST. **`#575` IS REBASED, BOTH SENDBACK DEFECTS ARE
+> # FIXED, AND THE CODE HEAD IS `b5d2b0af`.** Branch **`exec/members-states`**; **the handoff commit sits ON TOP
+> # of that head** — a commit cannot name its own sha, so this block names the CODE head it was pushed at, which
+> # is the reading that survives.
+>
+> ## WHAT WENT BACK, AND BOTH WERE MINE
+> 1. **THE BLOCK TABLE LOST A ROW BOUNDARY** — §16's two allocation rows were joined onto one line by my rebase
+>    resolution. **Every allocation survived as TEXT**, which is why the audit that looks for removed lines
+>    passed it: lines starting `| **exec` read **1** here against **2** at `main`, measured with the control in
+>    the same invocation. `check:runbook`, `check:citations` and `check:case-ids` cannot see table structure
+>    either. Restored, and READ rather than counted.
+> 2. **THIS FILE NAMED TWO SUPERSEDED HEADS AND NOT THE ONE IT WAS PUSHED AT.** The topmost block named
+>    `e35dc161`, the next named `e1e70b43`, and the then-tip `2dae25f3` appeared **zero** times — so a restart
+>    read the OLDER sha first. **The mechanism is structural, not careless: the handoff is the tip commit, and a
+>    commit cannot name its own sha, so writing the block and then rebasing makes the text stale by
+>    construction.** **The repair is ORDERING, not diligence: amend the handoff AFTER the rebase, in a commit on
+>    top, naming the head that results** — which is what this block does.
+>
+> ## THE LESSON, WHICH IS THE SAME ONE FIVE TIMES TONIGHT
+> **A resolution that keeps every byte and loses a newline passes every check you can run.** Five times tonight
+> "take both sides" produced something no instrument saw: a cut brace (caught by the build), a comment between
+> two selectors that re-sized every dialog (caught by a reviewer reading the BUILT css), a false population
+> propagated to four files, a docblock my own commit falsified, and now a lost newline. **Only two of the five
+> were caught by a machine, and neither by a check — one by a compiler, one by a person.** Read the RESULT of a
+> merge, not its marker count.
+>
+> ## #575 — BUILT, REVIEWED, GATED
+> The reviewer's verdict is in the PR body: it verified both mutation witnesses by name, the predicate against
+> `memberLabel`, the tokens, and both "already present" claims — and found **five things, three mine**, all
+> fixed. `16.61` (the two-line identity, two arms) and `16.62` (the COLUMN, the only instrument that can see it).
+> Gate **33/33 EXIT 0** at the code head; seven checks exit 0; `check-case-ids` **2494**, §16 **48/0/48**.
+>
+> ## OWED ON THIS LANE — ONE ITEM, AND IT IS NOT BUILDABLE HERE
+> **The parity VISUAL HALF**: at the next rebuild, screenshot the sheet at `data-style="hig"` against
+> `desktop.dc.html`, and the controller dispatches a correction if the page disagrees. **Nobody has seen the
+> parity branch render.** The "before" state was seen and it confirmed the classified delta.
+> **And the pending-invitations heading is with the OWNER** (the controller's note): a scope call, not a
+> dispatch. Recorded; not to be built, not to be held on.
+>
+> ## ANCHORS
+> | | |
+> |---|---|
+> | `origin/main` | **`e643715d`** |
+> | `#575` | code head **`b5d2b0af`** (+ this handoff commit on top), `--base main`, MERGEABLE |
+> | ids | parity `16.81`–`16.82` merged · `3b` `16.61`–`16.62` spent · **`16.63`–`16.80` free** · `§17` is the controller's at `16.99` |
+> | next | the controller gates and merges `#575`; **that merge is the fixed point** it restarts me from |
+
+> # ⚠ SUPERSEDED BY THE BLOCK ABOVE — its head readings are pre-rebase.
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~04:0x IST. **PARITY IS MERGED; `3b` IS BUILT, GATED AND PUSHED,
+> # AND ITS PR IS THE FIXED POINT.** Branch **`exec/members-states`** @ **`e35dc161`** — **ON THE REMOTE**
+> # (verified `git ls-remote` == `git rev-parse HEAD`; the controller's "local only" reading predates the push).
+>
+> # ⚠ SUPERSEDED BY THE BLOCK ABOVE — `e1e70b43` was pre-rebase; the live head is named above.
+> # ▣ **THE FIXED POINT — `3b`'s PR IS OPEN.** `#575`, head **`e1e70b43`**, `--base main`, verified against
+> # `git rev-parse` before it was reported. Branch **`exec/members-states`** @ `e1e70b43`, **pushed**.
+>
+> ## WHAT `3b` TURNED OUT TO BE, AND WHY IT WAS SMALL
+> **Re-measuring before writing is the reason.** The dispatch's decisive question was already answered (`role` IS
+> on the wire, `mapActors` carries it, case `13.760`) and **both changes the audit recorded for this screen were
+> already in the product** — the conditional role cell and the invitation panel's 403 gate. Neither was rebuilt.
+> **The one buildable gap was the Person cell's two-line identity** (`:675`), drawn only when the label is not
+> already the address — the nameless population is LABELLED by their address, so a second line would print one
+> string twice. `16.61` has two arms for that reason; `16.62` witnesses the COLUMN that stacks them, which is the
+> only instrument that can see it (jsdom has no layout engine and no browser case reaches `/members` for geometry).
+>
+> ## ⚠ THE REVIEW ROUND FOUND FIVE THINGS, THREE OF THEM MINE — the pattern is worth more than the list
+> 1. **A FALSE REASON, PROPAGATED TO FOUR FILES.** "A phone-only member is labelled by their address" — and, two
+>    clauses later in the same comment, "the address is absent for the phone population". `memberLabel`'s own
+>    docblock settles it: a phone sign-up's name IS the phone. **The wrong version named a population that reads
+>    plausible**, which is why nothing caught it until a second reader did.
+> 2. **I CLAIMED IMMUNITY FROM A FAILURE I HAD NOT WITNESSED.** Deleting `flex-direction: column` left every
+>    instrument green while the cell would render `Anselma Marakanselma@example.test` — the exact shape the
+>    subtask rows shipped. `16.62` now asserts it, with its own deletion witness.
+> 3. **MY OWN COMMIT FALSIFIED ITS FILE'S DOCBLOCK** — a heading counting "THREE things … NOT here" and a bullet
+>    saying "still unported", sixteen lines above the JSX that had just started drawing it. This is the
+>    catalogued class and **no check can catch it**.
+> Plus: the predicate was loose where it mirrors `memberLabel` (blank address), and a comment claimed an ellipsis
+> where the family declares none.
+>
+> ## 📌 AN OMISSION THE REVIEW FOUND, RECORDED WITH AN OWNER RATHER THAN BUILT
+> The authority draws a **pending-invitations HEADING** (`desktop.dc.html@6d7b67c0a52c:725`,
+> `"Pending invitations · " + invites.length`) and the product renders none — while `pending.length` is already in
+> state, so it needs no read. It appears in **neither** the page's absent-list docblock **nor** the audit's gap
+> list: an **unrecorded omission**, not a scope decision. **Owner: the controller, for a dispatch.** Three smaller
+> invite-half absences (the pending row's project scope, the minted card's `Copy link`/`Done`, four static
+> sentences) are recorded beside it in §16.
+>
+> ## ANCHORS
+> | | |
+> |---|---|
+> | `origin/main` | **`faecf837`** (the `#572` merge) |
+> | `#575` | head **`e1e70b43`**, `--base main`, OPEN, awaiting the controller's gate |
+> | gate at this head | **33/33 EXIT 0** · Node `v22.22.2` · seven checks exit 0 · `check-case-ids` **2492, highest `16.62`** · §16 **46/0/46** |
+> | ids | parity `16.81`–`16.82` SPENT (merged) · `3b` `16.61`–`16.62` spent · **`16.63`–`16.80` free** · `§17` is the controller's at `16.99` |
+> | next | **this is the fixed point.** The controller restarts me here; the outstanding item on my lane is the parity VISUAL HALF, owed to the next rebuild |
+
+> ## PARITY — MERGED, `#572` = **`faecf837`**
+> Three items: the sheet's sections as ONE segmented control on the shared component (`16.81`), `Full screen`
+> with the authority's three-part treatment (`16.82`), and the title's type step (CSS-only, no id by precedent).
+> **Its head `b3a7182c` is an ancestor of `main`, checked with `merge-base --is-ancestor` rather than assumed.**
+> **The reviewer pass ran and is recorded in the PR body**, and it earned its round — see the two lessons below.
+> **⚠ THE VISUAL HALF IS OWED, NOT WAIVED:** at the next rebuild the sheet is screenshotted at
+> `data-style="hig"` against `design-system/interactive/desktop.dc.html`, and the controller dispatches a
+> correction if the page disagrees. Nobody has seen this branch's rendering; the "before" state was seen.
+>
+> ## ⚠ TWO LESSONS FROM THE REVIEW ROUND, BOTH PAID FOR — carry them
+> 1. **AN EDIT TO SHARED TEXT NEEDS THE WHOLE RULE READ, NOT THE LINE.** I inserted a comment into
+>    `.gn-dialog__title, .gn-sheet__title { … }` and my text landed BETWEEN the two selectors — legal in a
+>    selector list, so the compiled rule silently re-sized **every dialog heading**. Found by the reviewer reading
+>    the BUILT CSS. **That is the second time tonight a change of mine silently took something it did not name**
+>    (the first was a brace a conflict resolution cut). Both were caught by a second reader or a loud build, never
+>    by a clean `git status`.
+> 2. **DO NOT CHANGE THE WORKTREE UNDER A RUNNING REVIEWER.** I checked out another branch while a reviewer was
+>    mid-flight: its static checks (reading shas) were unaffected, but its FILE MUTATIONS landed on the wrong
+>    checkout. A dispatched agent mutates the tree it FINDS, not the branch it was briefed on.
+> **And the reviewer's own limit, recorded rather than smoothed:** `16.82` asserts class MOVEMENT, not pixels —
+> a renamed-but-equivalent implementation fails it while a CSS deletion passes it. That is the same limit the
+> visual half carries.
+>
+> ## `3b` — BUILT, AND THE DISPATCH WAS LARGELY ALREADY DONE
+> **Re-measuring first is why this was small.** The dispatch's decisive question was answered before the branch
+> opened (`role` IS on the wire; `mapActors` carries it, case `13.760`), and **both changes the audit recorded
+> for this screen are already in the product** — the conditional role cell and the invitation panel's 403 gate.
+> Neither was rebuilt. **The one buildable gap was the two-line identity** (`:675`): the name at 600 over the
+> address at 13px/18px, drawn **only when the label is not already the address** (a phone-only member is
+> LABELLED by their address, so a second line would print one string twice) — which is why `16.61` has two arms.
+> Gate **33/33 EXIT 0**; seven checks exit 0; ratchets moved by exactly what was added — `check-case-ids`
+> 2490 → **2491, highest `16.61`**; §16 **44 → 45/0/45**.
+> **⚠ A reviewer is running against this branch right now; its PR opens only once the result is in the body**
+> (the bar that sent `#572` back once). **That PR is the fixed point the controller restarts me at.**
+>
+> ## ⚠ THE BRIEF'S STALE PREMISE — RECORDED SO NOBODY RE-DERIVES IT
+> This brief says the `:3001` stack is *"mounted from YOUR worktree"*. **It is not.** `docker inspect
+> gisik-nokma-dev-web-1` shows **NO bind mounts** and `node apps/web/server.js` — a **BAKED IMAGE** — and
+> `trustedOrigins` is built from `WEB_ORIGIN`, which is **`:3001` only** (a dev server on `:3031` answers
+> **"Invalid origin"**, measured). **So no browser can show an unmerged branch's rendering**, which is why the
+> parity visual half is owed to the rebuild. The premise predates the owner's 2026-09-19 "run from the main
+> folder" ruling.
 > # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~03:0x IST. **THE CHIP PR IS OPEN (#562, AWAITING THE
 > # CONTROLLER'S MERGE) AND THE PARITY TASK IS OPENED ON ITS OWN BRANCH.** Cycle 13's order is
 > # authoritative and it is **chip → parity → `3b`**.
@@ -110,6 +248,10 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > ## ANCHORS
 > | | |
 > |---|---|
+> | `origin/main` | **`faecf837`** (the `#572` merge) |
+> | my branches | `exec/members-states` @ **`e35dc161`** (pushed; the live one) · `exec/sheet-prototype-parity` @ `b3a7182c` (**merged**) |
+> | ids | parity `16.81`–`16.82` SPENT and merged · **`3b` `16.61` spent; `16.62`–`16.80` free** · `§17` is the controller's to open at `16.99` |
+> | next | **open `3b`'s PR** once the reviewer lands, then take the next dispatch |
 > | base | `origin/main` = **`e4d36f11`** (the cycle-13 anchor landed while the chip PR was open) |
 > | ids | chip `16.38`–`16.40` SPENT · **parity `16.81`–`16.99`** · `3b` `16.61`–`16.80` · **`§17` is the controller's to open at `16.99`** |
 > | the three styles | `hig` (the prototype's language) · `minimal` · `neo` — **every rule must be right in all three** |

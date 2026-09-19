@@ -457,6 +457,59 @@ describe('3.138 a refused withdrawal is said out loud, and the invitation stays 
  * `RosterMember` (see that type's docblock for why it is not `WorkspaceRole`),
  * and a case that expected "Owner" would be asserting a mapping nobody wrote.
  */
+/**
+ * `hig-per-screen/3b` (Members states), 2026-09-20 — case `16.61`.
+ *
+ * The prototype's Person cell is a TWO-LINE identity
+ * (`desktop.dc.html@6d7b67c0a52c:675`): the name at weight 600 over the address
+ * at 13px/18px in `label2`. This build had the name only, with the address kept
+ * as a FALLBACK — so a member who has a name never showed one. The wire gained
+ * the address on 2026-09-19, which is what made the second line buildable.
+ *
+ * **The case is TWO ARMS because the second line is only honest in one of
+ * them.** `memberLabel` falls back name → email → id, so the NAMELESS population — a magic-link sign-up with no name — is labelled by their address (**corrected 2026-09-20**: this read "a phone-only member", which contradicts `memberLabel`'s own docblock, where a phone sign-up's `displayName` IS the phone and the fallback never fires) is
+ * LABELLED by their address; drawing a second line for them would print one
+ * string twice inside one cell. A case that asserted only the drawn arm would
+ * pass against an implementation that printed the address twice for exactly the
+ * population the product says it does not.
+ */
+describe('16.61 the Person cell carries the address on a second line, and only when it is not the label', () => {
+  it('draws it for a person whose NAME is the label', async () => {
+    // `query` is the FOURTH parameter (`mount(invitesAdmin, ingest?, answer?,
+    // query?)`) — passing it second puts it in the `ingest` slot, where it is
+    // silently ignored and the default roster renders instead. Measured here
+    // rather than assumed: the first version of this case did exactly that and
+    // failed on the DEFAULT roster's names.
+    mount({ listPending: async () => [] }, undefined, undefined, {
+      getMembers: async () => [
+        {
+          id: '01J9USER000000000000000009',
+          name: 'Anselma Marak',
+          role: 'member',
+          email: 'anselma@example.test',
+        },
+      ],
+    });
+    const table = await screen.findByRole('table');
+    const row = within(table).getAllByRole('row')[1]!;
+    expect(within(row).getByText('Anselma Marak')).toBeInTheDocument();
+    expect(within(row).getByText('anselma@example.test')).toBeInTheDocument();
+  });
+
+  it('draws NO second line when the label IS the address — one string, once', async () => {
+    mount({ listPending: async () => [] }, undefined, undefined, {
+      getMembers: async () => [
+        { id: '01J9USER000000000000000010', name: '', role: 'member', email: 'phone@example.test' },
+      ],
+    });
+    const table = await screen.findByRole('table');
+    const row = within(table).getAllByRole('row')[1]!;
+    // The label falls back to the address, so the cell names this person ONCE.
+    // Counted rather than queried: `getByText` would find the first and pass.
+    expect(within(row).getAllByText('phone@example.test')).toHaveLength(1);
+  });
+});
+
 describe('13.761 the roster is a table with a Person and a Role column', () => {
   it('renders one row per person, each wearing the role the server spelled', async () => {
     mount({ listPending: async () => [] });

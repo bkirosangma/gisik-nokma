@@ -1615,6 +1615,30 @@ input, textarea, select { font-family: inherit; }
 }
 
 .gn-members__name { font-weight: 600; }
+/* The authority's two-line identity (`:675`): a flex COLUMN, so the name and
+   the address stack rather than running together — the same failure the
+   subtask rows shipped (`Order the brochuresTo do`), avoided here by making the
+   stack a property of the box rather than of the strings.
+
+   `min-width: 0` stops the cell WIDENING the table — and it WRAPS, it does not
+   ellipsise. An independent reviewer checked: nothing in this family declares
+   `overflow`, `text-overflow` or `white-space`, so the first version of this
+   sentence ("a long address ellipsises") was false as written. 13.887's sibling
+   records the same lesson from this family's own history — a claim about what a
+   declaration does is a measurement, not a description. */
+.gn-members__identity {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* `:675`'s own step: 13px/18px in the prototype's `label2`, which is
+   `--gn-text-muted` here. No material tokens, so it is correct in all three
+   styles without a fork. */
+.gn-members__email {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  color: var(--gn-text-muted);
+}
 
 /* The role chip is the SHARED `.gn-chip`: the mapping table sends the
    prototype's `--chipBg`/`--chipShadow` to exactly the two roles `.gn-chip`
