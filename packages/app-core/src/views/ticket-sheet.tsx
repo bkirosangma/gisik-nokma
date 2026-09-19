@@ -271,13 +271,24 @@ export function TicketSheet({
    * which is a refusal about this code shown to a user as if it were about
    * their move.
    */
-  const precheck = async (toStateId: string): Promise<PrecheckResult> => {
+  const precheck = async (
+    toStateId: string,
+    evidenceAttachmentId?: string | null,
+  ): Promise<PrecheckResult> => {
     if (cache === undefined) return { kind: 'not-evaluated', why: 'missing-local-state' };
+    // The candidate must carry WHAT THE SUBMISSION WILL CARRY, or the engine
+    // evaluates a claim nobody is about to make — and `require-evidence` is
+    // exactly that case: an absent id reads as "none was provided" and the
+    // preview refused a move the user had just satisfied.
+    const payload: Record<string, unknown> = { to: toStateId };
+    if (evidenceAttachmentId !== undefined && evidenceAttachmentId !== null) {
+      payload['evidenceAttachmentId'] = evidenceAttachmentId;
+    }
     const candidate: SubmittedEvent = make({
       workspaceId,
       entity: { kind: 'ticket', id: ticketId },
       type: 'ticket.transitioned',
-      payload: { to: toStateId },
+      payload,
     });
     return precheckEvent(candidate, cache);
   };

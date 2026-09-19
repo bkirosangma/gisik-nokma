@@ -2497,23 +2497,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " This rule means you must attach a file before the move is allowed — a signed-off proof, a delivery note. "
-                  },
-                  {
-                    "kind": "bold",
-                    "text": "It does not work."
-                  },
-                  {
-                    "kind": "text",
-                    "text": " The box says so: "
+                    "text": " This rule means you must attach a file before the move is allowed — a signed-off proof, a delivery note. The box is labelled "
                   },
                   {
                     "kind": "italic",
-                    "text": "\"This transition requires an attachment as evidence. Evidence upload is not available in this build yet.\""
+                    "text": "\"Evidence (required by this transition)\""
                   },
                   {
                     "kind": "text",
-                    "text": " and the Move button stays disabled."
+                    "text": ", and the Move button stays greyed out until the upload has finished and the server has stored the file. If the server will not keep the file you chose — too large, or a kind it does not accept — it says so beside the box and the move stays blocked."
                   }
                 ]
               },
@@ -2522,11 +2514,23 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "Practical advice: do not put an evidence rule on any move."
+                    "text": "This was broken until 2026-09-19, and the old advice here was to never use the rule."
                   },
                   {
                     "kind": "text",
-                    "text": " If you do, that move becomes impossible for everybody. The product is honest about it rather than greying out a button with no reason — but the rule is still offered in the builder as though it works."
+                    "text": " The box said "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Evidence upload is not available in this build yet\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and a move carrying the rule could not be made by anybody, ever. That is fixed. The rule is now worth exactly what it looks like: "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "a move that cannot proceed until a file is attached."
                   }
                 ]
               },
@@ -4272,11 +4276,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — must attach a file. "
+                      "text": " — must attach a file. The person moving the job picks the file on the job screen; the move stays blocked until the server has stored it. (See §7. "
                     },
                     {
                       "kind": "bold",
-                      "text": "This does not work; see §7. Do not use it."
+                      "text": "Until 2026-09-19 this did not work and the advice here was not to use it"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — an evidence rule made a move impossible for everybody. That is fixed.)"
                     }
                   ],
                   [
@@ -6830,28 +6838,59 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "That rule means a file must be attached before the move is allowed, and "
+                    "text": "That rule means a file must be attached before the move is allowed. The box labelled "
                   },
                   {
-                    "kind": "bold",
-                    "text": "it does not work."
+                    "kind": "italic",
+                    "text": "\"Evidence (required by this transition)\""
                   },
                   {
                     "kind": "text",
-                    "text": " The box says so — \"Evidence upload is not available in this build yet\" — and the Move button stays disabled."
+                    "text": " takes the file, and the Move button stays greyed out until the upload has finished and the server has stored it."
                   }
                 ]
-              },
+              }
+            ]
+          },
+          {
+            "id": "i-chose-a-file-and-the-move-is-still-blocked",
+            "title": "I chose a file and the move is still blocked.",
+            "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "text",
+                    "text": "The server has the last word on what it will keep, and the box tells you what it said — a file over the size ceiling, or a kind it will not take. The move stays blocked until a file it accepts is attached."
+                  }
+                ]
+              },
+              {
+                "kind": "quote",
+                "spans": [
+                  {
                     "kind": "bold",
-                    "text": "Practical consequence: if anybody puts an evidence rule on a move, that move becomes impossible for everyone."
+                    "text": "Until 2026-09-19 this did not work at all."
                   },
                   {
                     "kind": "text",
-                    "text": " Do not use that rule. The product is honest about it rather than greying out a button with no reason, but the rule is still offered in the builder as though it works."
+                    "text": " The box said "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Evidence upload is not available in this build yet\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", and an evidence rule made a move "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "impossible for everybody"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — which is why the docs used to tell you not to use one. That is fixed. What remains is the ordinary consequence: a move carrying this rule is blocked until somebody attaches a file, so put it only where that is what you mean."
                   }
                 ]
               }

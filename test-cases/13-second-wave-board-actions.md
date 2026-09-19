@@ -1975,7 +1975,7 @@ composition straight to the envelope and does **not** re-spell the payload — a
 
 ### The case
 
-- ✅ **`13.989` — the description is editable on the door that already exists.**
+- ✅ **13.989 — the description is editable on the door that already exists.**
   `packages/app-core/test/views/ticket-sheet.test.tsx`, six arms. It draws the row **on a ticket that
   has never carried a claim** (with a control asserting the fixture really has none, so the arm cannot
   pass on a ticket that happened to have one); it draws it **once**; the submission reaches

@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { WorkflowDef } from '@gisik-nokma/domain';
@@ -401,6 +401,247 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
       evidenceAttachmentId: '01J9GATA000000000000000000',
       fieldValues: {},
     });
+  });
+
+  /**
+   * The two ways an upload FAILS, and why they get different sentences.
+   *
+   * Neither was reachable before the web gained an uploader — the dialog
+   * rendered the dead-end sentence instead and never called one. The moment a
+   * real uploader arrives, so does every way it can fail, and the original
+   * `void uploadEvidence(file).then(…)` had **no `.catch`**: a refused file
+   * left a rejected promise nobody handled and a Move button disabled with no
+   * sentence beside it. These two cases pin the split Ruling 27 established
+   * for this dialog's other slots.
+   */
+  it('16.31 evidence attached for ONE move does NOT satisfy a different guarded move', async () => {
+    const user = userEvent.setup();
+    // TWO guarded moves out of the same state, so switching between them is a
+    // real choice a person can make — and the one that would otherwise come up
+    // already-satisfied by a file attached for the other.
+    renderDialog({
+      uploadEvidence: async () => ({ attachmentId: '01J9GATA000000000000000000' }),
+      workflow: {
+        ...WF_ERRAND,
+        transitions: WF_ERRAND.transitions.map((transition) =>
+          transition.from === 'doing'
+            ? { ...transition, rules: [{ kind: 'require-evidence' }] }
+            : transition,
+        ),
+      },
+    });
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.upload(
+      screen.getByLabelText('Evidence (required by this transition)'),
+      new File(['bytes'], 'receipt.pdf', { type: 'application/pdf' }),
+    );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move' })).toBeEnabled());
+
+    // Now choose the OTHER guarded move. The evidence belonged to the first.
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(
+      within(await screen.findByRole('listbox')).getByRole('option', { name: 'Waiting on counterparty' }),
+    );
+    // The rule is real and this move has no evidence of its own — so the button
+    // must be blocked again. Reachable only once a caller supplied an uploader.
+    expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
+  });
+
+  it('16.31 an upload still IN FLIGHT when the destination changes does not re-arm the new move', async () => {
+    const user = userEvent.setup();
+    let release!: (value: { attachmentId: string }) => void;
+    const pending = new Promise<{ attachmentId: string }>((resolve) => {
+      release = resolve;
+    });
+    renderDialog({
+      uploadEvidence: () => pending,
+      workflow: {
+        ...WF_ERRAND,
+        transitions: WF_ERRAND.transitions.map((transition) =>
+          transition.from === 'doing' ? { ...transition, rules: [{ kind: 'require-evidence' }] } : transition,
+        ),
+      },
+    });
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.upload(
+      screen.getByLabelText('Evidence (required by this transition)'),
+      new File(['bytes'], 'receipt.pdf', { type: 'application/pdf' }),
+    );
+
+    // Change the destination WHILE the upload is still running. The reset
+    // clears the id; the danger is what happens when the upload lands.
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(
+      within(await screen.findByRole('listbox')).getByRole('option', { name: 'Waiting on counterparty' }),
+    );
+
+    release({ attachmentId: '01J9GATA000000000000000000' });
+    await act(async () => {
+      await pending;
+    });
+
+    // The move the person is now LOOKING AT has no evidence of its own, so it
+    // must still be blocked. Without the attempt token this resolves into the
+    // new destination and enables it — with a file attached for the old one.
+    expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
+  });
+
+  it('16.31 the instant check re-asks once evidence lands, and stops contradicting the button', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      uploadEvidence: async () => ({ attachmentId: '01J9GATA000000000000000000' }),
+      // The real engine refuses `require-evidence` when the candidate carries
+      // no id — so this mirrors it, and the point is that the id now REACHES it.
+      precheck: async (_toStateId, evidenceAttachmentId) =>
+        evidenceAttachmentId === undefined || evidenceAttachmentId === null
+          ? { kind: 'refused', rule: 'require-evidence', reason: 'none was provided' }
+          : { kind: 'passed' },
+      workflow: {
+        ...WF_ERRAND,
+        transitions: WF_ERRAND.transitions.map((transition) =>
+          transition.to === 'done' ? { ...transition, rules: [{ kind: 'require-evidence' }] } : transition,
+        ),
+      },
+    });
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    expect(await screen.findByText(/instant check — require-evidence/)).toBeInTheDocument();
+
+    await user.upload(
+      screen.getByLabelText('Evidence (required by this transition)'),
+      new File(['bytes'], 'receipt.pdf', { type: 'application/pdf' }),
+    );
+
+    // A refusal printed beside the control it contradicts is a false statement:
+    // the button is enabled and the line still said no file was provided.
+    await waitFor(() => expect(screen.queryByText(/instant check/)).toBeNull());
+    expect(screen.getByRole('button', { name: 'Move' })).toBeEnabled();
+  });
+
+  it('16.31 closing and reopening drops the evidence, rather than re-arming it invisibly', async () => {
+    const user = userEvent.setup();
+    const props = {
+      workflow: WF_ERRAND,
+      fromStateId: 'doing',
+      ticketFields: {},
+      onClose: vi.fn(),
+      onSubmit: vi.fn(),
+      precheck: async () => ({ kind: 'passed' as const }),
+      serverRefusal: null,
+      transportError: null,
+      uploadEvidence: async () => ({ attachmentId: '01J9GATA000000000000000000' }),
+    };
+    const { rerender } = render(
+      <TransitionDialog
+        {...props}
+        open
+        workflow={{
+          ...WF_ERRAND,
+          transitions: WF_ERRAND.transitions.map((transition) =>
+            transition.to === 'done' ? { ...transition, rules: [{ kind: 'require-evidence' }] } : transition,
+          ),
+        }}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.upload(
+      screen.getByLabelText('Evidence (required by this transition)'),
+      new File(['bytes'], 'receipt.pdf', { type: 'application/pdf' }),
+    );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move' })).toBeEnabled());
+
+    // Cancel and reopen. The destination survives (pre-existing, deliberate);
+    // the EVIDENCE must not — the file input remounts EMPTY, so an armed
+    // button would point at a file no longer visible anywhere in the dialog.
+    rerender(
+      <TransitionDialog
+        {...props}
+        open={false}
+        workflow={{
+          ...WF_ERRAND,
+          transitions: WF_ERRAND.transitions.map((transition) =>
+            transition.to === 'done' ? { ...transition, rules: [{ kind: 'require-evidence' }] } : transition,
+          ),
+        }}
+      />,
+    );
+    rerender(
+      <TransitionDialog
+        {...props}
+        open
+        workflow={{
+          ...WF_ERRAND,
+          transitions: WF_ERRAND.transitions.map((transition) =>
+            transition.to === 'done' ? { ...transition, rules: [{ kind: 'require-evidence' }] } : transition,
+          ),
+        }}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
+  });
+
+  it('16.31 a REFUSED upload says so in the server’s own words, and keeps the move blocked', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      uploadEvidence: async () => {
+        const err = new Error('That file is larger than the 25 MiB ceiling.');
+        err.name = 'UploadRefusedError';
+        throw err;
+      },
+      workflow: {
+        ...WF_ERRAND,
+        transitions: WF_ERRAND.transitions.map((transition) =>
+          transition.to === 'done' ? { ...transition, rules: [{ kind: 'require-evidence' }] } : transition,
+        ),
+      },
+    });
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.upload(
+      screen.getByLabelText('Evidence (required by this transition)'),
+      new File(['bytes'], 'huge.pdf', { type: 'application/pdf' }),
+    );
+
+    // The authority spoke: `--server`'s tone, and its reason carried without
+    // paraphrase — never the "could not be uploaded" wording, which would put
+    // a dropped connection and a refusal in one sentence.
+    expect(
+      await screen.findByText(
+        'The server would not store that file — That file is larger than the 25 MiB ceiling.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
+  });
+
+  it('16.31 an upload that never reached a server says THAT instead, and never claims a verdict', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      uploadEvidence: async () => {
+        throw new TypeError('Failed to fetch');
+      },
+      workflow: {
+        ...WF_ERRAND,
+        transitions: WF_ERRAND.transitions.map((transition) =>
+          transition.to === 'done' ? { ...transition, rules: [{ kind: 'require-evidence' }] } : transition,
+        ),
+      },
+    });
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.upload(
+      screen.getByLabelText('Evidence (required by this transition)'),
+      new File(['bytes'], 'receipt.pdf', { type: 'application/pdf' }),
+    );
+
+    expect(await screen.findByText('That file could not be uploaded — Failed to fetch')).toBeInTheDocument();
+    // Nobody adjudicated, so the sentence must not be the one a verdict wears.
+    expect(screen.queryByText(/The server would not store/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
   });
 
   it('prompts for a required field and hands its value back for a field_set claim', async () => {

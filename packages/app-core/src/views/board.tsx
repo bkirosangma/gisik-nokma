@@ -125,7 +125,31 @@ export type BoardMoveCapability = {
   currentUserId: string;
   onMoved: () => void;
   cache?: ClientStateCache;
-  uploadEvidence?: (file: File) => Promise<{ attachmentId: string }>;
+  /**
+   * ⚠ **THIS ONE TAKES A `ticketId`, AND `TicketSheetProps.uploadEvidence` DOES
+   * NOT — the difference is forced, not stylistic.**
+   *
+   * `TicketSheet` is mounted for ONE ticket, so its host can close over the id
+   * and the prop needs no parameter: `apps/web` supplies
+   * `(file) => uploadAttachmentHttp(file, openTicketId)`. **`Board` is mounted
+   * for the whole board and carries ONE capability object for every card.** A
+   * closure over "the ticket" cannot exist here — there is no single ticket —
+   * so an upload performed from a card's own `Move…` dialog has no way to name
+   * what it is uploading TO unless the capability is told.
+   *
+   * **The ticket matters and is not incidental:** `POST /v1/attachments` takes
+   * `ticketId` in its form body, the server writes `attachments.ticket_id` from
+   * it, and the EVIDENCE GATE admits an upload as evidence only when
+   * `attachments.id = $1 AND ticket_id = $2` — the id AND the ticket
+   * (`apps/server/src/gates/evidence-gate.ts:44-50`). An uploader that guessed
+   * the wrong ticket would not merely mis-file the bytes: the move it was
+   * meant to unblock would be refused `attachment.evidence-unknown`.
+   *
+   * `MoveArrows` binds it per card (`card.ticketId`), so `TransitionDialog`'s
+   * own prop stays `(file) => …` at both mounts and the dialog never learns
+   * what a ticket id is.
+   */
+  uploadEvidence?: (file: File, ticketId: string) => Promise<{ attachmentId: string }>;
 };
 
 /**
@@ -1128,6 +1152,26 @@ function MoveArrows({
   /** Board-prototype-port Task 14 — see `MoveRegistry`'s own docblock above `Board`. */
   registerAttempt: (ticketId: string, attempt: (toStateId: string) => void) => () => void;
 }) {
+  /**
+   * THE EVIDENCE UPLOADER, BOUND TO THIS CARD.
+   *
+   * `BoardMoveCapability.uploadEvidence` takes a `ticketId` (see its own
+   * docblock: ONE capability object serves every card, so it cannot close over
+   * "the ticket"), and `TransitionDialog`'s prop takes none. This is the one
+   * place the two meet, and this card is the one thing that knows which ticket
+   * its dialog is moving.
+   *
+   * Captured into a local rather than read through `moves.` inside the JSX
+   * callback: TypeScript does not carry a narrowing of a PROPERTY into a
+   * closure, and the alternative here is a non-null assertion, which this file
+   * uses nowhere.
+   */
+  const { uploadEvidence } = moves;
+  const uploadEvidenceForCard =
+    uploadEvidence === undefined
+      ? undefined
+      : (file: File): Promise<{ attachmentId: string }> => uploadEvidence(file, card.ticketId);
+
   const [refusal, setRefusal] = useState<{ available: string[] } | null>(null);
   const [serverRefusal, setServerRefusal] = useState<{ rule: string; reason: string } | null>(null);
   /**
@@ -1523,13 +1567,23 @@ function MoveArrows({
   }, [registerAttempt, card.ticketId, attemptMove]);
 
   /** Mirrors `TicketSheet.precheck` exactly — `cache` optional, absence answers `not-evaluated` rather than manufacturing `passed`. */
-  const precheck = async (toStateId: string): Promise<PrecheckResult> => {
+  const precheck = async (
+    toStateId: string,
+    evidenceAttachmentId?: string | null,
+  ): Promise<PrecheckResult> => {
     if (moves.cache === undefined) return { kind: 'not-evaluated', why: 'missing-local-state' };
+    // Same reason as `TicketSheet`'s twin: the candidate carries what the
+    // submission will carry, or `require-evidence` refuses a move the person
+    // has just satisfied. See `TransitionDialogProps.precheck`.
+    const payload: Record<string, unknown> = { to: toStateId };
+    if (evidenceAttachmentId !== undefined && evidenceAttachmentId !== null) {
+      payload['evidenceAttachmentId'] = evidenceAttachmentId;
+    }
     const candidate = make({
       workspaceId: moves.workspaceId,
       entity: { kind: 'ticket', id: card.ticketId },
       type: 'ticket.transitioned',
-      payload: { to: toStateId },
+      payload,
     });
     return precheckEvent(candidate, moves.cache);
   };
@@ -1691,7 +1745,7 @@ function MoveArrows({
           precheck={precheck}
           serverRefusal={serverRefusal}
           transportError={transportError}
-          uploadEvidence={moves.uploadEvidence}
+          uploadEvidence={uploadEvidenceForCard}
         />
       ) : null}
     </div>

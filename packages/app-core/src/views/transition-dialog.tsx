@@ -120,8 +120,27 @@ export type TransitionDialogProps = {
   ticketFields: Record<string, FieldClaim>;
   onClose: () => void;
   onSubmit: (submission: TransitionSubmission) => void;
-  /** Instant named-reason preview, advisory only (Task 6's `precheckEvent`, wired by the sheet). */
-  precheck: (toStateId: string) => Promise<PrecheckResult>;
+  /**
+   * Instant named-reason preview, advisory only (Task 6's `precheckEvent`,
+   * wired by the sheet).
+   *
+   * ⚠ **IT TAKES THE EVIDENCE ID, AND IT DID NOT UNTIL INDEPENDENT REVIEW
+   * FOUND THE CONSEQUENCE.** The pre-check builds a candidate
+   * `ticket.transitioned` and runs the real engine over it, so a rule that
+   * needs a fact the candidate cannot carry is evaluated as REFUSED. With a
+   * `(toStateId) => …` signature the candidate could only ever say `{ to }`,
+   * and `evaluateRequireEvidence` reads `payload.evidenceAttachmentId` — so
+   * attaching a file to a `require-evidence` move left the preview insisting
+   * *"none was provided"* beside a Move button that had just become **enabled**.
+   * A refusal printed next to the control it contradicts, telling the person
+   * the move was still blocked when it was not.
+   *
+   * This is the same class of omission as `BoardMoveCapability.uploadEvidence`
+   * needing a `ticketId`: **a contract that cannot carry a fact its caller
+   * holds.** Advisory still — it decides nothing — but it must be able to see
+   * what the submission will actually carry.
+   */
+  precheck: (toStateId: string, evidenceAttachmentId?: string | null) => Promise<PrecheckResult>;
   /** The authority's answer, shown VERBATIM whenever present. */
   serverRefusal: { rule: string; reason: string } | null;
   /**
@@ -207,6 +226,27 @@ export function TransitionDialog({
   const [comment, setComment] = useState('');
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [evidenceAttachmentId, setEvidenceAttachmentId] = useState<string | null>(null);
+  /**
+   * ⚠ **NEWLY REACHABLE AS OF THE DAY THE WEB GAINED AN UPLOADER, and it was
+   * a silent hole until then.** The `onChange` below used to be
+   * `void uploadEvidence(file).then(…)` with **no `.catch`** — which was
+   * unreachable while every caller passed no uploader at all (the branch
+   * above simply rendered the dead-end sentence instead). The moment a real
+   * uploader arrives, so does every way an upload can FAIL: a file over the
+   * ceiling, a type the server refuses, a dropped connection. Each of those
+   * left a rejected promise nobody handled and a Move button disabled with no
+   * sentence beside it — a control that silently does nothing.
+   *
+   * TWO FACTS, TWO TONES, the split Ruling 27 established for this dialog's
+   * other slots: `server` is the authority refusing to store the bytes (the
+   * uploader answers with the server's own reason), `transport` is nobody
+   * answering at all. Carried as one state rather than two because a second
+   * file REPLACES the first attempt's outcome — there is exactly one last
+   * upload, so there is exactly one sentence about it.
+   */
+  const [uploadError, setUploadError] = useState<{ tone: 'server' | 'transport'; message: string } | null>(
+    null,
+  );
   const [preview, setPreview] = useState<PrecheckResult | null>(null);
 
   const selected = options.find((option) => option.toStateId === toStateId) ?? null;
@@ -242,13 +282,80 @@ export function TransitionDialog({
     setPreview(null);
     if (toStateId === '') return;
     let cancelled = false;
-    void precheckRef.current(toStateId).then((result) => {
+    void precheckRef.current(toStateId, evidenceAttachmentId).then((result) => {
       if (!cancelled) setPreview(result);
     });
     return () => {
       cancelled = true;
     };
+    // `evidenceAttachmentId` is a dependency because it CHANGES THE ANSWER:
+    // `require-evidence` is evaluated against the candidate, and attaching a
+    // file between two runs of the same destination must re-ask.
+  }, [toStateId, evidenceAttachmentId]);
+
+  /**
+   * ⚠ **EVIDENCE IS PER-MOVE, AND THE CLAIM IS NOW REACHABLE FOR THE FIRST TIME.**
+   *
+   * A file attached as evidence for one move must not satisfy a `require-evidence`
+   * rule on a DIFFERENT move — and until this change no caller supplied an
+   * uploader, so `evidenceAttachmentId` could never be set in the product and
+   * the carry-over was unreachable. The moment one did, so did this: choose a
+   * move, attach a file, choose ANOTHER guarded move, and the Move button came
+   * up enabled carrying evidence the person attached for the first one. The
+   * engine would commit it — the id is real, the ticket matches, and the rule
+   * only asks that evidence be present.
+   *
+   * Reset on the SAME dependency the pre-check above uses, and for the same
+   * reason: `toStateId` is what actually changes when somebody chooses a
+   * different move. The upload error goes with it, because a sentence about an
+   * attempt for the previous move is a claim about a move no longer selected.
+   */
+  /**
+   * ⚠ **AN UPLOAD IN FLIGHT MUST NOT OUTLIVE THE MOVE IT WAS FOR.** Clearing
+   * the state when the destination changes is not enough on its own: the
+   * upload that was already running resolves AFTERWARDS and calls
+   * `setEvidenceAttachmentId` unconditionally, re-arming the very carry-over
+   * the reset exists to close. Independent review found this, and it is the
+   * sibling pre-check effect above that shows the guard — `let cancelled =
+   * false` / `if (!cancelled)` — which this handler lacked.
+   *
+   * A monotonic token rather than a boolean, because there is more than one
+   * way for an attempt to be superseded (a different destination, the dialog
+   * closing) and a stale attempt must lose to all of them. Every superseding
+   * event bumps it; a resolving upload applies only if it is still the latest.
+   */
+  const uploadAttemptRef = useRef(0);
+
+  useEffect(() => {
+    uploadAttemptRef.current += 1;
+    setEvidenceAttachmentId(null);
+    setUploadError(null);
   }, [toStateId]);
+
+  /**
+   * ⚠ AND THE SAME HOLE ONE LAYER OUT — closing and reopening. `Dialog` returns
+   * `null` while hidden (`packages/ui/src/components/dialog.tsx:15`) but this
+   * component STAYS MOUNTED at the sheet's mount (`ticket-sheet.tsx`, `open={moveOpen}`),
+   * so `toStateId` and the evidence both survive. Before this change nothing
+   * could set an id, so the carry-over was unreachable; with an uploader it is
+   * not: attach a file, press Cancel, reopen — the destination is still chosen
+   * and Move is ENABLED with no file visible anywhere in the dialog, because
+   * the `<input type="file">` remounts empty. Invisible state the user cannot
+   * see, silently satisfying a rule.
+   *
+   * Cleared on CLOSE rather than on open, so the abandoned attempt is discarded
+   * at the moment it is abandoned. **The comment and the field values still
+   * persist across a reopen — pre-existing behaviour, left alone deliberately:**
+   * typing into a dialog and losing it to a stray Cancel is a real cost, and
+   * unlike an attachment id it is visible in the reopened dialog.
+   */
+  useEffect(() => {
+    if (!open) {
+      uploadAttemptRef.current += 1;
+      setEvidenceAttachmentId(null);
+      setUploadError(null);
+    }
+  }, [open]);
 
   const blocked =
     selected === null ||
@@ -314,9 +421,36 @@ export function TransitionDialog({
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 if (file === undefined) return;
-                void uploadEvidence(file).then(({ attachmentId }) =>
-                  setEvidenceAttachmentId(attachmentId),
-                );
+                // A second attempt supersedes the first, in BOTH directions:
+                // the old id and the old sentence both go, so the dialog can
+                // never point at a file this attempt did not produce.
+                setEvidenceAttachmentId(null);
+                setUploadError(null);
+                const attempt = (uploadAttemptRef.current += 1);
+                void uploadEvidence(file)
+                  .then(({ attachmentId }) => {
+                    // Superseded while this was in flight — by a different
+                    // destination, or by the dialog closing. Applying it now
+                    // would re-arm evidence for a move nobody chose.
+                    if (uploadAttemptRef.current !== attempt) return;
+                    setEvidenceAttachmentId(attachmentId);
+                    setUploadError(null);
+                  })
+                  .catch((err: unknown) => {
+                    if (uploadAttemptRef.current !== attempt) return;
+                    // The refused/hung split, WITHOUT importing the client's
+                    // error class: `packages/app-core` must not depend on
+                    // `@gisik-nokma/editor` (amendment 12 — app-core never
+                    // learns what an editor is). `UploadRefusedError` sets its
+                    // own `name`, which is the one thing the two sides agree on
+                    // without a dependency, and it is the same signal the
+                    // editor's own suite asserts on.
+                    const verdict = err instanceof Error && err.name === 'UploadRefusedError';
+                    setUploadError({
+                      tone: verdict ? 'server' : 'transport',
+                      message: err instanceof Error ? err.message : String(err),
+                    });
+                  });
               }}
             />
           </label>
@@ -357,6 +491,22 @@ export function TransitionDialog({
       {transportError !== null ? (
         <p role="alert" className="gn-refusal gn-refusal--transport">
           {transportError}
+        </p>
+      ) : null}
+
+      {/*
+        The EVIDENCE UPLOAD's own outcome — a fourth fact, in the two tones the
+        split above establishes. It shares `--server`'s danger rule with the
+        refusal slot without sharing its sentence, deliberately: the tone says
+        WHO SPOKE (the authority, versus nobody), not which claim was refused.
+        `--transport` here means the file never reached a server that could
+        judge it, which is the same fact that class carries one block up.
+      */}
+      {uploadError !== null ? (
+        <p role="alert" className={`gn-refusal gn-refusal--${uploadError.tone}`}>
+          {uploadError.tone === 'server'
+            ? `The server would not store that file — ${uploadError.message}`
+            : `That file could not be uploaded — ${uploadError.message}`}
         </p>
       ) : null}
 

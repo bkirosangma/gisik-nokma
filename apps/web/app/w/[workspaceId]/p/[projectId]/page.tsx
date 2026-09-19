@@ -32,7 +32,7 @@ import {
   type ListRow,
   type TicketDatesInput,
 } from '@gisik-nokma/app-core';
-import { TicketEditorSlot } from '@gisik-nokma/editor';
+import { TicketEditorSlot, uploadAttachmentHttp } from '@gisik-nokma/editor';
 import { Avatar, Switch } from '@gisik-nokma/ui';
 import { AppNav } from '../../../../../src/app-nav.js';
 import { startTargetFor } from '../../../../../src/backlog-start.js';
@@ -2082,6 +2082,21 @@ function ProjectBoard() {
                           currentUserId,
                           onMoved: board.reload,
                           cache,
+                          /*
+                            THE EVIDENCE UPLOAD — the sixth thing this page
+                            passes to a board capability, and the one that makes
+                            a `require-evidence` transition POSSIBLE rather than
+                            permanently blocked.
+
+                            `BoardMoveCapability.uploadEvidence` takes a
+                            `ticketId` because one capability serves every card
+                            (`MoveArrows` binds it per card); the upload itself
+                            is the shipped `POST /v1/attachments` through the
+                            shipped client, so no route is added and nothing
+                            here speaks HTTP directly.
+                          */
+                          uploadEvidence: (file: File, ticketId: string) =>
+                            uploadAttachmentHttp(file, ticketId),
                         },
                       }
                     : {})}
@@ -2372,6 +2387,21 @@ function ProjectBoard() {
             is the argument `canSetVisibility` states at length.
           */
           editorSlot={TicketEditorSlot}
+          /*
+            THE EVIDENCE UPLOAD. The sheet has accepted this prop all along
+            (`TicketSheetProps.uploadEvidence`) and forwarded it to its own
+            `TransitionDialog` (`ticket-sheet.tsx`); THIS CALL SITE never passed
+            it, so the dialog fell to its fallback — *"Evidence upload is not
+            available in this build yet"* — and every `require-evidence`
+            transition was refused with no way to satisfy it. That sentence was
+            TRUE about the build it described and is false about this one.
+
+            The sheet is mounted for ONE ticket, so the closure binds it here;
+            `TransitionDialog`'s own prop takes no ticket and never learns what
+            one is. The upload is the shipped `POST /v1/attachments` through the
+            shipped client — no route is added and nothing here speaks HTTP.
+          */
+          uploadEvidence={(file: File) => uploadAttachmentHttp(file, openTicketId)}
         />
       ) : null}
 
