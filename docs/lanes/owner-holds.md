@@ -80,6 +80,40 @@ screens.** Fifteen items: **nine BUILD, four DECLINED, one NOT NOW, two already 
 **A DECLINE here is a decision, not a hold** — the same distinction §3 draws for the legal copy. These
 are settled product positions, and **a later session must not surface them as gaps to close.**
 
+#### THE CAPABILITY SWEEP'S ONE OPEN ITEM, RULED — `/v1/search`'s `matchedIn`
+
+**The capability sweep's triage closed everything but one item, and the owner ruled it on 2026-09-19
+late: _change the query so `matchedIn` is derivable._**
+
+**What the item is.** `GET /v1/search` is a **working full-text search over ticket titles, descriptions
+AND comments** (`routes/search.ts`, reading `proj_search`): `websearch_to_tsquery` against a `tsv`
+tsvector, ranked by `ts_rank_cd`, with a `ts_headline` snippet. **The client calls it and then refuses
+the answer** — `mapSearchHits(_raw): never` (`mappers.ts:1711`), registered in `SERVING_GAPS` — because
+the route squashes all three columns into **one** headline:
+
+```sql
+ts_headline(…, s.title || ' — ' || s.description || ' — ' || s.comments, …) AS snippet
+```
+
+so **which field matched is not recoverable from the response**, and `SearchHit.matchedIn`
+(`view-types.ts:476`, `'title' | 'description' | 'comment'`) is *"the whole of it — a hit that claimed
+`matchedIn: 'title'` because that is the commonest case would be this client inventing the answer to the
+one question the field asks."* **And no view calls `.search(` at all** — so the search is built, indexed
+and served, and unreachable.
+
+**⚠ THE FAVOURABLE DETAIL, MEASURED: THE PROJECTION IS ALREADY COLUMN-AWARE, SO THIS IS A QUERY
+CHANGE AND NOT A MIGRATION.** `proj_search` stores `title`, `description` and `comments` as **three
+separate columns**, and its generated `tsv` already weights them apart —
+`setweight(… title …, 'A') || setweight(… description …, 'B') || setweight(… comments …, 'C')`. **The
+distinction the client needs is already in the data; it is the SELECT that throws it away.**
+
+**⚠ AND `matchedIn` IS A SINGLE VALUE, NOT A LIST** — so a query matching two columns needs a
+**documented precedence**, and the weights' own order (title → description → comment) is the one the
+schema already implies. **A derivation with no stated precedence is the same defect one layer down.**
+
+**The board's "Search the board" box is NOT this** — it is a `FilterSpec.text` axis narrowing the rows
+already loaded. It works today and is untouched by this ruling.
+
 #### THE TICKET SHEET, RULED — owner, 2026-09-19 late
 
 **Raised by the owner's own correction.** The controller had compared the ticket sheet's *container*
