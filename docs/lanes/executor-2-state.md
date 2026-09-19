@@ -59,11 +59,11 @@ first and the surfaces were never wired.
 
 ### § 3 — CASES AND MUTATIONS.
 
-- **`13.990`** — `apps/web/test/evidence-upload.test.tsx`, rendering the **REAL** page, opening a **REAL**
+- **`16.31`** — `apps/web/test/evidence-upload.test.tsx`, rendering the **REAL** page, opening a **REAL**
   ticket, driving the **REAL** dialog. First assertion is an **ABSENCE** (the dead-end sentence), second
   follows the upload to the shipped door asserting `/v1/attachments`, `POST`, and **`ticketId` = the open
   ticket**. **Mutation-witnessed:** deleting the prop from `page.tsx` reddens both arms.
-- **`3.72`'s SIX new arms**, every one named `13.990` so a grep finds all witnesses. **First pass, three:**
+- **`3.72`'s SIX new arms**, every one named `16.31` so a grep finds all witnesses. **First pass, three:**
   the refused upload, the unreachable one, and **evidence carrying across moves**. **Review round, three
   more** — see § 9. **Mutation-witnessed, one per arm:** deleting the `.catch` reddens the first two,
   deleting the `[toStateId]` reset the third, and § 9's three redden their own. Files restored
@@ -80,8 +80,8 @@ was ever visible.
 `check-case-ids.mjs`'s `ID_LINE` is `/^-\s+(?:([^\s\d*][^\s]*)\s+)?(\*{0,2})(\d+\.\d+[a-z]?)/` — it
 requires a **bullet** whose id is **not wrapped in backticks**. This lane writes its catalogue entries as
 `## … — case \`13.9xx\`` headings with a `- ✅ **\`13.9xx\` — …**` bullet, **and that form contributes
-ZERO.** Measured: with `13.990` written that way the count stayed at **2433**; reformatted to
-`- ✅ **13.990 — …**` it moved to **2434**. `13.989` on `main` (from #544) has the same defect and was
+ZERO.** Measured: with `16.31` written that way the count stayed at **2433**; reformatted to
+`- ✅ **16.31 — …**` it moved to **2434**. `13.989` on `main` (from #544) has the same defect and was
 fixed in the same change set, so this PR takes the count to **2435 = 2433 + exactly the two ids it adds**.
 **The guard is blind to a whole class of entries, which is how `13.969` collided undetected** — recorded,
 not fixed: widening `ID_LINE` would change what every existing file reports and is the controller's call.
@@ -121,9 +121,42 @@ are done, so **next is `C` (`isInbox` bulk + Undo)**, then `H` (sheet footer), t
 **Read `CTL-QUEUE-2026-09-19-door-builds.md` with its Addenda 1–5 before starting** — and note C is a
 `NEW ROUTE` + CSRF registration, so its door is the one that genuinely needs measuring first.
 
-**⛔ BLOCK `13.988`–`13.999`: three spent (`13.988` = E, `13.989` = description, `13.990` = this), NINE
-LEFT.** Keep the `{3}` width. **Write the id line as a bullet with NO backticks** (§ 4) or it will not
-register.
+**⛔ THE BLOCK CHANGED UNDER THIS TASK — `§13` IS CLOSED, THE OWNER OPENED `§16`.** (Controller,
+2026-09-19 late.) **This lane's block is `16.31`–`16.60`, and NOTHING may be minted in `§13`** — its
+remaining window is `13.990`–`13.993` and `13.995`–`13.999`, and it is not this lane's to spend. The old
+`13.988`–`13.999` block is **retired**. `13.988` (E) and `13.989` (the description, merged in `#544`) were
+spent while it was valid; **this task's id was renumbered to `16.31`** in the two test files, and its
+catalogue section was LIFTED OUT of `test-cases/13-second-wave-board-actions.md` — see § 10.
+
+**⚠ AND `test-cases/16-remaining-doors.md` HAS NOT LANDED.** `git cat-file -e
+origin/main:test-cases/16-remaining-doors.md` → does not exist (control: `13-second-wave-board-actions.md`
+present). Executor 1 is creating that file, and minting into `§16` before it exists would create a
+competing copy and a conflict **on the file itself**. **So the catalogue entry is HELD, not written** —
+its 96 lines are staged at `/tmp/held-16.31-section.md` and go in the moment the file lands. **Owner:
+whoever next sees `test-cases/16-remaining-doors.md` on `main`.**
+
+**Write the id line as a bullet whose id is BARE and BOLD** — `- **16.31** ✅ …` — because a backtick
+between the asterisks and the digits stops `check-case-ids`'s regex, and a `##` heading carrying the id in
+prose contributes ZERO. Both mistakes are in this lane's recent history and § 4 measures them.
+
+---
+
+### § 10 — ⚠ THE GATE IS DOWN MACHINE-WIDE, AND IT IS NOT ANY LANE'S CHANGE.
+
+After the owner's dev-stack rebuild, measured: **`:54329` REFUSED** (`nc -z 127.0.0.1 54329`), with
+`docker ps` showing `gisik-nokma-dev-postgres-1` but **no `gisik-nokma-postgres-1`** — the container the
+gate's DB suites connect to is gone. And **Docker's VM disk is 100% FULL**: `docker run --rm --privileged
+alpine df -h /` → `overlay 58.4G, 56.4G used, 0 available, 100%`, which is the `could not create directory
+"base/…": No space left on device` PostgreSQL emitted while it was still up. **The HOST has 84 GiB free**,
+so it is the Docker image and not the volume (41 images / 43.3 GB, 39.6 GB reclaimable; 8.4 GB build
+cache, 6.8 GB reclaimable; 100 volumes).
+
+**A gate run reported `36 failed | 967 passed | 593 skipped` in `@gisik-nokma/server`, and NOT ONE is a
+code failure** — every one is `CREATE DATABASE` on a full disk, then cascading `Cannot read properties of
+undefined (reading 'drop')`. **This does NOT clear by re-running the file alone**, which is what separates
+it from the load timeouts this lane has been reading correctly all day. **Docker was not touched** —
+deleting images or volumes on a shared box mid-rebuild is not this lane's to do. Reported to the
+controller; **the gate cannot pass for anyone until the database is back.**
 
 ---
 

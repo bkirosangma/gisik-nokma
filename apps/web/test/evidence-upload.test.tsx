@@ -182,7 +182,7 @@ async function openTheBlockedTransition(): Promise<void> {
 }
 
 describe('the evidence upload — the call site that made a rule permanently blocking', () => {
-  it('13.990 the page supplies an uploader, so the dead end is GONE', async () => {
+  it('16.31 the page supplies an uploader, so the dead end is GONE', async () => {
     await openTheBlockedTransition();
 
     // ⚠ THE ASSERTION THAT NAMES THE DEFECT, and it is an ABSENCE. While the
@@ -193,7 +193,7 @@ describe('the evidence upload — the call site that made a rule permanently blo
     expect(screen.getByLabelText('Evidence (required by this transition)')).toBeInTheDocument();
   });
 
-  it('13.990 the upload reaches the SHIPPED door, scoped to THIS ticket, and unblocks the move', async () => {
+  it('16.31 the upload reaches the SHIPPED door, scoped to THIS ticket, and unblocks the move', async () => {
     await openTheBlockedTransition();
 
     const moveButton = screen.getByRole('button', { name: 'Move' });

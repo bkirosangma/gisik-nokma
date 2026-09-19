@@ -414,7 +414,7 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
    * sentence beside it. These two cases pin the split Ruling 27 established
    * for this dialog's other slots.
    */
-  it('13.990 evidence attached for ONE move does NOT satisfy a different guarded move', async () => {
+  it('16.31 evidence attached for ONE move does NOT satisfy a different guarded move', async () => {
     const user = userEvent.setup();
     // TWO guarded moves out of the same state, so switching between them is a
     // real choice a person can make — and the one that would otherwise come up
@@ -448,7 +448,7 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
     expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
   });
 
-  it('13.990 an upload still IN FLIGHT when the destination changes does not re-arm the new move', async () => {
+  it('16.31 an upload still IN FLIGHT when the destination changes does not re-arm the new move', async () => {
     const user = userEvent.setup();
     let release!: (value: { attachmentId: string }) => void;
     const pending = new Promise<{ attachmentId: string }>((resolve) => {
@@ -488,7 +488,7 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
     expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
   });
 
-  it('13.990 the instant check re-asks once evidence lands, and stops contradicting the button', async () => {
+  it('16.31 the instant check re-asks once evidence lands, and stops contradicting the button', async () => {
     const user = userEvent.setup();
     renderDialog({
       uploadEvidence: async () => ({ attachmentId: '01J9GATA000000000000000000' }),
@@ -520,7 +520,7 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
     expect(screen.getByRole('button', { name: 'Move' })).toBeEnabled();
   });
 
-  it('13.990 closing and reopening drops the evidence, rather than re-arming it invisibly', async () => {
+  it('16.31 closing and reopening drops the evidence, rather than re-arming it invisibly', async () => {
     const user = userEvent.setup();
     const props = {
       workflow: WF_ERRAND,
@@ -585,7 +585,7 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
     expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
   });
 
-  it('13.990 a REFUSED upload says so in the server’s own words, and keeps the move blocked', async () => {
+  it('16.31 a REFUSED upload says so in the server’s own words, and keeps the move blocked', async () => {
     const user = userEvent.setup();
     renderDialog({
       uploadEvidence: async () => {
@@ -618,7 +618,7 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
     expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
   });
 
-  it('13.990 an upload that never reached a server says THAT instead, and never claims a verdict', async () => {
+  it('16.31 an upload that never reached a server says THAT instead, and never claims a verdict', async () => {
     const user = userEvent.setup();
     renderDialog({
       uploadEvidence: async () => {
