@@ -20,7 +20,119 @@
 
 ---
 
-## ▲ TOP BLOCK — the members **name fallback is BUILT**: an address on the roster wire, withheld where it is synthetic, and ONE resolved label for all three sites. (2026-09-19, ~15:1x IST)
+## ▲ TOP BLOCK — the ticket sheet's **scrim and entrance now MOVE**, at the prototype's own values and behind the repo's own reduced-motion idiom. (2026-09-19, ~15:4x IST)
+
+**Position: the dispatch is DONE and the branch is PUSHED — `exec2/sheet-scrim-motion`, base `main`, cut
+from `origin/main` `db52f911`.** The PR opens as the last step of this dispatch, so **measure it rather than
+reading it here**: `gh pr list --head exec2/sheet-scrim-motion --state all`.
+
+**⚠ THIS BLOCK WAS WRITTEN AGAINST A BASE THAT #525 HAS SINCE MOVED PAST.** It first read *"the OPEN PR
+#525 also edits this file"* — **and #525 MERGED at `2026-09-19T09:57:45Z` (merge `2c6d5682`), before this
+branch was cut at 15:17 IST.** So the sentence was stale the moment it was written, which is the same
+failure this file records at its own `:226` and the second time this lane has shipped a stale "open PR"
+line. **The fix is not a sentence: the branch has been REBASED onto `origin/main`,** so this block now sits
+above #525's rather than conflicting with it. **The lesson: `gh pr view <n> --json state` is one call and it
+was not made.**
+
+**Dispatch:** `CTL-DISPATCH-2026-09-19-sheet-scrim-motion.md`. Owner: *"gn-sheet__scrim. the surface that
+shows when you open a ticket. check with the prototype and match it."*
+
+### § 1 — THE COLOUR WAS NOT THE MISMATCH; MOTION WAS.
+
+`.gn-sheet__scrim` computed to **`animation: none 0s`**, `.gn-sheet` had none, and **`gnSlide` existed
+nowhere** — the sheet snapped open. Both now carry the prototype's own values
+(`desktop.dc.html@6d7b67c0a52c`): **`gnFade .2s ease`** on the scrim (`@keyframes` `:96`; carried by all
+FOUR of its scrims — `:1384`, `:1436`, `:1570`, `:3396`) and **`gnSlide .26s cubic-bezier(.32,.72,0,1)`**
+over its **`translateX(28px)`** on the panel (`:95`).
+
+**The 28px was checked against OUR width rather than copied blind:** the prototype's sheet is
+`min(660px,100%)` (`:3399`), ours is `min(40rem, 94vw)` = **640px** — twenty pixels apart, not a difference
+a travel distance can be wrong for — and both dock to the same right edge, so a positive `translateX` is a
+slide IN on both sides.
+
+**A trap the dispatch names, repeated because it cost the controller an eyeball error:** the prototype's
+default body is **`data-style="hig"`** while the running app is **`neo`**, so the two scrims LOOK different
+(cool blue vs warm tan) while both being correct. **A style difference is not a defect.**
+
+### § 2 — THE QUESTION THE DISPATCH ASKED ME TO VERIFY, AND THE ERROR I MADE ANSWERING IT.
+
+The dispatch asked me to verify whether animating the SHARED `.gn-dialog__scrim, .gn-sheet__scrim` rule is
+right rather than assume it. **I answered wrongly, and an independent review measured the error.**
+
+**What I claimed:** a grep for `background:var(--overlay)` returns exactly four scrims, **all four are side
+panels**, so **"the prototype draws no centred dialog anywhere"** — therefore the shared rule could not be
+justified from the reference, and `.gn-dialog` was left unanimated because "a scale or a rise would be a
+value chosen for a shape the reference does not draw". I recorded `gnRise` as a keyframe "used by nothing".
+
+**What is true:** three of the four hits are side panels. **The fourth, `desktop.dc.html:1570`, is the scrim
+of a CENTRED dialog** — its container (`:1569`) is `align-items:center;justify-content:center`, its panel
+(`:1571`) is a rounded `min(560px,100%)`, and that panel carries exactly
+`animation:gnRise .24s cubic-bezier(.32,.72,0,1)`. `mobile.dc.html:1206-1208` draws the same pair.
+
+**So every part of my answer was inverted:** the reference DOES support fading our dialog scrim (same
+`gnFade .2s ease`), it DOES give the centred panel an entrance, and `gnRise` was never idle — **it is that
+entrance.** Leaving the dialog alone would also have shipped a modal whose scrim faded while its panel
+snapped, an inconsistency this change would have introduced rather than found. `.gn-dialog` now rises on
+the reference's own values, with its own guard.
+
+***THE ERROR IS THE ONE THIS FILE KEEPS RECORDING: the grep WAS run — but the step that would have
+falsified the conclusion drawn from it, reading each hit's CONTAINER rather than the hit itself, was
+not.*** A four-hit grep was treated as a measurement when it was only a population.
+
+### § 3 — THE COMMENT THIS CHANGE MAKES FALSE, CORRECTED IN THE SAME CHANGE.
+
+`ui.css`'s `gnFade` docblock said the keyframes lived at the foot of the Help section *"rather than in a
+shared block"* **because `gnFade` was "the only animation in this stylesheet"**. `gnSlide` makes that
+sentence false. **Its own reasoning is what moved them**, so `gnFade` and `gnSlide` now sit in a SHARED
+KEYFRAMES block at the head of the file, and the sentence is corrected rather than left to be discovered.
+
+### § 4 — VERIFIED IN A REAL BROWSER, BECAUSE NO UNIT TEST CAN SEE MOTION.
+
+**jsdom has no layout engine and no animation timeline.** Two instruments, both named:
+
+- **A declaration scan** (`packages/ui/test/sheet-motion.test.ts`, case **`13.961`**) in the idiom `13.893`
+  established — the declared values, the keyframe frames, the reduced-motion guards, and a uniqueness claim
+  for the cascade-loss gap this shape is blind to. Its docblock states what a source scan cannot see.
+- **A REAL BROWSER RUN** — Chromium via Playwright, driving the same bytes of `ui.css` with the `Sheet`
+  component's own markup: **11 checks, all true** — a mid-animation transform (`matrix(1,0,0,1,1.26534,0)`
+  at t=130ms), a settled `transform: none`, the scrim's `0 → 1` opacity, and **`prefers-reduced-motion:
+  reduce` emulated at the engine level** (both read `animation: none`). A screenshot at t=130ms shows the
+  scrim mid-fade and the panel mid-slide at its 640px width.
+
+**I WATCHED IT OPEN. What I did NOT do is drive the running app's `/p/:projectId?ticket=<id>` route** — the
+viewport suite does not visit it, and the PR body says so rather than implying otherwise.
+
+### § 5 — MUTATIONS, AND THE ONE THAT TAUGHT THE LESSON.
+
+Four aimed mutations, all killing the case: scrim animation removed · panel animation removed · panel
+timing changed · keyframe `translateX(28px)` → `14px`.
+
+**The first attempt at the fourth MUTATED NOTHING and the case correctly stayed green.** The pattern
+matched the first `translateX(28px)` in the file — inside this change's own **prose comment QUOTING the
+value** — so the keyframe was untouched. *A mutation result of "passed" is not evidence unless the mutation
+is confirmed to have fired*; the check that caught it printed the file's own sha before and after.
+
+**The case's own first draft was also broken in a way worth recording:** the block scanner captured a
+rule's PRECEDING DOC COMMENT as part of its "selector", so the two commented rules this case is about were
+invisible and **the only block that matched was the reduced-motion guard's** — a reading that passed for
+the wrong element. Comments are stripped before any scan now.
+
+### § 6 — GATE, AND THE ENVIRONMENT RED THAT IS NOW ROUTINE.
+
+**Gate 33/33, `EXIT=0`, node v22.22.2.** The FIRST run reddened on the same 30 s timeout in the same
+unrelated `test/seed/seed-dev.test.ts`, at **load 73.51** — **the same red the controller warned about
+twice, and the same one this lane hit on the members change.** Isolated at **8/8 in 1.7 s**, no orphans,
+green on re-run. **Do not report this red as a code red; re-measure the file alone first.** All seven checks
+green; `check:db-tz` needs `DATABASE_URL` (`.env.example:67`).
+
+### § 7 — CASE ID `13.961`, MINTED ON THE TIP INSTRUCTION, DELIBERATELY SKIPPING THREE.
+
+`13.958`–`13.960` are **reserved by the open PR #525**. This task therefore took **`13.961`**, swept with a
+control in the same invocation (`13.955`=5, `13.953`=4, `13.946`=7, `13.893`=11 — the sweep can see ids)
+and with `13.961` measuring 0 *before* the test file that now carries it was written. **The controller is
+asked to veto the number if a block was allocated elsewhere.**
+
+## ▼ PREVIOUS BLOCK — the members **name fallback is BUILT** — and it is **MERGED as `#525`** (`2c6d5682`). (2026-09-19, ~15:1x IST)
 
 **Position: the dispatch is DONE and the branch is PUSHED — `exec2/members-name-fallback`, base `main`,
 cut from `origin/main` `1bfa6804`.** The PR for this head opens as the last step of the dispatch that wrote
