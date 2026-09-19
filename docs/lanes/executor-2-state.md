@@ -48,11 +48,20 @@ CSRF-unprotected until its exact `routeUrl` is added.**
   exactly 62/1,853/51/2,490 from the docblock's pattern, and showed the brief's came from a
   **word-boundary-anchored** pattern the docblock does not use.
 
-### § 3 — ID BUDGET.
+### § 3 — ID BUDGET. ⚠ **REALLOCATED — DO NOT USE `16.32`.**
 
-**`§13` IS CLOSED.** This lane's block is **`16.31`–`16.60`**; **`16.31` is spent** (the evidence upload).
-**Next free: `16.32`.** Write cases as `- **16.N** ✅ …` — id bolded ALONE, nothing between the asterisks
-and the digits — and confirm the `check-case-ids` count moved by exactly what you added.
+**`§13` IS CLOSED. This lane's block is now `16.41`–`16.60`** — reallocated 2026-09-19 late,
+controller-ruled: it was `16.31`–`16.60`, and **exec 1 took `16.32`–`16.40` for `/v1/search`.**
+
+- **`16.31` is SPENT** (the evidence upload).
+- **`16.32`–`16.40` are EXEC 1'S.** A mint there is a collision, not a mistake to paper over.
+- **NEXT FREE: `16.41`.**
+
+Write cases as `- **16.N** ✅ …` — id bolded ALONE, nothing between the asterisks and the digits — and
+**confirm the `check-case-ids` count moved by exactly what you added.** *This paragraph said "next free
+`16.32`" for about forty minutes, which is this file's own recurring defect: **a number is a reading that
+expires, a block is the only form that stays true** — and even a block expires when the controller
+reallocates. Re-read the block at every task boundary rather than carrying it forward.*
 
 ---
 
@@ -181,11 +190,15 @@ are done, so **next is `C` (`isInbox` bulk + Undo)**, then `H` (sheet footer), t
 `NEW ROUTE` + CSRF registration, so its door is the one that genuinely needs measuring first.
 
 **⛔ THE BLOCK CHANGED UNDER THIS TASK — `§13` IS CLOSED, THE OWNER OPENED `§16`.** (Controller,
-2026-09-19 late.) **This lane's block is `16.31`–`16.60`, and NOTHING may be minted in `§13`** — its
+2026-09-19 late.) **This lane's block was `16.31`–`16.60`**, and **NOTHING may be minted in `§13`** — its
 remaining window is `13.990`–`13.993` and `13.995`–`13.999`, and it is not this lane's to spend. The old
 `13.988`–`13.999` block is **retired**. `13.988` (E) and `13.989` (the description, merged in `#544`) were
 spent while it was valid; **this task's id was renumbered to `16.31`** in the two test files, and its
 catalogue section was LIFTED OUT of `test-cases/13-second-wave-board-actions.md` — see § 10.
+
+> **⚠ THAT BLOCK WAS REALLOCATED THE SAME DAY: it is now `16.41`–`16.60`** (exec 1 took `16.32`–`16.40`
+> for `/v1/search`). The paragraph above is kept as written because it is the record of what changed then —
+> **the block it names is not current.** Read the top block's § 3 before minting anything.
 
 **✅ AND THE HELD ENTRY HAS SINCE LANDED** — `test-cases/16-remaining-doors.md` came in with **#548**, the
 branch was rebased onto the new `main`, and the 96-line section is now a section of that file, written as
