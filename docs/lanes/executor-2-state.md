@@ -1,4 +1,104 @@
-## ▲ TOP BLOCK — **THE MANUAL'S THREE GAPS CLOSED; AND THE FOOTER IS BUILT BUT NOT SHIPPED, SO IT IS NOT DOCUMENTED.** (2026-09-20, ~03:3x IST)
+## ▲ TOP BLOCK — **THE FILTERS SHEET, DOCUMENTED FROM SOURCE; AND THE FAQ ANSWER THAT SAID IT DID NOT EXIST.** (2026-09-20, ~04:1x IST)
+
+### § 1 — WHERE TO FIND IT
+
+- **Dispatch: the controller's Filters-sheet paste**, restart-delivered. Base named as `main` = `634696aa`.
+- **Branch `exec2/filters-doc`**, cut from `634696aa`, **rebased onto `e643715d`** — `main` moved twice
+  under it (`#572`, then `#574`). **HEAD `a67cb7cd`**: `15e607c8` (the documentation) + `a67cb7cd` (the
+  fix round, three defects the reviewer found). **Do not carry the ahead-count forward** — count it:
+  `/usr/bin/git rev-list --count origin/main..HEAD`.
+- **The PR opens as the last step of this dispatch.** If you are reading this from `main`, settle it in
+  one call: `gh pr list --state all --head exec2/filters-doc`.
+
+### § 2 — ANCHORS, RECOUNTED AT `a67cb7cd` (not carried forward)
+
+| anchor | value |
+|---|---|
+| `git merge-base origin/main HEAD` | `e643715d` |
+| ahead / behind `origin/main` | **2 / 0** |
+| tree | **clean** |
+| `pnpm turbo run build` | **11/11, exit 0** |
+| `pnpm turbo run test` | **17/17** — 154 files, **1620 passed / 5 skipped** |
+| `pnpm turbo run typecheck` | **17/17, exit 0** |
+| `check:help` | **ok** — 2 documents, 29 sections, **229 entries** |
+| `check:tasks` / `check:citations` / `check:env` / `check:runbook` / `check:migrations` | **all exit 0** |
+
+**Every figure above was re-measured AFTER the rebase.** The first gate ran on the pre-rebase tree and is
+not evidence for this one — `#572` touched `ui.css`, `sheet.tsx`, `ticket-sheet.tsx`, `Features.md` and
+`test-cases/`. Diff at this head: `manual.md` **+51/−0** (pure insertion), `faq.md` **+17/−4**,
+`content.generated.ts` **+484/−2**.
+
+**The entry count 227 → 229 is +1 `###` and +1 FAQ entry — predicted before regenerating, then
+confirmed.** The fix round did NOT move it (prose inside existing entries), which is the evidence it
+added no entry.
+
+### § 3 — WHAT WAS WRITTEN, AND ONE PLACE THE DISPATCH'S SHORTHAND COULD MISLEAD
+
+`manual.md` §8 gains `### The Filters sheet`, placed after `### The one filter` and before
+`### Very large projects`. Why its own section and not an extension of `The one filter`: that section is
+written around the switch and warns twice that the switch is not the board; folding a six-control sheet
+into it would bury the warning and make the title a lie. The sheet's own facts are measured from
+`page.tsx` — six sections in order, one cycling button per value, no Apply, Clear all / Done / Escape /
+click-outside.
+
+⚠ **The dispatch points at `:393-412` as "the state it writes, including the four board-blind axes".** The
+state block can carry all four; the **SHEET sets one of them**, and the difference decides what the
+manual may say. `dueBefore`/`dueAfter`/`fields` have no control anywhere (`page.tsx:2683-2695` — its own
+docblock calls that a known, named gap). And `collaboratorIds` is applied by **no tab**: dropped from the
+board path (`:467`) and from `listFilterSpec` (`:636-637`), which the product discloses in its own
+sentence *"Not applied on the board: collaborator."* (`:2013`). The manual says so rather than describing
+a working control.
+
+### § 4 — THE REVIEWER PASS: 16 CLAIMS, 13 HELD, 3 WERE MINE
+
+One reviewer against a numbered claim list. All three defects were in the **new prose**, not in the
+source reading it was built from — which is the shape worth remembering.
+
+1. **The cycle is THREE clicks, not four.** `off -> include -> exclude -> off` (`filter-cycle.ts:21-25`).
+   The FAQ's parallel sentence already said "a third time"; the manual said "a fourth". Two shipped
+   documents disagreed about one mechanism and the manual was wrong.
+2. **Closed shows no chip on the Board.** `activeFilterChips` is built from bare `boardFilter`
+   (`:1250-1262`), which carries no `closed`, so the chip branch can never fire there; the Board
+   discloses it in the scope note instead, for a real reason (closed tickets are dropped before a card
+   reaches `matchesBoardCard`). The manual had named only Collaborators as chip-less.
+3. **"Removing a chip … the same act" was false for every multi-value axis.** One chip per axis, and its
+   `onRemove` clears the whole axis (`board-search-scope.ts:132-155`).
+
+Two tightenings in the same round: the three sentences are the **roster's** alone (the board's State list
+renders `null` when empty, `:2892`), and "Clear all empties every filter" → "everything you have set".
+
+**The rebase was proved content-neutral by blob hash, not asserted:** all three files identical at
+`3a4d343e` (pre-rebase) and at `a67cb7cd`, and identical to the reviewed head `f1a3da34`. The one edit
+the rebase FORCED was in a commit message — `ui.css:4690-4692` → **`4775-4777`** — because `#572` added
+100 lines above it and `:4690` on main now lands on a CSS comment. Decided by what the line resolves to,
+not by the number looking plausible. `page.tsx`, `filter-cycle.ts`, `board-search-scope.ts` and
+`tri-state-choice.tsx` are blob-identical at base and at main, so every citation into them holds at both.
+
+### § 5 — TWO THINGS FOUND AND NOT FIXED, EACH WITH A NAMED OWNER
+
+1. **A stale citation.** `test-cases/13-board-prototype-port.md:1549` quotes the scope note as *"Filters
+   set here are not applied on this tab."* That copy **no longer exists anywhere in source** — it was
+   generalised to `Not applied on the {tabNoun}: {unapplied.join(', ')}.` (`page.tsx:2013`). A stale
+   citation still RESOLVES as prose, so the reader is misled rather than corrected. Outside this
+   dispatch's named file set (`manual.md`, `faq.md`, the generated copy). **Not fixed.**
+2. **A coverage gap.** The Calendar and Timeline **hide closed jobs by default**
+   (`closedDefaultInForce`, `:1369-1378`), and the manual's §8 Calendar/Timeline sections do not
+   describe it at all. Adjacent to this dispatch but not part of it — the subject here was the sheet.
+   **Not fixed.**
+
+Also measured, so the next sweep does not re-find it: `apps/web/test-results/*/error-context.md` still
+quote the OLD manual sentence (*"That is the only filter on the website…"*). Those are **gitignored
+Playwright artifacts**, `git check-ignore` confirms, not stale citations.
+
+### § 6 — A WARNING THAT TRAVELS WITH THIS FILE
+
+**Shas in the narrative blocks below are unreliable — several are ORPHANED by rebases, and `git cat-file`
+will still pass on them and lie.** Verify reachability with
+`git merge-base --is-ancestor <sha> origin/main`, never with `cat-file`.
+
+---
+
+## ▼ PREVIOUS BLOCK — **THE MANUAL'S THREE GAPS CLOSED; AND THE FOOTER IS BUILT BUT NOT SHIPPED, SO IT IS NOT DOCUMENTED.** (2026-09-20, ~03:3x IST)
 
 ### § 1 — WHERE TO FIND IT
 
