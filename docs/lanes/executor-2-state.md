@@ -121,10 +121,29 @@ edited** (all four citation sites in the `Features.md` roster entry; the roster 
 than being silently renumbered** — and one of them (`mappers.ts:438` naming the `role` read) was **already
 wrong before this change**: it pointed at the `id` read, so it was corrected rather than shifted.
 
-**Recorded rather than rewritten, with a named owner — the remaining pre-existing citations into
-`members/page.tsx`** (its insertion points are `+11` at `:357`, then `+1` each at `:419`, `:424`, `:427`,
-`:429`, `:472`, and `+44` at `:582`, so arithmetic alone is unsafe and each site needs content-verification).
-**Owner: the next change to `13-second-wave-roles-and-navigation.md`.**
+**⚠ THE DRIFT IS BIGGER THAN A FIRST ACCOUNT OF IT SAID, and this block is corrected rather than trimmed.**
+An earlier version of this paragraph named only `members/page.tsx`. Counted at the head: **~20 DISTINCT
+`view-types.ts` line numbers are cited repo-wide and every one at or above `:43` shifted by `+16`**, and the
+other four files moved too. **The anchor table, measured `1bfa6804` → the frozen head** — use it rather than
+arithmetic, because the insertions are not uniform:
+
+| file | symbol | old | new |
+|---|---|---|---|
+| `view-types.ts` | `export type Actor` | 3 | **3** (before the insert) |
+| `view-types.ts` | `export type RosterMember` | 44 | **60** |
+| `view-types.ts` | `assignee: Actor \| null` (1st) | 151 | **167** |
+| `view-types.ts` | `assignee: Actor \| null` (2nd) | 240 | **256** |
+| `mappers.ts` | `export function mapActors` | 433 | **436** |
+| `mappers.ts` | `role: asString` | 440 | **444** |
+| `read-models.ts` | `export type WorkspaceMember` | 560 | **560** (the type stayed) |
+| `builder-reads.ts` | `export async function readMembers` | 242 | **243** |
+| `builder-reads.ts` | the roster `SELECT` | 248 | **254** |
+| `builder-reads.ts` | the MEMBERS route's `no-guests` door | 647 | **664** |
+| `members/page.tsx` | insertion points | — | `+11` at `:357`, then `+1` at `:419`, `:424`, `:427`, `:429`, `:472`, and `+44` at `:582` |
+
+**Owner: the next change to any of the five files.** Deliberately NOT mechanically rewritten here: a blank
+`+16` applied to a citation that was already approximate (several were, and `mappers.ts:438` named the `id`
+read rather than the `role` one) produces a DIFFERENT wrong line and hides the original error.
 
 ### Rules that bind this branch
 - **Never `docker compose`** — the stack is served from the main folder and is the owner's.
