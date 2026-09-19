@@ -31,6 +31,56 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 SATURDAY 2026-09-19 ~21:2x IST — **CYCLE 11, HANDED OVER AT 81 % CONTEXT: 28 PRs MERGED, THE OWNER CLEARED THE WHOLE DOOR QUEUE, AND TWO LANES ARE WORKING.** `main` is `25c2a883` **plus this anchor**; **zero open PRs**; ledger **305 done / 3 todo** — unchanged, nothing was owed a flip.
+
+### If you are the next controller reading this: your position, in six lines
+1. **`main` = `25c2a883`.** **28 PRs merged this cycle**, every one with tree identity EXACT against a pre-merge prediction, API reachability, the seven checks at its landing tree, and a forced gate at the landing tree (batched for docs-only). **Read the gate and check status below before trusting the last two.**
+2. **EXEC 1** (`gisik:1` / `…-exec` / `exec/`) was **mid-handover on `A` (`isWorkspace` description, a MIGRATION)** and **fighting a RUN OF LOAD FLAKES** — *"three flakes in a row, all timeout, all in files my change cannot touch."* **Read its pane before assuming it is stuck.**
+3. **EXEC 2** (`gisik:2` / `…-exec2` / `exec2/`) was **on `E` (`isInvite` expiry)** and had hit **gate failures it was diagnosing**.
+4. **The queue is written, not dispatched**: `gisik-nokma-lanes/CTL-QUEUE-2026-09-19-door-builds.md` with **Addenda 1–5**. `docs/lanes/owner-holds.md` §1 holds **`THE DOORS, RULED`** — the authority for what may be built.
+5. **⛔ `§13` IS 24 IDS FROM FULL — `13.976`–`13.999` is the entire remaining window.** Blocks: **exec 1 `13.976`–`13.987`, exec 2 `13.988`–`13.999`.** When a block empties, **STOP AND ASK** — the next id is a section-structure decision and it is the owner's. **Keep the `{3}` width, and know that it truncates `13.9999`** (a pixel value this repo already names as a trap — it fooled the controller's own count today).
+6. **Rulings you cannot make:** anything touching the owner's environment, the owner-holds register, a new route/migration/disclosure the door table does not name, or **a product decision the CODE ITSELF refuses to take** (two turned up today; see below).
+
+### 📌 THE OWNER'S RULINGS THIS CYCLE — the newest authority, and most of them changed what may be built
+- **"lift all 5 and queue them up"** — the five held wire-gap screens. With the two already lifted, **all seven are lifted**; `owner-holds.md` §1 now says so.
+- **"go with all recommended"** on the **five doors** → **9 BUILD, 4 DECLINED, 1 NOT NOW, 2 already built, nothing held.** The DECLINEDs are decisions, not holds: **`isWorkspace` delete** (the prototype refuses its own button), **`isMcpAuth` scopes** (contradicts the shipped consent model), **`isMcpAuth` displayed code** (inverts who holds the code), **`isInvite` member count** (4c).
+- **`isInvite` inviter identity — "go with the recommend: name + role, authenticated."** Never on the session-less token page; **no email anywhere.**
+- **`isInvite` member count (4c) — DECLINED**, because `visibleMemberCount` returns **`null` for a guest**: building it would disclose more to an unauthenticated URL-holder than to a person inside the workspace.
+- **"assignee should not be read only"** and **"description should be editable"** — both BUILT or in flight; both were **props, not doors**.
+- **"need to build the real subtask section"**, **"Priority, Due, Type as first-class rows. yes do it"**, **"The footer: Delete and ‹ Previous / Next ›: build it."**
+- **Rename authority — "for the renaming permission: admin and owner only."** Gated server-side beside `workspace.settings_set`; the pinning test was **inverted on purpose**.
+- **"have the rename be there right on the header. the click to rename."** → the name itself is the control.
+- **"queue up the evidence upload"** — `require-evidence` is **authorable from a SHIPPED screen and unsatisfiable**, so an admin can permanently block every transition out of a state.
+- **`/v1/search` — "change the query so matchedIn is derivable."** A query change, **not a migration**: `proj_search` already stores the three columns separately and weights them A/B/C.
+
+### TWO PRODUCT DECISIONS THE CODE ITSELF REFUSED — and both were right to refuse
+1. **`workspace.renamed` asked nobody who may emit it.** `check-permission.ts:381-391` says verbatim that *"which roles may rename a workspace is a product decision no plan in this series has taken"*, and a test pinned the guest as ADMITTED. **The owner ruled admin + owner.**
+2. **The invite member count** — `visibleMemberCount` returns `null` for a guest, so building it would have inverted the product's own disclosure ladder. **The owner declined.**
+**Both refusals were written down in the source before anyone asked, and both turned out to be the right place to stop.** Expect more of them.
+
+### THE QUEUE — written in `CTL-QUEUE-2026-09-19-door-builds.md`, and read its Addenda
+- **exec 1, in order:** ~~blemishes~~ (landed `#537`) → **A** (`isWorkspace` description) → **`/v1/search` matchedIn** → **D** (`isMcpTokens` name) → **F** (subtasks section) → **G** (Priority/Due/Type).
+- **exec 2, in order:** **E** (`isInvite` expiry, in flight) → **description field** → **evidence upload** → **C** (`isInbox` bulk + Undo) → **H** (sheet footer) → **the inviter card**.
+- **Landed this cycle:** `isWorkspace` rename (`#531`), `isInbox` filter (`#536`), `#524` deny, `#525` member email, `#517` `13.304`, `#513` Task 8, `#521` the filter switch, `#529` sheet motion, `#530` assignee, `#534` inline rename, `#518` `13.693`, plus the register/ledger/queue docs.
+
+### ⛔ THE THING THAT BROKE, AND ITS ROOT CAUSE IS NOW FIXED STRUCTURALLY
+**`main` went RED on `check-case-ids`** — `13.962`–`13.964` each existed **twice**, because **two branches each minted from their own recount of "the next free id" and BOTH WERE GREEN ALONE.** Measured: the seven checks at the intermediate tree read `ok (2423 unique)`. **A tip is a reading and a reading expires.** Repaired by `#532` (first-landed keeps the id), and **fixed structurally by case-id BLOCKS** (queue Addendum 1). **The controller contributed to it**: it merged the second PR on a report of green checks *at the PR head*, which cannot see a merge-only collision.
+
+### INSTRUMENTS THAT LIED THIS CYCLE, ALL CAUGHT — carry these
+1. **A GATE REDDENED ON LOAD FIVE TIMES** — always a 30 s DB-suite timeout, always passing in isolation seconds later. **Re-run a red timeout ALONE before believing it.** One was real (the DB was down); four were contention.
+2. **A `merge-tree` PREDICTION CAN COME BACK EMPTY, AND AN EMPTY VARIABLE SILENTLY REMOVES THE CHECK.** The controller merged a PR whose prediction failed because it **retyped a sha and transposed two characters**. **Extract the sha into a variable, never retype it, and ABORT when a prediction is empty.**
+3. **A COUNT IS EVIDENCE ONLY ONCE ITS UNIT IS PINNED.** `git grep -c` counts prose cross-references; `check-case-ids` counts **id lines**. The controller's id count was measuring a different thing than the checker.
+4. **A FAKE THAT ACCEPTS LESS THAN THE CONTRACT IS A CHECK THAT CANNOT FAIL.** `FakeNotificationsGateway.list` took one parameter and *compiled* — so every case through it would have passed against a page that sent no filter.
+5. **A STALE BASE AND A REAL DEFECT PRODUCE AN IDENTICAL REPORT.** `check-case-ids` was `EXIT 1` on a branch and `EXIT 0` on main purely because the branch predated the renumber. **Run the check on `main` to separate them.**
+6. **`*.generated.ts` IS NOT A CALL SITE** — a built bundle contains its source's strings, so it acted as a "consumer" for nearly every event type until excluded.
+7. **THE ZSH UNQUOTED-VARIABLE TRAP FIRED THREE TIMES ACROSS TWO SESSIONS**, each producing a clean, well-formed zero that only a same-path control exposed.
+
+### THE NEXT CONTROLLER'S FIRST ACTIONS
+1. Read the executors' handoffs **from `main`** — `docs/lanes/executor-state.md` and `docs/lanes/executor-2-state.md` — and **capture both panes** (`gisik:1`, `gisik:2`). **exec 1 was fighting load flakes; exec 2 was diagnosing gate failures.** Neither may still be true.
+2. **Re-measure every anchor above** at the sha you report. Do not carry a gate composition, a task count or an open-PR count forward.
+3. **Confirm the test Postgres on `54329` is up by CONNECTING**, not by container status — a gate without it is red for a reason that is not the code.
+4. Then `gh pr list --state open`, and resume the loop.
+
 ## ✅ SATURDAY 2026-09-19 ~14:4x IST — **CYCLE 10 CLOSED: THE OWNER ANSWERED "yes to both", THE ENVIRONMENT WAS FIXED, ALL FOUR PRs ARE MERGED AND GATED, THE LAUNCHER IS REPAIRED, AND BOTH EXECUTORS ARE RELAUNCHED CLEAN.** `main` is `752ace59`; **zero open PRs**; ledger **304 done / 4 todo** — unchanged, nothing was owed a flip. **READ THE 🔴 ENTRY BELOW FOR THE DIAGNOSIS; READ THIS ONE FOR WHERE YOU ARE — the red entry's "not merged / gate red / parked" lines are all superseded here.**
 
 ### The control that settles the red, which is the part worth keeping
