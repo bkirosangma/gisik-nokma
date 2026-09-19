@@ -1,4 +1,62 @@
-## ▲ TOP BLOCK — **THE EVIDENCE UPLOAD: a rule that permanently blocked a move, closed by one missing prop.** (2026-09-19, ~23:2x IST)
+## ▲ TOP BLOCK — **C IS MEASURED AND BLOCKED ON A RULING. DO NOT START IT.** (2026-09-19, ~19:0x IST)
+
+**Position: NOTHING IN FLIGHT. `main` is `b9f80935`.** Both prior tasks landed: **#549** (the evidence
+upload) and **#554** (the id-guard docblock note, merged 13:20:58Z). **Zero open PRs from this lane.**
+
+### § 1 — ⛔ THE NEXT TASK IS `C` (`isInbox` bulk + Undo), AND IT IS STOPPED AT THE DOOR.
+
+**The controller: _«measure the door before building it; if it needs anything the row does not name, stop
+and ask.»_** The row runs out. **The full request is
+`gisik-nokma-lanes/EXEC2-RULING-REQUEST-2026-09-19-inbox-bulk-undo.md`** — read that file, not this
+paragraph. In one line:
+
+> `owner-holds.md:69` rules **"bulk + Undo"** BUILD with door **`NEW ROUTE` + CSRF registration** — ONE
+> route — and separately records that *"`markRead` is one-way, so there is no unread door at all and the
+> prototype's Undo has nothing behind it"*. **An honest Undo needs an unread WRITE, which is the thing the
+> row does not name.**
+
+**Measured, with the control in the same invocation:** the prototype's Undo is a pure CLIENT snapshot
+restore (`desktop.dc.html:3029`, `undo: { notifs: before }`) and the prototype has no server, so it proves
+nothing about ours. `notifications.read` is `NOT NULL DEFAULT false` (`store.ts:88`), so un-reading is one
+line. **And it does not exist:** swept for the write shape `SET read` → **exactly one hit** (`store.ts:145`,
+so the sweep can see writes); swept for `SET read = false` in any spelling → **none, exit 1.**
+
+**The ask is one route or two** — (A) one bounded BIDIRECTIONAL bulk route `{ ids, read }`, recommended
+because it honours the singular `NEW ROUTE` and makes the Undo honest; (B) bulk read only with the Undo a
+named absence; (C) two routes, which this repo refuses by name. **A needs the `ids` bound ruled** — an
+unbounded array is a write-amplification surface, and the prototype's Undo restores *every row the bulk
+action changed*. **If the answer includes a "mark all read" that is not id-scoped, that is a different
+route and it is being asked, not guessed.**
+
+**⚠ FOR WHOEVER BUILDS IT:** `HTTP_ORIGIN_PROTECTED_ROUTES` is an **exact-match `Set`**
+(`http-origin.ts:151` holds the strings, `:243` does `.has(input.routeUrl)`) — the docblock calls it
+"pattern-keyed" and it is not. The per-id write is registered at `:164`; **a new bulk route ships
+CSRF-unprotected until its exact `routeUrl` is added.**
+
+### § 2 — WHAT LANDED SINCE THE BLOCK BELOW.
+
+- **#549, the evidence upload** — the block below is its record, and it is complete.
+- **#554, the id-guard docblock note.** Three points written into `scripts/check-case-ids.mjs`: a
+  declaration is a bullet with the id at the head; table rows and prose are citations by design; headings
+  are deliberately not counted. **Docs only, proved twice** — zero non-comment changed lines, and stripping
+  comment lines from both blobs gives an identical SHA-256. The review round's finding worth carrying:
+  **two of my three examples were drawn from the wrong bucket** (`"see 13.585"` existed nowhere, and
+  `` `3.72`'s arms `` lives in a BULLET — the bucket the same paragraph says DOES declare), and two quotes
+  used an ASCII hyphen where the files carry an **en dash**. All quotes are now asserted verbatim.
+- **⚠ THE COUNTS ARE SETTLED, NOT HARMONISED.** The brief gave 53 table rows / 1,756 prose; I measured
+  **62 / 1,853** and wrote mine with the classification pinned. Independent review recomputed and got
+  exactly 62/1,853/51/2,490 from the docblock's pattern, and showed the brief's came from a
+  **word-boundary-anchored** pattern the docblock does not use.
+
+### § 3 — ID BUDGET.
+
+**`§13` IS CLOSED.** This lane's block is **`16.31`–`16.60`**; **`16.31` is spent** (the evidence upload).
+**Next free: `16.32`.** Write cases as `- **16.N** ✅ …` — id bolded ALONE, nothing between the asterisks
+and the digits — and confirm the `check-case-ids` count moved by exactly what you added.
+
+---
+
+## ▼ PREVIOUS BLOCK — **THE EVIDENCE UPLOAD: a rule that permanently blocked a move, closed by one missing prop.** (2026-09-19, ~23:2x IST)
 
 **Position: DONE, PUSHED, and the PR IS OPEN — `exec2/evidence-upload`, base `main`, since REBASED onto
 `d071c7c0` (see § 11).** **PR #549**; measure it rather than reading it here:
