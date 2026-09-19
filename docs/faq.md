@@ -50,8 +50,9 @@ address was mistyped. Where the Phone tab is offered, it can also mean you are o
 Email link. Check the address carefully either way.
 
 **The phone number box shows "+91…". Is this India-only?**
-That is just the example text in the box. But it points at something real: the whole product runs on
-Indian time for everybody. See [Time](#time-safety-and-the-state-of-it).
+Where the Phone tab is offered, that is just the example text in the box. But it points at something
+real: the whole product runs on Indian time for everybody. See
+[Time](#time-safety-and-the-state-of-it).
 
 **Does signing out really sign me out?**
 Yes, immediately — the next thing you try on that device is refused straight away, not "at some point
@@ -555,8 +556,8 @@ still reach it from the refusing screen. The Board keeps working throughout.
 Read the sentence — it tells you *which kind* of empty, in three different wordings: nothing in this
 month has a claimed date at all ("Undated work is absent, not estimated"); every claim in the month is
 behind a narrowing you set; or every claim in it belongs to a date field you switched off with the
-legend switch. Three situations, three sentences — and one of those sentences names the filter, the
-grouping and the legend together, because narrowings stack.
+legend switch. Three situations, three sentences — and one of those sentences names several narrowings at
+once rather than picking one, because narrowings stack.
 
 **A job's start date is after its due date and the calendar looks odd.**
 It is showing you the contradiction rather than quietly fixing it — two separate markers and no bar

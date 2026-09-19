@@ -390,15 +390,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "There are two more buttons, under "
-                  },
-                  {
-                    "kind": "bold",
-                    "text": "Or continue with"
-                  },
-                  {
-                    "kind": "text",
-                    "text": ":"
+                    "text": "Below the email box there are two more buttons:"
                   }
                 ]
               },
@@ -489,7 +481,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — §0, item 1."
+                    "text": " — see "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "Before you start"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", item 1."
                   }
                 ]
               },
@@ -2995,7 +2995,7 @@ export const HELP_CONTENT: HelpContent = [
               },
               {
                 "kind": "text",
-                "text": ". Board is what you get by default."
+                "text": ". Board is what a project opens on the first time you look at it; after that it remembers the tab you were last on in that project and opens there."
               }
             ]
           }
@@ -3450,7 +3450,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " of empty in three different sentences: nothing in this month has a claimed date at all; every claim in the month is behind a narrowing you set; or every claim in it belongs to a date field you switched off in the legend. The middle one is a single sentence that names the filter, the grouping and the legend together, because narrowings stack — so it answers for more than one of them at once. Read the sentence — it is telling you something."
+                    "text": " of empty in three different sentences: nothing in this month has a claimed date at all; every claim in the month is behind a narrowing you set; or every claim in it belongs to a date field you switched off in the legend. The middle one is a single sentence that names several narrowings at once rather than picking one, because narrowings stack — so it stays true whichever of them is doing the hiding. Read the sentence — it is telling you something."
                   }
                 ]
               },
@@ -6814,7 +6814,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "That is just the example text in the box. But it points at something real: the whole product runs on Indian time for everybody. See "
+                    "text": "Where the Phone tab is offered, that is just the example text in the box. But it points at something real: the whole product runs on Indian time for everybody. See "
                   },
                   {
                     "kind": "link",
@@ -8803,7 +8803,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " of empty, in three different wordings: nothing in this month has a claimed date at all (\"Undated work is absent, not estimated\"); every claim in the month is behind a narrowing you set; or every claim in it belongs to a date field you switched off with the legend switch. Three situations, three sentences — and one of those sentences names the filter, the grouping and the legend together, because narrowings stack."
+                    "text": " of empty, in three different wordings: nothing in this month has a claimed date at all (\"Undated work is absent, not estimated\"); every claim in the month is behind a narrowing you set; or every claim in it belongs to a date field you switched off with the legend switch. Three situations, three sentences — and one of those sentences names several narrowings at once rather than picking one, because narrowings stack."
                   }
                 ]
               }

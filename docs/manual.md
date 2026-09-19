@@ -72,7 +72,7 @@ almost certainly a one-time code.
 
 ### The other two ways that work
 
-There are two more buttons, under **Or continue with**:
+Below the email box there are two more buttons:
 
 - **Continue with Google** — the obvious choice if your business email is already on Google.
 - **Sign in with a passkey** — this is the fingerprint or face unlock your phone or laptop already
@@ -88,7 +88,8 @@ number there and press **Send code** and no code will arrive: the product answer
 sign-in is by email. Nothing is broken on your end and there is nothing to wait for.
 
 It is worth knowing because it is the tab such a page opens on, so it is the very first thing a new
-person tries. **This deployment does not configure SMS, so the tab is not offered at all** — §0, item 1.
+person tries. **This deployment does not configure SMS, so the tab is not offered at all** — see *Before
+you start*, item 1.
 
 > **Treat your sign-in link like a password.** Anyone who has that link can get into your account.
 > Do not forward it and do not paste it into a group chat. The same goes for invitation links (§4).
@@ -619,8 +620,9 @@ product guessing, and it tells you it is stranded.
 
 ## §8 — Looking at the work
 
-A project has five tabs: **Backlog**, **Board**, **List**, **Calendar** and **Timeline**. Board is what
-you get by default.
+A project has five tabs: **Backlog**, **Board**, **List**, **Calendar** and **Timeline**. Board is what a
+project opens on the first time you look at it; after that it remembers the tab you were last on in that
+project and opens there.
 
 ### Backlog
 
@@ -705,8 +707,8 @@ touched it* are the same setting here; that is why the chip exists at all.
 **If the calendar looks empty**, it tells you *which kind* of empty in three different sentences:
 nothing in this month has a claimed date at all; every claim in the month is behind a narrowing you
 set; or every claim in it belongs to a date field you switched off in the legend. The middle one is a
-single sentence that names the filter, the grouping and the legend together, because narrowings stack —
-so it answers for more than one of them at once. Read the sentence — it is telling you something.
+single sentence that names several narrowings at once rather than picking one, because narrowings stack —
+so it stays true whichever of them is doing the hiding. Read the sentence — it is telling you something.
 
 **And this is the one empty month the sentences above get wrong.** When hiding closed jobs is the only
 thing that emptied the month, the calendar still says *"No claimed dates fall in this month"* — which is
