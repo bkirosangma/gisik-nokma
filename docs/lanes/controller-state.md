@@ -31,6 +31,59 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 SUNDAY 2026-09-20 ~03:0x IST — **CYCLE 16: ONE PR MERGED AND GATED AT ITS LANDING TREE, BOTH LANES RESTARTED OR UNBLOCKED AND WORKING, AND TWO FINDINGS FOR THE OWNER.** `main` is `4de03f03`; **zero open PRs**; ledger **306 done / 2 todo** — unchanged, **nothing was owed a flip** (the one PR was docs-only).
+
+### Position — read this instead of the older tables, which this supersedes
+| lane | task | status |
+|---|---|---|
+| exec 2 | **the manual's listed gaps** (`manual.md:738`, `:1073`, + subtask/footer/bulk coverage) | **IN FLIGHT** — `exec2/manual-gaps`, restarted this cycle, Ctx **6 %** |
+| exec 1 | **sheet prototype parity** — the headline: "make our build like the prototype" | **IN FLIGHT** — `exec/sheet-prototype-parity` @ `8d37a8e3`, **LOCAL ONLY, NOT PUSHED**; unblocked this cycle (below) |
+| exec 1 | **`hig-per-screen/3b`** (Members states) | **QUEUED** behind parity on `exec/members-states` @ `b4664bd4` |
+| exec 2 | **door `H`'s `Delete` half** | ⛔ **STILL HELD — the owner's ruling request is UNANSWERED** (cycle 15's) |
+**`main` = `4de03f03955bcd2611f3ac396553d9e06a5c2aaa`.** The owner is asleep; the standing order *"until everything finishes, you shouldnt stop"* is in force and the loop is running.
+
+### THE MERGE — `#570`, and this cycle's only one
+| reading | value |
+|---|---|
+| PR head (frozen at the gate) | **`7270bba4`** — re-read immediately before the merge, **unchanged**; had it moved, the gate would not have transferred |
+| `merge-tree --write-tree` prediction | **`0363ba00`**, **exit 0, empty stderr** — no collision, so cycle 15's new shared-handoff rule did not fire |
+| merged as | **`4de03f03`** (parents `62787290`, `7270bba4`); **`gh pr merge --merge` exit 0 — and the exit status is NOT the evidence**: verified by API (`state: MERGED`) and by `merge-base --is-ancestor` |
+| **tree identity** | **EXACT** — the merge commit's tree *is* `0363ba00` |
+| **forced gate at the landing tree** | **`EXIT=0` · `Tasks: 33 successful, 33 total` · `Cached: 0` · `1m54.475s` · `NODE=v22.22.2` · `Unsupported engine` 0 · no orphaned vitest workers** |
+| seven checks | `check:env` · `check:tasks` · `check:runbook` · `check:citations` · `check:help` · `check:migrations` · `check-case-ids` — **all raw 0**; `check-case-ids` **2490 unique ids, highest 16.44** |
+| **the control** | a verbatim duplicate of `10.1` inserted after `test-cases/10-workflow-builder.md:6` → **rc 1, naming `10.1: …:6, …:7`**; restored → **rc 0**. Baseline before planting was rc 0 on the same file — **the direction was watched in both directions through one path** |
+| drop check (no path filter) | **1 file — `docs/lanes/controller-state.md`** — and it is **main AHEAD**, not a loss: **all 4 of the PR's own files are byte-identical** (blob ids compared, 4/4) |
+| the drop check's control | `git diff --stat origin/main origin/main~3` → **6 files changed**, in the same invocation |
+
+**The landing tree was built and gated in `gisik-nokma-ctl`, never in the primary checkout** — see the stale-checkout instrument below.
+
+### ⚠ CI IS THE BILLING-BLOCKED SHAPE, AND IT IS NOT A RED — measured, then matched to the standing waiver
+Fetched at the PR head: **six check-runs read `failure` and every real job reads `skipped`.** Each failure's annotation is verbatim *"The job was not started because recent account payments have failed or your spending limit needs to be increased."* The jobs completed in **~3 seconds with `title: null` and `summary: null`** — **a check that never started, not a check that found something.** The record settles it: **the owner waived CI on 2026-09-06 and ruled it must not be re-asked**; it was **NOT treated as green and NOT re-asked.** **Do not re-derive this and do not re-ask it.**
+
+### THE FIXED-POINT RESTART OF EXEC 2 — done, and the launcher is the recorded technique
+Its PR merged, nothing in flight, its tree clean, its branch an ancestor of `main` — **the fixed point, taken.** Restarted via `/Users/kiro/my_projects/gisik-nokma-lanes/launch-exec2-2026-09-20.sh` (brief + blank line + dispatch, in ONE argument), **pasted as a 73-byte pointer** because the dispatch channel truncates long pastes. Verified running on **`deepseek-flash[1m]`, Ctx 6 %**, and it opened by **catching that the dispatch's own cited line numbers had drifted** (`731`→`738`, `1064`→`1073`) and measuring instead of trusting either — then confirming the drift predates `#570`.
+
+### EXEC 1 — unblocked by note, and the branch that exists on one machine only
+It settled `e2e-stack`'s attribution **by measurement, not argument**: the base run at `origin/main` fails **identically** — same six tests by name and line, same 6/2 split, same `ariaLabel` collapse (66 → 9). **Nothing in that run is its branch's.** It then held for a call rather than guessing. **The controller approved its option 2** (drive a browser by hand — Mailpit magic link + DevTools against `:3001`) with three requirements: **set `data-style="hig"` before ANY comparison** (the prototype is drawn in the flat language and the app defaults to `neo`), **be correct in all three styles**, and **compare against `design-system/interactive/desktop.dc.html`** — with `design-system/prototypes/TicketSheet.dc.html` named as the trap.
+**Two durability points it raised and the controller acted on:** its branch `exec/sheet-prototype-parity` @ `8d37a8e3` is **not on origin** (`ls-remote` empty — the work exists on one machine), and **`e2e-stack` writes a tracked file when it runs** (`non-text-contrast-roster.json`, `belowCount` 0→1), so anyone who runs it dirties their tree and a PR cut afterwards would carry a machine-written roster.
+
+### 📌 TWO FINDINGS PUT TO THE OWNER — neither is dispatched, and neither is the controller's to absorb
+1. **`e2e-stack` IS RED ON `main`** — six of eight specs fail before reaching the sheet (sign-in / the seeded board never renders), and **that suite is not in the turbo graph**, so **no gate can see it**. It is the instrument the parity task's own screenshot requirement depends on.
+2. **A REAL CONTRAST REGRESSION NOBODY HAS CLOSED** — `button.ticket-type-list__move` reads **1.41 against the 3:1 non-text floor** on `/settings/ticket-types`, while **`main`'s committed roster records `belowCount: 0`**. The committed roster and the live reading disagree, and the committed one is the one people trust.
+3. **And the standing one, unchanged and still unanswered: door `H`'s `Delete` half has no door** (cycle 15) — the ticket vocabulary has no removal event (controlled sweep: `ticket.deleted`/`removed`/`archived` → **0**, against `ticket.closed` → **110**). Request: `gisik-nokma-lanes/EXEC2-RULING-REQUEST-2026-09-20-h-delete-door.md`.
+
+### INSTRUMENTS THAT LIED THIS CYCLE, ALL CAUGHT — carry these
+1. **A COMPARISON THAT PRINTED "MISMATCH" FOR TWO EQUAL NUMBERS.** `[ "$comp" = "$((bs + ds + 2))" ]` compared `printf`-padded `wc -c` strings, so `36568` did not equal `36568`. **Arithmetic compares as numbers; strings compare as bytes — and a padded number is not the number.** The composition was complete (36568 = 36568, **0 bytes lost**).
+2. **A COMPLETE DISPATCH THAT LOOKED TRUNCATED.** The relaunched pane rendered the composed argument with **`──── (421 lines hidden) ────`** and resumed **mid-word** (`anual.md:731`), which is the exact signature of the recorded truncation. **It was the TUI collapsing a long paste for display.** Settled by measuring **the composed argument itself** — its byte count, and that it contains the brief's first line, the dispatch's header AND its last line — **not by reading the pane.** **A pane is a rendering, not the buffer.**
+3. **A MEASUREMENT TAKEN FROM A STALE CHECKOUT.** `node scripts/check-case-ids.mjs` run from **the primary checkout** (still `416ee1ff`) reports **2483 unique, highest 16.37**; at `origin/main` (`4de03f03`) it is **2490, highest 16.44**. **The same command, two answers, and both are honest — the number is a claim about the tree you are standing in.** **Run every measurement from a worktree at the sha you are reporting.** ⚠ **The owner's primary checkout is now many commits behind; they should `git pull`.**
+
+### WHAT THE NEXT CONTROLLER SHOULD DO FIRST
+1. **Re-measure every anchor above at the sha you report.** Do not carry a gate composition, a task count or an open-PR count forward.
+2. **Do NOT run measurements from the primary checkout** — it is behind. `gisik-nokma-ctl` at a branch off `origin/main` is the tree to use.
+3. **Confirm the test Postgres on `54329` is up by CONNECTING**, not by container status. `sweep-test-dbs.sh` **now discovers the container correctly** (`sweep: targeting 'gisik-nokma-postgres-1'`, `0 gisik-test_* present`) — the cycle-12 debt is paid.
+4. **Both lanes are working.** Capture `gisik:1` and `gisik:2` before assuming anything is stuck; read the handoffs from the branches carrying their latest work, and remember **exec 1's branch is not on origin yet**.
+5. **Then `gh pr list --state open`, and resume the loop.** Expect **one PR per lane at a time** — and expect the SECOND to need a rebase on a shared file (`docs/lanes/executor-2-state.md`, `test-cases/16-remaining-doors.md`).
+
 ## 🔄 SUNDAY 2026-09-20 ~02:4x IST — **CYCLE 15: SEVEN PRs MERGED OVERNIGHT, ZERO OPEN, TWO LANES WORKING, AND ONE NEW RULING REQUEST FOR THE MORNING.** `main` is `57a7593f`.
 
 ### Position — read this instead of the older tables, which this supersedes
