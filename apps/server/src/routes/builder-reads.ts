@@ -6,6 +6,7 @@ import type {
   MigrationOutcome,
   PublishedWorkflowDef,
   StateOccupancyResponse,
+  TicketCountsResponse,
   TicketTypeDef,
   TicketTypeListResponse,
   TypePopulationResponse,
@@ -415,6 +416,67 @@ export async function readTypePopulation(
 }
 
 /**
+ * How many tickets of EACH type this workspace holds — the type's own count,
+ * with no workflow predicate. `readTypePopulation`'s sibling is the pinned read
+ * above; `TicketCountsResponse`'s docblock is where the two questions are told
+ * apart and why this one is a separate read rather than a widened route.
+ *
+ * ## Why the join, and why `count(k.ticket_id)` rather than `count(*)`
+ *
+ * The left side is `proj_ticket_types`, so a type the workspace DEFINES but has
+ * never given a ticket still appears — with 0. That is the same contract
+ * `readStateOccupancy` keeps for empty states, and for the same reason: a screen
+ * that silently omitted an empty type would invite an author to delete one that
+ * turns out to hold work tomorrow.
+ *
+ * **`count(*)` would be wrong here and wrong in the direction that hides
+ * itself**: on a LEFT JOIN, a type with no tickets has one row — the left row —
+ * so `count(*)` answers 1 for every empty type. Exactly one case in
+ * `test/routes/builder-reads.test.ts` distinguishes the two, by seeding a type
+ * with no tickets and asserting 0; without that fixture the two spellings are
+ * indistinguishable, which is why the fixture exists rather than the assertion
+ * being left to the reader.
+ *
+ * The `k.workspace_id = t.workspace_id` term repeats the predicate rather than
+ * leaning on `t.workspace_id = $1`: `proj_tickets`' primary key is `ticket_id`
+ * alone, so nothing about that table's shape scopes a count on its own, and a
+ * join is where a missing correlation stops being obvious.
+ *
+ * `::int` on the count, as above: `createPool` installs an int8 parser, but
+ * saying it in the SQL means the JSON carries a number no matter which pool
+ * this runs on.
+ *
+ * ## Performance: UNMEASURED, and named here rather than left to be assumed
+ *
+ * **No index on `proj_tickets` leads with `(workspace_id, type_id)`** — the pair
+ * this read filters on. The table's three indexes are `(workspace_id, parent_id)`
+ * and `(workspace_id, project_id)` (`1787961800000_proj-tickets.sql:91-92`) and a
+ * partial `(workspace_id, project_id) WHERE closed_at IS NULL`
+ * (`1789100000000_proj-tickets-closed.sql:11`), and the absence of a third
+ * leading on `workflow_id` is itself a **recorded decision** at `:66-71` of the
+ * first migration. So this scans one workspace's ticket rows and joins.
+ *
+ * **No row count and no `EXPLAIN` was taken**, so "fast enough" is asserted
+ * nowhere and nothing here depends on it being true. The shape is bounded by one
+ * workspace and the screen that calls it is an admin settings page that renders
+ * every type once; if a real workspace ever says otherwise, **the fix is an index
+ * and not a new projection**, which is the same conclusion the query-vs-projection
+ * question reached from the other direction.
+ */
+export async function readTicketCounts(db: Queryable, workspaceId: string): Promise<Record<string, number>> {
+  const { rows } = await db.query<{ type_id: string; count: number }>(
+    `SELECT t.type_id, count(k.ticket_id)::int AS count
+       FROM proj_ticket_types t
+       LEFT JOIN proj_tickets k
+         ON k.workspace_id = t.workspace_id AND k.type_id = t.type_id
+      WHERE t.workspace_id = $1
+      GROUP BY t.type_id`,
+    [workspaceId],
+  );
+  return Object.fromEntries(rows.map((row) => [row.type_id, row.count]));
+}
+
+/**
  * The bulk rebind's body. Parsed HERE with zod rather than declared as a
  * Fastify body schema, and the difference is the door.
  *
@@ -649,6 +711,52 @@ export function registerBuilderReadRoutes(
         typeId,
         workflowId,
         count: await readTypePopulation(deps.pool, workspaceId, typeId, workflowId),
+      };
+      return body;
+    },
+  );
+
+  /**
+   * How many tickets of each type the workspace holds — the read behind the
+   * ticket-type list's `"N tickets"` meta segment.
+   *
+   * ## Why a route beside `population` rather than a widened one
+   *
+   * `population` above answers "how many of this type are pinned to one
+   * workflow". Its `workflowId` is optional in the TYPE and required at runtime
+   * — `:619`/`:631-633` before this change — and the tempting shortcut was to
+   * let an absent one mean "the whole workspace". **That was refused
+   * deliberately.** The two are genuinely different questions (a ticket pins
+   * the workflow it was created under, so the pinned number stops being the
+   * type's count the moment a rebind leaves tickets behind), and a route whose
+   * meaning depends on whether an argument was passed is one door answering two
+   * things — the defect this file refuses by name for the `Edit` button, read
+   * backwards. Widening would also have changed a shipped contract, since
+   * `TypePopulationResponse.workflowId` is required.
+   *
+   * ## No id to resolve, so no 404 to earn
+   *
+   * Unlike its sibling, nothing here comes from the caller except the workspace
+   * — the type set is the workspace's own — so there is no actor-supplied id to
+   * resolve against the tenancy and no "a zero that looks like an answer" to
+   * collapse. A caller with no membership gets the same 404 as everywhere else
+   * on this surface, from the door.
+   */
+  app.get<{ Params: { workspaceId: string } }>(
+    '/v1/workspaces/:workspaceId/ticket-counts-by-type',
+    { preHandler: requireSession },
+    async (request, reply) => {
+      const { workspaceId } = request.params;
+      // Admin-only, on state-occupancy's and population's exact terms and for
+      // their exact reason: the numbers are the whole workspace's, counted over
+      // tickets the caller may not see, so there is no per-viewer variant to
+      // serve instead. The door runs before anything is read.
+      if ((await door(request, workspaceId, 'admins-only')) === null) {
+        return reply.code(404).send(READ_NOT_FOUND_BODY);
+      }
+      const body: TicketCountsResponse = {
+        workspaceId,
+        counts: await readTicketCounts(deps.pool, workspaceId),
       };
       return body;
     },

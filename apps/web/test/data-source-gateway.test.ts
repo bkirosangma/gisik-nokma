@@ -203,17 +203,41 @@ describe('the three reads with no DataSource member at all go over the shipped r
       '/v1/workspaces/ws/ticket-types/task/population?workflowId=wf-flow',
     ]);
   });
+
+  /**
+   * 13.955 — a DIFFERENT route, not the pinned read with its query string
+   * dropped. That distinction is the whole of Task 8: the pinned route answers
+   * **400** without `workflowId`, on purpose, because the two are different
+   * questions. The path assertion below is what pins it — a `getTicketCountsByType`
+   * implemented by calling `…/population` would send either a query string or a
+   * 400, and neither matches.
+   */
+  it('13.955 getTicketCountsByType asks the counts route with no id but the workspace, and unwraps .counts', async () => {
+    const { http, seen } = scriptedHttp({
+      'GET /v1/workspaces/ws/ticket-counts-by-type': {
+        status: 200,
+        body: { workspaceId: 'ws', counts: { task: 5, chore: 0 } },
+      },
+    });
+    const gateway = createWebAuthoringGateway({ dataSource: fakeDataSource(), http });
+    // `chore: 0` survives: a type that holds nothing is a real answer, and an
+    // adapter that dropped zeroes would hide the ticket-less type the server
+    // went out of its way to include.
+    expect(await gateway.getTicketCountsByType('ws')).toEqual({ task: 5, chore: 0 });
+    expect(seen.map((call) => call.path)).toEqual(['/v1/workspaces/ws/ticket-counts-by-type']);
+  });
 });
 
 /**
  * The sharpest cases in this file. `createHttpClient` answers `null` for a 404
- * on a GET, and the three reads above have obvious-looking empties to fall back
- * on: `[]`, `{}` and `0`. Every one of them would be this adapter inventing an
- * answer the server declined to give — "this workspace has no workflows", "no
- * ticket is in any state", "nothing is pinned to this workflow" — at the moment
- * a mapping dialog is deciding there is nothing to move. `gateway.ts` forbids
- * exactly this by name for both counts: "it may reject, and the caller says
- * 'unavailable' rather than guessing a number".
+ * on a GET, and the reads above have obvious-looking empties to fall back on:
+ * `[]`, `{}`, `0`, and `{}` again. Every one of them would be this adapter
+ * inventing an answer the server declined to give — "this workspace has no
+ * workflows", "no ticket is in any state", "nothing is pinned to this workflow",
+ * "no type holds anything" — at the moment a mapping dialog is deciding there is
+ * nothing to move, or an admin is reading a count. `gateway.ts` forbids exactly
+ * this by name for every one of these counts: "it may reject, and the caller
+ * says 'unavailable' rather than guessing a number".
  */
 describe('a 404 is a refusal to answer, and never an empty answer', () => {
   it.each([
@@ -227,6 +251,11 @@ describe('a 404 is a refusal to answer, and never an empty answer', () => {
       'getTypeWorkflowPopulation',
       'GET /v1/workspaces/ws/ticket-types/task/population?workflowId=wf-flow',
       (g: ReturnType<typeof createWebAuthoringGateway>) => g.getTypeWorkflowPopulation('ws', 'task', 'wf-flow'),
+    ],
+    [
+      'getTicketCountsByType',
+      'GET /v1/workspaces/ws/ticket-counts-by-type',
+      (g: ReturnType<typeof createWebAuthoringGateway>) => g.getTicketCountsByType('ws'),
     ],
   ])('%s rejects rather than answering an empty', async (_name, route, call) => {
     const { http } = scriptedHttp({ [route]: { status: 404, body: {} } });

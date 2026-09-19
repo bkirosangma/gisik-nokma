@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { BUILTIN_TICKET_TYPE_SEEDS, type PublishedWorkflowDef, type TicketTypeDef } from '@gisik-nokma/domain';
 import { Button, Card } from '@gisik-nokma/ui';
 import { buildTicketTypeDefinedEvent } from '../events.js';
@@ -12,24 +12,29 @@ import { TypeIcon } from './icons.js';
  * the type list (prototype `design-system/interactive/desktop.dc.html:817-839`,
  * blob `6d7b67c0a52c` at commit `227434a5`).
  *
- * ## WHAT IS DRAWN, and the three things that are NOT
+ * ## WHAT IS DRAWN, and the two things that are NOT
  *
  * The prototype draws a header (an h2, a summary line and a `"New type"` action
  * over a card of rows), and each row as a flex line: a 34px rank tile, the name
  * and a meta line, an optional badge, two reorder controls and an `Edit` button.
- * **The header, the card, the rows, the meta line, the two reorder controls and
- * the `Built-in` badge are all drawn here. THREE elements are ABSENT, and not
- * one of them is an oversight** — two are rulings, one is lifted-and-queued, and each is
+ * **The header, the card, the rows, the meta line, the two reorder controls, the
+ * `"N tickets"` segment and the `Built-in` badge are all drawn here. TWO elements
+ * are ABSENT, and neither is an oversight** — both are owner rulings, and each is
  * recorded here so a reader comparing this screen to the prototype meets a
- * decision rather than a silence. (The count was FOUR until 2026-09-19, when the
- * owner lifted the hold on the reorder; a reader who remembers the earlier
- * number should read the ↑/↓ bullet below for what changed and why.)
+ * decision rather than a silence.
+ *
+ * (The number has moved twice, both on 2026-09-19, and a reader who remembers an
+ * earlier one should not go looking for a missing bullet: it was **FOUR** until
+ * the owner lifted the hold on the reorder, **THREE** once that shipped, and
+ * **TWO** once the count followed it the same day. The two entries below that
+ * describe BUILT work — the reorder and the count — are kept because each
+ * replaced a written hold, and the hold is what a reader will remember.)
  *
  * - **the `Edit` button — RULED: NOT BUILT** (owner, 2026-09-18). Row-as-door is
  *   a **pre-existing** owner ruling, quoted at the rule itself (`packages/ui/src/
  *   ui.css:1811-1812`, owner 2026-09-10: *"remove [Edit] and open on just
  *   clicking the entire card/row"*). The whole row is one
- *   `<button aria-label={\`Edit ${type.name}\`}>` (`:311-337`), so an `Edit` button
+ *   `<button aria-label={\`Edit ${type.name}\`}>` (`:387-416`), so an `Edit` button
  *   beside it would be a second door to the same place — not a port.
  * - **the `"Draft"` badge — RULED: NOT BUILT** (owner, 2026-09-18). A draft ticket
  *   type is not a state this product has, so `TicketTypeDef` gains no draft flag
@@ -69,25 +74,40 @@ import { TypeIcon } from './icons.js';
  *   One thing the prototype does not model, carried here: its rank is its **array
  *   index** (`rank: String(i + 1)`, `desktop.dc.html:3155`), while this product's is
  *   a **stored number that nothing enforces uniqueness on**.
- * - **the `"N tickets"` meta segment — LIFTED 2026-09-19 and QUEUED as Task 8, not built.**
- *   Two committed documents disagree about its status and both are quoted here rather
- *   than one of them being silently dropped: `docs/lanes/owner-holds.md` §1 reads
- *   *"`isTypes` | reorder and per-type counts | **LIFTED 2026-09-19 — both halves
- *   approved**"*, and its verbatim ruling table says *"per-type counts | **yes** |
- *   build it"* — so this is **not a hold**. The dispatch that built the reorder
- *   (`CTL-DISPATCH-2026-09-19-lifted-settings-tasks.md`) calls it *"still
- *   held-and-unbuilt"*, which the register contradicts. **Either way it is not in
- *   this change**, and a reader who needs the status should follow the register.
- *   Unlike the reorder, this one genuinely needs server surface: the only population read is
- *   `getTypeWorkflowPopulation(workspaceId, typeId, workflowId)`, **pinned to one
- *   workflow**, and the route behind it counts `WHERE workflow_id = $n`
- *   (`apps/server/src/routes/builder-reads.ts:408-414`). Every ticket pins the
- *   workflow it was created under, so that number stops being the type's count
- *   the moment a rebind leaves tickets behind — which is why the meta line names
- *   `rank N · N fields · <workflow name>` and no count at all, and why this
- *   screen's earlier note (`:115-122`) refused to print one.
- *   **If it needs a new projection rather than a query, it is a different size of
- *   task** (`docs/superpowers/plans/2026-09-18-settings-workflows-port.md:162`).
+ * - **the `"N tickets"` meta segment — BUILT 2026-09-19, the same day it was lifted.**
+ *   It is the prototype's own LAST meta item — `fields · wf · N tickets`, the count
+ *   after the workflow name (`desktop.dc.html:3156`) — so it goes last here too.
+ *
+ *   **The status this bullet used to carry is settled rather than restated.** It
+ *   quoted two documents that disagreed (this dispatch called the count *"still
+ *   held-and-unbuilt"*; `docs/lanes/owner-holds.md` §1's verbatim ruling table said
+ *   *"per-type counts | **yes** | build it"*). **The register is the authority on its
+ *   own holds and it said LIFTED, so the register was followed and the dispatch's
+ *   sentence was the error.** With the thing built, re-quoting the contradiction
+ *   would be keeping an argument about a decision that has been made.
+ *   **Where the number comes from.** `getTicketCountsByType(workspaceId)` — ONE call
+ *   for the whole list, answered by `GET /v1/workspaces/:id/ticket-counts-by-type`
+ *   (`apps/server/src/routes/builder-reads.ts`). **Not
+ *   `getTypeWorkflowPopulation`**, which answers *"how many are on THIS workflow"*:
+ *   a ticket pins the workflow it was created under, so that number stops being the
+ *   type's count the moment a re-point leaves tickets behind — the divergence this
+ *   package's editor screen exists to show. The pinned route was **not** widened to
+ *   answer both: a door whose meaning depends on whether an argument was passed is
+ *   one thing reached two ways.
+ *
+ *   The plan's own stop-and-ask was *"if the count turns out to need a new projection
+ *   rather than a query, stop and ask — that is a different size of task"*
+ *   (`docs/superpowers/plans/2026-09-18-settings-workflows-port.md:236` — **re-pointed
+ *   from `:162`, which this bullet cited until the plan's own Task 6+7 correction
+ *   merged as `cc4b84bf` moved the sentence. `:162` still RESOLVED; it is now a row of
+ *   the version-history table. A citation that resolves to the wrong thing misleads a
+ *   reader, which is worse than one that breaks.**). **The measurement was taken and
+ *   the answer is a query**: `proj_tickets` already carries `workspace_id` and
+ *   `type_id`, so the task did not grow.
+ *
+ *   A failed read renders `tickets unavailable`, never a `0`; while the read is in
+ *   flight the segment is absent rather than showing a number nobody has yet. Those
+ *   two states are cases `13.952`–`13.954`, not implementation details.
  *
  * ### The two deltas this change DOES close, and the one it does not
  *
@@ -120,15 +140,23 @@ export function TicketTypeListScreen(props: {
   onNew(): void;
 }) {
   const [types, setTypes] = useState<TicketTypeDef[] | null>(null);
-  // Workflow names for the meta line only — never a ticket count. There is no
-  // `countTicketsOfType(typeId)` on the gateway, and `getTypeWorkflowPopulation`
-  // answers "how many are on THIS workflow", which stops being the type's whole
-  // count the moment a rebind leaves tickets behind on a workflow it no longer
-  // names (the very divergence this package's editor screen exists to show).
-  // Showing a number here would be exactly the invented count `divergenceBody`
-  // in the editor screen refuses to print. A type-wide count is a separate, LIFTED item — queued as Task 8, not built here;
-  // see this file's docblock for the two documents that disagree about its status.
+  // Workflow names for the meta line.
   const [workflows, setWorkflows] = useState<PublishedWorkflowDef[] | null>(null);
+  /**
+   * Every type's OWN ticket count, or `'unavailable'`.
+   *
+   * Three states rather than two, and each one is a distinct claim: `null` is
+   * "not asked yet", the record is the answer, and `'unavailable'` is "the read
+   * failed". Collapsing the last into `{}` would render a confident `0 tickets`
+   * for every type on the strength of a request that never came back — the
+   * invented count `divergenceBody` in the editor screen refuses to print.
+   *
+   * **This is not `getTypeWorkflowPopulation`.** That answers "how many are on
+   * THIS workflow", and a ticket pins the workflow it was created under, so its
+   * number stops being the type's count the moment a re-point leaves tickets
+   * behind — the very divergence the editor screen exists to show.
+   */
+  const [ticketCounts, setTicketCounts] = useState<Record<string, number> | 'unavailable' | null>(null);
   // A refusal the CLIENT did not predict. The client predicts the one refusal it
   // knows about (`type.builtin-rank`, below, by disabling the arrow that would
   // provoke it), but the server is the authority and may refuse for a reason
@@ -149,6 +177,18 @@ export function TicketTypeListScreen(props: {
         if (cancelled) return;
         setTypes(loadedTypes);
         setWorkflows(loadedWorkflows);
+      },
+    );
+    // A SEPARATE promise, and its own rejection handler. Folded into the
+    // `Promise.all` above, a failed count would reject the whole tuple and
+    // leave the screen on "Loading ticket types…" for ever — the counts are
+    // one segment of one meta line and must not be able to take the list down.
+    void gateway.getTicketCountsByType(workspaceId).then(
+      (counts) => {
+        if (!cancelled) setTicketCounts(counts);
+      },
+      () => {
+        if (!cancelled) setTicketCounts('unavailable');
       },
     );
     return () => {
@@ -257,6 +297,36 @@ export function TicketTypeListScreen(props: {
       setReorderPending(false);
     }
   }
+  /**
+   * The `"N tickets"` meta segment, LAST in the line — which is where the
+   * prototype puts it (`desktop.dc.html:3156`, `fields · wf · N tickets`, after
+   * the workflow name), and the only ordering fact this segment has.
+   *
+   * `null` while the read is in flight, so the segment is ABSENT rather than
+   * showing a number nobody has yet — and rather than leaving the `·` before it
+   * dangling. A failure says `tickets unavailable` in words: `0` is a real
+   * answer for a type that genuinely holds nothing, and a screen that printed it
+   * for a request that never returned would be inventing it.
+   */
+  function ticketsSegment(typeId: string): ReactNode {
+    if (ticketCounts === null) return null;
+    let text: string;
+    if (ticketCounts === 'unavailable') {
+      text = 'tickets unavailable';
+    } else {
+      const held = ticketCounts[typeId] ?? 0;
+      text = `${held} ${held === 1 ? 'ticket' : 'tickets'}`;
+    }
+    return (
+      <>
+        <span className="ticket-type-list__meta-sep" aria-hidden="true">
+          ·
+        </span>
+        <span className="ticket-type-list__tickets">{text}</span>
+      </>
+    );
+  }
+
   return (
     <section className="ticket-type-list">
       <header className="ticket-type-list__header">
@@ -284,7 +354,7 @@ export function TicketTypeListScreen(props: {
             <li key={type.id}>
               {canAuthor ? (
                 // SIBLINGS of the row, never children: the whole row is one
-                // `<button>` (`:311-337`, the row-as-door ruling), and a button
+                // `<button>` (`:387-416`, the row-as-door ruling), and a button
                 // inside a button is an invalid tree jsdom renders without
                 // complaint — so the controls sit beside the door.
                 <span className="ticket-type-list__reorder">
@@ -339,6 +409,7 @@ export function TicketTypeListScreen(props: {
                     <span className="ticket-type-list__workflow">
                       {workflowNames.get(type.workflowId) ?? 'an unknown workflow'}
                     </span>
+                    {ticketsSegment(type.id)}
                   </span>
                 </span>
                 {builtinIds.has(type.id) ? <span className="ticket-type-list__badge">Built-in</span> : null}

@@ -20,6 +20,17 @@ export type FakeGatewaySeed = {
   occupancy?: Record<string, Record<string, number>>;
   /** typeId → workflowId → count of tickets PINNED to that workflow (decision 10) */
   typePopulation?: Record<string, Record<string, number>>;
+  /**
+   * typeId → count of tickets of that type ANYWHERE in the workspace (Task 8).
+   *
+   * Deliberately a SEPARATE field rather than something this fake derives by
+   * summing `typePopulation`. Deriving it would make the two reads agree by
+   * construction, and the whole point of the wide read is that they can
+   * disagree — a ticket pins the workflow it was created under, so a re-point
+   * leaves tickets behind. A fake that reconciled them could not express the
+   * bug, and a screen test could not tell which number the screen renders.
+   */
+  typeCounts?: Record<string, number>;
   /** Drained in order; when empty, submissions commit. */
   submitResults?: IngestResult[];
   /** Drained in order; when empty, a migration moves the whole seeded population. */
@@ -28,6 +39,8 @@ export type FakeGatewaySeed = {
   occupancyError?: boolean;
   /** Simulate the population read failing — the divergence notice's "unavailable" path. */
   typePopulationError?: boolean;
+  /** Simulate the wide type-count read failing — the list's "unavailable" path (Task 8). */
+  typeCountsError?: boolean;
 };
 
 /**
@@ -111,6 +124,10 @@ export function createFakeGateway(
     getTypeWorkflowPopulation: async (_workspaceId, typeId, workflowId) => {
       if (seed.typePopulationError === true) throw new Error('type population read failed (seeded)');
       return seed.typePopulation?.[typeId]?.[workflowId] ?? 0;
+    },
+    getTicketCountsByType: async (_workspaceId) => {
+      if (seed.typeCountsError === true) throw new Error('ticket count read failed (seeded)');
+      return seed.typeCounts ?? {};
     },
     migrateTypeToWorkflow: async (input) => {
       migrations.push(input);

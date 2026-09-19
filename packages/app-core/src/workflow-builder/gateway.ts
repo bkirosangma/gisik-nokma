@@ -108,6 +108,26 @@ export interface WorkflowAuthoringGateway {
    */
   getTypeWorkflowPopulation(workspaceId: string, typeId: string, workflowId: string): Promise<number>;
   /**
+   * How many tickets of EACH type this workspace holds — every type it DEFINES,
+   * zeroes included.
+   *
+   * **Not `getTypeWorkflowPopulation` with a wider label**, and that is the
+   * whole reason it is a second method rather than an optional argument on the
+   * first. That one answers *"pinned to one workflow"*, and a ticket pins the
+   * workflow it was created under, so its number stops being the type's count
+   * the moment a re-point leaves tickets behind — the divergence
+   * `ticket-type-list-screen.tsx`'s own docblock describes. This is the type's
+   * own count; the list's `"N tickets"` segment asks exactly this question.
+   *
+   * One call for every type rather than one per row: the list renders them all
+   * at once.
+   *
+   * Same honest degradation as `getStateOccupancy` and the pinned read above:
+   * it may reject, and the caller says "unavailable" rather than substituting a
+   * zero.
+   */
+  getTicketCountsByType(workspaceId: string): Promise<Record<string, number>>;
+  /**
    * The bulk affordance: one cross-workflow state map in, one
    * ticket.workflow_rebound per ticket out (emitted server-side — Plan 3 owns
    * the event and its refusals). Never a stateMapping: that is keyed inside

@@ -594,6 +594,41 @@ export type TypePopulationResponse = {
 };
 
 /**
+ * How many tickets of each type exist in the WORKSPACE — the type's own count,
+ * asked once for every type the workspace defines.
+ *
+ * ## Why this is not `TypePopulationResponse`, and why the route was not widened
+ *
+ * `TypePopulationResponse` answers *"how many of this type are ON THIS
+ * WORKFLOW"*, filtered on both, and it is a different question: a ticket pins
+ * the workflow it was CREATED under (owner decision 2026-08-27), so re-pointing
+ * the type's binding changes only what new tickets get. The pinned number
+ * therefore stops being the type's count the moment a rebind leaves tickets
+ * behind — which is exactly the divergence the builder's migration dialog
+ * exists to show. Answering both questions from one route, with the meaning
+ * depending on whether an argument was passed, would be one door serving two
+ * things — this repo's "second door" defect read backwards. Two questions, two
+ * reads.
+ *
+ * ## One read for every type, zeroes included
+ *
+ * The type list renders every row at once, so a per-type read would be N
+ * requests to paint one screen. And every type the workspace DEFINES appears,
+ * zeroes included, on `StateOccupancyResponse`'s stated terms: a screen that
+ * silently omitted an empty type would invite an author to delete one that
+ * turns out to hold work tomorrow. A caller can therefore tell "this type has
+ * no tickets" (0) from "this workspace does not define that type" (absent).
+ *
+ * Admin-only on `StateOccupancyResponse`'s exact terms and for its exact
+ * reason: the number is the whole workspace's, counted over tickets the caller
+ * may not see, so there is no per-viewer variant to serve instead.
+ */
+export type TicketCountsResponse = {
+  workspaceId: string;
+  counts: Record<string, number>;
+};
+
+/**
  * The bulk rebind's answer — the shape Plan 8's gateway already pinned, served
  * verbatim rather than renegotiated.
  *

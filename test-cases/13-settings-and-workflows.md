@@ -161,7 +161,8 @@ deliverable. Two facts, each read rather than inferred:
    version?)` (`packages/app-core/src/data-source.ts:146`) declares a version parameter; the ONLINE
    adapter sends it (`online-data-source.ts:277-281` builds `?version=`), the replica adapter answers one
    locally, and the server route `GET /v1/workspaces/:workspaceId/workflows/:workflowId?version=N` serves
-   any single version (`apps/server/src/routes/builder-reads.ts:517-546`, numeric branch at
+   any single version (`apps/server/src/routes/builder-reads.ts:579-608` — **re-pointed 2026-09-19 from
+   `:517-546`, which was correct until Task 8's two insertions in that file moved it by +62**; numeric branch at
    `apps/server/src/projections/workflows.ts:116-120`). `WorkflowAuthoringGateway`
    (`packages/app-core/src/workflow-builder/gateway.ts:56-94`) **is** version-BLIND — neither
    `listWorkflows` nor `getWorkflow(workspaceId, workflowId)` takes a version — but the adapter that
@@ -263,8 +264,10 @@ knowing before concluding one of them is stale.
   3 killed. Action label and summary sentence reverted: **1 each, their own site.**
 
   **TWO ITEMS THE DISPATCH ORDERED ARE NOT BUILT, AND BOTH ARE HOLDS RATHER THAN DECISIONS.**
-  **⚠ SUPERSEDED 2026-09-19 — THE OWNER LIFTED BOTH.** The reorder is now BUILT (cases `13.928`–`13.934`
-  in the section at the foot of this file); the per-type count remains unbuilt and is Task 8. **The
+  **⚠ SUPERSEDED 2026-09-19 — THE OWNER LIFTED BOTH, AND BOTH ARE NOW BUILT.** The reorder is BUILT (cases
+  `13.928`–`13.934`); the per-type count is BUILT TOO (cases `13.948`–`13.955`, `getTicketCountsByType` over
+  a new `ticket-counts-by-type` route) — this sentence said "remains unbuilt and is Task 8" until Task 8
+  shipped in the same change set that rewrote it. **The
   paragraph below, including its sentence that the measurement "does NOT lift it", is the record as it
   stood on 2026-09-18 — read it as history, not as state.** It is kept rather than rewritten because the
   measurement it carries is what made the reorder a render task rather than the wire task three planning
@@ -352,6 +355,42 @@ prose citations and it does not cover them. **They are recorded rather than rewr
 doc is a dated audit snapshot whose line numbers describe the tree at audit time, and because two other
 writers hold conflicting claims on those files. **Owner: the controller, at the next settings-cluster
 sweep.**
+
+**ADDED 2026-09-19 — the same sweep is due again, and Task 8 followed the same rule rather than inventing
+one.** That change is **net +71 lines** in the same screen file. **Only five of them sit above the
+`Edit`/`Draft`/reorder bullets** — the count bullet is appended after them and the component bodies are
+below — so the shift is **+5** in the bullet region and larger further down, which is what a reader
+re-pointing a citation actually needs to know. **Re-pointed, because both ends are in this change set:**
+`packages/app-core/test/ticket-types/ticket-types.test.tsx`'s `:38-54` → **`:43-59`**; `Features.md`'s
+`:130-145` → **`:331-351`** (already off — it named the loading effect rather than the
+`section > header > Card` shell — so it is a fix rather than a shift, marked as one where it stands); and
+**`:311-337` → `:387-416` at three sites** — `ticket-type-list-screen.tsx:37` and `:357`, and
+`ticket-types.test.tsx:322`, all citing the row-door `<button>`. **Those three are the review's finding,
+not the author's:** the range was already drifting (the button was `:317-345` when the reorder shipped)
+and this change moved it out of the region entirely, so a reader following it landed in `ticketsSegment`.
+**A same-file citation whose target has moved twice is the one no instrument catches** —
+`check-case-citations` reads prose citations not at all.
+**Recorded and NOT rewritten, same named owner — the controller:**
+`apps/web/src/workspace-settings-form.tsx:94` (`:130-145`), the plan's `:195` (`:35-56`) and its
+`:113`/`:234` (`:17-23`), all five delta-audit rows, and `docs/lanes/controller-state.md:53`.
+**One of those is not merely shifted but CLOSED:** the delta audit's row for the `"N tickets"` segment
+reads *"the only population call is pinned to ONE workflow … no `countTicketsOfType` exists and the pinned
+count would be wrong here"* — both halves are now false, because the wide read exists and the screen
+renders it. That row describes the tree at audit time, which is what the audit is for.
+
+**A SECOND FILE SHIFTED, AND THE SAME RULE APPLIES TO IT.** Task 8's server work inserted **+62 lines**
+into `apps/server/src/routes/builder-reads.ts` (`readTicketCounts` and its docblock, then the performance
+note added after the review). **Re-pointed, because this file is in the change set:** the version-route
+citation at `:517-546` → **`:579-608`**, verified by content — the route's `app.get` opening line and its
+closing `);`. **Recorded, owner: the controller** — every other citation INTO that file:
+`test-cases/03-foundation-ledger.md:109` (`:531`), `test-cases/07-api-realtime-search.md:450` and `:603`
+(`:444`, `:448`), `test-cases/13-second-wave-board-actions.md:23` and
+`13-second-wave-roles-and-navigation.md:119`/`:1259` (`:247`, `:247-252`),
+`docs/hig-reconciliation-audit.md:185`/`:186` (`:247`), and the `docs/lanes/executor-state.md` ledger
+tables. **Which of those are actually wrong is part of the record, because a list a reader cannot act on
+is not a finding: `:247` and `:408-414` sit BEFORE the insertion and are untouched and still correct**;
+**`:444`/`:448` were ALREADY wrong at `origin/main`** (`MIGRATION_RULES` was at `:441` there, not `:444`),
+so they are pre-existing drift rather than this change's; the rest are shifted by +62.
 
 ## Settings → Workspace restyle: the switch, the info icons, the Save row (executor 2, 2026-09-18) — cases `13.895`–`13.901`
 
@@ -775,8 +814,8 @@ duplicated:
 - **`isTypes` (reorder, per-type counts) and `isWorkflows` (a badge, a second action) are HELD, not
   outstanding** — `docs/lanes/owner-holds.md` §1. A hold is a decision, not a debt.
   **⚠ SUPERSEDED 2026-09-19 — the owner answered all four items, and none is a hold any more.** The
-  reorder is **BUILT** (cases `13.928`–`13.934`); the per-type count is **Task 8**, still to build and
-  needing new server surface; the `isWorkflows` **badge was DROPPED**; and its **second action was
+  reorder is **BUILT** (cases `13.928`–`13.934`); the per-type count is **BUILT** too (cases
+  `13.948`–`13.955`); the `isWorkflows` **badge was DROPPED**; and its **second action was
   LIFTED** together with the version-history screen (Task 3). The sentence above is kept as the position on
   2026-09-18.
 
@@ -1146,6 +1185,78 @@ control that silently does nothing is indistinguishable from one that worked.
   is disabled in *every* state because a built-in sits above it, so `waitFor` returned instantly and
   asserted nothing. It now waits on `Move Invoice down`, which is enabled before the click and disabled
   only while a swap is in flight. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+
+### Task 8 — the ticket-type list's `"N tickets"` count (2026-09-19)
+
+**The read is a QUERY and not a projection.** `proj_tickets` already carries `workspace_id` and `type_id`,
+and `proj_ticket_types` is keyed `(workspace_id, type_id)`, so a workspace-wide count needs nothing
+derived. **The route was NOT a widening of the pinned one:** `GET …/ticket-types/:typeId/population`
+answers 400 without a `workflowId` on purpose, and letting an absent one mean "the whole workspace" would
+be one door answering two questions — the "second door" defect read backwards.
+
+- ✅ **13.948 — the read answers each type's OWN count across the workspace, and the fixture makes the two
+  questions disagree.** Three separate pairs, because three different wrong implementations each pass
+  most of it:
+  **(1) the wide/pinned pair** — `chore` is bound to `wf-second` and its ticket sits there, so the type's
+  own count is 1 while the pinned read for `wf-errands` is **0**, with the pinned read's own 1 for
+  `wf-second` as the control that the first 0 is the workflow predicate speaking.
+  **(2) the cross-tenancy pair** — the neighbour workspace defines its OWN `task` and gives it a ticket,
+  so a read matching on `type_id` alone would count another tenant's work in this number; this workspace's
+  `task` reads **5 and not 6**, and 13.951 reads the neighbour's own 1.
+  **(3) the divergence** — `stray` is defined, given a ticket on `wf-errands`, then **re-pointed** at
+  `wf-second`, so its binding and its tickets disagree: wide = **1**, the type's bound workflow = **0**,
+  and where the ticket actually sits = **1**. This is the state the screen's docblock names as the moment
+  the bound-workflow number stops being the type's count.
+  (`apps/server/test/routes/builder-reads.test.ts`)
+- ✅ **13.949 — a type the workspace DEFINES but has never given a ticket reads 0, and `count(*)` would say
+  1.** The read LEFT JOINs from `proj_ticket_types` so empty types appear (the same contract
+  `state-occupancy` keeps for empty states), which makes `count(k.ticket_id)` load-bearing: on a LEFT JOIN
+  a ticket-less type has one row — the left row itself — so `count(*)` answers **1** for every empty type.
+  **That mutation is invisible without this fixture**, because the shared world has no ticket-less type;
+  the case seeds one, and carries the same-read control that a type holding work is not collapsed to the
+  same value. A type the workspace has never heard of is **absent** rather than 0.
+  (`apps/server/test/routes/builder-reads.test.ts`)
+- ✅ **13.950 — admin-only on the pinned read's exact terms.** Owner/admin read it; member, guest,
+  outsider and stranger each get the tenancy **404**, byte-identical to one another, so no role can tell
+  "not for you" from "nothing here"; an unauthenticated read is refused earlier, on the session gate.
+  (`apps/server/test/routes/builder-reads.test.ts`)
+- ✅ **13.951 — one workspace's counts never appear in another's.** The neighbour reads its OWN workspace
+  and gets its own `nb-task` 1 **and its own `task` 1** — the same type KEY this workspace uses — while
+  this workspace's answer holds neither of the neighbour's. Neither direction resolves across the tenancy,
+  and both 404; the entitled caller's 200 in their own workspace is the control.
+  (`apps/server/test/routes/builder-reads.test.ts`)
+- ✅ **13.952 — the segment renders the type's own count, not the pinned one, and renders it LAST.** The
+  seed makes the two reads **disagree on purpose** — `invoice-type` is pinned 7 tickets while its
+  workspace-wide count is 3 — because a screen rendering the pinned number passes any assertion written
+  against a seed where they agree. The rendered meta line contains `3 tickets`, contains no `7 tickets`,
+  and **ends** with the segment, which is the prototype's own order (`desktop.dc.html:3156`).
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+- ✅ **13.953 — a failed read says `tickets unavailable`, never a `0`, and the list still renders.** The
+  load-bearing assertion is the negative one: `0 tickets` is a REAL answer for a type that holds nothing,
+  so printing it for a request that never returned would be inventing a number — the same refusal the
+  editor screen's `divergenceBody` makes. The case also pins that the failure is not collateral: the list
+  renders and the rest of the meta line (`rank 5 · 0 fields`) is untouched, because the counts are read in
+  a **separate promise** from the list's own tuple.
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+- ✅ **13.954 — `1 ticket`, `0 tickets` for a type the read omits, and NO segment while the read is in
+  flight.** Three edges in one case because each is a different claim: the singular (the prototype writes
+  `used + " tickets"` and has no singular, and this screen already handles singular for fields); an omitted
+  type reading a real **0** rather than "unknown", since the type is in the list so the screen knows it
+  exists; and — the one a later refactor is most likely to delete — the segment being **absent** rather
+  than empty while the read is in flight, so no `·` dangles after a number nobody has yet. The in-flight
+  arm is driven by a gateway whose count read never settles.
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+- ✅ **13.955 — the adapter asks the COUNTS route, not the pinned one with a query string dropped.** The
+  assertion that carries it is the recorded path: `…/ticket-counts-by-type`, with **no workflowId at all**.
+  A `getTicketCountsByType` implemented over `…/population` sends either a query string or a 400 and
+  matches neither. It also pins that `counts` is passed through **whole** — a seeded `chore: 0` survives —
+  so an adapter filtering zeroes cannot hide the ticket-less type the server went out of its way to
+  include. The method is additionally in the file's own 404 table, so it is held to "a 404 is a refusal to
+  answer, never an empty" alongside the three reads that were there before it.
+  (`apps/web/test/data-source-gateway.test.ts`)
+
+**Ids `13.947` and `13.956`–`13.957` are left UNUSED** in this block — the case set above is what the
+feature needed, and the rule is that a minted id is never renumbered down.
 
 **Ids `13.936`–`13.937` are left UNUSED** in this block — no case was written for them, and the rule is
 that a minted id is never renumbered down.

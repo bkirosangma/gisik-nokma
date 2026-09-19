@@ -4,6 +4,7 @@ import { HttpError, type HttpClient } from '@gisik-nokma/app-core/online';
 import type {
   MemberListResponse,
   StateOccupancyResponse,
+  TicketCountsResponse,
   TypePopulationResponse,
   WorkflowListResponse,
 } from '@gisik-nokma/domain';
@@ -264,6 +265,24 @@ export function createWebAuthoringGateway(deps: WebAuthoringDeps): WorkflowAutho
         `?workflowId=${encodeURIComponent(workflowId)}`;
       const body = answered(await http.get(route), route) as TypePopulationResponse;
       return body.count;
+    },
+
+    /**
+     * `GET .../ticket-counts-by-type` — each type's own count across the
+     * WORKSPACE, every type the workspace defines, zeroes included.
+     *
+     * **Deliberately not the pinned read above with its query string dropped.**
+     * That route answers **400** without `workflowId`, on purpose: the two are
+     * genuinely different questions — a ticket pins the workflow it was created
+     * under, so the pinned number stops being the type's count the moment a
+     * re-point leaves tickets behind — and letting one door mean both would be
+     * one thing reached two ways. This route takes no id at all beyond the
+     * workspace. Admin-only, same terms as occupancy and population.
+     */
+    getTicketCountsByType: async (workspaceId) => {
+      const route = `${ws(workspaceId)}/ticket-counts-by-type`;
+      const body = answered(await http.get(route), route) as TicketCountsResponse;
+      return body.counts;
     },
 
     /**
