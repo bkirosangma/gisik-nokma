@@ -174,11 +174,25 @@ the gate would have stayed 33/33.*
   document must examine more than zero elements. *A sweep that stopped matching reports zero losses and
   is byte-for-byte indistinguishable from a page that lost nothing — the failure this file catalogues
   more than any other. Measured populations range from 48 elements on `/sign-in` to 999 on `/help`.*
-- **13.287** ✅ The signed-in twin, over the stack suite's five routes, with its own baseline file
+- **13.287** ✅ The signed-in twin, over the stack suite's routes, with its own baseline file
   because it is a different population. *It is not redundant with 13.285 and the numbers show why:
   `AppNav`, the view tabs, the board and every settings screen exist only behind a session, so the
-  signed-out ratchet is structurally blind to them — `/p/:projectId` alone carries 13 roles and 4
-  `aria-selected`, and the signed-out sweep sees none of it.*
+  signed-out ratchet is structurally blind to them — `/p/:projectId` alone carries 14 roles and 5
+  `aria-selected`, and the signed-out sweep sees none of it.* *(Both counts read 13 and 4 until
+  2026-09-20 and were stale: recounted against `e2e-stack/accessible-names-baseline.json`'s own
+  recorded values and re-measured on the live stack, which agree at 14 and 5.)*
+  **⚠ WHICH PAGE THIS CASE MEASURES WAS WRONG UNTIL 2026-09-20, and the repair is what gives the
+  numbers their meaning.** `/p/:projectId` resolved its project as the FIRST project link on
+  `/w/<id>` — a POSITION, not a project. The live dev database has held a second project since
+  2026-09-10 (`gggg`, created through the real web UI, 1 ticket) and it sorts ahead of the seeded
+  `Shop operations` (26 tickets), so the ratchet was measuring `gggg`'s board and reporting
+  `LOST ariaLabel: baseline 66, now 9`. Measured with the instrument: `gggg` reads
+  `{ariaLabel: 9, role: 9}`, `Shop operations` reads `{ariaLabel: 65, role: 14}` — `role` matching
+  the recorded `14` exactly is what identifies the page the baseline was taken on. The route now
+  names the seeded project and refuses to fall back to a neighbour (`e2e-stack/helpers/board.ts`);
+  **it reds, correctly, at `66 → 65`: one accessible name genuinely lost on the real board, not yet
+  attributed. Owner: whoever next touches the board's labelled controls.**
+
 
 > **What this gate deliberately does NOT do.** It counts; it does not read. A restyle that swaps one
 > accessible name for another of equal count passes here, and should — whether the new words are better

@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
+import { readWorkspaceId, seededProjectHref } from './helpers/board.js';
 import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
 import { sweepBorders } from './helpers/non-text-contrast.js';
 import {
@@ -98,12 +99,11 @@ test('the signed-in shell does not scroll sideways at 390px', async ({ page }) =
   // an id: the seed's ULIDs are not stable across a reseed, and a hardcoded id
   // would fail as a 404 that looks like a layout pass.
   await page.goto('/workspaces');
-  const workspaceLink = page.locator('a[href^="/w/"]').first();
-  await workspaceLink.waitFor({ timeout: 15_000 });
-  const href = await workspaceLink.getAttribute('href');
-  expect(href, 'no workspace link on /workspaces — the seed or the session is wrong').not.toBeNull();
-  const workspaceId = /^\/w\/([^/]+)/.exec(href ?? '')?.[1];
-  expect(workspaceId, `could not read a workspace id out of ${href}`).toBeDefined();
+  // `readWorkspaceId` carries the same "the seed or the session is wrong" refusal, and RETURNS a
+  // `string` — the inline version this replaces left the id `string | undefined`, which typechecks
+  // through a template literal and fails the moment it is passed to a typed function. Found by the
+  // gate, not by reading.
+  const workspaceId = await readWorkspaceId(page);
 
   await page.goto(`/w/${workspaceId}/my-work`, { waitUntil: 'networkidle' });
 
@@ -249,11 +249,11 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
   await signIn(page, OWNER_EMAIL);
 
   await page.goto('/workspaces');
-  const workspaceLink = page.locator('a[href^="/w/"]').first();
-  await workspaceLink.waitFor({ timeout: 15_000 });
-  const workspaceHref = await workspaceLink.getAttribute('href');
-  const workspaceId = /^\/w\/([^/]+)/.exec(workspaceHref ?? '')?.[1];
-  expect(workspaceId, `could not read a workspace id out of ${workspaceHref}`).toBeDefined();
+  // `readWorkspaceId` carries the same "could not read a workspace id" refusal and RETURNS a
+  // `string` — the inline version this replaces left the id `string | undefined`, which typechecks
+  // through a template literal and fails the moment it is passed to a typed function. Found by the
+  // gate, not by reading. It does not navigate, so the caller is already on `/workspaces`.
+  const workspaceId = await readWorkspaceId(page);
 
   /**
    * The board's id comes from the page, for the same reason the workspace's
@@ -296,15 +296,24 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
    * names ratchet note a few hundred lines below for the same caveat on the
    * same day's edits).
    */
-  await page.goto(`/w/${workspaceId}`, { waitUntil: 'networkidle' });
-  const projectLink = page.locator(`a[href^="/w/${workspaceId}/p/"]`).first();
-  await projectLink.waitFor({ timeout: 15_000 });
-  const projectHref = await projectLink.getAttribute('href');
-  expect(
-    projectHref,
-    'no project link reachable from /w/<id> — the seed or the session is wrong, and sweeping ' +
-      'without the board would report coverage of the page the finding was actually about',
-  ).not.toBeNull();
+  /*
+   * ⚠ `BY NAME, NOT BY POSITION` — the second half of the same defect.
+   *
+   * These two lines were `.first()` on the project links, which is a fact about the DATABASE rather
+   * than about the product: on `/w/<id>` the first link is whichever project sorts first. The live
+   * dev database has held a second project since 2026-09-10 (`gggg`, created through the real web
+   * UI, 1 ticket, 3 columns) and it sorts ahead of the seeded `Shop operations` (26 tickets, 8
+   * columns). MEASURED on the live stack with this suite's own `sweepAccessibleNames`:
+   * `gggg` reads `{ariaLabel: 9, role: 9}`, `Shop operations` reads `{ariaLabel: 65, role: 14}` — and
+   * the recorded baseline is `{ariaLabel: 66, role: 14}`, matching `Shop operations` on `role`
+   * exactly. **So every measurement keyed `/p/:projectId` since 2026-09-10 has been taken on the
+   * wrong board**, and the ratchet reported it as `LOST ariaLabel: baseline 66, now 9` — a
+   * catastrophic-sounding accessibility regression that was nothing of the kind.
+   *
+   * `helpers/board.ts` names the project and REFUSES to fall back to a neighbour, so a missing seed
+   * fails loudly instead of silently measuring a different board.
+   */
+  const projectHref = await seededProjectHref(page, workspaceId);
 
   /**
    * SIX ROUTES, AND THREE OF THEM ARE THE ONES THAT EARN THEIR KEEP.
@@ -418,7 +427,7 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
 
   const routes: { path: string; key: string; reach?: () => Promise<void> }[] = [
     { path: `/w/${workspaceId}/my-work`, key: 'stack-phone-390|/my-work' },
-    { path: projectHref ?? '', key: 'stack-phone-390|/p/:projectId' },
+    { path: projectHref, key: 'stack-phone-390|/p/:projectId' },
     { path: `/w/${workspaceId}/members`, key: 'stack-phone-390|/members' },
     {
       path: `/w/${workspaceId}/settings/ticket-types`,
@@ -865,25 +874,24 @@ test('records non-text contrast across the signed-in surface, with a positive co
   absorb('/workspaces', await sweepBorders(page));
   await assertSunkenNoBorderField('/workspaces');
 
-  const workspaceLink = page.locator('a[href^="/w/"]').first();
-  await workspaceLink.waitFor({ timeout: 15_000 });
-  const workspaceHref = await workspaceLink.getAttribute('href');
-  const workspaceId = /^\/w\/([^/]+)/.exec(workspaceHref ?? '')?.[1];
-  expect(workspaceId, `could not read a workspace id out of ${workspaceHref}`).toBeDefined();
+  // `readWorkspaceId` carries the same "could not read a workspace id" refusal and RETURNS a
+  // `string` — the inline version this replaces left the id `string | undefined`, which typechecks
+  // through a template literal and fails the moment it is passed to a typed function. Found by the
+  // gate, not by reading. It does not navigate, so the caller is already on `/workspaces`.
+  const workspaceId = await readWorkspaceId(page);
 
   // Round 19c moved the project links off `/workspaces` (its card is now one
   // door-link and nothing else) onto `/w/<id>`'s own "Open board" rows — see
-  // the longer version of this note on the accessible-name sweep above. NOT
-  // re-run against the real stack after this edit; same caveat as there.
-  await page.goto(`/w/${workspaceId}`, { waitUntil: 'networkidle' });
-  const projectLink = page.locator(`a[href^="/w/${workspaceId}/p/"]`).first();
-  await projectLink.waitFor({ timeout: 15_000 });
-  const projectHref = await projectLink.getAttribute('href');
-  expect(projectHref, 'no project link — the seed or the session is wrong').not.toBeNull();
+  // the longer version of this note on the accessible-name sweep above.
+  //
+  // By NAME, not by position — see the longer note on the accessible-name sweep above. `.first()`
+  // here swept `gggg` rather than the seeded board, so `/p/:projectId`'s contrast roster entry was a
+  // measurement of the wrong page. `seededProjectHref` navigates to `/w/<id>` itself.
+  const projectHref = await seededProjectHref(page, workspaceId);
 
   const routes = [
     { path: `/w/${workspaceId}/my-work`, key: '/my-work' },
-    { path: projectHref ?? '', key: '/p/:projectId' },
+    { path: projectHref, key: '/p/:projectId' },
     { path: `/w/${workspaceId}/members`, key: '/members' },
     { path: `/w/${workspaceId}/settings/ticket-types`, key: '/settings/ticket-types' },
     { path: `/w/${workspaceId}/settings/workflows`, key: '/settings/workflows' },

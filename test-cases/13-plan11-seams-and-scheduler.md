@@ -408,7 +408,7 @@ that carries this file.** The auth cases below are ordinary `vitest` server case
   the surface now exist; the BROWSER assertion does not. **What is served and witnessed:**
   `MyWorkResponse.shared` carries the tickets whose RESOLVED audience names the viewer
   (`explicitAudienceWhere`, exported from `read/visible-where.ts` rather than restated), a guest already
-  reaches `/v1/me/work` — 13.175 asserts that very link is visible to them — and the My Work page renders
+  reaches `/v1/me/work` — **this sentence cited 13.175 for that link and was corrected 2026-09-20: the citation had gone stale rather than the fact being wrong.** Round 19c made `AppNav` CONTEXTUAL, so on `/workspaces` — where no workspace is selected — it renders the always-tier items only and the guest has NO `My Work` link there; 13.175's present-sibling is now the workspace door link, measured live on the stack. The guest's `My Work` link does exist on `/w/<id>`, where a workspace IS selected, and **no spec asserts it — recorded as a gap rather than left as a citation resolving to a spec which no longer says it** — and the My Work page renders
   a "Shared with me" section for it. Witnessed by 7.260–7.265 at the route, 3.159 at the mapper and
   3.160/3.161 at the view, each with measured mutations, plus both integration doors
   (`client-contract`, `real-door-round-trip`) whose exact-shape assertions now name the key.
