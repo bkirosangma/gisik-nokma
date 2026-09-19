@@ -43,11 +43,11 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 > # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~10:1x IST. **THE FALSIFIED-CLAIM SWEEP IS BUILT, PROVEN
 > # COMMENTS-ONLY, AND GATED GREEN.** Branch **`exec/falsified-claim-sweep`**, cut from
-> # `origin/main` = **`3f37ffc4`** (the `#578` merge). **The CODE head is `95470afb`** — the sweep commit,
-> # which pushed before this one. An earlier draft of this block read *"the handoff commit sits ON TOP of
-> # the code head"* while the two were still one commit, and the split was made so that the sentence is
-> # true: a commit cannot name its own sha, so the block names the head beneath it, which is the reading
-> # that survives a restart.
+> # `origin/main` = **`3f37ffc4`** (the `#578` merge). **The CODE head is `45b657db`** — Round 2, on top of
+> # Round 1's `95470afb`; this handoff commit sits above both. An earlier draft read *"the handoff commit
+> # sits ON TOP of the code head"* while the two were still one commit, and the split was made so that the
+> # sentence is true: a commit cannot name its own sha, so the block names the head beneath it, which is
+> # the reading that survives a restart.
 >
 > ## THE DISPATCH, AND THE ONE THING IT GOT WRONG IN MY FAVOUR
 > The controller sent me to `apps/web/src/ticket-location.ts:26` — a docblock asserting
@@ -169,12 +169,14 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > label — **left, because changing it changes test code**, and named here rather than quietly kept.
 >
 > ## GATE — run at the code head, not transferred
-> `pnpm turbo run build test typecheck` → **EXIT 0 · 33/33 successful · 17 cached · 1m12.4s**, Node
-> **v22.22.2** (`pnpm exec node -v`; the `pnpm` binary resolves under a v24 nvm dir while the node it runs
-> is v22 — name the version, never the path). Server suite 154 files / 1620 passed / 5 skipped.
+> `pnpm turbo run build test typecheck` → **EXIT 0 · 33/33 successful · 17 cached · 1m12.4s** at Round 1
+> and **EXIT 0 · 33/33 · 17 cached · 1m10.7s** at Round 2 (`45b657db`), Node **v22.22.2**
+> (`pnpm exec node -v`; the `pnpm` binary resolves under a v24 nvm dir while the node it runs is v22 —
+> name the version, never the path). Server suite 154 files / 1620 passed / 5 skipped.
 > **`check:citations` EXIT 0** (ratchet holds exactly on every file) · **`check:tasks` EXIT 0** ·
-> **`check:case-ids` EXIT 0** with per-file id-line counts **SAME on both sides** (03: 125/125,
-> 07: 263/263, 12: 347/347) — the diff adds and removes no case-id line.
+> **`check:case-ids` EXIT 0** at Round 2 — `2494 unique ids, highest 16.82, 24 files scanned`, with
+> per-file id-line counts **SAME on both sides** (03: 125/125, 07: 263/263, 12: 347/347) — the branch
+> adds and removes no case-id line.
 > **⛔ THE FORCED GATE IS THE CONTROLLER'S.** 17 tasks were cached here; a `--force` run at the landing
 > tree is the controller's to take.
 >
@@ -183,11 +185,11 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > |---|---|
 > | `origin/main` | **`3f37ffc4`** — the `#578` merge, `baseRefName: main`, `headRefOid 42783c53` |
 > | my branch | `exec/falsified-claim-sweep` — cut FROM `3f37ffc4`, **`--base main`** |
-> | code head | **`95470afb`** — the sweep commit; the handoff commit sits on top of it |
+> | code head | **`45b657db`** (Round 2) on **`95470afb`** (Round 1); the handoff commit sits on top of both |
 > | prior branch | `exec/e2e-stack-repair` @ `42783c53` — **fully contained in `origin/main`** (`git branch -r --contains` lists it; `origin/main...HEAD` diff is empty) |
 > | falsifiers | `c86c4b5c` (P25 clause 1, 2026-09-06) · `42fb2f2c` (search served, 2026-09-19). Both REACHABLE from `origin/main` |
 > | `:3001` | **untouched.** No `docker compose` action taken; the owner's stack was not bound or taken down |
-> | next | reviewer pass runs BEFORE the PR opens; its result goes in the PR BODY |
+> | next | **Round 2 is pushed. A SCOPED RE-REVIEW runs** (the fix round was large enough to warrant one), its result goes in the PR BODY, and only then does the PR open |
 >
 > # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~09:0x IST. **THE `e2e-stack` REPAIR IS BUILT AND PUSHED; ITS PR
 > # HAS BEEN REVIEWED AND SENT BACK ONCE; THE FIX ROUND IS PUSHED. THE CODE HEAD IS `2e02ddac`.** Branch
