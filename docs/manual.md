@@ -704,16 +704,12 @@ name* whose **×** only undoes your own setting — the default takes over again
 hidden. *Everything* on the Closed control is not a third way back, because *everything* and *never
 touched it* are the same setting here; that is why the chip exists at all.
 
-**If the calendar looks empty**, it tells you *which kind* of empty in three different sentences:
-nothing in this month has a claimed date at all; every claim in the month is behind a narrowing you
-set; or every claim in it belongs to a date field you switched off in the legend. The middle one is a
-single sentence that names several narrowings at once rather than picking one, because narrowings stack —
-so it stays true whichever of them is doing the hiding. Read the sentence — it is telling you something.
+**If the calendar looks empty**, it says either *"No claimed dates fall in this month"*, or — when the
+only thing hiding your claims is a date field you switched off in the legend — a sentence saying so.
 
-**And this is the one empty month the sentences above get wrong.** When hiding closed jobs is the only
-thing that emptied the month, the calendar still says *"No claimed dates fall in this month"* — which is
-not what happened. Trust the count in the strip instead: *"0 of 12 shown"* means the jobs are there and
-something is hiding them.
+**And the first of those two is wrong more often than it looks.** A month emptied by your own filter, or
+by closed jobs being hidden, still gets *"No claimed dates fall in this month"*. Trust the count in the
+strip instead: *"8 of 12 shown"* means four jobs are there and something is hiding them.
 
 ### Timeline
 
@@ -733,9 +729,9 @@ In the controls row above the tabs, beside the **Filters** button, there is a si
 Turn it on and you get a note: *"the list, calendar and timeline are asking only for tickets in progress
 — not started and done are both excluded. The board is not narrowed."*
 
-> **Read that last sentence carefully.** The switch **does not affect the Board** — and the Board is
-> the default tab. So you can turn it on, read "done are excluded", and be looking at a Done column
-> full of done cards. The note exists precisely because of this.
+> **Read that last sentence carefully.** The switch **does not affect the Board** — and a project opens
+> on the Board the first time you look at it. So you can turn it on, read "done are excluded", and be
+> looking at a Done column full of done cards. The note exists precisely because of this.
 
 That switch is not the only filter on the website — beside it sits a **Filters** button, and above the
 tabs there is a **Search the board** box that narrows what the board shows you.

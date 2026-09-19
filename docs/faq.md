@@ -499,8 +499,8 @@ as an open question rather than a no.
 
 **Why doesn't the "Only tickets in progress" switch change the Board?**
 Because it does not narrow the Board — only the List, Calendar and Timeline. There is a note on screen
-saying so, and the note is important, because **the Board is the default tab.** So you can turn it on,
-read "done are excluded", and be looking at a Done column full of done cards.
+saying so, and the note is important, because **a project opens on the Board the first time you look at
+it.** So you can turn it on, read "done are excluded", and be looking at a Done column full of done cards.
 
 **Is that really the only filter?**
 Not any more. It was when this answer was written — one switch, and nothing else on any screen. Now
@@ -553,11 +553,11 @@ The way out is the "Only tickets in progress" switch, which is deliberately plac
 still reach it from the refusing screen. The Board keeps working throughout.
 
 **My calendar is empty. Is it broken?**
-Read the sentence — it tells you *which kind* of empty, in three different wordings: nothing in this
-month has a claimed date at all ("Undated work is absent, not estimated"); every claim in the month is
-behind a narrowing you set; or every claim in it belongs to a date field you switched off with the
-legend switch. Three situations, three sentences — and one of those sentences names several narrowings at
-once rather than picking one, because narrowings stack.
+It says either "No claimed dates fall in this month" ("Undated work is absent, not estimated"), or — when
+the only thing hiding your claims is a date field you switched off with the legend switch — a sentence
+saying so. And the first one is wrong more often than it looks: a month emptied by your own filter, or by
+closed jobs being hidden, still gets it. Trust the count in the strip instead — if it shows fewer jobs
+than the project holds, something is hiding them.
 
 **A job's start date is after its due date and the calendar looks odd.**
 It is showing you the contradiction rather than quietly fixing it — two separate markers and no bar

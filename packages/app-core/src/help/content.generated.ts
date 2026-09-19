@@ -3442,15 +3442,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", it tells you "
+                    "text": ", it says either "
                   },
                   {
                     "kind": "italic",
-                    "text": "which kind"
+                    "text": "\"No claimed dates fall in this month\""
                   },
                   {
                     "kind": "text",
-                    "text": " of empty in three different sentences: nothing in this month has a claimed date at all; every claim in the month is behind a narrowing you set; or every claim in it belongs to a date field you switched off in the legend. The middle one is a single sentence that names several narrowings at once rather than picking one, because narrowings stack — so it stays true whichever of them is doing the hiding. Read the sentence — it is telling you something."
+                    "text": ", or — when the only thing hiding your claims is a date field you switched off in the legend — a sentence saying so."
                   }
                 ]
               },
@@ -3459,11 +3459,11 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "And this is the one empty month the sentences above get wrong."
+                    "text": "And the first of those two is wrong more often than it looks."
                   },
                   {
                     "kind": "text",
-                    "text": " When hiding closed jobs is the only thing that emptied the month, the calendar still says "
+                    "text": " A month emptied by your own filter, or by closed jobs being hidden, still gets "
                   },
                   {
                     "kind": "italic",
@@ -3471,15 +3471,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — which is not what happened. Trust the count in the strip instead: "
+                    "text": ". Trust the count in the strip instead: "
                   },
                   {
                     "kind": "italic",
-                    "text": "\"0 of 12 shown\""
+                    "text": "\"8 of 12 shown\""
                   },
                   {
                     "kind": "text",
-                    "text": " means the jobs are there and something is hiding them."
+                    "text": " means four jobs are there and something is hiding them."
                   }
                 ]
               }
@@ -3588,7 +3588,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — and the Board is the default tab. So you can turn it on, read \"done are excluded\", and be looking at a Done column full of done cards. The note exists precisely because of this."
+                    "text": " — and a project opens on the Board the first time you look at it. So you can turn it on, read \"done are excluded\", and be looking at a Done column full of done cards. The note exists precisely because of this."
                   }
                 ]
               },
@@ -8550,7 +8550,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "the Board is the default tab."
+                    "text": "a project opens on the Board the first time you look at it."
                   },
                   {
                     "kind": "text",
@@ -8795,15 +8795,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Read the sentence — it tells you "
-                  },
-                  {
-                    "kind": "italic",
-                    "text": "which kind"
-                  },
-                  {
-                    "kind": "text",
-                    "text": " of empty, in three different wordings: nothing in this month has a claimed date at all (\"Undated work is absent, not estimated\"); every claim in the month is behind a narrowing you set; or every claim in it belongs to a date field you switched off with the legend switch. Three situations, three sentences — and one of those sentences names several narrowings at once rather than picking one, because narrowings stack."
+                    "text": "It says either \"No claimed dates fall in this month\" (\"Undated work is absent, not estimated\"), or — when the only thing hiding your claims is a date field you switched off with the legend switch — a sentence saying so. And the first one is wrong more often than it looks: a month emptied by your own filter, or by closed jobs being hidden, still gets it. Trust the count in the strip instead — if it shows fewer jobs than the project holds, something is hiding them."
                   }
                 ]
               }
