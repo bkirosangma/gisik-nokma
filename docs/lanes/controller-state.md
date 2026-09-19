@@ -31,6 +31,57 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 SUNDAY 2026-09-20 ~05:0x IST — **CYCLE 18: TWO MORE PRs MERGED AND GATED, A SEND-BACK THAT FOUND TWO DEFECTS THE GATE CANNOT SEE, AND BOTH LANES REDISPATCHED.** `main` is `d8f18bf4`; **zero open PRs**; ledger **306 done / 2 todo** — unchanged, **one row is now a QUESTION FOR THE OWNER, not an omission** (below).
+
+### Position — read this instead of the older tables, which this supersedes
+| lane | task | status |
+|---|---|---|
+| exec 1 | **`e2e-stack` is RED ON `main`** — the repair | **IN FLIGHT** — `exec/e2e-stack-repair`, restarted at the fixed point, Ctx ~6 % |
+| exec 2 | **two documentation truths** (the Calendar/Timeline closed default; a §13 quote that no longer exists) | **IN FLIGHT** — `exec2/doc-truths`, restarted at the fixed point, Ctx 6 % |
+| exec 1 | **the parity visual half** | **OWED — and the `e2e-stack` repair may remove the rebuild dependency, which is the strongest reason it was dispatched** |
+| both | **ledger row `hig-per-screen/3b` · the footer's reachability · door `H`'s `Delete` · the pending-invitations heading · the reviewer-pass bar clause** | ⛔ **ALL FIVE ARE THE OWNER'S** |
+
+### THE TWO MERGES — every reading at the landing tree
+| | `#575` (exec 1, door `3b`) | `#576` (exec 2, the Filters sheet) |
+|---|---|---|
+| head, frozen at the gate | `e2fc7569` | `608687b7` |
+| `merge-tree` prediction | `ebf74453`, exit 0, empty stderr | `6929d572`, exit 0, empty stderr |
+| merged as | **`cc59ce8f`** | **`d8f18bf4`** |
+| tree identity | **EXACT** | **EXACT** |
+| forced gate | `EXIT=0` · 33/33 · 0 cached · **1m55.2s** · no orphans | `EXIT=0` · 33/33 · 0 cached · **1m57.0s** · no orphans |
+| seven checks | all raw 0; `check-case-ids` **2494 / 16.82** | all raw 0; `check-case-ids` **2494 / 16.82** (minted none); `check:help` **227 → 229**, exactly +1 `###` and +1 FAQ entry, **predicted before regenerating** |
+| per-file blob identity | **7 / 7 identical** | **4 / 4 identical** |
+| drop check + control | **empty**, control fires | 7 files — **exactly `#575`'s seven**, none of `#576`'s own; control fires |
+
+### ⛔ `#575` WAS SENT BACK, AND BOTH DEFECTS WERE REAL — neither visible to any check
+1. **A LOST ROW BOUNDARY IN THE BLOCK TABLE.** The rebase resolution joined exec 1's row and exec 2's row onto **one line** (`…parity) || **exec 2** | …`). **Measured with a control in one invocation: lines starting `| **exec` read `1` at the branch head against `2` at `main`.** ⚠ **AND THE RECORDED REBASE AUDIT PASSES IT** — that audit asks for "0 lines removed carrying each peer's marker", and **every marker survived as text**; what was lost was the **newline**. **The audit is necessary and not sufficient, and that is now written into the file's own record.** `check:runbook`, `check:citations` and `check:case-ids` are all blind to it, and this file says of itself *"THIS TABLE IS THE ALLOCATION."*
+2. **THE HANDOFF NAMED TWO SUPERSEDED HEADS AND NOT THE ONE IT WAS PUSHED AT** — topmost block `e35dc161`, next `e1e70b43`, and **`2dae25f3` occurred zero times in the file**. **The mechanism is structural, not careless: the handoff is the tip commit, and a commit cannot name its own sha — so writing the block and THEN rebasing makes it stale by construction, every time.** Repaired by **ordering**: a new topmost block naming the **code head** (`b5d2b0af`) with the tip noted, and both stale blocks **marked `SUPERSEDED BY THE BLOCK ABOVE` in place** rather than deleted. ⚠ **The controller's FIRST test for this was wrong** — it asked whether the handoff names its own head, which is impossible. **A check for a property that cannot exist reports a permanent failure.**
+**exec 1's own summary, which indicts the gate rather than the author:** five defects it wrote tonight — a cut brace, a comment between two selectors that re-sized **every dialog heading**, a false population propagated to four files, a docblock its own commit falsified, and a lost newline. **Two were caught by a machine (a compiler and a reviewer reading built CSS) and NEITHER by a check.**
+
+### ⛔ THE LEDGER ROW `hig-per-screen/3b` — HELD FOR THE OWNER, AND THE CONTROLLER DID NOT FLIP IT
+**`#575` builds "Door 3b", the row is the ONLY `todo` left in its plan (3a, 4a, 4b, 5a, 5b, 6a, 6b, 7a, 7b are all `done`), and its merge sha `cc59ce8f` IS an ancestor of `main`.** **But the row's own note scopes it as *"Members — states"* and records a dispatch to EXECUTOR 2 with `isInviteAdmin`, while exec 1 read it as the roster identity and found the rest already built.** **So the flip test may be met and the SCOPE is genuinely ambiguous.** ⚠ **A status flip is the owner's, and the controller's own trigger list names a ledger status change as a stop-and-ask.** **The ask is on the record: `flip 3b` in a word, and it flips with `cc59ce8f` and the reason in the row. Nothing is blocked meanwhile.**
+
+### ⚠ THE `e2e-stack` DISPATCH — AND THE ARGUMENT THAT MADE IT THE HIGHEST-VALUE WORK ON THE LANE
+`e2e-stack` is **red at `main`** — six of eight specs, before the sheet is reached (**attribution settled by exec 1's base control: same six by name and line, same 6/2 split, same `ariaLabel` collapse 66 → 9**). Three reasons it was dispatched rather than held:
+1. **IT IS NOT IN THE TURBO GRAPH** — `turbo.json` names no `e2e` task, so **every green forced gate this repo has produced is structurally blind to it.**
+2. **It is the ONLY instrument that can reach the authenticated sheet** — `e2e-viewport/responsive.spec.ts:23-25` records that the signed-in shell lives here *"because it needs a real session"*, and `auth.ts:113` trusts **one** origin. **A repaired suite may take the parity screenshot WITHOUT the 14-minute image rebuild.**
+3. **It is hiding a product defect** — `button.ticket-type-list__move` at **1.41 against the 3:1 floor** on `/settings/ticket-types`, while `main`'s committed roster records `belowCount: 0`. **An instrument that cannot run certifies nothing, including the absences it records.**
+**The dispatch forbids the one repair that would be worse than none: DO NOT make it pass by asserting less** — no `skip`, no widened timeout, no re-baselined ratchet without a number and a reason. **And `:3001` is the owner's stack: read-only, never taken down.**
+
+### INSTRUMENTS THAT LIED THIS CYCLE, ALL CAUGHT
+1. **A CHECK FOR A PROPERTY THAT CANNOT EXIST** (the handoff's own sha — §above). It reported a permanent failure, and the defect was real but **different** from the one being tested.
+2. **AN AUDIT THAT PASSES A STRUCTURAL LOSS** (the marker-count drop check — §above). **Every marker present, a row boundary gone.**
+3. **A REBASE THAT REWRITES THE CITATIONS IT DOES NOT TOUCH** — `#576` was rebased onto `e643715d` and **one commit message's citation moved `ui.css:4690` → `4775`**, because `#572` added 100 lines above it. **It decided the edit by what the line RESOLVES to, not by the number looking plausible** — the stale-citation doctrine, applied rather than quoted. **It also proved content-neutrality by BLOB HASH rather than asserting it, and re-ran its gate after the rebase, saying the first run is not evidence for the new tree.**
+4. **TWO SHIPPED DOCUMENTS DISAGREED ABOUT ONE MECHANISM** — the FAQ said *"a third time"*, the manual said *"a fourth"*, for the same three-click filter cycle. **The manual was wrong.** Found by a reviewer, not by the gate.
+
+### WHAT THE NEXT CONTROLLER SHOULD DO FIRST
+1. **Capture both panes** (`gisik:1`, `gisik:2`) — both lanes were mid-task on new dispatches at handover.
+2. **Re-measure every anchor above at the sha you report.**
+3. **Do NOT measure from the primary checkout** — it is behind. Use `gisik-nokma-ctl` on a branch off `origin/main`.
+4. **CI is the billing-blocked shape** (every failing annotation: *"the job was not started because recent account payments have failed"*). **Owner-waived 2026-09-06, not treated as green, NOT to be re-asked.**
+5. **FIVE items are the owner's and none is the controller's to build or to flip:** the reviewer-pass bar clause · `hig-per-screen/3b`'s status · the footer's reachability · door `H`'s `Delete` · the pending-invitations heading. **Every one is on the record with its evidence.**
+6. **Then `gh pr list --state open`, and resume the loop.**
+
 ## 🔄 SUNDAY 2026-09-20 ~03:3x IST — **CYCLE 17: TWO PRs MERGED AND GATED AT THEIR LANDING TREES, A REVIEW ROUND THAT CAUGHT A REAL REGRESSION, AND ONE BAR QUESTION FOR THE OWNER.** `main` is `faecf837`; **zero open PRs**; ledger **306 done / 2 todo** — unchanged, **nothing was owed a flip**.
 
 ### Position — read this instead of the older tables, which this supersedes
