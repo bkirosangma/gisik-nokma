@@ -31,6 +31,34 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## ✅ SATURDAY 2026-09-19 ~10:5x IST — **CYCLE 8: THE BOARD IS CLEAR. FOUR PRs MERGED SINCE THE HANDOVER, INCLUDING THE CANVAS FIX AND A SCOPE CORRECTION THAT WOULD HAVE BUILT A SECOND DOOR.** `main` is `1e56921f`; **zero open PRs**; ledger **301 done / 0 claimed / 7 todo**.
+
+### Read this ABOVE the 01:5x entry below, which it corrects
+**The 01:5x entry is a snapshot of an older board and three of its statements have since become false.** It says `#498`/`#499`/`#495` are open and `#498`'s gate is RED. **All three are CLOSED, `#498` merged green after a re-run at the merged tree, and the board is now empty.** Do not act on that entry's PR list or its gate verdict without re-measuring.
+
+**NO SUCCESSOR TOOK THE SEAT.** The 01:5x handover declared that a successor would gate the three stranded PRs. **It never arrived** — verified with `ListAgents`: three peers, none a controller. **This session took the gates back and merged four PRs**, because the alternative was two idle lanes behind a session that does not exist. **`ctl-respawn.sh` was deliberately NOT run while this controller was alive** — a second controller on one board is worse than a slow one.
+
+| PR | what | merged as |
+|---|---|---|
+| **`#501`** | **the builder canvas** — `.gn-workflow-canvas { display: grid; }` | `20d811dc` |
+| **`#499`** | exec 1's handoff, `#495` folded in verbatim | `b1a8d7ed` |
+| **`#503`** | **Task 6 rescoped — RENDER, not wire** | `7320950e` |
+| **`#502`** | the roster regenerated — **17.62 → 3.54**, examined **9 → 3**, classes **5 → 1** | `1e56921f` |
+
+### ⚠ THE CANVAS FIX IS LIVE, AND THE CHECK THAT PROVES IT IS NOT THE MERGE
+`.react-flow` computed to **0px** because a percentage height cannot resolve against a parent sized only by `min-height`. **Merged is not visible**: the hot stack mounts **exec 1's worktree**, so the fix only reached the browser once that worktree moved to `main` — and **that move is also why `main` is now HELD BY A WORKTREE and no other worktree can check it out** (`fatal: 'main' is already used by worktree at …-exec`). The controller's worktree runs on branches for this reason.
+**Verified on the live page**: `.react-flow` **480px**, `display: grid`, **4/4 nodes with non-zero boxes**. **A DOM count would have passed on the broken tree — that is disguise #42 in the memory file.**
+
+### ⚠ TASK 6 WAS MIS-SCOPED BY THREE DOCUMENTS, AND THE PRODUCT SAID SO
+The plan, the delta audit (*"wire gap 3"*) and the holds register each called the `isTypes` reorder **wire** work. **`ticket-type-list-screen.tsx:35-56` records the opposite, measured 2026-09-18:** the door already exists — `onSave` authors a `ticket-type.defined` event carrying `rank`, through `gateway.submit`; `rank: z.number().int().min(1)` is in the schema (`ticket-types.ts:98`); the gateway declares **no** reorder op; and built-ins are **rank-locked server-side** (`type.builtin-rank`). **Verified by the controller before acting.** A route here would be a **second door to one thing** — the defect this repo refuses by name in that same file. **Found by exec 1 reading the product against its own plan.**
+
+### STILL OPEN — none blocking, and the first one needs ONE WORD from the owner
+1. **THREE LEDGER ROWS READ `todo` FOR MERGED, ANCESTOR-VERIFIED WORK:** `hig-per-screen/6b` → `ed4c992f` (`#496`), `hig-per-screen/7b` → `7f9329cc` (`#494`), `backlog-and-closed-second-wave/12` → `77aa906a` (`#490`). **The controller did not flip them** — its launch override permits ledger edits only for flips a position names. **The owner names them and they flip.**
+2. **The brief for the three LIFTED tasks is still unwritten**, and the dispatches that exist for that work **predate the 2026-09-19 lift and say the opposite** — they record absences. Reconciliation is the deliverable.
+3. **The owner's hot-compile instruction is still unactioned**: *"remove the hot compile and rebuild on each merge."* **Measure one Docker `next build` before committing** — it may cost more CPU than the compile it replaces. Only `e2e-stack` depends on `:3001`; the viewport suite runs its own dev server on `:3021`.
+4. **`prewarm-web-routes` is HELD** — it optimises a container the instruction above may remove. Held, not deferred.
+5. **Two peer corrections stand against the controller, both recorded:** its `720` id count was **extractor-dependent** (exec 1's 775/700/803 all give EMPTY set differences — the invariant was the set difference, never the total); and its *"983 of ~991 compiles under 1s"* **did not reproduce** (86 lines over 23h, worst 106.5s). **Neither figure survived a second reader.**
+
 ## 🔴 SATURDAY 2026-09-19 ~01:5x IST — **CONTROLLER HANDOVER AT 83 % CONTEXT. THREE PRs IN THE AIR, ONE OWNER INSTRUCTION NOT YET DISPATCHED, AND A LIVE BUG FOUND IN THE RUNNING APP.** `main` is `ed4c992f`; open PRs **`#498`, `#499`, `#495`**; ledger **301 done / 0 claimed / 7 todo**.
 
 ### If you are the DeepSeek controller reading this: your position, in five lines
