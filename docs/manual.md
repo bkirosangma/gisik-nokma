@@ -512,12 +512,15 @@ real — spaces do not count. You cannot skip it.
 
 **2. It asks for "Evidence".**
 This rule means you must attach a file before the move is allowed — a signed-off proof, a delivery
-note. **It does not work.** The box says so: *"This transition requires an attachment as evidence.
-Evidence upload is not available in this build yet."* and the Move button stays disabled.
+note. The box is labelled *"Evidence (required by this transition)"*, and the Move button stays greyed
+out until the upload has finished and the server has stored the file. If the server will not keep the
+file you chose — too large, or a kind it does not accept — it says so beside the box and the move stays
+blocked.
 
-> **Practical advice: do not put an evidence rule on any move.** If you do, that move becomes
-> impossible for everybody. The product is honest about it rather than greying out a button with no
-> reason — but the rule is still offered in the builder as though it works.
+> **This was broken until 2026-09-19, and the old advice here was to never use the rule.** The box said
+> *"Evidence upload is not available in this build yet"* and a move carrying the rule could not be made by
+> anybody, ever. That is fixed. The rule is now worth exactly what it looks like: **a move that cannot
+> proceed until a file is attached.**
 
 **3. It asks you to fill in a field.**
 A "require a field to be set" rule. It only asks for fields that are not already filled in — it will

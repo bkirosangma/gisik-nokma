@@ -310,12 +310,18 @@ Somebody put a "require a comment" rule on that particular move. You cannot skip
 accept spaces. The Move button stays greyed out until you type something real.
 
 **It's asking for "Evidence" and there's nothing to attach with.**
-That rule means a file must be attached before the move is allowed, and **it does not work.** The box
-says so — "Evidence upload is not available in this build yet" — and the Move button stays disabled.
+That rule means a file must be attached before the move is allowed. The box labelled *"Evidence
+(required by this transition)"* takes the file, and the Move button stays greyed out until the upload
+has finished and the server has stored it.
 
-**Practical consequence: if anybody puts an evidence rule on a move, that move becomes impossible for
-everyone.** Do not use that rule. The product is honest about it rather than greying out a button with
-no reason, but the rule is still offered in the builder as though it works.
+**I chose a file and the move is still blocked.**
+The server has the last word on what it will keep, and the box tells you what it said — a file over the
+size ceiling, or a kind it will not take. The move stays blocked until a file it accepts is attached.
+
+> **Until 2026-09-19 this did not work at all.** The box said *"Evidence upload is not available in this
+> build yet"*, and an evidence rule made a move **impossible for everybody** — which is why the docs used
+> to tell you not to use one. That is fixed. What remains is the ordinary consequence: a move carrying
+> this rule is blocked until somebody attaches a file, so put it only where that is what you mean.
 
 **It won't let *me* make a move, but my colleague can.**
 Somebody put a "restrict who may move it" rule on that step, limited to a role, to whoever the job is

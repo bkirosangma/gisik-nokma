@@ -1,4 +1,131 @@
-## ▲ TOP BLOCK — **THE DESCRIPTION IS EDITABLE, AND THE ROW IT LIVES IN DID NOT EXIST.** (2026-09-19, ~22:5x IST)
+## ▲ TOP BLOCK — **THE EVIDENCE UPLOAD: a rule that permanently blocked a move, closed by one missing prop.** (2026-09-19, ~23:2x IST)
+
+**Position: DONE and PUSHED — `exec2/evidence-upload`, base `main` at `2c28f6bc`.** The PR opens as this
+dispatch's last step; **measure it rather than reading it here**:
+`gh pr list --head exec2/evidence-upload --state all`.
+
+**⚠ `main` MOVED UNDER THIS BRANCH MID-TASK: PR #544 (the description) MERGED at `12:07:17Z` while this
+branch was open.** The work was committed as a WIP, **cherry-picked onto the new `main`**, and re-gated
+there — so this branch is current with `main`, not stacked behind it. See § 5 for the one thing that went
+wrong doing it.
+
+### § 1 — IT WAS A DEFECT, NOT A GAP, AND THE DOOR MEASUREMENT SETTLED IT IN FIVE READINGS.
+
+`require-evidence` is authorable from a shipped screen (`add-rule-menu.tsx:6-11`), the engine enforces it,
+and **no surface could satisfy it** — an admin could configure a move nobody could ever make. Measured, in
+the order the dispatch asked for:
+
+1. **What the rule reads:** `evaluateRequireEvidence` reads `input.payload.evidenceAttachmentId`, refusing
+   when blank (`packages/rule-engine/src/rules/require-evidence.ts:9-15`).
+2. **The payload field already existed** (`packages/domain/src/workflow.ts:186`), the sheet already
+   forwards it, the dialog already sets it.
+3. **⚠ THE DEAD END WAS ONE `undefined`.** `transition-dialog.tsx` renders the file input when
+   `uploadEvidence !== undefined` and the dead-end sentence when it is not — **the entire upload path was
+   built.** The web never passed the prop, exactly as it never passed `editorSlot`.
+4. **The door ships:** `POST /v1/attachments`, whose ONLY client anywhere is
+   `uploadAttachmentHttp(file, ticketId)` (`packages/editor/src/upload.ts:44`). **No route was added.**
+5. **The evidence gate settles what "evidence" means:** `gates/evidence-gate.ts:44-50` admits an upload
+   only when `attachments.id = $1 AND ticket_id = $2`. So a real `attachments` row is required, an
+   `attachment.added` claim is **not**, and an uploader naming the wrong ticket would refuse the very move
+   it was meant to unblock.
+
+**`SERVER EXISTS → SURFACE` for the THIRD task running.** The pattern holds because the plane was built
+first and the surfaces were never wired.
+
+### § 2 — THREE THINGS THE DISPATCH DID NOT NAME, ALL REQUIRED.
+
+- **`BoardMoveCapability.uploadEvidence` could not carry the ticket.** `Board` holds ONE capability object
+  for every card, so it cannot close over "the ticket" the way `TicketSheet` can — and the board's arrows
+  open the SAME dialog, so fixing only the sheet would have left a second dead end standing. Widened to
+  `(file, ticketId)`; `MoveArrows` binds `card.ticketId`. `TicketSheetProps.uploadEvidence` is
+  deliberately NOT widened — its host closes over its own ticket, and the two differ for a stated reason.
+- **⚠ THE UPLOAD COULD NOW FAIL, AND NOTHING SAID SO.** `transition-dialog.tsx`'s handler was
+  `void uploadEvidence(file).then(…)` with **no `.catch`** — unreachable while no caller supplied an
+  uploader, and reachable the moment one did. A file over the ceiling would have left a rejected promise
+  nobody handled and a disabled Move button with no sentence beside it. Now caught and split the way
+  Ruling 27 splits every other outcome in that dialog: **the server refusing to store the bytes** gets
+  `--server`'s tone in the server's own words; **nothing reaching a server** gets `--transport`'s.
+- **⚠ EVIDENCE ATTACHED FOR ONE MOVE COULD SATISFY A DIFFERENT ONE.** `evidenceAttachmentId` is dialog
+  state, and the SHEET's `TransitionDialog` stays MOUNTED across a close/reopen (`open={moveOpen}`, and
+  `Dialog` returns `null` while hidden rather than unmounting) — so `toStateId`, the comment, the fields
+  and the evidence all survive. **Unreachable before this change**, because nothing could ever set an id;
+  the moment an uploader existed, a person could attach a file for one guarded move, switch to another,
+  and find Move ENABLED carrying evidence they attached for the first. The engine would commit it: the id
+  is real, the ticket matches, and the rule only asks that evidence be PRESENT. Reset on the same
+  dependency the pre-check uses (`toStateId`) — the one thing that actually changes when somebody chooses
+  a different move. **The comment and the fields still persist across a reopen, deliberately left alone:
+  that is pre-existing behaviour this task did not come to change, and it is recorded here rather than
+  quietly widened.**
+
+### § 3 — CASES AND MUTATIONS.
+
+- **`13.990`** — `apps/web/test/evidence-upload.test.tsx`, rendering the **REAL** page, opening a **REAL**
+  ticket, driving the **REAL** dialog. First assertion is an **ABSENCE** (the dead-end sentence), second
+  follows the upload to the shipped door asserting `/v1/attachments`, `POST`, and **`ticketId` = the open
+  ticket**. **Mutation-witnessed:** deleting the prop from `page.tsx` reddens both arms.
+- **`3.72`'s three new arms** — the refused upload, the unreachable one, and **evidence carrying across
+  moves**. **Mutation-witnessed:** deleting the `.catch` reddens the first two; deleting the per-move
+  reset reddens the third. Files restored byte-identical, sha printed before and after.
+
+**⚠ WHY THE DIALOG'S OWN SUITE COULD NOT HAVE CAUGHT THIS, and it is the whole lesson:**
+`transition-dialog.test.tsx` already covered BOTH branches and **both were green while the defect was
+live**, because the working path was proven against a `vi.fn()` stub. *A mocked contract is the thing that
+excuses the server from existing.* The new case is at the CALL SITE, which is the only place this defect
+was ever visible.
+
+### § 4 — ⚠ THE CASE-ID GUARD CANNOT SEE THIS LANE'S USUAL ENTRY STYLE. MEASURED.
+
+`check-case-ids.mjs`'s `ID_LINE` is `/^-\s+(?:([^\s\d*][^\s]*)\s+)?(\*{0,2})(\d+\.\d+[a-z]?)/` — it
+requires a **bullet** whose id is **not wrapped in backticks**. This lane writes its catalogue entries as
+`## … — case \`13.9xx\`` headings with a `- ✅ **\`13.9xx\` — …**` bullet, **and that form contributes
+ZERO.** Measured: with `13.990` written that way the count stayed at **2433**; reformatted to
+`- ✅ **13.990 — …**` it moved to **2434**. `13.989` on `main` (from #544) has the same defect and was
+fixed in the same change set, so this PR takes the count to **2435 = 2433 + exactly the two ids it adds**.
+**The guard is blind to a whole class of entries, which is how `13.969` collided undetected** — recorded,
+not fixed: widening `ID_LINE` would change what every existing file reports and is the controller's call.
+
+### § 5 — ⚠ THE THING THAT WENT WRONG, RECORDED BECAUSE IT NEARLY SHIPPED.
+
+Cherry-picking onto the post-#544 `main` auto-merged `apps/web/.../page.tsx` and **left conflict markers
+in it — which were then COMMITTED.** `git status --short` reported **clean**, because markers inside a
+commit are clean by git's measure; `git cherry-pick` had named only the other conflict in its summary, and
+I read the tail. **The gate caught it** (`TS1185: Merge conflict marker encountered`, 5 errors). Resolving
+them then took three attempts, the last of which concatenated a conflict that spanned a comment boundary
+and produced broken JSX — so **the gate was re-run after each**, and the final head is green.
+**The lesson: `git status` clean is not "no conflict". Only a build or typecheck is.**
+
+### § 6 — GATE AND CHECKS.
+
+**`33/33`, `EXIT=0`, `NODE=v22.22.2`, 0 TS errors**; **all seven checks EXIT=0**; `check-case-ids` ok at
+**2435**. The gate reddened on `server#test` **twice on load** — `seed/seed-dev.test.ts` at 30005ms at load
+50-84 — and **isolated PASS (8) FAIL (0)**, the same load red this lane has now hit on four tasks.
+
+### § 7 — WHAT IS NOT DONE, NAMED RATHER THAN IMPLIED.
+
+- **An evidence upload does not emit `attachment.added`.** The gate does not require it, so the move
+  succeeds — but the file will not appear in the ticket's attachment list, which is built from that
+  history. **That list is one of the two gaps the dispatch keeps open**, so this is the known gap, not a
+  new one. Owner: whoever wires the sheet's `attachments` prop decides whether an evidence upload should
+  also be claimed.
+- **No browser run.** The dispatch asks for one; a routed `/p/:projectId?ticket=` needs a real session
+  this lane cannot reach, and jsdom has no layout engine.
+- **The Drive-reference refusal is not exercised** — the dialog offers a plain file input, so no Drive
+  reference can reach it from here.
+
+### § 8 — NEXT IN THIS LANE, AND THE ID BUDGET.
+
+Lane order `E → description → evidence upload → C → H → the inviter card`. Both prior tasks and this one
+are done, so **next is `C` (`isInbox` bulk + Undo)**, then `H` (sheet footer), then the inviter card.
+**Read `CTL-QUEUE-2026-09-19-door-builds.md` with its Addenda 1–5 before starting** — and note C is a
+`NEW ROUTE` + CSRF registration, so its door is the one that genuinely needs measuring first.
+
+**⛔ BLOCK `13.988`–`13.999`: three spent (`13.988` = E, `13.989` = description, `13.990` = this), NINE
+LEFT.** Keep the `{3}` width. **Write the id line as a bullet with NO backticks** (§ 4) or it will not
+register.
+
+---
+
+## ▼ PREVIOUS BLOCK — **THE DESCRIPTION IS EDITABLE, AND THE ROW IT LIVES IN DID NOT EXIST.** (2026-09-19, ~22:5x IST)
 
 **Position: DONE and PUSHED — `exec2/description-editable`, base `main`, cut from `origin/main` `9b88f9b4`.**
 The PR opens as this dispatch's last step; **measure it rather than reading it here**:

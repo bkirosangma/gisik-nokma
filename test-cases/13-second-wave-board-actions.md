@@ -1975,7 +1975,7 @@ composition straight to the envelope and does **not** re-spell the payload — a
 
 ### The case
 
-- ✅ **`13.989` — the description is editable on the door that already exists.**
+- ✅ **13.989 — the description is editable on the door that already exists.**
   `packages/app-core/test/views/ticket-sheet.test.tsx`, six arms. It draws the row **on a ticket that
   has never carried a claim** (with a control asserting the fixture really has none, so the arm cannot
   pass on a ticket that happened to have one); it draws it **once**; the submission reaches
@@ -2021,3 +2021,80 @@ measures another.**
   branch is what the mutation kills.
 - **No browser run yet.** The dispatch asks for one (*"a typed change survives a reload … the
   `set by {actor} on {date}` line moves"*) and it is owed.
+## The evidence upload — the rule that permanently blocked a move (executor 2, 2026-09-19) — case `13.990`
+
+**Owner's ruling: build it.** Dispatch `CTL-DISPATCH-2026-09-19-evidence-upload.md`. **This one was a
+DEFECT rather than a gap:** `require-evidence` is authorable from a shipped screen
+(`add-rule-menu.tsx:6-11`), the engine enforces it, and **no surface in the product could satisfy it** —
+so an admin could configure a move that nobody, ever, could make. The dialog's own fallback said so:
+*"Evidence upload is not available in this build yet."*
+**Id `13.990`**, from this lane's block `13.988`–`13.999` (`13.988` = E, `13.989` = the description PR).
+Swept in one invocation with `13.989` as its control.
+
+### THE DOOR, MEASURED FIRST — and it is `SERVER EXISTS → SURFACE` for the THIRD task running
+
+1. **What the rule reads:** `evaluateRequireEvidence` reads `input.payload.evidenceAttachmentId` and
+   refuses when it is blank (`packages/rule-engine/src/rules/require-evidence.ts:9-15`).
+2. **The payload field already existed.** `ticketTransitionedPayloadSchema` carries it
+   (`packages/domain/src/workflow.ts:186`), the sheet already forwards it (`ticket-sheet.tsx`), and the
+   dialog already sets it (`transition-dialog.tsx:270`).
+3. **⚠ THE DEAD END WAS ONE `undefined`.** `transition-dialog.tsx` renders the file input when
+   `uploadEvidence !== undefined` and the dead-end sentence when it is not — **the whole upload path was
+   already built.** The web simply never passed the prop, exactly as it never passed `editorSlot`.
+4. **And the door to upload to already ships:** `POST /v1/attachments`, with its one client
+   `uploadAttachmentHttp(file, ticketId)` (`packages/editor/src/upload.ts:44` — the ONLY caller of that
+   route anywhere in the product). **No route was added.**
+5. **The server's EVIDENCE GATE settles what "evidence" means:** `gates/evidence-gate.ts:44-50` admits an
+   upload only when `attachments.id = $1 AND ticket_id = $2` — the id **and the ticket**. So a real
+   `attachments` row is required and **an `attachment.added` ledger claim is not**; and an uploader that
+   named the wrong ticket would not merely mis-file the bytes, it would refuse the very move it was meant
+   to unblock.
+
+### ⚠ TWO THINGS THE DISPATCH DID NOT NAME
+
+- **`BoardMoveCapability.uploadEvidence` could not carry the ticket.** `Board` is mounted for the whole
+  board and holds ONE capability object for every card, so it cannot close over "the ticket" the way
+  `TicketSheet` can. The prop is widened to `(file, ticketId)` and `MoveArrows` binds each card's own id.
+  **The board's arrows open the SAME dialog**, so fixing only the sheet would have left a second dead end
+  standing.
+- **The upload could now FAIL, and nothing said so.** `transition-dialog.tsx`'s handler was
+  `void uploadEvidence(file).then(…)` with **no `.catch`** — unreachable while no caller supplied an
+  uploader, and reachable the moment one did. A file over the ceiling would have left a rejected promise
+  nobody handled and a Move button disabled with no sentence beside it. Now caught, and split the way
+  Ruling 27 splits every other outcome in that dialog: **the server refusing to store the bytes** gets
+  `--server`'s tone in the server's own words, **nothing reaching a server** gets `--transport`'s.
+
+### The cases
+
+- ✅ **13.990 — the page supplies an uploader, so the dead end is GONE.**
+  `apps/web/test/evidence-upload.test.tsx`, rendering the **REAL** page, opening a **REAL** ticket,
+  driving the **REAL** dialog. Its first assertion is an **ABSENCE** — the dead-end sentence is not on the
+  page — and the second follows the upload to the **shipped door**: `/v1/attachments`, `POST`, and a
+  form carrying **`ticketId` = the ticket the sheet is open on**. **Mutation-witnessed:** deleting the
+  prop from the page reddens both arms.
+- ✅ **`3.72`'s two new arms** — `packages/app-core/test/views/transition-dialog.test.tsx`: a refused
+  upload states the server's reason and keeps the move blocked; an upload that never reached a server says
+  that instead and never claims a verdict. **Mutation-witnessed:** deleting the `.catch` reddens both.
+
+#### ⚠ Why the dialog's own suite could not have caught the defect
+
+`transition-dialog.test.tsx` already covered **both** branches — the dead end when `uploadEvidence` is
+`undefined`, and the working path when it is supplied — and **both were green while the defect was live**,
+because the working path was proven against a `vi.fn()` stub. *A mocked contract is the thing that
+excuses the server from existing.* The new `apps/web` case is deliberately at the CALL SITE, which is the
+only place this defect was ever visible.
+
+### What is NOT covered, named rather than implied
+
+- **`attachment.added` is not emitted for an evidence upload.** The gate does not require it (it queries
+  the `attachments` table), so the move succeeds — but the file will not appear in the ticket's
+  attachment list, which is built from `attachment.added` history. **That list is one of the two gaps the
+  dispatch keeps open**, so this is the known `attachments` gap rather than a new one — recorded, with an
+  owner: whoever wires the sheet's `attachments` prop should decide whether an evidence upload should also
+  be claimed.
+- **No browser run.** The dispatch asks for one; a routed `/p/:projectId?ticket=` needs a real session
+  this lane cannot reach. The `apps/web` case drives the real components in jsdom, which has **no layout
+  engine** — it cannot tell a rendered control from one drawn into nothing.
+- **The Drive-reference refusal is not exercised.** The gate refuses a Drive reference as evidence
+  (`attachment.evidence-drive-reference`); the transition dialog offers a plain file input, so no Drive
+  reference can reach it from here.
