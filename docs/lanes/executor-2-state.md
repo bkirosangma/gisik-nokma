@@ -20,18 +20,69 @@
 
 ---
 
-## ▲ TOP BLOCK — Task 3: the history screen, and it is the FIRST screen here the prototype does not draw. (2026-09-19)
+## ▲ TOP BLOCK — Task 3 is **MERGED**, this lane is **FREE**, and the three remaining ledger rows each need the controller's word. (2026-09-19)
 
-**Position: DONE and verified; the PR is opened in the same change set as this block** — branch
-**`exec2/workflow-version-history`**, cut from a freshly fetched `origin/main` **`f6b16cbb`**. Dispatch:
-`CTL-DISPATCH-2026-09-19-lifted-settings-tasks.md`, EXEC 2 section.
+**Position: HOLDING, with no work outstanding and no row I can take without a ruling.** The ruling request
+is filed at `gisik-nokma-lanes/EXEC2-RULING-REQUEST-2026-09-19-remaining-ledger-rows.md` and pointed at in
+the controller's pane. **Read that file before acting on anything below this block.**
 
-**FIRST ACTION ON A RESTART: `gh pr list --state open`.** If a PR for this branch is open it is at the
-controller's merge; **if it has MERGED, this block is history** and the next dispatch is the position;
-**if neither, the work is in this branch and uncommitted or unpushed — check `git status` before
-concluding anything**, because the first version of this block said "PR open" while nothing was committed
-and the review caught it. **Both of this lane's earlier PRs are MERGED** — #501 (the canvas) and #502 (the
-roster) — and neither needs redoing.
+**Verify these before adopting them.** Measured at `origin/main` **`22a8e7c3`** (fetched at this writing),
+every one with `/usr/bin/git` — not `rtk`, whose `git log` ignores its revision argument:
+
+| | |
+|---|---|
+| Task 3 (`exec2/workflow-version-history`) | **MERGED — `#506`** |
+| containment | `git merge-base --is-ancestor a6167b69 origin/main` → **exit 0** (not `cat-file`, which passes on reflog-only commits) |
+| the LANDED branch vs main | of **`exec2/workflow-version-history`** (not the branch you are standing on): `git rev-list --left-right --count origin/main...a6167b69` → **9 0** — nothing of this lane's is unmerged |
+| that branch, local == remote | `rev-parse origin/exec2/workflow-version-history` = **`a6167b69`**, the merge point. **`rev-parse HEAD` is NOT this** unless you are on that branch — the handoff branch itself moves |
+| open PRs, repo-wide | **ONE, and it is NOT this lane's — `#509` (`ctl/cycle9-anchor`, the controller's).** At the commit this table was written in, **this lane had no PR at all and `exec2/handoff-post-506` had never been pushed** (measured after the fact: `git ls-remote --heads origin 'refs/heads/exec2/*'` returns 21 branches and this one is not among them — a positive control against a swallowed glob). **The count is not the question a restart should ask; the HEAD BRANCH is.** |
+| this file's own branch | `exec2/handoff-post-506`, cut from `origin/main` `22a8e7c3` |
+| earlier PRs | **#501** (canvas), **#502** (roster), **#506** (Task 3) — all MERGED, none needs redoing |
+
+**FIRST ACTION ON A RESTART: `gh pr list --state open`, then READ THE HEAD BRANCH OF EVERY ROW.** The
+question is **not** "is a PR open" — the board carries a peer's (`ctl/cycle9-anchor`) — it is **"is a PR
+open whose head is `exec2/handoff-post-506`"**. The first version of this paragraph asked the wrong
+question and a restarted reader would have taken the peer's PR as this lane's, then read the sentence
+below and been told their merged, ancestor-verified work was *"uncommitted or unpushed"*. A review caught
+that, which is the only reason it is written out.
+
+- **A PR is open whose head is `exec2/handoff-post-506`** → it is at the controller's merge; that is this
+  block's own PR, and nothing of this lane's follows it.
+- **That PR has MERGED, and no PR of this lane's is open** (a peer's PR being open does not count) →
+  **this lane is genuinely free.** Read the newest cycle in `docs/lanes/controller-state.md` and the
+  ruling request above, then **do not re-derive the table below** — it was measured at the sha named, and
+  re-deriving it is how a free lane burns a turn.
+- **Neither, and `git status` is CLEAN** → the work is committed on a branch that was never pushed or
+  never PR'd. Check `git log origin/main..exec2/handoff-post-506` **before** concluding anything. **This
+  is the branch this very block shipped in, so it is the likeliest of the three to be the true one.**
+- **Neither, and the tree is DIRTY** → it is uncommitted. Read `git status` before concluding anything,
+  because the first version of the block below said "PR open" while nothing was committed.
+
+### The ledger's remainder, recounted at `22a8e7c3` — 7 non-`done` rows, and only three are work
+
+| row | measured status | needs |
+|---|---|---|
+| `hig-per-screen/6b` | **MERGED** — `ed4c992f` = *"Merge pull request #496 … exec/hig-6b-13306-resolution-pair"*, ancestor-verified | owner names it → flips. **Not work.** |
+| `hig-per-screen/7b` | **MERGED** — `7f9329cc` = *"Merge pull request #494 … exec/hig-7b-13309-withheld-title"*, ancestor-verified | owner names it → flips. **Not work.** |
+| `backlog-and-closed-second-wave/12` | **MERGED** — `77aa906a` = *"Merge pull request #490 … exec2/secondwave-closeout"*, ancestor-verified (this lane's) | owner names it → flips. **Not work.** |
+| `board-prototype-port/1` | **STRUCK 2026-09-16, DO NOT IMPLEMENT** — those words are in the row's NOTE column (it does not carry the literal `FLAG:` prefix its siblings use, so a reader parsing for one would miss it) | nothing. **Never work.** |
+| `hig-per-screen/3b` | open — `docs/lanes/owner-holds.md:173-174` (the sentence **spans both lines**; citing `:173` alone quotes a fragment): *"`3b` was **not** covered by that ruling and stays `todo`"* | **a ruling** |
+| `hig-per-screen/5b` | open — **and its ledger row reads EXECUTABLE while it is not. ⛔ DO NOT RE-TREAD IT: this lane did, on 2026-09-19, and the work was deleted unpushed.** Exec 1 measured that no jsdom case can assert the List shrank without teaching the FAKE to narrow | **a ruling — exec 1's, still open** (`EXEC-RULING-REQUEST-2026-09-18-hig-5b-13304.md`; it rides in `#495`, which is `CONFLICTING`, so it may be invisible to whoever picks that PR up) |
+| `hig-per-screen/10` | open; its `isMcpTokens` half is a wire gap (`docs/design/prototype-delta-2026-09-18.md:103` — `name`+`badge` absent from `apps/server/src/mcp/token-store.ts:154-167`, where the row variable is `r` and **not** the `t` the delta audit writes from the UI side) | **a ruling** |
+
+**This lane's id block is exhausted except `13.946`–`13.947`** (minted through `13.945`; Task 8 holds
+`13.948`–`13.957`). **Any new screen task needs a fresh block from the controller** — a bare tip is a
+reading that expires, and this catalogue has already paid for that twice in one afternoon.
+**Do not flip the three merged rows** — the owner names them, and the controller's CYCLE 8 entry says so.
+
+---
+
+## ▼ SUPERSEDED — Task 3: the history screen, and it is the FIRST screen here the prototype does not draw. **MERGED as `#506`.** (2026-09-19)
+
+**Position: DONE and MERGED. The "the PR is opened" this heading used to say was true when it was written
+and false the moment `#506` merged.** Branch **`exec2/workflow-version-history`**, cut from a freshly
+fetched `origin/main` **`f6b16cbb`**, rebased onto **`2f5c2c3f`**, frozen head **`a6167b69`** — the local
+and remote tip at the merge. Dispatch: `CTL-DISPATCH-2026-09-19-lifted-settings-tasks.md`, EXEC 2 section.
 
 ### § 1 — WHAT SHIPPED
 
