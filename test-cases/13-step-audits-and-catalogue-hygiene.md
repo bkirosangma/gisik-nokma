@@ -107,13 +107,16 @@ run's own summary line before it will report anything, which is the same rule th
 
 ---
 
-## Three contrast debts and one stale calibration, recorded as cases rather than fixed (Step 4b, 2026-09-18) — block `13.690`–`13.693`
+## Three contrast debts and one stale calibration, recorded as cases rather than fixed — one since closed (Step 4b, 2026-09-18) — block `13.690`–`13.693`
 
 Block `13.690`–`13.693`, allocated by `CTL-DISPATCH-2026-09-18-step4b-ledger-evidence.md`. Unlike every
-other block in this file these four are **`❌` by construction**: no commit performed the work, and each
+other block in this file these four were **`❌` by construction**: no commit performed the work, and each
 names its FIX as the deliverable so the entry cannot be closed by editing the measurement instead. All
 four come out of PR #426's review, which measured them and recorded them as pre-existing; Step 4b gives
-each an id, because a debt held only in a review comment has no owner and no scope.
+each an id, because a debt held only in a review comment has no owner and no scope. **Three of the four
+remain `❌`** — `13.690`, `13.691` and `13.692` are the contrast debts the owner deliberately left on
+hold (*"leave the contrast debts on hold as well. record it."*). `13.693` was closed on 2026-09-19 by a
+commit, which is the only thing that could close it.
 
 **The arithmetic below was re-derived for this block rather than transcribed from the review.** Every
 figure reproduces the review's to four decimal places — which is the point rather than the reassurance: a
@@ -150,20 +153,37 @@ diverge only in `radii`/`shadows`), so each measurement below is stated once for
   and a row added for one role leaves the other equally unguarded.
   (`packages/ui/src/tokens.ts`)
 
-- ❌ **13.693 — `tokens.ts`'s `green700` calibration arithmetic is stale: it is computed against a text
-  colour the light theme stopped shipping on 2026-09-16.** `tokens.ts:36-38` records that `successText` on
-  `success` measures **4.40** against 4.5 for Apple's `#248A3D` and **5.40** for the incumbent `green700`
-  `#1e7a34`; `:117` repeats the 4.40. Both reproduce exactly against **pure white** — re-measured here as
-  4.3953 and 5.4004 — and that was the right ground when the docblock was written (`c71e58bb`,
-  2026-09-08, whose light `successText` was the primitive `white`). `b05e723f` (2026-09-16) introduced
-  `onColorWarmLight` `#fbf7f3` and repointed `successText` to it, and against that ground the same two
-  hexes measure **4.1233** and **5.0662**. **The conclusion survives** — both values stay on the same
-  side of 4.5, so `green700` is still the correct keeper — but the recorded arithmetic does not, and it
-  is the kind that gets quoted forward into the next decision as a measured fact. Deliverable: the two
-  docblocks re-derived against the shipped ground, each stating which ground it was computed on. The same
-  commit moved `accentText`, `dangerText`, `warningText` and `textInverted` onto that primitive, so the
-  re-derivation should sweep their rows too rather than assume this one is alone.
-  (`packages/ui/src/tokens.ts`)
+- ✅ **13.693 — `tokens.ts`'s `green700` calibration arithmetic WAS STALE: it was computed against a text
+  colour the light theme stopped shipping on 2026-09-16.** `tokens.ts:36-38` used to record that
+  `successText` on `success` measures **4.40** against 4.5 for Apple's `#248A3D` and **5.40** for the
+  incumbent `green700` `#1e7a34`; `:117` repeated the 4.40. Both reproduced exactly against **pure
+  white** — re-measured here as 4.3953 and 5.4004 — and that was the right ground when the docblock was
+  written (`c71e58bb`, 2026-09-08, whose light `successText` was the primitive `white`). `b05e723f`
+  (2026-09-16) introduced `onColorWarmLight` `#fbf7f3` and repointed `successText` to it, and against
+  that ground the same two hexes measure **4.1233** and **5.0662**. **The conclusion survived** — both
+  values stay on the same side of 4.5, so `green700` is still the correct keeper — but the recorded
+  arithmetic did not, and it was the kind that gets quoted forward into the next decision as a measured
+  fact. **Closed 2026-09-19.** `:36-38` now reads 4.1233 / 5.0662 *on the shipped `onColorWarmLight`
+  ground*, names 4.40 / 5.40 as the pure-white figures it used to carry, and `:117` carries 4.1233 and
+  `#fbf7f3`. Both substitutions are LINE-NEUTRAL — `tokens.ts` is 1493 lines before and after — so no
+  citation into that file moved. **A review then found the first sweep INCOMPLETE** — it had measured
+  `dangerText` on `danger` at **5.0511** and then left the pure-white **5.38** standing in four
+  present-tense places, which is this same defect recurring on a role this very entry names. The fix
+  round closed that and the rest it surfaced: `Features.md` (`dangerText`) and
+  `13-neomorphism-and-workspace-screens.md` (the `brand` tile, 2.87 → **2.69**, in two more copies),
+  `13-hig-per-screen.md`'s 13.281 text (4.40 / 5.40 → 4.1233 / 5.0662, plus its `4.395`),
+  `apps/web/app/globals.css`, `packages/app-core/src/account/sessions-section.tsx`, the 13.281 test
+  title and its own docblock sentence, and the two `tokens.ts` accents that quoted a bare **"5.25+"**
+  naming no ground at all (`:680`, `:1270` — now 5.26 against the then-white `accentText`, 4.93 on
+  today's warm ground). Proof: every figure above, re-derived 2026-09-19 from the shipped
+  role→primitive map using the suite's own WCAG helpers, on an instrument calibrated against eight
+  ratios this repo had already pinned elsewhere — 4.3953, 5.4004, 4.3746, 4.2485, 4.4013, 4.876, and
+  `accentText`-on-`accent`'s recorded 5.26 / 4.93 — every one reproduced to four decimals. The moved
+  roles came back sound: `accentText` on `accent` **5.8139**, `dangerText` on `danger` **5.0511**,
+  `warningText` on `warning` **4.8758**, `successText` on `success` **5.0662**, all against 4.5, and the
+  light roster's 33 declared rows report zero failures.
+  (`packages/ui/src/tokens.ts`, `Features.md`, `apps/web/app/globals.css`,
+  `packages/app-core/src/account/sessions-section.tsx`)
 
 ---
 

@@ -78,7 +78,7 @@ export function SessionsSection({ sessions, onRevoke }: SessionsSectionProps) {
                 // tint was built and then removed on a measurement: `danger`
                 // text on `surfaceSunken` is 3.84:1 and on `surfaceRaised`
                 // 4.29:1, both under the 4.5 this 0.9375rem label owes, while
-                // the solid variant's `dangerText on danger` is 5.38:1 and is
+                // the solid variant's `dangerText on danger` is 5.0511:1 and is
                 // the only one of the three `CONTRAST_PAIRS` actually gates.
                 // The full table is on the `/account` block in `globals.css`.
                 <Button variant="danger" onClick={() => onRevoke(session.token)}>

@@ -41,6 +41,97 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~14:3x IST. **DISPATCH TAKEN: `13.693` (TASK A) IS BUILT AND
+> # ITS PR IS OPEN; TASK B IS A READ-ONLY MEASUREMENT, ALREADY ANSWERED HERE.** Branch
+> # **`exec/13693-calibration-lift`**, cut from **`origin/main` = `6cee248d`**; dispatch
+> # `CTL-DISPATCH-2026-09-19-13693-calibration-lift.md`. **This block supersedes the Task 8 one below** —
+> # #513 is MERGED (`7123bb9e`) and re-doing it is the one thing a restart must not do.
+>
+> ## VERIFIED ANCHORS — re-measured with `/usr/bin/git`, not inherited
+> | | |
+> |---|---|
+> | base | `origin/main` = **`6cee248d`**, and `merge-base --is-ancestor` confirms this branch was cut from it |
+> | tree | **clean** at the handoff commit; every change is on the branch, nothing unpushed |
+> | gate | **`pnpm turbo run build test typecheck` — 33 successful, 33 total, zero failures**, run by THIS lane at its own tree **twice**: `1m23.067s` (cached 15) before the review fix round, and **`1m44.389s`, EXIT 0, no cache at all** after it. **Node runtime `v22.22.2`**, proved by `lsof` on a live vitest worker — *not* by `which pnpm`, which resolves the LAUNCHER under `node/v24.11.1/bin` and says nothing about the runtime |
+> | checks | all **8 exit 0**: env-example · task-ledger · migration-order · case-citations · runbook-commands · skipif-coverage · help · db-tz (`Asia/Kolkata`) |
+>
+> ## WHAT LANDED (Task A) — four files, and the line-neutrality is the load-bearing part
+> 1. `packages/ui/src/tokens.ts` — the two stale docblocks (`:36-38`, `:117`). They said **4.40 / 5.40**,
+>    which are the **pure-white** figures; the light theme has shipped `onColorWarmLight` `#fbf7f3` as
+>    `successText`'s ground since owner round 4 (2026-09-16), and on it the pair measures **4.1233 /
+>    5.0662**. Both edits are **LINE-NEUTRAL (1493 lines before and after)**, so **no citation into that
+>    file moved** — the ~50 `tokens.ts:NNN` citations across `docs/` and `test-cases/` all still resolve.
+> 2. `Features.md` — the same two numbers, plus the `brand`/`textInverted` **2.87 → 2.69**. Line-neutral
+>    (2869 == 2869).
+> 3. `test-cases/13-step-audits-and-catalogue-hygiene.md` — **`13.693` flipped `❌` → `✅`**; `13.690`–
+>    `13.692` left `❌` (owner: *"leave the contrast debts on hold as well. record it."*). The block
+>    preamble's "these four are ❌ by construction" was corrected to "three remain" — the fix falsified it.
+> 4. `packages/ui/test/tokens.test.ts` — **a citing test for `13.693`**, appended at EOF (+44 lines) so
+>    nothing below it shifts. **The repo's own ratchet caught the flip without it**: `check-case-citations`
+>    exited **1** with *"uncited count REGRESSED -- baseline 0, now 1 ... 13.693"*. A `✅` case with no
+>    citing test is not closed, and the gate said so before the controller had to.
+>
+> ## TWO MUTATIONS, TWO KILLS — both at their own site
+> | # | mutation | result |
+> |---|---|---|
+> | M1 | `themes.light.successText` → `'white'` | **RED** — `expected 'white' to be 'onColorWarmLight'`. Kills the GROUND assertion |
+> | M2 | `themes.light.success` → `'green300'` (guards left intact) | **RED** — `expected 1.7266861201596508 to be close to 5.0661792`. Kills the ARITHMETIC assertion |
+> | — | both restored | `git hash-object` back to **`992d53b0`**, byte-identical |
+>
+> **M1 alone would NOT have been enough, and that is the transferable part:** it fails on the ground
+> assertion, which sits ABOVE the ratios, so the runner stops before reaching them — a red at an earlier
+> assertion is not evidence a later one can fail. M2 exists solely to prove the arithmetic is live.
+> **The counterfactual line (`4.1233`) is documented-pinning, not independently falsifiable**: it is a pure
+> function of the ground, and any mutation of that ground is caught by the guard above it. Recorded rather
+> than dressed up.
+>
+> ## ⚠ THE FIRST SWEEP WAS INCOMPLETE, AND A REVIEW CAUGHT IT — all of it is fixed now
+> This is the most important paragraph in this block, because it is a near-miss on the exact defect the
+> task exists to remove. The first pass measured the four moved roles, wrote the numbers into the case
+> entry as *proof the sweep ran* — **and then left the pure-white figure standing for one of them.**
+>
+> | | |
+> |---|---|
+> | **A** | `dangerText` on `danger` is **5.0511** on the shipped ground; the pure-white **5.38** survived in **four** present-tense places — `Features.md`, `apps/web/app/globals.css`, `test-cases/13-neomorphism-and-workspace-screens.md`, `packages/app-core/src/account/sessions-section.tsx`. All four corrected |
+> | **B** | case `13.281`'s text (`13-hig-per-screen.md`) still said 4.40 / 5.40 **and** `4.395`, while the test beside it had just been retitled to 4.1233. Corrected, line-neutrally |
+> | **C** | the `brand` tile's **2.87** survived in two more catalogue copies. Corrected to 2.69 |
+> | **D** | `docs/lanes/owner-holds.md` said `tokens.ts` "**record**[s]" 4.40 / 5.40 and "the catalogue rows stay ❌" — both falsified by this change. Register updated, `13.693` recorded CLOSED |
+> | **E** | `tokens.ts:680` / `:1270` quoted a bare **"5.25+"** naming **no ground at all** — which IS the 13.693 defect, not an exemption from it. **I had recorded this as a deliberate non-fix; the review's rebuttal was right and I was wrong**, so it is fixed: 5.26 against the then-white `accentText`, 4.93 on today's warm ground |
+> | **F** | residue: the test's own docblock said "not as a shipped 4.40" three lines above the title this change had just changed; the block heading "recorded as cases rather than fixed" was falsified; `toBeCloseTo(4.12, 1)` was far looser than the 4-decimal title it sat under |
+>
+> **The transferable lesson, and it is the same one this repo keeps re-learning:** the first sweep's
+> universe was *the list of roles the case named*, not *the places those figures live*. It measured
+> `dangerText` correctly and never grepped for where `dangerText`'s number was written down. A figure
+> you have just corrected in one file is a claim you now owe the whole repository.
+>
+> **Flagged, NOT fixed — different cause, so a different owner:** the `danger`-as-text-on-`surfaceRaised`
+> figure `4.29` is stale for a *different* reason — T5 (2026-09-18) lightened `neoPaper` `#ede4db` →
+> `#f1eae3`, so `red600` on it went 4.2872 → **4.5173** and now PASSES 4.5, inverting a documented
+> failure. That is a neo-surface move, not the round-4 ground move, and it is outside this dispatch.
+> Sites named by the reviewer: `Features.md:278`, `globals.css:858/871/874`, `13-neomorphism…md:1183/1188`,
+> `sessions-section.tsx:80`. **Owner: the controller**, for its own dispatch.
+>
+> ## TASK B — ANSWERED, READ-ONLY, NO PR (this is the whole deliverable; do not rebuild anything)
+> **`hig-per-screen/3b` (Members — states) is ON `main`, and the alert is refuted on BOTH counts.**
+> - **PR `#443`** (`exec2/members-inviteadmin` → `main`) **MERGED** 2026-09-18T04:05:47Z, merge commit
+>   **`ba96a8d2`** — *"Members + InviteAdmin at the refreshed prototype: carry `role` end to end, port the
+>   roster's backed surface"*. `merge-base --is-ancestor ba96a8d2 origin/main` → **exit 0**.
+> - **PR `#476`** (`exec2/members-styling`) **MERGED** 2026-09-18T12:16:49Z, merge commit **`1d131a68`**,
+>   also reachable. **No members/invite PR is closed-unmerged.**
+> - `apps/web/app/w/[workspaceId]/members/page.tsx` is **844 lines** and renders the role cell;
+>   `packages/app-core/src/online/mappers.ts:440` carries `role: asString(member['role'], …)` — the wire
+>   field is **carried end to end**, and `:1112` records it as read since Task 15. The invite gate answers
+>   **403 `INVITE_ADMIN_ONLY_BODY`**. `gn-members` is styled (`globals.css`, `ui.css`) and has **two** test
+>   files — not the "three hits, all in that one file" the dispatch measured on 2026-09-18.
+> - **`packages/domain/src/rank.ts` EXISTS** (blob `dde7fcf1`), carried by `b26d9cd6` — "Second wave Task 1:
+>   rank keys, `.ranked`, `TicketState.rank`". The alert's claim that it was absent is **false at
+>   `origin/main`**.
+>
+> ## ⚠ THE SHAS IN THIS FILE'S NARRATIVE ARE UNRELIABLE — including mine
+> Every sha above is a fact about the moment it was measured, and **this file has already been wrong in
+> both directions within one hour** (see the 13:4x block). Before acting on any of them, re-take the
+> reading. `6cee248d` was `origin/main` when this branch was cut; **it has almost certainly moved.**
+
 > # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~13:4x IST. **TASK 8 IS BUILT AND ITS PR IS OPEN. THIS LANE
 > # HAS NOTHING IN FLIGHT AND IS WAITING ON THE CONTROLLER** — branch `exec/isTypes-count`, **PR `#513`**,
 > # base `main`, head `3db69d91`, `MERGEABLE` with a clean `merge-tree` against `7e8af098`.

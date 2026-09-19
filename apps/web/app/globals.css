@@ -856,7 +856,7 @@ input, textarea, select { font-family: inherit; }
    |----------------------------------|-----------|-----------------------|
    | `danger` on `surfaceSunken`      | 3.84      | fails 4.5 (light/hig) |
    | `danger` on `surfaceRaised`      | 4.29      | fails 4.5 (light/neo) |
-   | `dangerText` on `danger` (solid) | 5.38      | passes everywhere     |
+   | `dangerText` on `danger` (solid) | 5.0511    | passes everywhere     |
 
    The button's label is 0.9375rem — under the 18.66px "large text" cutoff —
    so 4.5 is the floor it owes, not 3. Only the solid variant clears it, and

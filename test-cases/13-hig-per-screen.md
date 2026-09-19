@@ -11,12 +11,12 @@ visible from reading the palette — the values look reasonable, and the harm is
 compute against one specific background — which is exactly why they are cases and not comments.*
 
 - **13.281** ✅ `success` is not Apple's increased-contrast green, and the case computes *why* rather
-  than restating the ruling: `successText` on Apple's `#248A3D` measures **4.40** against 4.5, while the
-  kept `green700` `#1e7a34` measures **5.40**. The counterfactual is calculated in the test against the
-  same foreground the shipped palette actually puts on it, so "complete the palette" arrives as a red
-  test naming the pair instead of a shipped 4.40.
+  than restating the ruling: `successText` on Apple's `#248A3D` measures **4.1233** against 4.5 on the
+  shipped `onColorWarmLight` `#fbf7f3` ground, while the kept `green700` `#1e7a34` measures **5.0662**.
+  The counterfactual is calculated in the test against the same foreground the shipped palette actually
+  puts on it, so "complete the palette" arrives as a red test naming the pair instead of a shipped 4.1233.
   *Controlled: swapping in `#248a3d` reddens **two** guards — this case (naming the hex) and the
-  data-driven declared pair, which prints **4.395**. Two independent witnesses for one defect.*
+  data-driven declared pair, which prints **4.1233**. Two independent witnesses for one defect.*
 - **13.282** ✅ `textMuted` and `categoryOpen` must not resolve to the same primitive. They shared
   `inkMuted` before this change, which is precisely the shape that invites reuniting them. Apple's
   accessible grey `#6C6C70` is correct for a chip dot's 3:1 and **wrong for read text at 4.16 on

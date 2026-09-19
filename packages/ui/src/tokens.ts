@@ -33,10 +33,10 @@ export type StyleName = 'hig' | 'minimal' | 'neo';
  *
  * * **`green700` `#1e7a34` is KEPT** (owner ruling, 2026-09-08). Apple's
  *   increased-contrast green `#248A3D` is the **single pair in the whole roster
- *   that still fails**: `successText` on `success` measures **4.40 against
- *   4.5**, missing by 0.10. The incumbent measures **5.40** and sits within a
- *   hair of Apple's hue, so the cheapest correct answer was to not move it.
- *   Verified both ways here rather than taken on trust.
+ *   that still fails**: on the shipped `onColorWarmLight` `#fbf7f3` ground it
+ *   measures **4.1233 against 4.5** (missing by 0.3767); the incumbent
+ *   measures **5.0662** and sits within a hair of Apple's hue, so not moving it
+ *   stays cheapest. 4.40 / 5.40 were the pure-white figures. Verified both ways.
  * * **`line` / `lineStrong` / `seam` / `seamStrong` are UNTOUCHED**, and that is
  *   a sequencing decision, not an oversight. Ruling R1 dropped borders in favour
  *   of fill, which means the `border` role must be remapped to a grey that
@@ -114,7 +114,7 @@ export const primitives = {
   amber700: '#b25000',
   amber300: '#ffb340',
   amberInk: '#241a00',
-  /** KEPT over Apple's `#248A3D`, which fails `successText` at 4.40 vs 4.5. */
+  /** KEPT over Apple's `#248A3D`, which fails `successText` at 4.1233 vs 4.5 on `#fbf7f3`. */
   green700: '#1e7a34',
   green300: '#30db5b',
   greenInk: '#05230e',
@@ -677,8 +677,8 @@ export const TOKEN_ROLES = [
    * `neoNavyRaised` in dark), which is precisely the guarantee the renamed
    * `CONTRAST_PAIRS` rows below exist to state. The Round 2d accent hexes
    * (`#3A6DB0`/`#7FA9E4`, adopted from the owner's neo prototype) measure
-   * 4.19–4.30 as TEXT on light surfaces — below 4.5 — while clearing 5.25+ as
-   * a FILL. **T1 (2026-09-18) moved the light hex to `#33629f`, which now
+   * 4.19–4.30 as TEXT on light surfaces — below 4.5 — while clearing 5.26 as
+   * a FILL against the then-white `accentText` (4.93 on today's warm ground). **T1 (2026-09-18) moved the light hex to `#33629f`, which now
    * clears 4.5 on the plain (5.07) and raised (5.81) light surfaces but still
    * FAILS `surfaceSunken` (4.42)** — so the split below is kept with a narrower
    * reason rather than retired: a fill colour that clears two backgrounds and
@@ -1267,7 +1267,7 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
    * new `textAccent` role — not `accent` — is what these two rows guarantee.
    * `accent` itself no longer carries a text-contrast guarantee at all: the
    * owner's neo-round accent hexes (`#3A6DB0`/`#7FA9E4`) were only ever
-   * measured as a FILL (5.25+ against `accentText`), and measure 4.19–4.30 as
+   * measured as a FILL (5.26 vs the then-white `accentText`, 4.93 today), and measure 4.19–4.30 as
    * TEXT on these same backgrounds — below what these rows require. **T1
    * (2026-09-18) later moved the light hex to `#33629f`, which clears these two
    * backgrounds (5.07 / 5.81) while still failing `surfaceSunken` (4.42), so

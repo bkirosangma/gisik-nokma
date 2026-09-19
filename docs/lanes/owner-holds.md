@@ -108,12 +108,16 @@ contrast debts on hold as well. record it."**
 - **`13.692`** — `danger` on `surface` measures **4.4013**, also unguarded. `red600 #d70015` on
   `warmPaper #efe7df` — the closest to the floor and still under.
 - **`13.693`** — not a contrast failure: a stale calibration docblock. `tokens.ts:36-38` and `:117`
-  record `successText` on `success` as 4.40 / 5.40, computed against pure white; the light theme has
+  recorded `successText` on `success` as 4.40 / 5.40, computed against pure white; the light theme has
   shipped `onColorWarmLight #fbf7f3` as that ground since 2026-09-16, against which the same hexes
-  measure 4.1233 / 5.0662. The decision survives; the arithmetic does not.
+  measure 4.1233 / 5.0662. The decision survives; the arithmetic does not. **CLOSED 2026-09-19** — the
+  owner named this lift (*"lift it"*), both docblocks now state the shipped ground, and the catalogue
+  row is `✅`.
 
-**The catalogue rows stay `❌` and are not edited by this hold.** The hold says *do not fix*; it does
-not say *stop recording*. A future session that fixes the CSS closes the case by the normal route.
+**The three contrast-debt catalogue rows (`13.690`–`13.692`) stay `❌` and are not edited by this
+hold.** The hold says *do not fix*; it does not say *stop recording*. A future session that fixes the
+CSS closes the case by the normal route — which is what happened to `13.693`, whose lift the owner
+named on 2026-09-19 and which a commit closed the same day.
 
 ---
 
