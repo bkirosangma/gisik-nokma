@@ -1,4 +1,68 @@
-## ▲ TOP BLOCK — **THE INSTRUMENT DEBTS. Task 1 (the seed-dev load red) is DONE; Task 2 (the sweep that sweeps nothing) is NEXT.** (2026-09-20, ~07:0x IST)
+## ▲ TOP BLOCK — **THE INSTRUMENT DEBTS: BOTH TASKS BUILT, `#567` MERGED, `#568` AWAITING THE MERGE.** (2026-09-20, ~09:0x IST)
+
+### § 1 — WHERE TO FIND IT. Read this before anything else.
+
+- **Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-20-instrument-debts.md`.** `main` = **`a731c630`**.
+- **TASK 1 — `exec2/seed-dev-load` — MERGED as `#567`** (merge commit `a731c630`). **Its full block is
+  immediately BELOW this one**, which is why § 3 keeps only its one-line summary.
+- **TASK 2 — `exec2/sweep-discovery`** — **rebased onto `a731c630`; this PR is open and the controller
+  merges.** The rebase's only conflict was THIS file, resolved by keeping both blocks.
+- ⚠ **This lane's id block is `16.41`–`16.60`; `16.41`–`16.44` are SPENT, so next free is `16.45`** — and
+  **NEITHER task minted a case id, deliberately**: Task 1 changed no behaviour, and Task 2's property is
+  pinned by the check script's own `--self-test`, this repo's convention for a check script.
+- ⚠ **THE MERGE-ORDER HAZARD FIRED, AND THIS FILE IS WHERE IT LANDED.** Both branches were cut from
+  `cefc9c91` and **each carried a handoff block written against its own task**, so whichever merged second
+  would have superseded the first wholesale. It **conflicted** instead, and **both blocks are kept** —
+  Task 2's above, Task 1's below. **The lesson: a handoff block is not append-only when two branches share
+  a base; the second one to be written must expect to resolve a conflict in this file.**
+
+### § 2 — TASK 2: the sweep named a container that does not exist, and the fix DISCOVERS instead
+
+**Confirmed, and worse than the dispatch states.** `sweep-test-dbs.sh` hardcoded
+`CONTAINER=gisik-nokma-exec-postgres-1` — `docker ps -a` shows it **`Exited (255)` for 12 hours** — while
+the suite's actual Postgres is **`gisik-nokma-postgres-1`**, up 8 hours on `:54329`. `docker exec` against
+a stopped container fails, `pg_isready` failed, and the script printed *"Postgres is not accepting
+connections — skipping (not a failure)"* and **exited 0 having swept nothing.**
+
+**The name was never the property.** The suite addresses its Postgres by **published port**, so the port is
+what is now matched — and a rename cannot silently disable it again. ⚠ **The dev stack's Postgres is up at
+the same time on `54330` and is deliberately NOT swept** (a human's databases); matching the port rather
+than a name pattern is what tells them apart.
+
+**⚠ AND THE DEFECT HAD ACCUMULATED 126 DATABASES.** The first run of the fixed script reported
+**`126 gisik_test_* databases present`**, swept all 126, and left **0**. That is the size of what the
+silent skip was hiding.
+
+**A skip that reads as success IS the defect, so it now FAILS LOUDLY** — `exit 1` with a FATAL line for a
+port nothing publishes, and for a container that publishes it but is not answering. **Loud is safe here and
+that is measured**: `locked-test.sh:209` runs it as `... || echo "sweep failed — continuing, …"`, so a
+non-zero exit is loud and **NON-FATAL** — the gate carries on, but a sweep that did not happen can no
+longer be read as one that found nothing.
+
+**And it carries a `--self-test`, which every other check in this repo has and this one did not**
+(`check-case-ids: self-test passed …`, `check-migration-order: self-test passed (6 planted defects
+caught)`). **Mutation-witnessed:** restoring the old `exit 0` for a port nothing publishes makes it print
+`sweep: SELF-TEST FAILED …` and exit 1. Reverted.
+
+**No case id minted** — no product behaviour changed; the script's own self-test is where the property is
+pinned, which is this repo's convention for a check script.
+
+### § 3 — TASK 1 in one line, and its full block is immediately below this one
+
+The `seed-dev` red was **the test's own work, not the limit and not the database**: it seeded the real
+series (359 events) twice — 1690 ms under a 30 s limit — to assert counts that are not facts about corpus
+size. A 13-event fixture took it to **101 ms (16.3x)**, and `committed` is now asserted for its VALUE
+(`toBe(13)`) where it was `toBeGreaterThan(0)`. **The complete record — the three-way diagnosis, the
+coverage accounting and both mutation witnesses — is the next block, which this rebase is what put here.**
+⚠ **This paragraph first said the full record was NOT below, "because this branch was cut from `main`
+before Task 1 merged". That was TRUE when written and the rebase made it false** — recorded rather than
+silently edited, because the sentence is a neat illustration of the hazard § 1 describes.
+
+---
+
+---
+
+## ▼ PREVIOUS BLOCK — **TASK 1: the `seed-dev` load red, MERGED as `#567` (`a731c630`).** (2026-09-20, ~07:0x IST)
 
 ### § 1 — WHERE TO FIND IT. Read this before anything else.
 
@@ -37,12 +101,12 @@ re-founded workspace and the seed throws loudly); shrinking the fixture reddens 
 `expected 11 to be 13`. Both mutations reverted byte-identically — `git diff origin/main` over
 `seed-dev-workspace.ts` is **empty**.
 
-### § 3 — TASK 2, NOT YET STARTED, and its claim is the DISPATCH'S until I measure it
+### § 3 — TASK 2 is BUILT and is the block ABOVE this one
 
-`docs/lanes/gate-lock/sweep-test-dbs.sh` is said to hardcode `CONTAINER=gisik-nokma-exec-postgres-1`,
-which **does not exist**, so it prints *"Postgres is not accepting connections — skipping (not a
-failure)"* and **sweeps nothing while reading exactly like a clean sweep**. The fix is to **DISCOVER** the
-container rather than name it, or **fail loudly** — a skip that reads as success is the whole defect.
+This section used to hold the dispatch's claims about the sweep, marked as **the DISPATCH'S** until measured
+here. They were measured, **and they were worse than the dispatch states**: the sweep's hardcoded container
+was `Exited (255)` while the real one ran, and **126 `gisik_test_*` databases had accumulated** behind the
+silent skip. **The full record is the TOP BLOCK** — read it there rather than here.
 
 ---
 
