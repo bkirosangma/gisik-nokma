@@ -183,6 +183,18 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `:327`). Pre-existing, not authored here — but **this branch re-emitted that line**, so a reader would
 > attribute them to it. *Owner: the controller.*
 >
+> ## ROUND 4 — found by re-sweeping AFTER the PR opened, and it is a class nobody had looked for
+> Every prior round found more than the round before it, so **stopping was an assumption, not a
+> measurement**. Re-running the narrowed sweep against the current tree gave 127 lines, most legitimately
+> different (the replica's own `ReplicaGapError`s, past tense, quoted history, real current refusals such
+> as `mapTicketRead`'s `assignedProvenance`). **Four were live**, and they are the same falsification
+> **one abstraction down** — not *a read* refusing, but *the mapper* refusing over the contested kind's
+> missing title:
+> `apps/web/e2e/smoke.spec.ts:24` · `attention-strip.test.tsx:22` · `:119` · `my-work.test.tsx:157`.
+> **`attention-strip.tsx:63-66` had ALREADY recorded that expiry** — *"this rule used to rest on a SECOND
+> fact that has expired"* — three files away. **That is the shape of a sweep that reads the corrected
+> sentence and stops.**
+>
 > ## ⛔ THE ROUND-2 METHOD NOTE — the failure that recurred THREE TIMES IN ONE TASK
 > **Every citation this branch wrote was invalidated by this branch's own later edits to the same file.**
 > 1. `client-contract.test.ts:371` → `:375` (my Round-1 docblock sits above the function).
@@ -228,7 +240,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | prior branch | `exec/e2e-stack-repair` @ `42783c53` — **fully contained in `origin/main`** (`git branch -r --contains` lists it; `origin/main...HEAD` diff is empty) |
 > | falsifiers | `c86c4b5c` (P25 clause 1, 2026-09-06) · `42fb2f2c` (search served, 2026-09-19). Both REACHABLE from `origin/main` |
 > | `:3001` | **untouched.** No `docker compose` action taken; the owner's stack was not bound or taken down |
-> | next | **PR #583 is OPEN, `--base main`, `MERGEABLE`, `headRefOid 28418c5f` == this branch's local HEAD (verified, not assumed). THREE rounds are in it: two full reviewer passes plus a scoped re-review. NOTHING FURTHER IS PUSHED except this handoff commit. The controller gates the tip and merges.** |
+> | next | **PR #583 is OPEN, `--base main`, `MERGEABLE`.** Rounds 1–4 are in it. **#583 opened at `28418c5f`; round 4 landed after it, so the head is `581a5e5e` plus this handoff commit — a NEW HEAD, not a footnote. Gate the TIP.** Nothing further is pushed: the controller gates and merges. |
 >
 > # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~09:0x IST. **THE `e2e-stack` REPAIR IS BUILT AND PUSHED; ITS PR
 > # HAS BEEN REVIEWED AND SENT BACK ONCE; THE FIX ROUND IS PUSHED. THE CODE HEAD IS `2e02ddac`.** Branch
