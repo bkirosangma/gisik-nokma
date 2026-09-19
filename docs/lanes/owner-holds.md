@@ -16,26 +16,30 @@ revisit them."*
 
 ## Held
 
-### 1. The wire-gap screens — **PARTLY LIFTED 2026-09-19.** Read the per-row status.
+### 1. The wire-gap screens — **FULLY ANSWERED 2026-09-19. NOTHING HERE IS STILL HELD.** Read the per-row status.
 
 Seven screens from the 2026-09-18 prototype delta audit whose prototype controls have no server
 behind them. Each is server + mapper work, i.e. the most expensive category in the queue.
 
-**The owner answered all seven, row by row, on 2026-09-19.** **Four rows are now LIFTED and three remain
-HELD — do not dispatch a `HELD` row, and do not treat a lifted row as licence for a held one.**
+**The owner answered all seven, row by row, on 2026-09-19** — four in the first sitting and the rest in the
+second (below). **The section is now fully answered: six rows are LIFTED and one half is DROPPED. There is no
+`HELD` row left here**, so the "do not dispatch a `HELD` row" rule this section was written for has no
+remaining subject. **It is kept rather than deleted: it is the rule that must re-apply the moment the owner
+holds something again.**
 
 | Screen | What is missing | status |
 |---|---|---|
-| `isInbox` | the filter and the bulk actions | **HELD** |
+| `isInbox` | the filter and the bulk actions | **LIFTED 2026-09-19 — second sitting** |
 | `isTypes` | reorder and per-type counts | **LIFTED 2026-09-19 — both halves approved** |
 | `isWorkflows` | a badge and a second action | **SPLIT: the badge is DROPPED (not held, not to be built); the second action is LIFTED with version history (§9.1) as ONE decision** |
-| `isMcpTokens` | row names (the issue-token flow itself is separately ruled out) | **HELD** |
-| `isInvite` | three read fields | **HELD** |
-| `isMcpAuth` | scopes, client, and the deny route | **HELD** |
-| `isWorkspace` | project description, chips, delete | **HELD** |
+| `isMcpTokens` | row names (the issue-token flow itself is separately ruled out) | **LIFTED 2026-09-19 — second sitting** |
+| `isInvite` | three read fields | **LIFTED 2026-09-19 — second sitting** |
+| `isMcpAuth` | scopes, client, and the deny route | **LIFTED 2026-09-19 — second sitting** |
+| `isWorkspace` | project description, chips, delete | **LIFTED 2026-09-19 — second sitting** |
 
-**The rule this section was written for still stands for the three HELD rows**: the owner picked them
-individually, so do not generalise from the lifted ones.
+**The owner picked every row individually, which is why each carries its own status rather than one
+sentence for the set.** A lift of one row was never licence for another; that now applies to the second
+sitting's five as much as it did to the first sitting's four.
 
 #### The 2026-09-19 rulings, verbatim, and what each means
 
@@ -46,6 +50,18 @@ individually, so do not generalise from the lifted ones.
 | `isWorkflows` **status badge** | **drop it** | not built, and recorded as a **named absence** — not as an outstanding gap. The read serves only published workflows, so a field holding one value would be a badge that lies by omission |
 | `isWorkflows` **second action** + **version history** | **yes** | **ONE decision, one task.** The version chain is already readable (route `?version=`, `data-source.ts:146` `version?: number`); the web adapter drops the argument at `data-source-gateway.ts:224` and **no history screen exists** — so this is the first port that draws a screen the prototype does not |
 
+#### The second sitting, 2026-09-19 ~12:5x — the remaining rows, lifted together
+
+The controller put the whole owner-gated queue in front of the owner; §1's five remaining rows and §2 were
+part of it, and the owner answered them as one: **"lift em"**.
+
+| item | effect |
+|---|---|
+| §1's five remaining rows — `isInbox`, `isMcpTokens`, `isInvite`, `isMcpAuth`, `isWorkspace` | **LIFTED.** Each is server + mapper work, the most expensive category in the queue |
+| §2 — `McpAuthorize` and `McpTokens`, the `hig-per-screen/10` pair | **LIFTED.** This is what unblocks that ledger row |
+| §3 — the legal copy placeholders | **"leave the legal copies as is."** — see §3: **not a hold any more and not outstanding work**, a DECIDED STATE |
+| §4 — the contrast debts | **`13.693` LIFTED** (**"lift it"**) — arithmetic in a comment, not a design debt. **`13.690`, `13.691` and `13.692` REMAIN HELD**; see §4 |
+
 #### And one product question outside this register, ruled the same day
 **`Attachment` as a custom field kind — NO.** `CUSTOM_FIELD_KINDS` is `['text','number','date','select','person']`;
 the prototype's `Text/Date/Number/Attachment` is a **different set, not a superset**, and adding `Attachment`
@@ -53,18 +69,27 @@ decides whether a custom field can hold a file. **Recorded as a deliberate absen
 `packages/domain/src/ticket-types.ts`'s docblock and in the ticket-type editor's — a reader comparing the two
 must find the reason, not a silence.
 
-### 2. `McpAuthorize` and `McpTokens` — HELD (owner, 2026-09-18)
+### 2. `McpAuthorize` and `McpTokens` — **LIFTED 2026-09-19** (held 2026-09-18, lifted in the second sitting)
 
-The last two screens of `hig-per-screen/10`, both wire-gap by the same audit. This is why that ledger
-row cannot close: Help, Legal and NotFound all ship, and these two do not. Same hold as §1.
+The last two screens of `hig-per-screen/10`, both wire-gap by the same audit. This is why that ledger row
+could not close: Help, Legal and NotFound all ship, and these two did not. **The owner lifted both on
+2026-09-19 ("lift em"), which is what unblocks `hig-per-screen/10`** — it was never an implementer's
+question, it was a scope decision about new reads, and it is now answered.
 
-### 3. The legal copy placeholders — HELD (owner, 2026-09-18)
+### 3. The legal copy placeholders — **DECIDED 2026-09-19: THE PLACEHOLDERS STAY** (held 2026-09-18)
 
 `/privacy` and `/terms` ship with bracketed placeholder text where the real legal wording goes. Step
-2c-2 (#428) ported the chrome and deliberately left the copy untouched. This is a content gap only the
-owner can close; the owner's instruction was **"9 - hold these for now."**
+2c-2 (#428) ported the chrome and deliberately left the copy untouched. The owner's first instruction, on
+2026-09-18, was **"9 - hold these for now."**; on 2026-09-19 the owner was asked again and answered
+**"leave the legal copies as is."**
 
-### 4. The contrast debts — HELD (owner, 2026-09-18)
+**That is a decision, not a deferral, and the distinction matters to whoever reads this next.** A hold says
+*not yet*; this now says *this is what ships*. The bracketed text is the intended state, so **it must be
+recorded as a deliberate absence in the two screens' own files** — a reader comparing the product to a
+finished legal page has to find the reason, not a silence. **It is no longer outstanding work and must not
+be dispatched, planned around, or raised again without the owner reopening it.**
+
+### 4. The contrast debts — **PARTLY LIFTED 2026-09-19**: `13.693` lifted, `13.690`–`13.692` still held
 
 Four cases minted by Step 4b (#431), each `❌` by construction (no commit performed the work; the fix
 is the deliverable). The owner was shown the exact locations and ratios and answered: **"leave the
@@ -86,6 +111,20 @@ contrast debts on hold as well. record it."**
   record `successText` on `success` as 4.40 / 5.40, computed against pure white; the light theme has
   shipped `onColorWarmLight #fbf7f3` as that ground since 2026-09-16, against which the same hexes
   measure 4.1233 / 5.0662. The decision survives; the arithmetic does not.
+
+**`13.693` IS LIFTED AS OF 2026-09-19 — it is not a contrast debt at all.** It is a stale calibration
+docblock: `tokens.ts:36-38` and `:117` record `successText` on `success` as 4.40 / 5.40 computed against
+pure white, while the light theme has shipped `onColorWarmLight #fbf7f3` as that ground since 2026-09-16,
+against which the same hexes measure **4.1233 / 5.0662**. The decision survives; the arithmetic does not.
+The owner ruled **"lift it"** — it needs no colour change and no design call.
+
+**`13.690`, `13.691` and `13.692` REMAIN HELD.** On 2026-09-19 the owner asked **"why is the contrast ratio
+decided at 4.5?"** and the controller answered: **4.5:1 is WCAG 2.1 Success Criterion 1.4.3 (Contrast
+(Minimum), Level AA)** — an external standard rather than a house preference; the ratio is
+`(L1 + 0.05) / (L2 + 0.05)`, the 4.5 value is empirical (set from legibility research), 7:1 is AAA
+(SC 1.4.6) and 3:1 governs non-text (SC 1.4.11). **The owner took no action on those three.** One legitimate
+route out, recorded because it is a design answer rather than a waiver: the 4.5 floor governs *normal* text
+only, so rendering any of them at ≥24 px, or ≥18.66 px bold, drops the floor to 3:1 and each clears.
 
 **The catalogue rows stay `❌` and are not edited by this hold.** The hold says *do not fix*; it does
 not say *stop recording*. A future session that fixes the CSS closes the case by the normal route.
