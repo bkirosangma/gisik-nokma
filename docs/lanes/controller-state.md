@@ -31,6 +31,60 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 SUNDAY 2026-09-20 ~06:3x IST — **CYCLE 19: TWO MORE PRs MERGED AND GATED, A CONTRADICTION SETTLED BY MEASUREMENT, AND TWO CONTROLLER CORRECTIONS.** `main` is `3f37ffc4`; **zero open PRs**; ledger **306 done / 2 todo** — unchanged.
+
+### Position — read this instead of the older tables, which this supersedes
+| lane | task | status |
+|---|---|---|
+| exec 1 | **the falsified-claim sweep** (`getTicket` "refuses" — the carrier PR `#537` missed) | **IN FLIGHT** — `exec/falsified-claim-sweep`, restarted at the fixed point, Ctx 6 % |
+| exec 2 | **the manual's two false counts** (*"four different sentences"*, *"four tabs"*) + the closed-unaware empty-month copy, framed **measure-then-propose** | **IN FLIGHT** — `exec2/manual-counts`, restarted at the fixed point, Ctx 21 % |
+| exec 1 | **the parity visual half** | **OWED to a rebuild — and now known to be ACHIEVABLE** (below) |
+| both | **NINE items** — the reviewer-bar clause · the ledger flip `hig-per-screen/3b` · the tap-target 24px ruling · the unstyled `ticket-type-list__move` · the **style-axis question** · the footer's reachability · door `H`'s `Delete` · the pending-invitations heading · the `ticket-location.ts:26` docblock's owner | ⛔ **ALL THE OWNER'S** |
+
+### THE TWO MERGES
+| | `#579` (exec 2, the Calendar closed-hide + a stale quote) | `#578` (exec 1, the `e2e-stack` repair) |
+|---|---|---|
+| head, frozen at the gate | `4ef362e8` | **`42783c53`** — the fold the controller asked for, so the gate was run at the LANDING TREE and **not transferred** |
+| `merge-tree` prediction | `45d7ac36`, exit 0, empty stderr | `94f099c6`, exit 0, empty stderr |
+| merged as | **`84c35f5a`** | **`3f37ffc4`** |
+| tree identity | **EXACT** | **EXACT** |
+| forced gate | `EXIT=0` · 33/33 · 0 cached · **2m00.8s** · no orphans | `EXIT=0` · 33/33 · 0 cached · **1m56.0s** · no orphans |
+| seven checks | all raw 0; `check:help` **230** (the +1 predicted) | all raw 0; `check-case-ids` **2494** |
+| per-file blob identity | **5 / 5 identical** | **9 / 9 identical** |
+| drop check + control | 1 file, main-ahead | 6 files, **all attributable** (`#579`'s five + the anchor) |
+
+**The checks' control was RE-TAKEN at `#578`'s landing tree, not carried** — `2494` → a planted `10.1` at `10-workflow-builder.md:6/:7` → **rc 1** → restored **rc 0**, tree unchanged. **A control is a reading that expires.**
+
+### ✅ THE CONTRADICTION IS SETTLED — **`13.176` WAS WRONG AND THE SHEET OPENS**
+**Cycle 18 recorded a contradiction between case `13.176` (*"`DataSource.getTicket` refuses with `ServingGapError` for EVERY viewer … the SHEET is a refusal for everybody on every surface"*) and `#572`'s own body (a hand-driven session that screenshotted the sheet).** **exec 1 settled it by measurement, two-sided:**
+- **the wire** — `GET …/tickets/<id>` → **200** with exactly the seven keys `mapTicketRead` reads;
+- **the browser, three ways** — owner from a board card, owner from `/my-work`, and **a GUEST on a "Shared with me" errand** — all reach the sheet, with a real title and **`stateProvenance` rendering on screen** (one of the three fields the stale docblock says is missing);
+- **and a real negative arm** — a ticket **not** shared answers **404 on the API** and opens a sheet with the generic title, so **the refusal is on the READ, not on the sheet.** Deliberately indistinguishable between "not yours" and "does not exist".
+**So the headline task's visual half is ACHIEVABLE, not impossible — the controller's cycle-18 doubt is withdrawn.** ⚠ **But it still needs a rebuild, and the one remaining question is the STYLE AXIS** — `#572` says its screenshot was *"in `hig`"* while the running stack reads **`data-style="neo"`**, and no screenshot survives to settle it. **If that is right, the comparison measured the wrong axis — the exact trap this project recorded for the parity work.**
+
+### ⛔ TWO CONTROLLER CORRECTIONS THIS CYCLE — both of them the controller's, both caught
+1. **A FINDING WAS MISDIAGNOSED.** The controller told the owner `button.ticket-type-list__move` was a **contrast regression**. It is not: the class **has NO CSS rule at all** — grep over `ui.css` and `globals.css` returns **nothing**, against a control of `ticket-type-list__row` at **1 and 13** hits. It renders as **raw UA chrome**. **The measurement was right; the diagnosis named a property the element does not have.**
+2. **A MERGED PR'S SENTENCE WAS MISREAD.** The controller reported that `#572`'s body contradicted itself about the sheet. **It does not** — it says the post-change screenshot *"has NOT been taken for this branch"* **and** that what the hand-driven session produced was the **shipping sheet**, i.e. the pre-change baked image. **Two different claims, both true.** exec 1 pushed back with the measurement and was right.
+
+### AND ONE THE CONTROLLER GOT WRONG IN A NOTE, CORRECTED IN THE SAME CYCLE
+**It told exec 1 that `ticket-location.ts:26`'s falsified docblock was "the owner's". It is not** — a falsified comment in source is dispatchable (`01a24a9d`/PR `#537` was four of them). **It is dispatched.**
+
+### THE REVIEWER ROUND HAS NOW PAID OFF THREE TIMES IN ONE NIGHT
+`#572` — a **shipped regression** (a comment between two selectors in a shared rule silently re-sized every dialog heading). `#578` twice — **I1 falsified by the `events` table** (its history claim was too wide; there are TWO archives and TWO restores, and the wrong-board window starts at the 2026-09-19 restore), and **I2 in the PR's OWN defect class** (the repaired locator could still pick the wrong project — fixed with an exact accessible name, `toHaveCount(1)`, the href read before the click and `path === href` after, **both new guards mutation-witnessed**). **This is the controller's standing argument to the owner for the bar clause, and `#578` is the evidence.**
+
+### INSTRUMENTS THAT LIED THIS CYCLE, ALL CAUGHT
+1. **A DELTA THAT CANNOT MOVE A GATE, ARGUED AS A REASON NOT TO GATE.** exec 1 measured that nothing in `apps/`, `packages/` or `scripts/` reads `test-cases/` — **true** — and concluded the earlier gate held. **The rule that decides it is the other one: "a docs-only delta does not transfer a gate", because that reasoning is what makes a freeze decorative.**
+2. **THE CONTROLLER'S FIRST TEST FOR THE HANDOFF DEFECT ASKED FOR A PROPERTY THAT CANNOT EXIST** (a commit naming its own sha) — a permanent failure reported as a defect.
+3. **THE SWEEP UNIVERSE, AGAIN.** `#537` fixed `attention-strip.tsx` and `ticket-sheet.tsx` **and missed `ticket-location.ts`** — and the evidence that more remain is already in the tree (`stub-services.ts:44`: *"It was six … until ruling P25"*). **The next dispatch's whole rule is that the universe must be defined in writing BEFORE it is looked at.**
+
+### WHAT THE NEXT CONTROLLER SHOULD DO FIRST
+1. **Capture both panes** (`gisik:1`, `gisik:2`) — both lanes were mid-task at handover.
+2. **Re-measure every anchor above at the sha you report.**
+3. **Do NOT measure from the primary checkout** — it is behind. Use `gisik-nokma-ctl` on a branch off `origin/main`.
+4. **CI is the billing-blocked shape** (every failing annotation: *"the job was not started because recent account payments have failed"*). **Owner-waived 2026-09-06, not treated as green, NOT to be re-asked.**
+5. **NINE items are the owner's, all on the record with evidence.** The two newest: **the style-axis question** (was the parity "before" screenshot taken in the language the prototype is drawn in?) and **the tap-target 24px ruling** (`ui.css:1506-1522` carries the repo's own written rule: *"Dense in-list controls get 24, standalone controls get 44"*).
+6. **Then `gh pr list --state open`, and resume the loop.**
+
 ## 🔄 SUNDAY 2026-09-20 ~05:0x IST — **CYCLE 18: TWO MORE PRs MERGED AND GATED, A SEND-BACK THAT FOUND TWO DEFECTS THE GATE CANNOT SEE, AND BOTH LANES REDISPATCHED.** `main` is `d8f18bf4`; **zero open PRs**; ledger **306 done / 2 todo** — unchanged, **one row is now a QUESTION FOR THE OWNER, not an omission** (below).
 
 ### Position — read this instead of the older tables, which this supersedes
