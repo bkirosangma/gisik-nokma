@@ -62,21 +62,24 @@ This is the part a marketing page would leave out. Read it before you decide any
 - **You cannot create a project.** There is no button anywhere in the product that makes one. A brand
   new workspace comes with stages, job types and you as its owner — and nowhere to put a job. Until
   this is built, projects have to be put there for you.
-- **You cannot assign a job to anybody.** The board shows who a job is on, the Inbox tells you when
-  you have been assigned something, and the table can group by person — but nothing on any screen puts
-  a job on a person.
+- **You cannot assign a job to anybody on the phone or desktop apps.** The website can, from the job
+  sheet's **Assignee** picker — which also offers **Unassigned**, so an assignment can be cleared as
+  well as set. The board shows who a job is on, the Inbox tells you when you have been assigned
+  something, and the table can group by person.
 - **You cannot set a due date.** The calendar, the timeline and the whole "due soon" list are built
   around claimed dates, and there is no control that claims one.
-- **You cannot leave a comment on the web, and you cannot attach a file.** The description *is*
-  writable: the writing box handles formatting and mentions and is connected to the job screen, though
-  a file dropped into it is refused rather than quietly lost. A comment is different — nothing on the
-  web takes one, and nothing on the web lists one. The phone app can post a comment; the full website
-  cannot.
+- **You cannot leave a comment on the web, and you cannot attach a file to a job.** The description
+  *is* writable — the writing box handles formatting and mentions and is connected to the job screen,
+  though a file dropped into it is refused rather than quietly lost. A comment is different: nothing
+  on the web takes one, and no screen renders a comment thread — an Inbox row quotes the opening of a
+  comment that mentioned you, and that is the whole of it. The one way a file gets in is a Move that
+  requires evidence; the Move stays blocked until the server has stored it. The phone app can post a
+  comment; the full website cannot.
 - **No screen on the web or the desktop searches inside a job's description or its comments.** The
   full-text search that does exists — the phone app's offline search reads comment bodies, and an MCP
   client's `search_tickets` reads titles, descriptions and comments. What the web itself offers is a
-  **Search the board** box on a project's board, which matches card titles only, and the help's own
-  search over this manual and the FAQ.
+  **Search the board** box on a project's board, which matches the titles of the cards already loaded
+  there, and the help's own search over this manual and the FAQ.
 - **Nothing links to the settings screens.** The stage builder and the job-type editor — the screens
   that make the product yours — can only be reached by typing their address into the browser.
 - **Notifications never leave the app.** No email, no text message, no push. The only email Gisik
@@ -138,8 +141,7 @@ pnpm turbo run build test
 
 The gate is `pnpm turbo run build test typecheck`, plus six repository-check jobs in
 `.github/workflows/ci.yml` — `check:env`, `check:runbook`, `check:citations`, `check:help`,
-`check:tasks` and `check:migrations`. Two more checks ride inside `check:env`:
-`check:skipif-coverage` and `check:case-ids`.
+`check:tasks` and `check:migrations`.
 
 **If `pnpm install` exits 1 with no output at all, check `node -v` first.** `engine-strict=true` makes
 the declared Node range binding, and pnpm's refusal under a wrong version is completely silent — the
