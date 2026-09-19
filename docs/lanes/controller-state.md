@@ -31,6 +31,72 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## ✅ SATURDAY 2026-09-19 ~12:4x IST — **CYCLE 9: FOUR PRs MERGED, ONE GATE RED THAT THE EXECUTOR'S OWN CHECKS COULD NOT SEE, AND A PLAN THAT STILL TOLD TWO READERS TO BUILD A SECOND DOOR.** `main` is `22a8e7c3`; **zero open PRs**; ledger **301 done / 0 claimed / 7 todo**.
+
+### If you are the DeepSeek controller reading this: your position, in five lines
+1. **`main` = `22a8e7c3`.** This cycle merged **`#505`** (exec 1, Tasks 6+7 — the `isTypes` ↑/↓ reorder) → `2f5c2c3f`, **`#507`** (the plan correction) → `cc4b84bf`, **`#508`** (exec 1 handoff) → `0dce49e8`, **`#506`** (exec 2, Task 3 — the version-history screen) → `22a8e7c3`. Every one gated at its own landing tree, 33/33, tree-identical, blobs verified.
+2. **EXEC 1** (`gisik:1` / `…-exec` / `exec/`) is **MID-TASK on Task 8**, the `"N tickets"` count — dispatch `CTL-DISPATCH-2026-09-19-task8-isTypes-count.md`. **EXEC 2** (`gisik:2` / `…-exec2` / `exec2/`) is **freshly restarted and HOLDING**; it has no next task and none exists that is not owner-gated.
+3. **THE OWNER ANSWERED ALL EIGHT OWNER-GATED ITEMS ON 2026-09-19 ~12:5x IST. THE RULINGS BLOCK BELOW IS THE NEWEST AUTHORITY IN THIS FILE** — it supersedes the "not answered yet" framing this entry first carried, and it changes the DEV TOPOLOGY (no more hot reload; servers run from the MAIN folder). **Read it before touching the stack.**
+4. **THE RESTART PROMPTS WERE STALE AND ARE NOW FIXED — USE THE NEW ONES.** `.exec-prompt-restart-2026-09-19.md` (exec 1) and `…-exec2.md` (exec 2). The 2026-09-18 files end by telling a relaunched executor to *"cut every branch from `origin/owner/workspace-edits` and open every PR with `--base owner/workspace-edits`"* — **a branch that was deleted on 2026-09-18**, whose PRs GitHub auto-closes. Launching from them would have mis-based the next executor silently.
+5. **Rulings you cannot make:** a ledger status change beyond what a position names, a merge with conflicts outside the files named, an executor deviation you cannot measure, a scope question, **anything touching the owner's environment (the hot web) or the owner-holds register**. Write it to the owner in your pane and HOLD; **never `AskUserQuestion`**.
+
+### 📌 THE OWNER'S RULINGS, 2026-09-19 ~12:5x IST — the full owner-gated list, answered
+The controller laid out nine items; the owner answered eight (the ninth was a flag, not a question). **These are recorded verbatim where the wording is load-bearing, and they are the newest authority in this file.**
+
+| # | item | the owner's ruling |
+|---|---|---|
+| 1 | The three ledger rows reading `todo` for merged work | **"flip em"** — flip `hig-per-screen/6b`, `hig-per-screen/7b`, `backlog-and-closed-second-wave/12` to `done` |
+| 2 | The hot web / dev topology | **"no more hot reloads. rebuilt once they hit the main, is fine. that means the servers are to be run from the main folder instead of from the executor's branch. bring up the server once the hot reload is removed."** — see the topology block below |
+| 3 | `13.693` — the stale calibration docblock filed under the contrast debts | **"lift it"** — it is arithmetic in a comment, not a design decision |
+| 4 | `hig-per-screen/5b` — the unsatisfiable §5b sentence | **"c"** — the real-door case: real server, real Postgres, the List genuinely shrinks, ~½ day. The only option that witnesses the PRODUCT |
+| 5 | The hot-compile instruction | **"go"** |
+| 6 | The five held wire-gap screens | **"lift em"** — `isInbox`, `isMcpTokens`, `isInvite`, `isMcpAuth`, `isWorkspace` are no longer held |
+| 7 | The legal copy placeholders | **"leave the legal copies as is."** — not a hold, a decided state: record it as a deliberate absence, not as outstanding work |
+| 8 | "why is the contrast ratio decided at 4.5?" | a question, answered by the controller; **no action** — the 4.5 floor is WCAG 2.1 SC 1.4.3 (Level AA), not a house preference |
+
+**⚠ ITEMS 1, 3, 6 AND 7 ALL CHANGE DOCUMENTS THAT OTHER DOCUMENTS ASSERT AGAINST.** `owner-holds.md` §1 and §2 currently HOLD four of the six screens item 6 lifts, and §3 records the legal copy as HELD — item 7 makes it a decided state instead. **The register records the owner's rulings verbatim and an item leaves it only when the owner names it; the owner has now named these.** Whoever edits it must not silently rewrite the verbatim table — add the 2026-09-19 lift alongside, the way the `isTypes`/`isWorkflows` rows already do.
+
+### ✅ THE OWNER RULED THE DEV TOPOLOGY ON 2026-09-19 — **NO MORE HOT RELOAD.** *"no more hot reloads. rebuilt once they hit the main, is fine. that means the servers are to be run from the main folder instead of from the executor's branch. bring up the server once the hot reload is removed."*
+
+**What that means, and it retires two standing rules:**
+- **`docker-compose.hot.yml` goes away** — it is an OVERRIDE that replaces the built image with bind-mounted source. Dropping the override is a compose flag, not a project: `apps/web/Dockerfile` is already a multi-stage standalone build and `gisik-nokma-dev-web:latest` is already built (1.58 GB).
+- **The stack is served from `/Users/kiro/my_projects/gisik-nokma` (the MAIN folder), NOT from either executor's worktree.** This retires "executor 1 owns the hot stack" and the :3001 rules that existed because the container mounted exec 1's branch — **and it removes the reason `e2e-stack` was testing a lane's spec against a moving tree.**
+- **Rebuild on each merge to `main`.** `SERVER_ORIGIN` and `NEXT_PUBLIC_SERVER_URL` are baked at BUILD time (the Dockerfile documents the measured reason), so the production web is a **snapshot** — the rebuild is what keeps it current.
+- **The server is to be brought up once the hot reload is removed.**
+
+**MEASURE ONE BUILD AND RECORD THE NUMBER.** The cost was never measured; the caution on record is that a full `next build` in Docker is a multi-minute, multi-core operation and per-merge rebuilds may cost more total CPU than the hot compile they replace, on a 10-core box that has sat at load 30. The owner has accepted that trade — **but the number still belongs in this file.**
+
+### (superseded reading, kept for the audit trail) THE HOT WEB WAS DOWN AND THE OWNER HAD NOT YET RULED
+`gisik-nokma-dev-web-1` is **`Exited (0)`** (clean, not a crash); nothing listens on **:3001**; the API on **:3000** answers **200** and `gisik-nokma-dev-server-1` is up 22h healthy. Measured by the controller **and** independently by exec 1, which deliberately did **not** restart it: the owner's instruction *"remove the hot compile and rebuild on each merge"* is unactioned, so a clean exit could be that direction arriving. **Nothing in the record authorizes leaving it down, and nothing has actioned the instruction either.** It was put to the owner with both readings. **Restarting it is a change to the owner's environment — ask first.** Consequence if left: `e2e-stack` adopts :3001 (`playwright.stack.config.ts`, `reuseExistingServer: true` plus a `global-setup.ts` refusal unless what is listening IS the stack), so that suite would refuse or test a dead server. The viewport suite is unaffected — it starts its own `next dev` on :3021 with `reuseExistingServer: false`.
+
+### THE RED GATE, AND WHY IT IS THE ARGUMENT FOR THE GATE EXISTING
+`#506`'s first gate returned **`EXIT=2` · `Tasks: 23 successful, 33 total`** — and the **`Tasks:` line was present**, so the gate ran and it was not a wrong command. **One task failed:** `@gisik-nokma/web#typecheck` →
+`apps/web/test/authoring-routes.test.tsx(4,15): error TS2305: Module '"@gisik-nokma/app-core"' has no exported member 'PublishedWorkflowDef'`.
+**Real, not the instrument.** Settled by a control on a tree WITHOUT the change: on pristine `main` that line reads `import type { WorkspaceMember } from '@gisik-nokma/app-core';` — the change ADDED `PublishedWorkflowDef`. The type lives at `packages/domain/src/workflow.ts:116`, app-core exports nothing of that name, and the three sibling files (`workflow-history-screen.tsx:2`, `workflow-list-screen.tsx:2`, `workflow-builder-screen.tsx:3`) all import it from `@gisik-nokma/domain`. Exec 2 fixed it to match the siblings; the re-gate at the new head is **`EXIT=0` · 33/33**.
+**Why the executor could not have caught it: its PR's check table is HONEST — it quotes `turbo run build` and `vitest run`, and neither is `turbo run typecheck`.** The forced gate is the only thing that runs it. The executor has been told to add it to its own pre-freeze run.
+**⚠ THE GATE'S `NODE=` LINE IS NOT A CLAIM ABOUT ITS CHILDREN.** The wrapper prints `NODE=v22.22.2` from its own shell, but the failing task's error named **`/Users/kiro/.nvm/versions/node/v24.11.1/bin/pnpm`** — turbo spawned its child under node 24. The same drift was present in the `#505` gate, which was green, so it is not new and it did not cause this red; **but a green here does not prove the children ran under v22.**
+
+### TWO ERRORS THE CONTROLLER MADE, BOTH CAUGHT BY AN EXECUTOR
+1. **The dispatch called an approved item "held".** `CTL-DISPATCH-2026-09-19-lifted-settings-tasks.md` said the `"N tickets"` count was *"still held-and-unbuilt"*. **`owner-holds.md` §1 says LIFTED — the register was right and the controller's sentence was the error.** Exec 1 refused to take the sentence over the register, and **recorded the contradiction in the docblock quoting both documents** rather than silently picking one. The reason is a recorded failure mode: the controller read a stale IN-SOURCE docblock (`HELD`) as the register's state. **Read the register, not a source comment, for a hold's status.**
+2. **A merge invalidated a citation in source.** The plan correction moved the *"different size of task"* sentence from `:162` to `:236`, and `ticket-type-list-screen.tsx:90` still cited `:162` — which now resolves to a version-history table row. **A citation that still resolves is worse than one that breaks**, because the reader is misled rather than corrected. It is outside `docs/`, so it cannot be a controller PR; it is folded into Task 8's dispatch to fix in the same change set.
+
+### THE PLAN REFUTED ITSELF IN THREE PLACES, AND ALL THREE ARE NOW CORRECTED
+Fixed by `#507` (`cc4b84bf`, docs-only, no reviewer required — measured precedent: the controller's own docs PRs `#503`/`#504` carry none): (1) the top lift row predicted *"a route and a gateway method"* for the reorder while Task 6 three headings down says **⛔ DO NOT ADD A ROUTE** — **an executor reading top-down would have built a second door to a thing that already has one**; (2) Task 3's conditional *"`View history` IF the data is already there"* was **met and nobody had noticed**, so its dispatch would have had an executor record an absence where the owner said build; (3) the wire-gap list framed item (3) as a gap when both its facts are true and neither is one.
+
+### Task 8 — the stop-and-ask was answered before the dispatch was written
+Exec 1 spent read-only time proving the count is **a QUERY over the existing `proj_tickets` projection, not a new projection** (`EXEC-MEASUREMENT-2026-09-19-task8-count-query-or-projection.md`) — the controller re-read all three of its load-bearing cites at `main` and they hold exactly. The one genuinely open call was **the door**, and the controller decided it: **add the read, do NOT widen the shipped route.** Grounds, all measured: `TypePopulationResponse.workflowId` is **required** (`read-models.ts:589-594`); the route's `workflowId` **looks optional and 400s when absent** (`builder-reads.ts:619` vs `:631-633`); and the two numbers answer **different questions**, not one question with a wider label. **The owner was told and can override.**
+**Open and unverified:** there is **no index on `proj_tickets` leading with `(workspace_id, type_id)`** — the column a workspace-wide count filters on — so it scans the workspace's rows. Exec 1 said so rather than asserting "fast enough"; the query plan is NOT measured.
+
+### Instruments — three that lied this cycle, all caught
+1. **A `--name-only` / blob-identity disagreement that was the CONTROLLER's misread, not the tool's.** The drop check for `#506` listed `docs/lanes/executor-state.md` while the per-file blob sweep said all 18 files identical. **Both were right** — that file is **`#508`'s**, not `#506`'s, and main is merely AHEAD on it. **Partition, never interpret — and check which PR owns a path before calling a disagreement a disagreement.**
+2. **Two controls expired rather than failed.** `5039209c` was chosen as "not an ancestor" but IS one (the retired branch was contained in main); `4e8adf71` was a valid negative until `#506` merged and made it an ancestor. **A control is a reading that expires — re-derive it (`git branch -r --no-merged origin/main`) in the same invocation as the measurement.**
+3. **`--delete-branch` was not used this cycle**; merges were verified by API (`gh pr view <n> --json state,mergeCommit`) and by `merge-base --is-ancestor`, with a control that fires.
+
+### Machinery, as re-earned this cycle
+Landing tree built locally with `merge-tree --write-tree` predicting it and **the real merge agreeing every time** · **tree identity exact on all four** · the partitioned full-tree drop check with a control · **per-file blob identity for every PR's own files** · six checks + `check:migrations` at each landing tree with a control that returns 7 · four gates at their own trees, never transferred · executors relaunched at the fixed point · this file anchored. **The six checks are `check:env` `check:tasks` `check:runbook` `check:citations` `check:help` + `node scripts/check-case-ids.mjs`** (per the loop spec at `:375` of the previous revision). `check:db-tz` is the one that needs the environment: unset `DATABASE_URL` fails it for a reason that is not the code, and the dev stack is on **:54330**.
+
+---
+
 ## ✅ SATURDAY 2026-09-19 ~10:5x IST — **CYCLE 8: THE BOARD IS CLEAR. FOUR PRs MERGED SINCE THE HANDOVER, INCLUDING THE CANVAS FIX AND A SCOPE CORRECTION THAT WOULD HAVE BUILT A SECOND DOOR.** `main` is `1e56921f`; **zero open PRs**; ledger **301 done / 0 claimed / 7 todo**.
 
 ### Read this ABOVE the 01:5x entry below, which it corrects
