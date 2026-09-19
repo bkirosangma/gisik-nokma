@@ -81,6 +81,32 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >   Its decisive measurement is **done and it is not a stop-and-ask**: `role` is on the wire and the mapper
 >   carries it (case `13.760`), so its `mappers.ts:405-408` citation is stale and the work is the surface.
 >
+> ## ⛔ THE VISUAL HALF CANNOT BE MEASURED — BOTH INSTRUMENTS ARE BLOCKED, AND ONE IS A STALE PREMISE
+> **1. `e2e-stack` is RED ON MAIN, settled by measurement rather than argument.** On this branch it fails
+> **6/8**; run at **`origin/main`** in the same stack it fails **identically** — the same six tests *by
+> name and line*, the same 6/2, and the same **`LOST ariaLabel: baseline 66, now 9`**. So **nothing in the
+> run is this branch's**, my predicted **+2 aria-labels was never tested**, and the suite fails *before it
+> reaches the sheet* (sign-in/the seeded board), which is why it cannot serve the parity task. **The
+> controller is putting this red-on-main finding to the owner** — do not absorb it here.
+> **2. ⚠ A SUITE SIDE EFFECT:** running it **WRITES a tracked file** — `e2e-stack/non-text-contrast-roster.json`
+> (`belowCount 0→1`, `examined 3→13`). Reverted; anyone running this suite dirties their tree, and a PR cut
+> afterwards would carry a machine-written roster.
+> **3. A REAL PRE-EXISTING DEFECT it recorded:** `button.ticket-type-list__move` at **1.41** against the
+> 3:1 non-text floor on `/settings/ticket-types`. Main's committed roster says `belowCount: 0`, so this is
+> a live contrast regression nobody has closed. Not this lane's surface; also going to the owner.
+> **4. ⛔ THE HAND-DRIVEN ROUTE IS BLOCKED TOO, BY THE BRIEF'S OWN STALE PREMISE.** The brief says the
+> `:3001` stack is *"mounted from YOUR worktree"*. **Measured: it is not.** `docker inspect
+> gisik-nokma-dev-web-1` shows **NO bind mounts** and the container runs **`node apps/web/server.js`** — a
+> BAKED IMAGE. And `trustedOrigins` is built from `WEB_ORIGIN`, which is **`:3001` only**, so a dev server
+> on any other port cannot even sign in (**"Invalid origin"**, measured on `:3031`). **Consequence: this
+> branch's rendering cannot be seen in a browser without rebuilding the image — a docker action, and not
+> mine.** What the hand-driven session DID produce is the **"before" state**: the shipping sheet in `hig`,
+> screenshotted, which visually confirmed the classified deltas (two bordered tab buttons, no Full screen,
+> no breadcrumb) rather than merely reading them.
+> **5. AND A REBASE LESSON THAT COST A RED BUILD.** Resolving the `ui.css` conflict kept both sides but cut
+> one brace — main's `.gn-toast__dismiss` was left unclosed, and `@gisik-nokma/web#build` caught it at
+> 462:1. **A clean tree and zero conflict markers say nothing about whether the merged text is valid.**
+>
 > ## ANCHORS
 > | | |
 > |---|---|
