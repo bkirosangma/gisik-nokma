@@ -168,7 +168,7 @@ dispatch from `#581`'s own § 4. **Owner of all five: whoever next owns the READ
 one dispatch, not five.
 
 1. **`README.md:73-74` — "There is no search box on the web… The phone app's board screen has the only
-   search box in the product."** There IS one: `apps/web/…/page.tsx:1567-1573` renders
+   search box in the product."** There IS one: `apps/web/…/page.tsx:1568-1578` renders
    `<input type="search" className="gn-project__search" aria-label="Search the board" …>`, writing
    `filter.text`. The route underneath (`/v1/search`, `apps/server/src/routes/search.ts:136`,
    `websearch_to_tsquery`) is real and is called by the data source
