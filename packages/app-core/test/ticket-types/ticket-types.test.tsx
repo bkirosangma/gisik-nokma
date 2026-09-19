@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 // Named import, not the default: `@testing-library/user-event` ships no
 // default export that survives `verbatimModuleSyntax` — the same fix already
 // settled at test/views/board.test.tsx and test/workflow-builder/canvas.test.tsx.
@@ -249,6 +249,333 @@ describe('TicketTypeListScreen', () => {
     // half's to measure: it is read out of `ui.css` in
     // `packages/ui/test/tokens.test.ts`, which is the only place it can be
     // falsified.
+  });
+});
+
+/**
+ * The ↑/↓ reorder controls — Task 6+7 of the settings-workflows plan, lifted by
+ * the owner 2026-09-19. Case block `13.928`–`13.935`.
+ *
+ * THE DOOR IS NOT NEW. `ticket-type-list-screen.tsx:38-54` measured this on
+ * 2026-09-18 and it is still true: no route and no gateway op is needed,
+ * because `onSave` already authors a `ticket-type.defined` event carrying the
+ * whole definition — `rank` included — through `gateway.submit`. A reorder is
+ * "assign a different rank and submit". **No case here may assert that a rule
+ * or a string exists in source** — that is the shape this repo keeps
+ * re-finding, and the dispatch says so explicitly.
+ *
+ * The fixture is `4 built-ins (ranks 1–4) + Invoice (5) + Errand (6)`, in that
+ * order. It is chosen so that ONE row has a control that can actually move:
+ * Invoice sits between a built-in above it and Errand below it.
+ */
+describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-09-19)', () => {
+  const invoice: TicketTypeDef = {
+    id: newUlid(),
+    name: 'Invoice',
+    icon: 'receipt',
+    rank: 5,
+    workflowId: kanbanPublished.id,
+    fields: [],
+  };
+  const errand: TicketTypeDef = {
+    id: newUlid(),
+    name: 'Errand',
+    icon: 'bell',
+    rank: 6,
+    workflowId: kanbanPublished.id,
+    fields: [],
+  };
+
+  function renderReorderableList(seed: FakeGatewaySeed = {}) {
+    const gateway = createFakeGateway({
+      workflows: [kanbanPublished],
+      ticketTypes: [...builtins, invoice, errand],
+      ...seed,
+    });
+    const { container } = render(
+      <TicketTypeListScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={gateway}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />,
+    );
+    return { gateway, container };
+  }
+
+  /** The row texts in rendered order — what a reader actually sees. */
+  function renderedOrder(container: HTMLElement): string[] {
+    return Array.from(container.querySelectorAll('.ticket-type-list__rows > li')).map(
+      (li) => li.querySelector('.ticket-type-list__name')?.textContent ?? '',
+    );
+  }
+
+  /**
+   * 13.928 — every row carries both controls, and each is a SIBLING of the row
+   * door rather than a child of it.
+   *
+   * The row is one `<button aria-label="Edit …">` (`:311-337`). A control
+   * nested inside it would be a button inside a button — an invalid tree that
+   * jsdom will happily render, which is exactly why this is asserted on the
+   * DOM containment rather than on the fact that a control exists.
+   */
+  it('13.928 every row carries ↑ and ↓ controls, and they are siblings of the row door, not inside it', async () => {
+    const { container } = renderReorderableList();
+    await screen.findByText('Invoice');
+
+    const rows = Array.from(container.querySelectorAll('.ticket-type-list__rows > li'));
+    expect(rows).toHaveLength(6);
+
+    const up = screen.getByRole('button', { name: 'Move Invoice up' });
+    const down = screen.getByRole('button', { name: 'Move Invoice down' });
+    expect(up.tagName).toBe('BUTTON');
+    expect(down.tagName).toBe('BUTTON');
+
+    const door = screen.getByRole('button', { name: 'Edit Invoice' });
+    expect(door).not.toContainElement(up);
+    expect(door).not.toContainElement(down);
+    // …and the door is still the door: the control did not replace it.
+    expect(door).toContainElement(screen.getByText('Invoice'));
+  });
+
+  /**
+   * 13.929 — the ends are disabled, asserted on the RENDERED control, and the
+   * same assertion names a control that is NOT disabled.
+   *
+   * The second half is not decoration. A screen that disabled every control
+   * would satisfy the first half perfectly, so the pair is what makes this
+   * falsifiable — the shape this repo catalogues as a check that cannot fail.
+   */
+  it('13.929 the ends are disabled and a movable control is not — asserted on the rendered controls', async () => {
+    renderReorderableList();
+    await screen.findByText('Invoice');
+
+    // First row: nowhere above it to go.
+    expect(screen.getByRole('button', { name: `Move ${builtins[0]!.name} up` })).toBeDisabled();
+    // Last row: nowhere below it to go.
+    expect(screen.getByRole('button', { name: 'Move Errand down' })).toBeDisabled();
+
+    // The control: Invoice sits between a built-in and Errand, so it can move
+    // down. Without this line, "everything is disabled" passes this test.
+    expect(screen.getByRole('button', { name: 'Move Invoice down' })).toBeEnabled();
+    // And the first row's ↓ is NOT the disabled one — ends are the assertion,
+    // not the whole control set.
+    expect(screen.getByRole('button', { name: `Move ${builtins[0]!.name} down` })).toBeDisabled();
+  });
+
+  /**
+   * 13.930 — a swap goes through the EXISTING door, and it is a real swap.
+   *
+   * Two events, not one: `IngestResult` is per-event, so a single re-rank would
+   * leave the moved type TIED with its neighbour, and the server's read orders
+   * `BY rank, type_id` — a tie is broken by an id, which is to say by nothing a
+   * person can see. The assertion is on the submitted payloads' ranks, which is
+   * a computed value, not on the presence of a call.
+   */
+  it('13.930 a swap submits two ticket-type.defined events through the existing door, exchanging the two ranks', async () => {
+    const user = userEvent.setup();
+    const { gateway } = renderReorderableList();
+    await screen.findByText('Invoice');
+
+    await user.click(screen.getByRole('button', { name: 'Move Invoice down' }));
+
+    expect(gateway.submitted).toHaveLength(2);
+    const payloads = gateway.submitted.map(
+      (event) => event.payload as TicketTypeDef,
+    );
+    const byName = new Map(payloads.map((payload) => [payload.name, payload]));
+    // Invoice took Errand's rank and Errand took Invoice's — a swap, so the two
+    // ranks remain distinct and the order is total.
+    expect(byName.get('Invoice')?.rank).toBe(6);
+    expect(byName.get('Errand')?.rank).toBe(5);
+    // Everything else about the two types is carried through untouched: this is
+    // a re-rank, not a redefinition.
+    expect(byName.get('Invoice')?.id).toBe(invoice.id);
+    expect(byName.get('Errand')?.id).toBe(errand.id);
+    expect(byName.get('Invoice')?.fields).toEqual(invoice.fields);
+    // The "no new door" half of this case is STRUCTURAL — it lives in the diff,
+    // not in a runtime assertion: no gateway method was added and the builder
+    // used is the editor's own. An earlier draft closed with
+    // `expect(document.body).toBeTruthy()`, which asserts nothing at all;
+    // removed on review rather than left as decoration.
+  });
+
+  /**
+   * 13.931 — a swap that would MOVE A BUILT-IN is not attempted.
+   *
+   * `rule-engine/checks/ticket-type.ts:60-62` refunds `type.builtin-rank`, so
+   * the built-in's own event would be refused while its neighbour's commits —
+   * and the two would then share a rank, which is the broken order 13.930
+   * exists to prevent. The control therefore ANTICIPATES the refusal rather
+   * than discovering it: the arrow pointing at a built-in is disabled.
+   */
+  it('13.931 the arrow that would move a built-in is disabled, on both sides of a built-in', async () => {
+    renderReorderableList();
+    await screen.findByText('Invoice');
+
+    // Invoice's ↑ would swap it with the built-in directly above it.
+    expect(screen.getByRole('button', { name: 'Move Invoice up' })).toBeDisabled();
+
+    // The same rule read from the other side: the bottom built-in's ↓ would
+    // move it, so it is disabled — while its ↑, pointing at another built-in,
+    // is also disabled.
+    const lastBuiltin = builtins[builtins.length - 1]!;
+    expect(screen.getByRole('button', { name: `Move ${lastBuiltin.name} down` })).toBeDisabled();
+    expect(screen.getByRole('button', { name: `Move ${lastBuiltin.name} up` })).toBeDisabled();
+  });
+
+  /**
+   * 13.932 — a refusal the client did not predict is SURFACED, not swallowed.
+   *
+   * The guard in 13.931 is the client's prediction; the server is the
+   * authority, and it can refuse for a reason this screen does not model. The
+   * failure this guards against is the quiet one — a control that appears to do
+   * nothing, which a reader cannot distinguish from a click that worked.
+   */
+  it('13.932 a server refusal is shown with its reason rather than silently doing nothing', async () => {
+    const user = userEvent.setup();
+    const { container } = renderReorderableList({
+      submitResults: [
+        { status: 'refused', eventId: newUlid(), rule: 'type.builtin-rank', reason: 'built-in ranks are fixed' },
+        { status: 'refused', eventId: newUlid(), rule: 'type.builtin-rank', reason: 'built-in ranks are fixed' },
+      ],
+    });
+    await screen.findByText('Invoice');
+    const before = renderedOrder(container);
+
+    await user.click(screen.getByRole('button', { name: 'Move Invoice down' }));
+
+    // The server's own words reach the reader…
+    expect(await screen.findByText(/built-in ranks are fixed/)).toBeInTheDocument();
+    // …and the list did NOT move. Asserted on the RENDERED ORDER, not on the
+    // presence of a row: "Invoice is somewhere on the page" is true before and
+    // after a re-order, so it could not fail — found by review, and replaced.
+    expect(renderedOrder(container)).toEqual(before);
+    expect(renderedOrder(container).slice(4)).toEqual(['Invoice', 'Errand']);
+  });
+
+  /**
+   * 13.934 — a viewer gets no reorder control.
+   *
+   * The reorder is a WRITE, and every other write affordance on this screen is
+   * author-gated (`"New type"`, `:261`). A control that renders for a role the
+   * server would refuse is not a control, it is a trap — and the asset list
+   * here is the same one `New type` is hidden behind, so the two must agree.
+   */
+  it('13.934 a non-author gets no reorder controls, matching the New type gate', async () => {
+    render(<TicketTypeListScreen
+        workspaceId={newUlid()}
+        session={{ userId: newUlid(), role: 'member' }}
+        gateway={createFakeGateway({ workflows: [kanbanPublished], ticketTypes: [...builtins, invoice, errand] })}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />);
+    await screen.findByText('Invoice');
+
+    expect(screen.queryByRole('button', { name: 'New type' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Move Invoice down' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Move Invoice up' })).toBeNull();
+    // The control on that assertion: the same query on an AUTHOR finds it, so
+    // the nulls above are the gate and not a misspelt name. The author here is
+    // an OWNER, not an admin, on purpose — `canAuthorRole` is `owner || admin`,
+    // so an admin control would pass equally under a gate that tested for
+    // `'admin'` alone, and would be a control that cannot discriminate. Found by
+    // review: with an admin, this case passed under that mutation.
+    render(<TicketTypeListScreen
+        workspaceId={newUlid()}
+        session={{ userId: newUlid(), role: 'owner' }}
+        gateway={createFakeGateway({ workflows: [kanbanPublished], ticketTypes: [...builtins, invoice, errand] })}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />);
+    expect(await screen.findAllByRole('button', { name: 'Move Invoice down' })).not.toHaveLength(0);
+  });
+
+  /**
+   * 13.935 — a second click cannot land while the first swap is still in flight.
+   *
+   * Found by review, and it was a REAL defect. `moveType` read a render-scope
+   * snapshot and applied its result to that snapshot, so a second click before
+   * the first `submit` resolved computed from the PRE-swap array and overwrote
+   * it. Probed through this harness, two clicks in one tick folded to `Alpha:6`
+   * and `Charlie:6` on the server — a TIE, the exact thing the two-event swap
+   * exists to prevent — while the screen rendered `rank 5` for a type it had
+   * submitted as 6. Against the real door the window is a whole round-trip.
+   *
+   * The guard is asserted AS the guard: while a swap is in flight, every arrow
+   * is disabled and a second click submits nothing.
+   */
+  it('13.935 every arrow is disabled while a swap is in flight, and a second click submits nothing', async () => {
+    const user = userEvent.setup();
+    const base = createFakeGateway({
+      workflows: [kanbanPublished],
+      ticketTypes: [...builtins, invoice, errand],
+    });
+    // A door that stays open long enough to click through. This is the ONLY
+    // difference from the fake — `submit` is the real one once it resolves.
+    let release: (() => void) | null = null;
+    const slow = {
+      ...base,
+      submit: async (events: Parameters<typeof base.submit>[0]) => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return base.submit(events);
+      },
+    };
+    render(
+      <TicketTypeListScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={slow}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />,
+    );
+    await screen.findByText('Invoice');
+
+    const click = user.click(screen.getByRole('button', { name: 'Move Invoice down' }));
+    // In flight: nothing else may be started. `waitFor` rather than a bare
+    // assertion because the click is deliberately NOT awaited — awaiting it would
+    // wait for the door to close, which is the window under test.
+    //
+    // The condition waited on is `Move Invoice down` ON PURPOSE. An earlier draft
+    // waited on `Move Invoice up`, which is disabled in EVERY state (a built-in
+    // sits above it), so it returned instantly and asserted nothing — this repo's
+    // "check that cannot fail" shape, in the test that exists to catch a
+    // concurrency bug. `Invoice down` is enabled before the click and disabled
+    // only while a swap is in flight, so it discriminates.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Move Invoice down' })).toBeDisabled();
+    });
+    expect(screen.getByRole('button', { name: 'Move Invoice up' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Move Errand up' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Move Errand up' }));
+    release!();
+    await click;
+    // Exactly ONE swap reached the door — the second click submitted nothing.
+    expect(base.submitted).toHaveLength(2);
+  });
+
+  /**
+   * 13.933 — after a committed swap the rows are in the new order.
+   *
+   * Asserted on the RENDERED order, which is the only thing a person sees. The
+   * fake gateway serves its seed unchanged, so a screen that re-read instead of
+   * applying what it just committed would show the old order here — which is
+   * exactly the defect this pins.
+   */
+  it('13.933 a committed swap re-orders the rendered rows', async () => {
+    const user = userEvent.setup();
+    const { container } = renderReorderableList();
+    await screen.findByText('Invoice');
+    expect(renderedOrder(container).slice(4)).toEqual(['Invoice', 'Errand']);
+
+    await user.click(screen.getByRole('button', { name: 'Move Invoice down' }));
+
+    expect(renderedOrder(container).slice(4)).toEqual(['Errand', 'Invoice']);
   });
 });
 

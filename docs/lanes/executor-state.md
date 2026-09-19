@@ -41,6 +41,41 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SATURDAY 2026-09-19 ~midday IST. **TASKS 6+7 (the `isTypes` ↑/↓ reorder) ARE
+> # BUILT, and the PR awaits the controller. THE §13 SPLIT IS MERGED AND THE BOARD HAS DRAINED.**
+> # **Supersedes the block below.** That one says the split awaits merge — **it merged as `b1a8d7ed`
+> # (PR `#499`)**, and `#501` (the canvas fix) and `#502` (the roster) have merged since. `main` is now
+> # `f6b16cbb` at the time this branch was cut.
+>
+> | | |
+> |---|---|
+> | dispatch | `CTL-DISPATCH-2026-09-19-lifted-settings-tasks.md`, **EXEC 1** section |
+> | branch | `exec/isTypes-reorder`, cut from a fetched `origin/main` |
+> | cases | **`13.928`–`13.934`**, ids `13.935`–`13.937` deliberately unused |
+> | reviewer | one, told to falsify — **dispatched before the PR**, its verdict in the PR body |
+>
+> **THE TASK WAS SCOPED AS WIRE WORK AND IS A RENDER TASK.** The plan's lift box, the delta audit
+> (**"wire gap 3"**) and `owner-holds.md:44` all said *"a route and a gateway method"*; the plan's own
+> Task 6 section was corrected to **⛔ DO NOT ADD A ROUTE** on 2026-09-19, resting on a measurement this
+> screen recorded on 2026-09-18. **No route, no gateway method, no event type is added** — the swap goes
+> through `gateway.submit` with `ticket-type.defined`, the editor's own door.
+>
+> **Two things worth carrying forward, both general:**
+> 1. **`IngestResult` is PER EVENT.** A two-event swap can HALF commit — one re-rank landing while the
+>    other is refused — and the server's `ORDER BY rank, type_id` then breaks the resulting tie by an id,
+>    which is nothing a person can see. That is why the arrow that would move a rank-locked built-in is
+>    **disabled** rather than attempted, and why a swap submits both ranks.
+> 2. **A `vitest` green is not the check.** My new test passed under vitest while `pnpm turbo run
+>    typecheck` failed on it twice — once on `'viewer'` not being a `WorkspaceRole`, once on TypeScript
+>    not narrowing `types` inside a closure. **Run the typecheck.**
+>
+> **Survivor, recorded not hidden:** six mutations each killed a named case; **`13.928` survived all of
+> them** and is a structural DOM-containment property. Stated in the PR body rather than glossed.
+>
+> **NOT mine, and deliberately untouched:** `owner-holds.md:44` and the plan's lift box still say
+> *"a route and a gateway method"* — the dispatch calls those **a controller matter for the owner**.
+> **Task 8 (the `"N tickets"` count) is queued behind this and is NOT in this PR.**
+
 > # ▣ CURRENT POSITION — SATURDAY 2026-09-19 ~02:0x IST. **THE §13 CATALOGUE SPLIT IS BUILT, REVIEWED
 > # AND PUSHED: PR #498 AWAITS THE CONTROLLER'S MERGE. THIS LANE HAS NOTHING ELSE IN FLIGHT.**
 > # **Supersedes every block under it.** Those blocks describe `7b`'s PR as open (`#494` — merged

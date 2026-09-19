@@ -257,6 +257,12 @@ knowing before concluding one of them is stale.
   3 killed. Action label and summary sentence reverted: **1 each, their own site.**
 
   **TWO ITEMS THE DISPATCH ORDERED ARE NOT BUILT, AND BOTH ARE HOLDS RATHER THAN DECISIONS.**
+  **⚠ SUPERSEDED 2026-09-19 — THE OWNER LIFTED BOTH.** The reorder is now BUILT (cases `13.928`–`13.934`
+  in the section at the foot of this file); the per-type count remains unbuilt and is Task 8. **The
+  paragraph below, including its sentence that the measurement "does NOT lift it", is the record as it
+  stood on 2026-09-18 — read it as history, not as state.** It is kept rather than rewritten because the
+  measurement it carries is what made the reorder a render task rather than the wire task three planning
+  documents called it, and that correction is worth more than a tidy paragraph.
   `docs/lanes/owner-holds.md` §1 lists *"`isTypes` | reorder and per-type counts"* as **HELD (owner,
   2026-09-18)**, and the register's own rule is that an item leaves it only when the owner names it — never
   on a belief, and never because another document says so. The dispatch
@@ -762,6 +768,11 @@ duplicated:
   no membership, so any reader joining the roster for a name renders it blank.
 - **`isTypes` (reorder, per-type counts) and `isWorkflows` (a badge, a second action) are HELD, not
   outstanding** — `docs/lanes/owner-holds.md` §1. A hold is a decision, not a debt.
+  **⚠ SUPERSEDED 2026-09-19 — the owner answered all four items, and none is a hold any more.** The
+  reorder is **BUILT** (cases `13.928`–`13.934`); the per-type count is **Task 8**, still to build and
+  needing new server surface; the `isWorkflows` **badge was DROPPED**; and its **second action was
+  LIFTED** together with the version-history screen (Task 3). The sentence above is kept as the position on
+  2026-09-18.
 
 ## settings → workflows: the ticket-type editor's five NOT-ported items, each given a rule (executor 1, 2026-09-18) — cases `13.924`–`13.927`
 
@@ -1063,3 +1074,72 @@ in that block is `13.912`**.
   The trap here needs *both* halves: a parent sized only by `min-height` **and** a child with no intrinsic
   height of its own (React Flow's children are absolutely positioned, so it has none). No second instance
   was found. **Owner: whoever next adds a percentage-height child to a `min-height` container.**
+
+## settings → workflows Tasks 6+7: the ticket-type list's ↑/↓ reorder, built through the door that already existed (executor 1, 2026-09-19) — cases `13.928`–`13.934`
+
+Tasks 6+7 of the settings-workflows plan, built after the owner lifted the hold on `isTypes | reorder` on
+2026-09-19. **The task was scoped as WIRE work by three planning documents and is a RENDER task** — the
+plan's own Task 6 section was corrected to say so on the same day, resting on a measurement this screen had
+already recorded (`ticket-type-list-screen.tsx`, the ↑/↓ bullet). **No route, no gateway method and no event
+type is added:** the swap goes through `gateway.submit` with `ticket-type.defined`, the same door the
+editor's `"Hierarchy rank"` field already uses.
+
+**A swap is TWO events, and that is the load-bearing detail.** `IngestResult` carries one result per
+submitted event, so re-ranking only the moved type would leave it **tied** with its neighbour — and the
+server's own `ORDER BY rank, type_id` resolves a tie by an id, which is nothing a person can see. Both
+types are re-ranked in one `submit`.
+
+**The arrow that would move a built-in is DISABLED, not refused after the fact** — for the same per-event
+reason. The four built-ins are rank-locked server-side
+(`packages/rule-engine/src/checks/ticket-type.ts:60-62` refunds `type.builtin-rank`), so a swap across one
+would **half commit**: the neighbour's re-rank lands, the built-in's is refused, and the pair ends up tied.
+The control anticipates the refusal rather than discovering it. **A refusal the server returns anyway — for
+a reason this screen does not model — is surfaced with the server's own words, never swallowed**, because a
+control that silently does nothing is indistinguishable from one that worked.
+
+- ✅ **13.928 — every row carries an ↑ and a ↓ control, and each is a SIBLING of the row door rather than
+  inside it.** The whole row is one `<button aria-label="Edit …">` (the row-as-door ruling), so a control
+  nested inside it would be a button inside a button — an invalid tree jsdom renders without complaint,
+  which is why this asserts DOM containment (`not.toContainElement`) rather than that a control exists.
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+- ✅ **13.929 — the ends are disabled, asserted on the RENDERED control, and the same test names a control
+  that is NOT disabled.** The first row's ↑ and the last row's ↓ are `toBeDisabled()`; the movable control
+  (`Invoice`, between a built-in and a custom type) is `toBeEnabled()`. The second half is not decoration —
+  a screen that disabled every control would satisfy the first half perfectly, which is this repo's
+  "check that cannot fail" shape. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+- ✅ **13.930 — a swap submits two `ticket-type.defined` events through the EXISTING door, exchanging the
+  two ranks.** Asserted on the submitted payloads' `rank` values — a computed value, not the presence of a
+  call — plus the two `id`s and `fields` carried through untouched, because this is a re-rank and not a
+  redefinition. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+- ✅ **13.931 — the arrow that would move a built-in is disabled, read from BOTH sides.** `Invoice`'s ↑
+  (pointing at the built-in above it) and the last built-in's ↓ (pointing at the custom type below it, but
+  itself a built-in) are both disabled. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+- ✅ **13.932 — a server refusal is displayed with its reason rather than silently doing nothing.** Seeded
+  as two refused `IngestResult`s; the server's own sentence reaches the reader through a `role="alert"`,
+  and the list does not re-order for a swap whose ranks did not change.
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+- ✅ **13.933 — a committed swap re-orders the RENDERED rows.** Asserted on the DOM order a person sees,
+  not on state or on the submitted payload. The fake gateway serves its seed unchanged, so a screen that
+  re-read instead of applying what it committed would show the old order here.
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+- ✅ **13.934 — a viewer gets no reorder controls, matching the `"New type"` gate.** The reorder is a WRITE
+  and every other write affordance on this screen is author-gated, so the two must agree. The test carries
+  its own control: the same query on an author finds the button, so the nulls are the gate and not a
+  misspelt name. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+
+- ✅ **13.935 — every arrow is disabled while a swap is in flight, and a second click submits nothing.**
+  **This case exists because review found a REAL defect, and it is the most valuable one in the block.**
+  `moveType` read a render-scope snapshot and applied its result to that snapshot, so a second click
+  landing inside the first `submit`'s round-trip computed from the **pre-swap** array and overwrote it.
+  Probed through this harness, two clicks in one tick folded to two types **sharing a rank** — the exact
+  tie the two-event swap exists to prevent — while the screen rendered `rank 5` for a type it had
+  submitted as 6; against the real door the window is a whole round-trip. The fix is a one-swap-at-a-time
+  guard plus a **functional** `setTypes(previous => …)` matched by id, so the update is computed against
+  the state as it is NOW and never against the snapshot the click was born in.
+  **The case's own first draft was a check that could not fail** — it waited on `Move Invoice up`, which
+  is disabled in *every* state because a built-in sits above it, so `waitFor` returned instantly and
+  asserted nothing. It now waits on `Move Invoice down`, which is enabled before the click and disabled
+  only while a swap is in flight. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+
+**Ids `13.936`–`13.937` are left UNUSED** in this block — no case was written for them, and the rule is
+that a minted id is never renumbered down.
