@@ -41,10 +41,59 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~05:0x IST. **`#575` IS REBASED, BOTH SENDBACK DEFECTS ARE
+> # FIXED, AND THE CODE HEAD IS `b5d2b0af`.** Branch **`exec/members-states`**; **the handoff commit sits ON TOP
+> # of that head** — a commit cannot name its own sha, so this block names the CODE head it was pushed at, which
+> # is the reading that survives.
+>
+> ## WHAT WENT BACK, AND BOTH WERE MINE
+> 1. **THE BLOCK TABLE LOST A ROW BOUNDARY** — §16's two allocation rows were joined onto one line by my rebase
+>    resolution. **Every allocation survived as TEXT**, which is why the audit that looks for removed lines
+>    passed it: lines starting `| **exec` read **1** here against **2** at `main`, measured with the control in
+>    the same invocation. `check:runbook`, `check:citations` and `check:case-ids` cannot see table structure
+>    either. Restored, and READ rather than counted.
+> 2. **THIS FILE NAMED TWO SUPERSEDED HEADS AND NOT THE ONE IT WAS PUSHED AT.** The topmost block named
+>    `e35dc161`, the next named `e1e70b43`, and the then-tip `2dae25f3` appeared **zero** times — so a restart
+>    read the OLDER sha first. **The mechanism is structural, not careless: the handoff is the tip commit, and a
+>    commit cannot name its own sha, so writing the block and then rebasing makes the text stale by
+>    construction.** **The repair is ORDERING, not diligence: amend the handoff AFTER the rebase, in a commit on
+>    top, naming the head that results** — which is what this block does.
+>
+> ## THE LESSON, WHICH IS THE SAME ONE FIVE TIMES TONIGHT
+> **A resolution that keeps every byte and loses a newline passes every check you can run.** Five times tonight
+> "take both sides" produced something no instrument saw: a cut brace (caught by the build), a comment between
+> two selectors that re-sized every dialog (caught by a reviewer reading the BUILT css), a false population
+> propagated to four files, a docblock my own commit falsified, and now a lost newline. **Only two of the five
+> were caught by a machine, and neither by a check — one by a compiler, one by a person.** Read the RESULT of a
+> merge, not its marker count.
+>
+> ## #575 — BUILT, REVIEWED, GATED
+> The reviewer's verdict is in the PR body: it verified both mutation witnesses by name, the predicate against
+> `memberLabel`, the tokens, and both "already present" claims — and found **five things, three mine**, all
+> fixed. `16.61` (the two-line identity, two arms) and `16.62` (the COLUMN, the only instrument that can see it).
+> Gate **33/33 EXIT 0** at the code head; seven checks exit 0; `check-case-ids` **2494**, §16 **48/0/48**.
+>
+> ## OWED ON THIS LANE — ONE ITEM, AND IT IS NOT BUILDABLE HERE
+> **The parity VISUAL HALF**: at the next rebuild, screenshot the sheet at `data-style="hig"` against
+> `desktop.dc.html`, and the controller dispatches a correction if the page disagrees. **Nobody has seen the
+> parity branch render.** The "before" state was seen and it confirmed the classified delta.
+> **And the pending-invitations heading is with the OWNER** (the controller's note): a scope call, not a
+> dispatch. Recorded; not to be built, not to be held on.
+>
+> ## ANCHORS
+> | | |
+> |---|---|
+> | `origin/main` | **`e643715d`** |
+> | `#575` | code head **`b5d2b0af`** (+ this handoff commit on top), `--base main`, MERGEABLE |
+> | ids | parity `16.81`–`16.82` merged · `3b` `16.61`–`16.62` spent · **`16.63`–`16.80` free** · `§17` is the controller's at `16.99` |
+> | next | the controller gates and merges `#575`; **that merge is the fixed point** it restarts me from |
+
+> # ⚠ SUPERSEDED BY THE BLOCK ABOVE — its head readings are pre-rebase.
 > # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~04:0x IST. **PARITY IS MERGED; `3b` IS BUILT, GATED AND PUSHED,
 > # AND ITS PR IS THE FIXED POINT.** Branch **`exec/members-states`** @ **`e35dc161`** — **ON THE REMOTE**
 > # (verified `git ls-remote` == `git rev-parse HEAD`; the controller's "local only" reading predates the push).
 >
+> # ⚠ SUPERSEDED BY THE BLOCK ABOVE — `e1e70b43` was pre-rebase; the live head is named above.
 > # ▣ **THE FIXED POINT — `3b`'s PR IS OPEN.** `#575`, head **`e1e70b43`**, `--base main`, verified against
 > # `git rev-parse` before it was reported. Branch **`exec/members-states`** @ `e1e70b43`, **pushed**.
 >
