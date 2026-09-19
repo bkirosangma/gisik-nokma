@@ -130,7 +130,11 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > - **`packages/app-core/src/online/mappers.ts:59, :61`** — **the register's OWN FILE**, a heading
 >   reading *"Why several mappers below are nothing but a refusal"* and *"Four of the thirteen … cannot
 >   be answered"*. Round 1 grepped this file for `ServingGapError` and never opened this region.
-> - **`mappers.ts:212`** — *"the standing fact that the register carries `search` alone"*.
+> - **`mappers.ts:212`** — *"the standing fact that the register carries `search` alone"*. **⚠ The sentence
+>   is at `:219-220`; `:212` is the section heading above it.** The citation was correct when written and
+>   **this branch's own Round-2 edit to that file moved it** — the fifth self-shifting citation in this
+>   task (`mappers.ts:2179→:2189`, `:828→:838`, `online-data-source.ts:247→:253`,
+>   `mappers.test.ts:953→:957`).
 >
 > **Round 2 changed ~30 more carriers across 14 more files**, including a whole class Round 1 never saw:
 > **`getMyWorkspaces`** ("refuses whole — `mapWorkspaceRefs` throws a `ServingGapError`") in
@@ -149,6 +153,35 @@ brief recovers only what is written here. Refreshed at every task boundary.
 >    `[]` can only come from a real answer. **Re-derived at the line and recorded as such** — a
 >    conclusion kept because it was re-proved, not because the sentence that carried it survived.
 >
+> ## ROUND 3 — the scoped re-review: Q2/Q3 PASS, **Q1 NOT fully swept**, and one finding REFUTED
+> The scoped pass accepted the four Critical fixes and confirmed the Round-2 claims I could not take on
+> trust — that the empty arm **is** reachable (`mapWorkspaceRefs` answers, `routes/workspaces.ts:157`
+> returns an ordinary 200), that `contested` **is** REQUIRED (`asArray` throws at `:261`), and that every
+> count Round 2 wrote is correct. It re-verified comments-only independently (14/15 byte-identical, and
+> **`data-source.ts` is the ONLY zero-output file in the whole changed set**, which is the check I asked
+> for because an unmeasured file would pass silently). It judged the owner flags legitimate rather than
+> evasions.
+>
+> **But it found Q1 was not swept to the end**, and the shape is the worst one: **`Features.md:334`** and
+> **`test-cases/03:105`** each sit *in a file this branch had already edited*, and `:105` sits **one line
+> below** a line Round 2 corrected. Plus `Features.md:76` ("twelve of thirteen"), `Features.md:1994`
+> ("the online source's seven" — a number the register never held; peak six), `test-cases/13-neomorphism…
+> :963`, and `apps/web/src/app-nav.tsx:374`. **A correction that stops one line short of its own
+> paragraph is how a same-file contradiction is born** — and `Features.md:334` contradicted this
+> branch's own corrected `:77` in the same file.
+>
+> **One reviewer finding was REFUTED by measurement, and it is recorded as refuted rather than obeyed:**
+> the reviewer reported `Features.md:407` as a wrong citation for the `LIST_PAGE_CAP` text, saying that
+> line is the subtasks bullet. It is the subtasks bullet's *headline*, and the `LIST_ROW_CAP` cap text is
+> on that same long line — so the citation resolves to the right content. **A peer's finding is a claim.**
+>
+> **Recorded for the controller, NOT fixed** — a different claim class from this dispatch: the six
+> `ingest` call-site citations in the `Features.md` replica bullet are **4 of 6 wrong**
+> (`ticket-sheet.tsx:276`, `visibility-editor.tsx:176`, `members/page.tsx:137`,
+> `data-source-gateway.ts:296`; the real sites are `:501/:543/:585/:705/:868`, `:189`, `:249/:342`,
+> `:327`). Pre-existing, not authored here — but **this branch re-emitted that line**, so a reader would
+> attribute them to it. *Owner: the controller.*
+>
 > ## ⛔ THE ROUND-2 METHOD NOTE — the failure that recurred THREE TIMES IN ONE TASK
 > **Every citation this branch wrote was invalidated by this branch's own later edits to the same file.**
 > 1. `client-contract.test.ts:371` → `:375` (my Round-1 docblock sits above the function).
@@ -165,8 +198,12 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > the code above it is `const EXERCISED: string[] = []; for (const constName of [] as string[])` — so its
 > main assertion is **`[] toEqual []`**, and only the complement loop at the end does real work. **NOT
 > fixed here: a test assertion is outside "comments and docblocks only".** *Owner: the controller.*
-> Similarly `mappers.test.ts:953`'s `describe('3.39 the blocked methods refuse, …')` is now a false
+> Similarly `mappers.test.ts:957`'s `describe('3.39 the blocked methods refuse, …')` is now a false
 > label — **left, because changing it changes test code**, and named here rather than quietly kept.
+> **⚠ The citation itself was wrong for an hour:** this line and the Round-2 commit message both said
+> `:953`, which was correct at `95470afb` and was moved to `:957` by Round 2's own edit to that file —
+> the fifth self-shifting citation in this task. The commit message cannot be amended without rewriting
+> a reviewed head, so the correction lives here and in the PR body, which is the half that can be fixed.
 >
 > ## GATE — run at the code head, not transferred
 > `pnpm turbo run build test typecheck` → **EXIT 0 · 33/33 successful · 17 cached · 1m12.4s** at Round 1
