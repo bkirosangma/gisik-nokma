@@ -19,8 +19,10 @@ Read these five. They are the ones that catch everybody.
 2. **You cannot create a project.** There is no button for it anywhere. If your workspace has no
    projects, there is nowhere to put work, and somebody will have to add a project for you another
    way. (§3)
-3. **You cannot put a job on a person, and you cannot set a due date.** The product shows both of
-   these in several places, and offers no control that sets either. (§5)
+3. **You can put a job on a person only on the website — and you cannot set a due date anywhere.**
+   The website's job panel has an "Assignee" picker. The phone and desktop apps have no Assignee row
+   at all, so there you can neither see who a job is on nor set it. Due dates have no control on any
+   screen. (§5)
 4. **You cannot leave a comment on the website.** The job screen shows the description and lets you
    write one; there is no box for a comment. (§5)
 5. **Every date in the product is on Indian time**, wherever you are. "Today" changes over at midnight
@@ -334,8 +336,13 @@ when, and none of them editable.
 
 This is the honest list. Each one is an absence, not a hidden button.
 
-- **You cannot put a job on a person.** The panel shows "Assignee" with a name or a dash, and nothing
-  changes it. Not on the website, not on the phone app.
+- **You cannot put a job on a person on the phone or desktop apps — on the website you now can.**
+  This one is kept here rather than deleted, on the description row's precedent below, so a reader who
+  remembers it as an absence finds the correction where they last saw it. **On the website the panel's
+  "Assignee" row is a picker:** choose a person, or choose **Unassigned** to take the job off somebody.
+  It stays read-only in exactly two cases, and the row itself says which — the workspace roster has not
+  loaded, or the job is on a person outside the roster you can see. **On the phone and desktop apps
+  there is no "Assignee" row at all**, so there a job's assignee can be neither read nor set.
 - **You cannot set a due date or a start date.** (See the box below for the one thing that comes
   close, and why it is not a substitute.)
 - **The description is no longer on this list — you can write it now.** It is kept here, rather than
@@ -1043,12 +1050,14 @@ board, read a job's full history, see the job types and stages, and see your ass
 the copy on the device.
 
 **Changing is limited to what the two screens offer.** The queue underneath will happily carry a new
-job, a field value, a stage move or a reopen, and hold them until you reconnect. But a change you
-cannot make on screen offline is a change you could not make online either — the queue accepting a
-kind of change is not the same as a screen offering it, and the phone app is two screens deep. In
+job, a field value, a stage move or a reopen, and hold them until you reconnect. But a change these apps
+cannot make on screen is one they cannot make online either — the queue accepting a kind of change is
+not the same as a screen offering it, and the phone app is two screens deep. In
 practice, offline you can create a job, move one between stages, reopen one, post a comment, and deal
-with a disputed claim. You still cannot assign anybody or set a due date, because nothing offers to,
-online or off.
+with a disputed claim. **Offline you still cannot assign anybody or set a due date — and here that is a
+property of these apps rather than of being offline.** The phone app has no "Assignee" row in either
+state, while the website's panel can set one and simply has no offline queue to carry it: the browser
+version is online-only.
 
 Whatever you *do* manage to do is queued and sent when you reconnect.
 

@@ -184,10 +184,11 @@ No. That is refused outright, even for the owner, and it is checked before anyth
 ## Jobs
 
 **Can I assign a job to somebody?**
-**No.** The board shows who a job is on, the Inbox tells you when you have been assigned something, My
-Work is built around it and the list can group by it — and no screen anywhere lets a person do the
-assigning. Not on the website, not on the phone app. Everything you see assigned was assigned when the
-data was loaded in.
+**Yes on the website, no on the apps.** The website's job panel has an "Assignee" picker — choose a
+person, or choose **Unassigned** to take the job off somebody. The phone and desktop apps have no
+Assignee row at all, so there you can neither see who a job is on nor set it. The board shows who a job
+is on, the Inbox tells you when you have been assigned something, My Work is built around it and the
+list can group by it.
 
 **Can I set a due date?**
 **No control does it.** The calendar and timeline are built entirely around claimed dates and the
@@ -728,8 +729,9 @@ on the device.
 For changing things, you get whatever the two screens offer, which is not much: create a job, move one
 between stages, reopen one, post a comment, deal with a disputed claim. The queue underneath will
 carry more kinds of change than that — but **a queue accepting a kind of change is not a screen
-offering it**, and you still cannot assign anybody or set a due date offline, for the same reason you
-cannot online: nothing offers to.
+offering it**, and offline you still cannot assign anybody or set a due date. **That is a property of
+these apps rather than of being offline:** they have no Assignee row in either state. The website's
+panel *can* set one, and it is online-only — there is no offline queue there to carry it.
 
 **The browser version is online-only.** It has no offline queue at all — which is why its "claims
 waiting to send" section is always empty on the web. Offline is the apps' job.

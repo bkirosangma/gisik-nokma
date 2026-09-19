@@ -1,4 +1,66 @@
-## ▲ TOP BLOCK — **THE INSTRUMENT DEBTS: BOTH TASKS BUILT, `#567` MERGED, `#568` AWAITING THE MERGE.** (2026-09-20, ~09:0x IST)
+## ▲ TOP BLOCK — **THE MANUAL SAID YOU CANNOT ASSIGN A JOB — TRUE ON THE APPS, FALSE ON THE WEB SINCE `#530`.** (2026-09-20, ~11:0x IST)
+
+### § 1 — WHERE TO FIND IT. Read this before anything else.
+
+- **Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-20-manual-assignee.md`.** `main` = `57a7593f`.
+- **Branch `exec2/manual-assignee`**, cut from `57a7593f`. One PR, base `main`; the controller merges.
+- ⚠ **This lane's id block is `16.41`–`16.60`; `16.41`–`16.44` spent, next free `16.45`. THIS TASK MINTED
+  NONE** — a prose correction with no behaviour to pin, and the dispatch says to say so rather than mint
+  one to look thorough.
+
+### § 2 — THE MEASUREMENT, AND THE TWO SHELLS DO DISAGREE
+
+| shell | assignee behaviour | source |
+|---|---|---|
+| **web** | **visible AND settable** — a `<Select aria-label="Assignee">` with an `Unassigned` option | `packages/app-core/src/views/ticket-sheet.tsx:957-975`; row at `:1338-1345` |
+| **phone** | **no assignee surface AT ALL** | `apps/mobile/src/screens/ticket-screen.tsx:101-127`; the board row is `title · stateId` (`board-screen.tsx:61-65`) |
+| **desktop** | **no assignee surface** — it renders a list only | `apps/desktop/src/app.tsx:120-134`; `TicketList` at `:150-161` |
+
+**Mobile is "no surface AT ALL", not "read-only" — and that is the distinction the dispatch drew.** The
+manual's *"The panel shows 'Assignee' with a name or a dash"* was false there a second way: **the phone has
+no Assignee row to show a name or a dash in.** Controlled sweep of all mobile source: `assignee` → **1
+hit**, whose only use is an INTERIM `actorId` fallback for a comment (`ticket-screen.tsx:49`, the comment
+at `:46-48` saying the session user id is not wired up yet); `member` → **0**.
+
+**On the web it is settable except in two named cases** (`ticket-sheet.tsx:934-956`): the roster has not
+loaded or errored, or the job is on somebody outside the roster the viewer can see — where the row goes
+read-only rather than offering a control that cannot state the value.
+
+### § 3 — WHAT CHANGED: FIVE PLACES, NOT THE TWO THAT WERE FLAGGED
+
+`docs/manual.md` and `docs/faq.md` are the SOURCE for `packages/app-core/src/help/content.generated.ts`
+(`scripts/help-content.mjs`; `check:help` refuses a stale copy), so the generated file moved in the same
+change set — **225 entries, unchanged**, every edit being prose inside an existing entry.
+
+- `manual.md:22` — the "five things that catch everybody" list.
+- `manual.md:337` — the "things you cannot do" list. **Kept in place rather than deleted, on the
+  description row's own precedent two lines below** (*"kept here, rather than deleted, so a reader who
+  remembers it as an absence finds the correction where they last saw it"*).
+- `manual.md:1054` — the offline paragraph **and the clause immediately before it**, which said *"a change
+  you cannot make on screen offline is a change you could not make online either"* — falsified by the same
+  `#530`, and left contradicting the correction two sentences later. Scoped to the apps, which is what it
+  always meant.
+- `faq.md:186` — the headline *"Can I assign a job to somebody? **No.**"*
+- `faq.md:729` — the offline clause, *"for the same reason you cannot online: nothing offers to"* — the
+  reason is no longer the same, and is now named as the apps' own.
+
+**Every correction names the difference rather than averaging it.**
+
+### § 4 — LISTED, NOT FIXED (the dispatch's rule: one PR must not absorb a manual-wide audit)
+
+- **`manual.md:731`** — *"**To mark something read: click the row.** That is it."* **Incomplete since
+  `C` (`#563`)**: the inbox now has a bulk **`Mark N read`** and its Undo. "That is it" is no longer it.
+- **`manual.md:1064`** — *"the phone app's board screen has a search box — **the only one in the
+  product**"*. **False:** the web project board has one too
+  (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1569-1572`, `placeholder="Search the board"`).
+  ⚠ **Provenance unmeasured** — I did not date the web box, so it may predate the last two days.
+- **Not documented at all — gaps rather than falsifications:** the subtasks section, the sheet footer's
+  `‹ Previous / Next ›`, and the inbox bulk action. Measured: `grep -niE 'subtask' docs/manual.md` → **0**,
+  `'footer'` → **0**, `'bulk'` → **0**.
+
+---
+
+## ▼ PREVIOUS BLOCK — **THE INSTRUMENT DEBTS: BOTH TASKS BUILT, `#567` MERGED, `#568` MERGED (`57a7593f`).** (2026-09-20, ~09:0x IST)
 
 ### § 1 — WHERE TO FIND IT. Read this before anything else.
 
