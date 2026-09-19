@@ -54,17 +54,61 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 // suffixed id must be present AND distinct.
 const ID_LINE = /^-\s+(?:([^\s\d*][^\s]*)\s+)?(\*{0,2})(\d+\.\d+[a-z]?)/;
 
+// A FOURTH style, added 2026-09-19: a marker, then a bold id, then the id
+// BACKTICKED inside that bold --
+//   `- ✅ **`13.989` — the description is editable on the door that already exists.`
+// It READS exactly like the marker-first style above and matched none of the
+// three, because `(\d+\.\d+)` demands a digit immediately after the asterisks
+// and the backtick stops it at the first character. Measured cost: case
+// `13.989` sat on `main` through several greens, unseen by this script, and the
+// duplicate it could have formed was caught by a human reading instead.
+//
+// ## Why this is a SECOND regex and not one optional-backtick group
+//
+// The obvious repair -- make the backtick optional in `ID_LINE` -- is WRONG,
+// and it was measured rather than reasoned. Both the marker group and the
+// asterisk group are themselves optional, so an optional backtick lets the
+// engine SKIP the marker and match an ordinary prose bullet that merely begins
+// with a quoted id:
+//   `- `13.439`/`13.444` retired (their subject — the mirror note — no longer exists); ...`
+// On the real `test-cases/` files that change gained FOUR lines and manufactured
+// THREE DUPLICATE ids (13.439, 13.447, 13.517) -- a red `main` introduced by the
+// fix meant to prevent one. It is the same shape as the greedy-marker bug this
+// file already records: the loose matcher does not merely miss, it INVENTS.
+//
+// So a MARKER and BOLD are both required here. A prose bullet that begins with
+// a quoted id is not an id line, and the fixture now pins that with a line that
+// must NOT be counted.
+const ID_LINE_BOLD_BACKTICK = /^-\s+(?:([^\s\d*][^\s]*)\s+)?\*\*`(\d+\.\d+[a-z]?)`/;
+
+/**
+ * Resolve a line to the id-line style it is written in, or `null`.
+ *
+ * Kept as one place so the style COUNTS (`byStyle`) and the id shown in a
+ * failure cannot disagree about which style a line was read as.
+ *
+ * @returns {{marker: string|undefined, asterisks: string, id: string}|null}
+ */
+function idLineOf(line) {
+  const plain = line.match(ID_LINE);
+  if (plain) return { marker: plain[1], asterisks: plain[2], id: plain[3] };
+  const backticked = line.match(ID_LINE_BOLD_BACKTICK);
+  // `'**'` rather than the captured text: the backticked style IS the bold one,
+  // and reporting it as bare would make a style tally say something untrue.
+  if (backticked) return { marker: backticked[1], asterisks: '**', id: backticked[2] };
+  return null;
+}
+
 function extract(lines) {
   const byStyle = { bare: 0, bold: 0, markerFirst: 0 };
   const ids = [];
   for (const line of lines) {
-    const m = line.match(ID_LINE);
-    if (!m) continue;
-    const [, marker, asterisks, id] = m;
-    if (marker) byStyle.markerFirst += 1;
-    else if (asterisks) byStyle.bold += 1;
+    const found = idLineOf(line);
+    if (found === null) continue;
+    if (found.marker) byStyle.markerFirst += 1;
+    else if (found.asterisks) byStyle.bold += 1;
     else byStyle.bare += 1;
-    ids.push(id);
+    ids.push(found.id);
   }
   return { byStyle, ids };
 }
@@ -80,7 +124,7 @@ const fixtureUnion = new Set(fixtureResult.ids).size;
 // is ever dropped from ID_LINE again, that line collapses onto `13.91`, union
 // falls to 4 while sum stays 5, and this self-test fails BEFORE the real sweep
 // runs — which is the whole point of having it.
-const EXPECTED = { bare: 1, bold: 2, markerFirst: 2, sum: 5, union: 5 };
+const EXPECTED = { bare: 1, bold: 2, markerFirst: 3, sum: 6, union: 6 };
 const selfTestFailures = [];
 if (fixtureResult.byStyle.bare !== EXPECTED.bare) {
   selfTestFailures.push(`bare: expected ${EXPECTED.bare}, got ${fixtureResult.byStyle.bare}`);
@@ -136,19 +180,26 @@ const seen = new Map(); // id -> [locations]
 
 for (const file of files) {
   const lines = readFileSync(join(DIR, file), 'utf8').split('\n');
-  const { byStyle, ids } = extract(lines);
+  const { byStyle } = extract(lines);
   totalByStyle.bare += byStyle.bare;
   totalByStyle.bold += byStyle.bold;
   totalByStyle.markerFirst += byStyle.markerFirst;
 
   lines.forEach((line, i) => {
-    const m = line.match(ID_LINE);
-    if (!m) return;
-    const id = m[3];
+    // THE SAME RESOLVER `extract` USES, and that is not tidiness. Until
+    // 2026-09-19 this loop called `line.match(ID_LINE)` for itself while
+    // `extract` matched separately: TWO matchers that had to agree, deciding
+    // the same question. Teaching `extract` a fourth style left this one on the
+    // old regex, so the SUM counted a line the UNION did not -- and the report
+    // that came out was "DUPLICATE case ids found", a diagnosis of something
+    // that had not happened. Found by building the fourth style, not by reading
+    // it. One resolver, one answer.
+    const found = idLineOf(line);
+    if (found === null) return;
+    const id = found.id;
     if (!seen.has(id)) seen.set(id, []);
     seen.get(id).push(`${file}:${i + 1}`);
   });
-  void ids;
 }
 
 const totalSum = totalByStyle.bare + totalByStyle.bold + totalByStyle.markerFirst;
