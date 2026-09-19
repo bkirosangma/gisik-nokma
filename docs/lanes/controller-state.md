@@ -31,6 +31,28 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 SUNDAY 2026-09-20 ~02:0x IST — **CYCLE 14: THE OVERNIGHT RUN CONTINUES. THREE PRs MERGED SINCE THE CYCLE-13 ANCHOR, BOTH LANES WORKING, ZERO OPEN PRs.** `main` is `fdbb7fc8`.
+
+### Position
+| lane | task | status |
+|---|---|---|
+| exec 1 | **the `Subtask of {parent}` chip** + the separator defect | **DONE** — `#562` → `58aff430`. Reviewer found **five defects in its own change**, all fixed in it, including a stale authority and a CSS comment that falsified itself |
+| exec 1 | **sheet prototype parity** | **IN FLIGHT** — `exec/sheet-prototype-parity`, block `16.81`–`16.99` |
+| exec 1 | **`hig-per-screen/3b`** | **QUEUED** behind parity on `exec/members-states` @ `b4664bd4` — **NOT a stop-and-ask**: `role` IS on the wire and the mapper carries it (case `13.760`) |
+| exec 2 | **C — `isInbox` bulk + Undo** | **DONE** — `#563` → `fdbb7fc8`. The product's first toast: `packages/ui/src/components/toast.tsx`, wired to the inbox only, **15-second dismissal** |
+| exec 2 | **H** — sheet footer (history-retaining removal + undo) | **IN FLIGHT** — dispatched |
+| exec 2 | **the inviter card** | **QUEUED** behind H |
+**Also merged this cycle:** `#561` (the cycle-13 anchor itself). Blocks: parity `16.81`–`16.99`; **§17 is authorised by standing grant when `16.99` is reached.**
+
+### ⚠ A REBASE COLLISION IS NOW THE EXPECTED SHAPE, NOT THE EXCEPTION
+`#563` conflicted with `#562` — **both edited `test-cases/16-remaining-doors.md`**. `merge-tree --write-tree` reported **three stages on that one file** and the merge aborted. **That is the check that catches it BEFORE a merge rather than after** — it is now part of the bar. Expect it on every pair of lane PRs that share the §16 file; the fix is a rebase by the owning lane, keeping **both** sections.
+
+### ⚠ TWO TRUE THINGS ABOUT THE TEST RUNNERS, both measured by a lane today
+1. **`--concurrency` is NOT a valid vitest 3 flag.** Executor 2 ran its isolation check with it and the run died at **argument parsing** (`CACError: Unknown option --concurrency`) — which reads as a failure but never executed a test. The briefs say "`--concurrency=1` where the runner allows"; **for vitest, it does not allow it.** A run that dies at argv is not evidence about anything.
+2. **The rtk proxy's vitest parser can eat a run's output** (`[RTK:PASSTHROUGH] vitest parser: All parsing tiers failed`), so a proxied exit code is not a verdict. **Read the tee'd raw output.**
+
+### The `seed-dev` load red, settled again
+It reddened at **load average 201** with the Docker VM at 212 %, twice, in one gate — and passed alone in **2.37 s, 8/8** at the same content, with **zero orphaned vitest workers** by the brief's own `ppid=1` filter. **Re-run a red timeout ALONE before believing it.** It disappears entirely when the box is quiet — the gate after executor 2 restarted was **33/33, no flake**.
 ## 🔄 SUNDAY 2026-09-20 ~01:0x IST — **CYCLE 13, THE OVERNIGHT RUN. THE OWNER IS ASLEEP AND HAS GRANTED STANDING AUTONOMY UNTIL EVERYTHING FINISHES.** `main` is `416ee1ff`; zero open PRs at the time of writing; ledger **306 done / 0 claimed / 2 todo**.
 
 ### 📌 THE OWNER'S RULINGS AND STANDING ORDERS — the newest authority, taken 2026-09-20 before sleeping
