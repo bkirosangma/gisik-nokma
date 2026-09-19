@@ -399,3 +399,63 @@ case passed because it queried each span's own text; nothing read the row as a r
 removing the separator reddens it with the defect itself in the message. **The fix is TEXT rather than a
 CSS gap on purpose**: this section declares no stylesheet rule at all and jsdom has no layout engine, so
 a gap would have been unmeasurable — an unverifiable fix and the defect are the same shape.
+
+## The inbox's bulk action and its Undo — one route, both directions (executor 2, 2026-09-20)
+
+**Owner's ruling: option A — ONE bidirectional bulk route, id-scoped, bounded to the list page's own
+size; Undo surface = a shared `packages/ui` toast; dismissal after 15 seconds; a non-id-scoped "mark all
+read" stays OUT of scope.** Dispatch `CTL-DISPATCH-2026-09-19-c-inbox-bulk-undo.md`.
+
+### THE DOOR WAS MEASURED FIRST, AND IT NEEDED A WRITE THAT DID NOT EXIST
+
+`owner-holds.md:69` rules **"bulk + Undo"** BUILD with door `NEW ROUTE` + CSRF registration — ONE route —
+and separately records that `markRead` is one-way with no unread door. **An honest Undo needs an unread
+WRITE**, and the row did not name one. Measured with the control in the same invocation: the sweep for the
+write shape `SET read` finds **exactly one** hit (`store.ts:145`, so the sweep can see writes), and the
+sweep for `SET read = false` in any spelling finds **none**. The prototype's Undo proves nothing about
+ours — it is a pure CLIENT snapshot restore (`desktop.dc.html:3029`) and the prototype has no server.
+
+- **16.41** ✅ — **the bulk write, at the route and at the call site.** `POST /v1/me/notifications/read`,
+  `{ ids, read }` → `{ changed }`. **The property every arm is built around: the Undo must un-read exactly
+  what the forward call CHANGED, not what it asked about.** The route suite
+  (`apps/server/test/routes/notifications.test.ts`) covers the changed-set, the other-caller's-row
+  indistinguishability, the round trip, the bound, and the malformed bodies; the page suite
+  (`apps/web/test/inbox-bulk.test.tsx`) drives the real page and **its fake returns a SUBSET of what it was
+  asked for on purpose**, so a page that discarded `changed` and un-read its own request fails there rather
+  than in production. **⚠ MUTATION-WITNESSED TWICE, and the first caught a REAL BUG:** the store's
+  statement was `UPDATE … RETURNING id` with no `IS DISTINCT FROM`, and `RETURNING` reports every row the
+  `WHERE` **MATCHED** — so an already-read row came back in `changed` and **the Undo would have flipped it
+  to unread, inventing a notification nobody un-read.** Removing `AND read IS DISTINCT FROM $1::boolean`
+  reddens exactly the two arms that name the property; making the page store its requested ids instead of
+  the server's `changed` reddens the call-site arm. **The CSRF registration is witnessed THREE ways:**
+  unregistering the route reddens the 13.116 set-equality drift guard, the forged-Origin refusal, and the
+  no-Origin refusal — `HTTP_ORIGIN_PROTECTED_ROUTES` is an **exact-match `Set`**, so the per-id neighbour
+  string does not cover the bulk route.
+- **16.42** ✅ — **the shared `Toast`.** `packages/ui/test/toast.test.tsx`. The product had **no transient
+  surface at all** before this. ⚠ **The "zero `toast` hits across …" first written here was FALSE** —
+  there are **five, in three files, all comments about the prototype's toast**, and the sweep's own
+  `grep -viE` comment filter ate exactly the hits that existed: **a silent empty produced by the
+  searcher.** The material claim (nothing SHIPS a transient message) survives; the quoted measurement
+  did not, and is corrected rather than deleted. Covers the ruled 15 s window **at the boundary**
+  (not-yet at `-1 ms`, fired at `+1 ms`), `null` meaning no timer, the Undo and Dismiss being two
+  different calls, and the absence of an Undo button when none is offered. **Mutation-witnessed:** removing
+  the timer reddens the two arms that name it. ⚠ **ONE ADDITION TO THE RULING, flagged rather than
+  smuggled:** the countdown **pauses while the pointer or focus is inside the toast**. The ruling's 15 s is
+  the default and unchanged; the pause exists because a timer that runs down while somebody is reading or
+  tabbing toward the Undo makes the control vanish mid-use, and WCAG 2.2.1 asks for a time limit a person
+  can extend. **Owner may veto; it is one effect and its own arm.**
+
+### What is NOT done, named rather than implied
+
+- **A non-id-scoped "mark all read" is NOT built** — excluded by the ruling. The control acts on the drawn
+  rows and says so (`Mark N read`), which is also why its label departs from the prototype's *"Mark all
+  read"*: that sentence would be a claim about the whole inbox for an action scoped to the page.
+- **A page holding more rows than the bound cannot bulk-act.** The client sends exactly the ids it drew and
+  the server refuses an over-long list WHOLE; with the read's 30-per-page default, four Load-mores reach
+  101. Recorded rather than papered over — the ruling chose the bound and the refusal, and chunking would
+  make one click several writes.
+- **The toast is wired for the inbox ONLY.** The prototype's serves 66 call sites; the shared component is
+  in place for the rest, and wiring them is other tasks'.
+- **No browser run.** The dispatch asks for one; a routed `/inbox` needs a real session this lane cannot
+  reach, and jsdom has no layout engine — it cannot tell a toast drawn at the foot of the screen from one
+  drawn into nothing.

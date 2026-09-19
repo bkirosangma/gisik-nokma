@@ -24,6 +24,7 @@ export { Card, type CardProps } from './components/card.js';
 export { Chip, type ChipProps, type ChipTone } from './components/chip.js';
 export { Dialog, type DialogProps } from './components/dialog.js';
 export { InfoTip, type InfoTipProps } from './components/info-tip.js';
+export { Toast, TOAST_DEFAULT_DURATION_MS, type ToastProps, type ToastTone } from './components/toast.js';
 export { SegmentedControl } from './components/segmented-control.js';
 export type { SegmentedOption, SegmentedControlProps } from './components/segmented-control.js';
 export { Sheet, type SheetProps } from './components/sheet.js';

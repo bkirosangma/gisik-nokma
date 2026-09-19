@@ -200,6 +200,15 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
       '/v1/me/notifications/:id/read',
       'POST',
     ],
+    // The BULK sibling, added 2026-09-19 with the route itself. It needs its OWN
+    // row for a reason that is not book-keeping: the row above is
+    // `/v1/me/notifications/:id/read` and the drift guard below compares strings
+    // for set equality, so the bulk route is NOT covered by its neighbour's row
+    // any more than it is covered by its neighbour's PROTECTION — which is the
+    // exact hazard the task that added it was warned about. Note the request URL
+    // and the route pattern are the SAME string here: this route has no
+    // parameter for `:id` to absorb a stray segment into.
+    ['the inbox BULK read/unread', '/v1/me/notifications/read', '/v1/me/notifications/read', 'POST'],
     // Added by MCP plan Task 3, and added HERE because the drift guard below
     // REQUIRED it: protecting the route without a row reddens 13.116, which is
     // precisely what that guard is for. A cookie-authenticated POST that mints

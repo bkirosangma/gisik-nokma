@@ -203,6 +203,12 @@ export function stubServices(
       list: unstubbedGateway('notifications.list'),
       unreadCount: unstubbedGateway('notifications.unreadCount'),
       markRead: unstubbedGateway('notifications.markRead'),
+      // Same rule as every member beside it: a case that forgets this one sees
+      // the bulk write REJECT BY NAME rather than resolving with a `changed`
+      // nobody supplied. A default `[]` here would be this helper asserting
+      // "the bulk call changed nothing" — a claim about the world — and a case
+      // asserting the Undo would pass without the write ever being described.
+      setRead: unstubbedGateway('notifications.setRead'),
       ...gateways.notifications,
     },
     notificationPreferences: {

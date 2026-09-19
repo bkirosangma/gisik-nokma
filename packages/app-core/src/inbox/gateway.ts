@@ -95,4 +95,26 @@ export interface NotificationsGateway {
   unreadCount(): Promise<number>;
   /** Idempotent: marking an already-read row of your own is not an error. */
   markRead(id: string): Promise<void>;
+  /**
+   * **The bulk write, in BOTH directions — and it answers with the ids it
+   * actually changed, which is what makes the inbox's Undo honest.**
+   *
+   * `read: true` is the "Mark all read" action; `read: false` is its Undo. One
+   * method rather than two, because they are one operation on one flag; and it
+   * is NOT an extension of `markRead` above, which keeps answering the single
+   * question it was written for.
+   *
+   * ⚠ **THE RETURN VALUE IS NOT DECORATION.** The Undo must put back **exactly
+   * the rows the forward call changed** — not the rows it asked about. Those
+   * differ for any requested id that was ALREADY read, and un-reading such a row
+   * would invent an unread notification out of an action that never touched it.
+   * So the server returns the changed set and this method hands it straight back;
+   * **a caller that discards it and un-reads its own request instead has
+   * reintroduced the bug the return value exists to prevent.**
+   *
+   * Rejects over the server's bound (the largest set one page of the read can
+   * return) rather than truncating — an over-long list is refused whole, so a
+   * caller never believes it changed more than it did.
+   */
+  setRead(ids: readonly string[], read: boolean): Promise<string[]>;
 }

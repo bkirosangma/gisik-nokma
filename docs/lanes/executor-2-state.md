@@ -1,4 +1,76 @@
-## ▲ TOP BLOCK — **C IS MEASURED AND BLOCKED ON A RULING. DO NOT START IT.** (2026-09-19, ~19:0x IST)
+## ▲ TOP BLOCK — **C: BUILT AND PUSHED, NO PR OPEN. NEXT SESSION: OPEN THE PR.** (2026-09-20, ~01:0x IST)
+
+### § 1 — WHERE TO FIND IT. Read this before anything else.
+
+- **Branch `exec2/inbox-bulk-undo`**, base `main`, **head `dd22eb81`**, pushed to origin.
+- **NO PR IS OPEN** — the controller halted this session at 82% context with instructions to
+  push and stop. **`gh pr view --json headRefOid` against that branch will say "no pull requests";
+  that is correct, not a failure.** **Your first act is to open the PR**, body drafted below.
+- Everything is committed. The tree is clean at that sha.
+
+### § 2 — WHAT IS BUILT, AND IT IS ALL OF C.
+
+**The ruling applied:** owner's **option A** — ONE bidirectional route `POST /v1/me/notifications/read`
+taking `{ ids, read }`; id-scoped and **bounded at `MAX_LIMIT` (100)**, this route file's own ceiling on
+one page of the read, **refused WHOLE rather than truncated**; the Undo's surface is a **shared
+`packages/ui` Toast**; **dismiss after 15 s**; a non-id-scoped "mark all read" is **OUT of scope**.
+
+| piece | where | state |
+|---|---|---|
+| the bulk route | `apps/server/src/routes/notifications.ts` | ✅ built, 12 arms in its own suite |
+| **the unread write** (did not exist) | `apps/server/src/notifications/store.ts` | ✅ built |
+| **the CSRF registration** + its suite row | `apps/server/src/http/http-origin.ts`, `test/http/security-middleware.test.ts` | ✅ built; **triple-witnessed** |
+| the gateway (`setRead`) + HTTP adapter + fake | `packages/app-core/src/inbox/gateway.ts`, `online/notifications.ts`, `test/inbox/fake-gateway.ts` | ✅ built, all three tested |
+| the page: `Mark N read`, the Undo, the refusal | `apps/web/app/inbox/page.tsx` | ✅ built |
+| the shared **`Toast`** (the product's first transient surface) | `packages/ui/src/components/toast.tsx` + `ui.css` | ✅ built |
+
+**Cases `16.41`** (the bulk write, route and call site) and **`16.42`** (the Toast), both as id lines in
+`test-cases/16-remaining-doors.md`. **Block `16.41`–`16.60`: `16.41` and `16.42` spent, next free
+`16.43`.** `check-case-ids` ok at **2485**; control-verified as exactly +2 (backticking the two ids
+drops it to 2483).
+
+### § 3 — ⚠ THE THING TO READ BEFORE TRUSTING ANY OF IT: A REVIEW ROUND OF NINE, ONE SEVERE.
+
+Independent review ran before the halt. **Nine findings, all confirmed, all fixed in `dd22eb81`.**
+The severe one was MINE and it broke the ruling:
+
+> **THE RULED 15 s WAS DEAD FROM THE SECOND TOAST ON.** `paused` is set by `mouseenter`, and every way of
+> closing the toast puts the pointer or focus inside it — you cannot click Undo or Dismiss without
+> hovering. A removed node fires no `mouseleave`, so the flag survived to the next `open`, the effect's
+> `|| paused` early return never reached `setTimeout`, and **every later toast stayed on screen forever.**
+
+And one worth carrying: **my own "zero `toast` hits" sweep was FALSE** — there are five, in three files,
+all comments about the prototype's toast, and **the sweep's own `grep -viE` comment filter ate exactly
+the hits that existed.** Corrected in all five places it was written.
+
+The other seven: the >bound refusal was **silent** and discarded loaded pages; the HTTP adapter's
+`setRead` was **exercised by no test**; the fake's `setRead` was **dead code**; the route file said
+"Three routes" where it registers four; a second action inherited the first toast's remaining time; an
+unreachable empty guard; two present-tense counts the change moved.
+
+### § 4 — WHAT IS LEFT.
+
+1. **OPEN THE PR.** Not done. `--base main`, one PR, you do not merge.
+2. **The forced gate is the controller's.** The last run at this head: **`33/33` tasks, `0` TS errors**,
+   with `@gisik-nokma/server` reddening on **one** test — `test/seed/seed-dev.test.ts`'s 30 s timeout at
+   **load 89–97** — which is the **known load red this lane has isolated 8/8 twice today** and is not
+   this change. **`NODE=v22.22.2`.** All seven checks EXIT=0.
+3. **After C lands: `H` (the sheet footer)** — ruled *a HISTORY-RETAINING removal with undo, NOT a hard
+   delete*. Then the inviter card. **Note the Toast now exists, which is the surface such an undo would
+   want — but do NOT assume that is ruled: H's own dispatch decides.**
+
+### § 5 — THE TWO DEPARTURES FROM THE RULING/ PROTOTYPE, BOTH FLAGGED FOR A VETO.
+
+1. **The countdown PAUSES on hover/focus** — my addition. The ruled 15 s is the default and unchanged;
+   the pause is because a timer running down while somebody **tabs toward the Undo** makes the control
+   vanish mid-use (WCAG 2.2.1). **This addition is what caused finding #1 above; it is now correct and
+   its own arm guards the reopen path.**
+2. **The label reads `Mark N read`, not the prototype's "Mark all read"** — the ruling kept a
+   non-id-scoped "mark all" out of scope, so "all" would claim the inbox for an action scoped to the page.
+
+---
+
+## ▼ PREVIOUS BLOCK — **C IS MEASURED AND BLOCKED ON A RULING. DO NOT START IT.** (2026-09-19, ~19:0x IST)
 
 **Position: NOTHING IN FLIGHT. `main` is `b9f80935`.** Both prior tasks landed: **#549** (the evidence
 upload) and **#554** (the id-guard docblock note, merged 13:20:58Z). **Zero open PRs from this lane.**
