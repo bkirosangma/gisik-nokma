@@ -1,8 +1,9 @@
 ## ▲ TOP BLOCK — **THE EVIDENCE UPLOAD: a rule that permanently blocked a move, closed by one missing prop.** (2026-09-19, ~23:2x IST)
 
-**Position: DONE and PUSHED — `exec2/evidence-upload`, base `main` at `2c28f6bc`.** The PR opens as this
-dispatch's last step; **measure it rather than reading it here**:
-`gh pr list --head exec2/evidence-upload --state all`.
+**Position: DONE, PUSHED, and the PR IS OPEN — `exec2/evidence-upload`, base `main`, since REBASED onto
+`d071c7c0` (see § 11).** **PR #549**; measure it rather than reading it here:
+`gh pr view 549 --json state,headRefOid,mergeable`. **The head is a reading** — it moved twice after this
+block was first written (the fix round, then the rebase), which is why this file names the PR and not a sha.
 
 **⚠ `main` MOVED UNDER THIS BRANCH MID-TASK: PR #544 (the description) MERGED at `12:07:17Z` while this
 branch was open.** The work was committed as a WIP, **cherry-picked onto the new `main`**, and re-gated
@@ -128,12 +129,10 @@ remaining window is `13.990`–`13.993` and `13.995`–`13.999`, and it is not t
 spent while it was valid; **this task's id was renumbered to `16.31`** in the two test files, and its
 catalogue section was LIFTED OUT of `test-cases/13-second-wave-board-actions.md` — see § 10.
 
-**⚠ AND `test-cases/16-remaining-doors.md` HAS NOT LANDED.** `git cat-file -e
-origin/main:test-cases/16-remaining-doors.md` → does not exist (control: `13-second-wave-board-actions.md`
-present). Executor 1 is creating that file, and minting into `§16` before it exists would create a
-competing copy and a conflict **on the file itself**. **So the catalogue entry is HELD, not written** —
-its 96 lines are staged at `/tmp/held-16.31-section.md` and go in the moment the file lands. **Owner:
-whoever next sees `test-cases/16-remaining-doors.md` on `main`.**
+**✅ AND THE HELD ENTRY HAS SINCE LANDED** — `test-cases/16-remaining-doors.md` came in with **#548**, the
+branch was rebased onto the new `main`, and the 96-line section is now a section of that file, written as
+`- **16.31** ✅ …` (§ 11). The hold was correct and it cost nothing: minting into `§16` before the file
+existed would have created a competing copy and a conflict on the file itself.
 
 **Write the id line as a bullet whose id is BARE and BOLD** — `- **16.31** ✅ …` — because a backtick
 between the asterisks and the digits stops `check-case-ids`'s regex, and a `##` heading carrying the id in
