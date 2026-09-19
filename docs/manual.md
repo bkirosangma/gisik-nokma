@@ -649,13 +649,14 @@ is there for.
 
 ### The one filter
 
-Above the tabs there is a single tick box: **"Only tickets in progress"**.
+In the controls row above the tabs, beside the **Filters** button, there is a single switch:
+**"Only tickets in progress"**.
 
-Tick it and you get a note: *"the list, calendar and timeline are asking only for tickets in progress —
-not started and done are both excluded. The board is not narrowed."*
+Turn it on and you get a note: *"the list, calendar and timeline are asking only for tickets in progress
+— not started and done are both excluded. The board is not narrowed."*
 
-> **Read that last sentence carefully.** The tick box **does not affect the Board** — and the Board is
-> the default tab. So you can tick the box, read "done are excluded", and be looking at a Done column
+> **Read that last sentence carefully.** The switch **does not affect the Board** — and the Board is
+> the default tab. So you can turn it on, read "done are excluded", and be looking at a Done column
 > full of done cards. The note exists precisely because of this.
 
 That is the only filter on the website. There is no filtering by person, by date, or by type, and
@@ -669,7 +670,7 @@ refuse** rather than showing you part of a project pretending to be the whole on
 button disappears too**, because it reads from the same place — so a project that grows past the
 ceiling becomes one you cannot add to.
 
-The way out is the **"Only tickets in progress"** tick box — narrowing gets you back under the ceiling
+The way out is the **"Only tickets in progress"** switch — narrowing gets you back under the ceiling
 — and it is deliberately placed where you can still reach it from the refusing screen. The Board keeps
 working throughout.
 
