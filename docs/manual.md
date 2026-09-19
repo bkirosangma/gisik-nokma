@@ -680,6 +680,14 @@ own name.
 There is a legend with one switch per custom date field that actually claimed a day in the month you
 are looking at. Switching one off only hides it from view; it changes nothing about the job.
 
+**Closed jobs are hidden here until you ask for them.** The Calendar and the Timeline both leave closed
+work out; the List does not. So a month can look emptier than the project really is, and the strip
+under the tabs is where you check: while this default is on it carries a **Closed: hidden** chip, and
+**removing that chip is what brings closed jobs back.** Turning the **Closed** control in the Filters
+sheet to *everything* does not lift it, because *everything* and *never touched it* are the same
+setting — which is exactly why the chip exists. *Closed only* or *not closed*, set there explicitly,
+does override the default, the way an explicit choice should.
+
 **If the calendar looks empty**, it tells you *which kind* of empty in four different sentences:
 nothing in this month has a claimed date at all; your filter removed everything; the grouping removed
 everything; or you switched a date field off in the legend. Read the sentence — it is telling you
@@ -691,6 +699,9 @@ The same idea stretched sideways over weeks, moving four weeks at a time with **
 **Later**. A bar again needs both a start and a needed-by. Anything with only one date, no dates, or a
 contradiction goes into a side list beside the chart, with a heading saying which of five reasons it
 is there for.
+
+**Closed jobs are hidden here too, on the same terms as the Calendar** — the **Closed: hidden** chip
+and the one thing that lifts it are described in that section above.
 
 ### The one filter
 
@@ -740,6 +751,10 @@ A third click puts the empty circle back.
 Two of the six are not lists of your workspace's own values. **Closed** is a single control, so its
 three settings read *everything*, *closed only* and *not closed*. **Category** is always the same three
 words. The other four are built from what your workspace actually has.
+
+On the **Calendar** and the **Timeline**, *everything* is not enough to get closed jobs back — those
+two tabs hide them until you remove the **Closed: hidden** chip the strip is showing. See the Calendar
+section above.
 
 **If the roster cannot be shown, the sheet says which of three things happened.** One that has not
 loaded yet, one that could not be loaded, and a workspace with nobody in it are three different facts,

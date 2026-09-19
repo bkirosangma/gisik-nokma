@@ -3244,6 +3244,83 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
+                    "text": "Closed jobs are hidden here until you ask for them."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " The Calendar and the Timeline both leave closed work out; the List does not. So a month can look emptier than the project really is, and the strip under the tabs is where you check: while this default is on it carries a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Closed: hidden"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " chip, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "removing that chip is what brings closed jobs back."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Turning the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Closed"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " control in the Filters sheet to "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "everything"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " does not lift it, because "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "everything"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "never touched it"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " are the same setting — which is exactly why the chip exists. "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "Closed only"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " or "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "not closed"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", set there explicitly, does override the default, the way an explicit choice should."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
                     "text": "If the calendar looks empty"
                   },
                   {
@@ -3288,6 +3365,27 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": ". A bar again needs both a start and a needed-by. Anything with only one date, no dates, or a contradiction goes into a side list beside the chart, with a heading saying which of five reasons it is there for."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Closed jobs are hidden here too, on the same terms as the Calendar"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Closed: hidden"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " chip and the one thing that lifts it are described in that section above."
                   }
                 ]
               }
@@ -3661,6 +3759,47 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " is always the same three words. The other four are built from what your workspace actually has."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "On the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Calendar"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Timeline"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "everything"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " is not enough to get closed jobs back — those two tabs hide them until you remove the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Closed: hidden"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " chip the strip is showing. See the Calendar section above."
                   }
                 ]
               },
@@ -8557,6 +8696,93 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " a start and a needed-by claim. On the Timeline, anything with only one date, no dates, or a contradiction goes into a side list with a heading saying which of five reasons it is there for."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "does-the-calendar-show-closed-jobs",
+            "title": "Does the Calendar show closed jobs?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Not by default, and neither does the Timeline. Both leave closed work out until you ask for it; the List does not. While that is in force the strip under the tabs carries a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Closed: hidden"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " chip, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "removing that chip is what brings them back."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Setting "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Closed"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "everything"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in the Filters sheet does "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "not"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " do it, because "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "everything"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "never touched it"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " are the same setting — which is the whole reason the chip is there. An explicit "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "closed only"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " or "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "not closed"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", set on that same control, does override the default either way."
                   }
                 ]
               }
