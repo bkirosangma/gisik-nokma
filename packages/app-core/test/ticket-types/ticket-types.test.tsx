@@ -256,8 +256,12 @@ describe('TicketTypeListScreen', () => {
  * The ↑/↓ reorder controls — Task 6+7 of the settings-workflows plan, lifted by
  * the owner 2026-09-19. Case block `13.928`–`13.935`.
  *
- * THE DOOR IS NOT NEW. `ticket-type-list-screen.tsx:38-54` measured this on
+ * THE DOOR IS NOT NEW. `ticket-type-list-screen.tsx:43-59` measured this on
  * 2026-09-18 and it is still true: no route and no gateway op is needed,
+ * (Re-pointed from `:38-54` when Task 8's docblock edit shifted the file by five
+ * lines at that point. Both citations are in files this change touches, which is
+ * the test the repo's own note in `test-cases/13-settings-and-workflows.md`
+ * sets for rewriting one rather than recording it.)
  * because `onSave` already authors a `ticket-type.defined` event carrying the
  * whole definition — `rank` included — through `gateway.submit`. A reorder is
  * "assign a different rank and submit". **No case here may assert that a rule
