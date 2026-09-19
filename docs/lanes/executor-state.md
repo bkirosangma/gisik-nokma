@@ -113,6 +113,23 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > (**STRUCK — never implement**). **None of the seven is an instruction.** Holding is the correct action,
 > and it is a *ruling request*, not idleness.
 >
+> ## ENVIRONMENT — the hot web is DOWN, and it went down cleanly before any of this lane's work
+>
+> Measured `2026-09-19 ~12:12 IST`, read-only (`docker ps`, `lsof`, `curl` — **no `docker compose` was run,
+> by this lane or before it**):
+>
+> | | |
+> |---|---|
+> | `gisik-nokma-dev-server-1` | **Up 21 hours (healthy)** on `:3000`; `curl -s localhost:3000/v1/auth/methods` → **`{"google":true,"apple":false,"phone":false}`** — the Google sign-in is intact, which is the check the launch rule names. |
+> | `gisik-nokma-dev-web-1` | **`Exited (0)` 52 minutes ago** — a **clean** exit, not a crash, and **well before this lane touched anything**. Nothing listens on `:3001`. |
+> | this lane's own effect | **none.** The only thing this lane did to the shared environment was switch its worktree between two trees whose *source* is identical to `main` (the second differs by this docs file alone). |
+>
+> **Do not "fix" this by running compose.** The owner's standing instruction is to *remove the hot compile
+> and rebuild on each merge*, and `prewarm-web-routes` is already HELD for the same reason — a clean exit 52
+> minutes ago is far more likely to be that instruction being acted on than a fault. **Recorded, not
+> repaired**, and named to the controller in this lane's report. A restarted executor should not assume the
+> web is up just because the brief says it is live.
+>
 > ## OPEN RULINGS FROM THIS LANE — unchanged, none of them mine to settle
 >
 > 1. **`owner-holds.md:44` and the plan's lift box still call the `isTypes` reorder *"a route and a gateway
