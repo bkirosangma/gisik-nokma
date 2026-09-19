@@ -27,7 +27,11 @@ export const COPY_IT_NOW = 'Copy it now — it is not stored and cannot be shown
  * `/w/[workspaceId]/members` — the roster, and for owners and admins the invite
  * machinery (Plan 6 Task 15b, item 2).
  *
- * ## The roster table, and the THREE things the prototype draws that are NOT here
+ * ## The roster table, and the TWO things the prototype draws that are NOT here
+ *
+ * **⚠ IT READ "THREE" UNTIL 2026-09-20, and the count moved in the change that made it wrong rather
+ * than in a later one.** A heading that counts is a claim like any other, and an independent reviewer
+ * found both it and the bullet below still describing a state the same commit had just ended.
  *
  * The screen is ported from `desktop.dc.html@6d7b67c0a52c:651-798`. What the
  * product can back from the wire is a Person column and a Role column over the
@@ -50,15 +54,15 @@ export const COPY_IT_NOW = 'Copy it now — it is not stored and cannot be shown
  *   the workspace's TICKETS against a people directory — no product read
  *   computes that set, and the button behind it writes a membership the product
  *   has no door for.
- * - **`Email` as a LINE OF ITS OWN**, which the prototype renders inside the
- *   Person cell (`:675`). **This bullet read *"which is not on this wire either"*
- *   until 2026-09-19 and that is no longer true** — `readMembers` carries the
- *   address now and the cell DOES show it, but as the NAME FALLBACK when a name
- *   is absent rather than as a second line beside one. The prototype's line is
- *   therefore still unported and the wire gap is closed; see `memberLabel` below
- *   for what replaced it. The sentence is corrected rather than deleted because
- *   the reason it gave — that the line needed a wire field which did not exist —
- *   is exactly the reason the field was added.
+ * - **`Email` as a LINE OF ITS OWN — PORTED 2026-09-20** (`hig-per-screen/3b`,
+ *   case `16.61`), which is why the heading above counts two and not three. This
+ *   bullet carried three successive readings and each is kept rather than deleted:
+ *   *"which is not on this wire either"* (true until 2026-09-19), then "the cell
+ *   shows it only as the NAME FALLBACK, so the prototype's line is still
+ *   unported" (true until 2026-09-20), and now the line is drawn. **A claim about
+ *   the artifact being edited is the one no check can catch** — the reviewer found
+ *   "still unported" standing sixteen lines above the JSX that had just started
+ *   drawing it.
  *
  * What IS here and was already here — the invite panel and its 403 gate — is
  * unchanged. Its strings are load-bearing and match the prototype verbatim.
@@ -441,18 +445,25 @@ export default function MembersPage() {
                           showed one, and the prototype draws both.
 
                           ⚠ DRAWN ONLY WHEN THE LABEL IS NOT ALREADY THE ADDRESS.
-                          `memberLabel` falls back name → email → id, so a
-                          phone-only member (whose `displayName` IS the number)
-                          and a magic-link sign-up with no name are LABELLED by
-                          their address; a second line for them would print one
-                          string twice inside one cell. `email` is also absent
-                          for the phone population by the server's own decision
-                          (`WorkspaceMember.email`), which is why the test is
-                          `!== undefined` rather than truthiness. */}
+                          `memberLabel` falls back name → email → id, so the
+                          population whose LABEL is the address is the NAMELESS
+                          one — a magic-link sign-up with no name. For them a
+                          second line would print one string twice inside one
+                          cell.
+
+                          ⚠ **THIS COMMENT NAMED THE WRONG POPULATION, and an
+                          independent reviewer caught it contradicting itself:**
+                          it said a "phone-only member" is labelled by their
+                          address AND that `email` is absent for the phone
+                          population, two clauses apart. `memberLabel`'s own
+                          docblock settles it — a phone sign-up's `displayName`
+                          IS the phone, so the fallback never fires for them. The
+                          correction is recorded rather than swapped because the
+                          wrong version named a population that reads plausible. */}
                       <span className="gn-members__identity">
                         <span className="gn-members__name">{label}</span>
-                        {member.name.trim() !== '' && member.email !== undefined ? (
-                          <span className="gn-members__email">{member.email}</span>
+                        {member.name.trim() !== '' && (member.email?.trim() ?? '') !== '' ? (
+                          <span className="gn-members__email">{member.email?.trim()}</span>
                         ) : null}
                       </span>
                     </span>

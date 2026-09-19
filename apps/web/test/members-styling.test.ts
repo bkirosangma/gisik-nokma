@@ -12,8 +12,10 @@ import { describe, expect, it } from 'vitest';
  * `:651-798` — the answer is not readable off the JSX: four of the five it named
  * (`:658` card, `:662` tray header, `:659` 17px/820px table body, and the cell
  * padding at `:672`) are already the prototype's values, so a case here pins
- * them rather than changing them. The fifth (`:675`'s second line) is a wire
- * absence, recorded at `members/page.tsx:52-53` and not a styling gap.
+ * them rather than changing them. The fifth (`:675`'s second line) WAS a wire
+ * absence — the wire gained the address on 2026-09-19 and the line was drawn on
+ * 2026-09-20 (`16.61`) — and what remains unwitnessed is the STRUCTURE that
+ * stacks it, which is `16.62` below.
  *
  * The one treatment the family really was missing is the ZEBRA, and it lives in
  * the prototype's DATA rather than its markup — `style: i % 2 ?
@@ -276,5 +278,37 @@ describe('13.887 the roster’s zebra, on the rows the prototype actually tints'
     const proseComment = css.replace(ANCHOR, `${ANCHOR}\n/* A note about .gn-members__row and its one rule. */`);
     expect(proseComment, 'the prose plant did not land').not.toBe(css);
     expect(rowRuleSelectors(proseComment, uiCss)).toHaveLength(1);
+  });
+});
+
+
+/**
+ * 16.62 — the two-line identity is a COLUMN, and the stylesheet says so.
+ *
+ * ⚠ **THIS IS THE ONLY INSTRUMENT THAT CAN SEE IT, which an independent reviewer
+ * proved by deleting the declaration: every other check stayed green.** jsdom has
+ * no layout engine, so two inline `<span>`s in this box render as ONE RUN OF
+ * GLYPHS — `Anselma Marakanselma@example.test`, the same shape the subtask rows
+ * shipped tonight — and the only real-browser instrument over `/members` measures
+ * colour, not geometry. So the fix for the string defect is a declaration, and
+ * the declaration had no witness until this case.
+ *
+ * The uniqueness claim is 13.887's doctrine, for 13.887's reason: a source scan
+ * cannot see CASCADE LOSS, so asserting the declaration exists is not enough —
+ * it also has to be the only rule that could be overridden into nothing.
+ */
+describe('16.62 the identity cell stacks, and exactly one rule says so', () => {
+  const css = readFileSync(GLOBALS_CSS_PATH, 'utf8');
+
+  it('declares the column', () => {
+    const rule = /\.gn-members__identity\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(rule).toMatch(/display:\s*flex/);
+    expect(rule).toMatch(/flex-direction:\s*column/);
+    expect(rule).toMatch(/min-width:\s*0/);
+  });
+
+  it('and no other rule mentions the class, so nothing can override it away', () => {
+    const mentions = css.match(/\.gn-members__identity/g) ?? [];
+    expect(mentions).toHaveLength(1);
   });
 });

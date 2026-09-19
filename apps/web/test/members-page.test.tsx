@@ -467,7 +467,7 @@ describe('3.138 a refused withdrawal is said out loud, and the invitation stays 
  * the address on 2026-09-19, which is what made the second line buildable.
  *
  * **The case is TWO ARMS because the second line is only honest in one of
- * them.** `memberLabel` falls back name → email → id, so a phone-only member is
+ * them.** `memberLabel` falls back name → email → id, so the NAMELESS population — a magic-link sign-up with no name — is labelled by their address (**corrected 2026-09-20**: this read "a phone-only member", which contradicts `memberLabel`'s own docblock, where a phone sign-up's `displayName` IS the phone and the fallback never fires) is
  * LABELLED by their address; drawing a second line for them would print one
  * string twice inside one cell. A case that asserted only the drawn arm would
  * pass against an implementation that printed the address twice for exactly the

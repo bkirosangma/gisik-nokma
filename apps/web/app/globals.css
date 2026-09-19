@@ -1618,8 +1618,14 @@ input, textarea, select { font-family: inherit; }
 /* The authority's two-line identity (`:675`): a flex COLUMN, so the name and
    the address stack rather than running together — the same failure the
    subtask rows shipped (`Order the brochuresTo do`), avoided here by making the
-   stack a property of the box rather than of the strings. `min-width: 0` so a
-   long address ellipsises inside the cell instead of widening the table. */
+   stack a property of the box rather than of the strings.
+
+   `min-width: 0` stops the cell WIDENING the table — and it WRAPS, it does not
+   ellipsise. An independent reviewer checked: nothing in this family declares
+   `overflow`, `text-overflow` or `white-space`, so the first version of this
+   sentence ("a long address ellipsises") was false as written. 13.887's sibling
+   records the same lesson from this family's own history — a claim about what a
+   declaration does is a measurement, not a description. */
 .gn-members__identity {
   display: flex;
   flex-direction: column;
