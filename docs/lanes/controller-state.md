@@ -31,6 +31,81 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 SUNDAY 2026-09-20 ~01:0x IST — **CYCLE 13, THE OVERNIGHT RUN. THE OWNER IS ASLEEP AND HAS GRANTED STANDING AUTONOMY UNTIL EVERYTHING FINISHES.** `main` is `416ee1ff`; zero open PRs at the time of writing; ledger **306 done / 0 claimed / 2 todo**.
+
+### 📌 THE OWNER'S RULINGS AND STANDING ORDERS — the newest authority, taken 2026-09-20 before sleeping
+**SIX RULINGS, all actioned:**
+1. **Door C — option A.** One bidirectional bulk route, `POST /v1/me/notifications/read` taking `{ ids, read }`; bulk sends `true`, Undo sends `false`. **`ids` capped at the list page's own size**, client sends exactly what it drew. **A non-id-scoped "mark all read" is explicitly OUT OF SCOPE.**
+2. **The Undo's surface — option A:** a shared `packages/ui` toast, prototype-shaped, **wired only for the inbox flow** here. **Dismissal window: 15 seconds.**
+3. **Door F's `Subtask of {parent}` chip — IN.** And its **restricted-parent arm is option (b): a non-control pill reading "Subtask of a restricted parent".**
+4. **Door G's Priority row — always draw with an honest "no priority claimed".** (Already built that way in `#557`; no change.)
+5. **The ledger flip — flip rows whose named blocker is built, merge sha verified an ancestor, reason recorded in the row.** `hig-per-screen/10` was the first (`#560`; done 305→306, todo 3→2).
+6. **The merge bar — the seven checks run at the LANDING TREE, not the frozen head.** **This is now law.** It is the hole that let a merge-only `check-case-ids` collision reach `main` and stay red ~25 minutes on 2026-09-19.
+
+**STANDING ORDERS FOR THE OVERNIGHT RUN, verbatim:**
+- **"until everything finishes, you shouldnt stop."** Keep the loop running; do not idle waiting for input.
+- **"make sure that you restart you and both the executors if ctx is filling up."** See the restart section below.
+- **"open 17 if 16 runs out."** The controller MAY open §17 when §16's window is spent — this is a standing grant, not a per-case question.
+- **"2 neo survives. we have hig minimalist and neo styling. the option is there in the account page."**
+- **"make our build like the prototype."** (See the parity section below — this is the headline task.)
+- **Defaults the owner accepted for everything else:** scope of the restyle is **the ticket sheet and its body only**; ledger flips yes with the evidence standard; `docker compose` permitted **for restoring a dead service and for rebuilding after merges**, nothing destructive, no pruning without asking; the register, the doors table and anything disclosure-shaped stay the owner's.
+
+### ⚙ THE THREE STYLES — the single most important fact for any visual comparison
+**The app has THREE user-selectable styles, on the account page: Apple HIG · Minimal · Neomorphic.** They are `localStorage['gn-style']` and land as **`<html data-style="hig|minimal|neo">`**; `ThemeName` (light/dark) is a **separate axis**. `hig` is the unmarked flat base; `minimal` and `neo` are runtime overrides (`packages/ui/src/tokens.ts:11-20`).
+**⚠ THE PROTOTYPE IS DRAWN IN THE FLAT LANGUAGE — i.e. `hig`.** At the app's default (`neo`) our screens are neumorphic and appear to be a different design entirely. **Every prototype comparison must set `data-style="hig"` first.** A comparison across styles measures the two style axes, not the build. **This cost the controller a wrong report once — do not repeat it.**
+**And the style axis STAYS:** anything written must be correct in **all three** styles. A rule that only looks right in `hig` is not finished.
+
+### ⛔ THE TWO-PROTOTYPE TRAP — measured, and it flips the answer
+- **AUTHORITY: `design-system/interactive/desktop.dc.html`** (mtime **2026-09-18**), cited by **at least eight** planning and lane documents (`docs/design/prototype-delta-2026-09-18.md`, the lane handoffs, several plans).
+- **TRAP: `design-system/prototypes/TicketSheet.dc.html`** (mtime **2026-09-09**) — an older per-screen prototype that matches our build **much more closely** (two tabs, read-only rows), so comparing against it concludes "we are nearly there". **NOTHING in the repo cites it — not one plan, doc or dispatch.**
+**Compare against the cited file. If a session believes the older one should win, that is a product call: STOP AND ASK.**
+
+### 🎯 THE HEADLINE TASK — sheet prototype parity (dispatched, `exec/sheet-prototype-parity`)
+**The authority draws, and we do not** (measured by rendering both in a browser):
+**a breadcrumb** (`Workspace › Project › State › GN-1183`) · **a large bold title** · **three tabs `Details | History | Attachments` as ONE segmented control** (ours is two bordered buttons, no Attachments) · **a rich-text toolbar** (`B i code link list quote`) over the editor with a live markdown hint · **State and Assignee as `<select>` controls** (ours is a pill + `Move…`) · **Priority as a segmented `P1 | P2 | P3`** · **a footer with `Delete` (red) left and `‹ Previous / Next ›` right** · **a `Full screen` control** beside the close `✕`.
+**Scope: the ticket sheet and its body ONLY.** Other screens keep their current treatment. Structure first, then styling — and **if any of it needs a route, a migration or a disclosure the table does not name, STOP AND ASK.**
+
+### 🐞 A DEFECT FOUND BY LOOKING AT THE RENDERED PAGE, NOT BY READING
+`ticket-sheet.tsx:1135-1136` renders `<span>{title}</span><span>{stateName}</span>` with **no separator**, so subtask rows read `"HSN codes for the real catalogueWaiting"`. **It corrupts the accessible name too.** Folded into the chip branch. **The general lesson: this project's tests passed and its gates were green while the page was visibly wrong. A viewport run is part of a UI task, not an extra.**
+
+### WHERE EVERYTHING STANDS
+| lane | task | status |
+|---|---|---|
+| exec 1 | B, A, D, F, G, `/v1/search` | **DONE** — `#536`, `#545`, `#551`, `#556`, `#557`, `#559` |
+| exec 1 | guard work + handoffs | **DONE** — `#550`, `#553`, `#547` |
+| exec 1 | **the `Subtask of {parent}` chip** + the subtask-separator defect | **IN FLIGHT** — block `16.38`–`16.40`, `16.22`'s absence-witness flips with it |
+| exec 1 | **sheet prototype parity** | **QUEUED** behind the chip — block `16.81`–`16.99` |
+| exec 1 | **`hig-per-screen/3b`** (Members states) | **QUEUED** behind parity — block `16.61`–`16.80` |
+| exec 2 | E, description, evidence upload, docblock, block-table fix | **DONE** — `#540`, `#544`, `#549`, `#554`, `#558` |
+| exec 2 | **C — `isInbox` bulk + Undo** | **IN FLIGHT** — server half built and green (1620 passed); UI wiring now that the toast is ruled. Block `16.41`–`16.60` |
+| exec 2 | **H** — sheet footer (a HISTORY-RETAINING removal with undo, NOT a hard delete) | **QUEUED** behind C |
+| exec 2 | **the inviter card** (`isInvite` inviter identity) | **QUEUED** behind H |
+**Block arithmetic:** §16 runs `16.1`–`16.99`. Spent/allocated: D `1`–`14`, F `15`–`22`, G `23`–`30`, exec 2's E `31`, search `32`–`37`, chip `38`–`40`, exec 2 `41`–`60`, 3b `61`–`80`, parity `81`–`99`. **When `16.99` is reached, the controller opens §17 — standing authority.**
+
+### THE RESTART SURFACES — how to restart each session
+- **The executors:** `tmux kill-window -t gisik:N` then `tmux new-window -t gisik:N -n exec -c <worktree>` then paste
+  `GISIK_EXECUTOR_BACKEND=deepseek '<lanes>/exec-claude.sh' --permission-mode bypassPermissions "$(cat '<prompt>')"`.
+  Exec 1's brief: `.exec-prompt-restart-2026-09-19.md`; exec 2's: `.exec-prompt-restart-2026-09-19-exec2.md`.
+  **Register the backend on the tmux session: `tmux set-environment -t gisik GISIK_EXECUTOR_BACKEND deepseek`.**
+- **THE CONTROLLER:** `.ctl-respawn-deepseek.sh` — it `exec`s `exec-claude.sh` with `.ctl-prompt-deepseek-2026-09-18.md`.
+  **Restart at a fixed point** (a merge done, nothing in flight), never mid-merge.
+- **⚠ THE DISPATCH CHANNEL TRUNCATES.** Long pastes into a pane **lose their FRONT** — two dispatches were nearly
+  lost on 2026-09-19 (the guard fix and door C); both were caught by the recipient refusing to guess from a tail.
+  **The technique that works: write the dispatch to a FILE in `gisik-nokma-lanes/`, paste a pointer under ~200
+  bytes, READ THE INPUT BOX BACK to confirm the tail arrived, and only then paste the submitting CR.** A 106-byte
+  pointer landed intact; a 1,400-byte one did not. **tmux's own buffer round-trips byte-identical — the loss is at
+  paste delivery, not in the buffer.**
+
+### INSTRUMENT NOTES HANDED OVER, all measured
+- **`/dev/tcp` is a SILENT FALSE NEGATIVE under zsh** — do not use it to probe a port.
+- **`check:db-tz` needs an explicit `DATABASE_URL`** or it reads as red for a reason that is not the code.
+- **`seed-dev.test.ts` times out at its 30 s hook limit on the first gate run under load** — six times on 2026-09-19, passing alone in ~2.4 s every time. Costs a re-run; not a defect in any branch.
+- **`docs/lanes/executor-state.md`'s `/v1/search` block cites an ORPHANED sha `5e76257e`** (real carrier `42fb2f2c`) — a stale citation in a merged artifact. Assigned to exec 1 to correct.
+- **The `check-case-ids` guard is now four spellings wide** (`#550`, `#553`) and its docblock states the convention (`#554`). **Table rows and `##` headings are deliberately NOT counted** — 62 table rows, 51 headings and 1,853 prose lines carry id-shaped text and almost all are CITATIONS; counting them would manufacture thousands of false ids.
+
+### ENVIRONMENT
+Dev stack rebuilt **2026-09-20 00:25** from the primary checkout at `main`'s tip; **Google sign-in verified ON inside the container**; both of the day's migrations applied to the running stack (`mcp_tokens.name`, `proj_projects.description`). Docker disk **48 GB free** after a 100 %-full incident that killed the test Postgres — **`gisik-nokma-postgres-1` on `:54329` is the GATE's database; `gisik-nokma-dev-postgres-1` on `:54330` is the APP's. Do not confuse them.** `sweep-test-dbs.sh` still names a container that no longer exists (`gisik-nokma-exec-postgres-1`), so its pre-run sweep silently skips.
+**claude-mem is PAUSED** (owner, 2026-09-19): `enabledPlugins["claude-mem@thedotmack"] = false` in `~/.claude/settings.json`, worker stopped. **It was leaking 6.6 GB** — a retry storm: the Anthropic weekly limit was exhausted, every summarisation call returned quota prose, and the worker preserved its queue in memory and retried **7,698 times in a day** (queue depth 1,313 and climbing). **Resume by flipping that boolean back to `true`; the limit resets Sep 21 06:30.** `phys_footprint` — not `ps` RSS, which understated it 60× — is the instrument.
 ## 🔄 SATURDAY 2026-09-19 ~17:0x IST — **CYCLE 12: ONE PR MERGED, THE GATE IS GREEN, BOTH EXECUTORS RESTARTED CLEAN AND FRESH, AND ONE RULING IS OPEN.** `main` is `9b88f9b4`; **zero open PRs**; ledger **305 done / 0 claimed / 0 in-flight / 3 todo** — unchanged, nothing was owed a flip.
 
 ### If you are the next controller reading this: your position, in six lines
