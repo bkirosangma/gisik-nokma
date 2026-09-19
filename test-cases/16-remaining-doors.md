@@ -229,3 +229,55 @@ one screen up makes with `workflowId@version`.
 - **The CSS is not measured.** jsdom loads no stylesheet, so nothing here shows that the section's heading, list or add row RENDER as the prototype draws them.
 - **The `Subtask of {parent}` chip is out of scope**, not tested and not built — see `16.22`, which asserts its ABSENCE rather than its behaviour.
 - **The paste/move of a child between parents is not covered.** `ticket.reparented` exists and moves `parentId`, but nothing in this row changes a child's parent, so `16.19`'s filter is asserted for the CREATE path only.
+
+## Door G — Priority, Due and Type as rows (executor 1, 2026-09-19) — cases `16.23`–`16.30`
+
+**The classification came first, and it is the deliverable the dispatch demanded.** The queue's row G
+warns this is *"a difference in what the sheet CLAIMS TO BE, not just layout"*, and asks which of the
+three are domain concepts, which are conventions, and which would need new schema. **Measured, not
+inferred from the prototype:**
+
+| field | bucket | evidence |
+|---|---|---|
+| **Type** | a **DOMAIN CONCEPT** | `TicketState.typeId` (`entity-state.ts:29`). Its NAME is not on the ticket; it comes from the ladder the sheet now reads — `getTicketTypes(workspaceId)` (`data-source.ts:147`), which already ships. |
+| **Due** | a **DOMAIN CONCEPT** and a **BUILT-IN field** | `ticket-events.ts:66`: *"built-ins title/description/dueDate/startDate ride this same event"*. Typed `{date, note?}`, own schema, on `WorkItem` as `{date, claim} \| null`, and in `DEFAULT_LIST_COLUMNS`. Read through `dateClaimOf`, the declared single source of dates. |
+| **Priority** | **NEITHER — a CUSTOM-FIELD CONVENTION** | **Zero hits for `priority` in `packages/domain`**, against 9 files for `assignee` and 6 for `dueDate` in the same run. No new schema is needed (the `ticket.field_set` mechanism carries it), but it exists only when a ticket's TYPE declares such a field. |
+
+**⛔ No migration, no route, no new schema** — so nothing here was a stop-and-ask.
+
+**⚠ And two of the prototype's three are EDITORS there, which is a separate door.**
+`desktop.dc.html:1192-1205` draws Priority as a segmented control whose options carry `on-click`
+handlers, and Due as an `<input type="date">` **with a note line**; only Type is read-only
+(`<span>{{ sheetType }}</span>`). The dispatch's scope is *the three ROWS … not editing them*, so
+**this is the read half** and the editors are named as an unbuilt door. `16.29` asserts the read-only
+half, the same way `16.22` asserts F's chip absence.
+
+- **16.23** ✅ All three rows are drawn **ALWAYS**, even on a ticket claiming none of them — the state this task exists to end. Each absence carries its own sentence.
+- **16.24** ✅ Due renders the claimed day **and** its claim line — a value is never a standing property, the rule every other row on this sheet keeps.
+- **16.25** ✅ Type renders the **NAME from the workspace ladder**, not the raw id.
+- **16.26** ✅ Type **falls back to the id** when the ladder does not hold it — the control for 16.25, without which a hard-coded name would pass.
+- **16.27** ✅ Priority renders the claim when the ticket carries one: it is a CONVENTION, so the claimed case arrives by the ticket carrying the field, exactly as a custom field would.
+- **16.28** ✅ **No second row for a field that now has its own** — `dueDate` is skipped by the generic field loop, so one claim is not drawn twice.
+- **16.29** ✅ The three rows are **READ-ONLY**: no `input`, `select` or `button` inside any of them.
+- **16.30** ✅ They are drawn in the prototype's **order** — Assignee, Priority, Due, Type — compared by document position, not by markup index.
+
+**Mutation witnesses, run and recorded rather than predicted.** Dropping `dueDate` from the generic
+loop's exclusion reddens **16.28 alone** (a second row for one claim). Removing the Type row's `??
+state.typeId` fallback reddens **16.26 alone** — the row renders an empty span, which is what the
+ladder-miss case would look like undetected.
+
+**⚠ The absent copy is the prototype's own.** `No date claimed` is transcribed
+(`desktop.dc.html:2362`/`:2853`/`:3587`); `No priority claimed` is the same construction for the field
+the prototype always has and we often do not — worded to be TRUE of a ticket whose type declares no such
+field, rather than "none", which would be a claim about a field the type does not have.
+
+**⚠ And the claim line uses the sheet's OWN wording.** The first draft said `claimed by …`; every other
+field row on this sheet says `set by …`, and one surface with two provenance phrasings is the drift this
+file's claim-line comment exists to prevent. The ABSENT copy stays the prototype's, because that
+sentence is about the DATE and the claim line is about the ACTOR.
+
+### What is NOT covered
+
+- **The two editors are NOT built.** Priority and Due are read-only rows here; making them editable — Priority as a segmented control, Due as a date input with its note line — is a separate door, named and not taken. `16.29` asserts the absence rather than describing it.
+- **The CSS is not measured.** jsdom loads no stylesheet.
+- **`pendingFieldIds` is empty.** `ClientStateCache` exposes no pending surface (measured), so the Due row does not badge an in-flight claim. The sheet's other field rows do not badge one either — this is stated because an empty list is a value, not a placeholder.

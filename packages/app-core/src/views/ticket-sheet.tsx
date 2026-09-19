@@ -6,6 +6,7 @@ import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
 import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js';
 import { makeSubmittedFactory } from '../submit.js';
+import { dateClaimOf } from '../claims/ticket-dates.js';
 import type { TicketHistoryEvent, TicketRead } from '../view-types.js';
 import { AttachmentList, type AttachmentListEntry } from './attachment-list.js';
 import {
@@ -298,6 +299,25 @@ export function TicketSheet({
     const page = await dataSource.query.getTickets(current.projectId, {}, 'flat');
     return page.rows.filter((row) => row.parentId === ticketId);
   });
+  /**
+   * The workspace's ticket type ladder (door G, 2026-09-19) — read ONLY to put a
+   * NAME on the `Type` row.
+   *
+   * **`state.typeId` is a domain concept; the word "Defect" is not in the ticket
+   * at all.** The id is what the state carries (`entity-state.ts:29`), and the
+   * ladder is the one place a person-readable name lives —
+   * `getTicketTypes(workspaceId)` (`data-source.ts:147`, the thirteenth method),
+   * which the sheet did not previously read.
+   *
+   * **The key is the WORKSPACE and nothing narrower, which is correct here and
+   * would not be for the subtasks read above.** A ticket's type is fixed at
+   * creation and the ladder changes rarely, so this read does not depend on the
+   * ticket having arrived — there is no `read.data` in its body and so none of
+   * the "runs once and never again" trap that the subtasks key had to dodge.
+   */
+  const ticketTypes = useLiveQuery(dataSource, workspaceId, `${workspaceId}:ticket-types`, () =>
+    dataSource.query.getTicketTypes(workspaceId),
+  );
 
   if (read.error !== null) {
     return (
@@ -635,6 +655,61 @@ export function TicketSheet({
   };
 
   const state = ticketRead.ticket;
+  /**
+   * Door G, 2026-09-19 — PRIORITY, DUE and TYPE as rows that are always drawn.
+   *
+   * ## What each one actually IS, measured rather than inferred
+   *
+   * The three are NOT the same kind of thing, and rendering them as though they
+   * were would be the defect:
+   *
+   * - **Type** is a DOMAIN CONCEPT — `state.typeId` (`entity-state.ts:29`). The
+   *   human name is not on the ticket at all, so it comes from the workspace's
+   *   type ladder (`ticketTypes` above), falling back to the ID — the same
+   *   fallback `readMyWork`'s project names use, and for the same reason: an id
+   *   is a worse label than a name and a far better one than nothing.
+   * - **Due** is a DOMAIN CONCEPT and a BUILT-IN field — `ticket-events.ts:66`
+   *   names it among *"built-ins title/description/dueDate/startDate"*. It is
+   *   read through `dateClaimOf`, the ONE place that resolves a date claim
+   *   (`claims/ticket-dates.ts`, whose own docblock: *"There is NO other source
+   *   of dates — absence is absence"*) rather than by reinterpreting
+   *   `state.fields['dueDate'].value` here.
+   * - **Priority** is NEITHER: it has **no domain concept at all** (measured —
+   *   `priority` appears in zero files of `packages/domain`, against 9 for
+   *   `assignee` and 6 for `dueDate` in the same run). It is a CUSTOM-FIELD
+   *   CONVENTION: it exists when a ticket's type declares such a field, and the
+   *   row says so plainly when it does not rather than implying the ticket
+   *   carries a priority of zero.
+   *
+   * ## ⚠ Two of the prototype's three rows are EDITORS there, and that is a
+   * ## separate door — this row builds the READ
+   *
+   * `desktop.dc.html:1192-1205` draws Priority as a segmented control whose
+   * options carry `on-click` handlers, and Due as an `<input type="date">`. Only
+   * **Type** is read-only there (`<span>{{ sheetType }}</span>`). The dispatch's
+   * scope is *the three ROWS … not editing them*, so this is the read half, and
+   * the editors are named as an unbuilt door in the PR body and the catalogue.
+   *
+   * ## The absent-value copy is the prototype's own
+   *
+   * `No date claimed` is transcribed (`:2362`/`:2853`/`:3587` — the prototype
+   * uses that exact sentence for the same absence). `No priority claimed` is the
+   * same construction for the field the prototype always has and we often do
+   * not, and it is worded to be TRUE of a ticket whose type declares no such
+   * field — not "none", which would be a claim about a field that does not
+   * exist in the type at all.
+   */
+  const ticketTypeName =
+    (ticketTypes.data ?? []).find((def) => def.id === state.typeId)?.name ?? state.typeId;
+  /**
+   * `pendingFieldIds: []` — the sheet renders a date, and nothing here badges an
+   * in-transit claim. `ClientStateCache` exposes no pending surface (measured),
+   * and the sheet's other field rows do not badge one either, so this is not a
+   * regression; it is stated because an empty list is a value and not a
+   * placeholder.
+   */
+  const dueDate = dateClaimOf({ state, pendingFieldIds: [] }, 'dueDate');
+  const priorityClaim = state.fields['priority'];
   /**
    * The children, RECONCILED against the count the server sent (door F).
    *
@@ -1105,6 +1180,59 @@ export function TicketSheet({
                 <span className="gn-ticket-sheet__claim">{assigneeRow.claim}</span>
               </dd>
             </div>
+            {/* Door G — PRIORITY, DUE and TYPE, drawn ALWAYS and in the
+                prototype's own order (Assignee, Priority, Due, Type, Visibility
+                — `desktop.dc.html:1183-1205`). Read-only here; the prototype's
+                two editors are a separate door, argued in the derivations
+                above. */}
+            <div className="gn-ticket-sheet__field" data-testid="field-priority">
+              <dt>Priority</dt>
+              <dd>
+                {/* A CONVENTION, not a built-in: absent whenever the ticket's
+                    type declares no such field. The sentence says exactly that
+                    rather than "none", which would be a claim about a field the
+                    type does not have. */}
+                {priorityClaim === undefined ? (
+                  <span className="gn-ticket-sheet__absent">No priority claimed</span>
+                ) : (
+                  <>
+                    <span>{renderFieldValue(priorityClaim.value)}</span>
+                    <span className="gn-ticket-sheet__claim">{`set by ${nameOf(priorityClaim.actorId)} on ${formatDate(priorityClaim.serverTime)}`}</span>
+                  </>
+                )}
+              </dd>
+            </div>
+            <div className="gn-ticket-sheet__field" data-testid="field-due">
+              <dt>Due</dt>
+              <dd>
+                {/* The prototype's own sentence for this absence
+                    (`desktop.dc.html:2853`), transcribed rather than re-worded:
+                    an unclaimed date is not an empty one. */}
+                {dueDate === null ? (
+                  <span className="gn-ticket-sheet__absent">No date claimed</span>
+                ) : (
+                  <>
+                    <span>{formatDate(dueDate.date)}</span>
+                    {/* The SAME wording every other field row on this sheet uses
+                        (`set by … on …`), because one surface with two
+                        provenance phrasings is the drift this file's claim-line
+                        comment exists to prevent. The ABSENT copy stays the
+                        prototype's ("No date claimed") — that sentence is about
+                        the DATE, and the claim line is about the ACTOR. */}
+                    <span className="gn-ticket-sheet__claim">{`set by ${nameOf(dueDate.actorId)} on ${formatDate(dueDate.serverTime)}`}</span>
+                  </>
+                )}
+              </dd>
+            </div>
+            <div className="gn-ticket-sheet__field" data-testid="field-type">
+              <dt>Type</dt>
+              <dd>
+                {/* The NAME from the workspace ladder, or the id when the
+                    ladder does not hold it — never an invented label. No claim
+                    line: a type is not a claim, it is fixed at creation. */}
+                <span>{ticketTypeName}</span>
+              </dd>
+            </div>
             {/*
               THE DESCRIPTION IS A ROW WHETHER OR NOT ANYBODY HAS EVER CLAIMED
               ONE — and that is the half the dispatch did not name, found by
@@ -1165,7 +1293,17 @@ export function TicketSheet({
               // Drawn above, unconditionally. A second pass here would mount a
               // SECOND editor over one claim and make `field-description`
               // ambiguous to `getByTestId` — two controls for one field.
-              if (fieldId === 'description') return null;
+              //
+              // `dueDate` and `priority` join it for door G, and the reason is
+              // the same one rung less severe: both are drawn as their OWN rows
+              // above, so a second pass would render **two rows for one claim**.
+              // Without this the sheet shows a `field-dueDate` beside the
+              // `field-due` this task adds, which is exactly the ambiguity the
+              // description line exists to prevent — and it would be INVISIBLE
+              // on any fixture whose ticket carries no such field.
+              if (fieldId === 'description' || fieldId === 'dueDate' || fieldId === 'priority') {
+                return null;
+              }
               return (
                 <div key={fieldId} className="gn-ticket-sheet__field" data-testid={`field-${fieldId}`}>
                   <dt>{fieldId}</dt>

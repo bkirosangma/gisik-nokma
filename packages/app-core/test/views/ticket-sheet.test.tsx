@@ -83,6 +83,14 @@ function sheetSource(read: TicketRead, history: TicketHistoryEvent[] = [], rows:
     // them, and the sheet's RECONCILIATION is what makes an empty list here a
     // visible disagreement rather than a silent one.
     getTickets: async (projectId) => ({ projectId, rows }),
+    // Door G: the workspace TYPE LADDER, read only to put a NAME on the `Type`
+    // row. The `task` entry is the one `ticketStateSeed`'s `typeId` names, so
+    // the default is a ticket whose type the ladder KNOWS — a case that wants
+    // the fallback passes a ladder that does not hold it.
+    getTicketTypes: async () => [
+      { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf-errand', fields: [] },
+      { id: 'epic', name: 'Epic', icon: 'flag', rank: 1, workflowId: 'wf-errand', fields: [] },
+    ],
   });
 }
 
@@ -121,7 +129,7 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     expect(screen.getByRole('dialog', { name: 'File the GST return' })).toBeInTheDocument();
     const titleRow = screen.getByTestId('field-title');
     expect(within(titleRow).getByText('File the GST return')).toBeInTheDocument();
-    const dueDateRow = screen.getByTestId('field-dueDate');
+    const dueDateRow = screen.getByTestId('field-due');
     expect(within(dueDateRow).getByText('set by Kiro on 18 Aug 2026')).toBeInTheDocument();
     // The due DAY CLAIM renders as claimed, through the one renderer.
     expect(within(dueDateRow).getByText('30 Aug 2026')).toBeInTheDocument();
@@ -138,7 +146,7 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     });
     renderSheet(ticketRead(), source);
     await settled();
-    const dueDateRow = screen.getByTestId('field-dueDate');
+    const dueDateRow = screen.getByTestId('field-due');
     expect(within(dueDateRow).getByText('set by user_kiro on 18 Aug 2026')).toBeInTheDocument();
     expect(screen.getByTestId('field-assignee').textContent).toContain('user_anselma');
     expect(document.body.textContent).not.toContain('system');
@@ -147,7 +155,15 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
   it('PLANTED DEFECT: every field carries a claim line — a value is never a standing property', async () => {
     renderSheet(ticketRead());
     await settled();
-    for (const fieldId of ['title', 'dueDate']) {
+    // `dueDate` became `due` in door G: the built-in date now has its own
+    // first-class row (`field-due`) instead of riding the generic field loop,
+    // which is where `field-dueDate` used to come from. The row is still
+    // asserted, through the same claim-line shape.
+    //
+    // `type` is deliberately NOT in this list and is not an omission: a ticket's
+    // type is fixed at creation and is not a CLAIM, so its row carries no claim
+    // line. Adding it here would assert the opposite of what the sheet means.
+    for (const fieldId of ['title', 'due']) {
       const row = screen.getByTestId(`field-${fieldId}`);
       expect(row.querySelector('.gn-ticket-sheet__claim')?.textContent, fieldId).toMatch(
         /^set by .+ on \d{1,2} \w{3} \d{4}$/,
@@ -211,9 +227,9 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     expect(screen.getByText('19 Aug 2026, 15:30 IST')).toBeInTheDocument();
   });
 
-  it('PLANTED DEFECT: five live reads means five stream subscriptions, all on this workspace', async () => {
+  it('PLANTED DEFECT: six live reads means six stream subscriptions, all on this workspace', async () => {
     // Ruling P17: `useLiveQuery` keys the SUBSCRIPTION on the workspace and the
-    // REFETCH on the query key. Five reads ride this sheet — ticket, workflow,
+    // REFETCH on the query key. SIX reads ride this sheet — ticket, workflow,
     // members, history, and the project's rows from which the SUBTASKS are
     // derived (door F, 2026-09-19) — and each opens its own subscription.
     //
@@ -225,7 +241,7 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     const source = sheetSource(ticketRead());
     renderSheet(ticketRead(), source);
     await settled();
-    expect(source.subscriptions).toHaveLength(5);
+    expect(source.subscriptions).toHaveLength(6);
     expect(source.subscriptions.every((s) => s.workspaceId === WS)).toBe(true);
   });
 
@@ -1654,5 +1670,156 @@ describe('F — the subtasks section', () => {
 
     await screen.findByTestId('sheet-subtasks');
     expect(screen.queryByText(/Subtask of/)).toBeNull();
+  });
+});
+
+/**
+ * Door G, 2026-09-19 — PRIORITY, DUE and TYPE as first-class rows. Cases
+ * `16.23`–`16.30`.
+ *
+ * **The three are NOT the same kind of thing, and that is the point of the
+ * task.** Type is a domain concept; Due is a domain concept AND a built-in
+ * field; Priority has **no domain concept at all** and is a custom-field
+ * convention. A section that drew all three as though they were alike would be
+ * the defect the dispatch names — *"a difference in what the sheet CLAIMS TO
+ * BE, not just layout"*.
+ *
+ * **And two of the prototype's three are EDITORS there, which is a separate
+ * door.** `16.29` asserts the READ-ONLY half so that making them editable later
+ * is a decision rather than a drift — the same shape as F's `16.22`.
+ */
+describe('G — Priority, Due and Type as rows', () => {
+  /** A ticket claiming NOTHING, so every absence copy is exercised. */
+  const bare = (): TicketRead => ticketRead({ ticket: ticketStateSeed({ fields: {} }) });
+
+  it('16.23 draws all three ALWAYS, even on a ticket that claims none of them', async () => {
+    renderSheet(bare());
+    await settled();
+
+    // The claim is the ALWAYS: `title` is absent from this fixture too, and a
+    // section that only drew fields the ticket happens to carry would show no
+    // Priority and no Due at all — which is the state this task exists to end.
+    expect(screen.getByTestId('field-priority')).toBeInTheDocument();
+    expect(screen.getByTestId('field-due')).toBeInTheDocument();
+    expect(screen.getByTestId('field-type')).toBeInTheDocument();
+    // Each says what is TRUE of the absence, in its own words: the date
+    // sentence is the prototype's own, transcribed.
+    expect(within(screen.getByTestId('field-due')).getByText('No date claimed')).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('field-priority')).getByText('No priority claimed'),
+    ).toBeInTheDocument();
+  });
+
+  it('16.24 Due renders the claimed day AND its claim line — both halves', async () => {
+    renderSheet(ticketRead());
+    await settled();
+
+    const row = screen.getByTestId('field-due');
+    // BOTH, in one case: a row that drew the day without the claim would be a
+    // standing property rather than a claim, which is the rule every other row
+    // on this sheet keeps.
+    expect(within(row).getByText('30 Aug 2026')).toBeInTheDocument();
+    expect(within(row).getByText('set by Kiro on 18 Aug 2026')).toBeInTheDocument();
+    // And the absence copy is NOT present, so the two arms are distinguished.
+    expect(within(row).queryByText('No date claimed')).toBeNull();
+  });
+
+  it('16.25 Type renders the NAME from the workspace ladder', async () => {
+    renderSheet(ticketRead());
+    await settled();
+
+    // The ticket carries `typeId: 'task'`; the ladder carries `task -> Task`.
+    // A row that printed the ID would be technically true and useless.
+    expect(within(screen.getByTestId('field-type')).getByText('Task')).toBeInTheDocument();
+  });
+
+  it('16.26 Type falls back to the ID when the ladder does not hold it — the control for 16.25', async () => {
+    // Without this, `16.25` would pass against a row that hard-coded 'Task',
+    // and the fallback — which is what a stale or partial ladder actually
+    // produces — would never be exercised.
+    const read = ticketRead();
+    const source = sheetSource(read);
+    source.query.getTicketTypes = async () => [];
+    renderSheet(read, source);
+    await settled();
+
+    expect(within(screen.getByTestId('field-type')).getByText('task')).toBeInTheDocument();
+  });
+
+  it('16.27 Priority renders the claim when the ticket carries one — it is a CONVENTION, not a built-in', async () => {
+    // Priority has no domain concept: it exists only because a type declared
+    // such a field. So the claimed case is reached by the ticket carrying the
+    // field, exactly as a custom field would.
+    const read = ticketRead({
+      ticket: ticketStateSeed({
+        fields: {
+          ...ticketRead().ticket.fields,
+          priority: {
+            value: 'P1',
+            actorId: 'user_anselma',
+            clientTime: '2026-08-18T08:06:00.000Z',
+            serverTime: '2026-08-18T08:07:00.000Z',
+          },
+        },
+      }),
+    });
+    renderSheet(read);
+    await settled();
+
+    const row = screen.getByTestId('field-priority');
+    expect(within(row).getByText('P1')).toBeInTheDocument();
+    expect(within(row).getByText('set by Anselma Marak on 18 Aug 2026')).toBeInTheDocument();
+    expect(within(row).queryByText('No priority claimed')).toBeNull();
+  });
+
+  it('16.28 draws NO second row for a field that now has its own — the exclusion', async () => {
+    // `ticketRead()` carries `dueDate` in `state.fields`, which the generic
+    // field loop used to render as `field-dueDate`. It now has its own row, so
+    // the loop must SKIP it — otherwise the sheet shows two rows for one claim.
+    renderSheet(ticketRead());
+    await settled();
+
+    expect(screen.getByTestId('field-due')).toBeInTheDocument();
+    expect(screen.queryByTestId('field-dueDate')).toBeNull();
+    // And one node, not two: the date appears exactly once on the sheet.
+    expect(screen.getAllByText('30 Aug 2026')).toHaveLength(1);
+  });
+
+  it('16.29 the three rows are READ-ONLY — the prototype’s editors are a separate door', async () => {
+    // The prototype draws Priority as a segmented control with click handlers
+    // and Due as an `<input type="date">` (`desktop.dc.html:1192-1205`); only
+    // Type is read-only there. The dispatch's scope is the ROWS, not editing
+    // them — so this asserts the absence, the same way `16.22` does for F's
+    // chip. Without it, "read-only" is a claim nobody checked.
+    renderSheet(ticketRead());
+    await settled();
+
+    for (const id of ['field-priority', 'field-due', 'field-type']) {
+      const row = screen.getByTestId(id);
+      expect(row.querySelector('input'), id).toBeNull();
+      expect(row.querySelector('select'), id).toBeNull();
+      expect(row.querySelector('button'), id).toBeNull();
+    }
+  });
+
+  it('16.30 draws them in the prototype’s order: Assignee, Priority, Due, Type', async () => {
+    // Order is transcribed, not chosen: the prototype draws these five in this
+    // sequence (`desktop.dc.html:1183-1205`), and a sheet that reordered them
+    // would be a different claim about which facts matter most.
+    renderSheet(ticketRead());
+    await settled();
+
+    const rows = ['field-assignee', 'field-priority', 'field-due', 'field-type'];
+    const drawn = rows.map((id) => screen.getByTestId(id));
+    for (let i = 1; i < drawn.length; i += 1) {
+      const before = drawn[i - 1]!;
+      const after = drawn[i]!;
+      // DOCUMENT_POSITION_FOLLOWING: `after` comes later in the document than
+      // `before`. Comparing node positions rather than indexOf on markup,
+      // which a whitespace change would move.
+      expect(before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING, rows[i]).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+    }
   });
 });
