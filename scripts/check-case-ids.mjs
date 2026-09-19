@@ -79,7 +79,34 @@ const ID_LINE = /^-\s+(?:([^\s\d*][^\s]*)\s+)?(\*{0,2})(\d+\.\d+[a-z]?)/;
 // So a MARKER and BOLD are both required here. A prose bullet that begins with
 // a quoted id is not an id line, and the fixture now pins that with a line that
 // must NOT be counted.
-const ID_LINE_BOLD_BACKTICK = /^-\s+(?:([^\s\d*][^\s]*)\s+)?\*\*`(\d+\.\d+[a-z]?)`/;
+// ## And a fifth thing that is NOT a declaration: the POSSESSIVE
+//
+// Added 2026-09-19, because this matcher took `main` RED within the hour of
+// landing. `test-cases/16-remaining-doors.md` carries a line whose whole job is
+// to say that case `3.72`'s arms live in a particular test file:
+//
+//   `- ✅ **`3.72`'s SIX new arms** — `packages/app-core/test/views/transition-dialog.test.tsx`, …`
+//
+// That is a CITATION of `3.72`, which is declared once, in
+// `03-foundation-ledger.md:79`. But it wears marker + bold + backticked id, so
+// it matched the rule above and was read as a SECOND declaration — `union 2447 <
+// sum 2448`, duplicate `3.72`. **The loose matcher does not merely miss, it
+// INVENTS**, which is the failure this file already records twice; it has now
+// invented one on `main`, from a line that was trying to be helpful.
+//
+// The rule: **a declaration's id STANDS ALONE.** `**`3.72`'s**` is a possessive,
+// not a declaration — the `'s` continues the id into a word, so the id is being
+// USED rather than claimed. A closing backtick followed by an apostrophe or any
+// letter is therefore not the end of a declared id, and the lookahead rejects
+// it. Both apostrophes are covered: the ASCII `'` and the typographic `’`, since
+// the two are indistinguishable on screen and a rule that held for one and not
+// the other would be a trap for whoever typed the other one.
+//
+// **What must keep matching**: the archetype this rule exists for,
+// `- ✅ **`13.94` — …`, whose closing backtick is followed by a SPACE. The
+// fixture pins both directions, and the possessive line is asserted NOT to be
+// counted — the same way the prose citation at the foot of that file is.
+const ID_LINE_BOLD_BACKTICK = /^-\s+(?:([^\s\d*][^\s]*)\s+)?\*\*`(\d+\.\d+[a-z]?)`(?![A-Za-z'’])/;
 
 /**
  * Resolve a line to the id-line style it is written in, or `null`.
@@ -149,6 +176,20 @@ if (!fixtureResult.ids.includes('13.91b')) {
 }
 if (fixtureResult.ids.includes('13.99')) {
   selfTestFailures.push('the mid-sentence prose citation of 13.99 was counted as a case id -- the line-head anchor is not working');
+}
+if (fixtureResult.ids.includes('13.97')) {
+  selfTestFailures.push(
+    "the POSSESSIVE `- ✅ **`13.97`'s six arms**` was counted as a declaration -- the closing backtick " +
+      'must be followed by something that does not continue the id, or a citation of another case is ' +
+      'read as a second declaration of it and the sweep INVENTS a duplicate. This is the exact shape that ' +
+      'took main red on 2026-09-19 (union 2447 < sum 2448, duplicate 3.72)',
+  );
+}
+if (!fixtureResult.ids.includes('13.94')) {
+  selfTestFailures.push(
+    'the backticked-inside-bold DECLARATION (13.94) was not extracted -- the possessive lookahead has ' +
+      'over-reached and killed the very style the backticked rule exists to see',
+  );
 }
 
 if (selfTestFailures.length > 0) {

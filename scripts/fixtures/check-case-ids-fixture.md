@@ -19,6 +19,15 @@ outside, from a matcher that cannot fire at all -- this file is what tells them 
 
 This sentence cites 13.99 in prose, mid-sentence, and must NOT be counted -- only line-head ids count.
 
+- ✅ **`13.97`'s six arms** — a POSSESSIVE, not a declaration: the closing backtick is followed by `'s`, so
+  the id is being USED rather than claimed, and `13.97` is not declared here. Added 2026-09-19, an hour
+  after the backticked rule above landed and took `main` red with it: a CITATION of `3.72` in
+  `test-cases/16-remaining-doors.md` wore marker + bold + backticked id, was read as a second declaration
+  of a case that is declared once in `03-foundation-ledger.md`, and the sweep reported
+  `union 2447 < sum 2448, DUPLICATE 3.72`. It must NOT be counted — and note the direction it fails in:
+  a citation in the declaration shape does not merely escape the guard, **it INVENTS a duplicate**, which
+  is the loud-but-wrong direction this file has now recorded three times.
+
 - `13.95`/`13.96` retired (a note ABOUT ids, not a declaration) -- and it must NOT be counted either.
   This line is the REASON the backticked rule is restricted to bold: a bare optional backtick made
   bullets like `- `13.439`/`13.444` retired (their subject ...)` match on real files, which gained four

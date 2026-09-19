@@ -93,8 +93,13 @@ Swept in one invocation with `13.989` as its control.
   page — and the second follows the upload to the **shipped door**: `/v1/attachments`, `POST`, and a
   form carrying **`ticketId` = the ticket the sheet is open on**. **Mutation-witnessed:** deleting the
   prop from the page reddens both arms.
-- ✅ **`3.72`'s SIX new arms** — `packages/app-core/test/views/transition-dialog.test.tsx`, every one of
-  them named `16.31` so a grep for the case finds all of its witnesses. **Three were added in the first
+- ✅ **SIX arms added to case 3.72** — `packages/app-core/test/views/transition-dialog.test.tsx`, every one
+  of them named `16.31` so a grep for the case finds all of its witnesses. **This line CITES `3.72`; it
+  does not declare it** — `3.72` is declared once, in `03-foundation-ledger.md:79`, and first-landed keeps
+  the id. It read *"`3.72`'s SIX new arms"* until 2026-09-19, when that spelling — marker, then a bolded
+  **backticked** id — matched the guard's new backtick rule and took `main` red with a duplicate that did
+  not exist. A citation in the declaration's shape does not merely escape the guard, it **invents**.
+  **Three were added in the first
   pass**: a refused upload states the server's reason and keeps the move blocked; an upload that never
   reached a server says that instead and never claims a verdict (**mutation-witnessed:** deleting the
   `.catch` reddens both); and **evidence attached for one move does not satisfy another**
