@@ -35,14 +35,17 @@ vi.mock('../src/auth-client.js', () => ({
 const ID = 'a'.repeat(64);
 const OTHER = 'b'.repeat(64);
 
-type Call = { url: string; method: string };
+type Call = { url: string; method: string; body?: unknown };
 let calls: Call[] = [];
 
 /** A `fetch` that answers from a script, recording every call it was asked to make. */
 function fetchStub(script: (call: Call, n: number) => { status: number; body?: unknown }): void {
   let n = 0;
   globalThis.fetch = (async (input: string, init?: RequestInit) => {
-    const call = { url: String(input), method: init?.method ?? 'GET' };
+    // The REQUEST body is recorded, not just the method and url: a case about a
+    // write that only asserted "a PUT happened" would pass on a client that sent
+    // the wrong name, or none. It stays the raw string the transport was handed.
+    const call = { url: String(input), method: init?.method ?? 'GET', body: init?.body };
     calls.push(call);
     const answer = script(call, n);
     n += 1;
@@ -188,5 +191,117 @@ describe('14.103 last used', () => {
     // that renders one string unconditionally.
     expect(screen.getByText('Never used')).toBeInTheDocument();
     expect(screen.getByText('Last used 8 Sept 2026')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Door D, 2026-09-19 — the row's NAME. Cases `16.10`–`16.14`.
+ *
+ * **`null` draws NOTHING, and that is the case worth having.** The failure this
+ * guards is not a missing name; it is an EMPTY line where a name belongs, which
+ * looks like a correct row with a name of zero length and is invisible to any
+ * assertion that only checks a named row renders.
+ */
+describe('D — naming a connection from the row', () => {
+  const rowScript =
+    (name: string | null) =>
+    (): { status: number; body?: unknown } => ({
+      status: 200,
+      body: { tokens: [{ id: ID, name, createdAt: '2026-09-07T19:51:44.951Z', lastUsedAt: null }] },
+    });
+
+  it('16.10 draws the name when there is one, and draws NO name line when there is not', async () => {
+    fetchStub(rowScript('Claude Desktop — Anjali'));
+    mount();
+    await screen.findByTestId('mcp-tokens-list');
+    const named = screen.getByTestId('mcp-tokens-list');
+    expect(named.querySelector('.gn-mcp-tokens__name')?.textContent).toBe('Claude Desktop — Anjali');
+    // The control for the assertion below: this fixture DOES render the element,
+    // so an absent one in the next render is the component's answer and not a
+    // class that never appears.
+    expect(screen.getByRole('button', { name: /^Rename the connection/ })).toBeInTheDocument();
+  });
+
+  it('16.11 a connection nobody named draws no name element, and the control says Name', async () => {
+    fetchStub(rowScript(null));
+    mount();
+    await screen.findByTestId('mcp-tokens-list');
+    const list = screen.getByTestId('mcp-tokens-list');
+    // NO ELEMENT AT ALL — not an empty one. `toBeNull` on the query rather than
+    // a text assertion, because an empty span has no text to assert against and
+    // would pass every content-shaped check.
+    expect(list.querySelector('.gn-mcp-tokens__name')).toBeNull();
+    expect(screen.getByRole('button', { name: /^Name the connection/ })).toBeInTheDocument();
+  });
+
+  it('16.12 sends the draft AS TYPED, to the token it belongs to, and re-reads the list', async () => {
+    fetchStub((call) => {
+      if (call.method === 'PUT') return { status: 204 };
+      return rowScript(null)();
+    });
+    mount();
+    await screen.findByTestId('mcp-tokens-list');
+
+    await userEvent.click(screen.getByTestId(`mcp-tokens-name-${ID}`));
+    // AS TYPED, including the spaces — the server's schema is what refuses a
+    // blank, and a component that trimmed would make that refusal unreachable
+    // while quietly rewriting the person's words.
+    await userEvent.type(screen.getByTestId(`mcp-tokens-name-input-${ID}`), '  CI — ticket sync  ');
+    await userEvent.click(screen.getByTestId(`mcp-tokens-name-save-${ID}`));
+
+    await waitFor(() =>
+      expect(calls.some((c) => c.method === 'PUT' && c.url === `/v1/me/mcp-tokens/${ID}`)).toBe(true),
+    );
+    const put = calls.find((c) => c.method === 'PUT');
+    // The BODY, parsed — because "a PUT reached the right url" is satisfied by a
+    // client that sent the wrong name, or an empty one.
+    expect(JSON.parse(String(put?.body))).toEqual({ name: '  CI — ticket sync  ' });
+    // The outcome is OBSERVED by re-reading, never by editing this list: a
+    // second GET after the PUT is the proof.
+    await waitFor(() =>
+      expect(calls.filter((c) => c.method === 'GET').length).toBeGreaterThan(1),
+    );
+  });
+
+  it('16.13 a refusal keeps the editor OPEN and shows the server’s own sentence', async () => {
+    fetchStub((call) => {
+      if (call.method === 'PUT') {
+        return { status: 400, body: { error: 'invalid', message: 'nope' } };
+      }
+      return rowScript(null)();
+    });
+    mount();
+    await screen.findByTestId('mcp-tokens-list');
+
+    await userEvent.click(screen.getByTestId(`mcp-tokens-name-${ID}`));
+    await userEvent.click(screen.getByTestId(`mcp-tokens-name-save-${ID}`));
+
+    // The editor is still on screen, so the draft is not thrown away by a
+    // refusal the person can fix — and the input still holds what they typed.
+    await waitFor(() =>
+      expect(screen.getByTestId(`mcp-tokens-name-input-${ID}`)).toBeInTheDocument(),
+    );
+    expect(document.body.textContent ?? '').toMatch(/1 to 60 characters/);
+  });
+
+  it('16.14 Cancel closes the editor and sends the server NOTHING', async () => {
+    fetchStub(rowScript(null));
+    mount();
+    await screen.findByTestId('mcp-tokens-list');
+
+    await userEvent.click(screen.getByTestId(`mcp-tokens-name-${ID}`));
+    await userEvent.type(screen.getByTestId(`mcp-tokens-name-input-${ID}`), 'discarded');
+    await userEvent.click(screen.getByTestId(`mcp-tokens-name-cancel-${ID}`));
+
+    // `queryByTestId`, NOT `getByTestId`: the latter THROWS when the element is
+    // absent, so `waitFor` would retry on the very condition this asserts and
+    // report the passing state as an error. A test whose success is its own
+    // failure mode is worse than no test.
+    await waitFor(() =>
+      expect(screen.queryByTestId(`mcp-tokens-name-input-${ID}`)).toBeNull(),
+    );
+    // Not merely "the editor closed": a Cancel that had saved the draft would
+    // look identical on screen. No write of any method reached the server.
+    expect(calls.filter((c) => c.method !== 'GET')).toEqual([]);
   });
 });

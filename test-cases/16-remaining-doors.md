@@ -136,3 +136,46 @@ only place this defect was ever visible.
   everywhere. **Found by independent review, recorded rather than fixed:** the fix is a platform
   qualifier in the help text, and the help system has no per-platform variant today — that is a bigger
   decision than this task. **Owner: whoever next touches the help content's platform story.**
+## Door D — naming a connection (executor 1, 2026-09-19) — cases `16.1`–`16.14`
+
+**The door.** `isMcpTokens`' row carries a NAME. The prototype leads each row with one —
+`Claude Desktop — Anjali`, `CI — ticket sync` (`McpTokens.dc.html:100-112`) — over a second line of the
+token's own facts. Ours listed only the approval date, so a person with three connections saw three
+dates. The ruled-out issue-time flow is **not required**: a name is set ABOUT a token already held, so
+this is a `migration` (`mcp_tokens.name`) plus a new owner-scoped write.
+
+**`null` is NOT NAMED, and it is not `''`** — the same distinction `proj_projects.description` draws.
+Every token minted before this column existed is unnamed in exactly that sense, and the row draws
+NOTHING where a name would go rather than a blank line that reads as a name of zero length.
+
+**⚠ The write is a `PUT` on the path the DELETE already owns, and that is the CSRF story.** The route-URL
+matcher in `http-origin.ts` is **path-keyed with no method in the key**, so `/v1/me/mcp-tokens/:id` was
+already protected and this route is covered **by construction** — no new entry, nothing to remember.
+`16.5` asserts it with a forged-`Origin` write rather than by reading the set. `PUT` rather than `PATCH`
+because `HttpClient` carries no `patch` and six files in the repo satisfy its shape; widening that
+interface for one route was out of this row's scope.
+
+- **16.1** ✅ A freshly minted token is NOT NAMED: the key is present and `null`, never `''`.
+- **16.2** ✅ Naming sticks, and the LIST reads it back — the row is observed by re-reading, never by the client editing its own copy.
+- **16.3** ✅ Refuses a blank, a spaces-only and a 61-character name with one fixed body; accepts exactly 60; and a refused write leaves the row unnamed.
+- **16.4** ✅ The SAME 404 for a token that is not yours and one that never existed — identical bodies, and the refused write leaves the real owner's name alone.
+- **16.5** ✅ CSRF-protected by construction: a forged-`Origin` write is refused, writes nothing, and the same write bearer-authenticated succeeds.
+- **16.6** ✅ Needs a session, and the refusal writes nothing.
+- **16.7** ✅ Naming changes the NAME and nothing else the row states — `createdAt` and `lastUsedAt` are untouched, since a rename is not a use.
+- **16.8** ✅ Naming your own token names no other person's.
+- **16.9** ✅ A named token still never returns the credential — a write path is a new chance for it to leak.
+- **16.10** ✅ The row draws the name when there is one.
+- **16.11** ✅ A connection nobody named draws NO name element at all — not an empty one — and its control says `Name`.
+- **16.12** ✅ The control sends the draft AS TYPED, addressed to that row's id, and the list is re-read.
+- **16.13** ✅ A refused name keeps the editor OPEN and shows the server's own sentence, so a fixable refusal does not discard the draft.
+- **16.14** ✅ Cancel closes the editor and sends the server NOTHING — not merely "the editor closed".
+
+**Mutation witnesses, run and recorded rather than predicted.** Defeating the UPDATE's tenant clause
+(`user_id = $2` → `(user_id = $2 OR true)`, which keeps the parameter USED so the failure is the
+property and not a 500) reddens **16.4 alone**, with `expected 204 to be 404` — A renamed B's token.
+Collapsing `name: r.name` to `name: r.name ?? ''` reddens **16.1** with `expected '' to be null`.
+
+### What is NOT covered
+
+- **The CSS is a judgement, not a measurement.** jsdom loads no stylesheet, so nothing here shows that the name's 600 weight, its place above the dates, or the inline editor's wrap RENDER as drawn.
+- **The accessible-name baseline was NOT re-run.** The row's naming control carries an `aria-label` naming the connection (`Name the connection approved 8 Sept 2026`) because a column of identical `Rename` buttons tells a screen-reader user nothing about which renames what. That baseline is generated from a live `e2e-stack` run, so this is a PREDICTION that it moves, not a measurement — and two connections approved on the SAME day are the one pair the label cannot separate, which is stated rather than hidden.

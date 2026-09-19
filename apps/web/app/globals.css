@@ -2675,6 +2675,18 @@ input, textarea, select { font-family: inherit; }
   color: var(--gn-text-muted);
   font-size: 1rem;
 }
+/* The token's NAME (door D, 2026-09-19) — the row's PRIMARY line, which is why
+   it is the only 600-weight text here. The prototype draws the same split: a
+   bold name, then the token's own facts in muted text beneath it. It inherits
+   `__when`'s column and gap, so a named row gains one line and an unnamed one
+   gains none — no empty span, per the render's own comment. */
+.gn-mcp-tokens__name { font-weight: 600; }
+/* The inline naming form, drawn in the row's action slot while one row is being
+   renamed. `flex-wrap` and `align-items: flex-end` are `.gn-project-founding`'s
+   own pair, for the same reason: the input and its buttons are a single row at
+   wide widths and must not overlap when the row is narrow. */
+.gn-mcp-tokens__naming { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; }
+.gn-mcp-tokens__naming .gn-field { min-width: 12rem; }
 
 .gn-mcp-tokens__empty,
 .gn-mcp-tokens__what {

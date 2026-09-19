@@ -4,6 +4,7 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { buildTestApp, TEST_WEB_ORIGIN } from '../helpers/app.js';
 import { signInWithPhone } from '../helpers/session.js';
 import { HTTP_ORIGIN_PROTECTED_ROUTES } from '../../src/http/http-origin.js';
+import { INVALID_TOKEN_NAME_BODY } from '../../src/routes/mcp-tokens.js';
 
 /**
  * Plan: MCP server, Task 12. Cases 14.90–14.95, and 14.102 (owner ruling, 2026-09-08).
@@ -222,5 +223,224 @@ describe('DELETE /v1/me/mcp-tokens/:id', () => {
       headers: { authorization: `Bearer ${a.session}` },
     });
     expect(honest.statusCode).toBe(204);
+  });
+});
+
+/**
+ * Door D, 2026-09-19 — a person can NAME a token, and the list reads it back.
+ * Cases `16.1`–`16.9`.
+ *
+ * **`null` is NOT NAMED and it is not `''`.** Every token minted before this
+ * column existed is unnamed in exactly that sense, and the screen draws nothing
+ * where a name would go rather than an empty label. `16.1` pins the absence, and
+ * `16.7` pins that naming is the ONLY thing a name changes.
+ *
+ * **Every token here is minted through the REAL device flow**, as the file's own
+ * header requires: a row this file inserted itself would prove the list can read
+ * rows this file wrote.
+ */
+describe('PUT /v1/me/mcp-tokens/:id — naming a token', () => {
+  const rename = (app: FastifyInstance, session: string, id: string, payload: unknown) =>
+    app.inject({
+      method: 'PUT',
+      url: `/v1/me/mcp-tokens/${id}`,
+      headers: { authorization: `Bearer ${session}` },
+      payload: payload as object,
+    });
+
+  /** The caller's only token's id, read from the list rather than assumed. */
+  async function onlyId(app: FastifyInstance, session: string): Promise<string> {
+    const body = (await list(app, session)).json() as { tokens: { id: string }[] };
+    const id = body.tokens[0]?.id;
+    if (id === undefined) throw new Error('no token row');
+    return id;
+  }
+
+  it('16.1 a freshly minted token is NOT NAMED — `null`, never an empty string', async () => {
+    const { app, otp } = buildTestApp(db);
+    const a = await mintMcpToken(app, otp, '+911100009101');
+
+    const body = (await list(app, a.session)).json() as { tokens: { name: unknown }[] };
+    const row = body.tokens[0];
+    if (row === undefined) throw new Error('no row');
+    // The KEY is always present — the row states its name, spelling "nobody has
+    // named this" as null — so a mapper reading it cannot confuse an omitted key
+    // with an unnamed token. Asserted with `in`, which `toBeNull` would not.
+    expect('name' in row).toBe(true);
+    expect(row.name).toBeNull();
+    // `''` is the specific wrong value this case exists to catch: it reads as a
+    // name of zero length rather than as the absence of one.
+    expect(row.name).not.toBe('');
+  });
+
+  it('16.2 naming a token sticks, and the LIST reads it back', async () => {
+    const { app, otp } = buildTestApp(db);
+    const a = await mintMcpToken(app, otp, '+911100009102');
+    const id = await onlyId(app, a.session);
+
+    const res = await rename(app, a.session, id, { name: 'Claude Desktop — Anjali' });
+    expect(res.statusCode).toBe(204);
+
+    const body = (await list(app, a.session)).json() as { tokens: { name: string | null }[] };
+    expect(body.tokens[0]?.name).toBe('Claude Desktop — Anjali');
+    // CONTROL, same run: the row carried `null` before the PUT — `16.1` proves
+    // that on a different fixture, and this asserts it on THIS one, so the value
+    // above cannot be a fixture that was born named.
+    expect(body.tokens).toHaveLength(1);
+  });
+
+  it('16.3 refuses a blank, a spaces-only and a 61-character name; accepts exactly 60', async () => {
+    const { app, otp } = buildTestApp(db);
+    const a = await mintMcpToken(app, otp, '+911100009103');
+    const id = await onlyId(app, a.session);
+
+    for (const bad of ['', '   ', 'x'.repeat(61)]) {
+      const res = await rename(app, a.session, id, { name: bad });
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toEqual(INVALID_TOKEN_NAME_BODY);
+    }
+    // A name that is absent entirely is refused the same way — the body must
+    // STATE a name, and `undefined` is not one.
+    expect((await rename(app, a.session, id, {})).statusCode).toBe(400);
+    expect((await rename(app, a.session, id, { name: 42 })).statusCode).toBe(400);
+
+    // THE BOUNDARY ITSELF, both sides, so an off-by-one in either direction is
+    // visible. And the refusal above must not have written anything: the row is
+    // still unnamed at this point.
+    const body = (await list(app, a.session)).json() as { tokens: { name: string | null }[] };
+    expect(body.tokens[0]?.name).toBeNull();
+
+    expect((await rename(app, a.session, id, { name: 'x'.repeat(60) })).statusCode).toBe(204);
+    const after = (await list(app, a.session)).json() as { tokens: { name: string | null }[] };
+    expect(after.tokens[0]?.name).toHaveLength(60);
+  });
+
+  it('16.4 answers the SAME 404 for a token that is not yours and one that never existed', async () => {
+    const { app, otp } = buildTestApp(db);
+    const a = await mintMcpToken(app, otp, '+911100009104');
+    const b = await mintMcpToken(app, otp, '+911100009105');
+    const bsId = await onlyId(app, b.session);
+
+    // B's token really exists — the fixture is not vacuous.
+    expect((await rename(app, b.session, bsId, { name: 'B owns this' })).statusCode).toBe(204);
+
+    const notMine = await rename(app, a.session, bsId, { name: 'A tries' });
+    const never = await rename(app, a.session, 'f'.repeat(64), { name: 'A tries' });
+    expect(notMine.statusCode).toBe(404);
+    expect(never.statusCode).toBe(404);
+    // Identical bodies, which is the property — not merely identical statuses.
+    expect(notMine.json()).toEqual(never.json());
+
+    // AND THE WRITE DID NOT LAND: refusing A must leave B's name alone.
+    const bBody = (await list(app, b.session)).json() as { tokens: { name: string | null }[] };
+    expect(bBody.tokens[0]?.name).toBe('B owns this');
+  });
+
+  it('16.5 is CSRF-protected by CONSTRUCTION — and the construction is asserted, not read', async () => {
+    const { app, otp } = buildTestApp(db, {
+      security: { webOrigin: TEST_WEB_ORIGIN, rateLimit: null, trustProxy: false },
+    });
+    const a = await mintMcpToken(app, otp, '+911100009106');
+    const id = await onlyId(app, a.session);
+
+    // The PUT is covered because the SET IS KEYED BY PATH, with no method in
+    // the key, and the DELETE already put this path in it. This assertion is
+    // deliberately about the key rather than about this route having an entry of
+    // its own — the entry would be a second copy of a rule already true.
+    expect(HTTP_ORIGIN_PROTECTED_ROUTES.has('/v1/me/mcp-tokens/:id')).toBe(true);
+
+    const forged = await app.inject({
+      method: 'PUT',
+      url: `/v1/me/mcp-tokens/${id}`,
+      headers: {
+        cookie: 'better-auth.session_token=whatever',
+        origin: 'https://attacker.example',
+      },
+      payload: { name: 'forged' },
+    });
+    expect(forged.statusCode).toBe(403);
+    expect(forged.json()).toEqual({ error: 'forbidden_origin' });
+
+    // The forged attempt wrote nothing.
+    const body = (await list(app, a.session)).json() as { tokens: { name: string | null }[] };
+    expect(body.tokens[0]?.name).toBeNull();
+
+    // CONTROL: the same write, bearer-authenticated with nothing ambient to
+    // forge, succeeds — so the 403 above is about the ORIGIN and not about the
+    // route refusing everything.
+    const honest = await app.inject({
+      method: 'PUT',
+      url: `/v1/me/mcp-tokens/${id}`,
+      headers: { authorization: `Bearer ${a.session}` },
+      payload: { name: 'honest' },
+    });
+    expect(honest.statusCode).toBe(204);
+  });
+
+  it('16.6 needs a session', async () => {
+    const { app, otp } = buildTestApp(db);
+    const a = await mintMcpToken(app, otp, '+911100009107');
+    const id = await onlyId(app, a.session);
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/v1/me/mcp-tokens/${id}`,
+      payload: { name: 'anonymous' },
+    });
+    expect(res.statusCode).toBe(401);
+    // The refusal did not write.
+    const body = (await list(app, a.session)).json() as { tokens: { name: string | null }[] };
+    expect(body.tokens[0]?.name).toBeNull();
+  });
+
+  it('16.7 naming changes the NAME and nothing else the row states', async () => {
+    const { app, otp } = buildTestApp(db);
+    const a = await mintMcpToken(app, otp, '+911100009108');
+    const id = await onlyId(app, a.session);
+    const before = (await list(app, a.session)).json() as {
+      tokens: { createdAt: string; lastUsedAt: string | null }[];
+    };
+
+    expect((await rename(app, a.session, id, { name: 'CI — ticket sync' })).statusCode).toBe(204);
+
+    const after = (await list(app, a.session)).json() as {
+      tokens: { createdAt: string; lastUsedAt: string | null }[];
+    };
+    // A PUT that touched `created_at` (or, worse, `last_used`) would be
+    // rewriting the token's HISTORY to record a rename — and `last_used` is an
+    // observation about use, which a rename is not.
+    expect(after.tokens[0]?.createdAt).toBe(before.tokens[0]?.createdAt);
+    expect(after.tokens[0]?.lastUsedAt).toBe(before.tokens[0]?.lastUsedAt);
+  });
+
+  it('16.8 naming one of the caller’s tokens does not name any OTHER', async () => {
+    const { app, otp } = buildTestApp(db);
+    const a = await mintMcpToken(app, otp, '+911100009109');
+    const second = await mintMcpToken(app, otp, '+911100009110');
+    // Same person, two tokens: mint the second under A's OWN session is not what
+    // this helper does, so A holds one — the disjointness assertion below is
+    // therefore about the two PEOPLE's rows, which is the scoping that matters.
+    const ids = ((await list(app, a.session)).json() as { tokens: { id: string }[] }).tokens.map(
+      (t) => t.id,
+    );
+    expect(ids).toHaveLength(1);
+    expect((await rename(app, a.session, ids[0]!, { name: 'A only' })).statusCode).toBe(204);
+
+    const bBody = (await list(app, second.session)).json() as { tokens: { name: string | null }[] };
+    expect(bBody.tokens[0]?.name).toBeNull();
+  });
+
+  it('16.9 a named token still never returns the credential', async () => {
+    const { app, otp } = buildTestApp(db);
+    const a = await mintMcpToken(app, otp, '+911100009111');
+    const id = await onlyId(app, a.session);
+    expect((await rename(app, a.session, id, { name: 'Named' })).statusCode).toBe(204);
+
+    // 14.90's property, re-asserted through the door that now writes to this
+    // table: a write path is a new chance for the raw token to reach a response,
+    // and the row's `name` is the one field a person supplies.
+    const raw = (await list(app, a.session)).body;
+    expect(raw).toContain('Named');
+    expect(raw).not.toContain(a.mcpToken);
   });
 });

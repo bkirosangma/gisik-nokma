@@ -26,7 +26,21 @@ import { useSessionStatus } from './providers.js';
  * duplication, applied here to a component instead of a data read).
  */
 
-type TokenRow = { id: string; createdAt: string; lastUsedAt: string | null };
+type TokenRow = {
+  id: string;
+  /**
+   * What the person calls this connection (door D, 2026-09-19), or **`null` for
+   * one nobody has named**.
+   *
+   * `null` is a value the server states, not an absent key: the route always
+   * sends `name`, spelling "nobody has named this" as `null`. A row without a
+   * name renders the date line alone — **never an empty string**, which would
+   * draw a blank where a name belongs and read as a name of zero length.
+   */
+  name: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+};
 
 /**
  * The approval date, in the product's timezone.
@@ -97,6 +111,9 @@ export function McpTokensScreen({
   const [tokens, setTokens] = useState<TokenRow[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
+  /** The row whose name is being edited, or null. ONE at a time: two open editors would be two unsaved drafts against one list. */
+  const [namingId, setNamingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
 
   const http = createHttpClient('', (input, init) => fetch(input, init));
 
@@ -136,6 +153,49 @@ export function McpTokensScreen({
         setRefusal(
           (cause instanceof HttpError ? refusalText(cause.body) : null) ??
             'That could not be revoked, and the server did not say why. Try again in a moment.',
+        );
+      },
+    );
+  };
+
+  /**
+   * Save a name for one connection (door D, 2026-09-19).
+   *
+   * **The draft goes AS TYPED**, like every other name in this product: the
+   * server's schema refuses a blank or a spaces-only name with its own sentence,
+   * and trimming here would silently repair a claim the person made while making
+   * that refusal unreachable. The value is NOT defaulted and NOT `''`-substituted
+   * — an empty box is submitted as an empty string and refused by the server,
+   * which is the same answer the person would get from any other door.
+   *
+   * The outcome is OBSERVED by re-reading, never by editing this list: the
+   * server is the authority on what the row now says.
+   */
+  const saveName = (id: string): void => {
+    setRefusal(null);
+    setBusy(id);
+    void http.put(`/v1/me/mcp-tokens/${id}`, { name: draft }).then(
+      () => {
+        setBusy(null);
+        setNamingId(null);
+        setDraft('');
+        load();
+      },
+      (cause: unknown) => {
+        setBusy(null);
+        if (cause instanceof HttpError && cause.status === 400) {
+          setRefusal('A name must be 1 to 60 characters and cannot be only spaces.');
+          return;
+        }
+        if (cause instanceof HttpError && cause.status === 404) {
+          setRefusal('That connection is already gone. The list below is up to date.');
+          setNamingId(null);
+          load();
+          return;
+        }
+        setRefusal(
+          (cause instanceof HttpError ? refusalText(cause.body) : null) ??
+            'That name could not be saved, and the server did not say why. Try again in a moment.',
         );
       },
     );
@@ -183,6 +243,14 @@ export function McpTokensScreen({
                 {tokens.map((token) => (
                   <li className="gn-mcp-tokens__row" key={token.id}>
                     <span className="gn-mcp-tokens__when">
+                      {/* The NAME leads the row, as the prototype draws it — a bold
+                          line above the dates. A connection nobody has named draws
+                          NOTHING here rather than an empty line: `null` is the
+                          server's spelling for "not named", and a blank line would
+                          read as a name of zero length. */}
+                      {token.name === null ? null : (
+                        <span className="gn-mcp-tokens__name">{token.name}</span>
+                      )}
                       Approved {approvedOn(token.createdAt)}
                       {/* The honest answer for a token nothing has used yet, rather
                           than a date picked to fill the column. `last_used` is NULL
@@ -193,13 +261,76 @@ export function McpTokensScreen({
                           : `Last used ${approvedOn(token.lastUsedAt)}`}
                       </span>
                     </span>
-                    <Button
-                      data-testid={`mcp-tokens-revoke-${token.id}`}
-                      onClick={() => revoke(token.id)}
-                      disabled={busy !== null}
-                    >
-                      {busy === token.id ? 'Revoking…' : 'Revoke'}
-                    </Button>
+                    {namingId === token.id ? (
+                      <form
+                        className="gn-mcp-tokens__naming"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          saveName(token.id);
+                        }}
+                      >
+                        <label className="gn-field" htmlFor={`mcp-token-name-${token.id}`}>
+                          <span className="gn-field__label">Name</span>
+                          <input
+                            id={`mcp-token-name-${token.id}`}
+                            className="gn-field__input"
+                            data-testid={`mcp-tokens-name-input-${token.id}`}
+                            placeholder="e.g. Claude Desktop — Anjali"
+                            value={draft}
+                            onChange={(event) => setDraft(event.target.value)}
+                            disabled={busy !== null}
+                          />
+                        </label>
+                        <Button
+                          data-testid={`mcp-tokens-name-save-${token.id}`}
+                          type="submit"
+                          disabled={busy !== null}
+                        >
+                          {busy === token.id ? 'Saving…' : 'Save name'}
+                        </Button>
+                        <Button
+                          data-testid={`mcp-tokens-name-cancel-${token.id}`}
+                          type="button"
+                          disabled={busy !== null}
+                          onClick={() => {
+                            setNamingId(null);
+                            setDraft('');
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </form>
+                    ) : (
+                      <>
+                        <Button
+                          data-testid={`mcp-tokens-name-${token.id}`}
+                          // The accessible name carries the ROW, so a column of
+                          // identically-labelled buttons does not tell a
+                          // screen-reader user which one renames what — the rule
+                          // the workspace rename control and the project card's
+                          // Archive button both keep. The approval date is the only
+                          // human handle an UNNAMED connection has; two approved on
+                          // the same day are the one pair this cannot separate, and
+                          // that is stated rather than hidden.
+                          aria-label={`${token.name === null ? 'Name' : 'Rename'} the connection approved ${approvedOn(token.createdAt)}`}
+                          disabled={busy !== null}
+                          onClick={() => {
+                            setRefusal(null);
+                            setNamingId(token.id);
+                            setDraft(token.name ?? '');
+                          }}
+                        >
+                          {token.name === null ? 'Name' : 'Rename'}
+                        </Button>
+                        <Button
+                          data-testid={`mcp-tokens-revoke-${token.id}`}
+                          onClick={() => revoke(token.id)}
+                          disabled={busy !== null}
+                        >
+                          {busy === token.id ? 'Revoking…' : 'Revoke'}
+                        </Button>
+                      </>
+                    )}
                   </li>
                 ))}
               </ul>
