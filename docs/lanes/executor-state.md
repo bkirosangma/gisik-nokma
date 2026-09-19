@@ -41,9 +41,80 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~02:0x IST. **THE `Subtask of {parent}` CHIP IS BUILT; ITS PR IS
+> # OPENING. `3b` IS PARKED ON ITS OWN BRANCH, AND A SEPARATOR DEFECT IN DOOR F IS FIXED IN THIS SAME PR.**
+> Branch **`exec/subtask-parent-chip`**, cut from **`origin/main` = `ad6dc515`**; code head **`68def392`**.
+> **Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-20-f-chip.md`.**
+>
+> ## THE THREE ARMS, AND THE ONE THAT TOOK A RULING
+> `Subtask of {parent}` beside the subtasks heading (`desktop.dc.html@6d7b67c0a52c:1238-1241`), drawn only
+> when the sheet's ticket is itself a subtask. **No parent → nothing. A parent the viewer may see → a
+> control naming it that opens it. A parent the viewer may NOT see → a NON-CONTROL pill reading
+> `Subtask of a restricted parent`** (controller ruling 2026-09-20, option (b)).
+>
+> **⚠ THE DISPATCH'S TRAP #2 ASKED FOR A MEASUREMENT AND GOT ONE — that is why I held on it.** *"Measure
+> which read carries the parent's title for a viewer who may not see it; if none does, stop and ask."*
+> **None does, and structurally:** `ParentRef` is a discriminated union whose restricted arm cannot carry
+> a title (`apps/server/src/routes/tickets.ts:144-168`), and 6.66 records that no title exists in the
+> projection to serve at all. **The trap the dispatch did NOT name:** the prototype's own label fallback
+> is `p ? p.title : sheet.parentId` (`:3609`) — an id dressed as a title, which a faithful port makes the
+> restricted arm BY DEFAULT. **A fallback is not a decision.** Trap #2 also cites `13.673`, the
+> `/settings` deep-link case; the authorities are `3.73`, `6.14`, `6.66`, `7.212`.
+>
+> **ONE HOP, stated rather than accidental:** the chip names the IMMEDIATE parent, and the prototype's
+> `openParent` swaps the open sheet in place (`:3611`), so a chain is walked one sheet per click and no
+> traversal lives in the chip to loop. **No route, no migration** — the parent's PROJECT is the one thing
+> `ParentRef` lacks (and a parent may sit in another project, 6.57), so the page asks the shipped
+> `TicketLocator`, the same question the inbox asks, and renders both failure arms as refusals.
+>
+> ## ⚠ THE SEPARATOR DEFECT — FOUND BY A BROWSER, NOT BY A TEST, AND FIXED HERE
+> The subtask rows rendered `Order the brochuresTo do`: two adjacent inline spans with NO text between
+> them are ONE RUN OF GLYPHS, on screen and in the accessible name. **`16.15` passed anyway** — it queried
+> each span's own text, so nothing read the row as a row. The controller's browser pass found it on
+> 2026-09-20 (`HSN codes for the real catalogueWaiting`). **The fix is TEXT rather than a CSS gap, on
+> purpose:** this section declares **no stylesheet rule at all** (measured 2026-09-20 with a control in
+> the same sweep — the string `subtask` appears in no rule in `ui.css` or `globals.css`) and jsdom has no
+> layout engine, so a gap would have been UNMEASURABLE. An unverifiable fix and the defect are the same
+> shape. **Door F recorded this gap in the weaker form** ("the CSS is not measured"); what it shipped is
+> unstyled markup.
+>
+> ## MUTATION WITNESSES, RUN AND RECORDED
+> | mutation | reddens |
+> |---|---|
+> | the restricted arm removed | **16.40 alone** |
+> | the label made a constant | **16.38 + 16.39** (both assert it exactly) |
+> | the control opens nothing | **16.38** |
+> | a ROOT ticket draws a chip | **16.22** |
+> | the `·` separator removed | **16.15** — `expected 'Order the brochuresTo do' to be 'Order the brochures · To do'` |
+>
+> ## ⚠ `3b` IS PARKED, NOT ABANDONED — AND ITS ORDERING GATE DEADLOCKED
+> `exec/members-states` carries ONE commit (**`b4664bd4`**, the `16.61`–`16.80` block-table band, the
+> dispatch's own first action) and no PR. **Its gate is "after the chip PR opens", which was unreachable
+> while the chip sat on a ruling — so the gate deadlocked the queue rather than sequencing it.** I took
+> the primary dispatch first and will return to `3b`.
+> **`3b`'s decisive measurement is already done, and it is NOT a stop-and-ask:** `role` is ON the wire
+> (`readMembers` selects `m.role`, `routes/builder-reads.ts:247`) and the mapper CARRIES it (`mapActors`,
+> case `13.760`) — so the dispatch's `mappers.ts:405-408` citation is stale and the remaining work is the
+> SURFACE half (the conditional role cell + the `isInviteAdmin` gate). `isInviteAdmin` has no hits in
+> `apps/web/src` or `packages/app-core/src`.
+>
+> ## ANCHORS — re-take them, `main` moves
+> | | |
+> |---|---|
+> | base | `origin/main` = **`ad6dc515`** at the cut |
+> | gate | **33/33, EXIT 0** under **Node `v22.22.2`** (probed by spawn, not by turbo's launcher path) — **first run was RED on two 30 s timeouts** in `seed-dev` and `grant-backfill`, both green alone in 8.5 s and both green on the re-run; neither reaches this diff |
+> | checks | all **seven exit 0**; `check-case-ids` **2486, highest 16.40** — **exactly +3** on main's 2483; `16-remaining-doors.md` **40 cited / 0 uncited / 40** — **exactly +3** on 37 |
+> | ids | **`16.38`–`16.40` SPENT. `16.61`–`16.80` is `3b`'s block.** |
+> | the flake | ⚠ a SECOND file joined it this run — `grant-backfill.test.ts` timed out at 30 s for the first time recorded here. Both are DB-heavy. **Not previously on the list.** |
+
 > # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~23:0x IST. **`/v1/search` IS BUILT; ITS PR IS OPENING AT
 > # THIS HEAD.** Branch **`exec/search-matchedin`**, cut from **`origin/main` = `5aa82743`**; code head
-> # **`5e76257e`**. **Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-19-search-matchedin.md`.**
+> # **`5e76257e` — CORRECTED 2026-09-20 to `42fb2f2c`, the real carrier.** `5e76257e` was the
+> # PRE-REBASE head of this branch: `git merge-base --is-ancestor 5e76257e origin/main` exits 1 and
+> # no branch contains it, while `git cat-file -t` prints `commit` and `git log -1` returns a
+> # plausible commit with the SAME SUBJECT LINE as the merged one. **An orphaned sha still
+> # resolves, so a reader is misled rather than corrected** — the base `5aa82743` on the same line
+> # is a real ancestor and was left alone. **Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-19-search-matchedin.md`.**
 > **Door G is NOT merged** (PR #557) — do not confuse it with this; this branch does not carry it.
 >
 > ## ⛔ FIRST, A CORRECTION THAT MATTERS TO EVERY RESTART: **THE LANE WAS NOT EMPTY**
