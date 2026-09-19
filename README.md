@@ -68,13 +68,11 @@ This is the part a marketing page would leave out. Read it before you decide any
   something, and the table can group by person.
 - **You cannot set a due date.** The calendar, the timeline and the whole "due soon" list are built
   around claimed dates, and there is no control that claims one.
-- **You cannot leave a comment on the web, and you cannot attach a file to a job.** The description
-  *is* writable — the writing box handles formatting and mentions and is connected to the job screen,
-  though a file dropped into it is refused rather than quietly lost. A comment is different: nothing
-  on the web takes one, and no screen renders a comment thread — an Inbox row quotes the opening of a
-  comment that mentioned you, and that is the whole of it. The one way a file gets in is a Move that
-  requires evidence; the Move stays blocked until the server has stored it. The phone app can post a
-  comment; the full website cannot.
+- **You cannot leave a comment on the web.** The description *is* writable — the writing box handles
+  formatting and mentions and is connected to the job screen, though a file dropped into it is refused
+  rather than quietly lost. A comment is different: nothing on the web takes one, and no screen renders
+  a comment thread — an Inbox row quotes the opening of the comment or description that mentioned you,
+  and that is the whole of it. The phone app can post a comment; the full website cannot.
 - **No screen on the web or the desktop searches inside a job's description or its comments.** The
   full-text search that does exists — the phone app's offline search reads comment bodies, and an MCP
   client's `search_tickets` reads titles, descriptions and comments. What the web itself offers is a
