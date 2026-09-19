@@ -36,11 +36,37 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 ### If you are the DeepSeek controller reading this: your position, in five lines
 1. **`main` = `22a8e7c3`.** This cycle merged **`#505`** (exec 1, Tasks 6+7 — the `isTypes` ↑/↓ reorder) → `2f5c2c3f`, **`#507`** (the plan correction) → `cc4b84bf`, **`#508`** (exec 1 handoff) → `0dce49e8`, **`#506`** (exec 2, Task 3 — the version-history screen) → `22a8e7c3`. Every one gated at its own landing tree, 33/33, tree-identical, blobs verified.
 2. **EXEC 1** (`gisik:1` / `…-exec` / `exec/`) is **MID-TASK on Task 8**, the `"N tickets"` count — dispatch `CTL-DISPATCH-2026-09-19-task8-isTypes-count.md`. **EXEC 2** (`gisik:2` / `…-exec2` / `exec2/`) is **freshly restarted and HOLDING**; it has no next task and none exists that is not owner-gated.
-3. **THE OWNER WAS GIVEN THE FULL OWNER-GATED LIST THIS CYCLE AND HAS NOT ANSWERED YET.** The hot web is DOWN (below), the three stale ledger rows are unflipped, `hig-per-screen/5b` still needs a choice among three priced options. **Do not act on any of these without the owner.**
+3. **THE OWNER ANSWERED ALL EIGHT OWNER-GATED ITEMS ON 2026-09-19 ~12:5x IST. THE RULINGS BLOCK BELOW IS THE NEWEST AUTHORITY IN THIS FILE** — it supersedes the "not answered yet" framing this entry first carried, and it changes the DEV TOPOLOGY (no more hot reload; servers run from the MAIN folder). **Read it before touching the stack.**
 4. **THE RESTART PROMPTS WERE STALE AND ARE NOW FIXED — USE THE NEW ONES.** `.exec-prompt-restart-2026-09-19.md` (exec 1) and `…-exec2.md` (exec 2). The 2026-09-18 files end by telling a relaunched executor to *"cut every branch from `origin/owner/workspace-edits` and open every PR with `--base owner/workspace-edits`"* — **a branch that was deleted on 2026-09-18**, whose PRs GitHub auto-closes. Launching from them would have mis-based the next executor silently.
 5. **Rulings you cannot make:** a ledger status change beyond what a position names, a merge with conflicts outside the files named, an executor deviation you cannot measure, a scope question, **anything touching the owner's environment (the hot web) or the owner-holds register**. Write it to the owner in your pane and HOLD; **never `AskUserQuestion`**.
 
-### ⚠ THE HOT WEB IS DOWN AND THE OWNER HAS NOT RULED
+### 📌 THE OWNER'S RULINGS, 2026-09-19 ~12:5x IST — the full owner-gated list, answered
+The controller laid out nine items; the owner answered eight (the ninth was a flag, not a question). **These are recorded verbatim where the wording is load-bearing, and they are the newest authority in this file.**
+
+| # | item | the owner's ruling |
+|---|---|---|
+| 1 | The three ledger rows reading `todo` for merged work | **"flip em"** — flip `hig-per-screen/6b`, `hig-per-screen/7b`, `backlog-and-closed-second-wave/12` to `done` |
+| 2 | The hot web / dev topology | **"no more hot reloads. rebuilt once they hit the main, is fine. that means the servers are to be run from the main folder instead of from the executor's branch. bring up the server once the hot reload is removed."** — see the topology block below |
+| 3 | `13.693` — the stale calibration docblock filed under the contrast debts | **"lift it"** — it is arithmetic in a comment, not a design decision |
+| 4 | `hig-per-screen/5b` — the unsatisfiable §5b sentence | **"c"** — the real-door case: real server, real Postgres, the List genuinely shrinks, ~½ day. The only option that witnesses the PRODUCT |
+| 5 | The hot-compile instruction | **"go"** |
+| 6 | The five held wire-gap screens | **"lift em"** — `isInbox`, `isMcpTokens`, `isInvite`, `isMcpAuth`, `isWorkspace` are no longer held |
+| 7 | The legal copy placeholders | **"leave the legal copies as is."** — not a hold, a decided state: record it as a deliberate absence, not as outstanding work |
+| 8 | "why is the contrast ratio decided at 4.5?" | a question, answered by the controller; **no action** — the 4.5 floor is WCAG 2.1 SC 1.4.3 (Level AA), not a house preference |
+
+**⚠ ITEMS 1, 3, 6 AND 7 ALL CHANGE DOCUMENTS THAT OTHER DOCUMENTS ASSERT AGAINST.** `owner-holds.md` §1 and §2 currently HOLD four of the six screens item 6 lifts, and §3 records the legal copy as HELD — item 7 makes it a decided state instead. **The register records the owner's rulings verbatim and an item leaves it only when the owner names it; the owner has now named these.** Whoever edits it must not silently rewrite the verbatim table — add the 2026-09-19 lift alongside, the way the `isTypes`/`isWorkflows` rows already do.
+
+### ✅ THE OWNER RULED THE DEV TOPOLOGY ON 2026-09-19 — **NO MORE HOT RELOAD.** *"no more hot reloads. rebuilt once they hit the main, is fine. that means the servers are to be run from the main folder instead of from the executor's branch. bring up the server once the hot reload is removed."*
+
+**What that means, and it retires two standing rules:**
+- **`docker-compose.hot.yml` goes away** — it is an OVERRIDE that replaces the built image with bind-mounted source. Dropping the override is a compose flag, not a project: `apps/web/Dockerfile` is already a multi-stage standalone build and `gisik-nokma-dev-web:latest` is already built (1.58 GB).
+- **The stack is served from `/Users/kiro/my_projects/gisik-nokma` (the MAIN folder), NOT from either executor's worktree.** This retires "executor 1 owns the hot stack" and the :3001 rules that existed because the container mounted exec 1's branch — **and it removes the reason `e2e-stack` was testing a lane's spec against a moving tree.**
+- **Rebuild on each merge to `main`.** `SERVER_ORIGIN` and `NEXT_PUBLIC_SERVER_URL` are baked at BUILD time (the Dockerfile documents the measured reason), so the production web is a **snapshot** — the rebuild is what keeps it current.
+- **The server is to be brought up once the hot reload is removed.**
+
+**MEASURE ONE BUILD AND RECORD THE NUMBER.** The cost was never measured; the caution on record is that a full `next build` in Docker is a multi-minute, multi-core operation and per-merge rebuilds may cost more total CPU than the hot compile they replace, on a 10-core box that has sat at load 30. The owner has accepted that trade — **but the number still belongs in this file.**
+
+### (superseded reading, kept for the audit trail) THE HOT WEB WAS DOWN AND THE OWNER HAD NOT YET RULED
 `gisik-nokma-dev-web-1` is **`Exited (0)`** (clean, not a crash); nothing listens on **:3001**; the API on **:3000** answers **200** and `gisik-nokma-dev-server-1` is up 22h healthy. Measured by the controller **and** independently by exec 1, which deliberately did **not** restart it: the owner's instruction *"remove the hot compile and rebuild on each merge"* is unactioned, so a clean exit could be that direction arriving. **Nothing in the record authorizes leaving it down, and nothing has actioned the instruction either.** It was put to the owner with both readings. **Restarting it is a change to the owner's environment — ask first.** Consequence if left: `e2e-stack` adopts :3001 (`playwright.stack.config.ts`, `reuseExistingServer: true` plus a `global-setup.ts` refusal unless what is listening IS the stack), so that suite would refuse or test a dead server. The viewport suite is unaffected — it starts its own `next dev` on :3021 with `reuseExistingServer: false`.
 
 ### THE RED GATE, AND WHY IT IS THE ARGUMENT FOR THE GATE EXISTING
