@@ -81,8 +81,8 @@ on — or worse, believed.
   see and the rendered list is what a person meets. **The prototype disagrees and that is why the case
   exists**: it draws `Owner` as an option and gates the select on the viewer alone
   (`design-system/interactive/desktop.dc.html:679-685`, data `:3061`).
-  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:518` (the option list), `:447` (the arm),
-  `:537` (the representability predicate), `apps/web/test/members-page.test.tsx:770`
+  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:538` (the option list), `:467` (the arm),
+  `:565` (the representability predicate, `isEditableRole`), `apps/web/test/members-page.test.tsx:770`
 
 - ✅ **13.825 — changing a role ingests exactly ONE `membership.granted`, with the right entity, and re-reads
   the roster.** Three claims, each of which a different defect would satisfy while the other two held: a
@@ -103,7 +103,7 @@ on — or worse, believed.
   is still said, because the absence alone passes on a page that draws no role at all. **The absence
   assertion is UNANCHORED on purpose** — see the accessible-name measurement below, which is what made an
   anchored pattern a check that could not fail.
-  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:447` (the viewer half of the predicate),
+  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:467` (the viewer half of the predicate),
   `apps/web/test/members-page.test.tsx:834`
 
 - ✅ **13.827 — a REFUSED role change is said out loud, and the cell does not move.** A swallowed answer
@@ -112,7 +112,7 @@ on — or worse, believed.
   first version of this sentence, which named the two rules plan-internally and was wrong about both.**
   `grant-owner-requires-owner` fires only when the payload grants `owner`
   (`apps/server/src/permissions/check-permission.ts:589`), and this control's options
-  (`apps/web/app/w/[workspaceId]/members/page.tsx:518-522`) cannot build that payload, so **it can never fire from here**. `last-owner` fires
+  (`apps/web/app/w/[workspaceId]/members/page.tsx:538-542`) cannot build that payload, so **it can never fire from here**. `last-owner` fires
   only when the SERVER's row for that user holds `owner`
   (`packages/rule-engine/src/checks/membership.ts:139-146`) while the rendered row is editable — and
   `isEditableRole` suppresses the control on an owner's row, both halves reading `proj_memberships`
@@ -146,8 +146,8 @@ on — or worse, believed.
   **This narrowing was a CONSERVATIVE DEFAULT taken by the executor, filed rather than assumed, and it has
   since been RULED ON: the controller confirmed it on 2026-09-18**, answering
   `gisik-nokma-lanes/EXEC2-2026-09-18-owner-row-editability.md`, which priced both readings. If that
-  decision is ever revisited, the predicate at `:447` and this case change together and nothing else does.
-  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:447`, `:537`,
+  decision is ever revisited, the predicate at `:475` (`isEditableRole(member.role)` in the arm) and this case change together and nothing else does.
+  **Citations:** `apps/web/app/w/[workspaceId]/members/page.tsx:475`, `:546`,
   `apps/web/test/members-page.test.tsx:910`
 
 **Mutations, each applied to a backed-up file, confirmed by sha256 to have CHANGED the file, run, then
@@ -1254,9 +1254,11 @@ lives in the prototype's DATA rather than its markup.
 | page container: `padding:0 32px 24px`, `flex`, `gap:20px`, `animation:gnFade .25s ease` (`:652`) | `.gn-shell` (`padding:0 1.25rem 3rem`, block flow) | **the padding is reachable and NOT reached; the flex/`gap` half is not reachable without a restructure** — see below |
 
 **The two-line Person cell is the dispatch's explicit "named absence" branch, and the page docblock
-already carries it** (`apps/web/app/w/[workspaceId]/members/page.tsx:52-53`): the prototype's second line
-is the person's EMAIL, and `readMembers` selects `user_id`, `u."name"` and `role` and nothing else
-(`apps/server/src/routes/builder-reads.ts:247`). Drawing a second line from any other field would be
+already carries it** (`apps/web/app/w/[workspaceId]/members/page.tsx:53`): the prototype's second line
+is the person's EMAIL, and `readMembers` selected `user_id`, `u."name"` and `role` and nothing else
+(`apps/server/src/routes/builder-reads.ts:254` — this read *"selects … and nothing else (`:247`)"* until
+2026-09-19, when the name fallback added `u."email"` to the SELECT and moved it; the field the prototype's
+line needed was the one this branch recorded as missing). Drawing a second line from any other field would be
 inventing one. **Recorded, not asked**: the dispatch pre-answered this branch in its own text.
 
 ### The zebra, and why the JSX never showed it
@@ -1506,3 +1508,95 @@ sweep — each re-measured by the reviewer at the line it names, on copies, with
   reporter surfaced that as `total=7 passed=7 failed=0` with the broken file simply absent from the
   assertion list. **A mutation result of `failed=0` is not evidence unless the total equals the full
   suite's count**; the suite-level failure is in `testResults[].message`, not in `assertionResults`.
+
+## The roster's name fallback: an address on the wire, withheld where it is synthetic, and ONE resolved label (executor 2, 2026-09-19) — cases `13.958`–`13.960`
+
+**The owner's instruction:** *"on the member's page, member list, if the name is absent, show the email
+instead."* It is a decision to show an address, so it was routed to the owner as a **disclosure** question
+before anything was built (`EXEC2-RULING-REQUEST-2026-09-19-members-name-fallback.md`), and ruled on in
+terms (`CTL-RULING-2026-09-19-members-name-fallback.md`).
+
+**Id block `13.958`–`13.960`, recounted at this tip by TWO instruments that agree.** The marker sweep and
+the test-file citation sweep both put the highest used id at **`13.955`**; `13.956`–`13.957` are exec 1's
+block tail, recorded *"left UNUSED"*, so taking them would consume another block's boundary and they are
+skipped deliberately. `13.958`–`13.965` measure **0 occurrences repo-wide**, with a control in the same
+invocation (`13.955` = 6) proving the sweep can see ids at all. **The triple is left contiguous on one
+line because the change is one feature with one owner instruction**, even though `13.958`'s subject is a
+route and the other two are client-side — `builder-reads.test.ts` already carries `13.611`/`13.612` for the
+same reason. *(Flagged for the controller's veto: this block was minted on the standing "recount at the tip"
+instruction rather than allocated by name, because the ask at
+`EXEC2-ASK-2026-09-19-case-id-block.md` had not been answered when the build finished.)*
+
+### What was measured before a line was written, and why it changed the shape of the answer
+
+**`user.name` is `NOT NULL` and an EMPTY name is the ORDINARY case for an email sign-up.** better-auth's
+magic-link request schema has `name` as `optional()` and stores it verbatim (`value: JSON.stringify({ email,
+name: ctx.body.name })`); on verification it creates the user with **`name: name || ""`**; and this
+product's sign-in page passes no name (`apps/web/app/sign-in/page.tsx`, `.magicLink({ email, callbackURL })`).
+**So every magic-link user has `name === ''` today** — the empty cell and the nameless control were not an
+edge case, they were the ordinary email population.
+
+**And the phone path can never be nameless:** `apps/server/src/auth/auth.ts` sets
+`getTempName: (phone) => phone`, so a phone sign-up's name *is* the phone. Its address, meanwhile, is
+synthesised from the same phone (`getTempEmail`, `<digits>@phone.gisik-nokma.invalid`).
+
+**The two populations therefore cannot overlap AS THIS PRODUCT CREATES THEM, and that is what makes the instruction coherent rather than
+risky: the fallback fires exactly for genuine addresses and never for synthetic ones.** It is also what
+makes withholding the synthetic address free — those rows always have a name, so they never reach the
+fallback this field exists to serve.
+
+### The cases
+
+- ✅ **13.958 — the roster carries a real address and WITHHOLDS a synthesised one, IN THE SAME ANSWER.**
+  `apps/server/test/routes/builder-reads.test.ts`. Every user the read harness creates signs in **by
+  phone**, so every address in that world is synthesised — which would let a route that dropped `email`
+  entirely pass. **One member is therefore moved onto a real address** (an `UPDATE` on `"user"`, which is
+  better-auth's vendor table and not a projection: no event writes it, and case `7.39` above already
+  SELECTs from it), restored in a `finally`. **The control runs FIRST and is what makes the absence an
+  absence:** the vendor column really does hold an address for every member, and the non-real ones really
+  are synthetic. Then: the real address travels; every other row has **no `email` key at all** — asserted
+  with `in`, because a route sending `email: undefined` would satisfy `=== undefined` and would be the
+  wrong shape; and **the synthetic domain appears nowhere in the response BYTES**, which is the strongest
+  form of the claim and the reason the field is withheld rather than blanked. *(A phone-only member's
+  address has the phone number as its local part, so this is a phone number that is not on the wire, not
+  merely unrendered.)* **Mutation-witnessed:** replacing the withholding with `email: row.email` reddens
+  this case ALONE (`1 failed | 33 passed`) at the `in` assertion — `[id, true]` against `[id, false]` —
+  while the control and the real-address arm stay green, so the failure names the withholding and not the
+  fixture.
+- ✅ **13.959 — `mapActors` carries `email` when the server sent one, and passes its ABSENCE through
+  untouched.** `packages/app-core/test/online/mappers.test.ts`. This is the seam a carried field is
+  dropped at, so it is asserted rather than assumed. **`toStrictEqual` and not `toEqual`, and the
+  difference is this case's whole spine** — verified by measurement, not from the docs: under a mutation
+  that sets `email: undefined` on the withheld row, `toStrictEqual` fails (`{…(4)}` vs `{…(3)}`) while a
+  `toEqual` written over the *same body* **passes**, because `toEqual` ignores a key whose value is
+  `undefined`. The distinction this case protects — *absent* versus *present and undefined* — is exactly
+  the one `toEqual` is blind to, so the matcher is part of the assertion rather than a style choice. A
+  `null` address is REFUSED, not treated as absence: absent is the server withholding, and `null` is a
+  body this client cannot read.
+- ✅ **13.960 — the roster shows the address when the name is absent, and names the control after the SAME
+  label.** `apps/web/test/members-page.test.tsx`. **Three sites were all reading the same possibly-empty
+  string** — the monogram, the name cell, and the control's `aria-label` — which is how they came to be
+  broken together. The fixture holds **both populations**, because one alone would not notice a fallback
+  that fired unconditionally: a nameless member with a real address (the fallback fires; the cell shows the
+  address and the monogram is no longer a blank disc) and a phone member with a name and **no `email` key**
+  (the fallback must not fire, and there is nothing to fall back to). The control's label is asserted
+  through the **attribute**, not by role name, because its accessible name is a concatenation (`13.828`).
+  The defect is then asserted **in its own form** rather than by example: no control on the screen
+  announces the fragment. **Mutation-witnessed twice, and the second is the one that matters:** removing
+  `memberLabel`'s fallback reddens it at the cell; reverting **only** the `aria-label` site to
+  `member.name` reddens it at `:1141` with `expected 'Role for ' to be 'Role for anselma@example.test'` —
+  **the failure message IS the defect.**
+
+### What is NOT covered, named rather than implied
+
+- **No viewport or browser run.** The suite that would cover this screen starts its own `next dev` on
+  `:3021`; the members route is not in `responsive.spec.ts`, and a viewport run would prove nothing about
+  a label's text.
+- **`memberLabel`'s third step (`?? member.id`) is reachable only by a magic-link sign-up on the SYNTHETIC domain** — accepted by better-auth's `z.email()`, measured — and is asserted
+  nowhere. It is there so that a future population with neither a name nor an address degrades to the id
+  rather than to an empty cell — the same convention `actorLabel` uses. Its absence from the cases is
+  deliberate and is recorded in the function's own docblock.
+- **The accessible-name baseline was not re-run.** The two live `aria-label` strings on this route are
+  unchanged in COUNT (the same controls, renamed only for the nameless population), so the ratchet's
+  number should not move — but that is a prediction, not a measurement, and the owner of that sweep is
+  whoever next runs it.

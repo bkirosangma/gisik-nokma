@@ -19,8 +19,9 @@ recounted at this tip before minting rather than assumed from the block floor.
 
 The screen is `design-system/interactive/desktop.dc.html@6d7b67c0a52c:651-798` — the members screen's
 body, with the invite panel to follow at `:722`. The prototype draws **five** table columns and two
-side panels; the members read serves **three** fields (`user_id`, `u."name"`, `role` —
-`apps/server/src/routes/builder-reads.ts:247`). The port is therefore partial by construction, and the
+side panels; the members read serves **four** fields (`user_id`, `u."name"`, `role`, and `u."email"`
+since 2026-09-19 — `apps/server/src/routes/builder-reads.ts:254`; this sentence read THREE and `:247`
+until that change moved the SELECT and added the address). The port is therefore partial by construction, and the
 four things not drawn are named as deliberate absences in the page's own file docblock and in the
 commit message rather than left to be inferred from an empty column. **A case is not minted for them:**
 they are scope decisions about surface nobody wrote, not scenarios with an assertion, and minting a
@@ -33,14 +34,17 @@ were never in scope for a client whose route cannot serve them.
   and the client silently drops, and every view-level test drives a fake data source, so none of them
   can see the drop: the assertion has to be made at the mapper, the single seam the wire crosses, and
   against a fixture typed as the server's own `MemberListResponse`. `RosterMember = Actor & { role:
-  string }` (`view-types.ts:44`) — an `Actor` with a field ADDED, so `rosterByActorId` and the board's
-  roster join keep compiling, which the case asserts beside the values (`mappers.ts:431`, the `role`
-  read at `:438`). The second arm runs its positive control FIRST and through the same path: the
+  string; email?: string }` (`view-types.ts:60`) — an `Actor` with a field ADDED, so `rosterByActorId`
+  and the board's roster join keep compiling, which the case asserts beside the values (`mappers.ts:444`,
+  the `role` read). *(Both citations here were re-pointed on 2026-09-19: the name fallback widened the
+  type and the mapper, and this row's original `view-types.ts:44` / `mappers.ts:431`/`:438` pointed into
+  the lines it moved — `:438` in fact named the `id` read rather than the `role` one even before that
+  change, so it was corrected rather than shifted.)* The second arm runs its positive control FIRST and through the same path: the
   identical body WITH its role maps cleanly, then the body without one throws
   `members.members[0].role: expected a string` and it is a `MappingError`, not a `ServingGapError` —
   the route does send this field, so a body missing it is unreadable rather than unserved.
-  (`packages/app-core/test/online/mappers.test.ts:148`, `packages/app-core/src/view-types.ts:44`,
-  `packages/app-core/src/online/mappers.ts:431`)
+  (`packages/app-core/test/online/mappers.test.ts:148`, `packages/app-core/src/view-types.ts:60`,
+  `packages/app-core/src/online/mappers.ts:444`)
 
 - ✅ **13.761 — the roster is a table with a Person column and a Role column, one row per person, role
   printed as the wire's own token.** This is the other half of the absences recorded above: "we left a
@@ -1662,8 +1666,8 @@ half is the same act read backwards, and it was open.
 
   **THE UI HALF, DECIDED BY READING THE CODE RATHER THAN REPEATING A CLAIM:** an admin is **not** offered a
   role change that removes `owner`, and no narrowing was needed. `EDITABLE_ROLE_OPTIONS`
-  (`apps/web/app/w/[workspaceId]/members/page.tsx:518-522`) is `admin`/`member`/`guest` — `owner` is absent
-  — and line `:447` renders the `<Select>` only when `isEditableRole(member.role)`, so **an owner's row
+  (`apps/web/app/w/[workspaceId]/members/page.tsx:546-550`) is `admin`/`member`/`guest` — `owner` is absent
+  — and line `:475` renders the `<Select>` only when `isEditableRole(member.role)`, so **an owner's row
   renders the `.gn-chip` instead of a control**. The control therefore cannot build such a payload from
   either side. Recorded as measured, because the same file's prose claims the prototype's version *does*
   list `Owner` and that "the two halves do not compose" — the claim was worth re-deriving, and it holds.

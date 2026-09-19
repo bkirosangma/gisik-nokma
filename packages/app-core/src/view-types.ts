@@ -4,7 +4,7 @@ export type Actor = { id: string; name: string };
 /**
  * A roster entry from `GET /v1/workspaces/:workspaceId/members`, as this client
  * holds it: `Actor` plus the `role` the server has always sent
- * (`routes/builder-reads.ts:247` selects it; `:259` returns it).
+ * (`routes/builder-reads.ts:254` selects it; `:266` returns it).
  *
  * ## Why a SEPARATE type rather than a third field on `Actor`
  *
@@ -40,8 +40,24 @@ export type Actor = { id: string; name: string };
  * server's, and a role added server-side would blank the whole members screen —
  * every person taken off it — over the text inside one chip. The server is the
  * authority on its own vocabulary; this reads what it says.
+ *
+ * ## `email` is on THIS type for the same reason `role` is, and not on `Actor`
+ *
+ * The owner's instruction — *"on the member's page, member list, if the name is
+ * absent, show the email instead"* — is a decision about the ROSTER screen, and
+ * the argument above applies to it word for word. `Actor` is also a ticket's
+ * `assignee` (`:167`, `:256`), produced on a replica by `actorOf`'s synthesised
+ * `{id, name: id}` from a ledger that holds no addresses at all — so a required
+ * `email` on `Actor` would oblige an offline device to invent one, and would put
+ * an address inside a value whose only claim is "this is who moved the ticket".
+ *
+ * **Optional, and the absence is meaningful:** the server withholds a phone
+ * member's synthetic address rather than sending a phone number under an
+ * invalid domain (`WorkspaceMember.email` in `@gisik-nokma/domain` carries the
+ * measurement). A consumer must therefore treat `undefined` as *nothing to
+ * show*, never as *show an empty string*.
  */
-export type RosterMember = Actor & { role: string };
+export type RosterMember = Actor & { role: string; email?: string };
 /**
  * `archived` and the two counts arrived with Task 16 (owner brief 2026-09-09).
  *
