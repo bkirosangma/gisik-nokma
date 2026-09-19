@@ -211,14 +211,14 @@ them all and `restrictedCount` names the ones this viewer may not see — so the
 against it on every render, and a disagreement is **said** rather than drawn. `16.17` is what makes that
 falsifiable; `16.18` is its control, without which a section that refused everything would pass.
 
-- **16.15** ✅ Lists this ticket's children, **each with its OWN state** — the empty state's claim ("a subtask is a ticket of its own") asserted in structure, not just in words.
+- **16.15** ✅ Lists this ticket's children, **each with its OWN state** — the empty state's claim ("a subtask is a ticket of its own") asserted in structure, not just in words. **And the ROW is read as a row** — `textContent` exactly `Order the brochures · To do`. The first version of this case did not, and that is the whole of the defect below: it queried each span's own text, so it passed while the row rendered `Order the brochuresTo do`. Two adjacent inline spans with no text between them are ONE RUN OF GLYPHS on screen and in the accessible name, and nothing in the case read the row as anything but two independent strings. **Found by the controller's browser pass on 2026-09-20** (`HSN codes for the real catalogueWaiting`); removing the separator now reddens this case with the defect itself in the message (`expected 'Order the brochuresTo do' to be 'Order the brochures · To do'`). **The treatment is TEXT rather than a CSS gap, deliberately**: this section declares no stylesheet rule at all and jsdom has no layout engine, so a gap would have been UNMEASURABLE — the unverifiable fix and the defect are the same shape.
 - **16.16** ✅ The empty state draws the prototype's sentence, verbatim, when `rollup` is null (the server's own spelling for "no children at all").
 - **16.17** ✅ **Refuses to render a short list:** when the rollup counts more children than were read, the section says so in the server's numbers and **draws no rows**.
 - **16.18** ✅ The control for 16.17 — with the count AGREEING, the list IS drawn and no refusal appears.
 - **16.19** ✅ Lists **only this ticket's** children: a sibling's child in the same project is not one of them.
 - **16.20** ✅ **Add subtask** sends `ticket.created` with **this ticket as `parentId`**, the title **as typed**, and `start: 'focus'` — the prototype births a subtask in the workflow's first state (`col: states[0].key`).
 - **16.21** ✅ A refused title shows the **server's own sentence** and **keeps** what was typed. An `invalid` answer carries `message`, not `reason` — reading the wrong arm renders `undefined`.
-- **16.22** ✅ Does **not** draw the prototype's `Subtask of {parent}` chip — out of the dispatch's row, and this case exists so adding it later is a decision rather than a drift.
+- **16.22** ✅ **DRAWS the prototype's `Subtask of {parent}` chip — FLIPPED 2026-09-20.** The superseded claim is kept beside it because it is why the flip is a decision rather than a drift: *"Does **not** draw the prototype's `Subtask of {parent}` chip — out of the dispatch's row, and this case exists so adding it later is a decision rather than a drift."* The owner ruled it IN and the same id now records the decision. The owner ruled it IN, and the same id now records the decision, updated rather than deleted, which is exactly what a negative witness exists for. It also carries the OTHER ARM of the same property: a ticket with NO parent draws no chip at all, so "the chip appears exactly when there is a parent" is one assertion rather than a presence test a root ticket would also satisfy.
 
 **Mutation witnesses, run and recorded rather than predicted.** Defeating the reconciliation
 (`subtasksIncomplete = false && …`) reddens **16.17 alone**. Dropping the parent from the add payload
@@ -234,7 +234,7 @@ one screen up makes with `workflowId@version`.
 ### What is NOT covered
 
 - **The CSS is not measured.** jsdom loads no stylesheet, so nothing here shows that the section's heading, list or add row RENDER as the prototype draws them.
-- **The `Subtask of {parent}` chip is out of scope**, not tested and not built — see `16.22`, which asserts its ABSENCE rather than its behaviour.
+- **The `Subtask of {parent}` chip is out of scope**, not tested and not built — see `16.22`, which asserted its ABSENCE rather than its behaviour — **UNTIL 2026-09-20, when the chip was ruled in and built; its behaviours are `16.38`–`16.40` below, and `16.22` flipped to assert its presence.**
 - **The paste/move of a child between parents is not covered.** `ticket.reparented` exists and moves `parentId`, but nothing in this row changes a child's parent, so `16.19`'s filter is asserted for the CREATE path only.
 
 ## Door G — Priority, Due and Type as rows (executor 1, 2026-09-19) — cases `16.23`–`16.30`
@@ -257,7 +257,7 @@ inferred from the prototype:**
 handlers, and Due as an `<input type="date">` **with a note line**; only Type is read-only
 (`<span>{{ sheetType }}</span>`). The dispatch's scope is *the three ROWS … not editing them*, so
 **this is the read half** and the editors are named as an unbuilt door. `16.29` asserts the read-only
-half, the same way `16.22` asserts F's chip absence.
+half, the same way `16.22` ASSERTED F's chip absence.
 
 - **16.23** ✅ All three rows are drawn **ALWAYS**, even on a ticket claiming none of them — the state this task exists to end. Each absence carries its own sentence.
 - **16.24** ✅ Due renders the claimed day **and** its claim line — a value is never a standing property, the rule every other row on this sheet keeps.
@@ -344,3 +344,58 @@ column as the union is what made the two agree.
 
 - **The client's presentation of a hit is not built.** This change makes the fact DERIVABLE and maps it; no view renders a search result yet, so nothing here shows `matchedIn` on a screen.
 - **`description` and `comment` precedence is asserted through the two planted fixtures only** — a ticket matching all THREE columns is not in the seed, and the first rung's answer implies the third.
+
+## The `Subtask of {parent}` chip (executor 1, 2026-09-20) — cases `16.38`–`16.40`
+
+**The door, and it is F's inverse.** F lists a ticket's CHILDREN; this names a ticket's PARENT and offers
+the way to it — `desktop.dc.html@6d7b67c0a52c:1237-1241`, a pill beside the section heading, drawn only
+when the sheet's ticket is itself a subtask (`sheetIsSub`, `:3605`). **Owner ruling, relayed by the
+controller: _"Door F's `Subtask of {parent}` chip — in."_**
+
+**No route, no migration.** `ticketRead.parent` already carries `{kind, id, title}` for a parent the
+viewer may see (`:144-168` at the read door). What the SHELL adds is the parent's PROJECT: `ParentRef`
+carries none, so the chip cannot build a sheet URL itself, and a parent may sit in ANOTHER project
+(6.57). The page asks the shipped `TicketLocator` — the same question the inbox asks — and answers
+`null` honestly when the server will not place the ticket.
+
+**⚠ ONE HOP, stated rather than accidental.** The prototype's `openParent` swaps the open sheet in place
+(`:3611`), so the chip names the IMMEDIATE parent and a chain is walked one sheet per click. No traversal
+lives in the chip, so no cycle is reachable.
+
+- **16.38** ✅ Names the parent and **opens it** — and is a control **ONLY when it can be honoured**: with `onOpenTicket` a `BUTTON` carrying the immediate parent's id, without it the same label as a `SPAN`. A button that would do nothing is the failure the second arm exists to avoid.
+- **16.39** ✅ **One hop** — exactly one chip, labelled with the immediate parent's title EXACTLY. A chain would have to append a second name and there is no second chip to append it with.
+- **16.40** ✅ **A restricted parent wears a NON-CONTROL pill** — `Subtask of a restricted parent`, a `SPAN`, and the parent's id nowhere in the body. It cannot be the prototype's chip for three structural reasons: the read's restricted arm carries no title (`apps/server/src/routes/tickets.ts:144-168`), the title is read INSIDE the `canSee` branch that arm never reaches (`apps/server/src/routes/tickets.ts:353-372`) — the real reason, and **not** 6.66's "no table stores a ticket title", which is stale now that `proj_tickets` exists — and the prototype's own fallback — `p ? p.title : sheet.parentId` (`:3609`) — would print an ID where a name belongs.
+
+**Mutation witnesses, run and recorded:** removing the restricted arm reddens **16.40 alone**; making the
+label a constant reddens **16.38 and 16.39**; making the control open nothing reddens **16.38**; drawing a
+chip for a ROOT ticket reddens **16.22**.
+
+**⚠ THE LABEL WITNESS NAMES ITS ARM, AND THAT IS A CORRECTION.** The line above first read *"making the
+label a constant reddens 16.38 and 16.39"* without saying WHICH of the chip's two label occurrences was
+mutated. The independent review mutated the same sentence in the other arm, reddened **four** tests
+(`16.22` among them, since that case asserts the span arm's label), and read the difference as an error in
+this record. Both measurements are right; the record was ambiguous. **A witness is a fact about ONE
+specific mutation, not about a sentence.**
+
+**Two mutations the review round ADDED, and one green that is CORRECT.** Making the restricted arm render
+`{parent.id}` — the prototype's own fallback — reddens **16.40** *and* the pre-existing planted-defect
+case that asserts the parent's id is absent from the body, so **the leak guard can fail**; dropping the
+state from a subtask row reddens **16.15**; and moving the separator INSIDE the title span stays **green**,
+correctly — the row's text and its accessible name are byte-identical either way, so green is the right
+answer there rather than a blind spot.
+
+**The review round's five findings, all applied BEFORE the PR opened:** the stale authority (this section's
+`16.40` cited 6.66's *"no table stores a ticket title"*, true when written and false since `proj_tickets`
+landed — the real reason is the `canSee` gate, and the authorities are `7.212` and `6.14`); the CSS comment
+that falsified itself (it said `subtask` appears in NO rule, in the commit that added the first three); this
+bullet's lead, which opened with the claim the flip superseded; **two `it`s sharing one id** (`16.38` twice,
+invisible to `check-case-ids`, which counts catalogue lines — one case, one id, one test); and the flex row's
+citation, off by one at `:1237` rather than `:1238`.
+
+**⚠ AND THE SECTION'S OWN SEPARATOR DEFECT, found by the controller's browser pass and fixed here.**
+`16.15`'s rows rendered `Order the brochuresTo do` until 2026-09-20 — two adjacent inline spans with no
+text between them — and the controller saw `HSN codes for the real catalogueWaiting` in a browser. **The
+case passed because it queried each span's own text; nothing read the row as a row.** It now does, and
+removing the separator reddens it with the defect itself in the message. **The fix is TEXT rather than a
+CSS gap on purpose**: this section declares no stylesheet rule at all and jsdom has no layout engine, so
+a gap would have been unmeasurable — an unverifiable fix and the defect are the same shape.

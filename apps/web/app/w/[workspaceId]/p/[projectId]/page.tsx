@@ -56,6 +56,7 @@ import {
   toTicketDatesInput,
 } from '../../../../../src/ticket-dates-input.js';
 import { useAppServices, useSessionStatus } from '../../../../../src/providers.js';
+import { ticketSheetPath } from '../../../../../src/ticket-location.js';
 import { useProjectName } from '../../../../../src/use-project-name.js';
 import {
   DEFAULT_PROJECT_TAB,
@@ -139,7 +140,7 @@ function ProjectBoard() {
   const params = useParams<{ workspaceId: string; projectId: string }>();
   const searchParams = useSearchParams();
   const { workspaceId, projectId } = params;
-  const { dataSource, cache } = useAppServices();
+  const { dataSource, cache, ticketLocation } = useAppServices();
   /**
    * `useSessionStatus`, not `useCurrentUser`, and the difference is a write.
    *
@@ -363,6 +364,18 @@ function ProjectBoard() {
    * with the text instead.
    */
   const [rankNotice, setRankNotice] = useState<{ channel: 'server' | 'transport'; text: string } | null>(null);
+  /**
+   * The `Subtask of {parent}` chip's failure arm — see `openParentTicket` below
+   * for the two things that can go wrong and why each is said rather than
+   * swallowed. Same two-channel shape as `rankNotice` above, for the same
+   * reason: a server that would not place the ticket and a request that never
+   * arrived are different events with different remedies, and one class for
+   * both would print a transport failure as the server's judgement.
+   */
+  const [parentOpenNotice, setParentOpenNotice] = useState<{
+    channel: 'server' | 'transport';
+    text: string;
+  } | null>(null);
   const applyRankOverride = useCallback((ticketId: string, rank: string | null) => {
     setRankOverrides((current) => {
       const next = new Map(current);
@@ -971,6 +984,48 @@ function ProjectBoard() {
   const openTicket = (ticketId: string) =>
     router.push(`/w/${workspaceId}/p/${projectId}?ticket=${ticketId}`);
   const closeTicket = () => router.push(`/w/${workspaceId}/p/${projectId}`);
+  /**
+   * Opening the ticket the sheet's `Subtask of {parent}` chip names.
+   *
+   * **NOT `openTicket` above, and that difference is the whole reason this
+   * exists.** That one pushes the CURRENT project's path, which is correct for
+   * the rows this project's own list serves. A parent may sit in ANOTHER
+   * PROJECT — case 6.57 records that nothing refuses one — and the read the chip
+   * is built from carries no project at all (`ParentRef` is `{kind, id, title}`,
+   * `packages/app-core/src/view-types.ts`). So the location has to be ASKED FOR,
+   * and `TicketLocator` is the shipped answer to exactly that question — the
+   * inbox asks it the same way, for the same reason, through the same route.
+   *
+   * **Both failure arms are SAID rather than swallowed.** `locate` answers
+   * `null` for the one frozen 404 the ticket route sends, which is the same
+   * answer for a ticket that does not exist and for one this viewer may not see
+   * — deliberately, so the status is not an existence oracle — and the locator's
+   * own docblock says the caller must *"say 'this cannot be opened from here'
+   * rather than guessing which of the two it was"*. A rejection is the other
+   * event. A chip that quietly did nothing would be the button that lies, on the
+   * surface whose whole subject is what this ticket is part of.
+   */
+  const openParentTicket = (ticketId: string): void => {
+    setParentOpenNotice(null);
+    void ticketLocation.locate(workspaceId, ticketId).then(
+      (location) => {
+        if (location === null) {
+          setParentOpenNotice({
+            channel: 'server',
+            text: 'That ticket cannot be opened from here — the server will not place it for you.',
+          });
+          return;
+        }
+        router.push(ticketSheetPath(location, ticketId));
+      },
+      (cause: unknown) => {
+        setParentOpenNotice({
+          channel: 'transport',
+          text: cause instanceof Error ? cause.message : String(cause),
+        });
+      },
+    );
+  };
 
   const labels = useMemo<GroupLabels>(() => {
     // KEPT `?? []`, and it is the truth rather than a substitute: the closures
@@ -2402,7 +2457,35 @@ function ProjectBoard() {
             shipped client — no route is added and nothing here speaks HTTP.
           */
           uploadEvidence={(file: File) => uploadAttachmentHttp(file, openTicketId)}
+          /*
+            THE PARENT CHIP'S DOOR. The sheet draws `Subtask of {parent}` on a
+            ticket that is itself a subtask and has no way to open it: that needs
+            the parent's PROJECT, and `ParentRef` — the only thing the chip is
+            built from — carries `{kind, id, title}` and no project. So the shell
+            supplies the one thing the sheet cannot compute. See
+            `openParentTicket` above; it is the same locator the inbox opens
+            notifications with, asked the same question.
+          */
+          onOpenTicket={openParentTicket}
         />
+      ) : null}
+
+      {/* The chip's failure arm, IMMEDIATELY below the sheet rather than in some
+          page-level slot: this is where the action was taken, which is the same
+          placement rule the roster's role-change refusal states. It renders on
+          the page rather than inside the sheet because the sheet is not the
+          thing that failed — the shell's own navigation is. */}
+      {parentOpenNotice !== null ? (
+        <p
+          role="alert"
+          className={
+            parentOpenNotice.channel === 'server'
+              ? 'gn-refusal gn-refusal--server'
+              : 'gn-refusal gn-refusal--transport'
+          }
+        >
+          {parentOpenNotice.text}
+        </p>
       ) : null}
 
       {/*
