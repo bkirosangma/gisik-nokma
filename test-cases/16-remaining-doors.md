@@ -179,3 +179,53 @@ Collapsing `name: r.name` to `name: r.name ?? ''` reddens **16.1** with `expecte
 
 - **The CSS is a judgement, not a measurement.** jsdom loads no stylesheet, so nothing here shows that the name's 600 weight, its place above the dates, or the inline editor's wrap RENDER as drawn.
 - **The accessible-name baseline was NOT re-run.** The row's naming control carries an `aria-label` naming the connection (`Name the connection approved 8 Sept 2026`) because a column of identical `Rename` buttons tells a screen-reader user nothing about which renames what. That baseline is generated from a live `e2e-stack` run, so this is a PREDICTION that it moves, not a measurement — and two connections approved on the SAME day are the one pair the label cannot separate, which is stated rather than hidden.
+
+## Door F — the SUBTASKS section (executor 1, 2026-09-19) — cases `16.15`–`16.22`
+
+**The door.** Our sheet drew only a COUNT (`2 of 4 done`, `formatRollup`). The prototype draws a section:
+a heading carrying the count, the children, an empty state, and an add row (`desktop.dc.html:1238-1265`).
+
+**⚠ THE QUEUE'S OWN QUESTION, ANSWERED BY MEASUREMENT: this is a SURFACE, not an architecture task.**
+*"If a subtask is a ticket in our model too, this is a surface over data we already have; if not, it is an
+architecture question."* **A subtask IS a ticket:** `TicketState.parentId` (`ticket-state.ts:139`) with a
+`ticket.reparented` fold (`:284`), served as `parentId: string | null` (`view-types.ts:266`), read into
+cards (`ticket-cards.ts:175`), and already rolled up as a count (`ticket-sheet.tsx`, `formatRollup`).
+
+**And the prop is honest, which was the measurement that decided it.** Children are DERIVED from the list
+read the client already makes, and three things had to hold before that was safe — all three measured:
+the read **walks the server's cursor to exhaustion** (no single-page loss); the call passes an **EMPTY
+`FilterSpec`**, which means "all" and so cannot exclude a closed child; and past `LIST_ROW_CAP` (2000
+rows) it **throws `ServingGapError`** — *"never 'we happened to stop'"* — so a project too large to read
+completely REFUSES rather than returning a short list. **No route, no migration:** `ticket.created`
+already carries `parentId` (`packages/domain/src/events/ticket-events.ts:44`).
+
+**⚠ AND A SECOND, INDEPENDENT GUARD.** The server already sends the number — `rollup.totalChildren` counts
+them all and `restrictedCount` names the ones this viewer may not see — so the derivation is RECONCILED
+against it on every render, and a disagreement is **said** rather than drawn. `16.17` is what makes that
+falsifiable; `16.18` is its control, without which a section that refused everything would pass.
+
+- **16.15** ✅ Lists this ticket's children, **each with its OWN state** — the empty state's claim ("a subtask is a ticket of its own") asserted in structure, not just in words.
+- **16.16** ✅ The empty state draws the prototype's sentence, verbatim, when `rollup` is null (the server's own spelling for "no children at all").
+- **16.17** ✅ **Refuses to render a short list:** when the rollup counts more children than were read, the section says so in the server's numbers and **draws no rows**.
+- **16.18** ✅ The control for 16.17 — with the count AGREEING, the list IS drawn and no refusal appears.
+- **16.19** ✅ Lists **only this ticket's** children: a sibling's child in the same project is not one of them.
+- **16.20** ✅ **Add subtask** sends `ticket.created` with **this ticket as `parentId`**, the title **as typed**, and `start: 'focus'` — the prototype births a subtask in the workflow's first state (`col: states[0].key`).
+- **16.21** ✅ A refused title shows the **server's own sentence** and **keeps** what was typed. An `invalid` answer carries `message`, not `reason` — reading the wrong arm renders `undefined`.
+- **16.22** ✅ Does **not** draw the prototype's `Subtask of {parent}` chip — out of the dispatch's row, and this case exists so adding it later is a decision rather than a drift.
+
+**Mutation witnesses, run and recorded rather than predicted.** Defeating the reconciliation
+(`subtasksIncomplete = false && …`) reddens **16.17 alone**. Dropping the parent from the add payload
+(`parentId: null`) reddens **16.20 alone**, on the payload comparison.
+
+**⚠ A defect the cases found, recorded because it is a live trap in this file.** The subtasks live query
+was first keyed `${ticketId}:subtasks`, which registers on the first render — while the ticket read is
+still null — runs once, answers `[]`, and **never re-runs**, because nothing in the key changes when the
+ticket arrives. Four cases caught it (they passed children in and the section listed none). The fix keys
+on the **project id**, which only exists once the ticket has landed — the same dodge the workflow query
+one screen up makes with `workflowId@version`.
+
+### What is NOT covered
+
+- **The CSS is not measured.** jsdom loads no stylesheet, so nothing here shows that the section's heading, list or add row RENDER as the prototype draws them.
+- **The `Subtask of {parent}` chip is out of scope**, not tested and not built — see `16.22`, which asserts its ABSENCE rather than its behaviour.
+- **The paste/move of a child between parents is not covered.** `ticket.reparented` exists and moves `parentId`, but nothing in this row changes a child's parent, so `16.19`'s filter is asserted for the CREATE path only.
