@@ -41,6 +41,52 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~04:0x IST. **PARITY IS MERGED; `3b` IS BUILT, GATED AND PUSHED,
+> # AND ITS PR IS THE FIXED POINT.** Branch **`exec/members-states`** @ **`e35dc161`** — **ON THE REMOTE**
+> # (verified `git ls-remote` == `git rev-parse HEAD`; the controller's "local only" reading predates the push).
+>
+> ## PARITY — MERGED, `#572` = **`faecf837`**
+> Three items: the sheet's sections as ONE segmented control on the shared component (`16.81`), `Full screen`
+> with the authority's three-part treatment (`16.82`), and the title's type step (CSS-only, no id by precedent).
+> **Its head `b3a7182c` is an ancestor of `main`, checked with `merge-base --is-ancestor` rather than assumed.**
+> **The reviewer pass ran and is recorded in the PR body**, and it earned its round — see the two lessons below.
+> **⚠ THE VISUAL HALF IS OWED, NOT WAIVED:** at the next rebuild the sheet is screenshotted at
+> `data-style="hig"` against `design-system/interactive/desktop.dc.html`, and the controller dispatches a
+> correction if the page disagrees. Nobody has seen this branch's rendering; the "before" state was seen.
+>
+> ## ⚠ TWO LESSONS FROM THE REVIEW ROUND, BOTH PAID FOR — carry them
+> 1. **AN EDIT TO SHARED TEXT NEEDS THE WHOLE RULE READ, NOT THE LINE.** I inserted a comment into
+>    `.gn-dialog__title, .gn-sheet__title { … }` and my text landed BETWEEN the two selectors — legal in a
+>    selector list, so the compiled rule silently re-sized **every dialog heading**. Found by the reviewer reading
+>    the BUILT CSS. **That is the second time tonight a change of mine silently took something it did not name**
+>    (the first was a brace a conflict resolution cut). Both were caught by a second reader or a loud build, never
+>    by a clean `git status`.
+> 2. **DO NOT CHANGE THE WORKTREE UNDER A RUNNING REVIEWER.** I checked out another branch while a reviewer was
+>    mid-flight: its static checks (reading shas) were unaffected, but its FILE MUTATIONS landed on the wrong
+>    checkout. A dispatched agent mutates the tree it FINDS, not the branch it was briefed on.
+> **And the reviewer's own limit, recorded rather than smoothed:** `16.82` asserts class MOVEMENT, not pixels —
+> a renamed-but-equivalent implementation fails it while a CSS deletion passes it. That is the same limit the
+> visual half carries.
+>
+> ## `3b` — BUILT, AND THE DISPATCH WAS LARGELY ALREADY DONE
+> **Re-measuring first is why this was small.** The dispatch's decisive question was answered before the branch
+> opened (`role` IS on the wire; `mapActors` carries it, case `13.760`), and **both changes the audit recorded
+> for this screen are already in the product** — the conditional role cell and the invitation panel's 403 gate.
+> Neither was rebuilt. **The one buildable gap was the two-line identity** (`:675`): the name at 600 over the
+> address at 13px/18px, drawn **only when the label is not already the address** (a phone-only member is
+> LABELLED by their address, so a second line would print one string twice) — which is why `16.61` has two arms.
+> Gate **33/33 EXIT 0**; seven checks exit 0; ratchets moved by exactly what was added — `check-case-ids`
+> 2490 → **2491, highest `16.61`**; §16 **44 → 45/0/45**.
+> **⚠ A reviewer is running against this branch right now; its PR opens only once the result is in the body**
+> (the bar that sent `#572` back once). **That PR is the fixed point the controller restarts me at.**
+>
+> ## ⚠ THE BRIEF'S STALE PREMISE — RECORDED SO NOBODY RE-DERIVES IT
+> This brief says the `:3001` stack is *"mounted from YOUR worktree"*. **It is not.** `docker inspect
+> gisik-nokma-dev-web-1` shows **NO bind mounts** and `node apps/web/server.js` — a **BAKED IMAGE** — and
+> `trustedOrigins` is built from `WEB_ORIGIN`, which is **`:3001` only** (a dev server on `:3031` answers
+> **"Invalid origin"**, measured). **So no browser can show an unmerged branch's rendering**, which is why the
+> parity visual half is owed to the rebuild. The premise predates the owner's 2026-09-19 "run from the main
+> folder" ruling.
 > # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~03:0x IST. **THE CHIP PR IS OPEN (#562, AWAITING THE
 > # CONTROLLER'S MERGE) AND THE PARITY TASK IS OPENED ON ITS OWN BRANCH.** Cycle 13's order is
 > # authoritative and it is **chip → parity → `3b`**.
@@ -110,6 +156,10 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > ## ANCHORS
 > | | |
 > |---|---|
+> | `origin/main` | **`faecf837`** (the `#572` merge) |
+> | my branches | `exec/members-states` @ **`e35dc161`** (pushed; the live one) · `exec/sheet-prototype-parity` @ `b3a7182c` (**merged**) |
+> | ids | parity `16.81`–`16.82` SPENT and merged · **`3b` `16.61` spent; `16.62`–`16.80` free** · `§17` is the controller's to open at `16.99` |
+> | next | **open `3b`'s PR** once the reviewer lands, then take the next dispatch |
 > | base | `origin/main` = **`e4d36f11`** (the cycle-13 anchor landed while the chip PR was open) |
 > | ids | chip `16.38`–`16.40` SPENT · **parity `16.81`–`16.99`** · `3b` `16.61`–`16.80` · **`§17` is the controller's to open at `16.99`** |
 > | the three styles | `hig` (the prototype's language) · `minimal` · `neo` — **every rule must be right in all three** |
