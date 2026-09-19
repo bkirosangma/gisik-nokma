@@ -1,12 +1,75 @@
-## ▲ TOP BLOCK — **C: BUILT AND PUSHED, NO PR OPEN. NEXT SESSION: OPEN THE PR.** (2026-09-20, ~01:0x IST)
+## ▲ TOP BLOCK — **H IS HALF-BUILT AND HALF-HELD: the footer's NAVIGATION ships, `Delete` waits on a door ruling.** (2026-09-20, ~03:0x IST)
 
 ### § 1 — WHERE TO FIND IT. Read this before anything else.
 
-- **Branch `exec2/inbox-bulk-undo`**, base `main`, **head `dd22eb81`**, pushed to origin.
-- **NO PR IS OPEN** — the controller halted this session at 82% context with instructions to
-  push and stop. **`gh pr view --json headRefOid` against that branch will say "no pull requests";
-  that is correct, not a failure.** **Your first act is to open the PR**, body drafted below.
-- Everything is committed. The tree is clean at that sha.
+- **Branch `exec2/sheet-footer`**, cut from **`main` = `fdbb7fc8`**, pushed to origin. **One PR, base
+  `main`, prefix `exec2/`** — measure it with `gh pr view --head exec2/sheet-footer`; **the head is a
+  reading and this block cannot carry it.**
+- Everything is committed; the tree is clean.
+
+### § 2 — WHAT IS BUILT, AND WHAT IS DELIBERATELY NOT
+
+| piece | where | state |
+|---|---|---|
+| the footer's `‹ Previous / Next ›` | `packages/app-core/src/views/ticket-sheet.tsx` — a `navigation` prop | ✅ built, case `16.43` |
+| its styles | `packages/ui/src/ui.css` — `.gn-ticket-sheet__footer`, `.gn-ticket-sheet__nav` | ✅ built |
+| **`Delete` — the history-retaining removal** | — | ⛔ **NOT BUILT. HELD ON A RULING.** |
+
+**`Delete` is held on a MEASUREMENT, not a preference.** The row rules it *a HISTORY-RETAINING removal with
+undo, NOT a hard delete*, and **that has no door in this product:** the eleven-event ticket vocabulary
+contains **no removal event** (controlled sweep on one path — `ticket.deleted` → 0, `ticket.removed` → 0,
+`ticket.archived` → 0, control `ticket.closed` → **110**), `archived` is **project-scoped only**
+(`project.archived`/`project.restored`), and `proj_tickets` carries **no removal column**. The prototype's
+`deleteTicket` is a pure CLIENT filter (`desktop.dc.html:3795`) in a prototype with no server, so it proves
+nothing about ours. Building it means a new event, a projection tombstone, a read filter and a route —
+**doors the table does not name.** Full request, with the three options:
+`gisik-nokma-lanes/EXEC2-RULING-REQUEST-2026-09-20-h-delete-door.md`.
+
+### § 3 — ⚠ TWO INSTRUMENTS LIED THIS TASK, AND BOTH WERE MINE
+
+1. **I read a failure that did not exist.** My first isolation run of the gate's red used
+   `--concurrency=1`, **which vitest 3 REJECTS** (`CACError: Unknown option --concurrency`). The run died
+   at argument parsing and executed **no test at all**; I had a log with an exit code 1 and an empty grep.
+   The rtk proxy *also* swallowed the output behind `[RTK:PASSTHROUGH] … All parsing tiers failed`. **Both
+   were only visible by reading the log.** The brief's "`--concurrency=1` where the runner allows" —
+   **vitest does not allow it.**
+2. **The recurring gate red is LOAD.** `test/seed/seed-dev.test.ts` timed out at **33051 ms** and again at
+   **31957 ms**; **alone it passes 8/8 in 2.37 s — twice, to the hundredth.** Re-run a red timeout ALONE
+   before believing it, and note it has now fired twice in one session on this lane.
+
+### § 4 — WHAT IS NEXT, AND IT IS ALSO STOPPED AT A DOOR
+
+**The inviter card** (queue Addendum 5) — **also awaiting an unanswered ruling**, on a different question:
+the authenticated banner **already renders inviter + role** (`#400`, `d3d0abdd`), while the token page's
+`InviteSummary` carries **no inviter** and `GET /v1/invites/:token` is **session-less by design**, so the
+second reading needs a server change that makes a session-less route's answer session-dependent.
+`gisik-nokma-lanes/EXEC2-RULING-REQUEST-2026-09-20-inviter-card-scope.md`.
+
+**Both of my remaining queue items are stopped at a door. That is the position, not a pause.**
+
+### § 5 — ⚠ THE BLOCK BELOW REACHED `main` WITH A FALSE INSTRUCTION IN IT, AND IS CORRECTED HERE
+
+Its §1 read *"NO PR IS OPEN — your first act is to open the PR"*. That was true when written and **became
+false the moment #563 opened**; it merged to `main` still saying it, so a restart reading `main` would have
+tried to open a second PR against a merged branch. Corrected rather than deleted.
+
+---
+
+## ▼ PREVIOUS BLOCK — **C LANDED: merged as #563** (`exec2/inbox-bulk-undo`, head `9d66abbc`, merge `fdbb7fc8`). (2026-09-20)
+
+**⚠ CORRECTED, NOT REWRITTEN.** This block's §1 used to instruct the next session to open its PR. **It is
+now MERGED** — and every sha it cites (`dd22eb81`, `af9b759f`, `bf34bd05`, `2d04805c`) is **ORPHANED** by
+the pre-merge rebase: `git branch --contains` returns **empty for all four**, while the merge head
+`9d66abbc` is an ancestor of `main`. **Anything below that cites a sha is stale; the narrative is not.**
+
+### § 1 — WHERE IT LANDED
+
+- **PR #563**, `exec2/inbox-bulk-undo` → `main`, **MERGED** (`9d66abbc`, merge commit `fdbb7fc8`).
+- **Rebased onto `58aff430` before merging.** Its one conflict was `test-cases/16-remaining-doors.md`,
+  where both lanes appended a section at EOF; **both were kept**, and `check-case-ids` moved
+  **2485 → 2488** — exactly the chip section's three ids joining this branch's two.
+- **C's content is verified PRESENT on `main`**, by reading it there: `packages/ui/src/components/toast.tsx`,
+  `apps/web/test/inbox-bulk.test.tsx`, `packages/ui/test/toast.test.tsx`, and both cases `16.41`/`16.42`.
 
 ### § 2 — WHAT IS BUILT, AND IT IS ALL OF C.
 

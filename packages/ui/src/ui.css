@@ -1496,6 +1496,51 @@
   color: var(--gn-text);
   border-bottom-color: var(--gn-surface-raised);
 }
+/* The sheet's footer row — the prototype's `‹ Previous / Next ›` bar
+   (`desktop.dc.html:1371`: `padding:16px 24px;background:var(--fill4);
+   justify-content:space-between`, whose left-hand `Delete` is NOT built — see
+   `ticket-sheet.tsx`'s footer).
+
+   ## One deliberate departure, and why it is not smuggled
+
+   The prototype grounds this strip in `--fill4` (`--gn-fill-quaternary`) and
+   runs it to the sheet's edges. **Reproduced as a separator rule instead**,
+   because `Sheet` mounts EVERY child inside `.gn-sheet__body`, whose
+   `padding: 1rem 1.1rem` is the only thing between this strip and the sheet's
+   edge: reaching it means hard-coding that inset as a negative margin, which is
+   a SECOND copy of a value that lives in the rule above and that nothing would
+   keep in sync. The prototype's fill and its full-bleed inset belong with the
+   complete footer, alongside `Delete`; this row carries the STRUCTURE — a
+   footer, below the body, with the controls at the end the prototype puts them.
+   The `margin-left:auto` below is what holds them there while the left slot is
+   empty, so `Delete` landing changes nothing about where the nav sits. */
+.gn-ticket-sheet__footer {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1.2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--gn-border);
+}
+.gn-ticket-sheet__nav { display: flex; gap: 0.6rem; margin-left: auto; }
+.gn-ticket-sheet__nav button {
+  font: inherit;
+  font-weight: 600;
+  /* The prototype's own touch target (`min-height:44px`), kept in rem so it
+     scales with the reader's text size rather than against it. */
+  min-height: 2.75rem;
+  padding: 0 1.1rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-sunken);
+  color: var(--gn-accent);
+  cursor: pointer;
+}
+/* The prototype GREYS the end it cannot move past rather than removing it
+   (`sheetAtStart`/`sheetAtEnd` add `opacity:0.4;cursor:not-allowed`), so the
+   row's layout is identical at every position in the list and the control does
+   not vanish from under a reader who has just reached the end. */
+.gn-ticket-sheet__nav button:disabled { opacity: 0.4; cursor: not-allowed; }
 .gn-ticket-sheet__state { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }
 .gn-ticket-sheet__provenance { color: var(--gn-text-muted); font-size: 0.85rem; }
 .gn-ticket-sheet__parent { margin: 0.6rem 0; color: var(--gn-text-muted); }
