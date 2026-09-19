@@ -91,7 +91,7 @@ headline**, which is why it is worth reading in full.
 | item | ruling | evidence |
 |---|---|---|
 | **Assignee** | **BUILD — editable.** Owner: *"assignee should not be read only."* | `SERVER EXISTS → SURFACE`. `ticket.assigned` is wired end to end — payload `events/ticket-events.ts:50` (an UNASSIGNMENT is the same event with `null`), projected `projections/tickets.ts:436,466`, a read `read/assigned-provenance.ts`, fan-out `notifications/fanout.ts:225`, synced `sync/snapshot-writer.ts:95`, and an MCP write tool `mcp/write-tools.ts:167-173`. **The web renders it read-only at `ticket-sheet.tsx:573`.** |
-| **Description** | **AN OMISSION, NOT YET RULED** | The door exists (`compose-editor-submission.ts:14,29`), the sheet already submits `ticket.field_set` (`:284`), the editor has both modes — and **nothing in `ticket-sheet.tsx` records a decision either way.** The FAQ states the consequence to users. |
+| **Description** | **BUILD — editable.** Owner: *"description should be editable."* | `SERVER EXISTS → SURFACE`, **and the fix is a PROP, not a door.** The door exists (`compose-editor-submission.ts:14,29`), the sheet already submits `ticket.field_set` (`ticket-sheet.tsx:284`), and the editor has both modes — **but the mount is `readOnly` (`:581`) and the web never passes `editorSlot`** (`page.tsx:2346-2353`), so the real editor never mounts at all. **One mount, four gaps.** |
 | **State dropdown** | **REFUSED — no second door** | The chip + "Move…" and a dropdown are **two presentations of the same legal-transition set**. A restyle, not a gap. |
 
 **⚠ THE FINDING THAT EXPLAINS MOST OF THE SHEET, and it is one line:** the web mounts `TicketSheet` at
