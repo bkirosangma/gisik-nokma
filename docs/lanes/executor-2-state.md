@@ -1,4 +1,34 @@
-## ▲ TOP BLOCK — **E SHIPPED**: the link read serves the TOKEN's expiry, and the three loudest pins all fired. (2026-09-19, ~17:2x IST)
+## ▲ TOP BLOCK — **CYCLE 11 POSITION: E IS MERGED, AND THE NEXT TASK IS THE DESCRIPTION FIELD — not addendum 5.** (2026-09-19, ~21:4x IST)
+
+**`main` is `7beccab4` (= *"Merge pull request #540 from bkirosangma/exec2/invite-expiry"*), ZERO open PRs,
+and every PR this lane opened today has landed.** Verified with `/usr/bin/git` and `gh pr list`; the numbers
+below are readings at that sha, not carried forward.
+
+**⚠ THIS BLOCK'S PREDECESSOR NAMED THE WRONG NEXT TASK, and that is why this one exists.** It said *"NEXT IN
+THIS LANE: addendum 5, `isInvite` inviter identity"*. **CYCLE 11's lane order is authoritative and is
+different**: `controller-state.md`'s CYCLE 11 entry gives exec 2 —
+
+> **E (`isInvite` expiry) → description field → evidence upload → C (`isInbox` bulk + Undo) → H (sheet
+> footer) → the inviter card.**
+
+**The inviter card is LAST, not next.** The earlier line was assembled from the two most recent
+controller *messages* rather than from the queue's own lane assignment, which is the mistake this file keeps
+recording: **a restart surface that names a position from messages rather than from the authority.**
+
+**SO: THE NEXT TASK IS THE DESCRIPTION FIELD** (`isWorkspace` description is exec 1's door A — this is the
+TICKET sheet's description, the owner's *"description should be editable"*, a dispatch of its own). Then the
+evidence upload, then **C**, then **H**, then the inviter card.
+
+**READ BEFORE STARTING ANY OF THEM:** `CTL-QUEUE-2026-09-19-door-builds.md` **with its Addenda 1–5**, and
+`owner-holds.md` §1's `THE DOORS, RULED` — **the table is the authority and this file does not extend it.**
+
+**⛔ `§13` IS 24 IDS FROM FULL.** This lane's block is **`13.988`–`13.999`**; `13.988` is spent on E.
+**When the block empties, STOP AND ASK** — the next id is a section-structure decision and it is the owner's.
+**Keep the `{3}` width**, and know it truncates `13.9999` (a pixel value, already a named trap).
+
+---
+
+## ▼ PREVIOUS BLOCK — **E SHIPPED**: the link read serves the TOKEN's expiry, and the three loudest pins all fired. (2026-09-19, ~17:2x IST)
 
 **Position: DONE and PUSHED — `exec2/invite-expiry`, base `main`, cut from `origin/main` `cce9fac1`.** The PR
 opens as this dispatch's last step; **measure it rather than reading it here**:
@@ -49,10 +79,7 @@ touches `/invite/[token]`** — and it must respect the same audience rule adden
 red in FOUR web suites** (`backlog-tab`, `filters-sheet`, `list-bulk-close` ×2) plus two timeouts — **surfaces
 this change never touched** — and **all 51 passed in isolation**, so they were load flakes at `load 83.79`.
 
-**NEXT IN THIS LANE: addendum 5, `isInvite` inviter identity** — name and role, **authenticated accept path
-ONLY, never the session-less token page, no email anywhere**; `proj_invites.invited_by` already records it;
-and **`invite.sent`'s PAYLOAD carries no inviter — it comes from the envelope actor**, which the PR body must
-say or a reader will conclude it is missing.
+**~~NEXT IN THIS LANE: addendum 5, `isInvite` inviter identity~~ — SUPERSEDED AND WRONG: the inviter card is LAST. The lane order is description field -> evidence upload -> C -> H -> the inviter card, per CYCLE 11. Kept struck rather than deleted so a reader who acted on it can see what it said and why it moved.**
 
 ### Rules that bind this branch
 - **Never `docker compose`**; **:3001 is executor 1's**; **never `AskUserQuestion`**; **do not edit
