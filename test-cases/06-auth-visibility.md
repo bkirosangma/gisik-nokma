@@ -260,3 +260,52 @@ Mirrors `Features.md` §6. Status: `❌` not covered · `✅` covered · `🟡` 
 - **6.147** ✅ **Both retention sweeps are safe to run twice, and a dry run writes nothing.** Idempotence is what lets a scheduling surface this round did not build call either tool without coordination: the second run of a pair reports and deletes zero, because the first left nothing its predicate matches. Asserted on the TABLE and not on the report alone in both files — a report naming a row while the row went anyway is exactly the failure a dry run exists to rule out — and the dry-run tests re-query afterwards to confirm the count is unchanged AND that the row the dry run named is still present. Both CLIs take `--dry-run` as a plain `process.argv.includes` boolean: **no general flag-value parser**, deliberately, because the one in this repo (`src/seed/cli-seed-convenience-corner.ts`'s `argValue`) consumes a following flag as a value and neither sweep needs a value.
 - **6.148** ✅ **THE P22 FIXTURE — a revoked person whose PROJECT-scope roster row is still standing is swept anyway.** The one state in which the sanctioned reader and the forbidden one give different answers, and therefore the only state in which the rule is testable at all. `membership.revoked` deletes the workspace-scope row and may not touch the project-scope one (a different entity's stream — `proj-memberships.ts` explains why), so a roster row STANDS for someone who is not a member and a bare `SELECT role FROM proj_memberships WHERE workspace_id = $1 AND user_id = $2` calls them current: case 6.137's bug, here in the expensive direction, where the sweep would exclude a departed person as a member and keep their data forever — the exact finding the tool exists to close. The premise is asserted first and PRINTED rather than counted (`[{ scope_kind: 'project', project_id, role: 'member' }]`), because a fixture whose surviving row was absent would prove only that a missing row confers nothing. Built through the ledger AND the projection per 6.146 — `project.member_added` via `record()`, never `seedMember(..., [{projectId}])`, which would re-apply `membership.granted` to the projection without appending it to the ledger. Two mutations driven, each reddening THIS case and nothing else in the file: replacing `resolveEffectiveRole` with the unfiltered direct read (the 6.137 shape), and dropping `scope_kind = 'workspace'` from the DELETE's own guard, which lets the surviving row veto the deletion at the last step instead of the first. The same state is already pinned for `canSee` at `test/visibility/can-see.test.ts`; retention needed its own, because a rule proved in one caller is not proved in another. — `apps/server/test/tools/sweep-user-preferences.test.ts`
 - **6.149** ✅ **Both sweeps' deletions are safe against what can change between reading and writing — one predicate ANDed with nothing it did not intend, one DELETE that re-states its own condition.** `sweepInviteTokens` deletes BY PREDICATE rather than by the id list its dry run returned, so one statement decides and acts on the same committed snapshot; the predicate is now PARENTHESISED, because its top level is an `OR` and `AND` binds tighter, so the first requirement to append `AND workspace_id = $1` would otherwise bind as `expires_at <= now() OR (EXISTS(…) AND workspace_id = $1)` and sweep every lapsed token in every workspace — a statement that still parses and still runs. `sweepUserPreferences` cannot use that shape (its window start comes from the ledger, per row), so its DELETE carries the membership condition instead of delegating eligibility to a TypeScript variable read three round-trips earlier: steps 1–3 are separate awaited statements with no enclosing transaction, and `user_preferences` is AUTHORED — "nothing derives it from the ledger and nothing rebuilds it" (`migrations/1788295700000_user-preferences.sql`) — so a `membership.granted` committing mid-sweep would destroy a now-current member's row unrecoverably. When the guard fires the row stays, `swept` still names it and `deleted` does not count it: the two numbers disagree, which is the honest report of a race rather than a claim the row went. *The `scope_kind = 'workspace'` filter on that guard is DRIVEN by 6.148 — widening it reintroduces 6.137 in the same expensive direction. The RACE ITSELF is not driven by any test: interleaving a commit between two awaited statements needs a hook this suite does not have, and a fixture that could not lose the race would be a check that cannot fail. Named rather than implied; owner: whoever gives these tools a scheduling surface, which is the round in which concurrent sweeps become real.* — `apps/server/src/tools/sweep-invite-tokens.ts`, `apps/server/src/tools/sweep-user-preferences.ts`
+
+## The link read serves the TOKEN's expiry (executor 2, 2026-09-19) — case `13.988`
+
+**The `isInvite` expiry ruling** (`docs/lanes/owner-holds.md` §1, `THE DOORS, RULED`). The door was measured
+as an **`ADDITIVE FIELD`** before it was built, and the measurement was exact: **`openableInvite` had read
+`expires_at` from the beginning** — it is the whole point of its `expires_at > now()` predicate — and
+**threw it away**, because until now nothing downstream needed it. So no route, no migration, and no new
+disclosure.
+
+**Id `13.988`**, from this lane's allocated block `13.988`–`13.999`.
+
+### The distinction the case exists to pin: the TOKEN's window, not the invitation's
+
+`invite_tokens` is server-owned state with **one row per PRESENTATION**; `proj_invites` is the invitation
+itself and **has no expiry column at all**. An invitation that is revoked and re-issued has one invitation
+row and several token rows over its life, each with its own window — **so a read that answered the
+invitation's lifetime would be answering a different question, and on a re-issued invitation it would answer
+the WRONG one.** The value served is the row `openableInvite` matched on, so it cannot disagree with the
+predicate that admitted the call. **`13.988`'s second arm re-issues the link and asserts the expiry MOVES**,
+which is the only way that distinction is visible from outside.
+
+### ⚠ THE THREE PINS THE QUEUE WARNED WERE THE LOUDEST, AND ALL THREE FIRED
+
+| pin | what happened |
+|---|---|
+| `invites.test.ts`'s **first** exact-body `toEqual` | reddened by the added key; **updated deliberately** |
+| its **second** exact-body `toEqual` | likewise — and its comment said *"Exactly three fields"*, which is now four |
+| **`:390`** — `expect(res.body).not.toContain('private@example.com')` | **not weakened**, and deliberately: see below |
+
+**The disclosure guard is not eroded by this field, and the difference is stated rather than assumed.** What
+that guard protects is the ADDRESS the invitation names — a fact belonging to somebody other than whoever
+may be holding a forwarded link. `expiresAt` is **a property of the credential the caller is already
+holding**, and telling them when it lapses is what lets them act before it does. The read's own docblock
+already drew that distinction; the fourth field lands on the allowed side of it. **That docblock is
+corrected in the same change set** — it read *"the three fields Plan 6 pinned and nothing else"* and now
+says four, with the half that moved named.
+
+### Mutation-witnessed
+
+Removing `expiresAt` from the response reddens the case (and both updated assertions), and the file was
+restored **byte-identical**, verified by sha256 before and after.
+
+### What is NOT covered, named rather than implied
+
+- **The invitee-facing page does not render it yet.** The queue scopes each row to its DOOR (*"build the
+  row's scope and nothing else"*), and this row is the field. The client's `expiresAt` today lives on the
+  **admin** side only (`invites-admin.ts`'s `MintedInvite`/`PendingInvite`). **Owner: whoever next touches
+  the invitee-facing `/invite/[token]` surface** — and note the audience rule that surface must respect, in
+  addendum 5 below: it is session-less, so anything shown there is shown to whoever holds the URL.
