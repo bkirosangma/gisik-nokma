@@ -2069,3 +2069,55 @@ right.
 - **No `e2e-viewport` case covers this route.** The real-browser evidence above is a Playwright harness
   against the stylesheet and the component's markup, **not** the running app's `/p/:projectId?ticket=<id>`
   route; the viewport suite does not visit it, and this case does not claim otherwise.
+
+## The rename ruling (2026-09-19) — cases `13.962`–`13.965`
+
+**Minted at `13.962`, past the global high-water mark rather than inside Task 19's allocated block.**
+That block's next free id is `13.390`, and this file records it as *"controller-allocated ON REQUEST
+ONLY"*; this task was not given it. `13.962` is the next free number in the catalogue and cannot
+collide with an allocation. Recounted before minting, id by id, not by an ordinal sweep.
+
+**The ruling.** `workspace.renamed` has been in the vocabulary since Plan 1 and had **no client UI at
+all**. Until 2026-09-19 the server asked **nobody** who may emit it: it is not in `ADMIN_ONLY_TYPES`,
+it is not membership or roster management, and check 1 examines ticket entities only — so **a workspace
+GUEST was admitted**, measured at Task 9, recorded as an open absence in `check-permission.ts`, and
+pinned by a case in `check-visibility-permission.test.ts` that asserted the guest was let through.
+**The owner ruled that a member's or a guest's rename must be refused.** The refusal NAMES THE ACT —
+`WORKSPACE_RENAME_REASON`, *"Only a workspace owner or admin can rename a workspace"* — rather than
+producing the generic admin-only sentence, which is the same reason `workspace.settings_set` is its own
+case beside it. A consequence worth stating because it was not obvious when the absence was written:
+**with this closed, no non-ticket event type is ungated any more.**
+
+- **13.962** ✅ The rename control is offered to an **owner** and an **admin**, and to **nobody else** —
+  the pairing is this file's own rule, because *"a control asserted PRESENT for an admin proves nothing
+  about a member"*. Both halves run on the same fixture: the control is absent for a `member` and for a
+  `guest`, **and the workspace NAME still renders for them**, so the case asserts the control's absence
+  rather than the workspace being hidden. — (`apps/web/test/workspace-home.test.tsx`)
+- **13.963** ✅ Saving submits **`workspace.renamed`** through the ordinary ingest door, and the case
+  asserts the **event, the entity and the payload** — `{ kind: 'workspace', id }` and `{ name }` — not
+  merely that something was sent. The entity matters: `workspaces/workspace-name.ts` folds
+  `workspace.created`/`workspace.renamed` to decide the directory's answer, so an event filed against
+  anything else renames nothing. — (`apps/web/test/workspace-home.test.tsx`)
+  *Planted defect, run: removing the `onSubmit(...)` call from the handler reddens **13.963 alone** —
+  1 failed / 24 passed, `expected +0 to be 1`. Not a 500: the form still rendered and the button still
+  worked, so the red names the missing submission rather than a broken page.*
+- **13.964** ✅ A **blank** name is never sent — and the whitespace case too, which is the one
+  `displayName`'s refine names in its own words (*"a name of only spaces names nothing"*). Both halves:
+  the button is disabled **and** nothing was sent, because a form that disabled the button but still
+  submitted on Enter would pass the first assertion alone. — (`apps/web/test/workspace-home.test.tsx`)
+- **13.965** ✅ The control's accessible name carries the **workspace** (`Rename Convenience Corner`),
+  so the page is not a column of identically-named buttons — the rule the archive control already
+  keeps. — (`apps/web/test/workspace-home.test.tsx`)
+- **The server half is pinned in the permissions suite**, and its case was **inverted by this ruling
+  rather than deleted**: it used to assert that a member was ADMITTED for `workspace.renamed`, and it
+  now asserts the refusal **by constant**, alongside two new cases — a guest refused (the case the
+  absence was originally measured on) and **an admin admitted, the control the two refusals need**,
+  without which a gate that refused everyone would pass both. —
+  (`apps/server/test/permissions/check-visibility-permission.test.ts`)
+
+> **A note on the Round 21 header instruction, which this control sits beside.** That instruction
+> removed the **Members** and **Settings** buttons from the workspace home's header, and its reason is
+> recorded in the page's own comment: each destination was already reachable elsewhere on the page.
+> **A rename duplicates nothing** — it had no route in the product at all — so the control does not
+> re-open it. The header comment's closing sentence (*"the header is now the monogram and the titles,
+> nothing else"*) is **amended rather than deleted**, and remains true of the two buttons it removed.

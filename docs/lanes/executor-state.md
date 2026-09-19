@@ -41,6 +41,64 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~16:2x IST. **THE `isWorkspace` RENAME CONTROL IS BUILT AND
+> # ITS PR IS OPEN.** Branch **`exec/workspace-rename`**, cut from **`origin/main` = `2a8a326e`**; dispatch
+> # `CTL-DISPATCH-2026-09-19-workspace-rename.md`. **The denial door is MERGED** (PR #524, `db52f911`) and
+> # the list-filter move before it (`a4483917`) — a restart must not redo any of the three.
+>
+> ## ⚠ A MISTAKE I MADE AND CAUGHT, recorded because it will recur
+> **I did the first two hours of this task while checked out on `exec/mcpauth-deny` — my already-merged
+> branch, 15 commits behind `main` — and only noticed when a catalogue edit failed to match the file.**
+> Nothing was lost: I verified with `git diff --quiet HEAD origin/main -- <each file>` that **all four
+> edited files were UNCHANGED across the drift**, so the edits applied cleanly to `main`'s content when I
+> cut `exec/workspace-rename` from `origin/main` and carried them over. **The check that saved it was
+> per-file, not a diff of the whole tree** — and the rule is the one this file keeps re-learning: after a
+> peer merges, **confirm the branch you are standing on before you edit, not after.**
+>
+> ## VERIFIED ANCHORS
+> | | |
+> |---|---|
+> | base | `origin/main` = **`2a8a326e`** when this branch was cut — **it moves; re-take it** |
+> | tree | **clean** at the handoff commit; every change is on the branch, nothing unpushed |
+> | gate | **33/33, EXIT 0, `1m10.339s`**, run by THIS lane at its own tree. **Node runtime `v22.22.2`** |
+> | checks | all **8 exit 0**; `check-case-ids` **2423**, union == sum |
+>
+> ## THE RULING, AND WHY IT WAS A BLOCKER BEFORE IT WAS A BUILD
+> The first three measurements all CONFIRMED (`vocabulary.ts:66-69`; `membership.ts:46` is `.strict()`;
+> no client consumer, control `workspace.settings_set` → 3; the door is the ordinary ingest, name folded
+> from the ledger at `workspaces/workspace-name.ts:51`). **What blocked was the dispatch's own authority
+> clause**: *"measure what the server refuses and make the control agree with it"* — and **the server
+> refused NOTHING**. `check-permission.ts` recorded that as a deliberate open absence (*"a workspace GUEST
+> is ADMITTED for `workspace.renamed` … a product decision no plan in this series has taken"*), pinned by
+> `check-visibility-permission.test.ts`. **The owner ruled: a member's or a guest's rename must be
+> refused, and the refusal must NAME WHAT IT REFUSES.**
+>
+> ## WHAT LANDED
+> - **Server**: `WORKSPACE_RENAME_REASON` (`'Only a workspace owner or admin can rename a workspace.'`)
+>   and a gate beside `workspace.settings_set` — its own case for that case's own reason, the refusal
+>   naming the ACT rather than producing `adminOnlyReason`'s generic sentence. The **docblock that
+>   recorded the absence is struck through with the closure beside it**, in this file's house style.
+> - **The pinning test INVERTED rather than deleted**, now asserting the refusal **by constant**, plus a
+>   guest case and **an admin-admitted control** without which a gate that refused everyone would pass.
+> - **UI**: a `Rename` control in the workspace home's header, gated on `mayAdminister` — **the same
+>   expression as the server's `isWorkspaceAdmin`** (`role === 'owner' || role === 'admin'`), so the two
+>   cannot drift without one being edited. Cases **13.962–13.965**, minted at the global high-water mark
+>   because Task 19's block is *"controller-allocated ON REQUEST ONLY"* and this task was not given it.
+> - **One mutation, one kill**: removing the `onSubmit(...)` call reddens **13.963 alone** by
+>   `expected +0 to be 1` — the property, not a 500.
+>
+> ## TWO THINGS A REVIEWER SHOULD LOOK AT FIRST
+> 1. **The control sits in a header the owner emptied.** Round 21 removed the Members/Settings buttons
+>    and the comment says *"the header is now the monogram and the titles, nothing else."* I amended that
+>    sentence rather than deleting it, on the argument that Round 21 removed **navigation** affordances
+>    that each had a duplicate elsewhere, and a rename duplicates nothing. **A reviewer may disagree, and
+>    the dispatch pointed at this header, so the tension is theirs to settle.**
+> 2. **A consequence I found while closing it: no non-ticket event type is ungated any more.** The
+>    absence's own docblock now says so, because it was not obvious when the entry was written.
+>
+> ## ⚠ SHAS IN THIS FILE ARE UNRELIABLE — including mine
+> `2a8a326e` was `origin/main` when this branch was cut. **Re-take every reading before acting.**
+
 > # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~15:2x IST. **THE `isMcpAuth` DENIAL DOOR IS BUILT; THE PR IS
 > # OPEN AND THIS LANE IS WAITING ON THE CONTROLLER.** Branch **`exec/mcpauth-deny`**, cut from
 > # **`origin/main` = `c2a80620`**; dispatch `CTL-DISPATCH-2026-09-19-mcpauth-deny.md`. **The list-filter

@@ -70,6 +70,18 @@ export const WORKSPACE_ALREADY_FOUNDED_REASON =
 export const WORKSPACE_MEMBERSHIP_REASON =
   'Only a workspace owner or admin can manage workspace membership.';
 /**
+ * The rename ruling, 2026-09-19. Renaming is the container's identity rather
+ * than its membership, so it is the same owner/admin question as the sentence
+ * above — but it names the ACT, because a person who tried to rename a
+ * workspace should be told that, not told about membership.
+ *
+ * Exported rather than inlined, unlike the `workspace.settings_set` sentence
+ * beside its check: this one is the subject of a ruling that closed a measured
+ * absence, and a test pins the sentence itself so the ruling cannot be re-opened
+ * by an edit that quietly changes what the refusal says.
+ */
+export const WORKSPACE_RENAME_REASON = 'Only a workspace owner or admin can rename a workspace.';
+/**
  * The narrower refusal that rides WITH the one above, never instead of it
  * (owner ruling 2026-09-18): the senders who may grant membership are an admin
  * question, and among them the senders who may grant the OWNER role are an
@@ -379,16 +391,24 @@ const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
  *
  * ### Still absent — questions nothing in this module asks
  *
- * - **Every WORKSPACE-entity event but `workspace.created`.** MEASURED on main
- *   at Task 9: a workspace GUEST is ADMITTED for `workspace.renamed`. It is not
- *   in `ADMIN_ONLY_TYPES`, it is not membership or roster management, and
- *   Task 9's check 1 examines ticket entities only — so nothing anywhere asks
- *   who may rename a workspace. Renaming is not destructive and the ledger
- *   attributes it, which is why this is an absence and not an emergency; but a
- *   guest renaming the container they were invited into is nobody's intent.
- *   Deliberately NOT closed here: which roles may rename a workspace is a
- *   product decision no plan in this series has taken, and adding a type to
- *   `ADMIN_ONLY_TYPES` on this task's own authority would be taking it.
+ * - **~~Every WORKSPACE-entity event but `workspace.created`.~~ CLOSED 2026-09-19.**
+ *   ~~MEASURED on main at Task 9: a workspace GUEST is ADMITTED for
+ *   `workspace.renamed`. It is not in `ADMIN_ONLY_TYPES`, it is not membership
+ *   or roster management, and Task 9's check 1 examines ticket entities only —
+ *   so nothing anywhere asks who may rename a workspace.~~ **The owner ruled on
+ *   2026-09-19 that a member's or a guest's rename must be refused**, and the
+ *   gate now sits beside `workspace.settings_set` above. The struck text is KEPT
+ *   rather than deleted, because it is the record of why this was an absence for
+ *   ten days: not an oversight, but a product decision no plan in this series
+ *   had taken, and Task 9 wrote down that it was declining to take one.
+ *   **What the ruling changed, in its own terms: the refusal NAMES THE ACT** —
+ *   `WORKSPACE_RENAME_REASON`, "Only a workspace owner or admin can rename a
+ *   workspace" — rather than producing `adminOnlyReason`'s generic sentence,
+ *   which is the same reason `workspace.settings_set` is its own case rather
+ *   than a member of `ADMIN_ONLY_TYPES`. **A consequence worth stating because it
+ *   was not obvious when the entry was written: with this closed, no non-ticket
+ *   event type is ungated any more**, so the second bullet below is now the
+ *   whole of what remains rather than a boundary with an exception beside it.
  * - **Every non-ticket, non-workspace entity's ordinary events.** Check 1 is an
  *   entity-kind filter, so `workflow`, `ticket-type`, `project`, `membership`
  *   and now `invite` events get the role gate and nothing more. That is right
@@ -651,6 +671,24 @@ export function checkRolePermission(env: EventEnvelope, ctx: PermissionContext):
   // `adminOnlyReason` produces (the settings test pins this exact sentence).
   if (env.type === 'workspace.settings_set' && !isWorkspaceAdmin) {
     return refuse('Only a workspace owner or admin can change workspace settings.');
+  }
+  // The rename ruling, 2026-09-19, and it CLOSES an absence this module used to
+  // record rather than answer (see the docblock above — the entry is discharged,
+  // not deleted). Until this line **nothing anywhere asked who may rename a
+  // workspace**: `workspace.renamed` was not in `ADMIN_ONLY_TYPES`, it is not
+  // membership or roster management, and check 1 examines ticket entities only —
+  // so a workspace GUEST was admitted, measured at Task 9 and pinned by
+  // `check-visibility-permission.test.ts`. It is the same owner/admin question
+  // the `settings_set` case above answers, kept as its own case for that case's
+  // own reason: the refusal NAMES THE ACT rather than producing the generic
+  // admin-only sentence, and the reason is an exported constant so a test can
+  // pin the sentence rather than a paraphrase of it.
+  //
+  // The envelope-origin is what makes this attributable — the ledger records who
+  // renamed — which is why the refusal can honestly say what it refuses rather
+  // than only that something was not permitted.
+  if (env.type === 'workspace.renamed' && !isWorkspaceAdmin) {
+    return refuse(WORKSPACE_RENAME_REASON);
   }
   return null;
 }
