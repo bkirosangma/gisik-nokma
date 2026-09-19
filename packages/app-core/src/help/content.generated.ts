@@ -3393,6 +3393,380 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
+            "id": "the-filters-sheet",
+            "title": "The Filters sheet",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Filters"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button in that controls row opens a sheet over the page. It sets the same filter the search box and the removable chips read — not a second one — so nothing here waits for an "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Apply"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Every click takes effect at once."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Six things can be set, in this order:"
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Assignee"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — one row per person in the workspace, with their picture and their name."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Collaborators"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — the same rows again. (This is the one that does not narrow anything yet — see the last paragraph of this section.)"
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Type"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — the job types your workspace has set up."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "State"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — the stages this project's board is built from."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Closed"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — one control, for jobs that are closed."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Category"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Open"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Active"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " or "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Terminal"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Every value is a single button, and each click moves it on one step:"
+                  }
+                ]
+              },
+              {
+                "kind": "table",
+                "head": [
+                  [
+                    {
+                      "kind": "text",
+                      "text": "what you clicked"
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "text",
+                      "text": "what shows"
+                    }
+                  ]
+                ],
+                "rows": [
+                  [
+                    [
+                      {
+                        "kind": "text",
+                        "text": "an empty circle"
+                      }
+                    ],
+                    [
+                      {
+                        "kind": "text",
+                        "text": "nothing is being filtered on this value"
+                      }
+                    ]
+                  ],
+                  [
+                    [
+                      {
+                        "kind": "text",
+                        "text": "a tick, and "
+                      },
+                      {
+                        "kind": "bold",
+                        "text": "included"
+                      },
+                      {
+                        "kind": "text",
+                        "text": " in the button's name"
+                      }
+                    ],
+                    [
+                      {
+                        "kind": "text",
+                        "text": "only jobs with this value"
+                      }
+                    ]
+                  ],
+                  [
+                    [
+                      {
+                        "kind": "text",
+                        "text": "a slash through the circle, "
+                      },
+                      {
+                        "kind": "bold",
+                        "text": "excluded"
+                      },
+                      {
+                        "kind": "text",
+                        "text": " in the name, and the name struck through"
+                      }
+                    ],
+                    [
+                      {
+                        "kind": "text",
+                        "text": "jobs with this value are hidden"
+                      }
+                    ]
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A fourth click puts the empty circle back."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Two of the six are not lists of your workspace's own values. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Closed"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " is a single control, so its three settings read "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "everything"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "closed only"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "not closed"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Category"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " is always the same three words. The other four are built from what your workspace actually has."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "If a list cannot be shown, the sheet says which."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " A roster that has not loaded yet, a roster that could not be loaded, and a workspace with nobody in it are three different facts, and it keeps them apart rather than handing you an empty panel."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The footer has two buttons. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Clear all"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " empties every filter, the search box's own text included, and does not close the sheet — so you can see what it did. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Done"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " closes it and changes nothing else. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Escape"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " also closes, and puts your keyboard focus back on the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Filters"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button; clicking outside closes without moving your focus at all."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "What you set appears under the tabs"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", in the strip that counts how many jobs are showing, as a chip with an "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "×"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " that removes it. Removing a chip there and switching the value off in the sheet are the same act."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "One value never becomes a chip. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Collaborators is the one thing no tab applies"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", and the strip says so itself: "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Not applied on the board: collaborator.\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " You can set it and the filter keeps it, but nothing narrows by it — and that sentence is the product telling you, rather than quietly ignoring what you asked for."
+                  }
+                ]
+              }
+            ]
+          },
+          {
             "id": "very-large-projects",
             "title": "Very large projects",
             "blocks": [
@@ -7886,11 +8260,87 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "On the website, yes. One switch. The product can filter by person, status, date range, type, blocked and custom field values underneath, and there is a whole saved-filters feature built — a named filter you can save, pick from a menu and delete, up to fifty of them, private to you per workspace. "
+                    "text": "Not any more. It was when this answer was written — one switch, and nothing else on any screen. Now there is a "
                   },
                   {
                     "kind": "bold",
-                    "text": "None of it is connected to any screen."
+                    "text": "Filters"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button beside it, which opens a sheet that sets an assignee, a collaborator, a type, a state, closed, and a category, each one either included or excluded; and a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Search the board"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " box above the tabs, which narrows the board as you type."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Still connected to nothing: the saved-filters feature — a named filter you can save, pick from a menu and delete, up to fifty of them, private to you per workspace. There is no menu for it on any screen. The date-range and custom-field filtering the engine can do has no control either."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "how-do-i-narrow-a-project-down-to-one-person",
+            "title": "How do I narrow a project down to one person?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Open the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Filters"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button beside the \"Only tickets in progress\" switch and click "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Assignee"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — you get one row per person, with their picture. Click once for "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "included"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " (only their jobs), twice for "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "excluded"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " (everything except theirs), and a third time to clear it. It takes effect at once; there is no Apply. The same sheet sets collaborators, type, state, closed and category the same way, and each one turns into a removable chip under the tabs. The one exception is "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "collaborators"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ": no tab applies it, and the strip says so on screen rather than pretending otherwise."
                   }
                 ]
               }
