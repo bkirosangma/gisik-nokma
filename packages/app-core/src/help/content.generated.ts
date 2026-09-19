@@ -3743,31 +3743,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " again replaces it, so once you start a second action the first one's Undo is gone — there is only ever one on screen. And one press carries at most a page of your Inbox: on a longer list the whole thing is refused and tells you so, rather than doing half the job and leaving you to work out which half went. The tabs — "
+                    "text": " again replaces it, so once you start a second action the first one's Undo is gone — there is only ever one on screen. And a single press carries at most "
                   },
                   {
                     "kind": "bold",
-                    "text": "All"
+                    "text": "100"
                   },
                   {
                     "kind": "text",
-                    "text": ", "
-                  },
-                  {
-                    "kind": "bold",
-                    "text": "Unread"
-                  },
-                  {
-                    "kind": "text",
-                    "text": ", "
-                  },
-                  {
-                    "kind": "bold",
-                    "text": "Mentions"
-                  },
-                  {
-                    "kind": "text",
-                    "text": " — are the way to make the page smaller when that happens."
+                    "text": " notifications: past that the whole press is refused and tells you so, rather than marking some of them and leaving you to work out which ones went."
                   }
                 ]
               },
@@ -8296,7 +8280,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " beside it, which puts back exactly what that one action changed. The message clears after about fifteen seconds, a second press replaces it and takes the first one's Undo with it, and one press carries at most a page of your Inbox — past that it refuses and says so rather than doing half the job."
+                    "text": " beside it, which puts back exactly what that one action changed. The message clears after about fifteen seconds, a second press replaces it and takes the first one's Undo with it, and a single press carries at most 100 — past that it refuses the whole thing and says so, rather than marking some of them."
                   }
                 ]
               }

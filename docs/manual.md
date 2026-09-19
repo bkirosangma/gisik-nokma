@@ -785,10 +785,9 @@ because there would be nothing to undo.
 
 **Three limits worth knowing.** The message clears itself after about fifteen seconds. Pressing
 `Mark N read` again replaces it, so once you start a second action the first one's Undo is gone — there
-is only ever one on screen. And one press carries at most a page of your Inbox: on a longer list the
-whole thing is refused and tells you so, rather than doing half the job and leaving you to work out
-which half went. The tabs — **All**, **Unread**, **Mentions** — are the way to make the page smaller
-when that happens.
+is only ever one on screen. And a single press carries at most **100** notifications: past that the
+whole press is refused and tells you so, rather than marking some of them and leaving you to work out
+which ones went.
 
 **The unread badge** on the Inbox link refreshes about once a minute. If a refresh fails it keeps the
 last number rather than resetting to nothing, and it shows nothing at all before the first answer

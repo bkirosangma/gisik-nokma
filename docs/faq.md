@@ -606,8 +606,8 @@ Yes — the **Mark N read** button above the list, where N is how many rows on s
 marks exactly those, not your whole Inbox, and it is absent when nothing on screen is unread. When it
 works you get a message with an **Undo** beside it, which puts back exactly what that one action
 changed. The message clears after about fifteen seconds, a second press replaces it and takes the
-first one's Undo with it, and one press carries at most a page of your Inbox — past that it refuses
-and says so rather than doing half the job.
+first one's Undo with it, and a single press carries at most 100 — past that it refuses the whole
+thing and says so, rather than marking some of them.
 
 **My "Needs your attention" strip isn't showing.**
 If nothing needs attention, the strip does not appear at all — no box, no "all caught up" message,
