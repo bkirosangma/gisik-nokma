@@ -77,9 +77,33 @@ const ID_LINE = /^-\s+(?:([^\s\d*][^\s]*)\s+)?(\*{0,2})(\d+\.\d+[a-z]?)/;
 // file already records: the loose matcher does not merely miss, it INVENTS.
 //
 // So a MARKER and BOLD are both required here. A prose bullet that begins with
-// a quoted id is not an id line, and the fixture now pins that with a line that
+// a quoted id is not an id line, and the fixture pins that with a line that
 // must NOT be counted.
-const ID_LINE_BOLD_BACKTICK = /^-\s+(?:([^\s\d*][^\s]*)\s+)?\*\*`(\d+\.\d+[a-z]?)`/;
+//
+// ## The `(?=\s)` guard, added 2026-09-19 after this rule went RED ON MAIN
+//
+// The rule above shipped, went green, and then turned `main` red -- because the
+// content that breaks it landed AFTER the branch that wrote it, in a file that
+// branch never touched. The line was:
+//   `- ✅ **`3.72`'s SIX new arms** — packages/app-core/test/…/transition-dialog.test.tsx, every one of`
+// a CITATION of case 3.72 used POSSESSIVELY, colliding with 3.72's real
+// declaration in `03-foundation-ledger.md`. It satisfies "marker AND bold AND a
+// backticked id" exactly, so the rule as written could not tell it from a
+// declaration.
+//
+// The discriminator is what FOLLOWS the closing backtick. A declaration reads
+// `**`id` — the case's own words`, the id standing alone as the bullet's
+// subject and a SPACE after it; a possessive citation reads `**`id`'s …`, an
+// apostrophe immediately after. Requiring whitespace keeps `13.989` and drops
+// `3.72`'s.
+//
+// **This is the same shape as the greedy-marker bug above, one turn later: a
+// matcher loose in a way nobody measured does not merely miss, it INVENTS.** The
+// first version of this rule was tested against the catalogue as it stood and
+// found exactly one genuine match; the content that falsified it arrived
+// afterwards. The fixture now carries BOTH forms, so the next loosening fails
+// the self-test instead of a lane's gate.
+const ID_LINE_BOLD_BACKTICK = /^-\s+(?:([^\s\d*][^\s]*)\s+)?\*\*`(\d+\.\d+[a-z]?)`(?=\s)/;
 
 /**
  * Resolve a line to the id-line style it is written in, or `null`.
