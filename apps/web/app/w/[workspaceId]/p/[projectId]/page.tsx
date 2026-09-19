@@ -32,7 +32,7 @@ import {
   type ListRow,
   type TicketDatesInput,
 } from '@gisik-nokma/app-core';
-import { Avatar } from '@gisik-nokma/ui';
+import { Avatar, Switch } from '@gisik-nokma/ui';
 import { AppNav } from '../../../../../src/app-nav.js';
 import { startTargetFor } from '../../../../../src/backlog-start.js';
 import { BacklogStartButton } from '../../../../../src/backlog-start-button.js';
@@ -1444,46 +1444,6 @@ function ProjectBoard() {
         ) : (
           <div className="gn-project">
             {/*
-              ABOVE the tab arms, and that placement is the whole point rather than
-              a layout choice.
-
-              Which forces the note beside it to NAME THE SURFACES. The control
-              renders on every tab, but it narrows only the reads that take a
-              filter: `useBoard` takes none and cannot be narrowed, so an unscoped
-              "done are excluded" sits on the DEFAULT tab directly above a Done
-              column holding a done card — an unnarrowed set claiming to be
-              narrowed, which is the same class of lie as a narrowed one claiming
-              to be whole and is the reason this control exists. Every renderer of the list lives inside
-              `list.error === null` — put the narrowing control there and it is
-              reachable by everyone EXCEPT the person who needs it, because past the
-              cap those arms render a refusal instead. That is the identical mistake
-              `createRegion` was making until PR #270, and it has the identical fix:
-              gate an affordance on what it actually needs, not on the read that
-              happens to sit beside it. This control needs nothing.
-            */}
-            <div className="gn-list-filter">
-              <label className="gn-list-filter__control">
-                <input
-                  type="checkbox"
-                  checked={activeOnly}
-                  onChange={(event) => setActiveOnly(event.target.checked)}
-                />
-                Only tickets in progress
-              </label>
-              {/*
-                Said here as well as in the list's own summary, because past the cap
-                there IS no list to carry a summary — the arms are refusing — and
-                this is the only place the state of the question is visible.
-              */}
-              {activeOnly ? (
-                <span className="gn-list-filter__note" data-testid="list-filter-note">
-                  the list, calendar and timeline are asking only for tickets in progress —
-                  not started and done are both excluded. The board is not narrowed.
-                </span>
-              ) : null}
-            </div>
-
-            {/*
               BREADCRUMB AND TITLE (fix round 1, Ruling 6; restructured fix round
               2, coordinator Critical finding) — stacked children of `.gn-project`
               itself, NOT of `.gn-project__header`. The metrics table lists "Page
@@ -1627,6 +1587,38 @@ function ProjectBoard() {
                 </select>
               ) : null}
               {/*
+                IN `.gn-project__header`, BESIDE THE FILTERS BUTTON — and the placement
+                is still the whole point rather than a layout choice.
+
+                It moved here from its own `.gn-list-filter` row on the owner's
+                instruction (2026-09-19: *"gn-list-filter__control in w/<id> page should
+                be next to the new filter button. and it should be a gn-switch."*), and
+                it is the shared `Switch` now rather than a bare checkbox.
+
+                WHAT THE MOVE HAD TO PRESERVE, because it is why this control was never
+                in a tab arm: every renderer of the list lives inside
+                `list.error === null` — put the narrowing control there and it is
+                reachable by everyone EXCEPT the person who needs it, because past the
+                cap those arms render a refusal instead. That is the identical mistake
+                `createRegion` was making until PR #270, and it has the identical fix:
+                gate an affordance on what it actually needs, not on the read that
+                happens to sit beside it. This control needs nothing.
+                `.gn-project__header` is rendered unconditionally and all four
+                `list.error` gates sit INSIDE the tab arms below it, so the property
+                holds where it now sits.
+
+                Which forces the note beside it to NAME THE SURFACES. The control
+                renders on every tab, but it narrows only the reads that take a
+                filter: `useBoard` takes none and cannot be narrowed, so an unscoped
+                "done are excluded" sits on the DEFAULT tab directly above a Done
+                column holding a done card — an unnarrowed set claiming to be
+                narrowed, which is the same class of lie as a narrowed one claiming
+                to be whole and is the reason this control exists.
+              */}
+              <Switch checked={activeOnly} onChange={setActiveOnly}>
+                Only tickets in progress
+              </Switch>
+              {/*
                 THE FILTERS BUTTON (Task 5). Task 4's own report left it
                 unrendered on purpose ("An inert Filters button is a button
                 that lies... I chose do not render it yet") because nothing
@@ -1650,6 +1642,29 @@ function ProjectBoard() {
                 Filters
               </button>
               {createRegion}
+              {/*
+                Said here as well as in the list's own summary, because past the cap
+                there IS no list to carry a summary — the arms are refusing — and
+                this is the only place the state of the question is visible. LAST in
+                the row on purpose: it is a sentence, not a control, and in a
+                `flex-wrap: wrap` header it takes its own line rather than pushing the
+                switch away from the button the owner asked it to sit beside.
+
+                `gn-project__scope-note`, NOT the old `gn-list-filter__note`: that
+                block no longer renders, so the class was an orphan element with no
+                block, and `.gn-list-filter` never had a CSS rule anywhere in this
+                repo (measured — `git log -S -- '*.css'` across all refs is empty).
+                This re-scopes onto the rule its sibling `board-scope-note` already
+                uses (`ui.css`: muted small print), so the note gains the treatment
+                it should always have had and no new rule is added.
+                The `data-testid` is the contract and is unchanged.
+              */}
+              {activeOnly ? (
+                <span className="gn-project__scope-note" data-testid="list-filter-note">
+                  the list, calendar and timeline are asking only for tickets in progress —
+                  not started and done are both excluded. The board is not narrowed.
+                </span>
+              ) : null}
             </div>
 
             {/*

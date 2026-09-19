@@ -397,7 +397,7 @@ publishing a newer version of the same workflow while you were still editing you
 **Why do I have to pick a "Category" for each stage?**
 Because the rest of the product needs to know which of your stages mean "finished". That is how it
 knows a parent job can be closed, how progress counts work, and what the "Only tickets in progress"
-tick box filters. Get it wrong and everything downstream guesses wrong, quietly. It is the one bit of
+switch filters. Get it wrong and everything downstream guesses wrong, quietly. It is the one bit of
 setup where a mistake does damage somewhere else.
 
 **A dropdown field won't save.**
@@ -487,13 +487,13 @@ as an open question rather than a no.
 
 ## Boards, lists and dates
 
-**Why doesn't the "Only tickets in progress" tick box change the Board?**
+**Why doesn't the "Only tickets in progress" switch change the Board?**
 Because it does not narrow the Board — only the List, Calendar and Timeline. There is a note on screen
-saying so, and the note is important, because **the Board is the default tab.** So you can tick the
-box, read "done are excluded", and be looking at a Done column full of done cards.
+saying so, and the note is important, because **the Board is the default tab.** So you can turn it on,
+read "done are excluded", and be looking at a Done column full of done cards.
 
 **Is that really the only filter?**
-On the website, yes. One tick box. The product can filter by person, status, date range, type, blocked
+On the website, yes. One switch. The product can filter by person, status, date range, type, blocked
 and custom field values underneath, and there is a whole saved-filters feature built — a named filter
 you can save, pick from a menu and delete, up to fifty of them, private to you per workspace. **None of
 it is connected to any screen.**
@@ -526,7 +526,7 @@ showing you part of a project pretending to be the whole one — and **the "New 
 disappears too**, because it reads from the same place. So a project that grows past the ceiling
 becomes one you cannot add to.
 
-The way out is the "Only tickets in progress" tick box, which is deliberately placed where you can
+The way out is the "Only tickets in progress" switch, which is deliberately placed where you can
 still reach it from the refusing screen. The Board keeps working throughout.
 
 **My calendar is empty. Is it broken?**

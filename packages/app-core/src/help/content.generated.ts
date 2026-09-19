@@ -3126,7 +3126,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Above the tabs there is a single tick box: "
+                    "text": "In the controls row above the tabs, beside the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Filters"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button, there is a single switch: "
                   },
                   {
                     "kind": "bold",
@@ -3143,7 +3151,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Tick it and you get a note: "
+                    "text": "Turn it on and you get a note: "
                   },
                   {
                     "kind": "italic",
@@ -3160,7 +3168,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " The tick box "
+                    "text": " The switch "
                   },
                   {
                     "kind": "bold",
@@ -3168,7 +3176,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — and the Board is the default tab. So you can tick the box, read \"done are excluded\", and be looking at a Done column full of done cards. The note exists precisely because of this."
+                    "text": " — and the Board is the default tab. So you can turn it on, read \"done are excluded\", and be looking at a Done column full of done cards. The note exists precisely because of this."
                   }
                 ]
               },
@@ -3233,7 +3241,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " tick box — narrowing gets you back under the ceiling — and it is deliberately placed where you can still reach it from the refusing screen. The Board keeps working throughout."
+                    "text": " switch — narrowing gets you back under the ceiling — and it is deliberately placed where you can still reach it from the refusing screen. The Board keeps working throughout."
                   }
                 ]
               }
@@ -7129,7 +7137,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Because the rest of the product needs to know which of your stages mean \"finished\". That is how it knows a parent job can be closed, how progress counts work, and what the \"Only tickets in progress\" tick box filters. Get it wrong and everything downstream guesses wrong, quietly. It is the one bit of setup where a mistake does damage somewhere else."
+                    "text": "Because the rest of the product needs to know which of your stages mean \"finished\". That is how it knows a parent job can be closed, how progress counts work, and what the \"Only tickets in progress\" switch filters. Get it wrong and everything downstream guesses wrong, quietly. It is the one bit of setup where a mistake does damage somewhere else."
                   }
                 ]
               }
@@ -7491,8 +7499,8 @@ export const HELP_CONTENT: HelpContent = [
         "intro": [],
         "entries": [
           {
-            "id": "why-doesn-t-the-only-tickets-in-progress-tick-box-change-the",
-            "title": "Why doesn't the \"Only tickets in progress\" tick box change the Board?",
+            "id": "why-doesn-t-the-only-tickets-in-progress-switch-change-the-b",
+            "title": "Why doesn't the \"Only tickets in progress\" switch change the Board?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -7507,7 +7515,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " So you can tick the box, read \"done are excluded\", and be looking at a Done column full of done cards."
+                    "text": " So you can turn it on, read \"done are excluded\", and be looking at a Done column full of done cards."
                   }
                 ]
               }
@@ -7522,7 +7530,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "On the website, yes. One tick box. The product can filter by person, status, date range, type, blocked and custom field values underneath, and there is a whole saved-filters feature built — a named filter you can save, pick from a menu and delete, up to fifty of them, private to you per workspace. "
+                    "text": "On the website, yes. One switch. The product can filter by person, status, date range, type, blocked and custom field values underneath, and there is a whole saved-filters feature built — a named filter you can save, pick from a menu and delete, up to fifty of them, private to you per workspace. "
                   },
                   {
                     "kind": "bold",
@@ -7649,7 +7657,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The way out is the \"Only tickets in progress\" tick box, which is deliberately placed where you can still reach it from the refusing screen. The Board keeps working throughout."
+                    "text": "The way out is the \"Only tickets in progress\" switch, which is deliberately placed where you can still reach it from the refusing screen. The Board keeps working throughout."
                   }
                 ]
               }
