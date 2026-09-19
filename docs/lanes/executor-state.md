@@ -41,38 +41,70 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — SATURDAY 2026-09-19 ~12:5x IST. **TASKS 6+7 ARE MERGED. THIS LANE HAS NO TASK IN
-> # FLIGHT — the next one (`settings` Task 8) is GATED ON TWO THINGS, neither of them mine. HOLDING.**
+> # ▣ CURRENT POSITION — SATURDAY 2026-09-19, written ~12:05–12:10 IST. **TASKS 6+7 ARE MERGED. THIS LANE
+> # HAS NO TASK IN FLIGHT — the next one (`settings` Task 8) is GATED. HOLDING.** (No self-referential sha
+> # in this line: an earlier draft named its own commit, which the next commit then falsified.)
 > # **Supersedes the block below.** That block says the PR *"awaits the controller"* — **it has had one**,
 > # and this block exists to stop a relaunched executor re-doing the reorder or hunting for a PR that is
 > # already closed. **Read the block below for WHAT was built (still accurate); read this one for WHERE
-> # you are.** The file's own `7b` block, further down, carries the identical sentence about the identical
-> # failure — which is the argument for reading the top block first, every time.
+> # you are.** The block immediately below carries the same class of stale line about its own PR, one merge
+> # further back — which is the argument for reading the top block first, every time.
 >
 > ## THE MERGE — VERIFIED WITH `/usr/bin/git`, NOT INHERITED
 >
 > | | |
 > |---|---|
 > | merged as | **`2f5c2c3f`** — a **real merge commit**, not a squash. `rev-list --parents -n 1` → parents `f6b16cbb` (main) + `7dc9347e` (this lane). |
-> | reachability | `git merge-base --is-ancestor 7dc9347e origin/main` → **true**. `branch -r --contains` names `origin/main` and `origin/exec/isTypes-reorder`; neither is orphaned. |
-> | **the strongest check** | **tree identity is EXACT** — `7dc9347e^{tree}` and `2f5c2c3f^{tree}` are both `43d9286705ce1cc2892b17d7db06bf2055e967ba`, and `git diff origin/main HEAD` prints **nothing**. Nothing dropped, nothing re-derived. |
+> | reachability | `git merge-base --is-ancestor 7dc9347e origin/main` → **exit 0, true**. So `7dc9347e` is not orphaned. (`branch -r --contains` also lists several other refs that have simply moved past it — `origin/HEAD`, `origin/main`, `origin/exec/isTypes-reorder`, `origin/exec/handoff-after-505`, `origin/ctl/plan-scope-fix`, `origin/exec2/workflow-version-history` — which is expected for a merged commit and is *not* the orphan test. **The orphan test is `--is-ancestor`, because an orphaned sha still resolves.**) |
+> | **the strongest check** | **tree identity is EXACT** — `7dc9347e^{tree}` and `2f5c2c3f^{tree}` are both `43d9286705ce1cc2892b17d7db06bf2055e967ba`, and `git diff origin/main 7dc9347e` prints **nothing**. (Name that sha, not `HEAD`: at *this* block's own head, `git diff origin/main HEAD` is non-empty by construction — the handoff edit is the diff.) Nothing was dropped or re-derived in the merge. |
+> | minted cases | **`13.928`–`13.935`** (eight), ids `13.936`–`13.937` left UNUSED. The allocation was `13.928`–`13.937`. **The block below states the minted range as `13.928`–`13.934` and is wrong by one** — corrected there in place, with the measurement. |
 > | `origin/main` here | **`2f5c2c3f`**, fetched with `--prune` at the time of writing. |
-> | open PRs repo-wide | **ONE** — `#506` (exec 2, settings Task 3), **`CONFLICTING`**. |
+> | open PRs repo-wide | **TWO, both `MERGEABLE`** — `#507` (`ctl/plan-scope-fix`, the controller's own docs branch, opened 12:02:53 IST) and `#506` (exec 2, settings Task 3). See the correction below: an earlier draft of this block said "ONE, `CONFLICTING`". |
 > | this lane's branch | `exec/isTypes-reorder` is **fully contained** in `origin/main` (`rev-list --left-right --count` → `1 0`). Do not re-open it. |
+>
+> ## ⚠ THE BLOCK WAS RIGHT WHEN MEASURED AND STALE WHEN COMMITTED — kept as the lesson, not deleted
+>
+> **An earlier revision of this block said `#506` was `CONFLICTING`, that the conflict was one file, and that
+> it was what held Task 3.** All of that was **measured true** — and it was **false by the time the block was
+> committed**, because **exec 2 rebased onto `2f5c2c3f` at `12:03:43`, 52 seconds before this block's commit
+> at `12:04:35`.** Re-measured afterwards:
+>
+> ```
+> $ /usr/bin/git merge-tree --write-tree --name-only origin/main 4e8adf71   # exec 2's REBASED head
+> 4df9d865fe5c60b6d9feaca571ccfd4c9bc50114
+> (exit 0 — no conflicted file list; the merge is CLEAN)
+> ```
+>
+> The stale reading's window was about **three minutes** (11:59:40, when `2f5c2c3f` was created, → 12:02:53,
+> when `#507` opened) — and I measured inside it and committed outside it.
+> **This is the reusable part: a conflict is a reading with a shelf life, and the thing that expires it is
+> the PEER acting, not main moving.** Re-take the measurement at the moment you write it down, and prefer
+> naming the head you measured (`origin/exec2/workflow-version-history` was `8ad62eb7` then, `4e8adf71` now)
+> over describing the state in the present tense.
+>
+> **It cost nothing this time** — the *conclusion* (Task 8 is gated) survives on condition 2 alone — but it
+> would have sent a reader to chase a rebase that was already done.
 >
 > ## THE NEXT TASK IS GATED — DO NOT START IT, AND DO NOT READ THE LEDGER AS OFFERING IT
 >
-> **`settings` Task 8 (the `"N tickets"` count) is the last lifted task and it is NOT startable.** Two
-> independent conditions, both named by `CTL-DISPATCH-2026-09-19-lifted-settings-tasks.md`: *"It goes to
-> whichever executor frees first, **after Task 3 lands**, with its own dispatch. **Do not start it.**"*
+> **`settings` Task 8 (the `"N tickets"` count) is the last lifted task and it is NOT startable**, per
+> `CTL-DISPATCH-2026-09-19-lifted-settings-tasks.md`: *"It goes to whichever executor frees first, **after
+> Task 3 lands**, with its own dispatch. **Do not start it.**"*
 >
-> 1. **Its own dispatch has not been written** — measured, not assumed. The newest file in
+> 1. **Its own dispatch has not been written** — measured, not assumed. The newest *dispatch* in
 >    `gisik-nokma-lanes/` addressed to this lane is still the `lifted-settings-tasks` brief. The brief that
 >    *does* cover Task 8, `CTL-DISPATCH-2026-09-18-settings-wf-task78.md`, **carries a `⛔ SUPERSEDED
 >    2026-09-19 — DO NOT EXECUTE THIS DISPATCH AS WRITTEN` banner at its own head** — it predates the lift
 >    and would have recorded an *absence* where the owner now wants the thing built.
-> 2. **Task 3 has not landed.** Both tasks touch `gateway.ts` — one at a time. Task 3 is `#506` and it is
->    **not merged** (see the measurement below).
+> 2. **Task 3 has not landed.** Both tasks touch `gateway.ts` — one at a time. Task 3 is `#506`, **open** and
+>    now `MERGEABLE`; it awaits the controller's merge, not a rebase.
+>
+> **A read-only measurement of Task 8's one scope question is already on disk and is NOT a dispatch:**
+> `gisik-nokma-lanes/EXEC-MEASUREMENT-2026-09-19-task8-count-query-or-projection.md`. It answers the brief's
+> own stop-and-ask — **the count is a QUERY over the existing `proj_tickets`, not a new projection** — and it
+> **records its own false starts in public** (an index it read into a comment that says there is *no* such
+> index; a citation wrong by 75 lines; and a sentence about the dispatch it had to soften after reading the
+> gateway method it names). That is why it is worth reading rather than trusting.
 >
 > **The ledger offers nothing either.** Its seven `todo` rows are exactly the known set: `3b` (contested
 > between two documents — ruling requested), `5b` (**HOLD** — its plan sentence is unsatisfiable; ruling
@@ -81,35 +113,20 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > (**STRUCK — never implement**). **None of the seven is an instruction.** Holding is the correct action,
 > and it is a *ruling request*, not idleness.
 >
-> ## A MEASUREMENT FOR THE UNBLOCKING — here rather than in a message, because it outlives the message
->
-> `#506` being `CONFLICTING` is what holds Task 3, and Task 3 is what holds Task 8. **The conflict is ONE
-> FILE.** Measured with `git merge-tree --write-tree --name-only origin/main origin/exec2/workflow-version-history`
-> (exit **1**, which is the conflict, and the only line outside the auto-merge chatter):
->
-> ```
-> 0dfe17b3ecffe4f07cff41015ae4409d3f18307b
-> test-cases/13-settings-and-workflows.md
->
-> Auto-merging Features.md
-> Auto-merging test-cases/13-settings-and-workflows.md
-> CONFLICT (content): Merge conflict in test-cases/13-settings-and-workflows.md
-> ```
->
-> **`Features.md` auto-merges.** The single conflict is an append-vs-append on the §13 part-file both lanes
-> appended their cases to — and **the blocks do not overlap** (`13.928`–`13.937` are this lane's per the
-> dispatch's block table; `13.938`–`13.945` are exec 2's per its own report), so it is **a UNION, mechanically**.
-> **NOT resolved here, deliberately:** it is exec 2's branch to rebase, and an executor does not push to a
-> peer's branch. Recorded so the rebase is a known quantity rather than an investigation.
->
 > ## OPEN RULINGS FROM THIS LANE — unchanged, none of them mine to settle
 >
 > 1. **`owner-holds.md:44` and the plan's lift box still call the `isTypes` reorder *"a route and a gateway
 >    method"*.** The plan's own Task 6 section refutes it (**⛔ DO NOT ADD A ROUTE**) and this lane shipped
 >    the refutation. The dispatch calls the stale rows **a controller matter for the owner**.
 > 2. **The three stale ledger rows** (`6b` → `ed4c992f`, `7b` → `7f9329cc`, `/12` → `77aa906a`): merged,
->    ancestor-verified, still `todo`. **The owner names them and they flip.** `pnpm check:tasks` will not
->    flag any of them.
+>    ancestor-verified, still `todo`. **The owner names them and they flip.** — **and the check is not
+>    silent, only quiet.** `node scripts/check-task-ledger.mjs` exits **0**, but its reverse-drift list
+>    *"merged PRs cited by no ledger row (169) -- expected for docs/ruling PRs"* **names all three by PR
+>    number and title** (`#496`, `#494`, `#490`). So the signal is printed and buried in 169 rows, not
+>    absent: **an earlier revision of this block said the check "will not flag any of them", which is true of
+>    its exit status and false of its output.** Run it with the repo's Node (`v22.22.2`) — on a bare `pnpm`
+>    it can die at `ERR_PNPM_UNSUPPORTED_ENGINE` before printing anything, which is an environment fact and
+>    not a finding about the ledger.
 > 3. **`5b` and `3b`** — both investigated once, at cost; the conclusions are in
 >    `EXEC-RULING-REQUEST-2026-09-18-hig-5b-13304.md` and the `3b` block below. **Do not re-derive either.**
 
@@ -126,7 +143,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > |---|---|
 > | dispatch | `CTL-DISPATCH-2026-09-19-lifted-settings-tasks.md`, **EXEC 1** section |
 > | branch | `exec/isTypes-reorder`, cut from a fetched `origin/main` |
-> | cases | **`13.928`–`13.934`**, ids `13.935`–`13.937` deliberately unused |
+> | cases | **`13.928`–`13.935`**, ids `13.936`–`13.937` deliberately unused — *corrected 2026-09-19 ~12:1x IST; this row read `13.928`–`13.934` / `13.935`–`13.937` and **understated this lane's own cases by one**. It was refuted not by re-reading my notes but by exec 2's rebase report asserting `13.928`–`13.935` present; the file agrees with exec 2 — `13.935` is a real case, `test-cases/13-settings-and-workflows.md:1130`, `✅ every arrow is disabled while a swap is in flight`, and the UNUSED note at `:1144` names only `13.936`–`13.937`. **A count of your own work, written from memory at the end of a task, is exactly the kind that goes unchecked.*** |
 > | reviewer | one, told to falsify — **dispatched before the PR**, its verdict in the PR body |
 >
 > **THE TASK WAS SCOPED AS WIRE WORK AND IS A RENDER TASK.** The plan's lift box, the delta audit
