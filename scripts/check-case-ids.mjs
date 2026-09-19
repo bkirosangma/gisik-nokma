@@ -14,26 +14,44 @@
 // accident of the pattern, and it is written down here because the boundary
 // cannot be inferred from the text:
 //
-//   1. A DECLARATION IS A BULLET WITH THE ID AT THE HEAD -- `- <marker?>
-//      <bold?>id <the case's own words>`. That is the only shape counted.
+//   1. A DECLARATION IS A BULLET WITH THE ID AT THE HEAD. What makes it a
+//      declaration is LINE POSITION -- the id is the bullet's own subject --
+//      not any one token sequence. In the tokens that means: a bullet that
+//      starts at column 0 with `- `, then optional marker, optional `**`, then
+//      the id, then the case's own words. The id may be BACKTICKED inside the
+//      bold (``- ✅ **`13.989` — …``); that is a fourth spelling of the same
+//      shape and is counted as one, so "the id at the head" is not a claim that
+//      only three spellings exist. **The anchor is a column-0 `- ` bullet: a
+//      `*` bullet, an indented bullet, a table row, a heading and running prose
+//      are all unmatched, by construction and not by luck.** A future author
+//      who writes a case as `* **13.9xx** ...` gets a silent miss -- the failure
+//      below, reached by a different road.
 //   2. TABLE ROWS AND PROSE ARE CITATIONS BY DESIGN. Recounted 2026-09-19 over
-//      the 24 files this script scans, counting any line containing `\d+\.\d+`:
-//      **62 table rows, 1,853 prose lines and 51 headings, against 2,490 bullet
-//      lines.** Almost none of those declare anything -- they are mutation
-//      tables, block-allocation notes and cross-references ("see 13.585",
-//      "3.72's arms"). **No regex is asked to tell a citation from a declaration
-//      in running text, because none can:** `- `13.439`/`13.444` retired` and a
-//      real declaration differ only in what the author MEANT. Counting that
+//      the 24 files this script scans, counting any line containing `\d+\.\d+`
+//      -- and, so the numbers can be reproduced rather than trusted -- **table =
+//      the line starts `|`; heading = it starts `#`; bullet = it starts `- ` or
+//      `* `; prose = the remainder**: **62 table rows, 1,853 prose lines and 51
+//      headings, against 2,490 bullet lines.** (Those four sum to 4,456, the
+//      id-bearing line count.) Almost none of the non-bullet lines declare
+//      anything. Real ones, not invented: `test-cases/06-auth-visibility.md:210`
+//      is a mutation TABLE ROW carrying `1 — case 6.34`, and
+//      `test-cases/13-second-wave-board-actions.md:9` is a PROSE block-allocation
+//      note opening ``Block `13.760`–`13.819`, allocated to executor 2``. **No
+//      regex is asked to tell a citation from a declaration in running text,
+//      because none can:** `` - `13.439`/`13.444` retired `` and a real
+//      declaration differ only in what the author MEANT. Counting that
 //      population would manufacture thousands of ids no case owns -- the
 //      inventing direction, which this file has now produced twice.
 //   3. HEADINGS ARE DELIBERATELY NOT COUNTED. A `##` heading declares a case
-//      about as often as it names a RANGE of them -- `test-cases/
-//      07-api-realtime-search.md:204` reads `## The integration checkpoint —
-//      Step 10 Task B (7.163–7.198)` -- and no convention separates the two yet.
-//      So the boundary is STATED here rather than guessed at in a pattern.
-//      **A case whose id appears only in a heading is not declared:** give it a
-//      bullet of its own, or this checker will not see it, and a duplicate
-//      against it will go unreported. That is exactly how `13.969` collided.
+//      about as often as it names a RANGE of them -- `test-cases/07-api-realtime-search.md:204`
+//      reads `## The integration checkpoint — Step 10 Task B (7.163–7.198)`,
+//      and of the 51 id-bearing headings 14 name one id and 9 name a range --
+//      and no convention separates the two yet. So the boundary is STATED here
+//      rather than guessed at in a pattern. **A case whose id appears only in a
+//      heading is not declared:** give it a bullet of its own, or this checker
+//      will not see it, and a duplicate against it goes unreported. That is
+//      exactly how `13.969` collided -- declared as a real bullet in one file,
+//      named only in a heading in another.
 //
 // THE SELF-TEST BELOW IS NOT DECORATION. A matcher that returns zero
 // results on every real file looks IDENTICAL, from the outside, to a
