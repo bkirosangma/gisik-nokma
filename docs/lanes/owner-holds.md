@@ -62,7 +62,7 @@ screens.** Fifteen items: **nine BUILD, four DECLINED, one NOT NOW, two already 
 
 | screen | item | ruling | the door |
 |---|---|---|---|
-| `isWorkspace` | **description** | **BUILD** | `MIGRATION` — `projectCreatedPayload` is `.strict()`, so payload, projection, read and render move together, and **every `ProjectRef` construction site must carry it** or the field arrives `undefined` on some route |
+| `isWorkspace` | **description** | **✅ BUILT — `#545` (`ed455768`), cases `13.976`–`13.987`.** **AND THE AUTHORING SURFACE WAS RULED SEPARATELY, because the code refused to decide it:** the prototype's `addProject` takes a name only and hard-codes `desc`, so nothing in the prototype ever authors one — a literal build would have shipped a column nothing writes. **Owner, verbatim: _"New-project form gains an optional description input: go with this."_** Chosen over a new `description_set` event precisely because it rides `project.created` and is therefore **not a second door**. | `MIGRATION` — `projectCreatedPayload` is `.strict()`, so payload, projection, read and render move together, and **every `ProjectRef` construction site must carry it** or the field arrives `undefined` on some route. **Measured rather than spot-checked: two production sites** (`routes/workspaces.ts`, `mappers.ts`), with the route ALWAYS sending the key and the mapper REFUSING a row that omits it — so a third site that forgot it fails loudly instead of rendering as a correct-looking card that says nothing. |
 | `isWorkspace` | **rename** | ✅ **BUILT** (`#531`, merge `0f0cc398`) | **NO NEW DOOR** — `workspace.renamed` already exists in the vocabulary with **zero client UI**. The cheapest item in the reconnaissance |
 | `isWorkspace` | **delete** | **DECLINED** | destructive, and **the prototype refuses it itself** — its own button is a no-op toast: *"that is irreversible, so it is disabled here"*. Building it would **exceed** the design, not implement it |
 | `isInbox` | **filter** | ✅ **BUILT** (`#536`, merge `cce9fac1`) | `ADDITIVE FIELD` on the existing read; `workspaceId` is the precedent |
@@ -124,14 +124,19 @@ headline**, which is why it is worth reading in full.
 
 | item | ruling | evidence |
 |---|---|---|
-| **Assignee** | **BUILD — editable.** Owner: *"assignee should not be read only."* | `SERVER EXISTS → SURFACE`. `ticket.assigned` is wired end to end — payload `events/ticket-events.ts:50` (an UNASSIGNMENT is the same event with `null`), projected `projections/tickets.ts:436,466`, a read `read/assigned-provenance.ts`, fan-out `notifications/fanout.ts:225`, synced `sync/snapshot-writer.ts:95`, and an MCP write tool `mcp/write-tools.ts:167-173`. **The web renders it read-only at `ticket-sheet.tsx:573`.** |
-| **Description** | **BUILD — editable.** Owner: *"description should be editable."* | `SERVER EXISTS → SURFACE`, **and the fix is a PROP, not a door.** The door exists (`compose-editor-submission.ts:14,29`), the sheet already submits `ticket.field_set` (`ticket-sheet.tsx:284`), and the editor has both modes — **but the mount is `readOnly` (`:581`) and the web never passes `editorSlot`** (`page.tsx:2346-2353`), so the real editor never mounts at all. **One mount, four gaps.** |
+| **Assignee** | **BUILD — editable.** Owner: *"assignee should not be read only."* | `SERVER EXISTS → SURFACE`. `ticket.assigned` is wired end to end — payload `events/ticket-events.ts:50` (an UNASSIGNMENT is the same event with `null`), projected `projections/tickets.ts:436,466`, a read `read/assigned-provenance.ts`, fan-out `notifications/fanout.ts:225`, synced `sync/snapshot-writer.ts:95`, and an MCP write tool `mcp/write-tools.ts:167-173`. **✅ BUILT — `#530` (`be72fb18`). This row's closing sentence was TRUE when written and went stale the moment `#530` landed: the web rendered it read-only at `ticket-sheet.tsx:573`, and no longer does.** |
+| **Description** | **✅ BUILT — `#544` (`2c28f6bc`), case `13.989`.** Owner: *"description should be editable."* | `SERVER EXISTS → SURFACE`, **and the fix turned out to be a PROP *and* a ROW — the dispatch named only the prop, and the missing row is the half that mattered.** The door exists (`compose-editor-submission.ts:14,29`) and the sheet already submits `ticket.field_set` (`ticket-sheet.tsx:284`) — **but the web never passed `editorSlot`** (`page.tsx:2346-2353`), *and* the description row lived **inside** the `Object.entries(state.fields)` loop while `ticket.created` writes `fields: { title }` and nothing else (`packages/domain/src/ticket-state.ts:150`), so on a ticket nobody had described **there was no row for an editor to mount into**. Enabling the composer alone would have changed almost nothing. Both are fixed; the row is now drawn unconditionally on the assignee row's precedent. |
 | **State dropdown** | **REFUSED — no second door** | The chip + "Move…" and a dropdown are **two presentations of the same legal-transition set**. A restyle, not a gap. |
 
 **⚠ THE FINDING THAT EXPLAINS MOST OF THE SHEET, and it is one line:** the web mounts `TicketSheet` at
 `page.tsx:2346-2353` with **six props and NONE of the four optional ones** — no `editorSlot` (so the real
 editor never mounts and the description falls back to `readOnly`), no `attachments` (so `<AttachmentList>`
 renders empty), no `uploadEvidence`, no `visibility`. **One mount, four gaps.**
+
+**⚠ AND ITS STATE, because the sentence above is a reading and reads have been expiring all day:** as of
+`#544` (`2c28f6bc`) **`editorSlot` is passed and `attachments`, `uploadEvidence` and `visibility` are still
+not** — so **two of the four gaps are closed** (the description, and the row it needed) and **two remain**,
+both owned by dispatches that exist. Re-measure before quoting this line.
 
 **⚠ THE COMMENTS CORRECTION — the controller's own headline was WRONG and is recorded wrong here.**
 `comment.added` is fully wired on the server (vocabulary `:195`, state machine, projections, search index,
