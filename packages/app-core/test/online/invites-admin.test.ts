@@ -260,7 +260,10 @@ describe('3.97 listPending — the roster of outstanding invitations', () => {
    * meets on this door. It is the ONLY client-readable statement of the
    * caller's own role on this branch: `/v1/me/workspaces` carries a `role` but
    * `getMyWorkspaces` refuses whole (`mapWorkspaceRefs`), so nothing else can
-   * tell an admin from a member.
+   * tell an admin from a member. **⚠ CORRECTED 2026-09-20: that refusal is gone —
+   * rulings P32/P38 served `getMyWorkspaces` and `SERVING_GAPS` has been empty since
+   * 2026-09-19 — so this door is no longer the ONLY client-readable statement of the
+   * caller's role. The case is unaffected: it asserts what THIS door says.**
    */
   it('carries the 403 status AND the door’s sentence, because a caller acts on both', async () => {
     const body = {

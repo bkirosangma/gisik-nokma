@@ -124,10 +124,14 @@ export const COPY_IT_NOW = 'Copy it now — it is not stored and cannot be shown
  *
  * Task 15b says the invite machinery is "feature-gated on the caller's own role
  * from `/v1/me/workspaces`". That route does carry a `role`
- * (`apps/server/src/routes/workspaces.ts:149`), but `getMyWorkspaces` REFUSES
- * whole — `mapWorkspaceRefs` throws a `ServingGapError` — so no client on this
- * branch can read it, and adding a role-only mapper over the same route would
- * be routing around a refusal this step is forbidden to weaken.
+ * (`apps/server/src/routes/workspaces.ts:149`). **⚠ CORRECTED 2026-09-20:** this
+ * read *"but `getMyWorkspaces` REFUSES whole — `mapWorkspaceRefs` throws a
+ * `ServingGapError` — so no client on this branch can read it, and adding a
+ * role-only mapper over the same route would be routing around a refusal this step
+ * is forbidden to weaken."* `getMyWorkspaces` ANSWERS — rulings P32/P38; register
+ * empty since 2026-09-19 — so there is no refusal to route around and the role IS
+ * readable from that route. **Which source this page reads is a product decision
+ * and is NOT changed here:** *owner, whoever next touches this page.*
  *
  * What IS readable is the door's own answer. `GET
  * /v1/workspaces/:workspaceId/invites` (`routes/invites.ts:542`) resolves the
@@ -690,9 +694,11 @@ function memberLabel(member: RosterMember): string {
  *   difference between a count and a claim about the world, and dropping it
  *   would hand a member a smaller number dressed as the true one.
  * - **The workspace name is OPTIONAL and is OMITTED, never faked.** It comes
- *   from `getMyWorkspaces`, which refuses whole (`mapWorkspaceRefs` throws a
- *   `ServingGapError`), and `useWorkspaceName` answers `null` rather than the
- *   raw id or a stale guess. With no name the sentence is shorter and still
+ *   from `getMyWorkspaces` (⚠ corrected 2026-09-20: this read "which refuses whole
+ *   (`mapWorkspaceRefs` throws a `ServingGapError`)" — rulings P32/P38 served that
+ *   read and the register has been empty since 2026-09-19), and `useWorkspaceName`
+ *   answers `null` rather than the raw id or a stale guess. With no name the
+ *   sentence is shorter and still
  *   true; the prototype's own clause order is kept so the two readings sit in
  *   the same place.
  *

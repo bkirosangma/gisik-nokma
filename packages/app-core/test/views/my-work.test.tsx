@@ -529,8 +529,11 @@ describe('3.61 MyWork — the due DAY CLAIM does not move with the viewer’s la
 });
 
 /**
- * `getMyWork` REFUSES today, over `contested`. The refusal must reach the
- * surface as an error — a `MyWorkView` with three empty sections is
+ * **⚠ CORRECTED 2026-09-20: this read *"`getMyWork` REFUSES today*, over
+ * `contested`."*** `getMyWork` ANSWERS — rulings P39/P40 served it and the register
+ * has been empty since 2026-09-19 — so the refusal below is CONSTRUCTED rather than
+ * inherited. **The property is unchanged:** a read that does not answer must reach
+ * the surface as an error, because a `MyWorkView` with three empty sections is
  * indistinguishable from a person who has nothing to do.
  */
 describe('3.60 useMyWork — a refusal is an error, never three empty sections', () => {

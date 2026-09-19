@@ -31,13 +31,19 @@ import { AuthoringReadRefused } from './data-source-gateway.js';
  *
  * ## Where the ROLE comes from, and why it is the roster
  *
- * `BuilderSession` needs a `WorkspaceRole`, and this branch has exactly one
- * readable source of the signed-in user's own role. `GET /v1/me/workspaces`
- * carries a `role` but `getMyWorkspaces` REFUSES whole — `mapWorkspaceRefs`
- * throws a `ServingGapError` (`online/mappers.ts:906`) — so no client here can
- * read it, and adding a role-only mapper over the same route would be routing
- * around a refusal this step may not weaken. `members/page.tsx` hit the same
- * wall and derived its admin-ness from a door's 403.
+ * `BuilderSession` needs a `WorkspaceRole`, and this branch reads it from the
+ * roster. **⚠ CORRECTED 2026-09-20 — this paragraph was wrong twice, and both
+ * halves matter.** It read: *"`GET /v1/me/workspaces` carries a `role` but
+ * `getMyWorkspaces` REFUSES whole — `mapWorkspaceRefs` throws a `ServingGapError`
+ * (`online/mappers.ts:906`) — so no client here can read it, and adding a role-only
+ * mapper over the same route would be routing around a refusal this step may not
+ * weaken."* **The refusal is gone** — rulings P32/P38 served `getMyWorkspaces` and
+ * the register has been empty since 2026-09-19 — so there is nothing to route
+ * around; and **the citation was already stale when written**: `mapWorkspaceRefs`
+ * is at `online/mappers.ts:1225`, while `:906` is inside `toServerFilterSpec`.
+ * **The DECISION survives both**, because it never rested on the refusal: the
+ * roster is the source this file reads. `members/page.tsx` hit the same wall and
+ * derived its admin-ness from a door's 403.
  *
  * What IS readable is `GET /v1/workspaces/:workspaceId/members`, which answers
  * `WorkspaceMember[]` — `{userId, displayName, role}` — for every non-guest

@@ -78,7 +78,11 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `Features.md`**.
 > **Class 2 — the COUNT of refusing methods, in the same sentences.** The register went 6 → 4 (P25 clause
 > 1) → 3 (P32/P38) → 1 (P39/P40) → **0** when `search` was served on 2026-09-19 (`42fb2f2c`).
-> **MEASURED AT THIS SHA: `Object.keys(SERVING_GAPS)` is EMPTY** (`mappers.ts:2179`), pinned green by 3.39.
+> **MEASURED AT THIS SHA: `Object.keys(SERVING_GAPS)` is EMPTY** (`mappers.ts:2189` — **it was `:2179` when
+> this line was first written, and THIS BRANCH'S OWN ROUND-2 EDIT to that file moved it**; the same
+> self-inflicted shift caught `:828`→`:838` and `online-data-source.ts:247`→`:253`. **Three citations in
+> one handoff, all invalidated by the sweep that wrote them** — see the ROUND 2 block's method note),
+> pinned green by 3.39.
 > So *"FOUR of the THIRTEEN query methods REFUSE, and that is the design"* — the canonical docblock of
 > `online-data-source.ts` — was itself false, along with every "one of the six serving gaps".
 >
@@ -95,15 +99,74 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > | **PROVEN comments-only** | esbuild `--minify` (strips comments) over HEAD and worktree: **18/18 files byte-identical**, two controls in the same run (a code change is caught; a comment-only change reads identical) |
 >
 > **DELIBERATELY LEFT, and why — 4 categories:**
-> 1. **The `LIST_PAGE_CAP` refusal is REAL and current** (`online-data-source.ts:247`, `ticket-list.tsx:98`,
+> 1. **The `LIST_PAGE_CAP` refusal is REAL and current** (`online-data-source.ts:253` (was `:247`), `ticket-list.tsx:98`,
 >    `app/…/p/[projectId]/page.tsx:287`, `Features.md:82`, `:407`). **Not corrected**, and checked.
-> 2. **`FILTER_BLOCKED_ABSENCE`** (`mappers.ts:828`, `preferences-gateway.ts:78`) — a live throw. Left.
+> 2. **`FILTER_BLOCKED_ABSENCE`** (`mappers.ts:838` (was `:828`), `preferences-gateway.ts:78`) — a live throw. Left.
 > 3. **`docs/lanes/*` and `docs/superpowers/plans|specs/*`** — logs and superseded specs. Rewriting a log's
 >    history destroys the record the sweep's own marking convention exists to keep. Left, all of it.
 > 4. **`expectStillUnserved`'s failure-message string** — inside a callerless function, and a string literal
 >    in a test file is closer to an assertion than to a comment. Left for the controller.
 >
 > **No case id minted.** `16.83` stays free: a comment correction pins no product behaviour, per the dispatch.
+>
+> ## ROUND 2 — THE REVIEWER FOUND THAT ROUND 1'S UNIVERSE WAS THE BUG, AT THE LEVEL OF PATTERN
+> The first reviewer pass returned **(A) comments-only PASS, (B) corrections true PASS, (C) MISSED
+> CARRIERS FAIL, (D) no false new claim**. Its finding is the one that matters and it is exactly the
+> dispatch's own rule, fixed at the file level in Round 1 and NOT at the pattern level:
+>
+> > **The falsified claim is carried in prose that contains NONE of the four tokens.** "refuses whole",
+> > "cannot be answered", "N of the thirteen", "ONE remaining REFUSAL", "DARK", "still refuse".
+>
+> Round 1 swept token-bearing **files** and was structurally blind to the sentences. **A universe is not
+> a pattern, and neither is a pattern's token list** — the same lesson as the root-list hole, one level
+> down. Round 2 re-swept on phrases; the reviewer supplied the control (the same phrasing must find the
+> Round-1 instances already marked `⚠ CORRECTED 2026-09-20`), and it does.
+>
+> **The four Critical carriers Round 1 left, all confirmed at the line before being changed:**
+> - **`Features.md:77`** — the canonical entry for the whole mapper module: *"its ONE remaining REFUSAL
+>   (…one since P39 and P40)"*, and further along *"ONE method refuses rather than returning a plausible
+>   view: `search`"*. Both false.
+> - **`test-cases/03:46`** — case **3.39** itself, whose assertion now proves the opposite.
+> - **`packages/app-core/src/online/mappers.ts:59, :61`** — **the register's OWN FILE**, a heading
+>   reading *"Why several mappers below are nothing but a refusal"* and *"Four of the thirteen … cannot
+>   be answered"*. Round 1 grepped this file for `ServingGapError` and never opened this region.
+> - **`mappers.ts:212`** — *"the standing fact that the register carries `search` alone"*.
+>
+> **Round 2 changed ~30 more carriers across 14 more files**, including a whole class Round 1 never saw:
+> **`getMyWorkspaces`** ("refuses whole — `mapWorkspaceRefs` throws a `ServingGapError`") in
+> `builder-wiring.tsx`, `data-source-gateway.ts`, `members/page.tsx` (×2), `members-page.test.tsx` (×2),
+> `founding.test.tsx`, `stub-services.ts`, `invites-admin.test.ts`, `workspaces/page.tsx` (×3),
+> `test-cases/12` (12.185) and `test-cases/13-second-wave-board-actions.md` (×2) — **none of those files
+> contains any of Round 1's four tokens.**
+>
+> **Two things the reviewer caught that were mine and not the repo's:**
+> 1. **A wrong citation that predates the sweep** — `builder-wiring.tsx` cited
+>    `online/mappers.ts:906` for `mapWorkspaceRefs`; it is `:1225`, and `:906` is inside
+>    `toServerFilterSpec`. A stale citation still RESOLVES, so the reader is misled, not corrected.
+> 2. **`my-work.tsx` under-claimed.** Round 1 flagged the `contested: []` conclusion as an open question
+>    with an owner. It is not open: `mapMyWork` reads `asArray(record['contested'], …)`
+>    (`mappers.ts:1890`) and `asArray` **throws** (`:261`), so the key is REQUIRED on the wire and
+>    `[]` can only come from a real answer. **Re-derived at the line and recorded as such** — a
+>    conclusion kept because it was re-proved, not because the sentence that carried it survived.
+>
+> ## ⛔ THE ROUND-2 METHOD NOTE — the failure that recurred THREE TIMES IN ONE TASK
+> **Every citation this branch wrote was invalidated by this branch's own later edits to the same file.**
+> 1. `client-contract.test.ts:371` → `:375` (my Round-1 docblock sits above the function).
+> 2. `Features.md` `c86c4b5c` citations — safe, but only by luck: that file's edits are all prose.
+> 3. **`mappers.ts:2179` → `:2189`, `mappers.ts:828` → `:838`, `online-data-source.ts:247` → `:253`** —
+>    all three written into the handoff and the PR body, all three moved by Round 2's own edits.
+> **On a branch whose purpose is editing files, a line citation is invalidated by the next edit to that
+> file. Cite the SYMBOL with the line, or measure citations LAST.** This is the third instance in one
+> task of the same shape, and the reason it kept happening is that each round's citations were written
+> before the next round's edits.
+>
+> **One finding recorded rather than fixed, with an owner — a check that cannot fail:**
+> `client-contract.test.ts`'s **7.209** still asserts `expect([...named].sort()).toEqual(EXERCISED)` where
+> the code above it is `const EXERCISED: string[] = []; for (const constName of [] as string[])` — so its
+> main assertion is **`[] toEqual []`**, and only the complement loop at the end does real work. **NOT
+> fixed here: a test assertion is outside "comments and docblocks only".** *Owner: the controller.*
+> Similarly `mappers.test.ts:953`'s `describe('3.39 the blocked methods refuse, …')` is now a false
+> label — **left, because changing it changes test code**, and named here rather than quietly kept.
 >
 > ## GATE — run at the code head, not transferred
 > `pnpm turbo run build test typecheck` → **EXIT 0 · 33/33 successful · 17 cached · 1m12.4s**, Node

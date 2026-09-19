@@ -49,11 +49,15 @@ beforeEach(() => push.mockClear());
  * 3.124 THE PLANTED DEFECT THIS FILE EXISTS FOR.
  *
  * The natural place for a founding form is inside the empty-state arm — "no
- * workspaces yet, make one". Against the shipped server that arm is
- * UNREACHABLE: `getMyWorkspaces` is one of the refusing reads (four of them
- * since ruling P25 clause 1; this is still one), so the page
+ * workspaces yet, make one". **⚠ CORRECTED 2026-09-20:** this read *"Against the
+ * shipped server that arm is UNREACHABLE: `getMyWorkspaces` is one of the refusing
+ * reads (four of them since ruling P25 clause 1; this is still one), so the page
  * resolves to the refusal branch every time, and a form nested in the empty arm
- * would be a form nobody could ever open. The person who cannot be told which
+ * would be a form nobody could ever open."* `getMyWorkspaces` ANSWERS — rulings
+ * P32/P38; register empty since 2026-09-19 — **so the premise that made that arm
+ * unreachable has expired. Whether the form should now move inside it is a product
+ * decision this correction does NOT take:** *owner, whoever next touches this page.*
+ * The person who cannot be told which
  * workspaces they are in is exactly the person who most needs to found one.
  */
 describe('3.124 the founding form is reachable when the workspace list REFUSES', () => {

@@ -49,11 +49,17 @@ export type MyWorkProps = {
  * `useLiveQuery` surfaces that rejection as `error` with `data` left null — so
  * this component does not render at all."* **Rulings P39 and P40 served that read
  * and `getMyWork` answers; the register has been empty since 2026-09-19.** The
- * reachability argument is therefore no longer available on those terms, and what
- * replaces it is a product claim this correction deliberately does NOT take:
- * `contested: []` can now arrive from a real answer, and whether the sentence
- * below still holds is an open question with a named owner — *whoever next
- * touches this component.* The sentence itself is kept rather than deleted. Suppressing the section
+ * reachability argument is therefore no longer available on those terms, so `contested: []`
+ * CAN now arrive from a real answer — and the sentence above needed a real argument
+ * rather than an inherited one. **It has one, and it is a property of the MAPPER
+ * rather than of a refusal: `mapMyWork` reads
+ * `asArray(record['contested'], 'myWork.contested')` (`online/mappers.ts:1890`), and
+ * `asArray` THROWS `MappingError(…, 'an array')` (`:261`) when the key is absent or
+ * is not an array.** The key is therefore REQUIRED on the wire — absence throws, it
+ * does not degrade to `[]` — so the only way `contested: []` reaches this component
+ * is a server that sent an empty array, which is a real answer. **Recorded this way
+ * deliberately:** the conclusion is kept because it was re-derived here from the
+ * mapper, not because the sentence that first carried it survived. Suppressing the section
  * when empty would lose that.
  *
  * That asymmetry with `AttentionStrip` — which renders NOTHING when it has

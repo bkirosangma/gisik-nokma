@@ -1369,9 +1369,12 @@ failure this bucket has recorded before, caught here by a compiler instead of by
   compared against `Object.keys(REPLICA_GAPS)` so the registry and the behaviour cannot drift:
   `getMyWorkspaces`, `getMembers`, `search`, `getMyWork`, `getAttention`, `getPreferences`,
   `putPreferences`. **NOT the online source's SIX**, and the difference is enumerated rather than
-  characterised, because "nearly disjoint" was written here first and is false. Online refuses
-  `getMyWorkspaces`, `getTickets`, `getTicket`, `search`, `getMyWork`, `getAttention`. FOUR are
-  refused by both (`getMyWorkspaces`, `search`, `getMyWork`, `getAttention`); TWO are refused online
+  characterised, because "nearly disjoint" was written here first and is false. Online **used to refuse** — **⚠ CORRECTED 2026-09-20: the tense is the correction. The online source
+  refuses NONE of the six now; `SERVING_GAPS` emptied on 2026-09-19, and each of the six is pinned
+  SERVED rather than dropped from a list. The CONTRAST this bullet draws is kept, and its live half is
+  the replica's own refusals, which are real and unchanged.**
+  `getMyWorkspaces`, `getTickets`, `getTicket`, `search`, `getMyWork`, `getAttention`. FOUR were
+  refused by both (`getMyWorkspaces`, `search`, `getMyWork`, `getAttention`); TWO were refused online
   and ANSWERED here (`getTickets`, `getTicket` — the replica holds the `TicketState` and the raw
   events the wire does not carry); THREE are answered online and refused here (`getMembers`,
   `getPreferences`, `putPreferences` — a roster and amendment-14 rows, neither of which is replicated).

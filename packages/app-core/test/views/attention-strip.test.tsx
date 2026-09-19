@@ -413,11 +413,16 @@ describe('3.61 AttentionStrip — one clock, and it is not the viewer’s laptop
 });
 
 /**
- * `getAttention` REFUSES today, and the strip is the surface where a swallowed
- * refusal is most dangerous: its emptiness IS its message. This drives the
- * REAL `ServingGapError` with the REAL absence register out of
- * `online/mappers.ts` rather than a stand-in `Error`, so the assertion pins the
- * refusal that actually ships and goes stale the day the register changes.
+ * **⚠ CORRECTED 2026-09-20: this read *"`getAttention` REFUSES today*, and the
+ * strip is the surface where a swallowed refusal is most dangerous: its emptiness
+ * IS its message."*** `getAttention` ANSWERS — rulings P39/P40 served it, and the
+ * register has been empty since 2026-09-19. **The property is unchanged, and so is
+ * the fixture's shape:** the refusal is now CONSTRUCTED rather than inherited, and
+ * what the cases below measure is the strip's behaviour when a read it needs does
+ * not answer, whatever the cause. This still drives the REAL `ServingGapError`
+ * class rather than a stand-in `Error`, so the assertion still pins the shape that
+ * ships. **The original promise that the assertion "goes stale the day the register
+ * changes" was kept to the letter:** it went stale, and this is that day.
  */
 describe('3.60 useAttention — a refusal is an error, never an empty strip', () => {
   function Harness({ source }: { source: ReturnType<typeof createFakeDataSource> }) {

@@ -124,8 +124,10 @@ export type Unsubscribe = () => void;
  * `getWorkflowDef` returns `WorkflowDef`: the wire body is
  * `TicketTypeListResponse` (`packages/domain/src/read-models.ts:301`), whose
  * `ticketTypes` are `TicketTypeDef` already. There is no rename to adapt and
- * therefore no view model to invent. It is NOT one of the refusals (six of them
- * until ruling P25 clause 1, four since): every
+ * therefore no view model to invent. It is NOT one of the refusals — and there are
+ * none left to be one of. **⚠ CORRECTED 2026-09-20:** this read *"(six of them until
+ * ruling P25 clause 1, four since)"*; the count reached **ZERO** on 2026-09-19 when
+ * `search`, the last key, was served, so `SERVING_GAPS` is empty. Every
  * field the client needs is on the wire, pinned by case 7.38
  * (`apps/server/test/routes/builder-reads.test.ts:250`).
  */

@@ -935,10 +935,14 @@ describe('3.38 toServerFilterSpec — the plural/singular disagreement, made lou
  * 3.39 — the refusals. Each asserts the enumeration, not the partiality:
  * WHICH facts are absent and WHO closes them.
  *
- * **FOUR of them, and it was six.** `getTickets` and `getTicket` answered with a
- * `ServingGapError` until ruling P25 clause 1's buildable subset landed; their
- * entries are gone from `SERVING_GAPS` rather than emptied, and 3.42 below is
- * what replaced them — the same two methods asserted to MAP, over bodies
+ * **NONE of them, and it was six.** ⚠ **CORRECTED 2026-09-20** — this read *"**FOUR
+ * of them, and it was six.**"*, and the count kept falling: 4 → 3 (P32/P38) → 1
+ * (P39/P40) → **0 on 2026-09-19**, when `search`, the last key, was served.
+ * `SERVING_GAPS` is EMPTY, and this block's own first assertion now says so. **The
+ * block is kept because the history is its content:** `getTickets` and `getTicket`
+ * answered with a `ServingGapError` until ruling P25 clause 1's buildable subset
+ * landed; their entries are gone from `SERVING_GAPS` rather than emptied, and 3.42
+ * below is what replaced them — the same two methods asserted to MAP, over bodies
  * carrying the facts that used to be missing. The case id is kept and its claim
  * inverted, on 7.189's precedent: a divergence that closed can silently re-open,
  * and deleting the case is what makes that invisible.

@@ -80,13 +80,18 @@ were never in scope for a client whose route cannot serve them.
 
 - ✅ **13.764 — the workspace name is OPTIONAL, and the clause is omitted rather than filled.** The
   prototype's sentence opens "N people in <workspace name>", and on this branch the name is genuinely
+  unavailable far more often than missing (**⚠ CORRECTED 2026-09-20: this read "the name is genuinely
   unavailable far more often than missing: `getMyWorkspaces` refuses whole (`mapWorkspaceRefs` throws a
-  `ServingGapError`). `useWorkspaceName` already answers `string | null` and fails silently to `null`,
+  `ServingGapError`)." That refusal is gone — rulings P32/P38; the register emptied on 2026-09-19 — so
+  the name is now unavailable only when it is genuinely missing, which makes the OPTIONALITY below more
+  load-bearing rather than less**). `useWorkspaceName` already answers `string | null` and fails silently to `null`,
   so the summary keeps the prototype's wording and drops the `in <name>` clause when it has no name.
   Both readings are asserted, and the second asserts the WHOLE string with `toBe` — a substring
   assertion on the front half would sail past `undefined` or `in null` — and then asserts the text does
   not contain the raw workspace id and does not contain `undefined`. The un-stubbed
-  `getMyWorkspaces` is the shape of the real refusal rather than a stand-in for it, because
+  `getMyWorkspaces` is the shape of a real refusal rather than a stand-in for it — **⚠ CORRECTED
+  2026-09-20: that read "the shape of the real refusal", and `getMyWorkspaces` does not refuse; the
+  un-stubbed shape is this helper's own rule rather than a live server state** — because
   `stubServices` rejects an un-stubbed read by name.
   (`apps/web/app/w/[workspaceId]/members/page.tsx:222`, `apps/web/src/use-workspace-name.ts`,
   `apps/web/test/members-page.test.tsx:559`)

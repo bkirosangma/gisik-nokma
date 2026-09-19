@@ -81,8 +81,11 @@ import type {
  *
  * That role is not decoration. The builder's `require-different-user` editor and
  * every rule summary name people out of this roster, and `builder-wiring.tsx`
- * resolves **the signed-in user's own role** from it — the only readable source
- * of it on this branch, since `getMyWorkspaces` refuses whole. So the roster is
+ * resolves **the signed-in user's own role** from it. **⚠ CORRECTED 2026-09-20:**
+ * this read *"the only readable source of it on this branch, since
+ * `getMyWorkspaces` refuses whole."* `getMyWorkspaces` ANSWERS — rulings P32/P38
+ * served it and `SERVING_GAPS` has been empty since 2026-09-19 — so the roster is a
+ * CHOICE here rather than the only possibility. So the roster is
  * read here from the route that serves it in full. Do not "simplify" this back
  * to `dataSource.query.getMembers`: `test/data-source-gateway.test.ts` asserts
  * that member is never called, precisely so the simplification reddens.

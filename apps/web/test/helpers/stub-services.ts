@@ -63,9 +63,10 @@ export function refuse(method: keyof typeof SERVING_GAPS): () => Promise<never> 
  *
  * `authoring` (Plan 8 Task 13) is the fourth. Its `listMembers` is the one a
  * case almost always has to stub even when it does not care about the roster:
- * `useBuilderWiring` reads the SIGNED-IN USER'S OWN ROLE out of it, because
- * `getMyWorkspaces` — the route that carries a role — refuses whole on this
- * branch. Left un-stubbed it rejects by name and the page under test renders
+ * `useBuilderWiring` reads the SIGNED-IN USER'S OWN ROLE out of it. **⚠ CORRECTED
+ * 2026-09-20:** this read *"because `getMyWorkspaces` — the route that carries a
+ * role — refuses whole on this branch."* It does not — rulings P32/P38 served it and
+ * the register has been empty since 2026-09-19. Left un-stubbed it rejects by name and the page under test renders
  * the refusal, which is the honest failure rather than a silent read-only
  * screen.
  */

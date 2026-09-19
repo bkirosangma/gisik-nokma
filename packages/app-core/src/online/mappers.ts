@@ -56,13 +56,20 @@ import type {
  *   route's query language cannot say. That one is about a REQUEST, so it is
  *   deliberately not a `MappingError`: no response was involved.
  *
- * ## Why several mappers below are nothing but a refusal
+ * ## Why several mappers below USED to be nothing but a refusal
  *
- * Four of the thirteen `DataSourceQuery` methods cannot be answered over the routes
- * that shipped — six until ruling P25 clause 1's buildable subset landed and
- * `mapListView` and `mapTicketRead` became real mappers. The register — coordination doc, "Step 11 (Plan 6 remainder) —
+ * **⚠ CORRECTED 2026-09-20 — this section is the register's own, and it was the one
+ * place the falsified count was never swept.** The heading read *"Why several
+ * mappers below are nothing but a refusal"*, and the paragraph read *"Four of the
+ * thirteen `DataSourceQuery` methods cannot be answered over the routes that
+ * shipped — six until ruling P25 clause 1's buildable subset landed and
+ * `mapListView` and `mapTicketRead` became real mappers."* **The number is ZERO.**
+ * It fell 6 → 4 (ruling P25 clause 1, `c86c4b5c`, 2026-09-06) → 3 (P32/P38) → 1
+ * (P39/P40) → 0 on 2026-09-19, when the owner ruled the search QUERY must derive
+ * `matchedIn`; **no mapper in this file refuses outright, and 3.39 asserts
+ * it.** The register — coordination doc, "Step 11 (Plan 6 remainder) —
  * the `DataSource` register, re-derived, and RULING REQUEST P25" — holds the
- * measurement; each refusal below repeats only its own half. A mapper that
+ * measurement. A mapper that
  * returned a plausible-looking view with `stateName: card.stateId` or
  * `contested: []` would be the exact failure this series is named for: it would
  * be indistinguishable, on screen, from an answer.
@@ -208,9 +215,12 @@ export const LIST_PAGE_CAP = LIST_ROW_CAP / LIST_PAGE_SIZE;
  * throws `ServingGapError` carrying a named `Absence`, which is what a shell
  * renders. It is deliberately NOT a `SERVING_GAPS['getTickets']` key, because
  * **that map means *this method refuses ALWAYS***, and `getTickets` answers for
- * every project small enough to finish. It would also contradict the standing
- * fact that the register carries `search` alone. Ratified by the controller
- * 2026-09-06.
+ * every project small enough to finish. ⚠ **CORRECTED 2026-09-20:** the next
+ * sentence read *"It would also contradict the standing fact that the register
+ * carries `search` alone"* — it does not, and the register carries **nothing**:
+ * `search` was its last key and was served 2026-09-19. The DECISION this sentence
+ * supports is untouched and rests on its own reason, two sentences up. Ratified by
+ * the controller 2026-09-06.
  *
  * *(An earlier draft of this note also claimed a key would "detonate
  * `stub-services.ts`'s `refuse(method)` lookup". **That was false and is
