@@ -44,8 +44,8 @@ speed.
 - **Set up your business** — create a workspace, invite people into it with one of three roles, and
   design your own set of stages for work to move through, with rules on the moves between them.
 - **Follow work** — a backlog of work that has not started, and of work sent back to it, then a
-  board, a table, a month calendar and a week-by-week timeline of one project's work. What needs
-  attention — blocked, stale or due soon — is on **My work**, not on a project's tabs.
+  board, a table, a month calendar and a week-by-week timeline of one project's work. What needs your
+  attention is on **My Work**, not on a project's tabs.
 - **Move work along** — open a job, press Move, pick the next stage. Your rules decide what is
   offered and what it asks for first.
 - **Control who sees what** — per job, down to a named list of people, with sub-jobs inheriting from
