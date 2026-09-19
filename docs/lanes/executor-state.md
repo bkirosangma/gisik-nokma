@@ -41,6 +41,49 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~21:0x IST. **DOOR F IS BUILT; ITS PR IS OPENING AT THIS
+> # HEAD.** Branch **`exec/subtasks-section`**, cut from **`origin/main` = `92a3edb4`**; code head
+> # **`b6c88359`**. **Dispatch: `gisik-nokma-lanes/CTL-DISPATCH-2026-09-19-f-subtasks.md`.** **Door D is
+> # MERGED** (`c5bcd13f`, PR #551) — do not redo it, and do not confuse it with this.
+>
+> ## WHAT IS BUILT — the sheet's SUBTASKS section, and nothing wider
+> The sheet drew only a COUNT (`2 of 4 done`). It now draws the prototype's section: a heading carrying
+> the count, the children **each with its own state**, the empty state verbatim, and an **Add subtask**
+> row. **No route and no migration** — children are DERIVED from the project list read the client already
+> makes, and adding one is the ordinary `ticket.created` with `parentId`.
+>
+> ## ⚠ THE THREE MEASUREMENTS THAT MADE THE DERIVATION HONEST — do not re-derive, they are cited in the code
+> | | |
+> |---|---|
+> | the walk | `getTickets` **walks the server's cursor to exhaustion** — no child lost to a page boundary |
+> | the filter | the call passes an **EMPTY `FilterSpec`**, which means "all", so a CLOSED child cannot be excluded |
+> | the bound | past `LIST_ROW_CAP` (2000 rows) it **throws `ServingGapError`** rather than truncating — a project too large REFUSES, it does not return a short list |
+>
+> **AND A SECOND GUARD ON TOP:** the section RECONCILES the derived list against `rollup.totalChildren −
+> rollup.restrictedCount` every render, and a disagreement is SAID rather than drawn (`16.17`, with
+> `16.18` as its control). A silently short list is the one failure this section could hide.
+>
+> ## ⚠ A TRAP IN THIS FILE WORTH CARRYING — it cost four red cases
+> **A `useLiveQuery` key that does not change when its data arrives runs ONCE and never again.** The
+> subtasks query was first keyed `${ticketId}:subtasks`; it registered on the first render while the
+> ticket read was still null, answered `[]`, and never re-ran. **Key it on something that only exists
+> once the data has landed** — here the project id; the workflow query one screen up does the same with
+> `workflowId@version`. Four cases caught it by passing children in and seeing none listed.
+>
+> ## ANCHORS — re-take `origin/main` (it moves)
+> | | |
+> |---|---|
+> | base | `origin/main` = `92a3edb4` at the cut; **door D merged into it** |
+> | gate | **33/33, EXIT 0** under **Node `v22.22.2`** |
+> | checks | all **seven exit 0**. `check-case-ids` **2469, union == sum** — **exactly +8** on main's 2461. `16-remaining-doors.md` **23 cited / 0 uncited / 23** |
+> | the flake | ⚠ `seed-dev.test.ts` timed out at 30s on the FIRST gate run — **the FOURTH time today**; 2.4s alone, green on re-run. Load, not code |
+>
+> ## NEXT IN THIS LANE'S QUEUE
+> **G (Priority, Due, Type as first-class rows).** ⚠ **Door F used `16.15`–`16.22`, so `16.23`–`16.30`
+> (EIGHT) remain** — G's row says it is *"a difference in what the sheet CLAIMS TO BE"* and warns that
+> **`Due` is already real** (the board cards carry due dates) while the other two need measuring. **If G
+> needs more than eight cases, STOP AND ASK.**
+>
 > # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~19:1x IST. **DOOR A IS MERGED AND CLOSED. THIS LANE IS
 > # HOLDING, AND THE HOLD IS A RULING, NOT AN IDLE.**
 > **Door A merged as PR #545 → `origin/main` = `ed455768`** (verified with `merge-base --is-ancestor

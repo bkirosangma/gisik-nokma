@@ -7,10 +7,18 @@ import { createClientStateCache } from '../../src/cache.js';
 import { ServingGapError, SERVING_GAPS } from '../../src/online/mappers.js';
 import type { AttachmentListEntry } from '../../src/views/attachment-list.js';
 import type { EditorSlotComponent } from '../../src/views/editor-slot.js';
-import type { TicketHistoryEvent, TicketRead } from '../../src/view-types.js';
+import type { ListRow, TicketHistoryEvent, TicketRead } from '../../src/view-types.js';
 import { HISTORY_PAGE_LIMIT, TicketSheet } from '../../src/views/ticket-sheet.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
-import { PARENT, TICKET, WF_ERRAND, WS, claim, ticketStateSeed } from '../helpers/seed.js';
+import {
+  PARENT,
+  TICKET,
+  WF_ERRAND,
+  WS,
+  claim,
+  listRowSeed,
+  ticketStateSeed,
+} from '../helpers/seed.js';
 
 const PROVENANCE_LINE = 'marked Doing by Anselma Marak on 19 Aug 2026';
 
@@ -57,7 +65,7 @@ function ticketRead(overrides: Partial<TicketRead> = {}): TicketRead {
   };
 }
 
-function sheetSource(read: TicketRead, history: TicketHistoryEvent[] = []) {
+function sheetSource(read: TicketRead, history: TicketHistoryEvent[] = [], rows: ListRow[] = []) {
   return createFakeDataSource({
     getTicket: async () => read,
     getWorkflowDef: async () => WF_ERRAND,
@@ -69,6 +77,12 @@ function sheetSource(read: TicketRead, history: TicketHistoryEvent[] = []) {
       { id: 'user_anselma', name: 'Anselma Marak', role: 'member' },
     ],
     getTicketHistory: async () => history,
+    // Door F: the project's rows, from which the SUBTASKS section derives this
+    // ticket's children by `parentId`. Empty by default so every case written
+    // before this one keeps the shape it had; a case that wants children passes
+    // them, and the sheet's RECONCILIATION is what makes an empty list here a
+    // visible disagreement rather than a silent one.
+    getTickets: async (projectId) => ({ projectId, rows }),
   });
 }
 
@@ -197,14 +211,21 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     expect(screen.getByText('19 Aug 2026, 15:30 IST')).toBeInTheDocument();
   });
 
-  it('PLANTED DEFECT: four live reads means four stream subscriptions, all on this workspace', async () => {
+  it('PLANTED DEFECT: five live reads means five stream subscriptions, all on this workspace', async () => {
     // Ruling P17: `useLiveQuery` keys the SUBSCRIPTION on the workspace and the
-    // REFETCH on the query key. Four reads ride this sheet — ticket, workflow,
-    // members, history — and each opens its own subscription.
+    // REFETCH on the query key. Five reads ride this sheet — ticket, workflow,
+    // members, history, and the project's rows from which the SUBTASKS are
+    // derived (door F, 2026-09-19) — and each opens its own subscription.
+    //
+    // **The count was four until door F and the change is deliberate.** This
+    // assertion is a planted defect: it exists so that adding a read is a
+    // decision somebody makes rather than a side effect. The fifth read is a
+    // real cost — a subscription per open sheet — and it is paid because the
+    // list read is what makes the subtasks section possible without a route.
     const source = sheetSource(ticketRead());
     renderSheet(ticketRead(), source);
     await settled();
-    expect(source.subscriptions).toHaveLength(4);
+    expect(source.subscriptions).toHaveLength(5);
     expect(source.subscriptions.every((s) => s.workspaceId === WS)).toBe(true);
   });
 
@@ -1457,5 +1478,181 @@ describe('13.989 the description is editable, on the door that already exists', 
     // the transport one is true of it — it gets its own slot and its own tone.
     expect(await screen.findByText('Attachments are unavailable here.')).toBeInTheDocument();
     expect(screen.queryByText(/Refused by the server/)).toBeNull();
+  });
+});
+
+/**
+ * Door F, 2026-09-19 — THE SUBTASKS SECTION. Cases `16.15`–`16.22`.
+ *
+ * **The section's whole claim is that a subtask is a ticket of its own**, which
+ * the empty state says in words and the list has to say in structure: each child
+ * carries its OWN state. That is why the fixture's children are given DIFFERENT
+ * states — a section that printed the parent's state on every row would pass a
+ * one-child fixture completely.
+ *
+ * **And the case that matters most is `16.17`.** The children are DERIVED from
+ * the list read rather than served by a route, so the failure this section could
+ * hide is a silently short list. The server already sends the count, so the
+ * derivation is reconciled against it every render — and `16.17` is the case
+ * that makes the reconciliation falsifiable rather than decorative.
+ */
+describe('F — the subtasks section', () => {
+  const child = (over: Partial<ListRow> = {}): ListRow =>
+    listRowSeed({ parentId: TICKET, ...over });
+
+  it('16.15 lists this ticket’s children, each with its OWN state', async () => {
+    const read = ticketRead({ rollup: { totalChildren: 2, terminalChildren: 1, restrictedCount: 0 } });
+    const source = sheetSource(read, [], [
+      child({ ticketId: 'tkt-s1', title: 'Order the brochures', stateName: 'To do' }),
+      child({ ticketId: 'tkt-s2', title: 'Book the venue', stateName: 'Done' }),
+    ]);
+    renderSheet(read, source);
+    await settled();
+
+    const section = await screen.findByTestId('sheet-subtasks');
+    expect(within(section).getByText('Order the brochures')).toBeInTheDocument();
+    // The SECOND child's OWN state, not a repeat of the first's — the property
+    // "a subtask is a ticket of its own", asserted rather than described.
+    expect(within(section).getByText('Done')).toBeInTheDocument();
+    expect(within(section).getByText('To do')).toBeInTheDocument();
+  });
+
+  it('16.16 says what a subtask IS when there are none', async () => {
+    // `rollup: null` is the server's own spelling for "no children at all"
+    // (`ticket-cards.ts`), so this is the genuine empty case and not a read that
+    // failed to answer.
+    const read = ticketRead({ rollup: null });
+    renderSheet(read, sheetSource(read, [], []));
+    await settled();
+
+    // The prototype's sentence, verbatim — and it is a claim about the MODEL,
+    // which `16.15` above is what makes true.
+    expect(await screen.findByTestId('sheet-subtasks-empty')).toHaveTextContent(
+      'No subtasks. A subtask is a ticket of its own — it gets a state, an assignee, a date and a history.',
+    );
+  });
+
+  it('16.17 REFUSES TO RENDER A SHORT LIST — the rollup counts more than could be read', async () => {
+    // THE RECONCILIATION. The server says two children are visible; the derived
+    // read produced one. That is the silently-short-list failure, and the
+    // section must SAY so rather than draw the one row it has.
+    const read = ticketRead({ rollup: { totalChildren: 2, terminalChildren: 0, restrictedCount: 0 } });
+    const source = sheetSource(read, [], [child({ ticketId: 'tkt-only', title: 'The only one read' })]);
+    renderSheet(read, source);
+    await settled();
+
+    const refusal = await screen.findByTestId('sheet-subtasks-incomplete');
+    expect(refusal).toHaveTextContent('The server counts 2 subtasks you can see, and 1 could be read');
+    // AND THE SHORT LIST IS NOT DRAWN. Asserting only the refusal would pass
+    // against a section that showed both — the failure mode is a row nobody
+    // should be able to read while the count says otherwise.
+    expect(screen.queryByText('The only one read')).toBeNull();
+    expect(screen.queryByTestId('sheet-subtasks-empty')).toBeNull();
+  });
+
+  it('16.18 does NOT draw the list when the read is complete — the control for 16.17', async () => {
+    // The same fixture with the count AGREEING. Without this, `16.17` would pass
+    // against a section that refused everything, and the reconciliation would
+    // look correct while making the section useless.
+    const read = ticketRead({ rollup: { totalChildren: 1, terminalChildren: 0, restrictedCount: 0 } });
+    const source = sheetSource(read, [], [child({ ticketId: 'tkt-ok', title: 'The only one' })]);
+    renderSheet(read, source);
+    await settled();
+
+    expect(screen.queryByTestId('sheet-subtasks-incomplete')).toBeNull();
+    expect(await screen.findByText('The only one')).toBeInTheDocument();
+  });
+
+  it('16.19 lists ONLY this ticket’s children — a sibling’s child is not one of them', async () => {
+    const read = ticketRead({ rollup: { totalChildren: 1, terminalChildren: 0, restrictedCount: 0 } });
+    const source = sheetSource(read, [], [
+      child({ ticketId: 'tkt-mine', title: 'Mine' }),
+      // Same project, a DIFFERENT parent. The filter is `parentId === ticketId`,
+      // so this must not appear — a section that listed the project's rows would
+      // look identical on a one-child fixture.
+      child({ ticketId: 'tkt-theirs', parentId: PARENT, title: 'Somebody else’s' }),
+    ]);
+    renderSheet(read, source);
+    await settled();
+
+    expect(await screen.findByText('Mine')).toBeInTheDocument();
+    expect(screen.queryByText('Somebody else’s')).toBeNull();
+  });
+
+  it('16.20 Add subtask sends ticket.created with THIS ticket as parent, the title AS TYPED, and start focus', async () => {
+    const read = ticketRead({ rollup: null });
+    const source = sheetSource(read, [], []);
+    renderSheet(read, source);
+    await settled();
+
+    await userEvent.type(screen.getByTestId('sheet-subtask-title'), '  Book the venue  ');
+    await userEvent.click(screen.getByTestId('sheet-subtask-add'));
+
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    const event = source.ingested[0]![0]!;
+    expect(event.type).toBe('ticket.created');
+    expect(event.payload).toEqual({
+      typeId: expect.any(String) as unknown as string,
+      projectId: expect.any(String) as unknown as string,
+      // THE PARENT, which is the whole of "a subtask".
+      parentId: TICKET,
+      // AS TYPED, spaces and all: the schema refuses a blank, and a client that
+      // trimmed would make that refusal unreachable while rewriting the words.
+      title: '  Book the venue  ',
+      // The prototype births a subtask in the workflow's FIRST state
+      // (`col: states[0].key`), which is this model's `'focus'` — sent ALWAYS,
+      // never left to the wire's absence-means-focus fallback.
+      start: 'focus',
+    });
+  });
+
+  it('16.21 a refused title shows the SERVER’s sentence and KEEPS what was typed', async () => {
+    const read = ticketRead({ rollup: null });
+    const source = sheetSource(read, [], []);
+    source.ingest = async (events) => {
+      source.ingested.push(events);
+      return events.map((event) => ({
+        status: 'invalid' as const,
+        eventId: event.id,
+        // `invalid-payload` — HYPHEN, matching `EnvelopeErrorCode`
+        // (`parse-event.ts:11`). The first draft wrote `invalid_payload` and
+        // typecheck refused it: an `as const` on a member that does not exist
+        // asserts the shape rather than checking it.
+        code: 'invalid-payload' as const,
+        message: 'must not be blank — a title of only spaces names nothing',
+      }));
+    };
+    renderSheet(read, source);
+    await settled();
+
+    await userEvent.type(screen.getByTestId('sheet-subtask-title'), '   ');
+    await userEvent.click(screen.getByTestId('sheet-subtask-add'));
+
+    const refusal = await screen.findByTestId('sheet-subtask-refusal');
+    // The server's own words, presented — not a paraphrase of a refusal it did
+    // not send. An `invalid` answer carries `message`, NOT `reason`, and reading
+    // the wrong arm would render `undefined` here.
+    expect(refusal).toHaveTextContent('must not be blank');
+    expect(refusal).not.toHaveTextContent('undefined');
+    // KEPT, so a fixable refusal does not make the person retype it.
+    expect(screen.getByTestId('sheet-subtask-title')).toHaveValue('   ');
+  });
+
+  it('16.22 does NOT draw the prototype’s `Subtask of {parent}` chip', async () => {
+    // The prototype's SECOND direction (`desktop.dc.html:1240`) — a chip on a
+    // ticket that is ITSELF a subtask, with a control to open the parent. It is
+    // not in the dispatch's row, and the standing rule is the row's scope and
+    // nothing else. This case exists so that adding it later is a decision
+    // rather than a drift, and the fixture IS a child (its parent is set), so
+    // the chip would have something to say.
+    const read = ticketRead({
+      parent: { kind: 'ticket', id: PARENT, title: 'Registrations' },
+      rollup: null,
+    });
+    renderSheet(read, sheetSource(read, [], []));
+    await settled();
+
+    await screen.findByTestId('sheet-subtasks');
+    expect(screen.queryByText(/Subtask of/)).toBeNull();
   });
 });

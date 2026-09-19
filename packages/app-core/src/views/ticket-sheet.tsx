@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { statesWithBacklog, type SubmittedEvent } from '@gisik-nokma/domain';
+import { newUlid, statesWithBacklog, type SubmittedEvent } from '@gisik-nokma/domain';
 import { Button, Chip, Select, Sheet } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
@@ -216,6 +216,20 @@ export function TicketSheet({
    * dialog with its own submit and its own concerns, untouched here.
    */
   const [submitting, setSubmitting] = useState(false);
+  /**
+   * The new-subtask field (door F, 2026-09-19), and its own double-submit
+   * latch and refusal slot — the same pair `submitting`/`editorError` keep for
+   * Close/Reopen, for the same reason: a rapid double-click would otherwise
+   * create the same child twice, and this sheet has ONE button to click.
+   *
+   * `''` is the input UNTOUCHED and it is not special-cased here: the field is
+   * submitted as typed, and `ticketCreatedPayload`'s own title rule refuses a
+   * blank with its own sentence — the prototype's refusal, *"Give the subtask a
+   * title — it is a ticket of its own"*, is the presentation of that answer.
+   */
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [addingSubtask, setAddingSubtask] = useState(false);
+  const [subtaskRefusal, setSubtaskRefusal] = useState<string | null>(null);
 
   const read = useLiveQuery(dataSource, workspaceId, ticketId, () =>
     dataSource.query.getTicket(workspaceId, ticketId),
@@ -235,6 +249,55 @@ export function TicketSheet({
   const history = useLiveQuery(dataSource, workspaceId, `${ticketId}:history`, () =>
     dataSource.query.getTicketHistory(ticketId, undefined, HISTORY_PAGE_LIMIT),
   );
+  /**
+   * The ticket's CHILDREN (door F, 2026-09-19) — derived from the list read the
+   * client already makes, NOT from a new route.
+   *
+   * ## Why the list read is the honest source, measured rather than assumed
+   *
+   * A child is a ticket whose `parentId` is this one (`entity-state.ts:30`), and
+   * every `ListRow` carries `parentId` (`view-types.ts:266`). Three things had
+   * to hold before deriving them here rather than adding a route, and all three
+   * were measured:
+   *
+   * 1. **The read is NOT single-page.** `getTickets` walks the server's cursor
+   *    to exhaustion (`online-data-source.ts`), so no child is lost to a page
+   *    boundary.
+   * 2. **The filter is EMPTY, so it cannot exclude a child.** `FilterSpec` with
+   *    every axis absent means "all" — including closed ones. A filtered call
+   *    would silently omit a closed child, which is the exact failure this
+   *    section would otherwise introduce.
+   * 3. **It REFUSES rather than truncating.** Past `LIST_ROW_CAP` (2000 rows)
+   *    the walk throws `ServingGapError` — *"never 'we happened to stop'"* in
+   *    its own words — so a project too large to read completely produces a
+   *    refusal the sheet can present, never a short list that looks right.
+   *
+   * ## And a SECOND guard, independent of all three
+   *
+   * The server already sends the number of children: `rollup.totalChildren`
+   * counts them all and `restrictedCount` names the ones this viewer may not
+   * see (`formatRollup` renders both together for exactly that reason). So the
+   * derived list is RECONCILED against it below, and a disagreement is reported
+   * rather than rendered — see `subtasksIncomplete`. Two independent checks on
+   * the same claim, because the failure they guard is a silently short list.
+   */
+  /**
+   * **The key CARRIES the project id, and that is not a detail.** A key of
+   * `${ticketId}:subtasks` alone is registered on the first render — when
+   * `read.data` is still null — runs once, answers `[]`, and NEVER re-runs,
+   * because nothing in the key changed when the ticket arrived. The workflow
+   * query one screen up dodges the identical trap by keying on
+   * `workflowId@version`, a value that only exists once the ticket has landed;
+   * this does the same with `projectId`. Found by the cases below failing: four
+   * of them passed children in and the section listed none.
+   */
+  const subtasksKey = `${ticketId}:subtasks:${read.data?.ticket.projectId ?? ''}`;
+  const subtasks = useLiveQuery(dataSource, workspaceId, subtasksKey, async () => {
+    const current = read.data?.ticket ?? null;
+    if (current === null) return [];
+    const page = await dataSource.query.getTickets(current.projectId, {}, 'flat');
+    return page.rows.filter((row) => row.parentId === ticketId);
+  });
 
   if (read.error !== null) {
     return (
@@ -572,6 +635,88 @@ export function TicketSheet({
   };
 
   const state = ticketRead.ticket;
+  /**
+   * The children, RECONCILED against the count the server sent (door F).
+   *
+   * **This is the second guard, and it is deliberately independent of the
+   * first.** The read that produced `subtaskRows` was measured to be complete
+   * (see the `subtasks` live query), but a render that TRUSTS that measurement
+   * is one refactor away from rendering a short list. The server already sends
+   * the number — `totalChildren` counts them all and `restrictedCount` names
+   * the ones this viewer may not see — so the derivation is checked against it
+   * every render, and a disagreement is SAID rather than drawn.
+   *
+   * `rollup === null` is a real fact (no children at all, `ticket-cards.ts`'s
+   * own reading), so it is not treated as an unknown to be excused.
+   */
+  const subtaskRows = subtasks.data ?? [];
+  const subtaskExpected =
+    ticketRead.rollup === null
+      ? 0
+      : ticketRead.rollup.totalChildren - ticketRead.rollup.restrictedCount;
+  const subtasksIncomplete = ticketRead.rollup !== null && subtaskRows.length !== subtaskExpected;
+
+  /**
+   * Add a subtask (door F, 2026-09-19) — the ordinary `ticket.created` with a
+   * parent, through the ingest the sheet already uses. **No route, no
+   * migration**: `ticketCreatedPayload` has carried `parentId` since it was
+   * written (`packages/domain/src/events/ticket-events.ts:44`).
+   *
+   * **`start: 'focus'`, transcribed rather than chosen.** The prototype births
+   * a subtask in the workflow's FIRST state (`col: states[0].key`,
+   * `desktop.dc.html:3652`) — the same thing this model's `'focus'` means. It
+   * is sent ALWAYS and never left to the wire's absence-means-focus fallback,
+   * for `create-ticket-flow.tsx`'s recorded reason: that fallback exists for
+   * events written before the field did, and a v2 client omitting an additive
+   * field is making a choice, not keeping a compatible silence.
+   *
+   * The title goes AS TYPED. The prototype trims before testing blank because
+   * it has no schema; `ticketCreatedPayload`'s own title rule refuses a blank
+   * AND a spaces-only title, so the same input draws the same refusal through
+   * our mechanism, and nobody's words are quietly rewritten on the way.
+   */
+  const addSubtask = async (): Promise<void> => {
+    setSubtaskRefusal(null);
+    setAddingSubtask(true);
+    try {
+      const event = make({
+        workspaceId,
+        entity: { kind: 'ticket', id: newUlid() },
+        type: 'ticket.created',
+        payload: {
+          typeId: state.typeId,
+          projectId: state.projectId,
+          parentId: ticketId,
+          title: newSubtaskTitle,
+          start: 'focus',
+        },
+      });
+      const results = await dataSource.ingest([event]);
+      const answer = results[0];
+      if (answer === undefined || answer.status !== 'committed') {
+        // A PRESENTATION of the refusal the server sent, never a paraphrase of
+        // one it did not — this file's own rule for the same slot elsewhere.
+        // **And BOTH non-committed arms are named, because they are different
+        // sentences**: a blank title is `invalid` (`IngestResult` carries
+        // `message` there, from the payload schema) while the rule engine's
+        // answer is `refused` (which carries `reason`). Reading `.reason` off
+        // an `invalid` answer would present `undefined` as the server's words.
+        const said =
+          answer === undefined
+            ? 'The server did not answer, so what happened is not known.'
+            : answer.status === 'invalid'
+              ? answer.message
+              : answer.reason;
+        setSubtaskRefusal(`That subtask was not created: ${said}`);
+        return;
+      }
+      // Cleared only on a committed answer: a refusal keeps the title so it can
+      // be fixed rather than retyped.
+      setNewSubtaskTitle('');
+    } finally {
+      setAddingSubtask(false);
+    }
+  };
   // `statesWithBacklog`, not `workflow.data?.states` (backlog/closed spec
   // §1.4, 2026-09-17): a ticket in the universal Backlog state has no row in
   // the published definition's own `states`, and the sheet must still say
@@ -874,6 +1019,80 @@ export function TicketSheet({
           {ticketRead.rollup !== null ? (
             <p className="gn-ticket-sheet__progress">{formatRollup(ticketRead.rollup)}</p>
           ) : null}
+
+          {/* Door F, 2026-09-19 — THE SUBTASKS SECTION. The prototype draws it
+              as its own block between the progress line and the fields
+              (`desktop.dc.html:1238-1265`): a heading carrying the count, the
+              children, an empty state that names what a subtask IS, and the add
+              row. Ours drew only the count, which is why this section exists.
+
+              ⚠ The prototype's SECOND direction — a `Subtask of {parent}` chip
+              on a ticket that is itself a subtask, with a control to open the
+              parent (`:1240`) — is deliberately NOT built. It is not in the
+              dispatch's row, and the standing rule is the row's scope and
+              nothing else. */}
+          <section className="gn-ticket-sheet__subtasks" data-testid="sheet-subtasks">
+            <p className="gn-ticket-sheet__subtasks-heading">
+              Subtasks
+              {ticketRead.rollup === null ? '' : ` · ${formatRollup(ticketRead.rollup)}`}
+            </p>
+            {subtasksIncomplete ? (
+              // THE RECONCILIATION, rendered rather than swallowed. A short list
+              // here is the one failure this section could hide, so it is said
+              // in the server's own numbers instead of drawn.
+              <p
+                className="gn-ticket-sheet__refusal"
+                role="alert"
+                data-testid="sheet-subtasks-incomplete"
+              >
+                {`The server counts ${subtaskExpected} subtask${subtaskExpected === 1 ? '' : 's'} you can see, and ${subtaskRows.length} could be read — so this list is not shown rather than shown short.`}
+              </p>
+            ) : subtaskRows.length === 0 ? (
+              <p className="gn-ticket-sheet__subtasks-empty" data-testid="sheet-subtasks-empty">
+                No subtasks. A subtask is a ticket of its own — it gets a state, an assignee, a date
+                and a history.
+              </p>
+            ) : (
+              <ul className="gn-ticket-sheet__subtasks-list">
+                {subtaskRows.map((row) => (
+                  <li key={row.ticketId} data-testid={`subtask-${row.ticketId}`}>
+                    <span className="gn-ticket-sheet__subtask-title">{row.title}</span>
+                    {/* The child's OWN state, spelled from the served row — the
+                        empty state's sentence claims a subtask gets a state, so
+                        the list has to show one or the claim is decoration. */}
+                    <span className="gn-ticket-sheet__subtask-state">{row.stateName}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <form
+              className="gn-ticket-sheet__subtask-add"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void addSubtask();
+              }}
+            >
+              <label className="gn-field" htmlFor="gn-new-subtask-title">
+                <span className="gn-field__label">New subtask title</span>
+                <input
+                  id="gn-new-subtask-title"
+                  className="gn-field__input"
+                  data-testid="sheet-subtask-title"
+                  value={newSubtaskTitle}
+                  onChange={(event) => setNewSubtaskTitle(event.target.value)}
+                  disabled={addingSubtask}
+                />
+              </label>
+              <Button data-testid="sheet-subtask-add" type="submit" disabled={addingSubtask}>
+                {addingSubtask ? 'Adding…' : 'Add subtask'}
+              </Button>
+            </form>
+            {subtaskRefusal === null ? null : (
+              <p className="gn-ticket-sheet__refusal" role="alert" data-testid="sheet-subtask-refusal">
+                {subtaskRefusal}
+              </p>
+            )}
+          </section>
 
           <dl className="gn-ticket-sheet__fields">
             <div className="gn-ticket-sheet__field" data-testid="field-assignee">
