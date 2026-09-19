@@ -223,7 +223,15 @@ describe('9.61 — the real editor mounts in the real sheet, in the app that dep
     // `PlainTextEditorSlot`. The submit control is that component's own, and the
     // plain fallback renders no button at all.
     expect(within(row).getByRole('button', { name: 'Save description' })).toBeInTheDocument();
-    expect(row.querySelector('.editor-slot--plain')).toBeNull();
+    // ⚠ THE SPELLING HERE IS LOAD-BEARING, and the first draft got it wrong.
+    // It read `.editor-slot--plain`, which is NOT the fallback's class — that
+    // component renders `gn-editor-slot gn-editor-slot--plain`
+    // (`packages/app-core/src/views/editor-slot.tsx:133`) — so the selector
+    // matched nothing whether or not the fallback rendered. **A check that
+    // cannot fail**, and it was caught by an independent review rather than by
+    // this file. The correct spelling is the one
+    // `packages/app-core/test/views/editor-slot.test.tsx:93` already uses.
+    expect(row.querySelector('.gn-editor-slot--plain')).toBeNull();
     // And the claim line states the truth about an unclaimed field.
     expect(within(row).getByText('no description yet')).toBeInTheDocument();
   });

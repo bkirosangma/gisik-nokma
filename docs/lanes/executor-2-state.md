@@ -42,7 +42,12 @@ same `<dl>`), and the loop skips `description` so it is drawn once.
 - **The web loaded no editor stylesheet.** `packages/editor/src/styles/editor.css` was imported ONLY by
   `packages/editor/src/webview/entry.tsx` (the RN webview bundle) and had no `exports` entry. Now exported
   (`"./editor.css"`, mirroring `packages/ui`'s `"./ui.css"`) and imported by `apps/web/app/layout.tsx`.
-  **Without it the composer mounts unstyled.**
+  **Without it the editor's CONTENT — the document, images, mention nodes, the picker popup, upload
+  chips, attachment and evidence items — renders bare. ⚠ The first draft of this line said "the composer
+  mounts unstyled", and an independent review measured that as an OVERSTATEMENT: `.editor-slot` and
+  `.editor-slot__submit` (the wrapper and the Save control, `TicketEditorSlot.tsx:199/218`) have **no CSS
+  rule anywhere in the repo** and fall back to user-agent styling. That is a real gap, recorded with an
+  owner below — it is just not this import's doing.**
 - **⚠ `apps/web/e2e-viewport/type-scale.ts` asserted the opposite**, in the paragraph excusing two mono
   rules from its font equality: *"`editor.css` is loaded only inside the RN webview this suite never
   opens."* True until this change, false after — corrected in the same change set, with the equality
@@ -216,6 +221,39 @@ this change never touched** — and **all 51 passed in isolation**, so they were
 - **A red at high load has been the environment every time today** — isolate the FILES alone before believing
   it, not just the one file.
 - **Never pipe a test run into `head`.**
+
+### § 8 — INDEPENDENT REVIEW, RUN AND RECORDED BEFORE THE PR OPENED (freeze-line ruling, 2026-09-18).
+
+**Four findings, all CONFIRMED and all acted on; the reviewer's verdict on what it checked is at the foot
+of this block.** It was dispatched after the branch was pushed and before the PR was opened, per
+`PR freeze-line discipline`. It left the tree clean.
+
+| # | finding | what was done |
+|---|---|---|
+| 1 | **`apps/web/test/description-editable.test.tsx` asserted `.editor-slot--plain`, and the fallback's class is `gn-editor-slot--plain`** — a selector that matches nothing either way. **A check that cannot fail**, in this very change set, caught by the reviewer and not by me. | Fixed to the real class; the arm is now live (mutation in `submit` kills it). |
+| 2 | **`editorError` was set and rendered but never cleared.** After a pasted-file refusal, a successful description save cleared the other two slots and left the amber alert up for the life of the sheet. | `setEditorError(null)` added to `submitDescription`'s `committed` branch. |
+| 3 | **`packages/ui/test/components.test.tsx`'s refusal roster (`13.290`) listed only `--preview` and `--server`.** `--transport` had been missing since Ruling 27 added it; `--editor` was missing because this change added it. | Roster widened to all four variants — it passes, so this **widens** the check rather than relaxing it. |
+| 4 | **⚠ MY OWN CLAIM WAS AN OVERSTATEMENT.** I wrote that importing `editor.css` is what stops the composer mounting "unstyled". `editor.css` styles the editor's CONTENT and furniture; **`.editor-slot` and `.editor-slot__submit` have no CSS rule anywhere in the repo** and fall back to UA styling. | The claim is narrowed to what is true, in this file, in `type-scale.ts`, and in the commit message. |
+
+**⚠ NEW GAP, FOUND BY FIX 4, MOUNTED AND UNSTYLED — owner: whoever next touches the composer's chrome.**
+`.editor-slot__submit` is the button a person clicks to save a description on the web, and it is drawn by
+the browser default because no stylesheet anywhere names it. `editor.css` is STRUCTURAL-ONLY by its own
+header (no colour of any kind), so the fix cannot live there without breaking that file's scanner contract
+— it belongs in `packages/ui/src/ui.css` beside the other controls, or in the slot's own component. **This
+change makes that button reachable for the first time, which is what put it in view; it does not fix it.**
+
+**What the reviewer checked and found SOUND**, recorded so a reader knows the coverage: the
+`queryUsers`/`NO_MENTIONS` justification (the cited lines and the `'No people match'` string are exact);
+`canEditDescription` against `canSetVisibility` and the assignee row; **that `packages/app-core/dist`
+matches `src` at this head**, which is what the § 4 survivor needed; the `ticket.created` writes-title-only
+premise; row geometry (no double render, no stale key, no other `field-description` reference, no
+snapshots anywhere); that the global `editor.css` import is colourless, collides with no class name, and
+keeps every `font-size` at or above the 12px floor; the help freshness gate and that the help section/entry
+titles are byte-identical to `main` (255 titles both sides), which is why the `/help` offender populations
+could not have moved; and the one-way dependency edge.
+
+**Not reproduced by the reviewer, named rather than implied:** the full turbo gate, the mutation battery
+(its dist state was verified instead), and the browser/viewport run.
 
 ---
 

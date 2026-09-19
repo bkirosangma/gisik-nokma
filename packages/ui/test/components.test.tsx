@@ -311,7 +311,20 @@ describe('R1(c) at the component layer', () => {
     expect(rule('.gn-button')).not.toMatch(PAINTING_BORDER);
   });
   it('13.290 refusal panels carry tone as an inset fill, never a border', () => {
-    for (const s of ['.gn-refusal--preview', '.gn-refusal--server']) {
+    // ⚠ `.gn-refusal--transport` and `.gn-refusal--editor` were BOTH MISSING
+    // from this roster, and a roster that omits members is the shape this repo
+    // keeps getting caught by: the property is unenforced for exactly the
+    // variants nobody listed, so a future edit that gave one of them a real
+    // border would go unnoticed. `--transport` has been absent since Ruling 27
+    // added it (2026-09-16); `--editor` was added on 2026-09-19 and its own
+    // change set is what put `--transport` back in view. Both pass — this
+    // widens the roster to the whole family, it does not relax it.
+    for (const s of [
+      '.gn-refusal--preview',
+      '.gn-refusal--server',
+      '.gn-refusal--transport',
+      '.gn-refusal--editor',
+    ]) {
       const body = rule(s);
       expect(body, s).toMatch(/box-shadow:\s*inset 4px 0 0 var\(--gn-(warning|danger)\)/);
       expect(body, s).not.toMatch(PAINTING_BORDER);

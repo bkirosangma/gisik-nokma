@@ -183,7 +183,20 @@ export type TypeScale = {
    * THE OPPOSITE.** Its sentence read *"`editor.css` is loaded only inside the
    * RN webview this suite never opens"* and was true until 2026-09-19, when
    * `apps/web/app/layout.tsx` began importing it so the ticket sheet's real
-   * editor renders styled rather than bare. **The equality above still holds,
+   * editor renders its CONTENT styled rather than bare.
+   *
+   * **⚠ "Its content" is the precise claim, and the first draft of this note
+   * said "the composer mounts unstyled" instead — which an independent review
+   * measured as an OVERSTATEMENT.** `editor.css` styles the editor's document
+   * and its furniture (images, mention nodes, the picker popup, upload chips,
+   * attachment and evidence items). It does **not** style `.editor-slot` or
+   * `.editor-slot__submit`, the wrapper and the Save control
+   * `TicketEditorSlot.tsx:199/218` emit: `grep -rn '\.editor-slot' --include='*.css'`
+   * over `packages/` and `apps/` returns **nothing**, so both fall back to
+   * user-agent styling. That is a real gap and it is recorded rather than
+   * implied away; it is simply not this import's doing.
+   *
+   * **The equality above still holds,
    * and that was MEASURED rather than assumed:** that stylesheet declares
    * `font: inherit` in three rules (`.mention-popup__item`,
    * `.image-wrap-menu__option`, `.image-wrap-menu__alt`) — INHERITANCE, never a

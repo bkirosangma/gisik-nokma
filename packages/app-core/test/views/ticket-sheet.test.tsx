@@ -1430,6 +1430,24 @@ describe('13.989 the description is editable, on the door that already exists', 
     expect(within(row).getByText('no description yet')).toBeInTheDocument();
   });
 
+  it('a SUCCESSFUL save clears the editor-error slot, so the sheet never asserts a failure that is over', async () => {
+    const source = renderSheet(ticketRead(), undefined, {
+      editorSlot: fakeEditorSlot({ readOnly: [] }),
+    });
+    await settled();
+    await userEvent.click(screen.getByRole('button', { name: 'Paste an image' }));
+    expect(await screen.findByText('Attachments are unavailable here.')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save description' }));
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    // The other two slots clear on `committed`; the third must too, or a save
+    // that just succeeded leaves the sheet asserting a current failure. Caught
+    // by independent review: this slot was set and rendered but never cleared.
+    await waitFor(() =>
+      expect(screen.queryByText('Attachments are unavailable here.')).toBeNull(),
+    );
+  });
+
   it("the editor's own failure reaches an alert, and is never swallowed", async () => {
     renderSheet(ticketRead(), undefined, { editorSlot: fakeEditorSlot({ readOnly: [] }) });
     await settled();

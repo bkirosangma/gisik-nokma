@@ -413,6 +413,13 @@ export function TicketSheet({
     if (result.status === 'committed') {
       setServerRefusal(null);
       setTransportError(null);
+      // AND THE THIRD SLOT, which the first draft of this handler left set.
+      // `editorError` reports the outcome of the editor's last action, so a
+      // SUCCESSFUL action supersedes it; without this line a pasted-file
+      // refusal stayed on screen for the life of the sheet, and the three slots
+      // disagreed about which of them was still current after a save that
+      // cleared the other two. Caught by independent review, not by this file.
+      setEditorError(null);
       read.reload();
       history.reload();
       return;
