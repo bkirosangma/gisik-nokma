@@ -630,7 +630,15 @@ describe('the admin gate — which admin-ness the three admin-only surfaces mean
  *
  * It has to run while the world is PRISTINE, and that is a measured constraint
  * rather than a taste. The very first thing this file's migrate suite does is
- * REBIND `chore` onto `wf-errands` (`:699-700` assert the move), and `chore` is
+ * REBIND `chore` onto `wf-errands`. **Cited by content and NOT by line number,
+ * deliberately** — this docblock's own insertion is what moves the target, and
+ * it did so twice in one sitting: the first version said `:699-700` (a blank line
+ * and the divergence-fixture header by the time it was written), and the version
+ * that replaced it said `:964` and was off by six before it was saved. Find it by
+ * `migrate('owner', 'chore', request)` in this file's migrate suite; its two
+ * assertions are the `populationOf('chore', …)` pair beneath it. **A same-file
+ * line citation is the easiest one to get wrong and the hardest to notice.**
+ * `chore` is
  * the whole distinguishing fixture below: before that rebind its one ticket is
  * on `wf-second`, so the type's own count is 1 while the pinned read for
  * `wf-errands` is 0 — and after the rebind both are 1 and the case proves

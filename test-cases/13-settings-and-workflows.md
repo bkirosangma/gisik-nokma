@@ -161,7 +161,8 @@ deliverable. Two facts, each read rather than inferred:
    version?)` (`packages/app-core/src/data-source.ts:146`) declares a version parameter; the ONLINE
    adapter sends it (`online-data-source.ts:277-281` builds `?version=`), the replica adapter answers one
    locally, and the server route `GET /v1/workspaces/:workspaceId/workflows/:workflowId?version=N` serves
-   any single version (`apps/server/src/routes/builder-reads.ts:517-546`, numeric branch at
+   any single version (`apps/server/src/routes/builder-reads.ts:579-608` — **re-pointed 2026-09-19 from
+   `:517-546`, which was correct until Task 8's two insertions in that file moved it by +62**; numeric branch at
    `apps/server/src/projections/workflows.ts:116-120`). `WorkflowAuthoringGateway`
    (`packages/app-core/src/workflow-builder/gateway.ts:56-94`) **is** version-BLIND — neither
    `listWorkflows` nor `getWorkflow(workspaceId, workflowId)` takes a version — but the adapter that
@@ -263,8 +264,10 @@ knowing before concluding one of them is stale.
   3 killed. Action label and summary sentence reverted: **1 each, their own site.**
 
   **TWO ITEMS THE DISPATCH ORDERED ARE NOT BUILT, AND BOTH ARE HOLDS RATHER THAN DECISIONS.**
-  **⚠ SUPERSEDED 2026-09-19 — THE OWNER LIFTED BOTH.** The reorder is now BUILT (cases `13.928`–`13.934`
-  in the section at the foot of this file); the per-type count remains unbuilt and is Task 8. **The
+  **⚠ SUPERSEDED 2026-09-19 — THE OWNER LIFTED BOTH, AND BOTH ARE NOW BUILT.** The reorder is BUILT (cases
+  `13.928`–`13.934`); the per-type count is BUILT TOO (cases `13.948`–`13.955`, `getTicketCountsByType` over
+  a new `ticket-counts-by-type` route) — this sentence said "remains unbuilt and is Task 8" until Task 8
+  shipped in the same change set that rewrote it. **The
   paragraph below, including its sentence that the measurement "does NOT lift it", is the record as it
   stood on 2026-09-18 — read it as history, not as state.** It is kept rather than rewritten because the
   measurement it carries is what made the reorder a render task rather than the wire task three planning
@@ -354,18 +357,40 @@ writers hold conflicting claims on those files. **Owner: the controller, at the 
 sweep.**
 
 **ADDED 2026-09-19 — the same sweep is due again, and Task 8 followed the same rule rather than inventing
-one.** That change added **71 lines** at the top of the same screen file, so every citation above is off
-by a further **five** in the bullet region and by more below it. **Re-pointed, because both ends are in
-this change set:** `packages/app-core/test/ticket-types/ticket-types.test.tsx`'s `:38-54` → **`:43-59`**,
-and `Features.md`'s `:130-145` → **`:331-351`** (that one was already off — it named the loading effect
-rather than the `section > header > Card` shell — so it is a fix rather than a shift, and it is marked as
-one where it stands). **Recorded and NOT rewritten, same named owner — the controller:**
+one.** That change is **net +71 lines** in the same screen file. **Only five of them sit above the
+`Edit`/`Draft`/reorder bullets** — the count bullet is appended after them and the component bodies are
+below — so the shift is **+5** in the bullet region and larger further down, which is what a reader
+re-pointing a citation actually needs to know. **Re-pointed, because both ends are in this change set:**
+`packages/app-core/test/ticket-types/ticket-types.test.tsx`'s `:38-54` → **`:43-59`**; `Features.md`'s
+`:130-145` → **`:331-351`** (already off — it named the loading effect rather than the
+`section > header > Card` shell — so it is a fix rather than a shift, marked as one where it stands); and
+**`:311-337` → `:387-416` at three sites** — `ticket-type-list-screen.tsx:37` and `:357`, and
+`ticket-types.test.tsx:322`, all citing the row-door `<button>`. **Those three are the review's finding,
+not the author's:** the range was already drifting (the button was `:317-345` when the reorder shipped)
+and this change moved it out of the region entirely, so a reader following it landed in `ticketsSegment`.
+**A same-file citation whose target has moved twice is the one no instrument catches** —
+`check-case-citations` reads prose citations not at all.
+**Recorded and NOT rewritten, same named owner — the controller:**
 `apps/web/src/workspace-settings-form.tsx:94` (`:130-145`), the plan's `:195` (`:35-56`) and its
 `:113`/`:234` (`:17-23`), all five delta-audit rows, and `docs/lanes/controller-state.md:53`.
 **One of those is not merely shifted but CLOSED:** the delta audit's row for the `"N tickets"` segment
 reads *"the only population call is pinned to ONE workflow … no `countTicketsOfType` exists and the pinned
 count would be wrong here"* — both halves are now false, because the wide read exists and the screen
 renders it. That row describes the tree at audit time, which is what the audit is for.
+
+**A SECOND FILE SHIFTED, AND THE SAME RULE APPLIES TO IT.** Task 8's server work inserted **+62 lines**
+into `apps/server/src/routes/builder-reads.ts` (`readTicketCounts` and its docblock, then the performance
+note added after the review). **Re-pointed, because this file is in the change set:** the version-route
+citation at `:517-546` → **`:579-608`**, verified by content — the route's `app.get` opening line and its
+closing `);`. **Recorded, owner: the controller** — every other citation INTO that file:
+`test-cases/03-foundation-ledger.md:109` (`:531`), `test-cases/07-api-realtime-search.md:450` and `:603`
+(`:444`, `:448`), `test-cases/13-second-wave-board-actions.md:23` and
+`13-second-wave-roles-and-navigation.md:119`/`:1259` (`:247`, `:247-252`),
+`docs/hig-reconciliation-audit.md:185`/`:186` (`:247`), and the `docs/lanes/executor-state.md` ledger
+tables. **Which of those are actually wrong is part of the record, because a list a reader cannot act on
+is not a finding: `:247` and `:408-414` sit BEFORE the insertion and are untouched and still correct**;
+**`:444`/`:448` were ALREADY wrong at `origin/main`** (`MIGRATION_RULES` was at `:441` there, not `:444`),
+so they are pre-existing drift rather than this change's; the rest are shifted by +62.
 
 ## Settings → Workspace restyle: the switch, the info icons, the Save row (executor 2, 2026-09-18) — cases `13.895`–`13.901`
 
@@ -789,8 +814,8 @@ duplicated:
 - **`isTypes` (reorder, per-type counts) and `isWorkflows` (a badge, a second action) are HELD, not
   outstanding** — `docs/lanes/owner-holds.md` §1. A hold is a decision, not a debt.
   **⚠ SUPERSEDED 2026-09-19 — the owner answered all four items, and none is a hold any more.** The
-  reorder is **BUILT** (cases `13.928`–`13.934`); the per-type count is **Task 8**, still to build and
-  needing new server surface; the `isWorkflows` **badge was DROPPED**; and its **second action was
+  reorder is **BUILT** (cases `13.928`–`13.934`); the per-type count is **BUILT** too (cases
+  `13.948`–`13.955`); the `isWorkflows` **badge was DROPPED**; and its **second action was
   LIFTED** together with the version-history screen (Task 3). The sentence above is kept as the position on
   2026-09-18.
 

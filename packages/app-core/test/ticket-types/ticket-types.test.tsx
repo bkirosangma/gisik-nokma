@@ -319,7 +319,7 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
    * 13.928 — every row carries both controls, and each is a SIBLING of the row
    * door rather than a child of it.
    *
-   * The row is one `<button aria-label="Edit …">` (`:311-337`). A control
+   * The row is one `<button aria-label="Edit …">` (`:387-416`). A control
    * nested inside it would be a button inside a button — an invalid tree that
    * jsdom will happily render, which is exactly why this is asserted on the
    * DOM containment rather than on the fact that a control exists.

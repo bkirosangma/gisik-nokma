@@ -445,6 +445,23 @@ export async function readTypePopulation(
  * `::int` on the count, as above: `createPool` installs an int8 parser, but
  * saying it in the SQL means the JSON carries a number no matter which pool
  * this runs on.
+ *
+ * ## Performance: UNMEASURED, and named here rather than left to be assumed
+ *
+ * **No index on `proj_tickets` leads with `(workspace_id, type_id)`** — the pair
+ * this read filters on. The table's three indexes are `(workspace_id, parent_id)`
+ * and `(workspace_id, project_id)` (`1787961800000_proj-tickets.sql:91-92`) and a
+ * partial `(workspace_id, project_id) WHERE closed_at IS NULL`
+ * (`1789100000000_proj-tickets-closed.sql:11`), and the absence of a third
+ * leading on `workflow_id` is itself a **recorded decision** at `:66-71` of the
+ * first migration. So this scans one workspace's ticket rows and joins.
+ *
+ * **No row count and no `EXPLAIN` was taken**, so "fast enough" is asserted
+ * nowhere and nothing here depends on it being true. The shape is bounded by one
+ * workspace and the screen that calls it is an admin settings page that renders
+ * every type once; if a real workspace ever says otherwise, **the fix is an index
+ * and not a new projection**, which is the same conclusion the query-vs-projection
+ * question reached from the other direction.
  */
 export async function readTicketCounts(db: Queryable, workspaceId: string): Promise<Record<string, number>> {
   const { rows } = await db.query<{ type_id: string; count: number }>(

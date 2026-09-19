@@ -34,7 +34,7 @@ import { TypeIcon } from './icons.js';
  *   a **pre-existing** owner ruling, quoted at the rule itself (`packages/ui/src/
  *   ui.css:1811-1812`, owner 2026-09-10: *"remove [Edit] and open on just
  *   clicking the entire card/row"*). The whole row is one
- *   `<button aria-label={\`Edit ${type.name}\`}>` (`:311-337`), so an `Edit` button
+ *   `<button aria-label={\`Edit ${type.name}\`}>` (`:387-416`), so an `Edit` button
  *   beside it would be a second door to the same place — not a port.
  * - **the `"Draft"` badge — RULED: NOT BUILT** (owner, 2026-09-18). A draft ticket
  *   type is not a state this product has, so `TicketTypeDef` gains no draft flag
@@ -354,7 +354,7 @@ export function TicketTypeListScreen(props: {
             <li key={type.id}>
               {canAuthor ? (
                 // SIBLINGS of the row, never children: the whole row is one
-                // `<button>` (`:311-337`, the row-as-door ruling), and a button
+                // `<button>` (`:387-416`, the row-as-door ruling), and a button
                 // inside a button is an invalid tree jsdom renders without
                 // complaint — so the controls sit beside the door.
                 <span className="ticket-type-list__reorder">
