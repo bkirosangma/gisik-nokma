@@ -641,6 +641,109 @@ describe('the admin gate — which admin-ness the three admin-only surfaces mean
  * `wf-errands`, `chore` 1 on `wf-second`.
  */
 describe('GET /v1/workspaces/:workspaceId/ticket-counts-by-type', () => {
+  /**
+   * The CROSS-TENANCY fixture — the only thing in the suite that makes the
+   * join's `k.workspace_id = t.workspace_id` term load-bearing.
+   *
+   * `ticket-type.defined`'s ENTITY id is a fresh ULID per definition, but its
+   * PAYLOAD id — `proj_ticket_types.type_id` — is the stable key its own column
+   * comment names: *"epic, story, task, sub-task, or a custom slug"*. So two
+   * workspaces genuinely CAN hold tickets of the same `type_id`, and in
+   * production every workspace defines the built-ins. The neighbour below
+   * defines its OWN `task` and gives it one ticket, so a read that matched on
+   * `type_id` alone would count the neighbour's ticket in THIS workspace's
+   * answer — a cross-tenant leak, in a number, on an admin screen.
+   *
+   * **MEASURED, and this is why the fixture exists:** with the shared world
+   * alone, deleting that one join term reddens **nothing** — 33/33 green. Every
+   * other fixed id in the neighbour is `nb-`prefixed (`read-app.ts:337-340`
+   * explains why), so no cross-tenancy type collision existed for the mutation
+   * to expose. With this fixture, the same deletion fails 13.948.
+   *
+   * The entity id is a ULID rather than the literal `task` because the ledger's
+   * `events_entity_seq_unique` is GLOBAL — the same reason the neighbour's own
+   * ids are prefixed.
+   */
+  beforeAll(async () => {
+    const { rows } = await db.pool.query<{ workspace_id: string; ws_seq: number | null }>(
+      'SELECT workspace_id, max(workspace_seq) AS ws_seq FROM events WHERE workspace_id = ANY ($1::text[]) GROUP BY workspace_id',
+      [[read.neighbour.workspaceId, read.world.workspaceId]],
+    );
+    const seqAfter = (workspaceId: string): number =>
+      (rows.find((row) => row.workspace_id === workspaceId)?.ws_seq ?? 0) + 1;
+    let workspaceSeq = seqAfter(read.neighbour.workspaceId);
+    let mainSeq = seqAfter(read.world.workspaceId);
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        workspaceId: read.neighbour.workspaceId,
+        actorId: read.userIds.neighbour,
+        entity: { kind: 'ticket-type', id: newUlid() },
+        type: 'ticket-type.defined',
+        workspaceSeq: workspaceSeq++,
+        payload: { id: 'task', name: 'Task', icon: 'check', rank: 7, workflowId: read.neighbour.workflowId, fields: [] },
+      }),
+      makeCommitted({
+        workspaceId: read.neighbour.workspaceId,
+        actorId: read.userIds.neighbour,
+        entity: { kind: 'ticket', id: newUlid() },
+        type: 'ticket.created',
+        workspaceSeq: workspaceSeq++,
+        payload: {
+          typeId: 'task',
+          projectId: read.neighbour.projectId,
+          parentId: null,
+          title: 'Same type key, other tenancy',
+        },
+      }),
+    ]);
+
+    // ── The DIVERGENCE fixture, in this workspace ───────────────────────────
+    //
+    // The screen's own docblock records why the bound-workflow number is wrong
+    // for this segment: *a ticket pins the workflow it was created under, so
+    // that number stops being the type's count the moment a rebind leaves
+    // tickets behind.* This builds exactly that state, and it is the only
+    // fixture in the suite that can tell the wide read from a read that counts
+    // each type's tickets on the workflow the TYPE IS BOUND TO — the tempting
+    // wrong implementation, since `ticket-type.defined` carries a `workflowId`.
+    //
+    // Three events, and no fourth: the type's binding is moved by RE-DEFINING
+    // it, which is what the product's own column comment says a re-point does
+    // (*"changes only what new tickets get"*). Doing it with a
+    // `ticket.workflow_rebound` instead would have been more literal and would
+    // have broken `7.45`, which asserts the workspace holds exactly SIX rebound
+    // events — a fixture that changes what an existing case measures.
+    //
+    // After this: `stray` is bound to `wf-second`, and its one ticket is on
+    // `wf-errands`. Wide = 1; bound-workflow = 0; pinned(`wf-errands`) = 1.
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        workspaceId: read.world.workspaceId,
+        actorId: read.userIds.owner,
+        entity: { kind: 'ticket-type', id: newUlid() },
+        type: 'ticket-type.defined',
+        workspaceSeq: mainSeq++,
+        payload: { id: 'stray', name: 'Stray', icon: 'inbox', rank: 11, workflowId: 'wf-errands', fields: [] },
+      }),
+      makeCommitted({
+        workspaceId: read.world.workspaceId,
+        actorId: read.userIds.owner,
+        entity: { kind: 'ticket', id: newUlid() },
+        type: 'ticket.created',
+        workspaceSeq: mainSeq++,
+        payload: { typeId: 'stray', projectId: read.world.projectId, parentId: null, title: 'Left behind by a re-point' },
+      }),
+      makeCommitted({
+        workspaceId: read.world.workspaceId,
+        actorId: read.userIds.owner,
+        entity: { kind: 'ticket-type', id: newUlid() },
+        type: 'ticket-type.defined',
+        workspaceSeq: mainSeq++,
+        payload: { id: 'stray', name: 'Stray', icon: 'inbox', rank: 11, workflowId: 'wf-second', fields: [] },
+      }),
+    ]);
+  });
+
   it('13.948 answers each type’s own count across the WORKSPACE — a different question from the pinned population', async () => {
     const body = await okJson<TicketCountsResponse>('owner', '/ticket-counts-by-type');
 
@@ -648,6 +751,10 @@ describe('GET /v1/workspaces/:workspaceId/ticket-counts-by-type', () => {
     // same numbers `7.44` asserts a few describes up, reached by a different
     // route — the sum over workflows rather than one workflow's slice.
     expect(body.workspaceId).toBe(read.world.workspaceId);
+    // 5 and NOT 6: the neighbour holds a ticket whose `type_id` is also `task`
+    // (see the fixture above), so this line is where a read that matched on
+    // `type_id` without correlating the workspace would leak another tenant's
+    // work into this number.
     expect(body.counts['task']).toBe(5);
     expect(body.counts['epic']).toBe(1);
 
@@ -672,6 +779,29 @@ describe('GET /v1/workspaces/:workspaceId/ticket-counts-by-type', () => {
       '/ticket-types/chore/population?workflowId=wf-second',
     );
     expect(pinnedHere.count).toBe(1);
+
+    // THE DIVERGENCE, and the assertion that pins this read's whole reason to
+    // exist. `stray` was RE-POINTED at `wf-second` after its ticket was created,
+    // so its binding and its tickets disagree — the state the screen's docblock
+    // names as the moment the bound-workflow number stops being the type's
+    // count. The wide read answers 1; the number you get from the type's own
+    // `workflowId` is 0; and the workflow the ticket actually sits on is 1.
+    //
+    // MEASURED: adding `AND k.workflow_id = t.workflow_id` to the read — the
+    // tempting wrong implementation, since `ticket-type.defined` carries a
+    // `workflowId` — reddens NOTHING without this fixture (33/33 green) and
+    // fails HERE with it.
+    expect(body.counts['stray']).toBe(1);
+    const boundElsewhere = await okJson<TypePopulationResponse>(
+      'owner',
+      '/ticket-types/stray/population?workflowId=wf-second',
+    );
+    expect(boundElsewhere.count).toBe(0);
+    const boundWhereTheTicketIs = await okJson<TypePopulationResponse>(
+      'owner',
+      '/ticket-types/stray/population?workflowId=wf-errands',
+    );
+    expect(boundWhereTheTicketIs.count).toBe(1);
   });
 
   it('13.949 reports a type the workspace DEFINES but has never given a ticket as 0 — and `count(*)` would say 1', async () => {
@@ -739,10 +869,16 @@ describe('GET /v1/workspaces/:workspaceId/ticket-counts-by-type', () => {
     );
     expect(own.workspaceId).toBe(read.neighbour.workspaceId);
     expect(own.counts['nb-task']).toBe(1);
-    // The two workspaces' type sets are disjoint: this workspace's types are
-    // ABSENT from the neighbour's answer rather than sitting there at 0. A read
-    // that dropped `t.workspace_id` would merge the two sets.
-    expect(own.counts['task']).toBeUndefined();
+    // The OTHER HALF of the cross-tenancy pair. The neighbour holds a `task` of
+    // its own — the same type KEY this workspace uses, because `type_id` is a
+    // stable slug and not a per-workspace identity. It reads its own 1 here, and
+    // 13.948 reads this workspace's 5 without it. A read that matched on
+    // `type_id` alone would answer the same wrong number to both callers, and
+    // neither line alone would catch it.
+    expect(own.counts['task']).toBe(1);
+    // A type the neighbour does not define is ABSENT rather than sitting there
+    // at 0, which is what the LEFT JOIN's left side buys.
+    expect(own.counts['epic']).toBeUndefined();
     expect(own.counts['chore']).toBeUndefined();
 
     // Neither direction resolves across the tenancy, and both are the same 404
