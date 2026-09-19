@@ -337,14 +337,25 @@ describe('TicketSheet — a refused read is a refusal, never a wait that never e
     expect(document.querySelector('.gn-ticket-sheet__details')).toBeNull();
   });
 
-  it('CONTROL (inverted) — the register names NONE of this view\'s reads, which is what licenses constructing the absences above', () => {
+  it('CONTROL (inverted) — the register is EMPTY, so the absences above are CONSTRUCTED rather than read off it', () => {
     for (const method of ['getTicket', 'getWorkflowDef', 'getMembers', 'getTicketHistory']) {
       expect(SERVING_GAPS[method], method).toBeUndefined();
     }
-    // Non-vacuity: the register is not simply empty. Four methods still refuse,
-    // so `toBeUndefined` above is a fact about THESE reads rather than about a
-    // register nobody populates any more.
-    expect(Object.keys(SERVING_GAPS).length).toBeGreaterThan(0);
+    // **THIS CONTROL'S PRECONDITION IS GONE, and it failed loudly rather than
+    // passing vacuously — which is the check working.** It read: *"Non-vacuity:
+    // the register is not simply empty. Four methods still refuse, so
+    // `toBeUndefined` above is a fact about THESE reads rather than about a
+    // register nobody populates any more."* **Four was one, and one is now
+    // zero**: `search` was the last entry and the owner ruled its query must
+    // derive `matchedIn` (2026-09-19).
+    //
+    // So `toBeUndefined` is true of EVERY method now, and the assertion above it
+    // cannot be rescued by counting. What the case actually rests on is stated
+    // instead: **the register is empty, so nothing here could be read off it** —
+    // which is exactly why the absences in the case above are CONSTRUCTED, and
+    // why a future entry appearing has to be a deliberate act rather than a
+    // silent narrowing of what that case proves.
+    expect(Object.keys(SERVING_GAPS)).toEqual([]);
   });
 });
 

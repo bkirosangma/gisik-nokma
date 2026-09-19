@@ -429,17 +429,22 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
     // Non-vacuity, so this is a fact about `getTicket` and not about an empty
     // register: the methods that DO still refuse are named, and one of them
     // carries a real absence.
-    // ONE, and it has read four, then three, then this. Each previous spelling
-    // said in as many words that it was SCHEDULED TO EXPIRE and named what
-    // would expire it; rulings P39 and P40 served `getMyWork` and
-    // `getAttention`, so this is that expiry arriving again — the check working
-    // rather than breaking. It will expire once more only if `search` is ever
-    // served, which needs `routes/search.ts` to stop destroying which column
-    // matched inside the query.
-    expect(Object.keys(SERVING_GAPS).sort()).toEqual(['search']);
-    // Non-vacuity carrier, now `search`: without this, an empty register would
-    // satisfy the line above and this control would pass by measuring nothing.
-    expect((SERVING_GAPS['search'] ?? []).length).toBeGreaterThan(0);
+    // ZERO, and it has read six, then four, then three, then one. Each previous
+    // spelling said in as many words that it was SCHEDULED TO EXPIRE and named
+    // what would expire it — **and this one named the exact condition and it
+    // ARRIVED**: *"It will expire once more only if `search` is ever served,
+    // which needs `routes/search.ts` to stop destroying which column matched
+    // inside the query."* The owner ruled that query must derive `matchedIn`
+    // (2026-09-19) and it now does, so the last entry is gone — the check
+    // working, not breaking, for the fourth time.
+    expect(Object.keys(SERVING_GAPS)).toEqual([]);
+    // The line that stood here was a NON-VACUITY CARRIER: *"without this, an
+    // empty register would satisfy the line above and this control would pass by
+    // measuring nothing."* **That is now the situation it was written to
+    // catch**, and it failed loudly rather than letting the control pass by
+    // measuring nothing — the carrier doing its job on its way out. There is no
+    // honest replacement for it: with the register empty, `toEqual([])` above is
+    // the whole of what this control can prove, and saying so is the point.
   });
 
   it('T13.4k a workflow with no non-terminal move out of its terminal state offers no reopen, and says so', async () => {

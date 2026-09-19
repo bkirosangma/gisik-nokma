@@ -951,52 +951,61 @@ describe('3.38 toServerFilterSpec — the plural/singular disagreement, made lou
  * and says what it must.
  */
 describe('3.39 the blocked methods refuse, and enumerate what is absent', () => {
-  const REFUSALS: ReadonlyArray<{
-    method: string;
-    call: () => unknown;
-    fields: readonly string[];
-  }> = [
-    {
-      method: 'search',
-      call: () => {
-        const body: SearchResponse = { workspaceId: 'w', query: 'q', hits: [] };
-        return mapSearchHits(body);
-      },
-      fields: ['SearchHit.matchedIn'],
-    },
-  ];
+  /**
+   * 3.39 — `mapSearchHits` ANSWERS. **This is what replaced the REFUSALS table
+   * that stood here, and the table held exactly ONE entry: `search`.**
+   *
+   * That entry recorded `SearchHit.matchedIn` as absent, and named the cause
+   * precisely: the route concatenated the three columns before one
+   * `ts_headline`, so *which* one matched was destroyed IN THE QUERY. The owner
+   * ruled the query must derive it (2026-09-19), the route now does, and the
+   * entry is gone from the register.
+   *
+   * **The case id is kept and its claim inverted**, on 7.189's precedent this
+   * file's own header cites — *"a divergence that closed can silently
+   * re-open, and deleting the case is what makes that invisible."* So the
+   * assertion that stood here (the refusal fires and names its absence) is
+   * replaced by the assertion that the FIELD IT NAMED now arrives.
+   */
+  it('3.39 search MAPS — the fact the register listed as absent is SERVED, and a fourth spelling is still refused', () => {
+    const body: SearchResponse = {
+      workspaceId: 'w',
+      query: 'q',
+      hits: [
+        {
+          card: serverCard({ ticketId: 'tkt-h1', projectId: '01J9GPRJ000000000000000000' }),
+          snippet: 'a **delivery** note',
+          // Deliberately NOT the commonest case. A mapper that defaulted to
+          // 'title' — the invention the old refusal existed to prevent — passes
+          // a fixture whose answer IS 'title' and fails this one.
+          matchedIn: 'description',
+        },
+      ],
+    };
 
-  for (const { method, call, fields } of REFUSALS) {
-    it(`${method} refuses, naming ${fields.length} absent fact(s) and an owner for each`, () => {
-      let thrown: unknown;
-      try {
-        call();
-      } catch (error) {
-        thrown = error;
-      }
-      expect(thrown, `${method} did not refuse`).toBeInstanceOf(ServingGapError);
-      const gap = thrown as ServingGapError;
-      // The enumeration, whole and in order — not "it threw something".
-      expect(gap.absences.map((absence) => absence.field)).toEqual(fields);
-      // Every absence says WHY and WHO. An owner-less gap is a gap that gets
-      // dropped rather than deferred.
-      for (const absence of gap.absences) {
-        expect(absence.because.length, absence.field).toBeGreaterThan(20);
-        expect(absence.owner.length, absence.field).toBeGreaterThan(4);
-        // `wireRoute` is what the server-side cross-check measures `wireKey`
-        // against, so a key with no route is a check with no body: either both
-        // are stated or neither is, and "neither" means no route can close it.
-        expect(
-          absence.wireKey === null ? absence.wireRoute === null : typeof absence.wireRoute,
-          `${absence.field}: wireKey and wireRoute must agree about whether a route can close it`,
-        ).toBe(absence.wireKey === null ? true : 'string');
-      }
-      // The message a developer actually sees carries the field names.
-      for (const field of fields) expect(gap.message).toContain(field);
-      // And the exported register agrees with what was thrown.
-      expect(SERVING_GAPS[method]).toEqual(gap.absences);
-    });
-  }
+    const hits = mapSearchHits(body);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]?.matchedIn).toBe('description');
+    expect(hits[0]?.snippet).toContain('delivery');
+    expect(hits[0]?.ticketId).toBe('tkt-h1');
+    expect(hits[0]?.projectId).toBe('01J9GPRJ000000000000000000');
+
+    // AND THE CLOSED UNION STILL REFUSES. A server that answered a fourth word
+    // would be answering a question this client did not ask; narrowing it to the
+    // nearest known value is the same invention, one layer down.
+    expect(() =>
+      mapSearchHits({
+        ...body,
+        hits: [{ ...body.hits[0]!, matchedIn: 'assignee' }],
+      }),
+    ).toThrow(MappingError);
+    // A MISSING key refuses too, rather than reading as a default — the field is
+    // the whole of what this method asks, so an absent one is not "no answer
+    // needed".
+    expect(() =>
+      mapSearchHits({ ...body, hits: [{ card: body.hits[0]!.card, snippet: 'x' }] }),
+    ).toThrow(MappingError);
+  });
 
   /**
    * 12.250 — `mapMyWork` ANSWERS, and this is what replaced case 3.41.
@@ -1355,18 +1364,24 @@ describe('3.39 the blocked methods refuse, and enumerate what is absent', () => 
     expect(items[0]?.claim).not.toBeNull();
   });
 
-  it('3.39 the register covers exactly ONE blocked method, and it is the only DATA gap', () => {
+  it('3.39 the register is EMPTY — no mapper in this file refuses outright', () => {
     // Six under P25 clause 1, four after it served `getTickets`/`getTicket`,
-    // three after P32/P38 served `getMyWorkspaces`, ONE now that P39 and P40
-    // have served `getMyWork` and `getAttention`. The number in this title has
-    // been wrong three times by being right when written, which is why the
+    // three after P32/P38 served `getMyWorkspaces`, one after P39 and P40 served
+    // `getMyWork` and `getAttention`, and **ZERO since the owner ruled the search
+    // QUERY must derive `matchedIn`** (2026-09-19). The number in this title has
+    // been wrong by being right when written more than once, which is why the
     // membership below is asserted INDIVIDUALLY rather than trusted to a count.
     //
-    // `search` is last because it is the only gap of the six that a join could
-    // never close: `routes/search.ts` destroys which column matched inside the
-    // query, so `SearchHit.matchedIn` is absent from the SERVER'S OWN answer
-    // rather than merely unread by this client.
-    expect(Object.keys(SERVING_GAPS).sort()).toEqual(['search']);
+    // **`search` was the last, and it was the one gap a join could never close:**
+    // `routes/search.ts` concatenated the three columns before a single
+    // `ts_headline`, destroying which one matched. That was a QUERY defect, not a
+    // missing capability — `proj_search` had stored the three separately, and
+    // weighted them apart, all along.
+    //
+    // **An empty register is not a claim that no read is missing.** It says no
+    // MAPPER here refuses outright; a refusal that MOVES has its own home, and a
+    // view with nothing to render says so where it renders.
+    expect(Object.keys(SERVING_GAPS).sort()).toEqual([]);
     // Positive control on the sort above: the methods NOT here are the ones this
     // source answers. `getBoard` is the one P25 clause 1 unblocked first;
     // `getTickets` and `getTicket` are the two it unblocked in this change set,

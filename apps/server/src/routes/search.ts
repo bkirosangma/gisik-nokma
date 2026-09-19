@@ -3,6 +3,7 @@ import {
   filterSpecSchema,
   searchTermSchema,
   type FilterSpec,
+  type SearchHit,
   type SearchResponse,
 } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
@@ -139,11 +140,55 @@ export async function readSearch(
   where.push(...compiled.clauses);
 
   const cte = compiled.needsBlockedCte ? `WITH ${BLOCKED_STATES_CTE} ` : '';
-  const { rows } = await db.query<ProjTicketRow & { snippet: string }>(
+  // `matched_in` is typed as the UNION rather than `string`, and that is what
+  // makes the wire contract checkable: the CASE below can only produce these
+  // three literals, so the column's real type is the domain's `SearchHit
+  // ['matchedIn']`. Typed loosely, this row type let the route return a field
+  // the domain's own `SearchHit` did not declare — the compiler waved it through
+  // because a `.map()` result is not a fresh object literal in that position.
+  const { rows } = await db.query<
+    ProjTicketRow & { snippet: string; matched_in: SearchHit['matchedIn'] }
+  >(
     `${cte}SELECT ${PROJ_TICKET_COLUMNS},
             ts_headline('${FTS_CONFIG}',
                         s.title || ' — ' || s.description || ' — ' || s.comments,
-                        ${tsquery}, '${HEADLINE_OPTIONS}') AS snippet
+                        ${tsquery}, '${HEADLINE_OPTIONS}') AS snippet,
+            -- DOOR: WHICH COLUMN MATCHED, derived rather than guessed.
+            --
+            -- proj_search already stores the three columns separately and its
+            -- generated tsv already weights them apart
+            -- (setweight(… A) || setweight(… B) || setweight(… C)), so
+            -- the distinction has always been IN THE DATA — the headline above
+            -- is what threw it away, by concatenating the three into one string
+            -- before ts_headline ever saw them.
+            --
+            -- ## Why per-column predicates and not three headlines
+            --
+            -- Three ts_headline calls would answer the same question, and
+            -- would cost three passes over the row's text plus three ways for
+            -- the snippet to disagree with the field. One @@ per column asks
+            -- exactly "did THIS column match" and nothing else.
+            --
+            -- **setweight(…) @@ q is equivalent to to_tsvector(…) @@ q**: the
+            -- weights affect RANKING, never MATCHING. So these three predicates
+            -- partition the very vector the WHERE clause already tested, and at
+            -- least one of them is therefore true for every row returned. The
+            -- ELSE 'title' is unreachable and kept as a floor rather than as
+            -- a case — see the test that asserts this partition.
+            --
+            -- ## The PRECEDENCE is the schema's own, and it is load-bearing
+            --
+            -- A query can match two columns and matchedIn is ONE value, so the
+            -- order is a decision: **title → description → comment**, which is
+            -- the order the weights already imply (A, B, C). Stating it in the
+            -- CASE is what makes it a rule rather than an accident of how the
+            -- expression happened to be written.
+            CASE
+              WHEN to_tsvector('${FTS_CONFIG}', s.title) @@ ${tsquery} THEN 'title'
+              WHEN to_tsvector('${FTS_CONFIG}', s.description) @@ ${tsquery} THEN 'description'
+              WHEN to_tsvector('${FTS_CONFIG}', s.comments) @@ ${tsquery} THEN 'comment'
+              ELSE 'title'
+            END AS matched_in
        FROM proj_search s
        JOIN proj_tickets t ON t.ticket_id = s.ticket_id
        JOIN proj_visibility v ON v.ticket_id = t.ticket_id
@@ -174,7 +219,12 @@ export async function readSearch(
           `readSearch: no card assembled for ticket ${row.ticket_id} — assembleTicketCards dropped a row it was handed`,
         );
       }
-      return { card, snippet: row.snippet };
+      // `matchedIn` joins the hit beside the snippet it explains. It is served
+      // rather than left for the client to guess — a client that inferred
+      // 'title' because that is the commonest case would be inventing the answer
+      // to the one question the field asks, which is exactly why the client
+      // REFUSED this route until the query could say.
+      return { card, snippet: row.snippet, matchedIn: row.matched_in };
     }),
   };
 }

@@ -121,7 +121,18 @@ export function stubServices(
     // — a world Plan 4's bootstrap makes impossible — and a page under test
     // would render an invented blank picker and pass.
     getTicketTypes: unstubbed('getTicketTypes'),
-    search: refuse('search'),
+    // UNSTUBBED since the owner ruled the search QUERY must derive `matchedIn`
+    // (2026-09-19), and NOT `[]` — the same treatment `getMyWorkspaces` and the
+    // pair below got, for the same reason and by the same mechanism. **This line
+    // was `refuse('search')`, and `refuse()` THROWS when the gap it names
+    // disappears from the register — which is how a served method announces
+    // itself here instead of degrading quietly.** It announced itself by taking
+    // 311 tests down in one gate run, and that is the check working, not a
+    // regression: `search` was the LAST entry in `SERVING_GAPS`, so this was the
+    // last time this line could fire. `[]` would be this helper asserting the
+    // workspace has no matching text — a claim about the world — and a page
+    // under test would render an invented blank result and pass.
+    search: unstubbed('search'),
     // UNSTUBBED since rulings P39 and P40 served them, and NOT `[]` — the same
     // treatment `getMyWorkspaces` got above, for the same reason and by the
     // same mechanism. `refuse()` THROWS when the gap it names disappears from

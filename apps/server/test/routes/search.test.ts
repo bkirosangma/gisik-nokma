@@ -217,6 +217,9 @@ async function seedSearchFixtures(pool: Pool, world: ReadWorld): Promise<SearchF
   const invisibleOffsets = new Set(BULK_INVISIBLE_OFFSETS);
   const bulkInvisibleIds = bulkIds.filter((_id, offset) => invisibleOffsets.has(offset));
   const bulkVisibleIds = bulkIds.filter((_id, offset) => !invisibleOffsets.has(offset));
+  const descOnlyId = searchTicketId(4);
+  const titleAndDescId = searchTicketId(5);
+  const descAndCommentId = searchTicketId(6);
   const leakVisibleId = searchTicketId(2);
   const leakHiddenId = searchTicketId(3);
 
@@ -226,6 +229,14 @@ async function seedSearchFixtures(pool: Pool, world: ReadWorld): Promise<SearchF
       entity: { kind: 'ticket', id },
       type: 'ticket.created',
       payload: { typeId: 'task', projectId, parentId: null, title },
+    });
+  /** A ticket DESCRIPTION — a `ticket.field_set` on the built-in, carrying a doc. */
+  const describe = (id: string, text: string): LedgerEvent =>
+    makeCommitted({
+      ...ws,
+      entity: { kind: 'ticket', id },
+      type: 'ticket.field_set',
+      payload: { fieldId: 'description', value: doc(text) },
     });
   const comment = (id: string, text: string): LedgerEvent =>
     makeCommitted({ ...ws, entity: { kind: 'ticket', id }, type: 'comment.added', payload: { body: doc(text) } });
@@ -255,6 +266,27 @@ async function seedSearchFixtures(pool: Pool, world: ReadWorld): Promise<SearchF
     ticket(leakHiddenId, 'Pangolin ledger'),
     comment(leakHiddenId, 'pangolin counts beside chinchilla receipts'),
     ownerOnly(leakHiddenId),
+
+    // DOOR — THE PER-COLUMN DERIVATION'S OWN FIXTURES (2026-09-19). Each word
+    // below is in exactly the columns its case names, and in no other ticket, so
+    // a case measures the column it claims and nothing else.
+    //
+    // `narwhal` is in a DESCRIPTION and no title: a derivation that answered
+    // 'title' for everything would pass a title fixture and fails this one.
+    ticket(descOnlyId, 'Quarterly summary'),
+    describe(descOnlyId, 'narwhal sighting filed'),
+    // `okapi` is in BOTH columns of ONE ticket — the precedence fixture for
+    // rung one. Without it, "title beats description" is a sentence rather than
+    // a measurement.
+    ticket(titleAndDescId, 'Okapi census overdue'),
+    describe(titleAndDescId, 'okapi counts outstanding'),
+    // `tapir` is in a DESCRIPTION and a COMMENT — precedence rung two. The
+    // ticket must be CREATED before anything can be claimed about it: the first
+    // draft of this fixture omitted the `ticket()` line and the seed refused
+    // loudly, naming the id, which is why that refusal exists.
+    ticket(descAndCommentId, 'Logistics review'),
+    describe(descAndCommentId, 'tapir tracks logged'),
+    comment(descAndCommentId, 'tapir notes attached'),
   ];
 
   // Inserted BACKWARDS: id order and insertion order are exact opposites, so a
@@ -798,5 +830,114 @@ describe('GET /v1/search — the door', () => {
     // rather than "this route stopped working": the same route, a real term,
     // after all five.
     expect(await hitIds('member', 'licence')).toEqual([read.world.sharedTaskId]);
+  });
+});
+
+/**
+ * DOOR — `matchedIn` IS DERIVABLE. Cases `16.32`–`16.37` (owner ruling,
+ * 2026-09-19: *"change the query so `matchedIn` is derivable"*).
+ *
+ * **The distinction was always in the data.** `proj_search` stores `title`,
+ * `description` and `comments` separately and its generated `tsv` already
+ * weights them apart (`setweight(… 'A') || setweight(… 'B') || setweight(… 'C')`).
+ * What destroyed it was the SELECT, which concatenated the three into one string
+ * before `ts_headline` ever saw them — so the route could not say which one
+ * matched, and the client refused to invent the answer. The SELECT now asks one
+ * `@@` per column.
+ *
+ * **The cases are built so a WRONG derivation fails them**, which is the only
+ * thing that makes them worth having:
+ * - `16.32`'s word is in a DESCRIPTION and in **no title**, so a constant
+ *   `'title'` answer reddens it.
+ * - `16.34` and `16.35` need a ticket matching in TWO columns, so the precedence
+ *   is measured rather than asserted.
+ * - `16.33` answers `title` for one hit and `comment` for another **in one
+ *   run**, so a derivation computed once per QUERY (rather than per row) fails.
+ */
+describe('GET /v1/search — which column matched', () => {
+  type Hit = { id: string; matchedIn: unknown; snippet: string };
+
+  /** The hits of one query, trimmed to the facts these cases are about. */
+  async function matched(q: string): Promise<Hit[]> {
+    const res = await seededSearch('member', q);
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      hits: Array<{ card: { ticketId: string }; snippet: string; matchedIn: unknown }>;
+    };
+    return body.hits.map((hit) => ({
+      id: hit.card.ticketId,
+      matchedIn: hit.matchedIn,
+      snippet: hit.snippet,
+    }));
+  }
+
+  it('16.32 a description-only match answers `description`, and its title does not carry the word', async () => {
+    const hits = await matched('narwhal');
+    expect(hits).toHaveLength(1);
+    // THE ANSWER, and `narwhal` is in this ticket's DESCRIPTION and in no title
+    // anywhere — so an implementation that answered `'title'` unconditionally
+    // fails here while passing every title fixture in this file.
+    expect(hits[0]?.matchedIn).toBe('description');
+    // The control that makes the line above mean something: the snippet is drawn
+    // from the row whose description matched, and the word really is there.
+    expect(unmarked(hits[0]?.snippet ?? '')).toContain('narwhal');
+  });
+
+  it('16.33 the derivation is PER ROW — one query answers `title` for one hit and `comment` for another', async () => {
+    // The `quokka` pair: one ticket carries the word in its TITLE, the other
+    // only in a COMMENT, and ONE query matches both. A `matchedIn` computed once
+    // per query rather than per row answers the same word twice and fails this.
+    const hits = await matched('quokka');
+    expect(hits).toHaveLength(2);
+    const byId = new Map(hits.map((hit) => [hit.id, hit.matchedIn]));
+    expect(byId.get(fixtures.rankTitleId)).toBe('title');
+    expect(byId.get(fixtures.rankCommentId)).toBe('comment');
+  });
+
+  it('16.34 PRECEDENCE, rung one — a ticket matching TITLE and DESCRIPTION answers `title`', async () => {
+    // `okapi` is in BOTH columns of ONE ticket. The order is the schema's own —
+    // title → description → comment, which is what the A/B/C weights imply —
+    // and this is the case that turns that sentence into a measurement.
+    const hits = await matched('okapi');
+    expect(hits).toHaveLength(1);
+    expect(hits[0]?.matchedIn).toBe('title');
+    // The control: BOTH columns really do carry it, so the answer above is a
+    // precedence decision and not merely "the only column that matched".
+    expect(unmarked(hits[0]?.snippet ?? '')).toContain('okapi');
+  });
+
+  it('16.35 PRECEDENCE, rung two — a ticket matching DESCRIPTION and COMMENT answers `description`', async () => {
+    const hits = await matched('tapir');
+    expect(hits).toHaveLength(1);
+    expect(hits[0]?.matchedIn).toBe('description');
+    expect(unmarked(hits[0]?.snippet ?? '')).toContain('tapir');
+  });
+
+  it('16.36 the SNIPPET is still COMBINED — a comment match shows the comment, not only the title', async () => {
+    // The feature's reason to exist, and the thing a lazy fix would silently
+    // lose: narrowing the headline to the matched column would strip a comment's
+    // words out of the window. `quokka`'s comment hit must still show its
+    // COMMENT — a word that appears in no title of that ticket.
+    const hits = await matched('quokka');
+    const commentHit = hits.find((hit) => hit.id === fixtures.rankCommentId);
+    expect(commentHit?.snippet).toBeDefined();
+    expect(unmarked(commentHit?.snippet ?? '')).toContain('seen');
+    // And the title hit still shows its own words.
+    const titleHit = hits.find((hit) => hit.id === fixtures.rankTitleId);
+    expect(unmarked(titleHit?.snippet ?? '')).toContain('census');
+  });
+
+  it('16.37 every hit carries a value from the closed union — the partition has no gap', async () => {
+    // A BROAD query, so the assertion covers many rows rather than one. The
+    // three predicates partition the very vector the WHERE clause tested, so a
+    // hit whose value is not one of the three would mean the two disagree —
+    // which is what the route's unreachable `ELSE` is a floor against.
+    const hits = await matched('wombat');
+    expect(hits.length).toBeGreaterThan(1);
+    for (const hit of hits) {
+      expect(['title', 'description', 'comment'], hit.id).toContain(hit.matchedIn);
+    }
+    // And the fixture is not vacuous: these rows matched by TITLE.
+    expect(hits.every((hit) => hit.matchedIn === 'title')).toBe(true);
   });
 });
