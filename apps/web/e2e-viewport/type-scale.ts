@@ -177,10 +177,22 @@ export type TypeScale = {
    * `.gn-mcp-authorize__input`'s own); and — the second typeface, added
    * 2026-09-15 with the prototype's fonts — two MONO rules, `.gn-help__code` in
    * `ui.css` and `.gn-invite-mint__url` in `globals.css`. Neither mono site is
-   * examined here: `code` is skipped by the `closest()` guard above, and
-   * `editor.css` is loaded only inside the RN webview this suite never opens. A
-   * second SANS typeface in a LABEL position would still need this widened to a
-   * set, and would still fail loudly here first.
+   * examined here: `code` is skipped by the `closest()` guard above.
+   *
+   * **⚠ `editor.css` IS NOW LOADED IN THIS APP, AND THIS PARAGRAPH USED TO SAY
+   * THE OPPOSITE.** Its sentence read *"`editor.css` is loaded only inside the
+   * RN webview this suite never opens"* and was true until 2026-09-19, when
+   * `apps/web/app/layout.tsx` began importing it so the ticket sheet's real
+   * editor renders styled rather than bare. **The equality above still holds,
+   * and that was MEASURED rather than assumed:** that stylesheet declares
+   * `font: inherit` in three rules (`.mention-popup__item`,
+   * `.image-wrap-menu__option`, `.image-wrap-menu__alt`) — INHERITANCE, never a
+   * `font-family` of its own — so it introduces no second typeface and cannot
+   * put a non-inherited family into this list. It also adds no element this
+   * suite visits: the first two selectors need the mention popup and the image
+   * wrap menu open, and the third is inside that same menu. A second SANS
+   * typeface in a LABEL position would still need this widened to a set, and
+   * would still fail loudly here first.
    *
    * ITS FALSE-GREEN MODE, AND WHY `bodyFamily` IS REPORTED BELOW. This compares
    * each element to `body` and never to the product. Since 2026-09-15 `body`'s

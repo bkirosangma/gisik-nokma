@@ -66,9 +66,11 @@ describe('composeEditorSubmission', () => {
 // `strictFunctionTypes` — where props are a parameter and therefore compared
 // contravariantly. A transcription can go stale silently, so the runtime check
 // further down reads app-core's actual source for the one field that diverged.
-// Neither stands in for the real end-to-end proof — an actual
-// `<TicketSheet editorSlot={TicketEditorSlot} />` — which is owed by whoever
-// wires the two packages together (Plan 6 step 12).
+// The real end-to-end proof — an actual `<TicketSheet editorSlot={TicketEditorSlot} />`
+// — LANDED 2026-09-19 in `apps/web`, which is the app that takes the dependency
+// edge on both packages. It cannot live here: the edge is one-way on purpose.
+// What stays here is the fast, loud half — a drift between the two declarations
+// still fails this file before any build.
 // ─────────────────────────────────────────────────────────────────────────────
 type AppCoreEditorSlotSubmission =
   | { type: 'comment.added'; payload: { body: unknown } }
@@ -111,7 +113,7 @@ const THIS_HALF_SOURCE = resolve(process.cwd(), 'src/components/TicketEditorSlot
 
 describe('the <EditorSlot> contract, written twice', () => {
   /**
-   * 9.71 — the `<EditorSlot>` contract written twice does not drift unnoticed: this runtime case reads `packages/app-core/src/views/editor-slot.tsx` and fails if its `doc` stops saying `unknown`. Neither this nor the type-level assignment above is the end-to-end mount, which is still 9.61.
+   * 9.71 — the `<EditorSlot>` contract written twice does not drift unnoticed: this runtime case reads `packages/app-core/src/views/editor-slot.tsx` and fails if its `doc` stops saying `unknown`. Neither this nor the type-level assignment above is the end-to-end mount — that is 9.61, which `apps/web` now builds.
    */
   it("app-core's half still spells `doc` as unknown, which is why this half widened", () => {
     // POSITIVE CONTROL 1: a missing file must fail here, not silently read as
@@ -238,11 +240,13 @@ describe('TicketEditorSlot', () => {
    * (TicketEditor.tsx:96-103) has filled `ownRef`"; clicking before that, the
    * early return swallows the click and the `submit` waitFor fails loudly.
    *
-   * This is NOT the end-to-end mount (case 9.61, Plan 6a Task 12): nothing here
-   * passes `TicketEditorSlot` to `TicketSheet`'s `editorSlot` prop.
+   * This is NOT the end-to-end mount (case 9.61): nothing here passes
+   * `TicketEditorSlot` to `TicketSheet`'s `editorSlot` prop. **That mount now
+   * exists** — `apps/web` passes it — and 9.61 is already ✅ 2026-09-19. This
+   * case remains the one that exercises the slot's own production branch.
    */
   /**
-   * 9.76 — the slot mounted the way app-core mounts it, with NO `editorRef`, populates its own `ownRef`, submits `comment.added`, fires `onDone` and clears. Every other runtime case in this file injects `editorRef`, so this is the only case that exercises the production branch. Not the end-to-end mount, which is still 9.61.
+   * 9.76 — the slot mounted the way app-core mounts it, with NO `editorRef`, populates its own `ownRef`, submits `comment.added`, fires `onDone` and clears. Every other runtime case in this file injects `editorRef`, so this is the only case that exercises the production branch. Not the end-to-end mount — that is 9.61, which `apps/web` now builds.
    */
   it('mounted the way app-core mounts it — no editorRef — the slot uses its OWN ref, submits, and clears', async () => {
     const submit = vi.fn(async (_submission: EditorSubmission) => {});

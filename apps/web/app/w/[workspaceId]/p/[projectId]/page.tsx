@@ -32,6 +32,7 @@ import {
   type ListRow,
   type TicketDatesInput,
 } from '@gisik-nokma/app-core';
+import { TicketEditorSlot } from '@gisik-nokma/editor';
 import { Avatar, Switch } from '@gisik-nokma/ui';
 import { AppNav } from '../../../../../src/app-nav.js';
 import { startTargetFor } from '../../../../../src/backlog-start.js';
@@ -2350,6 +2351,27 @@ function ProjectBoard() {
           ticketId={openTicketId}
           currentUserId={currentUserId}
           onClose={closeTicket}
+          /*
+            THE REAL EDITOR — the prop this mount never passed, which is why the
+            description was read-only on the web (`docs/product-coverage-map.md`
+            C3) and why `packages/editor/src/components/TicketEditorSlot.tsx`
+            recorded its end-to-end proof as OWED: *"an actual `<TicketSheet
+            editorSlot={TicketEditorSlot} />` in an app that legitimately depends
+            on both packages"*, which `apps/web` did not. This is that proof, and
+            the branch that carries it adds the dependency edge.
+
+            Plan 6 declares the arrangement in the same words
+            (`docs/superpowers/plans/2026-08-20-06-web-client.md:5667`): *"Plan 7
+            ships a Tiptap-backed `EditorSlotComponent` and `apps/web` passes it
+            into `TicketSheet` — no mount point changes."*
+
+            It is passed UNCONDITIONALLY and the sheet decides what it means: a
+            caller that mounted no editor gets the read-only fallback, and one
+            that mounted this one gets a composer. `apps/web` does not gate it on
+            anyone's role — the ingest door is the only party that knows, which
+            is the argument `canSetVisibility` states at length.
+          */
+          editorSlot={TicketEditorSlot}
         />
       ) : null}
 

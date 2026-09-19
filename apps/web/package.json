@@ -17,6 +17,7 @@
     "@better-auth/passkey": "^1.7.2",
     "@gisik-nokma/app-core": "workspace:*",
     "@gisik-nokma/domain": "workspace:*",
+    "@gisik-nokma/editor": "workspace:*",
     "@gisik-nokma/ui": "workspace:*",
     "better-auth": "^1.7.2",
     "next": "^15.1.6",

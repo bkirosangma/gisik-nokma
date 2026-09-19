@@ -8,7 +8,11 @@ import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js'
 import { makeSubmittedFactory } from '../submit.js';
 import type { TicketHistoryEvent, TicketRead } from '../view-types.js';
 import { AttachmentList, type AttachmentListEntry } from './attachment-list.js';
-import { PlainTextEditorSlot, type EditorSlotComponent } from './editor-slot.js';
+import {
+  PlainTextEditorSlot,
+  type EditorSlotComponent,
+  type EditorSlotSubmission,
+} from './editor-slot.js';
 import { HistoryList } from './history-list.js';
 import { formatRollup } from './rollup-text.js';
 import { TransitionDialog, type TransitionSubmission } from './transition-dialog.js';
@@ -183,6 +187,25 @@ export function TicketSheet({
    */
   const [transportError, setTransportError] = useState<string | null>(null);
   /**
+   * A THIRD slot, and the third distinct fact: something the editor itself
+   * could not do, where the server was never asked.
+   *
+   * The two slots above both describe an answer, or the absence of one, to a
+   * claim this sheet sent. This one describes a claim that was never sent. The
+   * editor slot states its own capability gaps rather than pretending — with no
+   * `uploadAttachment` wired a pasted file is REFUSED, not silently dropped
+   * (`TicketEditorSlot.uploadOrRefuse`) — and it reports that through `onError`,
+   * which reaches a user through THIS slot or through nothing at all. Folding it
+   * into `transportError` would say a connection failed; folding it into
+   * `serverRefusal` would claim the server adjudicated. Neither happened.
+   *
+   * Named for the same reason Ruling 27 keeps the other two apart: one sentence
+   * for one fact. Its tone is `--gn-warning` rather than `--gn-danger`, sharing
+   * `.gn-refusal--preview`'s rule, because a capability this build does not have
+   * is not a refusal of anything the person did.
+   */
+  const [editorError, setEditorError] = useState<string | null>(null);
+  /**
    * Ruling 32 (fix round 1, 2026-09-17) — the double-submit latch for
    * Close/Reopen, mirroring `board.tsx`'s `MoveArrows.submitting`
    * (`:956`/`:1029-1035`'s own docblock on why `finally`). Without it a
@@ -348,6 +371,86 @@ export function TicketSheet({
     }
     if (failed.status === 'refused') setServerRefusal({ rule: failed.rule, reason: failed.reason });
     else setServerRefusal({ rule: failed.code, reason: failed.message });
+  };
+
+  /**
+   * THE DESCRIPTION — the owner's ruling (*"description should be editable"*),
+   * on the door that already exists.
+   *
+   * **The event is the editor's own composition, handed straight to the
+   * envelope.** `composeEditorSubmission('description', doc)` returns
+   * `{ type: 'ticket.field_set', payload: { fieldId: 'description', value } }`
+   * (`packages/editor/src/attachments/compose-editor-submission.ts:14,29`) and
+   * that is exactly what arrives here: a description edit is not a mutation of
+   * a field, it is ONE MORE CLAIM, so the history of a description is the
+   * history of the claims that wrote it. This function therefore does not
+   * restate the payload — a second spelling of `{ fieldId: 'description' }`
+   * beside the composer that guarantees it is the duplication `submitTransition`
+   * already warns about at `:262-278`.
+   *
+   * Three outcomes, told apart by SLOT and never by wording, exactly as
+   * `closeOrReopen` does below — `results[0]` rather than `results.find(...)`,
+   * because exactly one event is ingested here and searching would imply a
+   * batch this call never sends. A silence goes to `transportError`; a real
+   * `refused`/`invalid` answer goes to `serverRefusal`. **A refusal costs the
+   * user nothing**: `TicketEditorSlot` clears the composer only in `comment`
+   * mode, so a refused description save leaves their words on screen.
+   */
+  const submitDescription = async (submission: EditorSlotSubmission): Promise<void> => {
+    const event = make({
+      workspaceId,
+      entity: { kind: 'ticket', id: ticketId },
+      type: submission.type,
+      payload: submission.payload,
+    });
+    const results = await dataSource.ingest([event]);
+    const result = results[0];
+    if (result === undefined) {
+      setServerRefusal(null);
+      setTransportError('The server did not answer this change.');
+      return;
+    }
+    if (result.status === 'committed') {
+      setServerRefusal(null);
+      setTransportError(null);
+      read.reload();
+      history.reload();
+      return;
+    }
+    if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
+    else setServerRefusal({ rule: result.code, reason: result.message });
+  };
+
+  /**
+   * Mentions, resolved off the roster this sheet ALREADY reads for `nameOf`
+   * and for the assignee picker — nothing new is read and nothing is passed in,
+   * the same argument the assignee row's own case makes.
+   *
+   * ## ⚠ The residual, stated rather than implied
+   *
+   * This interface cannot express "the roster could not be loaded". It returns
+   * `Promise<MentionCandidate[]>`, and the popup renders a count from whatever
+   * comes back (`mention-popup.ts:100` → `mentionResultAnnouncement(0)` is the
+   * string **"No people match"**). So over a REFUSED roster, typing `@` states
+   * that nobody in this workspace matches — which is the same collapse the
+   * assignee row was built to refuse (`members={members.data ?? []}`, fixed in
+   * `#530`), one control over.
+   *
+   * **The collapse is kept here, deliberately, because the alternative is
+   * worse rather than because it is right:** leaving `queryUsers` unwired
+   * reaches the identical `[]` through `TicketEditorSlot`'s own `NO_MENTIONS`
+   * default, so `@` would claim "No people match" on EVERY keystroke in every
+   * session, refusal or not. Wiring it is correct whenever the roster loaded,
+   * which is the ordinary case, and no worse in the window where it did not.
+   * **Named owner: whoever next widens `EditorSlotProps.queryUsers`** — an
+   * absent-roster signal has to exist before this can tell the truth.
+   */
+  const queryUsers = async (query: string): Promise<Array<{ userId: string; name: string }>> => {
+    const people = members.data ?? [];
+    const needle = query.trim().toLowerCase();
+    return people
+      .filter((member) => needle === '' || member.name.toLowerCase().includes(needle))
+      .map((member) => ({ userId: member.id, name: member.name }));
   };
 
   /**
@@ -554,6 +657,50 @@ export function TicketSheet({
     };
   })();
 
+  /**
+   * The description, derived once for the row below — and the CLAIM is what
+   * makes this a two-arm question rather than the assignee row's three.
+   *
+   * `FieldClaim` always carries its actor: the reducer writes
+   * `claim(p.value, env)` and there is no claim without one. So the arms here
+   * are the whole truth and are told apart cleanly — **absent means nobody has
+   * ever written one**, and present means somebody did and the line can name
+   * them. The assignee row cannot say that, because `assignedProvenance`
+   * collapses "never assigned" into the same `null` as "assigned, then
+   * cleared"; this one has no such collision and does not pretend to.
+   */
+  const descriptionClaim = state.fields['description'];
+  const descriptionClaimLine =
+    descriptionClaim === undefined
+      ? 'no description yet'
+      : `set by ${nameOf(descriptionClaim.actorId)} on ${formatDate(descriptionClaim.serverTime)}`;
+
+  /**
+   * Whether the mounted editor may be TYPED INTO. This answers one question —
+   * *is a real composer here at all* — and deliberately answers no other.
+   *
+   * It is NOT an authority check, and must not become one. The sheet's standing
+   * position, spelled out at length on `canSetVisibility` above, is that the
+   * only party that knows who may write is the ingest door: a control hidden on
+   * a client-side guess is unreachable and therefore leaves the door's own
+   * refusal unrendered, and it hides the power from exactly the people entitled
+   * to use it. `checkTicketFieldSet` answers this on the server, and its answer
+   * arrives here as `serverRefusal`.
+   *
+   * `editorSlot === undefined` is a different fact of a different kind: no
+   * composer was mounted, so the read-only fallback is rendering. Its own note
+   * says it "composes nothing … by having no control to type into rather than
+   * by offering one that silently discards what is typed" — and passing it
+   * `readOnly={false}` would be this sheet asserting an editability that
+   * component does not have.
+   */
+  const canEditDescription = editorSlot !== undefined;
+
+  /** The editor's own failures, carried into their own slot — never swallowed. */
+  const reportEditorError = (err: unknown): void => {
+    setEditorError(err instanceof Error ? err.message : String(err));
+  };
+
   return (
     <Sheet open title={ticketRead.title} onClose={onClose}>
       <div role="tablist" className="gn-ticket-sheet__tabs">
@@ -673,6 +820,19 @@ export function TicketSheet({
               {transportError}
             </p>
           ) : null}
+          {/*
+            The editor's own failures — a distinct fact with its own slot and
+            its own tone, for the reason Ruling 27 gives the two above. Nothing
+            here reached the server, so neither of those sentences is true of
+            it. Its commonest cause today is a capability this build has not
+            wired: a pasted image with no `uploadAttachment` is REFUSED rather
+            than silently dropped, and this is where that refusal is read.
+          */}
+          {editorError !== null ? (
+            <p role="alert" className="gn-refusal gn-refusal--editor">
+              {editorError}
+            </p>
+          ) : null}
 
           {/*
             Three different facts, three different sentences. A RESTRICTED
@@ -708,28 +868,79 @@ export function TicketSheet({
                 <span className="gn-ticket-sheet__claim">{assigneeRow.claim}</span>
               </dd>
             </div>
-            {Object.entries(state.fields).map(([fieldId, fieldClaim]) => (
-              <div key={fieldId} className="gn-ticket-sheet__field" data-testid={`field-${fieldId}`}>
-                <dt>{fieldId}</dt>
-                <dd>
-                  {fieldId === 'description' ? (
-                    <EditorSlot
-                      mode="description"
-                      doc={fieldClaim.value}
-                      readOnly
-                      workspaceId={workspaceId}
-                      ticketId={ticketId}
-                      placeholder="No description yet"
-                    />
-                  ) : (
+            {/*
+              THE DESCRIPTION IS A ROW WHETHER OR NOT ANYBODY HAS EVER CLAIMED
+              ONE — and that is the half the dispatch did not name, found by
+              measuring the reducer rather than the sheet.
+
+              `ticket.created` writes `fields: { title: claim(p.title, env) }`
+              and NOTHING else (`packages/domain/src/ticket-state.ts:150`), and
+              no other path writes a description except an explicit
+              `ticket.field_set` (`create-ticket-flow.tsx:209` submits
+              `ticket.created` alone). So on a ticket nobody has described there
+              is no `description` key at all — and this row used to live INSIDE
+              the `Object.entries(state.fields)` loop below. The editor it mounts
+              had nowhere to mount, and the owner saw no description and no way
+              to add one. **Flipping `readOnly` alone would have changed almost
+              nothing**: it would have enabled editing for the few tickets that
+              already carry a claim, which is precisely the shape of a fix that
+              passes its own test and does not do the thing.
+
+              Lifted out on the ASSIGNEE row's precedent, eleven lines up: a row
+              the sheet draws unconditionally, whose claim line states what is
+              actually known. The loop below now skips `description`, so the row
+              is drawn once.
+            */}
+            <div className="gn-ticket-sheet__field" data-testid="field-description">
+              <dt>description</dt>
+              <dd>
+                {/*
+                  ⚠ BOTH BRANCHES ARE LIVE AND NEITHER IS DEAD CODE — do not
+                  collapse them. `editorSlot` is the app's real Tiptap composer;
+                  `PlainTextEditorSlot` is this package's read-only default,
+                  which renders the document and offers no control to type into.
+                  A build that has not wired an editor is not a broken build, and
+                  the fallback is the correct behaviour for it — what was wrong
+                  was that the editor was never available. THIS CHANGE IS THE ONE
+                  THAT MAKES THE FIRST BRANCH REACHABLE FROM `apps/web`.
+
+                  `submit` is what makes a mounted editor usable at all:
+                  `TicketEditorSlot` disables its control and NAMES the gap when
+                  it is absent ("there is nowhere to send the words"). It is
+                  passed unconditionally because the read-only fallback ignores
+                  every capability prop on purpose.
+                */}
+                <EditorSlot
+                  mode="description"
+                  doc={descriptionClaim?.value}
+                  readOnly={!canEditDescription}
+                  workspaceId={workspaceId}
+                  ticketId={ticketId}
+                  placeholder="No description yet"
+                  submit={submitDescription}
+                  queryUsers={queryUsers}
+                  onError={reportEditorError}
+                />
+                <span className="gn-ticket-sheet__claim">{descriptionClaimLine}</span>
+              </dd>
+            </div>
+            {Object.entries(state.fields).map(([fieldId, fieldClaim]) => {
+              // Drawn above, unconditionally. A second pass here would mount a
+              // SECOND editor over one claim and make `field-description`
+              // ambiguous to `getByTestId` — two controls for one field.
+              if (fieldId === 'description') return null;
+              return (
+                <div key={fieldId} className="gn-ticket-sheet__field" data-testid={`field-${fieldId}`}>
+                  <dt>{fieldId}</dt>
+                  <dd>
                     <span>{renderFieldValue(fieldClaim.value)}</span>
-                  )}
-                  <span className="gn-ticket-sheet__claim">
-                    {`set by ${nameOf(fieldClaim.actorId)} on ${formatDate(fieldClaim.serverTime)}`}
-                  </span>
-                </dd>
-              </div>
-            ))}
+                    <span className="gn-ticket-sheet__claim">
+                      {`set by ${nameOf(fieldClaim.actorId)} on ${formatDate(fieldClaim.serverTime)}`}
+                    </span>
+                  </dd>
+                </div>
+              );
+            })}
           </dl>
 
           <AttachmentList entries={attachments ?? []} />

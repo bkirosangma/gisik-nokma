@@ -409,12 +409,13 @@ options to a field that is not a dropdown, or reuse a field name.
 ## Writing, comments and files
 
 **How do I write a description for a job?**
-On the website, you cannot. The job screen shows whatever description is there (or a note saying there
-is none), read-only, with nothing to type into.
+Type it into the description on the job screen and save it. It is written the same way everything else
+about a job is, so the panel reads back who set it and when, and the job's history keeps a line for
+each time it changed.
 
 **Is there a comment box?**
-Not on the website. The pieces for it are built — a proper writing box, mentions, attachments, all of
-it — and it is not connected to the job screen.
+Not on the website. The job screen's writing box now takes a description; it does not post comments,
+and nothing on the web lists them.
 
 **The phone app has a Comment button on a job and the website does not.** So the two-screen phone app
 can do something the full website cannot. Whichever way round that is meant to be, it is not this way
@@ -422,7 +423,8 @@ round.
 
 **Can I attach a photo or a file to a job?**
 Not from the website. The upload machinery works and is tested — but nothing on the web job screen
-reaches it, and the writing box that would accept a dropped file is not connected either.
+reaches it. The writing box on the job screen is connected now, so you can write a description there;
+dropping a file into it is refused rather than quietly lost.
 
 **When it does become reachable, what should I expect?**
 

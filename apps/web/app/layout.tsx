@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { themeStylesheet } from '@gisik-nokma/ui/tokens';
 import '@gisik-nokma/ui/ui.css';
+import '@gisik-nokma/editor/editor.css';
 import './globals.css';
 import { Providers } from '../src/providers.js';
 

@@ -92,11 +92,11 @@ export const HELP_CONTENT: HelpContent = [
               [
                 {
                   "kind": "bold",
-                  "text": "You cannot write a description or leave a comment on the website."
+                  "text": "You cannot leave a comment on the website."
                 },
                 {
                   "kind": "text",
-                  "text": " The job screen shows the description but gives you nothing to type into. (§5)"
+                  "text": " The job screen shows the description and lets you write one; there is no box for a comment. (§5)"
                 }
               ],
               [
@@ -1780,11 +1780,11 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "You cannot write or edit the description."
+                      "text": "The description is no longer on this list — you can write it now."
                     },
                     {
                       "kind": "text",
-                      "text": " The panel shows whatever is there, or a note saying there is none. There is nothing to type into. The writing box — with formatting, mentions and file attachments — is built and is not connected to this screen."
+                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. Type into the description on the job panel and save it; the panel reads back who set it and when. The same box handles formatting and mentions; dropping a file into it is refused rather than quietly lost."
                     }
                   ],
                   [
@@ -1794,7 +1794,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " Same reason. "
+                      "text": " The writing box takes a description and not a comment, and nothing on the web lists comments. "
                     },
                     {
                       "kind": "bold",
@@ -1805,10 +1805,6 @@ export const HELP_CONTENT: HelpContent = [
                     {
                       "kind": "bold",
                       "text": "You cannot attach a file."
-                    },
-                    {
-                      "kind": "text",
-                      "text": " For the same reason as the two above."
                     }
                   ],
                   [
@@ -7174,7 +7170,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "On the website, you cannot. The job screen shows whatever description is there (or a note saying there is none), read-only, with nothing to type into."
+                    "text": "Type it into the description on the job screen and save it. It is written the same way everything else about a job is, so the panel reads back who set it and when, and the job's history keeps a line for each time it changed."
                   }
                 ]
               }
@@ -7189,7 +7185,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Not on the website. The pieces for it are built — a proper writing box, mentions, attachments, all of it — and it is not connected to the job screen."
+                    "text": "Not on the website. The job screen's writing box now takes a description; it does not post comments, and nothing on the web lists them."
                   }
                 ]
               },
@@ -7217,7 +7213,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Not from the website. The upload machinery works and is tested — but nothing on the web job screen reaches it, and the writing box that would accept a dropped file is not connected either."
+                    "text": "Not from the website. The upload machinery works and is tested — but nothing on the web job screen reaches it. The writing box on the job screen is connected now, so you can write a description there; dropping a file into it is refused rather than quietly lost."
                   }
                 ]
               }
