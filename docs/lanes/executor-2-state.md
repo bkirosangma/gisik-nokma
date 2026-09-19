@@ -135,11 +135,35 @@ Pre-existing, outside this change's files. **Owner: whoever next touches that se
 | | |
 |---|---|
 | branch | `exec2/workflow-version-history` |
-| cut from / base | `origin/main` **`f6b16cbb`** |
+| cut from | `origin/main` **`f6b16cbb`** |
+| **rebased onto** | `origin/main` **`2f5c2c3f`** — exec 1's #505 merged while this PR was open |
+| sha mapping | `8ad62eb7` (the reviewed head) → **`5e21f1a5`** |
 | frozen head | `/usr/bin/git rev-parse HEAD` — a block cannot name the commit carrying it |
 | tree | clean after the commit |
 | earlier PRs | **#501 MERGED** (`20d811dc`), **#502 MERGED** |
 | NOT run | the forced gate — the controller's |
+
+### § 5b — THE REBASE (2026-09-19, after #505 landed)
+
+`main` moved `f6b16cbb` → **`2f5c2c3f`** (exec 1's Tasks 6+7, PR #505), and `git merge-tree` named **exactly
+one** conflicting file — `test-cases/13-settings-and-workflows.md`, because both lanes appended their case
+blocks to the same part-file. **Resolved as a union, sequential and provable rather than asserted:**
+
+- main's marker set **33** ids → the resolved file's **41**; `comm -23` between them returns **empty**, so
+  **no case was lost from main's side**;
+- the ids this branch adds and main does not have are exactly **`13.938`–`13.945`**;
+- exec 1's `13.928`–`13.935` are all present, and their own note that **`13.936`–`13.937` are left UNUSED**
+  is untouched — the blocks are adjacent and do not overlap;
+- **nothing was renumbered**, and this branch's correction of 13.920's superseded arm survived the merge.
+
+**`Features.md` was edited by both lanes and auto-merged** — verified afterwards rather than assumed: this
+branch's three statements are present and exec 1's insertion is too (the diff against `f6b16cbb` is
+2 insertions / 1 deletion). **The first measurement of that diff came back EMPTY through a pipe and was
+wrong** — the `rtk` proxy's known shape — so it was re-measured with the output written to a file.
+
+**Re-verified at `5e21f1a5`:** `pnpm turbo run build` **0** (11/11), app-core `test/workflow-builder`
+**210 pass**, `apps/web` **550 pass**, and the six checks + `check:migrations` + both scanners all raw
+**0** (2397 unique ids — 2389 here plus exec 1's 8).
 
 ---
 
