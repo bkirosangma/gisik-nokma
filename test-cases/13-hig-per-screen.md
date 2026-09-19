@@ -183,12 +183,19 @@ the gate would have stayed 33/33.*
   recorded values and re-measured on the live stack, which agree at 14 and 5.)*
   **⚠ WHICH PAGE THIS CASE MEASURES WAS WRONG UNTIL 2026-09-20, and the repair is what gives the
   numbers their meaning.** `/p/:projectId` resolved its project as the FIRST project link on
-  `/w/<id>` — a POSITION, not a project. The live dev database has held a second project since
-  2026-09-10 (`gggg`, created through the real web UI, 1 ticket) and it sorts ahead of the seeded
+  `/w/<id>` — a POSITION, not a project. The live dev database holds a second project (`gggg`,
+  created through the real web UI 2026-09-10, 1 ticket) and it sorts ahead of the seeded
   `Shop operations` (26 tickets), so the ratchet was measuring `gggg`'s board and reporting
   `LOST ariaLabel: baseline 66, now 9`. Measured with the instrument: `gggg` reads
-  `{ariaLabel: 9, role: 9}`, `Shop operations` reads `{ariaLabel: 65, role: 14}` — `role` matching
-  the recorded `14` exactly is what identifies the page the baseline was taken on. The route now
+  `{ariaLabel: 9, role: 9}`, `Shop operations` reads `{ariaLabel: 65, role: 14}`, against the
+  recorded `{66, 14}`.
+  **⚠ HOW FAR BACK — corrected under review, and the first version was too wide.** It said the
+  wrong-board period ran "since 2026-09-10", which the database falsifies: `gggg`'s own event log
+  records `project.archived` at **2026-09-16 04:27:47** and `project.restored` at **2026-09-19
+  18:40:20**, and the workspace home renders live projects only by default — so `gggg` was out of the
+  DOM across **2026-09-18**, when this baseline was recorded. **The recorded page WAS `Shop
+  operations`**, so the `role` match corroborates the baseline rather than being its only warrant.
+  The wrong-board window starts at the **2026-09-19 restore**. The route now
   names the seeded project and refuses to fall back to a neighbour (`e2e-stack/helpers/board.ts`);
   **it reds, correctly, at `66 → 65`: one accessible name genuinely lost on the real board, not yet
   attributed. Owner: whoever next touches the board's labelled controls.**

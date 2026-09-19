@@ -60,5 +60,5 @@ test('a guest sees the workspace and NOT its projects — the partial workspace,
   // with a stronger referent — the guest can still REACH the workspace they belong to (its card is
   // one door link to `/w/<id>`, Round 19c), while `Shop operations` is absent from the same render.
   // "The guest sees nothing at all" still fails this test.
-  await expect(page.getByRole('link', { name: 'Convenience Corner' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Convenience Corner', exact: true })).toBeVisible();
 });

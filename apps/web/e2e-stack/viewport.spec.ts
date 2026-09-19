@@ -301,14 +301,22 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
    *
    * These two lines were `.first()` on the project links, which is a fact about the DATABASE rather
    * than about the product: on `/w/<id>` the first link is whichever project sorts first. The live
-   * dev database has held a second project since 2026-09-10 (`gggg`, created through the real web
-   * UI, 1 ticket, 3 columns) and it sorts ahead of the seeded `Shop operations` (26 tickets, 8
-   * columns). MEASURED on the live stack with this suite's own `sweepAccessibleNames`:
+   * dev database holds a second project (`gggg`, created through the real web UI 2026-09-10, 1
+   * ticket, 3 columns) and it sorts ahead of the seeded `Shop operations` (26 tickets, 8 columns).
+   * MEASURED on the live stack with this suite's own `sweepAccessibleNames`:
    * `gggg` reads `{ariaLabel: 9, role: 9}`, `Shop operations` reads `{ariaLabel: 65, role: 14}` — and
    * the recorded baseline is `{ariaLabel: 66, role: 14}`, matching `Shop operations` on `role`
-   * exactly. **So every measurement keyed `/p/:projectId` since 2026-09-10 has been taken on the
-   * wrong board**, and the ratchet reported it as `LOST ariaLabel: baseline 66, now 9` — a
-   * catastrophic-sounding accessibility regression that was nothing of the kind.
+   * exactly. **So `/p/:projectId` was measured on the wrong board**, and the ratchet reported it as
+   * `LOST ariaLabel: baseline 66, now 9` — a catastrophic-sounding accessibility regression that was
+   * nothing of the kind.
+   *
+   * ⚠ **HOW FAR BACK, corrected under challenge.** This comment first said "since 2026-09-10" and
+   * that was too wide. `gggg`'s own event log records `project.archived` at 2026-09-16 04:27:47 and
+   * `project.restored` at 2026-09-19 18:40:20, and `/w/<id>` renders live projects only by default —
+   * so `gggg` was out of the DOM across 2026-09-18, when the `66`/`role 14` baseline was recorded.
+   * **The baseline was legitimately taken on `Shop operations`**, and the `role` match corroborates
+   * rather than proves it. The wrong-board window starts at the 2026-09-19 restore; the creation
+   * date is not a window.
    *
    * `helpers/board.ts` names the project and REFUSES to fall back to a neighbour, so a missing seed
    * fails loudly instead of silently measuring a different board.
@@ -884,9 +892,11 @@ test('records non-text contrast across the signed-in surface, with a positive co
   // door-link and nothing else) onto `/w/<id>`'s own "Open board" rows — see
   // the longer version of this note on the accessible-name sweep above.
   //
-  // By NAME, not by position — see the longer note on the accessible-name sweep above. `.first()`
-  // here swept `gggg` rather than the seeded board, so `/p/:projectId`'s contrast roster entry was a
-  // measurement of the wrong page. `seededProjectHref` navigates to `/w/<id>` itself.
+  // By NAME, not by position — see the longer note on the accessible-name sweep above (including the
+  // corrected window: the wrong-board period starts at `gggg`'s 2026-09-19 restore, not its
+  // 2026-09-10 creation). `.first()` here swept `gggg` rather than the seeded board, so
+  // `/p/:projectId`'s contrast roster entry was a measurement of the wrong page.
+  // `seededProjectHref` navigates to `/w/<id>` itself.
   const projectHref = await seededProjectHref(page, workspaceId);
 
   const routes = [
