@@ -41,6 +41,65 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~17:4x IST. **DOOR A IS PART-BUILT AND STOPPED AT A
+> # RESTART REQUEST. NO PR. THIS IS A WIP BRANCH.** Branch **`exec/workspace-description`**, cut from
+> # **`origin/main` = `7beccab4`** (main has since moved to `9b88f9b4`); head **`3b6cf2a1`**, pushed.
+> # **Dispatch: `gisik-nokma-lanes/CTL-QUEUE-2026-09-19-door-builds.md` §A.**
+>
+> ## WHERE DOOR A STANDS — measured ✓ / built ✓ / left ✗
+>
+> **The DOOR MEASUREMENT IS COMPLETE. Do not re-derive it.**
+>
+> | | |
+> |---|---|
+> | migration number | `proj_projects` is made by `1787961500000`; **highest applied is `1789500000000`**, so mine is `1789600000000` ✓ |
+> | `.strict()` | `projectCreatedPayload` (`events/membership.ts:49`) is `.strict()` ✓ confirmed |
+> | the prototype | `desc` is **real user-authored prose** (`{ name: "Delivery", desc: "Sprint work for the rollout" }`, `desktop.dc.html:2160-2172`), **displayed READ-ONLY** on the card (`:264`), and **nothing lets a person author one** — `addProject` takes a name only and hard-codes `desc: "No tickets yet"` (`:2698`) |
+>
+> ### ⛔ THE ONE FINDING THAT CHANGES HOW THIS IS READ, AND IT NEEDS NO RULING
+> **The queue row does not name a disclosure, and the obvious hazard is already answered by the
+> existing design.** The prototype's hidden project carries `desc: "You are not named on this project"`
+> — a **placeholder in the description slot** — while the card substitutes the NAME for a hidden project
+> and passes `desc` through verbatim (`:2665-2666`). In the product,
+> **`visibleProjects` (`read/visible-projects.ts:51-76`) scopes ROWS, not columns**: a caller not on a
+> project receives no row at all, and its own docblock says *"`archived` rides with the NAME … the
+> disclosure decision was made one line down, by the filter."* **A `description` rides identically. No
+> new visibility rule, and therefore no ruling is owed.** I checked this before building rather than
+> after, because it is exactly the "a disclosure the table does not name → STOP AND ASK" case.
+>
+> ### ✅ BUILT (head `3b6cf2a1`, pushed, NOT gated, NOT reviewed)
+> - `apps/server/migrations/1789600000000_proj-projects-description.sql` — `ADD COLUMN description text NULL` with a `COMMENT` recording the nullable-vs-blank decision.
+> - `packages/domain/src/events/membership.ts` — `descriptionText` (`.min(1).max(500)`, refuses blank, does NOT trim — both for `displayName`'s recorded reasons; 500 matches `searchTermSchema`), and `projectCreatedPayload` gains `description: descriptionText.optional()`. **No `null` spelling**, deliberately.
+> - `apps/server/src/projections/proj-projects.ts` — the INSERT carries the column, with `payload.description ?? null` and the reason (`?? ''` would write the CLAIM "no description" for every project founded before this field existed).
+>
+> ### ✗ LEFT — and this is the list a restart works from
+> 1. **THE READ**: `VisibleProject` (`read/visible-projects.ts:4`) and its `SELECT` (`:55`) must carry `description`.
+> 2. **THE WIRE OBJECT**: `apps/server/src/routes/workspaces.ts` (~`:157-190`) builds the `ProjectRef` rows — it must pass `description` through, **or the field arrives `undefined` on that route.** This is the dispatch's own warning and it is the half-witnessed-contract failure this repo has been bitten by.
+> 3. **THE MAPPER**: `mapWorkspaceRefs` (`packages/app-core/src/online/mappers.ts:1215-1225`) maps the nested project rows — it must map `description`. **This is the ONE construction site of `ProjectRef`**; every other hit in the tree is a consumer (a type, a prop, a hook), which I enumerated before starting.
+> 4. **THE TYPE**: `ProjectRef` (`packages/app-core/src/view-types.ts:72`) gains the field — **and `undefined` must mean NOT DESCRIBED, never "show an empty string"**, which is the rule `RosterMember.email`'s docblock above it already states.
+> 5. **THE RENDER**: the project card in `apps/web/app/w/[workspaceId]/page.tsx` (`ProjectCard`, `:364-430`).
+> 6. **CASES**: from the block **`13.976`–`13.987`**. None minted yet.
+> 7. **THEN**: gate + the eight checks, handoff refreshed before the freeze, PR.
+>
+> ### ⚠ A SCOPE QUESTION THE RESTART SHOULD SETTLE EARLY, NOT DISCOVER LATE
+> **The prototype has no create-time description field.** Its `addProject` takes a NAME only and
+> hard-codes the desc. So adding an optional `description` to `projectCreatedPayload` **lets the web's
+> New-project form author something the prototype's form cannot** — which the queue row authorises
+> (it names the payload as part of the move) but which the prototype does not draw. **Either the form
+> gains a description input, or the column is written only by events the product never sends.** Decide
+> it explicitly and say so in the PR body; do not leave it implicit.
+>
+> ## ⚠ BLOCK ARITHMETIC — THIS LANE'S IDS ARE RUNNING OUT
+> Block **`13.976`–`13.987`** (12). **Door A has used none yet.** Queue after A: **D → F → G**, which
+> **cannot all fit** — and §13 is **24 ids from full** (highest in use `13.999`). **When the block
+> empties, STOP AND ASK** — the queue's own rule is *"do not borrow a neighbour's, and do not mint from
+> the tip."*
+>
+> ## OTHER LANE STATE (for a fresh controller)
+> **Merged today:** rename `0f0cc398` · denial `db52f911` · list-filter `a4483917` · inbox filter `cce9fac1` · the four refusal docblocks `25c2a883`. **Doors B is done.** The `DataSourceQuery.search` ruling request went to the owner.
+>
+> ## ⚠ SHAS IN THIS FILE ARE UNRELIABLE — including mine
+
 > # ▣ CURRENT POSITION — SATURDAY 2026-09-19, ~17:1x IST. **THE TWO POST-FREEZE BLEMISHES ARE RE-AIMED
 > # AND THE PR IS OPEN.** Branch **`exec/refusal-docblocks`**, cut from **`origin/main` = `3aca76ab`**;
 > # the controller's small queued item. **Door B is also open as PR `#536`** (`exec/inbox-filter`) — a
