@@ -20,7 +20,88 @@
 
 ---
 
-## ▲ TOP BLOCK — the **Assignee row is EDITABLE**, on the door that already exists, and two dispatch premises measured false. (2026-09-19, ~16:0x IST)
+## ▲ TOP BLOCK — the **rename moved onto the NAME itself**, and a case about a neighbouring line caught a regression this change introduced. (2026-09-19, ~17:0x IST)
+
+**Position: DONE and PUSHED — `exec2/inline-rename`, base `main`, cut from `origin/main` `5c5dd920`.** The
+PR opens as this dispatch's last step; **measure it rather than reading it here**:
+`gh pr list --head exec2/inline-rename --state all`.
+
+**Owner:** *"have the rename be there right on the header. THE CLICK TO RENAME."*
+
+### § 1 — WHAT SHIPPED.
+
+- **The workspace NAME is now the control** — a **real `<button>` INSIDE the `<h1>`**. Not a bare button
+  replacing the heading (that costs the page its only `h1`), and **not an `h1` with an `onClick`** (the trap
+  the ruling names: focusable by nobody, absent from the tab order, announced as a heading rather than as
+  something that does anything). **The property is preserved, not newly earned** — the previous control was
+  already focusable and already moved focus into the input.
+- **The separate `Rename` button is GONE.** Strongest form of the argument the header comment was making.
+- **Escape cancels** (handler on the `<form>`, since focus may be on Save or Cancel by then); **Enter
+  commits** natively.
+- **The accessible name still carries the WORKSPACE** — `Rename Convenience Corner`.
+- **Unchanged: the authority (owner + admin, server-enforced) and the door (`workspace.renamed`).**
+
+### § 2 — THE COMMENT, RE-AIMED IN THE SAME CHANGE SET.
+
+Its operative clause read *"the `Rename` control **beside the titles**"* — which named a separate button,
+i.e. **a thing the page stopped having the moment the name became the control**. Re-aimed; **the Round 21
+argument is kept intact** (this is still a workspace ACT, not a navigation affordance).
+
+### § 3 — THE FOUR EXISTING CASES WERE NOT ENOUGH, AND THAT IS MEASURED.
+
+`13.962`–`13.965` **all still hold of the new shape** — they query `button[name^="Rename "]`, which the
+name-control carries — and **not one would notice the shape changing**, because every property they assert
+is equally true of a separate button labelled `Rename`. New case **`13.969`** is the three arms that
+discriminate: **the visible text IS the name** · **it takes focus** · **exactly one rename control exists**;
+plus Escape, which nothing covered.
+
+**Mutation-witnessed three times, each killing it:** visible text changed to `Rename` · the `<button>`
+swapped for a `<span>` with the same `onClick` — *the trap the ruling names* · the Escape handler neutered.
+Each run printed the file's sha before and after.
+
+### § 4 — ⚠ A REGRESSION THIS CHANGE INTRODUCED, CAUGHT BY A CASE ABOUT A DIFFERENT LINE.
+
+The restructure that moved the form into the heading's slot **deleted the header's meta line** (`N active
+projects · you're a …`) — it sat between the two anchors the edit spanned. **No rename case failed.
+`13.395`** (*the header reads only served numbers*) failed, with `Unable to find an element with the text: 1
+active project · you're a guest`. **A case about a neighbouring line is what caught an edit about a
+different one** — and the sweep that would have missed it is a sweep of the files the change was *about*.
+
+### § 5 — VERIFIED IN A REAL BROWSER, 10/10.
+
+Real Chromium against the real `next dev` on **:3021** rendering the real `WorkspaceHome`: clicking the name
+puts a field **where the heading was** carrying the current name; typing and **Enter commits**
+`workspace.renamed` with the typed name; **reloading shows the new name and the old one is gone.**
+Screenshots kept (`/tmp/rename-{1,2,3}-*.png`).
+
+**⚠ WHAT THAT DOES NOT PROVE, stated because it matters:** the write is **stubbed at the HTTP layer.** Phone
+sign-in is OFF on this stack (`/v1/auth/methods` → `phone:false`) and Google needs the owner's account, so
+**a real session is not reachable from this lane**. The real ingest door receiving this event is `13.963`'s
+job, not this harness's.
+
+### § 6 — CASE `13.969`, MINTED AT THE TIP AND FLAGGED.
+
+**The allocated-block rule arrived AFTER this task was dispatched, and this task had no block.**
+`13.966`–`13.968` were consumed by the renumber that fixed the red main, so the next free id was taken —
+**and the space is nearly gone (`13.994` is the highest in use).** **This lane asks for a block before its
+next task (the description field).**
+
+### § 7 — GATE.
+
+**33/33, `EXIT=0`, node v22.22.2**; all seven checks green, and `check-case-ids` EXIT=0 with `union == sum`.
+The first gate run reddened on the known 30 s load timeout in `test/seed/seed-dev.test.ts` — **isolated 8/8**
+and green on re-run.
+
+### Rules that bind this branch
+- **Never `docker compose`**; **:3001 is executor 1's** (this lane used **:3021** for the browser run and
+  released it); **never `AskUserQuestion`**; **do not edit `task-ledger.tsv`**.
+- **Do not run the forced gate** — the controller's. Run it yourself before freezing.
+- **A 30 s timeout at high load has been the environment every time today.** Isolate the file alone first.
+- **Never pipe a test run into `head`.**
+
+---
+
+## ▼ PREVIOUS BLOCK — the **Assignee row is EDITABLE**, merged as `#530`. (2026-09-19, ~16:0x IST)
 
 **Position: the dispatch is DONE and the branch is PUSHED — `exec2/assignee-editable`, base `main`, cut
 from `origin/main` `045b9cac`.** The PR opens as this dispatch's last step; **measure it rather than reading

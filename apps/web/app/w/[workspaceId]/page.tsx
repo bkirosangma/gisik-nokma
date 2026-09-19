@@ -696,49 +696,88 @@ function WorkspaceHome({
             must not change a colour a person has learned. */}
         <Avatar size="large" name={workspace.name} tint={workspace.id} />
         <div className="gn-workspace-home__header-titles">
-          <h1 className="gn-page-title">{workspace.name}</h1>
+          {/**
+           * THE NAME IS THE RENAME'S CONTROL (owner, 2026-09-19: *"have the
+           * rename be there right on the header. THE CLICK TO RENAME."*).
+           *
+           * A `<button>` INSIDE the `<h1>` rather than a bare button, and the
+           * reason is not cosmetic: this page's heading must survive. Replacing
+           * the `h1` with a button would trade a name for a control and leave
+           * the document without a first-level heading, which is a worse bargain
+           * than the one the owner asked for.
+           *
+           * **It is a real `<button>` and NOT an `h1` carrying an `onClick`** —
+           * the trap this shape invites. A heading with a click handler is
+           * reachable by pointer only: it is not focusable, it does not appear
+           * in the tab order, and it announces as a heading rather than as
+           * something that does anything. The control that stood here before was
+           * already focusable and already moved focus into the input; **that
+           * property is preserved, not newly earned.**
+           *
+           * The accessible name still carries the WORKSPACE (`Rename
+           * {name}`), for the reason the removed button's own comment gave: a
+           * page of identically-named controls tells a screen-reader user
+           * nothing about which one renames what. What the button SAYS visually
+           * is the name itself, which is the point of the change.
+           */}
+          {isAdmin && renaming ? (
+            /* THE INPUT REPLACES THE NAME, IN PLACE — the owner's own words:
+               *"have the rename be there right on the header. THE CLICK TO
+               RENAME."* Not a modal, not a relocation: the heading's own slot
+               holds the field for as long as the edit lasts. */
+            <form
+              className="gn-workspace-home__rename"
+              onSubmit={onRename}
+              onKeyDown={(event) => {
+                // ESCAPE CANCELS, and the handler is on the FORM rather than on
+                // the input because focus may be on Save or Cancel by the time a
+                // reader changes their mind. ENTER needs no handler: a form with
+                // a submit button commits on Enter natively, which is what
+                // `Save name` is for.
+                if (event.key === 'Escape') setRenaming(false);
+              }}
+            >
+              <label className="gn-field__label" htmlFor="workspace-rename">
+                New workspace name
+              </label>
+              <input
+                id="workspace-rename"
+                className="gn-field__input"
+                value={nameDraft}
+                onChange={(event) => setNameDraft(event.target.value)}
+                autoFocus
+              />
+              <Button variant="primary" type="submit" disabled={busy || nameDraft.trim() === ''}>
+                Save name
+              </Button>
+              <Button type="button" disabled={busy} onClick={() => setRenaming(false)}>
+                Cancel
+              </Button>
+            </form>
+          ) : (
+            <h1 className="gn-page-title">
+              {isAdmin ? (
+                <button
+                  type="button"
+                  className="gn-workspace-home__rename-trigger"
+                  aria-label={`Rename ${workspace.name}`}
+                  disabled={busy}
+                  onClick={() => {
+                    setNameDraft(workspace.name);
+                    setRenaming(true);
+                  }}
+                >
+                  {workspace.name}
+                </button>
+              ) : (
+                workspace.name
+              )}
+            </h1>
+          )}
           {/* `gn-workspace-list__role--pinned` (Task 7 fix round 1, ROUTED 3):
               a dedicated class, not a structural selector — see that class's
               rule in globals.css for why. */}
           <p className="gn-workspace-list__role gn-workspace-list__role--pinned">{meta}</p>
-          {isAdmin ? (
-            renaming ? (
-              <form className="gn-workspace-home__rename" onSubmit={onRename}>
-                <label className="gn-field__label" htmlFor="workspace-rename">
-                  New workspace name
-                </label>
-                <input
-                  id="workspace-rename"
-                  className="gn-field__input"
-                  value={nameDraft}
-                  onChange={(event) => setNameDraft(event.target.value)}
-                  autoFocus
-                />
-                <Button variant="primary" type="submit" disabled={busy || nameDraft.trim() === ''}>
-                  Save name
-                </Button>
-                <Button type="button" disabled={busy} onClick={() => setRenaming(false)}>
-                  Cancel
-                </Button>
-              </form>
-            ) : (
-              /* The accessible name carries the WORKSPACE, for the reason the
-                 archive control below gives: a page of identically-named
-                 buttons tells a screen-reader user nothing about which one
-                 renames what. */
-              <Button
-                type="button"
-                aria-label={`Rename ${workspace.name}`}
-                disabled={busy}
-                onClick={() => {
-                  setNameDraft(workspace.name);
-                  setRenaming(true);
-                }}
-              >
-                Rename
-              </Button>
-            )
-          ) : null}
         </div>
         {/* NO Members/Settings buttons here (Round 21, owner: "remove the
             members and settings button, not the nav bar item, but the buttons
@@ -747,17 +786,28 @@ function WorkspaceHome({
             section cards below AND a nav item once a workspace is open, and
             Settings is the nav's own workspace-scoped item (Round 21 item 6).
 
-            **The `Rename` control beside the titles does not re-open that
-            ruling, and the distinction is why it is a rename rather than one of
-            those two buttons returning.** Round 21 removed two NAVIGATION
-            affordances because each already had a destination elsewhere on the
-            page; a rename has no other route in the product at all —
-            `workspace.renamed` had no client UI before 2026-09-19 — so there is
-            nothing here for it to duplicate. **What the sentence above used to
-            say, "the header is now the monogram and the titles, nothing else",
-            is amended rather than deleted**: it remains true of the two buttons
-            it removed, and this control is a workspace ACT, not a way to
-            somewhere else. */}
+            **THE HEADER HOLDS THE MONOGRAM, THE TITLES AND THE RENAME — and the
+            NAME ITSELF is the rename's control** (owner, 2026-09-19: *"have the
+            rename be there right on the header. THE CLICK TO RENAME."*).
+
+            It still does not re-open this ruling, and the distinction is why it
+            is a rename rather than one of those two buttons returning: Round 21
+            removed two NAVIGATION affordances because each already had a
+            destination elsewhere on the page; a rename has no other route in the
+            product at all — `workspace.renamed` had no client UI before
+            2026-09-19 — so there is nothing here for it to duplicate. **It is a
+            workspace ACT, not a way to somewhere else.**
+
+            **THIS PARAGRAPH DESCRIBED THE OLD SHAPE AND IS RE-AIMED RATHER THAN
+            LEFT STANDING.** It used to say *"the `Rename` control **beside the
+            titles**"*, which was true of a separate button standing next to the
+            name — and by the time the name became the control that sentence
+            named a thing the page no longer had. **The duplication it argues
+            against is now removed in the strongest available form: there is no
+            longer a second control in this header at all**, because the name
+            does the job. What the sentence above used to say — *"the header is
+            now the monogram and the titles, nothing else"* — stays amended
+            rather than deleted: it remains true of the two buttons it removed. */}
       </div>
 
       {/* Round 20: the heading and its toggle sit in a BARE row above the grid,
