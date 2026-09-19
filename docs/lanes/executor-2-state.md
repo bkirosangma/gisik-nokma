@@ -22,13 +22,22 @@
 
 ## ▲ TOP BLOCK — Task 3 **MERGED**; the owner's rulings are in; and this lane is **DISPATCHED on the no-hot-reload change**. (2026-09-19)
 
-**Position: DISPATCHED — `CTL-DISPATCH-2026-09-19-drop-hot-reload.md` (EXEC 2, one PR, base `main`).** Task 3
-is merged (`#506`). The owner answered **all eight** owner-gated items at ~12:5x IST; the block to read is
-`docs/lanes/controller-state.md`'s **"📌 THE OWNER'S RULINGS"**, which is **the newest authority in that file
-and supersedes the "not answered yet" framing everything above it carries**. **What this lane is doing next
-is NOT one of them** — the controller dispatched the hot-reload removal separately and said in terms that
-**`5b`(c) and `13.693` are NOT being dispatched yet, "one thing at a time."** Two rulings still shape the
-queue below:
+**Position: the no-hot-reload dispatch is DONE and its PR is OPEN — `#512`, branch
+`exec2/drop-hot-reload`, frozen head `c8cb3395` (two commits: the change, then the review round).**
+Replaces the "DISPATCHED" this block said an hour ago; the work landed in the same change set as this line.
+
+**`CTL-DISPATCH-2026-09-19-drop-hot-reload.md`.** The headline finding, because it is the number the
+dispatch existed to produce: **a full `docker compose --env-file .env -f docker-compose.dev.yml build web`
+takes 841 s — 14 minutes 1 second — on this 10-core box**, and it is SILENT for 301.3 s of that, so a
+watcher reads a working build as hung. The stack now serves built images from
+`/Users/kiro/my_projects/gisik-nokma`, rebuilt after every merge to `main`.
+
+Task 3 is merged (`#506`). The owner answered **all eight** owner-gated items at ~12:5x IST; the block to
+read is `docs/lanes/controller-state.md`'s **"📌 THE OWNER'S RULINGS"**, which is **the newest authority in
+that file and supersedes the "not answered yet" framing everything above it carries**. **What this lane did
+next was NOT one of them** — the controller dispatched the hot-reload removal separately and said in terms
+that **`5b`(c) and `13.693` are NOT being dispatched yet, "one thing at a time."** Two rulings still shape
+the queue below:
 
 - **item 4 — `hig-per-screen/5b`: `"c"`.** The real-door case: real server, real Postgres, the List
   genuinely shrinks. **That ANSWERS exec 1's three-option ruling request** (their option (c)) and accepts
@@ -57,6 +66,7 @@ returns **empty** — the ledger is byte-identical between the two, measured rat
 | open PRs | **NOT a fact to read off a table — MEASURE IT.** A repo-wide count cannot tell this lane's PR from a peer's, and a count written here expires faster than the block: **`#509` merged 18 seconds after this block's own commit-time, and this lane's branch was pushed by that same commit** — so an earlier version of this row was false in both directions at the head it shipped in, and a re-review caught it. **Ask instead: is a PR open whose head is `exec2/handoff-post-506`?** |
 | this file's own branch | `exec2/handoff-post-506`, cut from `origin/main` `22a8e7c3` |
 | earlier PRs | **#501** (canvas), **#502** (roster), **#506** (Task 3) — all MERGED, none needs redoing |
+| **this lane's OPEN PRs** | **TWO, and they are independent branches** — **`#510`** (this handoff, branch `exec2/handoff-post-506`) and **`#512`** (the no-hot-reload change, branch `exec2/drop-hot-reload`, head `c8cb3395`). **They do not conflict: `#510` touches only this file.** Next action is the controller's on both; do not open a third for either |
 
 **FIRST ACTION ON A RESTART: THREE commands, because no single one answers the question.**
 `gh pr list --head exec2/handoff-post-506 --state all` · `git log origin/main..exec2/handoff-post-506 --oneline` ·
