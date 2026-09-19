@@ -18,8 +18,8 @@
 | anchor | value |
 |---|---|
 | `git merge-base origin/main HEAD` | `84c35f5a` |
-| `HEAD` | `a8ae1073` (the handoff commit sits on top and cannot name itself) |
-| ahead / behind `origin/main` (`d550c6c1`) | **4 / 7** |
+| `CODE HEAD` | `a8ae1073`; **pushed head `6b3b3c0c`** (the handoff commit sits on top and cannot name itself) |
+| ahead / behind `origin/main` (`d550c6c1`) | **5 / 7** (4 at `a8ae1073`) |
 | **overlap between the two sides** | **NONE — measured by set difference, with a control** |
 | tree | **clean** |
 
@@ -34,8 +34,12 @@ file sets**, so the merge is clean by construction rather than by hope. Measured
 a real empty and not a broken invocation. `docs/lanes/executor-state.md` is EXECUTOR 1's handoff and is not
 this lane's file. Rebasing would also orphan every sha the two reviewer passes were run against.
 
-**Two-dot warning, paid for here:** `git diff --shortstat origin/main HEAD` reports **14 files, +352/−521**
-on this branch. That is the *moved main* being counted as mine. Three dots gives **3 files, +147/−50**.
+**Two-dot warning, paid for here:** `git diff --shortstat origin/main HEAD` reports **15 files, +456/−575**
+on this branch. That is the *moved main* being counted as mine. **Three dots gives 4 files, +398/−81** —
+which is exactly what GitHub reports for #581 (`changedFiles: 4`, `additions: 398`, `deletions: 81`), so the
+two agree. ⚠ **These figures move with every commit, including this one** — I first wrote `+294/−81` here
+from a measurement taken at `a8ae1073`, before the handoff commit that changed it. A diffstat is a fact
+about a tree, and the handoff cannot count itself.
 | `node scripts/help-content.mjs --check` | **ok** — 2 documents, 29 sections, **231 entries** |
 | `check:env` / `check:tasks` / `check:runbook` / `check:citations` / `check:help` | **all exit 0** |
 | `check-case-ids` | ok — **2494** unique ids, highest `16.82` (**unchanged: no case id minted**) |
