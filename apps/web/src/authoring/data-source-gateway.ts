@@ -221,7 +221,16 @@ export function createWebAuthoringGateway(deps: WebAuthoringDeps): WorkflowAutho
      * `online/mappers.ts:508` rather than trusted, because a field this seam
      * dropped would be a field the next publish silently deleted.
      */
-    getWorkflow: (workspaceId, workflowId) => dataSource.query.getWorkflowDef(workspaceId, workflowId),
+    /**
+     * **The version rides through, and its absence here was a real gap rather
+     * than a simplification** (Task 3, lifted 2026-09-19). This seam called the
+     * query with two arguments while the query has declared three since Plan 6,
+     * so the version chain was served by the route, by the online adapter and
+     * by the projection — and reachable from no screen. Omitted still means
+     * "latest", which is what every other caller passes.
+     */
+    getWorkflow: (workspaceId, workflowId, version) =>
+      dataSource.query.getWorkflowDef(workspaceId, workflowId, version),
 
     /** Through `DataSource` — `getTicketTypes` returns the domain `TicketTypeDef[]` already. */
     listTicketTypes: (workspaceId) => dataSource.query.getTicketTypes(workspaceId),

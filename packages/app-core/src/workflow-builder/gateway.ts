@@ -55,7 +55,31 @@ export type MigrationOutcome =
 
 export interface WorkflowAuthoringGateway {
   listWorkflows(workspaceId: string): Promise<PublishedWorkflowDef[]>;
-  getWorkflow(workspaceId: string, workflowId: string): Promise<PublishedWorkflowDef | null>;
+  /**
+   * One published definition — **optionally a specific version of it** (Task 3,
+   * lifted 2026-09-19).
+   *
+   * The `version` parameter is not new to the product; it is new to THIS
+   * interface, and its absence was the whole of the gap. `DataSourceQuery`
+   * has declared `getWorkflowDef(workspaceId, workflowId, version?)` since Plan
+   * 6 (`packages/app-core/src/data-source.ts:146`), the online adapter already
+   * sends `?version=` (`online-data-source.ts`), and the server route serves
+   * any single version (`builder-reads.ts`, numeric branch). **The web adapter
+   * was the one seam that dropped it**
+   * (`apps/web/src/authoring/data-source-gateway.ts` called the query with two
+   * arguments — `:224` before this change, `:233` after it, because the
+   * docblock explaining the fix is what moved the line). Exposing it is what
+   * makes the version chain readable from a
+   * screen, which is what Task 3's conditional ruling turned on.
+   *
+   * Omitted = the latest published version, which is what every pre-existing
+   * caller wants and still gets — so this is an addition, not a change.
+   */
+  getWorkflow(
+    workspaceId: string,
+    workflowId: string,
+    version?: number,
+  ): Promise<PublishedWorkflowDef | null>;
   listTicketTypes(workspaceId: string): Promise<TicketTypeDef[]>;
   /**
    * The workspace roster. An executor ruling (2026-09-02, coordination doc

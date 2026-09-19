@@ -22,6 +22,7 @@ export * from './ui/publish-controls.js';
 export * from './ui/state-mapping-dialog.js';
 export * from './ui/workflow-builder-screen.js';
 export * from './ui/workflow-list-screen.js';
+export * from './ui/workflow-history-screen.js';
 export * from './ui/template-gallery.js';
 export * from './ticket-types/rank.js';
 export * from './ticket-types/icons.js';

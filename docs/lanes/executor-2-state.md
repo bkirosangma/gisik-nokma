@@ -20,7 +20,180 @@
 
 ---
 
-## ▲ TOP BLOCK — the non-text-contrast roster REGENERATED. PR open against `main`. (2026-09-19, ~02:5x)
+## ▲ TOP BLOCK — Task 3: the history screen, and it is the FIRST screen here the prototype does not draw. (2026-09-19)
+
+**Position: DONE and verified; the PR is opened in the same change set as this block** — branch
+**`exec2/workflow-version-history`**, cut from a freshly fetched `origin/main` **`f6b16cbb`**. Dispatch:
+`CTL-DISPATCH-2026-09-19-lifted-settings-tasks.md`, EXEC 2 section.
+
+**FIRST ACTION ON A RESTART: `gh pr list --state open`.** If a PR for this branch is open it is at the
+controller's merge; **if it has MERGED, this block is history** and the next dispatch is the position;
+**if neither, the work is in this branch and uncommitted or unpushed — check `git status` before
+concluding anything**, because the first version of this block said "PR open" while nothing was committed
+and the review caught it. **Both of this lane's earlier PRs are MERGED** — #501 (the canvas) and #502 (the
+roster) — and neither needs redoing.
+
+### § 1 — WHAT SHIPPED
+
+| artefact | what |
+|---|---|
+| `packages/app-core/src/workflow-builder/ui/workflow-history-screen.tsx` | **new** — the version chain |
+| `packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx` | the second action + its docblock rewritten from "NOT BUILT" to the lift |
+| `packages/app-core/src/workflow-builder/gateway.ts` | `getWorkflow(…, version?)` — the interface gains the parameter |
+| `apps/web/src/authoring/data-source-gateway.ts` | **the seam that dropped it** now passes it |
+| `packages/app-core/src/workflow-builder/fake-gateway.ts` | version-aware, so the fake cannot hide a dropped argument |
+| `apps/web/app/w/[workspaceId]/settings/workflows/[workflowId]/history/page.tsx` | **new** route |
+| `apps/web/app/w/[workspaceId]/settings/workflows/page.tsx`, `apps/web/app/settings/page.tsx` | both list callers wire `onHistory` |
+| `packages/ui/src/ui.css` | the `.workflow-history*` family |
+| `packages/app-core/test/workflow-builder/history.test.tsx` | **new** — cases `13.938`–`13.941` |
+| `apps/web/test/data-source-gateway.test.ts` | case `13.942` + the delegation arm corrected |
+| `packages/app-core/test/workflow-builder/screens.test.tsx` | 13.920's superseded arm corrected |
+| `test-cases/13-settings-and-workflows.md`, `Features.md` | the records |
+
+**Ids: `13.938`–`13.942` minted, recounted at this tip BY MARKER. The next free in the block is
+`13.943`.** 13.920's arm is corrected in place, never renumbered.
+
+### § 2 — THE THREE DECISIONS THE DISPATCH LEFT TO ME, and why
+
+1. **The action sits on EVERY card.** The prototype hangs `"View history"` on a SUPERSEDED version's card,
+   and this screen renders one card per workflow id (`listWorkflows` serves the latest per id), so there is
+   no superseded card for it to sit on. Copying the placement was impossible; the alternative was a button
+   that opens nothing from nowhere.
+2. **The chip is the LIST's chip, by class.** `.workflow-list__state` is the state chip; a second family
+   here would be two chips that drift, which this product already paid for once (the `Switch` was hoisted
+   rather than copied). Hoisting the family to a neutral name would rename classes a shipped case pins at
+   the rendered node, which is not this task's to carry — so the screen wears the list's classes and says
+   why.
+3. **Navigation stays in the route.** The screen is passive: no `onBack`. The route owns the breadcrumb,
+   above its load states, matching the builder route one level up.
+
+### § 3 — WHAT THE HISTORY VIEW RENDERS (the dispatch asks for this in one line, quoted from the case)
+
+> `13.940` — the fixture's two versions carry **different definitions**: `v1` has a `Review` state and two
+> transitions through it, `v2` dropped `Review` and carries a `stateMapping`. The case asserts `Review`
+> renders **inside v1's card** and is **absent from v2's**, with v2's own content (`To do`, `Done`) as the
+> control, plus `2 transitions` on v1 against `1 transition` and `maps 1 state` on v2.
+
+Every version renders **its own content** — states with their category bars, transitions, and the state
+mapping when it has one — newest first (`Current` vs `Superseded`), and a hole in the `1..N` chain is
+**named rather than shown as a shorter list** (`13.941`).
+
+### § 4 — VERIFICATION, including one the ratchet did for me
+
+- **`pnpm check:citations` is what caught the real gap**: `13.938`–`13.941` were minted and marked ✅ while
+  **no test cited them**, and the scanner failed with `uncited count REGRESSED -- baseline 0, now 4`,
+  naming all four. Fixed by citing them in their own test names. `13.942` was already cited. **A minted id
+  with no citing test is exactly what that ratchet exists for**, and it is worth recording that the case
+  text I wrote named the ids before the tests did.
+- app-core `test/workflow-builder`: **PASS 209 / FAIL 0** (was 205; +4 cases).
+- `apps/web` suite: **PASS 548 / FAIL 0** (was 547; +1 case).
+- `pnpm turbo run build`: **0** (11/11) — run FIRST, and it caught two real errors before any test: the
+  second `WorkflowListScreen` caller (`/settings`'s inlined pane) missing the new prop, and a JSX comment
+  placed between attributes.
+- The six checks, `check:migrations` and both scanners: all raw **0** (2389 unique ids).
+
+### § 4b — THE REVIEW: 0 Critical, 0 Important-to-the-code, 3 SURVIVING MUTATIONS — all three now killed
+
+One independent reviewer, read-only, over the uncommitted change. It ran the mutations itself and
+**three survived the whole suite**, which is the finding that matters:
+
+- **The door's DESTINATION was pinned nowhere.** Pointing `onHistory` at the **builder's** path left
+  **548 `apps/web` tests green** — `13.938` proves the handler is called with the right id and nothing
+  proved the id became the right URL. A PR that wires "View history" to the wrong screen would have
+  shipped green. **Killed by `13.944`**, which renders the shipped list PAGE and asserts the URL, with the
+  builder path as the negative.
+- **The history ROUTE was rendered by no test at all.** Its seven-deep relative imports and its
+  `useBuilderWiring` arm were compiler-checked only. **Killed by `13.945`**, through the real page.
+- **The missing-workflow branch was untested.** A bare `return` there left all four history cases green
+  while the shell froze on "Loading history…" forever. **Killed by `13.943`**, with the loading line's
+  absence as its control.
+
+And one arm was **strengthened rather than added**: deleting the `--current` class survived, so `13.939`
+now pins the marker's class as well as its word — the screen's own claim that the marker is *"two things,
+and only one of them is colour"* is now half-measured rather than half-asserted. **The colour half is still
+measured by nothing** (no browser case walks this route) and that is stated rather than implied.
+
+**Its mutations that DID die, for the record:** reverting the adapter to two arguments reddened `13.942`
+and the corrected delegation arm; rendering `versions[0]` under every heading reddened **`13.940` alone**
+with `13.939` green — exactly the discrimination the case claims; and dropping the states/transitions
+reddened `13.940` alone.
+
+**Its two prose findings, both closed.** (1) This block said "PR open" while nothing was committed and no
+PR existed — the repo's `restart-surface-goes-stale` class, failing in the optimistic direction; reworded
+above with an explicit third branch for "neither". (2) **A stale citation this change created**: the
+adapter's call moved `:224` → `:233` when the fix's own docblock was inserted, so every citation of `:224`
+became wrong — re-pointed in the four places this PR ships (`gateway.ts`, the list screen's docblock,
+`Features.md`, the catalogue). **A fix is a change like any other, and the citation sweep is run over the
+files it touches.**
+
+**Its one recorded, unfixed finding:** `data-source-gateway.ts:221` cites `online/mappers.ts:508` for
+`mapWorkflowDef`'s return, and `:508` is `mapAssignee`'s closing brace (`mapWorkflowDef` is at `:668`).
+Pre-existing, outside this change's files. **Owner: whoever next touches that seam.**
+
+### § 4c — `turbo run typecheck` WAS MISSING FROM MY OWN CHECK SET, and it found a real error
+
+**The controller caught this, and it is worth recording as a process failure rather than a footnote.** My
+first check table quoted `turbo run build` and `vitest run` — **neither is `turbo run typecheck`** — and the
+forced gate is the only thing that runs it. So the table was accurate about what I ran and **silent about a
+class it never covered**, on a task that changed TypeScript in three places (a new route, a gateway
+signature, a screen's props).
+
+**Run at this head, it failed immediately:**
+
+```
+test/authoring-routes.test.tsx(4,15): error TS2305: Module '"@gisik-nokma/app-core"'
+  has no exported member 'PublishedWorkflowDef'.
+```
+
+**Neither of the two things I DID run could have caught it, and that is the lesson rather than the typo.**
+`vitest` transpiles with esbuild and **strips types without checking them**, so `13.944`/`13.945` passed
+while importing a member the barrel does not export; and `apps/web`'s `next build` type-checks the APP, not
+`test/**`. **A green build and a green suite are not a typecheck**, and my table read as though they were.
+
+Fixed by importing the type from `@gisik-nokma/domain`, where it is declared. **`turbo run typecheck` then
+returned 17/17 with exit 0**, and it is now in the check set below — along with the note that the `apps/web`
+typecheck task resolves to **node v24.11.1's pnpm** while this shell's node is **v22.22.2**, because a gate
+result that does not name its Node is not evidence.
+
+### § 5 — ANCHORS, verify rather than trusting the row
+
+| | |
+|---|---|
+| branch | `exec2/workflow-version-history` |
+| cut from | `origin/main` **`f6b16cbb`** |
+| **rebased onto** | `origin/main` **`2f5c2c3f`** — exec 1's #505 merged while this PR was open |
+| sha mapping | `8ad62eb7` (the reviewed head) → **`5e21f1a5`** |
+| frozen head | `/usr/bin/git rev-parse HEAD` — a block cannot name the commit carrying it |
+| tree | clean after the commit |
+| earlier PRs | **#501 MERGED** (`20d811dc`), **#502 MERGED** |
+| NOT run | the forced gate — the controller's |
+
+### § 5b — THE REBASE (2026-09-19, after #505 landed)
+
+`main` moved `f6b16cbb` → **`2f5c2c3f`** (exec 1's Tasks 6+7, PR #505), and `git merge-tree` named **exactly
+one** conflicting file — `test-cases/13-settings-and-workflows.md`, because both lanes appended their case
+blocks to the same part-file. **Resolved as a union, sequential and provable rather than asserted:**
+
+- main's marker set **33** ids → the resolved file's **41**; `comm -23` between them returns **empty**, so
+  **no case was lost from main's side**;
+- the ids this branch adds and main does not have are exactly **`13.938`–`13.945`**;
+- exec 1's `13.928`–`13.935` are all present, and their own note that **`13.936`–`13.937` are left UNUSED**
+  is untouched — the blocks are adjacent and do not overlap;
+- **nothing was renumbered**, and this branch's correction of 13.920's superseded arm survived the merge.
+
+**`Features.md` was edited by both lanes and auto-merged** — verified afterwards rather than assumed: this
+branch's three statements are present and exec 1's insertion is too (the diff against `f6b16cbb` is
+2 insertions / 1 deletion). **The first measurement of that diff came back EMPTY through a pipe and was
+wrong** — the `rtk` proxy's known shape — so it was re-measured with the output written to a file.
+
+**Re-verified at `5e21f1a5`:** `pnpm turbo run build` **0** (11/11), app-core `test/workflow-builder`
+**210 pass**, `apps/web` **550 pass**, and the six checks + `check:migrations` + both scanners all raw
+**0** (2397 unique ids — 2389 here plus exec 1's 8). **`turbo run typecheck` was NOT in this list and
+belongs in it — see § 4c.**
+
+---
+
+## ▼ SUPERSEDED — the non-text-contrast roster REGENERATED. **MERGED as #502.** (2026-09-19, ~02:5x)
 
 **Position: DONE.** Branch **`exec2/non-text-contrast-roster`**, cut from `origin/main` **`cede2ab6`** and
 **rebased twice** — onto `98ffab2a` when the catalogue split landed, then onto **`20d811dc`** when #501

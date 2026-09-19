@@ -207,6 +207,7 @@ describe('read-only workflow views for non-admins', () => {
         session={memberSession}
         gateway={createFakeGateway()}
         onOpen={() => {}}
+        onHistory={() => {}}
         onNew={() => {}}
       />,
     );
@@ -220,6 +221,7 @@ describe('read-only workflow views for non-admins', () => {
         session={adminSession}
         gateway={createFakeGateway()}
         onOpen={() => {}}
+        onHistory={() => {}}
         onNew={() => {}}
       />,
     );

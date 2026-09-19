@@ -130,6 +130,7 @@ describe('WorkflowListScreen', () => {
         session={adminSession}
         gateway={createFakeGateway({ workflows })}
         onOpen={onOpen}
+        onHistory={() => {}}
         onNew={() => {}}
       />,
     );
@@ -170,6 +171,7 @@ describe('WorkflowListScreen', () => {
         session={adminSession}
         gateway={createFakeGateway({ workflows: [{ ...first, version: 3 }] })}
         onOpen={() => {}}
+        onHistory={() => {}}
         onNew={() => {}}
       />,
     );
@@ -198,19 +200,27 @@ describe('WorkflowListScreen', () => {
     const cards = document.querySelectorAll('.workflow-list__card');
     expect(cards).toHaveLength(1);
 
-    // THE TWO NAMED ABSENCES, asserted rather than assumed — a badge that can
-    // only ever say "Published" and a second button with no gateway method are
-    // exactly what this repo keeps re-finding, so their absence is pinned.
-    // Each is checked by CLASS and by CONTENT or TAG: a class-shaped guard
-    // alone would pass a badge renamed to `.gn-chip`, or a second action
-    // authored as `<a className="gn-button">` — the pattern this repo already
-    // uses for the ticket-type editor's Cancel.
+    // THE NAMED ABSENCE, asserted rather than assumed — a badge that can only
+    // ever say "Published" is exactly what this repo keeps re-finding, so it is
+    // pinned by CLASS and by CONTENT: a class-shaped guard alone would pass a
+    // badge renamed to `.gn-chip`.
     expect(document.querySelector('.workflow-list__badge')).toBeNull();
+    // THE SECOND ACTION IS NO LONGER ONE OF THEM. This arm used to read
+    // `actions?.querySelectorAll('button')).toHaveLength(1)` — the count WAS the
+    // assertion, and it was the right one while the action was held. Task 3 was
+    // lifted by the owner on 2026-09-19 and the action now ships, so the arm
+    // pins the opposite, **BY NAME AND BY ORDER**: a count of two would pass two
+    // `Open` buttons, which is the failure this file's own habits warn about.
     const actions = document.querySelector('.workflow-list__actions');
-    expect(actions?.querySelectorAll('button')).toHaveLength(1);
+    const actionButtons = [...(actions?.querySelectorAll('button') ?? [])];
+    expect(actionButtons.map((button) => button.getAttribute('aria-label'))).toEqual([
+      `Open ${first.name}`,
+      `View history of ${first.name}`,
+    ]);
     const card = cards[0]!;
     expect(card.textContent).not.toMatch(/Published|Superseded|Draft/);
-    expect(card.querySelectorAll('a, button')).toHaveLength(1);
+    // Two now, and the count is a second witness rather than the assertion.
+    expect(card.querySelectorAll('a, button')).toHaveLength(2);
   });
 
   /**
@@ -225,6 +235,7 @@ describe('WorkflowListScreen', () => {
         session={adminSession}
         gateway={createFakeGateway()}
         onOpen={() => {}}
+        onHistory={() => {}}
         onNew={onNew}
       />,
     );
@@ -247,6 +258,7 @@ describe('WorkflowListScreen', () => {
         session={adminSession}
         gateway={gateway}
         onOpen={() => {}}
+        onHistory={() => {}}
         onNew={() => {}}
       />,
     );
@@ -260,6 +272,7 @@ describe('WorkflowListScreen', () => {
         session={{ userId: newUlid(), role: 'member' }}
         gateway={createFakeGateway()}
         onOpen={() => {}}
+        onHistory={() => {}}
         onNew={() => {}}
       />,
     );

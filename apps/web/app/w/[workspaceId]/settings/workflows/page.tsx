@@ -31,6 +31,7 @@ export default function WorkflowsPage() {
           session={wiring.session}
           gateway={wiring.gateway}
           onOpen={(workflowId) => router.push(`${base}/${workflowId}`)}
+          onHistory={(workflowId) => router.push(`${base}/${workflowId}/history`)}
           onNew={() => router.push(`${base}/new`)}
         />
       )}

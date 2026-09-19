@@ -1,6 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { WorkspaceMember } from '@gisik-nokma/app-core';
+import type { PublishedWorkflowDef } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
 import { AuthoringReadRefused } from '../src/authoring/data-source-gateway.js';
 import { stubServices } from './helpers/stub-services.js';
@@ -25,11 +27,15 @@ import { stubServices } from './helpers/stub-services.js';
 
 const push = vi.fn();
 const WORKSPACE = '01J9WORKSPACE0000000000000';
+const WORKFLOW = '01J9WORKFLOW00000000000000';
 const ME = '01J9USER000000000000000000';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
-  useParams: () => ({ workspaceId: WORKSPACE }),
+  // `workflowId` is here for the history route, which reads it as well as the
+  // workspace. The other pages under test read `workspaceId` only, so the extra
+  // key changes nothing for them.
+  useParams: () => ({ workspaceId: WORKSPACE, workflowId: WORKFLOW }),
   usePathname: () => `/w/${WORKSPACE}/settings/workflows/new`,
   useSearchParams: () => new URLSearchParams(),
 }));
@@ -44,6 +50,7 @@ vi.mock('../src/auth-client.js', () => ({
 import NewWorkflowPage from '../app/w/[workspaceId]/settings/workflows/new/page.js';
 import NewTicketTypePage from '../app/w/[workspaceId]/settings/ticket-types/new/page.js';
 import WorkflowsPage from '../app/w/[workspaceId]/settings/workflows/page.js';
+import WorkflowHistoryPage from '../app/w/[workspaceId]/settings/workflows/[workflowId]/history/page.js';
 
 afterEach(() => {
   push.mockClear();
@@ -217,5 +224,100 @@ describe('a role read that FAILS is a refusal on screen, never a quietly read-on
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'New workflow' })).not.toBeInTheDocument();
     });
+  });
+});
+
+/** The two fixtures the history cases need: one workflow, two versions of it. */
+const v1: PublishedWorkflowDef = {
+  id: WORKFLOW,
+  version: 1,
+  name: 'Field ops',
+  initialStateId: 'todo',
+  states: [
+    { id: 'todo', name: 'To do', category: 'open' },
+    { id: 'review', name: 'Review', category: 'active' },
+    { id: 'done', name: 'Done', category: 'terminal' },
+  ],
+  transitions: [{ from: 'todo', to: 'review', rules: [] }],
+};
+const v2: PublishedWorkflowDef = {
+  ...v1,
+  version: 2,
+  states: [
+    { id: 'todo', name: 'To do', category: 'open' },
+    { id: 'done', name: 'Done', category: 'terminal' },
+  ],
+  transitions: [{ from: 'todo', to: 'done', rules: [] }],
+};
+
+/**
+ * ## The history door and the history route, at the ROUTE layer (Task 3)
+ *
+ * Both cases exist because an independent review measured two mutations that
+ * **survived the whole suite**: pointing `onHistory` at the BUILDER's path
+ * instead of `/history` (548 `apps/web` tests stayed green — nothing turned the
+ * id into a URL), and a history route rendered by no test at all. A door whose
+ * destination is pinned nowhere is the affordance-with-no-door defect one layer
+ * up: the button renders, the handler fires, and the person lands somewhere
+ * else.
+ */
+describe('the second action reaches the history route, and that route renders the chain', () => {
+  /**
+   * 13.944 — the DESTINATION. The component case (13.938) proves `onHistory` is
+   * called with the right id; this proves the id becomes the right URL.
+   */
+  it('13.944 the list card’s View history opens THAT workflow’s history URL', async () => {
+    const user = userEvent.setup();
+    render(
+      <Providers
+        services={stubServices(
+          {},
+          {
+            authoring: {
+              listMembers: async () => rosterWhereIAm('admin'),
+              listWorkflows: async () => [v2],
+              getWorkflow: async () => v2,
+            },
+          },
+        )}
+      >
+        <WorkflowsPage />
+      </Providers>,
+    );
+    await user.click(await screen.findByRole('button', { name: 'View history of Field ops' }));
+    expect(push).toHaveBeenCalledWith(`/w/${WORKSPACE}/settings/workflows/${WORKFLOW}/history`);
+    // The control: it did NOT go to the builder, which is the mutation that
+    // survived every other case in this app.
+    expect(push).not.toHaveBeenCalledWith(`/w/${WORKSPACE}/settings/workflows/${WORKFLOW}`);
+  });
+
+  /**
+   * 13.945 — **the route renders a real chain**, end to end through the page the
+   * product ships: wiring, gateway and screen. Nothing rendered this route
+   * before, so the seven-deep relative imports and the `useBuilderWiring` arm
+   * were checked only by the compiler.
+   */
+  it('13.945 the history route renders both versions, the superseded one with its own content', async () => {
+    render(
+      <Providers
+        services={stubServices(
+          {},
+          {
+            authoring: {
+              listMembers: async () => rosterWhereIAm('admin'),
+              getWorkflow: async (_workspaceId, _workflowId, version) => (version === 1 ? v1 : v2),
+            },
+          },
+        )}
+      >
+        <WorkflowHistoryPage />
+      </Providers>,
+    );
+    expect(await screen.findByRole('heading', { name: 'Version history' })).toBeInTheDocument();
+    expect(screen.getByText('Current')).toBeInTheDocument();
+    expect(screen.getByText('Superseded')).toBeInTheDocument();
+    // v1's dropped state, rendered by the real page rather than by the screen in
+    // isolation — the thing the door opens.
+    expect(screen.getByText('Review')).toBeInTheDocument();
   });
 });

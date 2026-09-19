@@ -365,12 +365,17 @@ function WorkspaceWorkflows({ workspaceId }: { workspaceId: string }) {
   const base = `/w/${workspaceId}/settings/workflows`;
 
   if (wiring.kind !== 'ready') return <WiringNotReady wiring={wiring} />;
+  /* The history view is a PAGE rather than a fourth pane in this shell — the
+     same arrangement as the builder, and for the reason `/settings`'s own note
+     records: it carries its own breadcrumb back. Both of this screen's jumps
+     leave the shell instead of inlining a screen inside it. */
   return (
     <WorkflowListScreen
       workspaceId={workspaceId}
       session={wiring.session}
       gateway={wiring.gateway}
       onOpen={(workflowId) => router.push(`${base}/${workflowId}`)}
+      onHistory={(workflowId) => router.push(`${base}/${workflowId}/history`)}
       onNew={() => router.push(`${base}/new`)}
     />
   );
