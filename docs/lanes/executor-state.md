@@ -42,7 +42,8 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
 > # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~09:0x IST. **THE `e2e-stack` REPAIR IS BUILT AND PUSHED; ITS PR
-> # IS OPENING. THE CODE HEAD IS `8e742d18`.** Branch **`exec/e2e-stack-repair`**, cut from `origin/main` =
+> # HAS BEEN REVIEWED AND SENT BACK ONCE; THE FIX ROUND IS PUSHED. THE CODE HEAD IS `2e02ddac`.** Branch
+> # **`exec/e2e-stack-repair`**, cut from `origin/main` =
 > # `cc59ce8f` (the `#575` merge). **The handoff commit sits ON TOP of that head** — a commit cannot name its
 > # own sha, so this block names the CODE head it was pushed at, which is the reading that survives.
 >
@@ -96,13 +97,13 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > ## ANCHORS (verify every one; a block cannot name its own sha)
 > | | |
 > |---|---|
-> | `origin/main` | **`cc59ce8f`** (the `#575` merge) — `8e742d18` is 1 ahead of it |
-> | my branch | `exec/e2e-stack-repair` @ **`8e742d18`** (the CODE head; pushed) |
+> | `origin/main` | **`cc59ce8f`** (the `#575` merge) |
+> | my branch | `exec/e2e-stack-repair` @ **`2e02ddac`** (the CODE head — the review round; pushed) |
 > | base | `origin/main`, `--base main` |
 > | gate | `pnpm turbo run build test typecheck --force --concurrency=2` → **33/33, 0 cached, EXIT 0, 1m18s**, Node **v22.22.2** (`pnpm exec node -v`, measured — the `pnpm` binary itself resolves under the v24 nvm dir while the node it runs is v22, so name the version, never the path) |
 > | checks | `tasks` · `citations` · `env` · `runbook` · `help` · `migrations` · `case-ids` (2494) — all EXIT 0. `check:db-tz` needs `DATABASE_URL`; run against the dev DB it reads `Asia/Kolkata`, EXIT 0 |
-> | `e2e-stack` | **5 passed / 3 failed** at the frozen head (was 2 / 6) |
-> | next | **PR #578 is OPEN and MERGEABLE (`--base main`, head `ea51de11`). Awaiting the tap-target ruling (below) and the next dispatch. ⛔ THE PARITY VISUAL HALF IS **NOT** UNBLOCKED — see the correction below; it is still owed to a rebuild.** |
+> | `e2e-stack` | **5 passed / 3 failed** at the code head (was 2 / 6) — unchanged by the review round |
+> | next | **PR #578 is OPEN and MERGEABLE (`--base main`). ONE independent reviewer ran and is RECORDED IN THE BODY; it returned two Important findings and BOTH ARE FIXED in `2e02ddac`.** ⛔ **THE PARITY VISUAL HALF IS NOT UNBLOCKED** — still owed to a rebuild. **The sheet-reachability measurement is DONE and reported** (`EXEC-2026-09-20-sheet-reachability.md`): **`13.176` is the wrong one — the sheet OPENS, for the owner and for a guest on a shared errand.** One question is with the controller: whether to fold the `13.176` correction into `#578` or hold it. |
 >
 > ## ⚠ THE RUNNING `:3001` IMAGE PREDATES `main`'s TIP — measured, and it bounds every reading
 > `#575` added `gn-members__identity`; the container's baked `.next` has ZERO references to it while
