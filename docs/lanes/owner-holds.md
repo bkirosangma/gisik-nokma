@@ -63,9 +63,9 @@ screens.** Fifteen items: **nine BUILD, four DECLINED, one NOT NOW, two already 
 | screen | item | ruling | the door |
 |---|---|---|---|
 | `isWorkspace` | **description** | **BUILD** | `MIGRATION` — `projectCreatedPayload` is `.strict()`, so payload, projection, read and render move together, and **every `ProjectRef` construction site must carry it** or the field arrives `undefined` on some route |
-| `isWorkspace` | **rename** | **BUILD** | **NO NEW DOOR** — `workspace.renamed` already exists in the vocabulary with **zero client UI**. The cheapest item in the reconnaissance |
+| `isWorkspace` | **rename** | ✅ **BUILT** (`#531`, merge `0f0cc398`) | **NO NEW DOOR** — `workspace.renamed` already exists in the vocabulary with **zero client UI**. The cheapest item in the reconnaissance |
 | `isWorkspace` | **delete** | **DECLINED** | destructive, and **the prototype refuses it itself** — its own button is a no-op toast: *"that is irreversible, so it is disabled here"*. Building it would **exceed** the design, not implement it |
-| `isInbox` | **filter** | **BUILD** | `ADDITIVE FIELD` on the existing read; `workspaceId` is the precedent |
+| `isInbox` | **filter** | ✅ **BUILT** (`#536`, merge `cce9fac1`) | `ADDITIVE FIELD` on the existing read; `workspaceId` is the precedent |
 | `isInbox` | **bulk + Undo** | **BUILD** | `NEW ROUTE` + CSRF registration — and the audit was **WRONG** here: `markRead` is one-way, so there is **no unread door at all** and the prototype's Undo has nothing behind it |
 | `isMcpTokens` | **row name** | **BUILD** | `MIGRATION` + a new owner-scoped write. **The ruled-out issue-time flow is NOT required** — the name is set *afterwards*; `mcp_tokens` has no `name` column and both insert paths confirm it |
 | `isMcpTokens` | **Revoked badge** | **NOT NOW** | it implies **soft-delete** — revoke is a hard `DELETE` today. A behaviour change, not a display change |
