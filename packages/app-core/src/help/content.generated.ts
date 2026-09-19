@@ -82,11 +82,11 @@ export const HELP_CONTENT: HelpContent = [
               [
                 {
                   "kind": "bold",
-                  "text": "You cannot put a job on a person, and you cannot set a due date."
+                  "text": "You can put a job on a person only on the website — and you cannot set a due date anywhere."
                 },
                 {
                   "kind": "text",
-                  "text": " The product shows both of these in several places, and offers no control that sets either. (§5)"
+                  "text": " The website's job panel has an \"Assignee\" picker. The phone and desktop apps have no Assignee row at all, so there you can neither see who a job is on nor set it. Due dates have no control on any screen. (§5)"
                 }
               ],
               [
@@ -1760,11 +1760,35 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "You cannot put a job on a person."
+                      "text": "You cannot put a job on a person on the phone or desktop apps — on the website you now can."
                     },
                     {
                       "kind": "text",
-                      "text": " The panel shows \"Assignee\" with a name or a dash, and nothing changes it. Not on the website, not on the phone app."
+                      "text": " This one is kept here rather than deleted, on the description row's precedent below, so a reader who remembers it as an absence finds the correction where they last saw it. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "On the website the panel's \"Assignee\" row is a picker:"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " choose a person, or choose "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Unassigned"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " to take the job off somebody. It stays read-only in exactly two cases, and the row itself says which — the workspace roster has not loaded, or the job is on a person outside the roster you can see. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "On the phone and desktop apps there is no \"Assignee\" row at all"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", so there a job's assignee can be neither read nor set."
                     }
                   ],
                   [
@@ -4853,7 +4877,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " The queue underneath will happily carry a new job, a field value, a stage move or a reopen, and hold them until you reconnect. But a change you cannot make on screen offline is a change you could not make online either — the queue accepting a kind of change is not the same as a screen offering it, and the phone app is two screens deep. In practice, offline you can create a job, move one between stages, reopen one, post a comment, and deal with a disputed claim. You still cannot assign anybody or set a due date, because nothing offers to, online or off."
+                    "text": " The queue underneath will happily carry a new job, a field value, a stage move or a reopen, and hold them until you reconnect. But a change these apps cannot make on screen is one they cannot make online either — the queue accepting a kind of change is not the same as a screen offering it, and the phone app is two screens deep. In practice, offline you can create a job, move one between stages, reopen one, post a comment, and deal with a disputed claim. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Offline you still cannot assign anybody or set a due date — and here that is a property of these apps rather than of being offline."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " The phone app has no \"Assignee\" row in either state, while the website's panel can set one and simply has no offline queue to carry it: the browser version is online-only."
                   }
                 ]
               },
@@ -6332,11 +6364,19 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "No."
+                    "text": "Yes on the website, no on the apps."
                   },
                   {
                     "kind": "text",
-                    "text": " The board shows who a job is on, the Inbox tells you when you have been assigned something, My Work is built around it and the list can group by it — and no screen anywhere lets a person do the assigning. Not on the website, not on the phone app. Everything you see assigned was assigned when the data was loaded in."
+                    "text": " The website's job panel has an \"Assignee\" picker — choose a person, or choose "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Unassigned"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to take the job off somebody. The phone and desktop apps have no Assignee row at all, so there you can neither see who a job is on nor set it. The board shows who a job is on, the Inbox tells you when you have been assigned something, My Work is built around it and the list can group by it."
                   }
                 ]
               }
@@ -8411,7 +8451,23 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", and you still cannot assign anybody or set a due date offline, for the same reason you cannot online: nothing offers to."
+                    "text": ", and offline you still cannot assign anybody or set a due date. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "That is a property of these apps rather than of being offline:"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " they have no Assignee row in either state. The website's panel "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "can"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " set one, and it is online-only — there is no offline queue there to carry it."
                   }
                 ]
               },
