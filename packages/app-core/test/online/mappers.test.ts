@@ -2167,7 +2167,7 @@ describe('13.715 mapWorkspaceSettings — the workspace settings read', () => {
 });
 
 /**
- * **13.963 — `mapTicketRead` carries the assignment's provenance, and REFUSES a
+ * **13.967 — `mapTicketRead` carries the assignment's provenance, and REFUSES a
  * body that omits it.**
  *
  * The single-ticket read gained `assignedProvenance` when the sheet's assignee
@@ -2184,7 +2184,7 @@ describe('13.715 mapWorkspaceSettings — the workspace settings read', () => {
  * read, because the route always emits it; mapping that to `null` would turn a
  * malformed payload into "nobody is assigned".
  */
-describe('13.963 mapTicketRead carries assignedProvenance, and refuses a body without it', () => {
+describe('13.967 mapTicketRead carries assignedProvenance, and refuses a body without it', () => {
   const claim = {
     actorId: ANSELMA,
     clientTime: '2026-08-19T09:58:12.000Z',

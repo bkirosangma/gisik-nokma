@@ -61,10 +61,10 @@ fixture default · `Features.md` · `test-cases/13-second-wave-board-actions.md`
 
 | mutation | kills |
 |---|---|
-| the server drops the field from its response | `13.962` |
-| the mapper drops the mapping | `13.963` |
-| `submitAssignee` never ingests | `13.964` |
-| **a refused roster collapsed back into `[]`** — the sheet's own OLD behaviour | `13.964`'s refusal arm |
+| the server drops the field from its response | `13.966` |
+| the mapper drops the mapping | `13.967` |
+| `submitAssignee` never ingests | `13.968` |
+| **a refused roster collapsed back into `[]`** — the sheet's own OLD behaviour | `13.968`'s refusal arm |
 
 Every run printed the file's sha before and after, so a mutation that failed to fire could not be read as a
 survivor — the trap this lane was bitten by earlier today on the sheet-motion case.
@@ -77,7 +77,7 @@ survivor — the trap this lane was bitten by earlier today on the sheet-motion 
 - **No browser run** — every arm is reachable in jsdom and the control's accessible behaviour is the shared
   `Select`'s, already covered.
 
-### § 6 — CASES `13.962`–`13.964`, SKIPPING THREE.
+### § 6 — CASES `13.966`–`13.968`, SKIPPING THREE.
 
 `13.961` is held by the **open** sheet-motion PR (`#529`) and `13.958`–`13.960` by `#525`, which is merged.
 Swept with a control in the same invocation. **Veto if a block was allocated elsewhere.**
