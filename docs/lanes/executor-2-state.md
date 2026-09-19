@@ -1,3 +1,68 @@
+## ▲ TOP BLOCK — **E SHIPPED**: the link read serves the TOKEN's expiry, and the three loudest pins all fired. (2026-09-19, ~17:2x IST)
+
+**Position: DONE and PUSHED — `exec2/invite-expiry`, base `main`, cut from `origin/main` `cce9fac1`.** The PR
+opens as this dispatch's last step; **measure it rather than reading it here**:
+`gh pr list --head exec2/invite-expiry --state all`.
+
+**Door measured BEFORE it was built, and the queue's own reading was exact:** `openableInvite` had selected
+`expires_at` from the beginning — it is the whole point of its `expires_at > now()` predicate — and **threw
+it away**. So this is an **`ADDITIVE FIELD`** on a read that already existed: **no route, no migration.**
+
+### § 1 — THE DISTINCTION THE CASE PINS: the TOKEN's window, not the invitation's.
+
+`invite_tokens` is server-owned state with **one row per PRESENTATION**; `proj_invites` **has no expiry column
+at all**. An invitation revoked and re-issued has one invitation row and several token rows, each with its own
+window — **a read answering the invitation's lifetime would answer the WRONG question on a re-issued link.**
+The value served is the row `openableInvite` matched on, so it cannot disagree with the predicate that
+admitted the call. **Case `13.988`'s second arm re-issues the link and asserts the expiry MOVES** — the only
+way that distinction is visible from outside.
+
+### § 2 — ⚠ THE THREE PINS THE QUEUE CALLED THE LOUDEST, AND ALL THREE FIRED.
+
+| pin | outcome |
+|---|---|
+| the first exact-body `toEqual` | reddened; **updated deliberately** |
+| the second exact-body `toEqual` | likewise — its comment said *"Exactly three fields"* and now says four |
+| `:390`, the disclosure guard | **not weakened** — see below |
+
+**The guard protects the ADDRESS the invitation names** (a fact belonging to someone other than whoever holds
+a forwarded link). `expiresAt` is **a property of the credential the caller is already holding.** The read's
+own docblock — *"the three fields Plan 6 pinned and nothing else"* — is **corrected in the same change set**,
+with the half that moved named rather than silently renumbered.
+
+### § 3 — MUTATION-WITNESSED.
+
+Removing `expiresAt` from the response reddens the case and both updated assertions; the file was restored
+**byte-identical** (sha256 before and after).
+
+### § 4 — WHAT IS NOT DONE.
+
+**The invitee-facing page does not render it yet.** This row's scope is the DOOR (*"build the row's scope and
+nothing else"*), and the client's `expiresAt` still lives on the **admin** side only. **Owner: whoever next
+touches `/invite/[token]`** — and it must respect the same audience rule addendum 5 states in terms.
+
+### § 5 — CASE `13.988`, from this lane's block `13.988`–`13.999`.
+
+### § 6 — GATE.
+
+**33/33, `EXIT=0`, node v22.22.2**; all seven checks green and `check-case-ids` EXIT=0. **The first run was
+red in FOUR web suites** (`backlog-tab`, `filters-sheet`, `list-bulk-close` ×2) plus two timeouts — **surfaces
+this change never touched** — and **all 51 passed in isolation**, so they were load flakes at `load 83.79`.
+
+**NEXT IN THIS LANE: addendum 5, `isInvite` inviter identity** — name and role, **authenticated accept path
+ONLY, never the session-less token page, no email anywhere**; `proj_invites.invited_by` already records it;
+and **`invite.sent`'s PAYLOAD carries no inviter — it comes from the envelope actor**, which the PR body must
+say or a reader will conclude it is missing.
+
+### Rules that bind this branch
+- **Never `docker compose`**; **:3001 is executor 1's**; **never `AskUserQuestion`**; **do not edit
+  `task-ledger.tsv`**. **Do not run the forced gate** — the controller's.
+- **A red at high load has been the environment every time today** — isolate the FILES alone before believing
+  it, not just the one file.
+- **Never pipe a test run into `head`.**
+
+---
+
 # Executor 2 — live state
 
 **This file is executor 2's restart surface.** Executor 1's is `docs/lanes/executor-state.md` —
@@ -20,7 +85,9 @@
 
 ---
 
-## ▲ TOP BLOCK — the **rename moved onto the NAME itself**, and a case about a neighbouring line caught a regression this change introduced. (2026-09-19, ~17:0x IST)
+## ▼ PREVIOUS BLOCK — the **inline rename**, merged as `#534`/open. (2026-09-19)
+
+
 
 **Position: DONE and PUSHED — `exec2/inline-rename`, base `main`, cut from `origin/main` `5c5dd920`.** The
 PR opens as this dispatch's last step; **measure it rather than reading it here**:

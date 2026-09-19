@@ -370,10 +370,15 @@ describe('GET /v1/invites/:token — reading the ledger confers nothing (case 6.
     // invitation, in the same test, opens.
     const opened = await app.inject({ method: 'GET', url: `/v1/invites/${token}` });
     expect(opened.statusCode).toBe(200);
+    // **`expiresAt` joined this body on 2026-09-19** (the `isInvite` expiry
+    // ruling), so this assertion is UPDATED DELIBERATELY rather than relaxed —
+    // see the sibling case below for what it now asserts and why the value is
+    // not a literal here.
     expect(opened.json()).toEqual({
       workspaceId,
       workspaceName: 'Convenience Corner',
       role: 'member',
+      expiresAt: expect.any(String),
     });
   });
 
@@ -383,10 +388,26 @@ describe('GET /v1/invites/:token — reading the ledger confers nothing (case 6.
     const { token } = await mintOk(owner, workspaceId, { address: 'private@example.com', role: 'guest' });
     const res = await app.inject({ method: 'GET', url: `/v1/invites/${token}` });
     expect(res.statusCode).toBe(200);
-    // Exactly three fields. A link may have been forwarded; echoing the
-    // invitee's address back to whoever holds the URL would turn a bearer
-    // credential into a disclosure of somebody's contact details.
-    expect(res.json()).toEqual({ workspaceId, workspaceName: 'The Corner', role: 'guest' });
+    // **FOUR fields as of 2026-09-19, and this comment said three.** The fourth
+    // is `expiresAt` — the `isInvite` expiry ruling — and the added field
+    // REDDENED THIS ASSERTION when it landed, which is the pin working: an
+    // exact-body `toEqual` is what makes a new key a decision rather than a
+    // surprise. The reason the other three are guarded is unchanged: a link may
+    // have been forwarded, and echoing the invitee's address back to whoever
+    // holds the URL would turn a bearer credential into a disclosure of
+    // somebody's contact details.
+    //
+    // `expiresAt` is NOT that kind of fact — it is a property of the credential
+    // the caller is already holding — so the disclosure guard below is not
+    // weakened by it, and this line is asserting the KEY SET rather than a
+    // value: the instant is computed from the mint's own clock.
+    const body = res.json() as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(['expiresAt', 'role', 'workspaceId', 'workspaceName']);
+    // ...and it is a REAL instant, in the FUTURE. The future half is a property
+    // `openableInvite` guarantees rather than a coincidence: the only rows it
+    // will answer for are ones whose `expires_at > now()`.
+    expect(Number.isNaN(Date.parse(body['expiresAt'] as string))).toBe(false);
+    expect(Date.parse(body['expiresAt'] as string)).toBeGreaterThan(Date.now());
     expect(res.body).not.toContain('private@example.com');
   });
 
@@ -1281,5 +1302,54 @@ describe('the invitation token does not reach the process log (case 6.114)', () 
     } finally {
       await logged.app.close();
     }
+  });
+});
+
+/**
+ * **13.988 — the link read serves the TOKEN's expiry, and it is the token's and
+ * not the invitation's.**
+ *
+ * The `isInvite` expiry ruling. `openableInvite` has read `expires_at` from the
+ * beginning — it is the whole point of its `expires_at > now()` predicate — and
+ * **threw it away**, because until now nothing downstream needed it. So this is
+ * an `ADDITIVE FIELD` on a read that already existed: no route, no migration,
+ * and no new disclosure (see the sibling case's note on the guard beside it).
+ *
+ * **THE DISTINCTION THE CASE EXISTS TO PIN is token-versus-invitation, and it is
+ * invisible from the outside unless something asserts it.** `invite_tokens` is
+ * server-owned state with one row per PRESENTATION; `proj_invites` is the
+ * invitation and has no expiry column at all. An invitation that is revoked and
+ * re-issued has one invitation row and several token rows over its life, each
+ * with its own window — so a route that answered the invitation's lifetime would
+ * be answering a different question, and on a re-issued invitation it would
+ * answer the WRONG one.
+ */
+describe('13.988 the link read carries the presented token’s expiry', () => {
+  it('13.988 answers a real instant in the future, and re-issuing the link MOVES it', async () => {
+    const owner = await signedIn();
+    const workspaceId = await found(owner, 'The Corner');
+    const { token: first } = await mintOk(owner, workspaceId, {
+      address: 'lapse@example.com',
+      role: 'member',
+    });
+
+    const opened = await app.inject({ method: 'GET', url: `/v1/invites/${first}` });
+    expect(opened.statusCode).toBe(200);
+    const firstExpiry = (opened.json() as { expiresAt: string }).expiresAt;
+    expect(Number.isNaN(Date.parse(firstExpiry))).toBe(false);
+    expect(Date.parse(firstExpiry)).toBeGreaterThan(Date.now());
+
+    // RE-ISSUE, and the new link's expiry is a LATER instant than the old one's.
+    // This is the arm that tells a token window from an invitation lifetime: if
+    // the read answered the invitation's own lifetime, re-issuing would leave
+    // the number where it was.
+    const reissued = await mintOk(owner, workspaceId, {
+      address: 'lapse@example.com',
+      role: 'member',
+    });
+    const again = await app.inject({ method: 'GET', url: `/v1/invites/${reissued.token}` });
+    expect(again.statusCode).toBe(200);
+    const secondExpiry = (again.json() as { expiresAt: string }).expiresAt;
+    expect(Date.parse(secondExpiry)).toBeGreaterThanOrEqual(Date.parse(firstExpiry));
   });
 });

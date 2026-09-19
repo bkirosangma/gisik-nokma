@@ -161,6 +161,22 @@ type InviteRow = {
 };
 
 /**
+ * The invitation PLUS the presented token's own expiry.
+ *
+ * **The expiry is a fact about the TOKEN, not about the invitation**, and that
+ * distinction is why it is carried here rather than added to `InviteRow`:
+ * `invite_tokens` is server-owned state with one row per presentation and a
+ * `NOT NULL` `expires_at`, while `proj_invites` is the invitation itself and has
+ * no such column. A revoked-and-reissued invitation has one `proj_invites` row
+ * and several token rows over its life, each with its own window.
+ *
+ * `openableInvite` has read this column from the beginning — it is the whole
+ * point of its `expires_at > now()` predicate — and **threw it away**, because
+ * until now nothing downstream needed it. The read now does.
+ */
+type OpenableInvite = InviteRow & { expires_at: Date };
+
+/**
  * The invitation surface: issue, read a link, accept a link, list what is
  * outstanding.
  *
@@ -365,11 +381,20 @@ export function registerInviteRoutes(
    * credential, and requiring a session first would mean a person had to create
    * an account before being told which workspace they were being asked to join.
    *
-   * It answers the three fields Plan 6 pinned and nothing else. In particular it
-   * does not answer the ADDRESS the invitation names: the link may have been
-   * forwarded, and echoing somebody's email or phone number back to whoever
-   * holds the URL would turn a bearer credential into a disclosure of the
-   * invitee's contact details.
+   * **It answers FOUR fields as of 2026-09-19, and this sentence used to say
+   * three.** The fourth is `expiresAt` — when the presented token stops
+   * working — added by the `isInvite` expiry ruling. **The sentence is corrected
+   * rather than deleted**, because the reason it gave for the other three still
+   * binds and a reader must be able to tell which half moved.
+   *
+   * What it still does NOT answer is the ADDRESS the invitation names: the link
+   * may have been forwarded, and echoing somebody's email or phone number back
+   * to whoever holds the URL would turn a bearer credential into a disclosure of
+   * the invitee's contact details. **`expiresAt` is not that kind of fact** — it
+   * is a property of the credential the caller is already holding, and telling
+   * them when it lapses is what lets them act before it does. The distinction is
+   * the one this docblock already draws; the fourth field lands on the allowed
+   * side of it rather than eroding it.
    */
   app.get<{ Params: { token: string } }>('/v1/invites/:token', async (request, reply) => {
     const invite = await openableInvite(deps.pool, request.params.token);
@@ -380,6 +405,16 @@ export function registerInviteRoutes(
       workspaceId: invite.workspace_id,
       workspaceName: await workspaceNameFromLedger(deps.pool, invite.workspace_id),
       role: invite.role,
+      // **ADDED 2026-09-19.** When the presented TOKEN stops working — the
+      // `isInvite` expiry ruling. It is the token row's own `expires_at`, the
+      // one `openableInvite` matched on, so it cannot disagree with the
+      // predicate that admitted this call.
+      //
+      // It is NOT a disclosure the read's own docblock forbids: what that
+      // guards is the ADDRESS the invitation names, which belongs to somebody
+      // other than whoever may be holding a forwarded link. This is a fact
+      // about the credential the caller is already holding.
+      expiresAt: invite.expires_at.toISOString(),
     };
   });
 
@@ -533,7 +568,7 @@ export function registerInviteRoutes(
  * test on this path could only assert that nothing changed, which is a check
  * that cannot fail.
  */
-async function openableInvite(db: Queryable, token: string): Promise<InviteRow | null> {
+async function openableInvite(db: Queryable, token: string): Promise<OpenableInvite | null> {
   const { rows: tokenRows } = await db.query<TokenRow>(
     `SELECT invite_id, expires_at FROM invite_tokens
       WHERE token_hash = $1 AND expires_at > now()`,
@@ -552,7 +587,10 @@ async function openableInvite(db: Queryable, token: string): Promise<InviteRow |
   if (invite === undefined || invite.status !== 'pending') {
     return null;
   }
-  return invite;
+  // The token's own window rides out with the invitation. It is the row this
+  // function just matched on, so the value is the one that admitted the call —
+  // not a second read that could disagree with the predicate above.
+  return { ...invite, expires_at: tokenRow.expires_at };
 }
 
 /**
