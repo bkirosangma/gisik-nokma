@@ -1,4 +1,150 @@
-## ▲ TOP BLOCK — **THE FILTERS SHEET, DOCUMENTED FROM SOURCE; AND THE FAQ ANSWER THAT SAID IT DID NOT EXIST.** (2026-09-20, ~04:1x IST)
+## ▲ TOP BLOCK — **THE CLOSED-HIDE DEFAULT ON THE TWO DATE TABS, AND A TEST-CASE THAT QUOTED COPY THE PRODUCT NO LONGER SHIPS.** (2026-09-20, ~05:3x IST)
+
+### § 1 — WHERE TO FIND IT
+
+- **Dispatch: the controller's "the two things you found and correctly did not fix" paste.** Base named
+  as `main` = `d8f18bf4`. **Both items are exactly the two I recorded in the PREVIOUS block's § 5** —
+  the Calendar/Timeline closed-hide default, and `test-cases/13-board-prototype-port.md:1549`.
+- **Branch `exec2/doc-truths`**, cut from `d8f18bf4`. **NOT rebased and no rebase needed**: `origin/main`
+  moved to `c2c79d0c` (#577, `9d03c93a`) and **touches only `docs/lanes/controller-state.md`** —
+  `git diff --name-only d8f18bf4..origin/main` returns that one path. Behind 2, no overlap.
+- **CODE HEAD `a150ffae`**: `ef314b3a` (the documentation) + `a150ffae` (the fix round, three defects the
+  reviewer found). **The handoff commit sits ON TOP of those and names them; it cannot name itself.**
+- **The PR opens as the last step of this dispatch.** If you are reading this from `main`, settle it in
+  one call: `gh pr list --state all --head exec2/doc-truths`.
+- ⚠ **`main`'s `task-ledger.tsv` is NOT ours to edit** — the controller flips rows after each merge.
+
+### § 2 — ANCHORS, RECOUNTED AT `a150ffae` (not carried forward)
+
+| anchor | value |
+|---|---|
+| `git merge-base origin/main HEAD` | `d8f18bf4` |
+| `HEAD` | `a150ffae` |
+| ahead / behind `origin/main` (`c2c79d0c`) | **2 / 2** |
+| tree | **clean** |
+| `pnpm turbo run build` | **11/11, exit 0** |
+| `pnpm turbo run test` | **17/17, exit 0** — server 154 files, **1620 passed / 5 skipped** |
+| `pnpm turbo run typecheck` | **17/17, exit 0** |
+| `check:help` | **ok** — 2 documents, 29 sections, **230 entries**, generated copy matches source |
+| `check:citations` / `check:env` / `check:runbook` / `check:tasks` | **all exit 0** |
+| `check-case-ids` | ok — **2494** unique ids, highest `16.82` (unchanged: **no case id was minted**) |
+| `check:db-tz` | **NOT RUN** — needs `DATABASE_URL`, not set here; it reads no docs |
+
+Diff vs `origin/main`: `manual.md` **+23** · `faq.md` **+11** · `content.generated.ts` **+280** ·
+`test-cases/13-board-prototype-port.md` **+38/−4** — **4 files, +348/−4** (`git diff --stat`). **The entry count moved 229 → 230, and that is
+exactly the one FAQ entry added** — manual 79 unchanged, faq 150 → 151, predicted before regenerating.
+Prose edits *inside* an entry never move it; that is the trap a count is only evidence against once its
+unit is pinned (`###` entries in the manual, bold-question lines in the FAQ).
+
+### § 3 — WHAT WAS WRITTEN
+
+**(a) `closedDefaultInForce` (`page.tsx:1369`), and the manual's §8 said nothing.** The Calendar and the
+Timeline hide closed jobs by default, applied through `datesNarrowing` (`:706-713`); the List never
+applies it (`:652-656`) and the Backlog tab inherits the List (`:842-847`); the Board excludes closed
+server-side, permanently. **It is not a hard default, and the route out is the part worth documenting:**
+there are exactly two ways back — set **Closed** to *closed only*, or leave Closed alone and remove the
+`Closed: hidden` chip (`:1370-1378`). The sheet's *everything* is **not** a third way, because
+`withCycledClosed` **deletes** the key (`filter-cycle.ts:65-73`) and `undefined` is the state the default
+is keyed on — the fourth state the page-level flag exists to carry (`:435-446`). Written into the
+Calendar section in full, into Timeline as a pointer, into the Filters-sheet section where the control is
+described, and mirrored as one FAQ entry.
+
+**(b) The quote was dead, and so was a second claim in the same entry.** `13-board-prototype-port.md:1549`
+quoted the scope note as *"Filters set here are not applied on this tab."* — **no hit in any source tree**
+(control in the same invocation: `Not applied on the` fires on `page.tsx:2013`). **BOTH the wording and
+the behaviour moved the day after the quote was written:** `4837a56c` retired the mirror note and
+`a02c717c` made the sentence name its tab and its axes (`page.tsx:2013`), and `13.517` — whose *"the List
+tab's own render is untouched"* the entry also asserts — was **FLIPPED** the same day to assert the
+sheet's Assignee axis now NARROWS the List (`board-narrowing.test.tsx:460`, flip recorded at `:414-428`).
+Marked and corrected with measurements rather than re-pointed, which is this file's own convention for an
+expired target (`:1567-1570`, the `(pre-R6)` citations).
+
+### § 4 — THE REVIEWER ROUND, AND WHAT IT FOUND THAT MY OWN TESTS COULD NOT
+
+One reviewer against a numbered 20-claim list, at `ef314b3a`. **14 of 16 substantive claims held**; the
+two it called defects were both real, and all three fixes are in `a150ffae`. **All three defects were in
+the NEW PROSE, not in the source reading it was built from** — the same shape the PREVIOUS block's
+reviewer round found.
+
+1. **The chip I told the reader to remove is not unique.** `Closed: hidden` is emitted **twice with
+   opposite behaviour**: the page's synthetic default chip (`page.tsx:1370-1378`, `onRemove →
+   setShowClosedOnDates(true)`, which SHOWS closed jobs) and `buildFilterChips`'s explicit-*not closed*
+   chip (`board-search-scope.ts:171`, `onRemove → clear({ closed: undefined })`, which HIDES them again,
+   because clearing the key re-arms the default). **Same label, same `mode: 'exclude'`, same ⊘ glyph, same
+   accessible name `Remove filter — Closed: hidden`**; only `data-testid` differs, which no reader sees.
+   So "removing that chip is what brings closed jobs back" was **false for one of the two**, and the
+   reader cannot tell which they have. Both texts now state the rule and name the trap.
+2. **The empty-month sentence lies in exactly this case, and my paragraph had invited the reader to trust
+   it.** MEASURED, not inferred: the page builds `dateInputs` from `datesNarrowing.rows` — already
+   closed-pruned (`page.tsx:1135-1147`) — and passes **no `filter` prop** to either view (`:2027`,
+   `:2070`), so an all-closed month reaches the model as `[]` and
+   `buildCalendarModel([], { year: 2026, month: 8, userName })` returns *"No claimed dates fall in this
+   month. Undated work is absent, not estimated — the calendar draws only what someone claimed."* That is
+   the very lie the model's own narrowed arm was added to end (`calendar-model.ts:332-337`), **at a third
+   door it cannot see because the pruning is upstream of it**. The strip's own count DOES disclose it, so
+   the manual now says the sentence is wrong here and points at the count.
+3. **My own line-wrap created a phantom FAQ entry.** The parser's question rule is `^\*\*.+\*\*\s*$`
+   (`scripts/help-content.mjs:243`): **any wrapped line that both starts and ends with `**` becomes an
+   entry.** A wrap left a line beginning ``**Closed** to … **Closed: hidden**``, so the count went
+   **230 → 231 while I was predicting no movement**. `check:help` cannot catch this — it compares the
+   generated copy against the source, so it passes either way. **The lesson: confirm a count moved by
+   exactly what you added, and treat an unexplained +1 as a defect until it is identified.** Re-wrapped;
+   back to 230, corroborated by a line-level scan (151 question-shaped lines in `faq.md` for 151 FAQ
+   entries, one of them mine).
+
+### § 5 — FOUND AND **NOT** FIXED, EACH WITH A NAMED OWNER (all in the PR body)
+
+1. **The calendar's empty copy is closed-unaware** (defect 2 above, product-side). The real fix is a
+   closed-aware arm or threading a filter to the view — a code change, outside a docs dispatch.
+   **Owner: whoever next owns the calendar/timeline empty-copy arms.**
+2. **Two identically-labelled chips whose `×` does opposite things** (defect 1 above, product-side).
+   **Owner: whoever next owns the strip's chip vocabulary.**
+3. **`clearAll` (`page.tsx:2786`) does not restore the closed-hide default** — `setFilter(clearFilterAxes)`
+   is the only thing it does, and `showClosedOnDates` is not in `FILTERS_SHEET_CLEARABLE_AXES`. So
+   "Clear all empties everything you have set" has a counterexample. **Owner: whoever next owns the
+   sheet's Clear-all scope.** **Not fixed, and *deliberately not documented*: the manual must not teach a
+   control's exact scope before that scope is ruled.** I found this one myself before the reviewer did.
+4. **The manual's "four different sentences" enumeration is wrong on its own terms** — the product ships
+   **three** copies (`claim-labels.ts:70/91/108`), and the narrowed one names a disjunction ("the filter,
+   the lane, or the legend") covering the manual's items 2 and 3. Pre-existing, adjacent, not caused by
+   this diff. My new text was reworded to **avoid** restating the count ("the sentences above get
+   wrong"), so it does not inherit the defect. **Owner: whoever next owns §8's Calendar prose.**
+5. **The stale "four tabs" framing** — `manual.md:620` says four; the rail is **five** (Backlog, Board,
+   List, Calendar, Timeline, `page.tsx:1756-1760`), and the "Only tickets in progress" note omits Backlog
+   although `activeOnly` strips backlog rows. Pre-existing. **Owner: whoever next audits the manual's tab
+   framing** — it is a whole-document pass, not a line fix, which is why it is not done here.
+
+Two more things measured so the next sweep does not re-find them: `apps/web/test-results/*/error-context.md`
+are **gitignored** Playwright artifacts (`git check-ignore` confirms), not stale citations; and the
+generated copy is **not** hand-editable — always `node scripts/help-content.mjs`, then `--check`.
+
+### § 6 — CASE IDS: **NONE MINTED**
+
+No case id was owed: (a) is a prose correction of the manual's silence and (b) is a correction of a
+**quote inside an existing entry**. **`16.45` remains the next free id in this lane's `16.41`–`16.60`
+block** — do not mint one for a prose-only change. The guard confirms it: `check-case-ids` is still
+**2494 unique ids, highest `16.82`**, and a control over the code diff showed **0 of 348 added lines**
+match either id-line regex.
+
+### § 7 — TWO TRAPS THIS DISPATCH PAID FOR
+
+1. **A sweep that quotes its own pattern cannot be quoted as a count.** My first correction paragraph
+   said the repo-wide sweep "returns three hits"; the paragraph *itself* contains the grep pattern, so
+   re-running returns four. **Fixed by removing the figure and saying the sweep matches itself** — a
+   number that a later reader can falsify by measuring is worse than no number.
+2. **The handoff's own § 5 in the PREVIOUS block is the authority for what was still open.** Both items
+   here came from it, and the dispatch named both. **When a handoff records "found and NOT fixed with a
+   named owner", that list is the queue.**
+
+### § 8 — A WARNING THAT TRAVELS WITH THIS FILE
+
+**Shas in the narrative blocks below are unreliable — several are ORPHANED by rebases, and `git cat-file`
+will still pass on them and lie.** Verify reachability with
+`git merge-base --is-ancestor <sha> origin/main`, never with `cat-file`.
+
+---
+
+## ▼ PREVIOUS BLOCK — **THE FILTERS SHEET, DOCUMENTED FROM SOURCE; AND THE FAQ ANSWER THAT SAID IT DID NOT EXIST.** (2026-09-20, ~04:1x IST) — **MERGED as PR #576 (`d8f18bf4`)**. Its § 1 says "the PR opens as the last step of this dispatch"; that step is DONE — do not open it again.
 
 ### § 1 — WHERE TO FIND IT
 
