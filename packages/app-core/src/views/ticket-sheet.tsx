@@ -806,7 +806,7 @@ export function TicketSheet({
    *
    * `ticket.field_set` is the only writer of a built-in field, and the title has
    * lived in `state.fields['title']` since `ticket.created` wrote it
-   * (`packages/domain/src/ticket-state.ts:150`). So an editable title is a
+   * (`packages/domain/src/ticket-state.ts:160`). So an editable title is a
    * SURFACE over an existing door — there is no new event, no new route and no
    * migration in this function, and that is a measurement rather than a hope:
    * the reducer's own comment shows `{ fieldId: 'title' }` parsing.
@@ -1784,7 +1784,7 @@ export function TicketSheet({
               measuring the reducer rather than the sheet.
 
               `ticket.created` writes `fields: { title: claim(p.title, env) }`
-              and NOTHING else (`packages/domain/src/ticket-state.ts:150`), and
+              and NOTHING else (`packages/domain/src/ticket-state.ts:160`), and
               no other path writes a description except an explicit
               `ticket.field_set` (`create-ticket-flow.tsx:209` submits
               `ticket.created` alone). So on a ticket nobody has described there

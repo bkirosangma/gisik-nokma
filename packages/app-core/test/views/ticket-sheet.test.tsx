@@ -1323,7 +1323,7 @@ describe('13.968 the Assignee row is editable, and a refused roster is not an em
  * would have made the fix look done while changing almost nothing:
  *
  *   `ticket.created` writes `fields: { title: claim(p.title, env) }` and
- *   NOTHING else (`packages/domain/src/ticket-state.ts:150`), and nothing else
+ *   NOTHING else (`packages/domain/src/ticket-state.ts:160`), and nothing else
  *   writes a description except an explicit `ticket.field_set`. The row lived
  *   INSIDE the `Object.entries(state.fields)` loop, so on every ticket nobody
  *   had described there was no row for an editor to mount into.
@@ -2221,7 +2221,7 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
  *
  * The owner's ruling (*"all 3 yes"*) made the title editable, and the dispatch
  * measured the door: `ticket.field_set` already writes `fields[fieldId]`
- * (`ticket-state.ts:273-284`) and `ticket.created` already puts the title there
+ * (`ticket-state.ts:299`) and `ticket.created` already puts the title there
  * (`:150`). So nothing here asserts that an input EXISTS — every case drives a
  * value into it and then reads the LEDGER EVENT the sheet sent, because a field
  * that rendered and sent nothing is the shape this could fail in.

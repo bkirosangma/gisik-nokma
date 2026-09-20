@@ -117,7 +117,7 @@ const WF: WorkflowDef = {
 
 /**
  * A ticket with a title claim and NO description claim — `ticket.created`'s
- * exact shape (`packages/domain/src/ticket-state.ts:150`), and the shape that
+ * exact shape (`packages/domain/src/ticket-state.ts:160`), and the shape that
  * matters here: before this change the description row did not exist on one, so
  * there was nothing for an editor to mount into.
  */
