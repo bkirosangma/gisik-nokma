@@ -227,6 +227,13 @@ export function VisibilityEditor({
   // whose own mode is `inherit` must not open showing a mode it never claimed.
   // (`current?.userIds ?? []` is not a default mode — it is the roster the read
   // served, and `[]` is what "no read served one" leaves the picker holding.)
+  //
+  // ⚠ This seed is re-run when the sheet's live query changes ticket, because
+  // `useLiveQuery` answers `null` on a queryKey change and the "Loading…" branch
+  // remounts the subtree. That is what makes the picker correct on a ticket
+  // SWITCH rather than stale from the previous one — and it is a behaviour of
+  // the hook, not an invariant this component states. Named here so the next
+  // reader sees the dependency instead of discovering it.
   const [mode, setMode] = useState<VisibilityMode>(current?.ownMode ?? 'inherit');
   const [userIds, setUserIds] = useState<string[]>(current?.userIds ?? []);
   const [submission, setSubmission] = useState<Submission>({ kind: 'idle' });
@@ -295,7 +302,7 @@ export function VisibilityEditor({
       ) : (
         <p className="gn-visibility__standing">
           <span className="gn-visibility__standing-mode">{standingSentence(current, nameOf)}</span>
-          {current.resolvedMode === 'explicit' && current.userIds === null ? (
+          {current.resolvedMode === 'explicit' && namedAudience(current) === null ? (
             // The MODE is served and the LIST is not (ruling: the roster stays
             // cut). "Only the people this ticket names" without this clause
             // would be a partial answer wearing the shape of a complete one —
@@ -423,12 +430,46 @@ const RESOLVED_MODE_LABELS: Record<ResolvedVisibilityMode, string> = {
   explicit: 'Only: the people this ticket names',
 };
 
+/**
+ * The names an `explicit` audience brought, or `null` when none arrived.
+ *
+ * ## Why this is ONE function, read by the sentence AND by the clause beneath it
+ *
+ * Two things must agree about the unserved state: the standing SENTENCE (which
+ * must not leave `Only: ` dangling) and the CLAUSE beneath it (which explains
+ * the absence). Written as two guards a few lines apart they are two chances to
+ * disagree, and the failure is SILENT — `Only: ` renders with nothing after it
+ * and nothing says why, which is a partial answer wearing the shape of a
+ * complete one. So the state is computed once, here, and both readers ask this.
+ *
+ * **Returning the names rather than a boolean is what makes it one definition
+ * instead of three.** A boolean would have to be re-checked at the call site to
+ * narrow `userIds`, and a re-check is a second copy. This way the sentence needs
+ * no second condition at all: `null` covers every mode but a *named* explicit
+ * one, so a single `if` answers the whole question.
+ *
+ * **The empty roster cannot come off the wire and is folded in anyway.** The
+ * domain refuses `explicit` with no names (`visibilitySetPayload`: *"an audience
+ * of nobody ... reads as a restriction that hides the ticket from everyone
+ * including its author"*) and the sheet passes `null`, never `[]`. But this
+ * prop admits `string[] | null`, so a caller CAN hand it `[]` — and a guard is
+ * about the state it makes unrepresentable, not the state it happens to receive.
+ * Found by the reviewer on 2026-09-20 as a latent coupling rather than a live
+ * defect.
+ */
+function namedAudience(claim: VisibilityClaim): string[] | null {
+  if (claim.resolvedMode !== 'explicit') return null;
+  if (claim.userIds === null || claim.userIds.length === 0) return null;
+  return claim.userIds;
+}
+
 function standingSentence(claim: VisibilityClaim, nameOf: (userId: string) => string): string {
-  if (claim.resolvedMode !== 'explicit') return RESOLVED_MODE_LABELS[claim.resolvedMode];
-  // No roster served: the MODE is named and the names are not, and the render
-  // says so in the clause beside this one rather than leaving `Only: ` dangling.
-  if (claim.userIds === null) return RESOLVED_MODE_LABELS.explicit;
+  const names = namedAudience(claim);
   // The names, not the count. "3 people" is a number a reader cannot check
   // against the one question this section answers.
-  return `Only: ${claim.userIds.map(nameOf).join(', ')}`;
+  if (names !== null) return `Only: ${names.map(nameOf).join(', ')}`;
+  // Every other state is the mode's own label: the three standing audiences,
+  // and an explicit one whose names did not arrive — which the clause beside
+  // this sentence says out loud rather than leaving `Only: ` dangling.
+  return RESOLVED_MODE_LABELS[claim.resolvedMode];
 }

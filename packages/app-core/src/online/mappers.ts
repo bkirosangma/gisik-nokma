@@ -1775,10 +1775,29 @@ function mapParentRef(raw: unknown, path: string): ParentRef {
  * **⚠ CORRECTED 2026-09-20.** This paragraph ended *"...and it is not a serving
  * gap; the visibility row is read by nothing here."* The second clause was true
  * when written and is false now: the row's two MODE columns reach the sheet as
- * `TicketRead.visibility` (`mapTicketVisibility` below). What is still read by
- * nothing here is the row's ROSTER — `own_user_ids` / `resolved_user_ids` never
- * leave the server at all (`routes/tickets.ts:111-114`), and that absence is
- * visible in `TicketVisibility`'s own shape rather than papered over.
+ * `TicketRead.visibility` (`mapTicketVisibility` below).
+ *
+ * ## Two rosters, and only one of them is cut — an earlier draft of this
+ * ## paragraph conflated them, so the distinction is written down here
+ *
+ * `proj_visibility`'s `own_user_ids` / `resolved_user_ids` are **derived
+ * projection state**, and `toTicketView` cuts them at every call site
+ * (`routes/tickets.ts:111-114`: *"an explicit audience ROSTER, a disclosure no
+ * plan authorized"*). That is why `TicketVisibility` has no roster member: the
+ * absence is in the shape rather than papered over.
+ *
+ * ⚠ **But the roster as a CLAIM does leave the server, by design, and an earlier
+ * draft of this paragraph said it "never leaves the server at all" — that was
+ * false.** `visibility.set` carries `userIds` in its own payload
+ * (`packages/domain/src/events/visibility.ts:35`), and the history read serves
+ * payloads verbatim: `toHistoryEvent` maps `payload: row.payload` with no
+ * redaction (`routes/ticket-history.ts:176-194`), and `/events` does the same
+ * (`routes/tickets.ts:519-527`). **This is not a leak to close.** The route's own
+ * allow-list docblock draws the line and says which way to cut it — *"Those are
+ * PROVENANCE — an attributed claim somebody made ... Cut derived state; never cut
+ * a claim."* What is cut is the resolved COLUMN; what is served is the event that
+ * set it. Conflating those two is the one mistake this endpoint's docblock was
+ * written to prevent.
  *
  * ## The rule these titles are served under, named
  *

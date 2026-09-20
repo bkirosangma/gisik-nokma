@@ -196,9 +196,15 @@ export type TicketSheetProps = {
    *
    * ## Why they are PROPS and not a read, measured at `e9c1a04f`
    *
-   * **`TicketRead` carries neither.** It is exactly six fields
-   * (`view-types.ts:356-381`): `ticket`, `title`, `stateProvenance`,
-   * `assignedProvenance`, `parent`, `rollup`. `BoardView` is
+   * **`TicketRead` carries neither.** It is exactly seven fields
+   * (`view-types.ts:404-458`): `ticket`, `title`, `stateProvenance`,
+   * `assignedProvenance`, `visibility`, `parent`, `rollup`. **The count moved
+   * from six to seven on 2026-09-20** when `visibility` was added, and the
+   * citation was re-resolved by content in the same change set — the old
+   * `:356-381` now names the `ResolvedVisibilityMode` / `TicketVisibility` block
+   * that this change introduced. The claim the count carries is unchanged:
+   * neither the workspace's name nor the project's is among them.
+   * `BoardView` is
    * `{projectId, groups}` with no name, and `DataSourceQuery` has no
    * `getProjects` and no `getWorkspace` — its one name-carrying method,
    * `getMyWorkspaces()`, returns **every workspace and every project in them**,
@@ -1146,7 +1152,7 @@ export function TicketSheet({
    * `6f08452c`). The sentence here used to call it "another lane's in-flight
    * branch"; that was true when written and is not now. **The fourth crumb is
    * still not built, and the reason has changed rather than lapsed:**
-   * `TicketRead` does not carry the key either — it is the SAME six fields — so
+   * `TicketRead` does not carry the key either — it is the SAME seven fields — so
    * a fourth crumb would need a third host prop or a read, which is the round
    * the dispatch scoped away. Nothing here is a placeholder for it.
    *
@@ -1159,7 +1165,7 @@ export function TicketSheet({
    * The state is the one crumb whose source is IN this component: it is
    * `currentStateName` above, already derived for the state chip from the
    * workflow this sheet has loaded. The two names are the props documented on
-   * `TicketSheetProps` — **they are NOT on `TicketRead`**, which is six fields
+   * `TicketSheetProps` — **they are NOT on `TicketRead`**, which is seven fields
    * and carries no name of any kind.
    *
    * ## A crumb is drawn only for a KNOWN name, and that is a correction

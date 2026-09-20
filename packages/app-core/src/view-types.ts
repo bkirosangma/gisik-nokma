@@ -436,7 +436,16 @@ export type TicketRead = {
    * row**, which is what the local replica answers (the offline read models are
    * folded from the event stream, and `visibility.set` is deliberately not one
    * of the fifteen types that reducer folds — see `TicketStateDeps`' neighbour
-   * in `ticket-state.ts`) and what any body without a `ticket` key means.
+   * in `ticket-state.ts`).
+   *
+   * **A body that OMITS the key is NOT this `null`, and it is refused.** The
+   * route emits the row on every answer, so `mapTicketVisibility` throws by path
+   * name rather than answering `null` — precisely so that "the field was
+   * missing" cannot arrive wearing the one meaning `null` is reserved for.
+   * ⚠ An earlier draft of this docblock said `null` is *"what any body without a
+   * `ticket` key means"*, which is the opposite of what the mapper beside it
+   * does. Corrected here rather than deleted, because the two must not drift
+   * back apart.
    *
    * REQUIRED and nullable rather than optional, on the rule this module states
    * for `WorkItem.projectName`: *"an optional key would let a mapper that simply

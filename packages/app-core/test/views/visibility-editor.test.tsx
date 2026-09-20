@@ -426,6 +426,30 @@ describe('3.111 the standing audience — served where it is served, absent wher
   });
 
   /**
+   * 3.177 — an `explicit` audience whose roster is EMPTY, not `null`.
+   *
+   * The domain refuses this shape outright (`visibilitySetPayload`: an audience
+   * of nobody *"reads as a restriction that hides the ticket from everyone
+   * including its author"*) and the sheet passes `null`, never `[]` — so it is
+   * not reachable from a shipped read. It is asserted anyway because **the prop
+   * admits `string[]`**, and the defect it guards is the one two separate guards
+   * produce the moment they disagree: the sentence suppressing `Only: ` under
+   * one condition while the clause explaining the absence lives under another.
+   * The result is a dangling `Only: ` with nothing after it and nothing saying
+   * why — a partial answer that looks like a complete one, which is the exact
+   * failure the clause was added to prevent.
+   *
+   * Found by the reviewer on 2026-09-20 as a latent coupling, not a live defect.
+   */
+  it('3.177 an explicit audience with an EMPTY roster is treated as unserved, not as a dangling Only:', () => {
+    mount({ current: { ownMode: 'explicit', resolvedMode: 'explicit', userIds: [], claim: null } });
+    const standing = document.querySelector('.gn-visibility__standing');
+    expect(standing?.textContent).toContain('Only: the people this ticket names');
+    expect(standing?.querySelector('.gn-visibility__roster-unserved')).not.toBeNull();
+    expect(standing?.textContent?.trim()).not.toBe('Only:');
+  });
+
+  /**
    * 3.173 — a read that served no provenance renders no attribution.
    *
    * PLANTED DEFECT: rendering the clause anyway. `claim` is `null` for every
