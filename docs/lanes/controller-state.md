@@ -31,6 +31,38 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 TUESDAY 2026-09-22 ~00:0x IST — **CYCLE 32: THE REVIEW'S SCOPE IS THE ENTIRE CODEBASE, AND THIS ENTRY NAMES THE UNIVERSE SO THE LANES CANNOT SAMPLE IT.** `main` is `a12f370e`; **zero open PRs**; ledger **307 done / 1 todo**.
+
+### 1. 📌 THE OWNER'S ADDITION, VERBATIM
+> *"btw the review has to be the most detailed of reviews of the entire codebase. every nook and corner of the code, every case, every edge has to be checked and reviewed. leave no stones unturned."*
+
+### 2. ⚠ WHAT THAT MEASURES TO — so the briefs can name it instead of gesturing at it
+**11 packages/apps with source: `apps/{server,web,mobile,desktop}` and `packages/{app-core,domain,editor,mcp-server,rule-engine,sync-client,ui}`.** Plus **416 test files**, **25 files under `test-cases/`** (**the guard reads 2586 unique ids** — ⚠ *not* the 1252 a bold-only grep returns; the guard's three spellings are the instrument), **19 route modules**, **32 migrations**, **9 checkers in `scripts/`**, the `docs/` set (including the generated help), and `design-system/interactive/desktop.dc.html` — **the prototype, which is the authority several of those files were built against.**
+⛔ **NO LANE MAY SAMPLE.** The universe is enumerated above so a lane can **partition it and report against it**, rather than review whatever it happened to open.
+
+### 3. THE PARTITION — by CONCERN, not by directory, and overlap is EXPECTED
+| lane | concern | the universe it owns |
+|---|---|---|
+| **exec 1** | **UI** | `packages/ui` (components, `ui.css`, tokens), `apps/web` (routes, components, styles), **`packages/app-core/src/views/*` as RENDERED**, `packages/editor`'s surfaces, `apps/mobile`, `apps/desktop`, the viewport/e2e suites — and **accessibility**: names, contrast, tap targets, type scale, focus. |
+| **exec 2** | **UX** | What a person MEETS: navigation and reachability, **every empty / loading / error / refusal state**, permissions as *experienced* rather than as enforced, the copy across the product **and `docs/faq.md` + `docs/manual.md` + the generated help**, the flows end to end, first-run, and the wording of every refusal. |
+| **exec 3** | **features / functionality** | The engine and the wire: `apps/server` (**19 routes, 32 migrations**, projections, read paths, the soft-delete predicate, permission ENFORCEMENT), `packages/domain`, `packages/rule-engine`, `packages/sync-client`, `packages/mcp-server`, `packages/app-core/src/online` + `replica`, **and the 9 checkers in `scripts/`** — an instrument that reports without measuring is a finding. |
+**Every case id is in scope for the lane whose concern it belongs to** — `test-cases/`' 2586 ids are not decoration: **for each id in your concern, ask whether it still holds, whether it is witnessed, and whether it is still TRUE of the product today.** ⚠ **`app-core` spans all three concerns** (views/mappers/replica/online) — **the directory is not the cut, the concern is**, and **overlap must NOT be resolved by the lanes** (cycle 31 §3).
+
+### 4. ⛔ THE METHOD — and the only honest form of "no stones unturned"
+1. **ENUMERATE FIRST, REVIEW SECOND.** Before a single finding, each lane writes down **its universe**: the files, the routes, the migrations, the components, the case ids. **That list is the yardstick, and it is what makes coverage checkable.**
+2. **Then cover it systematically** — not by reading whatever looks interesting.
+3. ⛔ **THEN STATE THE COVERAGE, INCLUDING WHAT WAS NOT REACHED.** *"Leave no stones unturned" is satisfiable only as an ENUMERATION plus an HONEST BOUNDARY.* ⚠ **A claim of totality that cannot be demonstrated is the single most-catalogued failure in this repository** — this file alone records a sweep whose universe omitted the file the defect was in, a count that did not match its parts, and a check that could not fail. **A report that says "these 40 files were reviewed, these 300 were not, and here is why" is worth more than one that says "the codebase was reviewed".**
+4. **Every finding carries the owner's three parts — WHAT is wrong, WHY it is wrong, WHAT WOULD HAVE BEEN BETTER — plus the measurement it rests on and a severity.** A finding missing the third is a complaint; a finding missing the measurement is unverified and **must be marked as such**.
+5. ⛔ **A reviewer fixes nothing. No branch of fixes, no PR from the review pass itself.**
+
+### 5. THE EDGE CLASSES — "every edge" is a list, not a mood
+**For every surface in your concern, walk these nine and say what happens: EMPTY · ERROR · PERMISSION-REFUSED · OFFLINE / REPLICA-DEGRADED · SOFT-DELETED · CONCURRENT or INTERLEAVED · NARROW VIEWPORT · FIRST-RUN · and THE SERVER REFUSES WHILE THE CLIENT BELIEVES.** The last is this product's most expensive recurring shape: a client that asserts a success the server declined.
+
+### 6. WHAT THIS CHANGES IN CYCLE 31
+Cycle 31's spec stands — the trigger, the fresh sessions, the report paths, the no-fixing rule, the controller's ruling duty and its count discipline. **This entry changes its SCOPE from "the recent work" to the whole codebase, and adds §3's partition, §4's method and §5's edge classes to what each lane brief must carry.** ⚠ **Its §2 trigger is UNCHANGED and still governs: all three of items 6, 7 and 8 merged, then fresh sessions.**
+
+---
+
 ## 🔄 MONDAY 2026-09-21 ~23:4x IST — **CYCLE 31: THE QUEUE IS EMPTY OF UNBLOCKED WORK, AND THE OWNER HAS ORDERED A THREE-REVIEWER EXERCISE TO RUN WHEN IT DRAINS. THIS ENTRY IS ITS EXECUTION SPEC.** `main` is `fef20170`; **zero open PRs**; ledger **307 done / 1 todo**.
 
 ### 1. 📌 THE OWNER'S INSTRUCTION
