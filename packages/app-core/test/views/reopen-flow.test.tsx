@@ -99,6 +99,11 @@ const PARENT_READ: TicketRead = {
   visibility: null,
   parent: null,
   rollup: null,
+  // Neither crumb field is read by this file's cases — it is about the
+  // close/reopen round-trip — so both take the honest default a fake standing
+  // in for a read that composed no key would carry.
+  key: null,
+  epic: null,
 };
 
 /**
@@ -122,6 +127,11 @@ const CLOSED_PARENT_READ: TicketRead = {
   visibility: null,
   parent: null,
   rollup: null,
+  // Neither crumb field is read by this file's cases — it is about the
+  // close/reopen round-trip — so both take the honest default a fake standing
+  // in for a read that composed no key would carry.
+  key: null,
+  epic: null,
 };
 
 function committed(eventId: string): IngestResult {

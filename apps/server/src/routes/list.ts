@@ -1,6 +1,5 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import {
-  BUILTIN_TICKET_TYPE_SEEDS,
   filterSpecSchema,
   groupingSchema,
   statesWithBacklog,
@@ -13,6 +12,7 @@ import {
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
 import { BLOCKED_STATES_CTE, compileFilterSpec } from '../read/compile-filter.js';
+import { EPIC_RANK, MAX_ANCESTRY_DEPTH } from '../read/ancestry.js';
 import { READ_NOT_FOUND_BODY, requireMember, workspaceOfProject } from '../read/membership.js';
 import { assembleListCards } from '../read/list-cards.js';
 import { SqlParams } from '../read/sql-params.js';
@@ -23,38 +23,19 @@ import { latestWorkflowDefs } from '../read/workflow-defs.js';
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
-/** How far up a parent chain the epic walk will climb before giving up. */
-const MAX_ANCESTRY_DEPTH = 32;
-
+/** How far up a parent chain the epic walk will climb before giving up.
+ *  MOVED to `read/ancestry.ts` with `EPIC_RANK` on 2026-09-20 — the ticket
+ *  detail route walks the same chain one ticket at a time and must not carry a
+ *  second copy of the cap. */
 /** The key a card with no epic-rank ancestor-or-self falls into. */
 const NO_EPIC = 'no-epic';
 
 /**
- * The epic rank, READ FROM THE BUILT-IN SEED and never written as a literal `1`.
- *
- * Grouping by epic resolves the nearest ancestor-or-self whose TYPE carries this
- * rank, so a workspace that renamed its top rung — "Initiative", "Campaign" —
- * gets its own headings without asking anybody's permission (owner sign-off
- * 2026-08-20). The rank is the concept; `'epic'` is one id of it, and the
- * planted-defect case in `test/routes/list.test.ts` fails on a route that
- * matched the id.
- *
- * Looked up rather than indexed, and it THROWS rather than falling back: a
- * missing epic seed means the built-in ladder changed shape underneath this
- * module, and silently grouping everything into `no-epic` would be that change
- * arriving as a UI that lost its headings instead of as an error.
+ * The epic rank — MOVED to `read/epic-rank.ts` on 2026-09-20, when the ticket
+ * detail route needed the same rung to resolve a single ticket's grandparent.
+ * The docblock went with it. Nothing about the rule changed; the second reader
+ * is what made a local constant the wrong shape.
  */
-const EPIC_RANK = epicRank();
-
-function epicRank(): number {
-  const seed = BUILTIN_TICKET_TYPE_SEEDS.find((candidate) => candidate.id === 'epic');
-  if (seed === undefined) {
-    throw new Error(
-      "list route: BUILTIN_TICKET_TYPE_SEEDS carries no 'epic' seed, so there is no epic rank to group by",
-    );
-  }
-  return seed.rank;
-}
 
 export type ListQuery = {
   spec: FilterSpec;

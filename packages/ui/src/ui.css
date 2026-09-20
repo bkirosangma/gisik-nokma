@@ -632,13 +632,47 @@
 .gn-ticket-sheet__crumb-sep {
   color: var(--gn-text-muted);
 }
-/* The CURRENT position — the third crumb, and the prototype draws it
-   `font-weight:600;color:var(--label)` while the two before it are links
-   (`:1108-1110`). Ours are not links (nothing here navigates), so weight and
-   colour are the whole difference, and they are the prototype's. */
+/* The CURRENT position — the LAST crumb now, and the prototype draws it
+   `font-weight:600;color:var(--label)` while the crumbs before it are links
+   (`:1108-1110`). Weight and colour are the whole difference, and they are the
+   prototype's.
+   ⚠ UNTIL 2026-09-20 THIS COMMENT SAID *"Ours are not links (nothing here
+   navigates)"*, and that was true of the THREE-crumb bar it was written for:
+   workspace and project were plain spans and the state crumb was the current
+   position. The owner's ruling of 2026-09-20 replaced the state crumb with the
+   ticket key and put the ticket's ANCESTORS in front of it, and **every
+   ancestor crumb is now a link that opens that ticket's sheet** (the
+   authority's own `isLink` arm, `:3404-3425`). Corrected here rather than left
+   to mislead the next reader, which is the same reason the sentence is kept. */
 .gn-ticket-sheet__crumb--current {
   font-weight: 600;
   color: var(--gn-text);
+}
+/* An ANCESTOR crumb, which opens that ticket's sheet. A real `<button>` and
+   never a `role="button"` span — this repo's rule for a control — so the UA's
+   border, background and font are reset here exactly as
+   `button.gn-ticket-sheet__parent-chip` below resets them for the same reason.
+   `color: inherit` takes the nav's own `--gn-text-muted` on `--gn-surface-raised`
+   (`CONTRAST_PAIRS`), which is also what the prototype does: its `<a>` sits in a
+   nav declaring `color:var(--label2)` and sets no colour of its own (`:1101`,
+   `:1103`). Only the PLAIN-and-current crumb departs from it. */
+button.gn-ticket-sheet__crumb--link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+/* An ancestor the viewer may NOT see — existence-without-title, NAMED rather
+   than dropped. Dropping it would make a restricted chain read as a shorter
+   one, which is the vanish `invariant 5` forbids and the reason the parent
+   indicator has a restricted arm at all. It carries the same ink
+   `.gn-ticket-sheet__restricted` uses, so the two restricted statements on one
+   screen agree about what restricted looks like. Never a link: the viewer
+   cannot open what they cannot see. */
+.gn-ticket-sheet__crumb--restricted {
+  color: var(--gn-restricted);
 }
 
 /* THE TITLE AS A CONTROL — the prototype's `<input>` at `:1116`:

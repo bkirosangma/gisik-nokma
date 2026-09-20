@@ -165,6 +165,10 @@ function ticketRead(): TicketRead {
     visibility: null,
     parent: { kind: 'ticket', id: PROJECT, title: 'Registrations' },
     rollup: null,
+    // The breadcrumb's two crumb fields, added 2026-09-20. No case here reads
+    // them, so both take the default a read that composed no key would carry.
+    key: null,
+    epic: null,
   };
 }
 

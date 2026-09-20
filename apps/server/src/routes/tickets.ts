@@ -1,5 +1,5 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
-import type { TicketRollup, TicketState } from '@gisik-nokma/domain';
+import { ticketKey, type TicketRollup, type TicketState } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { getTicketStateFromDb } from '../projections/tickets.js';
 import { ticketIsLive } from '../read/live-ticket.js';
@@ -10,6 +10,10 @@ import { sanitizeFilename } from '../attachments/filename.js';
 import { canSee } from '../visibility/can-see.js';
 import { rollupFor, type RollupView } from '../visibility/rollup.js';
 import { listVisibleTickets } from '../visibility/visible-tickets.js';
+import { ticketNumber } from '../read/ticket-numbers.js';
+import { projectPrefixesInWorkspace } from '../read/visible-projects.js';
+import { workspaceIdentityFromLedger } from '../workspaces/workspace-name.js';
+import { EPIC_RANK, MAX_ANCESTRY_DEPTH } from '../read/ancestry.js';
 
 /**
  * A ticket's title, out of the claim map the reducer maintains.
@@ -171,6 +175,29 @@ function toTicketView(row: VisibilityRow): TicketView {
  */
 export type ParentRef =
   | { kind: 'ticket'; id: string; title: string; ticket: TicketView }
+  | { kind: 'restricted'; id: string };
+
+/**
+ * The ticket's GRANDPARENT, for the sheet's breadcrumb chain — the same three
+ * answers `ParentRef` gives, and deliberately one field SHORTER.
+ *
+ * **It drops `ticket: TicketView`, and that is a decision rather than an
+ * oversight.** That member is the `proj_visibility` row — `own_user_ids` and
+ * `resolved_user_ids` among its columns — and the client never reads it: the
+ * sheet's `Who can see this` section maps the TICKET's own view
+ * (`mapTicketRead` → `mapTicketVisibility(record['ticket'])`), and the parent's
+ * copy is dropped on arrival by `mapParentRef`, which reads exactly `kind`,
+ * `id` and `title`. So serving it for the grandparent would add an audience
+ * roster to the wire for a reader that does not exist — the disclosure this
+ * repo refuses by name (`routes/tickets.ts`'s own note that an explicit roster
+ * is *"a disclosure no plan authorized"*).
+ *
+ * The crumb needs the ancestor's NAME and a way to open it. Both are here; the
+ * audience is not. `mapParentRef` maps this shape unchanged, so the client
+ * carries no second reader for it.
+ */
+export type AncestorRef =
+  | { kind: 'ticket'; id: string; title: string }
   | { kind: 'restricted'; id: string };
 
 /**
@@ -489,6 +516,113 @@ export function registerTicketRoutes(
         );
       }
 
+      /**
+       * THE TICKET'S KEY — `CCSO-1183` — composed here because it is a fact about
+       * three LEDGER reads and about none of the rows this handler already has.
+       *
+       * **The owner's spec (2026-09-20) is `workspacePrefix + projectPrefix +
+       * '-' + number`, and every one of the three is derived rather than
+       * stored.** The two prefixes come from readers that are already tested
+       * and already served on `GET /v1/me/workspaces`; the number is the
+       * ticket's position among its project's creations by `workspace_seq`
+       * (`read/ticket-numbers.ts`, which explains why it cannot be a column).
+       * Composing on the SERVER rather than shipping three numbers for the
+       * client to join is deliberate: it keeps ONE composer — `ticketKey`,
+       * whose own docblock says *"there is nothing for a caller to forget to
+       * pass"* — and it means the sheet needs no new host props to render the
+       * crumb.
+       *
+       * ## Every absence is `null`, and NOT a refusal
+       *
+       * `ticketNumber` returns `null` when the ticket has no creation position
+       * — which is the snapshot-bounded case — and `read/ticket-numbers.ts`
+       * records the ruling: *"a key is not worth refusing a ticket read over,
+       * and inventing a number would make the key name a ticket that does not
+       * exist."* The two prefixes are total for a named workspace and a listed
+       * project, but `workspaceIdentityFromLedger` answers `null` for a
+       * workspace with no `workspace.created` at all, and the project map is
+       * keyed by id — so both are checked rather than asserted, and the crumb
+       * renders an absence instead of a key assembled from a hole.
+       */
+      const identity = await workspaceIdentityFromLedger(deps.pool, workspaceId);
+      const prefixes = await projectPrefixesInWorkspace(deps.pool, workspaceId);
+      const projectPrefix = prefixes.get(state.projectId) ?? null;
+      const number = await ticketNumber(deps.pool, workspaceId, ticketId);
+      const key =
+        identity.prefix === null || projectPrefix === null || number === null
+          ? null
+          : ticketKey(identity.prefix, projectPrefix, number);
+
+      /**
+       * THE GRANDPARENT — the nearest PROPER ancestor whose type carries the
+       * epic rank, or `null` when there is none.
+       *
+       * ## Why this walks with `canSee` instead of calling `epicAncestors`
+       *
+       * `routes/list.ts` groups a whole PAGE by epic with one recursive CTE,
+       * and that CTE carries `visibleTicketsWhere` — a SQL visibility
+       * expression. **This route may not have one.** Its own docblock is
+       * explicit (`:281-288`): *"The visibility decision is `canSee`'s,
+       * always. No SQL here re-states who may see what."*
+       *
+       * So the walk is the `parent` branch directly above, repeated: the same
+       * `canSee`, the same `getTicketStateFromDb`, the same soft-delete arm,
+       * the same `restricted` shape for an ancestor this viewer may not see.
+       * **No visibility rule is restated** — each hop asks `canSee` the
+       * question it already answers — and the two reads agree by construction
+       * because they are the same calls.
+       *
+       * ## PROPER ancestor, unlike the list's walk
+       *
+       * `epicAncestorOf` is ancestor-OR-SELF, because a board lane legitimately
+       * groups an epic's own card under that epic. A CRUMB is different: the
+       * chain `workspace › project › epic › parent › ticket` names layers
+       * ABOVE the ticket, so a ticket that IS an epic must not appear as its
+       * own grandparent. The walk therefore starts at `state.parentId` and
+       * never considers `ticketId` itself.
+       *
+       * Depth is capped by `MAX_ANCESTRY_DEPTH`, shared with the list walk so
+       * the two cannot disagree about how deep the product's hierarchy goes. A
+       * chain that hits the cap answers `null` — the same absence as "no epic",
+       * which is honest: this read did not find one, and it does not claim
+       * there is none.
+       */
+      const { rows: epicTypeRows } = await deps.pool.query<{ type_id: string }>(
+        `SELECT type_id FROM proj_ticket_types WHERE workspace_id = $1 AND rank = $2`,
+        [workspaceId, EPIC_RANK],
+      );
+      const epicTypeIds = new Set(epicTypeRows.map((row) => row.type_id));
+
+      let epic: AncestorRef | null = null;
+      let cursor = state.parentId;
+      let depth = 0;
+      while (cursor !== null && depth < MAX_ANCESTRY_DEPTH) {
+        if (!(await canSee(deps.pool, request.currentUserId, cursor))) {
+          epic = { kind: 'restricted', id: cursor };
+          break;
+        }
+        const ancestor = await getTicketStateFromDb(deps.pool, workspaceId, cursor);
+        if (ancestor === null) {
+          throw new Error(
+            `readTicket: proj_visibility holds ancestor ${cursor} in workspace ${workspaceId} and proj_tickets does not — the two projections disagree`,
+          );
+        }
+        // An ancestor this viewer may not be told the TITLE of, for the same
+        // reason the parent branch above reuses `restricted` rather than
+        // inventing a fourth arm: `restricted` already means exactly "there is
+        // one here whose name you do not get".
+        if ((ancestor.deleted ?? null) !== null) {
+          epic = { kind: 'restricted', id: cursor };
+          break;
+        }
+        if (epicTypeIds.has(ancestor.typeId)) {
+          epic = { kind: 'ticket', id: cursor, title: titleOf(ancestor) };
+          break;
+        }
+        cursor = ancestor.parentId;
+        depth += 1;
+      }
+
       return {
         ticket: toTicketView(ticket),
         ticketState: state,
@@ -497,6 +631,8 @@ export function registerTicketRoutes(
         assignedProvenance,
         parent,
         rollup,
+        key,
+        epic,
       };
     },
   );

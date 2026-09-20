@@ -1455,8 +1455,22 @@ describe('GET /v1/workspaces/:ws/tickets/:id vs TicketRead', () => {
     // more call to the reader the list already uses (`read/assigned-provenance.ts`),
     // not a second door. This case caught it, which is the point of pinning the
     // set rather than counting it.
+    // **AND IT GAINED TWO MORE, 2026-09-20 — `key` and `epic`** — which is the
+    // same story a second time, and this case caught them too. The sheet's
+    // breadcrumb was rebuilt to the AUTHORITY's chain
+    // (`workspace › project › [epic] › [parent] › the ticket key`,
+    // `desktop.dc.html:3404-3425`), and two of those five crumbs had no source
+    // on any read: `TicketRead` carried no key and no `epicId`. **The key was
+    // the one the dispatch believed was already served** — what `#595` shipped
+    // is the COMPOSITION and the two PREFIXES, and the NUMBER had no route
+    // consuming it (`ticketNumber`'s only consumers were its own tests, and
+    // `Features.md:455` says *"NO SCREEN RENDERS IT YET"*). So this is a
+    // WIDENING by two readers on the existing route — `ticketNumber` and the
+    // ancestor walk — and not a second door, exactly as the seventh key was.
     expect(Object.keys(body).sort()).toEqual([
       'assignedProvenance',
+      'epic',
+      'key',
       'parent',
       'rollup',
       'stateProvenance',

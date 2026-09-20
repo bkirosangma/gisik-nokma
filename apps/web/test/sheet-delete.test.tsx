@@ -109,6 +109,9 @@ function ticketRead(): TicketRead {
     // shape `subtasksIncomplete` reads (`rollup === null` means zero expected).
     parent: null,
     rollup: null,
+    // The breadcrumb's two crumb fields (2026-09-20); no case here reads them.
+    key: null,
+    epic: null,
   };
 }
 

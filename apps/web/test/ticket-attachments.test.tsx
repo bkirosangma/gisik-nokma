@@ -106,6 +106,9 @@ function ticketRead(): TicketRead {
     visibility: null,
     parent: null,
     rollup: null,
+    // The breadcrumb's two crumb fields (2026-09-20); no case here reads them.
+    key: null,
+    epic: null,
   };
 }
 

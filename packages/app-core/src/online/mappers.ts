@@ -1934,6 +1934,22 @@ export function mapTicketRead(raw: unknown, roster: ReadonlyMap<string, string> 
     visibility: mapTicketVisibility(record['ticket'], 'ticket'),
     parent: mapParentRef(record['parent'], 'ticket.parent'),
     rollup: mapRollup(record['rollup'], 'ticket.rollup'),
+    // The key, and the `=== null` arm is the DISCRIMINATOR rather than a
+    // convenience: the route answers `null` for a ticket whose number falls
+    // outside the snapshot the number is derived from, and `asString` throws on
+    // `undefined` — so a server that simply stopped sending the field refuses
+    // here instead of arriving as the one absence that has a meaning.
+    //
+    // ⚠ Do NOT relax this to `record['key'] === undefined ? null : ...`. That
+    // reads the same on every fixture and reverses the rule: "this read could
+    // not compose a key" and "this producer forgot to send one" would become
+    // one value, which is precisely the collapse `TicketRead.visibility` above
+    // argues against.
+    key: record['key'] === null ? null : asString(record['key'], 'ticket.key'),
+    // The grandparent — `mapParentRef` UNCHANGED, because the route serves the
+    // same three answers the parent does and drops only the `proj_visibility`
+    // row that mapper never read anyway.
+    epic: mapParentRef(record['epic'], 'ticket.epic'),
   };
 }
 

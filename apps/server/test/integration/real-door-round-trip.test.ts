@@ -853,6 +853,27 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — the single read'
       // A leaf. `rollupFor` answers null for a ticket with no children, which
       // is the same call `TicketCard.rollup: null` makes.
       rollup: null,
+      // THE COMPOSED KEY, and this is the assertion the whole wire change is
+      // for. It reads `RTSF-2` and every character of it is derived:
+      // `RT` + `SF` + `-` + `2`. The two prefixes are the ones this fixture
+      // ENTERED on its founding claims (`workspace.created` `prefix: 'RT'` at
+      // `:455`, `project.created` `prefix: 'SF'` at `:483`); the number is the
+      // ticket's position among its project's creations by `workspace_seq`,
+      // and this child is the SECOND ticket founded in `Shop floor`.
+      //
+      // ⚠ Pinning the literal rather than a pattern is deliberate: a regex
+      // would pass for a route that composed the wrong prefixes, and the whole
+      // point of an exact-value pin here is that ANOTHER workspace's key would
+      // be a different string. Renaming a fixture that changes these prefixes
+      // moves this assertion, which is the correct failure.
+      key: 'RTSF-2',
+      // The grandparent, 2026-09-20. `null` — this fixture's world has an epic
+      // (`Shop floor`'s tickets hang off `Restock the chiller`, which is a
+      // `task`), so the walk climbs from the parent to a ticket with no parent
+      // and finds no epic-rank ancestor. A version that returned
+      // ancestor-or-self, or the immediate parent, would put `Restock the
+      // chiller` here and redden.
+      epic: null,
     });
   });
 
