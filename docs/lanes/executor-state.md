@@ -41,7 +41,237 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
-> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~11:4x IST. **THE PROTOTYPE ROUND: the reorder buttons
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~13:3x IST. **THE SHEET FOOTER IS BUILT, REVIEWED, FIXED,
+> # REBASED AND GREEN. THE PR IS THE ONLY THING LEFT.**
+> Branch **`exec/sheet-footer`**, `--base main`. **THE CODE HEAD IS `18d7e391`**; this handoff sits
+> directly above it, and a commit cannot name its own sha — the tip is the handoff commit and
+> `gh pr view --json headRefOid,baseRefName` settles everything else in one call.
+> **`origin/main` MOVED UNDER THIS ROUND** — from `bbbd5cda` at cut to **`4274b372`** (`#590`, executor
+> 2's product-copy round + the cycle-21 anchor). The branch is **rebased onto it**; the rebase was
+> CLEAN, and `test-cases/16-remaining-doors.md` — edited by BOTH lanes — carries both sections
+> (executor 2's `16.45` inserted, my `16.84` added in place).
+> ⚠ **The overlap was checked for an ID COLLISION rather than assumed away**: §16's highest id on
+> `origin/main` is **`16.83`**, so `16.84` was and is free. `check-case-ids` after the rebase reads
+> **`2497 unique, highest 16.84`** = the old `2495` + executor 2's `16.45` + this round's `16.84`.
+> **A count that moved by exactly the two lanes' additions.**
+>
+> ## ANCHORS, RECOUNTED AT THIS TREE, AFTER THE REBASE
+> - **gate** `pnpm turbo run build test typecheck --concurrency=1`: **EXIT=0 · 33/33 · 1m59s**, run on
+>   the rebased tree. server **1645** · app-core **1645** · web **598** · ui 372 · domain 525 ·
+>   rule-engine 345 · editor 178 · sync-client 90 · mcp-server 44 · mobile 29 · desktop 9.
+>   (`app-core` 1643 → 1645 is UPSTREAM's calendar work arriving with the rebase, not mine; `web`
+>   594 → 598 and `server` 1644 → 1645 are this round's.)
+> - `pnpm install` was re-run after the rebase, per the rule that a rebase past a merge needs it.
+> - **seven repo checks pass**: `check:env`, `check:tasks`, `check:migrations`, `check:runbook`,
+>   `check:citations`, `check:help`, `check:case-ids`.
+>   ⚠ **`check:db-tz` was NOT run** — it requires a provisioned `DATABASE_URL` and this worktree has
+>   none. **Environment prerequisite, not a defect; the one check that did not run.**
+>
+> ## THE INDEPENDENT REVIEW — RUN, RECORDED, AND ITS FINDINGS FIXED OR NAMED
+> **No Critical.** One reviewer, restore verified by checksum on 20/20 files. It re-derived the
+> read-path coverage independently, confirmed both prohibitions, agreed with the permission LEVEL, and
+> reproduced the contrast figures with its own WCAG implementation.
+> **Three Important, all addressed:**
+> 1. **`Features.md` carried a SECOND bullet still saying the navigation was BUILT and `Delete` HELD** —
+>    in the file this round had just added the opposite bullet to. **Deleted, not tombstoned.** Two
+>    survivors remain in `docs/lanes/executor-2-state.md` and `docs/lanes/controller-state.md`, **neither
+>    in this branch's diff** — recorded with a named owner rather than reached into across lanes.
+> 2. **Eleven sites carry `LIVE_TICKET_WHERE` and nothing constrains them.** The reviewer PROVED it:
+>    `AND TRUE` leaves the suites green, `AND FALSE` reddens them — **executed-but-unconstrained, not
+>    mutations that never ran.** **One is now covered** (a new `rollupFor` case; mutating the predicate
+>    reddens it, `expected 2 to be 1`). **The other ten are named in the PR body.**
+> 3. **The delete path never re-asked the list or the board, while the restore did** — with the socket
+>    down the list kept showing a row the toast had just said was deleted. **Fixed**, with its own
+>    witness (a `getTickets` call-count case; removing the reload reddens it).
+> **Four Minor were wrong COUNTS or UNITS in this round's own prose**, each corrected in place:
+> "184 `margin` declarations" (that was the LINE count; 161 declarations), "eleven hand-written
+> SELECTs" (**withdrawn** — the reviewer measured 14 statements; the grep is the enumeration),
+> "zero call sites repo-wide" (overreach; ONE product call site is the claim), and "TEN ways, each
+> killing its OWN arm" (mutations ≠ arms).
+> **And the reviewer corrected the implementer's own report**: its engine-read mutation is written up
+> as "SKIPPED" but does NOT skip — it kills the suite in `beforeAll`, so **the prohibition is enforced
+> by a fixture crash and not by the assertion that names it.**
+>
+> ## WHAT THIS ROUND SHIPPED
+> The navigation REMOVED (a decided absence, `16.43` retired to 🚫) and `Delete` built as a
+> history-retaining removal with an undo: `ticket.deleted`/`ticket.restored` → `TicketState.deleted` →
+> `proj_tickets.deleted_at`/`deleted_by` + a partial index → `LIVE_TICKET_WHERE` AND-ed at every
+> view-serving read. The sheet emits and closes itself; the host owns the toast and the Undo.
+> **Three doors, not the four the dispatch priced** — there is no route to add — and **an authorization
+> door no document named**, now gated on `hasProjectAdminRights` as **RULING E1** in the coordination
+> doc, for the owner to reverse.
+> **EIGHTEEN mutations, each killing an arm on its own assertion, every file restored from a
+> checksum-verified copy** (7 server-side by the implementer, 11 interface-side here).
+>
+> ## NEXT, AND THIS IS ALL THAT IS LEFT
+> **commit the handoff → `git push -u origin exec/sheet-footer` → `gh pr view --json headRefOid` against
+> `git rev-parse HEAD` to prove the push landed (a REJECTED push does not stop `gh pr create`) →
+> `gh pr create --base main`.**
+> The PR body is at **`/tmp/pr-body.md`**, complete, with the reviewer pass already recorded — the
+> controller's standing clause. **You do not merge.**
+
+> # ▣ CURRENT POSITION — SUPERSEDED BY THE BLOCK ABOVE — SUNDAY 2026-09-20, ~14:0x IST. **THE SHEET FOOTER: the navigation comes
+> # OUT and `Delete` goes IN — built as a history-retaining removal with UNDO. MEASUREMENT DONE,
+> # IMPLEMENTATION IN FLIGHT.**
+> Branch **`exec/sheet-footer`**, cut from **`origin/main` = `bbbd5cda`** (the `#588` merge). One PR,
+> `--base main`. **You do not merge.** The controller's dispatch of 2026-09-20 ~12:4x IST is the brief.
+> **THE BRANCH HAS NO COMMITS YET** — HEAD is the base, `bbbd5cda`, and the tree carried uncommitted
+> implementation work when this was written. Re-derive the head with `git rev-parse HEAD` and
+> `gh pr view --json headRefOid,baseRefName` rather than trusting either number here.
+>
+> ## ⚠ WHAT THE DISPATCH GUESSED, AND WHAT MEASUREMENT SAID — IT IS THREE DOORS, NOT FOUR
+> The dispatch names four candidate pieces: *"a new event kind, a projection tombstone, a read filter
+> and a route."* **The route is NOT needed and that is a correction, not a preference:** the ingest
+> door is generic. `POST /v1/events` (`apps/server/src/routes/events.ts`, `registerEventRoutes`) takes
+> a batch of envelopes and dispatches on the REGISTERED TYPE — `evaluateEvent`'s switch
+> (`packages/rule-engine/src/evaluate.ts:27`) has a `default: return { refused: false }`, so a newly
+> registered ticket event passes through with no route change at all. **The other three are all real.**
+>
+> ## THE SHAPE, AND IT IS A COPY OF A PATTERN THE REPO ALREADY HAS
+> `ticket.closed`/`ticket.reopened` is this repo's worked example of a reversible ticket flag, and the
+> delete is that pattern piece for piece: **`ticket.deleted`/`ticket.restored`** (naming follows the
+> existing `project.archived`/`project.restored` pair) → `TicketState.deleted` → `proj_tickets.deleted_at`
+> / `deleted_by` + a partial index → **a filter at EACH reading site, not in one shared helper** (see the
+> choke-point section below — an earlier draft of this very paragraph said "the shared reads" and that
+> was wrong). The engine gains
+> `checkTicketDeleted`/`checkTicketRestored`, mirroring `checks/close.ts`, **and that guard is
+> load-bearing rather than ceremony: the reducer writes `deleted: {actorId, at}` off the envelope, so a
+> second delete would OVERWRITE the original delete's actor and instant — destroying the history the
+> feature claims to retain.**
+>
+> ## ⚠ THE AUTHORIZATION DOOR — NAMED BY NEITHER THE DISPATCH NOR ITS LIST OF FOUR
+> **Nothing gates `ticket.deleted`.** `check-permission.ts` decides by type, and a newly registered
+> ticket event appearing in none of its branches is accepted for ANY member who can see the ticket.
+> **The controller's four candidate pieces do not include this, so it is exactly the "door the table
+> does not name" the dispatch asks to be stated rather than absorbed.**
+> **Conservative-default ruling, applied and to be reported:** `ticket.deleted` AND `ticket.restored`
+> gate on **`hasProjectAdminRights(eff, projectId)`** (`effective-role.ts:145`). Ground, in the repo's
+> own words — `visibility.set`, the ticket-scoped privileged act that already exists, is gated at
+> `check-permission.ts:930` by exactly that call, and `:292` says *"a project admin runs their project's
+> people and their tickets' visibility"*; `ADMIN_ONLY_TYPES` carries `project.archived` with
+> *"conservative in the reversible direction: widening this later … is one line … while an archive by
+> someone the workspace did not intend cannot be un-seen by the people whose work vanished"*. **A
+> deleted ticket vanishes from boards, lists, search, My Work and attention, so the same asymmetry
+> holds.** It is `hasProjectAdminRights` and NOT `ADMIN_ONLY_TYPES` because a single ticket is the
+> project's business; `:293` says retiring the PROJECT is the workspace's.
+> **⚠ The payload is EMPTY, so the `projectId` must be resolved from the ticket's own state** through
+> the engine reader — the same reader that must NOT be filtered. **This ruling is the executor's, not
+> the dispatch's: it goes in the PR body for the owner to reverse.**
+
+> ## ⛔ THE READ FILTER HAS **NO** CHOKE POINT — AND I FIRST GOT THIS WRONG, IN WRITING
+> **My first reading was that `read/visible-where.ts:94`'s `visibleTicketsWhere` is a choke point
+> because "every route reaching a card set arrives through it". That claim was in this file and in a
+> dispatch brief, and an exhaustive enumeration killed it.** The ASSEMBLER is shared
+> (`assembleTicketCards` + `PROJ_TICKET_COLUMNS`); **the SELECTs are not.** There are **eleven distinct
+> hand-written SQL statements** returning `proj_tickets` rows, and `visibleTicketsWhere` is one conjunct
+> inside some of their WHEREs. The repo's own `closed_at IS NULL` exclusion proves the point —
+> **hand-written inline at five sites with no helper** (`board.ts:114`, `attention.ts:187`,
+> `my-work.ts:137`, `my-work.ts:246`, and opt-in at `compile-filter.ts:113`).
+> **So the delete filter lands at each reading site, not in one function.** The remedy is a single
+> exported constant (`LIVE_TICKET_WHERE`) AND-ed in at each site, so a grep enumerates the coverage.
+> ⛔ **AND THE FIRST INSTRUCTION WOULD HAVE SHIPPED A RUNTIME ERROR, NOT A MISSING FILTER.** Verified at
+> the line by me: `visibility/visible-tickets.ts:70-74` is `SELECT v.* FROM proj_visibility v WHERE
+> ${workspaceClause} AND ${visibleClause}` — **there is no `t` in its FROM at all.** Folding
+> `AND t.deleted_at IS NULL` into `visibleTicketsWhere` compiles and then dies at runtime with Postgres
+> *"missing FROM-clause entry for table t"* for that one caller. That is why the predicate is a
+> SEPARATE constant rather than a conjunct inside the visibility one, and it is a better reason than the
+> semantic one.
+> ⚠ **`visibleTicketsWhere` is cross-checked ticket-by-ticket against `canSee` in
+> `test/read/visible-where.test.ts`; making the VISIBILITY predicate also the DELETION predicate would
+> fold two different rules into one and degrade that check.**
+> **Two server-side surfaces a predicate cannot reach, and BOTH are smaller than they first look:**
+> 1. `GET /v1/workspaces/:ws/tickets` is served from `proj_visibility` ALONE (`visible-tickets.ts:69-74`),
+>    so a `proj_tickets` column is invisible to it. **It also has NO CLIENT CONSUMER** — a controlled
+>    sweep of `apps/web/src`, `apps/web/app`, `packages/app-core/src` and `packages/mcp-server/src` for
+>    the collection URL returns EMPTY, against a positive control through the same pattern that finds
+>    the single-ticket call (`online-data-source.ts:270`). Name it; do not go hunting for it.
+> 2. The **sync/bootstrap + offline replica** path (`sync/sync-routes.ts:349,394`) serves `events`, never
+>    `proj_tickets` — **but it is coverable, and I first recorded it as not.** The replica's local
+>    `tickets` table stores the whole folded `TicketState` as JSON, and `replica-data-source.ts` already
+>    filters on it: `getBoard` excludes `state.stateId !== BACKLOG_STATE_ID` and
+>    `(state.closed ?? null) === null` (`:901`), and `ListRow.closed` is read as `state.closed ?? null`
+>    (`:782`). **So the offline fix is `(state.deleted ?? null) === null` at the same conjuncts** —
+>    mirroring `closed` exactly, which is this task's whole method.
+> ⛔ **AND THE ONE THAT MUST NOT BE FILTERED:** `projections/tickets.ts`'s `getTicketStateFromDb` feeds
+> `EngineContext`. Filter deleted rows THERE and `ticket.restored` — the UNDO — is refused with "no such
+> ticket", so the feature cannot be undone at all. **The engine reads everything; the views read live.**
+>
+> ## THE TWO-DOCUMENT DISAGREEMENT THIS ROUND SETTLES
+> `test-cases/16-remaining-doors.md:463` (executor 2, 2026-09-20) records this footer as **HALF HELD on
+> exactly this measurement** — *"a history-retaining removal has no door"* — and names the same three
+> pieces independently. **Its measurement is CONFIRMED here, not overturned.** Two things in it now
+> move: (a) case **`16.43`** and its five tests in `packages/app-core/test/views/ticket-sheet.test.tsx`
+> test the navigation the owner has just ruled OUT, so they retire with it; (b) that row's recorded
+> departure — *"the fill and the full-bleed inset belong with the complete footer, alongside `Delete`"* —
+> **comes due**, and the inset half is still blocked by `.gn-sheet__body { padding: 1rem 1.1rem }`
+> being a literal, not a token, which is the objection the departure was written on.
+>
+> ## NAMED, NOT COVERED — each read at the line, so a later reader does not re-derive it
+> The dispatch: *"Enumerate them and say which you covered and which you did not."* These are the ones
+> this change does NOT reach. The first three are **deliberate rulings this delete inherits**, not gaps:
+> 1. **Already-delivered notifications.** `routes/notifications.ts:36-42`, verbatim: *"a delivered
+>    notification stays exactly as delivered even after the underlying ticket's visibility narrows (Plan 9
+>    coordination ruling: 'a message you were sent is yours; revocation removes future sight, not letters
+>    delivered')"*. A deleted ticket's notification therefore stays in the inbox. **The same rule, asked a
+>    different way** — not an oversight.
+> 2. **`GET /v1/contests`.** `sync/contests-route.ts:271-283` LEFT JOINs `proj_tickets` for a title and
+>    gates each row by `canSee`, with no row-flag predicate. A deleted ticket's contest still renders.
+> 3. **`GET /v1/attachments/:id`** is gated by `canSee` and never reads `proj_tickets` at all.
+> 4. **`GET /v1/workspaces/:ws/tickets`** is served from `proj_visibility` alone and **has no client
+>    consumer** (controlled sweep, above).
+> 5. **The ledger-backed reads are retained ON PURPOSE** — `/v1/tickets/:id/history` and
+>    `/v1/workspaces/:ws/tickets/:id/events` read `events`, and `ticket-history.ts`'s own docblock refuses
+>    the `proj_tickets` existence check. That is the FAQ's *"its history is retained"*, made real.
+> 6. ⚠ **THE UNDO IS THE ONLY RESTORE PATH.** `Toast`'s ruled window is 15 s
+>    (`TOAST_DEFAULT_DURATION_MS`). After it lapses there is **no UI that emits `ticket.restored`**, so a
+>    soft delete becomes permanent in practice. `ticket.restored` exists and is gated, so a restore
+>    surface is a later UI-only change — **but say it out loud rather than letting "soft" imply
+>    recoverable.**
+> 7. ⚠ **A deleted ticket's CHILDREN and its place in a parent's rollup are an open question.** The
+>    `epicAncestors` walk (`routes/list.ts:418-444`) supplies an ancestor's title to a child's card;
+>    filtering it there means a deleted epic's children silently lose their epic chip. **Nothing here
+>    decides whether deleting a parent should cascade, refuse, or orphan.** Named, not decided.
+
+> ## ⚠ THE THREE PLACES THAT RECORD THE HOLD — ALL THREE MUST MOVE, NOT JUST THE ONE YOU ARE EDITING
+> The repo's oldest failure mode is a sweep whose universe is only the files you already edited. The
+> "delete is held" measurement is written down in **three** places, and each is a different artifact:
+> 1. **`packages/app-core/src/views/ticket-sheet.tsx:1596-1607`** — the component's own comment above the
+>    footer (*"Only the navigation half is built… `Delete` is NOT, and deliberately so"*).
+> 2. **`packages/app-core/test/views/ticket-sheet.test.tsx:2075-2084`** — the `16.43` describe's docblock
+>    (*"**`Delete` is NOT built** — measured, a history-retaining removal has no door"*).
+> 3. **`test-cases/16-remaining-doors.md:463-509`** — the doors row, *"⛔ HALF OF THIS ROW IS HELD"*.
+> **All three assert a fact the owner has now overruled, so all three are falsified by this change.** Grep
+> for the SENTENCE across the tree, not for the file you are already in.
+
+> # ⛔ NEW TOOL HAZARD, MEASURED 2026-09-20 ~12:0x IST — `grep` IS A SHELL FUNCTION AND IT OVER-COUNTS UNDER A PIPE
+> `type grep` answers **"grep is a shell function from …/snapshot-zsh-…sh"** — it is wrapped, the same way
+> `git` is (see the `rtk git log` hazard at the top of this file). Measured in ONE invocation, same file,
+> same pattern, file mtime unmoved throughout:
+> ```
+> grep -n "entityKind: 'ticket'" f | wc -l   →  21   ← WRONG
+> grep -c           "entityKind: 'ticket'" f →  19
+> /usr/bin/grep -c  "entityKind: 'ticket'" f →  19
+> node (independent line scan)               →  19 total, 1 of them a comment, 18 real
+> ```
+> **The piped form is the wrong one, by 2.** Both readings are well-formed, so nothing inside either run
+> reveals the error — the rtk-pitfalls family again. **Use `/usr/bin/grep` for any count you will assert.**
+> Found while checking a subagent's count claim, which turned out to be RIGHT (18); the near-miss was mine.
+
+> ## ANCHORS, RECOUNTED AT THIS TREE
+> - **base** `bbbd5cda` — verified an ancestor of `origin/main` with `git merge-base --is-ancestor`,
+>   never `git cat-file`. `main` was `bbbd5cda` at cut time.
+> - **case-id block** — executor 1's §16 block is **`16.81`–`16.99`** (`controller-state.md:395`).
+>   `16.81`, `16.82`, `16.83` are spent. **`16.84` is free and is the id this round takes**; `16.85` and
+>   `16.86` are also free. (`16.87` appears in `test-cases/13-owner-requests-and-backlog.md:1742` as a
+>   **load average in prose**, not an id — do not read `sort -u` as an allocation.)
+> - **migrations** — newest prefix is `1789700000000`; the new one is `1789800000000` and must be
+>   strictly above it, because `scripts/check-migration-order.mjs` refuses a prefix below an existing one.
+> - **the running stack** — `:3001` is a BAKED IMAGE with zero mounts; nothing here is visible in it
+>   until a rebuild, and a rebuild from a branch is outside the standing docker permission.
+
+> ## ⚠ SUPERSEDED: the block below was written before this round. Its anchors are history.
+
+> # ▣ CURRENT POSITION — SUPERSEDED BY THE BLOCK ABOVE — SUNDAY 2026-09-20, ~11:4x IST. **THE PROTOTYPE ROUND: the reorder buttons
 > # are styled from the prototype, and the three-style re-check is DONE AND MEASURED.**
 > Branch **`exec/prototype-round`**, cut from **`origin/main` = `546c92f8`** (the `#586` merge). One PR,
 > `--base main`. **You do not merge.** The controller's dispatch of 2026-09-20 ~11:3x IST is the brief;
