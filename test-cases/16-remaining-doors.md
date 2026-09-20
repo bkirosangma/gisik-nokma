@@ -551,9 +551,14 @@ is built. Nothing here re-adds, re-wires or re-tests the navigation.
   checked against the INSTALLED packages (`extension-bold`/`-italic`/`-code`/`-blockquote`/`-link` at
   3.30.5, `toggleBulletList` in `@tiptap/core` 3.30.5). **Ten cases, and NOT ONE asserts that a control is
   on screen** — the dispatch names the trap in one line (*"a test asserting a button exists proves nothing
-  about whether pressing it changes the document"*), so every case clicks a control and reads the
+  about whether pressing it changes the document"*), so **EIGHT of the ten** click a control and read the
   serialized ProseMirror JSON. A button that rendered and did nothing passes every "exists" assertion and
-  fails all of these. **Mutation-witnessed twice, each killing its own site and nothing else:** the bold
+  fails all of these. (The other two read the strip itself — the control SET AND ORDER, and its absence on
+  a read-only composer. This sentence said "not one" until an independent reviewer counted them.)
+  ⚠ **THE ORDER CASE WAS NAMED FOR AN ORDER IT DID NOT ASSERT** until that same review: the strip rendered
+  `B i code list quote link` while the case name, the component's comment and this file all said
+  `B i code link list quote`. Fixed in the component, and the assertion now pins the prototype's order
+  (`desktop.dc.html:3670-3678`). **Mutation-witnessed twice, each killing its own site and nothing else:** the bold
   command replaced with a no-op killed exactly the two bold cases; pointing `list` at
   `toggleBlockquote` killed exactly the bullet-list case. Both files restored from a checksum-verified
   copy. **`link` needs a destination, so it gets an inline URL field** (`toggleLink` with no `{href}`
@@ -574,9 +579,11 @@ is built. Nothing here re-adds, re-wires or re-tests the navigation.
   draft is on screen**, which is the case that catches the tempting simplification of naming the sheet
   after a control's uncommitted value.
 - **16.87** ✅ — **The location breadcrumb: `Workspace › Project › State`, and no fourth crumb.**
-  `packages/app-core/test/views/ticket-sheet.test.tsx`. **Three crumbs and STOP** — the prototype's fourth
-  is the ticket KEY (`desktop.dc.html:3404-3420`), which is a separate round and another lane's in-flight
-  branch, so nothing is stubbed for it. ⚠ **THE DISPATCH'S MEASUREMENT OF THE SOURCE WAS FALSE:** it said
+  `packages/app-core/test/views/ticket-sheet.test.tsx`. **Three crumbs and STOP** — the ticket KEY is OUR
+  FOURTH and is a separate round and another lane's in-flight branch, so nothing is stubbed for it. (The
+  prototype's own chain at `desktop.dc.html:3404-3420` is FIVE elements — workspace, project, epic,
+  parent, key — so "the fourth" counts against our three and not against that line range; an earlier
+  wording said "the prototype's fourth" and read as a claim about it.) ⚠ **THE DISPATCH'S MEASUREMENT OF THE SOURCE WAS FALSE:** it said
   all three crumbs are *"already on the ticket read"*, and `TicketRead` (`view-types.ts:332-357`) is six
   fields carrying no workspace name, no project name and no state name; `BoardView` is
   `{projectId, groups}` and `DataSourceQuery` has no `getProjects`. **Only the STATE is derived here**;

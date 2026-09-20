@@ -2259,17 +2259,112 @@ describe('TicketSheet — the editable title (16.86)', () => {
    * rather than about a field: the ledger is append-only, so a commit that
    * re-sends the title it already has would put a line in the ticket's history
    * saying somebody changed the title to what it already said.
+   *
+   * ## ⚠ THIS CASE USED TO PASS WITHOUT EVER REACHING THE GUARD IT NAMES
+   *
+   * Its first version was `click(field); tab()` — which leaves `titleDraft` at
+   * `null`, so the blur handler's `titleDraft !== null` check short-circuits and
+   * `submitTitle` is **never called at all**. An independent reviewer measured
+   * the consequence: **deleting the `next === ticketRead.title` guard entirely
+   * left this suite at PASS(90)/FAIL(0).** The case was green about an input
+   * nobody had typed into, while its own name claimed a property of the commit
+   * path.
+   *
+   * So it now TYPES THE SAME TITLE BACK, which is the only way to put a
+   * non-null draft equal to the server's title in front of the guard. Under that
+   * version the mutation above reddens it.
    */
-  it('16.86 an UNCHANGED title sends nothing at all', async () => {
+  it('16.86 retyping the SAME title and committing sends nothing at all', async () => {
+    const user = userEvent.setup();
+    const source = renderSheet(ticketRead());
+    await settled();
+
+    const field = screen.getByRole('textbox', { name: 'Ticket title' }) as HTMLInputElement;
+    await user.clear(field);
+    await user.type(field, 'File the GST return');
+    await user.tab();
+
+    expect(source.ingested).toHaveLength(0);
+    // The draft is abandoned anyway: a value identical to the server's is not a
+    // claim, so there is nothing to keep on screen.
+    expect(field.value).toBe('File the GST return');
+  });
+
+  /**
+   * 16.86 — ENTER commits, and that path had no case at all.
+   *
+   * An independent reviewer measured it: deleting the `Enter` branch of the
+   * field's `onKeyDown` left this suite at PASS(90)/FAIL(0), because every other
+   * title case commits by blurring with `user.tab()`. Enter is the gesture the
+   * field's own docblock names first, so it gets its own witness — and the
+   * assertion is on the LEDGER, not on the key handler having run.
+   */
+  it('16.86 Enter commits the title as well as blur does', async () => {
     const user = userEvent.setup();
     const source = renderSheet(ticketRead());
     await settled();
 
     const field = screen.getByRole('textbox', { name: 'Ticket title' });
-    await user.click(field);
+    await user.clear(field);
+    await user.type(field, 'Filed for August{Enter}');
+
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    expect(source.ingested[0]?.[0]?.payload).toEqual({
+      fieldId: 'title',
+      value: 'Filed for August',
+    });
+  });
+
+  /**
+   * 16.86 — THE IN-FLIGHT LATCH, and this case exists because the first cut had
+   * no latch to test.
+   *
+   * A browser blurs the focused control when `disabled` lands on it, so **one
+   * Enter can fire a second commit out of the first one's own `onBlur`** while
+   * the first is still awaiting — and a second `ticket.field_set` carrying the
+   * title the ledger already holds is exactly what the unchanged-value guard
+   * exists to prevent. jsdom does not blur on disable, so the two gestures are
+   * driven explicitly here: Enter, then a blur, inside one in-flight window.
+   *
+   * The gate is what makes the window real. `ingest` is held pending, so both
+   * gestures land before either answer arrives; **without the latch this reads
+   * two ingests, with it one.**
+   */
+  it('16.86 a blur during an in-flight Enter commit does not send a second time', async () => {
+    const user = userEvent.setup();
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const read = ticketRead();
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      async (events) => {
+        await gate;
+        return events.map((event) => ({
+          status: 'committed' as const,
+          eventId: event.id,
+          seq: 1,
+          serverTime: '2026-08-20T09:00:00.000Z',
+        }));
+      },
+    );
+    renderSheet(read, source);
+    await settled();
+
+    const field = screen.getByRole('textbox', { name: 'Ticket title' });
+    await user.clear(field);
+    await user.type(field, 'Filed for August');
+    await user.keyboard('{Enter}');
     await user.tab();
 
-    expect(source.ingested).toHaveLength(0);
+    expect(source.ingested).toHaveLength(1);
+    release();
   });
 
   /**
@@ -2318,9 +2413,30 @@ describe('TicketSheet — the editable title (16.86)', () => {
     expect(field.value).toBe('   ');
   });
 
-  it('16.86 Escape abandons the draft and sends nothing', async () => {
+  /**
+   * 16.86 — Escape abandons the draft, sends nothing, AND DOES NOT CLOSE THE
+   * SHEET.
+   *
+   * ## ⚠ THE THIRD ASSERTION IS THE ONE THAT WAS MISSING, AND IT WAS A REAL DEFECT
+   *
+   * `Sheet` registers a DOCUMENT-level keydown that calls `onClose()` on any
+   * Escape. Nothing in it checked `defaultPrevented`, so the field's own Escape
+   * branch — which calls `preventDefault()` and resets the draft — did not stop
+   * the sheet from closing: **the documented behaviour was true of an input that
+   * was being unmounted.** An independent reviewer measured `onClose` called
+   * once and reproduced it with a scratch case.
+   *
+   * The branch's own suite could not see it, and the reason is worth stating:
+   * `renderSheet` passes `onClose: vi.fn()`, which never unmounts anything, so
+   * the sheet stayed on screen for the two assertions above to hold against. The
+   * fix is in `Sheet` (`if (event.defaultPrevented) return;`), and this
+   * assertion is its witness — **revert that line and this case reddens while
+   * the other two stay green.**
+   */
+  it('16.86 Escape abandons the draft, sends nothing, and does not close the sheet', async () => {
     const user = userEvent.setup();
-    const source = renderSheet(ticketRead());
+    const onClose = vi.fn();
+    const source = renderSheet(ticketRead(), sheetSource(ticketRead()), { onClose });
     await settled();
 
     const field = screen.getByRole('textbox', { name: 'Ticket title' }) as HTMLInputElement;
@@ -2330,6 +2446,7 @@ describe('TicketSheet — the editable title (16.86)', () => {
 
     expect(field.value).toBe('File the GST return');
     expect(source.ingested).toHaveLength(0);
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   /**

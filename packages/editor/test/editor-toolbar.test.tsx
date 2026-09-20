@@ -202,20 +202,34 @@ describe('the editor toolbar (16.85)', () => {
   });
 
   /**
-   * 16.85 — the strip is the six controls the prototype draws, and the hint line
-   * is the prototype's own sentence.
+   * 16.85 — the strip is the six controls the prototype draws, IN ITS ORDER, and
+   * the hint line is the prototype's own sentence.
    *
-   * The one case here that reads the STRIP rather than the document, and it
-   * earns its place by asserting the SET — a missing `link` or an invented
-   * seventh control is exactly the drift a per-control document assertion
-   * cannot see.
+   * ## ⚠ THIS CASE WAS NAMED FOR AN ORDER IT DID NOT ASSERT
+   *
+   * Its first version was named `B/i/code/link/list/quote` and its body asserted
+   * `['Bold','Italic','Code','Bullet list','Quote','Link']`. **`list` and `quote`
+   * rendered BEFORE `link`**, so the strip was actually `B i code list quote
+   * link` while the case name, the component's own comment and the catalogue all
+   * said otherwise. An independent reviewer caught it by reading the prototype
+   * and then the test — the suite was green throughout, which is exactly the
+   * failure mode this repo records most often: **a case passing for a reason
+   * unrelated to the property its name states.**
+   *
+   * The order is not cosmetic: the prototype draws `B, i, code, link, list,
+   * quote` (`desktop.dc.html:3670-3678`), and a strip whose control order drifts
+   * from the authority's is a difference the owner will see.
+   *
+   * The one case here that reads the STRIP rather than the document, alongside
+   * the read-only case below — eight of these ten drive a control and read the
+   * serialized document.
    */
-  it('16.85 the strip is B/i/code/link/list/quote, and the hint is the prototype’s', async () => {
+  it('16.85 the strip is B/i/code/link/list/quote in the prototype’s order, and the hint is its sentence', async () => {
     const { view } = await mount(makeProps());
     const names = Array.from(view.container.querySelectorAll('.ticket-editor__tool')).map((el) =>
       el.getAttribute('aria-label'),
     );
-    expect(names).toEqual(['Bold', 'Italic', 'Code', 'Bullet list', 'Quote', 'Link']);
+    expect(names).toEqual(['Bold', 'Italic', 'Code', 'Link', 'Bullet list', 'Quote']);
     expect(view.container.querySelector('.ticket-editor__hint')?.textContent).toBe(MARKDOWN_HINT);
     view.unmount();
   });

@@ -56,6 +56,35 @@ export function Sheet({
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
+      /**
+       * ⚠ A child that has ALREADY handled this Escape keeps it.
+       *
+       * Without this line the sheet closes on ANY Escape, including one a
+       * control inside it consumed. The ticket sheet's title field is where that
+       * bites: its Escape branch abandons the draft, and while this line was
+       * absent the sheet ALSO closed, so the field's documented behaviour —
+       * *"Escape abandons the draft"* — was true of an input that was being
+       * unmounted. An independent reviewer measured `onClose` called once.
+       * **The branch's own case could not see it**: its `renderSheet` passes an
+       * `onClose` spy that never unmounts, so the sheet stayed on screen and the
+       * assertion held for a reason unrelated to what ships.
+       *
+       * ⚠ **THIS FIX IS ONLY HALF, AND THE OTHER HALF IS AT THE CALLER.** The
+       * reviewer's finding also said the title field's branch *"calls
+       * `preventDefault()`"* — **it did not**, and an earlier version of this
+       * docblock repeated that as fact without reading the line. A child that
+       * handles Escape must call `preventDefault()` for this guard to see it; the
+       * caller was changed in the same round, and the case that proves both
+       * halves is the ticket sheet's `Escape … does not close the sheet`, which
+       * stayed RED until the caller's half landed. **A peer's finding is a
+       * claim.**
+       *
+       * The React handler at the root container runs before this document-level
+       * native listener, so `defaultPrevented` is already set by the time this
+       * reads it. This is the standard escape-hatch contract, and the editor
+       * toolbar's own link field relies on the same one.
+       */
+      if (event.defaultPrevented) return;
       if (event.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKeyDown);

@@ -103,7 +103,24 @@ export function EditorToolbar({ editor, editable }: EditorToolbarProps): React.J
     setHref('');
   }
 
-  const marks: { key: string; label: string; name: string; active: boolean; run: () => void }[] = [
+  /**
+   * THE CONTROLS IN THE PROTOTYPE'S ORDER — `B i code link list quote` — and the
+   * first cut of this file had it WRONG.
+   *
+   * That version was `B i code list quote` followed by a hand-written `link`
+   * button appended after the map, so the strip rendered `B i code list quote
+   * link`. **The component's own comment claimed the right order, the case was
+   * NAMED for the right order, and its body asserted the wrong one** — a case
+   * passing for a reason unrelated to the property its name states, which is this
+   * repo's most-repeated defect. An independent reviewer found it by reading the
+   * prototype (`desktop.dc.html:3670-3678`: `B, i, code, link, list, quote`) and
+   * then the test file, not by running anything: the suite was green.
+   *
+   * `link` is not special-cased INTO the list to hide its difference — it is
+   * called out at the button, which is the one control that asks for input. Its
+   * `run` is the whole difference, and it is visible here rather than buried.
+   */
+  const controls: { key: string; label: string; name: string; active: boolean; run: () => void }[] = [
     {
       key: 'bold',
       label: 'B',
@@ -126,6 +143,23 @@ export function EditorToolbar({ editor, editable }: EditorToolbarProps): React.J
       run: () => editor.chain().focus().toggleCode().run(),
     },
     {
+      key: 'link',
+      label: 'link',
+      name: 'Link',
+      active: linkIsActive,
+      run: () => {
+        // Already a link: remove it, which is the one case with no destination
+        // to ask for. Otherwise reveal the URL field.
+        if (linkIsActive) {
+          editor.chain().focus().extendMarkRange('link').unsetLink().run();
+          setLinkOpen(false);
+          setHref('');
+          return;
+        }
+        setLinkOpen((was) => !was);
+      },
+    },
+    {
       key: 'list',
       label: 'list',
       name: 'Bullet list',
@@ -143,48 +177,26 @@ export function EditorToolbar({ editor, editable }: EditorToolbarProps): React.J
 
   return (
     <div className="ticket-editor__toolbar" role="toolbar" aria-label="Formatting">
-      {marks.map((mark) => (
+      {controls.map((control) => (
         <button
-          key={mark.key}
+          key={control.key}
           type="button"
           className={
-            mark.active
+            control.active
               ? 'ticket-editor__tool ticket-editor__tool--active'
               : 'ticket-editor__tool'
           }
-          aria-label={mark.name}
-          aria-pressed={mark.active}
-          onClick={mark.run}
+          aria-label={control.name}
+          aria-pressed={control.active}
+          // Only `link` opens anything, so only it reports an expanded state —
+          // an `aria-expanded` on the five toggles would promise a disclosure
+          // that never arrives.
+          {...(control.key === 'link' ? { 'aria-expanded': linkOpen } : {})}
+          onClick={control.run}
         >
-          {mark.label}
+          {control.label}
         </button>
       ))}
-      {/*
-        The prototype draws `link` in the same six-button run as the rest
-        (`:3670-3681`), so it sits here rather than beside the URL field: the
-        strip must read `B i code link list quote` whichever way the field is
-        hidden.
-      */}
-      <button
-        type="button"
-        className={
-          linkIsActive ? 'ticket-editor__tool ticket-editor__tool--active' : 'ticket-editor__tool'
-        }
-        aria-label="Link"
-        aria-pressed={linkIsActive}
-        aria-expanded={linkOpen}
-        onClick={() => {
-          if (linkIsActive) {
-            editor.chain().focus().extendMarkRange('link').unsetLink().run();
-            setLinkOpen(false);
-            setHref('');
-            return;
-          }
-          setLinkOpen((was) => !was);
-        }}
-      >
-        link
-      </button>
       {linkOpen ? (
         <input
           className="ticket-editor__link-url"

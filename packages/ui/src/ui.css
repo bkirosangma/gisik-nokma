@@ -567,16 +567,24 @@
 
    **⛔ THE PARAGRAPH ABOVE WAS TRUE WHEN WRITTEN AND IS NOT ANY MORE —
    corrected 2026-09-20.** The owner ruled the title editable and it is now
-   built: the sheet passes `titleSlot` and the header carries an `<input>`
-   instead of this `<h2>`. So `.gn-sheet__title` no longer reaches the ticket
-   sheet at all — it is the heading a `Sheet` without a slot draws, which today
-   is no product caller. The type step it declares is KEPT, and the input below
-   restates it, because the two are one decision about how prominent the title
-   is: deleting this rule would silently change any future slot-less caller's
-   heading, which is the shape of edit the note above is already a monument to.
-   The alternative — one rule serving both — was rejected because `.gn-sheet__title`
-   is an `<h2>` and the input needs `border/padding/background` resets that would
-   then apply to every dialog heading sharing the selector.
+   built: the ticket sheet's MAIN render passes `titleSlot` and its header
+   carries an `<input>` instead of this `<h2>`.
+
+   ⚠ **AN EARLIER VERSION OF THIS CORRECTION SAID `.gn-sheet__title` "no longer
+   reaches the ticket sheet at all … which today is no product caller", AND THAT
+   SENTENCE WAS FALSE.** `ticket-sheet.tsx` renders `Sheet` THREE times
+   (`:470`, `:478`, `:1279`); only the third passes a slot. The first two are the
+   read-error and the not-yet-loaded sheets — `<Sheet open title="Ticket"
+   onClose={onClose}>` — and they draw this heading every time a read fails or is
+   still in flight. **A reader acting on that sentence would have deleted a rule
+   that is live in the product.** Found by an independent reviewer, corrected
+   here; the lines above were re-measured at the tree this text ships in.
+
+   The type step is KEPT, and the input below restates it, because the two are
+   one decision about how prominent the title is. The alternative — one rule
+   serving both — was rejected because `.gn-sheet__title` is an `<h2>` and the
+   input needs `border/padding/background` resets that would then apply to every
+   dialog heading sharing the selector.
 
    No material tokens are involved — a type step is style-agnostic — so this is
    correct in `hig`, `minimal` and `neo` without a per-style fork. */

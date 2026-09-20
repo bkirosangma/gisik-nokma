@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { newUlid, statesWithBacklog, type SubmittedEvent } from '@gisik-nokma/domain';
 import { Button, Chip, SegmentedControl, Select, Sheet } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
@@ -345,6 +345,13 @@ export function TicketSheet({
    */
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
   const [titleSaving, setTitleSaving] = useState(false);
+  /**
+   * The title edit's re-entrancy guard, and it must be a REF rather than the
+   * `titleSaving` state above — see `submitTitle`'s docblock for the measurement
+   * (a browser blurs the field when `disabled` lands, so one Enter can fire a
+   * second commit out of the first one's own `onBlur`).
+   */
+  const titleSubmittingRef = useRef(false);
   /**
    * Ruling 32 (fix round 1, 2026-09-17) — the double-submit latch for
    * Close/Reopen, mirroring `board.tsx`'s `MoveArrows.submitting`
@@ -822,17 +829,41 @@ export function TicketSheet({
    * what this sheet refuses elsewhere. The value travels AS TYPED and the
    * engine's answer is what the reader sees.
    *
-   * ## Two early returns, both about not sending a claim nobody made
+   * ## The first early return, and it is about not sending a claim nobody made
    *
    * An UNCHANGED value is not a claim, and `ticket.field_set` is append-only:
    * a no-op commit would put a ledger line in the ticket's history saying
-   * somebody changed the title to what it already said.
+   * somebody changed the title to what it already said. (The second early return
+   * below is a DIFFERENT fact — a claim that WAS sent to a server that did not
+   * answer — and an earlier version of this heading called both of them "about
+   * not sending a claim nobody made", which is true of one.)
+   *
+   * ## ⚠ THE IN-FLIGHT LATCH, WHICH THE FIRST CUT DID NOT HAVE
+   *
+   * `titleSaving` is render state and drives `disabled`; **it is useless as a
+   * re-entrancy guard, and here it is worse than useless.** Two commits in one
+   * React batch both read the same pre-commit `false` and both get through — the
+   * exact measurement Ruling 32 records for Close/Reopen (`submittingRef`'s own
+   * docblock, above). And `disabled` is itself what makes a browser blur the
+   * focused control: one Enter on a browser that blurs on disable fires
+   * `onBlur` into a SECOND `submitTitle` while the first is still awaiting, and
+   * a `ticket.field_set` carrying the title the ledger already has is exactly
+   * what the guard above exists to prevent. **jsdom does not blur on disable**,
+   * so this suite cannot see it: an independent reviewer measured `ingestCalls:
+   * 2` with `ingest` held pending and a `focusout` fired, where the branch's own
+   * Enter probe — unobstructed — reported 1.
+   *
+   * `titleSubmittingRef` is set SYNCHRONOUSLY before the first `await`, which is
+   * the only place a second call in the same tick can be seen, and reset in a
+   * `finally` so a rejected ingest cannot leave the field permanently dead.
    */
   const submitTitle = async (next: string): Promise<void> => {
     if (next === ticketRead.title) {
       setTitleDraft(null);
       return;
     }
+    if (titleSubmittingRef.current) return;
+    titleSubmittingRef.current = true;
     setTitleSaving(true);
     try {
       const event = make({
@@ -863,6 +894,7 @@ export function TicketSheet({
       if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
       else setServerRefusal({ rule: result.code, reason: result.message });
     } finally {
+      titleSubmittingRef.current = false;
       setTitleSaving(false);
     }
   };
@@ -1072,11 +1104,18 @@ export function TicketSheet({
    * ## What was MEASURED, because the dispatch's arithmetic was not right here
    *
    * The prototype builds `sheetCrumbs` from workspace → project → epic →
-   * parent → **the ticket key** (`desktop.dc.html:3404-3420`) and draws them as
-   * a `<nav>` immediately above the title input (`:1100-1116`). The dispatch
-   * says to build `Workspace › Project › State` and STOP, because the fourth
-   * thing there is the KEY and the key is another round's work (it is, in fact,
-   * another lane's in-flight branch). **So three, and the state is the third.**
+   * parent → **the ticket key** — FIVE elements (`desktop.dc.html:3404-3420`) —
+   * and draws them as a `<nav>` immediately above the title input
+   * (`:1100-1116`). The dispatch says to build `Workspace › Project › State` and
+   * STOP: **the key is the FOURTH CRUMB OF OURS** (it would sit after these
+   * three), and it is another round's work — in fact another lane's in-flight
+   * branch. **So three, and the state is the third.**
+   *
+   * ⚠ "the fourth" is counted against OUR three, and an earlier version of this
+   * sentence said "the fourth thing THERE" directly after enumerating the
+   * prototype's five, which reads as a claim about `:3404-3420` and is false
+   * of it. An independent reviewer caught the ambiguity; `Features.md` had the
+   * same wording and is corrected with it.
    *
    * The state is the one crumb whose source is IN this component: it is
    * `currentStateName` above, already derived for the state chip from the
@@ -1101,9 +1140,24 @@ export function TicketSheet({
    * renders its own title exactly this way — `{projectName !== null ? <h1>…</h1>
    * : null}` (`page.tsx:1614`) — and the state crumb always renders, because it
    * is derived here rather than fetched.
+   *
+   * ## An EMPTY string is not a name either, and the first cut let one through
+   *
+   * That version was `workspaceName ?? null`, and the gate below reads
+   * `!== null` — so a served `name: ''` would have rendered a blank crumb and a
+   * dangling separator. **Whether the server can send one is NOT established:**
+   * `asString` (`online/mappers.ts`) checks only `typeof`, so nothing between
+   * the wire and here refuses it, but an independent reviewer flagged that as a
+   * code reading rather than a demonstrated defect and I did not chase it. The
+   * `!== ''` costs nothing and makes this docblock's phrase "a real string" true
+   * of the code rather than of the intent.
    */
-  const workspaceCrumb = workspaceName ?? null;
-  const projectCrumb = projectName ?? null;
+  const workspaceCrumb = workspaceName === undefined || workspaceName === null || workspaceName === ''
+    ? null
+    : workspaceName;
+  const projectCrumb = projectName === undefined || projectName === null || projectName === ''
+    ? null
+    : projectName;
   // OPTIONAL on `TicketState` (441 fixtures predate it, spec §1.2,
   // 2026-09-17); every reader spells the same `?? null`.
   const closed = state.closed ?? null;
@@ -1319,8 +1373,22 @@ export function TicketSheet({
                 return;
               }
               if (event.key === 'Escape') {
-                // Abandon the draft, exactly as Escape abandons the link URL
-                // field in the editor toolbar. Nothing reaches the ledger.
+                // ⚠ `preventDefault` IS LOAD-BEARING, and without it this branch
+                // did not do what its sentence said. `Sheet` registers a
+                // DOCUMENT-level Escape that calls `onClose`; the field's Escape
+                // runs first but did not consume the event, so the sheet closed
+                // and "abandon the draft" was true of an input being unmounted.
+                // An independent reviewer measured `onClose` called once.
+                //
+                // **The reviewer also said this branch ALREADY called
+                // `preventDefault`, and it did not** — I repeated that claim into
+                // `Sheet`'s docblock before checking it, and the case that
+                // caught the difference is the one asserting `onClose` was never
+                // called. A peer's finding is a claim; this is the half of it
+                // that was wrong.
+                //
+                // Nothing reaches the ledger either way.
+                event.preventDefault();
                 setTitleDraft(null);
               }
             }}
