@@ -13,7 +13,7 @@ leaving it outside, so the section was opened.
 
 | lane | block |
 |---|---|
-| **exec 1** | `16.1`–`16.30`, **then `16.32`–`16.40`** (taken 2026-09-19 late for `/v1/search`), **then `16.61`–`16.80`** (taken 2026-09-20 for `hig-per-screen/3b`), **then `16.81`–`16.99`** (taken 2026-09-20 for the sheet prototype parity) — of which **`16.96`–`16.99` are MINTED 2026-09-20 for the attachments leak**; `16.91`–`16.95` are left FREE and unspent, for the reason in the row below |
+| **exec 1** | `16.1`–`16.30`, **then `16.32`–`16.40`** (taken 2026-09-19 late for `/v1/search`), **then `16.61`–`16.80`** (taken 2026-09-20 for `hig-per-screen/3b`), **then `16.81`–`16.99`** (taken 2026-09-20 for the sheet prototype parity) — of which **`16.96`–`16.99` are MINTED 2026-09-20 for the attachments leak** and **`16.91`–`16.95` are MINTED 2026-09-20 for the Add-subtask affordance**. ⚠ **THE BLOCK `16.81`–`16.99` IS NOW FULLY SPENT**; exec 1's next free ids are `16.63`–`16.80` (the `3b` allocation, of which only `16.61`–`16.62` are minted) |
 | **exec 2** | **`16.41`–`16.60`** (`16.31` spent on the evidence upload; `16.32`–`16.40` reallocated to exec 1) — ⚠ **`16.88`–`16.90` were minted from exec 1's block by the soft-delete lane on 2026-09-20, and its merged handoff records `16.88`–`16.99` as THAT lane's block**, which overlaps exec 1's. **The controller corrected the spent set (exec 1's next free is `16.91`); the OVERLAP is flagged to the owner, not resolved here.** It is why the attachments lane minted from the TOP of the shared block instead of `16.91`: `16.91` is inside both claims and is the one id that can collide, and `exec2/comment-thread` was live in the tree at the time |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** It read `exec 2: 16.31–16.60` for about forty
@@ -30,7 +30,18 @@ that is the rule whose breach made §13 go red twice.
 
 `16.1`, `16.2`, … `16.30`. **Do not reintroduce the `{3}` width** that §13 used: that width existed to
 stop `13.99` sorting above `13.649`, and ids here are not padded, so importing it would be the truncation
-trap in a new costume.
+trap in a new costume. ⚠ **READ THE SCOPE WORD THAT WAS MISSING FROM THIS SENTENCE (added 2026-09-20,
+executor 1, on cycle 29 §3):** the trap it names is **MIXING two widths inside ONE section** — `16.100`
+sorting below `16.99` — and it is **NOT a prohibition on padding as such**. Beside a padded `17.NNN` this
+read as forbidding §17's shape, and it does not. **§13 is the proof a uniform width works:** it ran
+`13.001`–`13.999` and minted 882 ids with no sort trap.
+
+## §17's SHAPE — ruled by the owner 2026-09-20 (cycle 29), recorded here because THIS file, not the controller's, is what a minting session trusts
+
+**§17 is uniformly 3-digit padded: `17.001`–`17.999`, ceiling 999.** §16's own minted ids stay unpadded
+and are NOT renumbered — 76 of them are merged, so padding is not retro-fittable. **The rule is therefore
+one width per section, and the widening that matters is the one WITHIN a section.** §17's block table row
+is the controller's to write, under the standing grant, when §16's window is spent.
 
 ## ⚠ THREE SPELLINGS `check-case-ids` CANNOT SEE — write cases as id LINES
 
@@ -968,3 +979,75 @@ and stopped there.
 - **`routes/my-work.ts`'s contested-claim title gate and the replica's two TypeScript applications of the rule** remain measured survivors under their own owners — 16.90 (b) and (c), unchanged by this lane.
 - **The refusal costs one extra query per request on three doors**, and nothing asserts the query count. `read/live-ticket.ts` records why it is a separate read rather than a field taken off the state the detail route already holds.
 - ⚠ **`read/visible-where.ts`'s published COVERAGE COUNT is now stale, and this lane did not correct it.** Its docblock says *"**17 SQL statements carry the rule** (13 + 4)"*; this change adds one more (`read/live-ticket.ts` splices the constant against `proj_tickets t`), so the total is at least one short, and three of this change's applications are at ROUTES rather than in SQL, so the constant-vs-longhand axis is no longer the only split. **The dispatch forbids editing that file** — the fix is a guard at the route, never a change to the predicate — so the correction belongs to **whoever next touches `visible-where.ts`**, and the same docblock already says why a bare total is the wrong artifact to trust: three earlier versions of it (11, 14, 17) were each wrong, and *"the method is the thing that matters and the method is the grep."*
+
+## The Add-subtask affordance (executor 1, 2026-09-20) — cases `16.91`–`16.95`
+
+**The offering, not the refusal.** The owner pressed **Add subtask** on an Errand and was told
+`"Errand" cannot go under "Errand": a ticket's parent must be a bigger kind of work.` **The refusal was
+correct and the server was right.** What was wrong was the payload: `addSubtask` sent
+`typeId: state.typeId` — the PARENT'S OWN type, which is what `typeId: state.typeId` sent — and
+`checks/hierarchy.ts:133` refuses `type.rank <= parentType.rank`, which EQUAL RANKS satisfy. So the
+control was dead on **every** ticket, in **every** workspace, for **every** type, and the owner's report
+was one instance of a universal failure rather than a property of `errand`. MEASURED at the payload
+before any fix: pressing the button on an `errand` produced `typeId: 'errand'`.
+
+**Nobody chose that type; it was inherited.** `git blame` puts the line in door F's lane (`b6c88359`,
+2026-09-19), whose docblock argues `start: 'focus'` and the title rule at length and **never mentions the
+type**. The one case that covered it asserted `typeId: expect.any(String)` — it could see that a string
+was there and not WHICH, so the field that was wrong was the field the case declined to name, and its
+fake source always commits, so the refusal path was never reached from a test. The prototype names this
+operand and gets it right: `type: "Task"` (`desktop.dc.html:3654`), a FIXED type, never the sheet's.
+
+**The affordance and the payload now read ONE answer.** `subtaskTypeFor` asks the rank rule in the one
+direction the client can answer — a legal child is a type whose rank is **strictly greater** than the
+parent's — over the **workspace's own ladder**, never `BUILTIN_TICKET_TYPE_SEEDS`.
+
+⚠ **`DEEPEST_RANK` is NOT a bound here, and reading it as one is the natural mistake.** The constant
+(= 4, `packages/domain/src/ticket-types.ts:136`) governs ROOT creation alone — a type at that rank or
+below may not sit at project root (`hierarchy.ts:108`) — while a child's rank is unbounded above, which
+is that file's own reason for writing `>=`: *"a type DEEPER than sub-task is smaller still and cannot
+coherently be exempt… `===` would leave an escape hatch where defining rank 5 floats your tickets free."*
+The interval is `(parentRank, ∞)`, and the dispatch that opened this work wrote `(parentRank, DEEPEST_RANK]`.
+
+**The ladder this was measured against is the owner's**, read READ-ONLY from the dev database
+(`proj_ticket_types`, port 54330): workspace `0TZSS5W6ATCTF2YBPMWGGP9JF5` holds `epic 1 · story 2 ·
+task 3 · errand 3 · sub-task 4`. **`errand` is workspace-defined at rank 3, sharing a built-in's rank**,
+so a fix hard-coded to the built-ins would agree with a default workspace and disagree with the one the
+owner is looking at. For an Errand a legal child **does** exist (`sub-task`, rank 4), so the dispatch's
+proposed sentence — *"This is an Errand — nothing smaller can sit under it"* — is **false of the ticket it
+was written for**; the sentence now names THIS ticket's type, read off the ladder.
+
+**Three LADDER states, but FIVE render outcomes, and the extra ones are the point.** *"No type is deeper"*
+and *"the ladder has not been read"* are different facts, and rendering the first for the second asserts an
+absence this client has not measured — `Features.md:88`'s rule for the New-ticket control, *"TOLD … rather
+than handed an empty one"*. The outcomes: an unread ladder renders **nothing** and claims nothing; a ladder
+read but unusable — **the read FAILED**, **this ticket's type is ABSENT from it**, or **no type is deeper** —
+renders **its own sentence for each**, which is three distinct sentences and not one; and a READ ladder with
+a legal child draws the form. **A disabled control is never one of the answers** — it
+still asserts the action exists.
+
+- **16.91** ✅ **The form is WITHHELD where no type in the workspace's ladder is deeper, and the sentence names THIS ticket's type.** The withheld arm is `sheet-subtask-withheld`, `role="status"` and not `alert` — nothing went wrong and nothing was attempted; it is the role the New-ticket dialog's unavailable-parent sentence already wears. **The control is in the same run**: one rank deeper and the form is back, so a withheld arm cannot pass for a component that never draws anything. — `packages/app-core/src/views/ticket-sheet.tsx`
+- **16.92** ✅ **THE OWNER'S CASE: an Errand takes a subtask, and the child's type is LEGAL — asserted in both directions so a fix sending some OTHER illegal type cannot pass by differing.** `expect(payload.typeId).not.toBe('errand')` AND `.toBe('sub-task')`, plus the parent, on a ticket whose type shares a built-in's rank. `sub-task` (rank 4) is the shallowest type strictly deeper than rank 3. — `packages/app-core/src/views/ticket-sheet.tsx`
+- **16.93** ✅ **An unreadable ladder and an UNKNOWN ticket type each withhold the form and SAY which question could not be answered — never a silent absence, and never each other's sentence.** Two arms, because a case that only threw would be satisfied by a fix that collapsed "could not read" and "this type is not in the ladder" into one state. Arm one carries the read's own words; arm two is the shape `16.26` already records — an empty or partial ladder is something the product really serves. — `packages/app-core/src/views/ticket-sheet.tsx`
+- **16.94** ✅ **The built-in `Task` is preferred ONLY where it is legal, and its absence withholds nothing — both directions, because either arm alone is passed by a rule nobody wants.** Arm one: a ladder with no `task` in it at all still yields a legal child (`chore`), which a fix that looked up the built-in id and did not fall back would withhold. Arm two: under an `epic` (rank 1) with the owner's ladder the shallowest legal child is `story` (rank 2) and the answer is `task` (rank 3) — the prototype's own operand — which a rule that never preferred it would miss. — `packages/app-core/src/views/ticket-sheet.tsx`
+- **16.95** ✅ **While the ladder is still unread NOTHING is offered and NOTHING is claimed — and it arrives.** An absent control may mean "not yet" or "not ever" and only the arrival distinguishes them, so both arms are in one case: the deferred ladder resolves and the form appears. Rendering the 16.91 sentence here would assert an absence the client has not read. — `packages/app-core/src/views/ticket-sheet.tsx`
+
+**The mutation battery — five mutations, all five killed, and EVERY RUN ASSERTED ITS TEST COUNT (100), because a mutation that makes the file unparseable runs ZERO tests and a `failed`-only verdict scores that as a SURVIVOR — the damaging direction that condemns a check which is fine.** M1 the payload reverted to `state.typeId` → **16.20, 16.92, 16.94**. M2 the form drawn regardless of the answer → **16.91, 16.93, 16.95** — exactly the three withholding cases and nothing else. M3 the `task` preference dropped → **16.94 ONLY**, which is why arm two of that case exists. M4 `rank >` → `rank >=` → **16.20, 16.91, 16.92, 16.94**. M5 the unread state collapsed into the unknown-type state → **16.93, 16.95**. Each mutation reddens the cases that own its property and leaves the rest green; the file was restored and checksum-verified after every one.
+
+**One judgement in this change is FLAGGED FOR A RULING rather than settled here.** Where the prototype's `Task` is not legal — under a `task`/`errand` parent (equal rank) and under a `sub-task` parent — the fallback is the **shallowest legal type**. Whether it should instead be the deepest is a product question and the owner's; `subtaskTypeFor` is a pure function with its own cases so the answer changes in one line. **The withheld sentence is likewise provisional and the owner's**, quoted verbatim in the PR body.
+
+**Two cases moved with this change, and one of them was the check that let the defect ship.** `16.20`'s `typeId: expect.any(String)` is now the literal `'sub-task'`; and the shared `sheetSource` ladder gained `sub-task` (rank 4), because the default world must be one where the Add-subtask form can legitimately draw — with the ladder as it stood (`task` 3, `epic` 1) NOTHING could sit under the default ticket and every case that presses the button would have become a case about a correctly-withheld form. It changes no existing case's behaviour: the ladder is read for the `Type` row's NAME (which resolves off `task`, untouched) and for this decision.
+
+### What is NOT covered, named rather than implied
+
+- ⚠ **THE WITHHELD SENTENCE CLAIMS MORE THAN THE CLIENT MEASURED, AND THE REVIEW FOUND IT (F7).** *"This is a X — nothing smaller can sit under it"* is a statement about the WHOLE WORKSPACE, computed from whatever `getTicketTypes` returned. If a ladder is PARTIAL — it holds this ticket's type but not a deeper type the workspace also has — the sentence asserts an absence out of a read that did not cover the world. **16.26 already records that a partial or empty ladder is a shape the product really serves**, and the docblock above argues only the unread-versus-empty distinction, not this one. **The failure direction is safe** — withholding can only UNDER-offer, and an offered form is always legal — so this is a product caveat and not a defect, and it is recorded rather than fixed because narrowing it would mean refusing to answer at all on a partial read, which is a worse screen. **Owner: whoever next touches this section's copy or its ladder read.**
+- ⚠ **`errand` and `task` share rank 3, and nothing in the product prevents a workspace from defining two types at one rank.** This change reads that ladder correctly rather than assuming uniqueness; it does not add a constraint.
+- ⚠ **The withheld sentence is single-line copy owned by the owner.** It ships as a default and is quoted verbatim in the PR body so it can be changed in one line.
+- **`precheck.ts` still answers `not-evaluated` for both `ticket.created` and `ticket.reparented`**, and this change does NOT touch it: that module reads `ClientStateCache`, which holds no ticket-type store (`precheck.ts:251-267`), while the sheet reads the ladder over the wire. The two are different questions about different facts, and the sheet's answer decides only what to OFFER — never whether the event will be accepted, which stays the server's.
+- ⚠ **A POPULATION OF `file:line` CITATIONS INTO `ticket-sheet.tsx` HAD ALREADY ROTTED, AND THIS LANE MEASURED IT RATHER THAN SWEPT IT.** Adding 171 lines to that file shifts every citation into it below the insertion. The population, counted with the unit NAMED because three units give three different numbers: **45 occurrences, 41 distinct (file, line) pointers, across 13 files** (one of the 13 is not Markdown — `packages/editor/src/components/TicketEditorSlot.tsx:35`). **Only TWO were live pointers, and both are repointed** — `docs/lanes/controller-state.md:116`'s `:1683-1693` (now `:1807-1817`) and `:1745-1778` (now `:1869-1902`) — each verified by re-reading the new line, which is `gn-ticket-sheet__parent` and the chip's own docblock respectively.
+- ⛔ **AND A THIRD WAS REPOINTED, THEN WITHDRAWN — the independent review caught it and it is the most instructive thing in this change.** `docs/lanes/executor-2-state.md:1374`'s `:491` was repointed to `:554` on the strength of a PARTIAL read of its own prose. Read in full, that sentence is *"the comment is carried end-to-end (`transition-dialog.tsx:376` → `ticket-sheet.tsx:491` → `domain/src/workflow.ts:185`)"* — and old `:491` is `const page = await dataSource.query.getTickets(…)`, the SUBTASKS live query, not the comment carry (old `:617`, now `:680`). **So `:491` was ALREADY WRONG and repointing it was an arithmetic shift of a rotten pointer — precisely the practice this note says it refuses.** The file is reverted whole and carries no change from this lane. **Content plausibility is not liveness**, and a partial read of the citing sentence is not a read of it.
+- ⚠ **A FOURTH CANDIDATE WAS WITHDRAWN before it was touched**, on the same rule: `docs/lanes/executor-state.md:693`'s `:1596-1607` reads as a live pointer to a component comment and is a HISTORICAL record of where a hold was written down.
+- **The rest were ALREADY WRONG before this change.** The evidence is the cited lines themselves, and ⚠ **this list is a SAMPLE OF EIGHTEEN, not all 45 — I read the cited line for each one named here and for no others, and any not named is UNVERIFIED**: `docs/hig-second-audit.md:44` cites `:334-343` for the three self-describing parent branches and old `:334` is `canSetVisibility = true,` (the branches are at `:1679-1693`); `docs/product-coverage-map.md:239` and `docs/lanes/executor-2-state.md:1324` both cite `:979` for the Assignee picker and old `:979` is a docblock line about the prototype's handler (the picker is at `:1311`); `docs/lanes/controller-state.md:729` cites `:1135-1136` for the subtask row's two spans and old `:1135` is the refusal comment (the spans are at `:1800`); `test-cases/13-second-wave-board-actions.md:1105` cites `:429` for `TicketSheet` rendering `Sheet` and old `:429` is `);` (`<Sheet` is at `:516`); `docs/hig-reconciliation-audit.md` cites `:391-403`, `:480-509`, `:371-373`, `:170`, `:298-315` and `:324` for constructs that sit at `:1249`, `:2062`, `:1282`+, `:1521` and `:1653`+; `docs/lanes/owner-holds.md:128` cites `:486` and the `ticket.field_set` submit is at `:612`; `docs/superpowers/specs/2026-09-17-backlog-and-closed-design.md`'s `:195`, `:184` and `:279` are the `submitting` state at `:411`, `transportError` at `:361` and `submitTransition` at `:607`.
+- ⚠ **AND THE BUCKET IS NOT ALL ROT: four of the rest are DELIBERATELY HISTORICAL and must not be counted as wrong.** `docs/lanes/executor-state.md:1011` names `:276` and lists the real sites in the same breath (*"resolved BY CONTENT … the real sites are `:501/:543/:585/:705/:868`"*); `:1979-1985` is a table whose own text records *"P25 deleted the absence"*; `docs/lanes/owner-holds.md:127` quotes a sentence that *"was TRUE when written"*; and `test-cases/13-owner-requests-and-backlog.md:1144` is a from→to repair mapping (`:276`→`:299`). **A citation that tells the reader to re-measure self-corrects**, and the same reasoning that withdrew `:693` applies to these.
+- ⚠ **The rotted ones are NOT repointed, deliberately**: mechanically shifting an already-wrong citation relocates it and makes it look maintained — which is exactly what the withdrawn third repoint did before the review caught it. Nothing detects any of it: `check:citations` counts CASE-ID citations (this file: 79 cited / 0 uncited) and **no gate resolves a `file:line`**. **Owner: whoever next edits `ticket-sheet.tsx` at scale, or the owner of a future citation gate** — the old→new map is reproducible from `git show origin/main:packages/app-core/src/views/ticket-sheet.tsx` against the working tree.
+- **The refusal path itself is unchanged and is still reachable from other clients**: a caller that POSTs `ticket.created` directly can still send a same-type child and still gets `hierarchy.rank`. This change removes the SHEET as a route to it, which is what the dispatch scoped; it does not make the refusal unreachable in the product.

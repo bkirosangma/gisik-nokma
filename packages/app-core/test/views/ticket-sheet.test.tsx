@@ -1,7 +1,7 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { IngestResult, WorkflowDef } from '@gisik-nokma/domain';
+import type { IngestResult, TicketTypeDef, WorkflowDef } from '@gisik-nokma/domain';
 import { SYSTEM_ACTOR_AUTO_CLOSE } from '@gisik-nokma/domain';
 import { createClientStateCache } from '../../src/cache.js';
 import { ServingGapError, SERVING_GAPS } from '../../src/online/mappers.js';
@@ -100,13 +100,26 @@ function sheetSource(read: TicketRead, history: TicketHistoryEvent[] = [], rows:
     // them, and the sheet's RECONCILIATION is what makes an empty list here a
     // visible disagreement rather than a silent one.
     getTickets: async (projectId) => ({ projectId, rows }),
-    // Door G: the workspace TYPE LADDER, read only to put a NAME on the `Type`
-    // row. The `task` entry is the one `ticketStateSeed`'s `typeId` names, so
-    // the default is a ticket whose type the ladder KNOWS — a case that wants
-    // the fallback passes a ladder that does not hold it.
+    // Door G: the workspace TYPE LADDER, read to put a NAME on the `Type` row
+    // and — since 2026-09-20 — to decide whether this ticket can take a child
+    // at all (`16.91`–`16.95`). The `task` entry is the one
+    // `ticketStateSeed`'s `typeId` names, so the default is a ticket whose type
+    // the ladder KNOWS — a case that wants the fallback passes a ladder that
+    // does not hold it.
+    //
+    // ⚠ `sub-task` is here because the DEFAULT world must be one in which the
+    // Add-subtask form can legitimately draw, and that is not free: the rank
+    // rule is `childRank > parentRank`, and the default ticket is a `task` at
+    // rank 3 — so with this ladder as it stood before (`task` 3, `epic` 1)
+    // NOTHING could sit under the default ticket and every case that presses
+    // the button would have become a case about a form that is correctly
+    // withheld. Adding it changes no existing case's behaviour: the ladder is
+    // read for the `Type` row's NAME (which resolves off `task`, untouched) and
+    // for this decision, which the cases below are the witness for.
     getTicketTypes: async () => [
       { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf-errand', fields: [] },
       { id: 'epic', name: 'Epic', icon: 'flag', rank: 1, workflowId: 'wf-errand', fields: [] },
+      { id: 'sub-task', name: 'Sub-task', icon: 'list', rank: 4, workflowId: 'wf-errand', fields: [] },
     ],
   });
 }
@@ -1728,7 +1741,15 @@ describe('F — the subtasks section', () => {
     const event = source.ingested[0]![0]!;
     expect(event.type).toBe('ticket.created');
     expect(event.payload).toEqual({
-      typeId: expect.any(String) as unknown as string,
+      // ⚠ WAS `expect.any(String)`, AND THAT IS THE CHECK THAT LET THIS SHIP.
+      // It asserts that SOME string is there and cannot see WHICH — so when
+      // `addSubtask` sent the PARENT'S own type, this case stayed green while
+      // every real press was refused by `hierarchy.rank`. The field that was
+      // wrong was the one field the case declined to name. It is a literal
+      // now: `sub-task` (rank 4) is the shallowest type in the default ladder
+      // strictly deeper than this ticket's `task` (rank 3), and 16.92 is the
+      // same assertion on the owner's own ladder.
+      typeId: 'sub-task',
       projectId: expect.any(String) as unknown as string,
       // THE PARENT, which is the whole of "a subtask".
       parentId: TICKET,
@@ -1804,6 +1825,213 @@ describe('F — the subtasks section', () => {
     await screen.findByTestId('sheet-subtasks');
     expect(screen.queryByTestId('sheet-parent-chip')).toBeNull();
     expect(screen.queryByTestId('sheet-parent-chip-restricted')).toBeNull();
+  });
+});
+
+/**
+ * THE ADD-SUBTASK AFFORDANCE — cases `16.91`–`16.95`, 2026-09-20.
+ *
+ * The sheet OFFERED "Add subtask" on every ticket and the submission could
+ * never succeed. `addSubtask` sent `typeId: state.typeId` — the PARENT'S OWN
+ * type — and the engine refuses `type.rank <= parentType.rank`
+ * (`packages/rule-engine/src/checks/hierarchy.ts:133`). A same-type child has
+ * `rank <= rank`, so EVERY press was refused; the owner met it as
+ * `"Errand" cannot go under "Errand"`, and that message was the SERVER being
+ * right about a payload this client built wrong.
+ *
+ * **The ladder below is the owner's own**, read from the dev database on
+ * 2026-09-20 (`proj_ticket_types`, workspace `0TZSS5W6ATCTF2YBPMWGGP9JF5`):
+ * `errand` and `task` BOTH sit at rank 3, and `sub-task` at 4. So `errand` is a
+ * WORKSPACE-DEFINED type sharing a built-in's rank, and it is the case a fix
+ * hard-coded to `BUILTIN_TICKET_TYPE_SEEDS` gets wrong — it would agree with a
+ * default workspace and disagree with the one the owner is looking at.
+ *
+ * **`DEEPEST_RANK` does NOT bound a child's rank** and these cases say so by
+ * construction: the rule is `childRank > parentRank`, unbounded above.
+ * `DEEPEST_RANK` (= 4) governs the ROOT-creation rule alone — a type at that
+ * rank or below may not sit at project root (`hierarchy.ts:108`) — and the
+ * domain docblock contemplates "a type defined at rank 7, smaller work still"
+ * (`packages/domain/src/ticket-types.ts:126`).
+ */
+describe('the Add-subtask affordance', () => {
+  const typeDef = (id: string, name: string, icon: string, rank: number): TicketTypeDef => ({
+    id,
+    name,
+    icon,
+    rank,
+    workflowId: 'wf-errand',
+    fields: [],
+  });
+
+  /** The owner's ladder, verbatim from the dev database. */
+  const OWNER_LADDER = [
+    typeDef('epic', 'Epic', 'flag', 1),
+    typeDef('story', 'Story', 'book', 2),
+    typeDef('task', 'Task', 'check', 3),
+    typeDef('errand', 'Errand', 'bolt', 3),
+    typeDef('sub-task', 'Sub-task', 'list', 4),
+  ];
+
+  it('16.91 WITHHOLDS the form when nothing in the ladder is deeper, and names THIS ticket’s type', async () => {
+    // `sub-task` is the deep end of the owner's ladder, so no type can sit
+    // under it. The sentence must name THIS ticket's type — the dispatch's
+    // draft named `Errand`, which is FALSE: rank 4 is strictly greater than
+    // rank 3, so a sub-task legally sits under an errand (16.92 is that arm).
+    const read = ticketRead({ ticket: ticketStateSeed({ typeId: 'sub-task' }) });
+    const source = sheetSource(read);
+    source.query.getTicketTypes = async () => OWNER_LADDER;
+    renderSheet(read, source);
+    await settled();
+
+    // THE AFFORDANCE IS GONE, not disabled: a disabled control still asserts
+    // the action exists (`Features.md:88`'s rule for the New-ticket control).
+    expect(screen.queryByTestId('sheet-subtask-add')).toBeNull();
+    expect(screen.queryByTestId('sheet-subtask-title')).toBeNull();
+    const withheld = await screen.findByTestId('sheet-subtask-withheld');
+    expect(withheld).toHaveTextContent('This is a Sub-task — nothing smaller can sit under it.');
+    // `status`, not `alert`: nothing has gone wrong and nothing was attempted —
+    // the same role the New-ticket dialog's unavailable-parent sentence wears.
+    expect(withheld).toHaveAttribute('role', 'status');
+
+    // THE CONTROL, in the same run: one rank deeper and the form is BACK. A
+    // withheld arm alone cannot tell "correctly withheld" from "never draws".
+    cleanup();
+    const deeper = ticketRead({ ticket: ticketStateSeed({ typeId: 'task' }) });
+    const deeperSource = sheetSource(deeper);
+    deeperSource.query.getTicketTypes = async () => OWNER_LADDER;
+    renderSheet(deeper, deeperSource);
+    await settled();
+    expect(await screen.findByTestId('sheet-subtask-add')).toBeInTheDocument();
+    expect(screen.queryByTestId('sheet-subtask-withheld')).toBeNull();
+  });
+
+  it('16.92 THE OWNER’S CASE: an Errand takes a subtask, and the child’s type is LEGAL — never the parent’s', async () => {
+    const read = ticketRead({ ticket: ticketStateSeed({ typeId: 'errand' }) });
+    const source = sheetSource(read);
+    source.query.getTicketTypes = async () => OWNER_LADDER;
+    renderSheet(read, source);
+    await settled();
+
+    await userEvent.type(screen.getByTestId('sheet-subtask-title'), 'Book the venue');
+    await userEvent.click(screen.getByTestId('sheet-subtask-add'));
+
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    const payload = source.ingested[0]![0]!.payload as { typeId: string; parentId: string };
+
+    // THE DEFECT, pinned. This was `errand` — the parent's own type — and the
+    // engine refused it with `hierarchy.rank`. Asserted in BOTH directions so
+    // a fix that sent some other ILLEGAL type cannot pass by differing.
+    expect(payload.typeId).not.toBe('errand');
+    expect(payload.parentId).toBe(TICKET);
+    // The ladder's shallowest type strictly deeper than rank 3 — and the
+    // assertion is a LITERAL, because `expect.any(String)` is what let this
+    // ship: it cannot see the one field that was wrong.
+    expect(payload.typeId).toBe('sub-task');
+  });
+
+  it('16.93 an UNREADABLE ladder withholds the form and SAYS why — never a silent absence', async () => {
+    // `Features.md:88`: the New-ticket dialog "is TOLD the parent list is
+    // unavailable rather than handed an empty one". An empty ladder and an
+    // unread one are different facts and only one of them is about the
+    // workspace, so this arm must not render the 16.91 sentence.
+    const read = ticketRead();
+    const source = sheetSource(read);
+    source.query.getTicketTypes = async () => {
+      throw new Error('the type ladder is unavailable');
+    };
+    renderSheet(read, source);
+    await settled();
+
+    expect(screen.queryByTestId('sheet-subtask-add')).toBeNull();
+    const withheld = await screen.findByTestId('sheet-subtask-withheld');
+    // The server's/read's own words, carried — not a paraphrase of them.
+    expect(withheld).toHaveTextContent('the type ladder is unavailable');
+    expect(withheld).not.toHaveTextContent('nothing smaller can sit under it');
+
+    // ARM TWO — the same property one step over, and it is a DIFFERENT fact:
+    // the ladder READ FINE and simply does not hold this ticket's type, so its
+    // rank — the whole input to the question — cannot be obtained. A case that
+    // only threw would be satisfied by a fix that treated "unread" and
+    // "this type is unknown here" as one state, and 16.26 already records that
+    // an empty ladder is a shape the product really serves.
+    cleanup();
+    const unknown = ticketRead({ ticket: ticketStateSeed({ typeId: 'ghost-type' }) });
+    const unknownSource = sheetSource(unknown);
+    unknownSource.query.getTicketTypes = async () => OWNER_LADDER;
+    renderSheet(unknown, unknownSource);
+    await settled();
+
+    expect(screen.queryByTestId('sheet-subtask-add')).toBeNull();
+    const other = await screen.findByTestId('sheet-subtask-withheld');
+    expect(other).toHaveTextContent('not in the workspace');
+    expect(other).not.toHaveTextContent('the type ladder is unavailable');
+  });
+
+  it('16.94 the built-in `Task` is preferred ONLY where it is legal — and its absence withholds nothing', async () => {
+    // The trap the dispatch named, in BOTH directions, because either arm
+    // alone is passed by a rule nobody wants. A fix that looked for the
+    // built-in id `task` and DID NOT FALL BACK withholds arm one's ticket; a
+    // rule that never preferred it passes arm one and fails arm two.
+    //
+    // ARM ONE — no `Task` in this workspace's ladder at all.
+    const read = ticketRead({ ticket: ticketStateSeed({ typeId: 'story' }) });
+    const source = sheetSource(read);
+    source.query.getTicketTypes = async () => [
+      typeDef('epic', 'Epic', 'flag', 1),
+      typeDef('story', 'Story', 'book', 2),
+      typeDef('chore', 'Chore', 'broom', 3),
+    ];
+    renderSheet(read, source);
+    await settled();
+
+    await userEvent.type(screen.getByTestId('sheet-subtask-title'), 'Sweep up');
+    await userEvent.click(screen.getByTestId('sheet-subtask-add'));
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    const payload = source.ingested[0]![0]!.payload as { typeId: string };
+    expect(payload.typeId).toBe('chore');
+
+    // ARM TWO — `Task` IS in the ladder and IS legal, and it WINS over the
+    // shallowest legal type. Under an `epic` (rank 1) with the owner's ladder
+    // the shallowest legal child is `story` (rank 2); the prototype births a
+    // subtask as `Task` (`desktop.dc.html:3654`), so `task` is the answer.
+    // Without this arm, dropping the preference entirely would go unnoticed.
+    cleanup();
+    const epic = ticketRead({ ticket: ticketStateSeed({ typeId: 'epic' }) });
+    const epicSource = sheetSource(epic);
+    epicSource.query.getTicketTypes = async () => OWNER_LADDER;
+    renderSheet(epic, epicSource);
+    await settled();
+
+    await userEvent.type(screen.getByTestId('sheet-subtask-title'), 'Order the brochures');
+    await userEvent.click(screen.getByTestId('sheet-subtask-add'));
+    await waitFor(() => expect(epicSource.ingested).toHaveLength(1));
+    const epicPayload = epicSource.ingested[0]![0]!.payload as { typeId: string };
+    expect(epicPayload.typeId).toBe('task');
+    expect(epicPayload.typeId).not.toBe('story');
+  });
+
+  it('16.95 while the ladder is still unread NOTHING is offered and NOTHING is claimed — and it arrives', async () => {
+    // Two properties, and the second is what stops the first being a lie. An
+    // absent control may mean "not yet" or "not ever"; only the arrival
+    // distinguishes them, so both arms are in one case. Claiming the
+    // NO-DEEPER-TYPE sentence here would assert an absence we have not read.
+    let answer: ((rows: TicketTypeDef[]) => void) | undefined;
+    const pending = new Promise<TicketTypeDef[]>((resolve) => {
+      answer = resolve;
+    });
+    const read = ticketRead();
+    const source = sheetSource(read);
+    source.query.getTicketTypes = () => pending;
+    renderSheet(read, source);
+    await settled();
+
+    expect(screen.queryByTestId('sheet-subtask-add')).toBeNull();
+    expect(screen.queryByTestId('sheet-subtask-withheld')).toBeNull();
+
+    await act(async () => {
+      answer!(OWNER_LADDER);
+    });
+    expect(await screen.findByTestId('sheet-subtask-add')).toBeInTheDocument();
   });
 });
 
