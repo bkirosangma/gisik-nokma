@@ -62,26 +62,34 @@ over an empty set is the same defect as a form that can only be refused. Case `1
 NEGATIVE assertion with a positive control.
 
 **MEASURED BEFORE BUILDING, because a "known gap" that had already shipped is this repo's most expensive
-recorded failure.** At `534c450b`, `git grep -nE '^\s*\.gn-visibility' -- '*.css'` answered **0**, against
-a **positive control in the same sweep path** (`.gn-filters__body` → 3). The string's only appearance in
-any stylesheet was a **comment** (`packages/ui/src/ui.css:4810`) naming `.gn-visibility__modes` /
-`.gn-visibility__people` **hypothetically**, assuming they inherit a house rule that does not exist. **The
-gap is total: the section rendered as raw user-agent chrome** — the identical defect class `16.83`
-records for `.ticket-type-list__move`.
+recorded failure.** At `534c450b`, `git grep -nE '^\s*\.gn-visibility' -- '*.css'` answered **0**. The
+string's only appearance in any stylesheet was a **comment** (`packages/ui/src/ui.css:4810`) naming
+`.gn-visibility__modes` / `.gn-visibility__people` **hypothetically**, assuming they inherit a house rule
+that does not exist. **The gap is total: the section rendered as raw user-agent chrome** — the identical
+defect class `16.83` records for `.ticket-type-list__move`.
+⚠ **THE POSITIVE CONTROL WAS FIRST RECORDED AS *"`.gn-filters__body` → 3"*, AND A REVIEWER MEASURED THAT
+AS THE WRONG NUMBER FOR THE RIGHT REASON.** Three is the **unanchored substring** count; under the
+measurement's OWN anchored pattern (`^\s*`), the control answers **1** (`ui.css:4800`). **The zero is
+unaffected and was independently re-measured — but as recorded the control could not have caught a broken
+`^\s*` anchor, which is the one way this measurement could have been wrong.** Corrected here rather than
+left, because a control that does not traverse the measurement's own path is the failure mode this repo
+has recorded more than any other.
 
-**The TWO STRUCTURAL DIVERGENCES are recorded rather than built, on `16.81`'s own rule** that
-*styled differently* is a restyle and *structured differently* is a feature: the prototype draws
+**The TWO STRUCTURAL DIVERGENCES are recorded rather than built, on the rule the sheet-parity lane
+states at `test-cases/16-remaining-doors.md:838`** — *"styled differently* is a restyle; *structured
+differently* is a feature" — ⚠ **the first draft of this sentence attributed it to `16.81`, which is the
+segmented-control CASE and does not state it; a reviewer opened both lines.** The rule is: the prototype draws
 Visibility as a `<dt>/<dd>` row **inside** the sheet's `<dl>` where the product mounts a standalone
 `<section>` **after** `</dl>` (`ticket-sheet.tsx:2293` vs `:2335`), and the prototype's control is a
 **binary toggle** where the product's is a **4-mode radio group** a toggle cannot express. Neither is
 fixed here; both are named in `docs/lanes/executor-3-state.md`.
 
 - **17.001** ✅ **The section had NO CSS RULE AT ALL, and now has one that carries the prototype's own column geometry.** This is the whole defect: every other case in this group asserts against a class that rendered as UA chrome precisely because this one was false. The rule takes `rowValueB` (`:3756`) whole — `display:flex; flex-direction:column; gap:4px; align-items:flex-end` — so the section is the right-aligned value column the prototype draws. Mutation-witnessed by deleting the rule: `rule()` **throws** ("no rule for .gn-visibility") rather than answering empty, so the case reddens by naming its own site. — `packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx`
-- **17.002** ✅ **The eyebrow and the notes carry the ROW'S OWN 12px scale — which is the prototype's outlier, MEASURED rather than inherited.** `desktop.dc.html` carries the identical uppercase eyebrow declaration at **13px/18px twelve times**; this row's `:1213` at **12px/16px is the ONLY 12px instance in the file**. The row is internally consistent about it — its `visNote` (`:1210`) and its closing note (`:1230`) are both 12px/16px — so the row has its own dense scale and it is carried deliberately. **The 1px difference from `.gn-comments__heading` (which transcribed the 13px/18px constant) is the PROTOTYPE's divergence, not an invention here**, and the case exists so that a later "harmonise the two" edit reddens here instead of landing quietly. Mutation-witnessed: `0.75rem` → `0.8125rem` reddens it and nothing else. — `packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx`
+- **17.002** ✅ **The eyebrow and the notes carry the ROW'S OWN 12px secondary-text scale — the prototype's outlier, MEASURED rather than inherited.** Of the **13** lines in `desktop.dc.html` carrying `letter-spacing:0.6px` (the eyebrow constant), **twelve are `13px/18px` and exactly one, `:1213` (this row), is `12px/16px`.** ⚠ **THIS LINE FIRST READ *"this row's `:1213` at 12px/16px is the ONLY 12px instance in the file"*, WHICH IS FALSE AND WAS FALSIFIED BY A REVIEWER: 61 other lines carry `12px/16px`** (a weekday header at `:497` among them), so the claim was wrong by a factor of sixty. The narrow claim above is the measured one. The row's own SECONDARY TEXT is consistent at 12px/16px — its `visNote` (`:1210`) and its closing note (`:1230`) — which is what makes this the row's scale rather than a slip; ⚠ **that consistency is the secondary text's and not the row's: the same row also draws a 13px/18px chip (`:1216`), a 15px `<select>` (`:1224`) and a 15px `<dt>` (`:3755`).** **The 1px difference from `.gn-comments__heading` (which transcribed the 13px/18px constant) is the PROTOTYPE's divergence, not an invention here**, and the case exists so that a later "harmonise the two" edit reddens here instead of landing quietly. Mutation-witnessed: `0.75rem` → `0.8125rem` reddens it and nothing else. — `packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx`
 - **17.003** ✅ **The CONTROL block opts out to the LEFT, and the UA fieldset box is reset.** The prototype's row is right-aligned **except its control**, which carries `align-self:flex-start` (`visBtnStyle`, `:3786`) — that mixed geometry is the authority's own, and a form that right-aligned its own radio labels would be a transcription nobody could read. One wrapper carries it so the next control added to the block cannot miss it. **The fieldset reset is the defect `ui.css:4804` predicted one level up:** that comment names `.gn-visibility__modes`/`.gn-visibility__people` as selectors it assumed would "inherit a house rule already", while no rule anywhere provides one. Mutation-witnessed: removing `align-self` reddens it. — `packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx`
 - **17.004** ✅ **The standing line is the prototype's control — a pill with a dot — and the dot is toned by the MODE, not by the roster.** ⚠ **The fixture is the PRODUCTION SHAPE and that is what makes this case load-bearing:** the roster is cut at the wire, so a restricted ticket served by the shipped server has `resolvedMode: 'explicit'` and `userIds: null`. A dot keyed on the roster — the natural mistake, since the two arrive together in `VisibilityClaim` — would paint the NOT-restricted tone on exactly that ticket and would pass every assertion written against a fixture that happened to carry names. Both directions are asserted (restricted and not), and `current: null` draws **no pill and no dot at all**, because a tone for an audience nobody served is the same invention the absence sentence refuses. The dot is `aria-hidden` and contributes **zero characters** — asserted as an EXACT `textContent` match, so a dot that introduced so much as a leading space leaves `toContain` green and this red. Mutation-witnessed on both halves: the CSS tone swapped, the modifier rule deleted, and the component re-keyed onto `userIds`. — `packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx`, `packages/app-core/src/views/visibility-editor.tsx`, `packages/app-core/test/views/visibility-editor.test.tsx`
-- **17.005** ✅ **No `[data-style]` block forks the section, and each rule is declared exactly ONCE across BOTH stylesheets.** The scan covers `ui.css` and `globals.css` because `apps/web/app/layout.tsx` imports `ui.css` and **then** `globals.css`, so a `[data-style]` override appended there wins at equal specificity — a scan of `ui.css` alone is a check that cannot fail. The second half is that every assertion above goes through `rule()`, which answers the **FIRST** match: an appended second `.gn-visibility { … }` would beat them all while every one stayed green. Mutation-witnessed: a duplicate rule appended at EOF reddens it. — `packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx`
-- **17.006** ✅ **The section offers no audience picker and no chip — (b) keeps the roster off the wire — and the members picker is the POSITIVE CONTROL.** The prototype draws a `<select>` over `viewerCandidates` and a chip per viewer; the product has no data behind either. Asserted as `select`/`option`/chip-class absence **in the same run** as the control that the members fieldset IS rendered with its per-member rows, so the case cannot pass by the section drawing nothing at all. — `packages/app-core/test/views/visibility-editor.test.tsx`
+- **17.005** ✅ **No `[data-style]` block forks the section, and every selector this group asserts on is declared exactly ONCE across BOTH stylesheets.** The scan covers `ui.css` and `globals.css` because `apps/web/app/layout.tsx` imports `ui.css` and **then** `globals.css`, so a `[data-style]` override appended there wins at equal specificity — a scan of `ui.css` alone is a check that cannot fail. The second half is that every assertion above goes through `rule()`, which answers the **FIRST** match, so an appended duplicate beats them while they all stay green. ⚠ **THIS HALF WAS FIRST WRITTEN AS A COUNT OVER THE BASE SELECTOR ALONE, AND IT WAS A CHECK THAT COULD NOT FAIL FOR THE FAILURE ITS OWN COMMENT NAMED — a reviewer measured it.** It counted `/^\.gn-visibility\s*\{/gm` while the comment over it gave `.gn-visibility__standing-mode` as the example; the reviewer appended a duplicate of THAT selector at EOF and the case stayed **43 passed / 43** while the pill repainted danger-red in a browser (the negative control — a duplicate `.gn-visibility` — reddened correctly, so the case *could* fail, it just did not fail for its own subject). **A count over one member of a family is not a count over the family**, so the check now enumerates the eight selectors the group asserts on. Mutation-witnessed both ways. — `packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx`
+- **17.006** ✅ **The section draws NO roster — (b) keeps it off the wire — and the members picker is the POSITIVE CONTROL.** The prototype draws a `<select>` over `viewerCandidates` and a chip per viewer; the product has no data behind either. The `<select>`/`<option>` half is a tag-name assertion; ⚠ **the chip half WAS a `[class*="chip"]` SUBSTRING SEARCH FOR A CLASS NAME, AND A REVIEWER MEASURED IT FAILING FOR WHAT IT NAMES:** the reviewer mounted the prototype's actual chip row — a `×` remove button per member (`desktop.dc.html:1214-1224`'s shape) — under the class `gn-visibility__viewer`, i.e. a roster drawn on screen, and the file stayed **25 passed / 25**. The property is not a spelling, it is **whether the section DRAWS the audience**, so the assertion is now keyed on the roster itself: **no member's name may appear anywhere in the section except inside the editable people picker** — caught whatever the class is called, and it catches a list, a tooltip or a stray sentence too. The control is the SAME WALK with its predicate flipped (it must find exactly `MEMBERS.length` names inside the picker), so the empty result cannot be a scan that finds nothing anywhere. — `packages/app-core/test/views/visibility-editor.test.tsx`
 
 ### What is NOT covered, named rather than implied
 
@@ -100,3 +108,33 @@ fixed here; both are named in `docs/lanes/executor-3-state.md`.
 - **The `<dl>` placement and the binary toggle are NOT done, deliberately.** Both are structural
   divergences from the prototype and both are recorded in `docs/lanes/executor-3-state.md` § 2. **Owner:
   the controller, if either is ever wanted** — neither has a disclosure this dispatch names.
+- **A STALE `routes/tickets.ts:111-114` SURVIVES IN FOUR FILES THIS LANE DID NOT TOUCH, AND IS RECORDED
+  RATHER THAN FIXED.** At this head the roster-cut clause — *"an explicit audience ROSTER, a disclosure no
+  plan authorized"* — is at **`tickets.ts:115-118`**; `111-114` is the *"Reachable today, not
+  hypothetical"* paragraph above it. This lane corrected **every instance inside its own change set**
+  (`visibility-editor.tsx` ×2, `visibility-editor.test.tsx` ×1, `Features.md` ×1) so the change set does
+  not carry one sentence at two ranges. **The four it left alone are outside its scope and would push the
+  diff into unrelated files:** `packages/app-core/src/online/mappers.ts:1899`,
+  `packages/app-core/src/view-types.ts:391`, `test-cases/03-foundation-ledger.md` (×3) and
+  `docs/lanes/executor-state.md` (executor 1's handoff, which this lane must not edit). **Owner: whoever
+  next touches any of those four files** — it is a citation correction, no behaviour.
+
+## THE REVIEW PASS — recorded BEFORE the PR opened, and four of its findings were in THIS LANE'S OWN PROSE
+
+**One reviewer, dispatched 2026-09-21 at head `a959289d`, read-only (it mutated three files to test
+hypotheses and restored all three from the committed blobs, sha-verified).** It could not falsify the
+transcription or ruling (b), and it **did** falsify eleven things around them. Every one is fixed above.
+
+**The pattern, and it is the one worth carrying:** **four of the findings were in prose written the same
+day as the code it describes.** The lane doc claimed `origin/main` had not moved (it moved 103 seconds
+after the commit); `ui.css` claimed this row held *"the ONLY 12px/16px uppercase eyebrow"* in the file
+(61 other lines are 12px/16px); the same block claimed `rowValueB` was *"taken whole"* (four of nine
+declarations); and `17.002`/`17.005`/`17.006` each described a check broader than the check they had.
+**Two of the three test defects were checks that could not fail for the failure their own comments
+named** — which is exactly the class this repo's `checks-that-cannot-fail` record covers, found here by
+a peer rather than by the author of the check.
+
+**The Critical one is the one with a shelf life, and it is why the fold exists.** A handoff sentence that
+`origin/main` has not moved is *true when written* and *false within two minutes*; the `git log
+origin/main..HEAD` check the handoff itself prescribes is **structurally blind to being BEHIND**, so
+nothing in this lane's own machinery could have caught it.

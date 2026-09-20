@@ -407,7 +407,7 @@ describe('3.111 the standing audience — served where it is served, absent wher
    * 3.172 — an `explicit` audience whose ROSTER is not served.
    *
    * The roster is cut from the wire by a standing disclosure ruling
-   * (`routes/tickets.ts:111-114`), so this is the production shape for every
+   * (`routes/tickets.ts:115-118`), so this is the production shape for every
    * explicit ticket. The mode is named and the names are not, and the section
    * has to SAY so: "Only: the people this ticket names" without the clause
    * beside it is a partial answer wearing the shape of a complete one — a
@@ -557,12 +557,68 @@ describe('the standing line carries the prototype’s dot (17.004, 17.006)', () 
     });
     const section = document.querySelector('.gn-visibility');
     expect(section).not.toBeNull();
+    // The PICKER half — the prototype's `<select>` over `viewerCandidates`
+    // (`desktop.dc.html:1225-1229`). A tag name is a property, not a spelling.
     expect(section?.querySelector('select')).toBeNull();
     expect(section?.querySelector('option')).toBeNull();
-    expect(section?.querySelector('[class*="chip"]')).toBeNull();
-    // POSITIVE CONTROL, same run, same element: the control that DOES exist for
-    // choosing people is rendered, so this case cannot pass by the section
-    // drawing nothing at all.
+
+    /**
+     * ⚠ THE CHIP HALF WAS A CHECK THAT COULD NOT FAIL FOR WHAT IT NAMED, AND A
+     * REVIEWER MEASURED IT FAILING THAT WAY BEFORE THIS WAS WRITTEN.
+     *
+     * It read `querySelector('[class*="chip"]')` — a SUBSTRING SEARCH FOR A
+     * CLASS NAME. The reviewer mounted the prototype's actual chip row (a `×`
+     * remove button per member, `desktop.dc.html:1214-1224`'s shape) using the
+     * class `gn-visibility__viewer`, as a sibling of the standing line — a
+     * roster drawn on screen — and the whole file stayed **25 passed / 25**.
+     * `[class*="chip"]` was satisfied by a spelling, so it caught a chip that
+     * said `chip` and nothing else.
+     *
+     * The property is not a class name, it is **whether the section DRAWS the
+     * audience** — so the assertion is keyed on the roster itself: no member's
+     * name may appear anywhere in the section EXCEPT inside the editable people
+     * picker, which is the one place a person's name is legitimately shown
+     * (the control for choosing people, not a claim about who is on the list).
+     * That catches a chip row, a list, a tooltip or a stray sentence, whatever
+     * they are called.
+     */
+    // `where` selects WHICH side of the picker boundary to report on, so the
+    // property and its control are the SAME walk with the predicate flipped —
+    // two hand-written walks could disagree without either noticing.
+    const walkForMemberNames = (where: 'outside-picker' | 'inside-picker'): string[] => {
+      const found: string[] = [];
+      if (section === null) return ['<no section>'];
+      for (const element of Array.from(section.querySelectorAll('*'))) {
+        const insidePicker = element.closest('.gn-visibility__person') !== null;
+        if (where === 'outside-picker' ? insidePicker : !insidePicker) continue;
+        // ⚠ EACH ELEMENT'S OWN TEXT, NOT `textContent`. The first version of
+        // this walk used `textContent` and skipped any element with children to
+        // avoid double-counting an ancestor — which threw away every label
+        // whose text is a DIRECT text node beside its `<input>`, i.e. exactly
+        // the picker it was written for. Measured on its first run: the
+        // positive control answered `[]` where it owed three names. Reading the
+        // element's own text nodes takes each name once and keeps the ancestor
+        // exclusion without needing the children test at all.
+        const text = Array.from(element.childNodes)
+          .filter((node) => node.nodeType === Node.TEXT_NODE)
+          .map((node) => node.textContent ?? '')
+          .join('');
+        for (const member of MEMBERS) {
+          if (member.name !== null && text.includes(member.name)) {
+            found.push(`${element.tagName.toLowerCase()}.${element.className}: ${member.name}`);
+          }
+        }
+      }
+      return found;
+    };
+
+    expect(walkForMemberNames('outside-picker')).toEqual([]);
+    // POSITIVE CONTROL, same run and same walk: with the predicate flipped the
+    // walk DOES find the names, so the empty array above is the section not
+    // drawing a roster rather than a broken scan that finds nothing anywhere.
+    expect(walkForMemberNames('inside-picker')).toHaveLength(MEMBERS.length);
+    // …and the control for THAT control: the picker is genuinely rendered, in
+    // its most-populated state, so neither scan is passing over an empty shell.
     expect(section?.querySelectorAll('.gn-visibility__person').length).toBe(MEMBERS.length);
     expect(section?.querySelectorAll('.gn-visibility__mode').length).toBeGreaterThan(0);
   });

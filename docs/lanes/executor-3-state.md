@@ -77,7 +77,8 @@ at `534c450b`:
 
 ### § 2 — THE TWO STRUCTURAL DIVERGENCES, RECORDED RATHER THAN BUILT
 
-The sibling parity task's own rule (`test-cases/16-remaining-doors.md:9-11`) is the one applied here:
+The sibling parity task's own rule (`test-cases/16-remaining-doors.md:838`; ⚠ **this cited `:9-11`, which is
+the id-pattern paragraph and not the rule — a reviewer opened both**) is the one applied here:
 ***styled differently* is a restyle; *structured differently* is a feature**, and a feature needs a
 disclosure the dispatch does not name. Two divergences are therefore **recorded, not fixed** — the
 conservative direction, because building them would be inventing scope:

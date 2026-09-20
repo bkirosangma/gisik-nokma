@@ -1067,18 +1067,77 @@ describe('the Visibility section is styled to the prototype row (17.001–17.005
       }
     }
 
-    // …AND THE BODY IS DECLARED EXACTLY ONCE, because `rule()` answers the
-    // FIRST match: an appended second `.gn-visibility__standing-mode { … }`
-    // would beat every colour assertion above while they all stayed green.
+    // …AND EVERY SELECTOR THIS CASE ASSERTS ON IS DECLARED EXACTLY ONCE,
+    // because `rule()` answers the FIRST match: an appended duplicate would
+    // beat the assertions above while they all stayed green.
+    //
+    // ⚠ THE FIRST VERSION OF THIS HALF WAS A CHECK THAT COULD NOT FAIL FOR THE
+    // FAILURE ITS OWN COMMENT NAMED, AND IT WAS MEASURED FAILING THAT WAY BY A
+    // REVIEWER BEFORE THIS LINE WAS WRITTEN. It counted
+    // `/^\.gn-visibility\s*\{/gm` — the BASE selector only — while the comment
+    // sitting over it named `.gn-visibility__standing-mode` as the example.
+    // Reviewer's mutation: append
+    // `.gn-visibility__standing-mode { background: var(--gn-danger); }` at EOF
+    // → **43 passed / 43, this case GREEN**, the pill repainting danger-red in
+    // a browser. The negative control in the same run (appending a duplicate
+    // `.gn-visibility` instead) reddened correctly, so the case COULD fail —
+    // it simply did not fail for the selector its text names. **A count over
+    // one member of a family is not a count over the family**, which is why the
+    // list below is enumerated rather than inferred from the base selector.
+    // EXACTLY the selectors `rule()` is asked for above — and nothing else.
+    // The list is the assertion's own reach, not the class family: a selector
+    // this case never resolves through `rule()` cannot be beaten by a duplicate
+    // of itself here, so counting it would be asserting something unrelated.
+    // ⚠ TWO FAMILY MEMBERS ARE DELIBERATELY ABSENT BECAUSE THEY ARE DECLARED
+    // TWICE ON PURPOSE — `.gn-visibility__lockout` and `.gn-visibility__refusal`
+    // each take a shared rule for the fill and a per-variant one for the inset
+    // tone rule. The first draft of this list included them and the check
+    // caught it on its first run (`declares .gn-visibility__lockout in 2
+    // rule(s)`), which is the correct answer to the wrong question.
+    const FAMILY = [
+      '.gn-visibility',
+      '.gn-visibility__heading',
+      '.gn-visibility__standing',
+      '.gn-visibility__standing-mode',
+      '.gn-visibility__dot',
+      '.gn-visibility__controls',
+    ];
+    /**
+     * How many rule DECLARATIONS name this selector, counted as a member of a
+     * selector LIST.
+     *
+     * ⚠ THE OBVIOUS SPELLING OF THIS — `^selector\s*\{` per line — IS WRONG,
+     * AND IT FAILED LOUD ON ITS FIRST RUN, ON THIS FILE'S OWN CSS. A grouped
+     * rule puts every member but the last on a line of its own, so
+     * `.gn-visibility__refusal,` is followed on the NEXT line by
+     * `.gn-visibility__people {` — and the anchored pattern counts THAT as a
+     * declaration of the previous member. Measured: it reported
+     * *"ui.css declares .gn-visibility__refusal as a rule of its own 2 time(s)"*
+     * against CSS that declares it once. The comment is stripped first so a
+     * brace inside prose cannot open a phantom prelude.
+     */
+    const rulePreludes = (css: string): string[] =>
+      [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{/g)].map((m) => m[1] ?? '');
+    const declarationsOf = (css: string, selector: string): number =>
+      rulePreludes(css)
+        .flatMap((prelude) => prelude.split(','))
+        .filter((member) => member.trim() === selector).length;
+
     for (const [name, css] of [
       ['ui.css', UI_CSS],
       ['globals.css', GLOBALS_CSS],
     ] as const) {
-      const decls = [...css.matchAll(/^\.gn-visibility\s*\{/gm)];
-      expect(
-        decls.length,
-        `${name} declares .gn-visibility as a rule of its own ${decls.length} time(s)`,
-      ).toBe(name === 'ui.css' ? 1 : 0);
+      for (const selector of FAMILY) {
+        const decls = declarationsOf(css, selector);
+        expect(
+          decls,
+          `${name} declares ${selector} in ${decls} rule(s)`,
+        ).toBe(name === 'ui.css' ? 1 : 0);
+      }
     }
+    // POSITIVE CONTROL for the enumerator itself: it must SEE a selector that
+    // genuinely is declared twice, or every `1` above is a scan reading nothing.
+    expect(declarationsOf(`${UI_CSS}\n.gn-visibility { margin-top: 9rem; }`, '.gn-visibility')).toBe(2);
+    expect(declarationsOf(UI_CSS, '.gn-visibility__no-such-class-exists')).toBe(0);
   });
 });

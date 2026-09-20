@@ -1841,24 +1841,51 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    only be refused.** What survives (b) is what is styled here: the control's
    dot-and-label treatment, the note, the eyebrow, and the column geometry.
 
-   ⚠ THE 12px IS THE PROTOTYPE'S OWN OUTLIER, MEASURED RATHER THAN INHERITED.
-   This row is the ONLY place in `desktop.dc.html` with a 12px/16px uppercase
-   eyebrow: the identical declaration at 13px/18px occurs **twelve** times. The
-   row is internally consistent about it — its `visNote` (`:1210`) and its
-   closing note (`:1230`) are both 12px/16px — so the row is a dense one and
-   this is the row's own scale, not a slip. It is carried deliberately, and the
-   1px difference from `.gn-comments__heading` above (which transcribed the
-   13px/18px constant) is the prototype's divergence rather than an invention
-   here. **A future reader who "harmonises" the two is deleting the authority's
-   own row scale, which is why the number is pinned by a test.**
+   ⚠ THE 12px IS THE PROTOTYPE'S OWN OUTLIER, MEASURED RATHER THAN INHERITED —
+   AND THE MEASUREMENT IS NARROWER THAN THE FIRST DRAFT OF THIS COMMENT CLAIMED.
+   That draft read: *"This row is the ONLY place in `desktop.dc.html` with a
+   12px/16px uppercase eyebrow."* **False, and a reviewer falsified it: 61 other
+   lines in that file carry `12px/16px`** (a weekday header at `:497` and many
+   others), so "the only 12px" is wrong by a factor of sixty. The claim that IS
+   measured, and the one this rule rests on: **of the 13 lines in the file
+   carrying `letter-spacing:0.6px` — the eyebrow constant — twelve are
+   `13px/18px` and exactly one, `:1213` (this row), is `12px/16px`.** Verified
+   by enumerating the pattern, not by sampling it.
 
-   NO `[data-style]` FORK, deliberately: every value below resolves through a
-   token, so all three styles are served by this ONE unconditional block — the
-   same property case 16.83 asserts for `.ticket-type-list__move`. */
+   The row's own secondary text is consistently 12px/16px — its `visNote`
+   (`:1210`) and its closing note (`:1230`) — so this is the row's scale, not a
+   slip. ⚠ **That consistency is the ROW'S SECONDARY TEXT and nothing more; the
+   same row also draws a 13px/18px chip (`:1216`), a 15px `<select>` (`:1224`)
+   and a 15px `<dt>` (`rowLabelB`, `:3755`).** The narrower statement is the
+   true one and it is the one carried.
+
+   It is carried deliberately, and the 1px difference from `.gn-comments__heading`
+   BELOW (which transcribed the 13px/18px constant) is the prototype's
+   divergence rather than an invention here. **A future reader who "harmonises"
+   the two is deleting the authority's own row scale, which is why the number is
+   pinned by a test.**
+
+   NO `[data-style]` FORK, deliberately: **no colour literal appears below** —
+   every colour resolves through a `--gn-*` token, so all three styles are served
+   by this ONE unconditional block, the same property case 16.83 asserts for
+   `.ticket-type-list__move`. (The lengths, radii and `999px` below are plain
+   CSS values, not tokens — that has always been this file's convention and is
+   not what the no-fork property rests on.) */
 .gn-visibility {
   /* The prototype's `rowValueB` (`:3756`) is the right-aligned value column:
      `display:flex; flex-direction:column; gap:4px; align-items:flex-end`.
-     It is taken whole, `gap` included. */
+     ⚠ THIS READ *"It is taken WHOLE, `gap` included"*, WHICH OVERCLAIMS AND IS
+     CORRECTED RATHER THAN LEFT: `rowValueB` carries nine declarations and four
+     are taken. The four taken ARE taken exactly (`gap: 0.25rem` = its 4px), but
+     `margin: 0` becomes `margin-top: 0.8rem`, and its `background:var(--fill4)`
+     + `border-radius:0 8px 8px 0` are deliberately NOT taken — this is a
+     standalone `<section>` in the sheet body, not a `<dd>` inside the sheet's
+     `<dl>` with a label cell beside it, which is the structural divergence the
+     lane doc's § 2.1 records. **`text-align: right` is likewise NOT inherited
+     by the sentences below it** — only `.gn-visibility__standing` sets it, so
+     the owner note and the absence sentences wrap left-ragged where the
+     prototype's note inherits right-alignment. Named rather than fixed: jsdom
+     computes no cascade, so no test in this repo can see the difference. */
   margin-top: 0.8rem;
   display: flex;
   flex-direction: column;
@@ -1888,6 +1915,33 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   line-height: 1rem;
   text-wrap: pretty;
 }
+/* ⚠ TWO COMMENTS NAMED DIFFERENT ELEMENTS AS "THE PROTOTYPE'S CONTROL", AND A
+   REVIEWER CAUGHT THE DISAGREEMENT RATHER THAN THE AUTHOR. `visBtnStyle`
+   (`:3786`) belongs to the PILL — that is the element it styles — and it
+   carries `align-self:flex-start` (LEFT, inside a right-aligned column). The
+   comment on `.gn-visibility__controls` above attaches *"the prototype's own
+   `align-self:flex-start`"* to the FORM WRAPPER, which is not the element that
+   property was transcribed from.
+
+   BOTH STATEMENTS ARE NOW TRUE, AND THE SECOND IS A MOVE RATHER THAN A
+   TRANSCRIPTION: the opt-out is applied to the control BLOCK because this
+   product's control is the radio fieldset, not a button — so the wrapper is
+   where "the controls sit left" has to live. The pill keeps the prototype's
+   fill, radius, height and weight and does NOT take its `align-self`, so it
+   sits at the right edge of the column, which is where a right-aligned value
+   column's own readout belongs. A reader auditing this against the prototype
+   would otherwise "restore" `align-self:flex-start` to the pill and break the
+   alignment this block exists to assert.
+
+   ⚠ AND THE TINTED FILL IS NOT TRANSCRIBED, for a reason that lives elsewhere
+   and is named here so the omission does not read as an oversight: the
+   prototype paints the restricted pill `--tintPurple`/`--purple` and the open
+   one `--tintSuccess`/`--success`. **This product has no tint role for either**
+   — `tokens.ts` records that the export's `--tintDanger`/`--tintPink`/
+   `--tintPurple`/`--tintSuccess` washes were deliberately not ported, and
+   `tintWarning` is the only wash that exists. Inventing a purple wash to match
+   a prototype would be adding a token on a styling task's authority, so the
+   pill takes a neutral fill and the TONE is carried by the dot alone. */
 .gn-visibility__standing-mode {
   display: inline-flex;
   align-items: center;

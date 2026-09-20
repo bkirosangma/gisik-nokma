@@ -47,7 +47,7 @@ export const LOCKOUT_WARNING_COPY =
  *
  * Both are `| null` rather than optional, and `null` is a CLAIM here rather than
  * a shrug: it says *"no read served this"*, which is the honest answer for the
- * roster (**cut from the wire entirely** — `routes/tickets.ts:111-114`: an
+ * roster (**cut from the wire entirely** — `routes/tickets.ts:115-118`: an
  * explicit audience ROSTER is *"a disclosure no plan authorized"*) and for the
  * provenance (which lives on the LEDGER, not in the projection the ticket read
  * is built from). An optional key would let a mapper that simply forgot the
@@ -157,7 +157,7 @@ type Submission = { kind: 'idle' } | { kind: 'sending' } | { kind: 'refused'; ru
  * What the old text was RIGHT about, and what still stands:
  *
  * - the ROSTER (`own_user_ids` / `resolved_user_ids`) is **cut**, by a standing
- *   disclosure ruling — `routes/tickets.ts:111-114`: *"an explicit audience
+ *   disclosure ruling — `routes/tickets.ts:115-118`: *"an explicit audience
  *   ROSTER, a disclosure no plan authorized"*. So an `explicit` audience renders
  *   its mode and says the list is not served, rather than drawing names;
  * - the PROVENANCE is **not in the row** — who set the audience, and when, is on
@@ -361,12 +361,20 @@ export function VisibilityEditor({
       {canEdit ? (
         // ONE wrapper, for the geometry and not for grouping semantics: the
         // section is the prototype's right-aligned value column, and this block
-        // is the ONE part of the row that opts out to the left — the
-        // prototype's own `align-self:flex-start` on its control
-        // (`visBtnStyle`, `desktop.dc.html:3786`). Without a single element to
-        // hang that on, the fieldsets, the warning and the Apply button would
-        // each have to carry it separately, and the next control added to this
-        // block would silently miss it.
+        // is the ONE part of the row that opts out to the left.
+        //
+        // ⚠ THE OPT-OUT IS MOVED, NOT TRANSCRIBED, AND A REVIEWER CAUGHT THIS
+        // COMMENT AND `ui.css`'s DISAGREEING ABOUT WHICH ELEMENT IT BELONGS TO.
+        // The prototype's `align-self:flex-start` (`visBtnStyle`,
+        // `desktop.dc.html:3786`) belongs to its PILL BUTTON; this product's
+        // control is a four-mode radio fieldset, so the property is applied to
+        // the BLOCK that holds the controls rather than to the button that no
+        // longer exists. Saying "the prototype's own" without that clause read
+        // as a transcription of the pill, which sits at the right edge instead.
+        //
+        // Without a single element to hang it on, the fieldsets, the warning
+        // and the Apply button would each have to carry it separately, and the
+        // next control added to this block would silently miss it.
         <div className="gn-visibility__controls">
           <fieldset className="gn-visibility__modes">
             <legend>Change who can see this</legend>
