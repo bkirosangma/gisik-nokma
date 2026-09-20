@@ -1,0 +1,82 @@
+import { describe, expect, it } from 'vitest';
+import { MappingError, mapTicketComments } from '../../src/online/mappers.js';
+
+/**
+ * `mapTicketComments` — the wire shape to the view shape.
+ *
+ * ## ⚠ NO CASE ID IS MINTED IN THIS FILE, AND THAT IS DELIBERATE
+ *
+ * The controller ruled on 2026-09-20 (mid-task) that executor 2 has no free
+ * ids; the allocation is with the owner and the request is filed. The ids here
+ * are OWED, not omitted, and `test-cases/` is untouched by this change set for
+ * that reason.
+ *
+ * ## The one thing this mapper must NOT do
+ *
+ * `files[].mime` is `string | null` ON THE WIRE because `null` is the server
+ * saying an embedded attachment id resolved to no row — and the server renders
+ * the ID in place of a name rather than dropping the entry. A mapper that
+ * demanded a string would turn that honest fallback into a thrown
+ * `MappingError`, i.e. **one unresolvable id would cost the reader the whole
+ * thread.** That is the assertion below worth the most.
+ *
+ * `body` is deliberately NOT checked, and the reason is a contract rather than
+ * an omission: a comment body is a ProseMirror document, amendment 12 keeps it
+ * opaque outside `packages/editor`, and `docToPlainText` is total — so a
+ * malformed body renders as empty text rather than failing the read. The last
+ * case pins that too, because it is the shape of decision a later reader will
+ * want to "fix".
+ */
+
+const COMMENT = {
+  commentId: '01COMMENTONE',
+  authorId: 'user_anselma',
+  body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hey' }] }] },
+  recordedAt: '2026-09-20T16:23:57.306Z',
+  files: [{ attachmentId: '01PROOF', filename: 'gst-receipt.png', mime: 'image/png' }],
+};
+
+describe('mapTicketComments', () => {
+  it('maps a served thread, keeping every field it read', () => {
+    expect(mapTicketComments({ comments: [COMMENT] })).toEqual([COMMENT]);
+  });
+
+  it('maps an ANSWERED empty thread to an empty list', () => {
+    // The route answers a ticket with no comments with an empty array, and that
+    // is the one thing `[]` means here — the read THROWS on a refusal instead.
+    expect(mapTicketComments({ comments: [] })).toEqual([]);
+  });
+
+  it('keeps an unresolved file entry with a null mime rather than failing the read', () => {
+    const unresolved = {
+      ...COMMENT,
+      files: [{ attachmentId: '01NOATTACHMENTROW', filename: '01NOATTACHMENTROW', mime: null }],
+    };
+    expect(mapTicketComments({ comments: [unresolved] })).toEqual([unresolved]);
+  });
+
+  it('refuses a file entry whose mime is neither a string nor null', () => {
+    // The other side of the same rule: `null` is a claim the server can make,
+    // and a NUMBER is not one any writer produces — so it is refused loudly
+    // rather than coerced into a shape the renderer would draw as resolved.
+    const nonsense = { ...COMMENT, files: [{ attachmentId: '01X', filename: 'x', mime: 7 }] };
+    expect(() => mapTicketComments({ comments: [nonsense] })).toThrow(MappingError);
+  });
+
+  it('refuses a row missing a field it cannot invent', () => {
+    const { commentId: _dropped, ...withoutId } = COMMENT;
+    expect(() => mapTicketComments({ comments: [withoutId] })).toThrow(/comments\.comments\[0\]\.commentId/);
+  });
+
+  it('passes a body it cannot parse straight through, because the renderer is total', () => {
+    // `docToPlainText` answers '' for a body that is not a document rather than
+    // throwing, so a mapper that validated here would convert ONE malformed
+    // document into a failed READ — losing a thread the renderer would have
+    // drawn, minus one comment's text.
+    const odd = { ...COMMENT, body: 'not a document at all' };
+    expect(mapTicketComments({ comments: [odd] })[0]?.body).toBe('not a document at all');
+    // The control: the same row with a well-formed body maps identically, so
+    // the assertion above is about the pass-through and not about the fixture.
+    expect(mapTicketComments({ comments: [COMMENT] })[0]?.body).toEqual(COMMENT.body);
+  });
+});

@@ -128,6 +128,12 @@ export function stubServices(
     // asserting the ticket has no files, and a case that meant to prove "the
     // list is drawn" could pass against a read nobody stubbed.
     getTicketAttachments: unstubbed('getTicketAttachments'),
+    // UNSTUBBED, the same rule and the same second reason: the thread draws an
+    // ANSWERED empty list as *"No comments yet."* — a sentence about the ticket
+    // — so `[]` here would be this helper asserting nobody has commented, and a
+    // case meaning to prove the thread is drawn could pass against a read
+    // nobody stubbed.
+    getTicketComments: unstubbed('getTicketComments'),
     getWorkflowDef: unstubbed('getWorkflowDef'),
     // UNSTUBBED, not `[]`, even though the shipped server serves this one. The
     // rule above holds for a SERVED read exactly as for a refusing one: `[]`

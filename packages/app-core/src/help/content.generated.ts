@@ -8445,11 +8445,24 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Not on a job. The job screen's writing box now takes a description; it does not post comments, and nothing on the web shows a comment thread. "
+                    "text": "Yes, on a job. The job screen ends with the job's comments and a box under them: what you post is recorded against the job as an event citing you, so the thread reads back who wrote each comment and when. You can mention somebody by typing "
                   },
                   {
+                    "kind": "code",
+                    "text": "@"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — the mention is recorded on the comment and tells them, if they can see the job."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
                     "kind": "bold",
-                    "text": "There is one comment box on the website, and it belongs to a Move:"
+                    "text": "There is a second comment box on the website, and it belongs to a Move:"
                   },
                   {
                     "kind": "text",
@@ -8462,11 +8475,11 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "The phone app has a Comment button on a job and the website does not."
+                    "text": "It used to be that the phone app had a Comment button on a job and the website did not."
                   },
                   {
                     "kind": "text",
-                    "text": " So the two-screen phone app can do something the full website cannot. Whichever way round that is meant to be, it is not this way round."
+                    "text": " That is settled — the website has one now, and the two record the same thing."
                   }
                 ]
               }
@@ -8481,15 +8494,28 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Not to the job itself. There is no attachment list on the web job sheet, and the writing box on the job screen — which is connected now, so you can write a description there — refuses a dropped file rather than quietly losing it. "
+                    "text": "Through a comment, and the file travels with the comment that carries it. Drop an image into the comment box and it is stored and put inside what you are writing; the comment then names it, and the chip under the comment is how you reach it. "
                   },
                   {
                     "kind": "bold",
-                    "text": "One uploader does work on the web, and it belongs to a Move:"
+                    "text": "A file that is not an image cannot be put inside a comment"
                   },
                   {
                     "kind": "text",
-                    "text": " a move carrying the \"require evidence\" rule puts a file box in its dialog and stays blocked until the server has stored the file. So a file can be attached to a move, and not to a job for its own sake."
+                    "text": " — it is stored against the job instead and appears in the job's list of files, not in your comment. That split is the product's own rule rather than a limitation of the box: a comment's files are the ones its own text carries, so a comment can never be missing a file it was written with."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "A file can also be attached to a Move:"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " a move carrying the \"require evidence\" rule puts a file box in its dialog and stays blocked until the server has stored the file."
                   }
                 ]
               }

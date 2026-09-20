@@ -43,6 +43,9 @@ import type {
 // The list entry union lives with the component that renders it; see the note
 // on the same import in `../data-source.ts`. Type-only, so no runtime edge.
 import type { AttachmentListEntry } from '../views/attachment-list.js';
+// The comment view type lives with its component for the same reason, and the
+// same type-only import keeps the dependency erased at runtime.
+import type { TicketComment } from '../views/comments-thread.js';
 
 /**
  * The ONE adaptation layer between the shipped `/v1` JSON and the client
@@ -708,6 +711,61 @@ export function mapTicketAttachments(raw: unknown): AttachmentListEntry[] {
       mime: asString(row['mime'], `${path}.mime`),
       size: asNumber(row['size'], `${path}.size`),
       sha256,
+    };
+  });
+}
+
+/**
+ * `GET /v1/workspaces/:ws/tickets/:id/comments` → the thread.
+ *
+ * ## `body` is NOT validated, and that is the contract rather than an omission
+ *
+ * A comment body is a ProseMirror document, and amendment 12 keeps that opaque
+ * outside `packages/editor`: app-core passes it through or renders it with
+ * `docToPlainText`, which is total (it answers `''` for anything it cannot
+ * read rather than throwing). So there is nothing here this module could check
+ * that the renderer does not already handle, and a `MappingError` on a body
+ * this client cannot parse would turn a malformed document into a failed READ —
+ * losing the whole thread for one comment the renderer would have shown as
+ * empty. `PlainTextEditorSlot` takes the identical position on the identical
+ * value for the identical reason.
+ *
+ * ## `files`
+ *
+ * The three fields the chip row draws, and no more. `mime` is `string | null`
+ * and not `string`: `null` is the server saying an embedded id resolved to no
+ * attachment row, which it renders as the id in place of a name rather than
+ * dropping the entry. A mapper that demanded a string here would convert that
+ * honest fallback into a failed read. Note what is deliberately NOT carried:
+ * `size` and `sha256` are on the attachments route's rows because
+ * `AttachmentListEntry` needs them, and nothing on this screen does.
+ */
+export function mapTicketComments(raw: unknown): TicketComment[] {
+  const record = asRecord(raw, 'comments');
+  return asArray(record['comments'], 'comments.comments').map((entry, index) => {
+    const path = `comments.comments[${index}]`;
+    const row = asRecord(entry, path);
+    const files = asArray(row['files'], `${path}.files`).map((fileEntry, fileIndex) => {
+      const filePath = `${path}.files[${fileIndex}]`;
+      const file = asRecord(fileEntry, filePath);
+      const mime = file['mime'];
+      if (mime !== null && typeof mime !== 'string') {
+        throw new MappingError(`${filePath}.mime`, 'a string or null');
+      }
+      return {
+        attachmentId: asString(file['attachmentId'], `${filePath}.attachmentId`),
+        filename: asString(file['filename'], `${filePath}.filename`),
+        mime,
+      };
+    });
+    return {
+      commentId: asString(row['commentId'], `${path}.commentId`),
+      authorId: asString(row['authorId'], `${path}.authorId`),
+      body: row['body'],
+      // The envelope's `serverTime`, ISO 8601 — the server serializes it so,
+      // and `formatDateTime` is the one renderer for it.
+      recordedAt: asString(row['recordedAt'], `${path}.recordedAt`),
+      files,
     };
   });
 }

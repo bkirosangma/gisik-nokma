@@ -18,6 +18,7 @@ import {
   mapPreferences,
   mapSearchHits,
   mapTicketAttachments,
+  mapTicketComments,
   mapTicketRead,
   mapTicketTypes,
   mapWorkflowDef,
@@ -310,6 +311,24 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
       const raw = await http.get(path);
       if (raw === null) throw new HttpError(404, path);
       return mapTicketAttachments(raw);
+    },
+
+    /**
+     * The comment thread — a 404 re-raised, and the reason is the one directly
+     * above, one read over.
+     *
+     * `TicketComment[]` HAS an absence value, `[]`, and the comments block draws
+     * it as *"No comments yet."*. The route answers 404 for a ticket that is
+     * invisible, deleted or nonexistent — the same answer to all three, by
+     * design — so folding it into `[]` would print a sentence about the ticket
+     * over a failure to read it. `[]` here means exactly one thing: this ticket
+     * has no comments.
+     */
+    getTicketComments: async (workspaceId, ticketId) => {
+      const path = `/v1/workspaces/${workspaceId}/tickets/${ticketId}/comments`;
+      const raw = await http.get(path);
+      if (raw === null) throw new HttpError(404, path);
+      return mapTicketComments(raw);
     },
 
     getWorkflowDef: async (workspaceId, workflowId, version) => {

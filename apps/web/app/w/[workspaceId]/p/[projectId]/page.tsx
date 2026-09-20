@@ -2852,6 +2852,20 @@ function ProjectBoard() {
           */
           uploadEvidence={(file: File) => uploadAttachmentHttp(file, openTicketId)}
           /*
+            THE COMMENT COMPOSER'S UPLOADER — the same shipped helper, bound to
+            the same ticket, and the ONE prop the description editor deliberately
+            does not get.
+
+            A comment's files ARE its own document's embeds (`read/ticket-comments.ts`
+            carries the measurement: the ledger holds no attachment→comment
+            link), so an upload in the comment box is not a side effect — it is
+            the only way a file can become part of a comment at all. Without this
+            prop `TicketEditorSlot.uploadOrRefuse` refuses every drop with *"this
+            editor was mounted without an uploader"*, and the chip row this read
+            exists to serve could only ever be empty.
+          */
+          uploadAttachment={(file: File) => uploadAttachmentHttp(file, openTicketId)}
+          /*
             THE PARENT CHIP'S DOOR. The sheet draws `Subtask of {parent}` on a
             ticket that is itself a subtask and has no way to open it: that needs
             the parent's PROJECT, and `ParentRef` — the only thing the chip is

@@ -121,6 +121,13 @@ describe('projection registration order (coordination §8)', () => {
       // transaction — its readers (compile-filter's text clause, the search
       // route) are read-time callers on a request path.
       'proj_search',
+      // Executor 2's comment-thread dispatch. APPENDED, for the third time and
+      // by the same question: §8 names no position for it either, so the slot
+      // is decided by dependency — `ticketCommentsProjection.apply` reads no
+      // table at all, and no projection reads proj_ticket_comments inside an
+      // ingest transaction. Its one reader is the ticket-comments route, a
+      // read-time caller on a request path.
+      'proj_ticket_comments',
     ]);
   });
 
@@ -154,6 +161,10 @@ describe('projection registration order (coordination §8)', () => {
       // ONE table. `tsv` is a GENERATED column of proj_search, not a table of
       // its own, so there is nothing else here to declare.
       ['proj_search', ['proj_search']],
+      // ONE table. The comment's embedded attachment ids are NOT a table: they
+      // are derived from `body` by `collectImageAttachmentIds`, so there is no
+      // second spelling of them to declare — or to keep in step.
+      ['proj_ticket_comments', ['proj_ticket_comments']],
     ]);
   });
 

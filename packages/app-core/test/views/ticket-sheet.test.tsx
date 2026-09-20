@@ -273,21 +273,24 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     expect(screen.getByText('19 Aug 2026, 15:30 IST')).toBeInTheDocument();
   });
 
-  it('PLANTED DEFECT: six live reads means six stream subscriptions, all on this workspace', async () => {
+  it('PLANTED DEFECT: seven live reads means seven stream subscriptions, all on this workspace', async () => {
     // Ruling P17: `useLiveQuery` keys the SUBSCRIPTION on the workspace and the
-    // REFETCH on the query key. SIX reads ride this sheet — ticket, workflow,
-    // members, history, and the project's rows from which the SUBTASKS are
-    // derived (door F, 2026-09-19) — and each opens its own subscription.
+    // REFETCH on the query key. SEVEN reads ride this sheet — ticket, workflow,
+    // members, history, the project's rows from which the SUBTASKS are derived
+    // (door F, 2026-09-19), the ticket's TYPE LADDER (door G), and the comment
+    // THREAD — and each opens its own subscription.
     //
-    // **The count was four until door F and the change is deliberate.** This
-    // assertion is a planted defect: it exists so that adding a read is a
-    // decision somebody makes rather than a side effect. The fifth read is a
-    // real cost — a subscription per open sheet — and it is paid because the
-    // list read is what makes the subtasks section possible without a route.
+    // **The count was four until door F, five until door G, and six until the
+    // comment thread, and each change is deliberate.** This assertion is a
+    // planted defect: it exists so that adding a read is a decision somebody
+    // makes rather than a side effect. The seventh read is a real cost — a
+    // subscription per open sheet — and it is paid because the thread is what
+    // the sheet's own composer writes to, so a sheet that did not read it could
+    // not show the author their own comment.
     const source = sheetSource(ticketRead());
     renderSheet(ticketRead(), source);
     await settled();
-    expect(source.subscriptions).toHaveLength(6);
+    expect(source.subscriptions).toHaveLength(7);
     expect(source.subscriptions.every((s) => s.workspaceId === WS)).toBe(true);
   });
 
@@ -1493,6 +1496,25 @@ describe('13.989 the description is editable, on the door that already exists', 
   function fakeEditorSlot(seen: { readOnly: boolean[] }): EditorSlotComponent {
     return function FakeEditorSlot(props) {
       seen.readOnly.push(props.readOnly);
+      /*
+        ⚠ THIS STUB IS MODE-AWARE, AND IT HAS TO BE — it was not until
+        2026-09-21, and the comment composer exposed it. `TicketSheet` now
+        mounts a SECOND `EditorSlot` for the comment box, so a stub that drew
+        its description controls whatever `mode` it was handed put two `Save
+        description` buttons and two `Paste an image` buttons on the screen and
+        made four cases ambiguous (`Found multiple elements with the role
+        "button"`). The real `TicketEditorSlot` labels its control by mode —
+        *"Comment"* versus *"Save description"* — so the stub was the thing
+        disagreeing with the contract, not the sheet.
+
+        The comment arm is deliberately INERT: it submits nothing and reports
+        nothing, because every case in this file is about the DESCRIPTION row.
+        The comment composer's own behaviour is proven in
+        `test/views/ticket-sheet-comments.test.tsx`, against this same seam.
+      */
+      if (props.mode === 'comment') {
+        return <div data-testid="fake-comment-editor" />;
+      }
       return (
         <div data-testid="fake-editor">
           <button

@@ -5600,3 +5600,96 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   outline-offset: 1px;
 }
 .ticket-type-list__move:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* --- The comment thread and its box (executor 2's comment-thread dispatch) ---
+   Prototype: `design-system/interactive/desktop.dc.html:1268-1330` — the block
+   the owner read as `/Users/kiro/Downloads/Gisik Nokma Desktop (1).html`, which
+   cycle 21 settled is a self-contained export of the same design.
+
+   Every value below is the prototype's, converted to rem at 16px and resolved
+   to THIS repo's token roles (the prototype's `--fill1/3/4`, `--label2`,
+   `--fieldBg` and `--ctlR` do not exist here — `tokens.ts` is the origin):
+   `fillPrimary`, `fillQuaternary`, `textMuted`, `surface`, `radiusControl`.
+
+   ⚠ WHAT THIS BLOCK DELIBERATELY DOES NOT STYLE: the composer's own chrome. The
+   editor is `packages/editor`'s `.ticket-editor*` and it is styled by that
+   package's `styles/editor.css`, imported once in `apps/web/app/layout.tsx` —
+   `packages/ui` styling another package's internals is the duplication this
+   repo refuses. `.editor-slot` and `.editor-slot__submit` (the wrapper and the
+   Save/Post control) are UNSTYLED, and that is PRE-EXISTING and already
+   recorded at `apps/web/e2e-viewport/type-scale.ts:355-357`, which names the
+   same grep. The comment box inherits that gap exactly as the description row
+   already does; it is not introduced here and is not fixed here. */
+.gn-comments { margin-top: 1.4rem; padding-bottom: 0.5rem; }
+.gn-comments__heading {
+  font-size: 0.8125rem; /* 13px */
+  line-height: 1.125rem;
+  margin: 0;
+  color: var(--gn-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+.gn-comments__list {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.gn-comment { display: flex; gap: 0.7rem; align-items: flex-start; }
+.gn-comment__avatar {
+  width: 1.75rem; /* 28px */
+  height: 1.75rem;
+  border-radius: 999px;
+  background: var(--gn-fill-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex: none;
+}
+.gn-comment__column { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; flex: 1; }
+.gn-comment__meta { font-size: 0.9375rem; /* 15px */ line-height: 1.25rem; margin: 0; }
+.gn-comment__name { font-weight: 600; }
+.gn-comment__time { color: var(--gn-text-muted); margin-left: 0.5rem; font-size: 0.8125rem; }
+/* `pre-wrap` because `docToPlainText` separates blocks with NEWLINES
+   (`packages/domain/src/doc-text.ts`), so without it a two-paragraph comment
+   renders as one line and the words run together. The same declaration and the
+   same reason as `.gn-editor-slot--plain` above. */
+.gn-comment__body {
+  font-size: 1.0625rem; /* 17px */
+  line-height: 1.375rem;
+  margin: 0;
+  text-wrap: pretty;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.gn-comment__files { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.2rem; }
+.gn-comment__file {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: var(--gn-fill-quaternary);
+  border-radius: 8px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+}
+.gn-comment__file-ext { font-size: 0.6875rem; font-weight: 600; color: var(--gn-text-muted); }
+/* The file NAME is the link, and an unresolved id is plain text — a link to
+   bytes nobody holds is a control that does nothing. */
+.gn-comment__file-name { color: var(--gn-accent); }
+.gn-comments__empty { font-size: 0.9375rem; line-height: 1.25rem; margin: 0; color: var(--gn-text-muted); }
+/* Mirrors `.gn-ticket-sheet__attachments-error` (the sibling read's sentence)
+   rather than inventing a second treatment for the same kind of fact. */
+.gn-comments__error { color: var(--gn-danger); margin: 0; }
+.gn-comments__composer {
+  margin-top: 0.9rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface);
+  box-shadow: var(--gn-shadow-raised);
+  overflow: hidden;
+}
+.gn-comments__hint { font-size: 0.75rem; line-height: 1rem; color: var(--gn-text-muted); margin: 0; padding: 0.5rem 0.6rem; }

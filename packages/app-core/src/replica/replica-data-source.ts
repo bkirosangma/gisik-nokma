@@ -424,6 +424,52 @@ const WORKSPACE_SETTINGS_ABSENCES: readonly ReplicaAbsence[] = [
  * "what files does this ticket have", which is the failure this codebase
  * refuses by name. A refusal with an owner beats a plausible list.
  */
+/**
+ * The comment thread — the SECOND refusal whose tempting alternative is
+ * DERIVABLE FROM DATA THIS DEVICE ALREADY HOLDS, and the temptation here is
+ * stronger than the attachments one, which is why it is spelled out.
+ *
+ * `comment.added` IS one of the ticket event types the replica's own reducer
+ * folds, and unlike an attachment — where the ROW and the EVENT are two facts
+ * with two writers — a comment IS its event. So the thread's text is genuinely
+ * derivable here, and refusing the whole read costs an offline user something
+ * real. That is not the question this refusal answers. The question is whether
+ * a comment can be served WITHOUT ITS FILES, because:
+ *
+ *  - a comment's files are the attachments its own document embeds, resolved
+ *    against the `attachments` table (`apps/server/src/read/ticket-comments.ts`);
+ *  - the replica holds no such table — the same fact `ATTACHMENTS_ABSENCES`
+ *    below records, for the same reason;
+ *  - and the thread renderer draws the body through `docToPlainText`, which
+ *    renders an `image` node as NOTHING (`packages/domain/src/doc-text.ts`).
+ *
+ * Composed, those three mean a ledger-derived thread would draw a comment with
+ * an image in it as a comment with no file at all — the exact absence-drawn-as-
+ * a-fact this codebase refuses by name, and the reason the server carries an
+ * id-only fallback rather than dropping an unresolvable attachment.
+ *
+ * ## What is NOT the reason, said plainly
+ *
+ * Not "the bodies might be stale": the replica's thread would be as current as
+ * its log, which is the ordinary offline promise. Not "a fold is missing":
+ * there is nothing here to fold. It is the files, and only the files.
+ *
+ * ## The named owner, and the shape that would unblock it
+ *
+ * A `comments` read is unblocked by the SAME work `ATTACHMENTS_ABSENCES` names —
+ * an attachments table in the local schema, shipped in the bootstrap payload and
+ * kept by sync. This refusal and that one have one fix between them, which is
+ * worth knowing before either is attempted alone.
+ */
+const COMMENTS_ABSENCES: readonly ReplicaAbsence[] = [
+  {
+    field: 'TicketComment (the whole thread, including the body)',
+    because:
+      'a comment’s FILES are resolved against the server’s `attachments` table, which does not exist locally, and the renderer draws an image node as nothing — so a thread derived from the local ledger would draw a comment that embeds a file as a comment with no file, indistinguishably from one that embeds none. The bodies alone are derivable; the attribution is not, and serving the derivable half would state the underivable half as absent',
+    owner: 'Plan 10 — an attachments table in the local schema (bootstrap payload + sync), the same fix `getTicketAttachments` names',
+  },
+];
+
 const ATTACHMENTS_ABSENCES: readonly ReplicaAbsence[] = [
   {
     field: 'AttachmentListEntry (the whole list, both arms)',
@@ -535,6 +581,7 @@ export const REPLICA_GAPS: Readonly<Record<string, readonly ReplicaAbsence[]>> =
   getMyWorkspaces: MY_WORKSPACES_ABSENCES,
   getMembers: MEMBERS_ABSENCES,
   getTicketAttachments: ATTACHMENTS_ABSENCES,
+  getTicketComments: COMMENTS_ABSENCES,
   search: SEARCH_ABSENCES,
   getMyWork: MY_WORK_ABSENCES,
   getAttention: ATTENTION_ABSENCES,
@@ -895,6 +942,8 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     getMembers: () => Promise.reject(new ReplicaGapError('getMembers', MEMBERS_ABSENCES)),
     getTicketAttachments: () =>
       Promise.reject(new ReplicaGapError('getTicketAttachments', ATTACHMENTS_ABSENCES)),
+    getTicketComments: () =>
+      Promise.reject(new ReplicaGapError('getTicketComments', COMMENTS_ABSENCES)),
     getMyWork: () => Promise.reject(new ReplicaGapError('getMyWork', MY_WORK_ABSENCES)),
     getAttention: () => Promise.reject(new ReplicaGapError('getAttention', ATTENTION_ABSENCES)),
     getWorkspaceSettings: () =>

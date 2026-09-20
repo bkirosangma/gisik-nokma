@@ -134,6 +134,12 @@ describe('proj_entity_heads', () => {
       // for why this projection's existing READ-TIME reader
       // (`compile-filter.ts`'s text clause) is not an adjacency.
       'proj_search',
+      // Executor 2's comment-thread dispatch, 2026-09-21. APPENDED, and NOT at
+      // a §8 position, for the third time and the same reason — and this copy
+      // of the pin did its job a third time: the registrant extended
+      // projection-order.test.ts, the pin of record, and the red suite told
+      // them about this one.
+      'proj_ticket_comments',
     ]);
   });
 });

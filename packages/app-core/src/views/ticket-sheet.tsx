@@ -14,10 +14,12 @@ import { makeSubmittedFactory } from '../submit.js';
 import { dateClaimOf } from '../claims/ticket-dates.js';
 import type { ParentRef, TicketHistoryEvent, TicketRead } from '../view-types.js';
 import { AttachmentList, type AttachmentListEntry } from './attachment-list.js';
+import { CommentsThread, type TicketComment } from './comments-thread.js';
 import {
   PlainTextEditorSlot,
   type EditorSlotComponent,
   type EditorSlotSubmission,
+  type EditorSlotUpload,
 } from './editor-slot.js';
 import { HistoryList } from './history-list.js';
 import { formatRollup } from './rollup-text.js';
@@ -175,6 +177,28 @@ export type TicketSheetProps = {
    * draws "…parent cannot be shown. {reason}" for the same reason.
    */
   attachmentsUnavailable?: string;
+  /**
+   * The comment thread is read INSIDE this component, not passed in — see the
+   * `comments` live query in the body, which states why it differs from
+   * `attachments`. There is deliberately no `comments` prop: two sources for
+   * one read is how a sheet ends up showing a thread that disagrees with the
+   * one its own composer just wrote to.
+   */
+  /**
+   * The uploader a COMMENT's Attach and image-paste go through — the same
+   * `uploadAttachmentHttp(file, ticketId)` the board's evidence capability
+   * uses, and the same narrow prop the description editor deliberately does NOT
+   * get (it is mounted without an uploader and says so when a file is dropped).
+   *
+   * **Why the comment composer gets one and the description editor does not:**
+   * a comment's files ARE its document's embeds (see
+   * `apps/server/src/read/ticket-comments.ts`), so an upload here is not a
+   * side effect — it is the only way a file can become part of a comment at
+   * all. Without it the Attach arm is unreachable and the chip row can only
+   * ever be empty, which is the drawn absence this whole section is written to
+   * refuse.
+   */
+  uploadAttachment?: (file: File) => Promise<EditorSlotUpload>;
   /**
    * The ticket's standing audience, for the "Who can see this" section — **an
    * OVERRIDE, not the source.**
@@ -393,6 +417,7 @@ export function TicketSheet({
   uploadEvidence,
   attachments,
   attachmentsUnavailable,
+  uploadAttachment,
   visibility,
   canSetVisibility = true,
   onOpenTicket,
@@ -504,6 +529,22 @@ export function TicketSheet({
   );
   const history = useLiveQuery(dataSource, workspaceId, `${ticketId}:history`, () =>
     dataSource.query.getTicketHistory(ticketId, undefined, HISTORY_PAGE_LIMIT),
+  );
+  /**
+   * The comment thread.
+   *
+   * **Read HERE rather than passed in as a prop, and the difference from
+   * `attachments` is deliberate.** `attachments` arrives from the page because
+   * the page already held that query; this one is owned by the sheet for the
+   * same reason `read` and `history` are: the sheet is what WRITES a comment,
+   * and a write that cannot reload the read it just changed would show the
+   * author a thread without their own comment in it until something else
+   * happened to refetch. The key carries the ticket id for the P17 reason the
+   * attachments query states — opening another ticket must not show the
+   * previous ticket's thread under the new one's heading.
+   */
+  const comments = useLiveQuery(dataSource, workspaceId, `${ticketId}:comments`, () =>
+    dataSource.query.getTicketComments(workspaceId, ticketId),
   );
   /**
    * The ticket's CHILDREN (door F, 2026-09-19) — derived from the list read the
@@ -794,6 +835,106 @@ export function TicketSheet({
     }
     if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
     else setServerRefusal({ rule: result.code, reason: result.message });
+  };
+
+  /**
+   * A COMMENT, through the same three slots as a description change.
+   *
+   * **`read` is deliberately NOT reloaded here.** A comment changes no head
+   * state — `ticket-state.ts` returns the state unchanged for `comment.added`
+   * (and `proj_tickets` skips the event for the same reason) — so reloading the
+   * ticket read would be a request that cannot have a different answer. What a
+   * comment DOES join is the thread and the ledger tab, and both are reloaded.
+   *
+   * The composer clears itself on success without help from here:
+   * `TicketEditorSlot.handleSubmit` clears in `comment` mode only, which is the
+   * half of its contract this mode exists for.
+   */
+  const submitComment = async (submission: EditorSlotSubmission): Promise<void> => {
+    const event = make({
+      workspaceId,
+      entity: { kind: 'ticket', id: ticketId },
+      type: submission.type,
+      payload: submission.payload,
+    });
+    const results = await dataSource.ingest([event]);
+    const result = results[0];
+    if (result === undefined) {
+      setServerRefusal(null);
+      setTransportError('The server did not answer this change.');
+      return;
+    }
+    if (result.status === 'committed') {
+      setServerRefusal(null);
+      setTransportError(null);
+      setEditorError(null);
+      comments.reload();
+      history.reload();
+      return;
+    }
+    if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
+    else setServerRefusal({ rule: result.code, reason: result.message });
+  };
+
+  /**
+   * The `attachment.added` claim that follows an upload and PRECEDES the image
+   * the composer inserts.
+   *
+   * **It THROWS on a failure, and that is the contract rather than an oversight.**
+   * `createAttachmentPasteExtension` awaits this before it inserts the node
+   * (*"the claim precedes the picture"*, `attachment-paste.ts:49`), and catches
+   * a rejection into `onUploadError` — so a comment never ends up with a picture
+   * in it whose claim the server refused. Resolving quietly would put a node
+   * naming an attachment that no event ever recorded into the document, and the
+   * next Post would carry it.
+   *
+   * **This is the first MOUNTED producer of `attachment.added` — MEASURED, and
+   * the wording is exact because the looser claim is false.** The claim is
+   * COMPOSED elsewhere already: `packages/editor/src/drive/attachment-claims.ts`
+   * exports `composeUploadAttachmentAdded` and `composeDriveReferenceAdded`,
+   * both tested. **Neither has a production caller** — the symbol sweep returns
+   * their tests, their export and one docblock citation, and nothing else — and
+   * neither does `EvidencePicker`, the other path that would emit one. Mobile
+   * has no wiring for the event at all. So the code to make a claim existed and
+   * was never reachable from a screen; this mount is where it becomes reachable.
+   *
+   * ⚠ **AND THE PAYLOAD IS COMPOSED A SECOND TIME HERE, which is a divergence
+   * worth naming rather than hiding.** `composeUploadAttachmentAdded` does
+   * exactly this job, and app-core **cannot import it**: the dependency runs
+   * `apps/web → editor`, and app-core sits below it (`views/editor-slot.tsx`
+   * re-declares the submission union for that same reason). The honest home for
+   * one composer both packages can reach is `packages/domain`, beside
+   * `attachmentUploadedPayload` — which is the schema this payload must satisfy
+   * anyway. **Named owner: whoever next touches `attachment-claims.ts`.**
+   *
+   * The values are the SERVER-SNIFFED truth the upload answered with (`kind:
+   * 'upload'`, a ULID `attachmentId`, a mime, a size, a lowercase-hex
+   * `sha256`) — nothing here is inferred from the file the user chose.
+   */
+  const emitAttachmentAdded = async (uploaded: EditorSlotUpload): Promise<void> => {
+    const event = make({
+      workspaceId,
+      entity: { kind: 'ticket', id: ticketId },
+      type: 'attachment.added',
+      payload: {
+        kind: 'upload',
+        attachmentId: uploaded.attachmentId,
+        filename: uploaded.filename,
+        mime: uploaded.mime,
+        size: uploaded.size,
+        sha256: uploaded.sha256,
+      },
+    });
+    const results = await dataSource.ingest([event]);
+    const result = results[0];
+    if (result === undefined) throw new Error('The server did not answer this upload’s claim.');
+    if (result.status !== 'committed') {
+      throw new Error(
+        result.status === 'refused'
+          ? `The server refused this upload: ${result.reason}`
+          : `This upload’s claim was rejected: ${result.message}`,
+      );
+    }
   };
 
   /**
@@ -2367,6 +2508,66 @@ export function TicketSheet({
               read.reload();
               history.reload();
             }}
+          />
+
+          {/*
+            THE COMMENT THREAD AND ITS BOX — the block at
+            `design-system/interactive/desktop.dc.html:1268-1330`, mounted LAST
+            in the details tab, which is where the prototype draws it (its
+            details arm ends at the composer, `:1336`).
+
+            ⚠ NO COMPOSER WITHOUT A REAL EDITOR, and that is a refusal rather
+            than an omission. `EditorSlot` resolves to `PlainTextEditorSlot`
+            when the app mounts none, and that component renders a document and
+            offers NO control — over a comment draft there is no document to
+            render, so the fallback would draw the placeholder as static text
+            under a thread: a composer-shaped thing that cannot compose. The
+            description row can tolerate that (it renders a real document); this
+            one cannot. So the box appears exactly when something can write to
+            it, and a build with no editor shows the thread and no box — the
+            absence named by the shape of the screen rather than by a lie.
+
+            ⚠ **AND THE BOX STAYS WHEN THE THREAD READ FAILED — a deliberate
+            choice, raised by an independent reviewer and stated here rather than
+            left to look accidental.** The two are different questions: the read
+            asks *what has been said*, the composer asks *can I say something*,
+            and a failed read does not answer the second. A comment is a WRITE
+            through `POST /v1/events`, a door that does not consult this read at
+            all — so hiding the box would withhold a working affordance because
+            an unrelated one is broken. If the write is refused, the refusal
+            lands in the sheet's own refusal slot, in the server's words.
+
+            **What that costs, named:** on a 404 — an invisible or deleted
+            ticket — the box is offered and the post will be refused. The
+            alternative was measured and rejected the other way: gating the box
+            on `comments.error` would hide a working control every time a
+            transient read failed, which is the more common case and the more
+            expensive mistake.
+          */}
+          <CommentsThread
+            comments={comments.data ?? []}
+            commentsUnavailable={comments.error ?? undefined}
+            nameOf={nameOf}
+            composer={
+              editorSlot === undefined ? undefined : (
+                <EditorSlot
+                  mode="comment"
+                  // A comment is written, not edited: there is no stored draft
+                  // to open with, and `null` is `TicketEditorSlot`'s empty
+                  // composer.
+                  doc={null}
+                  readOnly={false}
+                  workspaceId={workspaceId}
+                  ticketId={ticketId}
+                  placeholder="Add a comment — @ to mention someone"
+                  submit={submitComment}
+                  queryUsers={queryUsers}
+                  uploadAttachment={uploadAttachment}
+                  emitAttachmentAdded={emitAttachmentAdded}
+                  onError={reportEditorError}
+                />
+              )
+            }
           />
         </div>
       ) : (
