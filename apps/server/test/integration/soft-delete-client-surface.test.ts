@@ -16,6 +16,9 @@ import { signInWithPhone } from '../helpers/session.js';
 /**
  * **THE SOFT-DELETE INVARIANT, ARM 1: the CLIENT READ SURFACE, walked by TYPE.**
  *
+ * Catalogue entry: **case 16.88** (`test-cases/16-remaining-doors.md`). Arm 2 is
+ * **case 16.89**, and the attachments leak this arm cannot see is **case 16.90**.
+ *
  * ## The problem this file exists for, stated as a measurement
  *
  * The DELETE delivered by `#591` is a soft delete: `ticket.deleted` sets
@@ -44,9 +47,14 @@ import { signInWithPhone } from '../helpers/session.js';
  *
  * ⚠ **The tripwire is the load-bearing half. A method that is never visited is a
  * surface nobody checked, and a green suite cannot say whether it was skipped or
- * passed.** Three tables below are all `Record<AbsenceDecision, …>`, so a new
- * member is a compile error in all three at once: it must be *visited*, it must
- * be *decided*, and it must *state whether the marker can reach it at all*.
+ * passed.** Two tables below are `Record<AbsenceDecision, …>` — `DECIDED` and
+ * `callers` — and the tripwire itself is the third obligation. A new member is
+ * therefore a compile error on all three counts at once: it must be *visited*,
+ * it must be *decided*, and it must *state whether the marker can reach it at
+ * all*. (⚠ This paragraph read "Three tables … are all `Record<…>`", and
+ * **there are two Records and one function.** Corrected at the line rather than
+ * left standing, because the sentence's whole job is to say how many independent
+ * things have to fail before a new method can slip through.)
  *
  * ## ⛔ WHAT THIS FILE DELIBERATELY IS NOT
  *
@@ -384,17 +392,16 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
   getTicketHistory: {
     verdict: 'retained',
     carries: true,
-    why: 'DELIBERATE, and the FAQ says so: *"Its history is retained, because other events cite it."* `read/visible-where.ts:136-139` states the same — a deleted ticket is still VISIBLE in the `canSee` sense. Asserting absence here would be asserting a lie.',
+    why: 'DELIBERATE, and the FAQ says so: *"Its history is retained, because other events cite it."* `read/visible-where.ts:138-140` states the same — a deleted ticket is still VISIBLE in the `canSee` sense. Asserting absence here would be asserting a lie.',
   },
   getTicketAttachments: {
     verdict: 'excluded',
     // ⛔ MEASURED, and named rather than hidden: this surface does not carry the
     // ticket's TITLE, so the marker is absent by construction and this row
     // constrains nothing. The surface has a REAL leak — a deleted ticket's FILES
-    // are still served (measured 2026-09-20, `apps/server/src/routes/tickets.ts`
-    // attachments GET/POST guard on `loadTicketRow` + `canSee` and NOT on
-    // `deleted`) — which this invariant cannot see, because a file list is not
-    // the marker. Published with its named owner in Arm 2's enumeration.
+    // are still served — which this invariant cannot see, because a file list is
+    // not the marker. Published with its named owner in Arm 2's enumeration,
+    // which carries the measurement and the three doors it reaches.
     carries: false,
   },
   getWorkflowDef: { verdict: 'excluded', carries: false },

@@ -16,6 +16,9 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 /**
  * **THE SOFT-DELETE INVARIANT, ARM 2: THE PATHS A CLIENT QUERY CANNOT REACH.**
  *
+ * Catalogue entry: **case 16.89** (`test-cases/16-remaining-doors.md`). Arm 1 is
+ * **case 16.88**, and the attachments leak named below is **case 16.90**.
+ *
  * ## Why this file is separate from Arm 1, in one sentence
  *
  * Arm 1 (`test/integration/soft-delete-client-surface.test.ts`) walks
@@ -59,7 +62,7 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  * ### Sites 9–13 are here because NO `DataSourceQuery` METHOD REACHES THEM
  *
  * `state-occupancy` and `ticket-types/:typeId/population` are **admin-only
- * routes of their own** (`routes/builder-reads.ts:692`, `:718`) with no client
+ * routes of their own** (`routes/builder-reads.ts:692`, `:714`) with no client
  * method beside them; the two sweeps are background jobs. **Arm 1 is
  * structurally blind to all five** — not under-covering them, blind: there is no
  * question the client can ask that reaches them. That is the whole reason this
@@ -67,13 +70,29 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  *
  * ### ⛔ WHAT NEITHER ARM COVERS, NAMED RATHER THAN LEFT AS AN ABSENCE
  *
- * **A soft-deleted ticket's ATTACHMENTS are still served.** Measured 2026-09-20:
- * one ticket, deleted through the real door, `GET …/tickets/:id` → **404** while
- * `GET …/tickets/:id/attachments` → **200** carrying the file. Cause read at the
- * line: the attachments GET and POST routes guard on `loadTicketRow` + `canSee`
- * and **not** on `deleted`, and `canSee` by its own ruling does not mean "not
- * deleted" (`read/visible-where.ts:136-139`). The sibling detail route carries
- * the third guard these lack (`routes/tickets.ts:365`).
+ * **A soft-deleted ticket's ATTACHMENTS are still served — by THREE doors, and
+ * the third one serves the BYTES.** MEASURED 2026-09-20 for the list: one
+ * ticket, deleted through the real door, `GET …/tickets/:id` → **404** while
+ * `GET …/tickets/:id/attachments` → **200** carrying the file, with the same
+ * pair answering `200/200` before the delete. The two other doors are **read at
+ * the line, NOT independently measured**, and are named as such rather than
+ * folded into the measurement:
+ *
+ * 1. the **list** — `GET …/tickets/:id/attachments` (`routes/tickets.ts:628`),
+ *    guards `loadTicketRow` + `canSee`;
+ * 2. the **upload** — `POST /v1/attachments` (`routes/attachments.ts:285`),
+ *    guard at `:356` is `canSee` alone;
+ * 3. the **download** — `GET /v1/attachments/:id` (`routes/attachments.ts:482`),
+ *    guard at `:486` is `canSee` alone. **This is the sharpest of the three: what
+ *    leaves is the file itself.**
+ *
+ * None of the three consults deletion, and the reason is one ruling:
+ * `canSee` by its own words does not mean "not deleted"
+ * (`read/visible-where.ts:138-140`). The sibling detail route carries the third
+ * guard they lack (`routes/tickets.ts:365`). ⚠ **The grep, with its control:
+ * `routes/attachments.ts` contains the word `deleted` ZERO times, while the same
+ * grep finds it 6 times in `routes/tickets.ts` — so this is an absence at the
+ * file, not a missed line.**
  *
  * **This is NOT one of the fourteen sites** — there is no predicate to
  * un-filter, so no mutation in this file's battery can reach it, and it is
