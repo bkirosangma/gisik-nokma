@@ -9,6 +9,7 @@ import {
   LIST_PAGE_CAP,
   LIST_PAGE_SIZE,
   LIST_TOO_LARGE_ABSENCE,
+  MappingError,
   ServingGapError,
   UnexpressibleFilterError,
 } from '../../src/online/mappers.js';
@@ -1149,5 +1150,93 @@ describe('13.721 getWorkspaceSettings refuses a body that is not an object', () 
     });
     const goodSource = createOnlineDataSource({ baseUrl: '', fetchImpl: good.fetchImpl });
     await expect(goodSource.query.getWorkspaceSettings(WORKSPACE)).resolves.toBeDefined();
+  });
+});
+
+/**
+ * The attachments read (2026-09-20) — the seam behind `TicketSheet`'s
+ * `attachments` prop, which the product's single mount had never passed because
+ * nothing served it.
+ *
+ * ## What these cases are about is NOT "does the URL get built"
+ *
+ * `Promise<AttachmentListEntry[]>` HAS an absence value — `[]` — and the whole
+ * risk of this method is that a refusal gets folded into it. `AttachmentList`
+ * renders `null` for an empty list by design ("must not promise there are
+ * none"), so a collapsed refusal draws the same nothing as "this ticket has no
+ * files": the drawn absence this project refuses by name. It is also the reason
+ * this method re-raises a 404 as a status rather than answering `[]` the way
+ * `getMembers` and `getTicketHistory` legitimately do for their own reads.
+ *
+ * So 16.54 is written as a PAIR in one run — the empty list resolving, the
+ * refusal rejecting, the same fixture shape either side — because either half
+ * alone passes for the wrong reason: a method that always throws passes the
+ * rejection half, and a method that never throws passes the resolution half.
+ */
+describe('16.54-16.55 getTicketAttachments — the read behind the sheet’s attachments prop', () => {
+  const TICKET = '01J9GTKA000000000000000000';
+  const PATH = `/v1/workspaces/${WORKSPACE}/tickets/${TICKET}/attachments`;
+  const ROW_A = {
+    attachmentId: '01J9GATA000000000000000000',
+    filename: 'gst-receipt.pdf',
+    mime: 'application/pdf',
+    size: 48211,
+    sha256: null,
+  };
+  const ROW_B = {
+    attachmentId: '01J9GATB000000000000000000',
+    filename: 'shelf.png',
+    mime: 'image/png',
+    size: 12,
+    sha256: 'a'.repeat(64),
+  };
+
+  /**
+   * 16.54 — an empty list RESOLVES to `[]`; a refusal REJECTS with the status it
+   * was. The two answers are different in kind, which is what lets the sheet
+   * draw silence for the first and a sentence for the second.
+   */
+  it('16.54 answers [] for an empty list and rejects on a refusal — never one answer for both', async () => {
+    const empty = recordingFetch({ [PATH]: { attachments: [] } });
+    const emptySource = createOnlineDataSource({ baseUrl: '', fetchImpl: empty.fetchImpl });
+    // The POSITIVE CONTROL for this line is the rejected arm below: both halves
+    // call the same method on the same ticket id through the same helper.
+    await expect(emptySource.query.getTicketAttachments(WORKSPACE, TICKET)).resolves.toEqual([]);
+
+    // `recordingFetch({})` answers 404 for every path — which is exactly what
+    // the shipped route answers for a ticket the caller may not see and for one
+    // that never existed, indistinguishably (the route's own cases 16.50/16.52).
+    const refused = recordingFetch({});
+    const refusedSource = createOnlineDataSource({ baseUrl: '', fetchImpl: refused.fetchImpl });
+    const err = await refusedSource
+      .query.getTicketAttachments(WORKSPACE, TICKET)
+      .then(
+        () => null,
+        (cause: unknown) => cause,
+      );
+    expect(err).toBeInstanceOf(HttpError);
+    expect((err as HttpError).status).toBe(404);
+  });
+
+  /**
+   * 16.55 — every served field reaches the view's upload arm, IN THE ORDER the
+   * route answered (the list renders that order), and a `sha256` that is neither
+   * a string nor `null` is refused rather than mapped into the view as
+   * `undefined` — where it would render as nothing and read as "no hash known",
+   * which is what `null` means.
+   */
+  it('16.55 maps the five served fields onto the upload arm and refuses a malformed sha256', async () => {
+    const good = recordingFetch({ [PATH]: { attachments: [ROW_A, ROW_B] } });
+    const goodSource = createOnlineDataSource({ baseUrl: '', fetchImpl: good.fetchImpl });
+    await expect(goodSource.query.getTicketAttachments(WORKSPACE, TICKET)).resolves.toEqual([
+      { kind: 'upload', ...ROW_A },
+      { kind: 'upload', ...ROW_B },
+    ]);
+
+    const badSha = recordingFetch({ [PATH]: { attachments: [{ ...ROW_A, sha256: 42 }] } });
+    const badSource = createOnlineDataSource({ baseUrl: '', fetchImpl: badSha.fetchImpl });
+    await expect(badSource.query.getTicketAttachments(WORKSPACE, TICKET)).rejects.toBeInstanceOf(
+      MappingError,
+    );
   });
 });

@@ -4,6 +4,8 @@ import type { Queryable } from '../db/queryable.js';
 import { getTicketStateFromDb } from '../projections/tickets.js';
 import { stateProvenanceFor } from '../read/state-provenance.js';
 import { assignedProvenanceFor } from '../read/assigned-provenance.js';
+import { listTicketAttachments } from '../attachments/attachment-repo.js';
+import { sanitizeFilename } from '../attachments/filename.js';
 import { canSee } from '../visibility/can-see.js';
 import { rollupFor, type RollupView } from '../visibility/rollup.js';
 import { listVisibleTickets } from '../visibility/visible-tickets.js';
@@ -525,6 +527,128 @@ export function registerTicketRoutes(
         [ticketId],
       );
       return { events: rows.map(toEventView) };
+    },
+  );
+
+  /**
+   * One ticket's attachments — the read `listTicketAttachments`
+   * (`../attachments/attachment-repo.ts:76`) has been waiting for.
+   *
+   * ## Why this door exists at all
+   *
+   * `listTicketAttachments` was written and tested by Plan 7 and had **zero
+   * production callers**: every reference in the tree was a test. So a ticket's
+   * files reached no surface — `TicketSheetProps` has accepted an `attachments`
+   * prop since Plan 6 (`packages/app-core/src/views/ticket-sheet.tsx`), and the
+   * product's single mount never passed it. Nothing here is new machinery: the
+   * rows come from the table the upload door writes, ordered `created_at, id` —
+   * creation order, which is the order the list renders.
+   *
+   * ## The predicate is the one the door above uses, and there is exactly one
+   *
+   * Same two guards, same order, same body: `loadTicketRow` → 404, then `canSee`
+   * → 404. That is deliberate rather than convenient — "may this caller see this
+   * ticket" is asked in exactly one place (`../visibility/can-see.ts:227`), and a
+   * second, weaker answer to it is this project's signature failure. The
+   * `:workspaceId` segment is checked by `loadTicketRow` for the reason that
+   * function's own docblock gives: `canSee` resolves the viewer's role in the
+   * workspace the TICKET's row names, "which leaves the URL free to lie".
+   *
+   * `ticket-attachments.test.ts` holds the two doors to AGREEMENT (case 16.52)
+   * rather than asserting the sameness in prose: an unseen ticket and a
+   * nonexistent one get the same status and the same bytes from both doors,
+   * behind a positive control that both answer for a ticket the caller may see.
+   *
+   * ⚠ **And the ORDER is a copy, not a measurement — recorded because a reader
+   * would otherwise take "in the same order" for a witnessed property.**
+   * Independent review could not falsify it: swapping the two guards survives
+   * every suite in this change, because `canSee` on a foreign-workspace ticket
+   * the caller does belong to answers `true` and the `loadTicketRow` refusal
+   * follows either way, so the response is identical under both orders. The
+   * order is kept because it is the door's, and its one visible effect is the
+   * QUERY COUNT on a ticket that exists (the cheap existence check first), which
+   * nothing asserts.
+   *
+   * ## What is served, and why the wire carries five fields and no `kind`
+   *
+   * Each row is `{attachmentId, filename, mime, size, sha256}` — the five fields
+   * the view's own upload arm names (`packages/app-core/src/views/attachment-list.tsx`,
+   * `AttachmentListEntry`), so the client's mapper is a field-for-field copy plus
+   * the `kind: 'upload'` literal. It is deliberately NOT the upload door's
+   * response shape, which also carries `url`: that door answers a POST and must
+   * say where the bytes it just took now live, while here the id is the address
+   * and the list item derives its own href.
+   *
+   * ## The arm this door does NOT serve, named rather than left to inference
+   *
+   * `attachment.added` (`packages/domain/src/events/ticket-events.ts`) is a
+   * discriminated union carrying a Drive REFERENCE as well as an upload, and
+   * `AttachmentListEntry` renders both. This route cannot serve the reference
+   * arm and does not pretend to: the `attachments` table has no kind column, and
+   * its only writer is the upload door. **The row and the event are two facts,
+   * not one** — a row exists the moment bytes land, whereas the event is the
+   * client's claim about them, which `routes/attachments.ts` says it expects
+   * afterwards and which `Features.md` §9 records the web client does not post
+   * at all today. So a ticket whose reference arrived as a ledger EVENT shows
+   * nothing in this list. **That is not a live absence at this commit** —
+   * measured: **no PRODUCTION code emits it.** The runtime composer DOES exist —
+   * `composeDriveReferenceAdded`
+   * (`packages/editor/src/drive/attachment-claims.ts:41`), exported from the
+   * package index, whose own docblock says *"the client submits it through
+   * `POST /v1/events` like any other claim"* — but its only callers are tests
+   * (swept at this commit), and `openDrivePicker` / `toDriveReference` have no
+   * production caller either. ⚠ **CORRECTED 2026-09-20: this sentence's
+   * exclusion list named only the domain's schema, the editor's TYPES and
+   * `attachment-list.tsx`'s union, and it missed that composer — the conclusion
+   * holds, the enumeration did not.** So it becomes a live absence the day a
+   * producer lands, and it would become one
+   * silently, because the list omits it rather than refusing. **RECORDED, not
+   * fixed. Owner: whoever gives the `attachments` table a kind column, or emits
+   * the reference arm for the first time — those are one task, not two.**
+   *
+   * ## The filename is sanitized here, exactly as it is at the download door
+   *
+   * The upload door sanitizes on the way in, so a row this product wrote is
+   * already clean. It runs again here for the row some OTHER writer put there —
+   * the same fixture, and the same argument, that
+   * `test/routes/attachments-download.test.ts` makes for its own
+   * re-sanitization. The alternative is that the list shows `bad"name.pdf` while
+   * the download names the same object `badname.pdf`: two surfaces of one row
+   * disagreeing about what it is called. Case 16.53.
+   *
+   * ## Empty is a 200, and that is load-bearing
+   *
+   * A visible ticket with no attachments answers `{attachments: []}`; only the
+   * two guards answer 404. `AttachmentList` returns `null` on an empty list —
+   * *"must not promise there are none"* — so the one answer this door must never
+   * give is `[]` for a ticket the caller may not see: that is precisely the
+   * drawn absence the component's own docblock refuses to make. Case 16.49 pins
+   * the pair, the empty list and the refusal, in one run.
+   */
+  app.get<{ Params: { workspaceId: string; ticketId: string } }>(
+    '/v1/workspaces/:workspaceId/tickets/:ticketId/attachments',
+    { preHandler: requireSession },
+    async (request, reply) => {
+      const { workspaceId, ticketId } = request.params;
+      // The same two guards, in the same order, answering the same body — the
+      // ledger above and the files here are one question about one ticket.
+      if ((await loadTicketRow(deps.pool, workspaceId, ticketId)) === undefined) {
+        return reply.code(404).send(NOT_FOUND_BODY);
+      }
+      if (!(await canSee(deps.pool, request.currentUserId, ticketId))) {
+        return reply.code(404).send(NOT_FOUND_BODY);
+      }
+
+      const rows = await listTicketAttachments(deps.pool, ticketId);
+      return {
+        attachments: rows.map((row) => ({
+          attachmentId: row.id,
+          filename: sanitizeFilename(row.filename),
+          mime: row.mime,
+          size: row.size,
+          sha256: row.sha256,
+        })),
+      };
     },
   );
 }

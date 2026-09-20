@@ -293,7 +293,19 @@ export type ReplicaDataSourceDeps = {
 };
 
 /* ------------------------------------------------------------------ *
- * The refusals. Seven of the thirteen, and NOT the online source's seven.
+ * The refusals — enumerated in `REPLICA_GAPS` below, and the count is
+ * deliberately NOT restated here.
+ *
+ * **⚠ CORRECTED 2026-09-20, and this is the THIRD copy of one false sentence.**
+ * It read *"Seven of the thirteen, and NOT the online source's seven"*, and both
+ * numbers were stale: this registry has carried **nine** members since the
+ * attachments read joined it, and the online source refuses **none** — its
+ * register emptied on 2026-09-19, which `Features.md`'s own correction records.
+ * The other two copies live in `Features.md` and `test-cases/12-offline-sync-apps.md`
+ * and were corrected first; this one sits 84 lines above the entry this change
+ * added, in a file this change edits, and was missed — which is the lesson
+ * 12.185 is written around: **the count is a reading, the enumerable list is the
+ * artifact.** Do not restore a number here.
  * ------------------------------------------------------------------ */
 
 const NO_WORKSPACE_TABLE: ReplicaAbsence = {
@@ -374,6 +386,41 @@ const WORKSPACE_SETTINGS_ABSENCES: readonly ReplicaAbsence[] = [
     because:
       'the local replica has no workspace-settings fold — `workspace.settings_set` is a workspace-entity event and every local projection here is ticket-shaped, so there is no row to read. Serving the defaults instead would be indistinguishable from a workspace that really claimed them, and `autoCloseAfterDays: null` is a CLAIM ("off") as well as the default, so a replica answering null would show "off" for a workspace that turned auto-close ON',
     owner: 'Plan 10 — a local workspace-settings fold, deliberately not invented here',
+  },
+];
+
+/**
+ * The attachments read — the refusal here whose tempting alternative is
+ * DERIVABLE FROM DATA THIS DEVICE ALREADY HOLDS, which is why it is spelled out
+ * rather than left to a default.
+ *
+ * **⚠ CORRECTED 2026-09-20: this read "the one refusal here that had a tempting
+ * alternative", and it is not the only one** — `WORKSPACE_SETTINGS_ABSENCES`
+ * above says of itself that it is *"a real 'could be built' rather than a
+ * 'cannot be known'"*, and `ATTENTION_ABSENCES` names a tempting partial. What
+ * is particular here is the KIND of temptation: not a missing fold or a missing
+ * table, but a list that could be computed on the spot from the local ledger
+ * and would be wrong in both directions.
+ *
+ * The local store DOES mirror the ledger, and `attachment.added` is one of the
+ * two ticket event types the replica's own reducer folds
+ * (`sync-client/src/replica/replica.ts:439`), so a list of this ticket's
+ * attachments looks derivable on the spot. It is not the same list. The route
+ * this method stands beside reads the `attachments` TABLE: a row is written by
+ * the upload door when the bytes land, while the event naming it is the
+ * CLIENT's claim about those bytes — a different fact with a different writer
+ * (`apps/server/src/routes/attachments.ts`: "This endpoint appends NOTHING to
+ * the ledger"). So a ledger-derived list would omit an upload whose event never
+ * arrived and include one whose upload failed — a second, weaker answer to
+ * "what files does this ticket have", which is the failure this codebase
+ * refuses by name. A refusal with an owner beats a plausible list.
+ */
+const ATTACHMENTS_ABSENCES: readonly ReplicaAbsence[] = [
+  {
+    field: 'AttachmentListEntry (the whole list, both arms)',
+    because:
+      'no attachments table exists locally — the rows live in a server table the upload door writes and the bootstrap payload does not ship. The `attachment.added` event is a DIFFERENT fact with a different writer: the row exists the moment bytes land, while the event is the client\'s claim about them, `routes/attachments.ts` says it expects that claim afterwards and `Features.md` §9 records the web client does not post it today. Deriving the list from the local ledger would omit an upload whose event never arrived and include an event whose upload failed, in the same field, indistinguishably',
+    owner: 'Plan 10 — an attachments table in the local schema (bootstrap payload + sync), not a /v1 route',
   },
 ];
 
@@ -478,6 +525,7 @@ export const OFFLINE_BORN_OMISSIONS: Readonly<Record<string, ReplicaAbsence>> = 
 export const REPLICA_GAPS: Readonly<Record<string, readonly ReplicaAbsence[]>> = {
   getMyWorkspaces: MY_WORKSPACES_ABSENCES,
   getMembers: MEMBERS_ABSENCES,
+  getTicketAttachments: ATTACHMENTS_ABSENCES,
   search: SEARCH_ABSENCES,
   getMyWork: MY_WORK_ABSENCES,
   getAttention: ATTENTION_ABSENCES,
@@ -836,6 +884,8 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
   const query: DataSourceQuery & ReplicaOnlyQuery = {
     getMyWorkspaces: () => Promise.reject(new ReplicaGapError('getMyWorkspaces', MY_WORKSPACES_ABSENCES)),
     getMembers: () => Promise.reject(new ReplicaGapError('getMembers', MEMBERS_ABSENCES)),
+    getTicketAttachments: () =>
+      Promise.reject(new ReplicaGapError('getTicketAttachments', ATTACHMENTS_ABSENCES)),
     getMyWork: () => Promise.reject(new ReplicaGapError('getMyWork', MY_WORK_ABSENCES)),
     getAttention: () => Promise.reject(new ReplicaGapError('getAttention', ATTENTION_ABSENCES)),
     getWorkspaceSettings: () =>

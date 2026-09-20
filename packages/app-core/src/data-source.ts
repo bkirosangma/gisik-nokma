@@ -6,6 +6,11 @@ import type {
   TicketTypeDef,
   WorkflowDef,
 } from '@gisik-nokma/domain';
+// Type-only, and it is the ONE place this file reaches into `views/`. The union
+// is declared there because the list that renders it is declared there (and
+// twinned in `packages/editor`); re-declaring it here would be the second
+// spelling of one contract that `attachment-list.tsx`'s own docblock forbids.
+import type { AttachmentListEntry } from './views/attachment-list.js';
 import type {
   AttentionItem,
   BoardView,
@@ -145,6 +150,29 @@ export type DataSourceQuery = {
   getTickets(projectId: string, filter: FilterSpec, grouping: Grouping): Promise<TicketListView>;
   getTicket(workspaceId: string, ticketId: string): Promise<TicketRead | null>;
   getTicketHistory(ticketId: string, afterSeq?: number, limit?: number): Promise<TicketHistoryEvent[]>;
+  /**
+   * The ticket's files — the read `TicketSheetProps.attachments` has been
+   * waiting for since Plan 6.
+   *
+   * **A 404 THROWS. IT DOES NOT ANSWER `[]`, and that is the whole point of the
+   * method's shape.** `AttachmentList` renders `null` for an empty list —
+   * *"must not promise there are none"* — so an empty answer and a failed read
+   * are two states the caller has to be able to tell apart, and `[]` has only
+   * one meaning here: this ticket has no attachments. The route refuses a ticket
+   * the caller may not see exactly as it refuses one that never existed, so the
+   * transport answers `null` and this method re-raises it as the STATUS it was
+   * — the same decision `getBoard` and `getTickets` make for the same reason,
+   * rather than the `[]`-on-404 that `getMembers` and `getTicketHistory` take
+   * for theirs (there, emptiness is a true answer with a stated cost).
+   *
+   * **Only the `kind: 'upload'` arm is served**, and the route's own docblock
+   * names what that costs: an `attachment.added` whose arm is a Drive reference
+   * is a ledger fact, not a row in the table this reads, so it is not in the
+   * list. The union is kept whole as the return type rather than narrowed,
+   * because narrowing it would make the day a reference arm is served a change
+   * to this contract instead of a change to one mapper.
+   */
+  getTicketAttachments(workspaceId: string, ticketId: string): Promise<AttachmentListEntry[]>;
   getWorkflowDef(workspaceId: string, workflowId: string, version?: number): Promise<WorkflowDef | null>;
   getTicketTypes(workspaceId: string): Promise<TicketTypeDef[]>;
   search(workspaceId: string, text: string, filter?: FilterSpec): Promise<SearchHit[]>;

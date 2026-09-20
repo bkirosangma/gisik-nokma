@@ -1,4 +1,171 @@
-## ▲ TOP BLOCK — **THE PENDING-INVITATIONS HEADING: BUILT, AND A MUTATION FOUND ONE OF MY OWN CLAIMS FALSE.** (2026-09-20)
+## ▲ TOP BLOCK — **THE ATTACHMENTS READ: A ROUTE OVER THE TABLE THAT HAD NO CALLER, THE SEAM BEHIND IT, AND THE MOUNT THAT FINALLY PASSES IT.** (2026-09-20)
+
+### § 1 — WHERE TO FIND IT
+
+- **Dispatch: the controller's cycle-25 dispatch** (2026-09-20), the `attachments` task, **option (A)** — a thin
+  route over the existing `listTicketAttachments`. The owner's ruling is the one-line kind; this is the read.
+- **Branch `exec2/attachments-read`**, cut from `origin/main` = `9c3dbdba` and **fully folded onto `ffb9389a`**
+  before the freeze.
+- **⚠ THE PR IS OPENED AT THIS EXACT HEAD** — `exec2/attachments-read` → `main`, `--base main`. **This file does
+  not carry its number, because the handoff had to LAND before the PR opened.** Settle any question about it in
+  one call: `gh pr list --state all --head exec2/attachments-read`. **It is the controller's to merge; I do not
+  merge it.**
+
+### § 2 — ANCHORS, RECOUNTED AT `f4596a92` (not carried forward)
+
+| anchor | value |
+|---|---|
+| `git merge-base origin/main HEAD` | **`ffb9389a` — equal to `origin/main`, so this branch is FULLY FOLDED** |
+| **the code head this reports on** | `f4596a92d18bcc5490fc40eb456978b11836ecd5` |
+| ⚠ **and everything on top of it** | **Touches only THIS FILE.** A row naming HEAD as its own tip is false the moment it lands — check it rather than trust it: `git diff --name-only f4596a92..HEAD` returns `docs/lanes/executor-2-state.md` and nothing else |
+| ahead / behind `origin/main` | **6 ahead / 0 behind** (`git rev-list --left-right --count` → `0  6`) |
+| `origin/main` | **`ffb9389a`** (the `#600` merge). It moved **twice** while this branch ran (`9c3dbdba` → `7b75b2dc` → `ffb9389a`) |
+| tree | **clean** |
+| changed files | **18** — see § 8 |
+| `check:case-ids` | **rc 0 — 2552 at this head, 2540 at `origin/main` (measured by exporting `origin/main` to `/tmp` and running the guard there, not by arithmetic). Delta exactly 12 = the twelve ids minted** |
+| `check:citations` | **rc 0** — 16-remaining-doors.md **66 cited / 0 uncited** (was 54) |
+| `check:migrations` · `check:env` · `check:help` · `check:runbook` · `check:tasks` | **rc 0** each |
+| `pnpm turbo run build` | **11/11**, Node **v22.22.2** |
+| `pnpm turbo run typecheck` | **17/17** |
+| server suite | **1652 passed / 5 skipped / 0 failed**, all **160** files, four foreground chunks at `--maxWorkers=1` |
+| app-core suite | **1672 passed / 0 failed** |
+| web suite | **606 passed / 0 failed** |
+| mutation battery | **12 mutations, each declaring its expected arms BEFORE it ran — NO SURVIVORS**, § 4 |
+| review | **one independent falsifying reviewer, run against `50b80d44`** (its report opens by noting the tip had moved there from the `1545474a` I named to it) — **8 findings (2 Important, 6 Minor), all fixed in `c916d24b`**; the design was not refuted — § 5 |
+
+⚠ **THE FORCED GATE IS THE CONTROLLER'S.** Everything above is my own build/typecheck/test. ⚠ `check:db-tz` is
+**NOT run** (`DATABASE_URL is required`) — it needs a live database and this lane never runs `docker compose`.
+
+⚠ **⚠ THE WEB SUITE'S GREEN WAS UNATTRIBUTABLE UNTIL I RE-ESTABLISHED IT.** `apps/web` resolves
+`@gisik-nokma/app-core` through `dist`, so a green web run proves nothing about a src the build has not seen.
+The reviewer measured that and could not attribute it; I rebuilt after the last src edit and **checked the
+provenance rather than assuming it** — `dist/online/online-data-source.js` mtime `15:27:47` against src
+`15:27:25`, and `getTicketAttachments` present in both the dist JS and the `.d.ts`. Re-run after that.
+
+### § 3 — WHAT SHIPPED, AND THE FOUR DECISIONS IN IT
+
+1. **The route** `GET /v1/workspaces/:workspaceId/tickets/:ticketId/attachments`, registered **beside the events
+   door, at its same two guards in its same order answering its same `NOT_FOUND_BODY`** (`loadTicketRow` → 404,
+   then `canSee` → 404). "May this caller see this ticket" is still asked in one function. Case `16.52` proves
+   sameness by AGREEMENT (identical status and bytes from both doors, positive control included).
+   ⚠ **The ORDER is a copy, not a measurement** — the reviewer could not falsify a swap, because `canSee` on a
+   foreign-workspace ticket the caller does belong to answers `true` and `loadTicketRow` refuses either way.
+   Written down in the route's docblock rather than implied.
+2. **The empty case is a 200 and the refusal is a 404** — the pair `AttachmentList`'s null-on-empty docblock
+   depends on. The client seam **THROWS on a 404 rather than answering `[]`**, which is what keeps "no files" and
+   "could not read them" apart all the way to the screen; the sheet draws a sentence for the second
+   (`attachmentsUnavailable`, mirroring `NewTicketDialogProps.parentCandidatesUnavailable`).
+   ⚠ **The prop is a scope judgement, flagged:** §3 of the dispatch says "the route and the mount, and nothing
+   else"; §4 says an empty list and a failed read must not render the same. Those cannot both hold through the
+   prop as it stood, so the smallest surface that discharges §4 was added (four lines + one CSS rule that is a
+   one-line twin of an existing one). The PR body says so and names the alternative.
+3. **The offline replica REFUSES this read** with a named absence instead of deriving the list from
+   `attachment.added`, which the local ledger really does hold. The row is written when bytes land, the event is
+   the client's later claim about them; a ledger-derived list would omit an upload whose event never arrived and
+   include one whose upload failed. Case `16.56` carries the positive control that makes this a DECISION.
+4. **Case 12.185 moved EIGHT → NINE** in the same change set, at the position the registry inserts the key —
+   its assertion is `toEqual(Object.keys(REPLICA_GAPS))` and is order-sensitive.
+
+### § 4 — THE MUTATION BATTERY: 12 MUTATIONS, NO SURVIVORS
+
+| # | mutation | cases that reddened |
+|---|---|---|
+| S1 | route registration removed | 16.47 (and every case after) |
+| S2 | `canSee` guard removed | **16.50, 16.52** |
+| S3 | `loadTicketRow` guard removed | **16.51, 16.52** |
+| S4 | `ticket_id` predicate dropped | 16.47, 16.48, 16.49, 16.51 |
+| S5 | `sanitizeFilename` dropped | 16.53 (+16.47) |
+| S6 | empty case made a 404 | **16.49 alone** |
+| C1 | seam folds 404 into `[]` | 16.54 |
+| C2 | `sha256` shape check disabled | 16.55 |
+| C3 | sheet always draws the list | 16.57 |
+| C4 | mount stops passing the entries | 16.58 |
+| C5 | replica serves `[]` instead of refusing | 16.56 |
+| C6 | registry entry removed, impl intact | **12.185** (and 16.56 stayed green — the point) |
+
+Every one died on the case that names its property, **none by 500-ing**, and each restore was proven by a clean
+`git status --short`.
+⚠ **A process hazard this round produced, mine:** C4's mutation replaced the mount line with the **empty
+string**, so the revert searched for `""` and matched everywhere. `page.tsx` was restored by hand and verified
+byte-identical to HEAD (`git diff --stat` empty). **An empty-string replacement is not a mutation you can
+revert** — both such mutations are now anchored. This is the `git checkout --` lesson in a new costume: the
+restore is the dangerous half, and it must be verified rather than believed.
+
+### § 5 — THE REVIEW ROUND: ONE FALSIFYING REVIEWER, 8 FINDINGS, ALL FIXED
+
+- **IMPORTANT — the false count had a THIRD copy, in the file this change edits.** `replica-data-source.ts:296`
+  still read *"The refusals. Seven of the thirteen, and NOT the online source's seven"*, 84 lines above the
+  registry entry this change added, after the same sentence had been corrected in `Features.md` and
+  `test-cases/12`. **I corrected the two documents and left the source.** The header no longer restates a count.
+  *Found only because the reviewer opened the source file rather than the two documents the sweep covered.*
+- **IMPORTANT — "the ONE method in this file whose 404 is re-raised" was false**: there are five such sites and
+  `getTicketTypes` argues the same choice for an array-returning signature.
+- MINOR ×6, each verified at the line before acting: an imaginary rendering consequence for a malformed
+  `sha256` (nothing renders `sha256` at all); an exclusion list for "no producer emits the reference arm" that
+  missed a **runtime** composer (`composeDriveReferenceAdded`, exported, callers = tests only, so the conclusion
+  held and the enumeration did not); a mount path in `test-cases/16` that is not a path in this repository;
+  "strictly smaller than that one" (unmeasured, and false in general — neither read is bounded); "the one refusal
+  here that had a tempting alternative" (not the only one); and `role="status"` where this sheet's five other
+  failure sentences use `role="alert"`.
+
+⚠ **What the reviewer could NOT falsify, kept because that is evidence too:** the guard ORDER (§ 3.1); the fact
+that the web suite's green could not be attributed to the sha until the build was re-established (§ 2); and that
+the replica suite dies under this shell's default Node v24 with `NODE_MODULE_VERSION 127 … requires 137` — **a
+FALSE RED** that would convict a suite which is fine. My runs export Node **v22.22.2**; a gate result that does
+not name its Node is not evidence.
+
+### § 6 — WHAT IS *NOT* IN THIS CHANGE SET, NAMED RATHER THAN IMPLIED
+
+- **The Drive-reference arm is not served and cannot be.** The `attachments` table has no kind column and its
+  only writer is the upload door, so a reference recorded as a ledger EVENT is not in this list. **No PRODUCTION
+  producer emits it today** (measured; the runtime composer exists and its callers are tests). It becomes a
+  silent omission the day one lands. **RECORDED — owner: whoever gives the table a kind column, or emits the
+  reference arm for the first time.**
+- **`{ error: 'not-found' }` (the attachment doors) vs `{ error: 'not_found' }` (the ticket doors)** — this route
+  uses the ticket body because it rides the ticket guards. Unifying them changes the download door's frozen
+  refusal, which its suite pins byte-for-byte. **RECORDED — owner: whoever next touches either refusal body.**
+- **No browser measurement of any kind.** No suite renders the sheet, so the accessible-name, type-scale and
+  non-text-contrast ratchets cannot see this change in either direction; the new CSS rule is a one-line twin of
+  an existing one and no viewport or contrast run was attempted. **Stated, not hidden.**
+- **`visibility`, its mapper, `mappers.ts`'s ticket read, and `canSetVisibility` are untouched** — verified
+  against the diff by the reviewer as well as by me.
+
+### § 7 — CASE IDS: MY BLOCK IS `16.41`–`16.60`. USED `16.47`–`16.58`. **`16.59` IS STILL FREE.**
+
+Recounted, not assumed: at `origin/main` (= my cut) the used 16.x ids were `16.1`–`16.46`, `16.60`–`16.62`,
+`16.72`, `16.80`–`16.87`, `16.99`; **`16.47`–`16.59` were free and interior to my block**, so the twelve minted
+here cannot collide with a future `16.88`+. **The delta is measured twice — 2535 → 2547 before the fold, and
+2540 → 2552 measured against the folded `origin/main` — both exactly 12.** Every id is written as an id LINE.
+
+### § 8 — THE FOLD, AND THE CONFLICT IT CARRIED
+
+`origin/main` moved **twice** while this branch ran. The second move was `exec/visibility-mode` (#600), which
+overlaps **five** of my files — one real conflict, in `ticket-sheet.tsx`, and it was ADDITIVE on both sides (my
+`attachmentsUnavailable` prop beside their rewritten `visibility` docblock); both kept. The other four
+auto-merged, and **each was checked by hand for the pieces this change depends on rather than trusted for it** —
+my render, my destructuring, my mapper, my registry entry, my case, all present post-merge.
+
+⚠ **AND THE FOLD BROKE THE TYPECHECK, WHICH IS THE MERGE WORKING RATHER THAN FAILING:** #600 made
+`TicketRead.visibility` a REQUIRED field, so my web test's hand-built fixture stopped compiling (TS2741). Fixed
+in the same change set, with the same `visibility: null` and the same reason `evidence-upload` and
+`description-editable` give. **A hand-built fixture is a merge surface nobody lists.**
+
+### § 9 — Rules that bind this branch
+
+- **Never `docker compose`** (any subcommand) and **never bind `:3001`** — a peer's hot stack is there.
+- Test runs at `--maxWorkers=1`, redirected to a file, **never piped into `head`**.
+- **Do not run the forced gate** — the controller does.
+- **Do not edit `task-ledger.tsv`** — it is `main`'s; the controller flips rows after each merge.
+- `Features.md` and `test-cases/` changed **in the same change set** as the code.
+- **Never `AskUserQuestion`** in this topology. A question for the owner is a file plus a one-line pointer, then a hold.
+- ⚠ **Scratch paths carry this lane:** `/tmp/exec2-<task>-<thing>.md`, never `/tmp/pr-body.md` — that path cost
+  `#595` its body, with `headRefOid` and `baseRefName` both correct. **Read the body back after creating.**
+- ⚠ **Before folding, re-fetch.** `origin/main` moved twice inside one task here; the merge-base you measured
+  an hour ago is a reading that expires.
+
+---
+
+## ▼ PREVIOUS BLOCK — **THE PENDING-INVITATIONS HEADING: BUILT, AND A MUTATION FOUND ONE OF MY OWN CLAIMS FALSE.** (2026-09-20)
 
 ### § 1 — WHERE TO FIND IT
 
