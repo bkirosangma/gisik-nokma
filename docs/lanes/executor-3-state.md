@@ -10,6 +10,8 @@ handoff conflict on every merge.
 
 - **Branch `exec3/visibility-styling`**, cut from **`origin/main = 534c450b`**. `git merge-base HEAD
   origin/main` equals `534c450b` exactly as of the handoff's own commit.
+- **THE PR IS OPEN: `#619`** — `--base main`, `headRefOid` verified equal to this branch's HEAD
+  (`6c79d06c`) at open, `state=OPEN`, `mergeable=MERGEABLE`. **This lane does not merge it.**
 - ⚠ **THE WINDOW: this file adds itself to its own figures.** Every count below is measured at
   `534c450b`, the pre-change head — so a restart that measures one commit more than § 2 says is seeing
   **this file's own landing**, not a foreign push. `git log --oneline origin/main..HEAD` and match the
@@ -204,6 +206,14 @@ enough, the name has to be the one that EXECUTES.)
 
 **The controller runs the forced gate at its own tree.** This pre-check is reported so the controller does
 not receive a surprise, not as a claim about that gate.
+
+**✅ RE-RUN AT THIS HEAD: `pnpm turbo run build test typecheck` → 33 successful / 33 total, `GATE_EXIT=0`.**
+**That is the second run, and it settles what the first one's four failures were:** the same tree, the same
+dist, one green — the red was **CPU contention between three lanes on this 16 GB box** (the isolated runs
+are the positive control, at 6–8 s against the gate's 16–45 s). ⚠ **The first run's `web:build` `exit 130`
+and `app-core` non-zero exits were TURBO CANCELLING DEPENDANTS after a failing task, not independent
+failures** — worth knowing, because "six tasks failed" reads as six defects when it was one failing task
+plus its cancelled dependants.
 
 ### § 3b — THE REVIEW, AND THE ONE THING THIS LANE DID TO ITSELF
 
