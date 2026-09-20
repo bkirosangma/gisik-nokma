@@ -138,7 +138,7 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  *
  * None of the three consults deletion, for one ruling: `canSee` by its own words
  * does not mean "not deleted" (`read/visible-where.ts:137-139`). The sibling
- * detail route carries the third guard they lack (`routes/tickets.ts:365`).
+ * detail route carries the third guard they lack (`routes/tickets.ts:366`).
  * ⚠ **The grep, with its control: `routes/attachments.ts` contains the word
  * `deleted` ZERO times, while the same grep finds it 6 times in
  * `routes/tickets.ts` — an absence at the file, not a missed line.**

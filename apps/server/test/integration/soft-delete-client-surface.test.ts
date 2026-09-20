@@ -444,7 +444,7 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
   getTicket: {
     verdict: 'excluded',
     carries: true,
-    why: 'Guarded at the ROUTE by a DIFFERENT mechanism — `routes/tickets.ts:365` reads the domain state and 404s on `deleted`, NOT by `LIVE_TICKET_WHERE`. Constrained here; not by the constant.',
+    why: 'Guarded at the ROUTE by a DIFFERENT mechanism — `routes/tickets.ts:366` reads the domain state and 404s on `deleted`, NOT by `LIVE_TICKET_WHERE`. Constrained here; not by the constant.',
   },
   getTicketHistory: {
     verdict: 'retained',

@@ -16,7 +16,7 @@ import { signInWithPhone } from '../helpers/session.js';
  * ## The defect this file closes
  *
  * `#591` gave a soft-deleted ticket a third guard on its DETAIL route
- * (`routes/tickets.ts:365` — the domain `deleted` flag → 404) and left the
+ * (`routes/tickets.ts:366` — the domain `deleted` flag → 404) and left the
  * routes beside it carrying only `loadTicketRow` + `canSee`. `canSee` is the
  * VISIBILITY predicate and by its own written ruling does not mean "not
  * deleted" (`read/visible-where.ts`, *"Deletion is not visibility"*), so a
@@ -48,8 +48,13 @@ import { signInWithPhone } from '../helpers/session.js';
  * - **16.99 the DOWNLOAD door** — this door serves **the bytes themselves**, so a
  *   200 after the delete is the whole disclosure rather than a hint of it:
  *   before, the exact bytes; after, the shared JSON body, asserted **not** to be
- *   the file and with the two headers this handler only ever sets on the
- *   success path asserted absent.
+ *   the file and with `content-disposition` absent. ⚠ Only that ONE header is
+ *   asserted here, and the reason is measured rather than tidy: this suite runs
+ *   the ASSEMBLED app, where `http/security-headers.ts:51` puts
+ *   `x-content-type-options: nosniff` on every response, so its presence says
+ *   nothing about this handler. The route-isolated
+ *   `attachments-download.test.ts` is where the handler's own header discipline
+ *   is observable, and it asserts both there.
  * - **16.96 the REFUSALS AGREE, and the HISTORY exception is pinned** — the two
  *   `routes/tickets.ts` doors agree with each other byte-for-byte, the two
  *   `routes/attachments.ts` doors agree with each other byte-for-byte, and the
