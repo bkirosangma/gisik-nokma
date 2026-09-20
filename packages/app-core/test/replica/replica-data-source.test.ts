@@ -432,7 +432,7 @@ describe('12.182-12.184 the replica-only surface, and what it confesses', () => 
 });
 
 describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
-  it('12.185 NINE methods refuse, enumerated by id rather than counted', async () => {
+  it('12.185 TEN methods refuse, enumerated by id rather than counted', async () => {
     const { ds } = await fixture();
     const refusals: Array<[string, () => Promise<unknown>]> = [
       ['getMyWorkspaces', () => ds.query.getMyWorkspaces()],
@@ -443,6 +443,11 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
       // under `getMembers`. Enumerated rather than counted, as the comment
       // above says, so the name travels with the list.
       ['getTicketAttachments', () => ds.query.getTicketAttachments(WS, newUlid())],
+      // Added 2026-09-21 with the comment thread, and placed here for the SAME
+      // reason the entry above is placed where it is: the assertion is
+      // `toEqual(Object.keys(REPLICA_GAPS))`, which is order-sensitive, and
+      // `REPLICA_GAPS` gained this key directly under `getTicketAttachments`.
+      ['getTicketComments', () => ds.query.getTicketComments(WS, newUlid())],
       ['search', () => ds.query.search(WS, 'x')],
       ['getMyWork', () => ds.query.getMyWork(WS)],
       ['getAttention', () => ds.query.getAttention(WS)],

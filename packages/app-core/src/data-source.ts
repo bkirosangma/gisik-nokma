@@ -11,6 +11,7 @@ import type {
 // twinned in `packages/editor`); re-declaring it here would be the second
 // spelling of one contract that `attachment-list.tsx`'s own docblock forbids.
 import type { AttachmentListEntry } from './views/attachment-list.js';
+import type { TicketComment } from './views/comments-thread.js';
 import type {
   AttentionItem,
   BoardView,
@@ -173,6 +174,23 @@ export type DataSourceQuery = {
    * to this contract instead of a change to one mapper.
    */
   getTicketAttachments(workspaceId: string, ticketId: string): Promise<AttachmentListEntry[]>;
+  /**
+   * The ticket's comment thread — oldest first.
+   *
+   * **A 404 THROWS, for the same reason `getTicketAttachments` re-raises and
+   * with the same consequence.** `TicketComment[]` has an absence value, `[]`,
+   * and the comments block draws it as *"No comments yet."* — a sentence about
+   * the ticket. The route answers 404 for a ticket that is invisible, deleted or
+   * nonexistent (indistinguishably, by design), so folding that into `[]` would
+   * tell the reader the ticket has no comments when the truth is that this
+   * client could not read them. The sheet draws the two states differently, and
+   * this signature is what keeps them apart.
+   *
+   * `TicketComment` lives with the component that renders it
+   * (`views/comments-thread.tsx`) for the reason `AttachmentListEntry` does:
+   * the union is the component's, and only the component's props describe it.
+   */
+  getTicketComments(workspaceId: string, ticketId: string): Promise<TicketComment[]>;
   getWorkflowDef(workspaceId: string, workflowId: string, version?: number): Promise<WorkflowDef | null>;
   getTicketTypes(workspaceId: string): Promise<TicketTypeDef[]>;
   search(workspaceId: string, text: string, filter?: FilterSpec): Promise<SearchHit[]>;

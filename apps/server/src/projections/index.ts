@@ -7,6 +7,7 @@ import { projVisibility } from './proj-visibility.js';
 import { createProjectionRegistry, type ProjectionRegistry } from './registry.js';
 import { rollupsProjection } from './rollups.js';
 import { searchProjection } from './search.js';
+import { ticketCommentsProjection } from './ticket-comments.js';
 import { ticketsProjection } from './tickets.js';
 import { ticketTypesProjection } from './ticket-types.js';
 import { workflowsProjection } from './workflows.js';
@@ -22,7 +23,8 @@ import { workspaceSettingsProjection } from './workspace-settings.js';
  *
  *   proj_entity_heads, proj_workflows, proj_ticket_types, proj_projects,
  *   proj_tickets, proj_rollups, proj_memberships, proj_invites,
- *   proj_visibility, proj_contested, proj_workspace_settings, proj_search
+ *   proj_visibility, proj_contested, proj_workspace_settings, proj_search,
+ *   proj_ticket_comments
  *
  * `proj_projects` is in that list by the owner decision of 2026-08-26 and was
  * MISSING from this comment until Plan 4 Task 9 registered it — coordination
@@ -129,5 +131,23 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   // is the moment this position becomes load-bearing and must be justified as
   // an adjacency.
   registry.register(searchProjection);
+  // APPENDED because no adjacency is load-bearing — and appended is NOT a §8
+  // position, for the third time and the same reason: §8's order ends at
+  // proj_visibility and names none for this projection either.
+  //
+  // The dependency was read in BOTH directions before this line was written.
+  // Downward: `apply` writes proj_ticket_comments and reads NO table at all —
+  // not another projection's, not its own — so nothing above it must run first.
+  // Upward: no registered projection reads proj_ticket_comments inside an
+  // ingest transaction. It does have a reader, and naming it is the more useful
+  // sentence than "nothing reads it": the ticket-comments route
+  // (`routes/tickets.ts`) selects from it, and that is a READ-TIME caller on a
+  // request path, never a handler inside an ingest transaction, so it creates
+  // no adjacency here.
+  //
+  // Should a later projection ever read this table inside a transaction, THAT is
+  // the moment this position becomes load-bearing and must be justified as an
+  // adjacency.
+  registry.register(ticketCommentsProjection);
   return registry;
 }

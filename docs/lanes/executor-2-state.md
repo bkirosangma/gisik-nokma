@@ -1,4 +1,146 @@
-## ▲ TOP BLOCK — **THE DELETE FILTER IS NOW HELD BY A TYPE, NOT BY CONVENTION — AND AN INDEPENDENT REVIEW REFUTED THE ENUMERATION TWICE.** (2026-09-20, cycle 25/26, task 2)
+## ▲ TOP BLOCK — **THE COMMENT THREAD: THE READ `comment.added` NEVER HAD, AND TWO PREMISES OF ITS DISPATCH THAT THE LEDGER REFUTES.** (2026-09-21, executor 2)
+
+### § 0 — WHERE TO FIND IT
+
+- **Branch `exec2/comment-thread`**, cut from **`origin/main = fed9a588`**, **folded THREE times**: onto
+  `fd14c48d`, onto `3d40ac68`, and onto **`origin/main = 00ee17e9`**. `git merge-base HEAD origin/main`
+  equals `00ee17e9` exactly — **this head IS the landing tree**, and `origin/main` has not moved since.
+  The third fold was clean, and it brought exec 1's `#614` (the subtask affordance), which edits FIVE
+  files this branch also edits — **including this handoff, where it corrected a rotted citation in an old
+  block** (`ticket-sheet.tsx:491` → `:554`).
+- **The commits, by SUBJECT rather than by count** — a count is a reading that expires the moment this
+  file lands, and the shas below are the ones measured at `13c91c78`:
+  1. `d89db1df` — the change itself.
+  2. `590254d0` — the first merge of `origin/main`.
+  3. `6a69f5df` — the fold's four corrections (the shared guard, the closed leak's stale citation, the
+     re-aimed mutation, the second copy of the marker claim).
+  4. `13c91c78` — the second merge.
+  5. `cbea3c3e` — this handoff.
+  6. **the citation sweep's fix** (`doc-text.ts:44-50` resolved to `BLOCK_NODE_TYPES`).
+  7. **the `Features.md` replica-refusal count** (`NINE` → `TEN`, with the membership).
+  **Anything on `origin/main..HEAD` that is not one of these subjects is a foreign push: re-run
+  `git rev-list --oneline origin/main..HEAD` and match before concluding anything.** ⚠ **`git log` rather
+  than `git rev-list` shows FIVE of these seven** — it simplifies the two merges away, so the log is the
+  one command that under-reports this branch; measured both ways.)
+- The PR is opened at this head; this file cannot carry its number because the handoff lands before the
+  PR opens. One call settles it: `gh pr list --state all --head exec2/comment-thread`.
+- ⚠ **THE WINDOW: this file adds itself to its own figures.** Every count below is measured at `13c91c78`,
+  the folded head, **before this handoff commit** — so a restart that measures one commit more than § 2
+  says is seeing **this file's own landing**, not a foreign push. `git log --oneline origin/main..HEAD`
+  and match the subjects before concluding anything.
+
+### § 1 — WHAT SHIPPED, AND THE PART THAT WAS REFUTED RATHER THAN BUILT
+
+Dispatch `CTL-DISPATCH-2026-09-20-comment-thread.md`, owner ruling **(A): a projection + a route**.
+`comment.added` was fully wired and reached no surface; its text landed only in `proj_search.comments`, a
+CONCATENATED TEXT column that cannot serve a thread. Now: `proj_ticket_comments` + a route + the mapper,
+the view type, the thread renderer and the composer, in the sheet's details tab.
+
+**⛔ PREMISE 1 — "a comment's files are `attachment.added` events" — IS FALSE, AND THE JOIN DOES NOT
+EXIST.** `comment.added` is `{body}`; `attachment.added` names no comment; the `attachments` table has no
+`comment_id`; a sweep finds none. The only per-comment file relation that exists is **the comment's own
+document** (`image` nodes carrying `attrs.attachmentId`, gate-checked at the door) — so that is what the
+read joins on, ticket-scoped, with an unresolved id rendered **as itself** rather than dropped. The
+ticket's files are never attributed to a comment. **The composer therefore gets an uploader**, which makes
+this the product's **first MOUNTED `attachment.added` producer** — ⚠ **not "first producer": the
+composers already exist** (`packages/editor/src/drive/attachment-claims.ts`, both TESTED, and
+`EvidencePicker`), and **none has a production caller**. Measured; the looser wording was false and was
+corrected at the three places it appeared.
+
+**⛔ PREMISE 2 — "`#594`'s toolbar is the prototype's toolbar plus the `@` mention button" — IS FALSE.**
+`packages/editor/src/components/EditorToolbar.tsx:123-176` has **six** controls and no seventh. Mentions
+work by TYPING `@` (shipped, `extensions/mention.ts:226`); the BUTTON is not built and is **named as an
+absence rather than faked** — a control that inserted `@` programmatically would not open the picker.
+**Both premises and three asks are filed:** `gisik-nokma-lanes/EXEC2-RULING-REQUEST-2026-09-20-comment-files-and-mention.md`.
+
+**THE THIRD GUARD, AND THE FOLD THAT CHANGED IT.** A comment read must refuse a soft-deleted ticket. I
+hand-rolled it off `getTicketStateFromDb`'s folded flag; **exec 1's `#610` landed mid-branch with
+`read/live-ticket.ts` (`ticketIsLive`), which is the same rule in its one route-level spelling**, so the
+fold replaced my version with the shared helper. `#610` also **closed the attachments leak this branch's
+commit message cited as open** — that sentence is corrected at the line, in the route docblock and in the
+invariant's `getTicketAttachments` row. **The mutation witness was re-measured rather than carried**: the
+old mutation targeted a line that no longer exists.
+
+### § 2 — ANCHORS, RECOUNTED AT THIS TREE (not carried forward)
+
+| anchor | value |
+|---|---|
+| `git merge-base HEAD origin/main` | **`00ee17e9` — equal to `origin/main`** (folded three times) |
+| ahead / behind | **11 / 0** — nothing behind, so this head IS the landing tree |
+| tree | clean (`git status --porcelain` empty) |
+| `test-cases/` vs `origin/main` | **EMPTY diff**, with a control (`Features.md` shows +1) — **no id was minted** |
+| `check-case-ids` | **2577 unique / highest 16.99**, identical on both sides of the fold; all four new ids are exec 1's |
+| `check:help` · `check:citations` · `check:migrations` · `check:tasks` · `check:runbook` · `check:env` | rc 0 each |
+| **suites** | **server 1696 · app-core 1702 · web 622 — all green, 0 failed**, re-run AFTER the third fold |
+| **the batteries** | **7/7 server mutations KILLED · 7/7 client mutations KILLED**, each naming its own case, both re-run after the third fold. The two the review added are `m7` (the filename sanitizer) and `c7` (the thread reload) — **both were unwitnessed until the reviewer measured them** |
+| ⚠ the forced gate | **NOT run — it is the controller's.** |
+
+### § 3 — THE REVIEW: 2 IMPORTANT + 5 MINOR, CRITICAL NONE, ALL SEVEN FIXED
+
+One independent reviewer, told to falsify, ran against `d89db1df` and mutated in an **APFS clone** rather
+than the shared worktree. **Its full findings are recorded in the PR body, written before the PR opened.**
+
+- **It could not break the core claim set** — the files join, the third guard, the six-control toolbar, the
+  stored instant and every count survived its attempts.
+- **Both Important findings were unwitnessed CODE, not wrong code**, and both are now killed by the
+  reviewer's own mutation: the route's `sanitizeFilename` call (the only name any case reached was one the
+  sanitizer passes through) and `comments.reload()` (deleting it left all 107 comment-suite tests green).
+  ⚠ **The reload finding also caught a self-contradiction**: this branch's test docblock said *"`read` and
+  `history` are reloaded too"* while the implementation docblock says `read` is deliberately NOT.
+- **One Minor was a claim THIS CHANGE SET created and did not update** — `Features.md:1491` still said the
+  web client never posts the `attachment.added` event, which the comment composer now does. Fixed in the
+  same change set, which is the rule.
+- Four more Minors: a migration citation naming one file for columns that span two, a sweep claim its own
+  tree contradicted, "verbatim" on one arm of a conditional, and the composer-under-a-failed-read
+  question — now a stated choice with its cost named.
+
+### § 4 — OPEN, AND WHAT IS OWED
+
+1. **THE CASE IDS ARE OWED, AND THIS BRANCH MINTS NONE.** The controller ruled mid-task that executor 2
+   has no free ids (`16.41`–`16.60` spent; `16.63`–`16.80` and `16.91`–`16.99` are exec 1's by `§16`'s
+   table). **Cycle 29 settled §17's SHAPE (`17.NNN`, uniformly 3-digit padded, ceiling 999) and did NOT
+   open it** — §16's window is not spent. **So four shipped test files carry no case id at all**, each
+   saying so in its own header, and `test-cases/` is untouched. When a block is ruled, the mint is
+   mechanical: the case text is already in the files.
+2. **AN OWED SENTENCE, NOT MINE TO WRITE.** Cycle 29 §4 owes a lane **one sentence in
+   `test-cases/16-remaining-doors.md`'s header** recording §17's shape and scoping the existing `{3}`
+   prohibition to *within* a section. I did **not** take it, deliberately: my change set touches no
+   `test-cases/` file, that promise is what keeps this branch's no-mint claim checkable, and exec 1 has a
+   `test-cases/`-touching task in flight. **It rides with the next `test-cases/` change.**
+3. **THE `@` MENTION BUTTON** — ruled or deferred; the request is filed (premise 2 above).
+4. **The replica serves NO comments.** `getTicketComments` refuses with a `ReplicaGapError`, because a
+   comment's FILES are resolved against a server table the replica does not hold and the renderer draws an
+   image as nothing — so a ledger-derived thread would draw a comment that embeds a file as one that
+   embeds none. The bodies alone are derivable; the attribution is not. **Named, not silent.**
+
+### § 5 — WHAT IS NOT COVERED, NAMED RATHER THAN IMPLIED
+
+- **No viewport run was attempted**, and the hot stack on `:3001` is exec 1's. The comment block is not in
+  the viewport suite's routes, so a run would prove nothing about it.
+- **`.editor-slot` and `.editor-slot__submit` remain UNSTYLED** — pre-existing, recorded at
+  `apps/web/e2e-viewport/type-scale.ts:355-357` with the grep. The comment box inherits it exactly as the
+  description row already does. **Not introduced here, not fixed here.**
+- **The composer's footer sentence renders as a LINE UNDER the composer** rather than inside a footer row
+  with `Attach` and `Post` as the prototype draws it: our composer is `packages/editor`'s
+  `TicketEditorSlot`, which draws its own submit control and cannot have one injected.
+- **A comment's files are chips, not inline images.** The body renders through `docToPlainText`, which
+  draws an `image` node as NOTHING — which is exactly why the chip row is load-bearing and why dropping it
+  would draw an absence as a fact.
+
+### § 6 — RULES THAT BIND THIS BRANCH (carried forward, unchanged)
+
+- **Never `docker compose`** and **never bind `:3001`**; `--maxWorkers=1`; **never `| head`**.
+- **Do not run the forced gate** — the controller does. **Do not edit `task-ledger.tsv`.**
+- **Never `AskUserQuestion`**: a question for the owner is a file plus a one-line pointer, then a hold.
+- **A mutation must be a REAL change**: both batteries refuse a pattern that matches more than once,
+  because the first `ORDER BY workspace_seq` mutation hit a **docblock's quotation** of the string and left
+  the SQL intact — a "survivor" that was a mutation which never ran.
+- **A reviewer mutates your tree.** The change set was COMMITTED before the review was dispatched, so any
+  mutation shows as a dirty tree against a known baseline.
+
+---
+
+## ▼ PREVIOUS BLOCK — **THE DELETE FILTER IS NOW HELD BY A TYPE, NOT BY CONVENTION — AND AN INDEPENDENT REVIEW REFUTED THE ENUMERATION TWICE.** (2026-09-20, cycle 25/26, task 2)
 
 ### § 0 — WHERE TO FIND IT
 
