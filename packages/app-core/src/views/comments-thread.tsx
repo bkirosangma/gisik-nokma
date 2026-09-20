@@ -18,11 +18,19 @@ import { formatDateTime } from '../provenance.js';
  *
  * **WHY THAT ARM IS NOT OPTIONAL — measured, not argued.** This component
  * renders the body through `docToPlainText`, and that renderer drops an
- * `image` node entirely (`packages/domain/src/doc-text.ts:44-50`: an image has
- * no `content` and is not a block type, so it renders `''`). A comment whose
- * only trace of its file were the chip row would therefore render as a comment
- * with no file at all if the row were dropped — an absence drawn as a fact.
- * The chips are the ONLY place an embedded image is reachable from this screen.
+ * `image` node entirely: `render`'s fallthrough takes `candidate.content`,
+ * which an image node does not have, so it returns `''`
+ * (`packages/domain/src/doc-text.ts:71-75` — `children` is `''` and the node is
+ * not a `BLOCK_NODE_TYPES` member, so the ternary returns it unchanged). A
+ * comment whose only trace of its file were the chip row would therefore render
+ * as a comment with no file at all if the row were dropped — an absence drawn as
+ * a fact. The chips are the ONLY place an embedded image is reachable from this
+ * screen.
+ *
+ * ⚠ **This citation read `doc-text.ts:44-50`, and it RESOLVED — at the end of
+ * `BLOCK_NODE_TYPES`, which is not the code it describes.** The range was
+ * corrected by reading the lines; a citation that resolves is not a citation
+ * that is right, which is the failure this repo has recorded most often.
  *
  * ## The two absences, kept apart
  *
