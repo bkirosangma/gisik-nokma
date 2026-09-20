@@ -84,7 +84,7 @@ export async function workspaceNameFromLedger(
  * `prefix` is `null` only where `name` is `null` — a workspace with no naming
  * event at all, which has nothing to derive from and nothing to render. For
  * every named workspace the answer is the stored prefix where the founding
- * claim carried one, and `derivePrefix(name)` where it did not.
+ * claim carried one, and `derivePrefix` of the FOUNDING name where it did not.
  *
  * **The derivation is a READER'S rule, not a column's.** Nothing writes it
  * back: every workspace in the ledger today was founded before the field
@@ -115,5 +115,22 @@ export async function workspaceIdentityFromLedger(
   // walk the history looking for a prefix no later event can carry — there is
   // exactly one candidate and it is the first.
   const stored = rows[0]?.payload.prefix;
-  return { name: named, prefix: typeof stored === 'string' ? stored : derivePrefix(named) };
+  // ⚠ THE DERIVATION READS THE **FOUNDING** NAME, NOT THE CURRENT ONE, and that
+  // is a defect fix rather than a tidy-up. Deriving from `named` made the
+  // prefix a function of whatever the workspace is called TODAY: renaming
+  // `Convenience Corner` to `Corner Emporium` moved `CC` to `CE` and rewrote
+  // every ticket key in the workspace — after readers had quoted them — which
+  // is the single thing this module's docblock and `membership.ts` both say a
+  // key may not do. **It was reachable on EVERY workspace in the ledger**,
+  // because none of them carries a stored prefix, so every one of them was on
+  // this branch; it took an independent reviewer to see it, and the case that
+  // was supposed to catch it (13.1012) passed because its fixture stores a
+  // prefix and therefore never took the derived path at all.
+  //
+  // The founding name is immutable in the same way the prefix is: no event
+  // rewrites a `workspace.created` payload (`events` refuses UPDATE). So
+  // reading it makes the derived half exactly as stable as the stored one.
+  const foundingName = rows[0]?.payload.name;
+  const derived = derivePrefix(typeof foundingName === 'string' ? foundingName : named);
+  return { name: named, prefix: typeof stored === 'string' ? stored : derived };
 }

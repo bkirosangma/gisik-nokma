@@ -226,6 +226,51 @@ describe('13.1004-13.1013 the ticket key', () => {
     });
   });
 
+  it('13.1027 — a rename does not move a DERIVED prefix either, which 13.1012 could not see', async () => {
+    // ⚠ THE CASE THE SUITE WAS MISSING, and it was missing it in the way that
+    // matters: 13.1012 stores a prefix, so it only ever exercised the forward
+    // (stored) branch. Every workspace in the ledger takes the OTHER branch —
+    // none of them entered a prefix — so the derived half was the one that
+    // shipped, and it read the CURRENT name: renaming this workspace to
+    // 'Corner Emporium' moved the prefix from `CC` to `CE` and rewrote every
+    // ticket key in it. Measured by an independent reviewer against a probe
+    // database; the fix is that the derivation reads the FOUNDING name.
+    const derived = newUlid();
+    const actor = newUlid();
+    await appendTestEvent(
+      db.pool,
+      testEnvelope({
+        workspaceId: derived,
+        entity: { kind: 'workspace', id: derived },
+        type: 'workspace.created',
+        payload: { name: 'Convenience Corner' },
+        actorId: actor,
+      }),
+    );
+    expect(await workspaceIdentityFromLedger(db.pool, derived)).toEqual({
+      name: 'Convenience Corner',
+      prefix: 'CC',
+    });
+
+    await appendTestEvent(
+      db.pool,
+      testEnvelope({
+        workspaceId: derived,
+        entity: { kind: 'workspace', id: derived },
+        type: 'workspace.renamed',
+        payload: { name: 'Corner Emporium' },
+        actorId: actor,
+      }),
+    );
+    // The NAME moves — that is what a rename is for. The PREFIX does not, and
+    // `CE` here would mean every `CCSO-*` key in the workspace had silently
+    // become `CESO-*`.
+    expect(await workspaceIdentityFromLedger(db.pool, derived)).toEqual({
+      name: 'Corner Emporium',
+      prefix: 'CC',
+    });
+  });
+
   it('13.1013 — a workspace with no naming event answers null for both halves', async () => {
     expect(await workspaceIdentityFromLedger(db.pool, newUlid())).toEqual({
       name: null,
