@@ -174,6 +174,10 @@ describe('withCacheFeed — the decorator that keeps the cache fed from ordinary
         // This fixture's ticket has never been assigned, so there is no claim
         // behind an assignee: `null` is the whole truth (`read/assigned-provenance.ts`).
         assignedProvenance: null,
+        // Nothing in this file reads the audience, and the fake is standing in
+        // for a read that carried no visibility row — the honest `null` rather
+        // than a mode this fixture has no basis for.
+        visibility: null,
         parent: null,
         rollup: null,
       }),
@@ -243,6 +247,9 @@ describe('withCacheFeed — the cache is never rendered as truth', () => {
           // This fixture's ticket has never been assigned, so there is no claim
           // behind an assignee: `null` is the whole truth (`read/assigned-provenance.ts`).
           assignedProvenance: null,
+          // As above: this fake carries no visibility row, and nothing here
+          // reads the audience.
+          visibility: null,
           parent: null,
           rollup: null,
         }),

@@ -4,7 +4,7 @@ import { Button } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatDateTime } from '../provenance.js';
 import { makeSubmittedFactory } from '../submit.js';
-import type { Actor, ClaimProvenance } from '../view-types.js';
+import type { Actor, ClaimProvenance, ResolvedVisibilityMode, TicketVisibility } from '../view-types.js';
 
 /**
  * The two sentences on this screen that are OWNER DECISIONS, not wording.
@@ -33,12 +33,52 @@ export const OWNER_ALWAYS_SEES_COPY = 'Visible to: these people — and the work
 export const LOCKOUT_WARNING_COPY =
   'You are about to lose access to this ticket. A project admin — or the workspace owner, who always sees — can restore it.';
 
-/** How the ticket's audience stands now, as somebody's claim rather than a property. */
-export type VisibilityClaim = {
-  mode: VisibilityMode;
-  /** Empty for every mode but `explicit`, which is the only one that names people. */
-  userIds: string[];
-  claim: ClaimProvenance;
+/**
+ * How the ticket's audience stands now, as somebody's claim rather than a
+ * property.
+ *
+ * ## This is `TicketVisibility` WIDENED, and the two extra members are nullable
+ *
+ * `TicketVisibility` (`../view-types.js`) is what the shipped ticket read
+ * serves: the two mode columns of `proj_visibility`, and nothing else. This type
+ * adds the two things a FULLER read would carry and no shipped read does — the
+ * roster an `explicit` audience names, and the provenance of whoever set the
+ * mode.
+ *
+ * Both are `| null` rather than optional, and `null` is a CLAIM here rather than
+ * a shrug: it says *"no read served this"*, which is the honest answer for the
+ * roster (**cut from the wire entirely** — `routes/tickets.ts:111-114`: an
+ * explicit audience ROSTER is *"a disclosure no plan authorized"*) and for the
+ * provenance (which lives on the LEDGER, not in the projection the ticket read
+ * is built from). An optional key would let a mapper that simply forgot the
+ * field look the same as the cut applying — the rule `WorkItem.projectName`
+ * states for the same reason.
+ *
+ * ## `ownMode` seeds the controls; `resolvedMode` is what the section REPORTS
+ *
+ * They are different questions and swapping them is a defect with a visible
+ * consequence: seeding the mode picker from `resolvedMode` shows "Everyone on
+ * the project" for a ticket whose own claim is `inherit`, and pressing Apply
+ * then FILES a claim nobody made. See `TicketVisibility`'s own docblock.
+ */
+export type VisibilityClaim = TicketVisibility & {
+  /**
+   * The people an `explicit` audience names, or `null` when no read served a
+   * roster.
+   *
+   * **Empty for every mode but `explicit`** — the domain refuses `userIds` on
+   * any other mode outright (`visibilitySetPayload`), because a list nothing
+   * reads would be a permanent, untrue record of a hand-picked audience.
+   */
+  userIds: string[] | null;
+  /**
+   * Who set the standing claim, and when — or `null` when no read served it.
+   *
+   * `ClaimProvenance` requires BOTH clocks, so there is no partial form of this
+   * to render: either the read named an actor and two instants, or the section
+   * says nothing about who set it. It never names an actor it does not have.
+   */
+  claim: ClaimProvenance | null;
 };
 
 export type VisibilityEditorProps = {
@@ -54,15 +94,24 @@ export type VisibilityEditorProps = {
    */
   members: Actor[];
   /**
-   * The standing claim, or `null` when nothing served it.
+   * The standing audience, or `null` when no read carried one.
    *
-   * **`null` is what the shipped server produces today**, and this prop exists
-   * in the honest shape rather than being dropped. See the component docblock:
-   * `TicketRead` carries no visibility field and `GET
-   * /v1/workspaces/:ws/tickets/:id` serves no provenance block at all, so there
-   * is no read behind this. The component renders the ABSENCE — a sentence
-   * saying the current audience is not being served — rather than drawing
-   * "Inherited" and inventing the very default the ledger may not hold.
+   * **⚠ CORRECTED 2026-09-20.** This prop's docblock read: *"`null` is what the
+   * shipped server produces today ... `TicketRead` carries no visibility field
+   * and `GET /v1/workspaces/:ws/tickets/:id` serves no provenance block at all,
+   * so there is no read behind this."* **The framing was wrong and the
+   * conclusion was right.** The endpoint has always served the `proj_visibility`
+   * row — under the key `ticket`, beside `ticketState` — and this client's
+   * `mapTicketRead` simply never looked at it; the MODE now reaches here as
+   * `TicketRead.visibility`. What no read serves is the ROSTER and the
+   * PROVENANCE, which is why the two nullable members of `VisibilityClaim` are
+   * still `null` in production, and why `null` for the whole prop remains the
+   * honest answer for a read that carried no row at all (the offline replica,
+   * `replica-data-source.ts`: `visibility.set` is not a type its reducer folds).
+   *
+   * The component renders the ABSENCE — a sentence saying the current audience
+   * is not being served — rather than drawing "Inherited" and inventing the
+   * very default the ledger may not hold.
    */
   current: VisibilityClaim | null;
   /**
@@ -86,28 +135,48 @@ type Submission = { kind: 'idle' } | { kind: 'sending' } | { kind: 'refused'; ru
 /**
  * "Who can see this" — the ticket sheet's audience section (spec §6).
  *
- * ## The READ side of this surface is UNSERVED, and that is reported rather than papered over
+ * ## The READ side: the MODE is served now, and the ROSTER and PROVENANCE are not
  *
- * Task 15b asks for "current resolved visibility rendered with its provenance
- * like every other claim". There is no such read on this branch:
+ * **⚠ CORRECTED 2026-09-20 — the framing below this paragraph was wrong and its
+ * conclusion was right.** It read: *"The READ side of this surface is UNSERVED
+ * ... `TicketRead` has five fields and none of them is visibility ... `GET
+ * /v1/workspaces/:ws/tickets/:ticketId` answers a `proj_visibility` row wrapped
+ * in `{ticket, parent, rollup}` ... so nothing anywhere can hand this component
+ * a `VisibilityClaim`."*
  *
- * - `TicketRead` (`src/view-types.ts:115`) has five fields and none of them is
- *   visibility;
- * - `GET /v1/workspaces/:ws/tickets/:ticketId` answers a `proj_visibility` row
- *   wrapped in `{ticket, parent, rollup}` — `mapTicketRead`'s absence table
- *   records that "the wrapper carries no provenance block at all". **This clause
- *   ended "...which is why `getTicket` REFUSES rather than mapping", and that half
- *   is corrected 2026-09-20: ruling P25 clause 1 (`c86c4b5c`, 2026-09-06) served
- *   that absence and `getTicket` maps.** The bullet's CONCLUSION is untouched —
- *   the wrapper still carries no provenance block, and `TicketRead` has no
- *   visibility field either;
- * - so nothing anywhere can hand this component a `VisibilityClaim`.
+ * **The endpoint has served the mode since it existed.** `toTicketView`
+ * (`apps/server/src/routes/tickets.ts:132-142`) answers
+ * `{ticket_id, workspace_id, project_id, parent_id, own_mode, resolved_mode,
+ * seq}`, and `mapTicketRead` never opened the key — so the section drew an
+ * absence for a fact that was on the wire the whole time. **That is now read**
+ * (`TicketRead.visibility`), and the section renders the audience in force. The
+ * correction to the old text is not "the read was served": it is that the old
+ * text derived a serving gap from a docblock that asserted the same gap, without
+ * opening the route's allow-list or the mapper.
  *
- * The response is a prop that admits `null` and an absence sentence behind it,
- * NOT a default. Rendering "Inherited from the parent" for an unserved read
- * would be this component asserting a mode nobody claimed — the same
- * absence-as-fact the refusals exist to prevent, on the one surface whose
- * subject is who may see what.
+ * What the old text was RIGHT about, and what still stands:
+ *
+ * - the ROSTER (`own_user_ids` / `resolved_user_ids`) is **cut**, by a standing
+ *   disclosure ruling — `routes/tickets.ts:111-114`: *"an explicit audience
+ *   ROSTER, a disclosure no plan authorized"*. So an `explicit` audience renders
+ *   its mode and says the list is not served, rather than drawing names;
+ * - the PROVENANCE is **not in the row** — who set the audience, and when, is on
+ *   the LEDGER, and no read behind this component carries it. So the *"set by
+ *   {actor} on {date}"* clause renders only when a caller supplies a claim, and
+ *   is absent in production rather than invented.
+ *
+ * The claim's own authorisation is unchanged — a fuller read may hand this
+ * component a complete `VisibilityClaim` (`userIds` and `claim` filled) and the
+ * section renders all three clauses.
+ *
+ * `null` is still reachable and still right, but it now means something
+ * narrower: **no read carried the row at all** — the offline replica, whose
+ * reduced state has no visibility column (`replica-data-source.ts`). It is a
+ * prop that admits `null` with an absence sentence behind it, NOT a default.
+ * Rendering "Inherited from the parent" for a read that carried nothing would be
+ * this component asserting a mode nobody claimed — the same absence-as-fact the
+ * refusals exist to prevent, on the one surface whose subject is who may see
+ * what.
  *
  * The WRITE side is whole: `visibility.set` is a registered domain event
  * (`packages/domain/src/vocabulary.ts:224`, entity kind `ticket`) and goes
@@ -153,7 +222,12 @@ export function VisibilityEditor({
   canEdit,
   onChanged,
 }: VisibilityEditorProps) {
-  const [mode, setMode] = useState<VisibilityMode>(current?.mode ?? 'inherit');
+  // Seeded from the ticket's OWN claim, never from the resolved audience: the
+  // picker is what a `visibility.set` on THIS ticket would assert, and a ticket
+  // whose own mode is `inherit` must not open showing a mode it never claimed.
+  // (`current?.userIds ?? []` is not a default mode — it is the roster the read
+  // served, and `[]` is what "no read served one" leaves the picker holding.)
+  const [mode, setMode] = useState<VisibilityMode>(current?.ownMode ?? 'inherit');
   const [userIds, setUserIds] = useState<string[]>(current?.userIds ?? []);
   const [submission, setSubmission] = useState<Submission>({ kind: 'idle' });
 
@@ -220,11 +294,30 @@ export function VisibilityEditor({
         </p>
       ) : (
         <p className="gn-visibility__standing">
-          <span className="gn-visibility__standing-mode">{standingSentence(current, nameOf)}</span>{' '}
-          <span className="gn-visibility__standing-claim">
-            set by {actorLabel(current.claim.actorId, current.claim.actorName)} on{' '}
-            {formatDateTime(current.claim.serverTime)}
-          </span>
+          <span className="gn-visibility__standing-mode">{standingSentence(current, nameOf)}</span>
+          {current.resolvedMode === 'explicit' && current.userIds === null ? (
+            // The MODE is served and the LIST is not (ruling: the roster stays
+            // cut). "Only the people this ticket names" without this clause
+            // would be a partial answer wearing the shape of a complete one —
+            // the reader cannot tell a name withheld by policy from a list that
+            // was simply never drawn.
+            <>
+              {' '}
+              <span className="gn-visibility__roster-unserved">
+                The list itself is not being served — this read carries the ticket’s audience mode
+                and not the names it holds.
+              </span>
+            </>
+          ) : null}
+          {current.claim === null ? null : (
+            <>
+              {' '}
+              <span className="gn-visibility__standing-claim">
+                set by {actorLabel(current.claim.actorId, current.claim.actorName)} on{' '}
+                {formatDateTime(current.claim.serverTime)}
+              </span>
+            </>
+          )}
         </p>
       )}
 
@@ -310,8 +403,31 @@ const MODE_LABELS: Record<VisibilityMode, string> = {
   inherit: 'Whatever the parent decided',
 };
 
+/**
+ * The STANDING line's words, and they are deliberately not `MODE_LABELS`.
+ *
+ * Two differences and one absence, all of them the same fact: `MODE_LABELS`
+ * names a choice a viewer is about to MAKE, and this names an audience that is
+ * already in force.
+ *
+ * - `explicit` is third-person here — *"the people this ticket names"*, not *"the
+ *   people I name"* — because whoever chose the audience is routinely not
+ *   whoever is reading the ticket.
+ * - `inherit` cannot appear: this is keyed by the RESOLVED mode, and
+ *   `proj_visibility` walks the inherit chain at write time, so the key type
+ *   (`ResolvedVisibilityMode`) has no such member and the compiler enforces it.
+ */
+const RESOLVED_MODE_LABELS: Record<ResolvedVisibilityMode, string> = {
+  workspace: MODE_LABELS.workspace,
+  project: MODE_LABELS.project,
+  explicit: 'Only: the people this ticket names',
+};
+
 function standingSentence(claim: VisibilityClaim, nameOf: (userId: string) => string): string {
-  if (claim.mode !== 'explicit') return MODE_LABELS[claim.mode];
+  if (claim.resolvedMode !== 'explicit') return RESOLVED_MODE_LABELS[claim.resolvedMode];
+  // No roster served: the MODE is named and the names are not, and the render
+  // says so in the clause beside this one rather than leaving `Only: ` dangling.
+  if (claim.userIds === null) return RESOLVED_MODE_LABELS.explicit;
   // The names, not the count. "3 people" is a number a reader cannot check
   // against the one question this section answers.
   return `Only: ${claim.userIds.map(nameOf).join(', ')}`;

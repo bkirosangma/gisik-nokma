@@ -86,12 +86,24 @@ export type TicketSheetProps = {
   /** Uploads and Drive references, from the ticket's `attachment.added` history. */
   attachments?: AttachmentListEntry[];
   /**
-   * The ticket's standing audience, for the "Who can see this" section.
+   * The ticket's standing audience, for the "Who can see this" section — **an
+   * OVERRIDE, not the source.**
    *
-   * Defaults to `undefined`, which the section renders as the ABSENCE it is —
-   * and `undefined` is what every caller passes today, because nothing serves
-   * it: `TicketRead` has no visibility field and the shipped ticket route's
-   * wrapper carries no provenance block. See `visibility-editor.tsx`.
+   * **⚠ CORRECTED 2026-09-20.** This docblock read: *"Defaults to `undefined`,
+   * which the section renders as the ABSENCE it is — and `undefined` is what
+   * every caller passes today, because nothing serves it: `TicketRead` has no
+   * visibility field and the shipped ticket route's wrapper carries no
+   * provenance block."* **Both clauses were wrong, in opposite directions.**
+   * The section does not render an absence by default any more: it defaults to
+   * the sheet's OWN read — `ticketRead.visibility`, which now carries the
+   * audience MODE off a wire that has served it since the endpoint existed. And
+   * the prop is not "what every caller passes"; it is what NO caller passes,
+   * which is why the sheet had to start reading it for itself.
+   *
+   * Supplying it still wins, and it is the only way to drive the section with a
+   * roster and a provenance — a caller that HAS a fuller read passes one. The
+   * read the sheet takes carries neither (see `TicketVisibility`), so the
+   * default fills both with `null`.
    */
   visibility?: VisibilityClaim | null;
   /**
@@ -482,6 +494,25 @@ export function TicketSheet({
   }
 
   const ticketRead: TicketRead = read.data;
+  /**
+   * What the "Who can see this" section draws, from the ONE read this sheet
+   * already made — with the caller's `visibility` prop winning when one is
+   * passed, because a caller holding a fuller read is a better source than this
+   * one.
+   *
+   * The two `null`s are the point rather than a placeholder. `TicketRead.
+   * visibility` carries the audience MODE and only the mode: the roster is cut
+   * from the wire by a standing disclosure ruling and the provenance is on the
+   * ledger, not in the projection. Annotating this `VisibilityClaim` — which is
+   * required precisely so that the two absences are VISIBLE here rather than
+   * inferred — forces the widening to be written out. Filling either with
+   * something else would be this sheet inventing an audience or an actor.
+   */
+  const standingVisibility: VisibilityClaim | null =
+    visibility ??
+    (ticketRead.visibility === null
+      ? null
+      : { ...ticketRead.visibility, userIds: null, claim: null });
   const nameOf = (userId: string): string =>
     actorLabel(userId, members.data?.find((member) => member.id === userId)?.name ?? null);
   const make = makeSubmittedFactory({ actorId: currentUserId, origin: 'web' });
@@ -1962,7 +1993,7 @@ export function TicketSheet({
             ticketId={ticketId}
             currentUserId={currentUserId}
             members={members.data ?? []}
-            current={visibility ?? null}
+            current={standingVisibility}
             canEdit={canSetVisibility}
             onChanged={() => {
               read.reload();
