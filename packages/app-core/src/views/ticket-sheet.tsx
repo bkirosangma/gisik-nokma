@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactElement, type ReactNode } from 'react';
 import {
   newUlid,
   statesWithBacklog,
@@ -12,7 +12,7 @@ import { precheckEvent, type PrecheckResult } from '../precheck.js';
 import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js';
 import { makeSubmittedFactory } from '../submit.js';
 import { dateClaimOf } from '../claims/ticket-dates.js';
-import type { TicketHistoryEvent, TicketRead } from '../view-types.js';
+import type { ParentRef, TicketHistoryEvent, TicketRead } from '../view-types.js';
 import { AttachmentList, type AttachmentListEntry } from './attachment-list.js';
 import { CommentsThread, type TicketComment } from './comments-thread.js';
 import {
@@ -1428,38 +1428,30 @@ export function TicketSheet({
       : statesWithBacklog(workflow.data).find((candidate) => candidate.id === state.stateId)?.name ?? state.stateId;
 
   /**
-   * The three crumbs above the title — `Workspace › Project › State`, which is
-   * the prototype's own shape stopped one short of its end.
+   * THE TWO NAMES the chain's first two crumbs are drawn from — the workspace's
+   * and the project's — and the rule that decides whether a crumb is drawn at
+   * all.
    *
-   * ## What was MEASURED, because the dispatch's arithmetic was not right here
+   * ## ⚠ THIS DOCBLOCK DESCRIBED A THREE-CRUMB BAR THAT NO LONGER EXISTS
    *
-   * The prototype builds `sheetCrumbs` from workspace → project → epic →
-   * parent → **the ticket key** — FIVE elements (`desktop.dc.html:3404-3420`) —
-   * and draws them as a `<nav>` immediately above the title input
-   * (`:1100-1116`). The dispatch says to build `Workspace › Project › State` and
-   * STOP: **the key is the FOURTH CRUMB OF OURS** (it would sit after these
-   * three), and it is another round's work. **So three, and the state is the
-   * third.**
+   * It read *"The three crumbs above the title — `Workspace › Project › State`"*
+   * and **"So three, and the state is the third."**, and it recorded that the
+   * ticket KEY *"is the FOURTH CRUMB OF OURS"* and *"is still not built"*
+   * because *"`TicketRead` does not carry the key either — it is the SAME seven
+   * fields"*. **Every one of those sentences was true when written and all of
+   * them are false now**, and an independent reviewer found them still standing
+   * beside the code that contradicts them. Corrected rather than deleted, since
+   * the reasoning about *what the crumb list owes a reader* is what the new
+   * derivation was built on.
    *
-   * ⚠ **AND THE KEY SHIPPED WHILE THIS BRANCH WAS OPEN** (PR #595, merged
-   * `6f08452c`). The sentence here used to call it "another lane's in-flight
-   * branch"; that was true when written and is not now. **The fourth crumb is
-   * still not built, and the reason has changed rather than lapsed:**
-   * `TicketRead` does not carry the key either — it is the SAME seven fields — so
-   * a fourth crumb would need a third host prop or a read, which is the round
-   * the dispatch scoped away. Nothing here is a placeholder for it.
+   * The chain is the AUTHORITY's now — `workspace › project › [epic] › [parent] ›
+   * key`, `sheetCrumbs` at `desktop.dc.html:3404-3425` — **there is no state
+   * crumb in it**, and the key crumb is built: `TicketRead` gained `key` and
+   * `epic`. The chain's own derivation, its link arms and the last crumb's
+   * fallback are documented at `ancestorCrumb` and `lastCrumb` below, beside the
+   * code that draws them.
    *
-   * ⚠ "the fourth" is counted against OUR three, and an earlier version of this
-   * sentence said "the fourth thing THERE" directly after enumerating the
-   * prototype's five, which reads as a claim about `:3404-3420` and is false
-   * of it. An independent reviewer caught the ambiguity; `Features.md` had the
-   * same wording and is corrected with it.
-   *
-   * The state is the one crumb whose source is IN this component: it is
-   * `currentStateName` above, already derived for the state chip from the
-   * workflow this sheet has loaded. The two names are the props documented on
-   * `TicketSheetProps` — **they are NOT on `TicketRead`**, which is seven fields
-   * and carries no name of any kind.
+   * What survives HERE is the part that is about these two NAMES:
    *
    * ## A crumb is drawn only for a KNOWN name, and that is a correction
    *
@@ -1476,8 +1468,15 @@ export function TicketSheet({
    *
    * So the behaviour is the sibling surface's, not a new one: the project page
    * renders its own title exactly this way — `{projectName !== null ? <h1>…</h1>
-   * : null}` (`page.tsx:1614`) — and the state crumb always renders, because it
-   * is derived here rather than fetched.
+   * : null}` (`page.tsx:1614`).
+   *
+   * ⚠ **"the state crumb always renders, because it is derived here rather than
+   * fetched" stood here and is GONE with the crumb.** The state is still on the
+   * sheet — its own chip, from the same `currentStateName` — but it is no longer
+   * a crumb, so nothing in this list is derived from the workflow any more.
+   *
+   * The two names are the props documented on `TicketSheetProps` — **they are
+   * NOT on `TicketRead`**, which carries no name of any kind.
    *
    * ## An EMPTY string is not a name either, and the first cut let one through
    *
@@ -1496,6 +1495,97 @@ export function TicketSheet({
   const projectCrumb = projectName === undefined || projectName === null || projectName === ''
     ? null
     : projectName;
+
+  /**
+   * THE ANCESTOR CRUMBS — the ticket's grandparent and parent, in that order,
+   * between the project and the ticket.
+   *
+   * ## Why these two and not "every layer"
+   *
+   * The owner asked for *"workspace -> project -> grandparent -> parent (or
+   * however many layers here) -> ticket"*, and the AUTHORITY draws exactly two
+   * conditional ancestors — `[epic.title] if sheet.epicId` and
+   * `[parent.id + " " + parent.title] if sheet.parentId`
+   * (`desktop.dc.html:3404-3425`). Two is the authority's answer and it is the
+   * one transcribed; the deeper chain the owner's parenthesis allows would need
+   * a read per layer, and `TicketRead.epic`'s docblock records why the server
+   * resolves the top one rather than the client climbing.
+   *
+   * ## An ancestor this viewer may not see is NAMED, never dropped
+   *
+   * A `restricted` ancestor is existence-without-title — the same shape
+   * `ParentRef` already carries for the parent indicator eight hundred lines
+   * above — and it renders as a sentence rather than as an absence. Dropping it
+   * would make a restricted chain look like a SHORTER one, which is the vanish
+   * `invariant 5` forbids and the exact reason the parent indicator has a
+   * restricted arm at all. It is never a link: the viewer cannot open what they
+   * cannot see.
+   *
+   * ## A link only where a callback can honour it
+   *
+   * The authority's ancestors each open that ticket's sheet, and `onOpenTicket`
+   * is the prop that does it — present on the mount, absent for a caller that
+   * cannot open anything (`page.tsx` passes it). With no callback the crumb
+   * degrades to the SAME plain span the restricted arm uses, which is that
+   * prop's own recorded rule: *"a control that cannot be honoured"* is not
+   * drawn. One hop per crumb, exactly as the `Subtask of` chip does it, and no
+   * traversal lives here to loop.
+   */
+  const epicCrumb = ticketRead.epic;
+  const ancestorCrumb = (
+    // `NonNullable`, because BOTH call sites have already answered the null
+    // case — a missing ancestor is an omitted crumb, not a rendered one — and
+    // the two arms left are exactly the two this decides between.
+    ancestor: NonNullable<ParentRef>,
+    testId: string,
+    onOpen: ((ticketId: string) => void) | undefined,
+    // ⚠ THE NOUN IS A PARAMETER AND NOT DERIVED FROM `testId`, which is what an
+    // earlier version of this helper did — it read
+    // ``testId === 'sheet-crumb-epic' ? 'epic' : 'parent'`` and so keyed
+    // USER-VISIBLE COPY on a test selector. A third caller, or a renamed
+    // testid, would have silently changed what a reader is told. An independent
+    // reviewer flagged it; no current call site was wrong, which is exactly why
+    // it would have survived until one was.
+    noun: 'epic' | 'parent',
+  ): ReactElement =>
+    ancestor.kind === 'restricted' ? (
+      <span className="gn-ticket-sheet__crumb gn-ticket-sheet__crumb--restricted" data-testid={testId}>
+        {`Restricted ${noun}`}
+      </span>
+    ) : onOpen === undefined ? (
+      <span className="gn-ticket-sheet__crumb" data-testid={testId}>
+        {ancestor.title}
+      </span>
+    ) : (
+      <button
+        type="button"
+        className="gn-ticket-sheet__crumb gn-ticket-sheet__crumb--link"
+        data-testid={testId}
+        onClick={() => onOpen(ancestor.id)}
+      >
+        {ancestor.title}
+      </button>
+    );
+
+  /**
+   * THE LAST CRUMB — the ticket's own identifier, PLAIN and bold.
+   *
+   * The owner: *"should show the ticket key"*. `ticketRead.key` is that key, or
+   * `null` when this read could not compose one (see its docblock — the number
+   * is derived from the ledger's order, so offline answers `null`).
+   *
+   * ⚠ **The fallback is the TITLE, and it is a deliberate substitution rather
+   * than a stand-in for the key.** A crumb list is a path to the thing the
+   * reader is looking at, so the last crumb has to NAME that thing; ending the
+   * chain at the parent would be a path that stops one step short of its own
+   * subject. The title is the ticket's other true name and is always on this
+   * read. **What is NOT substituted is `state.id`** — a ULID is not a key, and
+   * printing one where a key goes answers the crumb's question with a different
+   * kind of thing. `my-work.tsx`'s *"id-only rather than blank"* rule does not
+   * license it: that rule is for a SERVED withheld name, and this absence is a
+   * derivation this read could not complete.
+   */
+  const lastCrumb = ticketRead.key ?? ticketRead.title;
   // OPTIONAL on `TicketState` (441 fixtures predate it, spec §1.2,
   // 2026-09-17); every reader spells the same `?? null`.
   const closed = state.closed ?? null;
@@ -1673,14 +1763,42 @@ export function TicketSheet({
                 ›
               </span>
               <span className="gn-ticket-sheet__crumb">{projectCrumb}</span>
+              {/* THE ANCESTORS, in the authority's order and under its own
+                  conditionals (`desktop.dc.html:3410-3419`): the grandparent
+                  only when there is one, the parent only when there is one.
+                  Each is preceded by its own separator, so a chain with no
+                  ancestors at all renders exactly the two crumbs the project
+                  and the ticket need. */}
+              {epicCrumb === null ? null : (
+                <>
+                  <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
+                    ›
+                  </span>
+                  {ancestorCrumb(epicCrumb, 'sheet-crumb-epic', openParentSheet, 'epic')}
+                </>
+              )}
+              {parent === null ? null : (
+                <>
+                  <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
+                    ›
+                  </span>
+                  {ancestorCrumb(parent, 'sheet-crumb-parent', openParentSheet, 'parent')}
+                </>
+              )}
               <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
                 ›
               </span>
-              {/* The third crumb is the CURRENT position, so it is the one the
-                  prototype draws plain-and-bold rather than as a link
-                  (`:1108-1110`) — there is nowhere further to go from here. */}
-              <span className="gn-ticket-sheet__crumb gn-ticket-sheet__crumb--current">
-                {currentStateName}
+              {/* The last crumb is the CURRENT position, drawn plain-and-bold
+                  rather than as a link — there is nowhere further to go from
+                  here. It is the ticket's KEY (the owner's *"should show the
+                  ticket key"*, and `#595` shipped the composition); `lastCrumb`
+                  above records why the title stands in when this read could not
+                  compose one. */}
+              <span
+                className="gn-ticket-sheet__crumb gn-ticket-sheet__crumb--current"
+                data-testid="sheet-crumb-ticket"
+              >
+                {lastCrumb}
               </span>
             </nav>
           ) : null}
@@ -1939,21 +2057,110 @@ export function TicketSheet({
           </div>
 
           {/*
-            Three different facts, three different sentences. A RESTRICTED
-            parent is existence-without-title — the ticket has a parent and this
-            viewer may not see which; rendering it as "At project root" would
-            turn a restriction into a vanish (invariant 5). A NULL parent really
-            is at the root. A visible parent shows its title.
+            ONE ELEMENT, THREE FACTS — and it used to be TWO elements.
+
+            ## The duplication the owner ruled away (2026-09-20)
+
+            Until this change the same question was answered twice on one
+            screen: this line drew the parent's TITLE as plain text, and the
+            subtasks head drew a `Subtask of {title}` chip for the same parent —
+            with the restricted case worded differently in each place
+            (`Restricted parent — exists, but you can't see it` here,
+            `Subtask of a restricted parent` there), and "At project root"
+            appearing here and NOTHING appearing there. Two elements, one
+            question, two sets of words, in two places *"and only one of them is
+            where a person looks for the hierarchy"*.
+
+            The owner ruled the merge, verbatim: *"you can keep the badge. but
+            the placement is confusing. there is already a
+            `gn-ticket-sheet__parent` section above. put the badge in that
+            position instead. you can remove that `gn-ticket-sheet__parent`."*
+            So the chip came UP into this position and the subtasks head lost
+            its copy. The wrapper keeps the old class so the rule at
+            `ui.css`'s `.gn-ticket-sheet__parent` is still the thing that draws
+            this line — the alternative was renaming it and leaving an orphaned
+            rule behind, which the same ruling forbids.
+
+            ## The three arms, and WHY the root arm is not the badge
+
+            A RESTRICTED parent is existence-without-title — the ticket has a
+            parent and this viewer may not see which; rendering it as "At
+            project root" would turn a restriction into a vanish (invariant 5).
+            A NULL parent really is at the root, and **a root is not a subtask**,
+            so it does not get a "Subtask of" badge: the sentence stays, because
+            a crumb chain that ends at the project is a different reading of the
+            same silence. A visible parent shows the badge, as a control that
+            opens it when a caller passed `onOpenTicket` and as the pill
+            otherwise — `onOpenTicket`'s own recorded rule.
+
+            ⚠ **READING TAKEN, AND IT IS ONE ARM TO CHANGE:** the badge is the
+            VISIBLE arm's; the root and restricted arms keep their sentences. If
+            the owner meant the chip's own behaviour — nothing at root — that is
+            this one arm.
+
+            ## And the PROTOTYPE'S row is not what this is
+
+            The chip's CSS comment cites `desktop.dc.html:1237`, the authority's
+            subtasks header row, as its origin. **The owner is ruling the
+            placement AWAY from the authority deliberately**, so that citation
+            is not an argument against this and must not be quoted back as one.
+            The divergence is recorded here the way the ticket-key spec recorded
+            its own. What the authority DOES still own is the chip's CONTENT and
+            its one-hop behaviour, both unchanged.
+
+            ## The chip's own reasoning, carried up with it
+
+            - **One hop, never a chain.** The chip names the IMMEDIATE parent, as
+              the prototype's `openParent` does (`:3611`); the parent's own sheet
+              draws its own indicator in turn, so a nesting or a cycle is walked
+              sheet by sheet and no traversal lives here to loop.
+            - **With no `onOpenTicket` it is a PILL and not a control** — that
+              prop's own docblock: *"a control that cannot be honoured"* is not
+              drawn.
+            - **The restricted arm is a PILL, never a control, and it names the
+              restriction rather than the ticket.** The controller ruled it on
+              2026-09-20 after the alternative was priced: the read is a
+              discriminated union whose restricted arm *structurally cannot*
+              carry a title (`routes/tickets.ts:144-168`), the parent's title is
+              read INSIDE the `canSee` branch the restricted arm never reaches
+              (`routes/tickets.ts:353-372`, the code's own words at `:354-356`),
+              and cases `7.212` and `6.14` pin the existence-versus-title
+              contrast in both directions.
+              ⚠ **THE REASON FIRST RECORDED WAS WRONG, and it is corrected rather
+              than deleted:** it cited 6.66's *"no table stores a ticket
+              title"*, which was true when 6.66 was written and is stale now —
+              `proj_tickets` exists
+              (`migrations/1787961800000_proj-tickets.sql`) and the visible arm
+              serves `title: titleOf(parentState)` out of it. **The conclusion
+              never rested on it.**
+              And the prototype's own label fallback — `p ? p.title :
+              sheet.parentId` (`:3609`) — would have put an ID where a name
+              belongs and made the chip a control pointing at a ticket this
+              viewer's own read 404s (case 6.14). The pill re-words a disclosure
+              the sheet already makes; it does not widen one.
+            - **It must not read as "no parent"** — a root is a different fact —
+              which is why the restricted arm exists rather than being omitted.
           */}
-          <div className="gn-ticket-sheet__parent">
-            {ticketRead.parent === null ? (
+          <div className="gn-ticket-sheet__parent" data-testid="sheet-parent-indicator">
+            {parent === null ? (
               <span>At project root</span>
-            ) : ticketRead.parent.kind === 'restricted' ? (
-              <span className="gn-ticket-sheet__restricted">
+            ) : parent.kind === 'restricted' ? (
+              <span className="gn-ticket-sheet__restricted" data-testid="sheet-parent-restricted">
                 Restricted parent — exists, but you can&apos;t see it
               </span>
+            ) : openParentSheet === undefined ? (
+              <span className="gn-chip gn-ticket-sheet__parent-chip" data-testid="sheet-parent-chip">
+                {`Subtask of ${parent.title}`}
+              </span>
             ) : (
-              <span>{ticketRead.parent.title}</span>
+              <button
+                type="button"
+                className="gn-chip gn-ticket-sheet__parent-chip"
+                data-testid="sheet-parent-chip"
+                onClick={() => openParentSheet(parent.id)}
+              >
+                {`Subtask of ${parent.title}`}
+              </button>
             )}
           </div>
 
@@ -1974,73 +2181,37 @@ export function TicketSheet({
               the chip is below; case 16.22 asserted its absence and now asserts
               what it does instead, updated rather than deleted. */}
           <section className="gn-ticket-sheet__subtasks" data-testid="sheet-subtasks">
-            {/* The CHIP, and the prototype draws it BESIDE the heading in one
-                flex row (`align-items:baseline;gap:10px;flex-wrap:wrap`,
-                `:1237-1241`) rather than as a row of its own — so the wrapper
-                is the prototype's, not an invention.
+            {/* ⚠ THE CHIP WAS HERE UNTIL 2026-09-20 AND IS NOT ANY MORE. It is
+                a `<p>` alone now because the owner ruled the chip UP into the
+                parent indicator above (*"there is already a
+                `gn-ticket-sheet__parent` section above. put the badge in that
+                position instead"*) — one element, three facts, in the position
+                a person looks for the hierarchy.
 
-                THREE ARMS, and the third is the one that took a ruling:
+                **The reasoning that governed the chip did not die with its
+                position**, and it is kept rather than dropped: the three arms,
+                the restricted pill and why it must not read as "no parent", the
+                one-hop rule, and the `7.212`/`6.14` contrast all now live in the
+                indicator's own docblock above, at the site that renders them.
+                What is recorded HERE is the one fact that belongs to this
+                heading: **the row now seats ONE child.** The prototype's flex
+                row (`align-items:baseline;gap:10px;flex-wrap:wrap`,
+                `:1237-1241`) existed to seat a chip BESIDE this heading, and
+                the rule at `.gn-ticket-sheet__subtasks-head` is left in place
+                rather than deleted: the element still renders, so the rule is
+                not orphaned, it simply has nothing left to space apart. `gap`
+                on a single child is inert, not wrong, and removing it here
+                would be a layout change this change cannot witness.
 
-                - **no parent** — nothing is drawn, which is the prototype's own
-                  `sheetIsSub` test (`:3605`).
-                - **a parent this viewer may see** — the prototype's chip: a
-                  control naming the parent, `Subtask of {title}`, that opens it
-                  through `onOpenTicket`. ONE HOP, as the prototype's `openParent`
-                  does (`:3611`): the chip names the IMMEDIATE parent and never a
-                  chain, and the parent's own sheet draws its own chip in turn,
-                  so a nesting or a cycle is walked sheet by sheet and no
-                  traversal lives here to loop.
-                  With no `onOpenTicket` it is a PILL and not a control — see
-                  that prop's docblock.
-                - **a parent this viewer may NOT see** — a PILL, never a
-                  control, and it names the restriction instead of the ticket:
-                  `Subtask of a restricted parent`. The controller ruled this on
-                  2026-09-20 after the alternative was priced: the read is a
-                  discriminated union whose restricted arm *structurally cannot*
-                  carry a title (`routes/tickets.ts:144-168`), the parent's title is
-                  read INSIDE the `canSee` branch the restricted arm never reaches
-                  (`routes/tickets.ts:353-372`, the code's own words at `:354-356`),
-                  and cases `7.212` and `6.14` pin the existence-versus-title
-                  contrast in both directions. **⚠ THE REASON FIRST RECORDED HERE WAS
-                  WRONG, and it is corrected rather than deleted:** it cited 6.66's
-                  "no table stores a ticket title", which was true when 6.66 was
-                  written and is stale now — `proj_tickets` exists
-                  (`migrations/1787961800000_proj-tickets.sql`) and the visible arm
-                  serves `title: titleOf(parentState)` out of it. The conclusion
-                  never rested on it. And the
-                  prototype's own label fallback — `p ? p.title : sheet.parentId`
-                  (`:3609`) — would have put an ID where a name belongs and made
-                  the chip a control pointing at a ticket this viewer's own read
-                  404s (case 6.14). The pill re-words a disclosure the sheet
-                  already makes eight lines above it; it does not widen one.
-                  **It must not read as "no parent"** — a root is a different
-                  fact — which is why the arm exists rather than being omitted. */}
+                ⚠ And the prototype's `:1237` citation is NOT an argument that
+                the chip belongs here: the owner ruled the placement away from
+                the authority deliberately, which the indicator's docblock
+                records. */}
             <div className="gn-ticket-sheet__subtasks-head">
               <p className="gn-ticket-sheet__subtasks-heading">
                 Subtasks
                 {ticketRead.rollup === null ? '' : ` · ${formatRollup(ticketRead.rollup)}`}
               </p>
-              {parent === null ? null : parent.kind === 'restricted' ? (
-                <span
-                  className="gn-chip gn-ticket-sheet__parent-chip"
-                  data-testid="sheet-parent-chip-restricted"
-                >
-                  Subtask of a restricted parent
-                </span>
-              ) : openParentSheet === undefined ? (
-                <span className="gn-chip gn-ticket-sheet__parent-chip" data-testid="sheet-parent-chip">
-                  {`Subtask of ${parent.title}`}
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  className="gn-chip gn-ticket-sheet__parent-chip"
-                  data-testid="sheet-parent-chip"
-                  onClick={() => openParentSheet(parent.id)}
-                >
-                  {`Subtask of ${parent.title}`}
-                </button>
-              )}
             </div>
             {subtasksIncomplete ? (
               // THE RECONCILIATION, rendered rather than swallowed. A short list

@@ -66,6 +66,11 @@ function read(): TicketRead {
     assignedProvenance: null,
     parent: null,
     rollup: null,
+    // The breadcrumb's two crumb fields, added 2026-09-20 by the ancestor-chain
+    // change this file's fixtures were written before. No case here reads them,
+    // so both take the default a read that composed no key would carry.
+    key: null,
+    epic: null,
     visibility: { ownMode: 'inherit', resolvedMode: 'project' },
   };
 }

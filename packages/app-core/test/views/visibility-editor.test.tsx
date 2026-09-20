@@ -407,7 +407,7 @@ describe('3.111 the standing audience — served where it is served, absent wher
    * 3.172 — an `explicit` audience whose ROSTER is not served.
    *
    * The roster is cut from the wire by a standing disclosure ruling
-   * (`routes/tickets.ts:111-114`), so this is the production shape for every
+   * (`routes/tickets.ts:115-118`), so this is the production shape for every
    * explicit ticket. The mode is named and the names are not, and the section
    * has to SAY so: "Only: the people this ticket names" without the clause
    * beside it is a partial answer wearing the shape of a complete one — a
@@ -463,5 +463,163 @@ describe('3.111 the standing audience — served where it is served, absent wher
     expect(standing?.textContent).toContain('Everyone on the project');
     expect(standing?.querySelector('.gn-visibility__standing-claim')).toBeNull();
     expect(standing?.textContent).not.toContain('set by');
+  });
+});
+
+/**
+ * §17 — the styling transcription's COMPONENT half. The CSS half is
+ * `packages/ui/test/components.test.tsx` (17.001–17.005), and the two are split
+ * because neither suite can see the other's subject: jsdom computes no cascade,
+ * and a test in `packages/ui` cannot render a component from `app-core`.
+ */
+describe('the standing line carries the prototype’s dot (17.004, 17.006)', () => {
+  /**
+   * 17.004 — THE DOT IS TONED BY THE MODE, AND THE PRODUCTION SHAPE IS THE ONE
+   * THAT PROVES IT.
+   *
+   * `userIds: null` is not an edge case here: the roster is CUT at the wire
+   * (`apps/server/src/routes/tickets.ts:115-118` — *"an explicit audience
+   * ROSTER, a disclosure no plan authorized"*), so a restricted ticket served
+   * by the shipped server has `resolvedMode: 'explicit'` and NO names. A dot
+   * keyed on the ROSTER — the natural mistake, since the two arrive together in
+   * `VisibilityClaim` — renders the NOT-restricted tone on exactly that ticket,
+   * and would pass every assertion written against a fixture that happened to
+   * carry names. So the fixture is the production shape and the assertion is on
+   * the modifier, not on the dot's presence.
+   */
+  it('17.004 tones the dot from the MODE, on the production shape where the roster is null', () => {
+    mount({ current: { ownMode: 'explicit', resolvedMode: 'explicit', userIds: null, claim: null } });
+    const mode = document.querySelector('.gn-visibility__standing-mode');
+    expect(mode).not.toBeNull();
+    expect(mode).toHaveClass('gn-visibility__standing-mode--restricted');
+    // The audience genuinely IS restricted and the section still says so — the
+    // dot's tone is not standing in for a list that was withheld.
+    expect(mode?.textContent).toContain('Only:');
+  });
+
+  it('17.004 does NOT tone it restricted for a standing audience of everyone', () => {
+    mount({ current: { ownMode: 'project', resolvedMode: 'project', userIds: null, claim: null } });
+    const mode = document.querySelector('.gn-visibility__standing-mode');
+    expect(mode).not.toBeNull();
+    expect(mode).not.toHaveClass('gn-visibility__standing-mode--restricted');
+    expect(mode?.textContent).toContain('Everyone on the project');
+  });
+
+  it('17.004 draws NO pill and NO dot when no read carried the audience at all', () => {
+    // `current: null` is the offline replica's state. A dot here would be the
+    // same invention the absence sentence exists to refuse: the section would be
+    // reporting a tone for an audience nobody served.
+    mount({ current: null });
+    expect(document.querySelector('.gn-visibility__standing')).toBeNull();
+    expect(document.querySelector('.gn-visibility__standing-mode')).toBeNull();
+    expect(document.querySelector('.gn-visibility__dot')).toBeNull();
+  });
+
+  it('17.004 the dot is DECORATIVE — hidden from the accessible name, and adding no text', () => {
+    const claim = { ownMode: 'explicit' as const, resolvedMode: 'explicit' as const, userIds: null, claim: null };
+    mount({ current: claim });
+    const dot = document.querySelector('.gn-visibility__dot');
+    expect(dot).not.toBeNull();
+    // 1.4.11 binds a graphical object "required to identify … or convey
+    // information". This one is not: the pill's own label states the same fact
+    // in words, which is what the `aria-hidden` is asserting.
+    expect(dot).toHaveAttribute('aria-hidden', 'true');
+    // …and it contributes nothing to the text, asserted as an EXACT match
+    // rather than a containment: a dot that introduced so much as a leading
+    // space would leave `toContain` green and this red. The sentence is the
+    // mode label, because `namedAudience` answers `null` for a roster that was
+    // never served and `standingSentence` falls through to
+    // `RESOLVED_MODE_LABELS.explicit` — the same state clause `3.111` covers.
+    expect(document.querySelector('.gn-visibility__standing-mode')?.textContent).toBe(
+      'Only: the people this ticket names',
+    );
+  });
+
+  /**
+   * 17.006 — THE ROSTER STAYS CUT, and the prototype's own row is where the
+   * temptation comes from.
+   *
+   * `desktop.dc.html:1214-1229` draws a chip per viewer and an *"Add someone who
+   * can see it…"* `<select>` over `viewerCandidates`. The owner's standing ruling
+   * on `visibility` is **(a) BUILD, (b) KEEP THE RULING**, and (b) keeps the
+   * explicit audience roster off the wire — so the product has no data behind
+   * either control. **A picker over an empty set is the same defect as a form
+   * that can only be refused**, which is why this is a negative assertion with a
+   * positive control rather than an omission.
+   */
+  it('17.006 offers no audience picker and no chip, and the members picker is the control', () => {
+    mount({
+      current: { ownMode: 'explicit', resolvedMode: 'explicit', userIds: null, claim: null },
+      // `explicit` opens the members fieldset, so the section is in its
+      // most-populated state and "no select" cannot be satisfied by an
+      // empty render.
+      canEdit: true,
+    });
+    const section = document.querySelector('.gn-visibility');
+    expect(section).not.toBeNull();
+    // The PICKER half — the prototype's `<select>` over `viewerCandidates`
+    // (`desktop.dc.html:1225-1229`). A tag name is a property, not a spelling.
+    expect(section?.querySelector('select')).toBeNull();
+    expect(section?.querySelector('option')).toBeNull();
+
+    /**
+     * ⚠ THE CHIP HALF WAS A CHECK THAT COULD NOT FAIL FOR WHAT IT NAMED, AND A
+     * REVIEWER MEASURED IT FAILING THAT WAY BEFORE THIS WAS WRITTEN.
+     *
+     * It read `querySelector('[class*="chip"]')` — a SUBSTRING SEARCH FOR A
+     * CLASS NAME. The reviewer mounted the prototype's actual chip row (a `×`
+     * remove button per member, `desktop.dc.html:1214-1224`'s shape) using the
+     * class `gn-visibility__viewer`, as a sibling of the standing line — a
+     * roster drawn on screen — and the whole file stayed **25 passed / 25**.
+     * `[class*="chip"]` was satisfied by a spelling, so it caught a chip that
+     * said `chip` and nothing else.
+     *
+     * The property is not a class name, it is **whether the section DRAWS the
+     * audience** — so the assertion is keyed on the roster itself: no member's
+     * name may appear anywhere in the section EXCEPT inside the editable people
+     * picker, which is the one place a person's name is legitimately shown
+     * (the control for choosing people, not a claim about who is on the list).
+     * That catches a chip row, a list, a tooltip or a stray sentence, whatever
+     * they are called.
+     */
+    // `where` selects WHICH side of the picker boundary to report on, so the
+    // property and its control are the SAME walk with the predicate flipped —
+    // two hand-written walks could disagree without either noticing.
+    const walkForMemberNames = (where: 'outside-picker' | 'inside-picker'): string[] => {
+      const found: string[] = [];
+      if (section === null) return ['<no section>'];
+      for (const element of Array.from(section.querySelectorAll('*'))) {
+        const insidePicker = element.closest('.gn-visibility__person') !== null;
+        if (where === 'outside-picker' ? insidePicker : !insidePicker) continue;
+        // ⚠ EACH ELEMENT'S OWN TEXT, NOT `textContent`. The first version of
+        // this walk used `textContent` and skipped any element with children to
+        // avoid double-counting an ancestor — which threw away every label
+        // whose text is a DIRECT text node beside its `<input>`, i.e. exactly
+        // the picker it was written for. Measured on its first run: the
+        // positive control answered `[]` where it owed three names. Reading the
+        // element's own text nodes takes each name once and keeps the ancestor
+        // exclusion without needing the children test at all.
+        const text = Array.from(element.childNodes)
+          .filter((node) => node.nodeType === Node.TEXT_NODE)
+          .map((node) => node.textContent ?? '')
+          .join('');
+        for (const member of MEMBERS) {
+          if (member.name !== null && text.includes(member.name)) {
+            found.push(`${element.tagName.toLowerCase()}.${element.className}: ${member.name}`);
+          }
+        }
+      }
+      return found;
+    };
+
+    expect(walkForMemberNames('outside-picker')).toEqual([]);
+    // POSITIVE CONTROL, same run and same walk: with the predicate flipped the
+    // walk DOES find the names, so the empty array above is the section not
+    // drawing a roster rather than a broken scan that finds nothing anywhere.
+    expect(walkForMemberNames('inside-picker')).toHaveLength(MEMBERS.length);
+    // …and the control for THAT control: the picker is genuinely rendered, in
+    // its most-populated state, so neither scan is passing over an empty shell.
+    expect(section?.querySelectorAll('.gn-visibility__person').length).toBe(MEMBERS.length);
+    expect(section?.querySelectorAll('.gn-visibility__mode').length).toBeGreaterThan(0);
   });
 });

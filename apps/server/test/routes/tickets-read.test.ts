@@ -442,6 +442,16 @@ describe('the restricted-parent placeholder — existence, and nothing else', ()
     expect(res.statusCode).toBe(200);
     expect(res.json().ticket.parent_id).toBe(neverCreated);
     expect(res.json().parent).toBeNull();
+    // ⚠ AND THE SAME QUESTION OF THE WALK, which this case did not ask until
+    // 2026-09-20 — and the omission was a real defect, not a gap in coverage.
+    // The grandparent walk asked `canSee` FIRST and never tested the row, so for
+    // THIS dangling id it took the `restricted` arm on its first hop and the
+    // body carried `epic: {kind:'restricted', id: neverCreated}` — the inverse
+    // leak this very case exists to prevent, committed one field to the right of
+    // the one it was watching. **The assertion below is the falsifier: it is red
+    // on that implementation and green on the one that tests existence first.**
+    // An independent reviewer found it by asking what this case does NOT assert.
+    expect(res.json().epic).toBeNull();
   });
 });
 

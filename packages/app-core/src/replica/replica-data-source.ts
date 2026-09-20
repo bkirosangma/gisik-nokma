@@ -1203,6 +1203,31 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
         visibility: null,
         parent,
         rollup: null,
+        // `null` — the honest answer for the same class of reason `visibility`
+        // above is, and NOT a stand-in for a key. The number in a key is a fact
+        // about the LEDGER'S ORDER (`read/ticket-numbers.ts`: a ticket's
+        // position among its project's creations by `workspace_seq`), and the
+        // two prefixes ride `workspace.created`/`project.created` payloads this
+        // device may hold. Locally re-deriving the number would be a SECOND
+        // implementation of that read — the drift `visibility`'s neighbour
+        // refuses in as many words — and a key that named a different ticket
+        // from the server's would be worse than no key.
+        //
+        // The consequence is bounded and visible: offline, the sheet's LAST
+        // crumb falls back to the ticket's TITLE rather than a key — **its
+        // absence, not a blank and not the id** (`ticket-sheet.tsx`'s `lastCrumb`
+        // records the fallback and why `state.id` is not it). Owner for
+        // delivering the key offline, if that is wanted: whoever owns the
+        // replica's snapshot payload — the same door ruling P36 opened for state
+        // provenance.
+        key: null,
+        // `null` for the same reason, and NOT "this ticket has no epic": the
+        // walk needs each ancestor's TYPE RANK, which is a workspace-level read
+        // (`proj_ticket_types`) this fold does not hold. Answering by climbing
+        // the local parent chain would resolve the chain by the LOCAL partial
+        // graph, which is the shape `parent` below already answers — and would
+        // silently disagree with the server wherever an ancestor is undelivered.
+        epic: null,
       };
     },
 
