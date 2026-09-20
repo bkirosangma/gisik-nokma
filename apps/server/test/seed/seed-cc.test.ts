@@ -1,7 +1,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { newUlid } from '@gisik-nokma/domain';
+import { docToPlainText, newUlid } from '@gisik-nokma/domain';
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createIngestService } from '../../src/ingest/ingest-service.js';
@@ -201,6 +201,63 @@ describe('seedConvenienceCorner', () => {
     expect((dueClaim?.value as { note: string }).note).toContain('from the tracker record');
     // The one item the record dates itself, verbatim, in the built-in field.
     expect((hsn?.fields['startDate']?.value as { date: string }).date).toBe('2026-08-18');
+  });
+
+  /**
+   * 16.79 — the description the LEDGER holds, read back through the real door, is the
+   * parsed doc: record block literal, prose marked, every node in the editor's
+   * closed vocabulary.
+   *
+   * ⛔ THE REAL DOOR, AND THE CASE THAT SAYS WHAT THE FIX ACTUALLY CHANGED. The two
+   * cases the dispatch's third point turns on — the markdown parse and the
+   * literal record block — asserted where it counts: the description the
+   * LEDGER holds, after the seed went through `ingestClientBatch`, the
+   * projection registry wrote `proj_tickets`, and the read came back out. Both
+   * halves in one case, so a fix that parsed everything or parsed nothing fails
+   * here, and neither can pass by the other's assertion.
+   *
+   * ⚠ AND IT IS ALSO THE MEASUREMENT BEHIND THE EXISTING DEV ROWS. A database
+   * seeded by THIS code holds parsed descriptions; the dev database at 54330
+   * holds 23 literal ones because it was seeded BEFORE this change and the seed
+   * is idempotent on `seedUlid` (`13.83`/`13.84` below pin that: a re-run
+   * commits nothing). So re-running the seed cannot correct those rows, and the
+   * remedy is a database seeded fresh — recorded in the PR body with an owner
+   * rather than performed here, because 54330 is a live stack another lane is
+   * using.
+   */
+  it('the stored description is the PARSED doc — record block literal, prose marked', async () => {
+    const workspaceId = seedUlid('workspace', 'convenience-corner');
+    const state = await getTicketStateFromDb(db.pool, workspaceId, seedUlid('ticket', 'cc#ops:dlt-entity'));
+    const doc = state?.fields['description']?.value;
+
+    const marks: string[] = [];
+    const nodes = new Set<string>();
+    const walk = (node: unknown): void => {
+      if (!node || typeof node !== 'object') return;
+      const candidate = node as { type?: string; marks?: Array<{ type: string }>; content?: unknown[] };
+      if (typeof candidate.type === 'string') nodes.add(candidate.type);
+      for (const mark of candidate.marks ?? []) marks.push(mark.type);
+      if (Array.isArray(candidate.content)) candidate.content.forEach(walk);
+    };
+    walk(doc);
+
+    // The prose half: the asterisks are gone and a bold mark holds their run.
+    const text = docToPlainText(doc);
+    expect(text).toContain('Gates: every SMS the platform will ever send');
+    expect(text).not.toContain('**');
+    expect(marks).toContain('bold');
+
+    // The record half: byte-for-byte the record's own lines, in their own paragraphs.
+    expect(text).toContain('— tracker record —');
+    expect(text).toContain('tracker id: ops:dlt-entity');
+    expect(text).toContain('counterparty: TRAI-registered DLT platform');
+
+    // Every node the parse emitted is in the editor's closed schema vocabulary.
+    // `packages/editor/test/schema.test.ts` is its authority; this restates the
+    // set rather than importing it, because the server package does not depend
+    // on the editor — and the list is short enough to read.
+    const SCHEMA_V1_NODES = ['doc', 'paragraph', 'text', 'heading', 'bulletList', 'orderedList', 'listItem'];
+    for (const node of nodes) expect(SCHEMA_V1_NODES, `emitted an unnamed node "${node}"`).toContain(node);
   });
 
   /**

@@ -14,7 +14,7 @@ leaving it outside, so the section was opened.
 | lane | block |
 |---|---|
 | **exec 1** | `16.1`–`16.30`, **then `16.32`–`16.40`** (taken 2026-09-19 late for `/v1/search`), **then `16.61`–`16.80`** (taken 2026-09-20 for `hig-per-screen/3b`), **then `16.81`–`16.99`** (taken 2026-09-20 for the sheet prototype parity) — of which **`16.96`–`16.99` are MINTED 2026-09-20 for the attachments leak** and **`16.91`–`16.95` are MINTED 2026-09-20 for the Add-subtask affordance**. ⚠ **THE BLOCK `16.81`–`16.99` IS NOW FULLY SPENT**; exec 1's next free ids are `16.63`–`16.80` (the `3b` allocation, of which only `16.61`–`16.62` are minted) |
-| **exec 2** | **`16.41`–`16.60`** (`16.31` spent on the evidence upload; `16.32`–`16.40` reallocated to exec 1) — ⚠ **`16.88`–`16.90` were minted from exec 1's block by the soft-delete lane on 2026-09-20, and its merged handoff records `16.88`–`16.99` as THAT lane's block**, which overlaps exec 1's. **The controller corrected the spent set (exec 1's next free is `16.91`); the OVERLAP is flagged to the owner, not resolved here.** It is why the attachments lane minted from the TOP of the shared block instead of `16.91`: `16.91` is inside both claims and is the one id that can collide, and `exec2/comment-thread` was live in the tree at the time |
+| **exec 2** | **`16.41`–`16.60`**, **then `16.76`–`16.80`** (allocated by the controller 2026-09-21 for the markdown-editing item — ⚠ **carved out of the `16.63`–`16.80` slice the exec 1 row above still names, because the controller reallocated it in a message. That row is corrected by this one; both were re-read before minting, which is the discipline this table's own warning below asks for**; it is the unminted remainder of `16.72`–`16.80` after `#617` spent `16.72`–`16.75` on the comment thread) — ⚠ **`16.88`–`16.90` were minted from exec 1's block by the soft-delete lane on 2026-09-20, and its merged handoff records `16.88`–`16.99` as THAT lane's block**, which overlaps exec 1's. **The controller corrected the spent set (exec 1's next free is `16.91`); the OVERLAP is flagged to the owner, not resolved here.** It is why the attachments lane minted from the TOP of the shared block instead of `16.91`: `16.91` is inside both claims and is the one id that can collide, and `exec2/comment-thread` was live in the tree at the time |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** It read `exec 2: 16.31–16.60` for about forty
 minutes on 2026-09-19 and was wrong for that whole time, because the controller reallocated in a message
@@ -1051,3 +1051,50 @@ still asserts the action exists.
 - ⚠ **AND THE BUCKET IS NOT ALL ROT: four of the rest are DELIBERATELY HISTORICAL and must not be counted as wrong.** `docs/lanes/executor-state.md:1011` names `:276` and lists the real sites in the same breath (*"resolved BY CONTENT … the real sites are `:501/:543/:585/:705/:868`"*); `:1979-1985` is a table whose own text records *"P25 deleted the absence"*; `docs/lanes/owner-holds.md:127` quotes a sentence that *"was TRUE when written"*; and `test-cases/13-owner-requests-and-backlog.md:1144` is a from→to repair mapping (`:276`→`:299`). **A citation that tells the reader to re-measure self-corrects**, and the same reasoning that withdrew `:693` applies to these.
 - ⚠ **The rotted ones are NOT repointed, deliberately**: mechanically shifting an already-wrong citation relocates it and makes it look maintained — which is exactly what the withdrawn third repoint did before the review caught it. Nothing detects any of it: `check:citations` counts CASE-ID citations (this file: 79 cited / 0 uncited) and **no gate resolves a `file:line`**. **Owner: whoever next edits `ticket-sheet.tsx` at scale, or the owner of a future citation gate** — the old→new map is reproducible from `git show origin/main:packages/app-core/src/views/ticket-sheet.tsx` against the working tree.
 - **The refusal path itself is unchanged and is still reachable from other clients**: a caller that POSTs `ticket.created` directly can still send a same-type child and still gets `hierarchy.rank`. This change removes the SHEET as a route to it, which is what the dispatch scoped; it does not make the refusal unreachable in the product.
+
+
+## The seeds are PARSED, and the typed link is ON (executor 2, 2026-09-21) — cases `16.76`–`16.80`
+
+**Owner ruling 2026-09-20, verbatim: *"both"*.** Two written decisions, each citing spec §2 (*"nothing silently becomes
+markup"*), were put to the owner and both were reversed: `markdownLinks` goes `false` → `true` so a typed
+`[text](url)` becomes a link, and the seeds' record prose is parsed instead of rendered literally. **Each reversal is
+recorded where its decision was written, and the record is superseded in place, never deleted** — `plainTextDoc`'s
+docblock in `apps/server/src/seed/doc-text.ts` for the seed half, `packages/editor/src/schema/extensions.ts` for the
+option. Which decision moved and where its record now lives is stated in the PR body.
+
+**The measurement the parse had to survive.** Read READ-ONLY from the dev database (54330): **23 descriptions, ALL of
+them literal-text docs, zero marks anywhere** — `**bold**` in **111** text nodes, `*italic*` in **135**, `` `code` ``
+in **34**, two `[text](url)`, **32** `#` heading lines, **15** dash-bullet lines, **17** numbered ones. The 23 strings
+were also rebuilt from the frozen board (`reference/convenience-corner-tracker/board.data.js`) and matched the stored
+docs **character for character in both directions**, which is what makes the corpus cases below run over the REAL
+strings rather than a fixture.
+
+- **16.76** ✅ **The parser handles exactly the constructs the shipped records were measured to hold, and REFUSES the rest.** `**bold**`, `*italic*`, `` `code` ``, `[text](url)`, `#` headings, `-`/`+`/`*` bullets, `1.` ordered items, blank line → empty paragraph. Refused and left as characters, each with a case: `_underscore_` emphasis (**the real records write `submitted_on` and `enroling_in_apple_developer_program` — a naive `_…_` rule would emphasise an intraword run nobody wrote as markup**), `__bold__`, `~~strike~~`, `> quote`, ``` fences ```, `---`, and a bare URL (nothing autolinks). ⚠ **An unmatched delimiter stays literal** — `2 * 3 * 4` is `2 * 3 * 4` — and a single `*` may not open with `*`, which is what stops a stray `**` being re-paired into an italic. — `apps/server/test/seed/markdown-doc.test.ts`
+- **16.77** ✅ **THE PARSE IS LOSSLESS OVER THE 23 REAL DESCRIPTIONS**, asserted line-for-line against an oracle written from the SYNTAX RULES and never by calling the parser — a comparison against the parser's own output could not fail. Both halves: the prose (every character survives; the marks the corpus holds are produced, pinned per construct) and the record block (not one character touched, no mark gained). ⚠ **The oracle's precondition is asserted, not assumed** — it strips delimiters by count and is only valid where every `*` and backtick is PAIRED, which the corpus is (measured: zero odd-count lines) — and its **control runs in the same invocation**, proving it is not an identity, so a parser that did nothing could not pass. — `apps/server/test/seed/doc-text.test.ts`
+- **16.78** ✅ **A description is split into markdown PROSE and a LITERAL record block by CONSTRUCTION — the builder says which lines are prose, never an inspection of the text.** The witness is a record note that looks like a list (`- first thing`): it stays characters, while the same two lines through the markdown renderer do become a `bulletList` — the control is in the same run, so the case cannot pass by the renderer being broken. ⚠ **No line of the shipped corpus starts with a block marker, so on real data alone a whole-string parse would look identical — the split would be untested decoration, which is why this case exists.** — `apps/server/test/seed/cc-map.test.ts`
+- **16.79** ✅ **THE REAL DOOR: the description the LEDGER holds is the parsed doc.** Seeded through `ingestClientBatch`, written by the projection registry, read back out of `proj_tickets` — the prose parsed (asterisks gone, a bold mark holding their run) and the record block byte-for-byte beside it, with every emitted node checked against the editor's closed schema vocabulary. ⚠ Two halves in one case, so a fix that parsed everything or nothing fails here. — `apps/server/test/seed/seed-cc.test.ts`
+- **16.80** ✅ **The plan seed's own descriptions obey the same split** — 178 of them, one `Goal:` per plan and one `source:` per task — and the prose half is asserted on a plan that REALLY carries markdown: **3 of the 11 goals do** (measured), plan 06's backticked package names becoming `code` marks. ⚠ Corrected mid-write: the case first asserted against a fixture goal, and a fixture cannot show that the real series is parsed. — `apps/server/test/seed/seed-dev.test.ts`
+
+**The mutation battery — six mutations, six killed, EVERY RUN ASSERTING ITS TEST COUNT (103), because a mutation that makes a file unparseable runs ZERO tests and a `failed`-only verdict scores that as a SURVIVOR.** M1 `plainTextDoc` reverted to the literal renderer → **10 cases**, including 16.79 and 16.80. M2 the record block marked `markdown` → **16.78 ONLY**, which is exactly why that case exists. M3 the bold rule disabled → **10 cases**, the census among them. M4 a heading keeps its structure and loses its text → **16.77 and the heading case** — a real loss, and the losslessness case caught it. M5 the link rule drops the destination → **16.77 (the link case) and the parser's link case**. M6 in the editor, `markdownLinks` back to `false` → **4 cases including 9.95**, the typed `[text](url)` case. Every mutation restored by copy from a snapshot with sha256 verified — **never `git checkout -- <file>`, which would have destroyed this uncommitted work and left a clean `git status` reading like success.**
+
+### The existing 23 dev rows — measured, and NOT silently corrected
+
+**They are the OLD shape, and re-seeding does not fix them.** The seed's ids are deterministic (`seedUlid`), so
+`existingSeedEventIds` skips every already-present event — pinned by `13.83`/`13.84` — and a re-run of the corrected
+seed commits nothing. The rows are dev-seed data and are reproducible from the frozen board, so the honest remedy is a
+database seeded FRESH, not a corrective ingest: an ingest would mint event ids the seed can never reproduce on a ledger
+whose whole premise is that the events are the record. **⚠ NOT PERFORMED HERE: 54330 is a live stack another lane is
+using, and `docker compose` is forbidden in this topology. Owner: whoever next rebuilds the dev stack.**
+
+### What is NOT covered, named rather than implied
+
+- ⚠ **The parse is a one-way reader; nothing writes markdown back.** Markdown is NOT the stored format and this change
+  does not make it one — the output is schema-v1 doc JSON and only that.
+- ⚠ **The parser's vocabulary is closed at what the measured corpus holds.** A future record containing `_italic_`,
+  `~~strike~~` or a fenced code block will render it LITERALLY. That is the conservative direction and it is a choice,
+  not a gap: it is the same rule as the refusal list in 16.76.
+- ⚠ **`plainTextDoc`'s name now under-describes it** (it parses). Kept deliberately — the reversal's record belongs on
+  the symbol the decision was written about, and a rename detaches them — with the accurate spelling `markdownToDoc`
+  named in its docblock. **Owner: whoever next renames the seed's doc layer.**
+- ⚠ **The link rule offers no escape suggestion where the bold rule does** — measured in `9.95`, cause NOT established,
+  recorded with a named owner in `packages/editor/src/schema/extensions.ts` rather than guessed at here.

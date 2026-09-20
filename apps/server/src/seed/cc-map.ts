@@ -1,6 +1,6 @@
 import type { SubmittedEvent } from '@gisik-nokma/domain';
 import type { CcItem } from './cc-board.js';
-import { plainTextDoc } from './doc-text.js';
+import { seedDescriptionDoc, type SeedTextPart } from './doc-text.js';
 import { seedUlid } from './seed-ulid.js';
 import { TRACKER_STATE_TO_ERRAND_STATE } from './templates.js';
 
@@ -24,10 +24,21 @@ export function neededWeekEnd(week1: string, neededWeek: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-/** Everything the record says, verbatim, in reading order. Only lines whose
- * source field exists are emitted — absence stays absent. */
-export function errandDescriptionText(item: CcItem, titleById: Map<string, string>): string {
-  const lines: string[] = [item.body.trimEnd(), '', '— tracker record —'];
+/**
+ * The machine-ish half of a description: the tracker's own fields, one
+ * `key: value` line each. Everything the record says, verbatim, in reading
+ * order. Only lines whose source field exists are emitted — absence stays
+ * absent.
+ *
+ * ⚠ THIS IS THE `literal` PART, AND IT IS SEPARATE FROM THE PROSE ON PURPOSE.
+ * It is `key: value` lines a reader scans, not prose, and a markdown parser run
+ * over it would read a `-` or a `1.` at the head of a note as a list nobody
+ * wrote. Measured: no line here starts with a block marker in the shipped
+ * corpus, so nothing is broken today — the split exists so that stays true when
+ * a note changes, rather than depending on it.
+ */
+export function errandRecordText(item: CcItem, titleById: Map<string, string>): string {
+  const lines: string[] = ['— tracker record —'];
   lines.push(`tracker id: ${item.id}`);
   lines.push(`origin: ${item.origin_file}`);
   if (item.meta.counterparty) lines.push(`counterparty: ${item.meta.counterparty}`);
@@ -51,10 +62,28 @@ export function errandDescriptionText(item: CcItem, titleById: Map<string, strin
   if (attention.length > 0) {
     lines.push(`tracker attention schedule (authored in board.json, not origin truth): ${attention.join(' · ')}`);
   }
-  if (item.ask_text) {
-    lines.push('', 'ask (verbatim, as drafted in the record):', item.ask_text.trimEnd());
-  }
   return lines.join('\n');
+}
+
+/**
+ * The parts of an errand description, in reading order. `markdown` for the
+ * record's own prose — the item's body and its quoted ask, both of which the
+ * tracker's authors wrote with `##`, `-`, `1.`, `**`, `*`, `` ` `` and
+ * `[text](url)` — and `literal` for the record block above. Which part is which
+ * is decided HERE, by the code that writes the lines, never by inspecting them.
+ */
+export function errandDescriptionParts(item: CcItem, titleById: Map<string, string>): SeedTextPart[] {
+  const parts: SeedTextPart[] = [
+    { kind: 'markdown', text: item.body.trimEnd() },
+    { kind: 'literal', text: errandRecordText(item, titleById) },
+  ];
+  if (item.ask_text) {
+    parts.push({
+      kind: 'markdown',
+      text: `ask (verbatim, as drafted in the record):\n${item.ask_text.trimEnd()}`,
+    });
+  }
+  return parts;
 }
 
 export function buildErrandEvents(item: CcItem, ctx: CcMapContext): SubmittedEvent[] {
@@ -83,7 +112,7 @@ export function buildErrandEvents(item: CcItem, ctx: CcMapContext): SubmittedEve
   });
   push('description', 'ticket.field_set', {
     fieldId: 'description',
-    value: plainTextDoc(errandDescriptionText(item, ctx.titleById)),
+    value: seedDescriptionDoc(errandDescriptionParts(item, ctx.titleById)),
   });
 
   const counterparty = item.meta.counterparty ?? item.meta.who;

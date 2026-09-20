@@ -87,9 +87,9 @@ Case ids are unchanged and are never renumbered by the split.
 - 13.42 ✅ `seedUlid` is deterministic — the idempotence mechanism — `seed-ulid.test.ts`
 - 13.43 ✅ `seedUlid` differs across keys and across namespaces — `seed-ulid.test.ts`
 - 13.44 ✅ planted defect: a namespace/key join ambiguity cannot collide (`'ab'+'c'` vs `'a'+'bc'`) — `seed-ulid.test.ts`
-- 13.45 ✅ `plainTextDoc` keeps record text literal — markdown-looking characters stay characters — `doc-text.test.ts`
-- 13.46 ✅ `plainTextDoc` renders one paragraph per line; blank lines become empty paragraphs — `doc-text.test.ts`
-- 13.47 ✅ `plainTextDoc('')` is still a valid one-paragraph doc — `doc-text.test.ts`
+- 13.45 ✅ ⚠ **REVERSED 2026-09-20** (owner: *"both"*), flipped rather than deleted: `plainTextDoc` PARSES markdown — a `**Gates:**` becomes a bold mark — while `literalTextDoc` keeps record text literal, markdown-looking characters staying characters. The record of the reversed decision lives in `src/seed/doc-text.ts`'s superseded docblock — `doc-text.test.ts`
+- 13.46 ✅ the seed renderers emit one paragraph per line; blank lines become empty paragraphs — `doc-text.test.ts`
+- 13.47 ✅ an empty string is still a valid one-paragraph doc in BOTH renderers — `doc-text.test.ts`
 - 13.48 ✅ `findUserIdByEmail` queries better-auth's `"user"` table case-insensitively and returns the id — `users.test.ts`
 - 13.49 ✅ `findUserIdByEmail` returns null when nobody has signed in with that address — the seed never invents people — `users.test.ts`
 - 13.50 ✅ `checkErrandTemplate` accepts the real errand-with-waits template — `templates.test.ts`
@@ -118,8 +118,8 @@ Case ids are unchanged and are never renumbered by the split.
 - 13.71 ✅ planted defect: a `done` item is refused — the seed never claims completion on anyone's behalf — `cc-map.test.ts`
 - 13.72 ✅ planted defect: `done: true` against a stale non-done state string is still refused — the flag is checked, not just the state string — `cc-map.test.ts`
 - 13.73 ✅ planted defect: an unknown tracker state is refused, never guessed — `cc-map.test.ts`
-- 13.74 ✅ the body carries the record verbatim: tracker id, origin, counterparty/who, blocked-by resolved to the blocking item's human title, attention schedule, ask text — `cc-map.test.ts`
-- 13.75 ✅ the description event carries the text as a literal-text doc, round-tripped through the domain's own `docToPlainText` — `cc-map.test.ts`
+- 13.74 ✅ the body carries the record verbatim: tracker id, origin, counterparty/who, blocked-by resolved to the blocking item's human title, attention schedule, ask text. (Accessor changed 2026-09-20: the cases now read `errandDescriptionParts`, which replaced the string-returning `errandDescriptionText` when the split landed; the assertions themselves are unchanged.) — `cc-map.test.ts`
+- 13.75 ✅ ⚠ **REVERSED 2026-09-20**, flipped rather than deleted: the description event carries a PARSED doc — `**Gates:**` arrives as a bold mark and the asterisks are gone — asserted in both directions so a "parser" that merely deleted the delimiters cannot pass — `cc-map.test.ts`
 - 13.76 ✅ determinism: two builds of the same item are identical id-for-id; every event id is namespaced to the item so a re-snapshot cannot collide — `cc-map.test.ts`
 
 ## Convenience Corner seed runner (Task 9)

@@ -1,7 +1,7 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { newUlid } from '@gisik-nokma/domain';
+import { docToPlainText, newUlid } from '@gisik-nokma/domain';
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createIngestService } from '../../src/ingest/ingest-service.js';
@@ -154,6 +154,54 @@ describe('buildDevSeedEvents — the calendar stays empty', () => {
     expect(tasks).toHaveLength(docs.reduce((sum, doc) => sum + doc.tasks.length, 0));
     const eleven = docs.find((doc) => doc.planNumber === '11');
     expect(epics.some((event) => (event.payload as { title: string }).title === eleven?.title)).toBe(true);
+  });
+
+  /**
+   * 16.80 — the PLAN seed's descriptions obey the same split as the tracker seed's:
+   * the `Goal:` prose is parsed, and the `source:` line beside it is not. The
+   * fixture's goal carries a `**bold**` phrase and a `` `code` `` run so the
+   * parse is visible here — an unmarked goal would make this case pass under a
+   * renderer that parsed nothing.
+   */
+  it('the plan descriptions split too: Goal is parsed, the source line is not', () => {
+    const descriptions = events.filter(
+      (event) => event.type === 'ticket.field_set' && (event.payload as { fieldId: string }).fieldId === 'description',
+    );
+    const textOf = (event: (typeof descriptions)[number]): string =>
+      docToPlainText((event.payload as { value: unknown }).value);
+
+    // Every description is a goal OR a task source line, and no other shape exists.
+    expect(descriptions).toHaveLength(docs.length + docs.reduce((sum, doc) => sum + doc.tasks.length, 0));
+    const goals = descriptions.filter((event) => textOf(event).startsWith('Goal: '));
+    expect(goals).toHaveLength(docs.filter((doc) => doc.goal).length);
+
+    // THE RECORD HALF, over the whole real series: every `source:` line survives
+    // byte-for-byte, whichever plan or task it belongs to.
+    for (const doc of docs) {
+      const source = `source: docs/superpowers/plans/${doc.file}`;
+      expect(textOf(descriptions.find((event) => textOf(event).includes(source)) ?? descriptions[0]!)).toContain(source);
+    }
+
+    // THE PROSE HALF, on a plan that really carries markdown: three of the eleven
+    // goals do (measured), and plan 06 is one — its backticked package names are
+    // the assertion, because a `Goal:` line with no markers would pass under a
+    // renderer that parsed nothing.
+    const marked = docs.find((doc) => doc.planNumber === '06');
+    expect(marked?.goal).toContain('`');
+    const goalEvent = descriptions.find((event) => textOf(event).startsWith(`Goal: ${marked?.goal?.replace(/`/g, '')}`));
+    const goalText = textOf(goalEvent!);
+    expect(goalText).not.toContain('`');
+    expect(goalText).toContain('packages/ui');
+
+    const marks: string[] = [];
+    const walk = (node: unknown): void => {
+      if (!node || typeof node !== 'object') return;
+      const candidate = node as { marks?: Array<{ type: string }>; content?: unknown[] };
+      for (const mark of candidate.marks ?? []) marks.push(mark.type);
+      if (Array.isArray(candidate.content)) candidate.content.forEach(walk);
+    };
+    walk((goalEvent?.payload as { value: unknown }).value);
+    expect(marks.filter((mark) => mark === 'code').length).toBeGreaterThanOrEqual(2);
   });
 
   /**
