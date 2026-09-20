@@ -185,7 +185,7 @@ export type TicketSheetProps = {
    * ## Why they are PROPS and not a read, measured at `e9c1a04f`
    *
    * **`TicketRead` carries neither.** It is exactly six fields
-   * (`view-types.ts:332-357`): `ticket`, `title`, `stateProvenance`,
+   * (`view-types.ts:356-381`): `ticket`, `title`, `stateProvenance`,
    * `assignedProvenance`, `parent`, `rollup`. `BoardView` is
    * `{projectId, groups}` with no name, and `DataSourceQuery` has no
    * `getProjects` and no `getWorkspace` — its one name-carrying method,
@@ -1108,8 +1108,16 @@ export function TicketSheet({
    * and draws them as a `<nav>` immediately above the title input
    * (`:1100-1116`). The dispatch says to build `Workspace › Project › State` and
    * STOP: **the key is the FOURTH CRUMB OF OURS** (it would sit after these
-   * three), and it is another round's work — in fact another lane's in-flight
-   * branch. **So three, and the state is the third.**
+   * three), and it is another round's work. **So three, and the state is the
+   * third.**
+   *
+   * ⚠ **AND THE KEY SHIPPED WHILE THIS BRANCH WAS OPEN** (PR #595, merged
+   * `6f08452c`). The sentence here used to call it "another lane's in-flight
+   * branch"; that was true when written and is not now. **The fourth crumb is
+   * still not built, and the reason has changed rather than lapsed:**
+   * `TicketRead` does not carry the key either — it is the SAME six fields — so
+   * a fourth crumb would need a third host prop or a read, which is the round
+   * the dispatch scoped away. Nothing here is a placeholder for it.
    *
    * ⚠ "the fourth" is counted against OUR three, and an earlier version of this
    * sentence said "the fourth thing THERE" directly after enumerating the

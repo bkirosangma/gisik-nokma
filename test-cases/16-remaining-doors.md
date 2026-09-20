@@ -580,11 +580,15 @@ is built. Nothing here re-adds, re-wires or re-tests the navigation.
   after a control's uncommitted value.
 - **16.87** ✅ — **The location breadcrumb: `Workspace › Project › State`, and no fourth crumb.**
   `packages/app-core/test/views/ticket-sheet.test.tsx`. **Three crumbs and STOP** — the ticket KEY is OUR
-  FOURTH and is a separate round and another lane's in-flight branch, so nothing is stubbed for it. (The
+  FOURTH and is a separate round, so nothing is stubbed for it. ⚠ **THE KEY SHIPPED WHILE THIS BRANCH
+  WAS OPEN** (PR #595, merged `6f08452c`); the wording here used to call it "another lane's in-flight
+  branch" and that is no longer true. The fourth crumb is still not built for a reason that has changed
+  rather than lapsed — `TicketRead` is the same SIX fields and does not carry the key either, so a fourth
+  crumb needs a third host prop or a read. (The
   prototype's own chain at `desktop.dc.html:3404-3420` is FIVE elements — workspace, project, epic,
   parent, key — so "the fourth" counts against our three and not against that line range; an earlier
   wording said "the prototype's fourth" and read as a claim about it.) ⚠ **THE DISPATCH'S MEASUREMENT OF THE SOURCE WAS FALSE:** it said
-  all three crumbs are *"already on the ticket read"*, and `TicketRead` (`view-types.ts:332-357`) is six
+  all three crumbs are *"already on the ticket read"*, and `TicketRead` (`view-types.ts:356-381`) is six
   fields carrying no workspace name, no project name and no state name; `BoardView` is
   `{projectId, groups}` and `DataSourceQuery` has no `getProjects`. **Only the STATE is derived here**;
   the two names are host props, which is recorded as the executor's conservative default on
