@@ -938,7 +938,11 @@ describe('3.38 toServerFilterSpec — the plural/singular disagreement, made lou
  * **NONE of them, and it was six.** ⚠ **CORRECTED 2026-09-20** — this read *"**FOUR
  * of them, and it was six.**"*, and the count kept falling: 4 → 3 (P32/P38) → 1
  * (P39/P40) → **0 on 2026-09-19**, when `search`, the last key, was served.
- * `SERVING_GAPS` is EMPTY, and this block's own first assertion now says so. **The
+ * `SERVING_GAPS` is EMPTY, and the case that owns the register — *"3.39 the register
+ * is EMPTY — no mapper in this file refuses outright"*, the last one in this block —
+ * asserts exactly that. ⚠ **It said *"this block's own first assertion"*, and the
+ * register assertion is the block's LAST case: the first case here is `mapSearchHits`
+ * answering.** **The
  * block is kept because the history is its content:** `getTickets` and `getTicket`
  * answered with a `ServingGapError` until ruling P25 clause 1's buildable subset
  * landed; their entries are gone from `SERVING_GAPS` rather than emptied, and 3.42
@@ -947,14 +951,19 @@ describe('3.38 toServerFilterSpec — the plural/singular disagreement, made lou
  * inverted, on 7.189's precedent: a divergence that closed can silently re-open,
  * and deleting the case is what makes that invisible.
  *
- * These are pinned on the SERVER side too, and that is where they can go red for
- * the right reason: `apps/server/test/integration/client-contract.test.ts` reads
- * `src/online/mappers.ts`, extracts each list, and asserts every `wireKey` is
- * genuinely missing from a real `/v1` body. Nothing in this package can do that
- * — there is no server here — so what these cases pin is that the refusal fires
- * and says what it must.
+ * These were pinned on the SERVER side too, and that is where they once went red
+ * for the right reason: `apps/server/test/integration/client-contract.test.ts`
+ * read `src/online/mappers.ts`, extracted each absence list, and asserted every
+ * `wireKey` it named was genuinely missing from a real `/v1` body. Nothing in
+ * this package can do that — there is no server here. ⚠ **CORRECTED 2026-09-20:
+ * there are no absence lists left to extract and the cross-check helper has no
+ * callers, so that half is HISTORY rather than a live pin — it is stated in the
+ * past tense because the mechanism it describes is gone.** What the cases below
+ * pin now is the half that replaced it: that these mappers answer with the facts
+ * those lists used to name, over fixtures typed as the server's own response
+ * shapes, so a rename or a drop fails `typecheck` here rather than a comment.
  */
-describe('3.39 the blocked methods refuse, and enumerate what is absent', () => {
+describe('3.39 the register is EMPTY — the blocked methods ANSWER, and the facts they refused are SERVED', () => {
   /**
    * 3.39 — `mapSearchHits` ANSWERS. **This is what replaced the REFUSALS table
    * that stood here, and the table held exactly ONE entry: `search`.**

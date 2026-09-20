@@ -1428,17 +1428,17 @@ failure this bucket has recorded before, caught here by a compiler instead of by
 
 **RECORDED, NOT FIXED — Task 12's additions, with owners.**
 
-0. **`ingest`'s CONTRACT CHANGE reaches four call sites that do not catch.** The read path is
-   interchangeable; the write door is not, and the callers are enumerated rather than characterised —
-   `grep -rn "\.ingest(" packages/app-core/src apps/web/src apps/web/app` returns six:
-   `cache-feed.ts:17` and `apps/web/src/authoring/data-source-gateway.ts:296` pass the promise through,
-   while `views/ticket-sheet.tsx:299`, `views/visibility-editor.tsx:176`,
-   `flows/guarded-child-event.ts:54` (`ingestOne`) and
-   `apps/web/app/w/[workspaceId]/members/page.tsx:137` each `await` it and branch on the array without
-   catching a rejection. Against the replica each sees an `OfflineAcceptError` where it saw an array.
-   That is the honest signal arriving at the caller — there is no `IngestResult` to hand it — and it is
-   the caller that must learn to read it. Nothing today mounts a view on the replica source, so nothing
-   is broken; the day one does, these four are the sites. OWNER: **Plan 10 Task 13**.
+0. **`ingest`'s CONTRACT CHANGE reaches call sites that do not catch — the sites THIS BULLET names,
+   not all twenty the grep returns.** The read path is interchangeable; the write door is not:
+   `grep -rn "\.ingest(" packages/app-core/src apps/web/src apps/web/app` matches TWENTY-TWO lines
+   at 2026-09-20, where this read *"returns six"* (twenty call sites, two docblock mentions).
+   `cache-feed.ts:17` and `apps/web/src/authoring/data-source-gateway.ts:327` pass the promise through;
+   `views/ticket-sheet.tsx:501`, `:543` and `:585`, `views/visibility-editor.tsx:189` and
+   `flows/guarded-child-event.ts:54` (`ingestOne`) await it without catching a rejection; and
+   `apps/web/app/w/[workspaceId]/members/page.tsx:249` and `:342` neither await nor catch — they `void`
+   the promise and hang a `.then` off it. **FOUR of the six citations here had drifted; their obsolete
+   numbers are BARE so a sweep matches nothing: :299, :176, :137, :296.** Nothing mounts a view on the
+   replica source yet, so nothing is broken; the day one does, these are the sites. Against the replica each sees an `OfflineAcceptError` — there is no `IngestResult` to hand it — and it is the caller that must learn to read it. OWNER: **Plan 10 Task 13**.
 1. **A queued claim repaints nothing on any OTHER view.** `use-live-query.ts` reloads on `event`/`purge`
    frames, and a local `ticket.field_set` sitting in the outbox produces no frame — it is not a
    `LedgerEvent` and has no `seq`, `serverTime` or `workspaceSeq`, so emitting one would be inventing

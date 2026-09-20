@@ -208,7 +208,7 @@ state the rule ("every producer sets them"); the rig is why the rule is safe to 
   the door's would admit into the Backlog tab's sort a key the domain refuses to place. Mutation 5 —
   `isRankKey(raw)` → `typeof raw === 'string'` — reddened exactly this case and nothing else.
   `packages/app-core/src/online/mappers.ts:1278`, `:1357`, `:1536`,
-  `packages/app-core/test/online/mappers.test.ts:1390`, `:1425`
+  `packages/app-core/test/online/mappers.test.ts:1399`, `:1434`
 
 - ✅ **13.704 — the replica's list row carries the folded rank: `null` before a ranking, the key after
   it, on the SAME row.** The fold itself is 13.696's; what this case measures is the read door the Backlog

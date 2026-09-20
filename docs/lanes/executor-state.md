@@ -41,6 +41,178 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~06:3x IST. **`#584` WENT BACK FOR THE REVIEWER PASS
+> # THE CONTROLLER REQUIRED, AND THE PASS FOUND THE FIX ITSELF BROKEN — SIX TIMES, ACROSS TWO
+> # REVIEW ROUNDS. THE MECHANISM HAS BEEN REPLACED, NOT PATCHED AGAIN.**
+> Branch **`exec/vacuous-check`**, cut from `origin/main` = **`5c8ea78d`**. **The CODE head is
+> `71509bf6`** (the parse-tree rewrite); this handoff commit sits directly above it. **PR [#584](https://github.com/bkirosangma/gisik-nokma/pull/584), `--base main`** — its body carries the
+> reviewer result, per the rule. A commit cannot name its own sha, so this line names the code head
+> and the base; `gh pr view 584 --json headRefOid` settles anything else in one call.
+>
+> ## WHAT THE REVIEW FOUND, AND WHY THE ANSWER WAS A REWRITE
+> **Round 1 (the reviewer pass the controller sent it back for): 2 Critical, 2 Important. Three of
+> the four were CHECKS THAT CANNOT FAIL — the class this case exists to police, committed by the
+> repair three times.** Round 2 (a scoped re-review of that fix, run because my own mutation testing
+> had passed while all three mechanisms were broken): **2 more Critical, plus the same class again.**
+> Every one had ONE root, and it is the sentence to carry: **this file contains its own scanner.**
+> - ⛔ the throw-for-no-routes message quoted the url key in BACKTICKS; a backtick inside a STRING
+>   literal opens a bogus template running to the next backtick — **one match of 2061 characters
+>   over 93 lines**, swallowing the real `url: '/v1/workspaces'`, which left `exercised` silently and
+>   made the case redden **FALSELY**.
+> - ⛔ that fix caught only the LONG form. A **76-character single-line** phantom passed all three
+>   guard conditions, was quietly `continue`d, and took the route with it. **Closing the instance,
+>   not the class** — the same mistake one level up.
+> - ⛔ `withoutComments` treats STRING CONTENT as comment syntax: `const trap = '/*';` deleted an
+>   **entire register** from the scanned universe; 207 raw characters went in, **16 survived**.
+> - ⛔ the `wireRoute` scan read single quotes only, behind a control satisfied by the three
+>   `wireRoute: null` entries the value pattern can never match.
+> - ⚠ `absenceListNames` anchored `^const`, then required exactly one space after `const`.
+> - ⚠ `named` read RAW `mappers.ts` while the test file's scan stripped comments — a phantom on the
+>   SUPERSET side, the direction that HIDES a gap.
+> **So both sides now read a PARSE TREE.** A comment is trivia, a string is a `StringLiteral`, a
+> template is a `TemplateExpression`, a property is a `PropertyAssignment`, a type member is a
+> `PropertySignature` — those six are **unrepresentable**, not guarded. `typescript` is already an
+> `apps/server` devDependency; this is the first file in the repo to import it. **GETs only** (a
+> refusal's `wireKey` is measured against a response body), so `exercised` is **EIGHT routes** —
+> `/v1/events` and `/v1/workspaces` are both POSTs, and counting them was F3.
+> **Mutations re-run, restored from git between runs:** every survivor above now RED, the original
+> control still RED, the prose phantom GREEN. One probe read GREEN and was a **probe bug, not a
+> survivor** — the register was named `F5a`, which does not end `_ABSENCES`; run with a conforming
+> name it is RED. That residual is documented in `absenceListNames`' docblock.
+>
+> ## ⛔ I DESTROYED UNCOMMITTED WORK WITH A SCRATCH SCRIPT, AND THE LESSON IS THE GENERIC ONE
+> A battery script of mine ran `git checkout -- <test file>` as its "clean" step, which reverted the
+> file to HEAD and **destroyed the entire AST rewrite and the round-2 fixes** — uncommitted, so no
+> blob existed to recover. I reconstructed them from the edits in my own context and **committed
+> immediately**. It is the recorded rule with a new spelling: **a checksum restore, never a blanket
+> `git checkout`**, and **commit the moment a fix is green** when the next step is a mutation battery
+> that rewrites the same file. The battery now restores from git *because the work is committed*.
+>
+> ## ANCHORS, RECOUNTED AT THIS TREE
+> - merge-base with `origin/main` = **`5c8ea78d`**; tree carries only `test-cases/` and handoff edits
+>   above the committed code head. **`reference/` untouched.**
+> - **gate** `pnpm turbo run build test typecheck`: **EXIT=0 · 33/33 · 30 cached · 36.5s · Node
+>   v22.22.2**. `app-core` cache HITS are correct (its inputs are byte-identical — `mappers.ts`
+>   restored to `723c6d4c`). Touched tasks ran (cache MISS): `server` build/test/typecheck, **154
+>   files / 1620 passed / 5 skipped**.
+> - `check-case-ids` **ok** (2494 unique, highest `16.82` — **no id minted**); `check-case-citations`
+>   **ok** (ratchet holds).
+> - **Citations measured LAST, twice more:** the catalogue rewrite shifted `07-api-realtime-search.md`
+>   by **+18**, and **four** live citations were re-pointed and verified **IDENTICAL by content** at
+>   each new position (`:458`→`:476`, `:611`→`:629` bare, `:493,502`→`:511,520`, `:509`→`:527`, two
+>   sites). The earlier `12-offline-sync-apps.md` edit was kept **line-neutral (11/11)** on purpose —
+>   citations into it live in `docs/lanes/executor-state-2.md`, **a peer lane's restart surface**.
+> - **Not ours, unchanged:** the tap-target 24px ruling, the unstyled `button.ticket-type-list__move`,
+>   the parity visual half, and the two `e2e-stack` reds resting on those rulings.
+>
+> ## OUTSTANDING
+> **The controller names the head and gates at the landing tree.** One finding is theirs and NOT
+> touched: **`packages/app-core/src/replica/replica-data-source.ts:205`** asserts *"the six call sites
+> `Features.md` §12 enumerates"* — and §12 now says twenty. It contradicts its own cited authority;
+> product source, so outside "tests and docs only".
+>
+> # ▢ SUPERSEDED: the block below was written before the reviewer pass. Its "the three items are done"
+> # is true and its anchors are history; everything it says about the DERIVATION is superseded by the
+> # parse-tree rewrite above.
+
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~05:2x IST. **THE THREE CHECKS RECORDED AS THE
+> # CONTROLLER'S ARE DONE, GATED GREEN, AND ONE OF THEM COULD NOT FAIL.** Branch
+> # **`exec/vacuous-check`**, cut from `origin/main` = **`5c8ea78d`** (the `#583` merge). **The CODE
+> # head is `ac7f679d`**, and this handoff commit sits directly above it; the branch is **two commits
+> # ahead** of `origin/main`. **The PR is raised from this branch against `--base main` immediately
+> # after this commit** — a commit cannot name its own sha or a PR number it precedes, so this line
+> # names the CODE head and the base, which are the two readings that survive. If it says anything
+> # else, `gh pr list --state open` settles it in one call.
+>
+> ## THE THREE ITEMS, AND WHAT EACH TURNED OUT TO BE
+>
+> **(a) ⛔ `client-contract.test.ts` 7.209 — it was worse than vacuous, and its own comment said
+> why.** `expect([...named].sort()).toEqual(EXERCISED)` with `EXERCISED` = `[]` AND the loop ranging
+> over `[]`. The history, read rather than guessed: `EXERCISED` was SIX routes (2026-09-02), four
+> (`7bb93cc9`), three (`b4e2f14e`), one (`aa17046d`), NONE (`42fb2f2c`) — and **every entry that left
+> did so in the SAME commit that deleted the absence list naming it.** It was never an independent
+> measurement; it was a hand-maintained COPY of `named`. So `toEqual` compared a list against its own
+> mirror, which can only fail when somebody forgets to update the copy — and the history says nobody
+> ever did. The docblock above it says the two lists are *"kept apart on purpose"*; the history says
+> they were never apart. **MEASURED at `5c8ea78d`: the file still fetches ALL SIX of those routes.
+> The LIST shrank; the coverage did not.**
+> Both sides are now DERIVED — `named` by scanning every `wireRoute: '…'` in `mappers.ts`,
+> `EXERCISED` out of this file's own `url:` literals after comment-stripping — both reduced to path
+> SHAPE (`:param`), so `${childTicketId}` and `${ticketId}` are ONE route rather than three. The
+> assertion is the case's own TITLE: **containment, which is what it always was; equality was the
+> relation the mirror made look true**, and it is not assertable at all now that `named` is
+> legitimately empty while the file fetches ten routes. **It did NOT redden** — no product claim
+> moved, only the relation and both derivations.
+> **MUTATIONS, named and run:** planting an `Absence` with `wireRoute: '/v1/nobody-fetches-this'`
+> reddens 7.209 **ALONE** (`expected [ '/v1/nobody-fetches-this' ] to deeply equal []`) — the exact
+> mutation the OLD case would have SURVIVED; rewriting one `url:` to an absolute non-`/v1` path
+> reddens it with the scanner's own message. `mappers.ts` restored, `git diff` clean, verified.
+> **⚠ THE CONTROL FIRED ON ITSELF, and it is worth keeping.** An earlier draft of the throw message
+> read `` `url: \`${value}\`` `` in a template literal, and the backtick-quoted `url:` inside that
+> MESSAGE parsed as one more `url` with an empty value. A scan over a file that contains its own
+> scanner reads the scanner. The branch is a NAMED SKIP LIST now, not a throw on everything
+> unrecognised — the failure it had guarded was in the *safe* direction (a smaller `EXERCISED` makes
+> containment stricter), so it bought nothing for real fragility.
+> **ONE LIMIT, stated in the helper rather than left to be discovered:** the assertion is containment,
+> so with `named` empty a route rewritten into a spelling the scan does not match leaves the set
+> without reddening anything. Total failure is loud (`routes.size === 0` throws); partial is not.
+> Closing it needs a route this file is asserted to fetch, which is a ratchet on the FILE's coverage
+> rather than a check on the refusals — the trade this case deliberately does not make.
+> The wireKey/wireRoute invariant is **RE-ARMED rather than deleted**: it ranges over the register
+> names READ OUT of `mappers.ts`, so it covers a register again the moment one exists, instead of
+> over a literal `[]` that could not say it had no subject.
+>
+> **(b) `mappers.test.ts:957` — the `describe` LABEL was the wrong half, not the case.** It read
+> *"the blocked methods refuse, and enumerate what is absent"* while the block it heads contains
+> *3.39 "the register is EMPTY — no mapper in this file refuses outright"* plus six `mapMyWork`/
+> `mapAttention` mapping cases. Corrected the label, and with it two sentences of the block's own
+> docblock describing the same dead mechanism — including *"this block's own first assertion now
+> says so"*, where the register assertion is the block's **LAST** case. ⚠ **That docblock rewrite
+> grew the file by NINE lines**, which is what moved the citations in the next paragraph.
+>
+> **(c) The `Features.md` replica bullet's six `ingest` citations — FOUR had drifted, exactly as
+> dispatched, resolved BY CONTENT.** `ticket-sheet.tsx:276` and `members/page.tsx:137` had each come
+> to rest on a comment about something else, `visibility-editor.tsx:176` on the
+> `makeSubmittedFactory` call ABOVE its ingest, and `authoring/data-source-gateway.ts:296` on a
+> docblock about a 422. Only `flows/guarded-child-event.ts:54` and `cache-feed.ts:17` still pointed
+> at what they named. Re-pointed — **and one was wrong about KIND as well as line**: `members/page.tsx`
+> does not `await` at all, it `void`s the promise and hangs a `.then` off it, so a rejection there
+> has no handler. The bullet's own grep now returns **TWENTY-TWO lines** (twenty call sites, two
+> docblock mentions), not six.
+>
+> ## CITATIONS, MEASURED LAST — the recurrence this lane keeps paying for
+> (b)'s nine lines moved FOUR live `test-cases/` citations. All four re-pointed and **verified by
+> content, every one**: `mappers.test.ts:958,1116` → `:967,1125`, `:1389` → `:1398`, `:1390`,`:1425`
+> → `:1399`,`:1434`. `expectStillUnserved` is still at `client-contract.test.ts:375` — above the new
+> helpers — so the citation that names it by symbol and line is unaffected. `Features.md`'s edit was
+> 1 line in, 1 line out, so **no** `Features.md` citation moved.
+>
+> ## ANCHORS, RECOUNTED AT THIS TREE
+> - merge-base with `origin/main` = **`5c8ea78d`**; branch **TWO ahead** (`ac7f679d` + this handoff).
+> - tree **clean**; `reference/` untouched; **no product code, no route, no schema** — six files, all
+>   tests and docs: two test files, `Features.md`, three `test-cases/` files.
+> - **gate** `pnpm turbo run build test typecheck` at this tree: **EXIT=0 · 33/33 · 18 cached ·
+>   1m9.4s**. The 18 hits are `ui`, `domain`, `rule-engine`, `editor`, `mcp-server`, `sync-client` —
+>   every package this change does NOT touch. **The tasks it DOES touch all ran (cache MISS):**
+>   `app-core` typecheck+build+test (1641 tests), `server` typecheck+test (1620 passing, 5 skipped),
+>   `web`/`desktop`/`mobile` test. **So the 18 cached are not the gate hiding anything.**
+> - `check-case-ids` **ok** — 2494 unique ids, highest `16.82`. **No case id minted**, deliberately:
+>   a repair mints one only if it pins new product behaviour, and this pins none. `16.83` is still
+>   free in our block.
+> - `check-case-citations` **ok** — ratchet holds exactly on every file.
+> - **Not ours, unchanged:** the tap-target 24px ruling, the unstyled `button.ticket-type-list__move`,
+>   the parity visual half, and the two `e2e-stack` reds resting on those rulings.
+>
+> ## WHAT IS OUTSTANDING
+> **Nothing.** The dispatch's three items are done, gated, and empirically falsified. The branch is
+> pushed and the PR is raised against `main`; **the controller merges, not this lane.** A restarted
+> executor has no work here — verify the anchors above and HOLD.
+>
+> # ▢ SUPERSEDED: the block below was written before `#583` merged, so its "PR #583 is open" line
+> # and its `3f37ffc4`/`92f3d93c` anchors are history. The three findings it recorded **with the
+> # controller as owner** are the three this block completed — which is why they are struck here
+> # rather than left to be re-discovered.
+
 > # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~10:1x IST. **THE FALSIFIED-CLAIM SWEEP IS BUILT, PROVEN
 > # COMMENTS-ONLY, AND GATED GREEN.** Branch **`exec/falsified-claim-sweep`**, cut from
 > # `origin/main` = **`3f37ffc4`** (the `#578` merge) at cut, **`92f3d93c`** now — it MOVED. **The CODE head
@@ -182,6 +354,11 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `data-source-gateway.ts:296`; the real sites are `:501/:543/:585/:705/:868`, `:189`, `:249/:342`,
 > `:327`). Pre-existing, not authored here — but **this branch re-emitted that line**, so a reader would
 > attribute them to it. *Owner: the controller.*
+> **→ FIXED 2026-09-20 on `exec/vacuous-check` at `ac7f679d`.** The four are re-pointed by content, and
+> the recorded real-site list above is **confirmed correct**, with one addition this paragraph did not
+> make: `members/page.tsx` is wrong about **KIND** as well as line — it does not `await` at all, it
+> `void`s the promise and hangs a `.then` off it. The bullet's own grep was re-run and returns
+> **TWENTY-TWO lines** (twenty call sites, two docblock mentions), not "six call sites".
 >
 > ## ROUND 4 — found by re-sweeping AFTER the PR opened, and it is a class nobody had looked for
 > Every prior round found more than the round before it, so **stopping was an assumption, not a
@@ -206,13 +383,25 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > task of the same shape, and the reason it kept happening is that each round's citations were written
 > before the next round's edits.
 >
+> # ▣ **DONE 2026-09-20 — the three findings recorded below are no longer outstanding.** The controller
+> # took them as **`exec/vacuous-check`**, and all three are fixed, gated and mutation-proven: see the
+> # CURRENT POSITION block at the very top of this file. **Do not re-do them** — a restarted executor
+> # that reads only this paragraph would rebuild work that is already done and pushed.
+> #
 > **One finding recorded rather than fixed, with an owner — a check that cannot fail:**
 > `client-contract.test.ts`'s **7.209** still asserts `expect([...named].sort()).toEqual(EXERCISED)` where
 > the code above it is `const EXERCISED: string[] = []; for (const constName of [] as string[])` — so its
 > main assertion is **`[] toEqual []`**, and only the complement loop at the end does real work. **NOT
 > fixed here: a test assertion is outside "comments and docblocks only".** *Owner: the controller.*
+> **→ FIXED 2026-09-20 on `exec/vacuous-check` at `ac7f679d`** — and the fix found the cause this
+> paragraph did not: `EXERCISED` was a hand-maintained MIRROR of `named` (six routes → four → three →
+> one → none, each leaving in the commit that closed the refusal naming it), so `toEqual` compared a
+> list against its own copy. Both sides are derived now, and the mutation that kills it is named.
 > Similarly `mappers.test.ts:957`'s `describe('3.39 the blocked methods refuse, …')` is now a false
 > label — **left, because changing it changes test code**, and named here rather than quietly kept.
+> **→ FIXED 2026-09-20, same branch: the LABEL was the wrong half.** (It has since moved to `:966`,
+> because the fix grew that file's docblock by nine lines and moved four live `test-cases/` citations,
+> all four re-pointed by content.)
 > **⚠ The citation itself was wrong for an hour:** this line and the Round-2 commit message both said
 > `:953`, which was correct at `95470afb` and was moved to `:957` by Round 2's own edit to that file —
 > the fifth self-shifting citation in this task. The commit message cannot be amended without rewriting

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import * as ts from 'typescript';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid, serverStreamFrameSchema, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { FastifyInstance } from 'fastify';
@@ -405,6 +406,269 @@ function allKeys(value: unknown, path = ''): string[] {
     const here = path === '' ? key : `${path}.${key}`;
     return [here, ...allKeys(inner, here)];
   });
+}
+
+/**
+ * A `/v1` path reduced to the identity the assertion is made over: its SHAPE.
+ *
+ * Both sides of 7.209 go through this, and both need it. On this file's side,
+ * `${childTicketId}`, `${restrictedChildId}` and `${ticketId}` are the SAME
+ * Fastify route reached with three different local variable names, so a naive
+ * reading makes one route into four — and this is the SUPERSET side, so inflating
+ * it is the direction that covers a gap rather than opening one. On `mappers.ts`'
+ * side a `wireRoute` is written with a placeholder name too, and the property
+ * 7.209 asserts is about the path, not the spelling of a parameter that no
+ * request carries.
+ */
+function routeShape(path: string): string {
+  return (path.split('?')[0] ?? '')
+    .replace(/\$\{\w+\}/g, ':param')
+    .replace(/:[A-Za-z_]\w*/g, ':param');
+}
+
+/**
+ * Every `/v1` route THIS FILE really fetches, derived from this file's own
+ * source text rather than written down here.
+ *
+ * It is derived because the hand-written version of this list is what 7.209's
+ * failure was made of. It read six routes, then four, then three, then one,
+ * then `[]` — and every entry that left did so in the SAME commit that deleted
+ * the absence list naming it, because the list was being kept in step with
+ * `named` by hand. A list derived from the file cannot be kept in step with
+ * anything: it is a measurement, and it is what `named` gets compared against.
+ *
+ * Throws rather than returning `[]`, on `clientTypeFields`' contract: an empty
+ * list makes 7.209's containment assertion true for every input, which is the
+ * one way this derivation could pass by being broken.
+ *
+ * Three limits, all stated rather than left to be discovered:
+ *   - comments are stripped BEFORE scanning. This list is the SUPERSET side of
+ *     the assertion, so a route written inside prose would cover a gap rather
+ *     than open one — the direction that HIDES a real defect. The control in
+ *     the helper asserts the stripped text is still this file, which is also
+ *     what catches a stripper that over-reached.
+ *   - a request whose `url:` is not a `/v1` literal at all — `${base}?…` — is
+ *     skipped, and every OTHER unrecognised form THROWS. A skip is a request
+ *     this scan cannot read, and a route counted as fetched without having been
+ *     read is a route that covers a gap.
+ *   - ⚠ WHAT THIS CANNOT SEE, stated because it is the residual. The assertion
+ *     it feeds is CONTAINMENT, which is silent about this set's coverage: with
+ *     `named` legitimately empty, one route rewritten into a spelling this scan
+ *     does not match would leave the set without reddening anything. Total
+ *     failure is loud (`routes.size === 0` throws); partial is not. Closing
+ *     that needs a route this file is asserted to fetch, which would be a
+ *     ratchet on the file's coverage rather than a check on the refusals — the
+ *     trade this case deliberately does not make.
+ */
+const CONTRACT_TEST_SRC = fileURLToPath(new URL(import.meta.url));
+
+/**
+ * ⚠ THESE HELPERS READ A PARSE TREE, NOT TEXT, AND THE REASON IS A MEASURED ONE.
+ *
+ * The first version scanned this file's raw characters with a regex; the second
+ * added a comment-stripper and a swallow guard on top. **Between them they
+ * produced TEN defects across two review rounds, and every one had the same
+ * root: this file contains its own scanner.** A url key written inside a STRING
+ * literal is not a request, but regex cannot tell; a backtick in a message opened
+ * a bogus template that ate 93 lines and silently dropped a real route; `/*`
+ * inside a string opened a bogus block comment and deleted an entire register
+ * from the scanned universe; and the `wireRoute` scan read one quote style out
+ * of three. Each was patched with another guard, and each guard was itself
+ * satisfiable for a reason unrelated to what it named.
+ *
+ * A parse tree does not have that class of bug. A comment is trivia, a string is
+ * a `StringLiteral`, a template is a `TemplateExpression`, a property is a
+ * `PropertyAssignment` and a type member is a `PropertySignature` — so those four
+ * defects are not guarded against, they are **unrepresentable**.
+ *
+ * `typescript` is already an `apps/server` devDependency; this is the first file
+ * in the repo to import it.
+ */
+function parseSource(filePath: string): ts.SourceFile {
+  const file = ts.createSourceFile(
+    filePath,
+    readFileSync(filePath, 'utf8'),
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+  // A parse that produced nothing found nothing, and every set derived below
+  // would be empty for that reason rather than a real one.
+  if (file.statements.length === 0) throw new Error(`${filePath}: parsed zero statements`);
+  return file;
+}
+
+/** Every node in the tree. */
+function walk(node: ts.Node, visit: (node: ts.Node) => void): void {
+  visit(node);
+  node.forEachChild((child) => walk(child, visit));
+}
+
+/** The initializer of `{ <name>: … }` in an object literal, if written statically. */
+function propertyOf(object: ts.ObjectLiteralExpression, name: string): ts.Expression | undefined {
+  for (const property of object.properties) {
+    if (
+      ts.isPropertyAssignment(property) &&
+      ts.isIdentifier(property.name) &&
+      property.name.text === name
+    ) {
+      return property.initializer;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The literal text of a route, with every interpolation collapsed to `:param`.
+ *
+ * `undefined` means the value is not a literal at all — a bare identifier, or an
+ * expression — a form this scan cannot count and does not pretend to.
+ */
+function literalRouteText(init: ts.Expression): string | undefined {
+  if (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init)) return init.text;
+  if (ts.isTemplateExpression(init)) {
+    return init.head.text + init.templateSpans.map((span) => `:param${span.literal.text}`).join('');
+  }
+  return undefined;
+}
+
+/**
+ * Every `/v1` route this file really passes to `app.inject`, as a **GET**.
+ *
+ * GET-only is deliberate: a refusal's `wireKey` is measured against a RESPONSE
+ * BODY, and a setup `POST` — `beforeAll` creates the workspace with one — is a
+ * request whose body nothing measures an absence against. Counting it would let a
+ * refusal name a route no READ ever returns.
+ */
+function routesThisFileFetches(): string[] {
+  const file = parseSource(CONTRACT_TEST_SRC);
+  // The control is a claim about the TREE, not about the text: a case titled
+  // 7.209 exists. A scan that parsed the wrong file, or an empty one, fails here.
+  let saw7209 = false;
+  const routes = new Set<string>();
+  walk(file, (node) => {
+    // `it(…)` is a bare IDENTIFIER call here, not a property access — `vitest`'s
+    // `it` is imported directly.
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'it'
+    ) {
+      const [title] = node.arguments;
+      if (title !== undefined && ts.isStringLiteral(title) && title.text.startsWith('7.209')) {
+        saw7209 = true;
+      }
+      return;
+    }
+    if (
+      !ts.isCallExpression(node) ||
+      !ts.isPropertyAccessExpression(node.expression) ||
+      node.expression.name.text !== 'inject'
+    ) {
+      return;
+    }
+    const [options] = node.arguments;
+    if (options === undefined || !ts.isObjectLiteralExpression(options)) return;
+    const url = propertyOf(options, 'url');
+    if (url === undefined) return;
+    const method = propertyOf(options, 'method');
+    const verb = method === undefined ? 'GET' : ts.isStringLiteral(method) ? method.text : '«dynamic»';
+    if (verb.toUpperCase() !== 'GET') return;
+    const text = literalRouteText(url);
+    // Not a literal: a bare identifier, or an expression this scan cannot read.
+    // It resolves at runtime to a route one of the literals below already names.
+    if (text === undefined) return;
+    if (text.startsWith('/v1')) {
+      routes.add(routeShape(text));
+      return;
+    }
+    // A template rooted in an interpolation — `` `${base}?workspaceId=…` `` —
+    // becomes the same route a literal below already names, and the case that
+    // builds it injects both. Named, so the skip list has exactly this one entry.
+    if (ts.isTemplateExpression(url) && url.head.text === '') return;
+    // Anything else is a request this scan CANNOT count, and it talks rather than
+    // skipping: this set is the superset side of 7.209's assertion, so a route
+    // dropped here is a real route the check pretends the file does not fetch.
+    throw new Error(
+      `client-contract.test.ts: a GET url of ${JSON.stringify(text)} is not a /v1 route — this scan cannot count it as fetched`,
+    );
+  });
+  if (!saw7209) throw new Error('client-contract.test.ts: no case titled 7.209 in the parsed tree');
+  if (routes.size === 0) throw new Error('client-contract.test.ts: this file parses to zero GET routes');
+  return [...routes].sort();
+}
+
+/**
+ * The names of every `*_ABSENCES` register declaration in `mappers.ts`.
+ *
+ * 7.209's wireKey/wireRoute invariant ranged over six of these BY NAME, and the
+ * last (`MAP_SEARCH_HITS_ABSENCES`) was deleted on 2026-09-19 — leaving a loop
+ * over nothing that could not say so. Reading the names means the invariant
+ * covers a register again the moment one exists.
+ *
+ * ⚠ CORRECTED 2026-09-20, twice. First it was `/^const …/gm`, ANCHORED to the
+ * line start, so `export const X_ABSENCES` was invisible while `mapperAbsences`
+ * — unanchored — found the same block. Then it was unanchored text, which
+ * required exactly one space after `const` and so missed `let`, two spaces, and
+ * a comment between the keyword and the name; five spellings were measured
+ * bypassing the invariant silently. **A declaration is a `VariableDeclaration`
+ * in the tree whatever its keyword, spacing or comments**, so the class is gone
+ * rather than guarded. The residual is a register whose name does not end
+ * `_ABSENCES` at all, which is why the three deleted names are pinned separately
+ * by `mapperAbsences` throwing on them.
+ */
+function absenceListNames(file: ts.SourceFile): string[] {
+  const names: string[] = [];
+  walk(file, (node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      /_ABSENCES$/i.test(node.name.text)
+    ) {
+      names.push(node.name.text);
+    }
+  });
+  return names;
+}
+
+/**
+ * Every `wireRoute` VALUE written in `mappers.ts`.
+ *
+ * ⚠ CORRECTED 2026-09-20: the text scan read `wireRoute: '…'` — single quotes
+ * only — and a backtick-quoted value naming an unfetched route left 7.209 GREEN.
+ * Reading the `PropertyAssignment` sees all three quote styles, and the type
+ * declaration on the `Absence` shape is a `PropertySignature` rather than an
+ * assignment, so it is excluded by KIND instead of by a trailing `;`.
+ */
+function wireRouteValues(file: ts.SourceFile): {
+  /** How many `wireRoute` properties the parse REACHED, `null`s included. */
+  found: number;
+  /** The ones naming a route. */
+  routes: string[];
+  /** The ones in a spelling this scan cannot read. */
+  unreadable: string[];
+} {
+  const routes: string[] = [];
+  const unreadable: string[] = [];
+  let found = 0;
+  walk(file, (node) => {
+    if (
+      !ts.isPropertyAssignment(node) ||
+      !ts.isIdentifier(node.name) ||
+      node.name.text !== 'wireRoute'
+    ) {
+      return;
+    }
+    found += 1;
+    const init = node.initializer;
+    if (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init)) {
+      routes.push(init.text);
+      return;
+    }
+    if (init.kind === ts.SyntaxKind.NullKeyword) return; // names no route: nothing to measure
+    unreadable.push(init.getText());
+  });
+  return { found, routes, unreadable };
 }
 
 beforeAll(async () => {
@@ -1595,54 +1859,114 @@ describe('GET /v1/contests vs the two contested refusals', () => {
   /**
    * 7.209 — the guard on the guard.
    *
-   * `expectStillUnserved` now SELECTS absences by route, and a selection is a
-   * place a pin can be retired without anything going red: point a `wireRoute`
-   * at a route no case fetches and its `wireKey` is never measured against
-   * anything again. So the set of routes the refusals name is asserted against
-   * the set of routes this file actually exercises — one list derived from
-   * `mappers.ts`, the other written here, and neither able to shrink quietly.
+   * `expectStillUnserved` SELECTS absences by route, and a selection is a place
+   * a pin can be retired without anything going red: point a `wireRoute` at a
+   * route no case fetches and its `wireKey` is never measured against anything
+   * again. So the set of routes the refusals name is asserted against the set of
+   * routes this file actually exercises.
+   *
+   * ⚠ CORRECTED 2026-09-20: it read *"one list derived from `mappers.ts`, the
+   * other written here, and neither able to shrink quietly"* — and the
+   * written-here list was never kept apart from the derived one. It was
+   * maintained IN STEP with it until both were `[]`, and the assertion between
+   * them passed at every step on the way down. **Both sides are now derived,
+   * from `mappers.ts` and from this file, so neither can be pruned by hand at
+   * all** — the case carries the history and the measurement.
    */
   it('7.209 every route the refusals name is a route this file really fetches', () => {
-    // FOUR routes, and it was six. `/v1/projects/:projectId/tickets` and
-    // `/v1/workspaces/:workspaceId/tickets/:ticketId` left this set when ruling
-    // P25 clause 1's buildable subset landed and their two absence lists were
-    // DELETED. This file still fetches both — 7.203 and 7.206 below assert what
-    // they now serve — so a route dropping out of this set is not the same claim
-    // as a route dropping out of the file, and the two are kept apart on purpose.
-    // `/v1/me/workspaces` left this set with rulings P32/P38, the same way the
-    // two ticket routes left it with P25 clause 1: the file still FETCHES it
-    // (above), and a route dropping out of the refusal set is not the same
-    // claim as a route dropping out of the file.
-    // ONE route, and it was four, and six before that. `/v1/contests` and
-    // `/v1/me/work` left this set with rulings P39 and P40 when
-    // `MAP_MY_WORK_ABSENCES` and `MAP_ATTENTION_ABSENCES` were DELETED. This
-    // file still fetches both — the cases above assert what they now serve — so
-    // a route dropping out of this set is not the same claim as a route
-    // dropping out of the file, and the two are kept apart on purpose.
-    const EXERCISED: string[] = [];
-    const named = new Set<string>();
-    // EMPTY SINCE 2026-09-19. `MAP_SEARCH_HITS_ABSENCES` was the last list, and
-    // it is deleted rather than emptied — see the complement below, which is
-    // where this case still does real work.
-    for (const constName of [] as string[]) {
+    // ⚠ CORRECTED 2026-09-20 — THIS CASE COULD NOT FAIL, and its own docblock
+    // left the instruction that let it happen. The "written here" list was not a
+    // second measurement; it was a hand-maintained copy of `named`, and each
+    // entry left it in the very commit that deleted the absence list naming it:
+    //
+    //   2026-09-02  six routes  — the file's real coverage, and `named` matched
+    //   7bb93cc9    four        — `/v1/projects/:projectId/tickets` and
+    //                            `/v1/workspaces/:workspaceId/tickets/:ticketId`
+    //                            left with ruling P25 clause 1, and the comment
+    //                            here said, in the same breath, "This file still
+    //                            fetches both"
+    //   b4e2f14e    three       — `/v1/me/workspaces` left with P32/P38
+    //   aa17046d    one         — `/v1/contests` and `/v1/me/work` left with
+    //                            P39/P40
+    //   42fb2f2c    NONE        — `/v1/search` left, and the loop's six names
+    //                            became a bare `[]`
+    //
+    // So the assertion was `[] toEqual []`. And `toEqual` had never had content
+    // to lose: it compared a list against its own copy, which can only fail when
+    // somebody forgets to update the copy — and the history says nobody ever
+    // did, because the update rode along with the work that made it needed. **A
+    // measurement and its own mirror agree by construction, and they go on
+    // agreeing all the way to zero.**
+    //
+    // ⚠ MEASURED 2026-09-20: this file still fetches ALL SIX of those routes, so
+    // the list did not shrink because coverage did. `named` is read out of
+    // `mappers.ts` and `EXERCISED` out of this file, and what is asserted
+    // between them is the case's own title — every route the refusals name IS a
+    // route this file fetches — which is CONTAINMENT. Equality was never the
+    // property the title states; it is the relation the mirror made look true,
+    // and it is no longer assertable at all now that `named` is legitimately
+    // empty while the file injects against eight GET routes.
+    const mapperFile = parseSource(APP_CORE_MAPPERS);
+    // The control is a claim about the TREE: the module this scan says it read is
+    // the module it read. A parse of the wrong file, or an empty one, fails here.
+    let sawServingGapError = false;
+    walk(mapperFile, (node) => {
+      if (ts.isClassDeclaration(node) && node.name?.text === 'ServingGapError') {
+        sawServingGapError = true;
+      }
+    });
+    expect(sawServingGapError, 'online/mappers.ts declares ServingGapError').toBe(true);
+    // ⚠ CORRECTED 2026-09-20 — THE CONTROL THAT ONCE STOOD HERE COULD NOT FAIL,
+    // which is the very class this case exists to police. It was
+    // `toMatch(/wireRoute: /)`, satisfied by the register's THREE
+    // `wireRoute: null` entries and by the type declaration — none of which the
+    // value pattern could ever match. MEASURED: a `wireRoute` written in
+    // BACKTICKS, naming a route nothing fetches, left 7.209 GREEN; only the
+    // quoting changed and it reddened.
+    //
+    // The scan reads `PropertyAssignment`s now, so all three quote styles arrive,
+    // the type declaration is excluded by KIND — it is a `PropertySignature`, not
+    // an assignment — and a spelling this scan cannot read THROWS rather than
+    // being silently absent from `named`. The omission is the dangerous
+    // direction: it is a refusal pointing at a route that would never be measured.
+    const wireRoute = wireRouteValues(mapperFile);
+    // ⚠ The control counts PROPERTIES REACHED, not values read — the distinction
+    // the old shape collapsed. That shape passed on the three `wireRoute: null`
+    // entries while the value scan found nothing at all, which is precisely how a
+    // quoted value went unread. `found` is non-zero for the nulls, so it still
+    // fails if the parse stops reaching the property.
+    expect(wireRoute.found, 'mappers.ts declares `wireRoute` on something').toBeGreaterThan(0);
+    expect(
+      wireRoute.unreadable,
+      'a `wireRoute` in a spelling this scan cannot read — it would be invisible to `named`, so a refusal naming a real route would pass unmeasured',
+    ).toEqual([]);
+    const named = new Set(wireRoute.routes.map((route) => routeShape(route)));
+
+    // The invariant that ranged over six register names, RE-ARMED rather than
+    // deleted: a `wireKey` with no `wireRoute` is a key nothing can ever
+    // measure. It has no subject while the register is empty, and `named` being
+    // zero is a fact rather than a hole for the reason the control above gives.
+    for (const constName of absenceListNames(mapperFile)) {
       for (const absence of mapperAbsences(constName)) {
-        // A `wireKey` with no `wireRoute` is a key nothing can ever measure.
         expect(
           absence.wireKey === null || absence.wireRoute !== null,
           `${absence.field}: names a wireKey with no wireRoute`,
         ).toBe(true);
-        if (absence.wireRoute !== null) named.add(absence.wireRoute);
       }
     }
-    expect([...named].sort()).toEqual(EXERCISED);
+
+    const exercised = routesThisFileFetches();
+    const unexercised = [...named].filter((route) => !exercised.includes(route)).sort();
+    expect(
+      unexercised,
+      'a refusal names a route no case here fetches — its `wireKey` can never be measured, so a `wireRoute` pointed at one retires the pin in silence',
+    ).toEqual([]);
+
     // The complement, in the same run: **every** deleted list is GONE from the
-    // source rather than emptied — and this is the half of the case that is NOT
-    // vacuous now that the set above is empty. `mapperAbsences` throws on a
-    // `const` it cannot find and throws again on one that parses to zero
-    // entries, so an entry hollowed to `[]` fails this the same way a surviving
-    // one does. That is what stops a closed gap from leaving a refusal nobody
-    // can read behind it — and the three assertions below are the reason an
-    // empty `EXERCISED` is a fact rather than a hole.
+    // source rather than emptied. `mapperAbsences` throws on a `const` it cannot
+    // find and throws again on one that parses to zero entries, so an entry
+    // hollowed to `[]` fails this the same way a surviving one does. That is
+    // what stops a closed gap from leaving a refusal nobody can read behind it.
     for (const deleted of [
       'MAP_LIST_VIEW_ABSENCES',
       'MAP_TICKET_READ_ABSENCES',

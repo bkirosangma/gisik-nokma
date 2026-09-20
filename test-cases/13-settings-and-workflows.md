@@ -383,7 +383,7 @@ into `apps/server/src/routes/builder-reads.ts` (`readTicketCounts` and its docbl
 note added after the review). **Re-pointed, because this file is in the change set:** the version-route
 citation at `:517-546` → **`:579-608`**, verified by content — the route's `app.get` opening line and its
 closing `);`. **Recorded, owner: the controller** — every other citation INTO that file:
-`test-cases/03-foundation-ledger.md:109` (`:531`), `test-cases/07-api-realtime-search.md:450` and `:603`
+`test-cases/03-foundation-ledger.md:109` (`:531`), `test-cases/07-api-realtime-search.md:476` and `:629`
 (`:444`, `:448`), `test-cases/13-second-wave-board-actions.md:23` and
 `13-second-wave-roles-and-navigation.md:119`/`:1259` (`:247`, `:247-252`),
 `docs/hig-reconciliation-audit.md:185`/`:186` (`:247`), and the `docs/lanes/executor-state.md` ledger
@@ -745,7 +745,7 @@ path-qualified citations still carry an old number.
 
 **Already-stale citations, left as written and named here rather than silently repaired.** A handful of the
 wave's citations were imprecise *at birth* — the line they named did not carry the fact even then (the
-`13.703` mapper set `mappers.ts:1277`/`:1339`/`:1518` and `mappers.test.ts:1389` are the clearest: those
+`13.703` mapper set `mappers.ts:1277`/`:1339`/`:1518` and `mappers.test.ts:1398` are the clearest: those
 three name the mapper FILE's neighbourhoods, not the `rank: mapRank(…)` sites, which were `:1370`/`:1549`
 at birth and are `:1388`/`:1567` now). Ruling 30's method corrects DRIFT, not a claim that never matched;
 re-pointing those to the fact-bearing lines would be guessing at an intent rather than restoring one, so
