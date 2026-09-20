@@ -23,8 +23,8 @@ push; re-run `git log --oneline origin/main..HEAD` and match the subjects before
 | anchor | value |
 |---|---|
 | `git merge-base origin/main HEAD` | **`6db8b6b8` — equal to `origin/main`** |
-| ahead / behind `origin/main` | **5 ahead / 0 behind** ▸ counts-as-of `d2dd36da` (+1 for this handoff commit) |
-| the five commits | `6a4da237` (the wiring) · `99b74635` (the floor split) · `e1716e9f` (the catalogue) · `d2dd36da` (the fix round) · *the review round and this handoff follow* |
+| ahead / behind `origin/main` | **6 ahead / 0 behind** ▸ counts-as-of `b3adce87` (**+1** for this handoff commit, so a restart should see **7**) |
+| the six commits | `6a4da237` (the wiring) · `99b74635` (the floor split) · `e1716e9f` (the catalogue) · `d2dd36da` (the fix round) · `b3adce87` (the review round) · *this handoff* |
 | tree | clean |
 | changed files vs `origin/main` | **10**, reviewed at `6a1fe8d5` ▸ counts-as-of; the review round then added `tap-targets.ts` and `test-cases/13-pre-launch-checklist.md`, so **recount rather than quote this** |
 | `check:case-ids` | **2569 unique ids at this head, 2567 at `origin/main`** — **delta exactly +2, the two minted**; highest **16.87 both sides** (so no id above my block leaked in) |
