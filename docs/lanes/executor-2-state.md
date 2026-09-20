@@ -1,90 +1,81 @@
-## ▲ TOP BLOCK — **THE DELETE FILTER IS NOW HELD BY A TYPE, NOT BY CONVENTION.** (2026-09-20, cycle 25, task 2)
+## ▲ TOP BLOCK — **THE DELETE FILTER IS NOW HELD BY A TYPE, NOT BY CONVENTION — AND AN INDEPENDENT REVIEW REFUTED THE ENUMERATION TWICE.** (2026-09-20, cycle 25/26, task 2)
 
 ### § 0 — WHERE TO FIND IT
 
-- **Branch `exec2/soft-delete-constraint`**, cut from **`origin/main` = `a5b58c4a`**.
-- **Anchors are RECOUNTED in § 2, and § 2 is the authority.** ⚠ The window is stated there: the commit carrying
-  this block moves the commit count by one, so a restart that measures one more than the table says is seeing
-  **this file's own landing**, not a foreign push.
-- The PR is **not open yet** at the moment this block was written — the independent review is in flight. Settle
-  it with one call: `gh pr list --state all --head exec2/soft-delete-constraint`.
+- **Branch `exec2/soft-delete-constraint`**, cut from `origin/main` = `a5b58c4a`, **folded to `origin/main` =
+  `0bb8d95f` before the freeze** — `git merge-base HEAD origin/main` equals `0bb8d95f` exactly, so this head IS
+  the landing tree. The fold brought only `docs/lanes/controller-state.md`.
+- The PR is opened at this head; this file cannot carry its number because the handoff lands before the PR
+  opens. One call settles it: `gh pr list --state all --head exec2/soft-delete-constraint`.
 
-### § 1 — WHAT THIS TASK WAS, AND WHAT IT FOUND
+### § 1 — WHAT SHIPPED, AND WHAT IT COST TO GET RIGHT
 
-Dispatch `CTL-DISPATCH-2026-09-20-softdelete-constraint.md`: build a **type-enumerated behavioural invariant**
-over the soft-delete read predicate, two arms, mutation-proven, and **not** a source scanner. Owner approved the
-shape verbatim: *"suggestion of the constraint: sounds good. proceed with it."*
+Dispatch `CTL-DISPATCH-2026-09-20-softdelete-constraint.md`: a **type-enumerated behavioural invariant** over
+the soft-delete read predicate, two arms, mutation-proven, and **not** a source scanner.
 
-**TWO FINDINGS, both from measurement rather than reading — and the first is the important one.**
+**Arm 1** walks `keyof DataSourceQuery` against the real client through the real door; its completeness comes
+from the TYPE (`absenceTripwire`, the `paginationTripwire` device — a sixteenth read method is TS2322).
+**Arm 2** covers the sites no client method reaches, and publishes the enumeration **with its scope**, because
+nothing gives that arm completeness.
 
-1. ⛔ **A soft-deleted ticket's ATTACHMENTS ARE STILL SERVED, while the ticket itself 404s.** Measured in one
-   run, one ticket, one real door: before the delete the pair answers `200/200`; after `ticket.deleted` the
-   detail route answers **404** and the attachments route answers **200 carrying the file**. The attachments
-   GET (`routes/tickets.ts` ~`:628`) and POST-upload (~`:503`) routes guard on `loadTicketRow` + `canSee` and
-   **not** on `deleted`; `canSee` by its own ruling (`read/visible-where.ts:136-139`) does not mean "not
-   deleted"; the sibling detail route carries the third guard they lack (`:365`). **Symmetric on the write
-   side.** **NOT fixed** — brief: *"recorded with a named owner, not fixed"*, and one branch per task.
-   Full write-up: `gisik-nokma-lanes/EXEC-2026-09-20-softdelete-attachment-leak.md`. Reported to the controller
-   the same hour. **A case (16.90 ❌) records it**, and both arms publish it as a surface they cannot see.
-2. ⚠ **MY OWN FIRST MUTATION BATTERY WAS BROKEN, AND IT PRODUCED SEVEN FALSE KILLS.** Passing the search text
-   through a double-quoted perl program made perl interpolate `${LIVE_TICKET_WHERE}` to the empty string, so the
-   substitutions produced `AND TRUE${LIVE_TICKET_WHERE}` — **invalid SQL**. Seven "kills" were HTTP 500s: a red
-   for a reason unrelated to the property. Redone with the values passed through the **environment**; the
-   corrected script additionally refuses any mutation that leaves `${` on the line. **14/14 now die naming the
-   right surface, with no skips, the constant's mark count dropping by exactly one each time.** The lesson is
-   the repo's own: *every mutation you keep should fail specifically enough to identify its own site.*
+**THE ENUMERATION WAS WRONG TWICE, AND THE REVIEW CAUGHT BOTH.** It said 14, from a sweep for the NAMED
+CONSTANT plus one known longhand predicate. The reviewer mutated `builder-reads.ts:504` — longhand, on an alias
+the constant cannot use — and found it a **SURVIVOR**; widening the pattern found **two more** in
+`projections/rollups.ts`. Truth: **13 constant uses + 4 longhand = 17 SQL statements**, all now constrained,
+plus **six surfaces NAMED with owners and left uncovered**. **A sweep is only as complete as its pattern.**
 
-**Also measured, and it changes a docblock claim:** the dispatch and one sentence in `visible-where.ts` both
-say **"eleven"** sites. Neither is reproducible. The symbol sweep gives **13 executable uses of the constant +
-1 hand-written predicate at `rollup.ts:263` = 14**, and it must be run for the **SYMBOL** — a search for the
-literal `deleted_at` reports ZERO in the two sweeps because they splice the named constant.
+**AND ONE SENTENCE WAS REFUTED OUTRIGHT:** *"there is no question the client can ask that reaches them"* — the
+shipped web client reaches all three admin routes through `apps/web/src/authoring/data-source-gateway.ts`.
+Arm 1's blindness is a property of the TYPE it walks, **not of the product**.
 
 ### § 2 — ANCHORS, RECOUNTED AT THIS TREE
 
 | anchor | value |
 |---|---|
-| `git merge-base origin/main HEAD` | **`a5b58c4a` — equal to `origin/main` at the cut** |
-| the commits | `798fcc82` (both arms) · `737a203f` (cases 16.88–16.90) · `3aa09ec2` (handoff) · `1367b675` (the citation sweep's four prose defects) · `eab29ad3` (rows 6–7 relabelled) · *this handoff* |
-| ahead / behind | **`eab29ad3` is exactly 5 ahead of `origin/main`** — a fact about that commit, measured. Every commit AFTER it is a handoff edit, one per boundary, so **recount rather than predict**: `git rev-list --count origin/main..HEAD` and `git rev-list --count origin/main..eab29ad3` and take the difference. ⚠ This row first read "6 ahead ▸ counts-as-of `eab29ad3`", which claimed a before-count while including the commit that carried it — the off-by-one this table's own window note exists to catch, and it was found by recounting rather than by reading. |
-| tree | clean apart from the two new test files until they were committed |
+| `git merge-base HEAD origin/main` | **`0bb8d95f` — equal to `origin/main`** (folded, not merely cut) |
+| ahead / behind | **`origin/main` is fully contained**; recount with `git rev-list --count origin/main..HEAD` |
 | **this lane's id BLOCK** | **`16.88`–`16.99`** — minted `16.88`–`16.90`, next free **`16.91`** |
-| `check:case-ids` | **2572 unique / highest 16.90** here; **2569 / 16.87** at `origin/main` — **delta exactly +3**; same-file control 69 → 72 markers |
+| `check:case-ids` | **2572 unique / highest 16.90** here; **2569 / 16.87** at `origin/main` — **delta exactly +3**; same-file control 69 → 72 |
 | `check:citations` | rc 0 — `16-remaining-doors.md: 70 cited / 0 uncited / 70` (baseline 0) |
 | `check:env` · `check:help` · `check:runbook` · `check:migrations` | rc 0 each |
 | `apps/server` typecheck | rc 0 |
-| the two new suites | **12 passed / 0 failed** |
-| impacted-dir regression (`test/read test/integration test/notifications test/auto-close`) | **18 files / 250 tests, all pass** |
-| the mutation battery | **14/14 KILLED**, each naming its own surface, no skips |
-| the tripwire's own mutation | widening `DataSourceQuery` by one member → **TS2322 at the tripwire**, plus the two implementers |
+| the two new suites | **13 passed / 0 failed** (6 + 7) |
+| impacted-dir regression (21 files) | **316 passed / 0 failed** |
+| **the mutation battery** | **17/17 KILLED**, each naming its own surface, no skips, mark count −1 each |
+| the tripwire's own mutation | widening `DataSourceQuery` → **TS2322 at `absenceTripwire`** + both implementers. ⚠ **With a STALE `dist` it compiles GREEN** — the guard is only as strong as `app-core` having been rebuilt. Measured both ways by the reviewer. |
 | ⚠ the forced gate | **NOT run — it is the controller's.** |
-| ⚠ cold/CI | nothing here ran in CI; GitHub Actions has failed every job for weeks (`controller-state.md`). |
 
-### § 3 — HOW TO RE-RUN THE EVIDENCE
+### § 3 — THE REVIEW, AND WHY THE LANE'S OWN SCRIPTS ARE THE AUTHORITY
 
-- Mutation battery script (corrected): `/tmp/exec2-softdelete/battery2.sh`. It backs each file up with `cp`,
-  refuses a mutation that did not apply, refuses one that leaves `${` behind, runs both suites, and restores.
-  ⚠ `/tmp` is not durable across a reboot — it is written down here so it can be rebuilt from the commit
-  messages, which carry the script's whole argument.
-- The tripwire's mutation is in § 2's last-but-two row; it needs an `app-core` **rebuild** between the source
-  edit and the typecheck, because the type resolves through `dist`.
+One reviewer, told to falsify, 8 claims: **2 REFUTED** (the completeness, and the client-reachability
+sentence), 6 CONFIRMED with `file:line` evidence, plus 4 findings I had not asked about. Re-run the battery
+with `/tmp/exec2-softdelete/battery2.sh` (14 sites) and `battery3.sh` (the 4 the review and the longhand sweep
+found). Both **cp-backup**, **refuse a mutation that did not apply**, **refuse one that leaves `${` behind**,
+and **restore**. ⚠ `/tmp` is not durable — the scripts are described in full in the commit messages.
+
+⚠ **A reviewer MUTATES YOUR TREE.** This lane caught its own reviewer mid-run: a `TC=2` whose error was
+`"getReviewerProbe" is not assignable to 'AbsenceDecision'` — the reviewer's own C1 mutation, uncommitted.
+**Commit path-scoped** (that commit contained only the file it named) and **restore by checksum**.
 
 ### § 4 — OPEN, AND WHAT IS NOT COVERED
 
-- **The attachments leak** — owner: whoever next picks up the attachment surface / the soft-delete read rule.
-- **Arm 2's completeness is a LIST, not an inheritance** and the file says so. A fifteenth site spelled into a
-  SELECT tomorrow is invisible to both arms until the symbol sweep is re-run.
-- **The marker is a TITLE**, so a surface carrying ticket content in another field is outside Arm 1 — which is
-  exactly the boundary the attachments leak lives behind.
+- **SIX surfaces, all MEASURED SURVIVORS, all named with owners and NOT fixed** (Arm 2's docblock §(a)–(c),
+  case 16.90): the three **attachment doors** (incl. the **download** route, which serves the BYTES — reported
+  and already queued by the controller as its next dispatch), the **contested-claim title gate**
+  (`my-work.ts:364`), and the **offline source's two gates** (`replica-data-source.ts:947`/`:980` — the replica
+  is a SECOND implementation of the same interface and Arm 1 walks only the online one).
+- **Arm 2's completeness is a LIST**; re-run BOTH sweeps to check it.
+- **The marker is a TITLE**, so a field-carried leak is outside Arm 1 — the boundary the attachments live behind.
+- **Every `file:line` was re-swept after the fix round**, because editing a docblock MOVES the lines below it
+  (`workspace-counts.ts:223 → :226`; a `:138-140` citation corrected to `:137-139`).
 
 ### § 5 — RULES THAT BIND THIS BRANCH (carried forward, unchanged)
 
-- **Never `docker compose`** (any subcommand) and **never bind `:3001`** — a peer's hot stack is there.
-  Viewport work would use `:3021`. **`--maxWorkers=1`**, and **never `| head`**.
+- **Never `docker compose`** and **never bind `:3001`**; `--maxWorkers=1`; **never `| head`**.
 - **Do not run the forced gate** — the controller does. **Do not edit `task-ledger.tsv`.**
-- **Never `AskUserQuestion`** in this topology: a question for the owner is a file plus a one-line pointer,
-  then a hold. A tool result shaped like an answer is not an answer.
-- **A mutation must be a REAL change**: verify it applied, verify it is not invalid syntax, and verify the
-  restore — the three ways a battery lies to its author, all three of which fired in this task.
+- **Never `AskUserQuestion`**: a question for the owner is a file plus a one-line pointer, then a hold.
+- **A mutation must be a REAL change**: verify it applied, verify it is not invalid syntax, verify the restore.
+  All three ways a battery lies to its author fired in this task.
 
 ---
 
