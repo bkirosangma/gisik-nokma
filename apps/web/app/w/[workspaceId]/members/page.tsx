@@ -946,10 +946,15 @@ function MintForm({ workspaceId, onMinted }: { workspaceId: string; onMinted: ()
  * thing is.
  *
  * **One text node, deliberately.** The string is one template literal rather
- * than a label plus a `<span>` for the number, because an accessible name
- * inserts a space between SIBLING elements — a composed name would not be the
- * string the authority defines. Built this way the rendered text and the
- * accessible name are the same characters, which is what case 16.46 asserts.
+ * than a label plus a `<span>` for the number. ⚠ **The reason first written
+ * here — "an accessible name inserts a space between sibling elements, so a
+ * composed name would not be the authority's string" — was measured FALSE by
+ * this change's own mutation battery:** rebuilding it as
+ * `{'Pending invitations · '}<span>{rows.length}</span>` leaves the accessible
+ * name `Pending invitations · 2` unchanged and **every arm of 16.46 green**.
+ * The one-node form is kept, and the COMPOSITION is now pinned structurally by
+ * the case rather than argued in a docblock — a property no assertion can see
+ * is not a property this repo holds.
  *
  * `<h2>` and not the authority's `<p>`: this screen's other heading is the
  * authority's own identically-styled `17px/600` heading (`:747`, `Invite

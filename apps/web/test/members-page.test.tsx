@@ -349,9 +349,19 @@ describe('16.46 the pending list carries its heading, and its count is the list 
 
   it('names the section with the count the list renders — two rows, two', async () => {
     mount({ listPending: async () => [PENDING, SECOND] });
-    expect(
-      await screen.findByRole('heading', { level: 2, name: 'Pending invitations · 2' }),
-    ).toBeInTheDocument();
+    const heading = await screen.findByRole('heading', {
+      level: 2,
+      name: 'Pending invitations · 2',
+    });
+    // ONE text node, asserted STRUCTURALLY — and this is not decoration, it is
+    // the only instrument that can see the composition. MEASURED: rebuilding the
+    // string as `{'Pending invitations · '}<span>{n}</span>` leaves the
+    // accessible-name assertion above AND every other arm in this case GREEN,
+    // because the name computation flattens the element boundary into a space
+    // and the trailing space already in the literal absorbs it. A docblock
+    // cannot hold a property no assertion can see, so it is asserted here.
+    expect(heading.childNodes).toHaveLength(1);
+    expect(heading.querySelector('*')).toBeNull();
     // The heading and the rows are ONE reading, and that is the point of the
     // case rather than a decoration: asserted by COMPARISON against the rows
     // this same render drew, so a fixture that grew could not make the two
