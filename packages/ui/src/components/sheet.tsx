@@ -25,10 +25,34 @@ export type SheetProps = {
    * prototype's own 860px.
    */
   full?: boolean;
+  /**
+   * Replaces the `<h2>` heading with a caller-supplied node — the ticket
+   * sheet's editable title and the location breadcrumb above it.
+   *
+   * **`title` is still REQUIRED when this is passed, and it is still what names
+   * the dialog.** `aria-label={title}` is the sheet's accessible name, and it is
+   * deliberately NOT `titleSlot`: a control whose value is mid-edit, or empty
+   * because somebody cleared it, is not a name. The string is the ticket's
+   * current title as the server last served it; the slot is the control that
+   * proposes the next one.
+   *
+   * Optional so that no existing caller changes — `Sheet` has one product
+   * caller (`ticket-sheet.tsx`) plus tests, measured rather than assumed before
+   * adding a prop to a shared component.
+   */
+  titleSlot?: ReactNode;
 };
 
 /** A right-hand side panel with the same accessibility contract as Dialog. */
-export function Sheet({ open, title, onClose, children, headerActions, full = false }: SheetProps) {
+export function Sheet({
+  open,
+  title,
+  onClose,
+  children,
+  headerActions,
+  titleSlot,
+  full = false,
+}: SheetProps) {
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -53,7 +77,7 @@ export function Sheet({ open, title, onClose, children, headerActions, full = fa
         onClick={(event) => event.stopPropagation()}
       >
         <header className="gn-sheet__header">
-          <h2 className="gn-sheet__title">{title}</h2>
+          {titleSlot ?? <h2 className="gn-sheet__title">{title}</h2>}
           {headerActions}
           <button type="button" className="gn-sheet__close" aria-label="Close sheet" onClick={onClose}>
             ×
