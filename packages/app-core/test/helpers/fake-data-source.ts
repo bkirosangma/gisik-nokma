@@ -36,6 +36,14 @@ export function createFakeDataSource(
     getTickets: async () => ({ projectId: 'prj_unset', rows: [] }),
     getTicket: async () => null,
     getTicketHistory: async () => [],
+    // `[]`, and here it IS the honest default rather than the trap the online
+    // source's own docblock names: a view test that has not stubbed this read is
+    // rendering a ticket with no attachments, which is a state the product
+    // produces constantly. A case that cares about a REFUSAL must override this
+    // — the fake cannot refuse on its own, because the failure it would be
+    // imitating (a 404 from a real route) is the online source's, and this file
+    // is not that source (see this file's header).
+    getTicketAttachments: async () => [],
     getWorkflowDef: async () => null,
     // NOT `[]`, and this default is the one that is deliberately non-empty. Plan
     // 4's bootstrap materialises the four built-ins as real

@@ -83,8 +83,35 @@ export type TicketSheetProps = {
   onClose: () => void;
   editorSlot?: EditorSlotComponent;
   uploadEvidence?: (file: File) => Promise<{ attachmentId: string }>;
-  /** Uploads and Drive references, from the ticket's `attachment.added` history. */
+  /**
+   * The ticket's files — what `DataSourceQuery.getTicketAttachments` reads.
+   *
+   * **⚠ CORRECTED 2026-09-20.** This read *"Uploads and Drive references, from
+   * the ticket's `attachment.added` history"*, and that sentence described the
+   * read that was never built. The read now feeding it is a ROUTE over the
+   * `attachments` table (`apps/server/src/routes/tickets.ts`), which serves
+   * **uploads only**: a Drive reference recorded as a ledger event is not a row
+   * in that table, so it does not appear here. The union is kept whole — the
+   * `drive-reference` arm is still rendered below — because the day a producer
+   * emits that arm is the day the route grows a `kind`, and narrowing this prop
+   * to the arm served today would make that a change to every caller.
+   */
   attachments?: AttachmentListEntry[];
+  /**
+   * Why the files could not be read — drawn where the list would be.
+   *
+   * `undefined` on every mount that has an answer, an empty one included. The
+   * two states must NOT render alike: `attachments` is `[]` for a ticket with
+   * no files, `getTicketAttachments` THROWS rather than answering `[]` on a
+   * refusal (see its docblock), and `AttachmentList` returns `null` for an
+   * empty list by design — *"must not promise there are none"*. That silence is
+   * honest for an empty list and is the drawn absence the component refuses for
+   * a failed read, so a failed read gets a sentence of its own.
+   *
+   * The shape mirrors `NewTicketDialogProps.parentCandidatesUnavailable`, which
+   * draws "…parent cannot be shown. {reason}" for the same reason.
+   */
+  attachmentsUnavailable?: string;
   /**
    * The ticket's standing audience, for the "Who can see this" section.
    *
@@ -284,6 +311,7 @@ export function TicketSheet({
   editorSlot,
   uploadEvidence,
   attachments,
+  attachmentsUnavailable,
   visibility,
   canSetVisibility = true,
   onOpenTicket,
@@ -1939,7 +1967,25 @@ export function TicketSheet({
             })}
           </dl>
 
-          <AttachmentList entries={attachments ?? []} />
+          {attachmentsUnavailable === undefined ? (
+            <AttachmentList entries={attachments ?? []} />
+          ) : (
+            /*
+              The three-way distinction this sheet already draws for the ticket
+              read and for the ledger tab, applied to the files: an ANSWER (drawn
+              above, empty or not), a WAIT (nothing yet — `AttachmentList`'s own
+              silence), and a FAILURE, which is this sentence. It is deliberately
+              not a `Loading…` line: a read that failed under the word "Loading…"
+              is a wait that will never end, wearing the clothes of one that will.
+            */
+            <p
+              role="status"
+              className="gn-ticket-sheet__attachments-error"
+              data-testid="sheet-attachments-unavailable"
+            >
+              {`This ticket's attachments could not be read — ${attachmentsUnavailable}. That is a failure of this read, not a statement about the ticket: it may answer on a retry.`}
+            </p>
+          )}
 
           {/*
             Spec §6's audience section. **⚠ CORRECTED 2026-09-20.** This read: "It

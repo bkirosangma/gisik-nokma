@@ -1540,6 +1540,32 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   `apps/server/test/routes/attachments-wired.test.ts` is the test that can fail on it — it registers
   nothing, goes through `buildApp`, and asserts the `attachments` ROW rather than the 201.
   `apps/server/src/routes/attachments.ts`, `apps/server/src/app.ts`
+- ✅ **A ticket's attachments are READABLE — the per-ticket list, and the mount that finally passes it.** Until
+  2026-09-20 a ticket's files reached no surface at all: `listTicketAttachments`
+  (`apps/server/src/attachments/attachment-repo.ts:76`) was written and tested by Plan 7 with **zero production
+  callers** (every reference in the tree was a test), while `TicketSheetProps` has accepted an `attachments`
+  prop since Plan 6 and the product's single mount never passed it. `GET
+  /v1/workspaces/:workspaceId/tickets/:ticketId/attachments` is registered beside the events door and rides
+  **its same two guards, in the same order, answering the same body** — `loadTicketRow` → 404, then `canSee`
+  → 404 — so "may this caller see this ticket" is still asked in exactly one function; the case holds the two
+  doors to identical bytes for an unseen ticket and a nonexistent one rather than asserting the sameness in
+  prose. Each row is `{attachmentId, filename, mime, size, sha256}` with the filename re-sanitized here as it
+  is at the download door. **An empty list is a `200 {attachments: []}` and a refusal is a `404`** — the pair
+  `AttachmentList`'s null-on-empty docblock depends on, since the one answer this door must never give is `[]`
+  for a ticket the caller may not see. The client reaches it through a new `DataSourceQuery.getTicketAttachments`,
+  which **THROWS on a 404 rather than answering `[]`**, so "no files" and "could not read them" stay two states
+  all the way to the screen: the sheet draws nothing for the first (the component's own honest silence) and a
+  sentence for the second, via `TicketSheetProps.attachmentsUnavailable` — the shape
+  `NewTicketDialogProps.parentCandidatesUnavailable` already uses. The offline replica **refuses** this read
+  with a named absence rather than deriving it from `attachment.added`, because the row and the event are two
+  facts with two writers: a ledger-derived list would omit an upload whose event never arrived and include one
+  whose upload failed. **NOT served, and named rather than implied: the Drive-reference arm** — the
+  `attachments` table has no kind column, so a reference recorded as a ledger event is not in this list; no
+  producer emits that arm today, and the owner of the day one does is whoever gives the table a kind column.
+  Cases `16.47`–`16.58`. `apps/server/src/routes/tickets.ts`,
+  `packages/app-core/src/online/{online-data-source,mappers}.ts`,
+  `packages/app-core/src/replica/replica-data-source.ts`, `packages/app-core/src/views/ticket-sheet.tsx`,
+  `packages/ui/src/ui.css`, `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`
 - ⚙️ **The server-gate seam is wired into the one composition root** — `apps/server/src/index.ts` is the
   ONE composition root that calls `buildServerGates()` and hands the result into `createIngestService`,
   which is the narrower and true claim this bullet exists to draw: the gate seam is wired at

@@ -37,6 +37,9 @@ import type {
   WorkspaceRef,
   WorkspaceSettings,
 } from '../view-types.js';
+// The list entry union lives with the component that renders it; see the note
+// on the same import in `../data-source.ts`. Type-only, so no runtime edge.
+import type { AttachmentListEntry } from '../views/attachment-list.js';
 
 /**
  * The ONE adaptation layer between the shipped `/v1` JSON and the client
@@ -649,6 +652,52 @@ export function mapHistory(raw: unknown): TicketHistoryEvent[] {
       clientTime: asString(event['clientTime'], `${path}.clientTime`),
       serverTime: asString(event['serverTime'], `${path}.serverTime`),
       seq: asNumber(event['seq'], `${path}.seq`),
+    };
+  });
+}
+
+/**
+ * `GET /v1/workspaces/:ws/tickets/:id/attachments` → `AttachmentListEntry[]`.
+ *
+ * ## Every field is checked, and `kind` is written by this mapper rather than
+ * ## sent
+ *
+ * The route serves `{attachmentId, filename, mime, size, sha256}` — the five
+ * fields the `upload` arm names — so this is a field-for-field read and the
+ * `kind: 'upload'` literal is the mapper's own statement about what the door it
+ * reads can produce. That is the honest place for it: the wire carries no
+ * `kind` because the `attachments` table has no kind column, and a mapper that
+ * wrote a `kind` it had not been told would be inventing one if the arm ever
+ * widened. **When a Drive-reference row becomes producible, the wire grows a
+ * `kind` and this mapper reads it** — the route's docblock carries that
+ * recorded owner.
+ *
+ * `sha256` is checked as `string | null` rather than as a string: the column is
+ * nullable (an unknown hash is written as `null` honestly, not as a default),
+ * and `AttachmentListEntry`'s upload arm says `string | null`. The one thing
+ * this refuses is the shape that would be a silent half-truth — a `sha256` that
+ * is neither, which would reach the view as `undefined` and render as nothing.
+ *
+ * No `ServingGapError` branch: nothing here is a fact the server holds and
+ * withholds. The mapped rows ARE the answer, which is what a gap-free mapper
+ * looks like.
+ */
+export function mapTicketAttachments(raw: unknown): AttachmentListEntry[] {
+  const record = asRecord(raw, 'attachments');
+  return asArray(record['attachments'], 'attachments.attachments').map((entry, index) => {
+    const path = `attachments.attachments[${index}]`;
+    const row = asRecord(entry, path);
+    const sha256 = row['sha256'];
+    if (sha256 !== null && typeof sha256 !== 'string') {
+      throw new MappingError(`${path}.sha256`, 'a hex string or null');
+    }
+    return {
+      kind: 'upload' as const,
+      attachmentId: asString(row['attachmentId'], `${path}.attachmentId`),
+      filename: asString(row['filename'], `${path}.filename`),
+      mime: asString(row['mime'], `${path}.mime`),
+      size: asNumber(row['size'], `${path}.size`),
+      sha256,
     };
   });
 }

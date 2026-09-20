@@ -377,6 +377,32 @@ const WORKSPACE_SETTINGS_ABSENCES: readonly ReplicaAbsence[] = [
   },
 ];
 
+/**
+ * The attachments read — and the one refusal here that had a tempting
+ * alternative, which is why it is spelled out rather than left to a default.
+ *
+ * The local store DOES mirror the ledger, and `attachment.added` is one of the
+ * two ticket event types the replica's own reducer folds
+ * (`sync-client/src/replica/replica.ts:439`), so a list of this ticket's
+ * attachments looks derivable on the spot. It is not the same list. The route
+ * this method stands beside reads the `attachments` TABLE: a row is written by
+ * the upload door when the bytes land, while the event naming it is the
+ * CLIENT's claim about those bytes — a different fact with a different writer
+ * (`apps/server/src/routes/attachments.ts`: "This endpoint appends NOTHING to
+ * the ledger"). So a ledger-derived list would omit an upload whose event never
+ * arrived and include one whose upload failed — a second, weaker answer to
+ * "what files does this ticket have", which is the failure this codebase
+ * refuses by name. A refusal with an owner beats a plausible list.
+ */
+const ATTACHMENTS_ABSENCES: readonly ReplicaAbsence[] = [
+  {
+    field: 'AttachmentListEntry (the whole list, both arms)',
+    because:
+      'no attachments table exists locally — the rows live in a server table the upload door writes and the bootstrap payload does not ship. The `attachment.added` event is a DIFFERENT fact with a different writer: the row exists the moment bytes land, while the event is the client\'s claim about them, `routes/attachments.ts` says it expects that claim afterwards and `Features.md` §9 records the web client does not post it today. Deriving the list from the local ledger would omit an upload whose event never arrived and include an event whose upload failed, in the same field, indistinguishably',
+    owner: 'Plan 10 — an attachments table in the local schema (bootstrap payload + sync), not a /v1 route',
+  },
+];
+
 const PREFERENCES_ABSENCES: readonly ReplicaAbsence[] = [
   {
     field: 'UserPreferences (the whole document)',
@@ -478,6 +504,7 @@ export const OFFLINE_BORN_OMISSIONS: Readonly<Record<string, ReplicaAbsence>> = 
 export const REPLICA_GAPS: Readonly<Record<string, readonly ReplicaAbsence[]>> = {
   getMyWorkspaces: MY_WORKSPACES_ABSENCES,
   getMembers: MEMBERS_ABSENCES,
+  getTicketAttachments: ATTACHMENTS_ABSENCES,
   search: SEARCH_ABSENCES,
   getMyWork: MY_WORK_ABSENCES,
   getAttention: ATTENTION_ABSENCES,
@@ -836,6 +863,8 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
   const query: DataSourceQuery & ReplicaOnlyQuery = {
     getMyWorkspaces: () => Promise.reject(new ReplicaGapError('getMyWorkspaces', MY_WORKSPACES_ABSENCES)),
     getMembers: () => Promise.reject(new ReplicaGapError('getMembers', MEMBERS_ABSENCES)),
+    getTicketAttachments: () =>
+      Promise.reject(new ReplicaGapError('getTicketAttachments', ATTACHMENTS_ABSENCES)),
     getMyWork: () => Promise.reject(new ReplicaGapError('getMyWork', MY_WORK_ABSENCES)),
     getAttention: () => Promise.reject(new ReplicaGapError('getAttention', ATTENTION_ABSENCES)),
     getWorkspaceSettings: () =>

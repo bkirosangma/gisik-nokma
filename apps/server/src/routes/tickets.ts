@@ -575,15 +575,18 @@ export function registerTicketRoutes(
    * discriminated union carrying a Drive REFERENCE as well as an upload, and
    * `AttachmentListEntry` renders both. This route cannot serve the reference
    * arm and does not pretend to: the `attachments` table has no kind column, and
-   * its only writer is the upload door. A ticket whose reference arrived as a
-   * ledger EVENT therefore shows nothing in this list. **That is not a live
-   * absence at this commit** — measured, no producer emits the reference arm
-   * (the only occurrences outside the domain's own schema, the editor's types
-   * and `attachment-list.tsx`'s own union are none) — but it becomes one the day
-   * a producer lands, and it would become one silently, because the list omits
-   * it rather than refusing. **RECORDED, not fixed. Owner: whoever gives the
-   * `attachments` table a kind column, or emits the reference arm for the first
-   * time — those are one task, not two.**
+   * its only writer is the upload door. **The row and the event are two facts,
+   * not one** — a row exists the moment bytes land, whereas the event is the
+   * client's claim about them, which `routes/attachments.ts` says it expects
+   * afterwards and which `Features.md` §9 records the web client does not post
+   * at all today. So a ticket whose reference arrived as a ledger EVENT shows
+   * nothing in this list. **That is not a live absence at this commit** —
+   * measured, no producer emits the reference arm (outside the domain's own
+   * schema, the editor's types and `attachment-list.tsx`'s union there are
+   * none) — but it becomes one the day a producer lands, and it would become one
+   * silently, because the list omits it rather than refusing. **RECORDED, not
+   * fixed. Owner: whoever gives the `attachments` table a kind column, or emits
+   * the reference arm for the first time — those are one task, not two.**
    *
    * ## The filename is sanitized here, exactly as it is at the download door
    *
