@@ -31,6 +31,64 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 MONDAY 2026-09-21 ~23:2x IST — **CYCLE 30: A THIRD EXECUTOR, §17 IS OPEN, AND THE TWO MERGES THAT GOT HERE. THIS ENTRY SUPERSEDES EVERY EARLIER TOPOLOGY LINE — THERE ARE THREE LANES NOW.** `main` is `534c450b`; **zero open PRs**; ledger **307 done / 1 todo**; `check-case-ids` **2582 unique, highest `16.99`**.
+
+### 1. ⚙ THE TOPOLOGY CHANGED: THREE EXECUTORS. Owner, verbatim: *"spin up another exec and take up item 7."*
+| | exec 1 | exec 2 | **exec 3 (NEW)** |
+|---|---|---|---|
+| tmux | `gisik:1` | `gisik:2` | **`gisik:3`** |
+| worktree | `…-exec` | `…-exec2` | **`…-exec3`** |
+| branch prefix | `exec/` | `exec2/` | **`exec3/`** |
+| handoff file | `docs/lanes/executor-state.md` | `docs/lanes/executor-2-state.md` | **`docs/lanes/executor-3-state.md`** (does not exist yet; it is told to create it) |
+| viewport port | `:3001` | `:3021` | **`:3031`** |
+⚠ **THE 2026-09-18 TOPOLOGY BLOCK ABOVE STILL SAYS "TWO EXECUTORS" AND IS NOW WRONG. Read this table instead.** It also records why the number was cut to two: **five lanes drove this 16 GB box to ~66 MB free and forced a restart.** **Three is the lane count that makes the OOM rules load-bearing again** — every lane is bound to `--concurrency=1`, one subagent at a time, **no `docker compose` from any worktree, and no lane binds `:3001`.** Exec 3's brief was built from exec 2's by substitution (`exec3` / `EXECUTOR 3` / `executor-3-state.md` / `:3031`) and **every one of those seven self-references was verified to have moved** — exec 2's brief carried a live bug where its own line 4 named executor 1's worktree, and a session that trusted it would have `cd`-ed into a peer's tree.
+⚠ **AND EXEC 3'S LAUNCH NAMES ITS BACKEND: the status line reads `deepseek-flash[1m]`, the cwd is `…-exec3`, and it was launched through `exec-claude.sh`.** A bare `claude --model opus` would have silently put the lane back on Anthropic.
+
+### 2. 📌 §17 IS OPEN, AND THIS IS THE STANDING GRANT BEING EXERCISED — NOT A NEW RULING
+**§16's ids are now fully allocated across three lanes: `16.1`–`16.99` are all minted or held.** The standing order is verbatim ***"open 17 if 16 runs out"*** — **it has run out.** So §17 opens under the grant, **in the shape the owner already ruled in cycle 29: UNIFORMLY 3-DIGIT PADDED, `17.001`–`17.999`, ceiling 999.**
+⚠ **THE OPENING LANDS IN `test-cases/`, NOT HERE — exec 3 owns that edit, in its change set**, together with the §16 header clause that says §17 opens when `16.99` is reached. **That file is the artifact a minting session trusts.**
+
+### 3. ⚠ THE ALLOCATION, AS FINALLY SPLIT — AND THE REASON IT HAD TO BE
+**The `16.63`–`16.80` remainder was reallocated: exec 1 keeps `16.63`–`16.71` (nine), exec 2 takes `16.72`–`16.80` (nine), exec 3 takes `17.001`–`17.020` (twenty).**
+**The reason is measured, and it is what makes this bookkeeping rather than a product decision: `hig-per-screen` is 26/26 DONE**, so the `16.61`–`16.80` block — *"taken 2026-09-20 for `hig-per-screen/3b`"* — was a reservation for finished work, holding **eighteen ids nobody could use.** Reallocation is the block table's own clause (*"if your own allocation changes, change it HERE in the same action"*), and **the table rows themselves are owed in `test-cases/` — exec 2 was told to land them.**
+⚠ **THIS WAITED TOO LONG, AND THE COST IS RECORDED: `#615` SHIPPED WITH FOUR CASE IDS UNMINted BECAUSE EXEC 2 HAD NO BLOCK.** The lane disclosed it correctly and refused to borrow. **An allocation question that blocks a lane is not a documentation issue — it is throughput.**
+
+### 4. THE TWO MERGES THAT GOT HERE — each gated at its landing tree
+| PR | what | head | merged as | landing tree | gate |
+|---|---|---|---|---|---|
+| **`#614`** | the Add-subtask control — the payload sent the PARENT's own type | `3e9f87ad` | `00ee17e9` | `4d5843ec` | `EXIT=0` · 33/33 · 0 cached · 2m14.8s · engine 0 · no orphans · **5,616 passed** |
+| **`#615`** | the comment thread — the read `comment.added` never had | `2bc145a6` | **`534c450b`** | **`7d70dd6e`** | `EXIT=0` · 33/33 · 0 cached · 2m18.97s · engine 0 · no orphans · **5,641 passed** |
+**Both verified by API (`identical`), both tree-identical to their gated trees, both drop-checked by PARTITION** — `#614`'s 36 reverse lines and `#615`'s 49 all lie inside their own file sets, with a control confirming this file's entries survive. **`#615` carries a migration, and `check:migrations` verified it is numbered above the applied one.**
+
+### 5. ⛔ AND TWO OF THE CONTROLLER'S OWN DISPATCHES WERE FALSIFIED BY A LANE THAT MEASURED
+**A dispatch was issued for work that had ALREADY LANDED** — the §17-shape sentence had shipped in `#614` (`31697b5b`, an ancestor of `main`) — **and the same dispatch asserted the §16 header "already carries" a sentence that has NEVER been in that header.** Exec 2 refused it, measured both, filed the finding and held. **It cited `git log -S` returning empty, and located the real sentence in this file.** ⚠ **The controller had read the file list of `#614` and never checked whether the sentence was in it.** **A file list is not a content check; "a stale known gap is pre-authorised work that no longer needs doing" is this project's own recorded warning and it fired anyway.**
+
+### 6. THE QUEUE — and item 7 now has a dispatch
+| # | task | lane | state |
+|---|---|---|---|
+| 1–3 | empty states · soft-delete · attachments leak | exec 1/2 | **DONE** |
+| 4 | the comment box + thread | exec 2 | **DONE** — `#615` → `534c450b` |
+| 5 | the Add-subtask affordance | exec 1 | **DONE** — `#614` → `00ee17e9` |
+| 6 | breadcrumb hierarchy + the parent-indicator merge | exec 1 | **IN FLIGHT** — `exec/breadcrumb-ancestors` |
+| — | **`#615`'s four owed case ids** | exec 2 | **IN FLIGHT** — `exec2/mint-615-case-ids`, its own small PR |
+| 7 | **the visibility section styling** | **exec 3** | **IN FLIGHT** — `exec3/visibility-styling`; **dispatch `CTL-DISPATCH-2026-09-21-visibility-section-styling.md`, written this cycle** |
+| 8 | markdown editing | **exec 2** | **IN FLIGHT** — on `exec2/mint-615-case-ids`, **which is a BRANCH NAME and not the task**: that branch carries the owed-mint commit `4f68e0f2` and item 8 is being built on top of it. **Measured at the pane, not inferred from the branch.** |
+| 9 | `prewarm-web-routes` · `TOKENS` · contrast debts | — | **HELD by the owner** |
+⚠ **ITEM 7'S DISPATCH CARRIES A TRAP IT NAMES EXPLICITLY: the prototype's Visibility row DRAWS A VIEWER ROSTER — chips, an "Add someone" picker, candidates — AND THE OWNER'S RULING (b) KEEPS THE ROSTER CUT FROM THE WIRE.** So the chips, the picker and the candidate list **must not be built**; the honest product shape is the toggle, the note and the absence sentence. **A picker over an empty set is the same defect as a form that can only be refused.**
+⚠ **AND IT IS THE ONE TASK IN THE QUEUE WHOSE SCOPE HAS NEVER BEEN MEASURED** — every earlier queue row says only *"the visibility section styling"*. **Its dispatch therefore requires the lane to report what the section ALREADY matches before building anything, and says that "it already matches" is a complete outcome.**
+
+⚠ **AND THE CONTROLLER'S OWN REPORT OF THIS TABLE WAS WRONG INSIDE THE HOUR — CAUGHT BY THE OWNER, NOT BY A CHECK.** It listed **item 8 as QUEUED with no lane while exec 2 was already building it**, and gave exec 2's row to the *owed ids* instead. **The state was written from the controller's dispatch INTENT rather than measured**, and the branch name is what made it look like a different task. **This is the failure cycle 24 §1 named and this file keeps re-learning: a queue table READS AS AN ALLOCATION, which is why an invented or expired state in one is the harder half to notice.** The correction is one line of measurement — **the pane and the worktree, never the branch name and never the intention.**
+
+### 7. WHAT THE NEXT CONTROLLER SHOULD DO FIRST
+1. **Capture ALL THREE panes** (`gisik:1`, `gisik:2`, `gisik:3`) — **and read a lane's pane for the QUESTION, not for progress.** A lane that holds is invisible otherwise, and this cycle a lane held on a dispatch it had correctly refused.
+2. **Read §6 — it is the queue.** Then `gh pr list --state open`.
+3. **Re-measure every anchor at the sha you report**, from a worktree at that sha. **A lane's head and a lane's branch NAME are both readings** — exec 1 changed branch mid-task this cycle.
+4. ⚠ **Re-arm the PR watcher.** It exits on firing **and** on its 2-hour timeout, **and its 60-second poll can miss a PR that opens and merges inside one interval** — it missed two of the controller's own anchors this cycle.
+5. **CI is the billing-blocked shape** — not a code verdict. **The forced gate is the only evidence.**
+6. ⚠ **`--delete-branch` exits 1 while a worktree holds the branch — verify a merge by API, never by exit status.**
+
+---
+
 ## 🔄 SUNDAY 2026-09-20 ~22:4x IST — **CYCLE 29: THE OWNER CHOSE §17's SHAPE — UNIFORMLY 3-DIGIT PADDED, CEILING 999 — SO THE 99-ID CEILING THAT JUST SQUEEZED EXEC 2 IS NOT REPEATED.** `main` is `fd14c48d`; **zero open PRs**; ledger **307 done / 1 todo**; `check-case-ids` **2577 unique, highest `16.99`**.
 
 ### 1. 📌 THE RULING, AS READ FROM THE PANE — and the ambiguity that produced it, stated rather than hidden
