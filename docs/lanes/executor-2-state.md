@@ -1,4 +1,200 @@
-## ▲ TOP BLOCK — **NINE FALSE CLAIMS ABOUT THE PRODUCT, AND THE SIX REVIEW PASSES — FIVE OF WHICH FOUND A DEFECT IN PROSE WRITTEN THE DAY BEFORE.** (2026-09-20, ~13:xx IST)
+## ▲ TOP BLOCK — **FOUR ABSOLUTES TRUE OF ONE PATH AND STATED OF THE PRODUCT, FOUND BY SWEEPING THE DOCUMENTS' OWN LISTS.** (2026-09-20)
+
+### § 1 — WHERE TO FIND IT
+
+- **Dispatch: the controller's "the absolutes, swept as ONE LIST, and your fold-in recommendation is
+  ACCEPTED" paste** (2026-09-20 ~11:0x IST). **Base named as `main` = the `#585` merge.**
+- **Branch `exec2/absolute-claims`**, cut from `c8a57b46`. **CODE HEAD `c5981b93`** — `849d17fc` (the
+  change) + `1db3420c` (fix round 1, answering review pass 1's five findings) + `c5981b93` (fix round
+  2, answering the re-review's one new defect and one residual).
+- **The PR opens as the last step of this dispatch.** If you are reading this from `main`, settle it in
+  one call: `gh pr list --state all --head exec2/absolute-claims`.
+- **Docs only**: `README.md`, `docs/manual.md`, `docs/faq.md`, `docs/product-coverage-map.md`, and the
+  regenerated `packages/app-core/src/help/content.generated.ts`.
+- ⚠ **`docs/faq.md` WAS changed this round** — 4 hunks. The last dispatch's note that "faq.md was swept
+  twice and correctly untouched" did NOT repeat; do not read that note as a standing fact.
+
+### § 2 — ANCHORS, RECOUNTED AT `849d17fc` (not carried forward)
+
+| anchor | value |
+|---|---|
+| `git merge-base origin/main HEAD` | `c8a57b46` |
+| **CODE HEAD** (last change commit) | `c5981b93` |
+| the commit carrying THIS FILE | one on top of the code head — **do not trust a literal here**; `git log -1 --format=%h -- docs/lanes/executor-2-state.md` names it. Every anchor below is stated at the CODE head. |
+| ahead / behind `origin/main` (**`546c92f8`**) | **3 / 8** |
+| tree | **clean** |
+| diff vs `origin/main` (3-dot) | **5 files, +176/−47**; of that, **4 docs are +62/−33** and the generated file is the rest |
+| `check:help` | **ok** — 2 documents, 29 sections, **231 entries**. **Delta PREDICTED 0 before regenerating and measured 0, twice** (no heading added or removed) |
+| `check:env` / `check:runbook` / `check:citations` / `check:tasks` | **all exit 0** |
+| `check:case-ids` | ok — **2494** unique ids, highest `16.82` (unchanged: **no case id minted**; `16.45` stays free) |
+| **the gate** | **33/33 successful, Cached: 17, 1m17.5s**, with **16 cache misses** including `app-core:build/test/typecheck` and `web:build/test`. **The forced gate is the controller's.** |
+| `git merge-tree --write-tree origin/main HEAD` | **clean** (exit 0) |
+
+⚠ **`origin/main` MOVED WHILE THIS BRANCH RAN: `c8a57b46` → `546c92f8`** (8 commits). Main touched
+**none** of this branch's five files — control fired: 11 files changed on main in the same invocation —
+so the regenerated `content.generated.ts` is **NOT** stale and **no rebase was needed**.
+**The two-dot trap is live on this tree**: `git diff --stat origin/main HEAD` lists main's own commits
+as ours; use `origin/main...HEAD`.
+
+### § 3 — THE METHOD, WHICH IS THE DURABLE PART
+
+The dispatch's §4 was to **name the LIST, not the claims** — so the universe was **written down in a
+file before it was read**: `gisik-nokma-lanes/EXEC2-UNIVERSE-2026-09-20-absolute-claims.md` (patterns
+N1–N10 for absence, C1–C3 for counts, fixed in advance and not widened after seeing results).
+
+- **Universe: 366 unique `file:line` members** across the four documents, of which **148 are list items
+  or headings** and 218 are other lines.
+- **Changed: 14 claim-sites in 12 hunks.** Left: **~352 members.**
+- ⚠ **My own list-extraction was too narrow, and that is the round's clearest instrument lesson.** It
+  excluded markdown **table rows**, so the coverage map — which is mostly tables — looked far smaller
+  than it is. It also produced a FALSE defect: `manual.md:240` "The four roles" appeared to list only
+  three, because the `| **Admin** |` row did not match my list-item pattern. **The count was correct;
+  the sweep was wrong.** A missing member of an enumeration is not evidence the document is wrong.
+
+### § 4 — WHAT WAS WRITTEN, AND THE PATH EACH CLAIM NAMES
+
+**The two warrants that matter most were read in the SHIPPED SOURCE, not inferred from a test:**
+
+- **Project creation is admin-only at the SERVER too**, independently of the client gate:
+  `apps/server/src/permissions/check-permission.ts:269-273` puts `'project.created'` in
+  `ADMIN_ONLY_TYPES`, and `:290` adds that it "is NOT a roster question, so it does not go to
+  `hasProjectAdminRights`" — i.e. a *project* admin may not create one either. The client's
+  `mayAdminister` and the server's list agree, so the claim names the same path at both doors.
+- **The web's comment box is shipped, not merely tested.**
+  `packages/app-core/src/views/transition-dialog.tsx:254` computes `needsComment` from the rules,
+  `:394-397` renders the `<textarea>` labelled *"Comment (required by this transition)"*, and `:376`
+  submits it. **There is no web-side test asserting the Comment box** — the only web assertion of
+  "required by this transition" is the **Evidence** box (`evidence-upload.test.tsx:193`). The chain is:
+  the web mounts `TransitionDialog` (proven by that same web test exercising it), and the dialog renders
+  the comment box under `needsComment`. **That is an inference, and it is recorded as one.**
+
+
+All four families are the same failure: **a claim true of one path, stated of the product.** Every
+repair names the path. Nothing was deleted; nothing was broadened.
+
+| family | the absolute | the path it IS true of | sites |
+|---|---|---|---|
+| **Project creation** | "You cannot create a project", "There is no button anywhere in the product that makes one" | only a **member or guest**. `mayAdminister` (`workspace-viewer.ts:90-92`) → `page.tsx:632`; an owner/admin is offered `NewProjectForm` (`:918`), everybody else gets the sentence at `:921` | `README.md:62`, `manual.md:19`, `manual.md:167`, `faq.md:74`, `faq.md:82` (the follow-up "not created by somebody clicking", which the absence patterns never looked for), `coverage-map:120` (row 23's note), `coverage-map:231` |
+| **Comment on the web** | "You cannot leave a comment", "Is there a comment box? Not on the website" | a **free-standing** box on a job. The web **does** take one on a **Move**: the transition dialog, when a `require-comment` rule carries it (`transition-dialog.test.tsx:251`) | `manual.md:27`, `manual.md:361`, `faq.md:427`, `coverage-map:253` |
+| **Attach a file on the web** | "You cannot attach a file", "nothing on the web job screen reaches it" | attaching **to a job for its own sake**. The web **does** upload evidence on a Move: `uploadEvidence` is mounted at `p/[projectId]/page.tsx:2459`, and `apps/web/test/evidence-upload.test.tsx:193` asserts the box renders **in a web test** | `manual.md:366`, `faq.md:438` |
+| **Assign on the web** | "No way to assign work to anybody … and no screen sets it" | the **phone and desktop apps**. On the web the job sheet's Assignee row is a picker (`ticket-sheet.tsx:979`), **Unassigned** at `:984` | `coverage-map:235` |
+
+### § 5 — THE TWO COUNTS I CHECKED AND LEFT, AND ONE MEASURED DISAGREEMENT
+
+**The dispatch predicted the coverage map's list "loses one of four items and its count moves with it".
+The measurement says the count does NOT move, and the reason is the dispatch's own rule.**
+
+- `manual.md:245` **"The four roles"** — **correct**, it really lists Owner, Admin, Member, Guest. The
+  apparent defect was in my extraction (§3).
+- `coverage-map:228` **"four things stand out"** — **still four members.** Items 1 (project creation,
+  `:231`) and 2 (assignment, `:235`) are each **true of a path**, and the dispatch's §3 rule is
+  explicit: *"if it is true of a path, say so and name the path — **do not delete it**."* Both were
+  scoped, not removed, so the list keeps four. **The count was left alone rather than adjusted to fit a
+  prediction.**
+  ⚠ **If the controller instead wants that list to hold only TOTAL absences, that is a ruling and the
+  count becomes three — I did not guess it.**
+
+### § 6 — RECORDED, NOT FIXED, ALL WITH NAMED OWNERS
+
+1. **`coverage-map:151` (row 49) "three kinds in order" and `:213` (row 91) "five reasons"** — inside
+   `P§9`/`P§8` citations. **`P§n`/`R§n` are the persona DRAFTS, "NOT in this repository"** (`:11`, the
+   map's own Sources at `:8-15`), so they are unverifiable from here — exactly like the row reverted in
+   the previous round's fix round 1. Still recorded, still not fixed.
+2. **`coverage-map:159` (row 52)** still says the attachment behaviour "is **not reachable from the web
+   today**" while its own C6 row (`:73`) records that the evidence uploader IS mounted. **The two rows
+   disagree with each other.** Recorded rather than reconciled, because settling it means deciding
+   whether "reachable" means *to a job* or *at all* — a wording ruling, not a defect I should pick.
+3. **`manual.md:1214` / `faq.md:785` "Seven things flatly refuse offline"** and the other `C1`
+   enumerations (`manual.md:120` three top-bar items, `:558` five move rules, `:759` six filter
+   values, `:810` the 2,000-job ceiling, `:836` four attention kinds, `:858` five message kinds,
+   `:728`/`faq.md:577` five timeline reasons) were **matched by the universe and left**: each is a
+   count I did not falsify, and an unfalsified count is not a repaired one. **Named owner: whoever
+   next sweeps `manual.md` §7–§9.**
+
+### § 7 — THE REVIEW PASSES, AND THE ONE THAT FOUND THE BRANCH'S OWN THESIS
+
+**Pass 1 ran against `849d17fc` and found five defects — two Important — every one real.** The fix
+round is `1db3420c`.
+
+| # | sev | what it was | repaired by |
+|---|---|---|---|
+| 1 | **Important** | **"You cannot create a project unless you are an admin" was false of the OWNER.** `WorkspaceRole` is `'owner' \| 'admin' \| 'member' \| 'guest'` (`entity-state.ts:3`), the gate is `role === 'owner' \|\| role === 'admin'` (`workspace-viewer.ts:90-92`), matched server-side at `check-permission.ts:517` with `'project.created'` at `:272`. **This is the branch's own thesis — an absolute true of one path, stated of the product — re-committed in its boldest line**, and the clause right after it ("An admin — and the owner —") shows the strict role sense was intended | all four docs + the owner-blind tails |
+| 3 | **Important** | **the load-bearing citation `page.tsx:917-923` did not resolve under the map's own convention.** 23 tracked `page.tsx` files, never directory-qualified; the map's only other one is `page.tsx:1756-1760` (line 88), which exists only in `p/[projectId]/page.tsx` (**2945 lines**). Measured: the workspace page is **1044 lines**, so bare `page.tsx` is the PROJECT page — where `:917-923` is a `useCallback` dependency array. **The fact was right and the pointer was wrong** | qualified to `apps/web/app/w/[workspaceId]/page.tsx:917-923` |
+| 4 | Minor | `manual.md`'s "the only place a project can be created" — `seed-dev-workspace.ts:63`/`seed-convenience-corner.ts:175` also write `project.created` | narrowed to "the only **control** that creates one" |
+| 2 | Minor | owner-blind tails ("until an admin adds one") | "until an owner or admin adds one" |
+| 5 | Minor | the map's framing "because there is nothing to claim" no longer described its own item 1 once item 1 named a working door | framing replaced with "Where a path does have the capability, the item names that path rather than denying it"; item 1's lead is now "No way for a **member or a guest** to create a project" |
+
+**Confirmed correct by the reviewer, independently:** all four code facts; that `page.tsx:921`'s
+sentence is shown to member **and** guest (`:910-916`: *"ONE sentence for every non-admin role (member
+and guest alike)"*); the comment is carried end-to-end (`transition-dialog.tsx:376` →
+`ticket-sheet.tsx:491` → `domain/src/workflow.ts:185`) and **is not rendered back**, so "recorded on the
+move rather than shown back as a thread" is true; `type="file"` appears in exactly two app sources and
+the other (`EvidencePicker.tsx`) is mounted nowhere in `apps/`; both counts; and **no un-repaired copy
+of any family survives in the four documents**.
+
+⚠ **The reviewer's own recorded reservation, not fixed:** **there is no web-side assertion for the
+Comment box specifically.** The web witness (`apps/web/test/evidence-upload.test.tsx:193`) proves the
+*Evidence* box, and the comment box is the same dialog's other rule-gated field. The mount is
+established; the citation stops one step short of a web witness for that exact field.
+
+⚠ **The lesson the reviewer stated, worth keeping: "a citation that resolves is not a citation that is
+right."** Finding 3 is the second instance on this project — the first was `manual.md:359`.
+
+**The scoped re-review closed Findings 1, 2, 3 and 5 outright, and found ONE DEFECT THE FIX ROUND
+ITSELF INTRODUCED** — the same shape this branch exists to hunt: *round 1 changed the headline to name
+two roles and left the next clause quoting the app saying one.* `README.md`, `faq.md` and `manual.md`
+all read "…unless you are an owner or an admin … everybody else is told why … *"Only an admin can
+create a project in this workspace."*" — a faithful quotation of the app's own string, but unattributed,
+so a member got two different rules in adjacent clauses. Each site now marks it as **the app's own
+wording, which names only the admin**. Its **Finding 4 residual** — `coverage-map:232` still saying
+"exactly one door" after the fix round narrowed the manual's parallel sentence to "one control", so two
+documents described one fact at two strengths — is closed too: now "reached **from any screen** by
+exactly one **control**", with the seed CLIs named as the different vocabulary they are.
+
+⚠ **One reviewer observation was REFUTED rather than acted on, and the refutation is the record:** the
+re-review flagged `page.tsx:921` itself as "the last surviving copy of the absolute" on the grounds that
+an owner reading it is told only admins can do what they can do. Measured: `isAdmin` is
+`mayAdminister(role)` is `role === 'owner' || role === 'admin'`, so an owner takes the truthy arm of the
+ternary at `:917-923` and **the sentence is unreachable for an owner.** Its entire audience is
+non-admins, for whom it is accurate. Nothing is owed in code.
+
+**Round count: three passes** (pass 1: five findings; re-review: four closed, one NEW defect, one
+residual; pass 3, scoped to the round-2 diff: **clean on all four items — the three attributions, the
+two-strengths residual, and nothing new**). **Budget was six; three were used.**
+
+⚠ **Pass 3 half-withdrew and half-sharpened the refutation above, and the sharpened half is a REAL
+defect that is out of this dispatch's scope.** Correct: `page.tsx:921` renders only in the `!isAdmin`
+arm, so an owner never reads it — that part of the refutation stands. But *"true for its entire
+audience" does not follow*: the sentence is a claim about **who may create**, not about who reads, and
+an owner **can** create a project in every workspace. So **"Only an admin can create a project in this
+workspace." is false as written, in every workspace, for every member or guest who sees it.** The
+member's actionable takeaway ("ask an admin") is right; the rule it states is not. **Recorded, not
+fixed — see §6.4.**
+
+4. **⚠ THE LAST SURVIVING COPY OF THIS BRANCH'S OWN ABSOLUTE IS IN THE PRODUCT'S OWN UI COPY, AND IT
+   IS FALSE.** `apps/web/app/w/[workspaceId]/page.tsx:921` renders, to member and guest:
+   *"Only an admin can create a project in this workspace."* An **owner** — who is not an admin by role
+   — can also create one, so the restriction as stated is wrong in every workspace. The member's
+   actionable takeaway is right, which is why it has never been reported by a user. **This is CODE, and
+   this dispatch is explicitly docs-only, so it is recorded rather than fixed** — the rule is that
+   something outside scope gets a named owner, not a drive-by edit. **Named owner: the controller, for
+   a follow-up dispatch** — it is a one-string change in `page.tsx` plus a test assertion, and it should
+   not ride along with a docs PR. `faq.md:76`, `manual.md:170` and `README.md:64` already mark the
+   quotation as the app's own narrower wording, so the DOCUMENTS are honest about it today.
+
+### § 8 — THE INSTRUMENT NOTE
+
+⚠ **`git log --oneline origin/main` returned a STALE tip (`ef9eb059`) immediately after a fetch that
+`git rev-parse origin/main` showed to be `c8a57b46`.** Sha-bearing readings were re-taken with
+`/usr/bin/git` per the standing rule. **Do not take a tip from `git log` on this machine.**
+
+⚠ **Two 0-byte files were created in the repo root by a broken `sed -n "${ln}p"` loop of mine** (the
+line number field was not numeric, so body text was read as a sed script). They were `git status`
+visible, empty, and removed. **A sweep script that writes files is a sweep script that can dirty the
+tree** — check `git status` after any ad-hoc sweep, before staging.
+
+
+## ▼ PREVIOUS BLOCK — **NINE FALSE CLAIMS ABOUT THE PRODUCT, AND THE SIX REVIEW PASSES — FIVE OF WHICH FOUND A DEFECT IN PROSE WRITTEN THE DAY BEFORE.** (2026-09-20, ~13:xx IST)
 
 ### § 1 — WHERE TO FIND IT
 
