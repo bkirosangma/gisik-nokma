@@ -31,6 +31,44 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 MONDAY 2026-09-21 ~23:4x IST — **CYCLE 31: THE QUEUE IS EMPTY OF UNBLOCKED WORK, AND THE OWNER HAS ORDERED A THREE-REVIEWER EXERCISE TO RUN WHEN IT DRAINS. THIS ENTRY IS ITS EXECUTION SPEC.** `main` is `fef20170`; **zero open PRs**; ledger **307 done / 1 todo**.
+
+### 1. 📌 THE OWNER'S INSTRUCTION
+> *"once all the executors are done, lets do a review exercise. (wait for all 3 to finish before executing this on fresh session on all 3)"*
+> *"all 3 executors are highly critical reviewers. who will ruthlessly point out every single thing that is wrong, why they are wrong, and what would have been better instead. exec 1 is on UI, exec 2 on UX and exec 3 on features/functionality."*
+> *"they will submit the reports (a persisted file). the controller will then have to read all 3 reports, and for each criticism, make rulings on what it can and will do to answer to every points of the report. if it rejects the criticism or gives a very good reason, he can choose to not do anything about them. but have to defend it properly. it then writes its own compiled report that combines its answer to all 3."*
+
+### 2. ⛔ THE TRIGGER — AND IT IS "ALL THREE", NOT "SOON"
+**The exercise runs when items 6, 7 AND 8 are ALL merged and no lane holds unmerged work.** ⚠ **Not when the first lane finishes, and not when two do.** Measured at `fef20170`: exec 1 on `exec/breadcrumb-ancestors` (7 ahead), exec 2 on `exec2/markdown-editing` (1 ahead), exec 3 on `exec3/visibility-styling` (4 ahead). **Re-measure — do not carry this reading forward, and do not carry the ahead-counts as states.**
+**It must be a FRESH SESSION on all three**, as the owner says. **Kill-and-relaunch each lane through `exec-claude.sh` — never `/clear` — and read each status line to confirm the backend it chose.**
+
+### 3. THE EXECUTION SPEC
+| | exec 1 | exec 2 | exec 3 |
+|---|---|---|---|
+| tmux | `gisik:1` | `gisik:2` | `gisik:3` |
+| **role** | **UI** | **UX** | **features / functionality** |
+| report | `docs/lanes/review-ui-exec1.md` | `docs/lanes/review-ux-exec2.md` | `docs/lanes/review-functionality-exec3.md` |
+**Each lane writes its report to that path, commits it on its own review branch, and does NOT open a PR** — the controller collects all three and lands them with its compiled report (§4), which is the fewest gates and keeps the four documents together. **The controller reads each report from the lane's own worktree file, never from a summary of it.**
+**Every lane brief must carry, in its own section:**
+- ⛔ **BE RUTHLESS AND SPECIFIC. Every criticism names WHAT is wrong, WHY it is wrong, and WHAT WOULD HAVE BEEN BETTER.** Those are the owner's own three parts, and **a criticism missing the third is a complaint, not a finding.**
+- ⚠ **AND EVERY CRITICISM MUST BE MEASURED, NOT ASSERTED.** This project's most expensive recorded error is a confident sentence citing a line nobody opened. **A finding that cannot be measured says so and is marked as such** — an honest "I could not measure this" is worth more than a confident guess.
+- **Their own work is IN SCOPE, including what they themselves shipped.** The product is the subject, not their diff.
+- ⛔ **A reviewer does not fix what it finds.** No branch of fixes, no PR from the review pass itself.
+⚠ **THE THREE DOMAINS ARE ADJACENT AND WILL OVERLAP** — three cuts of one product, chosen deliberately. **Overlap is expected and must NOT be resolved by the lanes**; the controller reconciles it in §4.
+
+### 4. THE CONTROLLER'S COMPILED REPORT — `docs/lanes/review-compiled-controller.md`
+**For EVERY criticism in all three reports the controller must rule: ACCEPTED (and what it will do), or REJECTED (and the defence).** ⚠ **A rejection is only as good as its defence** — the owner's words are *"if it rejects the criticism or gives a very good reason"*, so **a bare disagreement is not a ruling**. **Every ruling cites the measurement it rests on**, and **a criticism the controller cannot resolve is ESCALATED TO THE OWNER, not silently dropped.**
+⚠ **AND THE COUNTS ARE ASSERTED, NEVER SUMMARISED**: how many criticisms were raised, accepted, rejected, escalated — **with the three ruling counts summing to the raised count**, because this file has a whole family of recorded failures about a total that did not match its parts.
+
+### 5. LANES AT HANDOVER — measured ~23:4x
+| lane | branch | task | state |
+|---|---|---|---|
+| exec 1 | `exec/breadcrumb-ancestors` | item 6 — breadcrumbs + parent-indicator merge | **IN FLIGHT** — 7 ahead |
+| exec 2 | `exec2/markdown-editing` | item 8 — markdown editing | **IN FLIGHT** — 1 ahead; **it cut its own branch from `origin/main` exactly as its #617 body said it would** |
+| exec 3 | `exec3/visibility-styling` | item 7 — visibility section styling | **IN FLIGHT** — 4 ahead |
+
+---
+
 ## 🔄 MONDAY 2026-09-21 ~23:2x IST — **CYCLE 30: A THIRD EXECUTOR, §17 IS OPEN, AND THE TWO MERGES THAT GOT HERE. THIS ENTRY SUPERSEDES EVERY EARLIER TOPOLOGY LINE — THERE ARE THREE LANES NOW.** `main` is `534c450b`; **zero open PRs**; ledger **307 done / 1 todo**; `check-case-ids` **2582 unique, highest `16.99`**.
 
 ### 1. ⚙ THE TOPOLOGY CHANGED: THREE EXECUTORS. Owner, verbatim: *"spin up another exec and take up item 7."*
