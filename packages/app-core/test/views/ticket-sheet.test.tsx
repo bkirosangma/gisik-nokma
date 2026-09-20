@@ -897,16 +897,25 @@ describe('3.116 TicketSheet — the "Who can see this" section is mounted', () =
    * `TicketRead.visibility` existed — the section then reports an absence for a
    * mode the server has always sent, on the one surface whose subject is who may
    * see what.
+   *
+   * ⚠ The read carries a pair the DEFAULT SEED DOES NOT: measured 2026-09-20,
+   * this case passed against a mutant that replaced the read with a hardcoded
+   * `{ownMode: 'inherit', resolvedMode: 'project'}` — the seed's own value, so
+   * the mutation produced the string the assertion was looking for. A case whose
+   * fixture equals the plausible hardcoding cannot tell "read it" from "guessed
+   * it", which is the tidy-fixture escape. `workspace` is not the seed and not
+   * any default, so only reading the wire produces it.
    */
   it('3.174 draws the audience the sheet’s own read served, with no prop passed', async () => {
-    renderSheet(ticketRead());
+    renderSheet(ticketRead({ visibility: { ownMode: 'workspace', resolvedMode: 'workspace' } }));
     await settled();
     const section = screen.getByRole('region', { name: 'Who can see this' });
     // Scoped to the STANDING line, not the section: the mode picker beside it
     // carries the same four labels, so a section-wide text query would match the
     // control and report the read as served on a build where it is not.
     const standing = section.querySelector('.gn-visibility__standing');
-    expect(standing?.textContent).toContain('Everyone on the project');
+    expect(standing?.textContent).toContain('Everyone in the workspace');
+    expect(standing?.textContent).not.toContain('Everyone on the project');
     expect(within(section).queryByText(/not being served yet/)).toBeNull();
   });
 
