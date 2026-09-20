@@ -182,6 +182,14 @@ export async function refreshSnapshotsForWorkflowPublish(
   if (event.type !== 'workflow.defined') return EMPTY;
   const target = workflowDefinedPayloadSchema.parse(event.payload);
 
+  // NO `deleted_at` predicate, deliberately — the same prohibition
+  // `projections/tickets.ts`'s `getTicketStateFromDb` records for its own reads,
+  // and here it is sharpened by what a snapshot IS. A snapshot is a ticket's
+  // head state at a workflow version, and it is what the replica resumes a
+  // replay from. Skipping a deleted ticket would leave its snapshot at the OLD
+  // version, so the ticket would come back on a stale `state_category` the
+  // moment it was restored — and restoring is the whole point of a soft delete.
+  // A deleted ticket is still a ticket that has to be kept current.
   const { rows } = await client.query<{ ticket_id: string }>(
     `SELECT ticket_id FROM proj_tickets
       WHERE workspace_id = $1 AND workflow_id = $2 AND workflow_version < $3

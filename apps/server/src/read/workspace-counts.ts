@@ -3,7 +3,7 @@ import type { EffectiveRole } from '../permissions/effective-role.js';
 import { BLOCKED_MEMBERSHIP, BLOCKED_STATES_CTE } from './compile-filter.js';
 import { ROSTER_VISIBLE_CLAUSE, isWorkspaceAdmin } from './membership-roster.js';
 import { SqlParams } from './sql-params.js';
-import { visibleTicketsWhere } from './visible-where.js';
+import { LIVE_TICKET_WHERE, visibleTicketsWhere } from './visible-where.js';
 
 /** One project's countable work, as this caller may count it. */
 export type ProjectCounts = { ticketCount: number; blockedCount: number };
@@ -109,6 +109,7 @@ export async function visibleProjectCounts(
        FROM proj_tickets t
        JOIN proj_visibility v ON v.ticket_id = t.ticket_id
       WHERE ${workspaceClause} AND t.workspace_id = v.workspace_id AND ${visibleClause}
+        AND ${LIVE_TICKET_WHERE}
       GROUP BY t.project_id`,
     params.toArray(),
   );
@@ -208,10 +209,18 @@ export async function ticketVisibleProjectIds(
   const workspaceClause = `v.workspace_id = ${params.add(workspaceId)}`;
   const visibleClause = visibleTicketsWhere(eff, userId, params);
   const { rows } = await db.query<{ project_id: string }>(
+    // `LIVE_TICKET_WHERE` here for the conservative-direction reason this whole
+    // function is written in: the answer is a set of projects the caller is told
+    // they have sight into, and it is derived from ticket rows. A project whose
+    // only sight-into row is a soft-deleted ticket is not a project they can see
+    // anything in, and saying otherwise is the existence-disclosure the docblock
+    // below refuses for the neighbouring count. No fixture separates the two
+    // today; stated here rather than left as an absence.
     `SELECT DISTINCT t.project_id
        FROM proj_tickets t
        JOIN proj_visibility v ON v.ticket_id = t.ticket_id
-      WHERE ${workspaceClause} AND t.workspace_id = v.workspace_id AND ${visibleClause}`,
+      WHERE ${workspaceClause} AND t.workspace_id = v.workspace_id AND ${visibleClause}
+        AND ${LIVE_TICKET_WHERE}`,
     params.toArray(),
   );
   return new Set(rows.map((row) => row.project_id));

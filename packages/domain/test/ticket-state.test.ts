@@ -148,6 +148,22 @@ function reopenedEvent(): EventEnvelope {
   });
 }
 
+function deletedEvent(): EventEnvelope {
+  return makeEnvelope({
+    type: 'ticket.deleted',
+    entity: { kind: 'ticket', id: TICKET },
+    payload: {},
+  });
+}
+
+function restoredEvent(): EventEnvelope {
+  return makeEnvelope({
+    type: 'ticket.restored',
+    entity: { kind: 'ticket', id: TICKET },
+    payload: {},
+  });
+}
+
 /** `rank` is typed `unknown` so the refusal cases can hand it a value the key space forbids. */
 function rankedEvent(rank: unknown): EventEnvelope {
   return makeEnvelope({
@@ -193,6 +209,14 @@ describe('applyTicketEvent', () => {
       // exact, which is what makes this list the place the presence decision
       // lives rather than a value a `?? null` reader would paper over.
       reopenedAt: null,
+      // The fourth of the same family. Creation writes the null rather than
+      // omitting the key, and `toEqual` is exact — so this line is where the
+      // presence decision for `deleted` lives, exactly as the three above are
+      // for `closed`/`rank`/`reopenedAt`. A reducer that dropped the key would
+      // still satisfy every `(state.deleted ?? null) === null` predicate in
+      // `apps/server` while differing in SHAPE from `rowToTicketState`, which
+      // the dual-client rig compares whole.
+      deleted: null,
       fields: {
         title: {
           value: 'File the GST return',
@@ -585,12 +609,20 @@ describe('TICKET_EVENT_TYPES', () => {
     // ticket: a type's workflow binding changes what NEW tickets get, never
     // where an existing one sits.
     expect((TICKET_EVENT_TYPES as readonly string[]).includes('ticket-type.defined')).toBe(false);
-    // THIRTEEN of the SIXTEEN registered against entityKind 'ticket' (backlog/closed
+    // FIFTEEN of the EIGHTEEN registered against entityKind 'ticket' (backlog/closed
     // spec, 2026-09-17: 'ticket.closed' and 'ticket.reopened' joined the list —
     // both move `closed`, so both belong here even though neither moves stateId;
     // spec §8.1, 2026-09-18: 'ticket.ranked' joined it for the same reason — it
-    // moves `rank`, which is head state, and moves nothing else).
-    expect(TICKET_EVENT_TYPES).toHaveLength(13);
+    // moves `rank`, which is head state, and moves nothing else; 2026-09-20:
+    // 'ticket.deleted' and 'ticket.restored' joined it for that same reason —
+    // `deleted` is head state and moves nothing else either).
+    //
+    // **Both numbers move together and neither is decorative.** The registered
+    // count is what `parseEvent` admits; this list is what a REPLAY reader
+    // iterates. A pair added to the registry but not to this list would parse at
+    // the door and then be skipped by every fold that iterates it — the two would
+    // disagree with no error anywhere, which is why the count is asserted at all.
+    expect(TICKET_EVENT_TYPES).toHaveLength(15);
   });
 });
 
@@ -631,6 +663,103 @@ describe('13.566 ticket.closed / ticket.reopened', () => {
   it('TICKET_EVENT_TYPES names both, so every replay reader that iterates it sees them', () => {
     expect(TICKET_EVENT_TYPES).toContain('ticket.closed');
     expect(TICKET_EVENT_TYPES).toContain('ticket.reopened');
+  });
+});
+
+/**
+ * The soft delete — `ticket.deleted` / `ticket.restored`. Deliberately the same
+ * four arms 13.566 pins for the closed/reopened pair, because this pair IS that
+ * pair piece for piece: a flag on head state, written from the ENVELOPE, and an
+ * undo that clears it. A reviewer comparing the two blocks should find them
+ * structurally identical.
+ *
+ * **The `at`/`actorId` provenance is the whole feature.** The FAQ's promise is
+ * that a delete retains history because other events cite the ticket, so what
+ * has to survive is not merely "this ticket is gone" but WHO removed it and
+ * WHEN. A `deleted: true` boolean would lose both, and the mutation that kills
+ * the first `it` below is exactly that: replace the object with `true` and the
+ * `toEqual({ actorId, at })` reddens while the `!== null` checks in every other
+ * suite stay green.
+ *
+ * **`restored` folds BACK to `null`, not to a third value.** That is what makes
+ * "never deleted" and "deleted then restored" the same state as far as every
+ * reader is concerned — the property `deleted?: {…} | null` was chosen for, and
+ * the one an `{ restoredAt }` variant would break: a reader testing
+ * `state.deleted === null` would then be false for a ticket that is visibly
+ * live everywhere.
+ */
+describe('ticket.deleted / ticket.restored fold the flag their closed pair folds', () => {
+  it('creation writes `deleted: null`, so the fold and the column read agree in SHAPE', () => {
+    // Not `deleted ?? null`. The dual-client rig compares whole `TicketState`s
+    // with `toEqual`, so creation having the KEY is the claim — the same
+    // tightening 13.696 records for `rank`, and for the same reason:
+    // `rowToTicketState` always produces a `deleted` key, so a reducer that
+    // omitted it on creation would differ from the server by shape alone.
+    expect(fold([createdWith({ start: 'focus' })]).deleted).toBeNull();
+  });
+
+  it('deleted records the actor and the server time; restored clears it; stateId never moves', () => {
+    const deleteEnv = deletedEvent();
+    const deleted = fold([createdWith({ start: 'focus' }), transitioned('doing'), deleteEnv]);
+    expect(deleted.deleted).toEqual({ actorId: DEFAULT_ACTOR, at: deleteEnv.serverTime });
+    // The state the ticket was deleted IN is untouched. This is the claim the
+    // undo rests on: `restored` puts the ticket back where the person left it,
+    // so a fold that moved `stateId` on delete would make the undo restore a
+    // ticket into a state nobody chose.
+    expect(deleted.stateId).toBe('doing');
+    expect(deleted.stateCategory).toBe('active');
+
+    const restored = fold([createdWith({ start: 'focus' }), transitioned('doing'), deleteEnv, restoredEvent()]);
+    expect(restored.deleted).toBeNull();
+    expect(restored.stateId).toBe('doing');
+  });
+
+  it('an actor set on the envelope is the one recorded, not the default', () => {
+    // The positive control for the line above: `toEqual({ actorId:
+    // DEFAULT_ACTOR, … })` passes trivially if the reducer hardcoded the
+    // fixture's own default actor. This one overrides it, so a reducer reading
+    // any constant reddens here and only here.
+    const deleteEnv = makeEnvelope({
+      type: 'ticket.deleted',
+      entity: { kind: 'ticket', id: TICKET },
+      payload: {},
+      actorId: '01J9GOTHER00000000000000A',
+      serverTime: '2026-09-20T06:30:00.000Z',
+    });
+    expect(fold([createdWith({ start: 'focus' }), deleteEnv]).deleted).toEqual({
+      actorId: '01J9GOTHER00000000000000A',
+      at: '2026-09-20T06:30:00.000Z',
+    });
+  });
+
+  it('a second delete OVERWRITES the first — which is why the engine refuses one', () => {
+    // Pinned here as a fact about the REDUCER, not as a defect: the fold is
+    // written from the envelope (the line above), so replaying two deletes
+    // yields the second actor's claim. The reducer cannot refuse — it is a pure
+    // fold with no notion of "already" — so `checkTicketDeleted`'s
+    // `already-deleted` guard (`packages/rule-engine/src/checks/deletion.ts`)
+    // is the only thing standing between this and an append-only ledger whose
+    // recorded deleter can be rewritten. A reader who finds this test
+    // surprising should read that guard before changing it.
+    const second = makeEnvelope({
+      type: 'ticket.deleted',
+      entity: { kind: 'ticket', id: TICKET },
+      payload: {},
+      actorId: '01J9GSECOND0000000000000A',
+      serverTime: '2026-09-20T07:00:00.000Z',
+    });
+    const state = fold([createdWith({ start: 'focus' }), deletedEvent(), second]);
+    expect(state.deleted).toEqual({ actorId: '01J9GSECOND0000000000000A', at: '2026-09-20T07:00:00.000Z' });
+  });
+
+  it('TICKET_EVENT_TYPES names both, so every replay reader that iterates it sees them', () => {
+    expect(TICKET_EVENT_TYPES).toContain('ticket.deleted');
+    expect(TICKET_EVENT_TYPES).toContain('ticket.restored');
+  });
+
+  it('the two are registered on the ticket entity at version 1', () => {
+    expect(domainRegistry.get('ticket.deleted', 1)?.entityKind).toBe('ticket');
+    expect(domainRegistry.get('ticket.restored', 1)?.entityKind).toBe('ticket');
   });
 });
 

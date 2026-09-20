@@ -16,7 +16,7 @@ import {
   PROJ_TICKET_COLUMNS,
   type ProjTicketRow,
 } from '../read/ticket-cards.js';
-import { visibleTicketsWhere } from '../read/visible-where.js';
+import { LIVE_TICKET_WHERE, visibleTicketsWhere } from '../read/visible-where.js';
 import { blockedStateKeys, latestWorkflowDefs } from '../read/workflow-defs.js';
 
 /** One IST day, in milliseconds. India has no daylight saving — see `addIstDays`. */
@@ -185,6 +185,10 @@ export async function readAttention(
     // and due-soon already skip non-active / terminal tickets below; blocked
     // does not, "whatever the category", per this function's own docblock).
     't.closed_at IS NULL',
+    // A deleted ticket demands no attention from anyone: the FAQ's "stops
+    // appearing in views" covers this strip like every other. Beside the other
+    // two conjuncts, never folded into the visibility predicate.
+    LIVE_TICKET_WHERE,
   ];
   const { rows } = await db.query<ProjTicketRow>(
     `SELECT ${PROJ_TICKET_COLUMNS}

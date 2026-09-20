@@ -6,7 +6,9 @@ import {
   NOT_ON_PROJECT_REASON,
   PERMISSION_ROLE_RULE,
   PERMISSION_VISIBILITY_RULE,
+  TICKET_DELETE_UNRESOLVED_REASON,
   TICKET_NOT_VISIBLE_REASON,
+  ticketDeleteAuthorityReason,
   VISIBILITY_AUTHORITY_REASON,
   VISIBILITY_CLAIM_MISMATCH_REASON,
   WORKSPACE_RENAME_REASON,
@@ -560,6 +562,229 @@ describe('check 5 — who may change who sees a ticket', () => {
       refused: true,
       rule: PERMISSION_VISIBILITY_RULE,
       reason: TICKET_NOT_VISIBLE_REASON,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Check 6 — the soft delete's authority.
+//
+// ADDED BY THE SOFT-DELETE CHANGE, not by the plan this file otherwise tests,
+// and the first thing worth saying is that it is a SIXTH check rather than a
+// restatement of one of the five. Before it existed, `ticket.deleted` was
+// registered in the domain and appeared in NO branch of this module, so it fell
+// through the whole gate: the only thing standing between a workspace GUEST and
+// a deleted ticket was check 4's `canSee`, which a guest can satisfy by being
+// named on one explicit list. That is the measured hole
+// (`docs/lanes/executor-state.md`: *"Nothing gates `ticket.deleted`"*).
+//
+// The level is `hasProjectAdminRights` and NOT `ADMIN_ONLY_TYPES`, on the same
+// line `visibility.set` already draws one branch above: a project admin runs
+// their project's people and their tickets' visibility, and deleting one ticket
+// is that same act on that same object. Retiring the PROJECT is the
+// workspace's, which is why `project.archived` sits in `ADMIN_ONLY_TYPES` and
+// this does not.
+// ---------------------------------------------------------------------------
+
+/**
+ * A founded project with ONE live ticket, its own `proj_visibility` row, and
+ * three people the cases below walk: a plain project MEMBER, a project ADMIN
+ * (workspace role `member` plus this project's flag — the cell that separates a
+ * project gate from a workspace one), and a workspace OWNER.
+ *
+ * The ticket is `seedTicket`'s default PROJECT visibility mode, so every one of
+ * those three can SEE it and nothing below is a check-4 case wearing a check-6
+ * label. That is the property that makes these assertions about authority at
+ * all: an actor who cannot see the ticket is refused three lines earlier, with a
+ * different sentence, and would prove nothing here.
+ */
+async function deletableTicket() {
+  const workspaceId = newUlid();
+  const projectId = newUlid();
+  const ticketId = newUlid();
+  const member = newUlid();
+  const projectAdmin = newUlid();
+  const owner = newUlid();
+  await seedProject(db.pool, workspaceId, projectId);
+  await seedMember(db.pool, workspaceId, member, 'member', [{ projectId }]);
+  await seedMember(db.pool, workspaceId, projectAdmin, 'member', [{ projectId, projectAdmin: true }]);
+  await seedMember(db.pool, workspaceId, owner, 'owner', [{ projectId, projectAdmin: true }]);
+  await seedTicket(db.pool, { workspaceId, projectId, ticketId });
+  return { workspaceId, projectId, ticketId, member, projectAdmin, owner };
+}
+
+/** The pair's two envelopes, built the way a client sends them: empty payload. */
+const deleteTicket = (workspaceId: string, ticketId: string, actorId: string): EventEnvelope =>
+  ticketEvent(workspaceId, 'ticket.deleted', ticketId, actorId);
+const restoreTicket = (workspaceId: string, ticketId: string, actorId: string): EventEnvelope =>
+  ticketEvent(workspaceId, 'ticket.restored', ticketId, actorId);
+
+describe('check 6 — who may delete or restore a ticket', () => {
+  it('planted defect: a plain project MEMBER is refused, naming the fault — and the project admin beside them is ADMITTED', async () => {
+    // MEASURED on main before this branch existed: `ticket.deleted` from a
+    // plain project member — and from a guest, below — was ADMITTED, because a
+    // newly registered ticket event appears in no other branch of this module.
+    //
+    // Both halves go through the IDENTICAL call with only the session user
+    // changed. The admitted half is the control: without it, a branch that
+    // refused every delete would satisfy the first assertion and this file
+    // would certify a feature nobody can use.
+    const { workspaceId, ticketId, member, projectAdmin } = await deletableTicket();
+
+    expect(await gate(deleteTicket(workspaceId, ticketId, member), member)).toEqual({
+      refused: true,
+      rule: PERMISSION_ROLE_RULE,
+      reason: ticketDeleteAuthorityReason('delete'),
+    });
+    // A FRESH envelope naming the admin as its actor, not the member's envelope
+    // re-gated under a second session: `checkRolePermission` refuses an envelope
+    // whose `actorId` is not the session user (`IDENTITY_SPOOF_REASON`), so
+    // reusing the member's would refuse the admin one check earlier and the
+    // control would be about identity rather than authority.
+    expect(await gate(deleteTicket(workspaceId, ticketId, projectAdmin), projectAdmin)).toBeNull();
+  });
+
+  it('a workspace OWNER is admitted, and so is an ADMIN who is on the project', async () => {
+    // `hasProjectAdminRights` answers true for `owner` and `admin` at the
+    // workspace level, so an admin needs no roster row — but they DO need
+    // check 4, and the case below is where an admin off the project is answered.
+    const { workspaceId, ticketId, owner } = await deletableTicket();
+    expect(await gate(deleteTicket(workspaceId, ticketId, owner), owner)).toBeNull();
+
+    // A separate world for the admin, because the roster above is the thing
+    // being varied: this one puts the admin ON the project, which is the only
+    // way the workspace-level arm of `hasProjectAdminRights` is reachable.
+    const second = await deletableTicket();
+    const admin = newUlid();
+    await seedMember(db.pool, second.workspaceId, admin, 'admin', [{ projectId: second.projectId }]);
+    expect(await gate(deleteTicket(second.workspaceId, second.ticketId, admin), admin)).toBeNull();
+  });
+
+  it('planted defect: a GUEST explicitly named on the ticket is refused — check 4 admits them and check 6 does not', async () => {
+    // The measured hole, in its exact shape. The guest is put on the ticket's
+    // explicit list, so `canSee` answers TRUE and check 4 passes: this refusal
+    // can only come from check 6. A guest NOT on the list is refused three
+    // lines earlier with `TICKET_NOT_VISIBLE_REASON`, which would make this case
+    // pass for a reason unrelated to the property it names.
+    //
+    // Mutation: delete the check-6 branch. This line returns null — but so does
+    // it for the member above, so the two cases together are what pin the gate.
+    const { workspaceId, projectId, ticketId } = await deletableTicket();
+    const guest = newUlid();
+    await seedGuest(db.pool, workspaceId, guest);
+    await applyAll(db.pool, [setVisibilityEnv(workspaceId, ticketId, 'explicit', [guest])]);
+
+    // The precondition, asserted rather than assumed: the guest really can read
+    // this ticket, so the refusal below is the authority gate and not the
+    // audience one. `ticket.transitioned` is the probe because it is the event
+    // check 4 alone decides.
+    expect(await gate(ticketEvent(workspaceId, 'ticket.transitioned', ticketId, guest, { to: 'doing' }), guest)).toBeNull();
+
+    expect(await gate(deleteTicket(workspaceId, ticketId, guest), guest)).toEqual({
+      refused: true,
+      rule: PERMISSION_ROLE_RULE,
+      reason: ticketDeleteAuthorityReason('delete'),
+    });
+  });
+
+  it('check 6 runs AFTER check 4: an off-project admin answers the AUDIENCE refusal, so authority is not a read bypass', async () => {
+    // A workspace admin holds project-admin rights on every project that exists
+    // — including this one — so a check-6-first ordering would ADMIT them on a
+    // real ticket and REFUSE them on one nobody has, telling the two apart and
+    // rebuilding the existence oracle Task 8 removed. Run after check 4, both
+    // answer the same sentence.
+    //
+    // MEASURED, in the same invocation: hoisting the check-6 block above the
+    // `canSee` call makes this line return `ticketDeleteAuthorityReason('delete')`
+    // for BOTH envelopes, while the `toBeNull` in the owner case two tests up
+    // stays green — a mutation this case alone kills.
+    const { workspaceId, projectId, ticketId } = await deletableTicket();
+    const admin = newUlid();
+    await seedMember(db.pool, workspaceId, admin, 'admin'); // in the workspace, on no project
+    // `seedTicket`'s visibility is PROJECT mode and this admin is not on the
+    // roster, so they cannot see it — asserted through the probe rather than
+    // inferred, because "the admin cannot see it" is the premise of the case.
+    expect(await gate(ticketEvent(workspaceId, 'ticket.transitioned', ticketId, admin, { to: 'doing' }), admin)).toEqual({
+      refused: true,
+      rule: PERMISSION_VISIBILITY_RULE,
+      reason: TICKET_NOT_VISIBLE_REASON,
+    });
+
+    const onInvisible = await gate(deleteTicket(workspaceId, ticketId, admin), admin);
+    const onNonexistent = await gate(deleteTicket(workspaceId, newUlid(), admin), admin);
+    expect(onInvisible).toEqual(onNonexistent);
+    expect(onInvisible).toEqual({
+      refused: true,
+      rule: PERMISSION_VISIBILITY_RULE,
+      reason: TICKET_NOT_VISIBLE_REASON,
+    });
+  });
+
+  it('a caller with no membership at all is refused before either audience or authority is asked', async () => {
+    // The boundary of the pair above: `resolveEffectiveRole` answers
+    // `workspaceRole: null`, so check 1 refuses. Cheap, and it keeps this block
+    // from reading as if check 6 were the first thing a stranger meets.
+    const { workspaceId, ticketId } = await deletableTicket();
+    const stranger = newUlid();
+    const answer = await gate(deleteTicket(workspaceId, ticketId, stranger), stranger);
+    expect(answer).toMatchObject({ refused: true, rule: PERMISSION_ROLE_RULE });
+    expect(answer?.reason).not.toBe(ticketDeleteAuthorityReason('delete'));
+  });
+
+  it('the UNDO is gated identically: the plain member is refused, the project admin is admitted', async () => {
+    // `ticket.restored` is the same act in reverse and gets the same gate, on
+    // purpose. If the undo were the looser door, a member refused the delete
+    // could still close the ticket's own history by restoring a row an admin
+    // removed — and the asymmetry would be invisible, because the refusing half
+    // only ever runs on the path the member was already denied.
+    const { workspaceId, ticketId, member, projectAdmin } = await deletableTicket();
+    // The realistic fixture: a genuinely deleted row, so the engine's own
+    // `not-deleted` guard cannot be what refuses the member below. `checkPermission`
+    // runs BEFORE the engine, but a fixture that would be refused for a second,
+    // unrelated reason is a fixture that makes this case pass by accident.
+    await db.pool.query('UPDATE proj_tickets SET deleted_at = now(), deleted_by = $2 WHERE ticket_id = $1', [
+      ticketId,
+      projectAdmin,
+    ]);
+
+    expect(await gate(restoreTicket(workspaceId, ticketId, member), member)).toEqual({
+      refused: true,
+      rule: PERMISSION_ROLE_RULE,
+      reason: ticketDeleteAuthorityReason('restore'),
+    });
+    expect(await gate(restoreTicket(workspaceId, ticketId, projectAdmin), projectAdmin)).toBeNull();
+  });
+
+  it('the delete and restore sentences differ, because they instruct different repairs', async () => {
+    // A shared sentence would leave an admin told to "grant delete rights" when
+    // the act they attempted was an undo. The two strings are built by one
+    // function taking the act, so this pins that the argument is not dropped.
+    expect(ticketDeleteAuthorityReason('delete')).not.toBe(ticketDeleteAuthorityReason('restore'));
+    expect(ticketDeleteAuthorityReason('delete')).toContain('delete');
+    expect(ticketDeleteAuthorityReason('restore')).toContain('restore');
+  });
+
+  it('an unreadable ticket cannot be deleted even by an admin — the resolution failure is named', async () => {
+    // The `getTicketStateFromDb` null arm. It is reachable only where the two
+    // projections DISAGREE — `canSee` answers from `proj_visibility`, this gate
+    // reads `proj_tickets`, and a visibility row with no head row is the
+    // recorded divergence class (case 6.57). That world is constructed here
+    // rather than left to be met by accident, because the alternative — no case
+    // at all — would make the branch an assertion nobody has ever run.
+    //
+    // Mutation: replace the null arm with `return null` and this case admits an
+    // admin on a ticket whose project cannot be resolved, which is a delete by
+    // somebody whose rights over the project were never established.
+    const { workspaceId, ticketId, projectAdmin } = await deletableTicket();
+    await db.pool.query('DELETE FROM proj_tickets WHERE ticket_id = $1', [ticketId]);
+    // The precondition: `proj_visibility` still stands, so check 4 passes and
+    // the branch below is genuinely reached.
+    expect(await gate(ticketEvent(workspaceId, 'ticket.transitioned', ticketId, projectAdmin, { to: 'doing' }), projectAdmin)).toBeNull();
+
+    expect(await gate(deleteTicket(workspaceId, ticketId, projectAdmin), projectAdmin)).toEqual({
+      refused: true,
+      rule: PERMISSION_ROLE_RULE,
+      reason: TICKET_DELETE_UNRESOLVED_REASON,
     });
   });
 });

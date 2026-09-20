@@ -8,6 +8,7 @@ import { checkTicketTypeDefined } from './checks/ticket-type.js';
 import { checkTicketWorkflowRebound } from './checks/workflow-rebind.js';
 import { checkTicketClosed, checkTicketReopened } from './checks/close.js';
 import { checkTicketRanked } from './checks/rank.js';
+import { checkTicketDeleted, checkTicketRestored } from './checks/deletion.js';
 import { checkMembershipGranted, checkMembershipRevoked } from './checks/membership.js';
 import type { Accept, EngineContext, Refusal } from './engine.js';
 
@@ -48,6 +49,14 @@ export async function evaluateEvent(env: EventEnvelope, ctx: EngineContext): Pro
       return checkTicketReopened(env, ctx);
     case 'ticket.ranked':
       return checkTicketRanked(env, ctx);
+    // The soft-delete pair (the product's `Delete` and its undo). Both are
+    // purely about the ticket's own head flag, so both are checkable here; the
+    // AUTHORITY half is deliberately not — it needs membership, which this
+    // context does not carry, and it lives in `checkVisibilityPermission`.
+    case 'ticket.deleted':
+      return checkTicketDeleted(env, ctx);
+    case 'ticket.restored':
+      return checkTicketRestored(env, ctx);
     // The last-owner guard (owner ruling 2026-09-18). These two types passed
     // through untouched until this arm existed, which is precisely what let an
     // admin demote the sole owner and promote themselves.

@@ -17,7 +17,7 @@ import { READ_NOT_FOUND_BODY, requireMember, workspaceOfProject } from '../read/
 import { assembleListCards } from '../read/list-cards.js';
 import { SqlParams } from '../read/sql-params.js';
 import { assembleTicketCards, PROJ_TICKET_COLUMNS, type ProjTicketRow } from '../read/ticket-cards.js';
-import { visibleTicketsWhere } from '../read/visible-where.js';
+import { LIVE_TICKET_WHERE, visibleTicketsWhere } from '../read/visible-where.js';
 import { latestWorkflowDefs } from '../read/workflow-defs.js';
 
 const DEFAULT_LIMIT = 50;
@@ -132,6 +132,9 @@ export async function readList(
     `t.workspace_id = ${params.add(workspaceId)}`,
     `t.project_id = ${params.add(projectId)}`,
     visibleTicketsWhere(eff, viewerId, params),
+    // A soft-deleted ticket is in no view, and a list is a view. Beside the
+    // visibility predicate, never folded into it — see `LIVE_TICKET_WHERE`.
+    LIVE_TICKET_WHERE,
   ];
   const compiled = compileFilterSpec(query.spec, params);
   where.push(...compiled.clauses);
@@ -412,6 +415,16 @@ async function epicAncestors(
   // second time for no reason; the `$n` placeholders it returns address the same
   // parameters wherever they appear.
   const visible = visibleTicketsWhere(eff, viewerId, params);
+  // NO soft-delete predicate on either arm of the walk below, and this is the
+  // dispatch's own recorded open question rather than an oversight
+  // (`docs/lanes/executor-state.md`, "NAMED, NOT COVERED" item 7: *"Nothing here
+  // decides whether deleting a parent should cascade, refuse, or orphan.
+  // Named, not decided."*). Filtering the walk means a deleted epic's children
+  // silently lose their epic chip — a visible regression in the common case,
+  // against a title the reader could see before the delete. The scope decides
+  // it when the cascade question is ruled; the residual is named here instead
+  // of being papered over: a deleted epic's TITLE still travels on its live
+  // children's cards.
   const depthParam = params.add(MAX_ANCESTRY_DEPTH);
   const rankParam = params.add(EPIC_RANK);
 

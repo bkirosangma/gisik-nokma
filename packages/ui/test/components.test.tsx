@@ -525,6 +525,100 @@ describe('R1(c) at the component layer', () => {
   });
 
   /**
+   * 16.84 — the sheet footer's `Delete`, and the `‹ Previous / Next ›` pair the
+   * owner ruled out.
+   *
+   * ## Why a CSS case exists for a control the component suite already covers
+   *
+   * `ticket-sheet.test.tsx`'s `16.84` proves the button is DRAWN, emits
+   * `ticket.deleted`, closes and narrates. **None of that can see whether the
+   * class it wears has a rule** — and 16.83 two cases up exists precisely
+   * because a class with no rule renders as raw user-agent chrome while every
+   * component-level assertion stays green. This control is transcribed from the
+   * prototype's own (`desktop.dc.html:1372`), so it takes 16.83's shape.
+   *
+   * ## The ABSENCE is half the case
+   *
+   * The owner ruled the navigation out on 2026-09-20 and the rules went with it.
+   * **A deleted rule is invisible to every instrument that measures a property
+   * rather than a presence**, so the removal is asserted the same way the
+   * original defect was — by requiring the rule to be GONE, which `rule()`
+   * reports by throwing.
+   *
+   * ## Why `background: transparent` is asserted rather than described
+   *
+   * The prototype's control is a TRANSPARENT ground with danger INK, which is
+   * NOT `.gn-button--danger` — that variant FILLS with `--gn-danger`. The two
+   * are one keyword apart in the markup and visually opposite, so the pair
+   * (`background: transparent` AND `color: var(--gn-danger)`) is pinned
+   * together: either half alone would pass for the wrong control.
+   */
+  it('16.84 the Delete control has a rule of its own, and the ruled-out nav has none', () => {
+    const body = rule('.gn-ticket-sheet__delete');
+
+    // Danger INK on a transparent ground — the prototype's own pairing, and the
+    // pair is asserted together (see the docblock).
+    expect(body).toMatch(/color:\s*var\(--gn-danger\)/);
+    expect(body).toMatch(/background:\s*transparent/);
+    expect(body).not.toMatch(/background:\s*var\(--gn-danger\)/);
+
+    expect(body).toMatch(/border:\s*none/);
+    expect(body).toMatch(/border-radius:\s*var\(--gn-radius-control\)/);
+
+    // The prototype's `min-height:44px` (`:1372`), kept in rem so it scales with
+    // the reader's text size, and pinned so a re-transcription is a red rather
+    // than a surprise in the viewport sweep — the same recorded divergence
+    // `.gn-board-card__move` and `.ticket-type-list__move` both made.
+    expect(body).toMatch(/min-height:\s*2\.75rem/);
+    expect(body).not.toMatch(/min-height:\s*(32|36)px/);
+
+    // The prototype's `justify-content:space-between`, which currently has one
+    // child and is kept on purpose: it is the structure a second control lands in.
+    expect(rule('.gn-ticket-sheet__footer')).toMatch(/justify-content:\s*space-between/);
+
+    // ⛔ THE REMOVAL. `rule()` throws on a selector it cannot find, so this is the
+    // assertion that the navigation is GONE rather than merely unused — and it is
+    // the one that reddens if a future edit re-adds the rules without a caller.
+    expect(() => rule('.gn-ticket-sheet__nav'), 'the nav rules must be gone').toThrow(
+      /no rule for/,
+    );
+
+    // 13.340's positive scan over BOTH stylesheets, and the second one WINS
+    // (`layout.tsx` imports `ui.css` then `globals.css`) — the gap 16.83's own
+    // reviewer found by planting the fork in `globals.css` and watching it stay
+    // green. Same two-sheet scan, for this control.
+    for (const [name, css] of [
+      ['ui.css', UI_CSS],
+      ['globals.css', GLOBALS_CSS],
+    ] as const) {
+      const styleBlocks = [...css.matchAll(/\[data-style="[a-z]+"\][^{]*\{([^}]*)\}/g)];
+      if (name === 'ui.css') {
+        expect(
+          styleBlocks.length,
+          'the scan found no [data-style] block in ui.css at all — it is reading nothing',
+        ).toBeGreaterThan(0);
+      }
+      for (const [fullMatch] of styleBlocks) {
+        expect(fullMatch, `${name}: ${fullMatch}`).not.toMatch(/\.gn-ticket-sheet__delete\b/);
+      }
+    }
+
+    // …AND DECLARED EXACTLY ONCE ACROSS BOTH, because `rule()` answers the FIRST
+    // match only: a duplicate appended at EOF would beat the body asserted above
+    // while every assertion here stayed green.
+    for (const [name, css] of [
+      ['ui.css', UI_CSS],
+      ['globals.css', GLOBALS_CSS],
+    ] as const) {
+      const decls = [...css.matchAll(/^\.gn-ticket-sheet__delete\s*\{/gm)];
+      expect(
+        decls.length,
+        `${name} declares .gn-ticket-sheet__delete as a rule of its own ${decls.length} time(s)`,
+      ).toBe(name === 'ui.css' ? 1 : 0);
+    }
+  });
+
+  /**
    * 13.340 — ghost/secondary controls keep fill + accent label as their
    * identifying signal in EVERY style, never a style-specific override that
    * strips it back to a boundary (or to nothing). 13.289 already pins this for

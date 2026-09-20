@@ -343,6 +343,27 @@ export function registerTicketRoutes(
         );
       }
 
+      // A SOFT-DELETED ticket is 404 on its own detail route, the same answer
+      // an invisible one gets — the FAQ's *"The ticket stops appearing in
+      // views"* covers this route like every list, and a ticket absent from
+      // every board but reachable at its URL would be the half-state this
+      // repo's read surfaces exist to refuse.
+      //
+      // The row is NOT gone (`getTicketStateFromDb` serves it to the engine on
+      // purpose — see its docblock; that is what makes `ticket.restored`
+      // possible), so this is a predicate at the ROUTE, not a filter in the
+      // reader. Do not move it.
+      //
+      // The undo therefore does not come from a read of this route: the design
+      // system's delete flow is a toast with an Undo button
+      // (`design-system/interactive/desktop.dc.html:1869`), which posts
+      // `ticket.restored` against the id the client already holds. If the
+      // interface half ever needs to render a deleted ticket READ-BACK, that is
+      // a new surface with its own decision, not a hole opened here.
+      if ((state.deleted ?? null) !== null) {
+        return reply.code(404).send(NOT_FOUND_BODY);
+      }
+
       let parent: ParentRef | null = null;
       if (ticket.parent_id !== null) {
         const parentRow = await loadTicketRow(deps.pool, workspaceId, ticket.parent_id);
@@ -364,12 +385,27 @@ export function registerTicketRoutes(
               `readTicket: proj_visibility holds parent ${parentRow.ticket_id} in workspace ${workspaceId} and proj_tickets does not — the two projections disagree`,
             );
           }
-          parent = {
-            kind: 'ticket',
-            id: parentRow.ticket_id,
-            title: titleOf(parentState),
-            ticket: toTicketView(parentRow),
-          };
+          // A soft-deleted PARENT withholds its title too, and answers the
+          // `restricted` shape rather than a fourth one. The distinction this
+          // branch is about is whose data is whose: the child is live and its
+          // `parentId` rides on its own card, so naming the parent's ID claims
+          // nothing new — but the parent's TITLE is the deleted ticket's
+          // content, and the FAQ's "stops appearing in views" is exactly a
+          // statement about content. `restricted` already means "there is a
+          // parent here whose name you do not get", which is precisely true and
+          // is not a visibility claim, so it is reused rather than re-invented.
+          // (`null` would be worse: it asserts the projection resolved this
+          // child as a ROOT, which is false.)
+          if ((parentState.deleted ?? null) !== null) {
+            parent = { kind: 'restricted', id: ticket.parent_id };
+          } else {
+            parent = {
+              kind: 'ticket',
+              id: parentRow.ticket_id,
+              title: titleOf(parentState),
+              ticket: toTicketView(parentRow),
+            };
+          }
         } else {
           parent = { kind: 'restricted', id: ticket.parent_id };
         }

@@ -88,6 +88,35 @@ export type TicketState = {
    * because no surface displays it.
    */
   reopenedAt?: string | null;
+  /**
+   * The soft-delete flag: set by `ticket.deleted`, cleared back to `null` by
+   * `ticket.restored`, never touching `stateId` — `closed`'s exact shape and
+   * its exact reason (the flag and the state are orthogonal).
+   *
+   * The product says "deleted" rather than "erased" on purpose, and the FAQ
+   * states the semantics this field carries before the event existed
+   * (`design-system/interactive/desktop.dc.html`, `faq-delete`): *"The ticket
+   * stops appearing in views. Its history is retained, because other events
+   * cite it — a comment, a block, a workflow version."* So this flag is a
+   * READ filter, not a tombstone: the ledger, the row and the history all stay,
+   * and every view-serving SELECT excludes the rows it marks. Nothing erases.
+   *
+   * The ENGINE's own by-id reads deliberately ignore it (`projections/
+   * tickets.ts`'s `getTicketStateFromDb`, which feeds `EngineContext`): the
+   * undo is `ticket.restored`, and a rule engine that could not see a deleted
+   * ticket would refuse its own undo with "no such ticket" — the feature would
+   * not be reversible at all. The filter belongs to views, not to the fold.
+   *
+   * OPTIONAL here, and only here, on `closed`'s exact rule and for its exact
+   * reason: hundreds of `TicketState` literals in tests across five packages
+   * predate the field, so the DOMAIN type is optional while every producer sets
+   * it — the reducer writes the `null` at creation and on `ticket.restored`,
+   * the object on `ticket.deleted`, and `rowToTicketState` reads the columns
+   * unconditionally. Every reader spells `state.deleted ?? null`. The wire
+   * types do NOT carry it: no surface renders it, and whether a ticket is
+   * deleted is a filter the server applies, not a fact the card needs.
+   */
+  deleted?: { actorId: string; at: string } | null;
 };
 
 export type MembershipState = {

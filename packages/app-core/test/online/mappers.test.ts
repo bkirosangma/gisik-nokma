@@ -1855,6 +1855,55 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     expect(() => mapTicketRead(body)).toThrow(MappingError);
   });
 
+  /**
+   * **NO CASE ID, deliberately.** The coordinator owns the `test-cases/`
+   * catalogue and the id allocation for this round, so this pair is added
+   * without one rather than minting a number; it is the soft delete's member of
+   * the family `13.603` opened and `13.703`/`13.724` continued, and it belongs
+   * under whichever id the coordinator assigns.
+   *
+   * The defect it closes is the FOURTH recurrence of one shape: `mapTicketState`
+   * enumerates `TicketState` by hand, so every new domain member is dropped
+   * until somebody adds it. `rowToTicketState` writes `deleted` unconditionally,
+   * so the single read's body carries it and this mapper did not read it — the
+   * `13.603` BLOCKER's exact mechanism (four UI surfaces dead in production,
+   * every one of their own tests green because they seed a fake `DataSource`).
+   */
+  it('carries the wire ticketState\'s deleted flag onto TicketState.deleted, present and null', () => {
+    const deletedRead = mapTicketRead(
+      ticketReadBody(
+        { kind: 'ticket', id: 'parent-1', title: 'The epic' },
+        null,
+        null,
+        null,
+        null,
+        null,
+        { actorId: ANSELMA, at: '2026-09-20T00:00:00.000Z' },
+      ),
+    );
+    expect(deletedRead.ticket.deleted).toEqual({ actorId: ANSELMA, at: '2026-09-20T00:00:00.000Z' });
+
+    // The positive control in the SAME invocation: a never-deleted ticket reads
+    // `null`. Without it this case would pass on a mapper that returned the
+    // claim unconditionally.
+    const liveRead = mapTicketRead(
+      ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' }, null, null),
+    );
+    expect(liveRead.ticket.deleted).toBeNull();
+  });
+
+  it('refuses a ticketState whose deleted key is missing rather than reading it as never-deleted', () => {
+    // `13.603`'s second case, for the same reason and against the same mutant:
+    // a mapper reading `record['deleted'] === undefined ? null : …` would
+    // satisfy the two assertions above while silently reintroducing the drop for
+    // any body that omits the key outright.
+    const body = ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' }) as {
+      ticketState: Record<string, unknown>;
+    };
+    delete body.ticketState['deleted'];
+    expect(() => mapTicketRead(body)).toThrow(MappingError);
+  });
+
   function ticketReadBody(
     parent: Record<string, unknown>,
     rollup: unknown = null,
@@ -1868,6 +1917,15 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
      * that wants an assignment claim passes one.
      */
     assignedProvenance: unknown = null,
+    /**
+     * The soft-delete flag, or `null` — REQUIRED on the wire exactly as `closed`
+     * is, because `rowToTicketState` reads the two columns unconditionally
+     * (soft delete, 2026-09-20). A trailing 7th parameter rather than an
+     * insertion beside `closed`: every existing call site passes its arguments
+     * POSITIONALLY, and inserting in the middle would silently re-point the 3rd
+     * through 6th of all of them.
+     */
+    deleted: unknown = null,
   ): Record<string, unknown> {
     return {
       // The `proj_visibility` row the route still serves. The client reads
@@ -1916,6 +1974,11 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
         // shape the server ever produces. See that case for why it is tolerant
         // where `closed` and `rank` are strict.
         reopenedAt,
+        // The fourth member, on `closed`'s exact rule: REQUIRED on the wire,
+        // defaulted to `null` so every pre-existing call site in this file —
+        // none of which is ABOUT this flag — keeps exercising the
+        // "never deleted" arm unchanged.
+        deleted,
       },
       title: 'File the GST return',
       stateProvenance: {
@@ -2327,6 +2390,7 @@ describe('13.967 mapTicketRead carries assignedProvenance, and refuses a body wi
         closed: null,
         rank: null,
         reopenedAt: null,
+        deleted: null,
       },
       title: 'File the GST return',
       stateProvenance: claim,

@@ -269,6 +269,16 @@ export function registerContestsRoute(
       // `c` narrows the contests, and this one keeps the JOIN inside the same
       // tenancy rather than trusting that it already is.
       const { rows } = await deps.pool.query<ContestRow>(
+        // NO soft-delete predicate, and this is the dispatch's own recorded
+        // ruling rather than an oversight (`docs/lanes/executor-state.md`'s
+        // "NAMED, NOT COVERED", item 2, verbatim: *"A deleted ticket's contest
+        // still renders."*). The reason is the FAQ's: a contest is an event
+        // that CITES the ticket — *"Its history is retained, because other
+        // events cite it"* — and this roster is gated per row by `canSee`,
+        // which is the whole audience decision here. The consequence is named
+        // rather than left to be found: the deleted ticket's TITLE travels with
+        // the contest, because the title is joined from `proj_tickets.fields`
+        // and `canSee` knows nothing about deletion.
         `SELECT c.*, t.fields AS ticket_fields, t.project_id AS ticket_project_id
            FROM proj_contested c
            LEFT JOIN proj_tickets t

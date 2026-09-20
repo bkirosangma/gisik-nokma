@@ -9,6 +9,7 @@ import {
 import type { Queryable } from '../db/queryable.js';
 import { getWorkflowDefFromProjection } from '../projections/workflows.js';
 import { getWorkspaceSettings } from '../projections/workspace-settings.js';
+import { LIVE_TICKET_WHERE } from '../read/visible-where.js';
 import { canSee } from '../visibility/can-see.js';
 import { deliverToAll, type NotificationTransport } from './transport.js';
 import type { CanSeeFn } from './fanout.js';
@@ -171,13 +172,20 @@ export async function runNotificationSweep(deps: SweepDeps): Promise<SweepReport
     // no `AT TIME ZONE`. Every day in it was computed in Node from the injected
     // clock, so the Postgres session's timezone cannot move the answer.
     const due = await deps.pool.query(
-      `SELECT ticket_id, workspace_id, assignee_id,
-              fields -> 'title' ->> 'value' AS title,
-              fields -> 'dueDate' AS due_claim
-         FROM proj_tickets
-        WHERE workspace_id = $1
-          AND state_category <> 'terminal'
-          AND fields -> 'dueDate' -> 'value' ->> 'date' <= $2`,
+      // `LIVE_TICKET_WHERE` with the alias this query did not previously need.
+      // A notification is a VIEW — it appears in a person's list — so a
+      // soft-deleted ticket must not arrive there. `canSeeTicket` below is not
+      // a substitute: it is the audience question, and it knows nothing about
+      // deletion (the two are deliberately separate predicates — see
+      // `read/visible-where.ts`).
+      `SELECT t.ticket_id, t.workspace_id, t.assignee_id,
+              t.fields -> 'title' ->> 'value' AS title,
+              t.fields -> 'dueDate' AS due_claim
+         FROM proj_tickets t
+        WHERE t.workspace_id = $1
+          AND t.state_category <> 'terminal'
+          AND ${LIVE_TICKET_WHERE}
+          AND t.fields -> 'dueDate' -> 'value' ->> 'date' <= $2`,
       [workspaceId, horizon],
     );
 
@@ -254,6 +262,7 @@ export async function runNotificationSweep(deps: SweepDeps): Promise<SweepReport
              ) entered ON true
         WHERE t.workspace_id = $1
           AND t.state_category = 'active'
+          AND ${LIVE_TICKET_WHERE}
           AND entered.server_time < $2`,
       [workspaceId, staleBefore],
     );
