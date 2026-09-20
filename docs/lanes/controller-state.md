@@ -31,6 +31,32 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 TUESDAY 2026-09-22 ~00:1x IST — **CYCLE 34: THE QUEUE IS EMPTY, ALL EIGHT ITEMS ARE MERGED, AND THE THREE-REVIEWER EXERCISE IS RUNNING. THIS ENTRY IS FOR A CONTROLLER THAT WAKES UP MID-EXERCISE.** `main` is **`e4baa425`**; **zero open PRs**; ledger **307 done / 1 todo**.
+
+### 1. 📌 THE EXERCISE IS LIVE — DO NOT RELAUNCH IT
+**The trigger in cycles 31–33 has fired: items 6, 7 and 8 are ALL merged.** The three lanes were killed and relaunched on **2026-09-22 ~00:1x**, each through `exec-claude.sh` with its backend confirmed as `deepseek-flash[1m]`, each having cut its own review branch:
+| lane | tmux | role | branch | report it will write |
+|---|---|---|---|---|
+| exec 1 | `gisik:1` | **UI** | `exec1/review-ui` | `docs/lanes/review-ui-exec1.md` |
+| exec 2 | `gisik:2` | **UX** | `exec2/review-ux` | `docs/lanes/review-ux-exec2.md` |
+| exec 3 | `gisik:3` | **features / functionality** | `exec3/review-functionality` | `docs/lanes/review-functionality-exec3.md` |
+**Their briefs are three files in `gisik-nokma-lanes/`** — `CTL-REVIEW-COMMON-2026-09-22.md` plus `CTL-REVIEW-{UI-EXEC1,UX-EXEC2,FUNCTIONALITY-EXEC3}-2026-09-22.md` — **and the launchers are `launch-exec{1,2,3}-2026-09-21-review.sh`.** ⛔ **A controller that finds this entry mid-exercise MUST NOT relaunch them**: a reviewer restarted mid-read loses everything it has read, and the reports are the whole deliverable.
+
+### 2. ⛔ WHAT THE CONTROLLER OWES WHEN THE THREE REPORTS EXIST
+**Read all three IN FULL** — from each lane's worktree file, never from a summary. **Then rule on EVERY criticism**, in the buckets cycle 33 §3 defines: **ACCEPTED** (and what WOULD be done — ⚠ this exercise builds nothing) · **REJECTED** (and the defence — the owner's bar is *"a very good reason"*, and every ruling cites its measurement) · **ACCEPTED-DEFERRED** (name when). ⛔ **The three counts MUST SUM to the criticisms raised.** Then write **`docs/lanes/review-compiled-controller.md`** and land **all four files in ONE PR**, with the seven checks rc=0 and the forced gate at the landing tree.
+⚠ **CYCLE 33 §2 also binds the ruling**: a prototype divergence is **MATCHES · DIVERGES-AND-RULED · DIVERGES-WITH-NO-RULING-FOUND**, and **the third is the finding** — *the reason a thing was built is not a ruling.*
+
+### 3. ⚠ THE PROTOTYPE THE REVIEWERS WERE SENT TO — and it is NOT the repo's copy
+**Owner, 2026-09-22: *"all prototype should be from this zip file"*** (`~/Downloads/Interactive prototype building (1).zip`). **Staged read-only at `gisik-nokma-lanes/prototype-2026-09-20/`**, with every file's sha256 recorded in the common brief. ⚠ **MEASURED, AND IT IS A FINDING IN ITSELF: the repo's `design-system/interactive/desktop.dc.html` has been through an attribute-camelCasing pass** — `onClick` → `sc-camel-on-click` (160 attributes) and **`viewBox` → `sc-camel-view-box`, which is NOT a valid SVG attribute.** And the ZIP's bundle hashes to `bf64cc446880`, **the very sha this repo's own `227434a5` recorded for its 2026-09-18 refresh** — so the repo refreshed from this export and something transformed it afterwards. **Why is not established.** If a reviewer reports on it, that is their finding to make; **do not pre-empt it.**
+
+### 4. THE OVERNIGHT SAFETY NETS — the owner is asleep and asked that nothing stop this
+- **A durable cron, `651ad750`, fires at `:13` and `:38`** with the whole procedure; the controller is re-poked even if it stalls.
+- **The harness's own check, `f456f920`, fires at `:09`, `:29`, `:49`.**
+- ⚠ **A PR watcher must be re-armed after every firing** — `/tmp/pr-watch.sh 120`, background. **A watcher found alive for 1 day 6 hours was BLIND**: it was running against a 2-hour script and had therefore missed every PR of the session.
+- ⚠ **AND A RED GATE UNDER LOAD IS TIMEOUTS, NOT ASSERTIONS.** Measured here: the same tree gated `EXIT=0 · 33/33` alone and `EXIT=1 · 25/33` with nothing but `Hook timed out in 30000ms` while three lanes ran. **Three reviewers on a 16 GB box is exactly that condition — re-run a red alone before believing it.**
+
+---
+
 ## 🔄 TUESDAY 2026-09-22 ~00:2x IST — **CYCLE 33: THREE AMENDMENTS TO THE REVIEW SPEC — THE PROTOTYPE IS A COMPARISON SURFACE, THE CONTROLLER RULES ON EVERYTHING, AND NOTHING IS BUILT.** `main` is `b05889b6`; zero open PRs.
 
 ### 1. 📌 THE OWNER'S WORDS
