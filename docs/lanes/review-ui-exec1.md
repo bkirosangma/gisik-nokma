@@ -40,7 +40,7 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 **⛔ NOT REACHED — and this is the honest boundary, stated as a list:**
 1. **Painted DOM: the SIGNED-OUT half only, and no screenshots at all.** I ran the signed-out suite by hand (§0) and it gives painted measurements for **5 routes × 3 viewports** — `/help`, `/privacy`, `/terms`, `/sign-in`, the 404. **NO signed-in route was measured at paint**, so every finding about the board, the ticket sheet, the settings screens, the members page, the inbox and the desktop/mobile shells rests on *source and stylesheets*, which is weaker than a painted claim and I am not going to dress it up. **The reason is I2's:** taking the signed-in suite needs a stack serving *this* tree, and `:3001` serves a baked image that predates `main` (`981aa92b` measured `docker inspect gisik-nokma-dev-web-1` → zero mounts). So a run would have produced confident numbers about a different product — the same trap, one layer up. **No product file was modified and no screenshot was taken.**
 2. Not reviewed file-by-file: `apps/web/app/*` route bodies (25 modules); the ~55 `apps/web/test/*` files; `packages/app-core/src/views/*` beyond `ticket-sheet`/`board`/`attachment-list`; `packages/editor`'s components beyond the class sweep; `apps/mobile`'s editor webview and both storage engines; `apps/desktop`'s Tauri config and storage; `apps/web/e2e/` (the mock-only suite). **`packages/ui` WAS read** — `button`, `card`, `chip`, `segmented-control`, `avatar`, `dialog`, `switch` in full; `sheet`/`toast`/`info-tip`/`table` grepped; `select/select.tsx` read for its structure, markup and sweep-visibility (it is built on React Aria — `useSelect`/`useComboBox`/`useListBox`/`useOption`/`HiddenSelect` — so its keyboard and role model comes from the library rather than from this repo, which is why P9's hand-rolled tabs stand out beside it). **Remaining largest hole: `apps/web/app/*`'s 25 route bodies.**
-3. Prototype comparison performed for **two** surfaces only (the ticket-sheet breadcrumb, the board empty states). The other ~20 prototype files were not compared.
+3. Prototype comparison performed for **two** surfaces directly (the ticket-sheet breadcrumb, the board empty states) **plus a re-measurement of the whole prototype-delta queue** (P14) — 4 of its 11 rows re-derived, 5 not, and the `held`/`none` rows untouched. **The other ~20 prototype files were not compared screen by screen**, so this lane has not done the exhaustive per-screen comparison the owner asked for; P14 is the queue, not the screens.
 4. §16's 97 case ids were **not** each opened. `check:citations` was run (§7) and its limit is stated there.
 
 ---
@@ -328,6 +328,33 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 
 ---
 
+### P14 — **IMPORTANT** — The prototype-delta queue reads eleven items OUTSTANDING; at least four have shipped, including its own row 0
+
+**WHAT.** `docs/design/prototype-delta-2026-09-18.md` is the project's prototype-provenance authority: 25 screens, a per-screen verdict, and an ordered queue of 11 items under *"**Row 0 is the one item that is not a screen and not optional** … it precedes everything else."* Four of those rows are closed as of this tree.
+
+**MEASUREMENT — each row re-derived, with the source of the answer named.**
+
+| queue row | the doc says | today |
+|---|---|---|
+| **1. TOKENS** ("wire-gap", *"not optional … precedes everything else"*) | product on the **old** values; names **four** probe pairs at `tokens.ts:95/:151/:281/:282` | **CLOSED — all four moved.** `blue600: '#33629f'` (`:108`) = the refreshed `#33629F`; `neoPaper: '#f1eae3'` (`:176`) = `#F1EAE3`; `tintWarmWarning: '#f07c341a'` (`:364`) and `tintNavyWarning: '#f7a9611a'` (`:365`) — `0x1a` = **0.102**, the refreshed α 0.10, from 0.20 and 0.141. |
+| **2. isLegal** ("port") | "nav bar + tabs/TOC + title scale" | **CLOSED** — `privacy/page.tsx:27` and `terms/page.tsx:27` import `LegalNav`, both render `LegalToc` and `LegalTabs` (`:26`), and the `gn-legal__*` family including `gn-legal__title` is in use. |
+| **3. isNotFound** ("port") | "icon tile, 3rd link to `/help`" | **CLOSED** — `not-found.tsx` renders `gn-notfound__tile` (`:82`), `gn-notfound__title` (`:98`) and **three** links: `/workspaces` (`:137`), `/help` (`:140`), `/inbox` (`:143`). |
+| **5. isTypeEditor** ("blocked") | *"field `required` toggle is a schema gap **needing a ruling**"* | **CLOSED** — `fields-editor.tsx:53` cites the owner ruling and `:104/:132-133` implement the toggle. |
+
+**Two of the four are corroborated by my own painted run, which is a stronger form of evidence than the grep:** the suite rendered `span.gn-legal__meta` and `a.gn-segmented__item` on both legal pages, three `a.gn-notfound__link` on the 404, and reported **`--gn-surface=#f1eae3`** — the refreshed `neoPaper`, measured live, from a run that started after `981aa92b` merged.
+
+**AND THE DOCUMENT CONTRADICTS ITSELF.** Its own header, 27 lines above the queue, tabulates the two rows that closed within hours of the reading and names the commits: *"`isTypeEditor` — the field `required` toggle … **`#447 caf1edec`, landed 10:43**"*. The queue row at `:101` still reads **"blocked"**. I verified `caf1edec` with `git merge-base --is-ancestor` → **ancestor of `origin/main`**. So the correction exists in the document and the row it corrects was never updated.
+
+**AND BOTH corroborating citations for the TOKENS row have drifted.** The doc supports its token claim with *"`apps/web/e2e-viewport/responsive.spec.ts:1939` asserts the neo `surfaceSunken` is `#ede4db`"* and *"`packages/ui/src/ui.css:3440` says the same in prose."* Today, `responsive.spec.ts:1939` is a docblock for case 13.298 about a 401, and `ui.css:3440` is a `.gn-timeline__open:focus-visible` outline rule. **Neither mentions `#ede4db`, `surfaceSunken` or a token.** The doc's own history already flags this class — *"Prototype-Side Citation Checking Gap: Bare `:NNN` Lines Are Ambiguous"* — and then relies on bare `:NNN` lines throughout.
+
+**WHY IT IS WRONG.** This is not a product defect; it is the artefact that *directs* product work, and its own opening records the price of exactly this staleness: **two dispatches were voided by rows that had already closed, each costing "a whole dispatch."** The header's remedy is *"re-measure a row before you act on it"* — but with all 11 rows printed as outstanding, that remedy is a per-row tax paid by every future lane, and the two rows already known-closed were not marked even in the same commit that recorded them closing. **The failure is not that the readings expired — the header says they would. It is that the correction was written into the header and not into the rows it corrects.**
+
+**WHAT WOULD HAVE BEEN BETTER.** Prefix a closed row in place — `✅ closed by #447` — which is a two-word edit to a line the closing commit already had open, and is the same "correct the sentence rather than delete it" discipline this document uses everywhere else. And name the string to find rather than a bare `:NNN`: *"asserts `surfaceSunken` is `#ede4db`"* survives a 200-line drift; `:1939` does not. That is the doc's own diagnosis applied to itself.
+
+**⚠ WHAT I DID NOT RE-MEASURE, so the count is a lower bound and not a total.** Rows 4, 7, 8, 10 and 11 I did not test. **Row 6 (`isInbox`, "no filter param, no bulk route") is *likely* closed but I did not establish the wire half** — `apps/web/test/inbox-bulk.test.tsx` (10.0 K) exists, so the client half ships; my grep for a bulk route in `apps/server/src/routes/*.ts` returned nothing, which is **not** evidence of absence, because I did not know the route's shape to search for. **Row 9 (`isWorkspace`) I could not decide** — `w/[workspaceId]/page.tsx` carries substantial archive logic and I could not separate "chips and description exist" from "they do not" without reading the render. **The four `held` rows and the six `none` rows were not touched.** So: **4 closed of the 11 tested, 5 untested, and the untested five are not a clean bill.**
+
+---
+
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
 
 | comparison | class | evidence |
@@ -375,7 +402,7 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 **CRITICAL — 1**
 - `I1` no browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate structurally cannot run one
 
-**IMPORTANT — 8**
+**IMPORTANT — 9**
 - `I2` the `e2e-stack` contrast roster records a defect fixed eight hours later, with no provenance
 - `I3` `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by its own docblock
 - `P1` seven interactive controls styled by no rule at all (raw UA chrome)
@@ -384,6 +411,7 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 - `P9` `SegmentedControl` carries ARIA tab semantics with none of the tab keyboard model, in 7 places
 - `P11` the `Select` panel is outside every sweep's population, for two independent reasons
 - `P12` every screen in the product has the same document title (WCAG 2.4.2, Level A)
+- `P14` the prototype-delta queue reads 11 items outstanding; at least 4 have shipped, including its own row 0
 
 **MINOR — 9**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
@@ -396,7 +424,7 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 - `P10` the accessible-name ratchet's unit is an attribute; its message claims a property of assistive tech
 - `P13` no skip link; a keyboard-only user Tabs the nav on every navigation (WCAG 2.4.1)
 
-**Total 18.** `raised` and `sum by severity` agree by enumeration above. ⚠ **One id carries two severities on purpose and is counted once:** `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 19.** `raised` and `sum by severity` agree by enumeration above. ⚠ **One id carries two severities on purpose and is counted once:** `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
