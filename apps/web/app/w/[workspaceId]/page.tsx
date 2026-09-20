@@ -74,6 +74,15 @@ export function foundingSeeds(
   name: string,
   founderUserId: string,
   description?: string,
+  /**
+   * The project prefix — `SO` in `CCSO-1183` (owner spec 2026-09-20). ABSENT when
+   * the form's box was left untouched, spread in the same way `description` is,
+   * so the key is genuinely missing rather than present-and-undefined and
+   * `'prefix' in payload` answers the same question as `payload.prefix ===
+   * undefined`. A project founded without one still gets a key: the half is
+   * derived from the name.
+   */
+  prefix?: string,
 ): EnvelopeSeed[] {
   return [
     {
@@ -90,6 +99,7 @@ export function foundingSeeds(
         // `''` spelling, because `''` fails `min(1)` and the schema refuses a
         // description of only spaces.
         ...(description === undefined ? {} : { description }),
+        ...(prefix === undefined ? {} : { prefix }),
       },
     },
     {
@@ -987,6 +997,17 @@ function NewProjectForm({
 }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  /**
+   * The project prefix — `SO` in `CCSO-1183` (owner spec 2026-09-20).
+   *
+   * **UPPER-CASED AS THE OWNER TYPES, and that is not cosmetic.** `prefixSchema`
+   * REFUSES a lower-case prefix rather than normalising it (the ledger stores a
+   * claim as it was made), so a form that sent `so` would earn a refusal whose
+   * remedy is "type it again in capitals". Correcting the case at the keyboard is
+   * the one place that repair belongs, and it is what `prefixSchema`'s own
+   * docblock says these forms do.
+   */
+  const [prefix, setPrefix] = useState('');
 
   const send = (event: FormEvent): void => {
     event.preventDefault();
@@ -1020,10 +1041,16 @@ function NewProjectForm({
           // would make that refusal unreachable from the one form that can
           // produce a description at all.
           description === '' ? undefined : description,
+          // Same `''` rule one line up, for the same reason: an untouched
+          // optional box makes no claim, so it becomes an ABSENT key rather
+          // than an empty string — and a prefix left off is not "no key", it
+          // is a key whose half is derived from the name.
+          prefix === '' ? undefined : prefix,
         ),
       () => {
         setName('');
         setDescription('');
+        setPrefix('');
       },
     );
   };
@@ -1065,6 +1092,26 @@ function NewProjectForm({
           placeholder="e.g. Sprint work for the rollout"
           value={description}
           onChange={(event) => setDescription(event.target.value)}
+        />
+      </label>
+      {/* The owner's spec, verbatim: *"during project creation up to 3 letters
+          for it"* — `SO` in `CCSO-1183`. OPTIONAL, like the description above:
+          a project founded without one still gets a key, because the half is
+          derived from the name (`packages/domain/src/prefix.ts`), and requiring
+          it here would make a key a precondition of founding a project rather
+          than a consequence of it.
+
+          No `maxLength`, matching the two inputs above: the domain schema owns
+          the bound, and an attribute that silently stopped the typing would
+          make that refusal unreachable from the form that can produce it. */}
+      <label className="gn-field gn-project-founding__field" htmlFor="gn-new-project-prefix">
+        <span className="gn-field__label">Prefix (optional)</span>
+        <input
+          id="gn-new-project-prefix"
+          className="gn-field__input"
+          placeholder="e.g. SO"
+          value={prefix}
+          onChange={(event) => setPrefix(event.target.value.toUpperCase())}
         />
       </label>
       <Button variant="primary" type="submit" disabled={busy}>

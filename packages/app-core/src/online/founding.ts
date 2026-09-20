@@ -52,12 +52,18 @@ export class FoundingError extends Error {
  * runs on the gate.
  */
 export type FoundingGateway = {
-  foundWorkspace(name: string): Promise<{ workspaceId: string }>;
+  /**
+   * `prefix` is the workspace's half of every ticket key — `CC` in `CCSO-1183`
+   * (owner spec 2026-09-20). OPTIONAL, and omitted rather than sent as `''`:
+   * an untouched box makes no claim, and a workspace founded without one still
+   * gets a key, because the half is derived from the name.
+   */
+  foundWorkspace(name: string, prefix?: string): Promise<{ workspaceId: string }>;
 };
 
 export function createHttpFoundingGateway(http: HttpClient): FoundingGateway {
   return {
-    async foundWorkspace(name) {
+    async foundWorkspace(name, prefix) {
       let raw: unknown;
       try {
         // The name is sent AS TYPED, untrimmed. Trimming here would silently
@@ -65,7 +71,13 @@ export function createHttpFoundingGateway(http: HttpClient): FoundingGateway {
         // not write — and it would make the door's 400 unreachable for the one
         // input it exists to refuse. What the user typed is what is submitted;
         // what the server thinks of it comes back in its own words.
-        raw = await http.post('/v1/workspaces', { name });
+        // Spread rather than `prefix`, so the body genuinely lacks the key when
+        // the box was untouched — `workspaceCreatedPayload` is `.strict()` and
+        // the route's body schema allows the property only when it is a string.
+        raw = await http.post('/v1/workspaces', {
+          name,
+          ...(prefix === undefined ? {} : { prefix }),
+        });
       } catch (cause) {
         if (cause instanceof HttpError) {
           throw new FoundingError(cause.status, refusalText(cause.body));

@@ -142,7 +142,18 @@ beforeAll(async () => {
       entity: { kind: 'project', id: project },
       type: 'project.created',
       version: 1,
-      payload: { name: 'Seed project' },
+      // `prefix` is here so the shadow rebuild exercises the NON-NULL path of
+      // `proj_projects.prefix`, added 2026-09-20. Without it this world only
+      // ever proves that NULL equals NULL — and the case that matters is the
+      // one where the column holds a value an event actually made, because
+      // THAT is the value a replay has to reproduce.
+      //
+      // ⚠ What this does NOT prove is that the column holds only what an event
+      // said. A DERIVED value written here reddens nothing at all, measured:
+      // the derivation is a pure function, so live and shadow agree and `EXCEPT`
+      // has nothing to report. See `proj-projects.ts`'s comment and mutation M4
+      // in `test-cases/13-owner-requests-and-backlog.md`.
+      payload: { name: 'Seed project', prefix: 'SP' },
       actorId: newUlid(),
       origin: 'web',
       clientTime: '2026-08-20T09:00:00.000Z',

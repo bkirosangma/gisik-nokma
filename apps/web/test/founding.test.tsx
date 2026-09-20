@@ -133,6 +133,48 @@ describe('3.126 founding — the happy path', () => {
     await user.click(screen.getByRole('button', { name: 'Create workspace' }));
     await waitFor(() => expect(names).toEqual(['   ']));
   });
+
+  it('13.1032 — the new-workspace form authors the PREFIX, upper-cases it, and passes undefined when untouched', async () => {
+    // Owner spec 2026-09-20: *"i can enter up to 3 letters for the workspace"* —
+    // `CC` in `CCSO-1183`. The assertion is on the ARGUMENT the gateway
+    // receives, because that is the whole of this form's part in it.
+    const calls: Array<{ name: string; prefix: string | undefined }> = [];
+    mount({
+      foundWorkspace: async (name, prefix) => {
+        calls.push({ name, prefix });
+        return { workspaceId: '01J9WORKSPACE0000000000000' };
+      },
+    });
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Name'), 'Convenience Corner');
+    // Typed in LOWER CASE on purpose: `prefixSchema` refuses lower case rather
+    // than normalising it, so the upper-casing has to happen here, at the
+    // keyboard. Delete it from the `onChange` and this line fails on `cc`.
+    await user.type(screen.getByLabelText('Prefix (optional)'), 'cc');
+    await user.click(screen.getByRole('button', { name: 'Create workspace' }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toEqual({ name: 'Convenience Corner', prefix: 'CC' });
+  });
+
+  it('13.1033 — an UNTOUCHED prefix box passes undefined, never an empty string', async () => {
+    // Not folded into 13.1032, because the two claims fail for different
+    // reasons: the one above fails if the upper-casing goes, this one fails if
+    // the box starts feeding `''` into the gateway — and `''` would reach the
+    // door's body schema as a present-but-wrong value rather than as "nobody
+    // entered one".
+    const calls: Array<{ name: string; prefix: string | undefined }> = [];
+    mount({
+      foundWorkspace: async (name, prefix) => {
+        calls.push({ name, prefix });
+        return { workspaceId: '01J9WORKSPACE0000000000000' };
+      },
+    });
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Name'), 'Convenience Corner');
+    await user.click(screen.getByRole('button', { name: 'Create workspace' }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toEqual({ name: 'Convenience Corner', prefix: undefined });
+  });
 });
 
 /**

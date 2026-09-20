@@ -93,8 +93,16 @@ the door's `project.prefix-taken` refusal; the mapper's required-field refusals;
 
 **Does NOT ship — the display half, and `Features.md` says so at the bullet rather than in a footnote.**
 The key composes, is served and is enforced; **no screen renders it yet.** `Features.md` §6 carries a
-per-site enumeration with an owner. Seven of the eight sites are `·` (not built); the eighth is the
-`Delete` toast, which **does not exist to wire** — `Delete` is exec 1's in-flight door. Cycle 21 puts the
+per-site enumeration with an owner. **It has NINE entries — TWO implemented (`-`, the two the wire
+delivers) and SEVEN not (`·`) — and the dispatch named seven of them, so this is not the dispatch's list
+with a status column.** ⚠ This sentence said "seven of the eight" until an independent reviewer counted
+the list; the number was never measured, and a wrong count here is the symptom this repo treats as a
+structural tell rather than a typo. The four site names beyond the dispatch's list are the workspace and
+project prefixes ON THE WIRE and the composition itself, which is what "ships" means for a display task.
+One of the seven is the `Delete` toast, which **does not exist to wire** — `Delete` is exec 1's in-flight
+door, and measured at `origin/main` its copy appears only in the two prototype files and
+`test-cases/16-remaining-doors.md`, with `ticket-sheet.tsx:1596` still saying *"Only the navigation half is
+built."* Cycle 21 puts the
 sheet's three-crumb breadcrumb in exec 1's NEXT queued task, so the fourth crumb belongs to whoever holds
 the sheet — **and that wire is now waiting for them.**
 
