@@ -923,6 +923,51 @@ function MintForm({ workspaceId, onMinted }: { workspaceId: string; onMinted: ()
  * It is dead, and it is named as dead, because an admin looking at a list with
  * a blank there would read it as "no expiry" — a link that never lapses rather
  * than one that never worked.
+ *
+ * ## The heading (2026-09-20, case 16.46)
+ *
+ * The authority draws `<p>{{ inviteHeading }}</p>` at `desktop.dc.html:725`,
+ * defined at `:3091` as `"Pending invitations · " + s.invites.length`. The
+ * product drew no heading for this list at all, and `test-cases/16` recorded
+ * that as an unrecorded omission rather than a scope decision.
+ *
+ * **The count is `rows.length` — the SAME array the `<ul>` maps, read in the
+ * same expression.** That is the reason the heading lives in THIS component
+ * rather than beside it at the call site: a heading fed from anywhere else is a
+ * second, weaker answer to a question the list already answers, and the two can
+ * disagree. Here they cannot — there is one array and one `.length`.
+ *
+ * **At zero it renders, reading `· 0`.** The authority draws the heading
+ * unconditionally inside its `isInviteAdmin` block (`:722`–`:725`), above the
+ * `noInvites` sentence (`:741`), and that is also the honest reading here: the
+ * empty sentence below ALREADY claims the list is empty, so the heading adds no
+ * claim the list was not already making. Hiding it at zero would instead leave
+ * the section unnamed exactly when a reader most needs to know what the empty
+ * thing is.
+ *
+ * **One text node, deliberately.** The string is one template literal rather
+ * than a label plus a `<span>` for the number. ⚠ **The reason first written
+ * here — "an accessible name inserts a space between sibling elements, so a
+ * composed name would not be the authority's string" — was measured FALSE by
+ * this change's own mutation battery:** rebuilding it as
+ * `{'Pending invitations · '}<span>{rows.length}</span>` leaves the accessible
+ * name `Pending invitations · 2` unchanged and **every arm of 16.46 green**.
+ * The one-node form is kept, and the COMPOSITION is now pinned structurally by
+ * the case rather than argued in a docblock — a property no assertion can see
+ * is not a property this repo holds.
+ *
+ * `<h2>` and not the authority's `<p>`: this screen's other heading is the
+ * authority's own identically-styled `17px/600` heading (`:747`, `Invite
+ * someone`), and the product renders it as
+ * `<h2 className="gn-invite-mint__heading">` (`:781`). Following the sibling is
+ * the port; the authority's `<p>` is the drawing.
+ *
+ * ⚠ **`gn-invite-pending*` has NO CSS RULE, and this heading inherits that.**
+ * `Features.md` **§3** — the people-page bullet, *"The people page, gated by the
+ * server's own 403"* — records the missing family as a scope call with a named
+ * owner. This heading joins the family rather than opening a second one, so the
+ * two headings on this screen stay consistent — styling one of them and not the
+ * other would be a divergence this change invented.
  */
 function PendingList({
   rows,
@@ -931,23 +976,27 @@ function PendingList({
   rows: PendingInvite[];
   onRevoke: (inviteId: string) => void;
 }) {
-  if (rows.length === 0) {
-    return <p className="gn-invite-pending__empty">No invitations are outstanding.</p>;
-  }
   return (
-    <ul className="gn-invite-pending">
-      {rows.map((row) => (
-        <li key={row.inviteId} className="gn-invite-pending__row">
-          <span className="gn-invite-pending__address">{row.address}</span>
-          <span className="gn-invite-pending__role">{row.role}</span>
-          <span className="gn-invite-pending__expiry">
-            {row.expiresAt === null
-              ? 'No link behind this one — withdraw it and invite again.'
-              : `Lapses ${formatDateTime(row.expiresAt)}`}
-          </span>
-          <Button onClick={() => onRevoke(row.inviteId)}>Withdraw</Button>
-        </li>
-      ))}
-    </ul>
+    <>
+      <h2 className="gn-invite-pending__heading">{`Pending invitations · ${rows.length}`}</h2>
+      {rows.length === 0 ? (
+        <p className="gn-invite-pending__empty">No invitations are outstanding.</p>
+      ) : (
+        <ul className="gn-invite-pending">
+          {rows.map((row) => (
+            <li key={row.inviteId} className="gn-invite-pending__row">
+              <span className="gn-invite-pending__address">{row.address}</span>
+              <span className="gn-invite-pending__role">{row.role}</span>
+              <span className="gn-invite-pending__expiry">
+                {row.expiresAt === null
+                  ? 'No link behind this one — withdraw it and invite again.'
+                  : `Lapses ${formatDateTime(row.expiresAt)}`}
+              </span>
+              <Button onClick={() => onRevoke(row.inviteId)}>Withdraw</Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }

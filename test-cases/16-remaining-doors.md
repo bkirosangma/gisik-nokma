@@ -733,16 +733,75 @@ The reviewer re-read the authority's `isInviteAdmin` block against the page and 
 was sent for are present and untouched. It also found a **thing the authority draws, that we do not, and that the
 data already serves** — so it is named here with an owner rather than built on this row:
 
-- **The pending-invitations HEADING.** The authority draws `<p>{{ inviteHeading }}</p>` at `:725` —
-  `"Pending invitations · " + s.invites.length` (data `:3096`) — and **the product renders no heading for the
-  pending list at all** (`PendingList` emits only the empty `<p>` or the `<ul>`; the page's only `<h2>` is
-  `Invite somebody`). `pending.length` is already in state, so this is buildable with no read. **It is in neither
-  the page's absent-list docblock nor the audit's gap list — an unrecorded omission rather than a scope
-  decision.** Owner: the controller, for a dispatch.
+- **The pending-invitations HEADING — BUILT (executor 2, 2026-09-20, case `16.46`).** The authority draws
+  `<p>{{ inviteHeading }}</p>` at `:725`, defined at `:3091` as `"Pending invitations · " + s.invites.length` —
+  and the product rendered **no heading for the pending list at all** (`PendingList` emitted only the empty `<p>`
+  or the `<ul>`, and the page's only `<h2>` **was** `Invite somebody`). `pending.length` was already in state, so this
+  needed no read and no route. **It was in neither the page's absent-list docblock nor the audit's gap list — an
+  unrecorded omission rather than a scope decision** — and the controller dispatched it. See the section below
+  for what shipped and how it was witnessed.
+  ⚠ **`(data :3096)` WAS A STALE CITATION and is corrected to `:3091` in this change set.** `:3096` is the
+  `named` scope line *inside* `inviteRows`; it does not carry `inviteHeading`. Nothing depended on it — the
+  omission it was cited for was real either way — but a citation that resolves to a different statement than the
+  one it is cited for is the shape this repo keeps paying for.
 - Also drawn and absent, in decreasing order of how data-backed they are: the pending row's **project scope**
-  (`:731-732`; `PendingInvite.projectIds` is served, project *names* are not), the minted card's **`Copy link` and
+  (`:732`; `PendingInvite.projectIds` is served, project *names* are not), the minted card's **`Copy link` and
   `Done`** (`:788-789`; the product renders the URL as inert text), and four static sentences the authority
   carries (`:726`, `:778`, `:780`, `:793`).
+
+## The pending-invitations heading (executor 2, 2026-09-20) — case `16.46`
+
+**The dispatch:** the omission recorded above, whose owner was "the controller, for a dispatch". One branch
+(`exec2/pending-heading`), one PR, `--base main`.
+
+**The authority draws the heading and the count was already in state, so this needed NO read and NO route.**
+⚠ **The three other things the same paragraph names are deliberately NOT in this change set** — the pending
+row's project scope (`:732`; needs project *names*, which are not served), the minted card's `Copy link`
+and `Done` (`:788-789`), and the four static sentences. They are unaffected and still recorded above.
+
+- **16.46** ✅ **The pending list carries its heading, and its count is the list it heads.** `PendingList` draws
+  `<h2 className="gn-invite-pending__heading">` reading `` `Pending invitations · ${rows.length}` `` — the SAME
+  array the `<ul>` maps, read in the same expression, which is why the heading lives in the COMPONENT rather
+  than beside it at the call site: a count fed from anywhere else is a second, weaker answer to a question the
+  list already answers. **Four arms, each with a literal expectation and none built by calling the component's
+  own code** — an expectation the implementation also produces cannot fail when the implementation changes.
+  Two rows read `· 2` **and the list is asserted to draw exactly two rows**; one row reads `· 1`, so the
+  number is a count and not a constant; no rows reads `· 0` **over** the `No invitations are outstanding.`
+  sentence, which is the empty-case DECISION (the authority draws the heading unconditionally inside its
+  `isInviteAdmin` block, and the empty sentence already makes the claim, so `· 0` repeats rather than adds
+  one); and a member who meets the door's 403 gets **neither the heading nor the list it heads**.
+  *Mutation-witnessed SEVEN ways, each declaring the arms it should redden BEFORE it ran, so a mutation that
+  reddened nothing would be a reported survivor rather than a silent hole.* The middot swapped for a hyphen
+  (A1/A2/A3); the count pinned to the constant `2` (A2/A3 — **and A1 stays green, which is exactly why A2
+  exists**); the heading deleted outright (A1/A2/A3); the heading **hoisted out of the admin gate** so it
+  renders for a member too (A4); the `<ul>` truncated to `rows.slice(0, 1)` while the heading still counts all
+  of them (A1 — **the only arm that catches the LIST drawing fewer rows than the fixture holds**; a count PINNED
+  to a constant leaves A1 green, which is exactly why A2 exists); the count off by one (A1/A2/A3).
+  ⚠ **THE SEVENTH SURVIVED THE FIRST RUN, AND IT WAS MY OWN CLAIM THAT DIED WITH IT.** Rebuilding the string
+  as `` {'Pending invitations · '}<span>{rows.length}</span> `` — the label-plus-span composition the dispatch
+  warned about — left the accessible name `Pending invitations · 2` **unchanged** and **all four arms green**.
+  So the docblock sentence "an accessible name inserts a space between sibling elements, so a composed name
+  would not be the authority's string" was **false as stated in this case's own environment**: measured, a
+  boundary between the text node and the span does not double the space the literal already ends with. (Whether
+  a boundary adds no separator at all or the whitespace is collapsed, this measurement does not distinguish, and
+  a real browser is not measured here.) **The one-node form is kept — it is still what the dispatch asked for —
+  and the COMPOSITION is now pinned by an assertion instead of argued in prose:** the case asserts the heading
+  has exactly one child node and holds no element, which is the only instrument that can see the difference.
+  Re-run after the fix, the seventh mutation reddens A1. **A survivor with no explanation is either an
+  unconstrained path or a mutation that never ran; this was neither — it was an assertion that could not make
+  the distinction it was named for.**
+  `<h2>` rather than the authority's `<p>` because this screen's other heading is the authority's own
+  identically-styled `17px/600` heading (`:747`, `Invite someone`) and the product already renders it as an
+  `<h2>` (`page.tsx:781`). ⚠ **The heading is ONE text node and not a label plus a `<span>`, deliberately** —
+  **and the reason first written HERE was measured FALSE by this same bullet's seventh mutation, above: a
+  two-node composition left the accessible name unchanged and every arm green.** The form is kept because it is
+  what the dispatch asked for; what holds it is the case's **STRUCTURAL assertion, not the name**. The middot is
+  pinned as a character, so a lookalike dot or a hyphen reddens. ⚠ **The
+  heading carries NO `aria-label`, `role`, `aria-selected` or `aria-describedby`, which is why the `/members`
+  accessible-name ratchet cannot move on it** — `sweepAccessibleNames` counts exactly those four attributes and
+  `rawMatches` is its un-ratcheted control. **No baseline file was touched, and the case is not claimed to be
+  seen by that ratchet.**
+  `apps/web/app/w/[workspaceId]/members/page.tsx`, `apps/web/test/members-page.test.tsx`, `Features.md`
 
 ## Sheet prototype parity (executor 1, 2026-09-20) — cases `16.81`–`16.99`
 
