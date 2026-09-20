@@ -119,7 +119,15 @@ import { signInWithPhone } from '../helpers/session.js';
  * one.
  */
 
-/** The marker, planted in the child's title and in nothing else. */
+/**
+ * The marker. ⚠ **CORRECTED 2026-09-21 — this read "planted in the child's title
+ * and in nothing else", and it is now in TWO places**, both on the ticket the
+ * delete removes: the child's title, and the body of one `comment.added` on that
+ * child (see the fixture's own note). The docblock above was corrected first and
+ * this copy was missed — a correction that fixes one of two copies is the shape
+ * this repo has recorded before, which is why the fixture now says where its
+ * marker lives in one place and this constant points at it.
+ */
 const MARKER = 'SOLARIS';
 
 let db: TestDatabase;
@@ -480,12 +488,22 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
   },
   getTicketAttachments: {
     verdict: 'excluded',
-    // ⛔ MEASURED, and named rather than hidden: this surface does not carry the
-    // ticket's TITLE, so the marker is absent by construction and this row
-    // constrains nothing. The surface has a REAL leak — a deleted ticket's FILES
-    // are still served — which this invariant cannot see, because a file list is
-    // not the marker. Published with its named owner in Arm 2's enumeration,
-    // which carries the measurement and the three doors it reaches.
+    // The marker cannot reach this surface — it does not carry the ticket's
+    // TITLE, so this row is vacuous in both passes and constrains nothing. Said
+    // plainly rather than dressed up as coverage.
+    //
+    // ⚠ **CORRECTED 2026-09-21, and the correction is another lane's merge.**
+    // This row used to read *"The surface has a REAL leak — a deleted ticket's
+    // FILES are still served — which this invariant cannot see"*, with a named
+    // owner and a pointer to Arm 2's enumeration. **That leak is CLOSED:**
+    // executor 1's `#610` (`ea56020a`) put the third guard at all three
+    // attachment doors (`routes/tickets.ts:671`, `routes/attachments.ts:388`
+    // and `:545`, each through `read/live-ticket.ts`'s `ticketIsLive`), and
+    // `test/integration/soft-deleted-attachments.test.ts` is its witness. The
+    // row is corrected rather than left standing because a "REAL leak" sentence
+    // outliving its fix is the failure this repo names most often — **a stale
+    // known gap is pre-authorised work that no longer needs doing** — and the
+    // fix landed in the same fold that brought this file into conflict.
     carries: false,
   },
   getTicketComments: {
@@ -498,7 +516,7 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
     // the delete the call THROWS (`refused` below) and the marker is absent for
     // a reason this walk can observe.
     carries: true,
-    why: 'Guarded at the ROUTE by the third guard `routes/tickets.ts` adds over the attachments read: the folded `deleted` flag, read off `getTicketStateFromDb` — the SAME mechanism `getTicket` above uses, and NOT `LIVE_TICKET_WHERE`, because the constant filters rows and this door owes a refusal. Removing that guard makes the deleted ticket’s thread answer 200 with the marker in it, which reddens this case (measured: the battery mutation m3-third-guard).',
+    why: 'Guarded at the ROUTE by the shared third guard — `read/live-ticket.ts`’s `ticketIsLive`, which is `LIVE_TICKET_WHERE` asked at a route, applied at `routes/tickets.ts` after the two visibility guards. NOT a predicate inside the read’s SELECT: the constant FILTERS ROWS, and a route must REFUSE — a deleted ticket owes the same 404 an invisible one gets, and an empty thread would be a claim about the ticket instead. Removing the guard makes the deleted ticket’s thread answer 200 with the marker in it, which reddens this case — re-measured 2026-09-21 after the fold replaced the hand-rolled flag read with `ticketIsLive`: with `if (!(await ticketIsLive(...)))` rewritten to `if (false)`, this file fails on `getTicketComments must not serve a deleted ticket`.',
   },
   getWorkflowDef: { verdict: 'excluded', carries: false },
   getTicketTypes: { verdict: 'excluded', carries: false },

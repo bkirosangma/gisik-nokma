@@ -698,12 +698,22 @@ export function registerTicketRoutes(
    *
    * The two guards above are the ledger's and the attachments read's — same
    * order, same body, because "may this caller see this ticket" is asked in
-   * exactly one place (`../visibility/can-see.ts:227`). **This door carries a
-   * third one that the attachments read does not, and that difference is the
-   * point:** a soft-deleted ticket's FILES are served today (case `16.90(a)`,
-   * measured, owned by whoever next picks up the attachment surface). The rule
-   * is `LIVE_TICKET_WHERE`'s (`../read/visible-where.ts:191`) — *"The ticket
-   * stops appearing in views"* — and this route applies it.
+   * exactly one place (`../visibility/can-see.ts:227`). The THIRD is the
+   * deletion question, which is a different one and is asked in its own one
+   * place (`../read/live-ticket.ts`): **a ticket the product has stopped showing
+   * must not serve its thread either**, and a ticket absent from every view but
+   * reachable at its URL is the half-state the detail route's docblock refuses
+   * by name.
+   *
+   * **⚠ CORRECTED 2026-09-21, ON THE FOLD.** This paragraph read: *"This door
+   * carries a third one that the attachments read does not … a soft-deleted
+   * ticket's FILES are served today (case 16.90(a), measured, owned by whoever
+   * next picks up the attachment surface)."* That was true when this branch was
+   * cut and **false by the time it was folded**: executor 1's `#610` shipped the
+   * same guard at the three attachment doors and put it in
+   * `read/live-ticket.ts`, and the leak this branch was carrying a citation for
+   * is closed. So the sentence is corrected rather than kept, and this route now
+   * RIDES that helper.
    *
    * **It is applied HERE and not as the constant in `listTicketComments`'s
    * SELECT, deliberately.** The constant FILTERS ROWS; a route must REFUSE. A
@@ -714,13 +724,6 @@ export function registerTicketRoutes(
    * second predicate here would be worse than either: the route check is
    * evaluated first, so the SQL one could never fire, and a check that cannot
    * fail reads exactly like protection.
-   *
-   * The mechanism is the one `GET /tickets/:id` already uses at `:365` — the
-   * folded `deleted` flag off `getTicketStateFromDb`, which is the same rule the
-   * constant spells in SQL, reached through the reader that folds it. That makes
-   * this the SECOND TypeScript application of the rule beside
-   * `routes/my-work.ts:364`, and it is named rather than left to be rediscovered:
-   * a sweep for `deleted_at` does not find either.
    *
    * ## The files
    *
@@ -741,16 +744,24 @@ export function registerTicketRoutes(
         return reply.code(404).send(NOT_FOUND_BODY);
       }
 
-      // The third guard. Read AFTER `canSee` said yes, like the detail route's,
-      // so an invisible ticket and a deleted one are indistinguishable from
-      // outside — both answer the same 404 body with nothing else.
-      const state = await getTicketStateFromDb(deps.pool, workspaceId, ticketId);
-      if (state === null) {
-        throw new Error(
-          `readTicketComments: proj_visibility holds ${ticketId} in workspace ${workspaceId} and proj_tickets does not — the two projections disagree`,
-        );
-      }
-      if ((state.deleted ?? null) !== null) {
+      // The third guard, and it is the SHARED one. Read AFTER `canSee` said yes,
+      // like the attachments list and the ledger beside it, so an invisible
+      // ticket and a deleted one are indistinguishable from outside — all three
+      // return the same `NOT_FOUND_BODY` and nothing else.
+      //
+      // ⚠ **THIS ROUTE HAND-ROLLED IT FIRST, AND THE FOLD REPLACED THAT.** It
+      // read the folded `deleted` flag off `getTicketStateFromDb`, which is the
+      // DETAIL route's mechanism. Between this branch's cut and its fold,
+      // executor 1 shipped `read/live-ticket.ts` — the route-level application
+      // of `LIVE_TICKET_WHERE`, whose own docblock names the two mechanisms and
+      // argues that the constant's spelling keeps the sites enumerable by the
+      // sweep its grep publishes. A second spelling of one rule at the routes is
+      // exactly what that module was written to prevent, so this door now rides
+      // it, and the divergence it names is worth knowing here: a ticket
+      // `proj_visibility` holds with no `proj_tickets` row THROWS at the detail
+      // route and answers 404 at this one — which is what the attachments list
+      // does too, because the two are the same kind of read.
+      if (!(await ticketIsLive(deps.pool, workspaceId, ticketId))) {
         return reply.code(404).send(NOT_FOUND_BODY);
       }
 
