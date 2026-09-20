@@ -7,6 +7,7 @@ import { EMBEDDABLE_IMAGE_MIME, newUlid } from '@gisik-nokma/domain';
 import type { Auth } from '../auth/auth.js';
 import { makeRequireSession } from '../auth/require-session.js';
 import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
+import { ticketIsLive } from '../read/live-ticket.js';
 import { getAttachment, insertAttachment } from '../attachments/attachment-repo.js';
 import { sha256Hex } from '../attachments/content-hash.js';
 import { sanitizeFilename } from '../attachments/filename.js';
@@ -142,8 +143,9 @@ function discardUnreadFile(file: Readable): void {
  *   3. no `file` part → 400
  *   4. no usable `ticketId` field (absent, or truncated by `fieldSize`) → 400
  *   5. ticket not visible, or not there → 404
- *   6. file over `maxBytes` → 413
- *   7. bytes not an accepted type → 415
+ *   6. ticket SOFT-DELETED → 404, the SAME body as step 5 (added 2026-09-20)
+ *   7. file over `maxBytes` → 413
+ *   8. bytes not an accepted type → 415
  *
  * Steps 2–4 are listed because they DO precede the visibility 404 and an
  * earlier version of this note left them out, which made the order look like a
@@ -152,15 +154,30 @@ function discardUnreadFile(file: Readable): void {
  * a field or looked up, so the answer is identical for a ticket that exists,
  * one that does not, and one the caller may not see.
  *
- * Step 5 before steps 6 and 7 is the part that matters and must stay: if size
- * or sniff ran first, a guest could learn which ticket ids exist by uploading
- * rubbish to each and reading 415 (ticket real, file bad) against 404 (ticket
- * not theirs). The oracle would be the refusal they got, not the one they were
- * meant to get. A refactor that reorders these lines re-opens that channel, and
- * `attachments-upload.test.ts` compares a guest's answer to a nonexistent
- * ticket's answer field by field to catch it, and separately sends an invisible
- * ticket a body that is over-size AND unsniffable so both of steps 6 and 7 are
- * pinned behind step 5 rather than only the one.
+ * ⚠ **Step 6 is a SECOND, DISTINCT 404 reason and was missing from this list
+ * until 2026-09-20** — the tombstone guard, added after step 5 rather than
+ * folded into it because it is a different question (`canSee` is visibility and
+ * does not mean "not deleted"). It sits BELOW step 5 on purpose: a caller who
+ * may not see the ticket must get step 5's answer whether or not the ticket is
+ * also deleted, or the deleted-ness would be an inference they were never owed.
+ * It is above steps 7 and 8 for the same reason step 5 is: a deleted ticket
+ * must not become detectable by uploading rubbish to it.
+ *
+ * Steps 5 and 6 before steps 7 and 8 is the part that matters and must stay: if
+ * size or sniff ran first, a guest could learn which ticket ids exist by
+ * uploading rubbish to each and reading 415 (ticket real, file bad) against 404
+ * (ticket not theirs). The oracle would be the refusal they got, not the one
+ * they were meant to get. A refactor that reorders these lines re-opens that
+ * channel, and `attachments-upload.test.ts` compares a guest's answer to a
+ * nonexistent ticket's answer field by field to catch it, and separately sends
+ * an invisible ticket a body that is over-size AND unsniffable so both of steps
+ * 7 and 8 are pinned behind step 5 rather than only the one.
+ *
+ * ⚠ **The renumbering is the 2026-09-20 addition's second effect and it is
+ * stated because a reader comparing this list to an older copy will find the
+ * numbers moved.** What did NOT move is the property: the tombstone 404 sits
+ * beside the visibility 404 in the same band, above every refusal that is
+ * decided on the BYTES.
  *
  * ## HTTP-Origin on this route: no, and by decision rather than by omission
  *
@@ -358,6 +375,21 @@ export async function registerAttachmentRoutes(
       return replyNotFound(reply);
     }
 
+    // A TOMBSTONED ticket takes no new files, and this is the door where the
+    // refusal matters most: the read doors DISCLOSE, this one lets content
+    // ACCRETE onto a ticket the product has removed from every view. `canSee`
+    // above cannot answer it — the visibility predicate deliberately does not
+    // mean "not deleted" (`read/visible-where.ts`) — so the rule is asked
+    // separately, in its one spelling.
+    //
+    // `discardUnreadFile` runs on this path for the same reason as the refusal
+    // above it: the multipart file stream must be drained or destroyed before a
+    // handler returns, or the request is left holding a part nobody reads.
+    if (!(await ticketIsLive(deps.pool, visibility.workspaceId, ticketId))) {
+      discardUnreadFile(data.file);
+      return replyNotFound(reply);
+    }
+
     const read = await readAtMost(data.file, maxBytes);
     if (!read.ok) {
       return reply.code(413).send({ error: 'payload-too-large', reason: read.reason });
@@ -426,17 +458,25 @@ export async function registerAttachmentRoutes(
    * unchanged (this lookup costs one query more than the nonexistent-id path,
    * same direction, same "recorded not fixed" status).
    *
-   * Three cases collapse into it:
+   * FOUR cases collapse into it:
    *
    *   (a) the row exists but its ticket is invisible to this viewer — `canSee`
    *       returns false;
    *   (b) the id names no row at all — `getAttachment` returns null;
    *   (c) the row exists, `canSee` passes, but the OBJECT is gone from the
-   *       store — `store.getStream` throws `ObjectNotFoundError`.
+   *       store — `store.getStream` throws `ObjectNotFoundError`;
+   *   (d) the row exists and `canSee` passes, but its TICKET is soft-deleted —
+   *       `ticketIsLive` returns false. This is the case the door was missing
+   *       until 2026-09-20, and it is the sharpest of the four: what leaves is
+   *       the file itself, so a 200 here is not a hint of a leak but the whole
+   *       content, on a ticket whose own detail route already answers 404.
    *
-   * (a) and (b) are the visibility property this whole plan enforces and must
-   * be indistinguishable by construction: both reach `replyNotFound` having
-   * added nothing case-specific to the response.
+   * (a), (b) and (d) must be indistinguishable by construction: all three reach
+   * `replyNotFound` having added nothing case-specific to the response. (d) is
+   * the ticket's rule and not this row's — the lookup resolves through
+   * `row.ticketId` — which is why it is asked here at all: an attachment id is
+   * addressed on its own, so a caller holding a URL from before the delete
+   * never passes a ticket-scoped route.
    *
    * (c) is NOT a visibility refusal — a caller who can see the ticket asking
    * for a real attachment id has done nothing wrong; the product has simply
@@ -478,12 +518,31 @@ export async function registerAttachmentRoutes(
    * this handler itself only ever adds after `getStream` succeeds, so those
    * two are the ones the suite asserts are entirely absent on every 404 —
    * explicitly, for all three cases (a), (b) and (c).
+   *
+   * ⚠ **That assertion is a reading of the ROUTE-ISOLATED app, and it does not
+   * hold of the assembled one** — measured 2026-09-20 while adding case (d).
+   * `http/security-headers.ts:51` sets `x-content-type-options: nosniff` on
+   * EVERY response the shipped app makes, so in a test built on
+   * `buildTestApp` that header is present on this door's 404 too and says
+   * nothing about this handler. `content-disposition` is the one header whose
+   * absence is evidence about the handler in either environment. A gate result
+   * is not evidence unless it names its environment — the same rule this repo
+   * applies to the Node version.
    */
   app.get('/v1/attachments/:id', { preHandler: requireSession }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const row = await getAttachment(deps.pool, id);
     if (!row) return replyNotFound(reply);
     if (!(await canSee(deps.pool, request.currentUserId, row.ticketId))) {
+      return replyNotFound(reply);
+    }
+    // The ticket this attachment belongs to is ASKED FOR BY ID — a caller who
+    // already holds a URL from before the delete reaches this door without
+    // passing any ticket-scoped route — so the guard has to be asked here as
+    // well as at the list door. It IS the ticket's rule: the lookup resolves
+    // through `row.ticketId`, and the tombstone makes the bytes leave nothing,
+    // exactly as the ticket's own detail route refuses its name.
+    if (!(await ticketIsLive(deps.pool, row.workspaceId, row.ticketId))) {
       return replyNotFound(reply);
     }
 
