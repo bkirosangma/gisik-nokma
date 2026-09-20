@@ -642,7 +642,8 @@ you arrange — drag a row, or use the **Move up** and **Move down** buttons on 
 **Start** button that moves that job into its workflow.
 
 It does not leave closed jobs out, unlike the Calendar and the Timeline below. When it is empty it says
-so: *"Nothing in the backlog — new tickets land here."*
+so: *"Nothing in the backlog — new tickets land here."* — or, when the only thing it would have listed
+was an epic, *"Nothing in the backlog — epics appear in the List."*
 
 ### Board
 
@@ -660,9 +661,13 @@ as a waiting or blocked one — "Waiting on parts", "Waiting on customer". Every
 in that state by definition. There is no switch you flip on an individual job to say it is stuck; you
 need a stage built for it.
 
-**If the board is empty** it says *"No tickets here yet — create one."* Note the exact wording: it says
-"no tickets", not "no columns", because the product genuinely cannot tell "there is no work here" from
-"none of it is visible to you", and that sentence is true of both.
+**If the board is empty** it says **which** emptiness it is. A project with no tickets at all gets
+*"No tickets here yet — create one."* A project whose only tickets are epics gets *"No tickets in this
+view — epics appear in the List."* — an epic is real work that this view does not draw, so "create one"
+would name the wrong remedy and the List is where it lives.
+
+Those two are the cases the board can tell apart, and it tells them apart exactly. It still cannot say
+*why else* a board might be empty to you: the wording is "no tickets", not "no columns".
 
 If you are a member of the workspace but not on that project, an empty board is the correct answer,
 not an error.
@@ -716,7 +721,8 @@ hidden. *Everything* on the Closed control is not a third way back, because *eve
 touched it* are the same setting here; that is why the chip exists at all.
 
 **If the calendar looks empty**, the sentence NAMES what can hide a claim: your filter, closed jobs being
-hidden, or a date field you switched off in the legend. It goes on to say *"Undated work is absent, not
+hidden, a date field you switched off in the legend, or an epic, which is drawn in the List and not here.
+It goes on to say *"Undated work is absent, not
 estimated"* — the calendar draws only what someone claimed, and an undated job is not estimated onto a day
 nobody gave it.
 

@@ -150,9 +150,15 @@ export type TicketListProps = {
    * `isNarrowed` one layer up in `board.tsx`), and this component cannot tell
    * the two apart — only a caller holding the narrowing context can. So the
    * List tab passes nothing and keeps its silence; the Backlog tab
-   * (`apps/web`'s project page) passes "Nothing in the backlog — new tickets
-   * land here." — a sentence that is TRUE of that tab specifically, not a
-   * generic one this component would have had to invent.
+   * (`apps/web`'s project page) passes one of TWO sentences — "Nothing in the
+   * backlog — new tickets land here." for a backlog holding nothing, and
+   * "Nothing in the backlog — epics appear in the List." when every row it
+   * would have drawn was an epic (owner ruling, 2026-09-20) — each TRUE of that
+   * tab specifically, not a generic one this component would have had to
+   * invent. ⚠ **The caller chooses BETWEEN them for the same reason, one cause
+   * further on**: this component is handed only the surviving rows, so an
+   * all-epic backlog and an empty one are the same input to it, exactly as
+   * "the project has none" and "a filter hid them all" are.
    */
   emptyCopy?: string;
   /**

@@ -138,6 +138,20 @@ const BUILTIN_TYPE_LADDER = BUILTIN_TICKET_TYPE_SEEDS.map((seed) => ({
 export const BUILTIN_LADDER_NOTICE =
   'Showing the four built-in ticket types while this workspace’s own types load.';
 
+/**
+ * THE BACKLOG'S TWO EMPTY SENTENCES (owner ruling, 2026-09-20), hoisted out of the JSX
+ * so the page spec can assert the same strings the tab renders rather than re-typing
+ * them — the discipline `EMPTY_BOARD_COPY`'s own docblock gives, and the reason
+ * `packages/app-core/src/index.ts` re-exports the board's pair.
+ *
+ * `BACKLOG_EMPTY_COPY` is the original and is UNCHANGED: it is true of a backlog with
+ * nothing in it, and nothing about the epic ruling made it false there.
+ * `BACKLOG_EMPTY_EPICS_COPY` is the new one and is reached ONLY when every row the
+ * tab would have drawn was an epic — see `backlogNarrowing`'s `epicsOnly`.
+ */
+export const BACKLOG_EMPTY_COPY = 'Nothing in the backlog — new tickets land here.';
+export const BACKLOG_EMPTY_EPICS_COPY = 'Nothing in the backlog — epics appear in the List.';
+
 function ProjectBoard() {
   const router = useRouter();
   const params = useParams<{ workspaceId: string; projectId: string }>();
@@ -912,12 +926,15 @@ function ProjectBoard() {
    * the honest drawing of "the parent row is not here"; inventing a phantom
    * depth for an undrawn row would indent under nothing.
    *
-   * ⚠ **THE RESIDUAL, RECORDED AND NOT FIXED.** A backlog holding only epics
-   * now reaches this memo's empty answer, and `TicketList` renders
-   * *"Nothing in the backlog — new tickets land here."* over a backlog that
-   * holds one. Naming it would be new user-facing copy, which is the owner's —
-   * see case 13.1044, owner: the owner, by way of whoever next owns this tab's
-   * empty state.
+   * ✅ **THE RESIDUAL IS CLOSED (owner ruling, 2026-09-20).** It used to be that a
+   * backlog holding only epics reached this memo's empty answer and `TicketList`
+   * rendered *"Nothing in the backlog — new tickets land here."* over a backlog
+   * that holds one — a claim about the backlog SET that denied a member of it.
+   * `epicsOnly` below is the fact this memo is the only place to compute: it is
+   * `true` exactly when there WERE rows here and every one was an epic, and the
+   * render site picks `BACKLOG_EMPTY_EPICS_COPY` on it. **A backlog emptied by
+   * anything else keeps the original sentence, and case 13.1044 asserts both
+   * arms** — one sentence for both would be false of one of them.
    *
    * RECORDED, NOT FIXED: "Only tickets in progress" sets `stateCategories:
    * ['active']` SERVER-SIDE (`listFilter`, above `useTicketList`) — a
@@ -932,13 +949,18 @@ function ProjectBoard() {
    */
   const backlogNarrowing = useMemo(() => {
     if (list.rows === null || listNarrowing === null) return null;
-    const rows = listNarrowing.rows.filter(
-      (row) => row.stateId === BACKLOG_STATE_ID && row.typeRank !== EPIC_RANK,
-    );
+    /**
+     * `inBacklog` is the set BEFORE this fold's epic drop and AFTER the tab's upstream
+     * filter — the only instant at which "there were rows here, and every one of them
+     * was an epic" is knowable. `TicketList` cannot tell the two empty backlogs apart
+     * (it sees only the array it is handed), so the sentence is chosen here.
+     */
+    const inBacklog = listNarrowing.rows.filter((row) => row.stateId === BACKLOG_STATE_ID);
+    const rows = inBacklog.filter((row) => row.typeRank !== EPIC_RANK);
     const total = list.rows.filter(
       (row) => row.stateId === BACKLOG_STATE_ID && row.typeRank !== EPIC_RANK,
     ).length;
-    return { rows, shown: rows.length, total };
+    return { rows, shown: rows.length, total, epicsOnly: rows.length === 0 && inBacklog.length > 0 };
   }, [list.rows, listNarrowing]);
 
   /**
@@ -1289,15 +1311,17 @@ function ProjectBoard() {
    * buys: with the epic out of both terms, `N of M shown` is a claim about what
    * this view draws, which is the property §4 of the dispatch names.
    *
-   * ⚠ **THE RESIDUAL, RECORDED AND NOT FIXED.** A board whose only non-closed
-   * tickets are epics now reaches `total === 0 && shown === 0`, so `Board`
-   * renders `EMPTY_BOARD_COPY` — *"No tickets here yet — create one."* — over a
-   * project that holds an epic. The truthful sentence would be new user-facing
-   * copy, which is the owner's to write (*"the message should name the filter"*
-   * was itself an owner ruling, and Addendum 2's *"an absence must say which
-   * absence it is"* is the same rule); it is recorded rather than invented.
-   * See case 13.1043, owner: the owner, by way of whoever next owns the board's
-   * empty states.
+   * ✅ **THE RESIDUAL IS CLOSED (owner ruling, 2026-09-20).** It used to be that a
+   * board whose only non-closed tickets are epics reached `total === 0 && shown
+   * === 0`, so `Board` rendered `EMPTY_BOARD_COPY` — *"No tickets here yet —
+   * create one."* — over a project that holds an epic. `epicsDropped` below is
+   * the fact this fold is the only place to compute, and the render site turns
+   * it into `EMPTY_BOARD_EPICS_COPY`, which names the cause and where the work
+   * went. **A project with no tickets at all keeps the original sentence** — the
+   * ruling is about empty views emptied BY THIS RULE, not about empty projects —
+   * and case 13.1043 asserts both arms, because the two are the SAME state here
+   * (see `Board`'s own `epicsHidden` docblock) and one sentence would be false
+   * of one of them.
    *
    * ⚠ **AND THE PREDICATE HAS A TRANSIENT, WHICH IS THE SAFE DIRECTION.** The
    * roster read is in flight on first paint, so `isEpicType` is `undefined` and
@@ -1336,23 +1360,57 @@ function ProjectBoard() {
     const isEpic = isEpicType ?? isBuiltinEpicType;
     let total = 0;
     let shown = 0;
+    /**
+     * THE EPIC RULE'S OWN CONSEQUENCE, COUNTED — because the view cannot recover it.
+     *
+     * `Board` is handed the NARROWED view, so by then a card this pass removed is
+     * indistinguishable from a card that was never there; and `isNarrowed` cannot carry
+     * it either, because `#602` deliberately does not call the epic drop a narrowing
+     * ("a permanently-false narrowing claim is worse than the residual it buys"). This
+     * fold is the only place both sets exist at once, so the two sentences the owner
+     * asked for (`EMPTY_BOARD_COPY` for a project that is simply empty,
+     * `EMPTY_BOARD_EPICS_COPY` for one whose only work this view refuses to draw) are
+     * chosen here and passed down as booleans.
+     *
+     * ⚠ `epicsDropped > 0` IS SUFFICIENT AT THE BOARD LEVEL ONLY BECAUSE THE BANNER
+     * ALREADY REQUIRES `totalCards === 0 && isNarrowed !== true`: with nothing drawn and
+     * no narrowing in force, a dropped epic is the entire explanation. It is NOT
+     * sufficient on its own and is not used on its own.
+     */
+    let epicsDropped = 0;
     const groups = board.data.groups.flatMap((group) => {
       const keepGroup =
         resolvedWorkflowFilter === 'all' || group.workflowId === resolvedWorkflowFilter;
-      const columns = group.columns.map((column) => ({
-        ...column,
-        cards: column.cards.filter((card) => {
+      const columns = group.columns.map((column) => {
+        let epicsInColumn = 0;
+        let droppedOtherwise = 0;
+        const cards = column.cards.filter((card) => {
           // Before `total`: see "not counted in `total` either" above.
-          if (isEpic(card.typeId)) return false;
+          if (isEpic(card.typeId)) {
+            epicsInColumn += 1;
+            return false;
+          }
           total += 1;
           const keep = keepGroup && matchesBoardCard(card, column, projectId, boardFilter);
           if (keep) shown += 1;
+          else droppedOtherwise += 1;
           return keep;
-        }),
-      }));
+        });
+        epicsDropped += epicsInColumn;
+        return {
+          ...column,
+          cards,
+          // STRICTER THAN THE BOARD'S, DELIBERATELY: a column also empties under the
+          // card filter, which this view cannot disclose (`EMPTY_COLUMN_COPY`'s own
+          // docblock), so the epic sentence is reached only when NOTHING else was
+          // removed from this column — otherwise "an epic is why this is empty" would
+          // be a half-truth over a column a filter also emptied.
+          epicsHidden: epicsInColumn > 0 && droppedOtherwise === 0 && cards.length === 0,
+        };
+      });
       return keepGroup ? [{ ...group, columns }] : [];
     });
-    return { view: { ...board.data, groups }, shown, total };
+    return { view: { ...board.data, groups }, shown, total, epicsDropped };
   }, [board.data, boardFilter, resolvedWorkflowFilter, projectId, isEpicType]);
 
   /**
@@ -2395,6 +2453,15 @@ function ProjectBoard() {
                   onOpenTicket={openTicket}
                   isNarrowed={boardNarrowing.shown !== boardNarrowing.total}
                   /*
+                    WHICH OF THE TWO EMPTY SENTENCES (owner ruling, 2026-09-20). True
+                    only when the epic rule removed cards — the fold above counts them,
+                    and nothing else here can: `Board` receives the narrowed view, and
+                    `isNarrowed` is false for an all-epic board BY DESIGN (#602 does not
+                    call the epic drop a narrowing). A project that is simply empty
+                    passes `false` and keeps "No tickets here yet — create one."
+                  */
+                  epicsHidden={boardNarrowing.epicsDropped > 0}
+                  /*
                     THE MOVE ARROWS' CAPABILITY (board-prototype-port Task
                     13). Gated on `session.kind === 'signed-in'`, the SAME
                     precedent `createRegion` above already sets for
@@ -2487,7 +2554,19 @@ function ProjectBoard() {
                     prefsEditable={list.canSetPrefs}
                     labels={labels}
                     onOpenTicket={openTicket}
-                    emptyCopy="Nothing in the backlog — new tickets land here."
+                    emptyCopy={
+                      /*
+                        THE SAME TWO CASES AS THE BOARD, one tab over (owner ruling,
+                        2026-09-20). `TicketList` is handed only the surviving rows, so
+                        it cannot tell a backlog that holds nothing from one whose only
+                        tickets are epics — the fold above answers it where both sets
+                        exist. A backlog emptied by anything else keeps the original
+                        sentence, which was written to be true of that.
+                      */
+                      backlogNarrowing.epicsOnly
+                        ? BACKLOG_EMPTY_EPICS_COPY
+                        : BACKLOG_EMPTY_COPY
+                    }
                     /*
                       THE START CAPABILITY, gated on `session.kind ===
                       'signed-in'` — the same precedent `createRegion` and the

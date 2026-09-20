@@ -120,7 +120,7 @@ export function contradictionCopy(start: AttributedDate, due: AttributedDate): s
  * copy"*), so this arm is now the one that has to be honest about all of them.
  */
 export const CALENDAR_EMPTY_MONTH_COPY =
-  'No claimed dates are drawn in this month. Undated work is absent, not estimated — the calendar draws only what someone claimed. If a claim is here and not drawn, a narrowing kept it off this grid without dropping it: your filter, closed jobs being hidden, or a field you switched off in the legend.';
+  'No claimed dates are drawn in this month. Undated work is absent, not estimated — the calendar draws only what someone claimed. If a claim is here and not drawn, a narrowing kept it off this grid without dropping it: your filter, closed jobs being hidden, a field you switched off in the legend, or an epic, which is drawn in the List and not here.';
 
 /**
  * The SECOND empty month, and it is a different fact.
@@ -231,7 +231,7 @@ export const TIMELINE_SIDE_LIST_UNDRAWABLE_COPY =
  * `timeline-view.test.tsx`'s "names only controls the TIMELINE has".
  */
 export const TIMELINE_EMPTY_COPY =
-  'No claimed dates are here to draw. Undated work is absent, not estimated — the timeline draws only the periods someone claimed. If a claim is here and not drawn, a narrowing kept it off these weeks without dropping it: your filter, or closed jobs being hidden.';
+  'No claimed dates are here to draw. Undated work is absent, not estimated — the timeline draws only the periods someone claimed. If a claim is here and not drawn, a narrowing kept it off these weeks without dropping it: your filter, closed jobs being hidden, or an epic, which is drawn in the List and not here.';
 
 /**
  * The THIRD empty timeline, and the ONE case the component cannot reconstruct

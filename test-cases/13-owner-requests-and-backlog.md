@@ -2182,8 +2182,9 @@ question. All three read as green.
 
 ## An epic is a row in the List and nowhere else (owner, 2026-09-20)
 
-Block `13.1034`–`13.1049` is this executor's for this work; `13.1046`–`13.1049` are reserved and
-deliberately unused. Suite: `packages/app-core/test/calendar/calendar-model.test.ts`,
+Block `13.1034`–`13.1049` is this executor's for this work; `13.1047`–`13.1049` are reserved and
+deliberately unused. **`13.1046` was minted on the controller's instruction (2026-09-20)** — see that case
+for why the count of empty-state residuals is four and not the three the dispatch assumed. Suite: `packages/app-core/test/calendar/calendar-model.test.ts`,
 `packages/app-core/test/timeline/timeline-model.test.ts`,
 `apps/web/test/epics-not-rows.test.tsx`. All under Node v22.22.2.
 
@@ -2228,13 +2229,39 @@ as a narrowing, which keeps `CALENDAR_ALL_HIDDEN_COPY` gated off.
   asserted FIRST so the negative is about the epic and not about a month that drew nothing.
 - **13.1042** ✅ On the page, the Timeline omits the epic's row and keeps its lane heading, asserted by
   ROLE (`h3`) so a row carrying the same string cannot satisfy it.
-- **13.1043** ✅ RECORDED, NOT FIXED — a Board whose only non-closed tickets are epics now reaches
-  `EMPTY_BOARD_COPY` over a project holding one. Owner: the owner, by way of whoever next owns the board's
-  empty states.
-- **13.1044** ✅ RECORDED, NOT FIXED — the same for the Backlog's own empty copy.
-- **13.1045** ❌ RECORDED, NOT FIXED — a calendar month or timeline window emptied only by this rule
-  reaches a sentence whose list of causes does not name it. Owner: the owner, by way of whoever next owns
-  those empty states. No test: the honest sentence would be new user-facing copy, and copy is the owner's.
+**ALL FOUR ARE NOW CLOSED (owner ruling applied 2026-09-20).** The ruling's shape is *"name this cause, and
+say where the epic lives"*, and — on the controller's reading (b) — **each sentence takes the new wording
+ONLY when an epic is the reason the view is empty**, keeping its own sentence otherwise. The second half is
+not decoration: an all-epic view and a genuinely empty one are the **same state** at all three literal sites,
+so one sentence for both would be false of one of them. **Every case below therefore carries a CONTROL arm.**
+
+- **13.1043** ✅ CLOSED — an all-epic Board says *"No tickets in this view — epics appear in the List."*
+  (`EMPTY_BOARD_EPICS_COPY`); **a genuinely empty project keeps `EMPTY_BOARD_COPY`, unchanged.** The
+  distinction arrives as a PROP, because the component cannot derive it: the epic is dropped before `total`
+  increments and `isNarrowed` is deliberately false here, so both cases reach the banner identically.
+  `apps/web/test/epics-not-rows.test.tsx`.
+- **13.1044** ✅ CLOSED — the all-epic Backlog says *"Nothing in the backlog — epics appear in the List."*; an
+  empty backlog keeps the original. Chosen by the **page**, not by `TicketList`, which sees only the
+  surviving rows; `backlogNarrowing` is the one place both sets exist.
+- **13.1045** ✅ CLOSED — the calendar's and the timeline's cause-lists **gain the cause** rather than being
+  replaced: *"…your filter, closed jobs being hidden, a field you switched off in the legend, or an epic,
+  which is drawn in the List and not here."* Amended in place because both sentences already name a SET of
+  narrowings and their clause is **conditional** — which is what lets a fourth cause ride along without
+  claiming this month has one. Witnessed by `claim-labels.test.ts` 11.1 (the exact sentence) plus the model
+  suites. The same treatment reaches the two shipped help documents (see below).
+- **13.1046** ✅ CLOSED — a board COLUMN whose only ticket is an epic says *"No tickets in this column —
+  epics appear in the List."* (`EMPTY_COLUMN_EPICS_COPY`); a genuinely empty column keeps
+  `EMPTY_COLUMN_COPY`. ⚠ **Stricter than the board's gate on purpose**: the column takes the new sentence
+  only when NOTHING ELSE was removed from it, because a column can also be emptied by the card filter, which
+  this view cannot disclose — and *"an epic is why this is empty"* would be a half-truth there.
+  ⚠ **Minted on the controller's instruction** after this executor measured the site and asked rather than
+  assuming §6's "delta ZERO" covered the whole set — `#602` minted nothing for it.
+- **The shipped help moves too, and it is easy to miss.** `docs/faq.md` and `docs/manual.md` carry the
+  calendar's cause-list **as prose**, and the manual additionally quotes the Board's and the Backlog's empty
+  sentences. `scripts/help-content.mjs` generates both into `content.generated.ts`, which `check:help` gates.
+  ⚠ **`docs/manual.md` also carried a justification the ruling had already falsified** — *"the product
+  genuinely cannot tell 'there is no work here' from 'none of it is visible to you'"* — corrected in the same
+  change set; the board **can** tell, which is why these cases exist at all.
 
 ⚠ **THE MUTATION BATTERY IS THE EVIDENCE, AND IT FOUND THREE THINGS.** Eight mutations, one per view plus
 one that isolates each fold's count term; each reddens its OWN view's cases and no other's. **M3 survived

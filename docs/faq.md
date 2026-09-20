@@ -560,9 +560,9 @@ The way out is the "Only tickets in progress" switch, which is deliberately plac
 still reach it from the refusing screen. The Board keeps working throughout.
 
 **My calendar is empty. Is it broken?**
-The sentence names what can hide a claim: your filter, closed jobs being hidden, or a date field you
-switched off with the legend switch. It also says "Undated work is absent, not estimated" — the calendar
-draws only what someone claimed. When a date field you switched off is hiding claims here, a different
+The sentence names what can hide a claim: your filter, closed jobs being hidden, a date field you
+switched off with the legend switch, or an epic, which is drawn in the List and not here. It also says
+"Undated work is absent, not estimated" — the calendar draws only what someone claimed. When a date field you switched off is hiding claims here, a different
 sentence says so, and it claims **ALL** of the month's claims — so treat that one carefully: the calendar
 only knows about the claims it was given, and closed or filtered-away jobs are not among them. The count
 in the strip tells you what the filters left behind; it cannot see the legend switches, which live only
