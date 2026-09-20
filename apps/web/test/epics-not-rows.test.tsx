@@ -286,6 +286,16 @@ describe('13.1039 the Backlog loses the epic ROW and keeps the epic SECTION HEAD
     expect(screen.queryByTestId('ticket-card-epic_1')).not.toBeInTheDocument();
     expect(screen.getByTestId('ticket-card-child_1')).toBeInTheDocument();
     expect(screen.getByText('A child of the epic')).toBeInTheDocument();
+
+    /*
+      AND THE "of M" MOVES TOO, asserted literally because a mutation that left
+      the epic in `total` SURVIVED the rest of this case: the row was gone, the
+      header was there, the child was there, and the strip printed `1 of 2
+      shown` over a backlog with no filter in force. `shown === total` is what
+      keeps that strip off the screen at all.
+    */
+    expect(screen.queryByText('1 of 2 shown')).not.toBeInTheDocument();
+    expect(screen.queryByText(/of \d+ shown/)).not.toBeInTheDocument();
   });
 
   /**
