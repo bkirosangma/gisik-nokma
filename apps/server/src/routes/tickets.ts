@@ -2,6 +2,7 @@ import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import type { TicketRollup, TicketState } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { getTicketStateFromDb } from '../projections/tickets.js';
+import { ticketIsLive } from '../read/live-ticket.js';
 import { stateProvenanceFor } from '../read/state-provenance.js';
 import { assignedProvenanceFor } from '../read/assigned-provenance.js';
 import { listTicketAttachments } from '../attachments/attachment-repo.js';
@@ -546,18 +547,34 @@ export function registerTicketRoutes(
    *
    * ## The predicate is the one the door above uses, and there is exactly one
    *
-   * Same two guards, same order, same body: `loadTicketRow` → 404, then `canSee`
-   * → 404. That is deliberate rather than convenient — "may this caller see this
-   * ticket" is asked in exactly one place (`../visibility/can-see.ts:227`), and a
-   * second, weaker answer to it is this project's signature failure. The
-   * `:workspaceId` segment is checked by `loadTicketRow` for the reason that
-   * function's own docblock gives: `canSee` resolves the viewer's role in the
-   * workspace the TICKET's row names, "which leaves the URL free to lie".
+   * Same guards, same order, same body: `loadTicketRow` → 404, then `canSee`
+   * → 404, and — since the soft-delete change — `ticketIsLive` → 404, which is
+   * the THIRD guard the DETAIL route carries and this pair did not. That is
+   * deliberate rather than convenient — "may this caller see this ticket" is
+   * asked in exactly one place (`../visibility/can-see.ts:227`), and a second,
+   * weaker answer to it is this project's signature failure. The deletion
+   * question is a DIFFERENT one and is asked in its own one place
+   * (`../read/live-ticket.ts`), because folding it into `canSee` would break
+   * that predicate's cross-check and its callers — see `visible-where.ts`.
    *
-   * `ticket-attachments.test.ts` holds the two doors to AGREEMENT (case 16.52)
+   * ⚠ **The ORDER of the first two is a copy, not a measurement** — recorded
+   * because a reader would otherwise take "in the same order" for a witnessed
+   * property; the note below is the review that could not falsify it. The third
+   * guard is placed AFTER both for the reason that note gives: its refusal must
+   * be indistinguishable from theirs, and it is by construction, since all
+   * three return the same `NOT_FOUND_BODY`. ⚠ It is a THIRD query on a request
+   * that already made two; if the order ever matters for cost rather than for
+   * answers, this is the line to move, and `ticketIsLive`'s own docblock says
+   * why it is a separate read rather than a field off the state the detail
+   * route already holds.
+   *
+   * `ticket-attachments.test.ts` holds the doors to AGREEMENT (case 16.52)
    * rather than asserting the sameness in prose: an unseen ticket and a
    * nonexistent one get the same status and the same bytes from both doors,
    * behind a positive control that both answer for a ticket the caller may see.
+   * The tombstoned arm is case 16.96 in
+   * `test/integration/soft-deleted-attachments.test.ts`, which also pins the
+   * HISTORY doors' deliberate exception.
    *
    * ⚠ **And the ORDER is a copy, not a measurement — recorded because a reader
    * would otherwise take "in the same order" for a witnessed property.**
@@ -619,7 +636,7 @@ export function registerTicketRoutes(
    * ## Empty is a 200, and that is load-bearing
    *
    * A visible ticket with no attachments answers `{attachments: []}`; only the
-   * two guards answer 404. `AttachmentList` returns `null` on an empty list —
+   * guards answer 404. `AttachmentList` returns `null` on an empty list —
    * *"must not promise there are none"* — so the one answer this door must never
    * give is `[]` for a ticket the caller may not see: that is precisely the
    * drawn absence the component's own docblock refuses to make. Case 16.49 pins
@@ -630,12 +647,27 @@ export function registerTicketRoutes(
     { preHandler: requireSession },
     async (request, reply) => {
       const { workspaceId, ticketId } = request.params;
-      // The same two guards, in the same order, answering the same body — the
-      // ledger above and the files here are one question about one ticket.
+      // The same two guards, in the same order, answering the same body.
       if ((await loadTicketRow(deps.pool, workspaceId, ticketId)) === undefined) {
         return reply.code(404).send(NOT_FOUND_BODY);
       }
       if (!(await canSee(deps.pool, request.currentUserId, ticketId))) {
+        return reply.code(404).send(NOT_FOUND_BODY);
+      }
+      // …and the THIRD, which the DETAIL route above carries and this pair did
+      // not. `canSee` is the visibility predicate and does not mean "not
+      // deleted" — `read/visible-where.ts` says so in its own words — so until
+      // this landed a tombstoned ticket kept serving its file list while the
+      // ticket itself answered 404: a ticket absent from every view and
+      // reachable at its URL, which is the half-state the detail route's
+      // docblock refuses by name.
+      //
+      // `ticketIsLive` is `LIVE_TICKET_WHERE` asked at a route, and NOT a
+      // widened `canSee`: folding deletion into the visibility predicate breaks
+      // the `canSeeResolved` cross-check AND makes `listVisibleTickets` — whose
+      // SELECT has no `proj_tickets` in its FROM — a runtime "missing FROM-clause
+      // entry". `read/live-ticket.ts` carries both reasons.
+      if (!(await ticketIsLive(deps.pool, workspaceId, ticketId))) {
         return reply.code(404).send(NOT_FOUND_BODY);
       }
 
