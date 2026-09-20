@@ -66,7 +66,16 @@ import {
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const UI_CSS_PATH = resolve(TEST_DIR, '../../../packages/ui/src/ui.css');
 
-/** The two suites that consume the split. Both are off every gate; see above. */
+/**
+ * The two suites that consume the split.
+ *
+ * ⚠ CORRECTED 2026-09-20: this read *"Both are off every gate; see above."* The
+ * signed-out one is on CI's `gate` as of case 16.59 — see the note at the head of
+ * this file. **The `see above` was the damaging part**: it made a stale sentence
+ * read as though it had already been reconciled with the correction sitting a few
+ * lines from it, which is why an independent review found this and the sweep that
+ * made the correction did not.
+ */
 const SPEC_PATHS: Record<string, string> = {
   'e2e-viewport/responsive.spec.ts': resolve(TEST_DIR, '../e2e-viewport/responsive.spec.ts'),
   'e2e-stack/viewport.spec.ts': resolve(TEST_DIR, '../e2e-stack/viewport.spec.ts'),
@@ -103,7 +112,9 @@ describe('tap-target density — case 13.990', () => {
      * dispatched to avoid is "one global constant changed to 24", which would
      * silently absolve every standalone control the owner kept at 44. That
      * failure has to edit exactly this constant to happen, so it reddens here
-     * by name rather than somewhere inside a browser suite no gate runs.
+     * by name rather than somewhere inside a browser suite — which, as of case
+     * 16.59, IS on CI's gate, and still needs a browser and a `next dev` to say
+     * anything. This file is what a plain `vitest` run can hold without either.
      */
     expect(DENSE_FLOOR_PX).toBe(24);
     expect(STANDALONE_FLOOR_PX).toBe(44);

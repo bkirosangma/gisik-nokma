@@ -5,17 +5,28 @@
 - **Branch `exec2/viewport-on-gate`**, cut from `origin/main` = **`6db8b6b8`** (the dispatch's own `main`).
 - **FULLY FOLDED AND STILL SO: `git merge-base origin/main HEAD` equals `origin/main` exactly.** `origin/main`
   has not moved since the cut — re-checked with `/usr/bin/git`, not the proxy.
-- **Three commits** (see § 2). The PR is opened at this head; this file cannot carry its number because the
-  handoff must LAND before the PR opens. One call settles it: `gh pr list --state all --head exec2/viewport-on-gate`.
+- **The commit count and every count below are RECOUNTED IN § 2, and § 2 is the authority.** ⚠ An earlier
+  version of this bullet said "Three commits" while § 2 said four, on the same screen — an independent review
+  caught the contradiction, which is exactly the failure a restart cannot resolve on its own. **The window is
+  stated there too**, because the handoff commit itself moves both counts by one and a reader cannot otherwise
+  tell an unexpected push from this file's own landing.
+- The PR is opened at this head; this file cannot carry its number because the handoff must LAND before the PR
+  opens. One call settles it: `gh pr list --state all --head exec2/viewport-on-gate`.
 
 ### § 2 — ANCHORS, RECOUNTED AT THIS TREE (not carried forward)
 
+⚠ **THE WINDOW, because this file adds itself to its own figures.** Every row below is measured at the head
+**before this handoff commit** — `d2dd36da`, five commits ahead — except the two marked `▸ counts-as-of`. A
+restart that measures one more commit than the table says is seeing **this file's own landing**, not a foreign
+push; re-run `git log --oneline origin/main..HEAD` and match the subjects before concluding anything.
+
 | anchor | value |
 |---|---|
-| `git merge-base origin/main HEAD` | **`6db8b6b8` — equal to `origin/main`, 0 behind / 4 ahead** |
-| the four commits | `6a4da237` (the wiring) · `99b74635` (the floor split) · `e1716e9f` (the catalogue) · `d2dd36da` (the fix round) |
+| `git merge-base origin/main HEAD` | **`6db8b6b8` — equal to `origin/main`** |
+| ahead / behind `origin/main` | **5 ahead / 0 behind** ▸ counts-as-of `d2dd36da` (+1 for this handoff commit) |
+| the five commits | `6a4da237` (the wiring) · `99b74635` (the floor split) · `e1716e9f` (the catalogue) · `d2dd36da` (the fix round) · *the review round and this handoff follow* |
 | tree | clean |
-| changed files vs `origin/main` | **9** (+525 / −41) |
+| changed files vs `origin/main` | **10**, reviewed at `6a1fe8d5` ▸ counts-as-of; the review round then added `tap-targets.ts` and `test-cases/13-pre-launch-checklist.md`, so **recount rather than quote this** |
 | `check:case-ids` | **2569 unique ids at this head, 2567 at `origin/main`** — **delta exactly +2, the two minted**; highest **16.87 both sides** (so no id above my block leaked in) |
 | `check:citations` | rc 0 — `16-remaining-doors.md: 68 cited / 0 uncited / 68 total` |
 | `check:env` · `check:help` · `check:runbook` · `check:migrations` | rc 0 each |
@@ -36,7 +47,11 @@
    shape), and `LABEL_SELECTOR` is BUILT FROM the table. Case **16.60**.
 4. `Features.md` + `test-cases/16-remaining-doors.md` move in the same change set.
 
-### § 4 — THE MUTATION BATTERY: 5, EACH DECLARING ITS TARGET BEFORE IT RAN
+### § 4 — THE MUTATION BATTERY: **6**, EACH DECLARING ITS TARGET BEFORE IT RAN
+
+⚠ **This heading said `5` while the table below had six rows, and the commit subject said "five" too.** The
+count was written before the last row existed; an independent review caught it. **Count the rows, not this
+number.** Six: `M1`, `M2`, `M-A`, `M-B`, `M-C`, `M-gate`.
 
 | # | mutation | observed |
 |---|---|---|
@@ -55,8 +70,10 @@ committed BEFORE it ran** — `git checkout --` on an uncommitted tree destroys 
 **Not new, and I am not claiming it is** — `controller-state.md:4600` records the owner waiver for the Actions
 billing block. I am recording the MEASUREMENT because it decides how the wiring above can be proven:
 
-- **200 CI runs since 2026-09-07 — 200 failures, 0 successes.** Last successful run of any workflow:
-  **`34023679658`, 2026-09-06T09:05:54Z.**
+- **831 CI runs since 2026-09-07 — 0 successes, 829 failures, 2 cancelled** (`gh api …/runs?created=>=2026-09-07`
+  `total_count`, and the three status queries sum to it). **This figure was `200 / 200` until an independent
+  review corrected it: I had read a `gh run list --limit 200` page as a total.** Last successful run of any
+  workflow: **`34023679658`, 2026-09-06T09:05:54Z.**
 - The signature is not a failing test: `scope` and `check-citations` complete in **3 s with `steps: []` and
   `runner_name: ""`, against a control from the last good run** (`runner_name: "GitHub Actions 1000002536"`, 5
   named steps). **The jobs are never picked up.**
@@ -102,6 +119,41 @@ billing block. I am recording the MEASUREMENT because it decides how the wiring 
   / 2. Both are 33 specs, so the difference is a real one and not a counting convention I can see. **I did not
   resolve it**: executor 1's entry is older and may describe a different tree, and their worktree is not mine to
   measure. Named so a restart does not read whichever number it finds first as the whole story.
+
+### § 8 — THE REVIEW ROUND (one independent reviewer, and it earned its keep)
+
+**One falsifying reviewer**, dispatched over `origin/main..HEAD`, which reported at **`6a1fe8d5`** — tree clean,
+merge-base equal to `origin/main` re-verified against the remote. **12 findings: 0 Critical, 2 Important, 10
+Minor.** All were acted on; the round is recorded in the PR body before it opens.
+
+**The two Important ones, and neither was visible from inside the diff:**
+
+1. **`test-cases/13-pre-launch-checklist.md:664` still asserted the absence this change closed**, in the
+   present tense, with a live `Owner: whoever next touches the CI gate.` A sweep scoped to the changed files
+   cannot see it — that file is not in the diff. **The identical sentence WAS corrected in `Features.md` and
+   `responsive.spec.ts`**, so one tree asserted both the absence and the fix. Corrected.
+2. **This file's own § 1 and § 2 contradicted each other** ("Three commits" against a four-row table) under a
+   header claiming the anchors were recounted. Corrected, with the measurement window now stated.
+
+**The one with a real failure mode behind it — the reviewer's best finding.** `LABEL_IN_BODY`'s exemption
+matched a **bare class anywhere in the document**, so a later screen rendering `<p class="gn-help__eyebrow">`
+outside `.gn-help__nav` — where it IS body copy — would have left the 16px hard floor silently, **with the
+table unedited and the stale-entry guard still reporting healthy.** The declared selector is now **scoped to
+each entry's container** (`${container} ${label}`) in both sweeps, so a same-named element outside the
+container is undeclared and section 4 judges it at 16px, hard. That is the dangerous direction the owner's
+ruling was about, and it was reachable without touching the table.
+
+**Also corrected from the review, each recorded at its site rather than silently:** the hand-off numbers are
+now PRINTED on every route's log line (they were asserted but invisible in a green run); `ci-workflow-shape.test.ts`
+now asserts the job's `if:` (a `viewport` job switched off with `if: false` left every prior assertion green
+AND the gate green, since `gate` counts `skipped` as success); the trace upload is `if-no-files-found: error`;
+`type-scale.ts`'s two `bodyOwned` definitions now carry the declared-label exception they predated; and **the
+CI figure in § 5 was wrong — `831`, not `200`, because I read a `gh run list --limit 200` page as a total.**
+The reviewer's number was re-measured here before adoption, and the three status queries sum to it.
+
+**The reviewer also re-ran the suite, `typecheck`, all four catalogue guards and both unit files at this head
+and confirmed every number this file reports**, and recorded its own mutations as restored sha256-verified
+with `git status --porcelain` empty.
 
 ### Rules that bind this branch
 - **Never `docker compose`** (any subcommand) and **never bind `:3001`** — a peer's hot stack is there. The

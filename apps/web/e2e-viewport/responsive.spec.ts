@@ -736,6 +736,27 @@ for (const route of UNAUTHED_ROUTES) {
         }, under-${LABEL_FLOOR_PX}px=${typeScale.offenders.length}`,
     );
     /**
+     * ⚠ THE PARAGRAPH-LABEL HAND-OFF, PRINTED RATHER THAN ONLY ASSERTED.
+     *
+     * Both assertions below speak ONLY when they fail, so a green run was exactly
+     * where the hand-off could not be seen. An independent review measured that
+     * neither `labelSkipped` nor `labelInBodyExamined` appeared anywhere in a full
+     * green log, and that the 17 was only inferable by subtraction (442 − 366 − 59)
+     * — while the tap-target line beside these states its own split out loud
+     * ("rescued from the flat 44 by the split=…"). **A suite whose readings are
+     * visible only on failure is one nobody can confirm is measuring anything**,
+     * which is the same argument this file makes for reporting `smallest` whether
+     * or not it offends.
+     */
+    console.log(
+      `${tag} — declared paragraph labels: section 4 handed over ${body.labelSkipped}, ` +
+        `section 4b received ${typeScale.labelInBodyExamined} by declaration — ` +
+        `${body.labelSkipped === typeScale.labelInBodyExamined ? 'AGREE' : '⚠ MISMATCH'}` +
+        (typeScale.brokenLabelEntries.length > 0
+          ? `, ⚠ STALE ENTRIES ${JSON.stringify(typeScale.brokenLabelEntries)}`
+          : ''),
+    );
+    /**
      * The whole distribution, not just the verdict. A ratchet reports one
      * number, and one number cannot distinguish "this page has no small text"
      * from "this page has a cliff of text sitting one pixel above the floor" —
@@ -1079,9 +1100,15 @@ for (const route of UNAUTHED_ROUTES) {
      * ⚠ AND THE RULING ASKED ONE QUESTION BE CHECKED RATHER THAN ASSUMED, because
      * it decides whether the fix is a second selector or an exemption:
      *
-     *     BODY_SELECTOR  = 'p, li, dd, dt, td, figcaption, label'
-     *     LABEL_SELECTOR = 'span, small, div, …'
-     *     'p' in body: true     'p' in label: false     intersection: (none)
+     *     BODY_SELECTOR       = 'p, li, dd, dt, td, figcaption, label'
+     *     LABEL_SELECTOR_BASE = 'span, small, div, …'
+     *     'p' in body: true     'p' in base: false     intersection: (none)
+     *
+     * (The constant was named `LABEL_SELECTOR` when this was measured; it is
+     * `LABEL_SELECTOR_BASE` now, because the built `LABEL_SELECTOR` = base plus
+     * the declared labels is what the sweep receives. Named as it was measured,
+     * so a reader does not resolve the identifier to a value that contradicts
+     * the quote.)
      *
      * `p` is in NEITHER, so simply removing these from section 4 would have left
      * them with **no floor at all, silently**. The fix is a SECOND SELECTOR, and

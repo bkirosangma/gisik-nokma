@@ -655,6 +655,14 @@ jobs:
           name: viewport-traces
           path: apps/web/test-results/
           retention-days: 7
+          # `warn` is the action's default and it is the wrong one here. The
+          # likeliest failure of this job is `next dev` never coming up on 3021,
+          # which produces NO `test-results/` directory — so the default would
+          # upload nothing, warn, and let the job report a browser failure with
+          # no downloadable evidence, which is indistinguishable from a config
+          # that dropped the traces. The step's whole reason to exist is that a
+          # failure here is otherwise a mystery; make its absence loud.
+          if-no-files-found: error
 
   # The single check name the auto-merge precondition and any branch
   # protection rule reads. Fans in every job above; treats a job's own

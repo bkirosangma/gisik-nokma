@@ -97,6 +97,27 @@ describe('ci.yml job graph', () => {
     // a job nothing depends on cannot fail the build.
     expect(needsOf('gate')).toContain('viewport');
 
+    /**
+     * ⚠ AND THE JOB MUST NOT BE TURNABLE OFF, WHICH NOTHING ABOVE CHECKS.
+     *
+     * `gate` counts a `skipped` job as success. So an `if: false`, or any extra
+     * condition a later "temporarily disable the flaky browser job" edit adds,
+     * leaves every assertion above green AND the gate green — the suite stops
+     * running while CI reports a clean sheet. That is precisely the shape this
+     * test's own docblock says it exists to prevent, one level up: **it would
+     * cover nothing while reading as coverage.** Finds-by-review, not by a run.
+     *
+     * The sibling jobs already carry a shared skip condition, and it is correct
+     * here for the same reasons (a docs-only diff runs nothing, and a failed
+     * build makes the reading meaningless). The property is therefore that this
+     * job carries THE SAME ONE, not a stricter one of its own — plus the literal
+     * disable, which is the specific edit to catch.
+     */
+    const ifExpr = workflow.jobs['viewport']?.if ?? '';
+    expect(ifExpr, 'the viewport job carries no `if:` at all').not.toBe('');
+    expect(ifExpr).not.toBe('false');
+    expect(ifExpr).toBe(workflow.jobs['typecheck']?.if);
+
     // The positive control, through the SAME accessor: `runsOf` is not vacuous
     // over this document. `build` really does carry `run:` steps, so an empty
     // list above would mean the parse or the accessor broke, not that CI is tidy.
