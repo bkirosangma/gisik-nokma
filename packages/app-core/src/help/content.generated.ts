@@ -2473,6 +2473,80 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
+                    "text": "The row names the new child's type for you, and it will not offer what your ranks forbid."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " A subtask is a job of its own and every job has a type, so the row picks one: "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Task"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " wherever a Task can sit under the job you are looking at, and otherwise the nearest kind below that job which your own list of types allows. That is the same rank rule as above — a child's rank has to be strictly bigger than its parent's — read against "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "your"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " types rather than the built-in ones, so a kind you defined yourself is weighed exactly as the standard ones are. Two jobs at the same rank cannot nest, which is why an "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Errand"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " gets a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Sub-task"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and never another Errand."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Where nothing at all is smaller, the row is not drawn."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " You get a sentence instead — "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"This is a Sub-task — nothing smaller can sit under it.\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — rather than a box and a button that could only end in a refusal. And if your list of types cannot be read at all, the section says "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "that"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " rather than showing you an empty row and letting you conclude there is nothing below."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
                     "text": "One refusal worth knowing about."
                   },
                   {
