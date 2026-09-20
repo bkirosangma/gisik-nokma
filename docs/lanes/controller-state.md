@@ -31,6 +31,69 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 SUNDAY 2026-09-20 ~19:4x IST — **CYCLE 25: FOURTEEN MERGES, FIVE OWNER RULINGS, AND THE QUEUE IS NOW EMPTY OF UNBLOCKED WORK — IT WAITS ON TWO QUESTIONS THAT ARE THE OWNER'S.** `main` is `bb018df5`; **zero open PRs**; ledger **307 done / 1 todo** (struck).
+
+### 1. THE POSITION — **READ THIS INSTEAD OF ANY OLDER ENTRY'S QUEUE**
+| # | task | state |
+|---|---|---|
+| 1 | the sheet footer — nav removed, `Delete` as a history-retaining removal | **DONE** — `#591` → `e9c1a04f` |
+| 2 | the ticket key `CCSO-1183` | **DONE** — `#595` → `6f08452c` |
+| 3 | the three sheet surfaces — toolbar, inline title, breadcrumb | **DONE** — `#594` → `db3ad3c7` |
+| 4a | `visibility` — the mode through the mapper | **DONE** — `#600` → `ffb9389a` |
+| 4b | `attachments` — the thin route over `listTicketAttachments` | **DONE** — `#601` → `99f2a780` |
+| 5 | the pending-invitations heading | **DONE** — `#598` → `9c3dbdba` |
+| 6 | the tap-target checker — 24 in-list / 44 standalone | **DONE** — `#604` → `bb018df5` |
+| 7 | `replica-data-source.ts`'s "six call sites" | **DONE** — `#603` → `bd8b58ef` |
+| 8 | `prewarm-web-routes` · the `TOKENS (every screen)` gap | **HELD** by the owner |
+| 9 | **epics out of Board, Calendar, Timeline and Backlog** | **DONE** — `#602` → `14965a51` |
+| 9b | **the five empty-state sentences** | ⛔ **BLOCKED ON THE OWNER'S WORDS — §3(a)** |
+Plus the controller's own anchors: `#592` → `6d1b7123`, `#593` → `19c998e5`, `#596` → `05c1b0f4`, `#597` → `f32f453c`, `#599` → `7b75b2dc`. **Fourteen merges, each gated at its own landing tree with tree identity verified and a partitioned drop check against a control.**
+
+### 2. 📌 THE OWNER'S RULINGS THIS CYCLE — **NEWEST AUTHORITY**
+1. **The delete door: *"as shipped works."*** `hasProjectAdminRights` stands — owner OR workspace admin OR that project's `projectAdmin`. `ticket.restored` is gated the same way. **Do not re-ask it.**
+2. **Epics, in three steps:** *"epics should never show up in the board, timeline and calendar views. they can only be in the list views"* → *"it shouldnt show up in the backlog either. only in the list view"* → and asked whether the epic's section HEADER also goes, **"Row only."**
+   **So: an epic is excluded as a ROW from Board, Calendar, Timeline AND Backlog; the List is the only view that draws one; the Backlog's section header STAYS, still titled with the epic's name, and is a LABEL rather than a control.** ⚠ **The epic is therefore VISIBLE AS A NAME and ABSENT AS A TICKET in the Backlog — that is the ruling, not a gap.**
+3. **`visibility`: (a) BUILD, (b) KEEP THE RULING.** The mode was on the wire all along and the client dropped it — a mapper fix, no server change. The explicit audience roster stays cut (`routes/tickets.ts`).
+4. **`attachments`: option (A)** — a thin route over `listTicketAttachments`, which was written and tested with **zero production callers**.
+5. **The tap-target checker: *"let the checker accept 24 for in-list controls, keep 44 for standalone buttons."*** **The floor SPLITS; it does not drop.** `#604` pinned the standalone 44 floor at the gate and made the default safe: **any control not declared dense is judged at 44**, so forgetting one reddens loudly.
+
+### 3. ⛔ TWO QUESTIONS ARE OPEN, AND THEY ARE THE ONLY THING BLOCKING THE PIPELINE
+**(a) THE FIVE EMPTY-STATE SENTENCES.** The epic ruling created empty states that now LIE — each is read **over a project that holds an epic**:
+| case | site | the sentence a person reads |
+|---|---|---|
+| `13.1043` | the whole **Board** | *"No tickets here yet — create one."* |
+| `13.1046` | **a single board COLUMN** | *"No tickets in this column."* |
+| `13.1044` | the **Backlog** | *"Nothing in the backlog — new tickets land here."* |
+| `13.1045` | **Calendar / Timeline** | a cause-list that does not name this cause |
+| — | **`docs/faq.md`** | the SAME enumeration, **user-facing**, generated into the shipped help |
+**All five cases are MINTED and record the gap.** ⚠ **The controller's proposal, UNRULED:** name this cause and say where the epic lives (*"… — epics appear in the List."*). **The words are the owner's. A lane that invents copy ships a sentence nobody ruled.**
+**(b) THE VIEWPORT SUITES ARE ON NO GATE.** Neither is run by `turbo run build test typecheck`, and `ci.yml` runs only `test:e2e:stack` — the string `viewport` does not occur in it (measured with a positive control). **At `99f2a780`, `/help` read 25/23/25 offenders against baselines of 10/16/16 — RED ON `main`, seen by nobody.** Exec 2's words: *"A ratchet with no runner is a note, not a check."* **It deliberately did not wire it — that is a ruling, not a task.**
+
+### 4. ⚠ THE INSTRUMENT THAT LIED THIS CYCLE — **THE IDLE NUDGER DRIVES A HOLDING LANE TO CHURN**
+Executor 1 was dispatched to hold, and said so itself. **It then made nine commits — 17:12, 17:29, 17:45 — 16 to 17 minutes apart, which is the idle nudger's cooldown.** The nudger's own paste offers the escape (*"if you are blocked on the controller, reply saying…"*) and the lane answered each poke with another verification pass and another handoff commit.
+⚠ **The control decides it: executor 2, holding the same hour under a dispatch that NAMED the hold, made ZERO commits.** **So the defect was the controller's dispatch, not the lane — a hold instruction that does not name the nudger is an instruction the nudger will undo.** Told to take the escape, exec 1 closed with *"Handoff: terminal state."*
+📌 **When dispatching a HOLD, name the nudger and say the answer is one line.** And **evenly-spaced commits on a lane with no task are the tell — real work is bursty.**
+
+### 5. ⚠ FIVE STALE CITATIONS, EVERY ONE WRITTEN BY THE CONTROLLER AND EVERY ONE CAUGHT BY A LANE
+`page.tsx:2417` (read at `4274b372`, cited as `05c1b0f4`); the `owner-holds.md` shift (*"+9"* when it was **6**); `ui.css:1504-1522` (read at `1391aef3`, but **`:1615`** at `main`); `page.tsx:1756-1760` and `view-types.ts:575` (both stale at `main`). **The cause is the same every time: read in the primary checkout while it sat 75 commits behind `main`.**
+📌 **THE STANDING PRACTICE: cite by SYMBOL OR CONTENT, never by line number, unless the sentence also names the sha it was read at.** A symbol cannot go stale.
+
+### 6. WHAT THE NEXT CONTROLLER SHOULD DO FIRST
+1. **Capture both panes** (`gisik:1`, `gisik:2`) and **read §1 — not any older entry's queue.**
+2. **Check whether the owner has ruled on §3.** If yes, dispatch the five sentences to executor 1: its branch already has everything that does not depend on the copy, minted and measured.
+3. **Re-measure every anchor at the sha you report**, from a worktree pinned at that sha.
+4. **CI is the billing-blocked shape** (annotation: *"the job was not started because recent account payments have failed"*). **Owner-waived 2026-09-06, not treated as green, NOT to be re-asked.**
+5. ⚠ **A LANE CAN BE DOWN AND LOOK BUSY** — **check the pane's last ERROR line, not the spinner.**
+6. ⚠ **RE-ARM THE PR WATCHER** — it exits when it fires **and on its 2-hour timeout.**
+
+### 7. LANES AT HANDOVER
+| lane | branch | state |
+|---|---|---|
+| exec 1 | `exec/empty-states-epic-rule` @ `8442c7a6` | **HOLDING** on the owner's words; everything not dependent on copy is done; **`13.1046` minted, delta +1 measured three ways with a control** |
+| exec 2 | `exec2/tap-target-density` @ `98f7a6dd` | **HOLDING** — its dispatch names every owner-gated item and says plainly not to invent work |
+
+---
+
 ## 🔄 SUNDAY 2026-09-20 ~15:0x IST — **CYCLE 24: `#595` MERGED AND GATED AT ITS LANDING TREE, `#594` SENT BACK FOR A MISSING REVIEWER PASS, AND §4's STATE COLUMN HAD EXPIRED. THIS ENTRY IS THE POSITION.** `main` is `6f08452c`; **zero open PRs**; ledger **307 done / 1 todo** (struck).
 
 ### 1. THE POSITION — read this, not §4's state column
