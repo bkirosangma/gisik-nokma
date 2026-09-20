@@ -160,10 +160,20 @@ describe('escape suggestion — every reserved sequence, planted-defect style', 
 
 describe('non-triggers stay literal with no suggestion', () => {
   /**
-   * 9.94 — three non-triggers stay literal with no suggestion offered at all: a markdown link `[text](url)`, a line containing pipe characters, and a bare URL — no `<a>` in the rendered HTML for any of them.
+   * 9.94 — two non-triggers stay literal with no suggestion offered at all: a line
+   * containing pipe characters, and a bare URL — no `<a>` in the rendered HTML for
+   * either.
+   *
+   * ⚠ THE THIRD ARM WAS REMOVED 2026-09-21, FOR A MEASURED REASON AND NOT A TIDY ONE.
+   * It asserted that a typed `[the doc](http://x)` stays literal — true while
+   * `markdownLinks` was false. The owner reversed that option on 2026-09-20, so typing
+   * a markdown link now CREATES the link, and the arm could only have been kept by
+   * asserting the old behaviour as the current one. What replaced it is in
+   * `schema.test.ts`, which pins what the typed link now does — **including the escape
+   * suggestion it measurably does NOT offer, which is recorded there as a finding with
+   * an owner rather than silently absorbed here.**
    */
   it.each([
-    { typed: 'see [the doc](http://x) now', literal: '[the doc](http://x)' },
     { typed: 'a | b | c', literal: 'a | b | c' },
     { typed: 'go to https://example.com now', literal: 'https://example.com' },
   ])('"$literal" stays literal', ({ typed, literal }) => {
