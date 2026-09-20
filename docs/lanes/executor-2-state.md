@@ -2,9 +2,12 @@
 
 ### § 0 — WHERE TO FIND IT
 
-- **Branch `exec2/comment-thread`**, cut from **`origin/main = fed9a588`**, **folded TWICE**: once onto
-  `fd14c48d` and again onto **`origin/main = 3d40ac68`**. `git merge-base HEAD origin/main` equals
-  `3d40ac68` exactly — **this head IS the landing tree**, and `origin/main` has not moved since.
+- **Branch `exec2/comment-thread`**, cut from **`origin/main = fed9a588`**, **folded THREE times**: onto
+  `fd14c48d`, onto `3d40ac68`, and onto **`origin/main = 00ee17e9`**. `git merge-base HEAD origin/main`
+  equals `00ee17e9` exactly — **this head IS the landing tree**, and `origin/main` has not moved since.
+  The third fold was clean, and it brought exec 1's `#614` (the subtask affordance), which edits FIVE
+  files this branch also edits — **including this handoff, where it corrected a rotted citation in an old
+  block** (`ticket-sheet.tsx:491` → `:554`).
 - **The commits, by SUBJECT rather than by count** — a count is a reading that expires the moment this
   file lands, and the shas below are the ones measured at `13c91c78`:
   1. `d89db1df` — the change itself.
@@ -62,20 +65,34 @@ old mutation targeted a line that no longer exists.
 
 | anchor | value |
 |---|---|
-| `git merge-base HEAD origin/main` | **`3d40ac68` — equal to `origin/main`** (folded twice) |
-| ahead / behind | **4 / 0** — nothing behind, so this head IS the landing tree |
+| `git merge-base HEAD origin/main` | **`00ee17e9` — equal to `origin/main`** (folded three times) |
+| ahead / behind | **11 / 0** — nothing behind, so this head IS the landing tree |
 | tree | clean (`git status --porcelain` empty) |
 | `test-cases/` vs `origin/main` | **EMPTY diff**, with a control (`Features.md` shows +1) — **no id was minted** |
 | `check-case-ids` | **2577 unique / highest 16.99**, identical on both sides of the fold; all four new ids are exec 1's |
 | `check:help` · `check:citations` · `check:migrations` · `check:tasks` · `check:runbook` · `check:env` | rc 0 each |
-| **suites** | **server 1696 · app-core 1696 · web 622 — all green, 0 failed** |
-| **the batteries** | **6/6 SQL+projection mutations KILLED · 6/6 client mutations KILLED**, each naming its own case |
+| **suites** | **server 1696 · app-core 1702 · web 622 — all green, 0 failed**, re-run AFTER the third fold |
+| **the batteries** | **7/7 server mutations KILLED · 7/7 client mutations KILLED**, each naming its own case, both re-run after the third fold. The two the review added are `m7` (the filename sanitizer) and `c7` (the thread reload) — **both were unwitnessed until the reviewer measured them** |
 | ⚠ the forced gate | **NOT run — it is the controller's.** |
 
-### § 3 — THE REVIEW (recorded in the PR body BEFORE it opened)
+### § 3 — THE REVIEW: 2 IMPORTANT + 5 MINOR, CRITICAL NONE, ALL SEVEN FIXED
 
-One independent reviewer, told to falsify. **Its findings and verdict are recorded in the PR body**, per
-the standing rule that the review pass is written down before the PR exists rather than summarised after.
+One independent reviewer, told to falsify, ran against `d89db1df` and mutated in an **APFS clone** rather
+than the shared worktree. **Its full findings are recorded in the PR body, written before the PR opened.**
+
+- **It could not break the core claim set** — the files join, the third guard, the six-control toolbar, the
+  stored instant and every count survived its attempts.
+- **Both Important findings were unwitnessed CODE, not wrong code**, and both are now killed by the
+  reviewer's own mutation: the route's `sanitizeFilename` call (the only name any case reached was one the
+  sanitizer passes through) and `comments.reload()` (deleting it left all 107 comment-suite tests green).
+  ⚠ **The reload finding also caught a self-contradiction**: this branch's test docblock said *"`read` and
+  `history` are reloaded too"* while the implementation docblock says `read` is deliberately NOT.
+- **One Minor was a claim THIS CHANGE SET created and did not update** — `Features.md:1491` still said the
+  web client never posts the `attachment.added` event, which the comment composer now does. Fixed in the
+  same change set, which is the rule.
+- Four more Minors: a migration citation naming one file for columns that span two, a sweep claim its own
+  tree contradicted, "verbatim" on one arm of a conditional, and the composer-under-a-failed-read
+  question — now a stated choice with its cost named.
 
 ### § 4 — OPEN, AND WHAT IS OWED
 
