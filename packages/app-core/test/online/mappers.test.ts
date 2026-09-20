@@ -1928,9 +1928,20 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     deleted: unknown = null,
   ): Record<string, unknown> {
     return {
-      // The `proj_visibility` row the route still serves. The client reads
-      // nothing from it; it is here because the real body carries it.
-      ticket: { ticket_id: '01J9GTKA000000000000000000', own_mode: 'inherit', seq: 4 },
+      // The `proj_visibility` row the route serves, under the route's own key
+      // for it. **⚠ CORRECTED 2026-09-20 — this comment read *"The client reads
+      // nothing from it; it is here because the real body carries it."* The
+      // second clause is still true; the first is not, and was the whole defect:
+      // `mapTicketRead` now reads this row's two MODE columns
+      // (`TicketRead.visibility`).** `resolved_mode` is REQUIRED here for the
+      // same reason the route always emits it — a body without it is one this
+      // client cannot read, and `mapTicketVisibility` says so by name.
+      ticket: {
+        ticket_id: '01J9GTKA000000000000000000',
+        own_mode: 'inherit',
+        resolved_mode: 'project',
+        seq: 4,
+      },
       ticketState: {
         kind: 'ticket',
         id: '01J9GTKA000000000000000000',
@@ -1992,6 +2003,58 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
       rollup,
     };
   }
+
+  /**
+   * 3.167 — the `proj_visibility` row's two MODE columns reach the read, each
+   * from ITS OWN key.
+   *
+   * The fixture's pair is `inherit` / `project`, and they DIFFER on purpose: a
+   * mapper that read one key twice cannot pass this, whichever key it picked —
+   * `own_mode` for both fails on `resolvedMode`, `resolved_mode` for both fails
+   * on `ownMode`. A fixture whose two modes agreed would be a body no client
+   * could tell apart, and this case would report coverage of the read while
+   * constraining nothing.
+   */
+  it('3.167 mapTicketRead carries the wire audience onto the read — own and resolved, separately', () => {
+    const mapped = mapTicketRead(
+      ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' }),
+    );
+    expect(mapped.visibility).toEqual({ ownMode: 'inherit', resolvedMode: 'project' });
+  });
+
+  /**
+   * 3.168 — a row that OMITS a mode is not the same answer as "no audience was
+   * served". `null` on `TicketRead.visibility` means the read carried no row at
+   * all (the replica), and a garbled response must not be able to reach it.
+   */
+  it('3.168 REFUSES a visibility row missing a mode rather than answering null', () => {
+    const body = ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' });
+    // The positive control runs FIRST and through the SAME path: the only
+    // difference below is the deleted key, so a throw there cannot be about the
+    // fixture. (An assertion placed above a control MASKS it.)
+    expect(mapTicketRead(body).visibility).toEqual({ ownMode: 'inherit', resolvedMode: 'project' });
+    delete (body['ticket'] as Record<string, unknown>)['resolved_mode'];
+    expect(() => mapTicketRead(body)).toThrow(/ticket\.resolved_mode/);
+    expect(() => mapTicketRead(body)).toThrow(MappingError);
+  });
+
+  /**
+   * 3.169 — `resolved_mode: 'inherit'` is refused, and `own_mode: 'inherit'` is
+   * not. The pair IS the assertion: `proj_visibility` walks the inherit chain at
+   * write time so the resolved column cannot hold `inherit`, while a ticket is
+   * BORN claiming it. A mapper that refused `inherit` on both would refuse
+   * nearly every ticket in the product.
+   */
+  it('3.169 REFUSES a resolved mode of `inherit`, and accepts the same value as own_mode', () => {
+    const body = ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' });
+    const row = body['ticket'] as Record<string, unknown>;
+    row['resolved_mode'] = 'inherit';
+    expect(() => mapTicketRead(body)).toThrow(/ticket\.resolved_mode/);
+    // …and the control on the same body: put the value back where it belongs
+    // and the read answers, carrying `inherit` as the OWN mode.
+    row['resolved_mode'] = 'project';
+    expect(mapTicketRead(body).visibility?.ownMode).toBe('inherit');
+  });
 });
 
 /**
@@ -2381,7 +2444,12 @@ describe('13.967 mapTicketRead carries assignedProvenance, and refuses a body wi
   /** The route's body, complete: the same shape `ticketReadBody` builds above. */
   function body(assignedProvenance: unknown): Record<string, unknown> {
     return {
-      ticket: { ticket_id: '01J9GTKA000000000000000000', own_mode: 'inherit', seq: 4 },
+      ticket: {
+        ticket_id: '01J9GTKA000000000000000000',
+        own_mode: 'inherit',
+        resolved_mode: 'project',
+        seq: 4,
+      },
       ticketState: {
         kind: 'ticket',
         id: '01J9GTKA000000000000000000',

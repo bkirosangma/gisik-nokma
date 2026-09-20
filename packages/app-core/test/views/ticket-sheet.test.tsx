@@ -7,7 +7,7 @@ import { createClientStateCache } from '../../src/cache.js';
 import { ServingGapError, SERVING_GAPS } from '../../src/online/mappers.js';
 import type { AttachmentListEntry } from '../../src/views/attachment-list.js';
 import type { EditorSlotComponent } from '../../src/views/editor-slot.js';
-import type { ListRow, TicketHistoryEvent, TicketRead } from '../../src/view-types.js';
+import type { ListRow, TicketHistoryEvent, TicketRead, TicketVisibility } from '../../src/view-types.js';
 import { HISTORY_PAGE_LIMIT, TicketSheet } from '../../src/views/ticket-sheet.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
 import {
@@ -34,6 +34,18 @@ const HISTORY_EVENT: TicketHistoryEvent = {
   serverTime: '2026-08-19T10:00:00.000Z',
   seq: 2,
 };
+
+/**
+ * What the ticket read serves for the audience by default.
+ *
+ * `ownMode: 'inherit'` with `resolvedMode: 'project'` is the ORDINARY production
+ * pair, not a convenient one: a root ticket is born claiming `inherit` and
+ * `proj_visibility` resolves it to `ROOT_DEFAULT_MODE` = `project`
+ * (`proj-visibility.ts`). It is also the pair that makes the own/resolved
+ * distinction TESTABLE — a case that wants "the ticket defers, and the parent
+ * decided" has it without inventing a shape the projection cannot produce.
+ */
+const SEED_VISIBILITY: TicketVisibility = { ownMode: 'inherit', resolvedMode: 'project' };
 
 function ticketRead(overrides: Partial<TicketRead> = {}): TicketRead {
   return {
@@ -62,6 +74,11 @@ function ticketRead(overrides: Partial<TicketRead> = {}): TicketRead {
     parent: { kind: 'ticket', id: PARENT, title: 'Registrations' },
     rollup: null,
     ...overrides,
+    // `Partial<TicketRead>` admits `visibility: undefined`, which is NOT one of
+    // the two answers the field has — it is a mode, or `null` for "this read
+    // carried no row". Spread last so a case that passes `null` really gets
+    // `null`; only a case that OMITS the key keeps the seed.
+    visibility: 'visibility' in overrides ? (overrides.visibility ?? null) : SEED_VISIBILITY,
   };
 }
 
@@ -845,20 +862,90 @@ describe('3.116 TicketSheet — the "Who can see this" section is mounted', () =
   });
 
   /**
-   * 3.117 PLANTED DEFECT — nothing serves the standing audience.
+   * 3.117 PLANTED DEFECT — a read that carried no audience, defaulted to a mode.
    *
-   * `TicketRead` has five fields and none is visibility; the shipped ticket
+   * **⚠ 2026-09-20 — the case's INPUT changed and its defect did not.** It read
+   * *"`TicketRead` has five fields and none is visibility; the shipped ticket
    * route answers a `proj_visibility` row wrapped in `{ticket, parent, rollup}`
-   * with no provenance block at all. So the sheet passes `undefined` and the
-   * section must render the ABSENCE. A default of "Whatever the parent decided"
-   * would be plausible — `inherit` is what a ticket is born with — and that is
-   * exactly why it must not be drawn.
+   * with no provenance block at all. So the sheet passes `undefined` ..."* — and
+   * that was the framing this whole section was built on, which was wrong: the
+   * row's MODE columns were on the wire the entire time and no client read them.
+   * The sheet now reads them (3.174). What remains, and is the honest state this
+   * case guards, is a read that carried **no row at all** — the offline replica,
+   * whose reduced state has no visibility column. Passing `visibility: null` is
+   * how that read is expressed here, and it is not a stand-in: it is exactly
+   * what `replica-data-source.ts` returns.
+   *
+   * A default of "Whatever the parent decided" would be plausible — `inherit`
+   * is what a ticket is born with — and that is exactly why it must not be
+   * drawn.
    */
-  it('3.117 shows the audience as UNSERVED rather than defaulting to a mode', async () => {
-    renderSheet(ticketRead());
+  it('3.117 shows the ABSENCE for a read that carried no audience, rather than defaulting to a mode', async () => {
+    renderSheet(ticketRead({ visibility: null }));
     await settled();
     const section = screen.getByRole('region', { name: 'Who can see this' });
     expect(within(section).getByRole('status')).toHaveTextContent('not being served yet');
+  });
+
+  /**
+   * 3.174 — the sheet draws the audience its OWN read served.
+   *
+   * **This is the production path**: `apps/web`'s mount passes no `visibility`
+   * prop (`page.tsx:2496`), so what the section shows comes from the read the
+   * sheet makes for itself. PLANTED DEFECT: falling back to the prop alone
+   * (`current={visibility ?? null}`), which is what this sheet did before
+   * `TicketRead.visibility` existed — the section then reports an absence for a
+   * mode the server has always sent, on the one surface whose subject is who may
+   * see what.
+   *
+   * ⚠ The read carries a pair the DEFAULT SEED DOES NOT: measured 2026-09-20,
+   * this case passed against a mutant that replaced the read with a hardcoded
+   * `{ownMode: 'inherit', resolvedMode: 'project'}` — the seed's own value, so
+   * the mutation produced the string the assertion was looking for. A case whose
+   * fixture equals the plausible hardcoding cannot tell "read it" from "guessed
+   * it", which is the tidy-fixture escape. `workspace` is not the seed and not
+   * any default, so only reading the wire produces it.
+   */
+  it('3.174 draws the audience the sheet’s own read served, with no prop passed', async () => {
+    renderSheet(ticketRead({ visibility: { ownMode: 'workspace', resolvedMode: 'workspace' } }));
+    await settled();
+    const section = screen.getByRole('region', { name: 'Who can see this' });
+    // Scoped to the STANDING line, not the section: the mode picker beside it
+    // carries the same four labels, so a section-wide text query would match the
+    // control and report the read as served on a build where it is not.
+    const standing = section.querySelector('.gn-visibility__standing');
+    expect(standing?.textContent).toContain('Everyone in the workspace');
+    expect(standing?.textContent).not.toContain('Everyone on the project');
+    expect(within(section).queryByText(/not being served yet/)).toBeNull();
+  });
+
+  /**
+   * 3.175 — the caller's prop WINS over the read, and it is the only way to
+   * reach the section with a roster or a provenance.
+   *
+   * Nothing on the wire carries either (the roster is cut, the provenance is on
+   * the ledger), so a caller holding a fuller read — or a test — is a better
+   * source than the sheet's own. PLANTED DEFECT: dropping the `visibility ??`
+   * arm, which would make this prop a lie: a caller passing one would silently
+   * get the wire's mode instead.
+   */
+  it('3.175 a caller’s `visibility` prop wins over what the read served', async () => {
+    renderSheet(ticketRead(), undefined, {
+      visibility: {
+        ownMode: 'inherit',
+        resolvedMode: 'explicit',
+        userIds: ['user_anselma'],
+        claim: null,
+      },
+    });
+    await settled();
+    const section = screen.getByRole('region', { name: 'Who can see this' });
+    // Scoped for the reason 3.174 gives: `Everyone on the project` is ALSO a
+    // label on the mode picker, so a section-wide query for it can never be
+    // null and would assert nothing.
+    const standing = section.querySelector('.gn-visibility__standing');
+    expect(standing?.textContent).toContain('Only: Anselma Marak');
+    expect(standing?.textContent).not.toContain('Everyone on the project');
   });
 });
 

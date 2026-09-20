@@ -1,4 +1,4 @@
-import type { FieldClaim, StateCategory, TicketState } from '@gisik-nokma/domain';
+import type { FieldClaim, StateCategory, TicketState, VisibilityMode } from '@gisik-nokma/domain';
 
 export type Actor = { id: string; name: string };
 /**
@@ -353,6 +353,54 @@ export type ParentRef =
   | { kind: 'restricted'; id: string }
   | null;
 
+/**
+ * The audience in force — three-valued, and the missing fourth is the point.
+ *
+ * `proj_visibility` walks the inherit chain at write time, so `resolved_mode`
+ * never holds `inherit`: it always lands on one of the three real audiences.
+ * Carrying `VisibilityMode` here instead would make `inherit` a value a reader
+ * had to handle and a value no row can produce.
+ */
+export type ResolvedVisibilityMode = Exclude<VisibilityMode, 'inherit'>;
+
+/**
+ * The ticket's standing audience, as the READ serves it — the MODE, and only
+ * the mode.
+ *
+ * ## Why this is NOT a `VisibilityClaim`
+ *
+ * `proj_visibility` holds five columns of interest and this shape carries two.
+ * `own_user_ids` / `resolved_user_ids` are CUT from the route by a standing
+ * disclosure ruling — `routes/tickets.ts:111-114`: an explicit audience ROSTER
+ * is *"a disclosure no plan authorized"* — and the row carries no provenance at
+ * all: who set the mode, and when, is on the LEDGER, not in this projection. So
+ * the two members below are the two the wire actually has.
+ *
+ * `VisibilityClaim` (`views/visibility-editor.tsx`) is the WIDER shape — this
+ * plus an optional roster and an optional claim — and it is what the editor
+ * takes. The sheet builds one from this, filling both extra members with `null`
+ * rather than with an invented list or an invented actor.
+ *
+ * ## The two modes are not interchangeable, and swapping them is a real defect
+ *
+ * - `ownMode` — what THIS ticket itself claims. `inherit` means it defers to
+ *   its parent. **This is what an editor's control must be seeded from:**
+ *   seeding from `resolvedMode` shows a mode the ticket never claimed, and
+ *   applying it FILES that claim — the invented-default failure this client
+ *   refuses everywhere else.
+ * - `resolvedMode` — the audience actually in force, after the inherit chain is
+ *   walked. **This is what "who can see this" renders**, because it is the
+ *   answer to that question. `ownMode: 'inherit'` on a root ticket is a ticket
+ *   that has never been given an audience of its own, and it resolves to
+ *   `project` (`proj-visibility.ts`'s `ROOT_DEFAULT_MODE`) — a ticket nobody
+ *   could see would be the alternative.
+ */
+export type TicketVisibility = {
+  ownMode: VisibilityMode;
+  /** Never `inherit`; see `ResolvedVisibilityMode`. */
+  resolvedMode: ResolvedVisibilityMode;
+};
+
 export type TicketRead = {
   ticket: TicketState;
   title: string;
@@ -376,6 +424,35 @@ export type TicketRead = {
    * history tab.
    */
   assignedProvenance: ClaimProvenance | null;
+  /**
+   * The ticket's standing audience, or `null` when this read carried no
+   * visibility row.
+   *
+   * ## `null` here does NOT mean "no audience"
+   *
+   * Every ticket has an audience — `proj_visibility` resolves one for every row
+   * in the workspace, and a ticket with none would be invisible to everybody
+   * including its author. So `null` can only mean **this read did not carry the
+   * row**, which is what the local replica answers (the offline read models are
+   * folded from the event stream, and `visibility.set` is deliberately not one
+   * of the fifteen types that reducer folds — see `TicketStateDeps`' neighbour
+   * in `ticket-state.ts`).
+   *
+   * **A body that OMITS the key is NOT this `null`, and it is refused.** The
+   * route emits the row on every answer, so `mapTicketVisibility` throws by path
+   * name rather than answering `null` — precisely so that "the field was
+   * missing" cannot arrive wearing the one meaning `null` is reserved for.
+   * ⚠ An earlier draft of this docblock said `null` is *"what any body without a
+   * `ticket` key means"*, which is the opposite of what the mapper beside it
+   * does. Corrected here rather than deleted, because the two must not drift
+   * back apart.
+   *
+   * REQUIRED and nullable rather than optional, on the rule this module states
+   * for `WorkItem.projectName`: *"an optional key would let a mapper that simply
+   * forgot the field look the same as the rule applying."* A producer that
+   * cannot know the mode must SAY so; it must not be able to omit the question.
+   */
+  visibility: TicketVisibility | null;
   parent: ParentRef;
   rollup: RollupToViewer | null;
 };
