@@ -1068,7 +1068,7 @@ for (const route of UNAUTHED_ROUTES) {
     ).toBeGreaterThan(0);
 
     /**
-     * ⚠ THE PARAGRAPH-LABEL HAND-OFF, MEASURED FROM BOTH ENDS.
+     * ⚠ THE PARAGRAPH-LABEL HAND-OFF, MEASURED FROM BOTH ENDS — case 16.60.
      *
      * Owner ruling 2026-09-20 (executor 2's ruling request): `/help`'s two eyebrow
      * labels are `<p>` elements, so section 4 judged them at a BODY floor of 16px
@@ -1107,7 +1107,8 @@ for (const route of UNAUTHED_ROUTES) {
       .toBe(typeScale.labelInBodyExamined);
 
     /**
-     * THE STALE-ENTRY GUARD — the half a declaration table makes invisible.
+     * THE STALE-ENTRY GUARD — case 16.60, and the half a declaration table makes
+     * invisible.
      *
      * A renamed label stops matching this sweep AND stays exempt from section 4,
      * so it leaves both populations and no floor applies to it at all. That is
