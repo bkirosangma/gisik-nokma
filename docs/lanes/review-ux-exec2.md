@@ -79,7 +79,7 @@ switch, table, **toast**) · `packages/app-core/src/inbox/inbox-view.tsx` · `ca
 
 ### 1.6 Case ids in my concern
 `/help` has its own catalogue — `test-cases/15-in-app-help.md`, ids **15.1 – 15.43**, all read.
-The 13.x catalogue carries the screen work; I did **not** attempt to verify 13.x ids one by one (see §9).
+The 13.x catalogue carries the screen work; I did **not** attempt to verify 13.x ids one by one (see §5 and §6).
 
 ### 1.7 The comparison surface
 Staged export at `/Users/kiro/my_projects/gisik-nokma-lanes/prototype-2026-09-20/`.
@@ -95,9 +95,12 @@ the prototype. Every prototype citation below names a file in the staged export.
 
 Counted by severity, members named: **Important 4** (F1, F2, F3, F4), **Minor 5** (F5, F6, F7, F8, F9).
 
-**§2b adds six more that came from a dispatched state sweep and that I then opened and verified myself:**
+**§2b adds six that came from a dispatched state sweep and that I then opened and verified myself:**
 **Critical 1** (V2), **Important 4** (V1, V3, V4, V5), **Minor 1** (V6).
-**Whole-report total: 15 findings — Critical 1, Important 8, Minor 6.**
+**§2c adds four more from a second sweep over the six end-to-end flows, each re-opened and verified
+myself: Critical 1 (V10), Important 3 (V7, V8, V9).**
+**Whole-report total: 19 findings — Critical 2 (V2, V10), Important 11 (F1–F4, V1, V3–V5, V7–V9),
+Minor 6 (F5–F9, V6).**
 
 ---
 
@@ -455,7 +458,7 @@ measured.**
 
 A read-only sweep was dispatched over every user-facing surface's ten states. **I did not adopt its
 report.** Its claims are its own; the six below I re-opened and measured myself, and on two of them my
-severity differs from the sweep's. The rest of its output is indexed in §2c and is **unverified by me.**
+severity differs from the sweep's. The rest of its output is indexed in §2e and is **unverified by me.**
 
 ---
 
@@ -610,7 +613,178 @@ The sweep rated the group Important; I decline.
 
 ---
 
-## 2c. THE REST OF THE SWEEP'S OUTPUT — CARRIED, NOT VERIFIED
+## 2c. FINDINGS FROM THE DISPATCHED FLOWS SWEEP, EACH OPENED AND VERIFIED BY ME
+
+A second read-only sweep walked the six flows end to end (create→assign→transition→close→reopen;
+invite→join; the subtask chain; the comment thread; the attachments door; delete and its undo). Its
+per-step narrative is the most useful part and I have not reproduced it. **Four of its findings I
+re-opened and measured; they are below. Its remainder is indexed in §2d, unverified by me.**
+
+---
+
+### V7 — IMPORTANT · A comment the server REFUSES costs the author the words they just wrote
+
+**WHAT.** `ticket-sheet.tsx:853-877` — on a refusal, `submitComment` sets `serverRefusal` and **returns
+normally**; it does not throw. `TicketEditorSlot.handleSubmit` (`:161-185) `await`s `submit(...)` and,
+on a **resolution**, runs `editor.commands.setContent(emptyDoc(), …)` at `:174`. The `catch` that would
+preserve the draft is only reached on a **rejection**.
+
+**WHY it is wrong — the contract is stated at the site that breaks it.** The comment at
+`TicketEditorSlot.tsx:178-180` reads: *"A refused claim must never cost the user their words. The clear
+lives INSIDE the try, after the await, so a rejection skips it."* The mechanism covers **a rejection**
+(nobody answered) and not **a refusal** (the server answered "no"). Those are this repository's own two
+categories, kept apart by rule everywhere else — `Ruling 27/33`, and the sheet maintains separate
+`serverRefusal` / `transportError` / `editorError` slots. This is the one place they collapse, and the
+collapse deletes the person's text.
+
+**Reachability, and the part I did not measure.** A refusal is reachable, and the sheet already renders
+one, so the defect stands on that alone. The sweep found a concrete route and I verified its two
+mechanisms: `packages/editor/src/extensions/ticket-image.ts:132` reads `data-attachment-id` off parsed
+HTML and `:159` registers `{ tag: 'img[data-attachment-id]' }`, while `attachment-paste.ts` handles only
+clipboard **File** items — so an ordinary copy of an image out of another ticket's comment pastes a node
+carrying **that** attachment's id with no upload, and
+`apps/server/src/gates/image-embed-gate.ts` refuses it as an embed this ticket does not own. The
+clipboard→`text/html` step is ProseMirror's standard behaviour and is **inferred, not exercised** — no
+browser in this pass.
+
+**WHAT WOULD HAVE BEEN BETTER.** Either `submitComment` rejects on a refusal (it already records the
+refusal in its slot either way, and rejecting is what makes the composer's stated contract true), or
+`handleSubmit` clears on an explicit success signal rather than on a non-throwing `await` — because
+"no exception" is not "the server accepted it" anywhere else in this codebase.
+
+**MEASUREMENT.** Opened: `ticket-sheet.tsx:853-877` (the `refused` arm at `:875-876` returns);
+`TicketEditorSlot.tsx:161-185` (the clear at `:174` inside the `try`, the catch at `:177-181`);
+`ticket-image.ts:132,133,159`; `attachment-paste.ts:42-50`.
+
+**SEVERITY: Important.** I considered Critical — the person loses what they wrote, and the code's own
+sentence says that must never happen. I decline because the loss is a transient draft, not a record: the
+ledger is untouched, the refusal is on screen, and the words can be retyped. The controller may upgrade
+it; I would not argue.
+
+---
+
+### V8 — IMPORTANT · Opening any parent ticket raises a false "this list is not shown rather than shown short" alert
+
+**WHAT.** `ticket-sheet.tsx:1278-1283` computes
+`subtaskRows = subtasks.data ?? []` and
+`subtasksIncomplete = ticketRead.rollup !== null && subtaskRows.length !== subtaskExpected`, where
+`subtaskExpected` comes from the **ticket** read's rollup. When the ticket read lands, the subtasks
+query's key changes — `:591` `const subtasksKey = \`${ticketId}:subtasks:${read.data?.ticket.projectId ?? ''}\``
+— and `useLiveQuery` **resets `data` to `null` on every key change** (`use-live-query.ts:95`). So for
+the whole second round trip, `subtaskRows` is `[]` while `subtaskExpected` is the real child count, and
+`subtasksIncomplete` is true. The section then renders, as a **`role="alert"`**
+(`ticket-sheet.tsx:2216-2226`): *"The server counts N subtasks you can see, and 0 could be read — so this
+list is not shown rather than shown short."*
+
+**WHY it is wrong.** Two facts collapse: **unread** and **read-and-short**. The section's own docblock
+(`:1275-1277`) carefully excludes `rollup === null` because *"no children at all is a real fact"* — but
+never divides `subtasks.data === null` from `[]`. Every sibling on this sheet draws that distinction:
+the roster (`:1650-1655`), the type ladder (`:1336-1345`), attachments (`:2466-2489`). And because the
+key change is *deliberate* (the docblock at `:585-590` explains that `projectId` is in the key on
+purpose), the window is **guaranteed on every parent ticket**, not occasional. A person opening a parent
+is told, on an alert region, that their children could not be read.
+
+**WHAT WOULD HAVE BEEN BETTER.** Gate the reconciliation on `subtasks.data !== null`: while unread,
+render nothing; raise the alert only when a read **that has answered** disagrees with the server's count.
+A strictly narrower condition, and it keeps the property the section exists for — a short list is never
+drawn silently.
+
+**MEASUREMENT.** Opened: `ticket-sheet.tsx:585-593` (the key and its rationale), `:1278-1283` (the
+comparison), `:2216-2226` (the alert); `use-live-query.ts:41-42` (`useState<T | null>(null)`) and
+`:91-98` (`setData(null)` before each new question, in the effect whose deps include the key).
+
+**SEVERITY: Important.** High frequency, a false statement about the ticket's children, and announced as
+an alert rather than as quiet text.
+
+---
+
+### V9 — IMPORTANT · The invite page reports a transport failure as a dead link, and sends the person to ask for a replacement
+
+**WHAT.** `apps/web/app/invite/[token]/page.tsx:59-69` — `getInvite`'s rejection handler sets
+`invite = null` for **any** failure. The render at `:93-97` then shows: *"This invitation link does not
+open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new one."*
+
+**WHY it is wrong, and the comment is the evidence.** The handler's own comment (`:64-66`) says *"A
+transport failure is not the same as a dead link, but the only thing this page can honestly do with
+either is stop claiming there is a workspace to join."* That is true of **saying nothing**. It is not
+true of **asserting the link is dead and naming three causes that do not include the real one**, and it
+is not true of **routing the person into an errand**: the recipient asks the admin to mint a new link,
+the admin does, and the original one is withdrawn or left to lapse — a working invitation destroyed by a
+dropped packet. The same file's `accept` failure arm, a few lines below (`:78-83`), carries the door's
+own words, so the discipline exists in this file.
+
+**WHAT WOULD HAVE BEEN BETTER.** Make the state four-valued rather than three — keep `null` for the
+answered 404 and add a distinct failure arm that says the invitation could not be checked and offers a
+retry. The dead-link sentence then means what it says.
+
+**MEASUREMENT.** Opened: `invite/[token]/page.tsx:52-69` (the state, the effect, both arms) and
+`:91-98` (the three rendered arms).
+
+**SEVERITY: Important.**
+
+---
+
+### V10 — CRITICAL · "Create" has no re-entrancy guard, and each call mints a fresh id: a double press files two tickets
+
+**WHAT.** `new-ticket-dialog.tsx:278-306` — `disabled={title.trim() === '' || typeId === ''}` and
+nothing else. The dialog's four `useState` calls (`:96-106`) contain **no in-flight latch**. Its
+`onCreate` reaches `create-ticket-flow.tsx:208`, which at `:212` mints `entity: { kind: 'ticket', id:
+newUlid() }` **per call** and submits at `:244`. Two presses are two distinct `ticket.created` events
+with two distinct ids — **two tickets**, in an append-only ledger.
+
+**WHY it is wrong — and the repository has already measured this exact failure.** The composer solved it
+and wrote down why, at `packages/editor/src/components/TicketEditorSlot.tsx:128-136`:
+
+> *"`submitting` is render state and drives `disabled`; it is useless as a re-entrancy guard, because two
+> clicks in one React batch both read the same pre-commit `false` and both get through — **MEASURED, two
+> `comment.added` events for one comment, in an append-only ledger that cannot take either back.**
+> `submittingRef` is set SYNCHRONOUSLY inside the handler, before the first await, which is the only
+> place a second click in the same tick can be seen."*
+
+**The Create control has neither the ref nor the render-state latch** — so it is worse than the case
+that was measured and fixed: there is no guard of any kind and `disabled` never changes during flight,
+so a second press is not even a race. This is the product's primary creation control.
+
+**WHAT WOULD HAVE BEEN BETTER.** A `submittingRef` set synchronously at the top of `create()` — the
+exact shape the composer adopted after measuring — plus `disabled={… || submitting}` so the button
+states the state. If creating two tickets from two presses is genuinely wanted, the dialog should say so
+and the two should be labelled; silently filing a duplicate is not a design.
+
+**Siblings of the same class, each measured, each lower-impact because a duplicate is refused or
+idempotent:** `transition-dialog.tsx:515` `disabled={blocked}` (Move), and
+`members/page.tsx:995` (`Withdraw`, with no latch and no `disabled` at all).
+
+**MEASUREMENT.** Opened: `new-ticket-dialog.tsx:96-106` (the state) and `:278-306` (the control);
+`create-ticket-flow.tsx:208-248` (`newUlid()` per call at `:212`, submit at `:244`, close only on
+`committed` at `:245-248`); `TicketEditorSlot.tsx:128-136` (the measured precedent).
+
+**SEVERITY: Critical.** Duplicate entities written to a ledger that cannot take them back, on the
+product's primary creation path, with the fix already measured and in-tree one package away.
+
+---
+
+## 2d. THE REST OF THE FLOWS SWEEP — CARRIED, NOT VERIFIED
+
+Its remaining findings, each naming the file it cited, **all unverified by me** and to be opened before
+any of them is ruled on: a transport failure during a **Move** has no surface at all — `submitTransition`
+has no `try`/`catch` (`ticket-sheet.tsx:711-745`), the sheet suppresses its transport sentence while the
+dialog is open (`:1975`), and the dialog is handed `transportError={null}` unconditionally (`:2644`); a
+partly committed field-then-transition batch reports only the failure and never reloads (`:731-745`); a
+**Delete** is offered to every viewer with no confirmation, so a non-admin learns the rule only after
+the press (`:2612-2621`, against the sheet's own contrary rule at `:2265-2269`); and the only route back
+from a delete is a **15-second toast** — `ticket.restored` has one producer in the product, the Undo
+button (`page.tsx:832`), while the message promises *"its history is retained"* which is true of the
+ledger and false of what the person can reach.
+
+It also reported, honestly, a guard whose stated purpose is unreachable
+(`ticket-sheet.tsx:1029` `if (submitting) return;` cannot see the same-render-pass double click its
+docblock names) and an editor-side component with no production caller
+(`packages/editor/src/components/AttachmentListItem.tsx`). Both are the class this repository catalogues
+most, and both are Minor.
+
+---
+
+## 2e. THE REST OF THE STATE SWEEP'S OUTPUT — CARRIED, NOT VERIFIED
 
 The sweep returned a further ~35 candidate findings. **I did not open the code for these and I am not
 asserting them.** They are listed so the controller knows what exists and can spend its budget where it
@@ -731,10 +905,10 @@ arms), the ticket sheet's parent indicator, subtask section, comment mount and v
    the controller's compiled report and not in this file.
 
    **A separate state sweep DID return, mid-report.** Its six findings I opened and verified myself are
-   §2b; its remaining ~35 candidates are indexed in §2c and marked unverified. **Two of the six came
+   §2b; its remaining ~35 candidates are indexed in §2e and marked unverified. **Two of the six came
    back rated Critical and I lowered both** (V1, V3) after reading the code — the sweep's severity
    calibration runs optimistic-severe, which is the right direction to be wrong in, but it means its
-   §2c list should not be planned against at face value.
+   §2e list should not be planned against at face value.
 4. **`apps/mobile`** — untouched. The manual's claim (e) contrasts the phone and the web; I verified the
    web half only.
 5. **`apps/desktop`** — untouched.
@@ -762,7 +936,7 @@ workspace rule says counts are readings that expire):
 
 ## 7. WHAT I AM LEAST SURE OF — aim here first
 
-0. **§2c as a whole.** It is a list of hypotheses by a machine, not findings. If the controller rules on
+0. **§2e as a whole.** It is a list of hypotheses by a machine, not findings. If the controller rules on
    any of them without someone opening the line first, this report will have caused exactly the failure
    it documents. **Verify before ruling; the two Criticals I did check were both overstated.**
 1. **F3's classification.** The thread's plain renderer is declared; the composer's toolbar is not
@@ -794,7 +968,7 @@ nine findings are themselves comments that a fix round wrote.
 
 ---
 
-*executor 2 — UX. **Report complete.** 15 findings — Critical 1 (V2) · Important 8 (F1–F4, V1, V3–V5) ·
-Minor 6 (F5–F9, V6) — plus ~35 unverified candidates indexed in §2c and one flows sweep still
-outstanding, both stated rather than implied. Branch `exec2/review-ux` pushed for the controller to
+*executor 2 — UX. **Report complete.** 19 findings — Critical 2 (V2, V10) · Important 11 (F1–F4, V1,
+V3–V5, V7–V9) · Minor 6 (F5–F9, V6) — plus ~40 unverified candidates indexed in §2d and §2e. Both
+sweeps have now returned; nothing is outstanding. Branch `exec2/review-ux` pushed for the controller to
 collect. **No PR opened, no file changed except this report.***
