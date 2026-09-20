@@ -1018,7 +1018,7 @@ proposed sentence — *"This is an Errand — nothing smaller can sit under it"*
 was written for**; the sentence now names THIS ticket's type, read off the ladder.
 
 **Three states, not two.** *"No type is deeper"* and *"the ladder has not been read"* are different facts,
-and rendering the first for the second asserts an absence this client has not measured — `Features.md:83`'s
+and rendering the first for the second asserts an absence this client has not measured — `Features.md:88`'s
 rule for the New-ticket control, *"TOLD … rather than handed an empty one"*. An unread ladder offers
 nothing and claims nothing; an unreadable ladder and an unknown type each get their own sentence; only a
 READ ladder with a legal child draws the form. **A disabled control is never one of the answers** — it

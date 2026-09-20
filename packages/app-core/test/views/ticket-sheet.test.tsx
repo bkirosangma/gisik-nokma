@@ -1884,7 +1884,7 @@ describe('the Add-subtask affordance', () => {
     await settled();
 
     // THE AFFORDANCE IS GONE, not disabled: a disabled control still asserts
-    // the action exists (`Features.md:83`'s rule for the New-ticket control).
+    // the action exists (`Features.md:88`'s rule for the New-ticket control).
     expect(screen.queryByTestId('sheet-subtask-add')).toBeNull();
     expect(screen.queryByTestId('sheet-subtask-title')).toBeNull();
     const withheld = await screen.findByTestId('sheet-subtask-withheld');
@@ -1930,7 +1930,7 @@ describe('the Add-subtask affordance', () => {
   });
 
   it('16.93 an UNREADABLE ladder withholds the form and SAYS why — never a silent absence', async () => {
-    // `Features.md:83`: the New-ticket dialog "is TOLD the parent list is
+    // `Features.md:88`: the New-ticket dialog "is TOLD the parent list is
     // unavailable rather than handed an empty one". An empty ladder and an
     // unread one are different facts and only one of them is about the
     // workspace, so this arm must not render the 16.91 sentence.

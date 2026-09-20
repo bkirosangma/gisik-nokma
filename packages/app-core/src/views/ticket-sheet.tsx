@@ -1166,7 +1166,7 @@ export function TicketSheet({
    * "Errand"` and the server was right about a payload this client built wrong.
    * The affordance and the payload now read ONE answer, so a form cannot be
    * drawn over a submission that cannot succeed — which is the whole of
-   * `Features.md:83`'s rule for the New-ticket control, *"asks before it
+   * `Features.md:88`'s rule for the New-ticket control, *"asks before it
    * offers"*.
    *
    * **Three states, not two, and the third is the one that matters.** "No type
@@ -1953,7 +1953,7 @@ export function TicketSheet({
             {/* THE FORM IS OFFERED ON ONE ANSWER, and the alternative is a
                 SENTENCE rather than a disabled control (`16.91`, `16.93`). A
                 disabled control still asserts that the action exists, and this
-                one could not be performed; `Features.md:83`'s rule for the
+                one could not be performed; `Features.md:88`'s rule for the
                 New-ticket control is the precedent this follows.
 
                 There is a THIRD arm — `subtaskWithheld === null` with no
