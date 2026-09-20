@@ -14,6 +14,7 @@
     "check:db-tz": "node scripts/check-db-timezone.mjs",
     "check:migrations": "node scripts/check-migration-order.mjs",
     "test:e2e:stack": "pnpm --filter @gisik-nokma/web run test:e2e:stack",
+  "test:e2e:viewport": "pnpm --filter @gisik-nokma/web run test:e2e:viewport",
     "dev:stack": "docker compose --env-file .env -f docker-compose.dev.yml up -d server web",
     "dev:stack:rebuild": "docker compose --env-file .env -f docker-compose.dev.yml up -d --build server web",
     "check:runbook": "node scripts/check-runbook-commands.mjs",

@@ -566,6 +566,96 @@ jobs:
         if: always()
         run: docker compose -f docker-compose.dev.yml down -v || true
 
+  # ── THE VIEWPORT SUITE, ON THE GATE AT LAST ─────────────────────────────
+  #
+  # Pre-launch item 7 — "actually check in a real viewport, not just visually
+  # inspect the code". `apps/web/playwright.viewport.config.ts` was reachable
+  # only by an explicit `-c` spelling that no turbo task defined and that this
+  # file never named: grepped, the string `viewport` occurred **0 times** here
+  # while the same invocation found `e2e` nine times and `test:e2e:stack`
+  # three. The suite ran only when a human remembered to run it.
+  #
+  # The consequence was measured, not hypothetical. The `/help` tap-target
+  # ratchet sat at **25 / 23 / 25** offenders at 390 / 768 / 1512 against
+  # recorded baselines of **10 / 16 / 16** — red on `main`, for as long as the
+  # topic sidebar has existed, seen by nobody. That particular red is fixed
+  # (the checker now agrees with the product's own 24px in-list floor and the
+  # baselines were re-recorded DOWN to 0). This job is what keeps the NEXT one
+  # from being invisible.
+  #
+  # ⚠ WHY THIS IS A JOB AND NOT A TURBO TASK — two independent reasons, and
+  # the first one is the dangerous one:
+  #
+  #   1. A check whose result turbo may REPLAY FROM CACHE is a check that can
+  #      go green without ever running. This repository has already paid for
+  #      that exact escape: the `@gisik-nokma/ui#test` entry in `turbo.json`
+  #      records `#270` reaching `main` because a cached task replayed a green
+  #      log over a real violation. A browser suite is the worst possible
+  #      candidate for a replayable verdict.
+  #   2. It needs a chromium binary that `pnpm install` does NOT fetch
+  #      (Playwright declares no install script) and a `next dev` server it
+  #      owns on a port of its own. Folding either into the `test` task would
+  #      put a browser download and a long-lived server on the critical path
+  #      of every local `pnpm test`, which is how a check gets routed around.
+  #      `pnpm test:e2e:viewport` at the repo root is the local entry point.
+  #
+  # SELF-CONTAINED BY CONSTRUCTION, verified rather than assumed: the suite
+  # starts its OWN `next dev` on **3021** — never 3001, and
+  # `reuseExistingServer: false`, so an occupied port is a loud stop rather
+  # than a silent adoption of whatever else is listening — and every spec that
+  # reaches an API route stubs it with `page.route` (16 call sites). **No
+  # Postgres, no compose stack, no secrets.** That is why this job needs
+  # neither the `services:` block the test jobs carry nor the stack `e2e`
+  # brings up.
+  viewport:
+    needs: [scope, build]
+    # Spelled out rather than relied on implicitly, for the same reason the
+    # three jobs above spell it out: whether Actions' own default needs-success
+    # gating already covers this was never verified against a real run.
+    if: needs.scope.outputs.code_changed == 'true' && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      # Same key as `build`, restored so the packages below are not rebuilt
+      # from source. The safety property is the one the `build` job states:
+      # the controller's own pre-merge gate runs `--force` and never consults
+      # this cache, so a hit here cannot become the merge decision.
+      - uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
+      - run: pnpm install --frozen-lockfile
+      # The suite drives `next dev` from the WORKING TREE, so the workspace
+      # packages it imports BY NAME must be built: `@gisik-nokma/app-core`
+      # resolves through `packages/app-core/dist`, and a missing or stale dist
+      # is a false reading of this tree in BOTH directions — the repository has
+      # recorded a false red and a false green from that one cause.
+      - run: pnpm turbo run build
+      # Not fetched by `pnpm install`; the one step this suite needs that the
+      # test jobs do not.
+      - name: install the browser
+        run: pnpm --filter @gisik-nokma/web exec playwright install --with-deps chromium
+      - name: the signed-out viewport suite — all three widths
+        run: pnpm run test:e2e:viewport
+      # A browser suite that fails with no artefact is a suite people learn to
+      # route around. `playwright.viewport.config.ts` sets `trace:
+      # 'retain-on-failure'`, so the evidence exists — this is what gets it out
+      # of the runner.
+      - name: viewport traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: viewport-traces
+          path: apps/web/test-results/
+          retention-days: 7
+
   # The single check name the auto-merge precondition and any branch
   # protection rule reads. Fans in every job above; treats a job's own
   # "skipped" (the expected shape on a docs-only change, or when a later job
@@ -574,7 +664,7 @@ jobs:
   gate:
     if: always()
     needs:
-      [scope, check-env, check-runbook, check-citations, check-help, check-tasks, check-migrations, build, typecheck, server-tests, other-tests, e2e]
+      [scope, check-env, check-runbook, check-citations, check-help, check-tasks, check-migrations, build, typecheck, server-tests, other-tests, e2e, viewport]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-node@v4

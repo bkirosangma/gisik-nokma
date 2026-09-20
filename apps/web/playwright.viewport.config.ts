@@ -96,24 +96,47 @@ import { VIEWPORT_BASE_URL, VIEWPORT_PORT, VIEWPORTS } from './e2e-viewport/view
  * image, not the checkout. Nothing holds 3021.
  *
  * ═══════════════════════════════════════════════════════════════════════════
- * ON THE GATE? NO — AND FOR THE SAME TWO INDEPENDENT REASONS AS THE SMOKE
+ * ON THE GATE? **YES** — SINCE 2026-09-20. IT WAS "NO", AND IT COST FIVE DAYS.
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Following `playwright.config.ts`'s pattern rather than inventing a new one:
+ * The previous version of this block is kept, because it was not wrong about
+ * the mechanics and the reversal has to be readable at the rule rather than
+ * discovered as a regression:
  *
  *   * `apps/web/package.json`'s `test` script is `vitest run`, and
  *     `vitest.config.ts` includes `test/**` only — nothing under
- *     `e2e-viewport/` is collected by the gate's runner.
+ *     `e2e-viewport/` is collected by the gate's runner. **Still true.**
  *   * This config is reached only by an explicit `-c playwright.viewport.config.ts`,
- *     a spelling no turbo task defines.
+ *     a spelling no turbo task defines. **Still true.**
  *
- * Two reasons, deliberately, so that editing one away does not put a browser
- * download on CI's critical path by accident.
+ * Two independent reasons were given for staying off the gate, "so that editing
+ * one away does not put a browser download on CI's critical path by accident".
+ * The first is a statement about `vitest`, not about CI, and the second was
+ * answered by naming the suite in `.github/workflows/ci.yml` — which is what
+ * the `viewport` job now does. **What the two reasons actually bought was a
+ * suite that ran only when a human remembered it.**
  *
- * `typecheck` is a different question and the answer there is YES: this config
- * and `e2e-viewport/**` are added to `tsconfig.e2e.json`, which
- * `apps/web`'s `typecheck` script runs. Same precedent, same reason the stack
- * config gives for its own inclusion — "these files should not rot".
+ * The bill, measured rather than argued. The `/help` tap-target ratchet read
+ * **25 / 23 / 25** offenders at 390 / 768 / 1512 against baselines of
+ * **10 / 16 / 16**: red on `main`, for as long as the topic sidebar has
+ * existed, invisible for exactly as long as nothing ran this file. `viewport`
+ * occurred **0 times** in `ci.yml` while the same grep found `e2e` nine times.
+ * **A ratchet with no runner is a note, not a check.**
+ *
+ * ⚠ SO IT RUNS ON CI'S `gate` AND NOT IN TURBO, AND THE SPLIT IS DELIBERATE.
+ * A turbo task's verdict can be REPLAYED FROM CACHE, and a check that can go
+ * green without running is the precise failure `turbo.json`'s own
+ * `@gisik-nokma/ui#test` note records (`#270` reached `main` because a cached
+ * task replayed a green log over a real violation). A browser suite is the
+ * worst possible candidate for a replayable verdict. It also needs a chromium
+ * binary `pnpm install` does not fetch and a `next dev` it owns. `pnpm
+ * test:e2e:viewport` at the repo root is the local entry point; the CI job
+ * `viewport` is the gate.
+ *
+ * `typecheck` was always a YES and still is: this config and `e2e-viewport/**`
+ * are in `tsconfig.e2e.json`, which `apps/web`'s `typecheck` script runs —
+ * "these files should not rot". Types were never the gap. **The gap was a
+ * runner for the assertions.**
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * PROJECTS

@@ -861,15 +861,23 @@ for (const route of UNAUTHED_ROUTES) {
      * ⚠ MEASURED AT `99f2a780`, BEFORE THE SPLIT — and this is why it was urgent.
      * The three `/help` routes read **25 / 23 / 25** against recorded baselines of
      * **10 / 16 / 16**. The sweep had been red on `main` for as long as the topic
-     * sidebar has existed, and nobody saw it, **because this suite is on no gate**:
-     * `pnpm turbo run build test typecheck` defines no task that RUNS it, and
-     * `.github/workflows/ci.yml` runs `test:e2e:stack` only — `viewport` does not
-     * appear in that file at all. **Types are still checked on the gate**
-     * (`tsconfig.e2e.json` includes `e2e-viewport/**`), so what is missing is a
+     * sidebar has existed, and nobody saw it, **because this suite was then on no
+     * gate at all**: `pnpm turbo run build test typecheck` defined no task that RAN
+     * it, and `.github/workflows/ci.yml` ran `test:e2e:stack` only — the string
+     * `viewport` did not occur in that file. **Types WERE still checked on the gate**
+     * (`tsconfig.e2e.json` includes `e2e-viewport/**`), so what was missing was a
      * RUNNER for the assertions, not a compiler for the files. A ratchet with no
      * runner is a note, not a check.
-     * (Wiring this suite to a gate is NOT this change's to make; it is recorded in
-     * the PR body as a finding with its own owner.)
+     *
+     * ✅ **THAT IS FIXED, 2026-09-20 — case 16.59.** `.github/workflows/ci.yml`
+     * carries a `viewport` job that runs `test:e2e:viewport`, and `gate` waits on
+     * it, so every assertion below is now on the merge gate. Re-measured at this
+     * change's own head rather than asserted: `viewport` occurs in `ci.yml`, and
+     * `gate`'s PARSED `needs` list contains the job
+     * (`apps/server/test/ci/ci-workflow-shape.test.ts`, the shape case 13.208
+     * established for `check-citations`). ⚠ **Not via turbo, and deliberately**: a
+     * turbo verdict can be REPLAYED FROM CACHE, and a check that can go green
+     * without running is the failure `turbo.json` already records for `#270`.
      *
      * Every one of those 25 offenders was an in-list control the CSS had ALREADY
      * given the 24px floor — at 390px: 5 `button.gn-help__group-toggle` at 36px,

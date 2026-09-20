@@ -14,16 +14,26 @@ import {
  *
  * ⚠ WHY THIS FILE EXISTS AT ALL, AND IT IS NOT REDUNDANCY. The tap-target
  * assertions live in `apps/web/e2e-viewport/responsive.spec.ts` and
- * `apps/web/e2e-stack/viewport.spec.ts`, and **neither suite is on any gate**:
- * `pnpm turbo run build test typecheck` defines no task that reaches them, and
- * `.github/workflows/ci.yml` runs `test:e2e:stack` only — the string `viewport`
- * does not appear in that file. Measured 2026-09-20, with a positive control in
- * the same invocation. The consequence was not theoretical: the `/help` ratchet
- * sat at **25 / 23 / 25 offenders against baselines of 10 / 16 / 16** on `main`,
- * for as long as the topic sidebar has existed, red the whole time, seen by
- * nobody. This file puts the parts of that rule that a `vitest` run CAN hold —
- * the table's integrity, the two constants, and the fact that the floor has one
- * home — on the gate.
+ * `apps/web/e2e-stack/viewport.spec.ts`, and **when this file was written,
+ * neither suite was on any gate**: `pnpm turbo run build test typecheck` defined
+ * no task that reached them, and `.github/workflows/ci.yml` ran
+ * `test:e2e:stack` only — the string `viewport` did not appear in that file.
+ * Measured 2026-09-20, with a positive control in the same invocation. The
+ * consequence was not theoretical: the `/help` ratchet sat at **25 / 23 / 25
+ * offenders against baselines of 10 / 16 / 16** on `main`, for as long as the
+ * topic sidebar has existed, red the whole time, seen by nobody. This file put
+ * the parts of that rule that a `vitest` run CAN hold — the table's integrity,
+ * the two constants, and the fact that the floor has one home — on the gate.
+ *
+ * ⚠ **THE SENTENCE ABOVE IS PAST TENSE ON PURPOSE — case 16.59, 2026-09-20.**
+ * `ci.yml` now carries a `viewport` job that runs `test:e2e:viewport`, and
+ * `gate` waits on it, so the browser half is on the merge gate too. **This file
+ * did not become redundant when that landed, and the distinction is the whole
+ * reason both exist**: a source scan and a browser measurement fail
+ * independently. This one reddens when a constant or the table is edited and no
+ * browser is involved; the viewport suite reddens when the CSS stops honouring
+ * the floor and no source text changes. A green here is not evidence for the
+ * other, which is why `tests` above and this docblock are both kept.
  *
  * WHAT IT IS NOT. This is a SOURCE-LEVEL test and it does not measure a box.
  * Nothing here proves a control is 24px tall; that is the viewport suite's job
