@@ -1496,7 +1496,7 @@ round is `1db3420c`.
 **Confirmed correct by the reviewer, independently:** all four code facts; that `page.tsx:921`'s
 sentence is shown to member **and** guest (`:910-916`: *"ONE sentence for every non-admin role (member
 and guest alike)"*); the comment is carried end-to-end (`transition-dialog.tsx:376` →
-`ticket-sheet.tsx:491` → `domain/src/workflow.ts:185`) and **is not rendered back**, so "recorded on the
+`ticket-sheet.tsx:554` → `domain/src/workflow.ts:185`) and **is not rendered back**, so "recorded on the
 move rather than shown back as a thread" is true; `type="file"` appears in exactly two app sources and
 the other (`EvidencePicker.tsx`) is mounted nowhere in `apps/`; both counts; and **no un-repaired copy
 of any family survives in the four documents**.

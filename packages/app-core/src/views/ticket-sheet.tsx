@@ -1,5 +1,10 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { newUlid, statesWithBacklog, type SubmittedEvent } from '@gisik-nokma/domain';
+import {
+  newUlid,
+  statesWithBacklog,
+  type SubmittedEvent,
+  type TicketTypeDef,
+} from '@gisik-nokma/domain';
 import { Button, Chip, SegmentedControl, Select, Sheet } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
@@ -64,6 +69,64 @@ import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
  *    the wire; it is NOT built here (no Load-more, no `afterSeq` walk).
  */
 export const HISTORY_PAGE_LIMIT = 200;
+
+/**
+ * The type a NEW SUBTASK takes under a ticket whose type sits at `parentRank`,
+ * or `null` when this workspace's ladder offers no legal child at all.
+ *
+ * **This is the rank rule asked in the one direction the client can answer.**
+ * `checks/hierarchy.ts:133` refuses `type.rank <= parentType.rank`, so a legal
+ * child is a type whose rank is STRICTLY GREATER than the parent's, and that is
+ * the whole of the predicate.
+ *
+ * ⚠ **`DEEPEST_RANK` is NOT a bound on this, and reading it as one is the
+ * natural mistake.** The constant (= 4, `packages/domain/src/ticket-types.ts:136`)
+ * governs ROOT creation alone — a type at that rank or below may not sit at
+ * project root (`hierarchy.ts:108`) — while a child's rank is unbounded above,
+ * which is that file's own reason for writing `>=` there: *"a type DEEPER than
+ * sub-task is smaller still and cannot coherently be exempt — `===` would leave
+ * an escape hatch where defining rank 5 floats your tickets free."* A workspace
+ * that defines rank 7 gets it here for nothing; nothing below knows a maximum.
+ *
+ * **The ladder is the WORKSPACE's, never the built-ins.** `errand` is a
+ * workspace-defined type sharing rank 3 with the built-in `task`, so a fix that
+ * consulted `BUILTIN_TICKET_TYPE_SEEDS` would agree with a default workspace and
+ * disagree with an ordinary one.
+ *
+ * **Which legal child, when several qualify — the prototype first, then the
+ * ladder:**
+ *
+ * 1. **the built-in `task`, whenever `task` is itself legal.** The design
+ *    authority births a subtask as `type: "Task"` (`desktop.dc.html:3654`), and
+ *    this section is otherwise a transcription of it, so departing where the
+ *    prototype IS expressible would be a drift rather than a decision.
+ * 2. **otherwise the SHALLOWEST legal type** — the nearest kind of work below
+ *    the parent that the rank rule admits.
+ *
+ * ⚠ **Rule 2 is the one judgement in this change that is not forced, and it is
+ * flagged for a ruling rather than settled here.** The prototype's `Task` is
+ * impossible under a `task`/`errand` parent (equal rank) and under a `sub-task`
+ * parent, so it cannot be an answer on its own; whether the fallback should be
+ * the shallowest legal type or the deepest is a product question. Under the
+ * owner's ladder this makes an `errand` (rank 3) take a `sub-task` (rank 4),
+ * which is the case the predicate was written for. It is a pure function with
+ * its own cases so the answer changes in one line.
+ *
+ * Ties are broken by `id`, so the answer does not depend on the order the server
+ * happened to return the ladder in.
+ */
+export function subtaskTypeFor(
+  ladder: readonly TicketTypeDef[],
+  parentRank: number,
+): TicketTypeDef | null {
+  const legal = ladder.filter((def) => def.rank > parentRank);
+  if (legal.length === 0) return null;
+  const task = legal.find((def) => def.id === 'task');
+  if (task !== undefined) return task;
+  return legal.reduce((best, def) =>
+    def.rank < best.rank || (def.rank === best.rank && def.id < best.id) ? def : best,
+  );
+}
 
 /**
  * The prototype's two `sheetFullIcon` paths (`desktop.dc.html@6d7b67c0a52c:3402`),
@@ -1234,6 +1297,54 @@ export function TicketSheet({
   const openParentSheet = onOpenTicket;
 
   /**
+   * WHETHER this ticket can take a subtask at all, and WHICH type the child
+   * takes — the single answer the form below is offered on (`16.91`–`16.95`).
+   *
+   * **Why this exists.** Until 2026-09-20 the form was drawn on every ticket
+   * and `addSubtask` sent `typeId: state.typeId` — the PARENT'S OWN type. The
+   * engine refuses `type.rank <= parentType.rank` and equal ranks satisfy that,
+   * so EVERY press was refused; the owner met it as `"Errand" cannot go under
+   * "Errand"` and the server was right about a payload this client built wrong.
+   * The affordance and the payload now read ONE answer, so a form cannot be
+   * drawn over a submission that cannot succeed — which is the whole of
+   * `Features.md:88`'s rule for the New-ticket control, *"asks before it
+   * offers"*.
+   *
+   * **Three ladder states, but FIVE render outcomes, and the extra ones are
+   * the point.** "No type is deeper" and "the ladder has not been read" are
+   * different facts, and rendering the first for the second asserts an absence
+   * this client has not measured — the same rule, one notch quieter: the dialog
+   * *"is TOLD the parent list is unavailable rather than handed an empty one"*.
+   * So an UNREAD ladder renders NOTHING and claims nothing; a ladder read but
+   * unusable — the read FAILED, this ticket's type is ABSENT from it, or no
+   * type is deeper — renders its own sentence for each; a READ ladder with a
+   * legal child draws the form. A disabled control is never one of the answers.
+   *
+   * ⚠ **The ladder is read OVER THE WIRE (`getTicketTypes`), not off
+   * `ClientStateCache` — and that is the difference between this and
+   * `precheck.ts`.** That module's own docblock records that it may not answer
+   * `passed` for `ticket.created` or `ticket.reparented` because this client's
+   * cache holds *"no ticket-type store"* (`precheck.ts:251-267`), so no accept
+   * is derivable there. Here the definitions ARE held, the empty-vs-unread
+   * distinction above is what keeps that honest, and the answer decides only
+   * what to OFFER — never whether the event will be accepted, which stays the
+   * server's.
+   */
+  const parentTypeDef = ticketTypes.data?.find((def) => def.id === state.typeId) ?? null;
+  const subtaskType =
+    parentTypeDef === null ? null : subtaskTypeFor(ticketTypes.data ?? [], parentTypeDef.rank);
+  const subtaskWithheld =
+    ticketTypes.data === null
+      ? ticketTypes.error === null
+        ? null
+        : `The workspace's ticket types could not be read, so a subtask cannot be added here. ${ticketTypes.error}`
+      : parentTypeDef === null
+        ? `This ticket's type is not in the workspace's list of ticket types, so a subtask cannot be added here.`
+        : subtaskType === null
+          ? `This is a ${parentTypeDef.name} — nothing smaller can sit under it.`
+          : null;
+
+  /**
    * Add a subtask (door F, 2026-09-19) — the ordinary `ticket.created` with a
    * parent, through the ingest the sheet already uses. **No route, no
    * migration**: `ticketCreatedPayload` has carried `parentId` since it was
@@ -1251,8 +1362,21 @@ export function TicketSheet({
    * it has no schema; `ticketCreatedPayload`'s own title rule refuses a blank
    * AND a spaces-only title, so the same input draws the same refusal through
    * our mechanism, and nobody's words are quietly rewritten on the way.
+   *
+   * ⚠ **`typeId` is `subtaskType`, NOT `state.typeId`, since 2026-09-20 — and
+   * that single word was the whole defect.** The parent's own type is refused
+   * by `hierarchy.rank` for every ticket that can exist (equal ranks satisfy
+   * `rank <= parentType.rank`), so the form was offering a submission no server
+   * would ever accept. The prototype names this operand too and got it right:
+   * `type: "Task"` (`desktop.dc.html:3654`), a FIXED type, never the sheet's.
    */
   const addSubtask = async (): Promise<void> => {
+    // Unreachable by construction — the form below is drawn only when
+    // `subtaskType` is non-null — and written out rather than asserted with a
+    // `!`, because a payload built from a type this function cannot name is
+    // exactly the defect being closed. An early return sends NOTHING, which is
+    // the only honest answer available.
+    if (subtaskType === null) return;
     setSubtaskRefusal(null);
     setAddingSubtask(true);
     try {
@@ -1261,7 +1385,7 @@ export function TicketSheet({
         entity: { kind: 'ticket', id: newUlid() },
         type: 'ticket.created',
         payload: {
-          typeId: state.typeId,
+          typeId: subtaskType.id,
           projectId: state.projectId,
           parentId: ticketId,
           title: newSubtaskTitle,
@@ -1967,28 +2091,51 @@ export function TicketSheet({
                 ))}
               </ul>
             )}
-            <form
-              className="gn-ticket-sheet__subtask-add"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void addSubtask();
-              }}
-            >
-              <label className="gn-field" htmlFor="gn-new-subtask-title">
-                <span className="gn-field__label">New subtask title</span>
-                <input
-                  id="gn-new-subtask-title"
-                  className="gn-field__input"
-                  data-testid="sheet-subtask-title"
-                  value={newSubtaskTitle}
-                  onChange={(event) => setNewSubtaskTitle(event.target.value)}
-                  disabled={addingSubtask}
-                />
-              </label>
-              <Button data-testid="sheet-subtask-add" type="submit" disabled={addingSubtask}>
-                {addingSubtask ? 'Adding…' : 'Add subtask'}
-              </Button>
-            </form>
+            {/* THE FORM IS OFFERED ON ONE ANSWER, and the alternative is a
+                SENTENCE rather than a disabled control (`16.91`, `16.93`). A
+                disabled control still asserts that the action exists, and this
+                one could not be performed; `Features.md:88`'s rule for the
+                New-ticket control is the precedent this follows.
+
+                There is a THIRD arm — `subtaskWithheld === null` with no
+                `subtaskType` — which draws NOTHING. It is the ladder's unread
+                state, and it is the one that must not be collapsed into the
+                sentence above it: "nothing is deeper" is a claim about the
+                workspace and this client has not read the workspace yet. */}
+            {subtaskType === null ? (
+              subtaskWithheld === null ? null : (
+                <p
+                  className="gn-ticket-sheet__subtask-withheld"
+                  role="status"
+                  data-testid="sheet-subtask-withheld"
+                >
+                  {subtaskWithheld}
+                </p>
+              )
+            ) : (
+              <form
+                className="gn-ticket-sheet__subtask-add"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void addSubtask();
+                }}
+              >
+                <label className="gn-field" htmlFor="gn-new-subtask-title">
+                  <span className="gn-field__label">New subtask title</span>
+                  <input
+                    id="gn-new-subtask-title"
+                    className="gn-field__input"
+                    data-testid="sheet-subtask-title"
+                    value={newSubtaskTitle}
+                    onChange={(event) => setNewSubtaskTitle(event.target.value)}
+                    disabled={addingSubtask}
+                  />
+                </label>
+                <Button data-testid="sheet-subtask-add" type="submit" disabled={addingSubtask}>
+                  {addingSubtask ? 'Adding…' : 'Add subtask'}
+                </Button>
+              </form>
+            )}
             {subtaskRefusal === null ? null : (
               <p className="gn-ticket-sheet__refusal" role="alert" data-testid="sheet-subtask-refusal">
                 {subtaskRefusal}

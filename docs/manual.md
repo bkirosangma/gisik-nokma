@@ -509,6 +509,20 @@ filled in for you, so the new child starts in the first stage of its workflow an
 the same rule as any other: blank, or spaces only, is refused. A refusal keeps what you typed, so you
 correct it rather than retype it.
 
+**The row names the new child's type for you, and it will not offer what your ranks forbid.** A subtask
+is a job of its own and every job has a type, so the row picks one: **Task** wherever a Task can sit
+under the job you are looking at, and otherwise the nearest kind below that job which your own list of
+types allows. That is the same rank rule as above — a child's rank has to be strictly bigger than its
+parent's — read against *your* types rather than the built-in ones, so a kind you defined yourself is
+weighed exactly as the standard ones are. Two jobs at the same rank cannot nest, which is why an
+**Errand cannot take another Errand** — and in the ladder this project ships, the kind below it is a
+**Sub-task**.
+
+**Where nothing at all is smaller, the row is not drawn.** You get a sentence instead — *"This is a
+Sub-task — nothing smaller can sit under it."* — rather than a box and a button that could only end in
+a refusal. And if your list of types cannot be read at all, the section says *that* rather than showing
+you an empty row and letting you conclude there is nothing below.
+
 **One refusal worth knowing about.** The heading's count comes from the server; the list itself comes
 from a separate read. If those two ever disagree — the server counts five children you can see and only
 three could be read — the section **shows you no list at all** and says so in the server's own numbers.
