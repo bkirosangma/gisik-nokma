@@ -1214,9 +1214,12 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
         // from the server's would be worse than no key.
         //
         // The consequence is bounded and visible: offline, the sheet's LAST
-        // crumb renders its absence rather than a key. Owner for delivering it
-        // offline, if that is wanted: whoever owns the replica's snapshot
-        // payload — the same door ruling P36 opened for state provenance.
+        // crumb falls back to the ticket's TITLE rather than a key — **its
+        // absence, not a blank and not the id** (`ticket-sheet.tsx`'s `lastCrumb`
+        // records the fallback and why `state.id` is not it). Owner for
+        // delivering the key offline, if that is wanted: whoever owns the
+        // replica's snapshot payload — the same door ruling P36 opened for state
+        // provenance.
         key: null,
         // `null` for the same reason, and NOT "this ticket has no epic": the
         // walk needs each ancestor's TYPE RANK, which is a workspace-level read

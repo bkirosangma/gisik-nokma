@@ -23,18 +23,21 @@ import { latestWorkflowDefs } from '../read/workflow-defs.js';
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
-/** How far up a parent chain the epic walk will climb before giving up.
- *  MOVED to `read/ancestry.ts` with `EPIC_RANK` on 2026-09-20 — the ticket
- *  detail route walks the same chain one ticket at a time and must not carry a
- *  second copy of the cap. */
 /** The key a card with no epic-rank ancestor-or-self falls into. */
 const NO_EPIC = 'no-epic';
 
 /**
- * The epic rank — MOVED to `read/epic-rank.ts` on 2026-09-20, when the ticket
- * detail route needed the same rung to resolve a single ticket's grandparent.
- * The docblock went with it. Nothing about the rule changed; the second reader
- * is what made a local constant the wrong shape.
+ * `EPIC_RANK` and `MAX_ANCESTRY_DEPTH` were declared here until 2026-09-20 and
+ * now live at `read/ancestry.ts`; their own docblocks went with them.
+ *
+ * ⚠ **THEY WERE CITED IN PROSE BY NAME HERE FOR ONE ROUND AFTER THE MOVE, AND
+ * THAT WAS WORSE THAN A STALE LINE NUMBER.** What stood in this spot was two
+ * "MOVED to …" notes with no code beneath them — one of them naming
+ * `read/epic-rank.ts`, **a module that has never existed** (the file is
+ * `read/ancestry.ts`) — so a reader following the signpost reached nothing, and
+ * a reader grepping for the old constant found an explanation instead of a
+ * definition. A pointer is not a substitute for the thing it points at; the
+ * imports below are what actually resolve.
  */
 
 export type ListQuery = {

@@ -1862,7 +1862,14 @@ describe('F — the subtasks section', () => {
     await settled();
     await screen.findByTestId('sheet-subtasks');
     expect(screen.queryByTestId('sheet-parent-chip')).toBeNull();
-    expect(screen.queryByTestId('sheet-parent-chip-restricted')).toBeNull();
+    // ⚠ REPOINTED 2026-09-20, because the id it named had lost its LAST
+    // producer and the assertion could no longer fail. The owner's merge ruling
+    // moved the restricted arm out of a chip and into the parent indicator, so
+    // `sheet-parent-chip-restricted` renders nowhere; asserting on a testid with no
+    // producer is a check that cannot fail wearing the costume of one that can. The
+    // property it was written for — a root ticket draws NO restricted sentence — is
+    // carried by the id the merged element actually wears.
+    expect(screen.queryByTestId('sheet-parent-restricted')).toBeNull();
   });
 });
 
@@ -2851,9 +2858,13 @@ describe('TicketSheet — the editable title (16.86)', () => {
  * ⚠ **The owner's *"should show the ticket key"* was NOT buildable from what
  * `#595` shipped.** That PR shipped the key's COMPOSITION and the two PREFIXES;
  * the NUMBER — the ticket's position among its project's creations — had no
- * route consuming it, which `Features.md:455` says in as many words (*"the key
- * is composed, served and is enforced, and NO SCREEN RENDERS IT YET"*). The
- * detail route serves it now, and `TicketRead.key` carries it.
+ * route consuming it, which `Features.md:456` said in as many words — *"the key
+ * is composed, served and is enforced, and NO SCREEN RENDERS IT YET"*, quoted in
+ * the PAST TENSE because this change set is what replaced that sentence with
+ * *"until 2026-09-20 NO SCREEN RENDERED IT"*. The detail route serves it now, and
+ * `TicketRead.key` carries it. ⚠ The citation is to `:456` and not `:455`: `:455`
+ * is the PREFIXES bullet above it, and two of this change set's own comments
+ * cited the wrong one until an independent reviewer opened both lines.
  *
  * The arms worth having are the ones the old shape could not express: an
  * ANCESTOR crumb is a LINK that opens that ticket's sheet, the epic crumb is
@@ -2958,7 +2969,7 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
   });
 
   /**
-   * 16.65 — WITH NO `onOpenTicket` AN ANCESTOR CRUMB IS NOT A CONTROL.
+   * 16.64 — WITH NO `onOpenTicket` AN ANCESTOR CRUMB IS NOT A CONTROL.
    *
    * `onOpenTicket` is optional and absent for a caller that cannot open
    * anything. The rule is that prop's own recorded one — *"a control that
@@ -2981,7 +2992,7 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
   });
 
   /**
-   * 16.66 — A RESTRICTED ANCESTOR IS NAMED, NEVER DROPPED, and is never a
+   * 16.65 — A RESTRICTED ANCESTOR IS NAMED, NEVER DROPPED, and is never a
    * control.
    *
    * Dropping it would make a restricted chain render as a SHORTER one — the
@@ -3011,7 +3022,7 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
   });
 
   /**
-   * 16.67 — THE LAST CRUMB IS THE TICKET KEY, which is the owner's own words
+   * 16.66 — THE LAST CRUMB IS THE TICKET KEY, which is the owner's own words
    * (*"should show the ticket key"*) and the thing `TicketRead.key` was added
    * to carry.
    */
@@ -3027,7 +3038,7 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
   });
 
   /**
-   * 16.68 — WHEN THIS READ COULD NOT COMPOSE A KEY, the last crumb falls back to
+   * 16.66 — WHEN THIS READ COULD NOT COMPOSE A KEY, the last crumb falls back to
    * the ticket's TITLE — **and never to `state.id`**.
    *
    * The fallback is asserted in BOTH directions in one case, because the wrong
@@ -3056,7 +3067,7 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
   });
 
   /**
-   * 16.69 — THE STATE IS NOT A CRUMB ANY MORE, and this is the case that makes
+   * 16.63 — THE STATE IS NOT A CRUMB ANY MORE, and this is the case that makes
    * the removal deliberate rather than a silent loss.
    *
    * The old last crumb was the workflow's name for the state (`Doing`), and it
@@ -3119,7 +3130,7 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
   });
 
   /**
-   * 16.70 — THE PARENT INDICATOR RENDERS THE BADGE, IN THE UPPER POSITION, AND
+   * 16.67 — THE PARENT INDICATOR RENDERS THE BADGE, IN THE UPPER POSITION, AND
    * THE SUBTASKS HEAD NO LONGER RENDERS A SECOND COPY.
    *
    * The owner's ruling, verbatim: *"you can keep the badge. but the placement is
@@ -3165,7 +3176,7 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
   });
 
   /**
-   * 16.71 — AT PROJECT ROOT THE INDICATOR NAMES THE ROOT AND DRAWS NO BADGE.
+   * 16.68 — AT PROJECT ROOT THE INDICATOR NAMES THE ROOT AND DRAWS NO BADGE.
    *
    * **A root is not a subtask**, so the `Subtask of …` badge would be a false
    * statement about it; the sentence is kept instead, because the fact is real

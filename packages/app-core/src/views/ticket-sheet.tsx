@@ -1428,38 +1428,30 @@ export function TicketSheet({
       : statesWithBacklog(workflow.data).find((candidate) => candidate.id === state.stateId)?.name ?? state.stateId;
 
   /**
-   * The three crumbs above the title — `Workspace › Project › State`, which is
-   * the prototype's own shape stopped one short of its end.
+   * THE TWO NAMES the chain's first two crumbs are drawn from — the workspace's
+   * and the project's — and the rule that decides whether a crumb is drawn at
+   * all.
    *
-   * ## What was MEASURED, because the dispatch's arithmetic was not right here
+   * ## ⚠ THIS DOCBLOCK DESCRIBED A THREE-CRUMB BAR THAT NO LONGER EXISTS
    *
-   * The prototype builds `sheetCrumbs` from workspace → project → epic →
-   * parent → **the ticket key** — FIVE elements (`desktop.dc.html:3404-3420`) —
-   * and draws them as a `<nav>` immediately above the title input
-   * (`:1100-1116`). The dispatch says to build `Workspace › Project › State` and
-   * STOP: **the key is the FOURTH CRUMB OF OURS** (it would sit after these
-   * three), and it is another round's work. **So three, and the state is the
-   * third.**
+   * It read *"The three crumbs above the title — `Workspace › Project › State`"*
+   * and **"So three, and the state is the third."**, and it recorded that the
+   * ticket KEY *"is the FOURTH CRUMB OF OURS"* and *"is still not built"*
+   * because *"`TicketRead` does not carry the key either — it is the SAME seven
+   * fields"*. **Every one of those sentences was true when written and all of
+   * them are false now**, and an independent reviewer found them still standing
+   * beside the code that contradicts them. Corrected rather than deleted, since
+   * the reasoning about *what the crumb list owes a reader* is what the new
+   * derivation was built on.
    *
-   * ⚠ **AND THE KEY SHIPPED WHILE THIS BRANCH WAS OPEN** (PR #595, merged
-   * `6f08452c`). The sentence here used to call it "another lane's in-flight
-   * branch"; that was true when written and is not now. **The fourth crumb is
-   * still not built, and the reason has changed rather than lapsed:**
-   * `TicketRead` does not carry the key either — it is the SAME seven fields — so
-   * a fourth crumb would need a third host prop or a read, which is the round
-   * the dispatch scoped away. Nothing here is a placeholder for it.
+   * The chain is the AUTHORITY's now — `workspace › project › [epic] › [parent] ›
+   * key`, `sheetCrumbs` at `desktop.dc.html:3404-3425` — **there is no state
+   * crumb in it**, and the key crumb is built: `TicketRead` gained `key` and
+   * `epic`. The chain's own derivation, its link arms and the last crumb's
+   * fallback are documented at `ancestorCrumb` and `lastCrumb` below, beside the
+   * code that draws them.
    *
-   * ⚠ "the fourth" is counted against OUR three, and an earlier version of this
-   * sentence said "the fourth thing THERE" directly after enumerating the
-   * prototype's five, which reads as a claim about `:3404-3420` and is false
-   * of it. An independent reviewer caught the ambiguity; `Features.md` had the
-   * same wording and is corrected with it.
-   *
-   * The state is the one crumb whose source is IN this component: it is
-   * `currentStateName` above, already derived for the state chip from the
-   * workflow this sheet has loaded. The two names are the props documented on
-   * `TicketSheetProps` — **they are NOT on `TicketRead`**, which is seven fields
-   * and carries no name of any kind.
+   * What survives HERE is the part that is about these two NAMES:
    *
    * ## A crumb is drawn only for a KNOWN name, and that is a correction
    *
@@ -1476,8 +1468,15 @@ export function TicketSheet({
    *
    * So the behaviour is the sibling surface's, not a new one: the project page
    * renders its own title exactly this way — `{projectName !== null ? <h1>…</h1>
-   * : null}` (`page.tsx:1614`) — and the state crumb always renders, because it
-   * is derived here rather than fetched.
+   * : null}` (`page.tsx:1614`).
+   *
+   * ⚠ **"the state crumb always renders, because it is derived here rather than
+   * fetched" stood here and is GONE with the crumb.** The state is still on the
+   * sheet — its own chip, from the same `currentStateName` — but it is no longer
+   * a crumb, so nothing in this list is derived from the workflow any more.
+   *
+   * The two names are the props documented on `TicketSheetProps` — **they are
+   * NOT on `TicketRead`**, which carries no name of any kind.
    *
    * ## An EMPTY string is not a name either, and the first cut let one through
    *
@@ -1540,10 +1539,18 @@ export function TicketSheet({
     ancestor: NonNullable<ParentRef>,
     testId: string,
     onOpen: ((ticketId: string) => void) | undefined,
+    // ⚠ THE NOUN IS A PARAMETER AND NOT DERIVED FROM `testId`, which is what an
+    // earlier version of this helper did — it read
+    // ``testId === 'sheet-crumb-epic' ? 'epic' : 'parent'`` and so keyed
+    // USER-VISIBLE COPY on a test selector. A third caller, or a renamed
+    // testid, would have silently changed what a reader is told. An independent
+    // reviewer flagged it; no current call site was wrong, which is exactly why
+    // it would have survived until one was.
+    noun: 'epic' | 'parent',
   ): ReactElement =>
     ancestor.kind === 'restricted' ? (
       <span className="gn-ticket-sheet__crumb gn-ticket-sheet__crumb--restricted" data-testid={testId}>
-        {`Restricted ${testId === 'sheet-crumb-epic' ? 'epic' : 'parent'}`}
+        {`Restricted ${noun}`}
       </span>
     ) : onOpen === undefined ? (
       <span className="gn-ticket-sheet__crumb" data-testid={testId}>
@@ -1767,7 +1774,7 @@ export function TicketSheet({
                   <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
                     ›
                   </span>
-                  {ancestorCrumb(epicCrumb, 'sheet-crumb-epic', openParentSheet)}
+                  {ancestorCrumb(epicCrumb, 'sheet-crumb-epic', openParentSheet, 'epic')}
                 </>
               )}
               {parent === null ? null : (
@@ -1775,7 +1782,7 @@ export function TicketSheet({
                   <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
                     ›
                   </span>
-                  {ancestorCrumb(parent, 'sheet-crumb-parent', openParentSheet)}
+                  {ancestorCrumb(parent, 'sheet-crumb-parent', openParentSheet, 'parent')}
                 </>
               )}
               <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">

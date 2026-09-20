@@ -229,6 +229,24 @@ describe('16.70 the grandparent is the nearest PROPER ancestor of EPIC rank', ()
     await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: rootTask, typeId: 'task' });
     const rootRead = await get(`/v1/workspaces/${ws}/tickets/${rootTask}`, headers);
     expect(rootRead.json().epic).toBeNull();
+
+    // ⚠ AND THE ARM THAT SEPARATES "THERE IS NO TICKET THERE" FROM "THERE IS
+    // ONE YOU MAY NOT SEE" — the two answers `canSee` gives alike, and which an
+    // earlier version of the walk COLLAPSED. A `parent_id` naming a ticket that
+    // was never created must answer `null`; the collapsed version answered
+    // `{kind:'restricted', id:<never created>}`, asserting the existence of a
+    // ticket the system has no evidence for. Case 6.68 owns the property at the
+    // PARENT field; this is the same question one hop further up, where the
+    // walk — not the parent branch — was the thing asking.
+    const neverCreated = newUlid();
+    const dangling = newUlid();
+    await seedTicket(db.pool, {
+      workspaceId: ws, projectId: prj, ticketId: dangling, typeId: 'task', parentId: neverCreated,
+    });
+    const danglingRead = await get(`/v1/workspaces/${ws}/tickets/${dangling}`, headers);
+    expect(danglingRead.statusCode).toBe(200);
+    expect(danglingRead.json().parent).toBeNull();
+    expect(danglingRead.json().epic).toBeNull();
   });
 
   it('a grandparent the viewer may NOT see is restricted — existence and id, no title', async () => {

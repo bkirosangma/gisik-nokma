@@ -855,24 +855,45 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — the single read'
       rollup: null,
       // THE COMPOSED KEY, and this is the assertion the whole wire change is
       // for. It reads `RTSF-2` and every character of it is derived:
-      // `RT` + `SF` + `-` + `2`. The two prefixes are the ones this fixture
-      // ENTERED on its founding claims (`workspace.created` `prefix: 'RT'` at
-      // `:455`, `project.created` `prefix: 'SF'` at `:483`); the number is the
-      // ticket's position among its project's creations by `workspace_seq`,
-      // and this child is the SECOND ticket founded in `Shop floor`.
+      // `RT` + `SF` + `-` + `2`.
+      //
+      // ⚠ **BOTH PREFIXES ARE DERIVED, NOT ENTERED, AND THAT MAKES THIS A
+      // STRONGER WITNESS THAN IT FIRST LOOKS.** My first version of this
+      // comment said the fixture "ENTERED" them on its founding claims; that was
+      // FALSE and an independent reviewer caught it by opening the lines. The
+      // founding posts carry names and nothing else — `POST /v1/workspaces` with
+      // `{name: 'Round Trip Corner'}` (`:226`) and `project.created` with
+      // `{name: 'Shop floor', description: …}` (`:254`) — and this file says so
+      // itself at `:450-454`. The `prefix: 'RT'` my comment cited at `:455` is
+      // inside the expected body of `GET /v1/me/workspaces`, i.e. an EXPECTED
+      // answer, not an input. So `RT` and `SF` are `derivePrefix` running on the
+      // far side of a real door, which is a better property to have pinned here
+      // than a typed prefix would have been.
+      //
+      // The number is the ticket's position among its project's creations by
+      // `workspace_seq`: `Restock the chiller` (`:273`) is the first and this
+      // child the second — `ticketCount: 2` at `:486` agrees.
       //
       // ⚠ Pinning the literal rather than a pattern is deliberate: a regex
       // would pass for a route that composed the wrong prefixes, and the whole
-      // point of an exact-value pin here is that ANOTHER workspace's key would
-      // be a different string. Renaming a fixture that changes these prefixes
-      // moves this assertion, which is the correct failure.
+      // point of an exact-value pin is that ANOTHER workspace's key would be a
+      // different string. Renaming a fixture that changes these prefixes moves
+      // this assertion, which is the correct failure.
       key: 'RTSF-2',
-      // The grandparent, 2026-09-20. `null` — this fixture's world has an epic
-      // (`Shop floor`'s tickets hang off `Restock the chiller`, which is a
-      // `task`), so the walk climbs from the parent to a ticket with no parent
-      // and finds no epic-rank ancestor. A version that returned
-      // ancestor-or-self, or the immediate parent, would put `Restock the
-      // chiller` here and redden.
+      // The grandparent, 2026-09-20. `null` for a two-hop reason this fixture
+      // happens to contain: the child's parent `Restock the chiller` is a
+      // `story` (`:274`) and the story's own parent is null, so the walk reaches
+      // a root and finds no epic-rank ancestor.
+      //
+      // ⚠ **A version reporting the IMMEDIATE PARENT would put `Restock the
+      // chiller` here and redden** — that is the falsifier this assertion
+      // carries. My first version of this comment named ancestor-or-self as the
+      // other failing version, and that was WRONG: the walk is rank-filtered, so
+      // starting at the ticket itself still finds no `epic`-rank type on this
+      // chain and still answers `null`. Corrected rather than deleted, because
+      // the difference between the two wrong versions is exactly the difference
+      // between the two checks (`16.70`'s sibling arm is the one that witnesses
+      // PROPER-versus-self, on a fixture that HAS an epic).
       epic: null,
     });
   });

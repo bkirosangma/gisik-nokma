@@ -1464,7 +1464,8 @@ describe('GET /v1/workspaces/:ws/tickets/:id vs TicketRead', () => {
     // the one the dispatch believed was already served** — what `#595` shipped
     // is the COMPOSITION and the two PREFIXES, and the NUMBER had no route
     // consuming it (`ticketNumber`'s only consumers were its own tests, and
-    // `Features.md:455` says *"NO SCREEN RENDERS IT YET"*). So this is a
+    // `Features.md:456` said *"NO SCREEN RENDERS IT YET"* until this change set
+    // replaced that sentence). So this is a
     // WIDENING by two readers on the existing route — `ticketNumber` and the
     // ancestor walk — and not a second door, exactly as the seventh key was.
     expect(Object.keys(body).sort()).toEqual([

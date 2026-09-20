@@ -563,15 +563,23 @@ export function registerTicketRoutes(
        * `routes/list.ts` groups a whole PAGE by epic with one recursive CTE,
        * and that CTE carries `visibleTicketsWhere` — a SQL visibility
        * expression. **This route may not have one.** Its own docblock is
-       * explicit (`:281-288`): *"The visibility decision is `canSee`'s,
+       * explicit (`:309-316`): *"The visibility decision is `canSee`'s,
        * always. No SQL here re-states who may see what."*
        *
-       * So the walk is the `parent` branch directly above, repeated: the same
-       * `canSee`, the same `getTicketStateFromDb`, the same soft-delete arm,
-       * the same `restricted` shape for an ancestor this viewer may not see.
-       * **No visibility rule is restated** — each hop asks `canSee` the
-       * question it already answers — and the two reads agree by construction
-       * because they are the same calls.
+       * So the walk is the `parent` branch directly above, repeated: **the same
+       * `loadTicketRow` existence test FIRST**, then the same `canSee`, the
+       * same `getTicketStateFromDb`, the same soft-delete arm, the same
+       * `restricted` shape for an ancestor this viewer may not see. **No
+       * visibility rule is restated** — each hop asks `canSee` the question it
+       * already answers — and the two reads agree by construction because they
+       * are the same calls.
+       *
+       * ⚠ **THE ORDER IS NOT DECORATION AND THIS SENTENCE ONCE OMITTED IT.** An
+       * earlier version of this docblock said the walk repeated the parent
+       * branch while the code asked `canSee` FIRST and never tested the row —
+       * and an independent reviewer caught that the claim was false of the code
+       * beneath it. The consequences were not cosmetic: see the existence test
+       * in the loop for what that ordering was emitting.
        *
        * ## PROPER ancestor, unlike the list's walk
        *
@@ -610,6 +618,27 @@ export function registerTicketRoutes(
       let cursor = state.parentId;
       let depth = 0;
       while (cursor !== null && depth < MAX_ANCESTRY_DEPTH) {
+        // ⚠ EXISTENCE IS ASKED FIRST, AND THE ORDER IS THE WHOLE OF CASE 6.68.
+        // This walk originally asked `canSee` here and nothing else, which was a
+        // defect an independent reviewer caught: **`canSee` answers `false` for
+        // an invisible ticket AND for a ticket with no row** (its own docblock:
+        // *"Unknown and invisible are the same answer"*), so a `parent_id`
+        // naming a ticket that was never created took the `restricted` arm on
+        // the first hop and this route emitted `{kind:'restricted', id:<never
+        // created>}` — **asserting the existence of a ticket the system has no
+        // evidence for**, which is the inverse leak `tickets-read.test.ts:419`
+        // exists to prevent, and the authority omits the crumb entirely in that
+        // case (`desktop.dc.html:3416-3419`, `if (p) chain.push(...)`, no else).
+        //
+        // The parent branch directly above orders it this way, and that is what
+        // makes the docblock's claim about it true rather than merely intended.
+        // A dangling id breaks the walk: `proj_visibility` already resolved such
+        // a child as a ROOT (case 6.9), so the chain genuinely ends here and
+        // `null` is the answer the projection gave.
+        const row = await loadTicketRow(deps.pool, workspaceId, cursor);
+        if (row === undefined) {
+          break;
+        }
         if (!(await canSee(deps.pool, request.currentUserId, cursor))) {
           epic = { kind: 'restricted', id: cursor };
           break;
