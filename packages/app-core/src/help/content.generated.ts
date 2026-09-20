@@ -4188,7 +4188,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", with three kinds of thing, in this order:"
+                    "text": ", with four kinds of thing, in this order:"
                   }
                 ]
               },
@@ -4224,6 +4224,16 @@ export const HELP_CONTENT: HelpContent = [
                     {
                       "kind": "text",
                       "text": " — a claimed deadline coming up."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Contested"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — a claim somebody disputed; its sentence is the rule's own reason for refusing it."
                     }
                   ]
                 ]

@@ -85,7 +85,7 @@ component's other mode, which the web does not use.
 
 | # | L | Bullet | Verdict | Where |
 |---|---|---|---|---|
-| 1 | 50 | `apps/web` — the Next.js 15 App Router shell | Covered | P§2 (three-link menu), P§8 (view tabs), P§12 + R§1 (light/dark toggle cycling system→light→dark). **Note:** the bullet's own route list names Board and List tabs; the shipped page has four (Board, List, Calendar, Timeline), and the personas are right |
+| 1 | 50 | `apps/web` — the Next.js 15 App Router shell | Covered | P§2 (three-link menu), P§8 (view tabs), P§12 + R§1 (light/dark toggle cycling system→light→dark). **Note:** the bullet's own route list names Board and List tabs; the shipped page has five — Backlog, Board, List, Calendar and Timeline, in that order (`page.tsx:1756-1760`) — and the personas are right |
 | 2 | 51 | Passwordless sign-in, all four methods and nothing password-shaped | Covered | P§1, R§1. Correction **C1** applied — phone is refused |
 | 3 | 52 | A refused read is rendered as the refusal | Covered | P§1 + R§1 (an expired session says so and takes you to sign in, then returns you where you were going); P§13 + R§10 (a genuine failure shows one plain sentence, never technical wreckage) |
 | 4 | 53 | The list can be asked a smaller question, and says so on every surface that answers it | Covered | P§8 (the exact note, and the Board exemption), R§7. P§8 also has the 2,000-job ceiling and that narrowing is the way back under it |
@@ -207,9 +207,9 @@ component's other mode, which the web does not use.
 
 | # | L | Bullet | Verdict | Where |
 |---|---|---|---|---|
-| 88 | 1780 | Calendar view | Covered | P§8 (drawn only from claimed days; bar for two dates, single marker for one, two markers and no bar for a contradiction; undated work absent; four different sentences for four kinds of empty), R§8 |
+| 88 | 1780 | Calendar view | Covered | P§8 (drawn only from claimed days; bar for two dates, single marker for one, two markers and no bar for a contradiction; undated work absent; the sentences for the kinds of empty), R§8. The shipped model selects three of those sentences and only two can render — the third needs a `filter` or a lane that no screen passes |
 | 89 | 1781 | Custom date fields on Calendar and Timeline | Covered | R§8 is the clearer ("a start date, a due date, or a custom date field your business set up"); P§8 covers claimed dates generally |
-| 90 | 1782 | Claimed-date-field legend | Covered *(thin)* | P§8 lists the legend switch as one of the four reasons a calendar can be empty; neither describes it as a per-field control that is named and counted |
+| 90 | 1782 | Claimed-date-field legend | Covered *(thin)* | P§8 lists the legend switch among the reasons a calendar can be empty; neither describes it as a per-field control that is named and counted |
 | 91 | 1783 | Timeline view | Covered | P§8 (four weeks at a time; a side list with a heading naming which of five reasons a job is not drawn as a bar), R§8 |
 | 92 | 1790 | Inbox | Covered | P§9 (exactly five kinds and the vocabulary is closed; the badge refreshing about once a minute and keeping its last number rather than resetting; click to mark read; the empty message that doubles as an explanation; Load more; a message that outlives your access to what it is about), R§8 |
 
@@ -248,5 +248,4 @@ absences that no `✅` bullet claims, because there is nothing to claim:
    a workaround and was wrong.
 4. **No way to leave a comment on the web.** The first half of this is fixed: the description is writable on the web since 2026-09-19 (C3, corrected). Comments are not — and nothing on the web renders a comment thread either.
 
-Two smaller ones in the same shape: nothing links to the six settings screens (C5), and there is no
-search box anywhere on the web (bullet 47).
+A smaller one in the same shape: nothing links to the six settings screens (C5).

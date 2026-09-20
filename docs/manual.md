@@ -823,11 +823,12 @@ person. Past that you are told you have too many, and closing one frees a slot s
 
 ### The "Needs your attention" strip
 
-A row at the top of My Work, headed *"Needs your attention"*, with three kinds of thing, in this order:
+A row at the top of My Work, headed *"Needs your attention"*, with four kinds of thing, in this order:
 
 1. **Blocked** — sitting in a stage somebody flagged as blocked.
 2. **Stale** — has been sitting in the same stage too long.
 3. **Due soon** — a claimed deadline coming up.
+4. **Contested** — a claim somebody disputed; its sentence is the rule's own reason for refusing it.
 
 Each one carries its own sentence, so you never have to guess why it is there: *"In an active state
 since 2026-07-10 — past the 7-day staleness threshold."* or *"Needed by 2026-08-30 — due within 7

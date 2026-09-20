@@ -62,22 +62,31 @@ This is the part a marketing page would leave out. Read it before you decide any
 - **You cannot create a project.** There is no button anywhere in the product that makes one. A brand
   new workspace comes with stages, job types and you as its owner — and nowhere to put a job. Until
   this is built, projects have to be put there for you.
-- **You cannot assign a job to anybody.** The board shows who a job is on, the Inbox tells you when
-  you have been assigned something, and the table can group by person — but nothing on any screen puts
-  a job on a person.
+- **You cannot assign a job to anybody on the phone or desktop apps.** The website can, from the job
+  sheet's **Assignee** picker — which also offers **Unassigned**, so an assignment can be cleared as
+  well as set. The board shows who a job is on, the Inbox tells you when you have been assigned
+  something, and the table can group by person.
 - **You cannot set a due date.** The calendar, the timeline and the whole "due soon" list are built
   around claimed dates, and there is no control that claims one.
-- **You cannot write a description or leave a comment on the web.** The writing box — formatting,
-  mentions, attachments, all of it — is built and is not connected to the job screen. The phone app
-  can post a comment; the full website cannot.
-- **There is no search box on the web.** A good search exists underneath and nothing on any screen
-  calls it. The phone app's board screen has the only search box in the product.
+- **There is no comment thread on the web.** The description *is* writable — the writing box handles
+  formatting and mentions and is connected to the job screen, though a file dropped into it is refused
+  rather than quietly lost. A comment is different: the writing box takes a description and not a
+  comment, and a Move's *required* comment is recorded on the Move. A comment can still reach you — an
+  Inbox row quotes the opening of the comment or description that mentioned you, and that is the whole
+  of it. The phone app has a Comment button on a job and the website does not.
+- **No screen on the web or the desktop searches inside a job's description or its comments.** The
+  full-text search that does exists — the phone app's offline search reads comment bodies, and an MCP
+  client's `search_tickets` reads titles, descriptions and comments. What the web itself offers is a
+  **Search the board** box on a project's board, which matches the titles of the cards already loaded
+  there, and the help's own search over this manual and the FAQ.
 - **Nothing links to the settings screens.** The stage builder and the job-type editor — the screens
   that make the product yours — can only be reached by typing their address into the browser.
 - **Notifications never leave the app.** No email, no text message, no push. The only email Gisik
   Nokma sends is your sign-in link. If nobody opens the Inbox, nobody finds out about anything.
-- **Sign-in by phone number does not work.** The sign-in screen opens on the Phone tab and that tab is
-  refused. Use **Email link**, Google or a passkey.
+- **Sign-in by phone number does not work.** There is no SMS channel at all — sending a code to an
+  Indian number needs a DLT-registered sender and template, which is a registration rather than a
+  setting — so the sign-in screen offers **no Phone tab**. There is nothing to press that then fails.
+  Use **Email link**, Google or a passkey.
 
 There is also one thing that surprises everybody, and it is a decision rather than a gap: **the whole
 product runs on Indian time, for everybody, everywhere.** A day starts at midnight in India, not
@@ -115,6 +124,7 @@ pnpm workspaces + Turborepo (Node 22, TypeScript strict, ESM, Vitest):
 | `packages/sync-client` | The offline replica and the sync protocol the native apps run on. |
 | `packages/ui` | Shared components and design tokens. |
 | `packages/editor` | The rich-text/mention editor. |
+| `packages/mcp-server` | An MCP server, over stdio, that lets an assistant read and change a board **as you** — the same visibility and workflow rules, the same refusals, and every write it makes carries `origin: 'mcp'` so a machine's claim is distinguishable from yours. |
 | `apps/server` | Fastify server; the append-only Postgres event ledger and its projections; migrations via node-pg-migrate. |
 | `apps/web` | The Next.js 15 App Router shell. |
 | `apps/mobile` | Expo/React Native. |
@@ -128,8 +138,9 @@ pnpm install
 pnpm turbo run build test
 ```
 
-The gate is `pnpm turbo run build test typecheck`, plus four repository checks — `pnpm check:tasks`,
-`check:runbook`, `check:citations` and `check:env`.
+The gate is `pnpm turbo run build test typecheck`, plus six repository-check jobs in
+`.github/workflows/ci.yml` — `check:env`, `check:runbook`, `check:citations`, `check:help`,
+`check:tasks` and `check:migrations`.
 
 **If `pnpm install` exits 1 with no output at all, check `node -v` first.** `engine-strict=true` makes
 the declared Node range binding, and pnpm's refusal under a wrong version is completely silent — the
@@ -153,7 +164,8 @@ says 22; `nvm use` is the fix.
 standalone from a `file:` URL with its snapshot data, four views included (Focus, Board, Backlog,
 Calendar).
 
-The generator (`tools/build_tracker.py`, 73 tests) is included as reference; it reads that
+The generator (`reference/convenience-corner-tracker/tools/build_tracker.py`) is included as
+reference, with its tests beside it (`tools/test_build_tracker.py`, 73 of them); it reads that
 repository's origin files (README roadmap, `test-cases/`, `operations/`, `tokens.json`) and will not
 run here. That is expected — the snapshot is provenance, not a dev environment.
 

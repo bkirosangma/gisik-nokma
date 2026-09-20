@@ -1,4 +1,124 @@
-## ▲ TOP BLOCK — **THE README'S TWO WRONG COUNTS, AND THE FOUR OTHER PLACES THE SAME TWO CLAIMS SURVIVE.** (2026-09-20, ~08:xx IST)
+## ▲ TOP BLOCK — **NINE FALSE CLAIMS ABOUT THE PRODUCT, AND THE SIX REVIEW PASSES — FIVE OF WHICH FOUND A DEFECT IN PROSE WRITTEN THE DAY BEFORE.** (2026-09-20, ~13:xx IST)
+
+### § 1 — WHERE TO FIND IT
+
+- **Dispatch: the controller's "the seven you recorded, including the one a user reads inside the
+  product" paste** (2026-09-20 ~08:0x IST). **Base named as `main` = `fbe8f933`** (`#582`, mine, merged).
+- **Branch `exec2/readme-false-claims`**, cut from `fbe8f933`. **CODE HEAD `33a7253a`** — `4b356a0e`
+  (the change) + **five** fix rounds (`ea6d768a`, `8621790a`, `85afe05d`, `e6ab6d42`, `33a7253a`), each
+  one answering a defect the NEXT review pass found.
+- **The PR opens as the last step of this dispatch.** If you are reading this from `main`, settle it in
+  one call: `gh pr list --state all --head exec2/readme-false-claims`.
+- **Docs only**: `README.md`, `docs/manual.md`, `docs/product-coverage-map.md`,
+  `packages/app-core/src/help/content.generated.ts`. `docs/faq.md` was swept twice and correctly needed
+  no change.
+- ⚠ **`main` MOVED WHILE THIS BRANCH RAN: `fbe8f933` → `5c8ea78d`.** Main touched **none** of this
+  branch's four files (control fired: 40 files changed on main in the same invocation), and
+  `git merge-tree --write-tree origin/main HEAD` is **clean**. So the regenerated
+  `content.generated.ts` is NOT stale and no rebase was needed. **The two-dot trap is live on this
+  tree**: `git diff --stat origin/main HEAD` prints **44 files** (main's own commits) where the
+  three-dot form prints this branch's **4**.
+
+### § 2 — ANCHORS, RECOUNTED AT `33a7253a` (not carried forward)
+
+| anchor | value |
+|---|---|
+| `git merge-base origin/main HEAD` | `fbe8f933` |
+| **CODE HEAD** (last change commit) | `33a7253a` |
+| ahead / behind `origin/main` (`5c8ea78d`), **at the code head** | **6 / 10** |
+| the commit carrying THIS FILE | one on top of the code head — **do not trust a literal here.** `git log -1 --format=%h -- docs/lanes/executor-2-state.md` names it. Every anchor above is stated at the CODE head, which is the last commit that changes anything a reader would act on. |
+| tree | **clean** |
+| diff vs `origin/main` (3-dot) | **4 files, +42/−20** |
+| `check:help` | **ok** — 2 documents, 29 sections, **231 entries**, generated copy matches source |
+| `check:env` / `check:runbook` / `check:citations` / `check:tasks` | **all exit 0** |
+| `check-case-ids` | ok — **2494** unique ids, highest `16.82` (unchanged: **no case id minted**) |
+| **the gate** | `4b356a0e` — **33/33, Cached: 17, 1m12.8s**, with `app-core:build/test/typecheck` all **cache-miss** (so the regenerated content genuinely re-ran). At the five fix heads the gate is **FULL TURBO / 0 cache-miss**, because markdown is not a turbo input. **The forced gate is the controller's.** |
+
+⚠ **No case id was minted, on purpose:** nothing in this dispatch pins a product behaviour. Every
+sentence changed *describes* behaviour that already ships and is already pinned — the strip's four
+kinds are pinned by case **3.62** (`attention-strip-kinds.test.tsx` renders all four).
+
+### § 3 — WHAT WAS WRITTEN
+
+Seven dispatched, **nine shipped**, plus **four clauses** withdrawn from prose this branch itself wrote.
+
+| # | claim | old text said | now says |
+|---|---|---|---|
+| 1 | README search | "There is no search box on the web" | no **web/desktop screen** searches a job's description or comments; the board box matches **loaded card titles**, the help searches the manual+FAQ, the phone's offline search reads comment bodies, MCP's `search_tickets` reads all three |
+| 2 | README phone | "opens on the Phone tab and that tab is refused" | **no Phone tab is offered at all** — `selectOtpSender` has no branch |
+| 3 | README checks | "four repository checks" | **six repository-check jobs**, named |
+| 4 | README packages | six listed | **seven** — `packages/mcp-server` added |
+| 5 | README generator | `tools/build_tracker.py`, 73 tests | `reference/convenience-corner-tracker/tools/build_tracker.py`, tests beside it |
+| 6 | manual strip | "three kinds of thing" | **four** — Blocked, Stale, Due soon, **Contested** |
+| 7 | coverage map | four views / four empty-sentences / four reasons / "no search box anywhere on the web" | **five** views Backlog-first; **three** sentences of which **two render**; **two** things an empty calendar can say; search-box clause deleted |
+| 8 | README description | "You cannot write a description" | the description **IS writable** (since 2026-09-19) |
+| 9 | README assignee | "nothing on any screen puts a job on a person" | the **web** can, from the job sheet's Assignee picker |
+
+⚠ **#8 was the reviewer's Critical and it sat TWO LINES ABOVE the claims the dispatch named.** #9 came
+from the same sweep. **Three of the nine were found by asking of each bullet "can this actually
+appear?" rather than by matching a pattern** — the universe rule applied to a LIST, which is why the
+next dispatch names the list and not the claims.
+
+### § 4 — THE FIVE PASSES, WHICH ARE THE DURABLE PART
+
+**Five passes found a defect; the sixth came back clean.** Every one of the five was in prose written the
+day it was reviewed. Four of the five were the same failure: **a claim true of one path, stated as true
+of the product** — and each time I had verified that a citation RESOLVED rather than that what it
+resolved to was TRUE.
+
+| pass | found | repaired by |
+|---|---|---|
+| 1 | 8th claim (description writable), my search bullet false twice (phone offline search reads comment bodies; MCP `search_tickets`), the checks riders named as pnpm scripts that do not exist, a dropped true qualifier | fix round 1 |
+| 2 | "nothing on the web lists one [a comment]" — the Inbox quotes a mention's opening; "you cannot attach a file" — the Move's evidence upload stores a row ON the ticket. **My warrant was `manual.md:359`, which RESOLVES correctly and is contradicted by `manual.md:562-565`** | fix round 2 |
+| 3 | **I had answered a falsified headline by ADDING a sentence under it rather than removing the false absolute** — the only edit was appending " to a job" | fix round 3 (**deletion**) |
+| 4 | the web DOES have a comment box — the Move dialog's `require-comment` textarea — so "you cannot leave a comment on the web" was false; `manual.md:356` contradicts `manual.md:550-552` | fix round 4 |
+| 5 | **fix round 4 traded a TRUE narrow claim ("no comment thread") for a FALSE broad one ("nothing on the web renders a comment back") and deleted the qualifier that made it honest** | fix round 5 |
+| 6 | **CLEAN** — every clause of the rewritten bullet holds, read line by line. Two reader-mis-take risks recorded, neither a false clause, **neither fixed**: (a) a mention typed into a Move's *required* comment notifies nobody, because `ticket.transitioned` is not routed to fan-out at all — so "the comment … that mentioned you" is not universal; (b) "the writing box takes a description and not a comment" is true of the **web** box only (the phone's same editor writes `comment.added`), which the bullet's own final sentence scopes. | nothing owed |
+
+**The lesson, and it is the third time on this project: deleting a gloss beats correcting it.** Round 3
+and round 5 both ended in removal. Round 2's `manual.md:359` warrant is the sharpest instance: **a
+citation that resolves is not a citation that is right.**
+
+### § 5 — RECORDED, NOT FIXED, ALL WITH NAMED OWNERS
+
+1. **`README.md:62` — "You cannot create a project." FALSE in FIVE documents.** Filed at
+   `gisik-nokma-lanes/EXEC2-FINDING-2026-09-20-project-creation.md`; **the controller verified all five
+   locations and ruled it a SEPARATE dispatch** (note at `CTL-NOTE-2026-09-20-project-creation-finding.md`).
+   **The gate is measured and recorded at the finding's §6:** `mayAdminister` (`workspace-viewer.ts:90-92`)
+   → `page.tsx:632` → owner/admin get the form, **member/guest get an explicit sentence**
+   (`page.tsx:921`, *"Only an admin can create a project in this workspace."*) — so **the repair is
+   viewer-scoped, NOT a deletion**, and the coverage map's list loses one of four items.
+2. **The attachment family.** `manual.md:359` ("You cannot attach a file") is contradicted by the same
+   document at `:562-565` and `:1058-1061`, both recording the 2026-09-19 fix; `faq.md:433` too.
+   **Same claim as pass 2's Important — the two repairs should land together.** Recorded, not fixed:
+   the manual feeds `content.generated.ts`.
+3. **The comment family.** `manual.md:356` says "You cannot leave a comment" while `:550-552` calls the
+   Move dialog's box a comment; `product-coverage-map.md:249` carries the same absolute.
+4. **`Features.md:67` and `test-cases/03-foundation-ledger.md:62` (case 3.55)** — "a surface that is
+   structurally incapable of holding its fourth kind". **It can hold it**:
+   `attention-strip-kinds.test.tsx` renders all four kinds (case **3.62**).
+5. **`packages/app-core/src/help/search.ts:15`** — "The product has **no search on the web at all**".
+   The eight-gap tally it cites is still correct (re-measured: README's list holds 8 bullets); the
+   no-search half is stale.
+6. **`docs/product-coverage-map.md:151` (row 49) and `:213` (row 91)** — "three kinds in order" and
+   "five reasons", inside `P§9`/`P§8` citations. **`P§n`/`R§n` are the persona DRAFTS, "NOT in this
+   repository"** (the map's own Sources, `:8-15`) — so these are unverifiable from here, exactly like
+   the row I had to revert in fix round 1.
+
+### § 6 — THE INSTRUMENT NOTE
+
+**`coverage-map` row 90 (`:212`) was rewritten by me and then REVERTED**, because the row's subject is
+`P§8` — a document not in this repository — and I had asserted what it "names" and "describes" by
+inferring `P§8 == manual.md §8`. The inference may be right; I could not check it. The row now drops the
+wrong number and asserts nothing new. **Row 88 keeps its correction, moved OUT of the `P§8`
+parentheses** so it no longer reads as a claim about the draft.
+
+⚠ **`docs/lanes/executor-2-state.md` was touched on `main`** while this branch ran. Not ours; do not
+"reconcile" it.
+
+---
+
+## ▼ PREVIOUS BLOCK — **THE README'S TWO WRONG COUNTS, AND THE FOUR OTHER PLACES THE SAME TWO CLAIMS SURVIVE.** (2026-09-20, ~08:xx IST)
 
 ### § 1 — WHERE TO FIND IT
 
