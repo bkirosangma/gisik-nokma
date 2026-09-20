@@ -451,8 +451,12 @@ export function buildTimelineModel(
    * `start-after-due` entry already satisfies while sitting in the list, and
    * that an `unplaceable-day` entry can satisfy too. So the exhaustive
    * sentence is reached only when every entry really is here for a missing
-   * claim, exactly as `emptyCopy` reaches `CALENDAR_ALL_HIDDEN_COPY` only
-   * when the legend is the only narrowing in play.
+   * claim, exactly as `emptyCopy` reaches `CALENDAR_ALL_HIDDEN_COPY` only when
+   * nothing the MODEL narrowed was removed from this grid. ⚠ **"The model
+   * narrowed" is load-bearing and narrower than "the legend is the only cause":
+   * the calendar's gate cannot see the page's upstream pruning, so that
+   * sentence is reachable while false today.** See `calendar-model.ts`'s
+   * precedence note; do not restate the condition here as exclusivity.
    */
   const sideListCopy = sideList.every((entry) => MISSING_CLAIM_REASONS.has(entry.reason))
     ? TIMELINE_SIDE_LIST_COPY

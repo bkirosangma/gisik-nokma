@@ -403,13 +403,30 @@ export function buildCalendarModel(
    * month belongs to a field you have hidden" — false on both clauses, and the
    * one switch it offers does not bring the missing claims back.
    *
-   * **Owner: the owner, by way of whoever next owns the calendar's empty
-   * states.** The repair is a design decision, not a typo: either the page
-   * tells the view that something was pruned before the model saw it (a coarse
-   * flag, and coarse in the direction the `CALENDAR_EMPTY_MONTH_COPY` note
-   * explains is not good enough for the FALLBACK sentence), or this sentence
-   * stops claiming exhaustivity. Fixing it in passing would pre-empt a ruling
-   * of the same shape as the one this branch exists to implement.
+   * ⚠ **A SECOND BLIND SPOT IN THE SAME GUARD, measured by a reviewer the same
+   * day.** The gate's bounds are the six-week GRID (`gridFirst`/`gridLast`),
+   * while the sentence it gates says "in this month". A claim on 2 Sep is a
+   * trailing cell of the AUGUST grid, so hiding its field renders "Every
+   * claimed date in this month belongs to a field you have hidden" over an
+   * August that holds no August claim at all. **The codebase knows the unit is
+   * the grid** — case 11.49's own name says "claimed nothing IN THIS GRID", and
+   * `hiddenInGrid`'s docblock says the sentence and the switches describe the
+   * same set — **but the copy the reader sees says month.** Pre-existing, like
+   * the first blind spot, and recorded here because this note would otherwise
+   * read as a complete account of the guard.
+   *
+   * **Owner of both: the owner, by way of whoever next owns the calendar's
+   * empty states.** Two candidate repairs, and they are different questions —
+   * naming them separately so the next reader does not have to guess which one
+   * a sentence refers to:
+   * **(a) The page tells the view that it pruned something before the model saw
+   * it.** Note carefully: a page-level flag is too coarse for the FALLBACK
+   * sentence — "a filter is on" cannot say whether THIS month was emptied, the
+   * objection `CALENDAR_EMPTY_MONTH_COPY`'s note works through — but it may be
+   * exactly right for THIS sentence, whose claim is about the whole grid rather
+   * than about one cause. **(b) This sentence stops claiming exhaustivity.**
+   * Fixing either in passing would pre-empt a ruling of the same shape as the
+   * two this branch exists to implement.
    */
   return {
     month: { year: opts.year, month: opts.month },

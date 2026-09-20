@@ -154,13 +154,13 @@ export const CALENDAR_EMPTY_MONTH_COPY =
  * sentence renders over a month it is not true of: the other claims belong to no
  * hidden field, and the one switch it offers does not bring them back.
  *
- * **Owner: the owner, via whoever next owns the calendar's empty states.** The
- * repair is a design decision rather than a typo — either the page tells the
- * view that something was pruned before the model saw it (a coarse flag, and
- * coarse in the direction the `CALENDAR_EMPTY_MONTH_COPY` note explains is not
- * good enough for the FALLBACK sentence), or this sentence stops claiming
- * exhaustivity. Fixing it in passing would pre-empt a ruling of the same shape
- * as the two this branch exists to implement.
+ * ⚠ **AND THE SAME GUARD HAS A SECOND BLIND SPOT, measured the same day:** its
+ * bounds are the six-week GRID, while this sentence says "in this month" — so a
+ * claim on 2 Sep (a trailing cell of the August grid) can put this sentence over
+ * an August holding no August claim. Both blind spots, the two candidate
+ * repairs, and the owner are named in full at `calendar-model.ts`'s precedence
+ * note; **this docblock points at it rather than restating it**, because two
+ * statements of one condition are free to drift.
  */
 export const CALENDAR_ALL_HIDDEN_COPY =
   'Every claimed date in this month belongs to a field you have hidden. Nothing was dropped — switch a field back on in the legend to see its claims again.';
@@ -203,8 +203,14 @@ export const TIMELINE_SIDE_LIST_UNDRAWABLE_COPY =
  * window, and nothing a narrowing removed would have shown here — i.e. every
  * loaded ticket is an undated epic (a lane, not missing work) or there are
  * none — OR when a narrowing did remove work that would have shown here, which
- * is why the third sentence below names it. The second sentence is the
- * calendar's, verbatim, because it is the same promise about the same product.
+ * is why the third sentence below names it. The second sentence carries the
+ * SAME PROMISE as the calendar's, word for word — "undated work is absent, not
+ * estimated". ⚠ **"verbatim" was the wrong word and is corrected 2026-09-20:**
+ * the rest of the sentence names this surface's own noun ("the periods someone
+ * claimed", not "what someone claimed"), so the two are symmetric in the
+ * promise and NOT in the text. They were never verbatim, and the paragraphs
+ * below say why they must not be — a copy clause naming a control this surface
+ * lacks is the defect this branch was dispatched to remove.
  *
  * The narrowing clause is here for the same reason as its calendar twin's:
  * the model cannot see the filter (the page narrows `tickets` upstream before
