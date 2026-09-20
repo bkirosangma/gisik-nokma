@@ -96,17 +96,22 @@ than the shared worktree. **Its full findings are recorded in the PR body, writt
 
 ### § 4 — OPEN, AND WHAT IS OWED
 
-1. **THE CASE IDS ARE OWED, AND THIS BRANCH MINTS NONE.** The controller ruled mid-task that executor 2
-   has no free ids (`16.41`–`16.60` spent; `16.63`–`16.80` and `16.91`–`16.99` are exec 1's by `§16`'s
-   table). **Cycle 29 settled §17's SHAPE (`17.NNN`, uniformly 3-digit padded, ceiling 999) and did NOT
-   open it** — §16's window is not spent. **So four shipped test files carry no case id at all**, each
-   saying so in its own header, and `test-cases/` is untouched. When a block is ruled, the mint is
-   mechanical: the case text is already in the files.
-2. **AN OWED SENTENCE, NOT MINE TO WRITE.** Cycle 29 §4 owes a lane **one sentence in
-   `test-cases/16-remaining-doors.md`'s header** recording §17's shape and scoping the existing `{3}`
-   prohibition to *within* a section. I did **not** take it, deliberately: my change set touches no
-   `test-cases/` file, that promise is what keeps this branch's no-mint claim checkable, and exec 1 has a
-   `test-cases/`-touching task in flight. **It rides with the next `test-cases/` change.**
+1. ✅ **DISCHARGED 2026-09-21 — `16.72`–`16.75` ARE MINTED, AND THIS ITEM IS CLOSED.** It read *"THE CASE
+   IDS ARE OWED, AND THIS BRANCH MINTS NONE"* and named `16.63`–`16.80` as exec 1's. **Both halves are
+   now false of `main`, and an independent reviewer is why this is rewritten rather than left standing:**
+   the controller reallocated **`16.72`–`16.80` to exec 2 on 2026-09-21** (exec 1 keeps `16.63`–`16.71`),
+   and the four owed ids are minted in `test-cases/16-remaining-doors.md` with a citation in each of the
+   four files. **The block table there is the authority and carries the reallocation, its authority and
+   its reason.** ⚠ **Cycle 29's `§17` ruling is unchanged and §17 is NOT opened** — §16's window still is
+   not spent.
+2. ✅ **DISCHARGED — AND IT WAS NEVER MINE, WHICH IS WHY IT IS STRUCK RATHER THAN CLAIMED.** Cycle 29 §4
+   owed a lane one sentence recording §17's shape in `test-cases/16-remaining-doors.md`'s header and
+   scoping the `{3}` prohibition to *within* a section. **Exec 1 landed it at `31697b5b`, 2026-09-20
+   22:27 IST**, an ancestor of `origin/main` (verified by `git merge-base --is-ancestor`, not `cat-file`,
+   which passes on reflog-only commits) — the header now carries `## §17's SHAPE` at `:39-44` and the
+   scope paragraph at `:33-37`. **It was already stale when the controller dispatched it back to me as
+   `CTL-DISPATCH-2026-09-21-sec17-shape.md`; the refusal and its measurement are in
+   `gisik-nokma-lanes/EXEC2-2026-09-21-sec17-already-landed.md`.**
 3. **THE `@` MENTION BUTTON** — ruled or deferred; the request is filed (premise 2 above).
 4. **The replica serves NO comments.** `getTicketComments` refuses with a `ReplicaGapError`, because a
    comment's FILES are resolved against a server table the replica does not hold and the renderer draws an
