@@ -464,8 +464,13 @@ describe('R1(c) at the component layer', () => {
    * The prototype draws `min-height:32px; min-width:36px` (`desktop.dc.html:3152`,
    * the shared control constant, byte-equal to the one `.gn-board-card__move`
    * was ported from at `:2501`). This rule takes **2.75rem — 44px** — because
-   * `apps/web/e2e-viewport/tap-targets.ts:108` sweeps every `button` against a
-   * hard 44px floor with no per-component exemption, which is the same
+   * the sweep in `apps/web/e2e-viewport/tap-targets.ts` holds every `button` to a
+   * floor this control cannot meet: it is `inline-flex`, so the inline-in-prose
+   * exemption misses it, and `DENSE_IN_LIST` does not name it. ⚠ This read
+   * "sweeps every `button` against a hard 44px floor with no per-component
+   * exemption" until 2026-09-20, which the declared table falsified — that table
+   * IS such an exemption, which is why the clause is replaced rather than
+   * re-pointed at line numbers that moved under it. That is the same
    * divergence, for the same reason, that control already made. Asserted rather
    * than merely commented: a re-transcription of the prototype's 32px is the
    * most likely future edit here, and it is the one that reddens the viewport

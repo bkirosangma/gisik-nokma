@@ -99,10 +99,20 @@
       ]
     },
     // `next-config.test.ts` reads `apps/server/src` to check the shell's config
-    // against the server it talks to.
+    // against the server it talks to; `members-styling.test.ts` and
+    // `tap-target-density.test.ts` both read `packages/ui/src/ui.css` directly.
+    // The second entry is therefore load-bearing rather than tidy: without it, a
+    // change to that stylesheet replays a cached GREEN log instead of re-running
+    // either test, which is the same class of hole the comment below records for
+    // the server suite. Found while adding the second reader, and it is the
+    // FIRST reader that was already exposed.
     "@gisik-nokma/web#test": {
       "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/server/src/**"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/server/src/**",
+        "$TURBO_ROOT$/packages/ui/src/**"
+      ]
     },
     // The tooling, ci and docs suites assert things that live at the REPO ROOT and
     // nowhere near this package: the gate scripts and their fixtures, the runbook,

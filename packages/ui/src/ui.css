@@ -5210,10 +5210,14 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    `* { box-sizing: border-box }` (`globals.css:5`) and it was exactly 20x20.
 
    **The 44px tap ratchet still does not see it**, and that is recorded rather
-   than implied: `apps/web/e2e-viewport/tap-targets.ts:108` flags anything under
-   44, and its inline-control exemption (`:100-104`) needs `display: inline`
-   with a text-bearing parent — an `inline-flex` trigger holding an `aria-hidden`
-   SVG fails both. The reason it stays green is that **no roster covers the
+   than implied: the sweep in `apps/web/e2e-viewport/tap-targets.ts` flags
+   anything under the floor its own class sets, and this control is reached by
+   NEITHER of the two exemptions — the inline-in-prose one needs `display: inline`
+   with a text-bearing parent, and `DENSE_IN_LIST` (added 2026-09-20) does not
+   name it, because no sweep's roster covers the routes it renders on. ⚠ Cited by
+   SELECTOR, not by line: this sentence named `tap-targets.ts:108` and `:100-104`
+   until 2026-09-20, and both numbers now land INSIDE the table that was added
+   there — a stale citation that still resolves. The reason it stays green is that **no roster covers the
    settings routes at all** (`viewports.ts:171-176` lists help, privacy, terms,
    sign-in and a 404 probe; `viewport.spec.ts:419-427` covers my-work, a
    project, members and the two other settings tabs). That gap is the settings
@@ -5446,11 +5450,16 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 
    `min-height`/`min-width` are **2.75rem, not the prototype's 32px/36px**, which
    is the divergence `.gn-board-card__move` already made for the byte-identical
-   constant (`:869-883`) and for the identical reason: `apps/web/e2e-viewport/
-   tap-targets.ts:108` sweeps every `button` on every real page against a hard
-   44px floor with no per-component exemption, and its ONLY exemption is
-   `display: inline` (`tap-targets.ts:102`) — this control is `inline-flex`, so it is
-   not exempt. **A 32×36 control WOULD redden that gate, but no sweep visits this
+   constant (`:869-883`) and for the identical reason: the sweep in `apps/web/
+   e2e-viewport/tap-targets.ts` holds every `button` on every real page to a floor
+   this control cannot meet — it is `inline-flex`, so the inline-in-prose
+   exemption misses it, and `DENSE_IN_LIST` does not name it.
+   ⚠ This sentence read "against a hard 44px floor with **no per-component
+   exemption**, and its ONLY exemption is `display: inline`" until 2026-09-20.
+   **That clause is now false, not merely stale**: the declared `DENSE_IN_LIST`
+   table added that day IS a per-component exemption, which is why the sentence is
+   replaced rather than re-pointed at moved line numbers.
+   **A 32×36 control WOULD redden that gate, but no sweep visits this
    route today** (`responsive.spec.ts` sweeps the unauthed routes; the stacked suite's
    only tap sweep is keyed to `/my-work`), so the floor is one this rule keeps rather
    than one that currently enforces it — said plainly, because "it reddens on a
@@ -5459,8 +5468,10 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 
    ⚠ **AND ONE THING THIS RULE DOES NOT DECIDE, NAMED RATHER THAN ASSUMED.** The
    owner ruled on 2026-09-20 that **standalone** controls take 44px and **dense
-   in-list** controls take 24px, with the tap-target checker to be widened for the
-   second case in a later round. **Whether these two are "dense in-list" is not
+   in-list** controls take 24px, with the tap-target checker widened for the
+   second case on 2026-09-20 — it now names the four controls it classifies
+   in-list, and **these two are not among them**, so 44 still bites here.
+   **Whether these two are "dense in-list" is not
    settled by anything on this screen**, and the two readings pull opposite ways:
    they sit one pair per row inside a list (`dense in-list`), and they are
    always-visible standalone controls on a settings row with no prose to be

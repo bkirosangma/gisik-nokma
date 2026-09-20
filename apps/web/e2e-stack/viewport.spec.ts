@@ -157,8 +157,13 @@ test('the signed-in shell does not scroll sideways at 390px', async ({ page }) =
    * So the one place the counts were written down was a prose note in a
    * checklist, which no run can contradict.
    *
-   * The measurement is IMPORTED, not restated. `measureTapTargets` and the
-   * baseline helpers live in `e2e-viewport/responsive.spec.ts`; a second copy
+   * The measurement is IMPORTED, not restated. `measureTapTargets`, the
+   * `DENSE_IN_LIST` table and the baseline helpers live in
+   * `e2e-viewport/tap-targets.ts` — a plain MODULE, which is why the import
+   * below reaches them without dragging this file's sibling spec in. (This
+   * sentence said `e2e-viewport/responsive.spec.ts` until 2026-09-20; that was
+   * true before the 2026-09-08 move and stale for the twelve days after it, in the
+   * same paragraph that explains why a spec is not a library.) A second copy
    * here would be a second definition of "what a tap target is", free to drift
    * from the first while both files keep reporting confident numbers.
    * ────────────────────────────────────────────────────────────────────────*/
@@ -170,6 +175,15 @@ test('the signed-in shell does not scroll sideways at 390px', async ({ page }) =
       `invisible skipped ${taps.invisibleSkipped}, smallest examined = ` +
       `${smallest === null ? 'n/a' : `${smallest.w}x${smallest.h} (${smallest.selector})`}, ` +
       `offenders=${taps.offenders.length}`,
+  );
+  // The split's own reading — the twin of the line `responsive.spec.ts` prints,
+  // and the only place this suite can show that `DENSE_IN_LIST` classified the
+  // attention row's title rather than leaving it judged at 44.
+  console.log(
+    `[stack-phone-390] /my-work — tap-target floors: in-list classified ${taps.denseMembers} ` +
+      `(24px floor), standalone judged ${taps.examined.length - taps.denseMembers} (44px floor), ` +
+      `rescued from the flat 44 by the split=${taps.denseAccepted.length}, ` +
+      `stale entries=${JSON.stringify(taps.brokenEntries)}`,
   );
   // The anti-broken-selector control, the same one the unauthed suite carries:
   // `examined` may legitimately be small, but a zero `rawMatches` on a page with
@@ -196,10 +210,29 @@ test('the signed-in shell does not scroll sideways at 390px', async ({ page }) =
   } else {
     expect(
       taps.offenders.length,
-      `interactive targets under 44x44 on the signed-in shell rose above the recorded ` +
-        `${allowed}: ${JSON.stringify(taps.offenders.slice(0, 8))}`,
+      `interactive targets below their own floor on the signed-in shell rose above the recorded ` +
+        `${allowed}: ${JSON.stringify(taps.offenders.slice(0, 8))}. The floor is 24px for a ` +
+        `control this suite's DENSE_IN_LIST classifies as in-list (WCAG 2.5.8) and 44px for every ` +
+        `other control (WCAG 2.5.5); each offender above carries the floor it missed.`,
     ).toBeLessThanOrEqual(allowed);
   }
+
+  /**
+   * THE STALE-ENTRY GUARD, the twin of the one the unauthed suite carries. Its
+   * own argument is written out there and is not repeated here beyond the part
+   * that is specific to this suite: `/my-work` is the ONLY route in this file,
+   * so this is the only place the attention strip's entry can be caught
+   * matching nothing while its container still renders.
+   */
+  expect
+    .soft(
+      taps.brokenEntries,
+      `a DENSE_IN_LIST entry's container rendered on the signed-in shell but its control ` +
+        `selector matched nothing inside it — the entry has stopped classifying anything, so the ` +
+        `control it names is being judged against the 44px floor again. Fix the selector in ` +
+        `apps/web/e2e-viewport/tap-targets.ts, or remove the entry.`,
+    )
+    .toEqual([]);
 });
 
 /**

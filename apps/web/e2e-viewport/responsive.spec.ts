@@ -654,6 +654,20 @@ for (const route of UNAUTHED_ROUTES) {
             : `${taps.smallestExamined.w}x${taps.smallestExamined.h} (${taps.smallestExamined.selector})`
         }, offenders=${taps.offenders.length}`,
     );
+    /**
+     * The SPLIT's own reading, printed whether or not it fires — the same rule
+     * the rest of this block follows. A run where `denseMembers` is 0 on a page
+     * that renders the attention strip or the help sidebar is the split quietly
+     * not applying, which is precisely what `brokenEntries` names; and a run
+     * where `rescued` is 0 has the split doing nothing observable, which is a
+     * fact a reader should be able to see rather than infer from a green tick.
+     */
+    console.log(
+      `${tag} — tap-target floors: in-list classified ${taps.denseMembers} (24px floor), ` +
+        `standalone judged ${taps.examined.length - taps.denseMembers} (44px floor), ` +
+        `rescued from the flat 44 by the split=${taps.denseAccepted.length}, ` +
+        `stale entries=${JSON.stringify(taps.brokenEntries)}`,
+    );
     console.log(
       `${tag} — body text: selector matched ${body.rawMatches}, examined ${body.examined}, ` +
         `skipped ${body.skipped}, smallest = ${
@@ -820,30 +834,59 @@ for (const route of UNAUTHED_ROUTES) {
       )
       .toBeLessThanOrEqual(overflow.clientWidth + 1);
 
-    /* ── 3. TAP TARGETS >= 44x44 — A RATCHET, NOT A FLOOR. ────────────────*/
+    /* ── 3. TAP TARGETS — TWO FLOORS, ONE RATCHET. ───────────────────────*/
     /**
-     * This started as `.toEqual([])` and reddened 15 of 21 cases. The reading is
-     * real — every table-of-contents link on `/help` is 23px tall, 10 of them at
-     * 390px and 16 at the wider widths, plus 6 on `/sign-in` — but three things
-     * about it decide the shape of the assertion rather than its truth:
+     * The floor is 24px for an in-list control and 44px for a standalone one.
+     * `e2e-viewport/tap-targets.ts`'s `DENSE_IN_LIST` docblock carries the owner
+     * ruling, the membership rule, and the three structural predicates that were
+     * tried against this product's real markup and rejected. This block carries
+     * the RATCHET's history and its numbers.
      *
-     * 1. **It fails IDENTICALLY at 390, 768 and 1512.** A number that does not
+     * It started as `.toEqual([])` and reddened 15 of 21 cases, and the shape of
+     * the assertion has been decided by three things about the reading rather
+     * than by its truth:
+     *
+     * 1. **It failed IDENTICALLY at 390, 768 and 1512.** A number that does not
      *    move with the viewport is not a responsive finding, and item 7 is the
      *    responsive item. It is a type-and-spacing decision that happens to be
      *    visible here.
-     * 2. **Most offenders miss by one to three pixels** (21–23px against WCAG
-     *    2.5.8's 24, or against 2.5.5's 44), and they are wide — `312x23` table
-     *    -of-contents links, not small targets. Raising them is a design pass
-     *    over `packages/ui`, with product-wide blast radius.
-     * 3. **The pre-launch checklist already records this as an OWNER decision**,
-     *    with the numbers, alongside the non-text-contrast finding. Asserting a
-     *    hard floor here would have this suite block every branch on a decision
-     *    that has been deliberately deferred to a person.
+     * 2. **The offenders are wide and shallow, not small targets.** The narrowest
+     *    on `/help` measures 114px across and 24px tall; the sidebar rows are
+     *    `348x33` and the disclosures `366x36`. Raising them to 44 is a design
+     *    pass over `packages/ui`, with product-wide blast radius.
+     * 3. **The pre-launch checklist records this as an OWNER decision**, with the
+     *    numbers. Asserting a hard floor here would have this suite block every
+     *    branch on a decision deliberately deferred to a person.
      *
-     * So it ratchets: the count may FALL and may not RISE. The measurement stays
-     * in code with its real numbers, a new sub-44px control reddens immediately,
-     * and the standing debt does not hold the gate hostage. Same pattern as
-     * `check:citations`, which this repo already runs as an exact ratchet.
+     * ⚠ MEASURED AT `99f2a780`, BEFORE THE SPLIT — and this is why it was urgent.
+     * The three `/help` routes read **25 / 23 / 25** against recorded baselines of
+     * **10 / 16 / 16**. The sweep had been red on `main` for as long as the topic
+     * sidebar has existed, and nobody saw it, **because this suite is on no gate**:
+     * `pnpm turbo run build test typecheck` defines no task that RUNS it, and
+     * `.github/workflows/ci.yml` runs `test:e2e:stack` only — `viewport` does not
+     * appear in that file at all. **Types are still checked on the gate**
+     * (`tsconfig.e2e.json` includes `e2e-viewport/**`), so what is missing is a
+     * RUNNER for the assertions, not a compiler for the files. A ratchet with no
+     * runner is a note, not a check.
+     * (Wiring this suite to a gate is NOT this change's to make; it is recorded in
+     * the PR body as a finding with its own owner.)
+     *
+     * Every one of those 25 offenders was an in-list control the CSS had ALREADY
+     * given the 24px floor — at 390px: 5 `button.gn-help__group-toggle` at 36px,
+     * 10 `a.gn-help__nav-link` at 33px, 10 `a.gn-help__pager-link` at 24px. The
+     * ratchet was recording, as debt, a decision the product had already taken;
+     * the four rules that say so are quoted in `tap-targets.ts`.
+     *
+     * So it still ratchets — the count may FALL and may not RISE — and **13.992**:
+     * after the split these three routes measure **0**. The baselines were re-recorded DOWN
+     * to that reading, which is the only direction the guard below blesses: a rise
+     * fails before it can be recorded, so observation can only ever lower the
+     * ceiling. **No floor is hand-lowered anywhere in this change.** The floor for
+     * a standalone control is still 44, and the reason to believe it is
+     * `apps/web/test/tap-target-density.test.ts` plus the mutation recorded in the
+     * PR body, not this sentence.
+     *
+     * Same ratchet pattern as `check:citations`.
      *
      * The baseline file is committed, and a MISSING entry FAILS rather than
      * seeding itself (see the guard below). To re-baseline after a genuine
@@ -884,13 +927,39 @@ for (const route of UNAUTHED_ROUTES) {
       expect
         .soft(
           taps.offenders.length,
-          `interactive targets under 44x44 at ${spec.width}px rose above the recorded baseline ` +
-            `${allowed} for ${tapKey} (WCAG 2.5.5; the repo's own min-height: 2.75rem at ` +
-            `ui.css:1250 is the same number). This is a RATCHET — the count may fall, never rise. ` +
+          `interactive targets below their own floor at ${spec.width}px rose above the recorded ` +
+            `baseline ${allowed} for ${tapKey}. The floor is 24px for a control that ` +
+            `apps/web/e2e-viewport/tap-targets.ts's DENSE_IN_LIST classifies as in-list ` +
+            `(WCAG 2.5.8) and 44px for every other control (WCAG 2.5.5 — the same number as the ` +
+            `"44px — the minimum touch target" comment on packages/ui/src/ui.css's ` +
+            `.gn-help__search-input rule, cited by SELECTOR because the line number moved the last ` +
+            `time it was cited here). Each offender below carries the floor it missed. This is a ` +
+            `RATCHET — the count may fall, never rise. ` +
             `Offenders: ${JSON.stringify(taps.offenders)}`,
         )
         .toBeLessThanOrEqual(allowed);
     }
+
+    /**
+     * THE STALE-ENTRY GUARD — the other half of a table that classifies by
+     * selector, and the half that is invisible without it.
+     *
+     * A `DENSE_IN_LIST` control that gets renamed goes on being judged at 44,
+     * which reddens LOUDLY and is the safe direction. Its ENTRY, though, dies
+     * silently: the table still reads as though it were doing work, and the next
+     * person to add a dense control copies a selector that matches nothing. This
+     * is the only place the two can be told apart, because `measureTapTargets` is
+     * the only thing that knows which containers actually rendered.
+     */
+    expect
+      .soft(
+        taps.brokenEntries,
+        `a DENSE_IN_LIST entry's container rendered on ${route.path} but its control selector ` +
+          `matched nothing inside it — the entry has stopped classifying anything, so the control ` +
+          `it names is being judged against the 44px floor again. Fix the selector in ` +
+          `apps/web/e2e-viewport/tap-targets.ts, or remove the entry.`,
+      )
+      .toEqual([]);
 
     /* ── 4. BODY TEXT >= 16px, phone viewport only. ───────────────────────*/
     if (spec.width <= 640) {
