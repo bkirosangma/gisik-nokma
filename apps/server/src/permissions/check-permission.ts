@@ -2,6 +2,7 @@ import {
   inviteSentPayload,
   membershipGrantedPayload,
   membershipRevokedPayload,
+  projectCreatedPayload,
   ticketCreatedPayload,
   visibilitySetPayload,
   type EventEnvelope,
@@ -9,6 +10,7 @@ import {
 import { REFUSAL_RULES, type Refusal } from '@gisik-nokma/rule-engine';
 import type { Queryable } from '../db/queryable.js';
 import { projectExists } from '../projections/proj-projects.js';
+import { projectPrefixesInWorkspace } from '../read/visible-projects.js';
 import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
 import { hasProjectAdminRights, resolveEffectiveRole, type EffectiveRole } from './effective-role.js';
 
@@ -46,6 +48,14 @@ export const PERMISSION_VISIBILITY_RULE = 'permission.visibility';
  * reason wins where both would fire.
  */
 export const PROJECT_UNKNOWN_RULE = 'project.unknown';
+
+/**
+ * A project founded under a prefix another project in the same workspace
+ * already answers to (owner ruling 2026-09-20). Its own id because it is not a
+ * role question and not a visibility one: the caller is allowed to found a
+ * project, and is being asked to choose a different half of its key.
+ */
+export const PROJECT_PREFIX_TAKEN_RULE = 'project.prefix-taken';
 
 /**
  * The envelope-origin refusal's rule and reason, character for character.
@@ -808,6 +818,68 @@ export async function checkProjectExists(db: Queryable, env: EventEnvelope): Pro
 }
 
 /**
+ * May this project be founded under the prefix it names?
+ *
+ * ## The owner's ruling, and why it is a door and not a display rule
+ *
+ * *"yes project prefixes are unique per workspace"* (2026-09-20). A key is
+ * `CCSO-1183` — workspace prefix, project prefix, number — so a second project
+ * answering to `SO` in one workspace makes that key name two tickets, and a
+ * key's whole job is to name one thing durably. The rule is enforced HERE,
+ * where the prefix is AUTHORED and where the author can be told to choose
+ * again, rather than at render time where the only remedies are a suffix nobody
+ * asked for or a duplicate nobody notices.
+ *
+ * ## It checks the DERIVED prefixes too, and that is the load-bearing half
+ *
+ * `projectPrefixesInWorkspace` resolves the workspace the way a reader does, so
+ * a project that entered no prefix still occupies the one derived from its name.
+ * A check against stored prefixes alone would accept this sequence: an existing
+ * project named `Shop operations` answering to `SO`, then an admin founding a
+ * second project and entering `SO`. `resolveProjectPrefixes` lets the ENTERED
+ * value win, so the new project would quietly take `SO` and the OLD one would
+ * move to `SO2` — every ticket key in it changing, after the fact, under readers
+ * who had already quoted one. That is a worse outcome than a refusal, and it is
+ * the reason this pass reads derived values rather than the column.
+ *
+ * ## A project that enters NOTHING is never refused
+ *
+ * The derived path already resolves collisions by moving, and it can move
+ * precisely because nobody claimed the value. Refusing a caller who expressed no
+ * preference would make the prefix mandatory in fact while the schema keeps it
+ * optional in form.
+ *
+ * ## Ordering
+ *
+ * Fifth, after `checkProjectExists` and before `checkVisibilityPermission`. It
+ * is placed with the other project-shaped questions and after the role gates, so
+ * somebody with no standing to found a project here is told THAT rather than
+ * being handed a sentence about a prefix — and, like `checkProjectExists`, it
+ * runs strictly after `checkRolePermission` so a non-member cannot use it to
+ * enumerate the workspace's prefixes.
+ */
+export async function checkProjectPrefixUnique(
+  db: Queryable,
+  env: EventEnvelope,
+): Promise<Refusal | null> {
+  if (env.type !== 'project.created') {
+    return null;
+  }
+  const parsed = projectCreatedPayload.parse(env.payload);
+  if (parsed.prefix === undefined) {
+    return null;
+  }
+  const taken = await projectPrefixesInWorkspace(db, env.workspaceId);
+  if (!taken.has(parsed.prefix)) {
+    return null;
+  }
+  return refuseWith(
+    PROJECT_PREFIX_TAKEN_RULE,
+    `Another project in this workspace already uses the prefix ${parsed.prefix}. A prefix identifies a project's tickets — ${parsed.prefix}-1, ${parsed.prefix}-2 — so two projects cannot share one. Choose a different prefix.`,
+  );
+}
+
+/**
  * Who created this ticket, read from the LEDGER rather than from a projection.
  *
  * There is no projection to read it from: `proj_tickets` does not exist on this
@@ -1102,6 +1174,15 @@ export async function checkPermission(
   const projectRefusal = await checkProjectExists(ctx.db, env);
   if (projectRefusal !== null) {
     return projectRefusal;
+  }
+  // FIFTH — the prefix a project is founded under must be free in its
+  // workspace (owner ruling 2026-09-20). Grouped with the project-shaped
+  // questions above and, like them, strictly downstream of the role gates: a
+  // caller with no standing to found a project is told that, and never gets a
+  // sentence about which prefixes are in use.
+  const prefixRefusal = await checkProjectPrefixUnique(ctx.db, env);
+  if (prefixRefusal !== null) {
+    return prefixRefusal;
   }
   return checkVisibilityPermission(env, permissionContext);
 }

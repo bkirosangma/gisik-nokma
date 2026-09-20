@@ -83,6 +83,59 @@ export type VisibleProject = {
  * By `project_id`, so the answer is a function of the SET and not of insertion
  * order — the same reason `latestWorkflowDefs` sorts its input.
  */
+/**
+ * Every project prefix in use in one workspace — STORED OR DERIVED.
+ *
+ * ## Why this exists beside `visibleProjects` rather than inside it
+ *
+ * The door needs the same answer a reader gets, and it needs it for a viewer
+ * who is not looking at anything: an admin founding a project has to be refused
+ * a prefix another project already answers to. `visibleProjects` cannot serve
+ * that — it filters ROWS by role, deliberately, and a prefix that is invisible
+ * to this caller is still a prefix the KEY of the project they can see must not
+ * collide with.
+ *
+ * So this is the role-free half, over the same query, with the same
+ * `resolveProjectPrefixes` call and therefore the same ORDER (`project_id`).
+ * Two callers, one rule: a door that resolved prefixes its own way would accept
+ * a prefix the read then hands to somebody else.
+ *
+ * ## Derived prefixes COUNT, and that is the whole point of the check
+ *
+ * A project founded with no entered prefix derives one, and `resolveProjectPrefixes`
+ * lets an ENTERED prefix outrank a derived one. So if this set held only stored
+ * prefixes, an admin could found a project entering `SO` while another project
+ * already ANSWERS to `SO` — the new one would take the value at read time and
+ * the older project would silently move to `SO2`, changing every ticket key in
+ * it under readers who had already quoted one. The refusal is what stops that,
+ * and it exists only because the derived values are in here.
+ */
+export async function projectPrefixesInWorkspace(
+  db: Queryable,
+  workspaceId: string,
+): Promise<Set<string>> {
+  const rows = await projectPrefixRows(db, workspaceId);
+  return new Set(resolveProjectPrefixes(rows.map((row) => ({ name: row.name, prefix: row.prefix }))));
+}
+
+/** The workspace's projects in the order the prefix rule is defined over them. */
+async function projectPrefixRows(
+  db: Queryable,
+  workspaceId: string,
+): Promise<Array<{ project_id: string; name: string; prefix: string | null }>> {
+  const { rows } = await db.query<{
+    project_id: string;
+    name: string;
+    prefix: string | null;
+  }>(
+    `SELECT project_id, name, prefix FROM proj_projects
+      WHERE workspace_id = $1
+      ORDER BY project_id`,
+    [workspaceId],
+  );
+  return rows;
+}
+
 export async function visibleProjects(
   db: Queryable,
   eff: EffectiveRole,
