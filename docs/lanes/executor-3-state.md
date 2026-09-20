@@ -8,8 +8,16 @@ handoff conflict on every merge.
 
 ### § 0 — WHERE TO FIND IT
 
-- **Branch `exec3/visibility-styling`**, cut from **`origin/main = 534c450b`**. `git merge-base HEAD
-  origin/main` equals `534c450b` exactly as of the handoff's own commit.
+- **Branch `exec3/visibility-styling`**, cut from **`origin/main = 534c450b`**, **folded TWICE** — onto
+  `fef20170` and onto `a12f370e`. ⚠ **THE FOLD COUNT IS A READING AND IT HAS ALREADY GONE STALE TWICE; DO
+  NOT TRUST THIS LINE, MEASURE IT.** At the last measurement: `git merge-base HEAD origin/main` ==
+  `origin/main` == `a12f370e`, `behind=0`, HEAD `58701b33`. **`origin/main` moved TWICE inside this one
+  task's lifetime** — once 103 seconds after a commit, and once again while the PR sat open — so
+  **re-measure `git rev-list --count HEAD..origin/main` before treating this head as the landing tree.**
+  The three-command check is `git rev-parse origin/main`, `git merge-base HEAD origin/main`,
+  `git rev-list --count HEAD..origin/main`; **equality of the first two AND a zero on the third are what
+  make the claim, and `git log origin/main..HEAD` — the check this file used to prescribe — is
+  structurally BLIND to being behind and will print only this lane's own commits either way.**
 - **THE PR IS OPEN: `#619`** — `--base main`, `headRefOid` verified equal to this branch's HEAD
   (`6c79d06c`) at open, `state=OPEN`, `mergeable=MERGEABLE`. **This lane does not merge it.**
 - ⚠ **THE WINDOW: this file adds itself to its own figures.** Every count below is measured at
