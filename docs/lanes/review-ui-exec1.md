@@ -37,7 +37,7 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 
 **⛔ NOT REACHED — and this is the honest boundary, stated as a list:**
 1. **No painted DOM anywhere. No browser ran, no screenshot was taken.** Every rendering claim below is a measurement of *source and stylesheets*. Section 5's last row says why a live run would have measured a different product. **A static claim is weaker than a painted one and I am not going to dress it up.**
-2. Not reviewed file-by-file: `apps/web/app/*` route bodies (25 modules); the ~55 `apps/web/test/*` files; `packages/app-core/src/views/*` beyond `ticket-sheet`/`board`/`attachment-list`; `packages/editor`'s components beyond the class sweep; `apps/mobile`'s editor webview and both storage engines; `apps/desktop`'s Tauri config and storage; `apps/web/e2e/` (the mock-only suite); `packages/ui/src/components/*` one by one.
+2. Not reviewed file-by-file: `apps/web/app/*` route bodies (25 modules); the ~55 `apps/web/test/*` files; `packages/app-core/src/views/*` beyond `ticket-sheet`/`board`/`attachment-list`; `packages/editor`'s components beyond the class sweep; `apps/mobile`'s editor webview and both storage engines; `apps/desktop`'s Tauri config and storage; `apps/web/e2e/` (the mock-only suite). **`packages/ui/src/components/*` WAS read** — `button`, `card`, `chip`, `segmented-control`, `avatar`, `dialog`, `switch` in full, and `sheet`/`toast`/`info-tip`/`table` grepped; **`select/select.tsx` (597 lines, the product's largest shared control) was NOT read** and is the biggest single hole in this lane's coverage.
 3. Prototype comparison performed for **two** surfaces only (the ticket-sheet breadcrumb, the board empty states). The other ~20 prototype files were not compared.
 4. §16's 97 case ids were **not** each opened. `check:citations` was run (§7) and its limit is stated there.
 
@@ -93,7 +93,7 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 
 ---
 
-### I5 — **MINOR** — `tap-targets.ts` cites a line range that resolves and misleads
+### I4 — **MINOR** — `tap-targets.ts` cites a line range that resolves and misleads
 
 **WHAT.** The docblock that justifies the 24/44 split cites the wrong lines for the sentence it quotes.
 
@@ -105,7 +105,7 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 
 ---
 
-### I4 — **MINOR** — My own live handoff carries two position blocks that contradict each other, and the pointer that found it is itself stale
+### I5 — **MINOR** — My own live handoff carries two position blocks that contradict each other, and the pointer that found it is itself stale
 
 **WHAT.** `docs/lanes/executor-state.md` (exec 1's handoff — **mine**) states the id block twice, differently.
 
@@ -158,6 +158,51 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 **WHY IT IS WRONG.** An addition is not a defect — the banner is arguably better than the prototype's silence. The defect is that the addition was never **styled**, so the first-run surface a person meets on a brand-new project is a sentence in inherited text and a UA button, in a page whose per-column sibling is fully styled and whose prototype draws the equivalent control with explicit resets. Two states answering the same question, one dressed and one not.
 
 **WHAT WOULD HAVE BEEN BETTER.** Style the three classes from the prototype's shared control constant (the same constant `981aa92b` reused for `.ticket-type-list__move` — fill-tertiary + text-accent + control radius, no border), and record the whole-board banner as a deliberate addition in `Features.md` with its rationale, so a later reader does not "correct" it back toward a prototype that has no such state.
+
+---
+
+### P8 — **IMPORTANT** — `Dialog` and `Sheet` both declare `aria-modal="true"`, and nothing in the product implements containment
+
+**WHAT.** Both modal components tell assistive tech that the rest of the document is inert. Neither moves focus into the dialog, traps it, or restores it on close — and no focus trap or `inert` attribute exists anywhere in the product.
+
+**MEASUREMENT.**
+- `packages/ui/src/components/dialog.tsx:18-24`: `role="dialog" aria-modal="true"` on the `<section>`. Its only effect is an Escape keydown listener (`:6-13`). No focus call, no `tabIndex`, no trap.
+- `packages/ui/src/components/sheet.tsx:102-104`: the same three attributes, same shape; the ticket sheet renders this component.
+- **Nothing anywhere implements containment:** `grep -rn "inert\|focus-trap\|focusTrap\|trapFocus"` over `packages apps` (excluding `node_modules`/`dist`/tests) returns **only prose uses of the word "inert"** — zero hits on the HTML attribute or a trap helper. **Positive control in the same command: `Escape` handlers are found in both `dialog.tsx:9` and `sheet.tsx:58`**, so the greps traverse the right tree.
+- **No caller supplies it either:** the four `<Dialog>` sites (`transition-dialog.tsx:382`, `bulk-close-dialog.tsx:242`, `new-ticket-dialog.tsx:126`, `reopen-dialog.tsx:64`) were checked for focus management; the only `useRef` among them is `bulk-close-dialog.tsx:161`'s `attemptRef`, a retry counter.
+
+**WHY IT IS WRONG.** `aria-modal="true"` is a stronger claim than `role="dialog"` — it asserts that content outside the dialog is unavailable. A screen-reader user is told the background is gone, then Tab moves focus into it: the dialog's own boundary is described as a wall that is not there. The product already has the good example next door: `InfoTip` documents *"No focus trap and no `role="menu"`"* and explains why each omission is correct **for a non-modal popover** (`info-tip.tsx:43-47`). These two components make the modal claim without the modal work.
+
+**WHAT WOULD HAVE BEEN BETTER.** Either implement containment — move focus to the dialog on open, restrict Tab to it, restore focus to the opener on close — or drop `aria-modal` to `role="dialog"` alone and be honest about it. The second is one attribute and is not a worse product; the current state is the only one that is *wrong*, because it asserts the property rather than merely lacking it.
+
+---
+
+### P9 — **IMPORTANT** — `SegmentedControl` carries full ARIA tab semantics and implements none of the tab keyboard model
+
+**WHAT.** `role="tablist"` + `role="tab"` + `aria-selected`, with no `tabpanel`, no `aria-controls`, no arrow-key handling and no roving `tabindex`.
+
+**MEASUREMENT.** `packages/ui/src/components/segmented-control.tsx:25-40`: the container is `<div role="tablist" aria-label={…}>` and each option is `<button role="tab" type="button" aria-selected={on} …>`. `grep -n "onKeyDown\|Arrow\|tabIndex\|aria-controls\|tabpanel"` on that file → **NONE** (positive control in the same command: `Escape` is found in `dialog.tsx`/`sheet.tsx`). Per WAI-ARIA's tabs pattern a `tablist` requires arrow-key navigation between tabs, a roving tabindex, and the tab↔tabpanel relationship; none is present.
+
+**Blast radius, measured:** seven render sites — `apps/web/src/theme-toggle.tsx:64`, `apps/web/src/style-toggle.tsx:74`, `apps/web/app/inbox/page.tsx:406`, `apps/web/app/sign-in/page.tsx:292`, `packages/app-core/src/help/help-browser.tsx:494`, `packages/app-core/src/views/ticket-sheet.tsx:1915`, plus `components.test.tsx:258`.
+
+**WHY IT IS WRONG.** A person using a screen reader is told "tab, 1 of 3" and will press the arrow keys the pattern promises. Nothing happens. The cost is not cosmetic. And the component's own docblock gives the reason the roles were kept: *"keeping the exact roles the old markup carried — `tablist`, `tab`, `aria-selected` — so the accessible-name ratchet (13.285/13.287) sees no loss."* **A counter was preserved, and the semantics it counts were not implemented** — which is P10's mechanism showing its cost in a second place.
+
+**WHAT WOULD HAVE BEEN BETTER.** If these are view switches, `role="tablist"` is the wrong role: a group of buttons with `aria-pressed` needs no keyboard model beyond Tab. If they really are tabs, they need the keyboard model and a `tabpanel` to point at. Either is small; the current shape takes the semantics and skips the contract.
+
+---
+
+### P10 — **MINOR** — The accessible-name ratchet's unit is an attribute; its failure message claims a property of assistive tech
+
+**WHAT.** `ariaLabel` counts **elements carrying the attribute**, and the assertion that consumes it tells the reader something stronger.
+
+**MEASUREMENT.**
+- `apps/web/e2e-viewport/accessible-names.ts:47-52`: `const count = (attr: string): number => all.filter((el) => el.hasAttribute(attr)).length;` and `ariaLabel: count('aria-label')`. `RATCHETED` (`:118-123`) includes `ariaLabel`.
+- The failing assertion's message (`apps/web/e2e-stack/viewport.spec.ts:719-722`) reads: *"…LOST ${attr}: baseline …, now …. **Something that identified an element to assistive tech is gone.**"*
+- **A live site where the two differ:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:3288` wraps an `Avatar` — which sets its own `aria-label` (`components/avatar.tsx:65`) — in `<span aria-hidden="true">`, with a comment explaining that the wrap exists precisely so that `aria-label` does **not** reach assistive tech. The attribute is present in the DOM, counted by the ratchet, and deliberately hidden.
+
+**WHY IT IS WRONG — and how far I am willing to take it.** The file's own docblock is **honest** about this (*"Counts, not names"*), so the instrument is not lying. The **assertion message** is: a count of attributes is reported as a statement about assistive technology. And I checked the tempting stronger version of this finding and **withdrew it**: I hypothesised that `Avatar`'s `aria-label` on a role-less `<span>` names nothing, and the code disproved me — `page.tsx:3279-3286` records a measurement that it *does* contribute, doubling a wrapping checkbox's accessible name to *"Uma One Uma One"*. **So an `aria-label` on this span is exposed; the finding is about the unit, not about `Avatar`.**
+
+**WHAT WOULD HAVE BEEN BETTER.** Keep the count (it is cheap and it does catch a dropped attribute) but say what it measures: *"an `aria-label` attribute left the document; whether it named anything is not what this measured"*. That sentence costs nothing and stops a count being read as a property.
 
 ---
 
@@ -242,6 +287,10 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 | **`editor-slot__submit` unstyled** | **RECORDED as pre-existing** | `ui.css:5861-5870` points at `apps/web/e2e-viewport/type-scale.ts:355-357`. **I still list it in P1** — a recorded *reason* ("UNSTYLED, and that is PRE-EXISTING") is a record of a shortcut, not a ruling that it should stay that way. The controller can rule it either way; the difference is one line. |
 | **Non-text-contrast roster at `belowCount: 1`** | **STALE RECORD** | I2. |
 | **Prototype's per-column empty state** | **MATCHES** | `ui.css:846-885`. |
+| **`Toast`'s accessibility** | **GOOD** — listed so this is not a defect-only list | `role="status"` (`toast.tsx:139`), decorative dot `aria-hidden`, timer pausing on **both** `mouseenter` and `focus`, and the docblock reasons about how *"every way of closing this toast puts the pointer or the focus INSIDE it"* (`:103-106`). |
+| **`InfoTip`'s accessibility** | **GOOD** | `info-tip.tsx:43-47` states *"No focus trap and no `role="menu"`"* and justifies each omission **for a non-modal popover** — the correct use of the same reasoning `Dialog`/`Sheet` misapply (P8). Its Escape-closes-without-moving-focus decision at `:39-42` is argued from the control's own behaviour, not asserted. |
+| **`Switch`'s role choice** | **RULED/recorded** — not a defect | `switch.tsx:41-53` uses a real `<input type="checkbox">` rather than `role="switch"` and **states the trade**: *"to assistive technology this is a checkbox, not a `switch`. That is the pre-existing position on `/account`… what it does change is that there is now one place to change it in."* A limitation named and located is not the same as one hidden. |
+| **`Avatar`'s tint palette** | **GOOD** | `avatar.tsx:25-41` derives its four tints from pairs `CONTRAST_PAIRS` already measures, so *"this palette cannot drift out of contrast without `tokens.test.ts` going red"* — the one place I saw a visual choice welded to an existing gate rather than asserted beside it. |
 
 ---
 
@@ -265,25 +314,30 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 
 ## 8. FINDINGS BY SEVERITY — members named, not counted from memory
 
+⚠ **Ids are in discovery order, not reading order** (`I*` are instrument findings, `P*` are product/render findings; the second pass added `P8`–`P10` before `P3`–`P7`). **This section is the enumeration that groups them.**
+
 **CRITICAL — 1**
 - `I1` no browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate structurally cannot run one
 
-**IMPORTANT — 4**
+**IMPORTANT — 6**
 - `I2` the `e2e-stack` contrast roster records a defect fixed eight hours later, with no provenance
 - `I3` `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by its own docblock
 - `P1` six interactive controls styled by no rule at all (raw UA chrome)
 - `P2` the board's whole-board empty state has no prototype counterpart and no styling
+- `P8` `Dialog` and `Sheet` declare `aria-modal="true"`; nothing implements containment
+- `P9` `SegmentedControl` carries ARIA tab semantics with none of the tab keyboard model, in 7 places
 
-**MINOR — 7**
-- `I4` my own handoff carries two contradicting position blocks; the pointer that found it is itself stale
-- `I5` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
+**MINOR — 8**
+- `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
+- `I5` my own handoff carries two contradicting position blocks; the pointer that found it is itself stale
 - `P3` the parent crumb cannot show the parent's key; the prototype's does; no ruling found
 - `P4` "the SAME plain span" is false of the restricted arm (code docblock + `Features.md:77`)
 - `P5` an owner-requested type selector was neither built nor reported
 - `P6` mobile: two of three screens have no styling while the third is themed
 - `P7` desktop's task list has no rules
+- `P10` the accessible-name ratchet's unit is an attribute; its message claims a property of assistive tech
 
-**Total 12.** `raised` and `sum by severity` agree by enumeration above.
+**Total 15.** `raised` and `sum by severity` agree by enumeration above.
 
 ---
 
