@@ -31,6 +31,34 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 SUNDAY 2026-09-20 ~22:4x IST — **CYCLE 29: THE OWNER CHOSE §17's SHAPE — UNIFORMLY 3-DIGIT PADDED, CEILING 999 — SO THE 99-ID CEILING THAT JUST SQUEEZED EXEC 2 IS NOT REPEATED.** `main` is `fd14c48d`; **zero open PRs**; ledger **307 done / 1 todo**; `check-case-ids` **2577 unique, highest `16.99`**.
+
+### 1. 📌 THE RULING, AS READ FROM THE PANE — and the ambiguity that produced it, stated rather than hidden
+**The owner was offered TWO lists of options in two places and typed `b`.** The reading taken is against the list that was on screen when they answered — the controller's most recent message: **(a)** open §17 early; **(b)** make §17 **uniformly 3-digit padded** (`17.001`–`17.999`, ceiling 999).
+⚠ **THAT IS NOT THE ONLY `b` THEY COULD HAVE MEANT, AND THE DEFECT IS THE QUESTION, NOT THE ANSWER.** The cycle-28 anchor's §3 had put a *different* list to them — **(a)** split `16.91`–`16.95`; **(b)** open §17 early for exec 2; **(c)** reallocate `16.63`–`16.80`; **(d)** leave the tail. **Two option lists with overlapping letters in one session is exactly the shape that misfiles a one-letter answer.**
+**So the reading applied is: §17 is to be UNIFORMLY 3-DIGIT PADDED, `17.001`–`17.999`, ceiling 999 — and §17 is NOT opened by this entry.** ⚠ **If the other `b` was meant, one word corrects it and nothing is lost: no id has been minted under either reading, and both lanes are unblocked meanwhile (§5).**
+
+### 2. ⛔ WHY THIS DOES NOT OPEN §17 — AND WHY THAT IS NOT THE CONTROLLER DECLINING
+**A standing order already governs the opening, verbatim: *"open 17 if 16 runs out."*** — and this file's own gloss reads **"The controller MAY open §17 when §16's window is spent — this is a standing grant, not a per-case question."** **§16's window is NOT spent: 23 of its 99 ids are unminted** (`16.91`–`16.95` and `16.63`–`16.80`, measured with the guard's own regexes). Opening now would be the controller **exceeding** its grant rather than exercising it. **The owner does not need to rule on the opening at all** — that is the controller's to do, and theirs to expect.
+
+### 3. ⚠ WHAT THE RULING CHANGES, AND WHAT IT CANNOT
+- **Nothing retroactive.** §16's minted ids are unpadded (`16.1`–`16.99`) and **76 of them are merged**; padding cannot be retro-fitted without renumbering merged ids. **§17 onward is the ruling's scope.**
+- ⚠ **AND IT LEAVES A SENTENCE IN THE §16 HEADER THAT WILL READ AS CONTRADICTING IT.** That header says: *"**Do not reintroduce the `{3}` width** that §13 used: that width existed to stop `13.99` sorting above `13.649`, and ids here are not padded, so importing it would be the truncation trap in a new costume."* **Read beside a 3-digit `17.NNN`, that now looks like a prohibition on the ruling. It is not** — its trap is **MIXING widths inside ONE section** (`16.100` sorting below `16.99`), and **`§13` is the proof a UNIFORM width works**: it ran `13.001`–`13.999` and minted **882** ids without the trap. **The correction is a scope word, not a reversal.**
+- ⛔ **THAT CORRECTION IS IN `test-cases/`, OUTSIDE THE CONTROLLER's `docs/`-only scope, so it is OWED to a lane and is not made here.**
+
+### 4. WHAT IS NOW OWED, AND TO WHOM
+1. **A lane**: one sentence in `test-cases/16-remaining-doors.md`'s header recording **§17's shape as `17.NNN`, uniformly 3-digit padded, ceiling 999**, and scoping the existing `{3}` prohibition to *within* a section. **It should ride with the next `test-cases/` change rather than its own PR — but it must not be forgotten, because the artifact a minting session trusts is that file, not this one.**
+2. **The controller**: write §17's block table row in that same file when §17 opens, under the standing grant.
+3. ⚠ **Unchanged and still open**: exec 2 has no ids at all; `16.91`–`16.95` and `16.63`–`16.80` are exec 1's by the table; and the §16 case body plus exec 2's handoff still assert `16.88`–`16.99` as exec 2's. **Cycle 27 §3 carries the measurement; cycle 28 §3 the update.**
+
+### 5. LANES — unchanged from cycle 28, re-measured
+| lane | branch | state |
+|---|---|---|
+| exec 1 | `exec/subtask-affordance` @ `00fbf4c8` | **WORKING** item 5 — at the commit step, Ctx 19 % |
+| exec 2 | `exec2/comment-thread` @ `fed9a588` (**8 behind `main`**) | **WORKING** item 4 — running the app-core suite, Ctx 42 % |
+
+---
+
 ## 🔄 SUNDAY 2026-09-20 ~22:2x IST — **CYCLE 28: BOTH UNANCHORED MERGES CLEARED — THE CYCLE-27 ANCHOR ITSELF, AND EXEC 1'S ATTACHMENTS LEAK — AND EXEC 1 IS RESTARTED ONTO THE NEXT QUEUED TASK.** `main` is `00fbf4c8`; **zero open PRs**; ledger **307 done / 1 todo**; `check-case-ids` **2577 unique, highest `16.99`**.
 
 ### 1. THE TWO MERGES, EACH GATED AT ITS OWN LANDING TREE
