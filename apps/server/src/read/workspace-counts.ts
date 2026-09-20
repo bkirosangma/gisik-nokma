@@ -214,8 +214,11 @@ export async function ticketVisibleProjectIds(
     // they have sight into, and it is derived from ticket rows. A project whose
     // only sight-into row is a soft-deleted ticket is not a project they can see
     // anything in, and saying otherwise is the existence-disclosure the docblock
-    // below refuses for the neighbouring count. No fixture separates the two
-    // today; stated here rather than left as an absence.
+    // below refuses for the neighbouring count. ⚠ **There IS a fixture now**:
+    // this sentence read "No fixture separates the two today; stated here rather
+    // than left as an absence", and case 16.89's `ticketVisibleProjectIds` case
+    // closed it — a project holding ONE tombstone and nothing else is asserted
+    // ABSENT from the set, with a project holding live tickets as the control.
     `SELECT DISTINCT t.project_id
        FROM proj_tickets t
        JOIN proj_visibility v ON v.ticket_id = t.ticket_id
