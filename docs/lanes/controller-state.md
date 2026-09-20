@@ -31,6 +31,76 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 TUESDAY 2026-09-22 ~00:0x IST — **CYCLE 32: THE REVIEW'S SCOPE IS THE ENTIRE CODEBASE, AND THIS ENTRY NAMES THE UNIVERSE SO THE LANES CANNOT SAMPLE IT.** `main` is `a12f370e`; **zero open PRs**; ledger **307 done / 1 todo**.
+
+### 1. 📌 THE OWNER'S ADDITION, VERBATIM
+> *"btw the review has to be the most detailed of reviews of the entire codebase. every nook and corner of the code, every case, every edge has to be checked and reviewed. leave no stones unturned."*
+
+### 2. ⚠ WHAT THAT MEASURES TO — so the briefs can name it instead of gesturing at it
+**11 packages/apps with source: `apps/{server,web,mobile,desktop}` and `packages/{app-core,domain,editor,mcp-server,rule-engine,sync-client,ui}`.** Plus **416 test files**, **25 files under `test-cases/`** (**the guard reads 2586 unique ids** — ⚠ *not* the 1252 a bold-only grep returns; the guard's three spellings are the instrument), **19 route modules**, **32 migrations**, **9 checkers in `scripts/`**, the `docs/` set (including the generated help), and `design-system/interactive/desktop.dc.html` — **the prototype, which is the authority several of those files were built against.**
+⛔ **NO LANE MAY SAMPLE.** The universe is enumerated above so a lane can **partition it and report against it**, rather than review whatever it happened to open.
+
+### 3. THE PARTITION — by CONCERN, not by directory, and overlap is EXPECTED
+| lane | concern | the universe it owns |
+|---|---|---|
+| **exec 1** | **UI** | `packages/ui` (components, `ui.css`, tokens), `apps/web` (routes, components, styles), **`packages/app-core/src/views/*` as RENDERED**, `packages/editor`'s surfaces, `apps/mobile`, `apps/desktop`, the viewport/e2e suites — and **accessibility**: names, contrast, tap targets, type scale, focus. |
+| **exec 2** | **UX** | What a person MEETS: navigation and reachability, **every empty / loading / error / refusal state**, permissions as *experienced* rather than as enforced, the copy across the product **and `docs/faq.md` + `docs/manual.md` + the generated help**, the flows end to end, first-run, and the wording of every refusal. |
+| **exec 3** | **features / functionality** | The engine and the wire: `apps/server` (**19 routes, 32 migrations**, projections, read paths, the soft-delete predicate, permission ENFORCEMENT), `packages/domain`, `packages/rule-engine`, `packages/sync-client`, `packages/mcp-server`, `packages/app-core/src/online` + `replica`, **and the 9 checkers in `scripts/`** — an instrument that reports without measuring is a finding. |
+**Every case id is in scope for the lane whose concern it belongs to** — `test-cases/`' 2586 ids are not decoration: **for each id in your concern, ask whether it still holds, whether it is witnessed, and whether it is still TRUE of the product today.** ⚠ **`app-core` spans all three concerns** (views/mappers/replica/online) — **the directory is not the cut, the concern is**, and **overlap must NOT be resolved by the lanes** (cycle 31 §3).
+
+### 4. ⛔ THE METHOD — and the only honest form of "no stones unturned"
+1. **ENUMERATE FIRST, REVIEW SECOND.** Before a single finding, each lane writes down **its universe**: the files, the routes, the migrations, the components, the case ids. **That list is the yardstick, and it is what makes coverage checkable.**
+2. **Then cover it systematically** — not by reading whatever looks interesting.
+3. ⛔ **THEN STATE THE COVERAGE, INCLUDING WHAT WAS NOT REACHED.** *"Leave no stones unturned" is satisfiable only as an ENUMERATION plus an HONEST BOUNDARY.* ⚠ **A claim of totality that cannot be demonstrated is the single most-catalogued failure in this repository** — this file alone records a sweep whose universe omitted the file the defect was in, a count that did not match its parts, and a check that could not fail. **A report that says "these 40 files were reviewed, these 300 were not, and here is why" is worth more than one that says "the codebase was reviewed".**
+4. **Every finding carries the owner's three parts — WHAT is wrong, WHY it is wrong, WHAT WOULD HAVE BEEN BETTER — plus the measurement it rests on and a severity.** A finding missing the third is a complaint; a finding missing the measurement is unverified and **must be marked as such**.
+5. ⛔ **A reviewer fixes nothing. No branch of fixes, no PR from the review pass itself.**
+
+### 5. THE EDGE CLASSES — "every edge" is a list, not a mood
+**For every surface in your concern, walk these nine and say what happens: EMPTY · ERROR · PERMISSION-REFUSED · OFFLINE / REPLICA-DEGRADED · SOFT-DELETED · CONCURRENT or INTERLEAVED · NARROW VIEWPORT · FIRST-RUN · and THE SERVER REFUSES WHILE THE CLIENT BELIEVES.** The last is this product's most expensive recurring shape: a client that asserts a success the server declined.
+
+### 6. WHAT THIS CHANGES IN CYCLE 31
+Cycle 31's spec stands — the trigger, the fresh sessions, the report paths, the no-fixing rule, the controller's ruling duty and its count discipline. **This entry changes its SCOPE from "the recent work" to the whole codebase, and adds §3's partition, §4's method and §5's edge classes to what each lane brief must carry.** ⚠ **Its §2 trigger is UNCHANGED and still governs: all three of items 6, 7 and 8 merged, then fresh sessions.**
+
+---
+
+## 🔄 MONDAY 2026-09-21 ~23:4x IST — **CYCLE 31: THE QUEUE IS EMPTY OF UNBLOCKED WORK, AND THE OWNER HAS ORDERED A THREE-REVIEWER EXERCISE TO RUN WHEN IT DRAINS. THIS ENTRY IS ITS EXECUTION SPEC.** `main` is `fef20170`; **zero open PRs**; ledger **307 done / 1 todo**.
+
+### 1. 📌 THE OWNER'S INSTRUCTION
+> *"once all the executors are done, lets do a review exercise. (wait for all 3 to finish before executing this on fresh session on all 3)"*
+> *"all 3 executors are highly critical reviewers. who will ruthlessly point out every single thing that is wrong, why they are wrong, and what would have been better instead. exec 1 is on UI, exec 2 on UX and exec 3 on features/functionality."*
+> *"they will submit the reports (a persisted file). the controller will then have to read all 3 reports, and for each criticism, make rulings on what it can and will do to answer to every points of the report. if it rejects the criticism or gives a very good reason, he can choose to not do anything about them. but have to defend it properly. it then writes its own compiled report that combines its answer to all 3."*
+
+### 2. ⛔ THE TRIGGER — AND IT IS "ALL THREE", NOT "SOON"
+**The exercise runs when items 6, 7 AND 8 are ALL merged and no lane holds unmerged work.** ⚠ **Not when the first lane finishes, and not when two do.** Measured at `fef20170`: exec 1 on `exec/breadcrumb-ancestors` (7 ahead), exec 2 on `exec2/markdown-editing` (1 ahead), exec 3 on `exec3/visibility-styling` (4 ahead). **Re-measure — do not carry this reading forward, and do not carry the ahead-counts as states.**
+**It must be a FRESH SESSION on all three**, as the owner says. **Kill-and-relaunch each lane through `exec-claude.sh` — never `/clear` — and read each status line to confirm the backend it chose.**
+
+### 3. THE EXECUTION SPEC
+| | exec 1 | exec 2 | exec 3 |
+|---|---|---|---|
+| tmux | `gisik:1` | `gisik:2` | `gisik:3` |
+| **role** | **UI** | **UX** | **features / functionality** |
+| report | `docs/lanes/review-ui-exec1.md` | `docs/lanes/review-ux-exec2.md` | `docs/lanes/review-functionality-exec3.md` |
+**Each lane writes its report to that path, commits it on its own review branch, and does NOT open a PR** — the controller collects all three and lands them with its compiled report (§4), which is the fewest gates and keeps the four documents together. **The controller reads each report from the lane's own worktree file, never from a summary of it.**
+**Every lane brief must carry, in its own section:**
+- ⛔ **BE RUTHLESS AND SPECIFIC. Every criticism names WHAT is wrong, WHY it is wrong, and WHAT WOULD HAVE BEEN BETTER.** Those are the owner's own three parts, and **a criticism missing the third is a complaint, not a finding.**
+- ⚠ **AND EVERY CRITICISM MUST BE MEASURED, NOT ASSERTED.** This project's most expensive recorded error is a confident sentence citing a line nobody opened. **A finding that cannot be measured says so and is marked as such** — an honest "I could not measure this" is worth more than a confident guess.
+- **Their own work is IN SCOPE, including what they themselves shipped.** The product is the subject, not their diff.
+- ⛔ **A reviewer does not fix what it finds.** No branch of fixes, no PR from the review pass itself.
+⚠ **THE THREE DOMAINS ARE ADJACENT AND WILL OVERLAP** — three cuts of one product, chosen deliberately. **Overlap is expected and must NOT be resolved by the lanes**; the controller reconciles it in §4.
+
+### 4. THE CONTROLLER'S COMPILED REPORT — `docs/lanes/review-compiled-controller.md`
+**For EVERY criticism in all three reports the controller must rule: ACCEPTED (and what it will do), or REJECTED (and the defence).** ⚠ **A rejection is only as good as its defence** — the owner's words are *"if it rejects the criticism or gives a very good reason"*, so **a bare disagreement is not a ruling**. **Every ruling cites the measurement it rests on**, and **a criticism the controller cannot resolve is ESCALATED TO THE OWNER, not silently dropped.**
+⚠ **AND THE COUNTS ARE ASSERTED, NEVER SUMMARISED**: how many criticisms were raised, accepted, rejected, escalated — **with the three ruling counts summing to the raised count**, because this file has a whole family of recorded failures about a total that did not match its parts.
+
+### 5. LANES AT HANDOVER — measured ~23:4x
+| lane | branch | task | state |
+|---|---|---|---|
+| exec 1 | `exec/breadcrumb-ancestors` | item 6 — breadcrumbs + parent-indicator merge | **IN FLIGHT** — 7 ahead |
+| exec 2 | `exec2/markdown-editing` | item 8 — markdown editing | **IN FLIGHT** — 1 ahead; **it cut its own branch from `origin/main` exactly as its #617 body said it would** |
+| exec 3 | `exec3/visibility-styling` | item 7 — visibility section styling | **IN FLIGHT** — 4 ahead |
+
+---
+
 ## 🔄 MONDAY 2026-09-21 ~23:2x IST — **CYCLE 30: A THIRD EXECUTOR, §17 IS OPEN, AND THE TWO MERGES THAT GOT HERE. THIS ENTRY SUPERSEDES EVERY EARLIER TOPOLOGY LINE — THERE ARE THREE LANES NOW.** `main` is `534c450b`; **zero open PRs**; ledger **307 done / 1 todo**; `check-case-ids` **2582 unique, highest `16.99`**.
 
 ### 1. ⚙ THE TOPOLOGY CHANGED: THREE EXECUTORS. Owner, verbatim: *"spin up another exec and take up item 7."*

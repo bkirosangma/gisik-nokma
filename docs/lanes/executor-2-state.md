@@ -65,15 +65,18 @@ old mutation targeted a line that no longer exists.
 
 | anchor | value |
 |---|---|
-| `git merge-base HEAD origin/main` | **`00ee17e9` — equal to `origin/main`** (folded three times) |
-| ahead / behind | **11 / 0** — nothing behind, so this head IS the landing tree |
-| tree | clean (`git status --porcelain` empty) |
-| `test-cases/` vs `origin/main` | **EMPTY diff**, with a control (`Features.md` shows +1) — **no id was minted** |
-| `check-case-ids` | **2577 unique / highest 16.99**, identical on both sides of the fold; all four new ids are exec 1's |
-| `check:help` · `check:citations` · `check:migrations` · `check:tasks` · `check:runbook` · `check:env` | rc 0 each |
-| **suites** | **server 1696 · app-core 1702 · web 622 — all green, 0 failed**, re-run AFTER the third fold |
-| **the batteries** | **7/7 server mutations KILLED · 7/7 client mutations KILLED**, each naming its own case, both re-run after the third fold. The two the review added are `m7` (the filename sanitizer) and `c7` (the thread reload) — **both were unwitnessed until the reviewer measured them** |
+| `git merge-base HEAD origin/main` | **`52a04b8c` — equal to `origin/main`** (folded three times, then onto cycle 30) |
+| ahead / behind | **3 / 0** — nothing behind, so this head IS the landing tree |
+| tree | clean (`git status --porcelain` empty) at the head this block was written against — **this handoff commit is the only thing after it** |
+| `test-cases/` vs `origin/main` | **NON-EMPTY** — this change set mints `16.72`–`16.75`, one per comment-thread test file |
+| `check-case-ids` | **2586 unique / highest 16.99**, re-measured after the fold (+4, exactly the four ids added) |
+| `check:citations` | **rc 0**, `16-remaining-doors.md` **83 cited / 0 uncited** — the ratchet holds exactly, no baseline moved |
+| `check:help` · `check:migrations` · `check:tasks` · `check:runbook` · `check:env` | rc 0 each |
+| **suites** | **server 6/6 · app-core 19/19** over the four files this change set touches, re-run AFTER the fold |
+| ⚠ what "after the fold" is worth here | `pnpm turbo run build typecheck` returned **22/22 FULL TURBO CACHED** — **because the fold added only `docs/lanes/controller-state.md`.** That is what the cache MEANS, not evidence that a build ran; a reader who wants a real build must change an input. |
+| **the batteries** | **7/7 server · 7/7 client mutations KILLED** — from the merged `#615` change set; this one adds no executable code and re-runs none of them |
 | ⚠ the forced gate | **NOT run — it is the controller's.** |
+| ⛔ **and the row that matters** | **This whole table read `00ee17e9` / `11 / 0` / EMPTY / `2577` / "all four new ids are exec 1's" until 2026-09-21** — every row falsified by the change set below it, and **left standing by the fix round that struck the debt item in `§4`.** An independent re-review caught it, not this lane. **The lesson is not "recount the table"; it is that striking a claim in one section does not expire the same claim in the anchors table, and a handoff whose anchors are stale is worse than none.** |
 
 ### § 3 — THE REVIEW: 2 IMPORTANT + 5 MINOR, CRITICAL NONE, ALL SEVEN FIXED
 
@@ -96,17 +99,29 @@ than the shared worktree. **Its full findings are recorded in the PR body, writt
 
 ### § 4 — OPEN, AND WHAT IS OWED
 
-1. **THE CASE IDS ARE OWED, AND THIS BRANCH MINTS NONE.** The controller ruled mid-task that executor 2
-   has no free ids (`16.41`–`16.60` spent; `16.63`–`16.80` and `16.91`–`16.99` are exec 1's by `§16`'s
-   table). **Cycle 29 settled §17's SHAPE (`17.NNN`, uniformly 3-digit padded, ceiling 999) and did NOT
-   open it** — §16's window is not spent. **So four shipped test files carry no case id at all**, each
-   saying so in its own header, and `test-cases/` is untouched. When a block is ruled, the mint is
-   mechanical: the case text is already in the files.
-2. **AN OWED SENTENCE, NOT MINE TO WRITE.** Cycle 29 §4 owes a lane **one sentence in
-   `test-cases/16-remaining-doors.md`'s header** recording §17's shape and scoping the existing `{3}`
-   prohibition to *within* a section. I did **not** take it, deliberately: my change set touches no
-   `test-cases/` file, that promise is what keeps this branch's no-mint claim checkable, and exec 1 has a
-   `test-cases/`-touching task in flight. **It rides with the next `test-cases/` change.**
+1. ✅ **DISCHARGED 2026-09-21 — `16.72`–`16.75` ARE MINTED, AND THIS ITEM IS CLOSED.** It read *"THE CASE
+   IDS ARE OWED, AND THIS BRANCH MINTS NONE"* and named `16.63`–`16.80` as exec 1's. **Both halves are
+   now false of `main`, and an independent reviewer is why this is rewritten rather than left standing:**
+   the controller reallocated **`16.72`–`16.80` to exec 2 on 2026-09-21** (exec 1 keeps `16.63`–`16.71`),
+   and the four owed ids are minted in `test-cases/16-remaining-doors.md` with a citation in each of the
+   four files. **The block table there is the authority and carries the reallocation, its authority and
+   its reason.** ⚠ **§17 IS NOW OPEN — AND THIS SENTENCE SAID THE OPPOSITE FOR FORTY-FIVE SECONDS.**
+   It read *"Cycle 29's `§17` ruling is unchanged and §17 is NOT opened — §16's window still is not
+   spent."* Cycle 29 fixed §17's SHAPE (`17.NNN`, uniformly 3-digit padded, ceiling 999); **cycle 30
+   exercised the standing grant and opened it, because §16 had run out**, splitting the remainder three
+   ways (exec 1 `16.63`–`16.71`, exec 2 `16.72`–`16.80`, exec 3 `17.001`–`17.020`). **True when typed at
+   23:16:10; false by 23:16:55 when cycle 30 landed. That is the whole shelf life of an anchor, and it is
+   why `§2` below is RECOUNTED rather than carried.**
+2. ✅ **DISCHARGED — AND IT WAS NEVER MINE, WHICH IS WHY IT IS STRUCK RATHER THAN CLAIMED.** Cycle 29 §4
+   owed a lane one sentence recording §17's shape in `test-cases/16-remaining-doors.md`'s header and
+   scoping the `{3}` prohibition to *within* a section. **Exec 1 landed it at `31697b5b`, 2026-09-20
+   22:27 IST**, an ancestor of `origin/main` (verified by `git merge-base --is-ancestor`, not `cat-file`,
+   which passes on reflog-only commits) — the header carries `## §17's SHAPE` and the scope paragraph
+   **at `:41` and `:35` in THIS tree** (they were `:39` and `:33` at `534c450b`; this change set's own
+   block-table additions above them pushed both down by two, which is why a citation into a file you are
+   editing expires while you write it). **It was already stale when the controller dispatched it back to me as
+   `CTL-DISPATCH-2026-09-21-sec17-shape.md`; the refusal and its measurement are in
+   `gisik-nokma-lanes/EXEC2-2026-09-21-sec17-already-landed.md`.**
 3. **THE `@` MENTION BUTTON** — ruled or deferred; the request is filed (premise 2 above).
 4. **The replica serves NO comments.** `getTicketComments` refuses with a `ReplicaGapError`, because a
    comment's FILES are resolved against a server table the replica does not hold and the renderer draws an
