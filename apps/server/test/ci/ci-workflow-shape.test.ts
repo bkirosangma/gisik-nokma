@@ -12,13 +12,28 @@ import { parse } from 'yaml';
  */
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const workflow = parse(readFileSync(join(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8')) as {
-  jobs: Record<string, { needs?: string | string[]; if?: string }>;
+  jobs: Record<string, { needs?: string | string[]; if?: string; steps?: { run?: string }[] }>;
 };
 
 const needsOf = (job: string): string[] => {
   const n = workflow.jobs[job]?.needs;
   return n === undefined ? [] : Array.isArray(n) ? n : [n];
 };
+
+/**
+ * The non-empty `run:` bodies of a job's steps.
+ *
+ * Carried because "a job exists" and "a job RUNS something" are two different
+ * properties, and only the second one can fail. A `viewport:` key with no step
+ * that invokes the suite would satisfy a name check while running nothing — the
+ * exact shape this repository catalogues as a check that cannot fail, and the
+ * shape `e2e`'s own comment records having already been through once
+ * ("green-by-absence had become green-by-presence").
+ */
+const runsOf = (job: string): string[] =>
+  (workflow.jobs[job]?.steps ?? [])
+    .map((s) => s.run ?? '')
+    .filter((r) => r !== '');
 
 describe('ci.yml job graph', () => {
   /**
@@ -48,5 +63,64 @@ describe('ci.yml job graph', () => {
     expect(workflow.jobs['check-help']).toBeDefined();
     expect(needsOf('gate')).toContain('check-help');
     expect(needsOf('gate').length).toBeGreaterThan(2);
+  });
+
+  /**
+   * 16.59 — the VIEWPORT suite is on the gate, and the assertion is on what the
+   * job RUNS rather than on the job's name.
+   *
+   * `apps/web/e2e-viewport/responsive.spec.ts` drives a real Chromium at 390 /
+   * 768 / 1512 against a `next dev` built from the working tree. It was
+   * reachable only by an explicit `-c playwright.viewport.config.ts` that no
+   * turbo task defined and that this workflow never named: measured 2026-09-20,
+   * the string `viewport` occurred **0 times** in `ci.yml` while the same
+   * invocation found `e2e` nine times. The bill was five days of a red tap-target
+   * ratchet on `main` (`25 / 23 / 25` against baselines of `10 / 16 / 16`) that
+   * nothing could see. **A ratchet with no runner is a note, not a check.**
+   *
+   * ⚠ The FIRST assertion below is the one that carries the weight. A `viewport:`
+   * job whose steps do not invoke `test:e2e:viewport` satisfies every name-shaped
+   * check while running nothing, and then reads as coverage — strictly worse than
+   * no job at all, which is the same reasoning `e2e`'s own comment gives for
+   * refusing a file-presence gate. So the command is asserted, not the key.
+   */
+  it('runs the viewport suite on CI, and gate waits on it', () => {
+    expect(workflow.jobs['viewport']).toBeDefined();
+
+    const runs = runsOf('viewport');
+    // The control for a sweep that found nothing: the job must have SOMETHING to
+    // run before "one of them is the suite" can mean anything.
+    expect(runs.length).toBeGreaterThan(0);
+    expect(runs.some((r) => r.includes('test:e2e:viewport'))).toBe(true);
+
+    // And the second half of the property, the same one check-citations needed:
+    // a job nothing depends on cannot fail the build.
+    expect(needsOf('gate')).toContain('viewport');
+
+    /**
+     * ⚠ AND THE JOB MUST NOT BE TURNABLE OFF, WHICH NOTHING ABOVE CHECKS.
+     *
+     * `gate` counts a `skipped` job as success. So an `if: false`, or any extra
+     * condition a later "temporarily disable the flaky browser job" edit adds,
+     * leaves every assertion above green AND the gate green — the suite stops
+     * running while CI reports a clean sheet. That is precisely the shape this
+     * test's own docblock says it exists to prevent, one level up: **it would
+     * cover nothing while reading as coverage.** Finds-by-review, not by a run.
+     *
+     * The sibling jobs already carry a shared skip condition, and it is correct
+     * here for the same reasons (a docs-only diff runs nothing, and a failed
+     * build makes the reading meaningless). The property is therefore that this
+     * job carries THE SAME ONE, not a stricter one of its own — plus the literal
+     * disable, which is the specific edit to catch.
+     */
+    const ifExpr = workflow.jobs['viewport']?.if ?? '';
+    expect(ifExpr, 'the viewport job carries no `if:` at all').not.toBe('');
+    expect(ifExpr).not.toBe('false');
+    expect(ifExpr).toBe(workflow.jobs['typecheck']?.if);
+
+    // The positive control, through the SAME accessor: `runsOf` is not vacuous
+    // over this document. `build` really does carry `run:` steps, so an empty
+    // list above would mean the parse or the accessor broke, not that CI is tidy.
+    expect(runsOf('build').length).toBeGreaterThan(0);
   });
 });

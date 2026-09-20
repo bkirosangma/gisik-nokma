@@ -14,16 +14,26 @@ import {
  *
  * ⚠ WHY THIS FILE EXISTS AT ALL, AND IT IS NOT REDUNDANCY. The tap-target
  * assertions live in `apps/web/e2e-viewport/responsive.spec.ts` and
- * `apps/web/e2e-stack/viewport.spec.ts`, and **neither suite is on any gate**:
- * `pnpm turbo run build test typecheck` defines no task that reaches them, and
- * `.github/workflows/ci.yml` runs `test:e2e:stack` only — the string `viewport`
- * does not appear in that file. Measured 2026-09-20, with a positive control in
- * the same invocation. The consequence was not theoretical: the `/help` ratchet
- * sat at **25 / 23 / 25 offenders against baselines of 10 / 16 / 16** on `main`,
- * for as long as the topic sidebar has existed, red the whole time, seen by
- * nobody. This file puts the parts of that rule that a `vitest` run CAN hold —
- * the table's integrity, the two constants, and the fact that the floor has one
- * home — on the gate.
+ * `apps/web/e2e-stack/viewport.spec.ts`, and **when this file was written,
+ * neither suite was on any gate**: `pnpm turbo run build test typecheck` defined
+ * no task that reached them, and `.github/workflows/ci.yml` ran
+ * `test:e2e:stack` only — the string `viewport` did not appear in that file.
+ * Measured 2026-09-20, with a positive control in the same invocation. The
+ * consequence was not theoretical: the `/help` ratchet sat at **25 / 23 / 25
+ * offenders against baselines of 10 / 16 / 16** on `main`, for as long as the
+ * topic sidebar has existed, red the whole time, seen by nobody. This file put
+ * the parts of that rule that a `vitest` run CAN hold — the table's integrity,
+ * the two constants, and the fact that the floor has one home — on the gate.
+ *
+ * ⚠ **THE SENTENCE ABOVE IS PAST TENSE ON PURPOSE — case 16.59, 2026-09-20.**
+ * `ci.yml` now carries a `viewport` job that runs `test:e2e:viewport`, and
+ * `gate` waits on it, so the browser half is on the merge gate too. **This file
+ * did not become redundant when that landed, and the distinction is the whole
+ * reason both exist**: a source scan and a browser measurement fail
+ * independently. This one reddens when a constant or the table is edited and no
+ * browser is involved; the viewport suite reddens when the CSS stops honouring
+ * the floor and no source text changes. A green here is not evidence for the
+ * other, which is why `tests` above and this docblock are both kept.
  *
  * WHAT IT IS NOT. This is a SOURCE-LEVEL test and it does not measure a box.
  * Nothing here proves a control is 24px tall; that is the viewport suite's job
@@ -56,7 +66,16 @@ import {
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const UI_CSS_PATH = resolve(TEST_DIR, '../../../packages/ui/src/ui.css');
 
-/** The two suites that consume the split. Both are off every gate; see above. */
+/**
+ * The two suites that consume the split.
+ *
+ * ⚠ CORRECTED 2026-09-20: this read *"Both are off every gate; see above."* The
+ * signed-out one is on CI's `gate` as of case 16.59 — see the note at the head of
+ * this file. **The `see above` was the damaging part**: it made a stale sentence
+ * read as though it had already been reconciled with the correction sitting a few
+ * lines from it, which is why an independent review found this and the sweep that
+ * made the correction did not.
+ */
 const SPEC_PATHS: Record<string, string> = {
   'e2e-viewport/responsive.spec.ts': resolve(TEST_DIR, '../e2e-viewport/responsive.spec.ts'),
   'e2e-stack/viewport.spec.ts': resolve(TEST_DIR, '../e2e-stack/viewport.spec.ts'),
@@ -93,7 +112,9 @@ describe('tap-target density — case 13.990', () => {
      * dispatched to avoid is "one global constant changed to 24", which would
      * silently absolve every standalone control the owner kept at 44. That
      * failure has to edit exactly this constant to happen, so it reddens here
-     * by name rather than somewhere inside a browser suite no gate runs.
+     * by name rather than somewhere inside a browser suite — which, as of case
+     * 16.59, IS on CI's gate, and still needs a browser and a `next dev` to say
+     * anything. This file is what a plain `vitest` run can hold without either.
      */
     expect(DENSE_FLOOR_PX).toBe(24);
     expect(STANDALONE_FLOOR_PX).toBe(44);
@@ -111,10 +132,16 @@ describe('tap-target density — case 13.991', () => {
       /**
        * The witness is REQUIRED and is checked here as well as in the type, for
        * the same reason the floors are pinned here: the guard that consumes it
-       * lives in a suite on no gate at all. A witness that emptied would not
-       * fail a type — a string is a string — and the entry would fall back to
-       * firing on any non-empty container, which is exactly the false red an
-       * unnamed FAQ group produced.
+       * lives in the viewport suite, which needs a browser to run. A witness
+       * that emptied would not fail a type — a string is a string — and the
+       * entry would fall back to firing on any non-empty container, which is
+       * exactly the false red an unnamed FAQ group produced.
+       *
+       * ⚠ CORRECTED 2026-09-20. This sentence read "lives in a suite on no gate
+       * at all", which was true when it was written and stopped being true the
+       * day this suite's sibling reached CI's gate (case 16.59). The REASON for
+       * the check is unchanged — a `vitest` run holds what a browser run cannot
+       * be the only guard on — so the sentence is corrected rather than deleted.
        */
       expect(entry.witness.trim(), 'an entry names no witness').not.toBe('');
       // A `why` is the membership rule applied to one control. A stub proves

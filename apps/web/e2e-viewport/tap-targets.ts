@@ -425,12 +425,20 @@ export async function measureTapTargets(
  * never noticed, because Playwright loads it from disk.
  *
  * The reason that matters beyond the error: `apps/web/test/tap-target-density.test.ts`
- * needs `DENSE_IN_LIST` on the GATE, and **neither viewport suite is on any
- * gate** — so the table that decides which controls get the 24px floor was, and
- * would have stayed, checked by nothing that runs automatically. A module-scope
- * side effect that only works under one of its two loaders was the whole
- * obstacle. A default parameter expression is evaluated when the function is
+ * needs `DENSE_IN_LIST` on the GATE, and **when this was written neither viewport
+ * suite was on any gate** — so the table that decides which controls get the 24px
+ * floor was, and would have stayed, checked by nothing that runs automatically.
+ * A module-scope side effect that only works under one of its two loaders was the
+ * whole obstacle. A default parameter expression is evaluated when the function is
  * CALLED, so neither suite changes behaviour and the import becomes free.
+ *
+ * ⚠ **CORRECTED 2026-09-20 — the sentence above is now past tense, and that is
+ * deliberate.** The signed-out suite runs on CI's `gate` as of case 16.59, so
+ * "neither viewport suite is on any gate" stopped being true. **This paragraph
+ * was the one a sweep scoped to the diff CANNOT see**: this file is not in that
+ * change set, and the phrase is line-wrapped, so a one-line grep returns a silent
+ * empty. It was found by an independent review reading the floor's own module,
+ * which is where a future reader would look. The import fix below is unaffected.
  */
 function tapBaselinePath(): string {
   return fileURLToPath(new URL('./tap-target-baseline.json', import.meta.url));

@@ -1,4 +1,178 @@
-## ▲ TOP BLOCK — **THE TAP-TARGET CHECKER: TWO FLOORS INSTEAD OF ONE, A DECLARED CLASS, A GUARD THE REVIEW FOUND WOULD CONVICT A GOOD PAGE, AND A RATCHET THAT HAD BEEN RED ON `main` WHERE NOTHING COULD SEE IT.** (2026-09-20)
+## ▲ TOP BLOCK — **THE VIEWPORT SUITE REACHES THE GATE, AND THE BODY FLOOR SPLITS RATHER THAN DROPPING.** (2026-09-20, cycle 25)
+
+### § 1 — WHERE TO FIND IT
+
+- **Branch `exec2/viewport-on-gate`**, cut from `origin/main` = **`6db8b6b8`** (the dispatch's own `main`).
+- **FULLY FOLDED AND STILL SO: `git merge-base origin/main HEAD` equals `origin/main` exactly.** `origin/main`
+  has not moved since the cut — re-checked with `/usr/bin/git`, not the proxy.
+- **The commit count and every count below are RECOUNTED IN § 2, and § 2 is the authority.** ⚠ An earlier
+  version of this bullet said "Three commits" while § 2 said four, on the same screen — an independent review
+  caught the contradiction, which is exactly the failure a restart cannot resolve on its own. **The window is
+  stated there too**, because the handoff commit itself moves both counts by one and a reader cannot otherwise
+  tell an unexpected push from this file's own landing.
+- The PR is opened at this head; this file cannot carry its number because the handoff must LAND before the PR
+  opens. One call settles it: `gh pr list --state all --head exec2/viewport-on-gate`.
+
+### § 2 — ANCHORS, RECOUNTED AT THIS TREE (not carried forward)
+
+⚠ **THE WINDOW, because this file adds itself to its own figures.** Every row below is measured at the head
+**before this handoff commit** — `d2dd36da`, five commits ahead — except the two marked `▸ counts-as-of`. A
+restart that measures one more commit than the table says is seeing **this file's own landing**, not a foreign
+push; re-run `git log --oneline origin/main..HEAD` and match the subjects before concluding anything.
+
+| anchor | value |
+|---|---|
+| `git merge-base origin/main HEAD` | **`6db8b6b8` — equal to `origin/main`** |
+| ahead / behind `origin/main` | **6 ahead / 0 behind** ▸ counts-as-of `b3adce87` (**+1** for this handoff commit, so a restart should see **7**) |
+| the six commits | `6a4da237` (the wiring) · `99b74635` (the floor split) · `e1716e9f` (the catalogue) · `d2dd36da` (the fix round) · `b3adce87` (the review round) · *this handoff* |
+| tree | clean |
+| changed files vs `origin/main` | **10**, reviewed at `6a1fe8d5` ▸ counts-as-of; the review round then added `tap-targets.ts` and `test-cases/13-pre-launch-checklist.md`, so **recount rather than quote this** |
+| `check:case-ids` | **2569 unique ids at this head, 2567 at `origin/main`** — **delta exactly +2, the two minted**; highest **16.87 both sides** (so no id above my block leaked in) |
+| `check:citations` | rc 0 — `16-remaining-doors.md: 68 cited / 0 uncited / 68 total` |
+| `check:env` · `check:help` · `check:runbook` · `check:migrations` | rc 0 each |
+| `apps/server` `ci-workflow-shape` · `apps/web` `tap-target-density` | 3/3 and 4/4 pass |
+| `apps/web` typecheck (`tsc -p tsconfig.json` + `tsconfig.e2e.json`) | rc 0 |
+| viewport suite, warm `.next` | **31 passed / 0 failed / 2 skipped, `EXIT=0`, 67 s wall** (was 30 / 1 / 2) |
+| ⚠ the cold figure | **NOT MEASURED.** `rm -rf apps/web/.next` was declined at the permission layer. Do not quote a cold number. |
+| ⚠ the forced gate | **NOT run — it is the controller's.** |
+
+### § 3 — WHAT SHIPPED
+
+1. **`.github/workflows/ci.yml` gains a `viewport` job**, and `gate`'s `needs` gains `viewport`. The job runs
+   `pnpm run test:e2e:viewport`; it needs no Postgres, no compose stack and no secrets (its own `next dev` on
+   **3021**, `reuseExistingServer: false`, 16 `page.route` stubs).
+2. **`ci-workflow-shape.test.ts` asserts the COMMAND, not the job key** — a `viewport:` job whose steps run
+   nothing must redden it. Case **16.59**.
+3. **The body floor SPLITS by a declared membership table** (`type-scale.ts`'s `LABEL_IN_BODY`, `DENSE_IN_LIST`'s
+   shape), and `LABEL_SELECTOR` is BUILT FROM the table. Case **16.60**.
+4. `Features.md` + `test-cases/16-remaining-doors.md` move in the same change set.
+
+### § 4 — THE MUTATION BATTERY: **6**, EACH DECLARING ITS TARGET BEFORE IT RAN
+
+⚠ **This heading said `5` while the table below had six rows, and the commit subject said "five" too.** The
+count was written before the last row existed; an independent review caught it. **Count the rows, not this
+number.** Six: `M1`, `M2`, `M-A`, `M-B`, `M-C`, `M-gate`.
+
+| # | mutation | observed |
+|---|---|---|
+| **M1** | delete `viewport` from `gate`'s `needs` | **RED** at `ci-workflow-shape.test.ts:98` — `expected [ 'scope', …(10) ] to include 'viewport'` |
+| **M2** | change the job's step to `echo` (job exists, runs nothing) | **RED** at `:94` — the command assertion |
+| **M-A** | undeclare `.gn-help__section-eyebrow` from `LABEL_IN_BODY` | **RED** — §4 names it at 16px again (`p.gn-help__section-eyebrow`, 13px) |
+| **M-B** | rename the declared class (`…eyebrowRenamed`) | **RED, ISOLATED at desktop-1512** (where §4 is silent) — only the stale guard fires: *"exempt from section 4's 16px floor and covered by NOTHING"* |
+| **M-C** | collapse `LABEL_SELECTOR` to its base — **the exemption the ruling forbade** | **RED** — *"section 4 handed 17 declared label(s) … but the label sweep says it received 0 by declaration"* |
+| **M-gate** | `.gn-help__search-input` `min-height` 2.75rem → 1.5rem, then run the GATE'S OWN COMMAND | **RED at all 3 projects**, 28 passed / 3 failed, headline names the tap floor. `body copy under 16px` count **0** in the same run — the control that the red is the tap property, not the body one |
+
+Every restore verified by `git status --short` empty **and** by re-reading the mutated site. ⚠ **Each mutation was
+committed BEFORE it ran** — `git checkout --` on an uncommitted tree destroys work silently.
+
+### § 5 — THE FINDING THAT OUTLIVED THE TASK: CI DOES NOT EXECUTE AT ALL
+
+**Not new, and I am not claiming it is** — `controller-state.md:4600` records the owner waiver for the Actions
+billing block. I am recording the MEASUREMENT because it decides how the wiring above can be proven:
+
+- **831 CI runs since 2026-09-07 — 0 successes, 829 failures, 2 cancelled** (`gh api …/runs?created=>=2026-09-07`
+  `total_count`, and the three status queries sum to it). **This figure was `200 / 200` until an independent
+  review corrected it: I had read a `gh run list --limit 200` page as a total.** Last successful run of any
+  workflow: **`34023679658`, 2026-09-06T09:05:54Z.**
+- The signature is not a failing test: `scope` and `check-citations` complete in **3 s with `steps: []` and
+  `runner_name: ""`, against a control from the last good run** (`runner_name: "GitHub Actions 1000002536"`, 5
+  named steps). **The jobs are never picked up.**
+- **Consequence: the new `viewport` job has never executed and cannot be verified in CI today.** Its command was
+  run locally at this head instead, and that is the only evidence there is. When Actions returns, this job is
+  one whose **STEP LIST** the controller should read — per that same line's own instruction.
+
+### § 6 — RULINGS
+
+- **RULING 2026-09-20 (owner, relayed by the controller): PROCEED — the floor SPLITS, membership is DECLARED,
+  and §4's 16px stays HARD for anything undeclared.** Recorded here because the ruling request itself lives in
+  `gisik-nokma-lanes/EXEC-RULING-REQUEST-2026-09-20-viewport-gate-body-text-floor.md` and **that file is not in
+  any repo** — a restart must not depend on it. The ruling asked one thing be CHECKED rather than assumed, and
+  the answer decided the shape: **`p` is in `BODY_SELECTOR` and NOT in `LABEL_SELECTOR`, intersection empty** —
+  so removing the labels from §4 without adding them to §4b would have left them with **no floor at all,
+  silently**. Hence a SECOND SELECTOR, not an exemption. **All of that is implemented; nothing is outstanding.**
+- **No open rulings.**
+
+### § 7 — WHAT IS *NOT* COVERED, NAMED RATHER THAN IMPLIED
+
+- **The cold cost of the CI job.** See § 2.
+- **`e2e-stack/viewport.spec.ts` gets the label sweep but not the hand-off equality** — it never imports
+  `measureBodyText`, and the declared labels are on `/help`, a route it does not visit. **Owner: whoever next
+  touches the signed-in suite.**
+- **`docs/lanes/executor-state.md` carries sentences this change falsifies.** It is executor 1's handoff and
+  **two writers on one handoff file is what the split prevents**, so these are **RECORDED, not edited across the
+  lane boundary. Owner: whoever next writes that file.** Read, not inferred:
+  - **`:6189-6190`** — *"(NOT `pnpm test:e2e:viewport` — no such root script; **this repo's root only proxies
+    `test:e2e:stack`**)"*. **The root now also proxies `test:e2e:viewport`**; that parenthetical is false as of
+    this change and every command in it still resolves.
+  - **`:644-645`** — read, verbatim: *"`e2e-viewport/tap-targets.ts:108` sweeps every `button` against a hard
+    44px floor with no per-component exemption."* **Both halves are now false**: `DENSE_IN_LIST` IS a
+    per-component exemption, and the table is at `tap-targets.ts:140`, not `:108`. ⚠ **This lane cited this
+    same sentence as `:598-599` for two commits** — that citation was WRONG (598-599 is a note about piped
+    `grep` counts), it was never read, and it is corrected here rather than left to propagate. **A citation a
+    reader cannot resolve is worse than no citation**, which is why the line above carries the text it quotes.
+  - **`:4843`** — records the viewport suite at "28 passed, 2 skipped, 3 failed … `/help`'s pre-existing
+    tap-target ratchet". That red is fixed and the baselines were re-recorded DOWN to 0; the line is a
+    historical reading, not a current one.
+- ⚠ **AN UNRESOLVED DISCREPANCY, RECORDED RATHER THAN SMOOTHED.** `executor-state.md:6190` reports the viewport
+  suite as **"31 passed, 2 skipped"** with no failure. **I measure `6db8b6b8` at 30 passed / 1 failed / 2
+  skipped** — the failure being exactly the `/help` body-text red this branch fixes — and after the fix, 31 / 0
+  / 2. Both are 33 specs, so the difference is a real one and not a counting convention I can see. **I did not
+  resolve it**: executor 1's entry is older and may describe a different tree, and their worktree is not mine to
+  measure. Named so a restart does not read whichever number it finds first as the whole story.
+
+### § 8 — THE REVIEW ROUND (one independent reviewer, and it earned its keep)
+
+**One falsifying reviewer**, dispatched over `origin/main..HEAD`, which reported at **`6a1fe8d5`** — tree clean,
+merge-base equal to `origin/main` re-verified against the remote. **12 findings: 0 Critical, 2 Important, 10
+Minor.** All were acted on; the round is recorded in the PR body before it opens.
+
+**The two Important ones, and neither was visible from inside the diff:**
+
+1. **`test-cases/13-pre-launch-checklist.md:664` still asserted the absence this change closed**, in the
+   present tense, with a live `Owner: whoever next touches the CI gate.` A sweep scoped to the changed files
+   cannot see it — that file is not in the diff. **The identical sentence WAS corrected in `Features.md` and
+   `responsive.spec.ts`**, so one tree asserted both the absence and the fix. Corrected.
+2. **This file's own § 1 and § 2 contradicted each other** ("Three commits" against a four-row table) under a
+   header claiming the anchors were recounted. Corrected, with the measurement window now stated.
+
+**The one with a real failure mode behind it — the reviewer's best finding.** `LABEL_IN_BODY`'s exemption
+matched a **bare class anywhere in the document**, so a later screen rendering `<p class="gn-help__eyebrow">`
+outside `.gn-help__nav` — where it IS body copy — would have left the 16px hard floor silently, **with the
+table unedited and the stale-entry guard still reporting healthy.** The declared selector is now **scoped to
+each entry's container** (`${container} ${label}`) in both sweeps, so a same-named element outside the
+container is undeclared and section 4 judges it at 16px, hard. That is the dangerous direction the owner's
+ruling was about, and it was reachable without touching the table.
+
+**Also corrected from the review, each recorded at its site rather than silently:** the hand-off numbers are
+now PRINTED on every route's log line (they were asserted but invisible in a green run); `ci-workflow-shape.test.ts`
+now asserts the job's `if:` (a `viewport` job switched off with `if: false` left every prior assertion green
+AND the gate green, since `gate` counts `skipped` as success); the trace upload is `if-no-files-found: error`;
+`type-scale.ts`'s two `bodyOwned` definitions now carry the declared-label exception they predated; and **the
+CI figure in § 5 was wrong — `831`, not `200`, because I read a `gh run list --limit 200` page as a total.**
+The reviewer's number was re-measured here before adoption, and the three status queries sum to it.
+
+**The reviewer also re-ran the suite, `typecheck`, all four catalogue guards and both unit files at this head
+and confirmed every number this file reports**, and recorded its own mutations as restored sha256-verified
+with `git status --porcelain` empty.
+
+### Rules that bind this branch
+- **Never `docker compose`** (any subcommand) and **never bind `:3001`** — a peer's hot stack is there. The
+  viewport suite owns **3021**.
+- **Never pipe a test or build run into `| head`** — it orphans the worker pool. `| tail -N` or a file.
+  ⚠ A machine-local `PreToolUse` hook now REFUSES the piped form and will block a whole command line that
+  merely contains `| head`, even when the `head` is reading `ls`.
+- **Do not run the forced gate** — it is the controller's.
+- **Do not edit `task-ledger.tsv`** — the controller flips rows after each merge.
+- ⚠ **`rtk` proxies `git`, `grep`, `gh`, `ls` and `playwright`, and it has produced THREE silent wrong readings
+  this session**: `git log --oneline` dropped both merge commits (showing an older tip); `lsof` printed an empty
+  port that was occupied; a failing `playwright` run summarised as `PASS (0) FAIL (0)` while its raw output held
+  a real error. **Sha-bearing evidence goes through `/usr/bin/git`; measurements through raw binaries or a file
+  you name.**
+- **Never `AskUserQuestion`** in this topology. A question for the owner is a file plus a one-line pointer.
+
+---
+
+## ▼ PREVIOUS BLOCK — **THE TAP-TARGET CHECKER: TWO FLOORS INSTEAD OF ONE, A DECLARED CLASS, A GUARD THE REVIEW FOUND WOULD CONVICT A GOOD PAGE, AND A RATCHET THAT HAD BEEN RED ON `main` WHERE NOTHING COULD SEE IT.** (2026-09-20)
 
 ### § 1 — WHERE TO FIND IT
 
@@ -79,7 +253,11 @@ which is why the fix round was COMMITTED before M4/M5b ran.
    1 failed **both before and after**. The 1 is `body copy under 16px at 390px` on `/help` —
    `p.gn-help__eyebrow` at 12.48px plus 16 × `p.gn-help__section-eyebrow` at 13px. A DIFFERENT assertion
    (`measureBodyText`), untouched by this diff. Owner: whoever next owns the body-text floor on `/help`.
-3. **`docs/lanes/executor-state.md:598-599` carries a sentence this change FALSIFIED** — that the checker
+3. **⚠ CORRECTED 2026-09-20 — this line cited `:598-599` AND THAT WAS WRONG.** The sentence is at
+   **`docs/lanes/executor-state.md:644-645`**; `:598-599` is a note about piped `grep` counts and has nothing
+   to do with the sweep. The citation below was never read before it was written, and it is left in place with
+   this correction rather than silently edited, because a stale citation that still RESOLVES is the failure
+   mode this project keeps recording. **`docs/lanes/executor-state.md:644-645` carries a sentence this change FALSIFIED** — that the checker
    sweeps "against a hard 44px floor with no per-component exemption". It is executor 1's handoff, and
    two writers on one handoff file is what the split prevents, so it is **RECORDED, not edited across the
    lane boundary. Owner: whoever next writes that file.**
