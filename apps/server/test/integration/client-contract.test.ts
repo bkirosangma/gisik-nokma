@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import * as ts from 'typescript';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid, serverStreamFrameSchema, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { FastifyInstance } from 'fastify';
@@ -461,65 +462,213 @@ function routeShape(path: string): string {
  */
 const CONTRACT_TEST_SRC = fileURLToPath(new URL(import.meta.url));
 
-function routesThisFileFetches(): string[] {
-  const source = readFileSync(CONTRACT_TEST_SRC, 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/[^\n]*/g, '');
-  // The read found THIS file, and the comment-stripper did not eat it: 7.209
-  // sits near the bottom, so a control that survives is a control on the whole
-  // text above it. Every claim below is a claim about this string.
-  expect(source, 'client-contract.test.ts').toContain("it('7.209");
-  const routes = new Set<string>();
-  for (const [, single, template] of source.matchAll(/url:\s*(?:'([^']*)'|`([^`]*)`)/g)) {
-    const value = single ?? template ?? '';
-    if (!value.startsWith('/v1')) {
-      // An absolute path that is not `/v1` is a request this scan cannot count,
-      // and it TALKS rather than skipping: the set it feeds is the superset side
-      // of the assertion, so a route dropped here is a real route the check
-      // pretends the file does not fetch.
-      if (value.startsWith('/')) {
-        throw new Error(
-          `client-contract.test.ts: a url of ${value} is an absolute path and not /v1 — this scan cannot count it as fetched`,
-        );
-      }
-      // Everything else is skipped ON PURPOSE and that is the whole skip list:
-      // a bare identifier, and a template rooted in an interpolation. Both
-      // resolve at runtime to a route one of the `/v1` literals below already
-      // names, and the cases that build them fetch both.
-      //
-      // ⚠ This branch also catches the scan's OWN text, measured 2026-09-20: an
-      // earlier version of the throw above read `` `url: \`${value}\`` `` in a
-      // template literal, and the backtick-quoted `url:` inside that message
-      // parsed as one more `url` with an empty value. It is why the branch is a
-      // named skip list rather than a `throw` on everything unrecognised — the
-      // accidental firing proved the control works and proved, at the same time,
-      // that a scan over a file containing its own scanner reads the scanner.
-      continue;
+/**
+ * ⚠ THESE HELPERS READ A PARSE TREE, NOT TEXT, AND THE REASON IS A MEASURED ONE.
+ *
+ * The first version scanned this file's raw characters with a regex; the second
+ * added a comment-stripper and a swallow guard on top. **Between them they
+ * produced TEN defects across two review rounds, and every one had the same
+ * root: this file contains its own scanner.** A url key written inside a STRING
+ * literal is not a request, but regex cannot tell; a backtick in a message opened
+ * a bogus template that ate 93 lines and silently dropped a real route; `/*`
+ * inside a string opened a bogus block comment and deleted an entire register
+ * from the scanned universe; and the `wireRoute` scan read one quote style out
+ * of three. Each was patched with another guard, and each guard was itself
+ * satisfiable for a reason unrelated to what it named.
+ *
+ * A parse tree does not have that class of bug. A comment is trivia, a string is
+ * a `StringLiteral`, a template is a `TemplateExpression`, a property is a
+ * `PropertyAssignment` and a type member is a `PropertySignature` — so those four
+ * defects are not guarded against, they are **unrepresentable**.
+ *
+ * `typescript` is already an `apps/server` devDependency; this is the first file
+ * in the repo to import it.
+ */
+function parseSource(filePath: string): ts.SourceFile {
+  const file = ts.createSourceFile(
+    filePath,
+    readFileSync(filePath, 'utf8'),
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+  // A parse that produced nothing found nothing, and every set derived below
+  // would be empty for that reason rather than a real one.
+  if (file.statements.length === 0) throw new Error(`${filePath}: parsed zero statements`);
+  return file;
+}
+
+/** Every node in the tree. */
+function walk(node: ts.Node, visit: (node: ts.Node) => void): void {
+  visit(node);
+  node.forEachChild((child) => walk(child, visit));
+}
+
+/** The initializer of `{ <name>: … }` in an object literal, if written statically. */
+function propertyOf(object: ts.ObjectLiteralExpression, name: string): ts.Expression | undefined {
+  for (const property of object.properties) {
+    if (
+      ts.isPropertyAssignment(property) &&
+      ts.isIdentifier(property.name) &&
+      property.name.text === name
+    ) {
+      return property.initializer;
     }
-    // `?groupBy=flat` and the paging cursor are query, not path.
-    routes.add(routeShape(value));
   }
-  if (routes.size === 0) {
+  return undefined;
+}
+
+/**
+ * The literal text of a route, with every interpolation collapsed to `:param`.
+ *
+ * `undefined` means the value is not a literal at all — a bare identifier, or an
+ * expression — a form this scan cannot count and does not pretend to.
+ */
+function literalRouteText(init: ts.Expression): string | undefined {
+  if (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init)) return init.text;
+  if (ts.isTemplateExpression(init)) {
+    return init.head.text + init.templateSpans.map((span) => `:param${span.literal.text}`).join('');
+  }
+  return undefined;
+}
+
+/**
+ * Every `/v1` route this file really passes to `app.inject`, as a **GET**.
+ *
+ * GET-only is deliberate: a refusal's `wireKey` is measured against a RESPONSE
+ * BODY, and a setup `POST` — `beforeAll` creates the workspace with one — is a
+ * request whose body nothing measures an absence against. Counting it would let a
+ * refusal name a route no READ ever returns.
+ */
+function routesThisFileFetches(): string[] {
+  const file = parseSource(CONTRACT_TEST_SRC);
+  // The control is a claim about the TREE, not about the text: a case titled
+  // 7.209 exists. A scan that parsed the wrong file, or an empty one, fails here.
+  let saw7209 = false;
+  const routes = new Set<string>();
+  walk(file, (node) => {
+    // `it(…)` is a bare IDENTIFIER call here, not a property access — `vitest`'s
+    // `it` is imported directly.
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'it'
+    ) {
+      const [title] = node.arguments;
+      if (title !== undefined && ts.isStringLiteral(title) && title.text.startsWith('7.209')) {
+        saw7209 = true;
+      }
+      return;
+    }
+    if (
+      !ts.isCallExpression(node) ||
+      !ts.isPropertyAccessExpression(node.expression) ||
+      node.expression.name.text !== 'inject'
+    ) {
+      return;
+    }
+    const [options] = node.arguments;
+    if (options === undefined || !ts.isObjectLiteralExpression(options)) return;
+    const url = propertyOf(options, 'url');
+    if (url === undefined) return;
+    const method = propertyOf(options, 'method');
+    const verb = method === undefined ? 'GET' : ts.isStringLiteral(method) ? method.text : '«dynamic»';
+    if (verb.toUpperCase() !== 'GET') return;
+    const text = literalRouteText(url);
+    // Not a literal: a bare identifier, or an expression this scan cannot read.
+    // It resolves at runtime to a route one of the literals below already names.
+    if (text === undefined) return;
+    if (text.startsWith('/v1')) {
+      routes.add(routeShape(text));
+      return;
+    }
+    // A template rooted in an interpolation — `` `${base}?workspaceId=…` `` —
+    // becomes the same route a literal below already names, and the case that
+    // builds it injects both. Named, so the skip list has exactly this one entry.
+    if (ts.isTemplateExpression(url) && url.head.text === '') return;
+    // Anything else is a request this scan CANNOT count, and it talks rather than
+    // skipping: this set is the superset side of 7.209's assertion, so a route
+    // dropped here is a real route the check pretends the file does not fetch.
     throw new Error(
-      'client-contract.test.ts: parsed no `/v1` route out of any `url:` — the scan broke, it did not find a file that fetches nothing',
+      `client-contract.test.ts: a GET url of ${JSON.stringify(text)} is not a /v1 route — this scan cannot count it as fetched`,
     );
-  }
+  });
+  if (!saw7209) throw new Error('client-contract.test.ts: no case titled 7.209 in the parsed tree');
+  if (routes.size === 0) throw new Error('client-contract.test.ts: this file parses to zero GET routes');
   return [...routes].sort();
 }
 
 /**
- * The names of every `Absence[]` register `mappers.ts` still declares.
+ * The names of every `*_ABSENCES` register declaration in `mappers.ts`.
  *
- * 7.209's wireKey/wireRoute invariant ranged over six of these by name, and the
+ * 7.209's wireKey/wireRoute invariant ranged over six of these BY NAME, and the
  * last (`MAP_SEARCH_HITS_ABSENCES`) was deleted on 2026-09-19 — leaving a loop
  * over nothing that could not say so. Reading the names means the invariant
- * covers a register again the moment one exists, without anyone having to
- * remember to re-add a string. The residual hole is a register named outside
- * this pattern, which is why the three deleted names are pinned separately: by
- * `mapperAbsences` throwing on them.
+ * covers a register again the moment one exists.
+ *
+ * ⚠ CORRECTED 2026-09-20, twice. First it was `/^const …/gm`, ANCHORED to the
+ * line start, so `export const X_ABSENCES` was invisible while `mapperAbsences`
+ * — unanchored — found the same block. Then it was unanchored text, which
+ * required exactly one space after `const` and so missed `let`, two spaces, and
+ * a comment between the keyword and the name; five spellings were measured
+ * bypassing the invariant silently. **A declaration is a `VariableDeclaration`
+ * in the tree whatever its keyword, spacing or comments**, so the class is gone
+ * rather than guarded. The residual is a register whose name does not end
+ * `_ABSENCES` at all, which is why the three deleted names are pinned separately
+ * by `mapperAbsences` throwing on them.
  */
-function absenceListNames(source: string): string[] {
-  return [...source.matchAll(/^const ([A-Z][A-Z0-9_]*_ABSENCES)\b/gm)].map(([, name]) => name ?? '');
+function absenceListNames(file: ts.SourceFile): string[] {
+  const names: string[] = [];
+  walk(file, (node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      /_ABSENCES$/i.test(node.name.text)
+    ) {
+      names.push(node.name.text);
+    }
+  });
+  return names;
+}
+
+/**
+ * Every `wireRoute` VALUE written in `mappers.ts`.
+ *
+ * ⚠ CORRECTED 2026-09-20: the text scan read `wireRoute: '…'` — single quotes
+ * only — and a backtick-quoted value naming an unfetched route left 7.209 GREEN.
+ * Reading the `PropertyAssignment` sees all three quote styles, and the type
+ * declaration on the `Absence` shape is a `PropertySignature` rather than an
+ * assignment, so it is excluded by KIND instead of by a trailing `;`.
+ */
+function wireRouteValues(file: ts.SourceFile): {
+  /** How many `wireRoute` properties the parse REACHED, `null`s included. */
+  found: number;
+  /** The ones naming a route. */
+  routes: string[];
+  /** The ones in a spelling this scan cannot read. */
+  unreadable: string[];
+} {
+  const routes: string[] = [];
+  const unreadable: string[] = [];
+  let found = 0;
+  walk(file, (node) => {
+    if (
+      !ts.isPropertyAssignment(node) ||
+      !ts.isIdentifier(node.name) ||
+      node.name.text !== 'wireRoute'
+    ) {
+      return;
+    }
+    found += 1;
+    const init = node.initializer;
+    if (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init)) {
+      routes.push(init.text);
+      return;
+    }
+    if (init.kind === ts.SyntaxKind.NullKeyword) return; // names no route: nothing to measure
+    unreadable.push(init.getText());
+  });
+  return { found, routes, unreadable };
 }
 
 beforeAll(async () => {
@@ -1756,24 +1905,48 @@ describe('GET /v1/contests vs the two contested refusals', () => {
     // route this file fetches — which is CONTAINMENT. Equality was never the
     // property the title states; it is the relation the mirror made look true,
     // and it is no longer assertable at all now that `named` is legitimately
-    // empty while the file fetches ten routes.
-    const mapperSource = readFileSync(APP_CORE_MAPPERS, 'utf8');
-    expect(mapperSource, 'online/mappers.ts').toContain('export class ServingGapError');
-    // A control on the scan below, in the same file and the same run: `wireRoute`
-    // is still a KEY of an `Absence` (three entries carry `null`), so a `named`
-    // of zero is a fact about the refusals and not the pattern having quietly
-    // stopped matching. The register emptied on 2026-09-19 — that is the reading
-    // this case now has to make, and it must not be able to make it by accident.
-    expect(mapperSource, 'mappers.ts still declares `wireRoute`').toMatch(/wireRoute: /);
-    const named = new Set(
-      [...mapperSource.matchAll(/\bwireRoute: '([^']+)'/g)].map(([, route]) => routeShape(route ?? '')),
-    );
+    // empty while the file injects against eight GET routes.
+    const mapperFile = parseSource(APP_CORE_MAPPERS);
+    // The control is a claim about the TREE: the module this scan says it read is
+    // the module it read. A parse of the wrong file, or an empty one, fails here.
+    let sawServingGapError = false;
+    walk(mapperFile, (node) => {
+      if (ts.isClassDeclaration(node) && node.name?.text === 'ServingGapError') {
+        sawServingGapError = true;
+      }
+    });
+    expect(sawServingGapError, 'online/mappers.ts declares ServingGapError').toBe(true);
+    // ⚠ CORRECTED 2026-09-20 — THE CONTROL THAT ONCE STOOD HERE COULD NOT FAIL,
+    // which is the very class this case exists to police. It was
+    // `toMatch(/wireRoute: /)`, satisfied by the register's THREE
+    // `wireRoute: null` entries and by the type declaration — none of which the
+    // value pattern could ever match. MEASURED: a `wireRoute` written in
+    // BACKTICKS, naming a route nothing fetches, left 7.209 GREEN; only the
+    // quoting changed and it reddened.
+    //
+    // The scan reads `PropertyAssignment`s now, so all three quote styles arrive,
+    // the type declaration is excluded by KIND — it is a `PropertySignature`, not
+    // an assignment — and a spelling this scan cannot read THROWS rather than
+    // being silently absent from `named`. The omission is the dangerous
+    // direction: it is a refusal pointing at a route that would never be measured.
+    const wireRoute = wireRouteValues(mapperFile);
+    // ⚠ The control counts PROPERTIES REACHED, not values read — the distinction
+    // the old shape collapsed. That shape passed on the three `wireRoute: null`
+    // entries while the value scan found nothing at all, which is precisely how a
+    // quoted value went unread. `found` is non-zero for the nulls, so it still
+    // fails if the parse stops reaching the property.
+    expect(wireRoute.found, 'mappers.ts declares `wireRoute` on something').toBeGreaterThan(0);
+    expect(
+      wireRoute.unreadable,
+      'a `wireRoute` in a spelling this scan cannot read — it would be invisible to `named`, so a refusal naming a real route would pass unmeasured',
+    ).toEqual([]);
+    const named = new Set(wireRoute.routes.map((route) => routeShape(route)));
 
     // The invariant that ranged over six register names, RE-ARMED rather than
     // deleted: a `wireKey` with no `wireRoute` is a key nothing can ever
     // measure. It has no subject while the register is empty, and `named` being
     // zero is a fact rather than a hole for the reason the control above gives.
-    for (const constName of absenceListNames(mapperSource)) {
+    for (const constName of absenceListNames(mapperFile)) {
       for (const absence of mapperAbsences(constName)) {
         expect(
           absence.wireKey === null || absence.wireRoute !== null,
