@@ -262,6 +262,18 @@ describe('SegmentedControl (13.288)', () => {
 // `test/helpers/colour-scan.ts`'s identical note). Resolving the path after
 // converting `import.meta.url` on its own avoids the rewrite.
 const UI_CSS = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../src/ui.css'), 'utf8');
+/**
+ * The OTHER stylesheet a rule for any of these classes could hide in.
+ * `apps/web/app/layout.tsx` imports `ui.css` and then `globals.css`, so a rule
+ * appended there WINS at equal specificity — which is why a "no style forks
+ * this" scan over `ui.css` alone is a check that cannot fail. Case 13.893
+ * (`attention-styling.test.ts:44-49`) reached the same conclusion for its own
+ * class and scans both; 16.83 does the same.
+ */
+const GLOBALS_CSS = readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), '../../../apps/web/app/globals.css'),
+  'utf8',
+);
 const rule = (selector: string): string => {
   const m = UI_CSS.match(new RegExp(selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{([^}]*)\\}'));
   if (!m) throw new Error(`no rule for ${selector}`);
@@ -394,10 +406,11 @@ describe('R1(c) at the component layer', () => {
    *
    * ## The defect this exists to keep closed
    *
-   * `button.ticket-type-list__move` was styled by NOTHING. Not "styled badly" —
-   * the class appeared in `ui.css` zero times, against a positive control of
-   * `.ticket-type-list__row` in the same sweep. Chromium on the live stack
-   * measured it as raw user-agent chrome: `border: 2px outset`,
+   * `button.ticket-type-list__move` had NO RULE OF ITS OWN. Not "styled badly" —
+   * the class appeared in `ui.css` and in `globals.css` zero times each, against a
+   * positive control of `.ticket-type-list__row` in the same sweep. Two rules of no
+   * class did reach it (`* { box-sizing }`, `button { font: inherit }`); the rest was
+   * Chromium on the live stack measuring raw user-agent chrome: `border: 2px outset`,
    * `background: rgba(239,239,239,0.3)`, `border-radius: 0px`,
    * `font-weight: 400`, `28.2 × 29.2`. **A case asserting "it looks right" could
    * not have been written against that**, which is why the first assertion below
@@ -464,10 +477,50 @@ describe('R1(c) at the component layer', () => {
 
     // 13.340's positive scan, for this control: one unconditional rule IS the
     // whole story, in every style.
-    const styleBlocks = [...UI_CSS.matchAll(/\[data-style="[a-z]+"\][^{]*\{([^}]*)\}/g)];
-    expect(styleBlocks.length, 'the scan found no [data-style] block at all — it is reading nothing').toBeGreaterThan(0);
-    for (const [fullMatch] of styleBlocks) {
-      expect(fullMatch, fullMatch).not.toMatch(/\.ticket-type-list__move\b/);
+    //
+    // ⚠ OVER BOTH STYLESHEETS, and the second one is the one that WINS.
+    // `apps/web/app/layout.tsx` imports `@gisik-nokma/ui/ui.css` and then
+    // `./globals.css`, so a `[data-style]` override appended to `globals.css`
+    // beats anything here at equal specificity. A scan of `ui.css` alone
+    // therefore passes while the rendered control is forked — **measured, not
+    // reasoned: a reviewer planted exactly that rule in `globals.css` against the
+    // first version of this case and it stayed GREEN.** Case 13.893
+    // (`attention-styling.test.ts:44-49`) records the identical gap and closed it
+    // the same way; this case re-introduced it and now closes it too.
+    for (const [name, css] of [
+      ['ui.css', UI_CSS],
+      ['globals.css', GLOBALS_CSS],
+    ] as const) {
+      const styleBlocks = [...css.matchAll(/\[data-style="[a-z]+"\][^{]*\{([^}]*)\}/g)];
+      if (name === 'ui.css') {
+        expect(
+          styleBlocks.length,
+          'the scan found no [data-style] block in ui.css at all — it is reading nothing',
+        ).toBeGreaterThan(0);
+      }
+      for (const [fullMatch] of styleBlocks) {
+        expect(fullMatch, `${name}: ${fullMatch}`).not.toMatch(/\.ticket-type-list__move\b/);
+      }
+    }
+
+    // …AND THE BODY MUST BE DECLARED EXACTLY ONCE ACROSS BOTH, because every
+    // assertion above goes through `rule()`, which answers the FIRST match only.
+    // This block is appended at EOF precisely so that future edits land AFTER it,
+    // so the most likely edit is one that beats `rule()`'s answer while leaving
+    // every colour assertion green — **also measured: a reviewer appended a second
+    // `.ticket-type-list__move { background: … }` at EOF and this case stayed
+    // GREEN.** 13.893 generalises the same property for the same reason ("`ruleFor`
+    // answers the FIRST rule for a name, so a later duplicate would beat the colour
+    // this file pins while every assertion above stayed green").
+    for (const [name, css] of [
+      ['ui.css', UI_CSS],
+      ['globals.css', GLOBALS_CSS],
+    ] as const) {
+      const decls = [...css.matchAll(/^\.ticket-type-list__move\s*\{/gm)];
+      expect(
+        decls.length,
+        `${name} declares .ticket-type-list__move as a rule of its own ${decls.length} time(s)`,
+      ).toBe(name === 'ui.css' ? 1 : 0);
     }
   });
 

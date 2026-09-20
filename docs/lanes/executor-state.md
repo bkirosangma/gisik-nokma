@@ -95,11 +95,11 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > no orphaned workers.**
 >
 > ## ANCHORS, RECOUNTED AT THIS TREE
-> - **gate** `pnpm turbo run build test typecheck`: **EXIT=0 · 33/33 · 32 cached · 31.9s · Node v22.22.2.**
->   The 32 cache hits are LEGITIMATE, and it was checked rather than assumed: `ui#test` was a cache **miss**
->   in the run that computed them (`executing b5851a58590377b0`, **8 files / 370 passed**) and the second run
->   replays that same hash. `server#test` ran: **154 files / 1620 passed / 5 skipped** — matching this file's
->   own recorded figures.
+> - **gate** `pnpm turbo run build test typecheck`: **EXIT=0 · 33/33 · 16 cache misses · 1m17s · Node
+>   v22.22.2**, run AT THE FROZEN HEAD `981aa92b` — a near-full re-run across `ui`, `app-core`, `web`,
+>   `desktop`, `mobile` and `server`, not a replay. `server#test`: **154 files / 1620 passed / 5 skipped**
+>   — matching this file's own recorded figures. An earlier run of the same gate at the same code content
+>   read `33/33 · 32 cached · 31.9s`; the frozen-head run is the stronger of the two and is the one quoted.
 > - ⚠ **THE FIRST GATE RUN WAS RED AND IT WAS NOT MINE.** `server#test` → `12.291 the walk is capped at
 >   GRANT_BACKFILL_MAX_TICKETS` hit its **30 000 ms timeout**. It passes in **883 ms** in isolation, and the
 >   box was loaded (a `next dev` of mine plus the docker stack plus 667 s of test CPU). **A timeout under load
@@ -109,26 +109,63 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > - **`origin/main` MOVED UNDER THIS ROUND**: `0ea15006` → **`546c92f8`** while the work was in flight. The
 >   two intervening commits touch **only** `docs/lanes/controller-state.md` and `docs/lanes/task-ledger.tsv`
 >   — **disjoint from all four files in this diff**, so no gate result was invalidated. Checked, not assumed.
-> - The diff is four files: `packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx`, `Features.md`,
+> - The diff is five files: `packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx`, `Features.md`,
 >   `test-cases/16-remaining-doors.md`. `reference/` untouched. No product source changed.
 >
-> ## CASE 16.83, AND THE SIX MUTATIONS
+> ## CASE 16.83, AND THE EIGHT MUTATIONS
 > Pinned in `packages/ui/test/components.test.tsx`. **Mutation-witnessed six ways and each dies on ITS OWN
 > assertion** — rule deleted (`rule()` throws), fill swapped, `2.75rem → 32px`, a `[data-style="neo"]`
 > override added, `:disabled 0.4 → 0.55`, `<li>` taken off `display: flex` — with the unmutated control
 > GREEN and the file restored by **checksum-verified copy, never a blanket `git checkout`** (the #584 lesson).
 > **Measured, not assumed:** the glyph clears **4.5 in all six style×theme combinations on its real painted
-> composite** — worst `neo` light at **4.98** — because the button's ground is the CARD, not the `surface`
-> the existing `fillTertiary` case pins.
+> composite** — worst **`hig`/`minimal` DARK at `4.75`** (not `neo` light's `4.98`) — because the button's ground is the CARD, not the `surface`
+> the existing `fillTertiary` case pins. **No case in `tokens.test.ts` asserts this pairing** — its composited
+> check (`:588`) uses the default style only, over `surface` — so the figure is recorded in the case text and
+> nowhere enforced.
 > ⚠ **The ENABLED rendering is unreachable on the seeded workspace** and this is CORRECT, not a defect:
 > `moveBlocker` refuses when EITHER neighbour is a built-in, 4 of the 5 seeded types are built-ins, and the
 > only custom one (Errand) is adjacent to two of them — so all ten arrows are legitimately disabled. The
 > enabled branch was witnessed by flipping the DOM `disabled` property and re-measuring (opacity 1, cursor
 > pointer, 44×44, accent label), which touches no row and no API.
 >
+> ## INDEPENDENT REVIEWER — RUN AND RECORDED BEFORE THE PR OPENED
+> One reviewer, dispatched per the brief's cap. It reproduced the control and **all six original mutations**,
+> and then **FOUND TWO REAL GAPS IN MY OWN CASE, BOTH BY PLANTING THE MUTATION THAT MY ASSERTION MISSED:**
+> 1. ⛔ **the `[data-style]` scan read `ui.css` ONLY** — so a fork appended to `globals.css`, **which loads
+>    second and therefore WINS** (`layout.tsx:3` then `:5`), left 16.83 **GREEN**. Case 13.893
+>    (`attention-styling.test.ts:44-49`) had already found and closed this exact gap for its own class, and
+>    this case re-introduced it. **Now scans both stylesheets**, and the mutation is RED (M7).
+> 2. ⛔ **`rule()` answers the FIRST match**, and this block is appended at EOF *precisely so future edits
+>    land after it* — so a second `.ticket-type-list__move { … }` at EOF left the case GREEN while changing
+>    what renders. **Now asserts the body is declared exactly ONCE across both stylesheets**, and that
+>    mutation is RED (M8). 13.893 generalises the same property for the same reason.
+> Both are the repo's own named failure mode — *a check passing for a reason unrelated to the property it
+> names* — and both were found by a peer, not by a rule.
+>
+> **AND ONE REAL ERROR IN MY OWN DATA:** I recorded the worst glyph contrast as `neo` light `4.98`. My own
+> measured table has **`hig`/`minimal` DARK at `4.75`** — the minimum. I named the wrong row of a table I had
+> printed. Corrected in the case file and here; the reviewer's independent arithmetic from `tokens.ts` agrees
+> at **4.761**, and an existing measurement in `tokens.ts:471` records the same pair as "4.755 → 4.984". All
+> six still clear 4.5, so nothing shipped wrong; the *number* did.
+>
+> **Also corrected at the reviewer's direction:** the roster sentence read as an accomplished fact when the
+> roster is provably UNMODIFIED (now "WILL leave", with the prediction labelled); "styled by NOTHING"
+> overstated a class-scoped truth (two rules of no class — `globals.css:5`/`:84` — did reach the element);
+> the `fillNavyNeo4` citation named `fillQuaternary` rather than `fillTertiary`'s dark primitive
+> (`fillNavyHig3`/`fillNavyNeo3`); "it reddens on a shipped route" read as a live gate when **no sweep
+> visits this route**; the citation tally now states its universe; `:2160-2290` → `:2160-2286`.
+>
+> **Recorded, not fixed, at the reviewer's direction:** the rule body is a **byte-identical copy** of
+> `.gn-board-card__move`'s with nothing guarding the drift, where this repo's convention for a second
+> consumer of one body is an alias. Making it a fifth alias member would drag another screen's docblock into
+> this change. **Owner: whoever next edits either rule** — recorded in `ui.css` beside the rule.
+>
+> **What the reviewer could NOT check, stated rather than implied:** both Chromium measurements (it ran no
+> browser) and the roster's post-change state (needs a web build carrying this change).
+
 > ## OUTSTANDING — FOUND, NOT FIXED, EACH WITH A NAMED OWNER
 > 1. **`ui.css:865`'s citation `(.gn-button's own docblock, :22-30 above)` is STALE.** `:22-30` is the
->    SHARED KEYFRAMES block (`gnFade`/`gnRise`); `.gn-button`'s docblock is **`:52-60`**. It RESOLVES, so it
+>    SHARED KEYFRAMES block (`gnFade`/`gnRise`); `.gn-button`'s docblock is **`:52-60`** and the `ctlShadow` decision it reaches for is at **`:69-77`**. It RESOLVES, so it
 >    misleads. **Owner: whoever next edits `.gn-board-card__move`'s block.** Recorded rather than fixed — a
 >    citation fix drags its own sweep, and this one is outside the round's scope.
 > 2. **`Features.md`'s ticket-type reorder bullet says the rule engine "refunds `type.builtin-rank`"** — a

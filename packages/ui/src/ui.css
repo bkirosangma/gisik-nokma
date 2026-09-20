@@ -5230,17 +5230,23 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 
    APPENDED AT THE END OF THE FILE for the reason the settings → workflows card
    grid above already prices: inserting beside `.ticket-type-list__*`'s own rules
-   (`:2160-2290`) shifts every `ui.css:NNN` citation below the insert, and **50 of
-   this repo's 204 citations into this file name a line past `:2290`**. The
+   (`:2160-2286`) shifts every `ui.css:NNN` citation below the insert, and **50 of
+   the 206 `ui.css:NNN` citations across this repo's tracked `*.md`/`*.ts`/`*.tsx`/
+   `*.css` files, excluding `reference/`, name a line past `:2286`** — a universe
+   stated because the figure is unreadable without one (a `grep -r` over the worktree
+   gives a different denominator). The
    locality given up is real and small — these rules sit a few hundred lines from
    their sibling screen's `.workflow-list__*` family, both appended late for the
    same reason.
 
    ## THE DEFECT THIS CLOSES: THE CLASS HAD NO RULE AT ALL
 
-   `button.ticket-type-list__move` was styled by NOTHING — 0 hits in this file and
-   in `apps/web/app/globals.css`, against a positive control of
-   `.ticket-type-list__row` at 1 and 13 hits in the same sweep. It rendered as raw
+   `button.ticket-type-list__move` had NO RULE OF ITS OWN — 0 hits for the class in
+   this file and in `apps/web/app/globals.css`, against a positive control of
+   `.ticket-type-list__row` at 1 and 13 hits in the same sweep. **Two rules of no
+   class did reach it** (`* { box-sizing: border-box }` and `button { font: inherit }`,
+   `globals.css:5`/`:84` — and the second is why the table below reports `font:
+   inherit`'s 16px/400 rather than the UA's own button font). Everything else was raw
    user-agent chrome, measured in Chromium against the live stack at
    `/w/…/settings/ticket-types` (`data-style="neo"`, 1280×1000):
 
@@ -5257,8 +5263,13 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    the roster's own `border`/`backdrop` columns recorded all along. **So this rule
    does NOT "fix a contrast", and a reader who finds the old roster entry should
    read it as evidence of the missing rule, not of a colour choice.** The entry
-   leaves the roster in the same change, because `border: none` below means
-   `sweepBorders` no longer counts this element as bordered at all.
+   **WILL leave** the roster once a build carrying this change is swept — `border:
+   none` below means `sweepBorders` stops counting this element as bordered, so
+   `belowCount` should fall 1 → 0. **THAT IS A PREDICTION, NOT A MEASUREMENT: the
+   roster in this change is UNMODIFIED and still reads `belowCount: 1`**, because
+   `e2e-stack/viewport.spec.ts` needs a live stack and the running container is a
+   baked image. Editing a measured artifact by hand is the anti-pattern here, so it
+   is left to the instrument, with an owner named in the PR body.
 
    ## THE PROTOTYPE'S SPEC, AND THE THREE TOKENS IT NAMES
 
@@ -5273,7 +5284,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    prototype re-declares all three per style: `:59` (`--ctlR:14px` under neo),
    `:63` (neo light `--ctlBg:#F1EAE3` plus a raised `--ctlShadow`), `:75` (neo
    dark). **Every one of those already has a role in `tokens.ts`** —
-   `radii.neo.control`, `fillWarmNeo3`/`fillNavyNeo4`, `shadowValueOf` — so this
+   `radii.neo.control`, `fillWarmHig3`/`fillNavyHig3`/`fillWarmNeo3`/`fillNavyNeo3`
+   (`themes`/`STYLE_COLOR_OVERRIDES`, `tokens.ts:814`/`:851`/`:911`/`:925` — note it is
+   `fillNavyNeo3` and NOT `fillNavyNeo4`, which is `fillQuaternary`), `shadowValueOf` — so this
    rule names the ROLES and gets the prototype's three styles for free rather than
    transcribing a fourth copy of the palette. That is the whole reason there is no
    `[data-style="…"]` block below: 13.340's positive scan asserts style-specific
@@ -5293,9 +5306,14 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    is the divergence `.gn-board-card__move` already made for the byte-identical
    constant (`:869-883`) and for the identical reason: `apps/web/e2e-viewport/
    tap-targets.ts:108` sweeps every `button` on every real page against a hard
-   44px floor with no per-component exemption. A 32×36 control reddens that gate
-   the moment it is reachable — and it is reachable on a shipped settings route
-   today. This is a RECORDED, not a silent, divergence.
+   44px floor with no per-component exemption, and its ONLY exemption is
+   `display: inline` (`tap-targets.ts:102`) — this control is `inline-flex`, so it is
+   not exempt. **A 32×36 control WOULD redden that gate, but no sweep visits this
+   route today** (`responsive.spec.ts` sweeps the unauthed routes; the stacked suite's
+   only tap sweep is keyed to `/my-work`), so the floor is one this rule keeps rather
+   than one that currently enforces it — said plainly, because "it reddens on a
+   shipped route" would read as a live gate. This is a RECORDED, not a silent,
+   divergence.
 
    ⚠ **AND ONE THING THIS RULE DOES NOT DECIDE, NAMED RATHER THAN ASSUMED.** The
    owner ruled on 2026-09-20 that **standalone** controls take 44px and **dense
@@ -5322,6 +5340,18 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    `:disabled { opacity: 0.4 }` is the prototype's OWN number for this control
    (`:3161-3162`, `";opacity:0.4;cursor:not-allowed"`), not `.gn-button`'s generic
    0.55 (`:126`) — the same distinction `.gn-board-card__move:disabled` records.
+
+   **⚠ THE BODY BELOW IS A COPY OF `.gn-board-card__move`'s AND NOTHING GUARDS THE
+   DRIFT — found by review 2026-09-20 and RECORDED rather than fixed.** The two are
+   byte-identical once the one differing comment word is normalised, which is by
+   design: they implement the same prototype constant. But this repo's own convention
+   for a second consumer of one rule body is an ALIAS — `.gn-board-card__close`,
+   `.gn-row-action`, `.gn-board__column-action` and `.gn-list__bulk-close` share one
+   body *"so the two can never drift"* (`:906-946`). A change to `.gn-board-card__move`
+   cannot redden case 16.83, which pins only `rule('.ticket-type-list__move')`.
+   **Owner: whoever next edits either rule.** Making this the fifth member of that
+   alias set would drag `.gn-board-card__move`'s docblock and its screen into this
+   change, which is why it is not done here. Today the two agree.
 
    ## THE LAYOUT HALF, WHICH THE STYLING ALONE WOULD HAVE LEFT WRONG
 
