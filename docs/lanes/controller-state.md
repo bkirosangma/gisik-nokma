@@ -31,6 +31,51 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 SUNDAY 2026-09-20 ~21:3x IST — **CYCLE 26: A SECOND SITTING — THE OWNER RULED THE SHEET, THE PARENT INDICATOR, THE EDITOR AND THE LEAK, AND THE QUEUE IS NOW EIGHT DEEP WITH A DISPATCH FOR EVERY ITEM.** `main` is `a5b58c4a`; **zero open PRs**; ledger **307 done / 1 todo** (struck).
+
+### 1. 📌 THE POSITION AND **THE QUEUE, IN DISPATCH ORDER — THIS IS THE QUEUE**
+| # | task | lane | dispatch | state |
+|---|---|---|---|---|
+| 1 | the five empty-state sentences — new wording where epics emptied the view, **the existing wording where the project is genuinely empty** | exec 1 | `CTL-DISPATCH-2026-09-20-epic-empty-states.md` | **IN FLIGHT** |
+| 2 | the soft-delete constraint — a `keyof`-guarded invariant + the background paths | exec 2 | `CTL-DISPATCH-2026-09-20-softdelete-constraint.md` | **IN FLIGHT** |
+| 3 | **the attachments leak** — three doors, incl. the download route that serves the bytes | next | `CTL-DISPATCH-2026-09-20-attachment-leak.md` | **QUEUED — next, and the only time-sensitive one** |
+| 4 | the comment box + thread — option **(A)**, a projection + route | — | `CTL-DISPATCH-2026-09-20-comment-thread.md` | **QUEUED** |
+| 5 | the Add-subtask affordance — withhold where no legal child type exists; type selector | — | `CTL-DISPATCH-2026-09-20-subtask-affordance.md` | **QUEUED** |
+| 6 | the breadcrumb hierarchy + the parent-indicator merge | — | `CTL-DISPATCH-2026-09-20-breadcrumb-hierarchy.md` | **QUEUED** |
+| 7 | the visibility section styling | — | *(not yet written — the prototype spec is in §3)* | **QUEUED** |
+| 8 | markdown editing — typed links ON, and the seeds PARSED | — | `CTL-DISPATCH-2026-09-20-markdown-editing.md` | **QUEUED** |
+| 9 | `prewarm-web-routes` · the `TOKENS (every screen)` gap · the contrast debts | — | — | **HELD by the owner** |
+⚠ **`gisik-nokma-lanes/` is NOT under version control** — every dispatch above lives there as a plain file. **It survives a restart; it does not survive a machine.** If it matters beyond this session, it needs a home in the repo.
+
+### 2. 📌 THE OWNER'S RULINGS THIS CYCLE
+1. **The five empty states: *"go with your proposal."*** The wording is the controller's shape (*"…— epics appear in the List."*), applied to the four sites plus `docs/faq.md`. **And the controller answered the lane's blocked follow-up as a CONTROLLER READING, not the owner's words: the TRULY-EMPTY project keeps its existing sentence** — the owner's ruling is about epic-caused emptiness, and a project with nothing in it was told the truth before. ⚠ **If a site cannot tell the two apart, it reports that site and stops on it alone.**
+2. **The parent indicator: *"you can keep the badge. but the placement is confusing … put the badge in that position instead. you can remove that `gn-ticket-sheet__parent`."*** The two were **rendering the same three facts twice** (`ticket-sheet.tsx:1683-1693` and the chip at `:1745-1778`). **One element, three facts, in the upper position.** The restricted arm is load-bearing: *"it must not read as 'no parent' — a root is a different fact."*
+3. **The Move control: asked for as a dropdown, then WITHDRAWN — *"forgot my previous reason. leave it how it is. cancel this one."*** **Nothing was dispatched and the register's refusal stands untouched** (`owner-holds.md:129`).
+4. **The attachments leak: *"do as you recommend"*** → a third guard at the routes, **never a widened `canSee`** (`visible-where.ts:136-139` gives two reasons it must stay: the cross-check asserts a different property, and `listVisibleTickets` has no `t` alias → a RUNTIME error).
+5. **The editor: *"both"*** — `markdownLinks: true` **and** the seeds parsed. ⚠ **BOTH REVERSE A WRITTEN DECISION that cites spec §2** (*"nothing silently becomes markup"*, whose own elaboration is the escape-suggestion mechanic, owned by Task 5). **`plainTextDoc`'s docblock is to be SUPERSEDED IN PLACE, never deleted** — it is the record of a decision, chosen once and changed deliberately.
+
+### 3. ⚠ AND ONE MEASUREMENT THE NEXT CONTROLLER SHOULD NOT REPEAT
+**The five empty-state sentences and the parent indicator were both settled against the AUTHORITY, and in both cases the product had been built to a READING OF IT rather than to it:**
+- the breadcrumb's authority chain is `workspace › project › [epic] › [parent] › the ticket` (`desktop.dc.html:3404-3425`) — **there is NO state crumb**, yet the sheet was built as `Workspace › Project › State` because the state was *"the one crumb whose source is IN this component"*, and the ancestor chain *"would need a third host prop or a read"*;
+- the parent chip **is** in the authority (`:1240`), gated `sheetIsSub: !!(sheet && sheet.parentId)` — and the prototype's seed keeps the **epic link** (`epicId`, the crumb) separate from the **parent link** (`parentId`, the chip), which is why the owner saw no chip on a ticket that plainly had a parent.
+⚠ **THE CONTROLLER ARGUED THE OWNER WAS WRONG TWICE ON THAT SECOND ONE, having measured that the STRING exists in the files rather than whether the WIDGET DRAWS.** A string in the file is not a widget on the screen.
+
+### 4. WHAT THE NEXT CONTROLLER SHOULD DO FIRST
+1. **Capture both panes** and **read §1 — it is the queue.** Then `gh pr list --state open`.
+2. **Re-measure every anchor at the sha you report**, from a worktree pinned at that sha.
+3. ⚠ **A LANE CAN BE BLOCKED ON A QUESTION IN ITS PANE AND NOTHING ELSE WILL TELL YOU.** Exec 1 held ~25 minutes on a copy question because the controller read its pane without reading it. **When a lane's activity line is stale, read its pane for the QUESTION, not for progress.**
+4. **CI is the billing-blocked shape** — measured this cycle at **831 runs since 2026-09-07, 0 successes**, jobs dying before their first step. **The forced gate is the only evidence.** Do not read a CI red as a code verdict.
+5. ⚠ **RE-ARM THE PR WATCHER** — it exits on firing **and on its 2-hour timeout.**
+6. ⚠ **A reviewer mutates YOUR tree** — exec 2 caught its own reviewer's mutation mid-run (`getReviewerProbe` in an error message). Commit path-scoped and restore by checksum.
+
+### 5. LANES AT HANDOVER
+| lane | branch | state |
+|---|---|---|
+| exec 1 | `exec/empty-states-epic-rule` @ `cb98728e`, dirty 9 | applying the sentences after the controller's answer |
+| exec 2 | `exec2/soft-delete-constraint` @ `2410f2dc`, dirty 1 | **waiting on its reviewer**; it also found the leak's **third door** |
+
+---
+
 ## 🔄 SUNDAY 2026-09-20 ~19:4x IST — **CYCLE 25: FOURTEEN MERGES, FIVE OWNER RULINGS, AND THE QUEUE IS NOW EMPTY OF UNBLOCKED WORK — IT WAITS ON TWO QUESTIONS THAT ARE THE OWNER'S.** `main` is `bb018df5`; **zero open PRs**; ledger **307 done / 1 todo** (struck).
 
 ### 1. THE POSITION — **READ THIS INSTEAD OF ANY OLDER ENTRY'S QUEUE**
