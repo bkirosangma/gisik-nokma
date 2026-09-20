@@ -383,7 +383,7 @@ into `apps/server/src/routes/builder-reads.ts` (`readTicketCounts` and its docbl
 note added after the review). **Re-pointed, because this file is in the change set:** the version-route
 citation at `:517-546` → **`:579-608`**, verified by content — the route's `app.get` opening line and its
 closing `);`. **Recorded, owner: the controller** — every other citation INTO that file:
-`test-cases/03-foundation-ledger.md:109` (`:531`), `test-cases/07-api-realtime-search.md:450` and `:603`
+`test-cases/03-foundation-ledger.md:109` (`:531`), `test-cases/07-api-realtime-search.md:476` and `:629`
 (`:444`, `:448`), `test-cases/13-second-wave-board-actions.md:23` and
 `13-second-wave-roles-and-navigation.md:119`/`:1259` (`:247`, `:247-252`),
 `docs/hig-reconciliation-audit.md:185`/`:186` (`:247`), and the `docs/lanes/executor-state.md` ledger

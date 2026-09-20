@@ -41,6 +41,80 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~06:3x IST. **`#584` WENT BACK FOR THE REVIEWER PASS
+> # THE CONTROLLER REQUIRED, AND THE PASS FOUND THE FIX ITSELF BROKEN — SIX TIMES, ACROSS TWO
+> # REVIEW ROUNDS. THE MECHANISM HAS BEEN REPLACED, NOT PATCHED AGAIN.**
+> Branch **`exec/vacuous-check`**, cut from `origin/main` = **`5c8ea78d`**. **The CODE head is
+> `71509bf6`** (the parse-tree rewrite); this handoff commit sits directly above it. **PR [#584](https://github.com/bkirosangma/gisik-nokma/pull/584), `--base main`** — its body carries the
+> reviewer result, per the rule. A commit cannot name its own sha, so this line names the code head
+> and the base; `gh pr view 584 --json headRefOid` settles anything else in one call.
+>
+> ## WHAT THE REVIEW FOUND, AND WHY THE ANSWER WAS A REWRITE
+> **Round 1 (the reviewer pass the controller sent it back for): 2 Critical, 2 Important. Three of
+> the four were CHECKS THAT CANNOT FAIL — the class this case exists to police, committed by the
+> repair three times.** Round 2 (a scoped re-review of that fix, run because my own mutation testing
+> had passed while all three mechanisms were broken): **2 more Critical, plus the same class again.**
+> Every one had ONE root, and it is the sentence to carry: **this file contains its own scanner.**
+> - ⛔ the throw-for-no-routes message quoted the url key in BACKTICKS; a backtick inside a STRING
+>   literal opens a bogus template running to the next backtick — **one match of 2061 characters
+>   over 93 lines**, swallowing the real `url: '/v1/workspaces'`, which left `exercised` silently and
+>   made the case redden **FALSELY**.
+> - ⛔ that fix caught only the LONG form. A **76-character single-line** phantom passed all three
+>   guard conditions, was quietly `continue`d, and took the route with it. **Closing the instance,
+>   not the class** — the same mistake one level up.
+> - ⛔ `withoutComments` treats STRING CONTENT as comment syntax: `const trap = '/*';` deleted an
+>   **entire register** from the scanned universe; 207 raw characters went in, **16 survived**.
+> - ⛔ the `wireRoute` scan read single quotes only, behind a control satisfied by the three
+>   `wireRoute: null` entries the value pattern can never match.
+> - ⚠ `absenceListNames` anchored `^const`, then required exactly one space after `const`.
+> - ⚠ `named` read RAW `mappers.ts` while the test file's scan stripped comments — a phantom on the
+>   SUPERSET side, the direction that HIDES a gap.
+> **So both sides now read a PARSE TREE.** A comment is trivia, a string is a `StringLiteral`, a
+> template is a `TemplateExpression`, a property is a `PropertyAssignment`, a type member is a
+> `PropertySignature` — those six are **unrepresentable**, not guarded. `typescript` is already an
+> `apps/server` devDependency; this is the first file in the repo to import it. **GETs only** (a
+> refusal's `wireKey` is measured against a response body), so `exercised` is **EIGHT routes** —
+> `/v1/events` and `/v1/workspaces` are both POSTs, and counting them was F3.
+> **Mutations re-run, restored from git between runs:** every survivor above now RED, the original
+> control still RED, the prose phantom GREEN. One probe read GREEN and was a **probe bug, not a
+> survivor** — the register was named `F5a`, which does not end `_ABSENCES`; run with a conforming
+> name it is RED. That residual is documented in `absenceListNames`' docblock.
+>
+> ## ⛔ I DESTROYED UNCOMMITTED WORK WITH A SCRATCH SCRIPT, AND THE LESSON IS THE GENERIC ONE
+> A battery script of mine ran `git checkout -- <test file>` as its "clean" step, which reverted the
+> file to HEAD and **destroyed the entire AST rewrite and the round-2 fixes** — uncommitted, so no
+> blob existed to recover. I reconstructed them from the edits in my own context and **committed
+> immediately**. It is the recorded rule with a new spelling: **a checksum restore, never a blanket
+> `git checkout`**, and **commit the moment a fix is green** when the next step is a mutation battery
+> that rewrites the same file. The battery now restores from git *because the work is committed*.
+>
+> ## ANCHORS, RECOUNTED AT THIS TREE
+> - merge-base with `origin/main` = **`5c8ea78d`**; tree carries only `test-cases/` and handoff edits
+>   above the committed code head. **`reference/` untouched.**
+> - **gate** `pnpm turbo run build test typecheck`: **EXIT=0 · 33/33 · 30 cached · 36.5s · Node
+>   v22.22.2**. `app-core` cache HITS are correct (its inputs are byte-identical — `mappers.ts`
+>   restored to `723c6d4c`). Touched tasks ran (cache MISS): `server` build/test/typecheck, **154
+>   files / 1620 passed / 5 skipped**.
+> - `check-case-ids` **ok** (2494 unique, highest `16.82` — **no id minted**); `check-case-citations`
+>   **ok** (ratchet holds).
+> - **Citations measured LAST, twice more:** the catalogue rewrite shifted `07-api-realtime-search.md`
+>   by **+18**, and **four** live citations were re-pointed and verified **IDENTICAL by content** at
+>   each new position (`:458`→`:476`, `:611`→`:629` bare, `:493,502`→`:511,520`, `:509`→`:527`, two
+>   sites). The earlier `12-offline-sync-apps.md` edit was kept **line-neutral (11/11)** on purpose —
+>   citations into it live in `docs/lanes/executor-state-2.md`, **a peer lane's restart surface**.
+> - **Not ours, unchanged:** the tap-target 24px ruling, the unstyled `button.ticket-type-list__move`,
+>   the parity visual half, and the two `e2e-stack` reds resting on those rulings.
+>
+> ## OUTSTANDING
+> **The controller names the head and gates at the landing tree.** One finding is theirs and NOT
+> touched: **`packages/app-core/src/replica/replica-data-source.ts:205`** asserts *"the six call sites
+> `Features.md` §12 enumerates"* — and §12 now says twenty. It contradicts its own cited authority;
+> product source, so outside "tests and docs only".
+>
+> # ▢ SUPERSEDED: the block below was written before the reviewer pass. Its "the three items are done"
+> # is true and its anchors are history; everything it says about the DERIVATION is superseded by the
+> # parse-tree rewrite above.
+
 > # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~05:2x IST. **THE THREE CHECKS RECORDED AS THE
 > # CONTROLLER'S ARE DONE, GATED GREEN, AND ONE OF THEM COULD NOT FAIL.** Branch
 > # **`exec/vacuous-check`**, cut from `origin/main` = **`5c8ea78d`** (the `#583` merge). **The CODE

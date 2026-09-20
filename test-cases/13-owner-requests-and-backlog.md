@@ -1135,8 +1135,8 @@ every `test-cases/*.md` file grepped, not only this one):
   citations from outside this plan's own section.
 - **12 re-pointed**, verified correct at `3222b908` and at the fixed line by
   direct read (never by offset arithmetic): `06-auth-visibility.md:248`
-  `precheck.ts:154-157`→`:180-183`; `07-api-realtime-search.md:485,494`
-  `precheck.ts:268`→`:294` (both occurrences); `07-api-realtime-search.md:501`
+  `precheck.ts:154-157`→`:180-183`; `07-api-realtime-search.md:511,520`
+  `precheck.ts:268`→`:294` (both occurrences); `07-api-realtime-search.md:527`
   `ticket-state.ts:56-63`→`:59-66`; `05-tickets-hierarchy.md:54,60`
   `ticket-state.ts:94`→`:99` and `:211`→`:221`; `12-offline-sync-apps.md:2395`
   `list.ts:143`→`:144`, `:103-112`→`:104-113`, `:205`→`:206`;
@@ -1174,7 +1174,7 @@ every `test-cases/*.md` file grepped, not only this one):
   re-pointing a number a retrospective reports AS ITS OWN FINDING would
   misrepresent what that past investigation actually found, exactly the
   reasoning the prior sweep itself recorded. A borderline case decided the
-  same way: `07-api-realtime-search.md:501`'s "METHOD NOTE" records that
+  same way: `07-api-realtime-search.md:527`'s "METHOD NOTE" records that
   `sync-routes.ts:32` once read "ten of them" — Task 2 of this plan changed
   that line's own wording to "twelve of them" (the line NUMBER is
   unaffected, 32 both before and after), so the note's quoted fragment is
