@@ -166,8 +166,8 @@ You become the **owner** of that workspace. It also sets you up with:
 
 **A brand-new workspace has no projects.** Whether you can make one depends on your role. An **owner or
 admin** gets a **New project** form inside the workspace, and that is the only control that creates
-one. Everybody else gets a sentence saying so instead of a button that fails — the app's own wording,
-which names only the admin: *"Only an admin can create a project in this workspace."* For a member the
+one. Everybody else gets a sentence saying so instead of a button that fails: *"Only an owner or an
+admin can create a project in this workspace."* For a member the
 control is not hidden; it is not offered.
 Nowhere else offers it: not the Workspaces page, not a settings screen, not the top bar.
 
@@ -715,12 +715,17 @@ name* whose **×** only undoes your own setting — the default takes over again
 hidden. *Everything* on the Closed control is not a third way back, because *everything* and *never
 touched it* are the same setting here; that is why the chip exists at all.
 
-**If the calendar looks empty**, it says either *"No claimed dates fall in this month"*, or — when the
-only thing hiding your claims is a date field you switched off in the legend — a sentence saying so.
+**If the calendar looks empty**, the sentence NAMES what can hide a claim: your filter, closed jobs being
+hidden, or a date field you switched off in the legend. It goes on to say *"Undated work is absent, not
+estimated"* — the calendar draws only what someone claimed, and an undated job is not estimated onto a day
+nobody gave it.
 
-**And the first of those two is wrong more often than it looks.** A month emptied by your own filter, or
-by closed jobs being hidden, still gets *"No claimed dates fall in this month"*. Trust the count in the
-strip instead: *"8 of 12 shown"* means four jobs are there and something is hiding them.
+**When a date field you switched off is hiding claims in this month, a different sentence says so** —
+*"Every claimed date in this month belongs to a field you have hidden"*. **Read that one carefully: it
+claims ALL of the month's claims, and the calendar only knows about the claims it was given.** If closed
+jobs, or work your filter removed, also have claims in this month, switching the field back on will not
+bring those back. *"8 of 12 shown"* in the strip tells you what the filters left — that count cannot see
+the legend switches, because those live only in this view.
 
 ### Timeline
 

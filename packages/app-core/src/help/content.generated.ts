@@ -906,11 +906,11 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " form inside the workspace, and that is the only control that creates one. Everybody else gets a sentence saying so instead of a button that fails — the app's own wording, which names only the admin: "
+                    "text": " form inside the workspace, and that is the only control that creates one. Everybody else gets a sentence saying so instead of a button that fails: "
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Only an admin can create a project in this workspace.\""
+                    "text": "\"Only an owner or an admin can create a project in this workspace.\""
                   },
                   {
                     "kind": "text",
@@ -3502,15 +3502,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", it says either "
+                    "text": ", the sentence NAMES what can hide a claim: your filter, closed jobs being hidden, or a date field you switched off in the legend. It goes on to say "
                   },
                   {
                     "kind": "italic",
-                    "text": "\"No claimed dates fall in this month\""
+                    "text": "\"Undated work is absent, not estimated\""
                   },
                   {
                     "kind": "text",
-                    "text": ", or — when the only thing hiding your claims is a date field you switched off in the legend — a sentence saying so."
+                    "text": " — the calendar draws only what someone claimed, and an undated job is not estimated onto a day nobody gave it."
                   }
                 ]
               },
@@ -3519,19 +3519,27 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "And the first of those two is wrong more often than it looks."
+                    "text": "When a date field you switched off is hiding claims in this month, a different sentence says so"
                   },
                   {
                     "kind": "text",
-                    "text": " A month emptied by your own filter, or by closed jobs being hidden, still gets "
+                    "text": " — "
                   },
                   {
                     "kind": "italic",
-                    "text": "\"No claimed dates fall in this month\""
+                    "text": "\"Every claimed date in this month belongs to a field you have hidden\""
                   },
                   {
                     "kind": "text",
-                    "text": ". Trust the count in the strip instead: "
+                    "text": ". "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Read that one carefully: it claims ALL of the month's claims, and the calendar only knows about the claims it was given."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " If closed jobs, or work your filter removed, also have claims in this month, switching the field back on will not bring those back. "
                   },
                   {
                     "kind": "italic",
@@ -3539,7 +3547,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " means four jobs are there and something is hiding them."
+                    "text": " in the strip tells you what the filters left — that count cannot see the legend switches, because those live only in this view."
                   }
                 ]
               }
@@ -6972,11 +6980,11 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " form on the workspace page; everybody else gets a sentence saying so instead of a button that fails — the app's own wording, which names only the admin: "
+                    "text": " form on the workspace page; everybody else gets a sentence saying so instead of a button that fails: "
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Only an admin can create a project in this workspace.\""
+                    "text": "\"Only an owner or an admin can create a project in this workspace.\""
                   },
                   {
                     "kind": "text",
@@ -8905,7 +8913,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "It says either \"No claimed dates fall in this month\" (\"Undated work is absent, not estimated\"), or — when the only thing hiding your claims is a date field you switched off with the legend switch — a sentence saying so. And the first one is wrong more often than it looks: a month emptied by your own filter, or by closed jobs being hidden, still gets it. Trust the count in the strip instead — if it shows fewer jobs than the project holds, something is hiding them."
+                    "text": "The sentence names what can hide a claim: your filter, closed jobs being hidden, or a date field you switched off with the legend switch. It also says \"Undated work is absent, not estimated\" — the calendar draws only what someone claimed. When a date field you switched off is hiding claims here, a different sentence says so, and it claims "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "ALL"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " of the month's claims — so treat that one carefully: the calendar only knows about the claims it was given, and closed or filtered-away jobs are not among them. The count in the strip tells you what the filters left behind; it cannot see the legend switches, which live only in this view."
                   }
                 ]
               }

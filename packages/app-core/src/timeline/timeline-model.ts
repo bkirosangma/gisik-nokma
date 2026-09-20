@@ -1,7 +1,6 @@
 import type { TicketState } from '@gisik-nokma/domain';
 import {
   TIMELINE_EMPTY_COPY,
-  TIMELINE_NARROWED_COPY,
   TIMELINE_OUT_OF_WINDOW_COPY,
   TIMELINE_SIDE_LIST_COPY,
   TIMELINE_SIDE_LIST_UNDRAWABLE_COPY,
@@ -100,14 +99,26 @@ export type TimelineModel = {
   sideList: TimelineSideEntry[];
   sideListCopy: string;
   /**
-   * Why the timeline is empty, or null when it is not. THREE sentences,
-   * because they are three different facts — the same construction
-   * `CalendarModel.emptyCopy` was given, for the same reason.
+   * Why the timeline is empty, or null when it is not. **TWO sentences as of
+   * 2026-09-20** (it was three) — the same construction
+   * `CalendarModel.emptyCopy` was given, for the same reason, and trimmed by
+   * the same owner ruling.
    *
-   * Measured before this field existed, anchor `2026-08-23`: `model([])`, a
-   * filter matching nobody, an unmatched `laneEpicId`, and work that is fully
-   * dated but wholly outside the window all serialised to the SAME bytes.
-   * Four different emptinesses, one indistinguishable screen.
+   * ⚠ **THE MEASUREMENT THIS FIELD WAS BUILT ON HAS PARTLY REVERTED, AND THE
+   * REVERSION IS RECORDED RATHER THAN QUIETLY RESCOPED.** Measured before this
+   * field existed, anchor `2026-08-23`: `model([])`, a filter matching nobody,
+   * an unmatched `laneEpicId`, and work that is fully dated but wholly outside
+   * the window all serialised to the SAME bytes — four emptinesses, one screen.
+   * The three sentences made that three distinct models; deleting the narrowing
+   * one (`TIMELINE_NARROWED_COPY`, owner ruling 2026-09-20, *"delete the copy"*)
+   * takes it back to TWO. **A filter that matched nobody and a workless
+   * workspace are one model again** — the collapse this field was added to end.
+   *
+   * What replaces the lost distinction is that the surviving sentence NAMES the
+   * filter, so the reader is still pointed at the control that would bring the
+   * work back; and the `narrowedAway` guard that survives is what still keeps
+   * the window sentence from carrying the both-case. Both are witnessed, the
+   * collapse included as an asserted count, at `timeline-model.test.ts` 11.61.
    *
    * The window miss is the case Task 11 CANNOT reconstruct: its props carry
    * `tickets`, `filter` and `laneEpicId` and nothing about the window, so a
@@ -440,8 +451,12 @@ export function buildTimelineModel(
    * `start-after-due` entry already satisfies while sitting in the list, and
    * that an `unplaceable-day` entry can satisfy too. So the exhaustive
    * sentence is reached only when every entry really is here for a missing
-   * claim, exactly as `emptyCopy` reaches `CALENDAR_ALL_HIDDEN_COPY` only
-   * when the legend is the only narrowing in play.
+   * claim, exactly as `emptyCopy` reaches `CALENDAR_ALL_HIDDEN_COPY` only when
+   * nothing the MODEL narrowed was removed from this grid. ⚠ **"The model
+   * narrowed" is load-bearing and narrower than "the legend is the only cause":
+   * the calendar's gate cannot see the page's upstream pruning, so that
+   * sentence is reachable while false today.** See `calendar-model.ts`'s
+   * precedence note; do not restate the condition here as exclusivity.
    */
   const sideListCopy = sideList.every((entry) => MISSING_CLAIM_REASONS.has(entry.reason))
     ? TIMELINE_SIDE_LIST_COPY
@@ -486,32 +501,39 @@ export function buildTimelineModel(
   /**
    * PRECEDENCE, and like the calendar's it is a truth condition, not a taste.
    *
-   * `TIMELINE_NARROWED_COPY` comes first because it is the sentence that is
-   * still true when narrowings STACK — a filter that removed work which would
-   * have shown here, while what survived is merely out of window, is a screen
-   * a wider filter would fill, and saying only "it's outside these weeks"
-   * would send the viewer to the wrong control. The disjunction names the set
-   * rather than picking one.
+   * `narrowedAway` still comes FIRST, and it now guards the arm it steers to
+   * rather than one of its own. It was written for the sentence that said so —
+   * a filter that removed work which would have shown here, while what survived
+   * is merely out of window, is a screen a wider filter would fill, and saying
+   * only "it's outside these weeks" would send the viewer to the wrong control.
+   * ⚠ **That sentence was deleted on 2026-09-20** (owner ruling: *"delete the
+   * copy"* — it named "the LANE", a word no screen in this product shows, and
+   * no app could render it). Deleting the CONSTANT did not require deleting the
+   * GUARD: `!narrowedAway` is what keeps `TIMELINE_OUT_OF_WINDOW_COPY` — which
+   * is deliberately NOT exhaustive, and which is exactly why it is safe to
+   * reach with a filter still live — from carrying the both-case. Its own
+   * disjunction is now `TIMELINE_EMPTY_COPY`'s third sentence.
    *
-   * `TIMELINE_OUT_OF_WINDOW_COPY` is deliberately NOT exhaustive, which is why
-   * it is safe to reach with a filter still live: a filter can remove work
-   * that would ALSO have missed the window, leaving `narrowedAway` false and
-   * this arm reached with two narrowings in play. An "every piece of work"
-   * quantifier there would be exactly `CALENDAR_ALL_HIDDEN_COPY`'s failure in
-   * timeline clothes.
+   * `TIMELINE_OUT_OF_WINDOW_COPY` is therefore reached only when no narrowing
+   * removed work that would have shown here: a filter can remove work that
+   * would ALSO have missed the window, leaving `narrowedAway` false and this
+   * arm reached with two narrowings in play, which is the case its
+   * non-exhaustive wording is written for.
    *
-   * `TIMELINE_EMPTY_COPY` is then reached only when every loaded ticket is an
-   * undated epic, or there are none — so "no claimed dates are here to draw"
-   * is true, and it does NOT say "no work is here": an undated epic IS work,
-   * and it is still a lane.
+   * `TIMELINE_EMPTY_COPY` is reached otherwise — every loaded ticket is an
+   * undated epic (a lane, not missing work) or there are none, OR a narrowing
+   * removed work that would have shown here. So "no claimed dates are here to
+   * draw" holds of the CHART, and it does NOT say "no work is here": an undated
+   * epic IS work, and it is still a lane. Its third sentence names the set of
+   * narrowings, because this arm can no longer be told apart from a filter
+   * emptying the chart — the page narrows `tickets` upstream, so `visible ===
+   * inputs` in every app.
    */
   const emptyCopy = hasContent
     ? null
-    : narrowedAway
-      ? TIMELINE_NARROWED_COPY
-      : outOfWindow
-        ? TIMELINE_OUT_OF_WINDOW_COPY
-        : TIMELINE_EMPTY_COPY;
+    : outOfWindow && !narrowedAway
+      ? TIMELINE_OUT_OF_WINDOW_COPY
+      : TIMELINE_EMPTY_COPY;
 
   return { weeks, groups, sideList, sideListCopy, emptyCopy };
 }

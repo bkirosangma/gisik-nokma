@@ -1,4 +1,226 @@
-## ▲ TOP BLOCK — **FOUR ABSOLUTES TRUE OF ONE PATH AND STATED OF THE PRODUCT, FOUND BY SWEEPING THE DOCUMENTS' OWN LISTS.** (2026-09-20)
+## ▲ TOP BLOCK — **THREE PRODUCT SENTENCES: ONE FALSE, ONE DEAD, ONE NAMING A CONTROL NO SCREEN CAN OFFER — AND THE TWO OWNER RULINGS THAT PULLED IN OPPOSITE DIRECTIONS.** (2026-09-20)
+
+### § 1 — WHERE TO FIND IT
+
+- **Dispatch: the controller's "three false things the PRODUCT says" paste** (2026-09-20 ~12:0x IST).
+  **Base named as `main` = the `#587` merge.**
+- **Branch `exec2/product-copy`**, cut from `1391aef3` (= `origin/main` at the time = the `#587`
+  merge). **HEAD `b698961b`** — five commits: `b99bdfea` (the change), `a9931ab2` (the prose sweep),
+  `f69ec6d4` (the handoff), `bda9980c` (fix round 1 — **amended in place from `615ef96b` to correct a
+  count in its own message; tree identical**), `b698961b` (fix round 2).
+- **The PR opens as the last step of this dispatch.** If you are reading this from `main`, settle it in
+  one call: `gh pr list --state all --head exec2/product-copy`.
+
+### § 2 — ANCHORS, RECOUNTED AT `b698961b` (not carried forward)
+
+| anchor | value |
+|---|---|
+| `git merge-base origin/main HEAD` | `1391aef37d96e7fcbc07cbf39104009a8af83ad4` |
+| **HEAD** | `b698961b80496fb8507c28752eadf47d6bc38c57` |
+| ahead / behind `origin/main` | **4 / 5** (`git rev-list --left-right --count origin/main...HEAD` → `5 4`) |
+| `origin/main` | **`bbbd5cda4877fcb0357cf2e97475905f3ab43336`** — **it MOVED while this branch ran** (`1391aef3` → `bbbd5cda`, 5 commits); see the merge section below |
+| tree | **clean** |
+
+⚠ **THE COMMIT CARRYING THIS FILE SITS ON TOP OF THAT HEAD.** Every anchor above is stated at the
+**CODE** head (`b698961b`), never at this file's own commit — so
+`git log -1 --format=%h -- docs/lanes/executor-2-state.md` will name a sha that is NOT the one in the
+table, and that is correct rather than stale. Re-reading this file is not the same as re-measuring the
+tree; recount at the sha you are reporting.
+| `check:citations` / `check:env` / `check:runbook` / `check:tasks` | **all exit 0** |
+| `check:help` | **ok** — 2 documents, 29 sections, **231 entries**. **Delta PREDICTED 0 before regenerating and measured 0** (no heading added or removed; only text moved) |
+| `check:case-ids` | ok — **2495** unique ids (was 2494). **Delta +1, exactly the one case added (`16.45`)**; highest `16.82` |
+| `pnpm turbo run build typecheck` | **22/22 successful** |
+| app-core suite | **95 files, 1642 tests, all pass** (`--maxWorkers=1`) |
+| web suite | **54 files, 594 tests, all pass** (`--maxWorkers=1`) |
+| orphaned vitest workers after the runs | **none** (reaped-check run; ppid=1 sweep empty) |
+
+⚠ **THE FORCED GATE IS THE CONTROLLER'S.** What is recorded above is my own build/typecheck/test.
+
+### § 3 — THE THREE ITEMS, AND WHAT EACH ONE ACTUALLY TURNED OUT TO BE
+
+**(a) A false sentence — and the family was read, not just the one line.**
+`apps/web/app/w/[workspaceId]/page.tsx` now reads *"Only an owner or an admin can create a project in
+this workspace."* The old text said "an admin" only, and an **owner** — not an admin by role — can
+create one too. `isAdmin` there is `mayAdminister(role)`, verified by reading
+`apps/web/src/workspace-viewer.ts:90-92` = `role === 'owner' || role === 'admin'`.
+**The dispatch's warning that "a family written together is usually wrong together" was measured, and
+the answer is that this family is NOT wrong together:**
+- **Five refusal-family sentence sites in that file** — `:308` (the stranger sentence, *"ask an admin
+  for an invitation"*), `:323` (the server's own refusal carried verbatim), `:877`
+  (*"No projects you can open are active here."*), `:907` (`restrictedLine`), `:951` (the founding
+  refusal). **One was false; one was changed.** Three affordances (`:440` archive/restore, `:752`
+  rename) are hidden WITHOUT a sentence, so they assert nothing.
+- `:308` is TRUE and only incomplete (an admin *can* invite), so it is left with this note rather than
+  edited: it is advice about who to ask, not a claim about a gate.
+- `:877` is the model to copy — it is scoped to the caller (*"you can open"*) and says so deliberately.
+- **MEASURED: no test watched that sentence in either direction.** Reverting it or fixing it leaves the
+  whole web suite green, so (a) pins no behaviour and mints no case. The control for that null was run
+  through the SAME invocation and FIRED.
+- The sentence was transcribed verbatim from the prototype
+  (`design-system/interactive/desktop.dc.html:2694`, and mobile's `addProjectRefusal`) — **which is why
+  it read as authoritative.** Corrected in the product, not in the drawing: the drawing is the design
+  authority and its wording did not keep up with the roles.
+
+**(b) The reachable sentence, NOT the dead constant — and it was decided by elimination.**
+The owner ruled *"the message should name the filter"*. **Shape chosen: rewrite the REACHABLE sentence
+(`CALENDAR_EMPTY_MONTH_COPY`).** Wiring the dead constant was (i) **foreclosed** by the owner's own
+ruling 10 in the same sitting and (ii) **would not have worked anyway**: the page filters UPSTREAM —
+`datesNarrowing` feeds `dateInputs` already narrowed — so `visible === inputs` in every app and passing
+the filter down would re-filter a filtered set and exclude nothing.
+⚠ **THE REASON STATED HERE IN THE FIRST VERSION WAS FALSE AND A REVIEWER CAUGHT IT:** it said the
+page's closed-hidden rule "cannot be expressed as a `FilterSpec`". It can — `closed?: boolean` is one
+of `FilterSpec`'s own axes and `matchesFilter` evaluates it, and the page already expresses it as one,
+`{ ...listFilterSpec, closed: effectiveClosed }`. What makes wiring the wrong repair is that the view
+receives ALREADY-NARROWED rows, not that the rule is inexpressible. **A false reason attached to a
+right answer is worse than no reason: it is the part a successor would have checked and found sound.**
+The source docblock carries the corrected version with its citations. **A page-LEVEL "a filter is on"
+flag was considered and rejected, with the reason recorded in the source**: it cannot answer whether
+THIS month was emptied, so it would license a sentence that is false whenever the filter is merely
+irrelevant to the month.
+The sentence names the SET — *"your filter, closed jobs being hidden, or a field you switched off in the
+legend"* — which stays true whether one is set or none is.
+
+**(c) The two "lane" constants, deleted — and the DOORS KEPT, which is the part worth reading.**
+`git log -S` puts **both in ONE commit, `e09666ce` — "Plan 9: the calendar, the timeline and the
+notification engine" (PR #93, the same commit that introduced `CALENDAR_ALL_HIDDEN_COPY` as the control
+in the same invocation)**. So they are not a half-installed feature found in the wild: they were written
+TOGETHER with the lane filter as a planned door, and never revised.
+**They are dead TEXT, not a dead feature — the feature is the DOOR, and the doors are kept.**
+`narrowedOutOfGrid` (calendar) and `narrowedAway` (timeline) survive with live readers, because
+deleting a sentence does not require deleting the truth-condition it enforced: `CALENDAR_ALL_HIDDEN_COPY`
+may still not claim "EVERY claimed date" with a filter live, and `TIMELINE_OUT_OF_WINDOW_COPY` is still
+kept away when a filter removed work that would have shown. **The option the ruling-request priced
+("delete both constants, their model arms and their tests") would have destroyed that guard; this change
+honours the ruling and does not spend it.**
+
+### § 4 — ⚠ WHAT THE DELETION COST, MEASURED RATHER THAN IMPLIED
+
+**The timeline's distinct-model count went 3 → 2.** A filter that matched nobody, an unmatched lane, and
+a workless workspace are ONE model again — **the exact collapse case `11.61` was written to end**
+("four different emptinesses, one indistinguishable screen"). It is asserted at 2, with the loss named
+in the test, so the day someone writes a replacement sentence the count tells them it moved. What
+replaces the lost distinction is that the surviving sentence NAMES the filter.
+⚠ **This is the one place I went beyond the literal ruling, and it is flagged for the owner:** the
+dispatch's (b) named the CALENDAR only, so rewriting `TIMELINE_EMPTY_COPY` symmetrically is my call. I
+made it because (c) forces a decision on the timeline's arm anyway, and this repo's own doctrine forbids
+calendar/timeline asymmetry ("Fixing ONE would be worse than fixing neither"). **One word reverts it.**
+
+### § 5 — THE MUTATIONS, EACH KILLING ITS OWN SITE AND NOTHING ELSE
+
+| mutation | killed | and nothing else |
+|---|---|---|
+| `narrowedOutOfGrid` → the `date.slice(0,7) === monthKey` shortcut | **11.50's padding-cell arm** | ✓ 42 others green |
+| drop the `!narrowedAway` guard from the timeline's window arm | **11.61's "outranks the window" case** | ✓ 54 others green |
+| revert `CALENDAR_EMPTY_MONTH_COPY` to the pre-ruling text | **11.1** and **16.45** | ✓ 46 others green |
+
+All three restored with `git checkout -- <file>` and verified clean. **Two checks that could not fail
+were found and re-aimed while doing this**: 11.50's padding-cell test would have passed whatever the
+guard did once the per-cause sentence was gone, so it now discriminates against `CALENDAR_ALL_HIDDEN_COPY`;
+and the surviving copy deliberately KEEPS the substring `11.186`/`11.187` assert the ABSENCE of, because
+deleting it would have made those two cases vacuous.
+
+### § 6 — CASE IDS: **`16.45` MINTED, FROM MY OWN BLOCK**
+
+Block `16.41`–`16.60` is executor 2's (`test-cases/16-remaining-doors.md`). `16.41`–`16.44` were used, so
+`16.45` is the next free — **read from the allocation table, not taken from the dispatch's word.**
+`check-case-ids` moved **2494 → 2495, exactly +1** (bold 1070 → 1071), confirmed by re-running it.
+**(a) and (c) mint nothing** — (a) pins no behaviour (measured above), and (c) deletes copy rather than
+pinning any. Written as an **id LINE** (`- **16.45** ✅ …`), the spelling the guard can see.
+
+### § 7 — THE SIX DESCRIPTIONS THIS CHANGE FALSIFIED, FIXED IN `a9931ab2`
+
+**Every one was true when written, and five of them describe the very artifact this branch edits.**
+`CalendarModel.emptyCopy`'s docblock said "THREE different sentences"; `TimelineModel.emptyCopy`'s said
+the same AND carried the 4→3 measurement this change partly reverts; `collectItems`' docblock said the
+second build exists so `emptyCopy` can tell the two apart (it no longer does — it gates `ALL_HIDDEN`);
+`CALENDAR_ALL_HIDDEN_COPY`'s docblock deferred the both-case to "the third sentence's business"; and the
+11.63 and 11.75 DESCRIBE TITLES both announced three sentences in the present tense.
+**Plus one citation that moved because I moved the block it names:** the docblock inserted in the
+workspace page shifted the founding-form ternary from `:917-923` to **`:948-954`**, so
+`docs/product-coverage-map.md`'s two citations were updated. Swept, not assumed — **the repo has FOUR
+apps** and the other `page.tsx` citations in `test-cases/13-*` name `p/[projectId]/page.tsx`, a different
+file, untouched. Every `file:line` in this branch's own diff was then resolved **by content**:
+`workspace-viewer.ts:90-92` is `mayAdminister`'s `owner || admin`; `:706-713` is `datesNarrowing`;
+`:1135-1146` is `dateInputs`; and `desktop.dc.html:2694` is the prototype line (a) exists because of.
+
+⚠ **`apps/web/app/not-found.tsx`'s 404 rationale argued from the calendar saying which kind of empty it
+is "in four different sentences … four reasons". That count was ALREADY WRONG when written** (three
+sentences, four doors — case 11.50) and this change would have made it wrong a second way. The count is
+**dropped** rather than corrected: it was never load-bearing to the argument, which needs "more than
+one".
+
+### § 7b — THE REVIEW RECORD: TWO PASSES, FIFTEEN FINDINGS, AND THE ONE WHERE I COMMITTED THE DEFECT INSIDE ITS OWN FIX
+
+**Pass 1 (whole branch, briefed to falsify) — 9 findings, every one verified by reading the line
+before it was fixed.** It CONFIRMED the branch's central claim (`CALENDAR_EMPTY_MONTH_COPY` is true
+wherever it renders) and then found, in order of consequence: the symmetric copy naming a control the
+timeline does not have; the `narrowedOutOfGrid` guard's blind spot being LIVE rather than future; the
+documents inheriting that overclaim; my stated reason for rejecting the filter-wiring repair being
+simply FALSE; two render-site comments and a coverage-map row still announcing three arms/sentences; a
+citation whose bare `:921` form my sweep's pattern could not see; and a false "no test watched it"
+claim in my own case block. **Fix round 1 = `bda9980c`.**
+
+**Pass 2 (scoped to the fix round's own new prose and its new test) — all nine CONFIRMED fixed, the
+recovery from the destroyed fix round confirmed COMPLETE, plus 6 more.** The important one: **I wrote
+the F2 correction into the two files I was already editing and left three other places asserting the
+condition I had just measured as unenforced — and two of those three I had written myself, earlier the
+same day, in the course of fixing F2.** That is the "sweep's universe is the files you already edited"
+defect, which this project has now recorded three times, committed here *inside its own fix*. Pass 2
+also measured a SECOND blind spot in the same guard (its bounds are the six-week GRID, the sentence
+says "this month" — a 2 Sep claim is a trailing August cell) and caught a docblock disagreeing with a
+paragraph three lines below it, because I added the second without re-reading the first.
+**Fix round 2 = `b698961b`.**
+
+**⚠ A PROCESS FAILURE OF MINE, RECORDED BECAUSE IT COST REAL WORK.** I restored a mutation with
+`git checkout -- claim-labels.ts` while the FIX ROUND WAS UNCOMMITTED, which reverted the file to HEAD
+and destroyed F1/F2/F4/F9a in it. Recovered by redoing the edits and verifying each by grep, and pass 2
+independently confirmed no half-applied edit survived. **The rule this project already has is the one I
+broke: commit before mutating.** It was written down, I had followed it once, and I still walked into
+it — which is the argument for the rule being a *step* rather than a *reminder*.
+
+**Mutations, all against a committed tree, each killing its own site and nothing else:** the
+`narrowedOutOfGrid` month-key shortcut (kills 11.50's padding-cell arm); dropping the timeline's guard
+(kills 11.61's outranks case); reverting the copy (kills 11.1 + 16.45); re-adding the legend clause to
+the timeline copy (kills the new "names only controls the TIMELINE has" assertion). All restored; tree
+clean.
+
+### § 7c — `origin/main` MOVED WHILE THIS RAN, AND THE ONE FILE WE SHARE WAS CHECKED FOR AN ID COLLISION
+
+`origin/main` went `1391aef3` → **`bbbd5cda`** (5 commits). Main touched FIVE files:
+`Features.md`, `docs/lanes/executor-state.md`, `packages/ui/src/ui.css`,
+`packages/ui/test/components.test.tsx`, `test-cases/16-remaining-doors.md`. **Exactly one of those is
+also mine**, and it is the dangerous one — that file carries the CASE-ID BLOCK ALLOCATION.
+
+- **No id collision.** Main's insert is **`16.83`**, inside exec 1's `16.81`–`16.99` block. Main's
+  highest id inside **my** block (`16.41`–`16.60`) is still **`16.44`**, and main's allocation table is
+  unchanged, so `16.45` is free on both sides. **Read from the allocation table and the id lines, not
+  assumed from the absence of a conflict.**
+- **`content.generated.ts` is NOT stale:** main did not touch `docs/manual.md` or `docs/faq.md`.
+- **`Features.md` owes nothing:** main changed it, I did not, and `:2304`'s calendar bullet says only
+  that an empty month "says why" — still true, and now truer.
+- `git merge-tree --write-tree origin/main HEAD` → **clean (exit 0)**. **No rebase was run**, matching
+  this lane's precedent: a clean merge plus a verified non-collision, with the shas kept stable for the
+  PR body and the two review passes' citations.
+
+⚠ **THE TWO-DOT TRAP IS LIVE ON THIS TREE**: `git diff --stat origin/main HEAD` lists MAIN's commits as
+ours. Use `origin/main...HEAD` (22 files, +741/−208).
+
+### § 8 — WHAT IS *NOT* COVERED, NAMED RATHER THAN IMPLIED
+
+- **No viewport or browser run.** Nothing here changes layout; the only product-surface change is a
+  sentence's words.
+- **No test watches the corrected `page.tsx` sentence** — stated above as a measurement, not a gap I
+  closed. A test asserting the new string would pin wording, not the rule; the rule's real witnesses are
+  `mayAdminister`'s own cases (13.388) and the server's `ADMIN_ONLY_TYPES`.
+- **The `filter`/`laneEpicId` props remain unwired on both views.** That is unchanged by this dispatch
+  and is the door the deleted sentences were written for. **Owner: whoever wires a lane filter** — that
+  change must now write its own sentence, because this one is gone.
+- **`docs/lanes/controller-state.md:74`** describes the previous round and is history, not a claim
+  about this tree.
+
+---
+
+## ▼ PREVIOUS BLOCK — **FOUR ABSOLUTES TRUE OF ONE PATH AND STATED OF THE PRODUCT, FOUND BY SWEEPING THE DOCUMENTS' OWN LISTS.** (2026-09-20)
 
 ### § 1 — WHERE TO FIND IT
 

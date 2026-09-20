@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { TicketState } from '@gisik-nokma/domain';
 import {
   TIMELINE_EMPTY_COPY,
-  TIMELINE_NARROWED_COPY,
   TIMELINE_OUT_OF_WINDOW_COPY,
   TIMELINE_SIDE_LIST_COPY,
   TIMELINE_SIDE_LIST_UNDRAWABLE_COPY,
@@ -840,14 +839,21 @@ describe('11.59 filters narrow rows and side list alike', () => {
  * matching nobody, an unmatched lane, and work that is fully dated but wholly
  * outside the window all `JSON.stringify`d to the SAME bytes. Distinct count:
  * ONE. The sibling `CalendarModel` — same package, same author — already had
- * `emptyCopy` and three sentences for exactly this failure; the timeline had
+ * `emptyCopy` and (then) three sentences for exactly this failure; the timeline had
  * no such field at all.
  *
  * The window miss is the case the component cannot reconstruct: Task 11's
  * props carry `tickets`, `filter` and `laneEpicId` and nothing about the
  * window.
+ *
+ * ⚠ **THE BLOCK IS NOW ABOUT TWO SENTENCES, NOT THREE** (2026-09-20): the
+ * sentence for the narrowing case was deleted on the owner's ruling and its
+ * arm falls through to `TIMELINE_EMPTY_COPY`. The guard it steered by is kept,
+ * and the tests below are re-aimed at the outcomes the remaining two sentences
+ * still distinguish. The distinct-count assertion records the collapse rather
+ * than hiding it.
  */
-describe('11.61 four empty timelines, and the sentences that tell them apart', () => {
+describe('11.61 the empty timelines, and the guard a deleted sentence left behind', () => {
   function assigned(assigneeId: string, title: string, start?: string, due?: string): TicketDatesInput {
     const fields: Record<string, unknown> = { title: claimField(title) };
     if (start !== undefined) fields.startDate = claimField({ date: start });
@@ -864,19 +870,19 @@ describe('11.61 four empty timelines, and the sentences that tell them apart', (
     expect(m.emptyCopy).toBe(TIMELINE_EMPTY_COPY);
   });
 
-  it('a FILTER that matched nobody says the filter did it', () => {
+  it('a FILTER that matched nobody no longer has a sentence of its own — this one names it instead', () => {
     const m = model(inWindow(), { filter: { assigneeIds: ['user_nobody'] } });
     expect(m.groups).toEqual([]);
-    expect(m.emptyCopy).toBe(TIMELINE_NARROWED_COPY);
-    expect(m.emptyCopy).not.toBe(TIMELINE_EMPTY_COPY);
+    expect(m.emptyCopy).toBe(TIMELINE_EMPTY_COPY);
+    // The property the deleted sentence used to carry, now carried by this one.
+    expect(m.emptyCopy).toContain('your filter');
     expect(m.emptyCopy).not.toBe(TIMELINE_OUT_OF_WINDOW_COPY);
   });
 
-  it('an unmatched LANE says so too — the second door, same sentence', () => {
+  it('an unmatched LANE reaches the same sentence — the door outlives the copy', () => {
     const m = model(inWindow(), { laneEpicId: 'no_such_epic' });
     expect(m.groups).toEqual([]);
-    expect(m.emptyCopy).toBe(TIMELINE_NARROWED_COPY);
-    expect(m.emptyCopy).not.toBe(TIMELINE_EMPTY_COPY);
+    expect(m.emptyCopy).toBe(TIMELINE_EMPTY_COPY);
   });
 
   it('work that is fully dated and merely ELSEWHERE IN TIME says exactly that', () => {
@@ -885,24 +891,37 @@ describe('11.61 four empty timelines, and the sentences that tell them apart', (
     expect(m.sideList).toEqual([]);
     expect(m.emptyCopy).toBe(TIMELINE_OUT_OF_WINDOW_COPY);
     expect(m.emptyCopy).not.toBe(TIMELINE_EMPTY_COPY);
-    expect(m.emptyCopy).not.toBe(TIMELINE_NARROWED_COPY);
   });
 
   /**
-   * The measurement itself, inverted into an assertion. The reviewer's
-   * DISTINCT COUNT was 1; anything less than 3 here means two different facts
-   * are back to being one screen.
+   * ⚠ THE MEASUREMENT THAT MADE THIS BLOCK WORTH HAVING, INVERTED BY A RULING.
+   *
+   * The reviewer's DISTINCT COUNT was 1; the block was built to make it 3. It
+   * is **2** as of 2026-09-20, because `TIMELINE_NARROWED_COPY` was deleted on
+   * the owner's ruling (*"delete the copy"* — it named "the LANE", a word no
+   * screen shows, and no app could render it), and its arm now falls through to
+   * `TIMELINE_EMPTY_COPY`. **So a filter that matched nobody and a workspace
+   * with nothing in it are ONE screen again** — the exact collapse this block
+   * was written to end, and the cost the ruling buys. Reinstating the
+   * distinction means writing a new sentence for the narrowing case.
+   *
+   * It is asserted rather than described so that the day someone writes that
+   * sentence, THIS is what tells them the count moved — and so that the loss is
+   * a re-runnable measurement rather than a memory.
    */
-  it('the four empties are three distinct models, not one repeated four times', () => {
+  it('the empties are TWO distinct models, down from three — the narrowing sentence was deleted', () => {
     const serialised = [
       model([]),
       model(inWindow(), { filter: { assigneeIds: ['user_nobody'] } }),
       model(inWindow(), { laneEpicId: 'no_such_epic' }),
       model([dated('2026-11-02', '2026-11-06', 'Later')]),
     ].map((m) => JSON.stringify(m));
-    // The filter and the lane are the same fact said one way, by design.
-    expect(new Set(serialised).size).toBe(3);
-    expect(serialised[1]).toBe(serialised[2]);
+    expect(new Set(serialised).size).toBe(2);
+    // The filter, the lane and the empty workspace are one screen now.
+    expect(serialised[1]).toBe(serialised[0]);
+    expect(serialised[2]).toBe(serialised[0]);
+    // The window miss is still its own, because ITS guard survived.
+    expect(serialised[3]).not.toBe(serialised[0]);
   });
 
   it('a timeline with anything on it has no empty sentence at all', () => {
@@ -928,8 +947,11 @@ describe('11.61 four empty timelines, and the sentences that tell them apart', (
     expect(m.groups).toEqual([]);
     expect(m.sideList).toEqual([]);
     // Widening the filter WOULD fill this screen, so "it is outside these
-    // weeks" would send the viewer to the wrong control.
-    expect(m.emptyCopy).toBe(TIMELINE_NARROWED_COPY);
+    // weeks" would send the viewer to the wrong control. The guard that keeps
+    // that sentence away OUTLIVED the sentence it used to select, which is the
+    // whole reason this test still has a job.
+    expect(m.emptyCopy).toBe(TIMELINE_EMPTY_COPY);
+    expect(m.emptyCopy).not.toBe(TIMELINE_OUT_OF_WINDOW_COPY);
   });
 
   it('a filter that removed only work which would ALSO have missed the window is not blamed', () => {
@@ -944,7 +966,7 @@ describe('11.61 four empty timelines, and the sentences that tell them apart', (
     // Widening the filter would put nothing on this screen — the window is the
     // only control that reaches either ticket.
     expect(m.emptyCopy).toBe(TIMELINE_OUT_OF_WINDOW_COPY);
-    expect(m.emptyCopy).not.toBe(TIMELINE_NARROWED_COPY);
+    expect(m.emptyCopy).not.toBe(TIMELINE_EMPTY_COPY);
   });
 
   /**

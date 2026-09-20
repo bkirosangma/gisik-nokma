@@ -246,12 +246,13 @@ export function TimelineView(props: TimelineViewProps) {
       </header>
 
       {/*
-        The model chose the sentence and it is rendered VERBATIM. Three arms —
-        nothing claimed, a narrowing the viewer set, dated work scheduled
-        outside these weeks — because they are three different facts, and the
-        third is the one this component CANNOT reconstruct: its props say
-        nothing about where the window is. There is deliberately no bare
-        "nothing here" branch.
+        The model chose the sentence and it is rendered VERBATIM. **TWO arms
+        since 2026-09-20** — nothing claimed OR a narrowing emptied it (one
+        sentence, which names the narrowing because the model cannot tell the
+        two apart), and dated work scheduled outside these weeks — because they
+        are different facts, and the second is the one this component CANNOT
+        reconstruct: its props say nothing about where the window is. There is
+        deliberately no bare "nothing here" branch.
       */}
       {model.emptyCopy !== null && (
         <p role="note" className="gn-timeline__empty">

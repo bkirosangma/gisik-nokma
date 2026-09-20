@@ -61,8 +61,8 @@ This is the part a marketing page would leave out. Read it before you decide any
 
 - **You cannot create a project unless you are an owner or an admin.** Those two roles get a **New
   project** form on the workspace page. Everybody else is told why it is not there, in words rather
-  than a button that fails — the app's own wording, which names only the admin: *"Only an admin can
-  create a project in this workspace."* A brand new
+  than a button that fails: *"Only an owner or an admin can create a project in this workspace."*
+  A brand new
   workspace comes with stages, job types and you as its owner — and, until an owner or admin adds one,
   nowhere to put a job.
 - **You cannot assign a job to anybody on the phone or desktop apps.** The website can, from the job

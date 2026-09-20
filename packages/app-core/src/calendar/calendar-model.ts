@@ -3,7 +3,6 @@ import { monthGridWeeks, type WeekDays } from '../claims/dates.js';
 import {
   CALENDAR_ALL_HIDDEN_COPY,
   CALENDAR_EMPTY_MONTH_COPY,
-  CALENDAR_NARROWED_MONTH_COPY,
   barProvenance,
   claimTooltip,
   customClaimLabel,
@@ -88,17 +87,20 @@ export type CalendarModel = {
   weeks: CalendarWeek[];
   hasItems: boolean;
   /**
-   * Why the grid is empty, or null when it is not. THREE different sentences,
-   * because they are three different facts: nothing was claimed here, or
-   * everything claimed here belongs to a field the viewer switched off, or
-   * everything claimed here sits outside the filter/lane the viewer set.
+   * Why the grid is empty, or null when it is not. **TWO sentences as of
+   * 2026-09-20** (it was three): nothing was claimed on this grid, or
+   * everything claimed on it belongs to a field the viewer switched off. The
+   * remaining sentence names the OTHER narrowings that can empty a month, so it
+   * stays true whichever combination is live — that is what replaced the third
+   * arm rather than merely deleting it.
    *
    * The third arm was NOT in the plan and not in the first draft of this file:
    * `visible` is narrowed before any item is built, so a month emptied by a
    * filter reached the honest-empty sentence and told a viewer that a month
-   * full of their own claimed dates had none. Whichever arm is chosen, the
-   * sentence must be true of THIS grid — see the precedence note at the
-   * bottom of `buildCalendarModel`.
+   * full of their own claimed dates had none. The owner's ruling of 2026-09-20
+   * deleted the sentence written for it; the ARM is gone, the truth condition is
+   * not. Whichever sentence is chosen, it must be true of THIS grid — see the
+   * precedence note at the bottom of `buildCalendarModel`.
    */
   emptyCopy: string | null;
   /**
@@ -151,13 +153,17 @@ function touchesWeek(item: CalendarItem, first: string, last: string): boolean {
 /**
  * Claims in, items out — the ONE construction, deliberately called twice.
  *
- * The second call is over the tickets a filter or a lane removed, and it
- * exists so `emptyCopy` can tell "nobody claimed a date here" apart from
- * "your filter removed all of them". That question must be answered by
- * building the SAME items against the SAME grid predicate: a cheaper
- * `date.slice(0, 7) === monthKey` shortcut would answer it about the calendar
- * month while the grid renders six days of July and six of September, which
- * is the very off-by-a-week this file's edge tests exist to catch.
+ * The second call is over the tickets a filter or a lane removed. It no longer
+ * feeds a sentence of its own — that sentence was deleted on 2026-09-20 — but
+ * it is NOT dead: it still gates `CALENDAR_ALL_HIDDEN_COPY`, which may not
+ * claim "EVERY claimed date" while a filter is removing some of them, so a
+ * month emptied by the legend AND a filter must not be told the legend did all
+ * of it. That question must be answered by building the SAME items against the
+ * SAME grid predicate: a cheaper `date.slice(0, 7) === monthKey` shortcut would
+ * answer it about the calendar month while the grid renders six days of July
+ * and six of September — which is the very off-by-a-week this file's edge tests
+ * exist to catch, and which MUTATION-WITNESSED fails case 11.50's padding-cell
+ * arm and nothing else.
  */
 function collectItems(
   inputs: readonly TicketDatesInput[],
@@ -317,10 +323,13 @@ export function buildCalendarModel(
   const hasItems = weeks.some((week) => week.items.length > 0);
   /**
    * The distinction the plan's model would have collapsed: if the grid is
-   * empty ONLY because the viewer hid the fields whose claims fall in it,
-   * saying "no claimed dates fall in this month" would tell them their own
-   * claims do not exist. Measured against the same grid bounds the tally
-   * uses, so the sentence and the switches describe the same set.
+   * empty ONLY because the viewer hid the fields whose claims fall in it, the
+   * fallback's "nothing is drawn here" would tell a viewer their own claims do
+   * not exist. Measured against the same grid bounds the tally uses, so the
+   * sentence and the switches describe the same set.
+   *
+   * ⚠ "ONLY" is doing load-bearing work and is NOT enforced across the page's
+   * upstream pruning — see the precedence note at the bottom of this function.
    */
   const hiddenInGrid = customItems.some(
     (item) =>
@@ -358,12 +367,66 @@ export function buildCalendarModel(
    * PRECEDENCE, and it is a truth condition rather than a preference.
    *
    * `CALENDAR_ALL_HIDDEN_COPY` says "EVERY claimed date in this month belongs
-   * to a field you have hidden". With a filter also removing August claims
+   * to a field you have hidden". With a filter ALSO removing August claims
    * that no hidden field owns, that sentence is false — so the exhaustive
    * sentence may only be reached when the legend is the only narrowing that
-   * emptied the grid. The narrowed sentence names the set of narrowings
+   * emptied the grid. `CALENDAR_EMPTY_MONTH_COPY` names the set of narrowings
    * instead of picking one, which is what lets it carry the both-case
    * truthfully. Witnessed at `calendar-model.test.ts` 11.50.
+   *
+   * ⚠ **THE THIRD SENTENCE WAS DELETED HERE ON 2026-09-20 AND THIS GUARD WAS
+   * NOT.** `CALENDAR_NARROWED_MONTH_COPY` named "the filter, the LANE, or the
+   * legend"; no app could render it (no production call site passes `filter` or
+   * `laneEpicId` — see the render site's own note in `apps/web`'s project page),
+   * "lane" is a word no screen in this product shows, and the owner ruled
+   * *"delete the copy"*. Deleting the CONSTANT does not require deleting the
+   * DOOR: `narrowedOutOfGrid` is what stops the exhaustive sentence overclaiming
+   * when a filter joins the legend, and that is the failure this block exists to
+   * forbid. So the door stays, its arm now falls through to the sentence that
+   * names the set, and the ruling is honoured without spending the guard.
+   *
+   * The alternative — reaching `CALENDAR_ALL_HIDDEN_COPY` whenever
+   * `hiddenInGrid`, guard deleted — is what "delete the sentence, keep nothing"
+   * would have produced, and it would be indistinguishable TODAY: no app passes
+   * a filter, so `narrowedOutOfGrid` is false everywhere `hiddenInGrid` is
+   * measured. `narrowedAway`/`excluded` above therefore still have a reader.
+   *
+   * ⚠ **BUT THIS GUARD IS INERT IN EVERY SHIPPED APP, AND THAT IS A LIVE
+   * OVERCLAIM RATHER THAN A FUTURE ONE — recorded by a reviewer 2026-09-20,
+   * measured, and NOT fixed here.** The guard can only see what the MODEL
+   * narrowed. The page's own `datesNarrowing` prunes rows UPSTREAM (a filter,
+   * and the closed-hidden-by-default rule), so those claims never reach
+   * `inputs`, never enter `excluded`, and never make `narrowedOutOfGrid` true —
+   * while `hiddenInGrid` is computed over what did arrive. A viewer who hides a
+   * legend field holding an in-grid claim, in a month that ALSO holds claims on
+   * closed or filtered-away jobs, therefore reaches "EVERY claimed date in this
+   * month belongs to a field you have hidden" — false on both clauses, and the
+   * one switch it offers does not bring the missing claims back.
+   *
+   * ⚠ **A SECOND BLIND SPOT IN THE SAME GUARD, measured by a reviewer the same
+   * day.** The gate's bounds are the six-week GRID (`gridFirst`/`gridLast`),
+   * while the sentence it gates says "in this month". A claim on 2 Sep is a
+   * trailing cell of the AUGUST grid, so hiding its field renders "Every
+   * claimed date in this month belongs to a field you have hidden" over an
+   * August that holds no August claim at all. **The codebase knows the unit is
+   * the grid** — case 11.49's own name says "claimed nothing IN THIS GRID", and
+   * `hiddenInGrid`'s docblock says the sentence and the switches describe the
+   * same set — **but the copy the reader sees says month.** Pre-existing, like
+   * the first blind spot, and recorded here because this note would otherwise
+   * read as a complete account of the guard.
+   *
+   * **Owner of both: the owner, by way of whoever next owns the calendar's
+   * empty states.** Two candidate repairs, and they are different questions —
+   * naming them separately so the next reader does not have to guess which one
+   * a sentence refers to:
+   * **(a) The page tells the view that it pruned something before the model saw
+   * it.** Note carefully: a page-level flag is too coarse for the FALLBACK
+   * sentence — "a filter is on" cannot say whether THIS month was emptied, the
+   * objection `CALENDAR_EMPTY_MONTH_COPY`'s note works through — but it may be
+   * exactly right for THIS sentence, whose claim is about the whole grid rather
+   * than about one cause. **(b) This sentence stops claiming exhaustivity.**
+   * Fixing either in passing would pre-empt a ruling of the same shape as the
+   * two this branch exists to implement.
    */
   return {
     month: { year: opts.year, month: opts.month },
@@ -371,11 +434,9 @@ export function buildCalendarModel(
     hasItems,
     emptyCopy: hasItems
       ? null
-      : narrowedOutOfGrid
-        ? CALENDAR_NARROWED_MONTH_COPY
-        : hiddenInGrid
-          ? CALENDAR_ALL_HIDDEN_COPY
-          : CALENDAR_EMPTY_MONTH_COPY,
+      : hiddenInGrid && !narrowedOutOfGrid
+        ? CALENDAR_ALL_HIDDEN_COPY
+        : CALENDAR_EMPTY_MONTH_COPY,
     customDateFields,
   };
 }

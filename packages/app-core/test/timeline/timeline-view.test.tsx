@@ -6,7 +6,6 @@ import { describe, expect, it, vi } from 'vitest';
 import type { TicketState } from '@gisik-nokma/domain';
 import {
   TIMELINE_EMPTY_COPY,
-  TIMELINE_NARROWED_COPY,
   TIMELINE_OUT_OF_WINDOW_COPY,
   TIMELINE_SIDE_LIST_COPY,
   TIMELINE_SIDE_LIST_UNDRAWABLE_COPY,
@@ -256,7 +255,11 @@ describe('11.74 the window moves four weeks at a time, and Today follows the pro
   });
 });
 
-describe('11.75 three empty timelines are three different sentences, rendered verbatim', () => {
+describe('11.75 the empty timelines are the model sentences, rendered verbatim', () => {
+  /* ⚠ RETITLED 2026-09-20. It read "three empty timelines are three different
+     sentences". The narrowing sentence was deleted on the owner's ruling, so a
+     filter-emptied chart and an empty one render the SAME bytes now; the
+     discrimination this block keeps is between those and the window miss. */
   const dated = () =>
     ticket({
       fields: {
@@ -271,10 +274,35 @@ describe('11.75 three empty timelines are three different sentences, rendered ve
     expect(screen.getByRole('note')).toHaveTextContent(TIMELINE_EMPTY_COPY);
   });
 
-  it('a narrowing the viewer set', () => {
+  /**
+   * The empty timeline must not name a control the TIMELINE does not have.
+   *
+   * `TimelineViewProps` carries no hidden-field prop and `buildTimelineModel`
+   * has no `hiddenCustomFieldIds` option — the legend is `CalendarView`'s own
+   * state alone. A first draft of this change copied the calendar's clause
+   * across "for symmetry" and named the legend anyway, which is the SAME defect
+   * the owner deleted the lane sentence for one screen over: a word no surface
+   * can offer the reader. The reviewer who caught it noted that nothing
+   * forbade it, so this is the thing that forbids it.
+   *
+   * Asserted on the WORD rather than the whole string, so a later rewording
+   * fails at the clause that matters and not at a comma.
+   */
+  it('the empty timeline names only controls the TIMELINE has — it has no legend', () => {
+    renderTimeline([]);
+    expect(screen.getByRole('note')).toHaveTextContent(TIMELINE_EMPTY_COPY);
+    expect(screen.getByRole('note')).not.toHaveTextContent(/legend/i);
+  });
+
+  it('a narrowing the viewer set — the sentence names it, because the arm is shared now', () => {
     const filter: FilterSpec = { assigneeIds: ['user_nobody'] };
     renderTimeline([dated()], { filter });
-    expect(screen.getByRole('note')).toHaveTextContent(TIMELINE_NARROWED_COPY);
+    // `TIMELINE_NARROWED_COPY` was deleted on 2026-09-20 (owner ruling), so a
+    // filter-emptied chart reaches the SAME sentence as an empty one. What
+    // replaces the lost distinction is that the sentence names the filter —
+    // asserted as the property, since the constant alone would pass either way.
+    expect(screen.getByRole('note')).toHaveTextContent(TIMELINE_EMPTY_COPY);
+    expect(screen.getByRole('note')).toHaveTextContent('your filter');
   });
 
   it('dated work scheduled outside these weeks — the arm the component cannot reconstruct', () => {

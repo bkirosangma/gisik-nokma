@@ -914,11 +914,42 @@ function WorkspaceHome({
           guest alike); the prototype's guest-specific wording asserts a
           visibility rule ("you can only see tickets that name you") this round
           does not verify anywhere else, so it is not transcribed. */}
+      {/*
+        ⚠ THE SENTENCE NAMED ONE ROLE OF TWO, AND THAT WAS FALSE — not merely
+        narrower than the gate. `isAdmin` above is `mayAdminister(role)`, which
+        is `role === 'owner' || role === 'admin'` (`workspace-viewer.ts:90-92`),
+        so an OWNER takes the form arm and can create a project in every
+        workspace — while the sentence a member or guest reads says that only an
+        admin can. `apps/server/src/permissions/check-permission.ts`'s own
+        `ADMIN_ONLY_TYPES` agrees the two roles are one door, so the client and
+        the server were never in dispute; only the copy was wrong.
+
+        IT SURVIVED THREE REVIEW PASSES because "unreachable for owners" and
+        "false for its readers" are compatible facts and each looked like the
+        answer: the sentence renders only in the `!isAdmin` arm, so no owner
+        ever reads it — and its audience is exactly the people for whom "ask an
+        admin" is the right move, so nothing a user did ever surfaced it. The
+        claim is about WHO MAY CREATE, though, not about who reads it, and the
+        restriction as stated is wrong in every workspace.
+
+        IT WAS TRANSCRIBED VERBATIM FROM THE PROTOTYPE —
+        `design-system/interactive/desktop.dc.html:2694` and the mobile
+        drawing's `addProjectRefusal` both say "an admin" — which is why it read
+        as authoritative. A drawing is not a requirement: the roles exist in the
+        shipped product and the drawing's wording did not keep up. Corrected
+        here rather than in the drawing, which is the design authority and not
+        this product's copy.
+
+        The documents that QUOTE this sentence (`README.md`, `docs/manual.md`,
+        `docs/faq.md`) each marked it "the app's own wording, which names only
+        the admin"; they are corrected in the same change set, because a
+        quotation of a string that no longer exists is a citation that still
+        resolves and still misleads. */}
       {isAdmin ? (
         <NewProjectForm workspaceId={workspace.id} busy={busy} onSubmit={onSubmit} />
       ) : (
         <p className="gn-workspace-home__founding-refusal">
-          Only an admin can create a project in this workspace.
+          Only an owner or an admin can create a project in this workspace.
         </p>
       )}
 

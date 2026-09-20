@@ -4,7 +4,6 @@ import type { TicketState } from '@gisik-nokma/domain';
 import {
   CALENDAR_ALL_HIDDEN_COPY,
   CALENDAR_EMPTY_MONTH_COPY,
-  CALENDAR_NARROWED_MONTH_COPY,
 } from '../../src/claims/claim-labels.js';
 import type { TicketDatesInput } from '../../src/claims/ticket-dates.js';
 import type { IsEpicType } from '../../src/hierarchy/epic-ancestor.js';
@@ -182,7 +181,12 @@ describe('11.62 a bar is drawn only from a claimed pair, and it spans the days i
   });
 });
 
-describe('11.63 the three empty months are three different sentences, rendered verbatim', () => {
+describe('11.63 the empty months are the model sentences, rendered verbatim', () => {
+  /* ⚠ RETITLED 2026-09-20. It read "the three empty months are three different
+     sentences". The third sentence was deleted on the owner's ruling and the
+     filtered month now reaches the first one, so the title would have described
+     a product that no longer exists. The middle arm is the one that still
+     discriminates, and it is unchanged. */
   it('nothing claimed: the honesty note, and no item buttons at all', () => {
     renderCalendar([ticket(), ticket()]);
     expect(screen.getByRole('note')).toHaveTextContent(CALENDAR_EMPTY_MONTH_COPY);
@@ -204,7 +208,7 @@ describe('11.63 the three empty months are three different sentences, rendered v
       [ticket({ fields: { title: claimField('Filtered'), dueDate: claimField({ date: '2026-08-28' }) } })],
       { filter: { stateIds: ['done'] } },
     );
-    expect(screen.getByRole('note')).toHaveTextContent(CALENDAR_NARROWED_MONTH_COPY);
+    expect(screen.getByRole('note')).toHaveTextContent(CALENDAR_EMPTY_MONTH_COPY);
   });
 });
 

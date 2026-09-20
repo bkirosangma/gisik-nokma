@@ -520,11 +520,18 @@ describe('the roster is a convenience, never a gate', () => {
    * length was therefore unconstrained in both places.
    *
    * What that mutation renders is the exact sentence this product exists to not
-   * say: "No claimed dates fall in this month. Undated work is absent, not
-   * estimated" — an assertion about claims, made from a read that has not come
+   * say — the empty-month copy, whose opening has been "No claimed dates are
+   * drawn in this month. Undated work is absent, not estimated" since
+   * 2026-09-20 — an assertion about claims, made from a read that has not come
    * back. So the assertion here is deliberately two-sided: the loading state is
    * present AND the honest-empty copy is absent. Asserting only "Loading…"
    * would pass against a page that rendered both.
+   *
+   * ⚠ The quote above is kept current with the copy on purpose — it is a
+   * description of what the mutation renders, so it rots the moment the copy
+   * does. The ASSERTION below did not need touching, and that is the design:
+   * it pins the substring that is the reference's honesty note and has not
+   * moved, not the sentence's opening.
    *
    * `getTickets` returns a promise that never settles, which is the state
    * itself rather than a race: no `act` flush can advance past it.
