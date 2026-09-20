@@ -890,3 +890,151 @@ describe('11.51 the grid edges — the padding days are cells, and every bound i
     }
   });
 });
+
+/**
+ * 13.1034 / 13.1035 — THE OWNER'S RULING (2026-09-20): *"epics should never
+ * show up in the board, timeline and calendar views. they can only be in the
+ * list views"*, extended the same day to the Backlog — *"only in the list
+ * view."* `hideEpicRows` is how a SHELL says which surface it is drawing; the
+ * model cannot know it, and the List's own answer is the opposite one.
+ */
+describe('13.1034 hideEpicRows removes the epic\'s own claims, and only its own', () => {
+  it("drops the rank-1 ticket's bar, keeps its child's, and draws both with the option absent", () => {
+    const inputs = [
+      ticket({
+        id: 'epic_1',
+        typeId: 'epic',
+        fields: {
+          title: claimField('The epic'),
+          startDate: claimField({ date: '2026-08-03' }),
+          dueDate: claimField({ date: '2026-08-07' }),
+        },
+      }),
+      ticket({
+        id: 'child_1',
+        parentId: 'epic_1',
+        fields: { title: claimField('A child'), dueDate: claimField({ date: '2026-08-20' }) },
+      }),
+    ];
+    // THE CONTROL RUNS FIRST AND FROM THE SAME FIXTURE, because the arm below
+    // and the arm above differ in ONE word: with the option absent the epic
+    // draws, so what the second assertion measures is the OPTION and not the
+    // fixture. (A control that could not have failed proves nothing.)
+    expect(
+      allItems(buildCalendarModel(inputs, { ...AUG, userName }))
+        .map((item) => item.ticketId)
+        .sort(),
+    ).toEqual(['child_1', 'epic_1']);
+
+    const hidden = buildCalendarModel(inputs, { ...AUG, userName, hideEpicRows: true });
+    expect(allItems(hidden).map((item) => item.ticketId)).toEqual(['child_1']);
+    // The child still draws — this is a cut of the EPIC's claims, not of its
+    // subtree, and a model that took the children with it would have inverted
+    // the ruling's own "the child still says which epic it belongs to".
+    expect(hidden.hasItems).toBe(true);
+  });
+
+  /**
+   * AND IT READS THE VIEW'S OWN PREDICATE, never a name or an id —
+   * `epic-ancestor.ts`'s whole argument, and the reason the option sits beside
+   * `isEpicType` rather than testing `typeId === 'epic'` for itself.
+   */
+  it('removes a RENAMED rank-1 type only when the shell says that type is the epic', () => {
+    const inputs = [
+      ticket({
+        id: 'init_1',
+        typeId: 'initiative',
+        fields: { title: claimField('Initiative'), dueDate: claimField({ date: '2026-08-09' }) },
+      }),
+    ];
+    // The built-in default cannot name it, so the claim survives — narrower
+    // than the truth, which is the direction `isBuiltinEpicType` documents.
+    expect(
+      allItems(buildCalendarModel(inputs, { ...AUG, userName, hideEpicRows: true })).map(
+        (item) => item.ticketId,
+      ),
+    ).toEqual(['init_1']);
+    // The workspace's own rank-1 predicate names it, and it goes.
+    expect(
+      allItems(
+        buildCalendarModel(inputs, {
+          ...AUG,
+          userName,
+          hideEpicRows: true,
+          isEpicType: (typeId) => typeId === 'initiative',
+        }),
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe('13.1035 a hidden epic counts as a NARROWING, so the exhaustivity gate still fires', () => {
+  const FILED_ON = [{ id: 'filed-on', name: 'Filed on' }];
+
+  /**
+   * The epic's claim is INSIDE this grid, so removing the epic has really taken
+   * a claim off the month. `CALENDAR_ALL_HIDDEN_COPY` claims every claimed date
+   * in the month belongs to a hidden field — false here, because one belonged
+   * to an epic. Joining `visible` puts the removed epic into `excluded`, where
+   * `narrowedOutOfGrid` sees it and gates that sentence off: the conservative
+   * direction, and the same one a filter already takes.
+   */
+  it('a grid emptied only by hideEpicRows never reaches CALENDAR_ALL_HIDDEN_COPY', () => {
+    const model = buildCalendarModel(
+      [
+        ticket({
+          id: 'epic_1',
+          typeId: 'epic',
+          fields: { title: claimField('In-grid epic'), dueDate: claimField({ date: '2026-08-05' }) },
+        }),
+        // In-grid and hidden by the legend: this is what makes ALL_HIDDEN
+        // reachable at all, exactly as case 11.50's padding-cell arm does it.
+        ticket(
+          {
+            id: 'child_1',
+            parentId: 'epic_1',
+            fields: { title: claimField('Hidden but kept'), 'filed-on': claimField('2026-08-11') },
+          },
+          [],
+          FILED_ON,
+        ),
+      ],
+      { ...AUG, userName, hideEpicRows: true, hiddenCustomFieldIds: ['filed-on'] },
+    );
+    expect(model.hasItems).toBe(false);
+    expect(model.emptyCopy).toBe(CALENDAR_EMPTY_MONTH_COPY);
+    expect(model.emptyCopy).not.toBe(CALENDAR_ALL_HIDDEN_COPY);
+  });
+
+  /**
+   * THE CONTROL, and the ONE term that differs from the arm above is the epic's
+   * own date: moved to October, so nothing the option removed touches THIS
+   * grid. Now the legend really IS the only cause of the emptiness, and the
+   * exhaustive sentence becomes TRUE — which is what proves the arm above was
+   * being held off by the epic rather than by the fixture being unable to reach
+   * the sentence at all.
+   */
+  it('CONTROL — the SAME fixture with the epic\'s claim off this grid DOES reach it', () => {
+    const model = buildCalendarModel(
+      [
+        ticket({
+          id: 'epic_1',
+          typeId: 'epic',
+          fields: { title: claimField('Out-of-grid epic'), dueDate: claimField({ date: '2026-10-02' }) },
+        }),
+        ticket(
+          {
+            id: 'child_1',
+            parentId: 'epic_1',
+            fields: { title: claimField('Hidden but kept'), 'filed-on': claimField('2026-08-11') },
+          },
+          [],
+          FILED_ON,
+        ),
+      ],
+      { ...AUG, userName, hideEpicRows: true, hiddenCustomFieldIds: ['filed-on'] },
+    );
+    expect(model.hasItems).toBe(false);
+    expect(model.emptyCopy).toBe(CALENDAR_ALL_HIDDEN_COPY);
+  });
+});

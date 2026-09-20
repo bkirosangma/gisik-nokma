@@ -123,6 +123,42 @@ export type CalendarModelOptions = CalendarMonth & {
    * `hierarchy/epic-ancestor.ts`.
    */
   isEpicType?: IsEpicType;
+  /**
+   * AN EPIC IS NOT A ROW IN THIS VIEW (owner, 2026-09-20): *"epics should never
+   * show up in the board, timeline and calendar views. they can only be in the
+   * list views"*, extended the same day to the Backlog — *"only in the list
+   * view"* — so the List is the one surface that draws an epic as a row.
+   *
+   * **Why this is an OPTION and not the model's behaviour.** The model's
+   * question is "what did someone claim, and where does it land"; the ruling is
+   * a fact about WHICH SURFACE is drawing. `TimelineView` needs the epic's own
+   * claims gone while the LANE it names stays, and the List needs the epic row
+   * drawn — so the answer is not a property of the claims. A model that dropped
+   * epics unconditionally would answer the List's question with this view's
+   * rule, and there is no door back.
+   *
+   * **It removes the epic's ROW and never the epic's NAME.** This option joins
+   * the `filter`/`laneEpicId` narrowing at `visible` below, which is *before*
+   * `collectItems` — so an epic's bar, its markers and its custom-date claims
+   * are all absent — and *after* `byId` is built from the complete input set,
+   * which is what keeps an ancestor this narrowing removed still naming the
+   * lane its child belongs to. The timeline at `:224` states that ordering as a
+   * rule; this option is bound by it.
+   *
+   * **It counts as a NARROWING rather than as a silent drop**, deliberately:
+   * an epic is a real ticket whose claims really are in this month, so a grid
+   * emptied only by this rule must NOT reach `CALENDAR_ALL_HIDDEN_COPY`'s
+   * exhaustivity claim. Joining `visible` puts the removed epic into `excluded`,
+   * where `narrowedOutOfGrid` sees it and gates that sentence off — the
+   * conservative direction, and the one this guard already takes for a filter.
+   * ⚠ The residual is real and is NOT fixed here: `CALENDAR_EMPTY_MONTH_COPY`
+   * names a SET of causes and this rule is not one of them, so a month holding
+   * one epic's claim and nothing else now reads "No claimed dates are drawn in
+   * this month" over a month that holds one. Naming it would be new user-facing
+   * copy, which is the owner's to write; recorded, with the owner named, rather
+   * than invented here. See case 13.1045.
+   */
+  hideEpicRows?: boolean;
   /** View state from the legend switches. Arrangement, never data. */
   hiddenCustomFieldIds?: readonly string[];
 };
@@ -275,6 +311,12 @@ export function buildCalendarModel(
   const isEpicType = opts.isEpicType ?? isBuiltinEpicType;
   const visible = inputs.filter((input) => {
     if (opts.filter !== undefined && !matchesFilter(input.state, opts.filter)) return false;
+    // The owner's ruling, read through THIS view's epic test — never a name or
+    // an id match, so a workspace that renamed or replaced its rank-1 type
+    // still has epics (`epic-ancestor.ts` is the whole argument). `opts.hideEpicRows`
+    // is opt-in: absent means epics draw here, which is what every case written
+    // before 2026-09-20 asserts.
+    if (opts.hideEpicRows === true && isEpicType(input.state.typeId)) return false;
     if (
       opts.laneEpicId !== undefined &&
       opts.laneEpicId !== null &&

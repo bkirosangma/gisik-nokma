@@ -71,6 +71,14 @@ export type CalendarViewProps = {
    * same ticket's epic on two tabs of one page.
    */
   isEpicType?: IsEpicType;
+  /**
+   * THE OWNER'S RULING (2026-09-20): an epic draws a row in the List and
+   * nowhere else, so this view does not draw the epic's own claimed dates.
+   * Forwarded UNCHANGED, never defaulted here — `buildCalendarModel`'s
+   * `hideEpicRows` states what the flag means, why it is opt-in, and why the
+   * calendar has no lane-heading half of the question to answer.
+   */
+  hideEpicRows?: boolean;
   initialMonth?: CalendarMonth;
 };
 
@@ -220,6 +228,7 @@ export function CalendarView(props: CalendarViewProps) {
         ...(props.filter === undefined ? {} : { filter: props.filter }),
         ...(props.laneEpicId === undefined ? {} : { laneEpicId: props.laneEpicId }),
         ...(props.isEpicType === undefined ? {} : { isEpicType: props.isEpicType }),
+        ...(props.hideEpicRows === undefined ? {} : { hideEpicRows: props.hideEpicRows }),
         hiddenCustomFieldIds,
       }),
     [
@@ -228,6 +237,7 @@ export function CalendarView(props: CalendarViewProps) {
       props.filter,
       props.laneEpicId,
       props.isEpicType,
+      props.hideEpicRows,
       month,
       hiddenCustomFieldIds,
     ],

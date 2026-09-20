@@ -159,6 +159,27 @@ export type TimelineModelOptions = {
    * product disagreeing with itself inside one function.
    */
   isEpicType?: IsEpicType;
+  /**
+   * AN EPIC'S OWN CLAIMS ARE NOT DRAWN HERE — the owner's ruling of
+   * 2026-09-20, whose full statement and whose counting rationale live on
+   * `calendar-model.ts`'s `hideEpicRows`. Read that one; the two options are
+   * ONE rule with two spellings only because the two models are separate files,
+   * and a second full argument here would be a second thing to keep true.
+   *
+   * ⚠ WHAT THE TIMELINE ADDS, AND IT IS THE WHOLE REASON THIS OPTION IS NOT
+   * JUST A FILTER OF ITS INPUTS. A lane here IS the epic — `groupTitle` reads
+   * `byId`, `byId` is built from the COMPLETE input set one line above `visible`
+   * *"before narrowing: an ancestor removed by a filter still names the lane its
+   * child belongs to"*, and `rowsWithEpic` reaches a lane through each child's
+   * `epicAncestorOf`. So removing the epic's own placement removes the epic's
+   * bar and nothing else: a lane that still holds a dated child keeps its
+   * heading, titled with the epic's name, which is exactly the shape the owner
+   * ruled for the Backlog's section headers — **visible as a NAME, absent as a
+   * ticket.** Reaching the same outcome by dropping epics from `inputs` instead
+   * would empty `byId`, move every child into `NO_EPIC_TITLE`, and delete the
+   * heading — the drawn absence this ruling's own addendum forbids.
+   */
+  hideEpicRows?: boolean;
 };
 
 export const NO_DATES_NOTE = 'no claimed dates';
@@ -224,6 +245,11 @@ export function buildTimelineModel(
   const byId = new Map<string, TicketState>(inputs.map((input) => [input.state.id, input.state]));
   const visible = inputs.filter((input) => {
     if (opts.filter !== undefined && !matchesFilter(input.state, opts.filter)) return false;
+    // The same ruling as the calendar's, and the same reasoning for putting it
+    // HERE rather than over `inputs`: `byId` above is already built, so this
+    // removes the epic's own bar from the grid and leaves its children's lanes
+    // named. See this option's docblock.
+    if (opts.hideEpicRows === true && isEpicType(input.state.typeId)) return false;
     if (
       opts.laneEpicId !== undefined &&
       opts.laneEpicId !== null &&

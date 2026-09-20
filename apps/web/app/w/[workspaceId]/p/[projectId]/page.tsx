@@ -15,8 +15,10 @@ import {
   CalendarView,
   CreateTicketFlow,
   TicketList,
+  EPIC_RANK,
   TicketSheet,
   TimelineView,
+  isBuiltinEpicType,
   makeSubmittedFactory,
   matchesBoardCard,
   matchesListRow,
@@ -579,62 +581,6 @@ function ProjectBoard() {
         : 'all';
 
   /**
-   * ONE PASS produces the narrowed board, its shown count, and its total — per
-   * coordinator Ruling 1. A count computed by a SECOND walk over `board.data`
-   * (or, worse, borrowed from `list.rows.length`, which `activeOnly` narrows
-   * server-side and the board never does) could disagree with what actually
-   * renders; a single fold cannot disagree with itself. `<Board>` below is
-   * handed `boardNarrowing.view`, never `board.data` directly, so the grid and
-   * the count are reading the SAME computed groups.
-   *
-   * TWO mechanisms fold into this ONE pass as of Task 8, not one:
-   * `boardFilter` (Task 4) drops CARDS, never a column or a group —
-   * `board.tsx:216-219`'s own rule, still exactly true of that mechanism on
-   * its own — while `workflowFilter` above (Ruling R3, Task 8) drops whole
-   * GROUPS, by construction, whenever a specific workflow is picked. The
-   * per-card predicate below is `keepGroup && matchesBoardCard(...)`, so
-   * `total` still counts every card in a DROPPED group — those cards are
-   * real, and R3's whole point is that the picker is a filter, so its "of
-   * M" must name the project's whole board, never only the remainder it
-   * kept — while `shown` counts only cards that are BOTH in a kept group
-   * AND pass `matchesBoardCard`. A fully-filtered board (by either
-   * mechanism, or both at once) therefore renders its remaining columns
-   * empty, or omits a group's rail entirely, rather than vanishing — the
-   * `N of M shown` count and the removable chip(s) below are the only
-   * disclosure, which is the invariant's whole point. This is also exactly
-   * why `shouldRenderNarrowingStrip`'s third term (`shown !== total`)
-   * exists independently of `activeFilterChips`/`boardUnappliedAxes`: no
-   * axis enumeration can ever name "a whole group was dropped", so the gate
-   * would otherwise miss this mechanism entirely — see that function's own
-   * docblock in `board-search-scope.ts`.
-   *
-   * Reads `resolvedWorkflowFilter`, not raw `workflowFilter` — see that
-   * value's own docblock immediately above (Ruling 20(b)): a picked
-   * workflow that has dropped out of `board.data` falls back to `'all'`
-   * here rather than narrowing every group to nothing on a stale id.
-   */
-  const boardNarrowing = useMemo(() => {
-    if (board.data === null) return null;
-    let total = 0;
-    let shown = 0;
-    const groups = board.data.groups.flatMap((group) => {
-      const keepGroup =
-        resolvedWorkflowFilter === 'all' || group.workflowId === resolvedWorkflowFilter;
-      const columns = group.columns.map((column) => ({
-        ...column,
-        cards: column.cards.filter((card) => {
-          total += 1;
-          const keep = keepGroup && matchesBoardCard(card, column, projectId, boardFilter);
-          if (keep) shown += 1;
-          return keep;
-        }),
-      }));
-      return keepGroup ? [{ ...group, columns }] : [];
-    });
-    return { view: { ...board.data, groups }, shown, total };
-  }, [board.data, boardFilter, resolvedWorkflowFilter, projectId]);
-
-  /**
    * THE SCOPE NOTE (Step 4): axes an active filter carries that `BoardCard`
    * cannot answer at all. This is SEPARATE from `activeFilterChips` (declared
    * further down, once the label resolvers it needs exist) and from the
@@ -907,6 +853,51 @@ function ProjectBoard() {
    * partial set presented as whole under exactly this kind of silent
    * substitution. `shown` is the same rows the Backlog tab actually renders.
    *
+   * ## AND AN EPIC IS NOT A BACKLOG ROW (owner, 2026-09-20)
+   *
+   * *"it shouldnt show up in the backlog either. only in the list view."* So
+   * this fold drops every rank-1 row, and it drops it from `rows` AND from
+   * `total` — the same two-term argument `boardNarrowing` states at length: an
+   * epic is a row this tab can NEVER draw, so counting it in "of M" would make
+   * `shown !== total` true on every backlog holding one and tell a person with
+   * no filter in force that a filter is hiding work.
+   *
+   * **`total` excluding epics is NOT the "count of a filter" the paragraph
+   * above forbids**, and the difference is the whole reason this is stated
+   * separately: a filter is something the PERSON set and can unset, so a total
+   * read after it has run answers a question about their arrangement. "An epic
+   * is not a row here" is a fact about the tab, and there is no control that
+   * brings those rows back on this tab — the List is where they are.
+   *
+   * **THE EPIC'S NAME SURVIVES, AND THAT IS THE RULING RATHER THAN AN
+   * OVERSIGHT.** The owner was asked whether removing the epic's ROW should
+   * also remove the SECTION HEADER its children sit under, and answered
+   * *"Row only."* So a backlog section is still headed by its epic and a child
+   * still says which epic it belongs to — the header is now the ONLY thing
+   * naming the group — while the epic itself is no longer a ticket anyone can
+   * click, rank, start or drag on this tab. **Read as: visible as a NAME,
+   * absent as a ticket.**
+   *
+   * It survives by CONSTRUCTION here rather than by a second guard: `total` is
+   * read off `list.rows`, and this memo never touches it, so
+   * `labels.epicTitle` still resolves every child's `epicId`; that is what
+   * `groupRows` titles each section with. The header was never sourced from the
+   * epic's own row, which is why dropping the row cannot take the header with
+   * it.
+   *
+   * ⚠ ONE CONSEQUENCE WORTH NAMING: the epic row was its children's PARENT, so
+   * `nestRows` no longer finds them a parent in the set and roots them at depth
+   * 0 — the caret column disappears and the children move 22px left. That is
+   * the honest drawing of "the parent row is not here"; inventing a phantom
+   * depth for an undrawn row would indent under nothing.
+   *
+   * ⚠ **THE RESIDUAL, RECORDED AND NOT FIXED.** A backlog holding only epics
+   * now reaches this memo's empty answer, and `TicketList` renders
+   * *"Nothing in the backlog — new tickets land here."* over a backlog that
+   * holds one. Naming it would be new user-facing copy, which is the owner's —
+   * see case 13.1044, owner: the owner, by way of whoever next owns this tab's
+   * empty state.
+   *
    * RECORDED, NOT FIXED: "Only tickets in progress" sets `stateCategories:
    * ['active']` SERVER-SIDE (`listFilter`, above `useTicketList`) — a
    * backlog ticket's category is `open`, so that toggle strips every backlog
@@ -920,8 +911,12 @@ function ProjectBoard() {
    */
   const backlogNarrowing = useMemo(() => {
     if (list.rows === null || listNarrowing === null) return null;
-    const rows = listNarrowing.rows.filter((row) => row.stateId === BACKLOG_STATE_ID);
-    const total = list.rows.filter((row) => row.stateId === BACKLOG_STATE_ID).length;
+    const rows = listNarrowing.rows.filter(
+      (row) => row.stateId === BACKLOG_STATE_ID && row.typeRank !== EPIC_RANK,
+    );
+    const total = list.rows.filter(
+      (row) => row.stateId === BACKLOG_STATE_ID && row.typeRank !== EPIC_RANK,
+    ).length;
     return { rows, shown: rows.length, total };
   }, [list.rows, listNarrowing]);
 
@@ -1192,6 +1187,115 @@ function ProjectBoard() {
     () => (ticketTypes.data === null ? undefined : rankOneEpicPredicate(ticketTypes.data)),
     [ticketTypes.data],
   );
+
+  /**
+   * ONE PASS produces the narrowed board, its shown count, and its total — per
+   * coordinator Ruling 1. A count computed by a SECOND walk over `board.data`
+   * (or, worse, borrowed from `list.rows.length`, which `activeOnly` narrows
+   * server-side and the board never does) could disagree with what actually
+   * renders; a single fold cannot disagree with itself. `<Board>` below is
+   * handed `boardNarrowing.view`, never `board.data` directly, so the grid and
+   * the count are reading the SAME computed groups.
+   *
+   * THREE mechanisms fold into this ONE pass as of 2026-09-20, not two:
+   * `boardFilter` (Task 4) drops CARDS, never a column or a group —
+   * `board.tsx:216-219`'s own rule, still exactly true of that mechanism on
+   * its own — while `workflowFilter` above (Ruling R3, Task 8) drops whole
+   * GROUPS, by construction, whenever a specific workflow is picked. The
+   * per-card predicate below is `keepGroup && matchesBoardCard(...)`, so
+   * `total` still counts every card in a DROPPED group — those cards are
+   * real, and R3's whole point is that the picker is a filter, so its "of
+   * M" must name the project's whole board, never only the remainder it
+   * kept — while `shown` counts only cards that are BOTH in a kept group
+   * AND pass `matchesBoardCard`. A fully-filtered board (by either
+   * mechanism, or both at once) therefore renders its remaining columns
+   * empty, or omits a group's rail entirely, rather than vanishing — the
+   * `N of M shown` count and the removable chip(s) below are the only
+   * disclosure, which is the invariant's whole point. This is also exactly
+   * why `shouldRenderNarrowingStrip`'s third term (`shown !== total`)
+   * exists independently of `activeFilterChips`/`boardUnappliedAxes`: no
+   * axis enumeration can ever name "a whole group was dropped", so the gate
+   * would otherwise miss this mechanism entirely — see that function's own
+   * docblock in `board-search-scope.ts`.
+   *
+   * ## The THIRD mechanism: `isEpic(card.typeId)` (owner, 2026-09-20)
+   *
+   * *"epics should never show up in the board, timeline and calendar views.
+   * they can only be in the list views"*, extended the same day to the Backlog
+   * — *"only in the list view"*. A board card for an epic is now dropped by
+   * this fold, and it is dropped **before `total` increments**, which is the
+   * only part of this worth arguing about.
+   *
+   * **An epic is not counted in `total` either, and that is not the R3 rule
+   * flipped.** R3's argument is that a card in a DROPPED GROUP is still a card
+   * this board could draw, so "of M" must include it. An epic is a card this
+   * board can NEVER draw — the ruling forbids it — so counting it would make
+   * `shown !== total` true on every project holding an epic, and `isNarrowed`
+   * would then tell a person with NO filter in force that a filter is hiding
+   * work. A permanently-false narrowing claim is worse than the residual it
+   * buys: with the epic out of both terms, `N of M shown` is a claim about what
+   * this view draws, which is the property §4 of the dispatch names.
+   *
+   * ⚠ **THE RESIDUAL, RECORDED AND NOT FIXED.** A board whose only non-closed
+   * tickets are epics now reaches `total === 0 && shown === 0`, so `Board`
+   * renders `EMPTY_BOARD_COPY` — *"No tickets here yet — create one."* — over a
+   * project that holds an epic. The truthful sentence would be new user-facing
+   * copy, which is the owner's to write (*"the message should name the filter"*
+   * was itself an owner ruling, and Addendum 2's *"an absence must say which
+   * absence it is"* is the same rule); it is recorded rather than invented.
+   * See case 13.1043, owner: the owner, by way of whoever next owns the board's
+   * empty states.
+   *
+   * ⚠ **AND THE PREDICATE HAS A TRANSIENT, WHICH IS THE SAFE DIRECTION.** The
+   * roster read is in flight on first paint, so `isEpicType` is `undefined` and
+   * this fold falls back to app-core's `isBuiltinEpicType` — the built-in
+   * `epic` id only. A workspace whose rank-1 type is NOT the built-in therefore
+   * draws those cards until the roster lands, and then they leave. Narrower
+   * than the truth, never wrong about it (the same default, and the same
+   * argument, `epic-ancestor.ts` states), and the identical transient the
+   * calendar and the timeline already carry for their own epic work.
+   *
+   * Reads `resolvedWorkflowFilter`, not raw `workflowFilter` — see that
+   * value's own docblock above (Ruling 20(b)): a picked workflow that has
+   * dropped out of `board.data` falls back to `'all'` here rather than
+   * narrowing every group to nothing on a stale id. `boardFilter` is likewise
+   * declared above, in its own section, because it is a filter the PERSON
+   * sets and this memo is only one of its readers.
+   *
+   * ⚠ **THIS MEMO SITS *AFTER* THE ROSTER BLOCK ON PURPOSE, AND THE POSITION IS
+   * LOAD-BEARING.** It was declared above `boardFilter`'s own section until
+   * 2026-09-20; `isEpicType` is a `const` declared here, so a `useMemo` whose
+   * callback reads it from ABOVE this line would throw a `ReferenceError` on
+   * first render (the callback runs during the render that reaches it). Moving
+   * the DECLARATION was the smaller change than moving the roster read up past
+   * `useBoard`/`useTicketList`, and the two orders are not equivalent.
+   */
+  const boardNarrowing = useMemo(() => {
+    if (board.data === null) return null;
+    // `?? isBuiltinEpicType` and not `isEpicType === undefined ? … : …`: the
+    // fallback is app-core's own stated default rather than a second copy of
+    // it here, and it draws MORE, never less. See the transient note above.
+    const isEpic = isEpicType ?? isBuiltinEpicType;
+    let total = 0;
+    let shown = 0;
+    const groups = board.data.groups.flatMap((group) => {
+      const keepGroup =
+        resolvedWorkflowFilter === 'all' || group.workflowId === resolvedWorkflowFilter;
+      const columns = group.columns.map((column) => ({
+        ...column,
+        cards: column.cards.filter((card) => {
+          // Before `total`: see "not counted in `total` either" above.
+          if (isEpic(card.typeId)) return false;
+          total += 1;
+          const keep = keepGroup && matchesBoardCard(card, column, projectId, boardFilter);
+          if (keep) shown += 1;
+          return keep;
+        }),
+      }));
+      return keepGroup ? [{ ...group, columns }] : [];
+    });
+    return { view: { ...board.data, groups }, shown, total };
+  }, [board.data, boardFilter, resolvedWorkflowFilter, projectId, isEpicType]);
 
   /**
    * `listNarrowing === null ? [] : …` and NOT `list.rows ?? []`, for the
@@ -2138,6 +2242,27 @@ function ProjectBoard() {
                      dropping this one would build that asymmetry one layer up,
                      to surface silently the day a lane filter is wired. */
                   {...(isEpicType === undefined ? {} : { isEpicType })}
+                  /*
+                    THE OWNER'S RULING (2026-09-20): *"epics should never show
+                    up in the board, timeline and calendar views."* The calendar
+                    does not draw an epic's own claimed dates.
+
+                    UNCONDITIONAL, and NOT gated on `isEpicType` resolving: the
+                    ruling is a fact about the VIEW, while `isEpicType` is a
+                    fact about the roster, and the model's own default
+                    (`isBuiltinEpicType`) is narrower than the roster's rule
+                    rather than broader — so an epic that the fallback cannot
+                    name is one this view would drop ONE RENDER LATER anyway.
+                    Gating on the roster would only make the flicker
+                    conditional.
+
+                    The calendar has no lane-heading half of this question to
+                    answer, and that is measured rather than assumed: nothing in
+                    `apps/web` passes `laneEpicId` (the block above records the
+                    four-hit grep), so an epic here names no group once its row
+                    is gone — there is no heading to keep.
+                  */
+                  hideEpicRows
                 />
               ) : (
                 <p>Loading…</p>
@@ -2156,6 +2281,24 @@ function ProjectBoard() {
                      for a lane filter, so a rank-1 predicate reaching here
                      changes the lane heading on screen. Witnessed at 11.165. */
                   {...(isEpicType === undefined ? {} : { isEpicType })}
+                  /*
+                    THE OWNER'S RULING (2026-09-20), and IN THE TIMELINE THE
+                    LANE IS THE HALF THAT STAYS. `hideEpicRows` removes the
+                    epic's OWN bar from the grid; `buildTimelineModel` builds
+                    `byId` from the complete input set BEFORE `visible` narrows
+                    it — *"an ancestor removed by a filter still names the lane
+                    its child belongs to"* — so a lane that still holds a dated
+                    child keeps its heading, titled with the epic's name.
+
+                    That is the shape the owner ruled for the Backlog's section
+                    headers in so many words — *"Row only."* — and the two are
+                    ONE rule: **the epic stays visible as a NAME and goes
+                    absent as a ticket.** `timeline-model.ts`'s `hideEpicRows`
+                    states why reaching the same outcome by dropping epics from
+                    `inputs` instead would delete the heading and move every
+                    child into "No epic".
+                  */
+                  hideEpicRows
                 />
               ) : (
                 <p>Loading…</p>
