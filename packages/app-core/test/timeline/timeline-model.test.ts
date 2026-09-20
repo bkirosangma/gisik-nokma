@@ -1055,3 +1055,106 @@ describe('11.62 the undated-epic skip fires only when the epic has nothing to sa
     expect(m.groups[0]!.rows.map((row) => row.title)).toEqual(['Child']);
   });
 });
+
+/**
+ * 13.1036 / 13.1037 — THE OWNER'S RULING (2026-09-20): *"epics should never
+ * show up in the board, timeline and calendar views. they can only be in the
+ * list views"*, extended the same day to the Backlog — *"only in the list
+ * view."* The timeline's half is the one with two answers, and this pair is
+ * written to keep them apart:
+ *
+ *   - the epic as a ROW — its own bar, its own side-list entry. GONE.
+ *   - the epic as a LANE NAME — the heading above its children. STAYS.
+ *
+ * That is the shape the owner ruled for the Backlog's section headers in so
+ * many words (*"Row only."*), and the lane survives HERE for a reason worth
+ * stating: `byId` is built from the COMPLETE input set before `visible` narrows
+ * it, so a lane reaches its name through `epicAncestorOf` on the CHILD, never
+ * through the epic's own placement. Reaching the same outcome by dropping epics
+ * from `inputs` would empty `byId`, move every child into "No epic" and delete
+ * the heading — the drawn absence the ruling's own addendum forbids.
+ */
+describe('13.1036 hideEpicRows removes the epic\'s own bar and KEEPS the lane it names', () => {
+  function epicBar(id: string, title: string, start: string, due: string): TicketDatesInput {
+    return ticket({
+      id,
+      typeId: 'epic',
+      fields: {
+        title: claimField(title),
+        startDate: claimField({ date: start }),
+        dueDate: claimField({ date: due }),
+      },
+    });
+  }
+
+  function datedChild(id: string, parentId: string, title: string): TicketDatesInput {
+    return ticket({
+      id,
+      parentId,
+      fields: {
+        title: claimField(title),
+        startDate: claimField({ date: '2026-08-24' }),
+        dueDate: claimField({ date: '2026-08-28' }),
+      },
+    });
+  }
+
+  it("drops the fully dated epic's row, and the child's lane is still titled with the epic", () => {
+    const inputs = [
+      epicBar('epic_1', 'The epic', '2026-08-17', '2026-08-21'),
+      datedChild('child_1', 'epic_1', 'A child'),
+    ];
+    // CONTROL FIRST, same fixture, ONE word different: with the option absent
+    // the epic draws its own bar — `epicAncestorOf` returns SELF for an epic,
+    // so it lands in the lane it names.
+    const drawn = model(inputs);
+    expect(allRows(drawn).map((row) => row.ticketId).sort()).toEqual(['child_1', 'epic_1']);
+    expect(drawn.groups).toHaveLength(1);
+    expect(drawn.groups[0]!.epicTitle).toBe('The epic');
+
+    const hidden = model(inputs, { hideEpicRows: true });
+    expect(allRows(hidden).map((row) => row.ticketId)).toEqual(['child_1']);
+    // THE HALF THAT STAYS — and the assertion is the TITLE, not merely that a
+    // group exists: a lane falling back to `NO_EPIC_TITLE` would still be one
+    // group, and would be the drawn absence this pair exists to forbid.
+    expect(hidden.groups).toHaveLength(1);
+    expect(hidden.groups[0]!.epicId).toBe('epic_1');
+    expect(hidden.groups[0]!.epicTitle).toBe('The epic');
+  });
+});
+
+describe('13.1037 hideEpicRows also takes a HALF-dated epic out of the side list', () => {
+  it('a start-only epic is no longer listed as missing work, and its child still is', () => {
+    const inputs = [
+      ticket({
+        id: 'epic_1',
+        typeId: 'epic',
+        fields: { title: claimField('The epic'), startDate: claimField({ date: '2026-08-18' }) },
+      }),
+      ticket({
+        id: 'child_1',
+        parentId: 'epic_1',
+        fields: { title: claimField('A child'), dueDate: claimField({ date: '2026-08-20' }) },
+      }),
+    ];
+    // CONTROL FIRST: a half-dated epic is listed like any other half-dated
+    // ticket today (the `lane-heading` arm fires only for a TRULY undated
+    // epic), so this arm is measuring the option and not an existing rule.
+    const drawn = model(inputs);
+    expect(drawn.sideList.map((entry) => entry.ticketId).sort()).toEqual(['child_1', 'epic_1']);
+
+    const hidden = model(inputs, { hideEpicRows: true });
+    // The side list is a list of WORK IN THIS VIEW, so an epic has no more
+    // business in it than a bar does — the ruling names the view, not one of
+    // its two outputs.
+    expect(hidden.sideList.map((entry) => entry.ticketId)).toEqual(['child_1']);
+    // And the truly-undated epic is STILL a lane even with the option on, which
+    // is the one epic behaviour the option must not touch: it never drew a row
+    // in the first place.
+    const bare = model([ticket({ id: 'epic_bare', typeId: 'epic', fields: { title: claimField('Bare') } })], {
+      hideEpicRows: true,
+    });
+    expect(bare.sideList).toEqual([]);
+    expect(bare.groups).toEqual([]);
+  });
+});

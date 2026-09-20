@@ -92,6 +92,21 @@ export type TimelineViewProps = {
    */
   isEpicType?: IsEpicType;
   /**
+   * THE OWNER'S RULING (2026-09-20): an epic draws a row in the List and
+   * nowhere else, so this view does not draw the epic's OWN bar. Forwarded
+   * UNCHANGED, never defaulted here — the model states what the flag means and
+   * why it is opt-in, and a `?? true` in this file would be a second statement
+   * of the product's rule, free to drift from the model's. `CalendarView`
+   * takes the identical prop; see `calendar-model.ts`'s `hideEpicRows`.
+   *
+   * ⚠ A LANE IS NOT A ROW, and the owner ruled on exactly this distinction for
+   * the Backlog's section headers: *"Row only."* A lane that still holds a
+   * dated child keeps its heading, titled with the epic's name, and that
+   * heading is now the ONLY thing naming the group — which is why the model
+   * removes the epic's placement INSIDE `visible` rather than from its inputs.
+   */
+  hideEpicRows?: boolean;
+  /**
    * Forwarded UNCHANGED, never defaulted here. `buildTimelineModel` states the
    * default (8) and refuses a count it cannot mean; a `?? 8` in this file
    * would be a second statement of the window's width, free to drift from the
@@ -185,6 +200,7 @@ export function TimelineView(props: TimelineViewProps) {
         ...(props.filter === undefined ? {} : { filter: props.filter }),
         ...(props.laneEpicId === undefined ? {} : { laneEpicId: props.laneEpicId }),
         ...(props.isEpicType === undefined ? {} : { isEpicType: props.isEpicType }),
+        ...(props.hideEpicRows === undefined ? {} : { hideEpicRows: props.hideEpicRows }),
         ...(props.weeksCount === undefined ? {} : { weeksCount: props.weeksCount }),
       }),
     [
@@ -193,6 +209,7 @@ export function TimelineView(props: TimelineViewProps) {
       props.filter,
       props.laneEpicId,
       props.isEpicType,
+      props.hideEpicRows,
       props.weeksCount,
       anchor,
     ],

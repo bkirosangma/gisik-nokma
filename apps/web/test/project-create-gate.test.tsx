@@ -76,7 +76,20 @@ const PROVENANCE = {
   serverTime: '2026-08-20T09:00:01.000Z',
 };
 
-/** A board that HAS a ticket, so "the picker says none exist" has a counterpart. */
+/**
+ * A board that HAS a ticket, so "the picker says none exist" has a counterpart.
+ *
+ * ⚠ **THE CARD'S TYPE IS `task` AND IT WAS `epic` UNTIL 2026-09-20.** The
+ * owner's ruling that day — *"epics should never show up in the board, timeline
+ * and calendar views"* — makes an epic a card the board deliberately does not
+ * draw, so an epic fixture would have made this file's central counterpart
+ * ("the board renders a real ticket") render NOTHING, and 3.142's own claim
+ * would have gone untested behind a fixture that had quietly stopped being
+ * about a ticket. The property is unchanged and is why the fix is here rather
+ * than in the page: the board must show a ticket it can draw, so the fixture
+ * must carry one. `task` is on the same workflow (`wf-errands`) and is rank 3,
+ * so nothing else about the fixture moves.
+ */
 const BOARD: BoardView = {
   projectId: PROJECT,
   groups: [
@@ -92,9 +105,9 @@ const BOARD: BoardView = {
           blocked: false,
           cards: [
             {
-              ticketId: '01J9TICKET00000000000000EP',
+              ticketId: '01J9TICKET00000000000000TS',
               title: 'Rewire the shop sign',
-              typeId: 'epic',
+              typeId: 'task',
               assignee: null,
               stateProvenance: PROVENANCE,
               cause: null,

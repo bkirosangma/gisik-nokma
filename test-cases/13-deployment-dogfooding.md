@@ -137,6 +137,12 @@ generalisation, 13.201–13.203, once `13.1–13.40` was confirmed exhausted; La
 13.204–13.209). Next BLOCK starts at `13.241`, controller-allocated on request. Never renumber a landed id; a lane exhausting its block asks
 the controller for another rather than borrowing a neighbour's.**
 
+**`13.1034`–`13.1049` is ALLOCATED to executor 1 (controller dispatch, 2026-09-20) for the owner's
+"epics leave the Board, Calendar, Timeline and Backlog" request — `13.1034`–`13.1045` minted by it,
+`13.1046`–`13.1049` reserved and deliberately unused.** The block was taken rather than derived: 13.1033
+was the maximum in use in section 13 when it was cut, recounted at `origin/main`, and **a bare "next free
+N" is a reading that expires — which is why a lane takes a BLOCK.**
+
 Nothing in the Task 14/15 section below is proven by an automated test in the usual `vitest` sense —
 there is no test runner for GitHub Actions YAML. `🧪` there means: reproduced by hand against the actual
 tools involved (actionlint, a real vitest run), not inferred from reading the YAML. The Tasks 7–10 sections
