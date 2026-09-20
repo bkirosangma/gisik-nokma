@@ -300,6 +300,34 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 
 ---
 
+### P12 — **IMPORTANT** — Every screen in the product has the same document title
+
+**WHAT.** Nothing in the product sets a per-route title. The browser tab, the window title, the browser history and a screen reader's page announcement read **"Gisik Nokma"** on `/sign-in`, `/inbox`, `/help`, the board, the ticket sheet, the settings screens, `/privacy`, `/terms` and the 404 alike.
+
+**MEASUREMENT.** Source-only sweep, excluding `.next` and `node_modules`:
+- `grep -rln --exclude-dir=.next --exclude-dir=node_modules -E 'generateMetadata|export const metadata' apps/web` → **exactly one file**: `apps/web/app/layout.tsx`.
+- `layout.tsx:8`: `export const metadata = { title: 'Gisik Nokma' }`.
+- **My first attempt at this reported 9 more hits and was wrong** — all nine were `apps/web/.next/types/app/*/page.ts`, Next's generated type files from a build I had just run, and `.next` is gitignored (`git check-ignore` → `.gitignore:18`). **The control that caught it was a `git check-ignore` on one of the hits**, not the grep. Recorded in §10.
+- `<title>` tags in source: **none**.
+
+**WHY IT IS WRONG.** WCAG 2.4.2 *Page Titled* is Level A and asks that pages have titles describing topic or purpose. One title for a 25-route product means the title distinguishes nothing: a screen-reader user moving between routes gets no announcement of where they have arrived, and a browser history of twenty entries is twenty identical strings. This is not a stylistic preference — it is the one Level A criterion in this lane that fails product-wide.
+
+**WHAT WOULD HAVE BEEN BETTER.** A `title` per route — `Settings · Gisik Nokma`, `Shop operations · Gisik Nokma` — set through Next's own `metadata`/`generateMetadata` on the route modules that already exist. The client-rendered routes (`'use client'`) would need `generateMetadata` in a small server wrapper or a `document.title` effect; either is a handful of lines per route, and the workspace/project ones already resolve their names via `use-workspace-name`/`use-project-name`.
+
+---
+
+### P13 — **MINOR** — There is no bypass mechanism; a keyboard user Tabs the nav on every navigation
+
+**WHAT.** No skip link exists anywhere in the product.
+
+**MEASUREMENT.** `grep -rniE 'skip[ -]?(to|link)|gn-skip'` over `apps/web`, `packages/app-core/src`, `packages/ui/src` (all `.tsx`/`.css`, excluding tests) → **no matches** — a genuinely empty result, and the same sweep shape returns hits for other tokens, so it traverses.
+
+**WHY IT IS WRONG — and where I am deliberately *not* overclaiming.** WCAG 2.4.1 *Bypass Blocks* is Level A, but **the `<main>` landmark this product does render is itself a conforming bypass mechanism for assistive-technology users**: every route that renders content wraps it in `<main>` (verified — 24 route modules, and the only exception, `app/page.tsx`, is a bare `redirect('/workspaces')`). So the person affected is the **keyboard-only, non-AT user** — typically someone with a motor impairment — who must Tab through `AppNav`'s workspace-scoped links on every single navigation with no way past them.
+
+**WHAT WOULD HAVE BEEN BETTER.** A visually-hidden-until-focused "Skip to content" link as the first focusable element in `layout.tsx`, targeting the `<main>`. That is the standard remedy, it is about ten lines, and it is the one element in this report that a keyboard user would notice immediately.
+
+---
+
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
 
 | comparison | class | evidence |
@@ -315,6 +343,10 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 | **`InfoTip`'s accessibility** | **GOOD** | `info-tip.tsx:43-47` states *"No focus trap and no `role="menu"`"* and justifies each omission **for a non-modal popover** — the correct use of the same reasoning `Dialog`/`Sheet` misapply (P8). Its Escape-closes-without-moving-focus decision at `:39-42` is argued from the control's own behaviour, not asserted. |
 | **`Switch`'s role choice** | **RULED/recorded** — not a defect | `switch.tsx:41-53` uses a real `<input type="checkbox">` rather than `role="switch"` and **states the trade**: *"to assistive technology this is a checkbox, not a `switch`. That is the pre-existing position on `/account`… what it does change is that there is now one place to change it in."* A limitation named and located is not the same as one hidden. |
 | **`Avatar`'s tint palette** | **GOOD** | `avatar.tsx:25-41` derives its four tints from pairs `CONTRAST_PAIRS` already measures, so *"this palette cannot drift out of contrast without `tokens.test.ts` going red"* — the one place I saw a visual choice welded to an existing gate rather than asserted beside it. |
+| **`lang="en"` on the document** | **GOOD** | `layout.tsx:38`. |
+| **`<main>` on every content route** | **GOOD** | 24 route modules render one; the sole exception is `app/page.tsx`, which is `redirect('/workspaces')` and renders nothing. **This is also what keeps P13 at Minor rather than Important** — it is a conforming bypass for AT. |
+| **No clickable `<div>`/`<span>` without a role** | **GOOD** | Swept `apps/web`, `app-core/src`, `ui/src`, `editor/src` for `<div|span|li|p|section … onClick` with no `role=`; **the only two hits are backdrop scrims** — `dialog.tsx`'s `gn-dialog__scrim` and the project page's `gn-filters__scrim` — and a backdrop is the case where a pointer-only affordance is legitimate, because both have a keyboard escape (Escape) and a real close control. Everything else interactive is a `<button>` or a link: `workspaces-section.tsx:53` records the choice in its own words — *"filling the row rather than a `<div onClick>`, so keyboard and…"*. |
+| **No unlabelled `<input>`** | **GOOD** | 48 `<input>` sites in code (control: 12 more removed as comment prose — docblocks that *mention* `<input>` in backticks, e.g. `switch.tsx:44`). **32 are inside a `<label>`**; the remaining 16 carry `id` or `aria-label`. **Three apparent stragglers resolved to false positives when opened** (`select.tsx:391` is a prop object passing `'aria-label'`, `select.tsx:481` spreads `inputProps` from `useComboBox`, `ticket-list.tsx:832` is a `TableColumn` object literal whose docblock states the accessible-name reason). **Net: zero unlabelled inputs found.** |
 
 ---
 
@@ -343,7 +375,7 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 **CRITICAL — 1**
 - `I1` no browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate structurally cannot run one
 
-**IMPORTANT — 7**
+**IMPORTANT — 8**
 - `I2` the `e2e-stack` contrast roster records a defect fixed eight hours later, with no provenance
 - `I3` `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by its own docblock
 - `P1` seven interactive controls styled by no rule at all (raw UA chrome)
@@ -351,8 +383,9 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 - `P8` `Dialog` and `Sheet` declare `aria-modal="true"`; nothing implements containment
 - `P9` `SegmentedControl` carries ARIA tab semantics with none of the tab keyboard model, in 7 places
 - `P11` the `Select` panel is outside every sweep's population, for two independent reasons
+- `P12` every screen in the product has the same document title (WCAG 2.4.2, Level A)
 
-**MINOR — 8**
+**MINOR — 9**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
 - `I5` my own handoff carries two contradicting position blocks; the pointer that found it is itself stale
 - `P3` the parent crumb cannot show the parent's key; the prototype's does; no ruling found
@@ -361,8 +394,9 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 - `P6` mobile: two of three screens have no styling while the third is themed
 - `P7` desktop's task list has no rules
 - `P10` the accessible-name ratchet's unit is an attribute; its message claims a property of assistive tech
+- `P13` no skip link; a keyboard-only user Tabs the nav on every navigation (WCAG 2.4.1)
 
-**Total 16.** `raised` and `sum by severity` agree by enumeration above. ⚠ **One id carries two severities on purpose and is counted once:** `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 18.** `raised` and `sum by severity` agree by enumeration above. ⚠ **One id carries two severities on purpose and is counted once:** `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
@@ -388,3 +422,20 @@ Two of my own instruments disagreed while I was writing this: a selector extract
 **The correction is instructive because the first attempt at it produced a FALSE ZERO with no error.** I widened the pattern to `<[A-Z][A-Za-z]*Link` — which requires at least one character *before* "Link", so it cannot match the literal `<Link` tag, which is the only spelling in this repo. It answered **0**, cleanly. What caught it was asking for a **control on the same path**: `grep -rhoE '<[A-Z][A-Za-z]*Link[^>]*className='` returned **0 occurrences seen**, while `legal-nav.tsx:97` plainly reads `<Link className="gn-nav__signin" href="/sign-in">`. **A pattern that matches nothing and a codebase that contains nothing print the same thing.** Corrected to `<(Link|[A-Z][A-Za-z]*Link)\b`, the control reads **18 occurrences seen** and the sweep finds exactly one site — which is P1's seventh member, with a sibling-roster measurement confirming it is the only unstyled class in its component.
 
 **Both bugs in this section are the same bug**: an instrument reporting a well-formed empty for a reason unrelated to the property it named. Neither was detectable from inside its own run. One was caught by a second instrument, the other only by a control that counted what the pattern *saw* rather than what it *returned*.
+
+### A third and a fourth, both caught by insisting on a control, both in the route sweep
+
+**P12's claim nearly died the same way, in the opposite direction.** I swept for page titles with `grep -rl 'generateMetadata'` and got **nine hits** — which would have falsified my finding before I wrote it. All nine were `apps/web/.next/types/app/*/page.ts`: **Next's own generated type files, produced by the `next build` I had just run two sections earlier**, and `.next` is gitignored. The measurement that caught it was not the grep but **`git check-ignore -v` on one of the hits** — asking whether the file I had just measured was in the repository at all. **A build artefact I created myself had become evidence about the code.** Re-run with `--exclude-dir=.next`, the count is **1**, and the finding stands.
+
+**And the input-labelling sweep took three iterations to say anything true.** The first version matched `<input` in docblocks (12 of 60 "sites" were prose). The second — comment-stripped — still flagged 9, including `sign-in/page.tsx`'s two inputs, which I opened and found **wrapped in a `<label>` two lines above**. The heuristic was `/<label\b/ && !/<\/label>/` over a look-back window, so **any input in a form with an earlier labelled field was convicted by its sibling's closing tag.** The correct test is which comes *last* — the last `<label` before the input, versus the last `</label>` — and with that, **3 stragglers remained** (48 inputs, 32 label-wrapped). Opened, all three were false positives too: `select.tsx:391` is a prop object passing `'aria-label'`, `select.tsx:481` spreads `inputProps` from `useComboBox`, and `ticket-list.tsx:832` is a `TableColumn` object literal whose own docblock gives the accessible-name reason.
+
+**The honest summary of this section: four instruments I wrote produced confident wrong answers, and every one was caught by a control rather than by reading the result harder.** They failed in **three different directions**, which is why "check the result" is not a remedy:
+
+| instrument | what it would have produced | direction |
+|---|---|---|
+| selector extractor (double-dotted needle) | `DENSE_IN_LIST` has four stale entries — a **false Critical** | manufactured a **finding** |
+| label-nesting heuristic (sibling `</label>`) | 9 unlabelled inputs — a **false Important** | manufactured a **finding** |
+| `<Link>` blindness | one unstyled control **missed entirely**, and the report's count wrong | manufactured a **clean bill** |
+| `.next` build artefacts counted as source | P12 apparently falsified — a **true finding deleted** | manufactured **the opposite of itself** |
+
+**A control is not a formality you run at the end — in this lane it was the only thing standing between four confident reports and the truth.** And note which controls worked: not one of them was a re-reading. Three were a **second instrument on the same path**, and one was asking whether the file I had measured was **in the repository at all**.
