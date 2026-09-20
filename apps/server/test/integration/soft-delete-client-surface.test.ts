@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { FastifyInstance } from 'fastify';
-import { createOnlineDataSource, type FetchLike } from '@gisik-nokma/app-core/online';
+import { HttpError, createOnlineDataSource, type FetchLike } from '@gisik-nokma/app-core/online';
 // TYPE-ONLY, and deliberately from the package ROOT rather than `/online`: the
 // root's value surface reaches React (`views/`), and this file runs in Node
 // under `apps/server` with no DOM. `import type` is erased at compile time, so
@@ -444,7 +444,7 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
   getTicket: {
     verdict: 'excluded',
     carries: true,
-    why: 'Guarded at the ROUTE by a DIFFERENT mechanism — `routes/tickets.ts:365` reads the domain state and 404s on `deleted`, NOT by `LIVE_TICKET_WHERE`. Constrained here; not by the constant.',
+    why: 'Guarded at the ROUTE by a DIFFERENT mechanism — `routes/tickets.ts:366` reads the domain state and 404s on `deleted`, NOT by `LIVE_TICKET_WHERE`. Constrained here; not by the constant.',
   },
   getTicketHistory: {
     verdict: 'retained',
@@ -520,15 +520,52 @@ async function walkAll(): Promise<Map<AbsenceDecision, string>> {
   const answers = new Map<AbsenceDecision, string>();
   // Sequential, deliberately: this runs against ONE Postgres, and a parallel
   // gather would make a failure's neighbours ambiguous for no gain.
+  //
+  // ⚠ ADDED 2026-09-20, and it is a CONSEQUENCE of a server change rather than a
+  // tightening here. Until then every read on the tombstone RESOLVED — `getTicket`
+  // folds a 404 to `null`, `getTicketHistory` to `[]` — so this walk could assume
+  // an answer. Then the attachments LIST door learned to refuse a tombstoned
+  // ticket (`routes/tickets.ts`, the same third guard the detail route carries),
+  // and `getTicketAttachments` is the one client method that RE-RAISES a 404 by
+  // its own argued decision (`online-data-source.ts`: folding it into `[]` would
+  // draw the same nothing for "this ticket has no files" and "we could not read
+  // them"). The throw killed this `beforeAll`, and the four cases below it
+  // reported as SKIPPED — a green-looking suite that says nothing, which is the
+  // failure this file's own docblock warns about.
+  //
+  // A refusal is not a leak: it is the strongest form of absence, so it is
+  // RECORDED as its own reading rather than crashing the hook. The tolerance is
+  // deliberately NARROW — only an `HttpError` whose status is 404; anything else
+  // still propagates, so a broken read cannot hide behind this — and it is
+  // PINNED, not open: the invariant test below asserts the exact set of members
+  // that may refuse, so a surface that starts refusing without that list moving
+  // reddens there rather than passing quietly.
   for (const key of Object.keys(call) as AbsenceDecision[]) {
     // `?? 'undefined'` because `putPreferences` answers `void`: `JSON.stringify`
     // returns the VALUE `undefined` for it, not the string, and an assertion
     // against `undefined` is a type error rather than a red. Coerced here so
     // every row is a string and absence is a real reading rather than a crash.
-    answers.set(key, JSON.stringify(await call[key]()) ?? 'undefined');
+    try {
+      answers.set(key, JSON.stringify(await call[key]()) ?? 'undefined');
+    } catch (err) {
+      if (!(err instanceof HttpError) || err.status !== 404) throw err;
+      answers.set(key, `${REFUSED_PREFIX}404`);
+    }
   }
   return answers;
 }
+
+/** The reading a refused read leaves, so a refusal is never mistaken for an answer. */
+const REFUSED_PREFIX = 'REFUSED ';
+
+/**
+ * The ONLY members allowed to answer `REFUSED`, and the set is asserted rather
+ * than assumed — see `walkAll`'s note. `getTicket` is deliberately NOT here even
+ * though its door refuses a tombstone too: its client method folds that 404 to
+ * `null`, so it still answers, and a `REFUSED` from it would be a change in the
+ * client rather than the server.
+ */
+const MAY_REFUSE: AbsenceDecision[] = ['getTicketAttachments'];
 
 const MEMBERS = Object.keys(DECIDED) as AbsenceDecision[];
 const CARRIERS = MEMBERS.filter((key) => DECIDED[key].carries);
@@ -581,6 +618,15 @@ describe('AFTER the delete — the invariant', () => {
   }, 120_000);
 
   it('the marker is absent from every excluding surface, and still present on the retained one', () => {
+    // WHICH members refused, asserted before the marker loop so the tolerance in
+    // `walkAll` is a witnessed decision rather than an open catch: a surface
+    // that starts refusing a tombstone without joining `MAY_REFUSE` reddens
+    // here, and one that STOPS refusing reddens here too, because the equality
+    // is two-directional.
+    expect(
+      MEMBERS.filter((key) => answers.get(key)?.startsWith(REFUSED_PREFIX) === true),
+    ).toEqual(MAY_REFUSE);
+
     for (const key of MEMBERS) {
       const { verdict, why } = DECIDED[key];
       const detail = why === undefined ? '' : ` — ${why}`;

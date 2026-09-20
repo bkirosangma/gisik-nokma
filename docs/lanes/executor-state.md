@@ -1,5 +1,40 @@
 # Serial executor — live state
 
+> # ▣ CURRENT POSITION — 2026-09-20. **THE ATTACHMENTS LEAK IS FIXED AT ALL THREE DOORS, THE PEER SUITE IT BROKE IS REPAIRED, AND THE PR IS OPEN.** Cases `16.96`–`16.99`.
+>
+> ## THE SHAPE THAT SHIPPED — read this before touching any of it
+> - **A soft-deleted ticket's files go with it.** The file LIST, the file BYTES and the UPLOAD door all refused only `loadTicketRow` + `canSee`; `canSee` is the VISIBILITY predicate and by its own written ruling does not mean "not deleted". So a tombstoned ticket served its list, streamed its bytes, and **accepted new uploads** — content accreting onto a ticket the product had removed from every view. Measured at the base before any change: detail 404 while list 200 / download 200 / upload **201**. The RED is exactly those four arms.
+> - **The fix is a THIRD GUARD AT THE ROUTE and NEVER a widened `canSee`.** `read/live-ticket.ts::ticketIsLive` asks `LIVE_TICKET_WHERE` (the repo's one spelling for the rule) at each door, after `canSee`, answering the same 404 body. `visible-where.ts` is untouched. Folding deletion into the visibility predicate breaks the `canSeeResolved` cross-check AND makes `listVisibleTickets` — no `proj_tickets` in its FROM — a runtime "missing FROM-clause entry".
+> - ⚠ **THE HISTORY DOORS ARE DELIBERATELY LEFT SERVING**, both of them (`…/tickets/:id/events` and `/v1/tickets/:id/history`) — *"Its history is retained, because other events cite it"*. Case 16.96 asserts that asymmetry so it is a decision on the record. **Do not "fix" it.**
+> - ⚠ **`GET …/tickets` (the workspace list) also has no deleted predicate** and that is a RECORDED ruling (`visible-tickets.ts`: no `proj_tickets` in the FROM; the route has no client consumer). Left alone.
+> - ⚠ **THE DETAIL ROUTE'S DELETED GUARD MOVED `:365` → `:366`** because this change adds an import above it. FIVE citations were repointed, **two of them in a file this change never otherwise touches** (`soft-delete-background-paths.test.ts`) — a diff-scoped citation sweep cannot see that kind, so the sweep was run over the whole tree by CONTENT.
+> - ⚠ **A REGRESSION THIS CHANGE CAUSED, AND WHERE IT WAS REPAIRED.** The new refusal made `getTicketAttachments` — the ONE client method that RE-RAISES a 404 (`getTicket` folds to `null`, `getTicketHistory` to `[]`) — throw, killing `walkAll`'s `beforeAll` in `soft-delete-client-surface.test.ts` and turning its four `AFTER the delete` cases into **SKIPPED** lines that read green. Repaired in the WALK (the invalidated assumption was its), narrowed to a 404 `HttpError`, and PINNED: the `MAY_REFUSE` set is asserted in both directions. Witnessed by three mutations.
+> - ⚠ **RECORDED, NOT FIXED:** `routes/tickets.ts` refuses `{error:'not_found'}` and `routes/attachments.ts` refuses `{error:'not-found'}`. The owner line reads "whoever next touches `attachments.ts`" — this lane IS that owner and declined on purpose (a wire-vocabulary change, not this leak; six assertions pin the hyphen). **Flagged for its own decision.**
+>
+> ## GATE AND CHECKS AT THIS TREE
+> - ⚠ **The forced gate is the CONTROLLER's and was NOT run by this lane.** What ran here: `apps/server` impacted suites **58 passed / 0 failed / 0 SKIPPED** across 7 files.
+> - `check:case-ids` **delta +4 against `origin/main` with a control on the same path**: `origin/main`'s own copy over its own tree **2573 / highest 16.90**; this tree **2577 / 16.99**; control — one id minted into the base tree's own copy → **2574 / 16.999**, style count moving exactly one (bold 1149 → 1150). Each reading from that tree's **own** copy of the script, which derives its repo root from its own file location.
+> - `check:citations` · `check:help` · `check:tasks` · `check:env` · `check:migrations` (0 new) · `check:runbook` · `check-skipif-coverage` (412 files) — all rc 0.
+> - ✅ **`check:db-tz` RAN AND PASSED, and it NAMES ITS ENVIRONMENT**: `database timezone: Asia/Kolkata`, with `DATABASE_URL` on the **DEV** database (54330). A bare shell reads `DATABASE_URL is required`; that gate is an environment gate and this is the environment.
+> - ⚠ **CI on this account fails every job before its first step** (billing block) — no CI signal exists or is claimed. The forced gate is the only evidence.
+>
+> ## ⚠ READ THIS FIRST — ANCHORS ROT, AND THE NARRATIVE CARRIES SHAS THAT ARE NOT ANCHORS
+> **Every sha in prose anywhere in this file is unreliable.** `git branch --contains` (not `cat-file`, which passes on reflog-only commits) settles reachability; `gh pr view <n> --json state,mergeCommit` settles whether a PR is open — **check that before acting on any "open/paused/NEXT STEP" line.** **Use `/usr/bin/git` for anything sha-bearing**: the `rtk` proxy returned a WRONG `git log` reading this session (it printed a commit that is not HEAD as though it were HEAD), and `rtk`'s vitest tee file is written only sometimes, so `ls -t … | sed -n 1p` can hand you the PREVIOUS run's log — run `rtk proxy` and read the `--outputFile` JSON when a verdict matters.
+> - **branch `exec/attachments-deleted-guard`**, cut from `origin/main = fed9a588`, **no fold needed** (`rev-list --left-right --count origin/main...HEAD` read `0 3` at the last check — ⚠ **a reading at a moment; re-read it immediately before freezing, because worktrees share ONE object store and a PEER'S fetch moves `origin/main` under me without my fetching.**)
+> - **THE DURABLE ANCHOR IS THE PR, not a sha** — `gh pr view <n> --json headRefOid,state,baseRefName,mergeCommit`. **`baseRefName` must read `main`.**
+> - **working tree clean**, nothing under `reference/` touched.
+>
+> ## THE ID BLOCK — and an overlap that is FLAGGED rather than resolved
+> - This lane minted **`16.96`–`16.99`** (all four), taken from the **TOP** of exec 1's block rather than from `16.91`. **Why:** the allocation table gives exec 1 `16.81`–`16.99`, but the merged soft-delete lane's own handoff records `16.88`–`16.99` as ITS block, and `exec2/comment-thread` was **live in the tree** while this was written — `16.91` is inside both claims and is the one id that can collide; the top of the shared block cannot.
+> - **The controller corrected the spent set** (`16.88`–`16.90` are exec 2's, on `main` via `#609`; exec 1's next free is `16.91`) **and the overlap is flagged to it, not resolved here.** `16.91`–`16.95` are left free and unspent; the table records all of this.
+>
+> ## WHERE I AM / WHAT IS IN FLIGHT
+> - **In flight: the PR, awaiting the controller's merge.** Nothing else.
+> - **Next after this merges:** the controller's next dispatch. The lane's tmux pane title is `Deleted ticket attachment leak`.
+> - **Method notes worth keeping from this cycle:** (1) `rtk`'s vitest tee file is intermittent — a stale `ls -t` reading caused a real false "1 failed" beside a real `EXIT=0`; the machine-readable verdict is `rtk proxy … --reporter=json --outputFile=…`. (2) A mutation whose replacement leaves an orphaned block turns the run into ZERO tests, and a verdict function that only reads `failed` scores that as a SURVIVOR — **assert the test COUNT too**. (3) `git grep -E` has no `\s`, so a `^\s*` route sweep returns a well-formed EMPTY; the sweep that found the doors used `app\.(get|post|…)` with no anchor.
+
+# ▣ SUPERSEDED BY THE BLOCK ABOVE.
+
 > # ▣ CURRENT POSITION — 2026-09-20. **THE WORDS ARE APPLIED, THE SPLIT IS BUILT, AND THE PR IS OPEN.** Ruling **(b)**: the new wording belongs to views emptied **by the epic rule**; a project with nothing in it keeps its own sentence. **All four cases closed**, every one with **both arms asserted**.
 >
 > ## THE SHAPE THAT SHIPPED — read this before touching any of it
