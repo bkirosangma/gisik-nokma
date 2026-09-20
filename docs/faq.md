@@ -71,16 +71,16 @@ A workspace is your whole business — everybody in it and all the work undernea
 bucket of work inside it: "Residential jobs", "Shop operations". Jobs live inside projects.
 
 **Can I create a project?**
-**Only if you are an admin.** An owner or admin gets a **New project** form on the workspace page;
-everybody else gets a sentence saying so instead of a button that fails — *"Only an admin can create a
-project in this workspace."* For anyone, there is no button on the Workspaces page, in settings, or in
-the top bar. A brand-new workspace has stages, job types and you as its owner, and nowhere to put a job
-until an admin adds one. For a member this is still the biggest hole in the product, and it sits right
-at the start of the journey.
+**Only if you are an owner or an admin.** Those two roles get a **New project** form on the workspace
+page; everybody else gets a sentence saying so instead of a button that fails — *"Only an admin can
+create a project in this workspace."* For anyone, there is no button on the Workspaces page, in
+settings, or in the top bar. A brand-new workspace has stages, job types and you as its owner, and
+nowhere to put a job until an owner or admin adds one. For a member this is still the biggest hole in
+the product, and it sits right at the start of the journey.
 
 **Then how does anybody have projects?**
-An admin creates one, with the **New project** form on the workspace page. Any that were already there
-when you arrived were put there when the system was set up.
+An owner or admin creates one, with the **New project** form on the workspace page. Any that were
+already there when you arrived were put there when the system was set up.
 
 **Can I have more than one workspace?**
 Yes. The Workspaces page lists them all, each with its projects underneath as links.

@@ -72,11 +72,11 @@ export const HELP_CONTENT: HelpContent = [
               [
                 {
                   "kind": "bold",
-                  "text": "You cannot create a project unless you are an admin."
+                  "text": "You cannot create a project unless you are an owner or an admin."
                 },
                 {
                   "kind": "text",
-                  "text": " An admin — and the owner — get a "
+                  "text": " Those two roles get a "
                 },
                 {
                   "kind": "bold",
@@ -84,7 +84,7 @@ export const HELP_CONTENT: HelpContent = [
                 },
                 {
                   "kind": "text",
-                  "text": " form on the workspace page; a member or a guest is told why it is not there instead of being shown a button that fails. If you are not an admin and your workspace has no projects, there is nowhere to put work, and an admin will have to add one for you. (§3)"
+                  "text": " form on the workspace page; a member or a guest is told why it is not there instead of being shown a button that fails. If you are neither an owner nor an admin and your workspace has no projects, there is nowhere to put work, and one of them will have to add one for you. (§3)"
                 }
               ],
               [
@@ -906,7 +906,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " form inside the workspace, and that is the only place a project can be created. Everybody else gets a sentence saying so instead of a button that fails — "
+                    "text": " form inside the workspace, and that is the only control that creates one. Everybody else gets a sentence saying so instead of a button that fails — "
                   },
                   {
                     "kind": "italic",
@@ -914,7 +914,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " For a member the control is not hidden; it is not offered. Nowhere else creates one: not the Workspaces page, not a settings screen, not the top bar."
+                    "text": " For a member the control is not hidden; it is not offered. Nowhere else offers it: not the Workspaces page, not a settings screen, not the top bar."
                   }
                 ]
               },
@@ -6960,11 +6960,11 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "Only if you are an admin."
+                    "text": "Only if you are an owner or an admin."
                   },
                   {
                     "kind": "text",
-                    "text": " An owner or admin gets a "
+                    "text": " Those two roles get a "
                   },
                   {
                     "kind": "bold",
@@ -6980,7 +6980,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " For anyone, there is no button on the Workspaces page, in settings, or in the top bar. A brand-new workspace has stages, job types and you as its owner, and nowhere to put a job until an admin adds one. For a member this is still the biggest hole in the product, and it sits right at the start of the journey."
+                    "text": " For anyone, there is no button on the Workspaces page, in settings, or in the top bar. A brand-new workspace has stages, job types and you as its owner, and nowhere to put a job until an owner or admin adds one. For a member this is still the biggest hole in the product, and it sits right at the start of the journey."
                   }
                 ]
               }
@@ -6995,7 +6995,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "An admin creates one, with the "
+                    "text": "An owner or admin creates one, with the "
                   },
                   {
                     "kind": "bold",

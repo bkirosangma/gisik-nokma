@@ -16,10 +16,10 @@ Read these five. They are the ones that catch everybody.
 1. **Sign in with the email link.** It is what the screen opens on, and on this deployment it is the
    way in. A **Phone** tab appears only where SMS delivery is configured, and it is not configured
    here — so the screen does not offer it. (§1)
-2. **You cannot create a project unless you are an admin.** An admin — and the owner — get a **New
+2. **You cannot create a project unless you are an owner or an admin.** Those two roles get a **New
    project** form on the workspace page; a member or a guest is told why it is not there instead of
-   being shown a button that fails. If you are not an admin and your workspace has no projects, there
-   is nowhere to put work, and an admin will have to add one for you. (§3)
+   being shown a button that fails. If you are neither an owner nor an admin and your workspace has no
+   projects, there is nowhere to put work, and one of them will have to add one for you. (§3)
 3. **You can put a job on a person only on the website — and you cannot set a due date anywhere.**
    The website's job panel has an "Assignee" picker. The phone and desktop apps have no Assignee row
    at all, so there you can neither see who a job is on nor set it. Due dates have no control on any
@@ -165,10 +165,10 @@ You become the **owner** of that workspace. It also sets you up with:
 ### The project problem
 
 **A brand-new workspace has no projects.** Whether you can make one depends on your role. An **owner or
-admin** gets a **New project** form inside the workspace, and that is the only place a project can be
-created. Everybody else gets a sentence saying so instead of a button that fails — *"Only an admin can
+admin** gets a **New project** form inside the workspace, and that is the only control that creates
+one. Everybody else gets a sentence saying so instead of a button that fails — *"Only an admin can
 create a project in this workspace."* For a member the control is not hidden; it is not offered.
-Nowhere else creates one: not the Workspaces page, not a settings screen, not the top bar.
+Nowhere else offers it: not the Workspaces page, not a settings screen, not the top bar.
 
 Jobs live inside projects. So a workspace with no projects has nowhere to put work.
 
