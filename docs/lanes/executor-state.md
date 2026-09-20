@@ -1,9 +1,16 @@
 # Serial executor — live state
 
-> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~17:0x IST. **THE SHEET'S THREE MISSING SURFACES ARE BUILT,
-> # GATED AND GREEN. THE PR IS THE ONLY THING LEFT.**
-> Branch **`exec/sheet-surfaces`**, cut from **`origin/main` = `e9c1a04f`** (the `#591` merge). One PR,
-> `--base main`. **You do not merge.**
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~18:0x IST. **THE SHEET'S THREE MISSING SURFACES ARE BUILT,
+> # GATED AND GREEN AT THE FOLDED TREE. PR #594 IS OPEN AND WAS SENT BACK FOR ONE REASON: NO REVIEWER
+> # PASS WAS RECORDED IN ITS BODY. THAT PASS IS IN FLIGHT.**
+> Branch **`exec/sheet-surfaces`**, **rebased onto `origin/main` = `19c998e5`** (the `#592`/`#593`
+> merges — verified docs-only here: the four commits touch `docs/lanes/controller-state.md` and
+> `docs/lanes/owner-holds.md` and NO other file), one PR, `--base main`. **You do not merge.**
+> **⚠ `19c998e5` IS NEWER THAN THE `e9c1a04f` THIS DISPATCH NAMES.** The controller ordered the fold so
+> that HEAD IS THE LANDING TREE and the forced gate runs at the tree that lands rather than at a
+> composite. After the rebase `rev-list --left-right --count origin/main...HEAD` reads **`0 5`**.
+> **No `pnpm install` was run and none was needed — verified, not assumed: no `package.json`,
+> `pnpm-lock.yaml` or `pnpm-workspace.yaml` appears in `origin/main..HEAD`.**
 > **⚠ THIS FILE'S PREVIOUS TOP BLOCK WAS STALE AND TOLD A RELAUNCHED EXECUTOR TO OPEN A PR THAT HAD
 > ALREADY MERGED.** It said `exec/sheet-footer`'s PR was "the only thing left"; **PR #591 merged at
 > 07:56Z** (`mergeCommit e9c1a04f`, `headRefOid 614649a2`) and `origin/main..HEAD` was EMPTY. That is the
@@ -39,14 +46,26 @@
 >   and in the PR body for the owner to reverse — the call site is one prop list.**
 > - **§2(a)'s toolbar measurement was RIGHT and is confirmed** (six commands, all present at 3.30.5).
 >
-> ## ANCHORS, RECOUNTED AT THIS TREE
-> - **gate** `pnpm turbo run build test typecheck --concurrency=1`: **EXIT=0 · 33/33 · 1m37s**.
+> ## ANCHORS, RECOUNTED AT THIS TREE — **AFTER the rebase onto `19c998e5`**
+> - **gate** `pnpm turbo run build test typecheck --concurrency=1`: **EXIT=0 · 33/33 · 1m42.6s**, run at
+>   the REBASED head (the pre-rebase run at `e9c1a04f` was EXIT=0 · 33/33 · 1m37.4s; **both are this
+>   executor's evidence — the controller runs the forced gate**).
 >   **Node `v22.22.2`** (`pnpm exec node --version` also v22.22.2 — the `pnpm` BINARY is v24's because
 >   v22's bin dir carries no pnpm; the node it spawns is v22, which is what the gate names).
 >   **server 1640 · app-core 1655 · web 598 · ui 373 · domain 525 · rule-engine 345 · editor 188 ·
->   sync-client 90 · mcp-server 44 · mobile 29 · desktop 9 — 5,496 tests.**
->   **Every delta is exactly what this round added:** app-core 1645 → **1655** (+10), editor 178 → **188**
->   (+10), ui 372 → **373** (+1). Nothing else moved.
+>   sync-client 90 · mcp-server 44 · mobile 29 · desktop 9 — 5,496 tests**, **byte-identical before and
+>   after the rebase**, which is the measurement that says the fold changed nothing but history.
+>   **Every delta against the pre-round baseline is exactly what this round added:** app-core 1645 →
+>   **1655** (+10), editor 178 → **188** (+10), ui 372 → **373** (+1). Nothing else moved.
+> - **THE CITATION SWEEP, RUN LAST AND OVER THE DIFF RATHER THAN OVER MY OWN FILES.** Every `file:line`
+>   added by this branch was resolved BY CONTENT. **Five citations to `ticket-state.ts:150` were all
+>   stale — the write is at `:160`** — and four of those also named the `ticket.field_set` reduction as
+>   `:273-284` when it is at **`:299`**. They were ALREADY WRONG ON `origin/main` (that file is not in
+>   this diff); one of the five lived in `apps/web/test/description-editable.test.tsx`, a file this
+>   branch otherwise never opens, and was corrected anyway rather than left as the one unmade copy of
+>   five. **A sixth was MINE and had shifted under this very change**: `currentStateName` was at
+>   `:942-945` when I wrote the PR body and is at **`:1063`** now. A stale citation still RESOLVES, so
+>   nothing about reading it tells you it is wrong — that is why this is swept last.
 > - **seven repo checks pass**: `check:env`, `check:tasks`, `check:migrations`, `check:runbook`,
 >   `check:citations`, `check:help`, and `node scripts/check-case-ids.mjs` (**there is no
 >   `check:case-ids` npm script — it is run directly**).
