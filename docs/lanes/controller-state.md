@@ -31,6 +31,54 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 SUNDAY 2026-09-20 ~14:0x IST — **CYCLE 23: TWO MERGES, THE OWNER RULED THE DELETE DOOR, AND A DISPATCH WAS CORRECTED MID-FLIGHT BECAUSE ITS OWN INSTRUCTION WOULD HAVE COMPILED AND THEN FAILED AT RUNTIME.** `main` is `6d1b7123`; **zero open PRs**; ledger **307 done / 1 todo** (struck).
+
+### 1. THE TWO MERGES — every reading at the landing tree
+| | `#591` (exec 1, the sheet footer) | `#592` (controller, the rebalance + the register) |
+|---|---|---|
+| head, frozen at the gate | `614649a2` | `7ac41abe` |
+| merged as | **`e9c1a04f`** | **`6d1b7123`** |
+| tree identity | **EXACT** | **EXACT** |
+| forced gate | `EXIT=0` · 33/33 · 0 cached · `NODE=v22.22.2` · `Unsupported engine` **0** · no orphans | same |
+| seven checks | all rc=0; `check-case-ids` **2497 / 16.84** | all rc=0; `check-case-ids` **2497** |
+| drop check + control | **0 bytes** / control 281 KB | **0 bytes** / control 18,656 B |
+**`#591` WAS REBASED ONTO `4274b372`; `#592` ONTO `e9c1a04f`** — **each base moved under its branch mid-round**, and in both cases the gate was run at the **LANDING TREE**, never transferred from an earlier one.
+
+### 2. 📌 THE OWNER RULED THE DELETE DOOR — *"as shipped works. for the delete permission."* **THIS CLOSES THE LAST OPEN RULING REQUEST.**
+`#591` found that **nothing gated `ticket.deleted` at all**. Verified here rather than relayed: at `4274b372`, `check-permission.ts` contains **no** `ticket.deleted` authority check (positive control: the file is present, 62,275 B), so deletion fell through to check 4's `canSee` — **which is exactly the guest path.** Exec 1 applied the conservative default (`hasProjectAdminRights`) and asked whether to narrow it to owner + workspace admins. **The owner ruled it stands as shipped: owner OR workspace admin OR that project's `projectAdmin` flag. `ticket.restored` is gated the same way. Nothing is owed.**
+📌 **"Which roles may delete a ticket" is now ANSWERED — do not re-ask it.**
+
+### 3. ⚠ THE DISPATCH CORRECTION THAT OUTLIVES THE TASK — **THE BRIEF'S OWN INSTRUCTION WOULD HAVE COMPILED AND THEN FAILED AT RUNTIME**
+Exec 1 corrected its own dispatch mid-flight, and the correction is worth more than the task:
+1. **There was no route to add** — the ingest door dispatches on the **registered type**, and `evaluateEvent`'s **default arm accepts an unlisted one**, so the door already existed.
+2. **There was no choke point for the read filter** — the **assembler is shared; the SELECTs are not.**
+3. ⛔ **AND THE DISPATCH TOLD THE IMPLEMENTER TO FOLD THE PREDICATE INTO `visibleTicketsWhere`, WHICH WOULD HAVE COMPILED AND THEN FAILED AT RUNTIME** — `visibility/visible-tickets.ts` selects `FROM proj_visibility v` with **no `t` alias at all.** **A dispatch sentence naming a function is not evidence that the function can host the change.**
+
+### 4. ⚠ A RECORDED RESIDUAL RISK — **ELEVEN SITES CARRY THE NEW READ PREDICATE AND TEN ARE UNCONSTRAINED**
+`#591`'s reviewer **proved** it rather than asserting it: mutating each site to `AND TRUE` leaves the whole server and app-core suites **green**, while `AND FALSE` reddens them — **executed-but-unconstrained paths, not mutations that never ran.** One is now covered; **the other ten are named in that PR's body.** ⚠ **On a soft delete this is the shape that matters: a later edit can un-filter a site and nothing will say so.** **Do not treat the suites as covering the predicate.**
+
+### 5. ⚠ THE HANDOFF IS STALE BY CONSTRUCTION, AND THE LANE CAUGHT IT
+Restarting exec 1 onto item 3, it read its own merged handoff and reported: *"the handoff is stale — it tells a relaunched executor to open a PR that already merged."* **The mechanism is structural: the handoff is the tip commit, and a commit cannot know its own PR merged.** It refused the instruction and re-derived its position. **Recorded because this is the RESPONSIBLE-SOUNDING failure — a lane that follows its handoff exactly will try to re-open a merged PR.**
+
+### 6. THE QUEUE ON `main` IS NOW THE REBALANCED ONE, AND IT IS LIVE
+§4 on `main` — verified from `origin/main` **after** `#592` landed, not from the branch — reads **exec 1: items 3 and 4**; **exec 2: items 2, 5, 6 and 7**; item 8 HELD. **Items 5–7 moved off exec 1 on the owner's *"go"*.** Cycle 22 wrote the lane-assignment rule; §4 is the allocation.
+
+### 7. IN FLIGHT AT HANDOVER
+| lane | task | state |
+|---|---|---|
+| exec 1 | **The three sheet surfaces** — toolbar, inline title, three-crumb breadcrumb | `exec/sheet-surfaces`, cut from `e9c1a04f`; now locating the sheet's CSS; Ctx 14 %. **Prototype re-measured here rather than relayed: `descTools` is SIX buttons at `desktop.dc.html:1167-1169`, and the `Markdown:` hint line is at `:1172`** — ⚠ **the number the lane reported was `:1173`, which is a BLANK line. A one-line citation relayed without measuring is exactly the defect this file keeps recording.** |
+| exec 2 | **The ticket key** `CCSO-1183` | `exec/ticket-key` @ `2307cdfa`, **5 ahead / 8 behind**, 10 files uncommitted, Ctx 41 % |
+⚠ **exec 2 was 2 behind `main` at cycle 22 and is 8 behind now** — `#591` and `#592` both landed under it. **Its PR will need a rebase, and it is the lane now holding the deeper queue.**
+
+### 8. WHAT THE NEXT CONTROLLER SHOULD DO FIRST
+1. **Capture both panes** (`gisik:1`, `gisik:2`).
+2. **Re-measure every anchor at the sha you report**, from a worktree **pinned at that sha** — never the primary checkout, which is behind.
+3. **CI is the billing-blocked shape** (annotation: *"the job was not started because recent account payments have failed"*). **Owner-waived 2026-09-06, not treated as green, NOT to be re-asked.**
+4. ⚠ **A LANE CAN BE DOWN AND LOOK BUSY** (the 402 lesson). **Check the pane's last ERROR line, not the spinner.**
+5. ⚠ **RE-ARM THE PR WATCHER.** It **exits when it fires**, so every detection disarms it — that is the topology's one documented blind spot, and it bit here: the watcher that caught `#591` was gone by the time `#592` merged.
+
+---
+
 ## 🔄 SUNDAY 2026-09-20 ~13:1x IST — **CYCLE 22: THE OWNER ASKED WHY EVERY QUEUED TASK SAT ON ONE LANE — IT WAS DRIFT, NOT A CONSTRAINT — AND THE REGISTER'S FALSE MOUNT SENTENCE IS CORRECTED.** `main` is `4274b372`; **zero open PRs**; ledger **307 done / 1 todo** (struck).
 
 ### 1. THE DEFECT THE OWNER CAUGHT
