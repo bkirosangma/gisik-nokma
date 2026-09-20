@@ -1199,7 +1199,7 @@ function ProjectBoard() {
    *
    * THREE mechanisms fold into this ONE pass as of 2026-09-20, not two:
    * `boardFilter` (Task 4) drops CARDS, never a column or a group —
-   * `board.tsx:216-219`'s own rule, still exactly true of that mechanism on
+   * `board.tsx:66`'s own rule, still exactly true of that mechanism on
    * its own — while `workflowFilter` above (Ruling R3, Task 8) drops whole
    * GROUPS, by construction, whenever a specific workflow is picked. The
    * per-card predicate below is `keepGroup && matchesBoardCard(...)`, so

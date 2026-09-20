@@ -142,8 +142,13 @@ export type CalendarModelOptions = CalendarMonth & {
    * `collectItems` — so an epic's bar, its markers and its custom-date claims
    * are all absent — and *after* `byId` is built from the complete input set,
    * which is what keeps an ancestor this narrowing removed still naming the
-   * lane its child belongs to. The timeline at `:224` states that ordering as a
-   * rule; this option is bound by it.
+   * lane its child belongs to. The timeline states that ordering as a rule,
+   * over the `byId` it builds at `timeline-model.ts:242-243` — *"Built from ALL
+   * inputs, before narrowing: an ancestor removed by a filter still names the
+   * lane its child belongs to"* — and this option is bound by it. ⚠ The line
+   * numbers moved when this option's own docblock landed above them; the
+   * QUOTED SENTENCE is the part that does not rot, so it is the part to measure
+   * against if the numbers have drifted again.
    *
    * **It counts as a NARROWING rather than as a silent drop**, deliberately:
    * an epic is a real ticket whose claims really are in this month, so a grid
