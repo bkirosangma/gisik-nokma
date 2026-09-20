@@ -1,5 +1,40 @@
 # Serial executor — live state
 
+> # ▣ CURRENT POSITION — 2026-09-20. **THE BREADCRUMB IS THE ANCESTOR CHAIN AND THE PARENT INDICATOR IS MERGED. COMMITTED, FOLDED, GATED, MUTATION-WITNESSED. CASES `16.63`–`16.71`. THE REVIEW IS IN FLIGHT AND THE PR IS NOT YET OPEN.** Branch **`exec/breadcrumb-ancestors`**, pushed.
+>
+> ## ⛔ THE DISPATCH'S §1 PREMISE WAS FALSE — READ THIS BEFORE RE-TRYING THE TASK
+> The dispatch says *"`#595` shipped the key, so use it."* **It shipped the key's COMPOSITION and the two PREFIXES, not the key to any screen.** The NUMBER had **no route consuming it** — `grep -rn "ticket-numbers" apps/server/src/` returns ONE hit, its own file, with `listVisibleTickets`→`routes/tickets.ts` and `visibleProjects`→`routes/workspaces.ts`,`my-work.ts` firing as positive controls on the same sweep; the whole-repo sweep minus `dist/` finds only `test/read/ticket-key.test.ts`. `Features.md:455` says it outright: *"NO SCREEN RENDERS IT YET"*, and enumerates this very crumb as a `·` site owned by *"the lane that next touches the sheet"*. **So the key crumb was a WIRE change.** Full write-up: `gisik-nokma-lanes/EXEC-2026-09-20-breadcrumb-scope-finding.md`.
+>
+> ## THE SHAPE THAT SHIPPED — read before touching any of it
+> - **The chain is `workspace › project › [epic] › [parent] › KEY`**, the authority's own `sheetCrumbs` (`desktop.dc.html:3404-3425`). ⚠ **The STATE crumb is GONE and should never have been there** — the authority has none, and the sheet was built to `Workspace › Project › State` because the state was *"the one crumb whose source is IN this component"* while the ancestor chain *"would need a third host prop or a read"*. **The cheap reading was built and the authority's actual chain was not.** The state is still on the sheet (its own chip); case `16.63` asserts both halves.
+> - **An ancestor crumb is a LINK** through the same optional `onOpenTicket` the badge uses, and a PILL with no callback. A RESTRICTED ancestor is NAMED, never dropped (dropping it makes a restricted chain render SHORTER — invariant 5).
+> - **The last crumb is `TicketRead.key`**, falling back to the TITLE when it is `null` — **never to `state.id`** (a ULID is not a key).
+> - **The parent indicator is MERGED** (owner ruling): the badge moved UP into the `gn-ticket-sheet__parent` position and the chip left the subtasks header. Three facts, still distinguishable: visible → `Subtask of {title}`; restricted → `Restricted parent — exists, but you can't see it`; root → `At project root`. The wrapper KEEPS the `gn-ticket-sheet__parent` class so its CSS rule is not orphaned.
+> - ⚠ **TWO SERVER DECISIONS, both reviewable:** the key is served COMPOSED from the detail route (one composer, `ticketKey`); the epic is walked with the ROUTE'S OWN `canSee` precedent, one hop at a time — **NOT** `routes/list.ts`'s recursive CTE, which carries a SQL visibility expression this route forbids (*"No SQL here re-states who may see what"*). The walk resolves the nearest **PROPER** ancestor, unlike the board's ancestor-**or-self** grouping.
+> - ⚠ **`epic` and `key` answer `null` OFFLINE**, with owners named, following `visibility`/`rollup`'s precedent.
+>
+> ## EVIDENCE AT THE FROZEN TREE (`82cec86e`)
+> - **`pnpm turbo run build test typecheck --concurrency=1` → `EXIT=0`, 33/33.** 5,658 passed, 5 skipped. Node **v22.22.2** (`pnpm exec node --version`). app-core 1715 · server 1695 (+5 skipped) · web 622 · domain 548 · ui 373 · rule-engine 345 · editor 188 · sync-client 90 · mcp-server 44 · mobile 29 · desktop 9.
+> - ⚠ **The gate was re-run AT THE FOLDED TREE, and that mattered**: the fold delivered `ticket-sheet-comments.test.tsx` (exec 2), whose own `TicketRead` literal then needed the two new fields. A count carried across a fold has expired.
+> - **MUTATION BATTERY: nine mutations, all nine killed AT THE FOLDED TREE, every run asserting its test count**, restored checksum-verified after each. M1 link opens the ticket's own id → `16.64` only · M2 epic crumb dropped → `16.63`,`16.64`×2,`16.65` · M3 null-key fallback → `state.id` → `16.66` only · M4 restricted arm removed → `16.65` only · M5 walk starts at the ticket (ancestor-or-self) → `16.70` · M6 project prefix dropped → `16.69` · M7 every ancestor is epic-rank → `16.70` both arms · M8 mapper null-vs-absent inverted → `16.71` · M9 mapper `epic` hard-coded null → `16.71` only.
+> - ⚠ **THE FIRST RE-RUN WAS INVALID AND ITS FAILURE MODE IS SILENT:** the harness restored only at the END, so M2 was still applied when M3 ran and M3's report was **M2+M3 STACKED** — five reds, identical to M2's. **A stacked mutation looks exactly like a broad one.** Restore before the NEXT mutation, always.
+> - **RATCHET +9**, against `origin/main`'s OWN script over its OWN tree, with a control on the same path: `origin/main` **2582** → this tree **2591** → one id minted here **2592** (style count moves exactly one). Re-measured after the fold, not carried.
+> - `check:citations` · `check:help` · `check:tasks` · `check:env` · `check:migrations` (0 new) · `check:runbook` — all rc 0. ⚠ **`check:db-tz` NOT run** (environment gate); **not red, not green.** CI fails every job before its first step (billing) — no CI signal claimed.
+>
+> ## THE ID BLOCK — the controller reallocated mid-flight
+> - ⚠ **THE CONTROLLER REALLOCATED `16.72`–`16.80` TO EXEC 2 WHILE THIS WORK WAS IN FLIGHT.** This lane had already minted to `16.75`; **thirteen assertions were brought inside the nine-id block `16.63`–`16.71` by grouping arms of one property under ONE id — never by dropping an arm.** The allocation table and the per-id `it` groupings are in `test-cases/16-remaining-doors.md`. **Exec 1's `3b` allocation is fully spent; exec 1 must ASK before minting.**
+>
+> ## ANCHORS (a READING at a moment; re-read before freezing)
+> - branch **`exec/breadcrumb-ancestors`**, merge-base **`534c450b`**, HEAD **`82cec86e`**, `rev-list --left-right --count origin/main...HEAD` reads **`0 3`** — ⚠ **re-read it; `origin/main` moved 13 commits under this branch once already, and a peer's fetch moves it without yours.**
+> - **THE DURABLE ANCHOR IS THE PR.** ⚠ **There is NO PR yet** — the review is in flight. Settle it with `gh pr list --state all --head exec/breadcrumb-ancestors`.
+>
+> ## WHERE I AM / WHAT IS IN FLIGHT
+> - **In flight: the independent review and the PR.** Branch pushed; remote head == local head (`82cec86e`). Everything else is done.
+> - **Open to the controller (no ruling needed to proceed):** the two wire decisions above, reported rather than assumed; and the confirmation that the reallocation was absorbed by grouping rather than by dropping coverage.
+> - **Next after this merges:** the controller's next dispatch. Queue items 7 (visibility section styling) and 8 (markdown editing) are still QUEUED with no dispatch written.
+> - **Method notes worth keeping:** (1) **a mutation harness must restore before the NEXT mutation**, or you measure a stack and it reads as breadth; (2) **`applyAll` in `test/helpers/seed.ts` carries exactly FOUR projections** and `ticket.type_defined` is not among them — a fixture that seeds a ticket type through it writes the event and no row, and the case reddens as "the walk found no epic"; apply the one projection by hand, as `seedWorkflowDef` does; (3) a dispatch sentence is a claim like any other — §1's was false and the whole task's shape changed with it.
+
+
 > # ▣ CURRENT POSITION — 2026-09-20. **THE ADD-SUBTASK AFFORDANCE IS BUILT, MUTATION-WITNESSED, REVIEWED, FOLDED AND COMMITTED. CASES `16.91`–`16.95`. ONLY THE PR IS OUTSTANDING.** Branch **`exec/subtask-affordance`**.
 >
 > ## THE SHAPE THAT SHIPPED — read this before touching any of it
