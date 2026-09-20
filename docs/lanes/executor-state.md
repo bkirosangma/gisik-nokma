@@ -1,6 +1,33 @@
 # Serial executor — live state
 
-> # ▣ CURRENT POSITION — 2026-09-21. **THE `replica-data-source.ts:205` "SIX CALL SITES" DISPATCH IS ANSWERED: THE COUNT IS NOW A PHRASE — AND RE-MEASURING IT FOUND THE AUTHORITY STALE TOO.** Branch **`exec/replica-callsite-count`**, one PR, `--base main`. **I do not merge.**
+> # ▣ CURRENT POSITION — 2026-09-20 (16:2x IST). **THE THREE-EMPTY-STATES DISPATCH IS MEASURED AND ANSWERED AS FAR AS IT CAN BE WITHOUT THE WORDS. I AM HOLDING — COPY IS THE OWNER'S AND HAS NOT ARRIVED.** Branch **`exec/empty-states-epic-rule`**, cut from **`origin/main`**, one PR, `--base main`, **not yet opened**. **I do not merge.**
+>
+> ## ⚠ READ THIS FIRST — ANCHORS ROT, AND THE NARRATIVE BELOW CARRIES SHAS THAT ARE NOT ANCHORS
+> **Every sha written in prose anywhere in this file is unreliable.** The anchors are the lines below and they are a READING at a moment. `git branch --contains` (not `cat-file`, which passes on reflog-only commits) settles reachability; `gh pr view <n> --json state,mergeCommit` settles whether a PR is open — **check that before acting on any "open/paused/NEXT STEP" line.**
+> **Use `/usr/bin/git` for anything sha-bearing: the `rtk` proxy returned a WRONG `git log` reading this session (it printed a commit that is not `origin/main` as though it headed `origin/main`).** The proxy is fine for prose; it is not evidence for a sha.
+>
+> ## ANCHORS AT THIS TREE (recounted, not carried forward)
+> - **branch `exec/empty-states-epic-rule`**, cut from **`origin/main = bd8b58ef`** (the `#603` merge). `rev-list --left-right --count origin/main...HEAD` read **`1 0`** at the cut — the one commit `origin/main` has that this branch does not is the merge commit itself, **so no fold is needed and none was done. If `origin/main` has moved since, FOLD BEFORE FREEZING.**
+> - ⚠ **My earlier `exec/replica-callsite-count` work is MERGED as `#603`** — `205fbbc1` is an ancestor of `origin/main` (`git branch --contains` lists both). That dispatch is closed; do not restart it from the block below.
+> - **working tree clean**, no untracked files. Nothing under `reference/` touched.
+> - **Measurements this cycle are readings of `origin/main`'s CONTENT**: this branch's tree and `origin/main`'s tree both hash **`9ba7801d`**. A fold cannot have changed any reading below.
+> - **THE DURABLE ANCHOR IS THE PR, not a sha** — `gh pr view <n> --json headRefOid,state,baseRefName,mergeCommit`. **`baseRefName` must read `main`.**
+>
+> ## WHAT THIS CYCLE FOUND — three sites, one extra, and the copy is NOT written
+> **Full write-up: `gisik-nokma-lanes/EXEC-RULING-REQUEST-2026-09-20-epic-empty-states.md`** — read that, not this summary; it carries the per-case evidence and the states table.
+> - **13.1043 Board** (`EMPTY_BOARD_COPY`): the epic drop does **NOT** count as a narrowing for the board (deliberately — the file argues a permanently-false narrowing claim is worse), so `isNarrowed` stays false and the sentence renders. *"No tickets **yet**"* attributes the absence to the PROJECT, which is the falsity. ⚠ The board **route** also excludes closed and backlog tickets **in the query**, so this gate has two older doors the case wording does not name.
+> - **13.1044 Backlog** (`emptyCopy` prop, `TicketList`): **I expected a header-plus-sentence self-contradiction and there is none** — with no surviving child there is no section at all. The falsity is instead stronger than the Board's: *"Nothing in the backlog"* denies a member of the set it names (`stateId === BACKLOG_STATE_ID` is the very field the drop predicate reads). ⚠ **The "Only tickets in progress" toggle is a SECOND, pre-existing falsity of this same sentence** — read in the source, **not executed by me**.
+> - **13.1045 Calendar + Timeline**: the epic exclusion sits **inside `visible`**, which is what makes it **the one narrowing the MODEL CAN SEE** — `narrowedOutOfGrid`/`narrowedAway` go true and the exhaustive sentences are correctly gated off (13.1035 exercised for real). The first clause is TRUE; **the third clause's enumerated list of causes is what omits the epic rule.** ⚠ **This is the one site where the fix is COPY ONLY** — unlike executor 2's closed-hide door, which needs the fact moved to the model. Two decisions, one symptom, different repairs: do not conflate them.
+> - ⚠ **A FOURTH SITE the dispatch does not name: `EMPTY_COLUMN_COPY` (*"No tickets in this column."*)**, reachable on the SAME screen as 13.1043 (13.466's fixture proves columns render under an empty board). Mechanism and render condition read; **end-to-end render NOT measured** — that is the claim least sure here, and the only one whose failure shrinks the ask from four sentences to three.
+>
+> ## WHERE I AM / WHAT IS IN FLIGHT
+> - **HOLDING, on the owner's words.** No source file, no `Features.md`, no `test-cases/` file changed; **no PR opened**; no case minted (the three are already minted, so the ratchet delta is **ZERO** and will be asserted **with a control** when the words arrive).
+> - **There is no work outstanding that does not depend on the copy.** This is a genuine hold, not a paused task.
+> - **When the words arrive:** apply verbatim → flip `13.1043`/`13.1044`/`13.1045` → fold `origin/main` → land the handoff → record the review pass in the body **before** the PR opens → one PR, `--base main`.
+>
+> # ▣ SUPERSEDED BY THE BLOCK ABOVE.
+>
+> > # ▣ CURRENT POSITION — 2026-09-21. **THE `replica-data-source.ts:205` "SIX CALL SITES" DISPATCH IS ANSWERED: THE COUNT IS NOW A PHRASE — AND RE-MEASURING IT FOUND THE AUTHORITY STALE TOO.** Branch **`exec/replica-callsite-count`**, one PR, `--base main`. **I do not merge.**
 >
 > ## ⚠ READ THIS FIRST — ANCHORS ROT, AND THE NARRATIVE BELOW CARRIES SHAS THAT ARE NOT ANCHORS
 > **Every sha written in prose anywhere in this file is unreliable.** The anchors are the lines below and they are a READING at a moment. `git branch --contains` (not `cat-file`, which passes on reflog-only commits) settles reachability; `git pull`-less `gh pr view <n> --json state,mergeCommit` settles whether a PR is open — **check that before acting on any "open/paused/NEXT STEP" line, a failure this file has now produced six times. The sixth was the block this one replaced: it said the `epics` PR was open and #602 had MERGED as `14965a51`.**
