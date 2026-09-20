@@ -324,6 +324,80 @@ describe('3.135 the minted link is shown once, and the list never carries one', 
 });
 
 /**
+ * 16.46 THE PENDING-INVITATIONS HEADING — the count and the list are one
+ * reading, and the heading is the authority's own.
+ *
+ * `desktop.dc.html:725` draws `<p>{{ inviteHeading }}</p>` and `:3091` defines
+ * it as `"Pending invitations · " + s.invites.length`. The product drew no
+ * heading for this list at all, which `test-cases/16` recorded as an
+ * unrecorded omission rather than a scope decision — this change is that
+ * dispatch, and the case is where the omission was recorded.
+ *
+ * ⚠ THE EXPECTATIONS ARE LITERAL STRINGS ON PURPOSE, and neither is built by
+ * calling the component's own code. An expectation the implementation also
+ * produces cannot fail when that implementation changes — this repo's most
+ * frequently recorded shape of a check that cannot fail. The middot is pinned
+ * as a character, so a transcription that reached for a hyphen or a lookalike
+ * dot reddens here rather than shipping.
+ */
+describe('16.46 the pending list carries its heading, and its count is the list it heads', () => {
+  const SECOND: PendingInvite = {
+    ...PENDING,
+    inviteId: '01J9INVITE00000000000000CD',
+    address: 'tengsak@example.test',
+  };
+
+  it('names the section with the count the list renders — two rows, two', async () => {
+    mount({ listPending: async () => [PENDING, SECOND] });
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Pending invitations · 2' }),
+    ).toBeInTheDocument();
+    // The heading and the rows are ONE reading, and that is the point of the
+    // case rather than a decoration: asserted by COMPARISON against the rows
+    // this same render drew, so a fixture that grew could not make the two
+    // agree by accident while the component had stopped counting.
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('and one row reads one — the number is a count rather than a constant', async () => {
+    mount({ listPending: async () => [PENDING] });
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Pending invitations · 1' }),
+    ).toBeInTheDocument();
+  });
+
+  /**
+   * THE EMPTY CASE IS A DECISION, not an accident, and this is the arm that
+   * records which one was taken. The authority draws the heading
+   * unconditionally inside its `isInviteAdmin` block (`:722`–`:725`), above
+   * the `noInvites` sentence (`:740`); and the sentence below ALREADY claims
+   * the list is empty, so `· 0` repeats a claim the list was making rather
+   * than making a new one. Hiding the heading at zero would instead leave the
+   * section unnamed exactly when a reader needs to know what the empty thing
+   * is. Both halves are asserted, so "the heading is gone" and "the heading is
+   * there over the empty sentence" cannot be confused for one another.
+   */
+  it('renders `· 0` with no invitations, over the sentence that says so', async () => {
+    mount({ listPending: async () => [] });
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Pending invitations · 0' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('No invitations are outstanding.')).toBeInTheDocument();
+  });
+
+  /**
+   * The heading sits INSIDE the same gate as the list it heads. A heading that
+   * outlived its list would name a section a member cannot see — and the gate
+   * is the door's own 403, not a client-side role read (3.129).
+   */
+  it('is absent for a member, along with the list it heads', async () => {
+    mount({ listPending: async () => Promise.reject(new InviteAdminError(403, ADMIN_ONLY)) });
+    await waitFor(() => expect(screen.getByText(ADMIN_ONLY)).toBeInTheDocument());
+    expect(screen.queryByRole('heading', { name: /^Pending invitations/ })).toBeNull();
+  });
+});
+
+/**
  * 3.136 — revoke goes through the ORDINARY ingest door.
  *
  * `invite.revoked` is a registered domain event, and it is in
