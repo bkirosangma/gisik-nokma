@@ -1,4 +1,93 @@
-## ▲ TOP BLOCK — **THE VIEWPORT SUITE REACHES THE GATE, AND THE BODY FLOOR SPLITS RATHER THAN DROPPING.** (2026-09-20, cycle 25)
+## ▲ TOP BLOCK — **THE DELETE FILTER IS NOW HELD BY A TYPE, NOT BY CONVENTION.** (2026-09-20, cycle 25, task 2)
+
+### § 0 — WHERE TO FIND IT
+
+- **Branch `exec2/soft-delete-constraint`**, cut from **`origin/main` = `a5b58c4a`**.
+- **Anchors are RECOUNTED in § 2, and § 2 is the authority.** ⚠ The window is stated there: the commit carrying
+  this block moves the commit count by one, so a restart that measures one more than the table says is seeing
+  **this file's own landing**, not a foreign push.
+- The PR is **not open yet** at the moment this block was written — the independent review is in flight. Settle
+  it with one call: `gh pr list --state all --head exec2/soft-delete-constraint`.
+
+### § 1 — WHAT THIS TASK WAS, AND WHAT IT FOUND
+
+Dispatch `CTL-DISPATCH-2026-09-20-softdelete-constraint.md`: build a **type-enumerated behavioural invariant**
+over the soft-delete read predicate, two arms, mutation-proven, and **not** a source scanner. Owner approved the
+shape verbatim: *"suggestion of the constraint: sounds good. proceed with it."*
+
+**TWO FINDINGS, both from measurement rather than reading — and the first is the important one.**
+
+1. ⛔ **A soft-deleted ticket's ATTACHMENTS ARE STILL SERVED, while the ticket itself 404s.** Measured in one
+   run, one ticket, one real door: before the delete the pair answers `200/200`; after `ticket.deleted` the
+   detail route answers **404** and the attachments route answers **200 carrying the file**. The attachments
+   GET (`routes/tickets.ts` ~`:628`) and POST-upload (~`:503`) routes guard on `loadTicketRow` + `canSee` and
+   **not** on `deleted`; `canSee` by its own ruling (`read/visible-where.ts:136-139`) does not mean "not
+   deleted"; the sibling detail route carries the third guard they lack (`:365`). **Symmetric on the write
+   side.** **NOT fixed** — brief: *"recorded with a named owner, not fixed"*, and one branch per task.
+   Full write-up: `gisik-nokma-lanes/EXEC-2026-09-20-softdelete-attachment-leak.md`. Reported to the controller
+   the same hour. **A case (16.90 ❌) records it**, and both arms publish it as a surface they cannot see.
+2. ⚠ **MY OWN FIRST MUTATION BATTERY WAS BROKEN, AND IT PRODUCED SEVEN FALSE KILLS.** Passing the search text
+   through a double-quoted perl program made perl interpolate `${LIVE_TICKET_WHERE}` to the empty string, so the
+   substitutions produced `AND TRUE${LIVE_TICKET_WHERE}` — **invalid SQL**. Seven "kills" were HTTP 500s: a red
+   for a reason unrelated to the property. Redone with the values passed through the **environment**; the
+   corrected script additionally refuses any mutation that leaves `${` on the line. **14/14 now die naming the
+   right surface, with no skips, the constant's mark count dropping by exactly one each time.** The lesson is
+   the repo's own: *every mutation you keep should fail specifically enough to identify its own site.*
+
+**Also measured, and it changes a docblock claim:** the dispatch and one sentence in `visible-where.ts` both
+say **"eleven"** sites. Neither is reproducible. The symbol sweep gives **13 executable uses of the constant +
+1 hand-written predicate at `rollup.ts:263` = 14**, and it must be run for the **SYMBOL** — a search for the
+literal `deleted_at` reports ZERO in the two sweeps because they splice the named constant.
+
+### § 2 — ANCHORS, RECOUNTED AT THIS TREE
+
+| anchor | value |
+|---|---|
+| `git merge-base origin/main HEAD` | **`a5b58c4a` — equal to `origin/main` at the cut** |
+| the commits | `798fcc82` (both arms) · `737a203f` (cases 16.88–16.90) · *this handoff* |
+| tree | clean apart from the two new test files until they were committed |
+| **this lane's id BLOCK** | **`16.88`–`16.99`** — minted `16.88`–`16.90`, next free **`16.91`** |
+| `check:case-ids` | **2572 unique / highest 16.90** here; **2569 / 16.87** at `origin/main` — **delta exactly +3**; same-file control 69 → 72 markers |
+| `check:citations` | rc 0 — `16-remaining-doors.md: 70 cited / 0 uncited / 70` (baseline 0) |
+| `check:env` · `check:help` · `check:runbook` · `check:migrations` | rc 0 each |
+| `apps/server` typecheck | rc 0 |
+| the two new suites | **12 passed / 0 failed** |
+| impacted-dir regression (`test/read test/integration test/notifications test/auto-close`) | **18 files / 250 tests, all pass** |
+| the mutation battery | **14/14 KILLED**, each naming its own surface, no skips |
+| the tripwire's own mutation | widening `DataSourceQuery` by one member → **TS2322 at the tripwire**, plus the two implementers |
+| ⚠ the forced gate | **NOT run — it is the controller's.** |
+| ⚠ cold/CI | nothing here ran in CI; GitHub Actions has failed every job for weeks (`controller-state.md`). |
+
+### § 3 — HOW TO RE-RUN THE EVIDENCE
+
+- Mutation battery script (corrected): `/tmp/exec2-softdelete/battery2.sh`. It backs each file up with `cp`,
+  refuses a mutation that did not apply, refuses one that leaves `${` behind, runs both suites, and restores.
+  ⚠ `/tmp` is not durable across a reboot — it is written down here so it can be rebuilt from the commit
+  messages, which carry the script's whole argument.
+- The tripwire's mutation is in § 2's last-but-two row; it needs an `app-core` **rebuild** between the source
+  edit and the typecheck, because the type resolves through `dist`.
+
+### § 4 — OPEN, AND WHAT IS NOT COVERED
+
+- **The attachments leak** — owner: whoever next picks up the attachment surface / the soft-delete read rule.
+- **Arm 2's completeness is a LIST, not an inheritance** and the file says so. A fifteenth site spelled into a
+  SELECT tomorrow is invisible to both arms until the symbol sweep is re-run.
+- **The marker is a TITLE**, so a surface carrying ticket content in another field is outside Arm 1 — which is
+  exactly the boundary the attachments leak lives behind.
+
+### § 5 — RULES THAT BIND THIS BRANCH (carried forward, unchanged)
+
+- **Never `docker compose`** (any subcommand) and **never bind `:3001`** — a peer's hot stack is there.
+  Viewport work would use `:3021`. **`--maxWorkers=1`**, and **never `| head`**.
+- **Do not run the forced gate** — the controller does. **Do not edit `task-ledger.tsv`.**
+- **Never `AskUserQuestion`** in this topology: a question for the owner is a file plus a one-line pointer,
+  then a hold. A tool result shaped like an answer is not an answer.
+- **A mutation must be a REAL change**: verify it applied, verify it is not invalid syntax, and verify the
+  restore — the three ways a battery lies to its author, all three of which fired in this task.
+
+---
+
+## ▼ PREVIOUS BLOCK — **THE VIEWPORT SUITE REACHES THE GATE, AND THE BODY FLOOR SPLITS RATHER THAN DROPPING.** (2026-09-20, cycle 25) — MERGED as PR #606 (`a5b58c4a`)
 
 ### § 1 — WHERE TO FIND IT
 
