@@ -77,6 +77,22 @@ Cycle 34 §1 held for the whole landing: **a reviewer restarted mid-read loses e
 ### 7. OWNER ACTION
 `git pull` in the primary checkout — it is on `main` at `6db8b6b8`, **117 commits behind** `origin/main` (`9e68735e`) as measured at this anchor, and every measurement taken there is a measurement of the wrong tree (the controller hit exactly this and recorded it in the compiled report's §2).
 
+### 8. ⚠ ADDENDUM (2026-09-21 ~01:0x IST) — A POST-FREEZE BLEMISH: RECORDED, HELD, AND NOT RE-LANDED
+**Between the collection and the anchor's merge, exec 1 advanced its report again:** `ebcca2b50e5c` (**64,835 B, 18 findings** — the copy collected and landed) → **`14d868475e` (82,201 B, 19 findings)**, four commits:
+- **`P14` ADDED** — the prototype-delta queue reads eleven items OUTSTANDING; at least four have shipped, including its own row 0 (7 of 11 rows re-derived).
+- **`P8` RE-FILED DOWNWARD** — the missing containment is *already recorded in the product* at `board.tsx:394` as a named follow-on, so it is no longer a discovery. (Its own commit: *"I re-filed my own P8 downward: the product already records that gap, and the remedy is tested two files away"*.)
+- **`P11`, `P2`, `P12` NARROWED** — exec 1 reports that tests **on the gate** do cover what those findings had implied was untested (commit: *"Three of my own findings were broader than the evidence"*).
+- **Four citation repairs** — exec 1 swept its own report and **four citations did not resolve**.
+
+**WHAT IS ON `main` IS INTERNALLY CONSISTENT AND CORRECT FOR ITS GENERATION**: the landed `review-ui-exec1.md` has 18 findings and `review-compiled-controller.md` rules those same 18. **The newer generation sits on `exec1/review-ui` and has deliberately NOT been re-landed.**
+
+**Why held rather than re-landed.** A post-freeze commit is a NEW HEAD, not a footnote — and re-landing it would require **re-ruling `P14` and re-premising `P8`/`P11`/`P2`/`P12`**, which changes the deliverable's counts. **That is the OWNER's call, not the controller's to make unilaterally.** ⛔ **A controller waking here must not re-land it silently, and must not treat the landed `review-ui-exec1.md` as the lane's final word.**
+
+**What was done instead.** Each of the three lanes was sent a HOLD naming the nudger, and **each acknowledged in one line** — exec 1: *"Holding — stopped, no further commits or work"*; exec 2: *"Holding at 2eddb291… no further work, no commits, awaiting the owner's call"*; exec 3: *"holding — no branch, no commit, no file until the owner's next dispatch"*. **The idle nudger was DISABLED:** `launchctl bootout gui/$(id -u)/com.kiro.claude-idle-nudger` (rc=0, verified absent from `launchctl list`) and its LaunchAgents plist removed. **The source plist is retained at `~/.claude/scripts/com.kiro.claude-idle-nudger.plist`, so this is reversible — and its own README gives the procedure.** Its README also states the reason it was worth disabling: *"It cannot know whether a session had work left, so it will nudge a correctly-finished one."* With three finished lanes and no pending work it was producing artifact churn, and it had nudged exec 1 three times.
+⚠ **RESTORE THE NUDGER IN THE SAME ACTION THAT DISPATCHES THE NEXT WORK** — a stalled lane is invisible while it is off.
+
+⚠ **PASTE DELIVERY, for whoever talks to a lane next:** `tmux load-buffer` takes a **path argument** — `tmux load-buffer -b x /tmp/file.txt`. A shell redirect (`< file`) is not accepted, it errors, and the `&&` **silently short-circuits the paste**, so nothing arrives and the pane looks untouched. The first attempt at these HOLDs failed exactly that way. Verify delivery by **reading the transcript**, not the input box — a submitted turn renders with the same `❯` glyph as an unsubmitted one.
+
 ---
 
 ## 🔄 TUESDAY 2026-09-22 ~00:1x IST — **CYCLE 34: THE QUEUE IS EMPTY, ALL EIGHT ITEMS ARE MERGED, AND THE THREE-REVIEWER EXERCISE IS RUNNING. THIS ENTRY IS FOR A CONTROLLER THAT WAKES UP MID-EXERCISE.** `main` is **`e4baa425`**; **zero open PRs**; ledger **307 done / 1 todo**.
