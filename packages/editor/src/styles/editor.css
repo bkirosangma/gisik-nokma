@@ -109,6 +109,66 @@
 .ticket-editor__content {
   min-height: 4rem;
 }
+
+/* The formatting strip (`EditorToolbar`), and the hint line under the field.
+   Layout and target size are transcribed from the prototype's own strip
+   (`design-system/interactive/desktop.dc.html:1166-1173`: `display:flex;gap:6px;
+   flex-wrap:wrap`, `padding:6px 8px`, buttons at `min-height:32px;min-width:34px`).
+
+   ⚠ THE FILL IS NOT TRANSCRIBED, and it cannot be: the prototype paints the
+   strip with `var(--fill4)` and each button with `var(--cardBg)` +
+   `var(--cardShadow)`, and THIS FILE'S HEADER (above) forbids colour of every
+   kind here — `packages/editor` does not depend on `packages/ui`, so no token
+   from `tokens.ts` is reachable. The strip is therefore drawn the way every
+   other control in this file is drawn: an edge in `currentColor`, which
+   inherits the surrounding text colour and is already contrast-proven. The
+   radius stays, so the strip still reads as sharing the field's top edge. */
+.ticket-editor__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 1rem;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid currentColor;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+}
+.ticket-editor__tool {
+  min-height: 32px;
+  min-width: 34px;
+  padding: 0 10px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+/* The active mark. `ImageWrapMenu`'s own `--active` rule is the precedent, and
+   the reason for a second cue rather than colour is the same: this file has no
+   colour to give it. */
+.ticket-editor__tool--active {
+  outline: 1px solid currentColor;
+  outline-offset: -1px;
+}
+.ticket-editor__link-url {
+  min-width: 10rem;
+  min-height: 32px;
+  border: 1px solid currentColor;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.ticket-editor__hint {
+  /* 0.75rem — the prototype's own 12px (`:1173`), and the floor this file
+     already holds itself to (`see .escape-chip__hint`). */
+  font-size: 0.75rem;
+  opacity: 0.7;
+  margin: 0.375rem 0 0;
+}
 .upload-chips {
   position: absolute;
   right: 0.5rem;
