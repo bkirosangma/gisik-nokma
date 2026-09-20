@@ -72,9 +72,8 @@ bucket of work inside it: "Residential jobs", "Shop operations". Jobs live insid
 
 **Can I create a project?**
 **Only if you are an owner or an admin.** Those two roles get a **New project** form on the workspace
-page; everybody else gets a sentence saying so instead of a button that fails — the app's own wording,
-which names only the admin: *"Only an admin can create a project in this workspace."* For anyone, there
-is no button on the Workspaces page, in
+page; everybody else gets a sentence saying so instead of a button that fails: *"Only an owner or an
+admin can create a project in this workspace."* For anyone, there is no button on the Workspaces page, in
 settings, or in the top bar. A brand-new workspace has stages, job types and you as its owner, and
 nowhere to put a job until an owner or admin adds one. For a member this is still the biggest hole in
 the product, and it sits right at the start of the journey.
@@ -561,11 +560,11 @@ The way out is the "Only tickets in progress" switch, which is deliberately plac
 still reach it from the refusing screen. The Board keeps working throughout.
 
 **My calendar is empty. Is it broken?**
-It says either "No claimed dates fall in this month" ("Undated work is absent, not estimated"), or — when
-the only thing hiding your claims is a date field you switched off with the legend switch — a sentence
-saying so. And the first one is wrong more often than it looks: a month emptied by your own filter, or by
-closed jobs being hidden, still gets it. Trust the count in the strip instead — if it shows fewer jobs
-than the project holds, something is hiding them.
+The sentence names what can hide a claim: your filter, closed jobs being hidden, or a date field you
+switched off with the legend switch. It also says "Undated work is absent, not estimated" — the calendar
+draws only what someone claimed. When the legend is the only thing hiding your claims it says so
+specifically instead, because that month is full and one switch brings all of it back — and the count in
+the strip tells you either way: if it shows fewer jobs than the project holds, something is hiding them.
 
 **A job's start date is after its due date and the calendar looks odd.**
 It is showing you the contradiction rather than quietly fixing it — two separate markers and no bar

@@ -166,8 +166,8 @@ You become the **owner** of that workspace. It also sets you up with:
 
 **A brand-new workspace has no projects.** Whether you can make one depends on your role. An **owner or
 admin** gets a **New project** form inside the workspace, and that is the only control that creates
-one. Everybody else gets a sentence saying so instead of a button that fails — the app's own wording,
-which names only the admin: *"Only an admin can create a project in this workspace."* For a member the
+one. Everybody else gets a sentence saying so instead of a button that fails: *"Only an owner or an
+admin can create a project in this workspace."* For a member the
 control is not hidden; it is not offered.
 Nowhere else offers it: not the Workspaces page, not a settings screen, not the top bar.
 
@@ -715,12 +715,17 @@ name* whose **×** only undoes your own setting — the default takes over again
 hidden. *Everything* on the Closed control is not a third way back, because *everything* and *never
 touched it* are the same setting here; that is why the chip exists at all.
 
-**If the calendar looks empty**, it says either *"No claimed dates fall in this month"*, or — when the
-only thing hiding your claims is a date field you switched off in the legend — a sentence saying so.
+**If the calendar looks empty**, the sentence NAMES what can hide a claim: your filter, closed jobs being
+hidden, or a date field you switched off in the legend. It goes on to say *"Undated work is absent, not
+estimated"* — the calendar draws only what someone claimed, and an undated job is not estimated onto a day
+nobody gave it.
 
-**And the first of those two is wrong more often than it looks.** A month emptied by your own filter, or
-by closed jobs being hidden, still gets *"No claimed dates fall in this month"*. Trust the count in the
-strip instead: *"8 of 12 shown"* means four jobs are there and something is hiding them.
+**When the legend is the only thing hiding your claims, it says so specifically instead** — *"Every claimed
+date in this month belongs to a field you have hidden"* — because that is the one case where the month is
+full and one switch brings all of it back.
+
+**So do not read the first sentence as "nothing is here".** Trust the count in the strip as well:
+*"8 of 12 shown"* means four jobs are there and something is hiding them.
 
 ### Timeline
 

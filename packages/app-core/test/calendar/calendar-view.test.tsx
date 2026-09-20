@@ -4,7 +4,6 @@ import type { TicketState } from '@gisik-nokma/domain';
 import {
   CALENDAR_ALL_HIDDEN_COPY,
   CALENDAR_EMPTY_MONTH_COPY,
-  CALENDAR_NARROWED_MONTH_COPY,
 } from '../../src/claims/claim-labels.js';
 import type { TicketDatesInput } from '../../src/claims/ticket-dates.js';
 import type { IsEpicType } from '../../src/hierarchy/epic-ancestor.js';
@@ -204,7 +203,7 @@ describe('11.63 the three empty months are three different sentences, rendered v
       [ticket({ fields: { title: claimField('Filtered'), dueDate: claimField({ date: '2026-08-28' }) } })],
       { filter: { stateIds: ['done'] } },
     );
-    expect(screen.getByRole('note')).toHaveTextContent(CALENDAR_NARROWED_MONTH_COPY);
+    expect(screen.getByRole('note')).toHaveTextContent(CALENDAR_EMPTY_MONTH_COPY);
   });
 });
 

@@ -906,11 +906,11 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " form inside the workspace, and that is the only control that creates one. Everybody else gets a sentence saying so instead of a button that fails — the app's own wording, which names only the admin: "
+                    "text": " form inside the workspace, and that is the only control that creates one. Everybody else gets a sentence saying so instead of a button that fails: "
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Only an admin can create a project in this workspace.\""
+                    "text": "\"Only an owner or an admin can create a project in this workspace.\""
                   },
                   {
                     "kind": "text",
@@ -3502,15 +3502,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", it says either "
+                    "text": ", the sentence NAMES what can hide a claim: your filter, closed jobs being hidden, or a date field you switched off in the legend. It goes on to say "
                   },
                   {
                     "kind": "italic",
-                    "text": "\"No claimed dates fall in this month\""
+                    "text": "\"Undated work is absent, not estimated\""
                   },
                   {
                     "kind": "text",
-                    "text": ", or — when the only thing hiding your claims is a date field you switched off in the legend — a sentence saying so."
+                    "text": " — the calendar draws only what someone claimed, and an undated job is not estimated onto a day nobody gave it."
                   }
                 ]
               },
@@ -3519,19 +3519,32 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "And the first of those two is wrong more often than it looks."
+                    "text": "When the legend is the only thing hiding your claims, it says so specifically instead"
                   },
                   {
                     "kind": "text",
-                    "text": " A month emptied by your own filter, or by closed jobs being hidden, still gets "
+                    "text": " — "
                   },
                   {
                     "kind": "italic",
-                    "text": "\"No claimed dates fall in this month\""
+                    "text": "\"Every claimed date in this month belongs to a field you have hidden\""
                   },
                   {
                     "kind": "text",
-                    "text": ". Trust the count in the strip instead: "
+                    "text": " — because that is the one case where the month is full and one switch brings all of it back."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "So do not read the first sentence as \"nothing is here\"."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Trust the count in the strip as well: "
                   },
                   {
                     "kind": "italic",
@@ -6972,11 +6985,11 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " form on the workspace page; everybody else gets a sentence saying so instead of a button that fails — the app's own wording, which names only the admin: "
+                    "text": " form on the workspace page; everybody else gets a sentence saying so instead of a button that fails: "
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Only an admin can create a project in this workspace.\""
+                    "text": "\"Only an owner or an admin can create a project in this workspace.\""
                   },
                   {
                     "kind": "text",
@@ -8905,7 +8918,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "It says either \"No claimed dates fall in this month\" (\"Undated work is absent, not estimated\"), or — when the only thing hiding your claims is a date field you switched off with the legend switch — a sentence saying so. And the first one is wrong more often than it looks: a month emptied by your own filter, or by closed jobs being hidden, still gets it. Trust the count in the strip instead — if it shows fewer jobs than the project holds, something is hiding them."
+                    "text": "The sentence names what can hide a claim: your filter, closed jobs being hidden, or a date field you switched off with the legend switch. It also says \"Undated work is absent, not estimated\" — the calendar draws only what someone claimed. When the legend is the only thing hiding your claims it says so specifically instead, because that month is full and one switch brings all of it back — and the count in the strip tells you either way: if it shows fewer jobs than the project holds, something is hiding them."
                   }
                 ]
               }

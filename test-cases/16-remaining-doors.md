@@ -545,6 +545,36 @@ Recorded here so the next reader does not take the sentence the other way and bu
   regardless, because this page's audience is whoever holds the URL, which `routes/invites.ts` records
   *"may have been forwarded"*.
 
+## The calendar's empty month names the filter (executor 2, 2026-09-20) — case `16.45`
+
+**The owner's ruling, against a measurement this lane filed the day before:** *"the message should name
+the filter"*, on an item whose recorded shape was *"three sentences in code, two renderable;
+`CALENDAR_NARROWED_MONTH_COPY` is dead"*.
+
+- **16.45** ✅ — **the REACHABLE empty-month sentence names the filter.** `packages/app-core/test/claims/claim-labels.test.ts`.
+  The three sentences were `CALENDAR_EMPTY_MONTH_COPY` (the fallback), `CALENDAR_ALL_HIDDEN_COPY` (the
+  legend, driven by the view's own switch state) and the third, which no app could render: no production
+  call site passes `filter` or `laneEpicId` to `CalendarView` — `apps/web`'s project page hands
+  `datesNarrowing`-filtered rows to `dateInputs` and passes neither prop — so `visible === inputs` in
+  every app and the fallback is what a filtered month reaches. **So the fix had to be the reachable
+  sentence, not the dead one**, and that was not a preference: the common shape — *wire the dead
+  constant* — is foreclosed by the owner's own second ruling in the same sitting (*"delete the copy"*)
+  and could not have worked in any case, because the page filters UPSTREAM of the view, so passing the
+  filter down would re-filter an already-filtered set and still exclude nothing. **A page-LEVEL "a filter
+  is on" flag was considered and rejected with the reason recorded**: it cannot answer whether THIS month
+  was emptied by the filter, so it would license a sentence that is false whenever the filter is simply
+  irrelevant to the month.
+  ⚠ **The assertion is on the WORD (`'your filter'`), and on the reference's honesty note surviving
+  (`'Undated work is absent, not estimated'`).** Pinning the whole string would pin wording, not the
+  ruling's property — and the second assertion is load-bearing for someone else's case: `11.186`/`11.187`
+  assert that same substring is ABSENT while a read is in flight, and would have gone vacuous had this
+  copy stopped containing it anywhere. Both `docs/manual.md` and `docs/faq.md` had **documented this
+  sentence as the product's known lie** ("the first one is wrong more often than it looks … trust the
+  count in the strip instead"); both are corrected in the same change set, and `content.generated.ts` is
+  regenerated (`check:help` 231 entries, delta 0 — no heading moved).
+  **No test watched the copied string before this case**, which is why nothing else objecting is not
+  evidence that the sentence was right.
+
 ## `hig-per-screen/3b` — Members states (executor 1, 2026-09-20) — cases `16.61`–`16.80`
 
 **The dispatch's decisive question, already answered before this branch opened:** *is `role` on the server's members

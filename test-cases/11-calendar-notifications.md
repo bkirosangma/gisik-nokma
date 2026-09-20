@@ -33,7 +33,7 @@ computed "now".
 - **11.39** ✅ The legend switch hides a field's markers without erasing the field's own switch, and the legend is sorted by field name and bounded by the grid, not by the roster — (`calendar-model.test.ts`)
 - **11.48** ✅ The calendar view-model reads no clock — proved by varying the zone — and the scanner proving this is itself proven against planted defects before being trusted — (`clock-free.test.ts`)
 - **11.49** ✅ An all-hidden month says the field is HIDDEN, not that nothing was claimed, and hiding a field that claimed nothing in this grid leaves the honest empty-month copy alone — a different sentence from the plain empty case — (`calendar-model.test.ts`, `claim-labels.test.ts`)
-- **11.50** ✅ Three empty months read as three different sentences — plain, filtered, and lane-narrowed each get their own — (`calendar-model.test.ts`)
+- **11.50** ✅ The empty month NAMES THE NARROWING, and only the legend may claim all of it — a filtered month and a lane-narrowed month reach the sentence that names the filter (`CALENDAR_EMPTY_MONTH_COPY`), while `CALENDAR_ALL_HIDDEN_COPY`'s "EVERY claimed date" gate survives the deletion of the per-cause sentence, so a filter PLUS the legend still cannot reach it. **⚠ AMENDED 2026-09-20 (owner ruling, item 9: "the message should name the filter"):** this case read "Three empty months read as three different sentences"; the third sentence was deleted in the same change (item 10), so the count is now TWO and the filtered/lane-narrowed pair share the naming sentence. The gate is the half that did not move — (`calendar-model.test.ts`, `claim-labels.test.ts` 16.45)
 - **11.51** ✅ The grid's edges are covered: padding days are real cells, and every bound is closed — (`calendar-model.test.ts`)
 
 ## Timeline model (`packages/app-core`)
@@ -48,9 +48,9 @@ computed "now".
 - **11.60** ✅ The timeline view-model reads no clock either — (`clock-free.test.ts`)
 
 ## Calendar view — React component (`packages/app-core`)
-- **11.61** ✅ A marker is a claim, attributed, and opens its ticket on click; four empty timelines get four distinct sentences that tell them apart — (`calendar-view.test.tsx`, `timeline-model.test.ts`)
+- **11.61** ✅ A marker is a claim, attributed, and opens its ticket on click; the empty timeline NAMES the narrowing it can no longer identify. **⚠ AMENDED 2026-09-20 — THIS CASE LOST GROUND AND THE LOSS IS RECORDED RATHER THAN QUIETLY RESCOPED.** It read "four empty timelines get four distinct sentences that tell them apart", and the distinct-count assertion measured **3**. With `TIMELINE_NARROWED_COPY` deleted (owner ruling, item 10) the count is **2**: a filter that matched nobody, an unmatched lane, and a workless workspace are ONE model again — the exact collapse this case was written to end. What replaces the lost distinction is that the surviving sentence names the filter. The `narrowedAway` guard survives and still keeps the window sentence away, so the window miss is still its own — (`calendar-view.test.tsx`, `timeline-model.test.ts`)
 - **11.62** ✅ A bar is drawn only from a claimed pair and spans exactly the days claimed for it; the undated-epic skip fires only when the epic truly has nothing to say — (`calendar-view.test.tsx`, `timeline-model.test.ts`)
-- **11.63** ✅ The three empty-month sentences render verbatim in the view, not just the model — (`calendar-view.test.tsx`)
+- **11.63** ✅ The empty-month sentences render verbatim in the view, not just the model — **TWO of them since 2026-09-20** (the third was deleted; see 11.50) — (`calendar-view.test.tsx`)
 - **11.64** ✅ "Today" is a prop — the ring never asks the device what day it is — (`calendar-view.test.tsx`)
 - **11.65** ✅ Per-week overflow folds, and folding is reversible — (`calendar-view.test.tsx`)
 - **11.66** ✅ A claim still in transit says so — (`calendar-view.test.tsx`)

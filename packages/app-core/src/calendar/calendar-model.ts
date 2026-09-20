@@ -3,7 +3,6 @@ import { monthGridWeeks, type WeekDays } from '../claims/dates.js';
 import {
   CALENDAR_ALL_HIDDEN_COPY,
   CALENDAR_EMPTY_MONTH_COPY,
-  CALENDAR_NARROWED_MONTH_COPY,
   barProvenance,
   claimTooltip,
   customClaimLabel,
@@ -358,12 +357,30 @@ export function buildCalendarModel(
    * PRECEDENCE, and it is a truth condition rather than a preference.
    *
    * `CALENDAR_ALL_HIDDEN_COPY` says "EVERY claimed date in this month belongs
-   * to a field you have hidden". With a filter also removing August claims
+   * to a field you have hidden". With a filter ALSO removing August claims
    * that no hidden field owns, that sentence is false — so the exhaustive
    * sentence may only be reached when the legend is the only narrowing that
-   * emptied the grid. The narrowed sentence names the set of narrowings
+   * emptied the grid. `CALENDAR_EMPTY_MONTH_COPY` names the set of narrowings
    * instead of picking one, which is what lets it carry the both-case
    * truthfully. Witnessed at `calendar-model.test.ts` 11.50.
+   *
+   * ⚠ **THE THIRD SENTENCE WAS DELETED HERE ON 2026-09-20 AND THIS GUARD WAS
+   * NOT.** `CALENDAR_NARROWED_MONTH_COPY` named "the filter, the LANE, or the
+   * legend"; no app could render it (no production call site passes `filter` or
+   * `laneEpicId` — see the render site's own note in `apps/web`'s project page),
+   * "lane" is a word no screen in this product shows, and the owner ruled
+   * *"delete the copy"*. Deleting the CONSTANT does not require deleting the
+   * DOOR: `narrowedOutOfGrid` is what stops the exhaustive sentence overclaiming
+   * when a filter joins the legend, and that is the failure this block exists to
+   * forbid. So the door stays, its arm now falls through to the sentence that
+   * names the set, and the ruling is honoured without spending the guard.
+   *
+   * The alternative — reaching `CALENDAR_ALL_HIDDEN_COPY` whenever
+   * `hiddenInGrid`, guard deleted — is what "delete the sentence, keep nothing"
+   * would have produced. It is indistinguishable today (no app passes a filter,
+   * so `narrowedOutOfGrid` is false everywhere `hiddenInGrid` is measured) and
+   * becomes a lie the day a lane filter is wired, which is the day this arm was
+   * written for. `narrowedAway`/`excluded` above therefore still have a reader.
    */
   return {
     month: { year: opts.year, month: opts.month },
@@ -371,11 +388,9 @@ export function buildCalendarModel(
     hasItems,
     emptyCopy: hasItems
       ? null
-      : narrowedOutOfGrid
-        ? CALENDAR_NARROWED_MONTH_COPY
-        : hiddenInGrid
-          ? CALENDAR_ALL_HIDDEN_COPY
-          : CALENDAR_EMPTY_MONTH_COPY,
+      : hiddenInGrid && !narrowedOutOfGrid
+        ? CALENDAR_ALL_HIDDEN_COPY
+        : CALENDAR_EMPTY_MONTH_COPY,
     customDateFields,
   };
 }

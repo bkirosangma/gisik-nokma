@@ -3,7 +3,6 @@ import type { TicketState } from '@gisik-nokma/domain';
 import {
   CALENDAR_ALL_HIDDEN_COPY,
   CALENDAR_EMPTY_MONTH_COPY,
-  CALENDAR_NARROWED_MONTH_COPY,
 } from '../../src/claims/claim-labels.js';
 import type { TicketDatesInput } from '../../src/claims/ticket-dates.js';
 import { buildCalendarModel, type CalendarItem, type CalendarModel } from '../../src/calendar/calendar-model.js';
@@ -609,8 +608,23 @@ describe('11.6–11.8 bars, weeks, filters, pending', () => {
  * belongs to filtered-out work printed "No claimed dates fall in this month"
  * about a month full of claimed dates — the same sentence, the same lie, a
  * different door.
+ *
+ * ⚠ **REWRITTEN 2026-09-20, AND THE GATE IS THE HALF THAT SURVIVED.** The
+ * sentence this block was built around — `CALENDAR_NARROWED_MONTH_COPY`, which
+ * named "the filter, the LANE, or the legend" — was deleted on the owner's
+ * ruling (*"delete the copy"*); no app could render it, and "lane" names a
+ * control no screen shows. The reachable sentence now names the narrowing set
+ * itself (case 16.45, 11.1), so the FILTER arm reaches `CALENDAR_EMPTY_MONTH_COPY`
+ * rather than a sentence of its own.
+ *
+ * **What did NOT change is the exhaustivity gate**, and it is the reason this
+ * block still exists: `CALENDAR_ALL_HIDDEN_COPY` says "EVERY claimed date in
+ * this month belongs to a field you have hidden", which a filter makes false.
+ * `narrowedOutOfGrid` still guards it, so the both-case below still asserts
+ * `CALENDAR_ALL_HIDDEN_COPY` is NOT reached. Deleting the constant did not
+ * require deleting the door, and this block is what says so.
  */
-describe('11.50 three empty months, three sentences — filter and lane get their own', () => {
+describe('11.50 the empty month names the narrowing, and only the legend may claim all of it', () => {
   const FILED_ON = [{ id: 'filed-on', name: 'Filed on' }];
 
   function augustPair(): TicketDatesInput[] {
@@ -620,23 +634,24 @@ describe('11.50 three empty months, three sentences — filter and lane get thei
     ];
   }
 
-  it('a month emptied by a FILTER says the filter did it, not that nobody claimed a date', () => {
+  it('a month emptied by a FILTER names the filter, and does not claim nobody claimed a date', () => {
     const model = buildCalendarModel(augustPair(), {
       ...AUG,
       userName,
       filter: { assigneeIds: ['user_nobody'] },
     });
     expect(model.hasItems).toBe(false);
-    expect(model.emptyCopy).toBe(CALENDAR_NARROWED_MONTH_COPY);
-    expect(model.emptyCopy).not.toBe(CALENDAR_EMPTY_MONTH_COPY);
+    expect(model.emptyCopy).toBe(CALENDAR_EMPTY_MONTH_COPY);
+    // The property, not just the constant: the sentence a filtered viewer
+    // reaches has to name the control that would bring the claims back.
+    expect(model.emptyCopy).toContain('your filter');
     expect(model.emptyCopy).not.toBe(CALENDAR_ALL_HIDDEN_COPY);
   });
 
-  it('a month emptied by a LANE says so too — the third door, same sentence', () => {
+  it('a month emptied by a LANE reaches the same sentence — the door outlives the copy', () => {
     const model = buildCalendarModel(augustPair(), { ...AUG, userName, laneEpicId: 'no_such_epic' });
     expect(model.hasItems).toBe(false);
-    expect(model.emptyCopy).toBe(CALENDAR_NARROWED_MONTH_COPY);
-    expect(model.emptyCopy).not.toBe(CALENDAR_EMPTY_MONTH_COPY);
+    expect(model.emptyCopy).toBe(CALENDAR_EMPTY_MONTH_COPY);
   });
 
   /**
@@ -657,22 +672,45 @@ describe('11.50 three empty months, three sentences — filter and lane get thei
   });
 
   /**
-   * The narrowed sentence must be measured against THE GRID, not the calendar
-   * month: a filtered-out claim on 6 Sep is a claim on a cell this month view
-   * renders, and a `date.slice(0, 7) === monthKey` shortcut here would rebuild
-   * the very off-by-a-week 11.51 exists to close — telling a viewer nothing was
-   * claimed while their filter hides a marker from a rendered September cell.
+   * The narrowing must be measured against THE GRID, not the calendar month: a
+   * filtered-out claim on 6 Sep is a claim on a cell this month view renders,
+   * and a `date.slice(0, 7) === monthKey` shortcut here would rebuild the very
+   * off-by-a-week 11.51 exists to close — telling a viewer nothing was claimed
+   * while their filter hides a marker from a rendered September cell.
+   *
+   * ⚠ **RE-AIMED 2026-09-20, AND THE RE-AIMING IS THE POINT.** While a
+   * dedicated narrowed sentence existed, "EMPTY was reached" WAS the assertion
+   * that discriminated. That sentence is deleted (owner ruling), so the filter
+   * arm and an empty month now BOTH reach `CALENDAR_EMPTY_MONTH_COPY` and the
+   * old expectation would have passed whatever the guard did — a check that
+   * cannot fail. The discriminating outcome is now the one the guard still
+   * buys: with a hidden field holding an in-grid claim, `CALENDAR_ALL_HIDDEN_COPY`
+   * is the alternative, and the padding-cell claim is the only thing keeping
+   * the model off it.
    */
   it('a claim filtered out of a PADDING cell counts as narrowed away, not as an empty month', () => {
     const model = buildCalendarModel(
       [
+        // In-grid, hidden by the legend: this is what makes ALL_HIDDEN reachable.
+        ticket(
+          {
+            fields: {
+              title: claimField('Hidden but kept'),
+              office: claimField('BLR'),
+              'filed-on': claimField('2026-08-11'),
+            },
+          },
+          [],
+          FILED_ON,
+        ),
+        // Off-month but ON a rendered padding cell, and filtered out.
         ticket({ fields: { title: claimField('Padding cell'), office: claimField('TUR'), dueDate: claimField({ date: '2026-09-06' }) } }),
-        ticket({ fields: { title: claimField('Kept but undated'), office: claimField('BLR') } }),
       ],
-      { ...AUG, userName, filter: { fields: { office: 'BLR' } } },
+      { ...AUG, userName, filter: { fields: { office: 'BLR' } }, hiddenCustomFieldIds: ['filed-on'] },
     );
     expect(model.hasItems).toBe(false);
-    expect(model.emptyCopy).toBe(CALENDAR_NARROWED_MONTH_COPY);
+    expect(model.emptyCopy).toBe(CALENDAR_EMPTY_MONTH_COPY);
+    expect(model.emptyCopy).not.toBe(CALENDAR_ALL_HIDDEN_COPY);
   });
 
   /**
@@ -680,8 +718,9 @@ describe('11.50 three empty months, three sentences — filter and lane get thei
    * in this month belongs to a field you have hidden"; with a filter also
    * removing an August claim that no hidden field owns, that sentence is
    * false. Reaching for it here would be a fourth instance of the very defect
-   * this block exists to close — so the narrowed sentence, which names the set
-   * of narrowings instead of picking one, carries the both-case.
+   * this block exists to close — so the sentence that names the set of
+   * narrowings instead of picking one carries the both-case. That sentence is
+   * `CALENDAR_EMPTY_MONTH_COPY` since 2026-09-20; the GATE is unchanged.
    */
   it('a month narrowed by BOTH a filter and the legend does not claim the legend did all of it', () => {
     const model = buildCalendarModel(
@@ -694,7 +733,7 @@ describe('11.50 three empty months, three sentences — filter and lane get thei
       { ...AUG, userName, filter: { fields: { office: 'BLR' } }, hiddenCustomFieldIds: ['filed-on'] },
     );
     expect(model.hasItems).toBe(false);
-    expect(model.emptyCopy).toBe(CALENDAR_NARROWED_MONTH_COPY);
+    expect(model.emptyCopy).toBe(CALENDAR_EMPTY_MONTH_COPY);
     expect(model.emptyCopy).not.toBe(CALENDAR_ALL_HIDDEN_COPY);
     // and the switch is still on screen, so the legend half stays reversible
     expect(model.customDateFields).toEqual([{ fieldId: 'filed-on', fieldName: 'Filed on', count: 1 }]);

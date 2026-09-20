@@ -66,9 +66,46 @@ export function contradictionCopy(start: AttributedDate, due: AttributedDate): s
   return `start ${formatClaimDate(start.date)} is after needed-by ${formatClaimDate(due.date)} — both claims shown, no bar drawn`;
 }
 
-/** The reference calendar's honesty note, generalised (its design doc: "an undated item is absent, not estimated"). */
+/**
+ * The reference calendar's honesty note, generalised (its design doc: "an
+ * undated item is absent, not estimated") — AND THE NARROWING NAMED IN IT.
+ *
+ * ## Why this sentence carries the narrowing instead of naming one cause
+ *
+ * It is the FALLBACK arm (`calendar-model.ts`'s last selector), so it is the
+ * sentence a month gets whenever nothing else claimed it: genuinely no claims,
+ * or claims kept off the grid by something the model cannot see. The model
+ * cannot see it because the narrowing happens UPSTREAM — `apps/web`'s
+ * `datesNarrowing` (`page.tsx:706-713`) feeds `dateInputs` (`:1135-1146`)
+ * already filtered, and it applies the page's own "closed hidden by default"
+ * rule too, which no `FilterSpec` can express. So `visible === inputs` holds in
+ * every app, `excluded` is `[]`, and the model is structurally unable to tell
+ * "filtered away" from "never claimed".
+ *
+ * It cannot be told either, and that was measured rather than assumed: a
+ * page-LEVEL flag ("a filter is on") cannot answer the only question that
+ * matters — whether THIS month was emptied by it — so such a flag would license
+ * a sentence that is false whenever the filter is simply irrelevant to the
+ * month. Passing the filter down while passing unfiltered rows would let the
+ * model answer it, and would draw tickets the page hides on purpose.
+ *
+ * So the sentence does what this file's other narrow-copy does: it names the
+ * SET. Naming the filter, closed jobs and the legend as the things that can
+ * hold a claim off the grid is true whether one of them is set or none is,
+ * which is the same reason `CALENDAR_ALL_HIDDEN_COPY` may only claim
+ * exhaustivity when the legend is the sole cause.
+ *
+ * ## Provenance
+ *
+ * It carried the third sentence's job until 2026-09-20, when the owner ruled
+ * *"the message should name the filter"* against a dispatch that had measured
+ * this arm reaching a viewer who had just filtered — the sentence said "no
+ * claimed dates fall in this month" about a month full of them. The dead
+ * per-cause sentence is deleted in that same change (owner ruling: *"delete the
+ * copy"*), so this arm is now the one that has to be honest about all of them.
+ */
 export const CALENDAR_EMPTY_MONTH_COPY =
-  'No claimed dates fall in this month. Undated work is absent, not estimated — the calendar draws only what someone claimed.';
+  'No claimed dates are drawn in this month. Undated work is absent, not estimated — the calendar draws only what someone claimed. If a claim is here and not drawn, a narrowing kept it off this grid without dropping it: your filter, closed jobs being hidden, or a field you switched off in the legend.';
 
 /**
  * The SECOND empty month, and it is a different fact.
@@ -90,23 +127,6 @@ export const CALENDAR_EMPTY_MONTH_COPY =
  */
 export const CALENDAR_ALL_HIDDEN_COPY =
   'Every claimed date in this month belongs to a field you have hidden. Nothing was dropped — switch a field back on in the legend to see its claims again.';
-
-/**
- * The THIRD empty month, and the review that asked for it said why: the copy
- * above was added because "no claimed dates fall in this month" lies to a
- * viewer who hid the field one switch ago — and a month emptied by a FILTER or
- * by a LANE told that same lie, at two other doors, about a month full of
- * claimed dates. Three different facts, three different sentences.
- *
- * The wording is a DISJUNCTION on purpose. Narrowings stack: a filter can
- * remove some of a month's claims while the legend hides the rest, and in that
- * case both "every claimed date is behind the filter" and "every claimed date
- * belongs to a hidden field" are false. Naming the set of narrowings the
- * viewer set, rather than picking one, is the sentence that stays true whether
- * one of them is on or all three are.
- */
-export const CALENDAR_NARROWED_MONTH_COPY =
-  'Dates are claimed in this month — every one of them is behind a narrowing you set: the filter, the lane, or the legend. Nothing was dropped — widen the filter or switch a field back on to see them again.';
 
 /**
  * The side-list heading when the list holds ONLY work with a MISSING claim.
@@ -142,26 +162,20 @@ export const TIMELINE_SIDE_LIST_UNDRAWABLE_COPY =
  * filter that matched nobody, a lane nobody belongs to, and work that is fully
  * dated and merely elsewhere in time.
  *
- * Reached when nothing is on screen, nothing a narrowing removed would have
- * shown here, and nothing visible is scheduled outside the window — i.e. every
+ * Reached when nothing is on screen, nothing visible is scheduled outside the
+ * window, and nothing a narrowing removed would have shown here — i.e. every
  * loaded ticket is an undated epic (a lane, not missing work) or there are
- * none. The second sentence is the calendar's, verbatim, because it is the
- * same promise about the same product.
+ * none — OR when a narrowing did remove work that would have shown here, which
+ * is why the third sentence below names it. The second sentence is the
+ * calendar's, verbatim, because it is the same promise about the same product.
+ *
+ * The narrowing clause is here for the same reason as its calendar twin's:
+ * the model cannot see the filter (the page narrows `tickets` upstream before
+ * the view is handed them), so this arm names the SET of things that can hold
+ * a claim off the chart rather than asserting that nobody claimed one.
  */
 export const TIMELINE_EMPTY_COPY =
-  'No claimed dates are here to draw. Undated work is absent, not estimated — the timeline draws only the periods someone claimed.';
-
-/**
- * The SECOND empty timeline: a narrowing the viewer set emptied it.
- *
- * A DISJUNCTION on purpose, and the reason is the one Task 8's fix had to
- * discover: NARROWINGS STACK. A filter can remove some of the work while the
- * window leaves the rest behind, and then "the filter removed everything" and
- * "everything is outside these weeks" are each false. Naming the set the
- * viewer set stays true whether one narrowing is live or all of them are.
- */
-export const TIMELINE_NARROWED_COPY =
-  'Work is claimed here — every piece of it is behind a narrowing you set: the filter, the lane, or the weeks in view. Nothing was dropped — widen the filter or move the window to see it again.';
+  'No claimed dates are here to draw. Undated work is absent, not estimated — the timeline draws only the periods someone claimed. If a claim is here and not drawn, a narrowing kept it off these weeks without dropping it: your filter, closed jobs being hidden, or a field you switched off in the legend.';
 
 /**
  * The THIRD empty timeline, and the ONE case the component cannot reconstruct
