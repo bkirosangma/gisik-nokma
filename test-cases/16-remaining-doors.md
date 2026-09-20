@@ -686,7 +686,7 @@ data already serves** — so it is named here with an owner rather than built on
   omission it was cited for was real either way — but a citation that resolves to a different statement than the
   one it is cited for is the shape this repo keeps paying for.
 - Also drawn and absent, in decreasing order of how data-backed they are: the pending row's **project scope**
-  (`:731-732`; `PendingInvite.projectIds` is served, project *names* are not), the minted card's **`Copy link` and
+  (`:732`; `PendingInvite.projectIds` is served, project *names* are not), the minted card's **`Copy link` and
   `Done`** (`:788-789`; the product renders the URL as inert text), and four static sentences the authority
   carries (`:726`, `:778`, `:780`, `:793`).
 
@@ -697,7 +697,7 @@ data already serves** — so it is named here with an owner rather than built on
 
 **The authority draws the heading and the count was already in state, so this needed NO read and NO route.**
 ⚠ **The three other things the same paragraph names are deliberately NOT in this change set** — the pending
-row's project scope (`:731-732`; needs project *names*, which are not served), the minted card's `Copy link`
+row's project scope (`:732`; needs project *names*, which are not served), the minted card's `Copy link`
 and `Done` (`:788-789`), and the four static sentences. They are unaffected and still recorded above.
 
 - **16.46** ✅ **The pending list carries its heading, and its count is the list it heads.** `PendingList` draws
@@ -711,7 +711,25 @@ and `Done` (`:788-789`), and the four static sentences. They are unaffected and 
   sentence, which is the empty-case DECISION (the authority draws the heading unconditionally inside its
   `isInviteAdmin` block, and the empty sentence already makes the claim, so `· 0` repeats rather than adds
   one); and a member who meets the door's 403 gets **neither the heading nor the list it heads**.
-  *Mutation-witnessed:* MUTATION_RESULTS_PLACEHOLDER
+  *Mutation-witnessed SEVEN ways, each declaring the arms it should redden BEFORE it ran, so a mutation that
+  reddened nothing would be a reported survivor rather than a silent hole.* The middot swapped for a hyphen
+  (A1/A2/A3); the count pinned to the constant `2` (A2/A3 — **and A1 stays green, which is exactly why A2
+  exists**); the heading deleted outright (A1/A2/A3); the heading **hoisted out of the admin gate** so it
+  renders for a member too (A4); the `<ul>` truncated to `rows.slice(0, 1)` while the heading still counts all
+  of them (A1 — this is the arm that gives the agreement assertion its teeth); the count off by one (A1/A2/A3).
+  ⚠ **THE SEVENTH SURVIVED THE FIRST RUN, AND IT WAS MY OWN CLAIM THAT DIED WITH IT.** Rebuilding the string
+  as `` {'Pending invitations · '}<span>{rows.length}</span> `` — the label-plus-span composition the dispatch
+  warned about — left the accessible name `Pending invitations · 2` **unchanged** and **all four arms green**.
+  So the docblock sentence "an accessible name inserts a space between sibling elements, so a composed name
+  would not be the authority's string" was **false as stated in this case's own environment**: measured, a
+  boundary between the text node and the span does not double the space the literal already ends with. (Whether
+  a boundary adds no separator at all or the whitespace is collapsed, this measurement does not distinguish, and
+  a real browser is not measured here.) **The one-node form is kept — it is still what the dispatch asked for —
+  and the COMPOSITION is now pinned by an assertion instead of argued in prose:** the case asserts the heading
+  has exactly one child node and holds no element, which is the only instrument that can see the difference.
+  Re-run after the fix, the seventh mutation reddens A1. **A survivor with no explanation is either an
+  unconstrained path or a mutation that never ran; this was neither — it was an assertion that could not make
+  the distinction it was named for.**
   `<h2>` rather than the authority's `<p>` because this screen's other heading is the authority's own
   identically-styled `17px/600` heading (`:747`, `Invite someone`) and the product already renders it as an
   `<h2>` (`page.tsx:781`). ⚠ **The heading is ONE text node and not a label plus a `<span>`, deliberately** —
