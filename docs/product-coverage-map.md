@@ -230,10 +230,11 @@ absences that no `✅` bullet claims. Where a path does have the capability, the
 rather than denying it:
 
 1. **No way for a member or a guest to create a project.** The underlying record and its rules are
-   reached by exactly one door — the **New project** form on the workspace page — and only an owner or
-   admin is offered it (`apps/web/app/w/[workspaceId]/page.tsx:917-923`); a member or guest gets the
-   refusal sentence at `:921` instead. A workspace whose owner and admins have not used it therefore
-   has nowhere to put work.
+   reached from any screen by exactly one control — the **New project** form on the workspace page —
+   and only an owner or admin is offered it (`apps/web/app/w/[workspaceId]/page.tsx:917-923`); a member
+   or guest gets the refusal sentence at `:921` instead. (The seed CLIs write `project.created` too,
+   through the ungated internal door — a different vocabulary from a screen.) A workspace whose owner
+   and admins have not used it therefore has nowhere to put work.
 2. **No way to assign work on the phone or desktop apps.** On the **website** the job sheet's
    "Assignee" row is a picker (`ticket-sheet.tsx:979`), with an **Unassigned** option that clears it
    (`:984`). Assignment is shown everywhere — on cards, in the Inbox, in My Work, as a grouping in the

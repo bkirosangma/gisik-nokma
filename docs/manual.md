@@ -166,8 +166,9 @@ You become the **owner** of that workspace. It also sets you up with:
 
 **A brand-new workspace has no projects.** Whether you can make one depends on your role. An **owner or
 admin** gets a **New project** form inside the workspace, and that is the only control that creates
-one. Everybody else gets a sentence saying so instead of a button that fails — *"Only an admin can
-create a project in this workspace."* For a member the control is not hidden; it is not offered.
+one. Everybody else gets a sentence saying so instead of a button that fails — the app's own wording,
+which names only the admin: *"Only an admin can create a project in this workspace."* For a member the
+control is not hidden; it is not offered.
 Nowhere else offers it: not the Workspaces page, not a settings screen, not the top bar.
 
 Jobs live inside projects. So a workspace with no projects has nowhere to put work.

@@ -72,8 +72,9 @@ bucket of work inside it: "Residential jobs", "Shop operations". Jobs live insid
 
 **Can I create a project?**
 **Only if you are an owner or an admin.** Those two roles get a **New project** form on the workspace
-page; everybody else gets a sentence saying so instead of a button that fails — *"Only an admin can
-create a project in this workspace."* For anyone, there is no button on the Workspaces page, in
+page; everybody else gets a sentence saying so instead of a button that fails — the app's own wording,
+which names only the admin: *"Only an admin can create a project in this workspace."* For anyone, there
+is no button on the Workspaces page, in
 settings, or in the top bar. A brand-new workspace has stages, job types and you as its owner, and
 nowhere to put a job until an owner or admin adds one. For a member this is still the biggest hole in
 the product, and it sits right at the start of the journey.

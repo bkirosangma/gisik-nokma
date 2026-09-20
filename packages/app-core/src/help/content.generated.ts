@@ -906,7 +906,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " form inside the workspace, and that is the only control that creates one. Everybody else gets a sentence saying so instead of a button that fails — "
+                    "text": " form inside the workspace, and that is the only control that creates one. Everybody else gets a sentence saying so instead of a button that fails — the app's own wording, which names only the admin: "
                   },
                   {
                     "kind": "italic",
@@ -6972,7 +6972,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " form on the workspace page; everybody else gets a sentence saying so instead of a button that fails — "
+                    "text": " form on the workspace page; everybody else gets a sentence saying so instead of a button that fails — the app's own wording, which names only the admin: "
                   },
                   {
                     "kind": "italic",
