@@ -298,7 +298,7 @@ type BodyText = {
  * 16px is not an arbitrary round number here — it is this repo's own stated
  * floor, already enforced once by hand:
  *
- *     apps/web/app/globals.css:154-157
+ *     apps/web/app/globals.css:2452-2455
  *     "1rem, not the 0.95rem this first shipped with. Measured in a real
  *      browser at 15.2px, which is under the 16px floor for body text on a
  *      phone — and this paragraph is the one telling a locked-out reader who
@@ -1025,7 +1025,7 @@ for (const route of UNAUTHED_ROUTES) {
         .soft(
           body.offenders,
           `body copy under 16px at ${spec.width}px. The floor is this repo's own — ` +
-            `globals.css:154-157 raised .gn-notfound__aside from 0.95rem for exactly this ` +
+            `globals.css:2452-2455 raised .gn-notfound__aside from 0.95rem for exactly this ` +
             `reason ("15.2px, which is under the 16px floor for body text on a phone"). ` +
             `Offenders: ${JSON.stringify(body.offenders)}`,
         )

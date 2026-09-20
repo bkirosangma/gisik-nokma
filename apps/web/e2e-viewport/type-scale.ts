@@ -104,9 +104,14 @@ const LABEL_SELECTOR_BASE =
  * ⚠ WHY THIS IS A SECOND SELECTOR AND NOT A SKIP, MEASURED RATHER THAN ASSUMED
  * (the ruling asks this question explicitly, and the answer decides the fix):
  *
- *     BODY_SELECTOR  = 'p, li, dd, dt, td, figcaption, label'
- *     LABEL_SELECTOR = 'span, small, div, …'          ← `p` is in NEITHER list above
- *     'p' in body: true     'p' in label: false     intersection: (none)
+ *     BODY_SELECTOR       = 'p, li, dd, dt, td, figcaption, label'
+ *     LABEL_SELECTOR_BASE = 'span, small, div, …'     ← `p` is in NEITHER
+ *     'p' in body: true     'p' in base: false     intersection: (none)
+ *
+ * (The constant was named `LABEL_SELECTOR` when this was measured. It is named
+ * `LABEL_SELECTOR_BASE` here because the BUILT `LABEL_SELECTOR` below — base plus
+ * the declared labels — is what this file now passes to the sweep. The rename is
+ * stated rather than left for a reader to chase a stale identifier.)
  *
  * So a `<p>` label is currently visible to the BODY sweep and **invisible to
  * this one**. Deleting it from the body sweep without adding it here would not

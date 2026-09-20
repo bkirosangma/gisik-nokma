@@ -121,10 +121,16 @@ describe('tap-target density — case 13.991', () => {
       /**
        * The witness is REQUIRED and is checked here as well as in the type, for
        * the same reason the floors are pinned here: the guard that consumes it
-       * lives in a suite on no gate at all. A witness that emptied would not
-       * fail a type — a string is a string — and the entry would fall back to
-       * firing on any non-empty container, which is exactly the false red an
-       * unnamed FAQ group produced.
+       * lives in the viewport suite, which needs a browser to run. A witness
+       * that emptied would not fail a type — a string is a string — and the
+       * entry would fall back to firing on any non-empty container, which is
+       * exactly the false red an unnamed FAQ group produced.
+       *
+       * ⚠ CORRECTED 2026-09-20. This sentence read "lives in a suite on no gate
+       * at all", which was true when it was written and stopped being true the
+       * day this suite's sibling reached CI's gate (case 16.59). The REASON for
+       * the check is unchanged — a `vitest` run holds what a browser run cannot
+       * be the only guard on — so the sentence is corrected rather than deleted.
        */
       expect(entry.witness.trim(), 'an entry names no witness').not.toBe('');
       // A `why` is the membership rule applied to one control. A stub proves
