@@ -98,6 +98,12 @@ function ticketRead(): TicketRead {
       serverTime: '2026-09-19T08:00:00.000Z',
     },
     assignedProvenance: null,
+    // `TicketRead.visibility` became REQUIRED when the audience mode was served
+    // (2026-09-20, `exec/visibility-mode`). Nothing in this case reads the
+    // audience, and a fake carries no visibility row — the same value, and the
+    // same reason, `evidence-upload.test.tsx` and `description-editable.test.tsx`
+    // give for theirs.
+    visibility: null,
     parent: null,
     rollup: null,
   };
