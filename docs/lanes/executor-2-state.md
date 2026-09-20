@@ -39,7 +39,10 @@ EXIST.** `comment.added` is `{body}`; `attachment.added` names no comment; the `
 document** (`image` nodes carrying `attrs.attachmentId`, gate-checked at the door) — so that is what the
 read joins on, ticket-scoped, with an unresolved id rendered **as itself** rather than dropped. The
 ticket's files are never attributed to a comment. **The composer therefore gets an uploader**, which makes
-this the product's **first `attachment.added` producer**.
+this the product's **first MOUNTED `attachment.added` producer** — ⚠ **not "first producer": the
+composers already exist** (`packages/editor/src/drive/attachment-claims.ts`, both TESTED, and
+`EvidencePicker`), and **none has a production caller**. Measured; the looser wording was false and was
+corrected at the three places it appeared.
 
 **⛔ PREMISE 2 — "`#594`'s toolbar is the prototype's toolbar plus the `@` mention button" — IS FALSE.**
 `packages/editor/src/components/EditorToolbar.tsx:123-176` has **six** controls and no seventh. Mentions
