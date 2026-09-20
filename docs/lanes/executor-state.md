@@ -1,6 +1,52 @@
 # Serial executor — live state
 
-> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~23:5x IST. **THE `epics` DISPATCH IS BUILT, MUTATION-WITNESSED, INDEPENDENTLY REVIEWED, FOLDED AND GREEN; THE PR IS OPEN AND AWAITING THE CONTROLLER.** Branch **`exec/epics-views`**, one PR, `--base main`. **I do not merge.**
+> # ▣ CURRENT POSITION — 2026-09-21. **THE `replica-data-source.ts:205` "SIX CALL SITES" DISPATCH IS ANSWERED: THE COUNT IS NOW A PHRASE — AND RE-MEASURING IT FOUND THE AUTHORITY STALE TOO.** Branch **`exec/replica-callsite-count`**, one PR, `--base main`. **I do not merge.**
+>
+> ## ⚠ READ THIS FIRST — ANCHORS ROT, AND THE NARRATIVE BELOW CARRIES SHAS THAT ARE NOT ANCHORS
+> **Every sha written in prose anywhere in this file is unreliable.** The anchors are the lines below and they are a READING at a moment. `git branch --contains` (not `cat-file`, which passes on reflog-only commits) settles reachability; `git pull`-less `gh pr view <n> --json state,mergeCommit` settles whether a PR is open — **check that before acting on any "open/paused/NEXT STEP" line, a failure this file has now produced six times. The sixth was the block this one replaced: it said the `epics` PR was open and #602 had MERGED as `14965a51`.**
+>
+> ## ANCHORS AT THIS TREE (recounted here, not carried forward)
+> - **branch `exec/replica-callsite-count`**, cut from **`origin/main = 14965a51`** (the `#602` merge). **The GATED tree is `d7984cb3`** (3 commits: `0c775702` the change, `c333196b` my own count correction, `d7984cb3` the review's fix round). `rev-list --left-right --count origin/main...HEAD` read **`0 3`** at the gated sha — nothing behind, so **no fold was needed**, re-checked at freeze (*twice*: `14965a51` still the tip when the gate started). **If `origin/main` has moved since, FOLD AGAIN.** ⚠ The commit carrying THIS block is one past the gated sha, by construction.
+> - **working tree clean**, no untracked files. Nothing under `reference/` touched.
+> - **THE DURABLE ANCHOR IS THE PR, not a sha** — `gh pr view <n> --json headRefOid,state,baseRefName,mergeCommit`. **`baseRefName` must read `main`.**
+>
+> ## THE ANSWER, WITH THE UNIT PINNED — *that was the dispatch's real first question and the sentence never answered it*
+> At **`14965a51`**, running §12's own published command:
+> - **LINES: 24. CALL SITES: 22** — the other 2 are docblock mentions (`flows/guarded-child-event.ts:171`, `authoring/data-source-gateway.ts:29`).
+> - **§12 said 22 lines / 20 call sites, and THAT WAS TRUE WHEN WRITTEN** (`3dc9cf11`, 05:11 IST). It is stale now for a reason worth keeping: **two call sites landed later the same day** (`p/[projectId]/page.tsx` 13:17, `ticket-sheet.tsx` 13:47), and they account for 22 → 24 **exactly**. *A delta is a fact about a commit; an absolute is a fact about a moment.*
+> - **§12 had ALREADY disowned "six"** — its own `:2023` records that it read *"returns six call sites"* and that four of the six citations had drifted. **So the docblock was citing its named authority for a number that authority had thrown away.** Same pair, same direction, third time.
+> - **DECISION: the docblock takes a PHRASE, not a number** (*"the call sites `Features.md` §12 enumerates"*). §12 and `test-cases/12` keep a figure because they publish the command that produces it. That is the dispatch's own "usually right" branch, and here it is the only branch that does not re-drift.
+>
+> ## THREE MORE THINGS THE RE-MEASURE FOUND — all inside the enumeration, so they moved WITH it rather than behind it
+> 1. **Every LIVE citation in §12's site list had rotted AGAIN.** At `3dc9cf11` all six resolved to real `.ingest(` awaits — **verified, not assumed: the earlier correction was right at birth** — and **nine commits have since touched `ticket-sheet.tsx`**, moving all five of its citations off the sites they named (`:501` now lands on a docblock about `getTicketTypes`). Both copies now cite **BY HANDLER**: the file and the enclosing function are the durable half; the line number is not.
+> 2. ⚠ **`ticket-sheet`'s "two that DO catch" is ONE — and the second never caught, so that clause was false at birth.** `submitTicketEvent` catches; `submitTitle` and `addSubtask` are bare `try`/`finally`, and **a `finally` handles no rejection**. **No citation sweep could ever have caught this: the line RESOLVED.** *Resolving is not agreeing.*
+> 3. **The enumeration is SCOPED BY ITS GREP, and the scope does not reach `apps/mobile`** — which mounts the replica (`apps/mobile/src/app.tsx:40`) and holds **one production `.ingest(` call site**. It already catches `OfflineAcceptError`, so nothing is broken. **Recorded with an owner, not fixed**: widening the grep changes what the enumeration IS.
+>
+> ## THE INDEPENDENT REVIEW — it ran BEFORE the PR opened, told to FALSIFY, and it earned its keep
+> One verifier over eight load-bearing claims, each answered `CONFIRMED / REFUTED / IMPRECISE` with the `file:line` it read: **8 confirmed, 0 refuted**, plus **four findings I had not asked about**, of which **two needed a fix round**. Every finding was re-read at the line before it was adopted.
+> 1. ⚠ **"nine commits touched `ticket-sheet.tsx` in one day" — the window was unnamed and the number does not survive it.** 2026-09-20 alone holds **16** commits against that file. Nine is real but it counts SINCE THE RE-POINTING. Corrected in both copies.
+> 2. ⚠ **"the delete" named the WRONG DOOR.** The 13:17 call site is `p/[projectId]/page.tsx:817`, inside **`restoreDeletedTicket`**, asserting `ticket.restored` — **the delete's Undo path**. **I had taken the label from the commit SUBJECT rather than from the line.** Verified at `:812-819` before adopting. *A commit subject is not the line's content.*
+> 3. **The reviewer measured the "five construction sites" count I had already fixed one commit earlier** and reached six by the same route. Corroboration, not a second fix.
+> - ⚠ **AND IT CORRECTED AN ATTRIBUTION OF MINE:** the count "TWENTY-TWO" entered `Features.md` at **`ac7f679d` (05:04)**, not at `3dc9cf11` (05:11) — the latter is the commit that propagated it into `test-cases/12`. My `0c775702` message says `3dc9cf11` and is seven minutes and one commit out. **No shipped prose carries that sha**, but a sha that merely RESOLVES is what misleads a sweep, so it is recorded rather than left standing.
+> - **Its C5 nuance is the sharpest thing in the report and the implementation already says it:** the six CITATIONS were right at birth (all resolved to real `.ingest(` awaits at `3dc9cf11`), while the CLAIM they carried was false at birth on one of them. **A citation sweep checks that a line resolves; this line resolved.**
+>
+> ## GATE AND CHECKS AT THIS TREE
+> - **`pnpm turbo run typecheck --filter=@gisik-nokma/app-core` → EXIT=0**, and that step was a **cache miss EXECUTING in `gisik-nokma-exec`** — not a replay of a peer worktree's cached log.
+> - `check-case-ids` **2564 unique / highest 16.87** · `check-case-citations` **ratchet holds on every file, 0 uncited**.
+> - **RATCHET DELTA ASSERTED ZERO against `origin/main`, WITH A CONTROL**: origin/main's OWN copy of the script, run against origin/main's OWN extracted tree, reads **2564**; this tree reads **2564**; **minting one id in the base tree moved the reading to 2565 and the highest to 16.999**, then restored. *Two identical numbers from two trees is a measurement of one tree* — the control is what makes the zero mean anything.
+> - The forced gate ran at this tree; its result is in the PR body. **The controller's forced gate is the gate.**
+>
+> ## WHAT I DID NOT DO
+> - **No case minted, so no block taken.** `Features.md` and `test-cases/` moved in the same change set, as the rule requires — the delta is zero, not unmeasured.
+> - **No commit to `main`, no push to `main`, no merge.** The review ran BEFORE the PR opened and is recorded in its body.
+>
+> ## WHERE I AM / WHAT IS IN FLIGHT
+> - **In flight: the PR, awaiting the controller's merge.** Nothing else.
+> - **Next after this merges:** the controller's next dispatch.
+>
+> # ▣ SUPERSEDED BY THE BLOCK ABOVE.
+>
+> > # ▣ SUPERSEDED BY THE BLOCK ABOVE — SUNDAY 2026-09-20, ~23:5x IST. **THE `epics` DISPATCH IS BUILT, MUTATION-WITNESSED, INDEPENDENTLY REVIEWED, FOLDED AND GREEN; ITS PR OPENED AND HAS SINCE MERGED.** Branch **`exec/epics-views`** (merged as **`#602` → `14965a51`**, base `main`). **I do not merge.**
 >
 > ## ⚠ READ THIS FIRST — ANCHORS ROT, AND THE NARRATIVE BELOW CARRIES SHAS THAT ARE NOT ANCHORS
 > **Every sha written in prose anywhere in this file is unreliable.** The anchors are the lines below, and they are a READING at a moment. `git branch --contains` (not `cat-file`, which passes on reflog-only commits) settles reachability; `gh pr view <n> --json state,mergeCommit` settles whether a PR is open — **check that before acting on any "open/paused/NEXT STEP" line, a failure this file has now produced five times. The fifth was the block this one replaced: it said PR #600 was open and #600 had merged as `ffb9389a`.**
