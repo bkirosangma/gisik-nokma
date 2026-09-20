@@ -179,7 +179,7 @@ describe('AccountPage — Profile', () => {
 
 function workspace(over: Partial<WorkspaceRef> = {}): WorkspaceRef {
   return {
-    id: 'w1', name: 'Meghalaya Rollout', role: 'admin',
+    id: 'w1', name: 'Meghalaya Rollout', prefix: 'MR', role: 'admin',
     memberCount: 4, nameRestrictedProjectCount: 0, projects: [],
     ...over,
   };
@@ -273,7 +273,7 @@ describe('AccountPage — Your workspaces', () => {
     render(
       <Providers services={stubServices({
         getMyWorkspaces: async () => [
-          workspace({ id: 'w1', name: 'Meghalaya Rollout', role: 'admin', projects: [{ id: 'p1', name: 'Delivery', archived: false, ticketCount: 3, blockedCount: 0 }] }),
+          workspace({ id: 'w1', name: 'Meghalaya Rollout', role: 'admin', projects: [{ id: 'p1', name: 'Delivery', prefix: 'DL', archived: false, ticketCount: 3, blockedCount: 0 }] }),
           workspace({ id: 'w2', name: 'Field Support', role: 'member', projects: [] }),
         ],
       }, {})}>

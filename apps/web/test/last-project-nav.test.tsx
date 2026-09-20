@@ -95,12 +95,13 @@ beforeAll(() => {
 });
 
 function project(over: Partial<ProjectRef> & { id: string }): ProjectRef {
-  return { name: `Project ${over.id}`, archived: false, ticketCount: 0, blockedCount: 0, ...over };
+  return { name: `Project ${over.id}`, prefix: 'PJ', archived: false, ticketCount: 0, blockedCount: 0, ...over };
 }
 
 function workspace(over: Partial<WorkspaceRef> & { id: string }): WorkspaceRef {
   return {
     name: 'Convenience Corner',
+    prefix: 'CC',
     role: 'owner',
     memberCount: 3,
     nameRestrictedProjectCount: 0,

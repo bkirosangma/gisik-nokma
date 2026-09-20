@@ -115,6 +115,18 @@ export const projProjects: Projection = {
         // (`packages/domain/src/prefix.ts`), which is where it can be applied to
         // a NULL without pretending the column said it.
         payload.prefix ?? null,
+        // ⚠ MEASURED LIMITATION, and it is why this line is a DECISION rather
+        // than a style. Writing `?? derivePrefix(payload.name)` here instead
+        // **reddens nothing at all** — not the reads, not the door, and not
+        // `tools/verify-projections`. The verifier diffs live against a rebuilt
+        // shadow, and the derivation is a PURE FUNCTION, so both sides compute
+        // the same value and `EXCEPT` has nothing to report: **that tool
+        // constrains a column to be REPRODUCIBLE, never to be ATTRIBUTED.** So
+        // the rule "the column holds only what an event said" is held by THIS
+        // comment and by review, not by a gate — which is exactly the kind of
+        // claim a successor should be told rather than left to infer from a
+        // green suite. (See `test-cases/13-owner-requests-and-backlog.md`,
+        // mutation M4.)
         event.actorId,
         event.serverTime,
       ],

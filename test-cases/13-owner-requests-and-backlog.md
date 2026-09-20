@@ -2007,8 +2007,13 @@ The enumeration lives in `Features.md` §6 ("Where the key is shown") with an ow
 ### The rule, and the refusals
 
 - **13.1019** ✅ `derivePrefix` takes the initials of the first two words — the owner's own workspace and
-  project — and `13.1020` ✅ takes the first two letters when the name is ONE word (`gggg`→`GG`). Both
-  halves are needed: a rule that got one right alone would pass a single-example test.
+  project.
+- **13.1020** ✅ It takes the first two letters when the name is ONE word (`gggg`→`GG`). Both halves are
+  needed: a rule that got one right alone would pass a single-example test. **This bullet exists on its
+  own line for a measured reason** — `check-case-ids` matches an id only at the START of a bullet, so the
+  first version of this pair, written as one sentence, left `13.1020` invisible to the guard while the
+  suite counted it. (The count moved by 25 for 27 minted ids; `13.1026` was the other one, and it had no
+  bullet at all.)
 - **13.1021** ✅ A name with no letters at all (`42`, `!!!`) falls back to the stated constant `XX`, and
   the result is a legal prefix. An empty string here would compose `SO-1` — a key with no workspace half.
 - **13.1022** ✅ A lower-case prefix is REFUSED, not upper-cased, for `displayName`'s own reason: the
@@ -2068,3 +2073,58 @@ The enumeration lives in `Features.md` §6 ("Where the key is shown") with an ow
   make the prefix mandatory in fact while the schema keeps it optional in form.
 - **13.1018** ✅ A MEMBER is told they may not found a project (`permission.role`), not which prefixes are
   taken — the same enumeration bound `checkProjectExists` documents.
+
+### The number under real contention
+
+- **13.1026** ✅ **N creations in flight at once take N DISTINCT numbers, and they are 1..N.** Eight
+  `ticket.created` submissions go through the REAL `ingestBatch` — all eight before any is awaited — and
+  the numbers are read back out of the ledger. A `for … await` loop would have serialised them and passed
+  against an implementation with no lock at all, so the concurrency is the fixture rather than a comment.
+  The keys are asserted per ticket and never against a fixture order: WHICH ticket gets 1 is decided by
+  the race, so pinning the first one would assert something about the scheduler. Mutation M6 is this
+  case's witness — removing `lockWorkspace` from `commitOne` reddens it with a real
+  `events_workspace_seq_unique` violation.
+
+### Mutation witness
+
+Every mutation below was applied to a tree with the change already COMMITTED, the test file run, and the
+file restored with `/usr/bin/git checkout --`; **each restore was then confirmed by comparing the file's
+SHA-256 with the value taken before the mutation** — never by a shell `diff`, which has returned a false
+"identical" in this repo. The two survivors are listed with their reasons, and neither is a mutation that
+failed to run: one of them refused to run at first and the refusal is recorded below.
+
+- **M1 — the door check reads the stored column instead of the derived set.** `checkProjectPrefixUnique`'s
+  input replaced with `new Set(rows.map(r => r.prefix).filter(p => p !== null))`.
+  **REDDENS 13.1015. 13.1014 passes.** The runner's own counts: `1 failed | 4 passed (5)` — the one
+  failure is 13.1015, so the control case is genuinely green. This is the mutation that separates the
+  check that works from the check that looks like it works.
+  ⚠ *The first sweep reported 13.1014 as ALSO RED and it was WRONG:* the file's `describe` is named
+  `13.1014-13.1018`, so a substring match on `13.1014` hit the describe line. Measured again by the
+  runner's failure COUNT, not by a regex.
+- **M2 — the resolver collapses to one pass.** The pre-claim of every stored prefix deleted.
+  **REDDENS 13.1024 only. 13.1023 passes.**
+- **M3 — the id filter moves inside the window** (`entity_id = ANY($2)` added to the subquery).
+  **REDDENS 13.1006** — the named case — **and 13.1007 as well**, which is a real over-broad effect rather
+  than a matcher artifact: the mutated SQL references `$2` on the whole-workspace path, where it is unbound.
+  Recorded rather than trimmed, because a mutation that reddens more than its own case is telling you
+  something about the query.
+- **M4 — SURVIVED. The projection writes the DERIVED prefix into the column** (`payload.prefix ??
+  derivePrefix(payload.name)`) instead of NULL. **Nothing reddens: not the reads, not the door, and not
+  `tools/verify-projections`.** The reason is worth keeping: the derivation is a PURE FUNCTION, so the
+  live row and the rebuilt shadow compute the SAME value and `EXCEPT` has nothing to report. **The
+  verifier constrains a column to be REPRODUCIBLE, never to be ATTRIBUTED** — it catches a value the
+  ledger cannot reproduce, and this value it can. The mutation is not harmless (it turns a derived prefix
+  into a stored one, which changes which claim wins in `resolveProjectPrefixes`' two passes), but it is
+  unconstrained, and that is the honest report: a survivor with an explanation.
+  ⚠ *This mutation did NOT run the first time either — it referenced `derivePrefix` without importing it,
+  so the file did not compile and the run failed with no test named. The import was added before the
+  result above was recorded.*
+- **M5 — `ticketKey` drops the workspace half.** **REDDENS 13.1025** and the sibling bare-key case in the
+  same `describe`; 13.1019 passes.
+- **M6 — the workspace lock is removed from `commitOne`.** **REDDENS 13.1026, live.** Eight concurrent
+  creations then read the same `max(workspace_seq)` and the second INSERT fails on
+  `duplicate key value violates unique constraint "events_workspace_seq_unique"` at
+  `ledger/event-store.ts:59`, through `commitOne` `ingest-service.ts:338`. This is the concurrency
+  property witnessed by a REAL scheduled race rather than asserted in prose: the lock is what makes the
+  numbers unique, and the constraint is the backstop that turns a lost lock into a loud failure instead
+  of two tickets sharing a key.

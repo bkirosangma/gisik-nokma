@@ -140,10 +140,11 @@ async function openTheBlockedTransition(): Promise<void> {
       {
         id: WORKSPACE,
         name: 'Garo Hills Logistics',
+        prefix: 'GH',
         role: 'owner',
         memberCount: 1,
         nameRestrictedProjectCount: 0,
-        projects: [{ id: PROJECT, name: 'Errand tracking', archived: false, ticketCount: 1, blockedCount: 0 }],
+        projects: [{ id: PROJECT, name: 'Errand tracking', prefix: 'ET', archived: false, ticketCount: 1, blockedCount: 0 }],
       },
     ],
     getTicket: async () => ticketRead(),

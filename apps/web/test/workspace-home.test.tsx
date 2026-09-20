@@ -62,13 +62,14 @@ function workspaceAs(role: string, over: Partial<WorkspaceRef> = {}): WorkspaceR
   return {
     id: WORKSPACE,
     name: 'Convenience Corner',
+    prefix: 'CC',
     role,
     memberCount: 5,
     nameRestrictedProjectCount: 2,
     projects: [
-      { id: 'p1', name: 'Shop operations', archived: false, ticketCount: 9, blockedCount: 3 },
-      { id: 'p2', name: 'Deliveries', archived: false, ticketCount: 4, blockedCount: 0 },
-      { id: 'p3', name: 'Old signage', archived: true, ticketCount: 7, blockedCount: 1 },
+      { id: 'p1', name: 'Shop operations', prefix: 'SO', archived: false, ticketCount: 9, blockedCount: 3 },
+      { id: 'p2', name: 'Deliveries', prefix: 'DL', archived: false, ticketCount: 4, blockedCount: 0 },
+      { id: 'p3', name: 'Old signage', prefix: 'OS', archived: true, ticketCount: 7, blockedCount: 1 },
     ],
     ...over,
   };
@@ -217,7 +218,7 @@ describe('13.384 the workspace home lists projects with the caller’s own count
         workspaceAs('guest', {
           memberCount: null,
           projects: [
-            { id: 'p1', name: 'Shop operations', archived: false, ticketCount: null, blockedCount: null },
+            { id: 'p1', name: 'Shop operations', prefix: 'SO', archived: false, ticketCount: null, blockedCount: null },
           ],
         }),
       ],
@@ -246,7 +247,7 @@ describe('13.384 the workspace home lists projects with the caller’s own count
       [
         workspaceAs('member', {
           projects: [
-            { id: 'p1', name: 'Shop operations', archived: false, ticketCount: 9, blockedCount: 3 },
+            { id: 'p1', name: 'Shop operations', prefix: 'SO', archived: false, ticketCount: 9, blockedCount: 3 },
           ],
         }),
       ],
@@ -337,8 +338,8 @@ describe('13.386 archive hides a project and restore returns it — read from th
         [
           workspaceAs('admin', {
             projects: [
-              { id: 'p1', name: 'Shop operations', archived: true, ticketCount: 9, blockedCount: 3 },
-              { id: 'p2', name: 'Deliveries', archived: false, ticketCount: 4, blockedCount: 0 },
+              { id: 'p1', name: 'Shop operations', prefix: 'SO', archived: true, ticketCount: 9, blockedCount: 3 },
+              { id: 'p2', name: 'Deliveries', prefix: 'DL', archived: false, ticketCount: 4, blockedCount: 0 },
             ],
           }),
         ],
@@ -346,8 +347,8 @@ describe('13.386 archive hides a project and restore returns it — read from th
         [
           workspaceAs('admin', {
             projects: [
-              { id: 'p1', name: 'Shop operations', archived: false, ticketCount: 9, blockedCount: 3 },
-              { id: 'p2', name: 'Deliveries', archived: false, ticketCount: 4, blockedCount: 0 },
+              { id: 'p1', name: 'Shop operations', prefix: 'SO', archived: false, ticketCount: 9, blockedCount: 3 },
+              { id: 'p2', name: 'Deliveries', prefix: 'DL', archived: false, ticketCount: 4, blockedCount: 0 },
             ],
           }),
         ],
@@ -591,7 +592,7 @@ describe('13.395 the header reads only served numbers, and its tint is keyed on 
         workspaceAs('guest', {
           memberCount: null,
           projects: [
-            { id: 'p1', name: 'Shop operations', archived: false, ticketCount: null, blockedCount: null },
+            { id: 'p1', name: 'Shop operations', prefix: 'SO', archived: false, ticketCount: null, blockedCount: null },
           ],
         }),
       ],
@@ -619,7 +620,7 @@ describe('13.395 the header reads only served numbers, and its tint is keyed on 
         workspaceAs('guest', {
           memberCount: 7,
           projects: [
-            { id: 'p1', name: 'Shop operations', archived: false, ticketCount: null, blockedCount: null },
+            { id: 'p1', name: 'Shop operations', prefix: 'SO', archived: false, ticketCount: null, blockedCount: null },
           ],
         }),
       ],
@@ -740,9 +741,9 @@ describe('13.413 each project card is one door, with the admin control outside t
       [
         workspaceAs('admin', {
           projects: [
-            { id: 'p1', name: 'Shop operations', archived: false, ticketCount: 9, blockedCount: 3 },
-            { id: 'p2', name: 'Old signage', archived: true, ticketCount: 7, blockedCount: 1 },
-            { id: 'p3', name: 'Deliveries', archived: false, ticketCount: 4, blockedCount: 0 },
+            { id: 'p1', name: 'Shop operations', prefix: 'SO', archived: false, ticketCount: 9, blockedCount: 3 },
+            { id: 'p2', name: 'Old signage', prefix: 'OS', archived: true, ticketCount: 7, blockedCount: 1 },
+            { id: 'p3', name: 'Deliveries', prefix: 'DL', archived: false, ticketCount: 4, blockedCount: 0 },
           ],
         }),
       ],
@@ -775,7 +776,7 @@ describe('13.413 each project card is one door, with the admin control outside t
  */
 describe('13.397 no archived projects means no archived control, on the home too', () => {
   it('renders neither the toggle nor an archived list when nothing is archived', async () => {
-    mount([[workspaceAs('member', { projects: [{ id: 'p1', name: 'Shop operations', archived: false, ticketCount: 2, blockedCount: 0 }] })]]);
+    mount([[workspaceAs('member', { projects: [{ id: 'p1', name: 'Shop operations', prefix: 'SO', archived: false, ticketCount: 2, blockedCount: 0 }] })]]);
     await screen.findByTestId('project-row-p1');
     expect(screen.queryByRole('button', { name: /archived/i })).toBeNull();
   });
@@ -817,6 +818,7 @@ describe('13.984-13.985 the project card draws the description, and draws nothin
             {
               id: 'p1',
               name: 'Delivery',
+              prefix: 'DL',
               archived: false,
               ticketCount: 2,
               blockedCount: 0,
@@ -842,10 +844,11 @@ describe('13.984-13.985 the project card draws the description, and draws nothin
       [
         workspaceAs('member', {
           projects: [
-            { id: 'p1', name: 'Delivery', archived: false, ticketCount: 2, blockedCount: 0 },
+            { id: 'p1', name: 'Delivery', prefix: 'DL', archived: false, ticketCount: 2, blockedCount: 0 },
             {
               id: 'p2',
               name: 'Site readiness',
+              prefix: 'SR',
               archived: false,
               ticketCount: 1,
               blockedCount: 0,

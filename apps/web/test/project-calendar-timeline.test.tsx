@@ -619,12 +619,13 @@ describe('the nav item follows the route it is on', () => {
             {
               id: 'ws_1',
               name: 'Convenience Corner',
+              prefix: 'CC',
               role: 'owner',
               memberCount: 1,
               nameRestrictedProjectCount: 0,
               projects: [
-                { id: 'p_other', name: 'Omega', archived: false, ticketCount: null, blockedCount: null },
-                { id: 'p_1', name: 'Alpha', archived: false, ticketCount: null, blockedCount: null },
+                { id: 'p_other', name: 'Omega', prefix: 'OM', archived: false, ticketCount: null, blockedCount: null },
+                { id: 'p_1', name: 'Alpha', prefix: 'AL', archived: false, ticketCount: null, blockedCount: null },
               ],
             },
           ],
