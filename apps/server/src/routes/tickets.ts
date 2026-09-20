@@ -588,11 +588,23 @@ export function registerTicketRoutes(
        * which is honest: this read did not find one, and it does not claim
        * there is none.
        */
-      const { rows: epicTypeRows } = await deps.pool.query<{ type_id: string }>(
-        `SELECT type_id FROM proj_ticket_types WHERE workspace_id = $1 AND rank = $2`,
-        [workspaceId, EPIC_RANK],
-      );
-      const epicTypeIds = new Set(epicTypeRows.map((row) => row.type_id));
+      // ⚠ THE RANK QUERY IS GUARDED ON THERE BEING SOMETHING TO CLIMB FROM, and
+      // that is not premature optimisation on a route the owner has open. A
+      // ticket with no parent never enters the walk below, so its `epic` is
+      // `null` whatever this set holds — the query would be a round trip whose
+      // answer nothing reads, on every root ticket's sheet open. The set stays
+      // EMPTY rather than unset, so the walk's own test is unchanged and this
+      // remains one code path rather than two.
+      const epicTypeIds = new Set<string>();
+      if (state.parentId !== null) {
+        const { rows: epicTypeRows } = await deps.pool.query<{ type_id: string }>(
+          `SELECT type_id FROM proj_ticket_types WHERE workspace_id = $1 AND rank = $2`,
+          [workspaceId, EPIC_RANK],
+        );
+        for (const row of epicTypeRows) {
+          epicTypeIds.add(row.type_id);
+        }
+      }
 
       let epic: AncestorRef | null = null;
       let cursor = state.parentId;
