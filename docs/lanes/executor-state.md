@@ -1,6 +1,48 @@
 # Serial executor — live state
 
-> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~21:0x IST. **BOTH MOUNT GAPS NEED A RULING. I BUILT
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~15:1x IST. **THE `visibility` DISPATCH IS BUILT, MUTATION-WITNESSED, REVIEWED AND GREEN; THE PR IS OPEN AND AWAITING THE CONTROLLER.** Branch **`exec/visibility-mode`**, one PR, `--base main`. **I do not merge.**
+>
+> ## ⚠ READ THIS FIRST — ANCHORS ROT, AND THE NARRATIVE BELOW CARRIES SHAS THAT ARE NOT ANCHORS
+> **Every sha written in prose anywhere in this file is unreliable.** The anchors are the four lines below, and they are a READING at a moment. `git branch --contains` (not `cat-file`, which passes on reflog-only commits) is what settles reachability; `gh pr view <n> --json state,mergeCommit` is what settles whether a PR is open — **check that before acting on any "open/paused/NEXT STEP" line, which is a failure this file has now produced four times.**
+>
+> ## ANCHORS AT THIS TREE (recounted here, not carried forward)
+> - **branch `exec/visibility-mode`**, cut from `origin/main`, then **folded** onto `origin/main = 7b75b2dc` (`#599`). `rev-list --left-right --count origin/main...HEAD` reads **`0 4`** — nothing behind, so HEAD IS THE LANDING TREE.
+> - **HEAD = `f3d4741e`** *at the moment this block was written*; the commit carrying THIS block is the next one, so HEAD moves by one and the count stays `0 4`. **The handoff commit is not in the sha above.**
+> - **working tree clean**, no untracked files.
+> - **The fold carried NO dependency change** — verified, not assumed: `git diff --name-only f32f453c..origin/main -- '**/package.json' pnpm-lock.yaml pnpm-workspace.yaml` returns ZERO files, so no `pnpm install` was run and none was needed.
+>
+> ## GATE — and the one red in it, which was contention rather than a defect
+> `pnpm turbo run build test typecheck` at the **pre-fold** tree: **EXIT=0, 33/33 tasks**, node **v22.22.2** as the runner's own interpreter (probed with `pnpm exec node -e 'process.version'` — turbo prints pnpm's LAUNCHER path, v24.11.1, and that is not drift), 10 suites, **5,552 tests passed**.
+> ⚠ **At the FOLDED tree the first gate run reddened ONE test: `12.291 the walk is capped at GRANT_BACKFILL_MAX_TICKETS (200)`, at 30,153 ms — a TIMEOUT, not an assertion.** Measured rather than assumed: the same case passes in **902 ms** alone and the **whole server suite is green standalone — 159 files, 1,658 passed / 5 skipped, 12.291 at 4,463 ms** — at the identical tree. The load was a reviewer subagent running concurrently with 33 turbo tasks. **Re-run the gate before treating this head as gated**; the honest statement today is "green pre-fold, one contention timeout post-fold, that case proven green standalone post-fold".
+>
+> ## WHAT SHIPPED — the owner's ruling `visibility (a) BUILD`, `(b) KEEP`
+> `toTicketView` (`apps/server/src/routes/tickets.ts:132-142`) has served `{ticket_id, workspace_id, project_id, parent_id, own_mode, resolved_mode, seq}` under the key `ticket` since the endpoint existed, and **`mapTicketRead` had never opened that key** — so the sheet's "Who can see this" section drew an ABSENCE for a fact the server had always sent. **The server needed no change**, exactly as the dispatch said. What changed: `TicketRead.visibility` (`TicketVisibility`), the mapper, the editor's rendering, and the sheet's default.
+>
+> ## THE THREE RULINGS I MADE UNDER THE DISPATCH'S OWN CONSERVATIVE DEFAULT — read these before reviewing the diff
+> 1. **`ownMode` and `resolvedMode` are BOTH carried, and they are different questions.** `resolvedMode` is what the standing line reports (the answer to "who can see this"); `ownMode` is what the mode PICKER is seeded from. **Seeding the picker from the resolved audience is a real defect** — it shows "Everyone on the project" for a ticket whose own claim is `inherit`, and Apply then FILES a claim nobody made, made by not touching anything. `ResolvedVisibilityMode` excludes `inherit` by TYPE; the mapper refuses a wire that says `resolved_mode: 'inherit'`, which `proj_visibility` cannot produce.
+> 2. **The roster and the provenance stay CUT (ruling (b) KEPT), and the section now SAYS SO.** `VisibilityClaim.userIds` and `.claim` are `| null` rather than optional, so "no read served this" cannot look like "the field was forgotten". An `explicit` audience with no roster names the mode and adds a clause that the list is not served — without it, "Only: the people this ticket names" is a partial answer wearing the shape of a complete one.
+> 3. **The audience is NOT delivered OFFLINE, and that is recorded as case `3.176` 🚫 with a named owner** rather than left as an unstated gap. `visibility.set` is deliberately not one of the fifteen ticket-entity types the reducer folds, so the replica answers `visibility: null` and the section renders its absence offline. Delivering it would mean re-deriving `proj_visibility`'s inherit-chain resolution on the device.
+> **New copy I minted** (nobody authorised these words; they are this change's, and a reviewer should read them as such): the roster-absence clause and the third-person resolved label `Only: the people this ticket names`.
+>
+> ## THE MUTATION SWEEP — ELEVEN MUTANTS, AND ONE SURVIVED
+> Nine died on the case written for them on the first pass. **M10 SURVIVED**, and the survival is the most useful thing this round produced: it replaced the sheet's read with a hardcoded `{ownMode:'inherit', resolvedMode:'project'}` — **the fixture's own seed value** — so the mutant rendered the very string the case was asserting. *A fixture equal to the plausible hardcoding cannot tell "read it" from "guessed it".* `3.174` now carries a `workspace`/`workspace` pair that is no default, and asserts the seed's string is ABSENT. Re-aimed (`M10'`, the NULL arm the case actually names) and re-run (`M11`), **both die**. Recorded because the next lane will write the same tidy fixture.
+>
+> ## THE INDEPENDENT REVIEW — see the PR body for the findings and their dispositions
+> One verifier, **told to falsify rather than confirm**, over nine load-bearing claims. **It ran BEFORE the PR opened and its findings are RECORDED IN THE PR BODY** — `#594` was sent back for *inviting* a reviewer instead of recording one.
+>
+> ## CITATIONS
+> Every `file:line` this branch ADDED was resolved by CONTENT at the folded tree — three of them, and they are the whole universe of added line-citations: `apps/server/src/routes/tickets.ts:132-142` (→ `toTicketView` returning exactly the seven keys), `:111-114` (→ the roster-cut paragraph), `page.tsx:2496` (→ `<TicketSheet`). Two named (not numbered) facts were checked too: `ROOT_DEFAULT_MODE = 'project'` and `BOOTSTRAP_BACKFILL_TYPES` carrying `'visibility.set'`.
+> ⚠ **A control that ran here and was WRONG, kept because it will be reached for again:** a hand-rolled grep for the ratchet head-delta reported **seven** added ids. Its greedy `[^ ]*` prefix can absorb `**3.167–` and then match `3.169`, so it reports whichever END of a range the backtracking lands on. The guard's own regex reads ONE id per bullet; measured against `origin/main` with THAT regex the delta is **+4 heads**, zero removed. **A bespoke pattern beside a precise one is not a second opinion — it is a different question.**
+>
+> ## WHERE I AM / WHAT IS IN FLIGHT
+> - `3.167–3.176` minted in `test-cases/03-foundation-ledger.md` (ten ids across four range bullets; **the guard counts heads only, so its `+4` is the four heads** — the six middle ids were controlled by checking them free across all 24 files before minting). `Features.md` carried the same false "UNSERVED" claim and is corrected in the same change set.
+> - **A `TicketRead` field was added, so the typechecker enumerated every producer by itself** — including three in `apps/web/test/` that a package-scoped typecheck could not see. *A sweep is a fact about a tree, and a PATH boundary is a boundary like any other.*
+> - **In flight: the PR, awaiting the controller's merge.** Nothing else. `#599` merged as `3cd4afc8` (verified `state,mergeCommit`); the previous block's "holding" is over.
+> - **Next after this merges:** the controller's next dispatch. `attachments` is NOT mine — it is executor 2's, under a separate dispatch (owner ruled option (A), a thin route).
+
+# ▣ SUPERSEDED BY THE BLOCK ABOVE.
+
+> # ▣ SUPERSEDED BY THE BLOCK ABOVE — SUNDAY 2026-09-20, ~21:0x IST. **BOTH MOUNT GAPS NEED A RULING. I BUILT
 > # NOTHING AND I AM HOLDING.** Branch `exec/mount-gaps` off `origin/main` = **`db3ad3c7`** (the `#594`
 > # merge). **`#597` MERGED as `f32f453c` while this lane was still writing** — this branch
 > # (`exec/mount-gaps-correction`) carries one follow-up docs commit and nothing else. No code, no route,
