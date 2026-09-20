@@ -356,16 +356,18 @@ describe('16.46 the pending list carries its heading, and its count is the list 
     // ONE text node, asserted STRUCTURALLY — and this is not decoration, it is
     // the only instrument that can see the composition. MEASURED: rebuilding the
     // string as `{'Pending invitations · '}<span>{n}</span>` leaves the
-    // accessible-name assertion above AND every other arm in this case GREEN,
-    // because the name computation flattens the element boundary into a space
-    // and the trailing space already in the literal absorbs it. A docblock
-    // cannot hold a property no assertion can see, so it is asserted here.
+    // accessible-name assertion above AND every other arm in this case GREEN.
+    // WHY the name survives the element boundary is NOT distinguished by that
+    // measurement — a boundary adding no separator and whitespace collapsing
+    // both fit it — so the structural assertion is what holds the property. A
+    // docblock cannot hold a property no assertion can see.
     expect(heading.childNodes).toHaveLength(1);
     expect(heading.querySelector('*')).toBeNull();
-    // The heading and the rows are ONE reading, and that is the point of the
-    // case rather than a decoration: asserted by COMPARISON against the rows
-    // this same render drew, so a fixture that grew could not make the two
-    // agree by accident while the component had stopped counting.
+    // This arm asserts the LIST against the FIXTURE — not the heading against
+    // the list, and the difference is measurable rather than pedantic: pinning
+    // the component's count to a constant `2` leaves this assertion green
+    // (recorded as that mutation, which is why the one-row arm below exists).
+    // What it does catch is the list drawing FEWER rows than the fixture holds.
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
 
@@ -380,7 +382,7 @@ describe('16.46 the pending list carries its heading, and its count is the list 
    * THE EMPTY CASE IS A DECISION, not an accident, and this is the arm that
    * records which one was taken. The authority draws the heading
    * unconditionally inside its `isInviteAdmin` block (`:722`–`:725`), above
-   * the `noInvites` sentence (`:740`); and the sentence below ALREADY claims
+   * the `noInvites` sentence (`:741`); and the sentence below ALREADY claims
    * the list is empty, so `· 0` repeats a claim the list was making rather
    * than making a new one. Hiding the heading at zero would instead leave the
    * section unnamed exactly when a reader needs to know what the empty thing

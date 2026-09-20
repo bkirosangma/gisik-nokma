@@ -939,7 +939,7 @@ function MintForm({ workspaceId, onMinted }: { workspaceId: string; onMinted: ()
  *
  * **At zero it renders, reading `· 0`.** The authority draws the heading
  * unconditionally inside its `isInviteAdmin` block (`:722`–`:725`), above the
- * `noInvites` sentence (`:740`), and that is also the honest reading here: the
+ * `noInvites` sentence (`:741`), and that is also the honest reading here: the
  * empty sentence below ALREADY claims the list is empty, so the heading adds no
  * claim the list was not already making. Hiding it at zero would instead leave
  * the section unnamed exactly when a reader most needs to know what the empty
@@ -963,7 +963,8 @@ function MintForm({ workspaceId, onMinted }: { workspaceId: string; onMinted: ()
  * the port; the authority's `<p>` is the drawing.
  *
  * ⚠ **`gn-invite-pending*` has NO CSS RULE, and this heading inherits that.**
- * `Features.md` §6 records the missing family as a scope call with a named
+ * `Features.md` **§3** — the people-page bullet, *"The people page, gated by the
+ * server's own 403"* — records the missing family as a scope call with a named
  * owner. This heading joins the family rather than opening a second one, so the
  * two headings on this screen stay consistent — styling one of them and not the
  * other would be a divergence this change invented.
