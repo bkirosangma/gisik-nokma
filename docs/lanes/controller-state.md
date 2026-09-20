@@ -31,6 +31,44 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 SUNDAY 2026-09-20 ~15:0x IST — **CYCLE 24: `#595` MERGED AND GATED AT ITS LANDING TREE, `#594` SENT BACK FOR A MISSING REVIEWER PASS, AND §4's STATE COLUMN HAD EXPIRED. THIS ENTRY IS THE POSITION.** `main` is `6f08452c`; **zero open PRs**; ledger **307 done / 1 todo** (struck).
+
+### 1. THE POSITION — read this, not §4's state column
+| # | task | lane | state |
+|---|---|---|---|
+| 1 | The sheet footer | exec 1 | **DONE** — `#591` → `e9c1a04f` |
+| 2 | The ticket key `CCSO-1183` | exec 2 | **DONE** — `#595` → `6f08452c` |
+| 3 | The three sheet surfaces | exec 1 | **IN FLIGHT** — `#594` open, **SENT BACK**; the lane has folded `main` and re-dispatched its reviewer |
+| 4 | The two mount gaps | exec 1 | **QUEUED** |
+| 5 | The pending-invitations heading | exec 2 | **IN FLIGHT** — restarted onto it; **a dispatch was written this cycle** (there was none) |
+| 6 | The tap-target checker | exec 2 | **QUEUED** |
+| 7 | `replica-data-source.ts:205`'s "six call sites" | exec 2 | **QUEUED** |
+| 8 | `prewarm-web-routes` · the `TOKENS` gap | — | **HELD** |
+⚠ **§4's ORDER was right; only its STATES had expired** — it still read items 1 and 2 IN FLIGHT and item 3 QUEUED. **Corrected in place, with a note.** A queue table reads as an allocation, which is why expired states in it are the harder half to notice.
+
+### 2. `#595` — MERGED AND GATED AT THE LANDING TREE, NOT TRANSFERRED
+`7aeaecf3` → **`6f08452c`**. Its base was **composite** (2 behind `main`), so the landing tree was **built and gated**: `merge-tree` predicted `f2e89030`, the real fold produced **`f2e89030`**, and the merge commit's tree is **`f2e89030` — the gated tree IS what landed.** Seven checks rc=0 at the head, including `check-migration-order` for the migration-number collision the lane hit when `main` moved under it. **Drop check 6,888 bytes, partitioned to ONE file** — `docs/lanes/controller-state.md`, present in BOTH trees and **touched by `#595` zero times**: `main`'s own `#593` anchor, which the PR head predated. **Nothing was dropped.** Control (`main` vs its own tip): **0 bytes.**
+⚠ **Its body names a mutation SURVIVOR rather than only its kills — that is the standard here.** A lane that reports only its kills is telling you what it checked, not what it missed.
+⚠ **Its head MOVED while the controller was measuring it** (`75a3abce` → `7aeaecf3`): the first checkout was already stale. **Re-read the head immediately before folding, not before starting.**
+
+### 3. `#594` SENT BACK — THE DEFECT WAS AN INVITATION WEARING THE SHAPE OF A RECORD
+`#594` (the three sheet surfaces) carried a section titled **"Two changes a reviewer should aim at"** — **an invitation to a reviewer, not a record of one having run.** `#591` and `#592` both carry a record; it did not. **The bar is that a pass RUNS and is RECORDED in the body BEFORE the PR opens.** Sent back; within a minute the lane had folded `main`, re-run its gate and **dispatched the reviewer** — so the send-back cost less than the defect would have.
+⚠ **Worth keeping: a section that *invites* review reads exactly like a section that *reports* it, and only one is evidence.**
+⚠ **AND IT FOUND A FALSE CLAIM IN THE CONTROLLER'S OWN DISPATCH** — §2(c) said the breadcrumb's names *"are already on the ticket read"*; `TicketRead` is six fields and carries **no workspace and no project name**. The lane measured it, took the conservative default (names as optional props from the host, which already computes both) and wrote it up. **A dispatch sentence is a claim like any other.**
+
+### 4. ⚠ THE SCRATCH-PATH HAZARD RECURRED INSIDE ONE CYCLE — AND THE CONTROLLER WAS A THIRD WRITER
+`#595` first opened **carrying exec 1's body** under its own branch and title, because **both lanes wrote `/tmp/pr-body.md`**. `gh pr create` reported success and **`headRefOid` and `baseRefName` were both correct** — **the prescribed ref checks are structurally blind to it.** ⚠ **The controller used the same path for `#592`.** Verified afterwards: `#592` and `#593` are intact — **but that was luck, not method.**
+📌 **The rule is not "lanes use distinct paths" but "EVERY writer carries its identity in the path", controller included** — `/tmp/ctl-<cycle>-<thing>.md`, never `/tmp/pr-body.md`. **And read the body back after `gh pr create`.**
+
+### 5. WHAT THE NEXT CONTROLLER SHOULD DO FIRST
+1. **Capture both panes** (`gisik:1`, `gisik:2`) and **read §1 above, not §4's states**.
+2. **Re-measure every anchor at the sha you report**, from a worktree **pinned at that sha** — never the primary checkout.
+3. **CI is the billing-blocked shape** (annotation: *"the job was not started because recent account payments have failed"*). **Owner-waived 2026-09-06, not treated as green, NOT to be re-asked.**
+4. ⚠ **A LANE CAN BE DOWN AND LOOK BUSY** — **check the pane's last ERROR line, not the spinner.**
+5. ⚠ **RE-ARM THE PR WATCHER.** It **exits when it fires**, so every detection disarms it.
+
+---
+
 ## 🔄 SUNDAY 2026-09-20 ~14:0x IST — **CYCLE 23: TWO MERGES, THE OWNER RULED THE DELETE DOOR, AND A DISPATCH WAS CORRECTED MID-FLIGHT BECAUSE ITS OWN INSTRUCTION WOULD HAVE COMPILED AND THEN FAILED AT RUNTIME.** `main` is `6d1b7123`; **zero open PRs**; ledger **307 done / 1 todo** (struck).
 
 ### 1. THE TWO MERGES — every reading at the landing tree
@@ -141,9 +179,9 @@ Cycle 21 ordered this: `owner-holds.md` said the two remaining mount gaps are *"
 ### 4. THE QUEUE — **IN ORDER, WITH LANES. THIS IS THE QUEUE.**
 | # | task | lane | state |
 |---|---|---|---|
-| 1 | **The sheet footer** — nav removal + `Delete` (history-retaining, with undo) | exec 1 | **IN FLIGHT** |
-| 2 | **The ticket key** — the full spec in §2 | exec 2 | **IN FLIGHT** |
-| 3 | **The three sheet surfaces** — toolbar, editable title, three-crumb breadcrumb (`CTL-DISPATCH-2026-09-20-sheet-surfaces.md`) | exec 1 | **QUEUED — next on lane** |
+| 1 | **The sheet footer** — nav removal + `Delete` (history-retaining, with undo) | exec 1 | **DONE — `#591` → `e9c1a04f`** |
+| 2 | **The ticket key** — the full spec in §2 | exec 2 | **DONE — `#595` → `6f08452c`** |
+| 3 | **The three sheet surfaces** — toolbar, editable title, three-crumb breadcrumb (`CTL-DISPATCH-2026-09-20-sheet-surfaces.md`) | exec 1 | **IN FLIGHT — `#594` open and SENT BACK for a missing reviewer pass** |
 | 4 | **The two mount gaps** — `attachments`, `visibility` (measure-then-build; `Attachments` may be a read) | exec 1 | **QUEUED** |
 | 5 | **The pending-invitations heading** (`desktop.dc.html:725`; `pending.length` already in state) | exec 2 | **QUEUED** |
 | 6 | **The tap-target checker** — accept 24 for dense in-list, keep 44 standalone | exec 2 | **QUEUED** |
@@ -151,6 +189,8 @@ Cycle 21 ordered this: `owner-holds.md` said the two remaining mount gaps are *"
 | 8 | **`prewarm-web-routes`** · **the audit's `TOKENS (every screen)` gap** | — | **HELD** — neither user-visible, neither on the critical path |
 
 **⚠ RE-BALANCED 2026-09-20 ~13:1x IST (cycle 22, owner-authorized — *"go"*): items 5, 6 and 7 moved from exec 1 to exec 2.** They were on exec 1 by drift, not by any rule; the reasoning, and the lane-assignment rule this writes down, are in the cycle-22 block at the top of this file.
+
+**⚠ AND ITS STATE COLUMN WAS STALE BY CYCLE 24 — CORRECTED IN PLACE ABOVE.** It read item 1 IN FLIGHT (merged as `#591`), item 2 IN FLIGHT (merged as `#595`) and item 3 QUEUED (actually in flight, `#594`). **A restarting controller reading §4 alone would have dispatched item 3 to exec 1, who was already building it.** ⚠ **THE ORDER WAS RIGHT AND ONLY THE STATES HAD EXPIRED — which is the harder half to notice, because a queue table reads as an allocation rather than as a set of readings.** The current position is §1 of the cycle-24 block at the top.
 
 ### 5. INSTRUMENTS THAT LIED THIS CYCLE, ALL CAUGHT
 1. **A ZSH PARAMETER MODIFIER ATE A VARIABLE.** `"$M:test-cases/16-remaining-doors.md"` — zsh read `$M:t` as the *tail* modifier, so the path became garbage and the check **reported `MISSING` for lines that were present**. **Use `${M}:path`.**
