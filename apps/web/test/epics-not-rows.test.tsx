@@ -6,7 +6,12 @@ import type { BoardCard, BoardView, ClaimProvenance, ListRow, TicketListView } f
 // Value import, deliberately: 13.1046 asserts the same string that renders rather
 // than a re-typed copy of it — two spellings of one sentence is how a copy change
 // passes a test it broke (`EMPTY_BOARD_COPY`'s own docblock, one constant over).
-import { EMPTY_COLUMN_COPY } from '@gisik-nokma/app-core';
+import {
+  EMPTY_BOARD_COPY,
+  EMPTY_BOARD_EPICS_COPY,
+  EMPTY_COLUMN_COPY,
+  EMPTY_COLUMN_EPICS_COPY,
+} from '@gisik-nokma/app-core';
 import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
 
@@ -72,7 +77,10 @@ vi.mock('../src/auth-client.js', () => ({
   },
 }));
 
-import ProjectPage from '../app/w/[workspaceId]/p/[projectId]/page.js';
+import ProjectPage, {
+  BACKLOG_EMPTY_COPY,
+  BACKLOG_EMPTY_EPICS_COPY,
+} from '../app/w/[workspaceId]/p/[projectId]/page.js';
 
 function claim(value: unknown): ClaimProvenance & { value: unknown } {
   return {
@@ -222,21 +230,47 @@ describe('13.1038 the Board draws no epic card, and neither count includes one',
 });
 
 /**
- * 13.1043 — THE RESIDUAL, RECORDED. A board whose only non-closed tickets are
- * epics now draws `EMPTY_BOARD_COPY` over a project that holds one. The
- * truthful sentence is new user-facing copy, which belongs to the owner; the
- * case exists so the gap is a MEASUREMENT rather than a discovery.
+ * 13.1043 — THE ALL-EPIC BOARD NAMES THE CAUSE (owner ruling, 2026-09-20), **AND IT IS NOT
+ * THE SENTENCE A GENUINELY EMPTY PROJECT GETS.**
+ *
+ * Minted as a RECORDED residual: `#602` left it saying *"No tickets here yet — create one."*
+ * over a project that holds an epic, where "create one" names the one action that cannot
+ * help. It flips with this change — and it flips into **TWO arms**, because a single
+ * sentence for both cases is exactly the defect the split exists to prevent.
  */
-describe('13.1043 the all-epic Board falls to the empty copy — recorded, owner: the owner', () => {
-  it('renders "No tickets here yet — create one." over a project holding an epic', async () => {
+describe('13.1043 the all-epic Board names the cause, and the empty Board keeps its own sentence', () => {
+  it('says epics appear in the List over a project that holds an epic', async () => {
     render(
       <Providers services={servedWorld({ cards: [EPIC_CARD] })}>
         <ProjectPage />
       </Providers>,
     );
     await screen.findByRole('searchbox');
-    expect(await screen.findByText('No tickets here yet — create one.')).toBeInTheDocument();
+    expect(await screen.findByText(EMPTY_BOARD_EPICS_COPY)).toBeInTheDocument();
+    // AND NOT THE OLD ONE, which is the sentence this case was minted to record: it calls
+    // an epic-holding project empty and points at "create one".
+    expect(screen.queryByText(EMPTY_BOARD_COPY)).toBeNull();
     expect(screen.queryByText('The epic')).not.toBeInTheDocument();
+  });
+
+  /**
+   * ⚠ THE ARM THAT MAKES THE SPLIT A MEASUREMENT RATHER THAN A WISH — controller ruling
+   * (b): *"a project with nothing in it is not that case — its sentence was true before
+   * the ruling and is still true after it."*
+   *
+   * **Represented here as a PROP rather than derived in the component**, because the two
+   * cases are otherwise identical: a page spec asserting the same constant for both, from
+   * the same gate, is what established that. One card different from the arm above.
+   */
+  it('13.1043 CONTROL — a genuinely empty project keeps "No tickets here yet — create one."', async () => {
+    render(
+      <Providers services={servedWorld({ cards: [] })}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByRole('searchbox');
+    expect(await screen.findByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
+    expect(screen.queryByText(EMPTY_BOARD_EPICS_COPY)).toBeNull();
   });
 });
 
@@ -244,22 +278,21 @@ describe('13.1043 the all-epic Board falls to the empty copy — recorded, owner
  * 13.1046 — THE FOURTH EMPTY STATE, AND THE ONE `#602` DID NOT MINT.
  *
  * The SAME `boardNarrowing` pass that drops the epic from the grid drops it from
- * `column.cards` too, so a column whose only card was an epic now renders
- * `EMPTY_COLUMN_COPY`. `boardOf` above always builds a `Doing` column, so the fixture
- * 13.1043 already uses **is** an all-epic board with a workflow attached — that case
- * simply never asserts the region, which is how this site went unminted. **The two
- * sentences render on ONE screen**: 13.1043's whole-board copy sits above a rail of
- * columns, each saying this one.
+ * `column.cards` too. `boardOf` above always builds a `Doing` column, so the fixture
+ * 13.1043 uses **is** an all-epic board with a workflow attached — that case simply never
+ * asserted the region, which is how this site went unminted. **The two sentences render on
+ * ONE screen**: 13.1043's whole-board copy sits above a rail of columns, each saying its
+ * own.
  *
- * ⚠ ITS OWN ARM, DELIBERATELY — and this is a correction, not tidiness. The first
- * version of this measurement asserted both sentences in ONE test with the BOARD
- * first. Under a mutation the board assertion failed and aborted the test before this
- * one ran, so the run proved the TEST was sensitive while leaving THIS claim
- * unwitnessed. **An assertion above another masks it; a red test can be as silent as a
- * green one about the line you care about.**
+ * ⚠ ITS OWN ARM, DELIBERATELY — and this is a correction, not tidiness. The first version
+ * of this measurement asserted both sentences in ONE test with the BOARD first. Under a
+ * mutation the board assertion failed and aborted the test before this one ran, so the run
+ * proved the TEST was sensitive while leaving THIS claim unwitnessed. **An assertion above
+ * another masks it; a red test can be as silent as a green one about the line you care
+ * about.**
  */
-describe('13.1046 the all-epic board draws a column, and that column says EMPTY_COLUMN_COPY — recorded, owner: the owner', () => {
-  it('draws the Doing region and renders EMPTY_COLUMN_COPY inside it', async () => {
+describe('13.1046 the all-epic column names the cause, and an empty column keeps its own sentence', () => {
+  it('draws the Doing region and renders EMPTY_COLUMN_EPICS_COPY inside it', async () => {
     render(
       <Providers services={servedWorld({ cards: [EPIC_CARD] })}>
         <ProjectPage />
@@ -269,13 +302,33 @@ describe('13.1046 the all-epic board draws a column, and that column says EMPTY_
 
     // The rail must exist for the assertion below to be about it at all.
     const doing = await screen.findByRole('region', { name: 'Doing' });
-    expect(within(doing).getByText(EMPTY_COLUMN_COPY)).toBeInTheDocument();
+    expect(within(doing).getByText(EMPTY_COLUMN_EPICS_COPY)).toBeInTheDocument();
+    // And not the column's other sentence, which is true of it only when epics are NOT
+    // the reason it is empty.
+    expect(screen.queryByText(EMPTY_COLUMN_COPY)).toBeNull();
   });
 
   /**
-   * THE CONTROL, on the same fixture and one card different: with a TASK sitting in
-   * the column it is not empty and no column sentence renders. Without this arm the
-   * assertion above would be indistinguishable from a query that cannot fail.
+   * ⚠ RULING (b) AT THE COLUMN, AND IT IS A SEPARATE ARM FROM THE BOARD'S because this is
+   * a separate gate: a column only takes the new sentence when NOTHING else was removed
+   * from it (`.epicsHidden` on the column, stricter than the board's). A column with no
+   * cards at all keeps the original sentence.
+   */
+  it('13.1046 CONTROL — a genuinely empty column keeps "No tickets in this column."', async () => {
+    render(
+      <Providers services={servedWorld({ cards: [] })}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByRole('searchbox');
+    const doing = await screen.findByRole('region', { name: 'Doing' });
+    expect(within(doing).getByText(EMPTY_COLUMN_COPY)).toBeInTheDocument();
+    expect(screen.queryByText(EMPTY_COLUMN_EPICS_COPY)).toBeNull();
+  });
+
+  /**
+   * THE SECOND CONTROL, on the same fixture and one card different: with a TASK sitting in
+   * the column it is not empty and no column sentence renders.
    */
   it('13.1046 CONTROL — the same fixture with a TASK card renders no column sentence', async () => {
     render(
@@ -286,6 +339,7 @@ describe('13.1046 the all-epic board draws a column, and that column says EMPTY_
     await screen.findByRole('searchbox');
     expect(await screen.findByText('Restock the cold shelf')).toBeInTheDocument();
     expect(screen.queryByText(EMPTY_COLUMN_COPY)).toBeNull();
+    expect(screen.queryByText(EMPTY_COLUMN_EPICS_COPY)).toBeNull();
   });
 });
 
@@ -370,21 +424,43 @@ describe('13.1039 the Backlog loses the epic ROW and keeps the epic SECTION HEAD
 });
 
 /**
- * 13.1044 — THE RESIDUAL, RECORDED. A backlog holding only epics now renders
- * "Nothing in the backlog — new tickets land here." over a backlog that holds
- * one. Same owner, same reason as 13.1043.
+ * 13.1044 — THE ALL-EPIC BACKLOG NAMES THE CAUSE (owner ruling, 2026-09-20), **AND AN
+ * EMPTY BACKLOG KEEPS ITS OWN SENTENCE.**
+ *
+ * Minted as a RECORDED residual: the sentence *"Nothing in the backlog — new tickets land
+ * here."* was a claim about the backlog SET, and an epic is literally a member of it
+ * (`stateId === BACKLOG_STATE_ID` is the very field `backlogNarrowing` reads to decide
+ * what the backlog is) — so it denied the existence of something in the set it named.
+ *
+ * The sentence is chosen by the PAGE, not by `TicketList`: the component is handed only
+ * the surviving rows and cannot tell a backlog that holds nothing from one whose only
+ * tickets were epics.
  */
-describe('13.1044 the all-epic Backlog falls to the empty copy — recorded, owner: the owner', () => {
-  it('renders "Nothing in the backlog — new tickets land here." over a backlog holding an epic', async () => {
+describe('13.1044 the all-epic Backlog names the cause, and an empty backlog keeps its own sentence', () => {
+  it('says epics appear in the List over a backlog that holds an epic', async () => {
     render(
       <Providers services={servedWorld({ rows: [BACKLOG_EPIC] })}>
         <ProjectPage />
       </Providers>,
     );
     await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
-    expect(
-      await screen.findByText('Nothing in the backlog — new tickets land here.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(BACKLOG_EMPTY_EPICS_COPY)).toBeInTheDocument();
+    expect(screen.queryByText(BACKLOG_EMPTY_COPY)).toBeNull();
+  });
+
+  /**
+   * ⚠ RULING (b): *"a project with nothing in it is not that case."* One fixture array
+   * different from the arm above.
+   */
+  it('13.1044 CONTROL — a genuinely empty backlog keeps "Nothing in the backlog — new tickets land here."', async () => {
+    render(
+      <Providers services={servedWorld({ rows: [] })}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
+    expect(await screen.findByText(BACKLOG_EMPTY_COPY)).toBeInTheDocument();
+    expect(screen.queryByText(BACKLOG_EMPTY_EPICS_COPY)).toBeNull();
   });
 });
 

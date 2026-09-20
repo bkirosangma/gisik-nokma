@@ -103,9 +103,19 @@ describe("11.5 attributed labels (spec §7's exact shape — planted defect: the
     ).toBe('start 30 Aug is after needed-by 24 Aug — both claims shown, no bar drawn');
   });
 
+  /**
+   * ⚠ AMENDED 2026-09-20 — the cause-list GAINS a cause (owner ruling: *"epics should never
+   * show up in the board, timeline and calendar views. they can only be in the list views"*).
+   *
+   * The sentence is not replaced. It already names a SET of narrowings, so the epic rule
+   * joins the set in the same voice, and the clause stays CONDITIONAL — *"If a claim is
+   * here and not drawn"* — which is what lets it carry a fourth cause without claiming
+   * this month has one. This is the arm `13.1045` recorded as reaching *"a sentence whose
+   * list of causes does not name it"*; that case flips with this change.
+   */
   it('11.1 the empty month says why it is empty', () => {
     expect(CALENDAR_EMPTY_MONTH_COPY).toBe(
-      'No claimed dates are drawn in this month. Undated work is absent, not estimated — the calendar draws only what someone claimed. If a claim is here and not drawn, a narrowing kept it off this grid without dropping it: your filter, closed jobs being hidden, or a field you switched off in the legend.',
+      'No claimed dates are drawn in this month. Undated work is absent, not estimated — the calendar draws only what someone claimed. If a claim is here and not drawn, a narrowing kept it off this grid without dropping it: your filter, closed jobs being hidden, a field you switched off in the legend, or an epic, which is drawn in the List and not here.',
     );
   });
 

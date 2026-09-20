@@ -3108,6 +3108,14 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "italic",
                     "text": "\"Nothing in the backlog — new tickets land here.\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — or, when the only thing it would have listed was an epic, "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Nothing in the backlog — epics appear in the List.\""
                   }
                 ]
               }
@@ -3177,12 +3185,45 @@ export const HELP_CONTENT: HelpContent = [
                     "text": " it says "
                   },
                   {
+                    "kind": "bold",
+                    "text": "which"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " emptiness it is. A project with no tickets at all gets "
+                  },
+                  {
                     "kind": "italic",
                     "text": "\"No tickets here yet — create one.\""
                   },
                   {
                     "kind": "text",
-                    "text": " Note the exact wording: it says \"no tickets\", not \"no columns\", because the product genuinely cannot tell \"there is no work here\" from \"none of it is visible to you\", and that sentence is true of both."
+                    "text": " A project whose only tickets are epics gets "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"No tickets in this view — epics appear in the List.\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — an epic is real work that this view does not draw, so \"create one\" would name the wrong remedy and the List is where it lives."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Those two are the cases the board can tell apart, and it tells them apart exactly. It still cannot say "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "why else"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " a board might be empty to you: the wording is \"no tickets\", not \"no columns\"."
                   }
                 ]
               },
@@ -3502,7 +3543,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", the sentence NAMES what can hide a claim: your filter, closed jobs being hidden, or a date field you switched off in the legend. It goes on to say "
+                    "text": ", the sentence NAMES what can hide a claim: your filter, closed jobs being hidden, a date field you switched off in the legend, or an epic, which is drawn in the List and not here. It goes on to say "
                   },
                   {
                     "kind": "italic",
@@ -8913,7 +8954,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The sentence names what can hide a claim: your filter, closed jobs being hidden, or a date field you switched off with the legend switch. It also says \"Undated work is absent, not estimated\" — the calendar draws only what someone claimed. When a date field you switched off is hiding claims here, a different sentence says so, and it claims "
+                    "text": "The sentence names what can hide a claim: your filter, closed jobs being hidden, a date field you switched off with the legend switch, or an epic, which is drawn in the List and not here. It also says \"Undated work is absent, not estimated\" — the calendar draws only what someone claimed. When a date field you switched off is hiding claims here, a different sentence says so, and it claims "
                   },
                   {
                     "kind": "bold",

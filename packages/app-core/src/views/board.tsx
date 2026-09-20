@@ -86,6 +86,28 @@ export type BoardProps = {
    */
   isNarrowed?: boolean;
   /**
+   * Whether the ONLY reason this board drew no cards is the epic rule (owner ruling,
+   * 2026-09-20). OPTIONAL, the SAME precedent `onCreateTicket` and `isNarrowed` set
+   * immediately above: **absent means `EMPTY_BOARD_COPY`**, so every mount written before
+   * this prop existed reads exactly as it did, and a mount with nothing to say passes
+   * nothing.
+   *
+   * ⚠ **IT EXISTS BECAUSE THE COMPONENT CANNOT WORK IT OUT, AND THAT IS MEASURED RATHER
+   * THAN ASSUMED.** An all-epic board and a genuinely empty one reach `emptyBanner` with
+   * **identical** state: the epic is dropped before `total` increments, so `totalCards`
+   * is `0` for both, and `isNarrowed` is `false` for both because `#602` deliberately
+   * chose not to call the epic drop a narrowing ("a permanently-false narrowing claim is
+   * worse than the residual it buys"). A page spec rendering both fixtures asserts the
+   * same constant from the same gate, with a one-task-card control proving the fixture
+   * can produce a different outcome — so this is a real indirection, not a skipped
+   * derivation. The caller holds it because it has `board.data` AND the narrowed view.
+   *
+   * **Only meaningful together with `totalCards === 0 && isNarrowed !== true`**, which is
+   * where it is read: with the board drawing no cards and no filter in force, a dropped
+   * epic is the whole explanation for the emptiness.
+   */
+  epicsHidden?: boolean;
+  /**
    * The per-card `‹ ›` move arrows (board-prototype-port Task 13). OPTIONAL,
    * the SAME precedent `onCreateTicket` and `isNarrowed` already set on this
    * type immediately above: a mount with nothing to submit through passes
@@ -162,6 +184,29 @@ export type BoardMoveCapability = {
 export const EMPTY_BOARD_COPY = 'No tickets here yet — create one.';
 
 /**
+ * The words an empty board says when the ONLY reason it is empty is the epic rule
+ * (owner ruling, 2026-09-20: *"epics should never show up in the board, timeline and
+ * calendar views. they can only be in the list views"*).
+ *
+ * **A DIFFERENT SENTENCE FROM `EMPTY_BOARD_COPY` ABOVE, AND THE DIFFERENCE IS THE WHOLE
+ * POINT.** *"No tickets here yet — create one."* is FALSE over an all-epic project: the
+ * project is not ticket-less, it holds a ticket this view will not draw, and *"create
+ * one"* names the one action that cannot help. This sentence names the cause instead,
+ * and names where the work actually went — which is the same discipline the calendar's
+ * two empty-month sentences already keep: **an absence must say which absence it is.**
+ *
+ * **IT MAY NOT BE REACHED BY A PROJECT THAT IS SIMPLY EMPTY.** An all-epic board and a
+ * genuinely empty one are the SAME state at this component — the epic is dropped before
+ * `total` increments, so both fold to zero cards and `isNarrowed` is false in both
+ * (`#602` deliberately does not call the epic drop a narrowing). So the distinction is
+ * carried in on the `epicsHidden` prop, computed one layer up where `board.data` and the
+ * narrowed view are both in hand; **absent means the OLD sentence**, which keeps every
+ * mount written before this prop existed reading exactly as it did. Reachability is
+ * witnessed both ways: `13.1043` (all-epic) and `13.303`/`13.466` (genuinely empty).
+ */
+export const EMPTY_BOARD_EPICS_COPY = 'No tickets in this view — epics appear in the List.';
+
+/**
  * The words a single COLUMN says when it holds no cards of its own — a
  * different granularity from `EMPTY_BOARD_COPY` above (board-prototype-port
  * Task 7, R6). Deliberately not a re-spelling of it: both can render on the
@@ -192,6 +237,30 @@ export const EMPTY_BOARD_COPY = 'No tickets here yet — create one.';
  * already holds itself to.
  */
 export const EMPTY_COLUMN_COPY = 'No tickets in this column.';
+
+/**
+ * The words an empty COLUMN says when the only reason it is empty is the epic rule
+ * (owner ruling, 2026-09-20). The whole-board sentence one level up has its own twin —
+ * see `EMPTY_BOARD_EPICS_COPY` — and the two are deliberately NOT re-spellings of each
+ * other for the reason `EMPTY_COLUMN_COPY`'s own docblock already gives: both can render
+ * on one screen, and a `getByText` query must still resolve to exactly one element.
+ *
+ * ⚠ **THIS SENTENCE HAS THE HARDEST REACHABILITY OF THE FOUR, AND THE REASON IS THE ONE
+ * `EMPTY_COLUMN_COPY`'s DOCBLOCK ALREADY RECORDS.** That docblock concedes the column's
+ * text names no reason because `BoardColumn` carries nothing distinguishing "this state
+ * genuinely holds no tickets" from "a filter narrowed it to zero" — and justifies the
+ * silence by saying the text is true *"whether or not a filter is active"*. The epic rule
+ * breaks that justification, because it is not a filter and nothing on screen discloses
+ * it: over an all-epic project there is no strip, no chip and no count. So the column
+ * needs its own signal, and `BoardColumn` gains an OPTIONAL `epicsHidden` — additive, so
+ * every existing constructor and every mount written before it still compiles and still
+ * renders the old sentence.
+ *
+ * **IT FIRES ONLY WHEN NOTHING ELSE WAS REMOVED FROM THIS COLUMN.** A column emptied by
+ * a filter AND by the epic rule takes the OLD text: "epics are why this is empty" would
+ * be a half-truth, and `EMPTY_COLUMN_COPY` is the one written to survive not knowing.
+ */
+export const EMPTY_COLUMN_EPICS_COPY = 'No tickets in this column — epics appear in the List.';
 
 /**
  * The `dataTransfer` format a dragged card's ticket id travels under
@@ -250,7 +319,7 @@ type MoveRegistry = Map<string, (toStateId: string) => void>;
  * workflow or several. A grouping that drops a card is a filter wearing a
  * grouping's name, and the ticket it dropped is gone with nothing saying so.
  */
-export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, moves }: BoardProps) {
+export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHidden, moves }: BoardProps) {
   /**
    * The shared drop registry (`MoveRegistry`'s own docblock above) —
    * created HERE, unconditionally, before any early return, because React's
@@ -412,7 +481,15 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, moves }
   const emptyBanner =
     totalCards === 0 && isNarrowed !== true ? (
       <>
-        <p className="gn-board__empty-copy">{EMPTY_BOARD_COPY}</p>
+        {/*
+          WHICH SENTENCE, AND WHY IT IS A PROP RATHER THAN A DERIVATION. `epicsHidden` is
+          the ONLY thing separating "this project holds nothing" from "this project holds
+          an epic this view will not draw" — the two are otherwise identical here (see the
+          prop's own docblock). Absent ⇒ the original sentence, unchanged.
+        */}
+        <p className="gn-board__empty-copy">
+          {epicsHidden === true ? EMPTY_BOARD_EPICS_COPY : EMPTY_BOARD_COPY}
+        </p>
         {onCreateTicket !== undefined ? (
           <button type="button" className="gn-board__empty-create" onClick={onCreateTicket}>
             Create a ticket
@@ -679,7 +756,9 @@ function BoardGroupSection({
                     <path d="M12 5.5v13M5.5 12h13" />
                   </svg>
                 </span>
-                <p className="gn-board__column-empty-copy">{EMPTY_COLUMN_COPY}</p>
+                <p className="gn-board__column-empty-copy">
+                  {column.epicsHidden === true ? EMPTY_COLUMN_EPICS_COPY : EMPTY_COLUMN_COPY}
+                </p>
                 {onCreateTicket !== undefined ? (
                   <Button onClick={onCreateTicket}>Add a ticket</Button>
                 ) : null}

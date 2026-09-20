@@ -220,6 +220,23 @@ export type BoardColumn = {
   category: StateCategory;
   blocked: boolean;
   cards: BoardCard[];
+  /**
+   * Whether the ONLY reason `cards` is empty is the epic rule (owner ruling,
+   * 2026-09-20) — OPTIONAL and additive, so every existing constructor of this type
+   * still compiles and every column built before it existed still renders
+   * `EMPTY_COLUMN_COPY`.
+   *
+   * ⚠ **REQUIRED-NULLABLE WOULD HAVE BEEN THE WRONG SHAPE**: it would force every
+   * existing caller to pass a value to say nothing had changed. Absence means exactly
+   * that, and it is the same precedent `BoardProps`' `isNarrowed`/`epicsHidden` follow.
+   *
+   * It is carried on the COLUMN rather than computed in the view because `Board` is
+   * handed an already-narrowed view: by the time a column reaches it, an epic removed
+   * from that column is indistinguishable from a column that never held one — the
+   * `BoardColumn` docblock on `EMPTY_COLUMN_COPY` records that same limitation for the
+   * filter, one cause earlier.
+   */
+  epicsHidden?: boolean;
 };
 
 /**
