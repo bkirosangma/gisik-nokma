@@ -99,14 +99,26 @@ export type TimelineModel = {
   sideList: TimelineSideEntry[];
   sideListCopy: string;
   /**
-   * Why the timeline is empty, or null when it is not. THREE sentences,
-   * because they are three different facts — the same construction
-   * `CalendarModel.emptyCopy` was given, for the same reason.
+   * Why the timeline is empty, or null when it is not. **TWO sentences as of
+   * 2026-09-20** (it was three) — the same construction
+   * `CalendarModel.emptyCopy` was given, for the same reason, and trimmed by
+   * the same owner ruling.
    *
-   * Measured before this field existed, anchor `2026-08-23`: `model([])`, a
-   * filter matching nobody, an unmatched `laneEpicId`, and work that is fully
-   * dated but wholly outside the window all serialised to the SAME bytes.
-   * Four different emptinesses, one indistinguishable screen.
+   * ⚠ **THE MEASUREMENT THIS FIELD WAS BUILT ON HAS PARTLY REVERTED, AND THE
+   * REVERSION IS RECORDED RATHER THAN QUIETLY RESCOPED.** Measured before this
+   * field existed, anchor `2026-08-23`: `model([])`, a filter matching nobody,
+   * an unmatched `laneEpicId`, and work that is fully dated but wholly outside
+   * the window all serialised to the SAME bytes — four emptinesses, one screen.
+   * The three sentences made that three distinct models; deleting the narrowing
+   * one (`TIMELINE_NARROWED_COPY`, owner ruling 2026-09-20, *"delete the copy"*)
+   * takes it back to TWO. **A filter that matched nobody and a workless
+   * workspace are one model again** — the collapse this field was added to end.
+   *
+   * What replaces the lost distinction is that the surviving sentence NAMES the
+   * filter, so the reader is still pointed at the control that would bring the
+   * work back; and the `narrowedAway` guard that survives is what still keeps
+   * the window sentence from carrying the both-case. Both are witnessed, the
+   * collapse included as an asserted count, at `timeline-model.test.ts` 11.61.
    *
    * The window miss is the case Task 11 CANNOT reconstruct: its props carry
    * `tickets`, `filter` and `laneEpicId` and nothing about the window, so a

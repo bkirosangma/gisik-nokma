@@ -68,7 +68,7 @@ computed "now".
 ## Timeline view — React component (`packages/app-core`)
 - **11.73** ✅ A bar is drawn only from a claimed pair, with the rest sitting beside the grid — never in both places at once — (`timeline-view.test.tsx`)
 - **11.74** ✅ The window moves four weeks at a time, and Today follows the prop rather than the mount — (`timeline-view.test.tsx`)
-- **11.75** ✅ Three empty timelines render as three different sentences, verbatim — (`timeline-view.test.tsx`)
+- **11.75** ✅ The empty timelines render the model's own sentences, verbatim. **⚠ AMENDED 2026-09-20:** this read "Three empty timelines render as three different sentences"; the narrowing sentence was deleted (owner ruling, item 10), so a filter-emptied chart and an empty one are now the SAME sentence — the naming is what survives the distinction, and the window miss is still its own arm. See 11.61 for the measured collapse — (`timeline-view.test.tsx`)
 - **11.76** ✅ The side list renders only when it has entries, under the heading the model chose — (`timeline-view.test.tsx`)
 - **11.77** ✅ All FIVE side-list reasons render, each saying which one it is — (`timeline-view.test.tsx`)
 - **11.78** ✅ A claim still in transit says so, and a settled one does not — (`timeline-view.test.tsx`)

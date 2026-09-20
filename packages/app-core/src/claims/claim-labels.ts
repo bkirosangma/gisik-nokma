@@ -122,8 +122,12 @@ export const CALENDAR_EMPTY_MONTH_COPY =
  *
  * IT CLAIMS EXHAUSTIVITY ("every claimed date"), so the model may only reach
  * for it when the legend is the ONLY thing standing between the viewer and
- * this month's claims. A month narrowed by a filter or a lane as well is the
- * third sentence's business, not this one's.
+ * this month's claims. A month narrowed by a filter as well does NOT get this
+ * sentence: it reaches `CALENDAR_EMPTY_MONTH_COPY` above, which names the set
+ * of narrowings rather than picking one. **That gate is `narrowedOutOfGrid` in
+ * the model, and it outlived the sentence that used to carry the both-case** —
+ * see `calendar-model.ts`'s precedence note, and case 11.50, which witnesses
+ * the gate against a mutation that would have removed it.
  */
 export const CALENDAR_ALL_HIDDEN_COPY =
   'Every claimed date in this month belongs to a field you have hidden. Nothing was dropped — switch a field back on in the legend to see its claims again.';

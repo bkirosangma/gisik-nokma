@@ -255,7 +255,11 @@ describe('11.74 the window moves four weeks at a time, and Today follows the pro
   });
 });
 
-describe('11.75 three empty timelines are three different sentences, rendered verbatim', () => {
+describe('11.75 the empty timelines are the model sentences, rendered verbatim', () => {
+  /* ⚠ RETITLED 2026-09-20. It read "three empty timelines are three different
+     sentences". The narrowing sentence was deleted on the owner's ruling, so a
+     filter-emptied chart and an empty one render the SAME bytes now; the
+     discrimination this block keeps is between those and the window miss. */
   const dated = () =>
     ticket({
       fields: {

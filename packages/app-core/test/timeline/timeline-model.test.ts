@@ -839,7 +839,7 @@ describe('11.59 filters narrow rows and side list alike', () => {
  * matching nobody, an unmatched lane, and work that is fully dated but wholly
  * outside the window all `JSON.stringify`d to the SAME bytes. Distinct count:
  * ONE. The sibling `CalendarModel` — same package, same author — already had
- * `emptyCopy` and three sentences for exactly this failure; the timeline had
+ * `emptyCopy` and (then) three sentences for exactly this failure; the timeline had
  * no such field at all.
  *
  * The window miss is the case the component cannot reconstruct: Task 11's

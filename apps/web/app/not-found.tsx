@@ -8,9 +8,18 @@ import Link from 'next/link';
  * A generic 404 asserts one cause — *this does not exist* — for a situation with
  * several, and asserting the tidy one is exactly the move this product refuses
  * everywhere else. The calendar does not say "no events"; it says **which kind**
- * of empty it is, in four different sentences, because "nothing here" is useless
- * when there are four reasons for it. A rollup does not round 8 down to 6; it
- * says *"5 of 8 done · 2 restricted"*. This page owes the reader the same.
+ * of empty it is, and it names the narrowing that emptied it, because "nothing
+ * here" is useless when there is more than one reason for it. A rollup does not
+ * round 8 down to 6; it says *"5 of 8 done · 2 restricted"*. This page owes the
+ * reader the same.
+ *
+ * ⚠ The sentence above used to name a COUNT — "in four different sentences …
+ * four reasons" — and the count was already wrong when it was written (there
+ * were three sentences and four doors; case 11.50). It is dropped rather than
+ * corrected because a count here was never load-bearing to the argument, and
+ * 2026-09-20's ruling took the calendar to **two** sentences, which would have
+ * made it wrong a second time in a different way. The argument needs "more than
+ * one", and that is what it now says.
  *
  * ## And one of the causes is a SECURITY PROPERTY, not an oversight
  *

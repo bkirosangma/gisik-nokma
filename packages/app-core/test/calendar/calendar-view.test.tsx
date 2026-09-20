@@ -181,7 +181,12 @@ describe('11.62 a bar is drawn only from a claimed pair, and it spans the days i
   });
 });
 
-describe('11.63 the three empty months are three different sentences, rendered verbatim', () => {
+describe('11.63 the empty months are the model sentences, rendered verbatim', () => {
+  /* ⚠ RETITLED 2026-09-20. It read "the three empty months are three different
+     sentences". The third sentence was deleted on the owner's ruling and the
+     filtered month now reaches the first one, so the title would have described
+     a product that no longer exists. The middle arm is the one that still
+     discriminates, and it is unchanged. */
   it('nothing claimed: the honesty note, and no item buttons at all', () => {
     renderCalendar([ticket(), ticket()]);
     expect(screen.getByRole('note')).toHaveTextContent(CALENDAR_EMPTY_MONTH_COPY);

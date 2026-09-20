@@ -87,17 +87,20 @@ export type CalendarModel = {
   weeks: CalendarWeek[];
   hasItems: boolean;
   /**
-   * Why the grid is empty, or null when it is not. THREE different sentences,
-   * because they are three different facts: nothing was claimed here, or
-   * everything claimed here belongs to a field the viewer switched off, or
-   * everything claimed here sits outside the filter/lane the viewer set.
+   * Why the grid is empty, or null when it is not. **TWO sentences as of
+   * 2026-09-20** (it was three): nothing was claimed on this grid, or
+   * everything claimed on it belongs to a field the viewer switched off. The
+   * remaining sentence names the OTHER narrowings that can empty a month, so it
+   * stays true whichever combination is live — that is what replaced the third
+   * arm rather than merely deleting it.
    *
    * The third arm was NOT in the plan and not in the first draft of this file:
    * `visible` is narrowed before any item is built, so a month emptied by a
    * filter reached the honest-empty sentence and told a viewer that a month
-   * full of their own claimed dates had none. Whichever arm is chosen, the
-   * sentence must be true of THIS grid — see the precedence note at the
-   * bottom of `buildCalendarModel`.
+   * full of their own claimed dates had none. The owner's ruling of 2026-09-20
+   * deleted the sentence written for it; the ARM is gone, the truth condition is
+   * not. Whichever sentence is chosen, it must be true of THIS grid — see the
+   * precedence note at the bottom of `buildCalendarModel`.
    */
   emptyCopy: string | null;
   /**
@@ -150,13 +153,17 @@ function touchesWeek(item: CalendarItem, first: string, last: string): boolean {
 /**
  * Claims in, items out — the ONE construction, deliberately called twice.
  *
- * The second call is over the tickets a filter or a lane removed, and it
- * exists so `emptyCopy` can tell "nobody claimed a date here" apart from
- * "your filter removed all of them". That question must be answered by
- * building the SAME items against the SAME grid predicate: a cheaper
- * `date.slice(0, 7) === monthKey` shortcut would answer it about the calendar
- * month while the grid renders six days of July and six of September, which
- * is the very off-by-a-week this file's edge tests exist to catch.
+ * The second call is over the tickets a filter or a lane removed. It no longer
+ * feeds a sentence of its own — that sentence was deleted on 2026-09-20 — but
+ * it is NOT dead: it still gates `CALENDAR_ALL_HIDDEN_COPY`, which may not
+ * claim "EVERY claimed date" while a filter is removing some of them, so a
+ * month emptied by the legend AND a filter must not be told the legend did all
+ * of it. That question must be answered by building the SAME items against the
+ * SAME grid predicate: a cheaper `date.slice(0, 7) === monthKey` shortcut would
+ * answer it about the calendar month while the grid renders six days of July
+ * and six of September — which is the very off-by-a-week this file's edge tests
+ * exist to catch, and which MUTATION-WITNESSED fails case 11.50's padding-cell
+ * arm and nothing else.
  */
 function collectItems(
   inputs: readonly TicketDatesInput[],
