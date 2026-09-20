@@ -1789,7 +1789,7 @@ function mapParentRef(raw: unknown, path: string): ParentRef {
  * ⚠ **But the roster as a CLAIM does leave the server, by design, and an earlier
  * draft of this paragraph said it "never leaves the server at all" — that was
  * false.** `visibility.set` carries `userIds` in its own payload
- * (`packages/domain/src/events/visibility.ts:35`), and the history read serves
+ * (`packages/domain/src/events/visibility.ts:36`), and the history read serves
  * payloads verbatim: `toHistoryEvent` maps `payload: row.payload` with no
  * redaction (`routes/ticket-history.ts:176-194`), and `/events` does the same
  * (`routes/tickets.ts:519-527`). **This is not a leak to close.** The route's own
