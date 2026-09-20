@@ -5225,3 +5225,161 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    as an absence with an owner — whoever first adds a reopen route — not as an
    empty slot. See the same note at the component.
    ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── The ticket-type list's ↑/↓ reorder controls (prototype `desktop.dc.html:824-825`) ──
+
+   APPENDED AT THE END OF THE FILE for the reason the settings → workflows card
+   grid above already prices: inserting beside `.ticket-type-list__*`'s own rules
+   (`:2160-2290`) shifts every `ui.css:NNN` citation below the insert, and **50 of
+   this repo's 204 citations into this file name a line past `:2290`**. The
+   locality given up is real and small — these rules sit a few hundred lines from
+   their sibling screen's `.workflow-list__*` family, both appended late for the
+   same reason.
+
+   ## THE DEFECT THIS CLOSES: THE CLASS HAD NO RULE AT ALL
+
+   `button.ticket-type-list__move` was styled by NOTHING — 0 hits in this file and
+   in `apps/web/app/globals.css`, against a positive control of
+   `.ticket-type-list__row` at 1 and 13 hits in the same sweep. It rendered as raw
+   user-agent chrome, measured in Chromium against the live stack at
+   `/w/…/settings/ticket-types` (`data-style="neo"`, 1280×1000):
+
+       w×h 28.2 × 29.2   display inline-block   border 2px outset
+       background rgba(239,239,239,0.3)        border-radius 0px
+       color rgba(16,16,16,0.3)                font 16px / weight 400
+       padding 1px 6px                         cursor default
+
+   **AND THE FIRST REPORT OF THIS WAS MISDIAGNOSED, so the misdiagnosis is
+   recorded here rather than only corrected.** The controller reported it to the
+   owner as a *contrast* regression at 1.41:1. The measurement was right and the
+   noun was wrong — a class with no rule has no ratio of its own to be below; the
+   1.41 was the stripped UA border colour measured against the card, which is what
+   the roster's own `border`/`backdrop` columns recorded all along. **So this rule
+   does NOT "fix a contrast", and a reader who finds the old roster entry should
+   read it as evidence of the missing rule, not of a colour choice.** The entry
+   leaves the roster in the same change, because `border: none` below means
+   `sweepBorders` no longer counts this element as bordered at all.
+
+   ## THE PROTOTYPE'S SPEC, AND THE THREE TOKENS IT NAMES
+
+   The prototype draws these as its shared control constant (`:3152`, byte-equal
+   to the one `.gn-board-card__move` was ported from at `:2501`):
+
+       min-height:32px; min-width:36px; border:none; border-radius:var(--ctlR);
+       background:var(--ctlBg); box-shadow:var(--ctlShadow); color:var(--accent);
+       font-size:15px; cursor:pointer            (:824-825)
+
+   `--ctlBg`/`--ctlR`/`--ctlShadow` are `:26` (`--fill3`, `8px`, `none`) and the
+   prototype re-declares all three per style: `:59` (`--ctlR:14px` under neo),
+   `:63` (neo light `--ctlBg:#F1EAE3` plus a raised `--ctlShadow`), `:75` (neo
+   dark). **Every one of those already has a role in `tokens.ts`** —
+   `radii.neo.control`, `fillWarmNeo3`/`fillNavyNeo4`, `shadowValueOf` — so this
+   rule names the ROLES and gets the prototype's three styles for free rather than
+   transcribing a fourth copy of the palette. That is the whole reason there is no
+   `[data-style="…"]` block below: 13.340's positive scan asserts style-specific
+   control overrides do not exist for `.gn-button`, and the same argument holds
+   here.
+
+   `color: var(--gn-text-accent)`, NOT `--gn-accent`. The prototype's `--accent`
+   is doing the job `textAccent` names — accent-hued TEXT on a neutral surface —
+   and `--gn-accent` is the fill-safe role that stops clearing 4.5 as text under
+   the Round 2d hexes (see `TOKEN_ROLES`'s own docblock). `.gn-button`,
+   `.gn-button--ghost` and `.gn-board-card__move` all resolve this same prototype
+   pairing to the same role.
+
+   ## THE ONE DIVERGENCE: 32×36 → 44×44, AND THE OPEN QUESTION UNDER IT
+
+   `min-height`/`min-width` are **2.75rem, not the prototype's 32px/36px**, which
+   is the divergence `.gn-board-card__move` already made for the byte-identical
+   constant (`:869-883`) and for the identical reason: `apps/web/e2e-viewport/
+   tap-targets.ts:108` sweeps every `button` on every real page against a hard
+   44px floor with no per-component exemption. A 32×36 control reddens that gate
+   the moment it is reachable — and it is reachable on a shipped settings route
+   today. This is a RECORDED, not a silent, divergence.
+
+   ⚠ **AND ONE THING THIS RULE DOES NOT DECIDE, NAMED RATHER THAN ASSUMED.** The
+   owner ruled on 2026-09-20 that **standalone** controls take 44px and **dense
+   in-list** controls take 24px, with the tap-target checker to be widened for the
+   second case in a later round. **Whether these two are "dense in-list" is not
+   settled by anything on this screen**, and the two readings pull opposite ways:
+   they sit one pair per row inside a list (`dense in-list`), and they are
+   always-visible standalone controls on a settings row with no prose to be
+   constrained by (`standalone`). **44 is taken here because it is what the
+   repo's only existing instance of this exact control already ships
+   (`.gn-board-card__move`), and because 24 would LOWER a floor that a live gate
+   currently enforces** — the direction that hides a loss. If the owner means
+   these to be dense, **this rule is the one to change** and it is named here so
+   that change is a one-line edit rather than a re-derivation. The prototype's own
+   32px answers neither question.
+
+   `box-shadow: var(--ctlShadow)` is DELIBERATELY OMITTED, which is the same
+   recorded, product-wide open decision `.gn-button` (`:69-77`),
+   `.gn-board-card__move` (`:863-865`) and two others already state: the
+   prototype gives controls a raised neumorphic shadow under neo and implementing
+   that for every control in the product is an owner visual decision, not one a
+   screen's task should take on the review's behalf.
+
+   `:disabled { opacity: 0.4 }` is the prototype's OWN number for this control
+   (`:3161-3162`, `";opacity:0.4;cursor:not-allowed"`), not `.gn-button`'s generic
+   0.55 (`:126`) — the same distinction `.gn-board-card__move:disabled` records.
+
+   ## THE LAYOUT HALF, WHICH THE STYLING ALONE WOULD HAVE LEFT WRONG
+
+   `ticket-type-list-screen.tsx:356-359` states the DOM's intent in its own
+   comment — *"the controls sit beside the door"* — and **no CSS has ever
+   honoured it.** `<li>` was `display: list-item` and `.ticket-type-list__row` is
+   `width: 100%`, so the pair rendered on a line of its OWN above the row it
+   reorders; measured on the same run, `moveRectTop 205.7` against
+   `rowRectTop 234.8`. Styling the button without this would have made that more
+   visible, not less — two 44px controls floating above each row instead of two
+   28px ones.
+
+   So the `<li>` becomes the flex row the comment describes, and `__reorder` a
+   flex pair so the two arrows read as one unit at `.gn-board-card__moves`'s own
+   `0.5rem` gap. **THE ROW DOOR KEEPS `width: 100%`, which as a flex item means
+   its base is the full line and it shrinks against the pair** — asserted by
+   measurement below rather than by reading the spec, and deliberately NOT
+   rewritten, because `.ticket-type-list__row`'s body is pinned by 10.80
+   (`components.test.tsx:381-388`).
+
+   **THE ZEBRA IS UNTOUCHED.** The stripe stays on the row door
+   (`.ticket-type-list__rows li:nth-child(even) .ticket-type-list__row`), which
+   means on an even row it now covers the door and stops before the arrows. That
+   is a real visual consequence, recorded rather than hidden, and it is the price
+   of not moving the stripe onto the `<li>`: that selector is pinned by case 13.894
+   (`tokens.test.ts:1597`) and the compositing ground behind it is measured from
+   it, so moving the stripe is a change to a pinned case, not a styling detail.
+   The `<li>` deliberately carries NO background, which the zebra's own block
+   asserts of the two intermediaries it names (`tokens.test.ts:1689`).
+   ═══════════════════════════════════════════════════════════════════════ */
+.ticket-type-list__rows li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ticket-type-list__reorder {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+}
+.ticket-type-list__move {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem; /* 44px, not the prototype's 32px — see this block's own comment */
+  min-width: 2.75rem; /* 44px, not the prototype's 36px — see this block's own comment */
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-accent);
+  font: inherit;
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 600;
+  cursor: pointer;
+}
+.ticket-type-list__move:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+.ticket-type-list__move:disabled { opacity: 0.4; cursor: not-allowed; }

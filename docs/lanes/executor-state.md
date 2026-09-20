@@ -41,6 +41,112 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > # measured 50 where this session measures 126 = the real count), so it is NOT recorded as fact. The
 > # rule survives the correction; the reviewer's number does not. A peer's finding is a claim.
 
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~11:4x IST. **THE PROTOTYPE ROUND: the reorder buttons
+> # are styled from the prototype, and the three-style re-check is DONE AND MEASURED.**
+> Branch **`exec/prototype-round`**, cut from **`origin/main` = `546c92f8`** (the `#586` merge). One PR,
+> `--base main`. **You do not merge.** The controller's dispatch of 2026-09-20 ~11:3x IST is the brief;
+> it carries the owner's two rulings of the same hour.
+>
+> ## ⚠ THE VERSION QUESTION IS SETTLED, BY CONTENT, AND IT NEEDED NO PRODUCT CALL
+> The owner's attachment `/Users/kiro/Downloads/Gisik Nokma Desktop (1).html` (565,271 B, mtime 09-15 14:09,
+> sha256 `bf64cc44…`) vs the repo authority `design-system/interactive/desktop.dc.html` (320,109 B, mtime
+> 09-18, sha256 `2cda054b…`). **They are NOT two revisions.** The owner's file is a `__bundler/template`
+> wrapper with the DC document as a JSON string inside it; extracting both `<x-dc>` blocks gives the
+> **SAME sha256 `2faa94b4fdfac742b6d7690d005977457b407f4c3052e2a1ccde252918733113`**, and a full line diff of
+> the inner document against the repo file is **one line**: `<script src="./support.js">` vs
+> `<script src="804d1df5-…">`. Same design, same revision, self-contained export vs split. **No STOP AND ASK.**
+> The cycle-13 trap (`design-system/prototypes/TicketSheet.dc.html`, 7,823 B) is a THIRD file and is unrelated.
+>
+> ## WHAT WAS BUILT
+> `button.ticket-type-list__move` **had no CSS rule at all** — 0 hits in `ui.css` and `globals.css` against a
+> positive control of `.ticket-type-list__row` in the same sweep; Chromium measured it as UA chrome
+> (`border: 2px outset`, `background: rgba(239,239,239,0.3)`, `border-radius: 0px`, weight 400, 28.2 × 29.2).
+> Now styled from the prototype's shared control constant (`desktop.dc.html:3152`): `--gn-fill-tertiary` +
+> `--gn-text-accent` + `--gn-radius-control`, `border: none`, 15px/600 — **the same pairing `.gn-button` and
+> `.gn-board-card__move` resolve this byte-identical constant to.** One unconditional rule, **no
+> `[data-style]` block**; measured in Chromium, `hig`/`minimal` resolve to `rgba(39,58,99,0.11)` + 8px and
+> `neo` to `rgba(176,152,132,0.16)` + 14px. **44×44, NOT the prototype's 32×36** — the same recorded
+> divergence `.gn-board-card__move` already made, because `e2e-viewport/tap-targets.ts:108` sweeps every
+> `button` against a hard 44px floor with no per-component exemption. **And the pair now sits BESIDE the row
+> door** — the component's own comment has claimed that since it was written and nothing honoured it while
+> `<li>` was `display: list-item` and the row door is `width: 100%`; measured before, pair top **205.7**
+> against row top **234.8**, i.e. the pair sat on its own line ABOVE the row it reorders.
+>
+> ## THE THREE-STYLE RE-CHECK, AND THE AXIS QUESTION IT SETTLES
+> **`#572`'s axis question is answered from `#572`'s own text.** Its body says the post-change `hig` shot
+> **"has NOT been taken for this branch, and I am not claiming otherwise"** (`:27`), and that what the
+> hand-driven session produced was the pre-change **"before" in `hig`** (`:29`) — **no artifact survives.**
+> Measured here, twice: the running stack reads **`data-style="neo"` with `localStorage['gn-style'] === null`**,
+> i.e. `neo` is the default and nothing had persisted a choice. `#572` also independently measured the same
+> two facts this round re-measured (the `:3001` web container is a **BAKED IMAGE**, `docker inspect` shows
+> **zero mounts**; `WEB_ORIGIN` is `:3001` only, so a dev server on another port answers **Invalid origin**).
+> **So: the "before" cannot be shown to have been taken in `hig`, `neo` is what the app actually renders by
+> default, and a comparison taken at the wrong axis measures the two style AXES rather than the build.**
+> The three-style re-check itself was run and is measured — see the gate block below.
+>
+> ## ⚠ THE RENDERED CHECK HAD TO BE BUILT, AND THE REASON MATTERS TO THE NEXT READER
+> **The brief says the compose `server` and `web` on `:3001` are "mounted from YOUR worktree". They are not.**
+> `docker inspect gisik-nokma-dev-web-1 --format '{{json .Mounts}}'` → `[]`, and the container runs baked CSS
+> bundles (`/app/.next/static/css/*.css`), with no `ui.css` anywhere in it. **A source edit cannot reach that
+> stack without a web rebuild, which was NOT done** — it would have replaced the owner's live `:3001` with
+> uncommitted CSS mid-round. Instead: `next dev -p 3031` from this worktree, sign-in on `:3001` (the only
+> trusted `WEB_ORIGIN`; **localhost ports share cookies**, so the session carries), then navigate to `:3031`.
+> That renders the REAL component with the REAL CSS pipeline. **The dev server was killed and `:3031` is free;
+> no orphaned workers.**
+>
+> ## ANCHORS, RECOUNTED AT THIS TREE
+> - **gate** `pnpm turbo run build test typecheck`: **EXIT=0 · 33/33 · 32 cached · 31.9s · Node v22.22.2.**
+>   The 32 cache hits are LEGITIMATE, and it was checked rather than assumed: `ui#test` was a cache **miss**
+>   in the run that computed them (`executing b5851a58590377b0`, **8 files / 370 passed**) and the second run
+>   replays that same hash. `server#test` ran: **154 files / 1620 passed / 5 skipped** — matching this file's
+>   own recorded figures.
+> - ⚠ **THE FIRST GATE RUN WAS RED AND IT WAS NOT MINE.** `server#test` → `12.291 the walk is capped at
+>   GRANT_BACKFILL_MAX_TICKETS` hit its **30 000 ms timeout**. It passes in **883 ms** in isolation, and the
+>   box was loaded (a `next dev` of mine plus the docker stack plus 667 s of test CPU). **A timeout under load
+>   is not a defect; re-run before believing a red.**
+> - `check-case-ids` **2495 unique, highest `16.83`** — moved from `2494`/`16.82` by EXACTLY the one id added.
+>   `check-case-citations` **ok**, `16-remaining-doors.md` **48 → 49 cited**. Both ran at this tree.
+> - **`origin/main` MOVED UNDER THIS ROUND**: `0ea15006` → **`546c92f8`** while the work was in flight. The
+>   two intervening commits touch **only** `docs/lanes/controller-state.md` and `docs/lanes/task-ledger.tsv`
+>   — **disjoint from all four files in this diff**, so no gate result was invalidated. Checked, not assumed.
+> - The diff is four files: `packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx`, `Features.md`,
+>   `test-cases/16-remaining-doors.md`. `reference/` untouched. No product source changed.
+>
+> ## CASE 16.83, AND THE SIX MUTATIONS
+> Pinned in `packages/ui/test/components.test.tsx`. **Mutation-witnessed six ways and each dies on ITS OWN
+> assertion** — rule deleted (`rule()` throws), fill swapped, `2.75rem → 32px`, a `[data-style="neo"]`
+> override added, `:disabled 0.4 → 0.55`, `<li>` taken off `display: flex` — with the unmutated control
+> GREEN and the file restored by **checksum-verified copy, never a blanket `git checkout`** (the #584 lesson).
+> **Measured, not assumed:** the glyph clears **4.5 in all six style×theme combinations on its real painted
+> composite** — worst `neo` light at **4.98** — because the button's ground is the CARD, not the `surface`
+> the existing `fillTertiary` case pins.
+> ⚠ **The ENABLED rendering is unreachable on the seeded workspace** and this is CORRECT, not a defect:
+> `moveBlocker` refuses when EITHER neighbour is a built-in, 4 of the 5 seeded types are built-ins, and the
+> only custom one (Errand) is adjacent to two of them — so all ten arrows are legitimately disabled. The
+> enabled branch was witnessed by flipping the DOM `disabled` property and re-measuring (opacity 1, cursor
+> pointer, 44×44, accent label), which touches no row and no API.
+>
+> ## OUTSTANDING — FOUND, NOT FIXED, EACH WITH A NAMED OWNER
+> 1. **`ui.css:865`'s citation `(.gn-button's own docblock, :22-30 above)` is STALE.** `:22-30` is the
+>    SHARED KEYFRAMES block (`gnFade`/`gnRise`); `.gn-button`'s docblock is **`:52-60`**. It RESOLVES, so it
+>    misleads. **Owner: whoever next edits `.gn-board-card__move`'s block.** Recorded rather than fixed — a
+>    citation fix drags its own sweep, and this one is outside the round's scope.
+> 2. **`Features.md`'s ticket-type reorder bullet says the rule engine "refunds `type.builtin-rank`"** — a
+>    typo for "refuses" on a line this round already edits. Owner: whoever next touches that bullet.
+> 3. **`packages/app-core/src/replica/replica-data-source.ts:205`** asserts *"the six call sites `Features.md`
+>    §12 enumerates"* while §12 now says twenty. Carried over from the previous round; still not ours.
+> 4. **The non-text-contrast roster will go stale and was NOT hand-edited.** With `border: none` the element
+>    stops being counted as bordered, so `sweepBorders` should drop its `button.ticket-type-list__move` entry
+>    and `belowCount` should fall **1 → 0**. **That is a PREDICTION, not a measurement** — the roster is
+>    written by `e2e-stack/viewport.spec.ts`, which needs a web build carrying this change, and the running
+>    container is baked. **Owner: whoever next runs `pnpm test:e2e:stack` against such a build.** Editing a
+>    measured artifact by hand is the recorded anti-pattern, so it was left to the instrument.
+> 5. **The 24px question is OPEN and is the owner's.** These controls are 44px because that is what the
+>    repo's only other instance of this exact control ships and because 24 would LOWER a floor a live gate
+>    still enforces. If they are meant to be "dense in-list", the rule to change is named in `ui.css`'s own block.
+>
+> ## ⚠ SUPERSEDED: the block below was written before this round. Its anchors are history.
+>
 > # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~06:3x IST. **`#584` WENT BACK FOR THE REVIEWER PASS
 > # THE CONTROLLER REQUIRED, AND THE PASS FOUND THE FIX ITSELF BROKEN — SIX TIMES, ACROSS TWO
 > # REVIEW ROUNDS. THE MECHANISM HAS BEEN REPLACED, NOT PATCHED AGAIN.**

@@ -390,6 +390,88 @@ describe('R1(c) at the component layer', () => {
   });
 
   /**
+   * 16.83 — the ticket-type list's ↑/↓ reorder control.
+   *
+   * ## The defect this exists to keep closed
+   *
+   * `button.ticket-type-list__move` was styled by NOTHING. Not "styled badly" —
+   * the class appeared in `ui.css` zero times, against a positive control of
+   * `.ticket-type-list__row` in the same sweep. Chromium on the live stack
+   * measured it as raw user-agent chrome: `border: 2px outset`,
+   * `background: rgba(239,239,239,0.3)`, `border-radius: 0px`,
+   * `font-weight: 400`, `28.2 × 29.2`. **A case asserting "it looks right" could
+   * not have been written against that**, which is why the first assertion below
+   * is the plain one: the rule must EXIST. That is the assertion that was
+   * missing, and a class with no rule is invisible to every instrument that
+   * measures a property rather than a presence.
+   *
+   * ## Why the rest is shape-pinned rather than colour-pinned
+   *
+   * The fill, the label and the radius are all ROLES, and the prototype's own
+   * three styles resolve those roles differently at the token layer
+   * (`fillWarmHig3`/`fillWarmNeo3`, `radii.hig.control`/`radii.neo.control`).
+   * Measured in Chromium, this one unconditional rule therefore renders
+   * `hig`/`minimal` at `rgba(39,58,99,0.11)` + 8px and `neo` at
+   * `rgba(176,152,132,0.16)` + 14px — **the three styles for free, with no
+   * `[data-style]` block.** The scan at the end asserts no such block exists, so
+   * a future edit cannot quietly fork the control per style; that is 13.340's
+   * argument applied to this control, and it is the POSITIVE half here for the
+   * same reason it is there.
+   *
+   * ## The size is a RECORDED divergence, and it is pinned so it stays recorded
+   *
+   * The prototype draws `min-height:32px; min-width:36px` (`desktop.dc.html:3152`,
+   * the shared control constant, byte-equal to the one `.gn-board-card__move`
+   * was ported from at `:2501`). This rule takes **2.75rem — 44px** — because
+   * `apps/web/e2e-viewport/tap-targets.ts:108` sweeps every `button` against a
+   * hard 44px floor with no per-component exemption, which is the same
+   * divergence, for the same reason, that control already made. Asserted rather
+   * than merely commented: a re-transcription of the prototype's 32px is the
+   * most likely future edit here, and it is the one that reddens the viewport
+   * suite rather than this one.
+   *
+   * **It does NOT settle the owner's 2026-09-20 24px-dense-in-list ruling**, and
+   * deliberately so — that ruling's second half is a WIDER checker that does not
+   * exist yet, so a case pinning 24 here would be pinning a floor nothing
+   * enforces. The open question is named in `ui.css`'s own block.
+   */
+  it('16.83 the reorder control has a rule at all, carries the shared control roles, and forks for no style', () => {
+    const body = rule('.ticket-type-list__move');
+
+    // The rule EXISTS — the whole defect. Every assertion below is about a class
+    // that rendered as UA chrome precisely because this one was false.
+    expect(body).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
+    expect(body).toMatch(/color:\s*var\(--gn-text-accent\)/);
+    expect(body).toMatch(/border-radius:\s*var\(--gn-radius-control\)/);
+    expect(body).toMatch(/border:\s*none/);
+
+    // The recorded 44px divergence, on BOTH axes, so the prototype's 36px
+    // width is pinned too and not only its 32px height.
+    expect(body).toMatch(/min-height:\s*2\.75rem/);
+    expect(body).toMatch(/min-width:\s*2\.75rem/);
+    expect(body).not.toMatch(/min-(height|width):\s*(32|36)px/);
+
+    // The prototype's OWN disabled number for this control (`:3161-3162`),
+    // not `.gn-button`'s generic 0.55 — the distinction it shares with
+    // `.gn-board-card__move:disabled`.
+    expect(rule('.ticket-type-list__move:disabled')).toMatch(/opacity:\s*0\.4/);
+
+    // The pair sits BESIDE the row door, which is what the component's own
+    // comment claims and what nothing honoured while `<li>` was
+    // `display: list-item`: the row is `width: 100%`, so the pair rendered on
+    // its own line ABOVE the row (measured: pair top 205.7, row top 234.8).
+    expect(rule('.ticket-type-list__rows li')).toMatch(/display:\s*flex/);
+
+    // 13.340's positive scan, for this control: one unconditional rule IS the
+    // whole story, in every style.
+    const styleBlocks = [...UI_CSS.matchAll(/\[data-style="[a-z]+"\][^{]*\{([^}]*)\}/g)];
+    expect(styleBlocks.length, 'the scan found no [data-style] block at all — it is reading nothing').toBeGreaterThan(0);
+    for (const [fullMatch] of styleBlocks) {
+      expect(fullMatch, fullMatch).not.toMatch(/\.ticket-type-list__move\b/);
+    }
+  });
+
+  /**
    * 13.340 — ghost/secondary controls keep fill + accent label as their
    * identifying signal in EVERY style, never a style-specific override that
    * strips it back to a boundary (or to nothing). 13.289 already pins this for
