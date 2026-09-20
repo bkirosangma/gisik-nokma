@@ -1979,7 +1979,12 @@ export function TicketSheet({
               is a wait that will never end, wearing the clothes of one that will.
             */
             <p
-              role="status"
+              // `alert`, matching this sheet's five other failure sentences
+              // (`:1542`, `:1556`, `:1569`, `:1749`, `:1815`). The CSS twin it
+              // borrows its rule from carries NO role at all, and copying that
+              // omission would have been the quieter choice — but a read that
+              // failed is exactly what a reader must be told about.
+              role="alert"
               className="gn-ticket-sheet__attachments-error"
               data-testid="sheet-attachments-unavailable"
             >

@@ -282,8 +282,17 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
     },
 
     /**
-     * The attachments read — and the ONE method in this file whose 404 is
-     * re-raised rather than folded into an empty value.
+     * The attachments read — a 404 re-raised rather than folded into an empty
+     * value.
+     *
+     * **⚠ CORRECTED 2026-09-20.** This read *"the ONE method in this file whose
+     * 404 is re-raised rather than folded into an empty value"*, and that is
+     * false: `getBoard` (`:168`), `getTickets` (`:243`), `getTicketTypes`
+     * (`:331`) and `getPreferences` (`:439`) re-raise too — five sites, and
+     * `getTicketTypes` argues the same choice at length for an array-returning
+     * signature. Re-raising is this file's ordinary handling of "no such thing,
+     * or not yours". What is particular here is the CONSEQUENCE of folding,
+     * stated below and not shared with those four.
      *
      * `Promise<AttachmentListEntry[]>` HAS an absence value, `[]`, and using it
      * here is the trap this method exists to avoid. `[]` is the TRUE answer for

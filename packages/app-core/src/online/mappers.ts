@@ -675,8 +675,15 @@ export function mapHistory(raw: unknown): TicketHistoryEvent[] {
  * `sha256` is checked as `string | null` rather than as a string: the column is
  * nullable (an unknown hash is written as `null` honestly, not as a default),
  * and `AttachmentListEntry`'s upload arm says `string | null`. The one thing
- * this refuses is the shape that would be a silent half-truth — a `sha256` that
- * is neither, which would reach the view as `undefined` and render as nothing.
+ * this refuses is the shape the view model cannot describe at all.
+ *
+ * **⚠ CORRECTED 2026-09-20: this read *"would reach the view as `undefined` and
+ * render as nothing", and NO surface renders `sha256`** — `attachment-list.tsx`'s
+ * upload arm draws the filename and the mime and nothing else, and every other
+ * `sha256` under `views/` is a type declaration. The check is unchanged and
+ * still right; the stated consequence was imaginary. What it actually buys is
+ * that a value the contract cannot hold never enters the view model at all,
+ * where a later renderer would inherit the lie instead of a type error.
  *
  * No `ServingGapError` branch: nothing here is a fact the server holds and
  * withholds. The mapped rows ARE the answer, which is what a gap-free mapper

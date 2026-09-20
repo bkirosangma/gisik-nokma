@@ -559,6 +559,16 @@ export function registerTicketRoutes(
    * nonexistent one get the same status and the same bytes from both doors,
    * behind a positive control that both answer for a ticket the caller may see.
    *
+   * ⚠ **And the ORDER is a copy, not a measurement — recorded because a reader
+   * would otherwise take "in the same order" for a witnessed property.**
+   * Independent review could not falsify it: swapping the two guards survives
+   * every suite in this change, because `canSee` on a foreign-workspace ticket
+   * the caller does belong to answers `true` and the `loadTicketRow` refusal
+   * follows either way, so the response is identical under both orders. The
+   * order is kept because it is the door's, and its one visible effect is the
+   * QUERY COUNT on a ticket that exists (the cheap existence check first), which
+   * nothing asserts.
+   *
    * ## What is served, and why the wire carries five fields and no `kind`
    *
    * Each row is `{attachmentId, filename, mime, size, sha256}` — the five fields
@@ -581,9 +591,17 @@ export function registerTicketRoutes(
    * afterwards and which `Features.md` §9 records the web client does not post
    * at all today. So a ticket whose reference arrived as a ledger EVENT shows
    * nothing in this list. **That is not a live absence at this commit** —
-   * measured, no producer emits the reference arm (outside the domain's own
-   * schema, the editor's types and `attachment-list.tsx`'s union there are
-   * none) — but it becomes one the day a producer lands, and it would become one
+   * measured: **no PRODUCTION code emits it.** The runtime composer DOES exist —
+   * `composeDriveReferenceAdded`
+   * (`packages/editor/src/drive/attachment-claims.ts:41`), exported from the
+   * package index, whose own docblock says *"the client submits it through
+   * `POST /v1/events` like any other claim"* — but its only callers are tests
+   * (swept at this commit), and `openDrivePicker` / `toDriveReference` have no
+   * production caller either. ⚠ **CORRECTED 2026-09-20: this sentence's
+   * exclusion list named only the domain's schema, the editor's TYPES and
+   * `attachment-list.tsx`'s union, and it missed that composer — the conclusion
+   * holds, the enumeration did not.** So it becomes a live absence the day a
+   * producer lands, and it would become one
    * silently, because the list omits it rather than refusing. **RECORDED, not
    * fixed. Owner: whoever gives the `attachments` table a kind column, or emits
    * the reference arm for the first time — those are one task, not two.**

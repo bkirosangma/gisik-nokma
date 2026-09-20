@@ -293,7 +293,19 @@ export type ReplicaDataSourceDeps = {
 };
 
 /* ------------------------------------------------------------------ *
- * The refusals. Seven of the thirteen, and NOT the online source's seven.
+ * The refusals — enumerated in `REPLICA_GAPS` below, and the count is
+ * deliberately NOT restated here.
+ *
+ * **⚠ CORRECTED 2026-09-20, and this is the THIRD copy of one false sentence.**
+ * It read *"Seven of the thirteen, and NOT the online source's seven"*, and both
+ * numbers were stale: this registry has carried **nine** members since the
+ * attachments read joined it, and the online source refuses **none** — its
+ * register emptied on 2026-09-19, which `Features.md`'s own correction records.
+ * The other two copies live in `Features.md` and `test-cases/12-offline-sync-apps.md`
+ * and were corrected first; this one sits 84 lines above the entry this change
+ * added, in a file this change edits, and was missed — which is the lesson
+ * 12.185 is written around: **the count is a reading, the enumerable list is the
+ * artifact.** Do not restore a number here.
  * ------------------------------------------------------------------ */
 
 const NO_WORKSPACE_TABLE: ReplicaAbsence = {
@@ -378,8 +390,17 @@ const WORKSPACE_SETTINGS_ABSENCES: readonly ReplicaAbsence[] = [
 ];
 
 /**
- * The attachments read — and the one refusal here that had a tempting
- * alternative, which is why it is spelled out rather than left to a default.
+ * The attachments read — the refusal here whose tempting alternative is
+ * DERIVABLE FROM DATA THIS DEVICE ALREADY HOLDS, which is why it is spelled out
+ * rather than left to a default.
+ *
+ * **⚠ CORRECTED 2026-09-20: this read "the one refusal here that had a tempting
+ * alternative", and it is not the only one** — `WORKSPACE_SETTINGS_ABSENCES`
+ * above says of itself that it is *"a real 'could be built' rather than a
+ * 'cannot be known'"*, and `ATTENTION_ABSENCES` names a tempting partial. What
+ * is particular here is the KIND of temptation: not a missing fold or a missing
+ * table, but a list that could be computed on the spot from the local ledger
+ * and would be wrong in both directions.
  *
  * The local store DOES mirror the ledger, and `attachment.added` is one of the
  * two ticket event types the replica's own reducer folds

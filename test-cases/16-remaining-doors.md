@@ -828,7 +828,10 @@ seam behind it, and the mount that had never passed the prop.
 **What was measured before building, and why the shortcut was refused.** `listTicketAttachments`
 (`apps/server/src/attachments/attachment-repo.ts:76`) was written and TESTED by Plan 7 with **zero production
 callers** — every reference in the tree was a test — while `TicketSheetProps` has accepted an `attachments`
-prop since Plan 6 and the product's single mount (`apps/web/app/w/[entry]./page.tsx`) never passed it. The
+prop since Plan 6 and the product's single mount
+(`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`) never passed it. ⚠ **CORRECTED
+2026-09-20: this read `apps/web/app/w/[entry]./page.tsx`, which is not a path in this repository — the mount
+this task wired is the one named above, the same one `Features.md` cites.** The
 tempting alternative needs no wire change at all and is **wrong**: the sheet's own history read serves the
 OLDEST 200 events (`ticket-history.ts`, `ORDER BY seq ASC LIMIT`, no paging on the wire) and
 `AttachmentList` returns `null` on empty, so a long ticket's recent attachments would vanish as a **drawn
@@ -869,7 +872,10 @@ merely 404s everything.
   `.gn-ticket-sheet__history-error` and is asserted by neither a viewport nor a contrast run.
 - **`check:db-tz` was not run** — it requires a live database and this lane never runs `docker compose`.
 - **The route's own rate-limit placement is a decision, stated:** it is NOT in the `events:` bucket, because the
-  only other unbounded read of a ticket's ledger — `GET /v1/workspaces/:ws/tickets/:id/events` — is not in any
-  bucket either, and this read is strictly smaller than that one. It is also NOT added to
+  only sibling read of a ticket's ledger — `GET /v1/workspaces/:ws/tickets/:id/events` — is not in any bucket
+  either. ⚠ **CORRECTED 2026-09-20: this read "and this read is strictly smaller than that one", which is
+  unmeasured and false in general — NEITHER read is bounded.** The argument is PARITY and it stands without the
+  size claim: an unbounded sibling door has never been rate-limited, so a bucket on the newer door alone would
+  bound one of two comparable reads and leave the other open. It is also NOT added to
   `HTTP_ORIGIN_PROTECTED_ROUTES`, which is a set of MUTATIONS: the file's own docblock says `GET` routes are
   absent "by definition and not by oversight", and CSRF needs a state change.
