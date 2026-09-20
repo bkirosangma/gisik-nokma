@@ -10,7 +10,7 @@ import {
 import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { ClientIngest } from '../ingest/ingest-service.js';
-import { workspaceNameFromLedger } from '../workspaces/workspace-name.js';
+import { workspaceIdentityFromLedger } from '../workspaces/workspace-name.js';
 
 /** The refusal body a blank name draws. Built once so both the route and its test name one object. */
 export const INVALID_NAME_BODY = {
@@ -89,12 +89,28 @@ export function registerWorkspaceRoutes(
           // The client does not get to name the workspace it founds. See the
           // docblock: this is the route's half of case 6.52.
           additionalProperties: false,
-          properties: { name: { type: 'string', minLength: 1 } },
+          properties: {
+            name: { type: 'string', minLength: 1 },
+            // The workspace prefix (owner spec 2026-09-20) — up to three
+            // capitals, the first half of every ticket key this workspace will
+            // hold. OPTIONAL here as it is in the payload: a caller who names
+            // none still founds a workspace whose keys derive one from the
+            // name, and refusing them would make a key a precondition of
+            // founding rather than a consequence of it.
+            //
+            // `maxLength: 3` is the ONLY thing this schema can check: the
+            // alphabet and the case are the domain schema's business
+            // (`prefixSchema`), and duplicating them here would be a second
+            // spelling of one rule. A body that fails the domain schema is
+            // refused inside the ingest result, which is the honesty the
+            // 422 below publishes.
+            prefix: { type: 'string', minLength: 1, maxLength: 3 },
+          },
         },
       },
     },
     async (request, reply) => {
-      const { name } = request.body as { name: string };
+      const { name, prefix } = request.body as { name: string; prefix?: string };
       // `minLength: 1` admits `'   '`, which names nothing while looking like a
       // name everywhere it is displayed. The domain schema refuses it too
       // (`displayName` in `packages/domain/src/events/membership.ts`), so
@@ -112,7 +128,11 @@ export function registerWorkspaceRoutes(
         entity: { kind: 'workspace', id: workspaceId },
         type: 'workspace.created',
         version: 1,
-        payload: { name },
+        // ABSENT when the caller mentioned none, never `prefix: undefined` —
+        // `workspaceCreatedPayload` is `.strict()`, and the key being present
+        // with an undefined value is exactly the "mentioned, value unknown"
+        // shape an `in`-based reader cannot tell from a claim.
+        payload: { name, ...(prefix === undefined ? {} : { prefix }) },
         actorId: request.currentUserId,
         origin: 'web',
         clientTime: new Date().toISOString(),
@@ -181,9 +201,21 @@ export function registerWorkspaceRoutes(
         // have cost a round trip per workspace to express the same rule.
         ticketVisibleProjectIds(deps.pool, eff, request.currentUserId, row.workspace_id),
       ]);
+      // ONE fold for both halves of the identity, resolved here rather than
+      // inline in the object below so the two cannot be read from different
+      // ends of the workspace's naming history by accident. The name is the
+      // LAST thing anyone said the workspace is called; the prefix is the
+      // FIRST claim that carried one, because it is immutable.
+      const identity = await workspaceIdentityFromLedger(deps.pool, row.workspace_id);
       workspaces.push({
         workspaceId: row.workspace_id,
-        name: await workspaceNameFromLedger(deps.pool, row.workspace_id),
+        name: identity.name,
+        // ALWAYS PRESENT, and `null` only where the NAME is null — a workspace
+        // with no naming event at all. Every workspace that can be named has a
+        // prefix, the stored one or the derived one, because the key's first
+        // half is not optional even when the claim that would have set it is:
+        // `CC` in `CCSO-1183`. See `workspaces/workspace-name.ts`.
+        prefix: identity.prefix,
         role: row.role,
         // WITHHELD IS AN ABSENT KEY, NEVER A ZERO (Task 16). A guest resolves
         // `null` here and the key is not written at all, so the card renders
@@ -219,6 +251,12 @@ export function registerWorkspaceRoutes(
             // fails loudly instead of arriving `undefined` and rendering as
             // "not described" on a route nobody tested.
             description: project.description,
+            // The second half of this project's ticket keys, resolved — never
+            // the raw column, which is NULL for every project founded before
+            // the field existed. `visibleProjects` has already collapsed the
+            // stored-or-derived fork into one value, so a render site has
+            // nothing to decide; see `read/visible-projects.ts`.
+            prefix: project.prefix,
             // `counts === null` is the WITHHOLDING, decided once in
             // `visibleProjectCounts` and never re-asked here. Inside a served
             // map, a project with no row is an honest 0 — the aggregation

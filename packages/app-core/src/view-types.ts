@@ -90,6 +90,18 @@ export type ProjectRef = {
    * on one line.
    */
   description?: string;
+  /**
+   * The second half of every ticket key in this project — `SO` in `CCSO-1183`
+   * (owner spec 2026-09-20).
+   *
+   * **Never absent, and NOT `| undefined` like `description` above**, because
+   * there is no third state to spell: the server resolves stored-or-derived
+   * into one value before it answers, so "nobody entered a prefix" and "the
+   * prefix is X" are the same field one layer down. A consumer composing a key
+   * has nothing to branch on — which is the property that lets the display
+   * sites be enumerated instead of each deciding for itself.
+   */
+  prefix: string;
   /** null = withheld (guest); a number is a count of what THIS caller may see. */
   ticketCount: number | null;
   /** null = withheld (guest). Counted by the same rule `FilterSpec.blocked` uses. */
@@ -123,6 +135,18 @@ export type ProjectRef = {
 export type WorkspaceRef = {
   id: string;
   name: string;
+  /**
+   * The first half of every ticket key in this workspace — `CC` in `CCSO-1183`
+   * (owner spec 2026-09-20). **Never absent and never empty**: the server
+   * answers the prefix a person entered at creation, or one derived from the
+   * workspace's name when nobody entered one, and it has no third state.
+   *
+   * A client that composed a key without it would render `SO-1` — a key with no
+   * workspace half — so this is REQUIRED rather than optional, and the mapper
+   * refuses a row that omits it rather than letting a forgotten construction
+   * site read as "no prefix".
+   */
+  prefix: string;
   role: string;
   /**
    * null = withheld (guest). When served it counts exactly the people

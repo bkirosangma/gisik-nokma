@@ -1230,6 +1230,14 @@ export function mapWorkspaceRefs(raw: unknown): WorkspaceRef[] {
     return {
       id: asString(workspace['workspaceId'], `${path}.workspaceId`),
       name: asString(workspace['name'], `${path}.name`),
+      // The workspace prefix (owner spec 2026-09-20) — `CC` in `CCSO-1183`.
+      // REQUIRED and a plain string, not a nullable one: the server answers
+      // `null` here only for a workspace it cannot NAME, and `name` above is
+      // read first and refuses that row outright. So a `prefix` that is absent
+      // or null on a row that got this far is a construction site that forgot
+      // the field, which is a bug worth a loud refusal rather than a blank
+      // half of every key in the workspace.
+      prefix: asString(workspace['prefix'], `${path}.prefix`),
       role: asString(workspace['role'], `${path}.role`),
       memberCount: withheldOrNumber(workspace, 'memberCount', `${path}.memberCount`),
       // REQUIRED, and deliberately not `withheldOrNumber`: this count has no
@@ -1286,6 +1294,12 @@ export function mapWorkspaceRefs(raw: unknown): WorkspaceRef[] {
           // for anyone who tested it with `in` — the difference `13.976`
           // asserts on the domain payload for exactly the same reason.
           ...(description === undefined ? {} : { description }),
+          // The project prefix — `SO` in `CCSO-1183`. REQUIRED and never null,
+          // and unlike `description` two lines up there is no "not entered"
+          // state to spell: the server has already collapsed stored-or-derived
+          // into one value, so a null here is not a project without a prefix
+          // but a route that did not resolve one. `asString` refuses it.
+          prefix: asString(row['prefix'], `${projectPath}.prefix`),
           ticketCount: withheldOrNumber(row, 'ticketCount', `${projectPath}.ticketCount`),
           blockedCount: withheldOrNumber(row, 'blockedCount', `${projectPath}.blockedCount`),
         };

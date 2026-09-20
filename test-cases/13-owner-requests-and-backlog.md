@@ -1964,3 +1964,107 @@ declared in `packages/ui/test/tokens.test.ts`.
 
 ---
 
+
+## The ticket key — `<workspace prefix><project prefix>-<number>` (owner request, 2026-09-20)
+
+The owner's spec, verbatim: *"prefix will be decided at the creation of the workspace and project. i can
+enter up to 3 letters for the workspace and during project creation up to 3 letters for it. for example
+for convenience corner if i choose CC and then for the project Shop Operations i choose SO, the key will
+look something like CCSO-xxxx where the xx are the counter per project."*
+
+**The dispatch prescribed a counter allocated at append plus a migration backfilling the rows that
+predate it. Both halves are foreclosed by this codebase, measured before anything was built:**
+
+- **`events` refuses UPDATE and DELETE.** `1787841717635_events-and-snapshots.sql` installs
+  `events_append_only` as a `BEFORE UPDATE OR DELETE` trigger that RAISES, so no migration can put a
+  prefix or a number into a founding event.
+- **A projection column must be reproducible from the ledger.** `tools/verify-projections.ts` diffs every
+  `proj_` table against a rebuilt shadow with `EXCEPT` in *both* directions, so a backfilled value the
+  replay cannot reproduce is a verifier failure — and it would be right.
+- **There is no `created_at` on `proj_tickets`** to order a ticket backfill by. The dispatch said the
+  controller could not confirm one; it could not, because it does not exist.
+
+So the key is composed from three **ledger** facts and stored in none of them: a prefix a person entered
+(riding `workspace.created` / `project.created`), a prefix **derived** from the name when nobody entered
+one, and the ticket's **position among its project's creations ordered by `workspace_seq`**. The
+derivation is what gives the rows that predate the field a stable half, and it reproduces the three rows
+the owner named by hand — `Convenience Corner`→`CC`, `Shop operations`→`SO`, `gggg`→`GG` — so no install
+needs a data step.
+
+`read/ticket-numbers.ts`, `packages/domain/src/prefix.ts`, `apps/server/src/read/visible-projects.ts`,
+`apps/server/src/workspaces/workspace-name.ts`, `packages/domain/src/events/membership.ts`,
+`apps/server/migrations/1789800000000_proj-projects-prefix.sql`,
+`apps/server/src/permissions/check-permission.ts`.
+
+**`13.988`–`13.999` are left UNUSED deliberately.** The highest `13.*` id at `origin/main` when this
+block was minted was `13.987`, and a second executor is minting into the same numbering line; this task
+takes a BLOCK starting at `13.1000` rather than the next free tip, so the two writers cannot collide.
+
+**What is NOT wired, and it is the display half.** The key composes, is served and is enforced; **no
+screen renders it yet**, and `Features.md` carries the marker as `⚙️` rather than `✅` for that reason.
+The enumeration lives in `Features.md` §6 ("Where the key is shown") with an owner named per site.
+
+### The rule, and the refusals
+
+- **13.1019** ✅ `derivePrefix` takes the initials of the first two words — the owner's own workspace and
+  project — and `13.1020` ✅ takes the first two letters when the name is ONE word (`gggg`→`GG`). Both
+  halves are needed: a rule that got one right alone would pass a single-example test.
+- **13.1021** ✅ A name with no letters at all (`42`, `!!!`) falls back to the stated constant `XX`, and
+  the result is a legal prefix. An empty string here would compose `SO-1` — a key with no workspace half.
+- **13.1022** ✅ A lower-case prefix is REFUSED, not upper-cased, for `displayName`'s own reason: the
+  ledger stores the claim as it was made. The forms upper-case as the owner types; the door does not.
+- **13.1023** ✅ A derivation collision is broken deterministically, in the order given — `Shop operations`
+  and `Service orders` both derive `SO`, so the second moves to `SO2`.
+- **13.1024** ✅ An ENTERED prefix outranks a derived one **regardless of order**: the resolver runs two
+  passes, claiming every stored prefix before handing out any derived one. A single pass would give `SO`
+  to the project that merely derives it and push the project that ASKED for it to `SO2`.
+- **13.1025** ✅ `ticketKey('CC','SO',1183)` is `CCSO-1183`, and the function takes no project context —
+  the owner ruled the bare key "is enough", so there is nothing for a caller to forget to pass.
+- **13.1000** ✅ `workspace.created` takes an optional `prefix`, and an absent one parses unchanged — the
+  compatibility half, because every workspace in the ledger was founded before the field existed.
+- **13.1001** ✅ A prefix that is not one to three capitals is refused by name, and a lower-case one is
+  refused rather than rewritten.
+- **13.1002** ✅ `project.created` takes an optional `prefix`, absent-unchanged, and the key is genuinely
+  absent rather than present-and-undefined (`'prefix' in …` is false; the positive control is true).
+- **13.1003** ✅ `description` and `prefix` coexist, and a bad prefix is refused at its own path.
+
+### The number
+
+- **13.1004** ✅ A project's tickets are numbered by their position in the ledger, and the key they compose
+  reads `CCSO-3` for the third.
+- **13.1005** ✅ The counter is per PROJECT: a second project in the same workspace starts at 1. Without
+  this, a workspace-wide counter and a per-project one are the same function on a one-project fixture.
+- **13.1006** ✅ THE CASE THAT DISTINGUISHES A WINDOW FROM A COUNTER. Asking for the THIRD ticket alone
+  answers 3, not 1 — the id filter is applied AFTER the window. A query that fed the ids into the window
+  would renumber every survivor, and would agree with the correct one on every full-list read.
+- **13.1007** ✅ A ticket with no `ticket.created` answers `null` rather than inventing a number.
+
+### The halves, resolved
+
+- **13.1008** ✅ A prefix that was ENTERED is used verbatim.
+- **13.1009** ✅ A project with no entered prefix derives one from its name — and the stored prefix beside
+  it in the SAME call is untouched, so a resolver that derived for everything fails here.
+- **13.1010** ✅ The answer does not depend on WHO is asking: the resolution runs over the whole workspace
+  before the role filter, so two owners read identical prefixes including a deduplicated one.
+- **13.1011** ✅ A founding claim with no `prefix` key derives from the name — the owner's own
+  `Convenience Corner` → `CC`.
+- **13.1012** ✅ A stored workspace prefix wins, and a RENAME moves the name and never the prefix. This is
+  also the case that would break a fold reading the prefix off the LATEST event, since
+  `workspace.renamed` carries no prefix at all.
+- **13.1013** ✅ A workspace with no naming event answers `null` for both halves.
+
+### The door
+
+- **13.1014** ✅ A project founded under a prefix another project ENTERED is refused with
+  `project.prefix-taken`, naming the value.
+- **13.1015** ✅ **A prefix another project DERIVES is refused too** — and this is the case a
+  stored-column check fails. `Shop operations` enters nothing, so the column is NULL and a column-only
+  check finds nothing to collide with; the read still answers `SO` for it, so accepting the new project
+  would hand `SO` to the newcomer and silently move the older project to `SO2`. The case carries its own
+  control: the same workspace, the same shape, a prefix nobody derives, is admitted.
+- **13.1016** ✅ A free prefix is admitted, and the same prefix in a DIFFERENT workspace is admitted too —
+  pins the residual scope the owner accepted rather than leaving it to be discovered.
+- **13.1017** ✅ A project that enters NOTHING is never refused, however its name derives. Refusing would
+  make the prefix mandatory in fact while the schema keeps it optional in form.
+- **13.1018** ✅ A MEMBER is told they may not found a project (`permission.role`), not which prefixes are
+  taken — the same enumeration bound `checkProjectExists` documents.

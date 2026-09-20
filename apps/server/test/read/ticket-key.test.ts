@@ -30,7 +30,7 @@ import { seedMember, seedProject, seedTicket } from '../helpers/seed.js';
  * fixture would pass equally against `ticket_id` order, insertion order, or a
  * clock. The subset case is the one that distinguishes a window from a counter.
  */
-describe('13.1004-13.1011 the ticket key', () => {
+describe('13.1004-13.1013 the ticket key', () => {
   let db: TestDatabase;
   const ws = newUlid();
   /** Two projects in ONE workspace, so a scoped counter has something to leak into. */
@@ -136,14 +136,12 @@ describe('13.1004-13.1011 the ticket key', () => {
     expect(visible.find((p) => p.projectId === shop)!.prefix).toBe('SO');
   });
 
-  it('13.1010 — a GUEST sees the same prefix as the owner, including a deduplicated one', async () => {
+  it('13.1010 — the prefix does not depend on WHO is asking, including a deduplicated one', async () => {
     // Two projects whose names collide on `DE`, so the suffixing path is live.
     const second = newUlid();
     await seedProject(db.pool, ws, second, 'Design');
     const owner = newUlid();
-    const guest = newUlid();
     await seedMember(db.pool, ws, owner, 'owner');
-    await seedMember(db.pool, ws, guest, 'guest', []);
 
     const ownerEff = await resolveEffectiveRole(db.pool, owner, ws);
     const asOwner = await visibleProjects(db.pool, ownerEff, ws);
@@ -155,12 +153,13 @@ describe('13.1004-13.1011 the ticket key', () => {
     expect(deliveryPrefix).toBe('DE');
     expect(designPrefix).not.toBe(deliveryPrefix);
 
-    // And the guest — who is on no project and therefore sees no rows — must not
-    // be able to shift what the owner reads. The resolution runs over the whole
-    // workspace before the role filter, so the owner's answer is the same one it
-    // was before the guest existed. This is asserted through a SECOND owner
-    // rather than a guest, because a guest by construction has no rows; what it
-    // pins is that the answer does not depend on WHO is asking.
+    // And a viewer who is on no project must not be able to shift what another
+    // viewer reads. The resolution runs over the WHOLE workspace before the role
+    // filter, so one owner's answer cannot depend on another caller's rows. It
+    // is asserted through a SECOND OWNER rather than a guest only because a
+    // guest's list is empty by construction and could not show a difference;
+    // what the pair pins is that the answer is a function of the workspace and
+    // not of the asker.
     const ownerAgain = newUlid();
     await seedMember(db.pool, ws, ownerAgain, 'owner');
     const secondEff = await resolveEffectiveRole(db.pool, ownerAgain, ws);

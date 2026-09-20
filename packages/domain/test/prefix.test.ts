@@ -20,12 +20,12 @@ import {
  * single-example test.
  */
 describe('derivePrefix', () => {
-  it('takes the initials of the first two words — the owner’s workspace and project', () => {
+  it('13.1019 — takes the initials of the first two words, the owner’s workspace and project', () => {
     expect(derivePrefix('Convenience Corner')).toBe('CC');
     expect(derivePrefix('Shop operations')).toBe('SO');
   });
 
-  it('takes the first two letters when the name is ONE word — the owner’s third project', () => {
+  it('13.1020 — takes the first two letters when the name is ONE word, the owner’s third project', () => {
     expect(derivePrefix('gggg')).toBe('GG');
   });
 
@@ -48,7 +48,7 @@ describe('derivePrefix', () => {
     expect(prefixSchema.safeParse(derivePrefix('A')).success).toBe(true);
   });
 
-  it('a name with NO letters falls back to a stated constant rather than an empty string', () => {
+  it('13.1021 — a name with NO letters falls back to a stated constant rather than an empty string', () => {
     // `.min(1)` on the input schema would admit this if it were not for the
     // blank-name refusal; the fallback exists because "no letters" is a shape
     // the door permits and a prefix must still be produced. It is NOT an
@@ -73,7 +73,7 @@ describe('prefixSchema', () => {
     }
   });
 
-  it('refuses lower case rather than upper-casing it', () => {
+  it('13.1022 — refuses lower case rather than upper-casing it', () => {
     // REFUSES rather than normalises, for `displayName`'s own reason: the
     // ledger stores the claim as it was made, so silently rewriting `cc` to
     // `CC` would put words in the actor's mouth. The form upper-cases as the
@@ -101,7 +101,7 @@ describe('resolveProjectPrefixes', () => {
     expect(resolveProjectPrefixes([{ name: 'Shop operations' }])).toEqual(['SO']);
   });
 
-  it('breaks a derivation collision DETERMINISTICALLY, in the order given', () => {
+  it('13.1023 — breaks a derivation collision DETERMINISTICALLY, in the order given', () => {
     // Both names initialise to `SO` — a real collision, and the one the owner's
     // uniqueness ruling exists for: two `SO` projects in one workspace would
     // make `CCSO-1183` name two tickets. The second one moves; the first keeps
@@ -111,7 +111,7 @@ describe('resolveProjectPrefixes', () => {
     ).toEqual(['SO', 'SO2']);
   });
 
-  it('lets an EXPLICIT prefix outrank a derived one regardless of order', () => {
+  it('13.1024 — lets an EXPLICIT prefix outrank a derived one regardless of order', () => {
     // Two passes, not one: `Service orders` claims `SO` explicitly, so the
     // project that merely derives it must move even though it comes FIRST. A
     // single-pass resolver would hand `SO` to `Shop operations` and then
@@ -140,7 +140,7 @@ describe('resolveProjectPrefixes', () => {
 });
 
 describe('ticketKey', () => {
-  it('composes workspace prefix, project prefix and number', () => {
+  it('13.1025 — composes workspace prefix, project prefix and number', () => {
     expect(ticketKey('CC', 'SO', 1183)).toBe('CCSO-1183');
   });
 
