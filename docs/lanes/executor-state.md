@@ -40,7 +40,16 @@
 > - ⚠ **AND ONE SWEEP OF MINE RETURNED A CONFIDENT, WELL-FORMED, WRONG ANSWER — THE EXACT RECORDED TRAP, CAUGHT ONE STEP BEFORE IT REACHED A COMMIT.** I grepped `docs/` for `"closed jobs being hidden"` and read the result as *"`docs/faq.md` is the only prose source"*. It is not: **`docs/manual.md:718` carries it too, and the phrase straddles a LINE BREAK**, so the literal never matched. **A wrapped or emphasised search string silences itself, and the empty result reads as a clean sweep.** Redone newline-tolerantly (`tr '\n' ' ' < "$f" | grep -o …`) **with a positive control proving the tolerant form still finds `faq.md`**:
 >   - **calendar cause-list: `docs/faq.md` AND `docs/manual.md`** — **two** shipped prose sources, not one.
 >   - **the TIMELINE's enumeration is in NO doc at all** (0 across every file searched) — so the timeline's sentence has no prose witness to move, and the calendar's has two.
-> - ⚠ **SO THE COUNT WHEN THE WORDS LAND IS: FIVE sentences + TWO prose documents** (plus the generated help, which follows from the two via `scripts/help-content.mjs` and is gated by `check:help`). **Not four, and not the five I reported earlier** — my own count was an undercount of the same kind, one layer out.
+> - ⚠ **AND FIXING THAT FOUND THE TRAP ONE LAYER UP: I was still finding candidate FILES with a plain `grep -rl`, which is ITSELF line-wrap-sensitive** — a wrapped phrase never entered the list, so the tolerant count never ran on it. Redone with **no pre-filter** over every file. Only `docs/manual.md` and `docs/faq.md` generate the shipped help (`check:help`: "2 documents"). **Definitive list of prose that must move:**
+>   | doc | where | what | state |
+>   |---|---|---|---|
+>   | `docs/manual.md` | `:645` | quotes the **Backlog's** sentence | moves with the copy |
+>   | `docs/manual.md` | `:663-665` | quotes the **Board's** sentence **and justifies it** | ⚠ **FALSE TODAY** |
+>   | `docs/manual.md` | `:718` | the **calendar's** cause-list | moves with the copy |
+>   | `docs/faq.md` | `:563` | the **calendar's** cause-list | moves with the copy |
+> - ⚠ **`docs/manual.md:663-665` IS ALREADY FALSE AND NO NEW COPY FIXES IT.** It justifies the board's sentence with *"the product **genuinely cannot tell** 'there is no work here' from 'none of it is visible to you', and that sentence is true of both."* **The ruling falsified both halves** — a third case exists that the sentence is not true of, and the product **can** tell, because `boardNarrowing` *computes* the drop. **Superseded the moment `#602` merged; nothing moved it.** *Owner: the owner, for the sentence; whoever applies the copy, for the paragraph.*
+> - **Not in shipped docs, checked not assumed:** *"No tickets in this column."* is only in `Features.md` + `test-cases/`; the calendar/timeline sentence openings are in **no** doc; and **the timeline's enumeration is described nowhere at all.**
+> - ⚠ **SO THE COUNT IS: FIVE sentences + FOUR prose passages across TWO documents** (plus generated help). **Not four, and not the five I reported earlier — that was an undercount, and the SECOND undercount in a row, each one layer out.**
 >
 > ## WHERE I AM / WHAT IS IN FLIGHT
 > - **HOLDING, on the owner's words** — now covering **FOUR** sites, not three (the controller ruled the fourth sentence joins the same question).
