@@ -869,7 +869,27 @@ export async function checkProjectPrefixUnique(
   if (parsed.prefix === undefined) {
     return null;
   }
-  const taken = await projectPrefixesInWorkspace(db, env.workspaceId);
+  const resolved = await projectPrefixesInWorkspace(db, env.workspaceId);
+  // ⚠ "ANOTHER project", and the distinction is a defect fix rather than a
+  // nicety. `projectPrefixesInWorkspace` resolves EVERY project in the
+  // workspace, including the one this event names — whose `proj_projects` row
+  // already exists, because the first delivery wrote it. So asking the set
+  // whether it holds this prefix answered YES for the project's own
+  // `project.created` re-delivered, and that retry was refused with
+  // `project.prefix-taken` instead of the `duplicate-event-id` the ledger
+  // answers. Reachable from `POST /v1/events` and `POST /v1/sync`, where a
+  // retry is the ordinary way a client recovers from a lost response; no test
+  // covered it, because every case in `project-prefix-unique.test.ts` uses a
+  // FRESH project id.
+  //
+  // Filtered by project ID and not by value: the resolution guarantees one
+  // project per prefix, so filtering by value would also be correct today — and
+  // would stop being correct the moment that guarantee moved.
+  const taken = new Set(
+    [...resolved.entries()]
+      .filter(([projectId]) => projectId !== env.entity.id)
+      .map(([, prefix]) => prefix),
+  );
   if (!taken.has(parsed.prefix)) {
     return null;
   }

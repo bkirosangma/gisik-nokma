@@ -125,6 +125,37 @@ describe('13.1014-13.1018 a project prefix is unique within its workspace', () =
     ).toBeNull();
   });
 
+  it('13.1028 — a RE-DELIVERY of the same project.created is not refused by its OWN prefix', async () => {
+    // ⚠ FOUND BY THE INDEPENDENT REVIEWER, and no case here could have seen it:
+    // every other case uses a FRESH project id. `projectPrefixesInWorkspace`
+    // resolves every project in the workspace including the one this event
+    // names, and its `proj_projects` row already exists because the FIRST
+    // delivery wrote it — so the gate answered "taken" for the project's own
+    // prefix and refused a retry with `project.prefix-taken` instead of the
+    // `duplicate-event-id` the ledger answers.
+    //
+    // A retry is the ordinary way a client recovers from a lost response, on
+    // `POST /v1/events` and on `POST /v1/sync`, so this is a real path even
+    // though nothing in today's UI reaches it.
+    const ws = newUlid();
+    const admin = newUlid();
+    const projectId = newUlid();
+    await seedMember(db.pool, ws, admin, 'admin');
+    await seedProject(db.pool, ws, projectId, 'Shop operations', undefined, 'SO');
+
+    // The SAME event, re-delivered: same entity id, same prefix.
+    const retry = projectCreated(ws, projectId, admin, { name: 'Shop operations', prefix: 'SO' });
+    expect(await gate(retry, admin)).toBeNull();
+
+    // THE CONTROL, same call shape, same workspace: a DIFFERENT project asking
+    // for the same prefix is still refused. Without it, this case would also
+    // pass against a gate that had simply stopped refusing anything.
+    expect(
+      (await gate(projectCreated(ws, newUlid(), admin, { name: 'Sunday orders', prefix: 'SO' }), admin))
+        ?.rule,
+    ).toBe(PROJECT_PREFIX_TAKEN_RULE);
+  });
+
   it('13.1018 — a MEMBER is told they may not found a project, not which prefixes are taken', async () => {
     // The ordering bound. This check reads the workspace's prefixes, so a
     // caller with no standing to found a project must not be able to use it to

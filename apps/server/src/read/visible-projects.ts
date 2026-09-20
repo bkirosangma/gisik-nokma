@@ -113,9 +113,16 @@ export type VisibleProject = {
 export async function projectPrefixesInWorkspace(
   db: Queryable,
   workspaceId: string,
-): Promise<Set<string>> {
+): Promise<Map<string, string>> {
   const rows = await projectPrefixRows(db, workspaceId);
-  return new Set(resolveProjectPrefixes(rows.map((row) => ({ name: row.name, prefix: row.prefix }))));
+  const resolved = resolveProjectPrefixes(rows.map((row) => ({ name: row.name, prefix: row.prefix })));
+  // A MAP keyed by project id, not a Set of values, and the caller needs the
+  // key: a project re-delivering its OWN `project.created` must not be refused
+  // by a prefix it already holds. A Set cannot answer "is this value held by
+  // somebody else", and asking it the wrong question made an idempotent retry
+  // fail with `project.prefix-taken` instead of the `duplicate-event-id` the
+  // ledger answers — see `checkProjectPrefixUnique`.
+  return new Map(rows.map((row, index) => [row.project_id, resolved[index]!]));
 }
 
 /** The workspace's projects in the order the prefix rule is defined over them. */
