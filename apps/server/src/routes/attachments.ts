@@ -143,8 +143,9 @@ function discardUnreadFile(file: Readable): void {
  *   3. no `file` part → 400
  *   4. no usable `ticketId` field (absent, or truncated by `fieldSize`) → 400
  *   5. ticket not visible, or not there → 404
- *   6. file over `maxBytes` → 413
- *   7. bytes not an accepted type → 415
+ *   6. ticket SOFT-DELETED → 404, the SAME body as step 5 (added 2026-09-20)
+ *   7. file over `maxBytes` → 413
+ *   8. bytes not an accepted type → 415
  *
  * Steps 2–4 are listed because they DO precede the visibility 404 and an
  * earlier version of this note left them out, which made the order look like a
@@ -153,15 +154,30 @@ function discardUnreadFile(file: Readable): void {
  * a field or looked up, so the answer is identical for a ticket that exists,
  * one that does not, and one the caller may not see.
  *
- * Step 5 before steps 6 and 7 is the part that matters and must stay: if size
- * or sniff ran first, a guest could learn which ticket ids exist by uploading
- * rubbish to each and reading 415 (ticket real, file bad) against 404 (ticket
- * not theirs). The oracle would be the refusal they got, not the one they were
- * meant to get. A refactor that reorders these lines re-opens that channel, and
- * `attachments-upload.test.ts` compares a guest's answer to a nonexistent
- * ticket's answer field by field to catch it, and separately sends an invisible
- * ticket a body that is over-size AND unsniffable so both of steps 6 and 7 are
- * pinned behind step 5 rather than only the one.
+ * ⚠ **Step 6 is a SECOND, DISTINCT 404 reason and was missing from this list
+ * until 2026-09-20** — the tombstone guard, added after step 5 rather than
+ * folded into it because it is a different question (`canSee` is visibility and
+ * does not mean "not deleted"). It sits BELOW step 5 on purpose: a caller who
+ * may not see the ticket must get step 5's answer whether or not the ticket is
+ * also deleted, or the deleted-ness would be an inference they were never owed.
+ * It is above steps 7 and 8 for the same reason step 5 is: a deleted ticket
+ * must not become detectable by uploading rubbish to it.
+ *
+ * Steps 5 and 6 before steps 7 and 8 is the part that matters and must stay: if
+ * size or sniff ran first, a guest could learn which ticket ids exist by
+ * uploading rubbish to each and reading 415 (ticket real, file bad) against 404
+ * (ticket not theirs). The oracle would be the refusal they got, not the one
+ * they were meant to get. A refactor that reorders these lines re-opens that
+ * channel, and `attachments-upload.test.ts` compares a guest's answer to a
+ * nonexistent ticket's answer field by field to catch it, and separately sends
+ * an invisible ticket a body that is over-size AND unsniffable so both of steps
+ * 7 and 8 are pinned behind step 5 rather than only the one.
+ *
+ * ⚠ **The renumbering is the 2026-09-20 addition's second effect and it is
+ * stated because a reader comparing this list to an older copy will find the
+ * numbers moved.** What did NOT move is the property: the tombstone 404 sits
+ * beside the visibility 404 in the same band, above every refusal that is
+ * decided on the BYTES.
  *
  * ## HTTP-Origin on this route: no, and by decision rather than by omission
  *

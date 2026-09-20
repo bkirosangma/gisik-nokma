@@ -129,6 +129,21 @@ import { signInWithPhone } from '../helpers/session.js';
  *   TypeScript applications of the rule** are named as MEASURED SURVIVORS in
  *   case 16.90 with their own owners. They are bulk reads and client reads, not
  *   doors that take one ticket id, and they are not touched.
+ * - ⚠ **`read/visible-where.ts`'s docblock publishes a COVERAGE COUNT, and this
+ *   change makes it stale — recorded rather than fixed, with an owner.** That
+ *   docblock says *"**17 SQL statements carry the rule** (13 + 4)"*, and this
+ *   change adds **one more** (`read/live-ticket.ts` splices the constant against
+ *   `proj_tickets t`), so the figure is at least one short. **It is NOT
+ *   re-derived here on purpose**: the same sentence records that three earlier
+ *   versions of it (11, 14, 17) were each wrong, and that *"a bare number here
+ *   was a claim about a universe nobody had pinned — the method is the thing
+ *   that matters and the method is the grep."* The dispatch for this task
+ *   forbids editing that file (the fix is a guard at the route, never a change
+ *   to the predicate), so the correction belongs to **whoever next touches
+ *   `visible-where.ts`** — and the population to recount is the one its own two
+ *   sweeps name. The AXIS also moved: three of this change's applications are at
+ *   ROUTES rather than in SQL, so "constant vs longhand" is no longer the only
+ *   split.
  */
 
 type InjectResponse = Awaited<ReturnType<FastifyInstance['inject']>>;

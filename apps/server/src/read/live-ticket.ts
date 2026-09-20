@@ -27,12 +27,20 @@ import { LIVE_TICKET_WHERE } from './visible-where.js';
  * undo clears both — so `deleted_at IS NULL` holds exactly when the domain flag
  * is `null`. A second read of the full row there would buy nothing.
  *
- * They differ in ONE reachable-in-theory case, named rather than left to be
- * found: a ticket `proj_visibility` holds and `proj_tickets` does not. The
- * detail route THROWS on that (the two projections disagree); these doors refuse
- * with the route's 404. Both refuse the read — the difference is loudness, not
- * access — and no ingest path reaches the state, because one projection pass
- * writes both rows.
+ * ⚠ **THE EQUIVALENCE IS A FACT ABOUT THE WRITER, NOT ABOUT THE SCHEMA, and two
+ * readers disagree about rows no writer produces.** The detail route's mapper
+ * reads the flag with an OR — `deleted_at === null || deleted_by === null` →
+ * `null` (`projections/tickets.ts`) — so a row with `deleted_at` SET and
+ * `deleted_by` NULL would be SERVED by the detail route and REFUSED here. And a
+ * ticket `proj_visibility` holds with no `proj_tickets` row at all THROWS at the
+ * detail route (the two projections disagree) where these doors refuse with the
+ * route's 404. Both are unreachable through the ingest path, where one
+ * projection pass writes both columns and both rows; **neither is guarded, and
+ * the risk is stated rather than closed**: the day a second writer reaches
+ * `proj_tickets` — anything that does not go through `upsertTicket` — these two
+ * doors can drift, and nothing would notice. An earlier version of this
+ * paragraph named only the second, and called it "ONE reachable-in-theory case";
+ * the count was wrong and the enumeration is the point.
  *
  * ## The refusal is the caller's, not this function's
  *
