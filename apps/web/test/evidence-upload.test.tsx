@@ -104,6 +104,9 @@ function ticketRead(): TicketRead {
       serverTime: '2026-09-19T08:00:00.000Z',
     },
     assignedProvenance: null,
+    // As in `description-editable.test.tsx`: nothing here reads the audience,
+    // and a fake carries no visibility row.
+    visibility: null,
     parent: null,
     rollup: null,
   };
