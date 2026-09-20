@@ -1,5 +1,94 @@
 # Serial executor — live state
 
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~17:0x IST. **THE SHEET'S THREE MISSING SURFACES ARE BUILT,
+> # GATED AND GREEN. THE PR IS THE ONLY THING LEFT.**
+> Branch **`exec/sheet-surfaces`**, cut from **`origin/main` = `e9c1a04f`** (the `#591` merge). One PR,
+> `--base main`. **You do not merge.**
+> **⚠ THIS FILE'S PREVIOUS TOP BLOCK WAS STALE AND TOLD A RELAUNCHED EXECUTOR TO OPEN A PR THAT HAD
+> ALREADY MERGED.** It said `exec/sheet-footer`'s PR was "the only thing left"; **PR #591 merged at
+> 07:56Z** (`mergeCommit e9c1a04f`, `headRefOid 614649a2`) and `origin/main..HEAD` was EMPTY. That is the
+> recorded failure mode *"the handoff that exists to survive restarts told a relaunched executor to open
+> a PR that had already merged"*, hit again. **Check `gh pr view --json headRefOid,state` before acting on
+> any "open/paused/NEXT STEP" line in this file.**
+>
+> ## WHAT SHIPPED THIS ROUND — the owner's *"all 3 yes"*, all three built
+> 1. **The rich-text toolbar** — `B i code link list quote` + the prototype's markdown hint
+>    (`packages/editor/src/components/EditorToolbar.tsx`). **No door, no migration, no schema change**;
+>    the six commands verified against the INSTALLED packages (`extension-*` at 3.30.5). `link` gets an
+>    inline URL field because `toggleLink` with no `{href}` is a link to nowhere; an empty box is a
+>    cancel. Active marks reported via `aria-pressed`, re-read on the editor's own transaction (the
+>    `ImageWrapMenu` pattern). **A read-only composer gets neither strip nor hint.**
+> 2. **The inline title editor** — the header carries a borderless `<input>` (the prototype's own shape,
+>    `desktop.dc.html:1116`) over the door that already existed, `ticket.field_set {fieldId:'title'}`.
+>    **No client-side blank rule**: `checks/fields.ts:118-123` already refuses a spaces-only title, so the
+>    value travels as typed and the engine's answer is what the reader sees. An UNCHANGED title sends
+>    nothing. **`Sheet` gained `titleSlot`; `title` (string) still names the dialog.**
+> 3. **The breadcrumb** — `Workspace › Project › State`, three crumbs and no fourth (the key is another
+>    lane's in-flight branch). **Drawn whole or not at all.**
+>
+> ## ⚠ TWO MEASUREMENTS IN THE DISPATCH WERE WRONG, BOTH REPORTED, NEITHER A HOLD
+> - **§2(c) said the three crumbs are "already on the ticket read". THEY ARE NOT.** `TicketRead`
+>   (`view-types.ts:332-357`) is six fields — `ticket`, `title`, `stateProvenance`, `assignedProvenance`,
+>   `parent`, `rollup` — carrying **no workspace name, no project name and no state name**; `BoardView` is
+>   `{projectId, groups}` and `DataSourceQuery` has no `getProjects`. **Only the STATE is derived
+>   in-sheet** (`currentStateName`, already there for the state chip). **Conservative-default ruling
+>   taken: the two names travel as OPTIONAL PROPS from the host**, which already computes
+>   `useWorkspaceName`/`useProjectName` at `page.tsx:174-175`. The alternative priced and rejected: the
+>   sheet calling `getMyWorkspaces()` fetches every workspace and every project in them to name one
+>   project. **Written up in `gisik-nokma-lanes/EXEC-2026-09-20-sheet-surfaces-breadcrumb-measurement.md`
+>   and in the PR body for the owner to reverse — the call site is one prop list.**
+> - **§2(a)'s toolbar measurement was RIGHT and is confirmed** (six commands, all present at 3.30.5).
+>
+> ## ANCHORS, RECOUNTED AT THIS TREE
+> - **gate** `pnpm turbo run build test typecheck --concurrency=1`: **EXIT=0 · 33/33 · 1m37s**.
+>   **Node `v22.22.2`** (`pnpm exec node --version` also v22.22.2 — the `pnpm` BINARY is v24's because
+>   v22's bin dir carries no pnpm; the node it spawns is v22, which is what the gate names).
+>   **server 1640 · app-core 1655 · web 598 · ui 373 · domain 525 · rule-engine 345 · editor 188 ·
+>   sync-client 90 · mcp-server 44 · mobile 29 · desktop 9 — 5,496 tests.**
+>   **Every delta is exactly what this round added:** app-core 1645 → **1655** (+10), editor 178 → **188**
+>   (+10), ui 372 → **373** (+1). Nothing else moved.
+> - **seven repo checks pass**: `check:env`, `check:tasks`, `check:migrations`, `check:runbook`,
+>   `check:citations`, `check:help`, and `node scripts/check-case-ids.mjs` (**there is no
+>   `check:case-ids` npm script — it is run directly**).
+>   ⚠ **`check:db-tz` was NOT run** — it requires a provisioned `DATABASE_URL` and this worktree has none.
+>   Environment prerequisite, not a defect; the one check that did not run.
+> - **Case ids: `check-case-ids` reads `2500 unique, highest 16.87`.** Baseline before this round was
+>   **2497 / 16.84**, so the sweep moved by **exactly +3** (bold 1073 → 1076) — the guard SAW all three,
+>   which "ok" alone does not prove. All three are in **exec 1's block `16.81`–`16.99`**, which has
+>   `16.88`–`16.99` still free. **Next free id: `16.88`.**
+>
+> ## MUTATION WITNESSES — four, each killing its own site and NOTHING else
+> - **M-A** the bold command replaced with a no-op → killed exactly the two bold cases (document +
+>   `aria-pressed`).
+> - **M-B** `list` pointed at `toggleBlockquote` → killed exactly the bullet-list case.
+> - **M-C** the title payload's `fieldId` changed `title` → `description` → killed exactly the
+>   `ticket.field_set` case.
+> - **M-D** the breadcrumb gate relaxed `&&` → `||` → killed exactly the half-path case (the version that
+>   rendered `Workspace › Doing` for a caller that passed one name).
+> **Every file restored from a checksum-verified copy, verified by `shasum -a 256` against a pre-mutation
+> snapshot — NEVER `git checkout --`, which reverts to HEAD and would have destroyed uncommitted work
+> (that rule is in this repo's own memory and it cost four fixes on 2026-09-20).** `git status` after
+> restore shows only the intended files.
+>
+> ## WHAT THE REVIEWER SHOULD AIM AT FIRST
+> 1. **The toolbar's commands are the prototype's SET but not its MECHANICS** — the prototype splices
+>    markdown into a `<textarea>`; these toggle ProseMirror marks. Is the set right, and is `link`'s
+>    inline URL field the right answer where the prototype's `[text](https://)` puts brackets on screen?
+> 2. **`editor.css` could not take the prototype's `--fill4` / `--cardBg` / `--cardShadow`** — that file is
+>    structural-only by its own header (no token from `tokens.ts` is reachable from `packages/editor`), so
+>    the strip is drawn with `currentColor` edges like every control there. **Is the visual departure
+>    acceptable, or should the surface live in `ui.css`?**
+> 3. **The three answer slots MOVED out of the details tab** (below the tab control) so the title's
+>    refusal is visible whichever tab is open. **No test pinned their old position** — verify that.
+> 4. **The breadcrumb's `&&` gate**: a withheld OR pending project name drops the whole nav. Is that
+>    better than the id-only rule `my-work.tsx` applies to a SERVED withheld name?
+>
+> ## NEXT, AND THIS IS ALL THAT IS LEFT
+> **commit the handoff → `git push -u origin exec/sheet-surfaces` → prove the push landed**
+> (`gh pr view --json headRefOid` against `git rev-parse HEAD` — a REJECTED push does not stop
+> `gh pr create`) **→ `gh pr create --base main`.** The PR body is at **`/tmp/pr-body.md`**.
+> **You do not merge.**
+
 **This file is the restart surface.** A controller that kills and relaunches the executor from its
 brief recovers only what is written here. Refreshed at every task boundary.
 
