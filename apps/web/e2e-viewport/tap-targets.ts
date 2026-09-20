@@ -70,10 +70,28 @@ import { fileURLToPath } from 'node:url';
  *
  * ## THE MEMBERSHIP RULE, STATED SO IT CAN BE APPLIED CONSISTENTLY
  *
- * > **A control belongs in `DENSE_IN_LIST` when the product's own CSS gives it
- * > the 24px WCAG 2.5.8 floor rather than the 44px 2.5.5 floor — i.e. when it
- * > is one item among many in a dense collection, or an interactive run inside
- * > running text, and its rule says so.**
+ * > **A control belongs in `DENSE_IN_LIST` when (a) the product's own CSS gives
+ * > it the 24px WCAG 2.5.8 floor rather than the 44px 2.5.5 floor, in a rule
+ * > whose own words make that call, AND (b) a sweep actually visits the route it
+ * > renders on.**
+ *
+ * Clause (b) is not decoration. It is what separates these four from three
+ * controls whose CSS ALSO claims the 24px floor and which are deliberately NOT
+ * here — recorded rather than left to be rediscovered:
+ *
+ *   * **`.gn-my-work__title`** (`ui.css`, byte-similar to `.gn-attention__title`
+ *     and on `/my-work`, which the stack suite does sweep). It genuinely belongs
+ *     by clause (a) and is the closest thing to an error in this table. It is
+ *     left out on the CONSERVATIVE side — a control wrongly judged at 44 is
+ *     judged too strictly, which is loud and safe — because `/my-work`'s
+ *     baseline can only be measured against the live stack on `:3001`, which is
+ *     another lane's worktree. **Owner: whoever next runs `test:e2e:stack`
+ *     against its own stack.**
+ *   * **`.gn-infotip__trigger`** — its own rule says "a dense control beside a
+ *     field label", so (a) holds; no sweep's roster covers the routes it renders
+ *     on, so (b) does not.
+ *   * **`.gn-list__select input[type='checkbox']`** — "THE INPUT CARRIES THE
+ *     24px FLOOR"; the list route is swept by neither suite's tap pass.
  *
  * Every entry below must therefore name the rule that makes the call. An entry
  * whose `declaredAt` rule no longer exists in `ui.css` is a live check:
@@ -84,12 +102,35 @@ import { fileURLToPath } from 'node:url';
  * sweep (loud, and the fix is one line); the only way to absolve a standalone
  * control is to add it here, which is an explicit, reviewable, committed act —
  * the same shape `CONTRAST_PAIRS` uses in `packages/ui/src/tokens.ts`.
+ *
+ * ⚠ **AND THIS TABLE IS NOT SELF-POLICING.** An independent review found the
+ * hole worth naming here rather than leaving implicit: a broad-class entry (say
+ * `control: '.gn-button'` with a plausible container) satisfies EVERY assertion
+ * in `tap-target-density.test.ts` — rule-head liveness, uniqueness, non-empty —
+ * and would silently absolve a whole shared class from the 44 floor. The unit
+ * test pins the CLASS IDENTITY of the four, not the general safety of adding a
+ * fifth. **Adding an entry is a review decision, not a mechanical one.**
  */
 export type DenseInList = {
   /** The control judged at the 24px floor. */
   readonly control: string;
   /** The container the control must be inside for the entry to apply. */
   readonly container: string;
+  /**
+   * A selector that must be present inside `container` for this entry's
+   * expectation to APPLY AT ALL — see the stale-entry guard's docblock.
+   *
+   * ⚠ REQUIRED, and that is the whole point. The guard used to fire whenever a
+   * container rendered with any children, which is a FALSE RED on a real page
+   * state: `help-browser.tsx` renders a group whose `title` is `null` as a bare
+   * `<GroupItems>` with **no toggle at all** ("Flat, with no toggle"), inside
+   * `.gn-help__groups`. The FAQ document declares no groups, so that container
+   * renders — non-empty, structurally different — with zero
+   * `.gn-help__group-toggle` in it. A required witness makes each entry state
+   * the context it expects instead of inferring one, and makes the inference
+   * impossible to leave implicit.
+   */
+  readonly witness: string;
   /** The `packages/ui/src/ui.css` rule that makes the 24px call, in its own words. */
   readonly declaredAt: string;
   /** What in that rule makes this an in-list control. */
@@ -100,6 +141,7 @@ export const DENSE_IN_LIST: readonly DenseInList[] = [
   {
     control: '.gn-attention__title',
     container: '.gn-attention__items',
+    witness: '.gn-attention__item',
     declaredAt: '.gn-attention__title',
     why:
       'A bare text button on a row that also carries a chip and the server’s reason, sharing the ' +
@@ -109,24 +151,30 @@ export const DENSE_IN_LIST: readonly DenseInList[] = [
   {
     control: '.gn-help__nav-link',
     container: '.gn-help__group-items',
+    witness: 'li',
     declaredAt: '.gn-help__nav-link',
     why:
-      'One of 224 section links in the /help topic sidebar — an index whose every row is a link. ' +
-      'Its rule records that the height floor was DROPPED deliberately and the 24px floor still ' +
-      'clears "with 9px to spare".',
+      'One of the /help topic sidebar’s section links — an index whose every row is a link. (The ' +
+      'count is deliberately not restated here: an earlier draft said "224", which no source ' +
+      'carries and which the sweep itself contradicted.) Its rule records that the height floor ' +
+      'was DROPPED deliberately and the 24px floor still clears "with 9px to spare".',
   },
   {
     control: '.gn-help__group-toggle',
     container: '.gn-help__groups',
+    witness: '.gn-help__group',
     declaredAt: '.gn-help__group-toggle',
     why:
       'The sidebar’s group disclosure, 36px "from the reference — above WCAG 2.5.8’s 24px floor ' +
       'for an in-list control, below the 44px this file gives STANDALONE controls." The rule names ' +
-      'both halves of this very split.',
+      'both halves of this very split. The witness is `.gn-help__group`, the wrapper only the ' +
+      'TITLED branch renders — an unnamed group draws its items flat, with no toggle, and must not ' +
+      'be read as a dead entry.',
   },
   {
     control: '.gn-help__pager-link',
     container: '.gn-help__pager',
+    witness: '.gn-help__pager-label',
     declaredAt: '.gn-help__pager-link',
     why:
       'The "Next section" link at the foot of each section. It looks standalone but is not: it ' +
@@ -241,8 +289,20 @@ export async function measureTapTargets(
         return `${el.tagName.toLowerCase()}${id}${cls}${text !== '' ? ` "${text}"` : ''}`;
       };
 
+      /**
+       * Strictly INSIDE the container — from the PARENT, not `el.closest`. The
+       * inclusive form counts an element that IS its own container, while the
+       * stale-entry guard below reads descendants only, so the two would
+       * disagree about a control that named itself as its own container: judged
+       * dense here, and reported broken there. No entry can do that today, which
+       * is exactly why it is worth closing rather than documenting.
+       */
+      const inside = (el: Element, container: string): boolean => {
+        const parent = el.parentElement;
+        return parent !== null && parent.closest(container) !== null;
+      };
       const classify = (el: Element): boolean =>
-        table.some((entry) => el.matches(entry.control) && el.closest(entry.container) !== null);
+        table.some((entry) => el.matches(entry.control) && inside(el, entry.container));
 
       const examined: TapTargetEntry[] = [];
       const offenders: TapTargetEntry[] = [];
@@ -260,6 +320,16 @@ export async function measureTapTargets(
           continue;
         }
         const isDense = classify(el);
+        /**
+         * Counted BEFORE the inline-in-prose exemption below, not after. The
+         * classification has already happened, so a dense control that is ALSO
+         * inline-in-prose really is a member; incrementing after the `continue`
+         * would let the printed population under-report by construction — the
+         * counter and the classifier would be describing two different sets. No
+         * measured page has such a control, and "no page has one" is not a
+         * reason to leave two statements disagreeing.
+         */
+        if (isDense) denseMembers += 1;
         const floor = isDense ? denseFloor : standaloneFloor;
         const entry: TapTargetEntry = {
           selector: describe(el),
@@ -275,7 +345,6 @@ export async function measureTapTargets(
           continue;
         }
         if (isDense) {
-          denseMembers += 1;
           // The split's whole effect, stated as the set it moves: a dense
           // control that would have been an offender under the flat 44.
           if (entry.w < standaloneFloor || entry.h < standaloneFloor) denseAccepted.push(entry);
@@ -290,28 +359,37 @@ export async function measureTapTargets(
           : examined.reduce((a, b) => (Math.min(a.w, a.h) <= Math.min(b.w, b.h) ? a : b));
 
       /**
-       * The stale-selector guard. A container that rendered CONTENT is evidence
-       * its control was meant to be on this page; a control selector that then
+       * The stale-selector guard. A container that rendered its WITNESS is
+       * evidence its control was meant to be there; a control selector that then
        * matches nothing inside it is a renamed or deleted class, and the entry
        * has quietly stopped classifying anything.
        *
-       * Both halves of the condition are load-bearing, and both are the
-       * difference between a check and a false red:
+       * ⚠ THE WITNESS IS THE FIX FOR A REAL FALSE RED, and the first version of
+       * this guard had it. That version fired whenever a container rendered with
+       * ANY children, and its docblock argued that plus the empty case covered
+       * the ground. They do not. `help-browser.tsx` renders a group whose
+       * `title` is `null` as a bare `<GroupItems>` — "Flat, with no toggle" — so
+       * on the FAQ document, which declares no groups, `.gn-help__groups`
+       * renders non-empty and structurally different with ZERO
+       * `.gn-help__group-toggle` in it, and the guard would have convicted a
+       * perfectly legitimate page. An independent review found it; the
+       * reachability argument ("the document is client state and defaults to
+       * `manual`") is a reading that expires the moment a `?doc=` parameter or a
+       * default change lands.
        *
-       *   * A container that did NOT render is not evidence of anything. The
-       *     attention strip returns `null` on an empty list, so
-       *     `.gn-attention__items` is legitimately absent on a page with
-       *     nothing needing attention.
-       *   * A container that rendered EMPTY is not evidence either.
-       *     `.gn-help__group-items` is an unconditional `<ul>`; a group that
-       *     declared no sections would render one with no `<li>` in it, and
-       *     flagging that would convict a table entry for a page with nothing
-       *     to classify rather than for a selector that stopped matching.
+       * Requiring each entry to NAME its witness is what makes the inference
+       * impossible to leave implicit — there is no default, because a default is
+       * how the first version went wrong.
+       *
+       * The other two non-cases are still excluded, and for the reason they
+       * always were: a container that did not render is not evidence of
+       * anything (the attention strip returns `null` on an empty list), and a
+       * container with no witness is not either.
        */
       const brokenEntries: string[] = [];
       for (const e of table) {
         const containers = Array.from(document.querySelectorAll(e.container)).filter(
-          (c) => c.children.length > 0,
+          (c) => c.querySelectorAll(e.witness).length > 0,
         );
         if (containers.length === 0) continue;
         const found = containers.reduce(

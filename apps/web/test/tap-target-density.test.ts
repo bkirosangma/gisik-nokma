@@ -39,6 +39,19 @@ import {
  *     exists to prevent → 13.990 fails by name.
  *   * `.gn-help__pager-link` deleted from `ui.css` → 13.991 fails naming that
  *     selector as "not a rule head", which is the stale-entry direction.
+ *
+ * ⚠ AND THE MUTATION THAT FOUND A REAL DEFECT IN THIS CHANGE, kept because it is
+ * the one that matters most. An independent review showed the stale-entry guard
+ * (in `tap-targets.ts`, not in this file) could produce a FALSE RED on a
+ * legitimate page: `help-browser.tsx` renders an unnamed help group as a bare
+ * `<GroupItems>` with **no toggle**, so on the FAQ document `.gn-help__groups`
+ * renders non-empty with zero `.gn-help__group-toggle`, and the guard's original
+ * "container has any children" trigger convicted it. The fix is the required
+ * `witness` field; the witness for it is the pair of runs recorded in the PR
+ * body — the OLD predicate under a FAQ-shaped page reports
+ * `stale entries=[".gn-help__group-toggle inside .gn-help__groups"]` while the
+ * NEW one reports `[]`. **This is the reason the table is not enough on its own:
+ * a guard that fires on a legitimate state teaches people to ignore it.**
  */
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const UI_CSS_PATH = resolve(TEST_DIR, '../../../packages/ui/src/ui.css');
@@ -95,6 +108,15 @@ describe('tap-target density — case 13.991', () => {
       expect(entry.control.trim(), 'an entry names no control').not.toBe('');
       expect(entry.container.trim(), 'an entry names no container').not.toBe('');
       expect(entry.declaredAt.trim(), 'an entry names no declaring rule').not.toBe('');
+      /**
+       * The witness is REQUIRED and is checked here as well as in the type, for
+       * the same reason the floors are pinned here: the guard that consumes it
+       * lives in a suite on no gate at all. A witness that emptied would not
+       * fail a type — a string is a string — and the entry would fall back to
+       * firing on any non-empty container, which is exactly the false red an
+       * unnamed FAQ group produced.
+       */
+      expect(entry.witness.trim(), 'an entry names no witness').not.toBe('');
       // A `why` is the membership rule applied to one control. A stub proves
       // nothing about why the control belongs, which is the whole content of
       // the decision — so it is length-guarded rather than merely present.

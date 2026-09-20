@@ -862,9 +862,12 @@ for (const route of UNAUTHED_ROUTES) {
      * The three `/help` routes read **25 / 23 / 25** against recorded baselines of
      * **10 / 16 / 16**. The sweep had been red on `main` for as long as the topic
      * sidebar has existed, and nobody saw it, **because this suite is on no gate**:
-     * `pnpm turbo run build test typecheck` defines no task that reaches it, and
+     * `pnpm turbo run build test typecheck` defines no task that RUNS it, and
      * `.github/workflows/ci.yml` runs `test:e2e:stack` only — `viewport` does not
-     * appear in that file at all. A ratchet with no runner is a note, not a check.
+     * appear in that file at all. **Types are still checked on the gate**
+     * (`tsconfig.e2e.json` includes `e2e-viewport/**`), so what is missing is a
+     * RUNNER for the assertions, not a compiler for the files. A ratchet with no
+     * runner is a note, not a check.
      * (Wiring this suite to a gate is NOT this change's to make; it is recorded in
      * the PR body as a finding with its own owner.)
      *

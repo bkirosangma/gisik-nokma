@@ -162,7 +162,7 @@ test('the signed-in shell does not scroll sideways at 390px', async ({ page }) =
    * `e2e-viewport/tap-targets.ts` — a plain MODULE, which is why the import
    * below reaches them without dragging this file's sibling spec in. (This
    * sentence said `e2e-viewport/responsive.spec.ts` until 2026-09-20; that was
-   * true before the 2026-09-08 move and stale for six weeks after it, in the
+   * true before the 2026-09-08 move and stale for the twelve days after it, in the
    * same paragraph that explains why a spec is not a library.) A second copy
    * here would be a second definition of "what a tap target is", free to drift
    * from the first while both files keep reporting confident numbers.

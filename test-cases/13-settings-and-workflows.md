@@ -462,9 +462,12 @@ sweep for the block's own bounds is prose *mentioning* the range, which is exact
   24×24 — the product's own floor for a dense in-list control (`ui.css:1246-1249`). It shipped at
   20×20, and the hit area is exactly the declared box because `globals.css:5` is
   `* { box-sizing: border-box }` and the trigger's padding is `0`. **(c)** The 44px tap ratchet does
-  NOT see it, and that is recorded rather than left to read as compliance: the inline-control
-  exemption (`e2e-viewport/tap-targets.ts:100-104`) needs `display: inline` with a text-bearing
-  parent, and an `inline-flex` trigger holding an `aria-hidden` SVG fails both; the ratchet stays
+  NOT see it, and that is recorded rather than left to read as compliance: it is reached by NEITHER
+  exemption in `e2e-viewport/tap-targets.ts` — the inline-in-prose one needs `display: inline` with a
+  text-bearing parent, and a `DENSE_IN_LIST` entry (added 2026-09-20) would need its route swept at
+  all — and an `inline-flex` trigger holding an `aria-hidden` SVG fails both. ⚠ Cited by SELECTOR:
+  this line named `e2e-viewport/tap-targets.ts:100-104` until 2026-09-20, and those numbers now land
+  inside the table added there. The ratchet stays
   green only because no roster walks the settings routes (`viewports.ts:171-176`,
   `e2e-stack/viewport.spec.ts:419-427`). **Owner: whoever next owns the settings-cluster viewport
   roster** — the whole settings page, not this control, is the gap.
