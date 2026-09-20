@@ -73,6 +73,14 @@ function ticketRead(overrides: Partial<TicketRead> = {}): TicketRead {
     assignedProvenance: null,
     parent: { kind: 'ticket', id: PARENT, title: 'Registrations' },
     rollup: null,
+    // The key and the grandparent — the two crumb fields the ticket read gained
+    // on 2026-09-20. A SEEDED key is what makes the last crumb's own case
+    // (`16.88`) mean anything: with `null` here every crumb assertion would be
+    // an assertion about the FALLBACK, and the key path would go unwitnessed.
+    key: 'CCSO-1183',
+    // `null` — no grandparent — because the sheet's fixtures already carry a
+    // parent, and a case that wants the whole three-layer chain must say so.
+    epic: null,
     ...overrides,
     // `Partial<TicketRead>` admits `visibility: undefined`, which is NOT one of
     // the two answers the field has — it is a mode, or `null` for "this read
@@ -203,7 +211,15 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
 
   it('renders the parent link when visible', async () => {
     renderSheet(ticketRead());
-    await waitFor(() => expect(screen.getByText('Registrations')).toBeInTheDocument());
+    // UPDATED 2026-09-20, not deleted: the visible parent used to render as its
+    // bare TITLE here, and the owner's ruling moved the `Subtask of {title}`
+    // badge up into this position. The fact this case is about — the parent is
+    // NAMED on the sheet when the viewer may see it — is the same; what changed
+    // is the wording and the element. The title alone is no longer a text node,
+    // which is exactly why `getByText('Registrations')` stopped matching.
+    await waitFor(() =>
+      expect(screen.getByTestId('sheet-parent-indicator')).toHaveTextContent('Registrations'),
+    );
   });
 
   it('PLANTED DEFECT: a restricted parent renders as existence-without-title, never as parentless', async () => {
@@ -1846,7 +1862,14 @@ describe('F — the subtasks section', () => {
     await settled();
     await screen.findByTestId('sheet-subtasks');
     expect(screen.queryByTestId('sheet-parent-chip')).toBeNull();
-    expect(screen.queryByTestId('sheet-parent-chip-restricted')).toBeNull();
+    // ⚠ REPOINTED 2026-09-20, because the id it named had lost its LAST
+    // producer and the assertion could no longer fail. The owner's merge ruling
+    // moved the restricted arm out of a chip and into the parent indicator, so
+    // `sheet-parent-chip-restricted` renders nowhere; asserting on a testid with no
+    // producer is a check that cannot fail wearing the costume of one that can. The
+    // property it was written for — a root ticket draws NO restricted sentence — is
+    // carried by the id the merged element actually wears.
+    expect(screen.queryByTestId('sheet-parent-restricted')).toBeNull();
   });
 });
 
@@ -2132,22 +2155,34 @@ describe('the `Subtask of {parent}` chip', () => {
     renderSheet(read, sheetSource(read, [], []), { onOpenTicket });
     await settled();
 
-    const pill = await screen.findByTestId('sheet-parent-chip-restricted');
-    expect(pill.textContent).toBe('Subtask of a restricted parent');
+    // ⚠ UPDATED 2026-09-20 BY THE OWNER'S MERGE RULING, not deleted. The
+    // restricted arm used to be a chip in the SUBTASKS header worded `Subtask of
+    // a restricted parent`. The owner moved the badge up into the parent
+    // indicator and ruled that arm keeps ITS sentence — so this arm is now
+    // `Restricted parent — exists, but you can't see it`, the words the sheet
+    // has used for this fact all along. **The properties this case exists for
+    // are unchanged and every one is still asserted below.**
+    const pill = await screen.findByTestId('sheet-parent-restricted');
+    expect(pill.textContent).toBe("Restricted parent — exists, but you can't see it");
     // NOT a control: the restricted arm carries no project and no title, so
     // there is nothing to open and nothing to name — and case 6.14 asserts a
     // direct read of that parent 404s.
     expect(pill.tagName).toBe('SPAN');
     // The arm EXISTS rather than being omitted, and that is the ruling's second
-    // half: an absent chip reads as "no parent", which is a different claim
+    // half: an absent arm reads as "no parent", which is a different claim
     // from "a parent you may not see" — the same distinction `16.22`'s sibling
     // cases draw between a restricted parent and `At project root`.
     expect(screen.queryByText('At project root')).toBeNull();
     // The id the read DID send is not rendered here. 3.73 owns this property on
-    // the sheet's own parent row; asserted again because this chip is a SECOND
-    // surface for the same fact, and a second surface is where a leak recurs.
+    // the sheet's own parent row; asserted again because this indicator is a
+    // SECOND surface for the same fact, and a second surface is where a leak
+    // recurs.
     expect(document.body.textContent).not.toContain('secret-parent');
     expect(onOpenTicket).not.toHaveBeenCalled();
+    // AND the subtasks header no longer carries a second copy of this fact —
+    // the duplication the owner ruled away. A chip there would be the bug this
+    // merge fixed, so its absence is asserted rather than assumed.
+    expect(screen.queryByTestId('sheet-parent-chip')).toBeNull();
   });
 });
 
@@ -2809,22 +2844,51 @@ describe('TicketSheet — the editable title (16.86)', () => {
 });
 
 /**
- * 16.87 — the BREADCRUMB.
+ * 16.87 — the BREADCRUMB, which is THE ANCESTOR CHAIN since 2026-09-20.
  *
- * `Workspace › Project › State`, drawn from the host-supplied names and the
- * state this sheet already derives. **The dispatch's measurement of the SOURCE
- * was wrong and that is recorded on the props**, so the interesting half of
- * these cases is the arm where no name arrives: the prototype's fourth crumb is
- * the ticket KEY and is deliberately not built.
+ * `Workspace › Project › [epic] › [parent] › KEY`, which is the AUTHORITY's own
+ * chain (`desktop.dc.html:3404-3425`). Until 2026-09-20 this was
+ * `Workspace › Project › State` — **there is no state crumb in the authority at
+ * all**, and the state was built instead because it was *"the one crumb whose
+ * source is IN this component"* while the ancestor chain *"would need a third
+ * host prop or a read"*. The cheap reading was built and the authority's actual
+ * chain was not; the owner asked why the hierarchy was missing from the crumb
+ * and this is the correction.
+ *
+ * ⚠ **The owner's *"should show the ticket key"* was NOT buildable from what
+ * `#595` shipped.** That PR shipped the key's COMPOSITION and the two PREFIXES;
+ * the NUMBER — the ticket's position among its project's creations — had no
+ * route consuming it, which `Features.md:456` said in as many words — *"the key
+ * is composed, served and is enforced, and NO SCREEN RENDERS IT YET"*, quoted in
+ * the PAST TENSE because this change set is what replaced that sentence with
+ * *"until 2026-09-20 NO SCREEN RENDERED IT"*. The detail route serves it now, and
+ * `TicketRead.key` carries it. ⚠ The citation is to `:456` and not `:455`: `:455`
+ * is the PREFIXES bullet above it, and two of this change set's own comments
+ * cited the wrong one until an independent reviewer opened both lines.
+ *
+ * The arms worth having are the ones the old shape could not express: an
+ * ANCESTOR crumb is a LINK that opens that ticket's sheet, the epic crumb is
+ * CONDITIONAL, a restricted ancestor is NAMED rather than dropped, and the last
+ * crumb is the KEY rather than the state's name.
  */
 describe('TicketSheet — the location breadcrumb (16.87)', () => {
+  /**
+   * The grandparent these cases hang off. Defined HERE rather than added to
+   * `helpers/seed.ts` beside `PARENT` and `TICKET`: `seed.ts` is shared by
+   * every suite in this package and a constant nothing else reads would be one
+   * more name every reader has to rule out. It is a plain id, distinct from
+   * `PARENT` and `TICKET`, so a crumb bound to the wrong one fails rather than
+   * passing by coincidence.
+   */
+  const EPIC = '01J9GEVT0000000000000000EP';
+
   function crumbTexts(): string[] {
     return Array.from(document.querySelectorAll('.gn-ticket-sheet__crumb')).map(
       (el) => el.textContent ?? '',
     );
   }
 
-  it('16.87 draws workspace, project and state, in that order', async () => {
+  it('16.87 draws workspace, project, parent and key, in that order', async () => {
     renderSheet(ticketRead(), sheetSource(ticketRead()), {
       workspaceName: 'Convenience Corner',
       projectName: 'Shop operations',
@@ -2832,7 +2896,205 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
     await settled();
 
     expect(screen.getByRole('navigation', { name: 'Ticket location' })).toBeInTheDocument();
-    expect(crumbTexts()).toEqual(['Convenience Corner', 'Shop operations', 'Doing']);
+    // The seeded read carries a parent (`Registrations`) and a key
+    // (`CCSO-1183`) and NO grandparent, which is the ordinary shape: the epic
+    // crumb is conditional and this fixture is what its absence looks like.
+    expect(crumbTexts()).toEqual([
+      'Convenience Corner',
+      'Shop operations',
+      'Registrations',
+      'CCSO-1183',
+    ]);
+  });
+
+  /**
+   * 16.63 — the GRANDPARENT crumb, which is the whole of what the owner's
+   * *"grandparent"* asked for and which the old three-crumb bar had nowhere to
+   * put.
+   *
+   * The epic crumb sits BETWEEN the project and the parent, which is the
+   * authority's order (`ws.name › tpName › [epic] › [parent] › sheet.id`) and
+   * not a choice made here.
+   */
+  it('16.63 draws the grandparent between the project and the parent', async () => {
+    const read = ticketRead({ epic: { kind: 'ticket', id: EPIC, title: 'Open Questions' } });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+
+    expect(crumbTexts()).toEqual([
+      'Convenience Corner',
+      'Shop operations',
+      'Open Questions',
+      'Registrations',
+      'CCSO-1183',
+    ]);
+  });
+
+  /**
+   * 16.64 — AN ANCESTOR CRUMB OPENS THAT TICKET'S SHEET, and the id it opens is
+   * the RIGHT one.
+   *
+   * The authority's ancestors are each a link (`go: () => setState({ sheetId })`)
+   * and `onOpenTicket` is the prop that honours it. Asserted on the ARGUMENT
+   * rather than on the call alone: a crumb that opened the wrong ticket, or the
+   * ticket's own sheet, would satisfy "the handler ran" — which is the shape
+   * this repo records as a check passing for a reason unrelated to the property
+   * it names. Each ancestor is clicked separately, so a handler bound to one id
+   * for both crumbs cannot pass.
+   */
+  it('16.64 an ancestor crumb opens THAT ancestor’s sheet, not the ticket’s own', async () => {
+    const user = userEvent.setup();
+    const onOpenTicket = vi.fn();
+    const read = ticketRead({ epic: { kind: 'ticket', id: EPIC, title: 'Open Questions' } });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+      onOpenTicket,
+    });
+    await settled();
+
+    await user.click(screen.getByTestId('sheet-crumb-epic'));
+    expect(onOpenTicket).toHaveBeenCalledWith(EPIC);
+
+    await user.click(screen.getByTestId('sheet-crumb-parent'));
+    expect(onOpenTicket).toHaveBeenLastCalledWith(PARENT);
+
+    // The last crumb is NOT a control — there is nowhere further to go from
+    // here — so it carries no click for a traversal to loop on.
+    expect(screen.getByTestId('sheet-crumb-ticket').tagName).toBe('SPAN');
+    expect(onOpenTicket).toHaveBeenCalledTimes(2);
+  });
+
+  /**
+   * 16.64 — WITH NO `onOpenTicket` AN ANCESTOR CRUMB IS NOT A CONTROL.
+   *
+   * `onOpenTicket` is optional and absent for a caller that cannot open
+   * anything. The rule is that prop's own recorded one — *"a control that
+   * cannot be honoured"* is not drawn — so the crumb degrades to the plain span
+   * the restricted arm already uses, and the name is still shown rather than
+   * the crumb vanishing.
+   */
+  it('16.64 an ancestor crumb is a plain span when the host cannot open tickets', async () => {
+    const read = ticketRead({ epic: { kind: 'ticket', id: EPIC, title: 'Open Questions' } });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+
+    const epic = screen.getByTestId('sheet-crumb-epic');
+    expect(epic.tagName).toBe('SPAN');
+    expect(epic.textContent).toBe('Open Questions');
+    expect(screen.getByTestId('sheet-crumb-parent').tagName).toBe('SPAN');
+  });
+
+  /**
+   * 16.65 — A RESTRICTED ANCESTOR IS NAMED, NEVER DROPPED, and is never a
+   * control.
+   *
+   * Dropping it would make a restricted chain render as a SHORTER one — the
+   * vanish `invariant 5` forbids, and the same reason the parent indicator has a
+   * restricted arm at all. It cannot be a link for the reason that arm cannot:
+   * the viewer cannot open what they cannot see, and the id the read DID send
+   * is not rendered.
+   */
+  it('16.65 a restricted grandparent is named rather than dropped, and is not a control', async () => {
+    const onOpenTicket = vi.fn();
+    const read = ticketRead({ epic: { kind: 'restricted', id: 'secret-epic' } });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+      onOpenTicket,
+    });
+    await settled();
+
+    const epic = screen.getByTestId('sheet-crumb-epic');
+    expect(epic.tagName).toBe('SPAN');
+    expect(epic.textContent).toBe('Restricted epic');
+    // The chain is still FIVE long: the restricted arm occupies its own place
+    // rather than collapsing the hierarchy by one level.
+    expect(crumbTexts()).toHaveLength(5);
+    expect(document.body.textContent).not.toContain('secret-epic');
+    expect(onOpenTicket).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 16.66 — THE LAST CRUMB IS THE TICKET KEY, which is the owner's own words
+   * (*"should show the ticket key"*) and the thing `TicketRead.key` was added
+   * to carry.
+   */
+  it('16.66 the last crumb is the ticket key', async () => {
+    const read = ticketRead({ key: 'CCSO-42' });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+
+    expect(screen.getByTestId('sheet-crumb-ticket').textContent).toBe('CCSO-42');
+  });
+
+  /**
+   * 16.66 — WHEN THIS READ COULD NOT COMPOSE A KEY, the last crumb falls back to
+   * the ticket's TITLE — **and never to `state.id`**.
+   *
+   * The fallback is asserted in BOTH directions in one case, because the wrong
+   * one is the plausible one: a ULID is not a key, and `my-work.tsx`'s
+   * *"id-only rather than blank"* rule does not license printing one here — that
+   * rule is for a SERVED withheld name, and a `null` key is a derivation this
+   * read could not complete. `TICKET` is the fixture's id, so the negative arm
+   * has something real to fail on.
+   */
+  it('16.66 a null key falls back to the title and never to the ticket id', async () => {
+    const read = ticketRead({ key: null, title: 'File the GST return' });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+
+    const last = screen.getByTestId('sheet-crumb-ticket');
+    expect(last.textContent).toBe('File the GST return');
+    // Scoped to the NAV rather than to `document.body`: the ticket's own id
+    // legitimately appears elsewhere on this sheet, and a body-wide assertion
+    // would be a check whose failure has nothing to do with what it names.
+    const nav = screen.getByRole('navigation', { name: 'Ticket location' });
+    expect(nav.textContent).not.toContain(TICKET);
+    expect(crumbTexts()).not.toContain(TICKET);
+  });
+
+  /**
+   * 16.63 — THE STATE IS NOT A CRUMB ANY MORE, and this is the case that makes
+   * the removal deliberate rather than a silent loss.
+   *
+   * The old last crumb was the workflow's name for the state (`Doing`), and it
+   * is gone from the breadcrumb because the authority has no such crumb. **The
+   * state is still on the sheet** — it has its own chip — so nothing was lost;
+   * what changed is which surface answers *"where am I"*. The positive control
+   * is in the same case: the chip is asserted PRESENT, so a version that simply
+   * dropped the state from the sheet cannot pass this by accident.
+   */
+  it('16.63 the state is not a crumb, and the state chip still names it', async () => {
+    renderSheet(ticketRead(), sheetSource(ticketRead()), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+
+    expect(crumbTexts()).not.toContain('Doing');
+    // ⚠ THE CONTROL, and it carries a property this change would otherwise have
+    // ORPHANED. The old state crumb asserted *"the workflow's NAME for the
+    // state, not the raw id"* (`nav.textContent` must not contain `doing`), and
+    // it was the ONLY case in this file owning that property. Removing the
+    // crumb would have silently retired it, so it follows the element to the
+    // state chip — which is the same `currentStateName` lookup and the surface
+    // that still renders it. Both arms, in the same case, so neither can pass
+    // for the other's reason.
+    expect(screen.getByText('Doing')).toBeInTheDocument();
+    expect(screen.getByRole('dialog').textContent ?? '').not.toContain('doing');
   });
 
   /**
@@ -2868,22 +3130,93 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
   });
 
   /**
-   * 16.87 — the STATE crumb is the workflow's name for the state, not the raw
-   * id, which is the same lookup the state chip above makes. A fixture whose
-   * ticket sits in a state the definition does not hold is what the fallback is
-   * for, and this case pins the positive half: a definition that DOES hold it
-   * gets its name.
+   * 16.67 — THE PARENT INDICATOR RENDERS THE BADGE, IN THE UPPER POSITION, AND
+   * THE SUBTASKS HEAD NO LONGER RENDERS A SECOND COPY.
+   *
+   * The owner's ruling, verbatim: *"you can keep the badge. but the placement is
+   * confusing. there is already a `gn-ticket-sheet__parent` section above. put
+   * the badge in that position instead. you can remove that
+   * `gn-ticket-sheet__parent`."*
+   *
+   * ## What was measured before the merge
+   *
+   * The SAME three facts were rendered twice: the parent indicator drew the
+   * parent's bare title (or `At project root`, or the restricted sentence), and
+   * the subtasks head drew a `Subtask of {title}` chip for the same parent —
+   * with the restricted case worded differently in each place and the root case
+   * appearing in only one of them. **Case 16.39 asserted there was exactly ONE
+   * chip; this case asserts there is exactly one SURFACE**, which is the
+   * property the ruling is about and which a chip count alone cannot see.
+   *
+   * ⚠ The two assertions are separated on purpose. `queryByTestId` returning
+   * null at the old site passes for the RIGHT reason only because the same case
+   * first proves the badge IS rendered at the new one — an element that moved
+   * and an element that was deleted are the same reading otherwise.
    */
-  it('16.87 names the state rather than printing its id', async () => {
-    renderSheet(ticketRead(), sheetSource(ticketRead()), {
+  it('16.67 the parent badge sits in the parent indicator and nowhere else', async () => {
+    const read = ticketRead({ parent: { kind: 'ticket', id: PARENT, title: 'Registrations' } });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+      onOpenTicket: vi.fn(),
+    });
+    await settled();
+
+    const chips = screen.getAllByTestId('sheet-parent-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0]?.textContent).toBe('Subtask of Registrations');
+    // IN THE UPPER POSITION: the badge's own ancestor is the indicator block.
+    expect(screen.getByTestId('sheet-parent-indicator')).toContainElement(chips[0]!);
+    // AND NOT in the subtasks section, which is the duplication the ruling
+    // removed. Asserted on the CONTAINER rather than on the document, so a chip
+    // re-appearing inside the subtasks head fails here.
+    expect(screen.getByTestId('sheet-subtasks')).not.toContainElement(
+      screen.queryByTestId('sheet-parent-chip'),
+    );
+  });
+
+  /**
+   * 16.68 — AT PROJECT ROOT THE INDICATOR NAMES THE ROOT AND DRAWS NO BADGE.
+   *
+   * **A root is not a subtask**, so the `Subtask of …` badge would be a false
+   * statement about it; the sentence is kept instead, because the fact is real
+   * and a crumb chain ending at the project is a different silence. This is the
+   * arm the owner's ruling left open (*"if the owner meant the chip's behaviour
+   * — nothing at root — that is this one arm"*), asserted so that changing it
+   * is a decision rather than a drift.
+   */
+  it('16.68 at project root the indicator says so and wears no badge', async () => {
+    const read = ticketRead({ parent: null });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+      onOpenTicket: vi.fn(),
+    });
+    await settled();
+
+    expect(screen.getByTestId('sheet-parent-indicator')).toHaveTextContent('At project root');
+    expect(screen.queryByTestId('sheet-parent-chip')).toBeNull();
+  });
+
+  /**
+   * 16.68 — A RESTRICTED PARENT IS NOT A ROOT, and the indicator keeps the two
+   * apart in the merged element.
+   *
+   * Invariant 5's whole point, re-asserted at the site the merge created: the
+   * restricted arm must not read as *"no parent"*. Both sentences are asserted
+   * in ONE case so neither can pass by the other's absence.
+   */
+  it('16.68 a restricted parent never reads as a root, in the merged indicator', async () => {
+    const read = ticketRead({ parent: { kind: 'restricted', id: 'secret-parent' } });
+    renderSheet(read, sheetSource(read), {
       workspaceName: 'Convenience Corner',
       projectName: 'Shop operations',
     });
     await settled();
 
-    const nav = screen.getByRole('navigation', { name: 'Ticket location' });
-    expect(nav.textContent).not.toContain('doing');
-    expect(crumbTexts().at(-1)).toBe('Doing');
+    const indicator = screen.getByTestId('sheet-parent-indicator');
+    expect(indicator).toHaveTextContent("Restricted parent — exists, but you can't see it");
+    expect(indicator).not.toHaveTextContent('At project root');
   });
 });
 

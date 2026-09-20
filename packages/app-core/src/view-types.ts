@@ -472,6 +472,67 @@ export type TicketRead = {
   visibility: TicketVisibility | null;
   parent: ParentRef;
   rollup: RollupToViewer | null;
+  /**
+   * The ticket's key — `CCSO-1183` — or `null` when one could not be composed.
+   *
+   * **This field is the whole reason the sheet's fourth crumb was not built
+   * before 2026-09-20.** `Features.md` enumerated it as a display site
+   * *"awaiting the key"* with the note that the key *"composes, is served and
+   * is enforced; NO SCREEN RENDERS IT YET"* — and the missing half was exactly
+   * this one: the number is a fact about the ledger's own order
+   * (`read/ticket-numbers.ts`), so no client can compose the key from what it
+   * holds, and no read carried it until this one did.
+   *
+   * ## Why `null` and not a refusal
+   *
+   * `read/ticket-numbers.ts` records the ruling: *"a key is not worth refusing a
+   * ticket read over, and inventing a number would make the key name a ticket
+   * that does not exist."* So a ticket whose creation position is outside the
+   * snapshot the number is derived from answers `null` here, and the crumb
+   * renders an absence rather than a key assembled from a hole. The two
+   * prefixes are checked the same way and for the same reason: a workspace with
+   * no `workspace.created` at all, or a project absent from the prefix map,
+   * leaves the key uncomposed rather than half-composed.
+   *
+   * ⚠ **A client must NOT fall back to `state.id` when this is `null`.** A ULID
+   * is not a key; printing one where a key goes would answer the crumb's
+   * question with a different kind of thing, which is the substitution
+   * `my-work.tsx`'s *"id-only rather than blank"* rule does NOT license — that
+   * rule is for a SERVED withheld name, and this absence is a derivation this
+   * read could not complete.
+   *
+   * REQUIRED and nullable rather than optional, on this module's standing rule
+   * for `visibility` above: an optional key would let a producer that forgot
+   * the field look identical to one reporting an uncomposable key.
+   */
+  key: string | null;
+  /**
+   * The ticket's GRANDPARENT — the nearest PROPER ancestor whose type carries
+   * the workspace's epic rank — for the sheet's breadcrumb chain, or `null`
+   * when there is none.
+   *
+   * ## Why this is a READ and not a client-side walk
+   *
+   * The sheet holds `parent` (one hop) and the workspace's ticket types (it
+   * reads them for the subtask form), so in principle it could climb. It must
+   * not: each hop is a round trip, a hop through an ancestor this viewer may
+   * not see has to be gated per ancestor, and the offline replica would answer
+   * a different chain from the online one. The server already resolves this
+   * question for a whole page (`routes/list.ts`) and now resolves it for one
+   * ticket through the SAME `canSee` the `parent` arm above uses.
+   *
+   * ## PROPER ancestor, unlike the board's grouping
+   *
+   * `epicAncestorOf` is ancestor-OR-SELF, because a board lane legitimately
+   * groups an epic's own card under that epic. A crumb is not a lane: the
+   * chain names the layers ABOVE the ticket, so a ticket that IS an epic must
+   * not appear as its own grandparent. The walk starts at `parentId`.
+   *
+   * The three answers are `ParentRef`'s three — visible, restricted, none —
+   * minus the visibility row the client never reads. `mapParentRef` maps it
+   * unchanged.
+   */
+  epic: ParentRef;
 };
 
 /** Plan 3's history event: the ledger filtered, both clocks, no summarising. */

@@ -1926,6 +1926,17 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
      * through 6th of all of them.
      */
     deleted: unknown = null,
+    /**
+     * The ticket's key, or `null` (2026-09-20). ⚠ **`unknown` with a `null`
+     * default, NOT `string | null`**, on this helper's own existing rule: several
+     * cases deliberately send a WRONG TYPE to prove the mapper refuses it, and a
+     * parameter typed to the happy path could not express that. `null` is the
+     * default because most cases are not about the key — but it is still SENT,
+     * because `mapTicketRead` distinguishes a `null` key from a MISSING one.
+     */
+    key: unknown = null,
+    /** The grandparent, or `null` — the same three answers `parent` takes. */
+    epic: unknown = null,
   ): Record<string, unknown> {
     return {
       // The `proj_visibility` row the route serves, under the route's own key
@@ -2001,6 +2012,18 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
       assignedProvenance,
       parent,
       rollup,
+      // The two crumb fields (2026-09-20), TRAILING for the reason the
+      // `deleted` parameter's docblock states: every call site above passes its
+      // arguments POSITIONALLY, and inserting these beside `parent` would
+      // silently re-point every one of them.
+      //
+      // ⚠ `key` defaults to `null` and the fixture must still SEND it — the
+      // mapper's `=== null` arm is the discriminator, so a body that omits the
+      // key REFUSES (case 16.71). Emitting it here is what makes every
+      // pre-existing case in this file exercise "this read composed no key"
+      // rather than "this producer forgot the field".
+      key,
+      epic,
     };
   }
 
@@ -2055,6 +2078,79 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     row['resolved_mode'] = 'project';
     expect(mapTicketRead(body).visibility?.ownMode).toBe('inherit');
   });
+
+  /**
+   * 16.71 — `mapTicketRead` carries the ticket's KEY and its GRANDPARENT, and
+   * **`key`'s `null` is a DISCRIMINATOR rather than a convenience**.
+   *
+   * ## Why this case is a mapper case at all
+   *
+   * The route's own cases (`16.69`, `16.70`) prove the server sends the right
+   * bytes; they say nothing about what this client makes of them. A `key` that
+   * reached the wire and was never read — or was read and collapsed into the same
+   * value as a missing one — would leave every one of those green.
+   *
+   * ## The refusal is the load-bearing half
+   *
+   * `null` means *"this read could not compose a key"*: the workspace has no
+   * founding claim, or the project is absent from the prefix map, or the number
+   * falls outside the snapshot. A body that OMITS the field means something else
+   * entirely — a producer that stopped sending it — and the two must not become
+   * one reading, because the first has a defined absence rendering and the second
+   * is a wire change this client has not agreed to read. That is the same fork
+   * `TicketRead.visibility` argues, and the same one `assignedProvenance` above
+   * is pinned with; the control for the refusal runs FIRST and differs only in
+   * that one key.
+   */
+  describe('16.71 mapTicketRead carries the key and the grandparent, and refuses a body without the key', () => {
+    /**
+     * `ticketReadBody`'s own builder, so this case cannot drift from it.
+     *
+     * The parent is a real VISIBLE one: that helper's first parameter is typed
+     * `Record<string, unknown>` and is not nullable, and these cases are about
+     * the key and the grandparent — so the parent stays at the file's own idiom
+     * rather than widening a shared signature to suit them.
+     */
+    function body(key: unknown, epic: unknown): Record<string, unknown> {
+      return ticketReadBody(
+        { kind: 'ticket', id: 'parent-1', title: 'The epic' },
+        null, null, null, null, null, null, key, epic,
+      );
+    }
+  
+    it('maps a composed key and a visible grandparent through to the read', () => {
+      const mapped = mapTicketRead(
+        body('CCSO-1183', { kind: 'ticket', id: '01J9GEPIC00000000000000000', title: 'Open Questions' }),
+      );
+      expect(mapped.key).toBe('CCSO-1183');
+      expect(mapped.epic).toEqual({
+        kind: 'ticket',
+        id: '01J9GEPIC00000000000000000',
+        title: 'Open Questions',
+      });
+    });
+  
+    it('answers `null` for the wire`s null key — no key composed — rather than throwing', () => {
+      // THE CONTROL, and it runs before the refusal below through the same path.
+      expect(mapTicketRead(body(null, null)).key).toBeNull();
+      expect(mapTicketRead(body(null, null)).epic).toBeNull();
+    });
+  
+    it('REFUSES a body that OMITS the key — absent is not the same answer as null', () => {
+      const omitted = body(null, null);
+      delete omitted['key'];
+      expect(() => mapTicketRead(omitted)).toThrow(/ticket\.key/);
+      expect(() => mapTicketRead(omitted)).toThrow(MappingError);
+    });
+  
+    it('carries the grandparent`s RESTRICTED arm as existence-without-title', () => {
+      const mapped = mapTicketRead(body(null, { kind: 'restricted', id: '01J9GSECRET000000000000000' }));
+      // `toEqual` is exact, so a title travelling on this arm reddens — and the
+      // id it must carry is asserted in the same breath.
+      expect(mapped.epic).toEqual({ kind: 'restricted', id: '01J9GSECRET000000000000000' });
+    });
+  });
+
 });
 
 /**
@@ -2475,6 +2571,8 @@ describe('13.967 mapTicketRead carries assignedProvenance, and refuses a body wi
       assignedProvenance,
       parent: null,
       rollup: null,
+      key: null,
+      epic: null,
     };
   }
 

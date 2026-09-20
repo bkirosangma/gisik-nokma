@@ -611,15 +611,28 @@
   flex: 1;
 }
 
-/* `Workspace › Project › State`, the prototype's breadcrumb
-   (`:1101-1113`: `gap:6px`, `font-size:13px`, `line-height:18px`, the crumb
-   text in `--label2` and the separator in `--label3`).
+/* The prototype's breadcrumb (`:1101-1113`: `gap:6px`, `font-size:13px`,
+   `line-height:18px`, the crumb text in `--label2` and the separator in
+   `--label3`).
+
+   ⚠ THIS LINE READ *"`Workspace › Project › State`, the prototype's
+   breadcrumb"*, and the chain is the prototype's now in a way it was not
+   before: `workspace › project › [epic] › [parent] › key`
+   (`desktop.dc.html:3404-3425`), with NO state crumb. Corrected with the
+   change that built it rather than left to describe a bar that no longer
+   renders.
 
    BOTH ROLES LAND ON `--gn-surface-raised`, which is `.gn-sheet`'s own
    background, and every pair used here is ALREADY DECLARED in `CONTRAST_PAIRS`
-   — `textMuted`/`surfaceRaised` and `text`/`surfaceRaised` — so this adds no
-   undeclared co-occurring pair, which that array's own docblock names as "the
-   one thing this file exists to make impossible". */
+   — `textMuted`/`surfaceRaised`, `text`/`surfaceRaised`, and
+   `restricted`/`surfaceRaised` (`tokens.ts:1329`) — so this adds no undeclared
+   co-occurring pair, which that array's own docblock names as "the one thing
+   this file exists to make impossible".
+   ⚠ The `restricted` pair is the one this enumeration MISSED when it was
+   written: `.gn-ticket-sheet__crumb--restricted` below is new, and the
+   enumeration named two pairs where the block now uses three. The substantive
+   claim survives — all three are declared — but a reader checking the list
+   against the rules would have found a pair the sentence did not account for. */
 .gn-ticket-sheet__crumbs {
   display: flex;
   align-items: center;
@@ -632,13 +645,47 @@
 .gn-ticket-sheet__crumb-sep {
   color: var(--gn-text-muted);
 }
-/* The CURRENT position — the third crumb, and the prototype draws it
-   `font-weight:600;color:var(--label)` while the two before it are links
-   (`:1108-1110`). Ours are not links (nothing here navigates), so weight and
-   colour are the whole difference, and they are the prototype's. */
+/* The CURRENT position — the LAST crumb now, and the prototype draws it
+   `font-weight:600;color:var(--label)` while the crumbs before it are links
+   (`:1108-1110`). Weight and colour are the whole difference, and they are the
+   prototype's.
+   ⚠ UNTIL 2026-09-20 THIS COMMENT SAID *"Ours are not links (nothing here
+   navigates)"*, and that was true of the THREE-crumb bar it was written for:
+   workspace and project were plain spans and the state crumb was the current
+   position. The owner's ruling of 2026-09-20 replaced the state crumb with the
+   ticket key and put the ticket's ANCESTORS in front of it, and **every
+   ancestor crumb is now a link that opens that ticket's sheet** (the
+   authority's own `isLink` arm, `:3404-3425`). Corrected here rather than left
+   to mislead the next reader, which is the same reason the sentence is kept. */
 .gn-ticket-sheet__crumb--current {
   font-weight: 600;
   color: var(--gn-text);
+}
+/* An ANCESTOR crumb, which opens that ticket's sheet. A real `<button>` and
+   never a `role="button"` span — this repo's rule for a control — so the UA's
+   border, background and font are reset here exactly as
+   `button.gn-ticket-sheet__parent-chip` below resets them for the same reason.
+   `color: inherit` takes the nav's own `--gn-text-muted` on `--gn-surface-raised`
+   (`CONTRAST_PAIRS`), which is also what the prototype does: its `<a>` sits in a
+   nav declaring `color:var(--label2)` and sets no colour of its own (`:1101`,
+   `:1103`). Only the PLAIN-and-current crumb departs from it. */
+button.gn-ticket-sheet__crumb--link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+/* An ancestor the viewer may NOT see — existence-without-title, NAMED rather
+   than dropped. Dropping it would make a restricted chain read as a shorter
+   one, which is the vanish `invariant 5` forbids and the reason the parent
+   indicator has a restricted arm at all. It carries the same ink
+   `.gn-ticket-sheet__restricted` uses, so the two restricted statements on one
+   screen agree about what restricted looks like. Never a link: the viewer
+   cannot open what they cannot see. */
+.gn-ticket-sheet__crumb--restricted {
+  color: var(--gn-restricted);
 }
 
 /* THE TITLE AS A CONTROL — the prototype's `<input>` at `:1116`:
@@ -1768,24 +1815,38 @@
 .gn-ticket-sheet__provenance { color: var(--gn-text-muted); font-size: 0.85rem; }
 .gn-ticket-sheet__parent { margin: 0.6rem 0; color: var(--gn-text-muted); }
 .gn-ticket-sheet__restricted { color: var(--gn-restricted); }
-/* The subtasks section's header row, and the `Subtask of {parent}` chip that
-   shares it with the heading — the prototype's own row, not an invention
+/* The subtasks section's header row — the prototype's own row, not an invention
    (`desktop.dc.html:1237`, `align-items:baseline;gap:10px;flex-wrap:wrap`) — the
    row's own line, NOT `:1238`, which is the heading `<p>` it contains.
 
-   The chip itself IS `.gn-chip` above, unmodified. That class is this
-   product's port of this very element, so the prototype's per-INSTANCE ink and
-   size (`:1240` — `font-size:12px;font-weight:600;color:var(--accent)`) are NOT
+   ⚠ IT NO LONGER SEATS THE `Subtask of {parent}` CHIP, and the sentences that
+   said it did are corrected rather than left standing. The owner moved the badge
+   UP into the parent indicator on 2026-09-20 (*"there is already a
+   `gn-ticket-sheet__parent` section above. put the badge in that position
+   instead"*), so this row now holds one `<p>` and nothing else, and the
+   `gap`/`flex-wrap` above have nothing left to space apart. They are LEFT IN
+   PLACE because the element still renders — the rule is inert, not orphaned —
+   and removing them would be a layout change nothing here can witness.
+
+   The reset below is still needed and its SUBJECT moved with the chip: the
+   badge is drawn in the parent indicator now, and it is a `<button>` there when
+   `onOpenTicket` can honour it. The scoping is unchanged and is the point — a
+   `.gn-chip` `<span>` is not a control, so `cursor: pointer` on one would
+   advertise an affordance the no-callback arm does not have. Only
+   `button.gn-ticket-sheet__parent-chip` needs the UA's border and font-family
+   undone, because `.gn-chip` already wins the background and padding.
+   ⚠ The old text named *"the restricted arm"* as a second span that must not
+   look like a control. That arm is no longer a chip at all: a restricted parent
+   renders as `.gn-ticket-sheet__restricted` inside the indicator, so the
+   contrast the sentence drew no longer exists between two chips.
+
+   The chip itself IS `.gn-chip` above, unmodified — that class is this product's
+   port of this very element, so the prototype's per-INSTANCE ink and size
+   (`:1240` — `font-size:12px;font-weight:600;color:var(--accent)`) are NOT
    re-declared here: a second metric set for one chip is the display mapping
    that exists in exactly one place, which is what the invite role labels and
    `.gn-members__role` both refused. Two of the three are already reconciled the
    other way by `.gn-chip`'s own docblock (13px/18px) and its fill.
-
-   The reset is scoped to the BUTTON arm alone, and that scoping is the point: a
-   `.gn-chip` `<span>` is not a control, so giving it `cursor: pointer` would
-   advertise an affordance neither the restricted arm nor the no-callback arm
-   has. Only `button.gn-ticket-sheet__parent-chip` needs the UA's border and
-   font-family undone — `.gn-chip` already wins the background and padding.
 
    ⚠ THE REST OF THIS SECTION HAS NO RULE IN EITHER STYLESHEET — heading, list,
    empty state, add form and the refusal all render on UA defaults. Measured

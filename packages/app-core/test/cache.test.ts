@@ -180,6 +180,10 @@ describe('withCacheFeed — the decorator that keeps the cache fed from ordinary
         visibility: null,
         parent: null,
         rollup: null,
+        // No case in this file renders the sheet's breadcrumb; both crumb
+        // fields take the default a read that composed no key would carry.
+        key: null,
+        epic: null,
       }),
       getWorkflowDef: async () => WF_ERRAND,
     });
@@ -252,6 +256,8 @@ describe('withCacheFeed — the cache is never rendered as truth', () => {
           visibility: null,
           parent: null,
           rollup: null,
+          key: null,
+          epic: null,
         }),
       }),
       cache,
