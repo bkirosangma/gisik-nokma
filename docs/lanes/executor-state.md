@@ -46,6 +46,9 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > Branch **`exec/prototype-round`**, cut from **`origin/main` = `546c92f8`** (the `#586` merge). One PR,
 > `--base main`. **You do not merge.** The controller's dispatch of 2026-09-20 ~11:3x IST is the brief;
 > it carries the owner's two rulings of the same hour.
+> **THE CODE HEAD IS `39777648`** (the fix round); this handoff commit sits directly above it, and
+> `gh pr view --json headRefOid,baseRefName` settles anything else in one call. A commit cannot name its own
+> sha, so the head named here is the CODE head and not the tip — the same convention the previous round used.
 >
 > ## ⚠ THE VERSION QUESTION IS SETTLED, BY CONTENT, AND IT NEEDED NO PRODUCT CALL
 > The owner's attachment `/Users/kiro/Downloads/Gisik Nokma Desktop (1).html` (565,271 B, mtime 09-15 14:09,
@@ -95,25 +98,31 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > no orphaned workers.**
 >
 > ## ANCHORS, RECOUNTED AT THIS TREE
-> - **gate** `pnpm turbo run build test typecheck`: **EXIT=0 · 33/33 · 16 cache misses · 1m17s · Node
->   v22.22.2**, run AT THE FROZEN HEAD `981aa92b` — a near-full re-run across `ui`, `app-core`, `web`,
->   `desktop`, `mobile` and `server`, not a replay. `server#test`: **154 files / 1620 passed / 5 skipped**
->   — matching this file's own recorded figures. An earlier run of the same gate at the same code content
->   read `33/33 · 32 cached · 31.9s`; the frozen-head run is the stronger of the two and is the one quoted.
+> - **gate** `pnpm turbo run build test typecheck`: **EXIT=0 · 33/33 · 15 cached · 1m22s · Node v22.22.2**,
+>   run at the CODE head `39777648`'s content, after the fix round. **Two earlier runs exist and neither is
+>   the one to quote**: the first was RED on a load-induced `server#test` timeout (below), and the second,
+>   at the pre-fix content, read `33/33 · 32 cached · 31.9s`. `server#test`: **154 files / 1620 passed /
+>   5 skipped** — matching this file's own recorded figures.
 > - ⚠ **THE FIRST GATE RUN WAS RED AND IT WAS NOT MINE.** `server#test` → `12.291 the walk is capped at
 >   GRANT_BACKFILL_MAX_TICKETS` hit its **30 000 ms timeout**. It passes in **883 ms** in isolation, and the
 >   box was loaded (a `next dev` of mine plus the docker stack plus 667 s of test CPU). **A timeout under load
 >   is not a defect; re-run before believing a red.**
-> - `check-case-ids` **2495 unique, highest `16.83`** — moved from `2494`/`16.82` by EXACTLY the one id added.
->   `check-case-citations` **ok**, `16-remaining-doors.md` **48 → 49 cited**. Both ran at this tree.
+> - `check-case-ids` **2495 unique, highest `16.83`** — moved from `2494`/`16.82` by EXACTLY the one id
+>   added. `check-case-citations` **ok**, `16-remaining-doors.md` **48 → 49 cited**. Both re-run after the fix
+>   round; neither figure moved, because the fix round changed prose and assertions, not ids.
 > - **`origin/main` MOVED UNDER THIS ROUND**: `0ea15006` → **`546c92f8`** while the work was in flight. The
 >   two intervening commits touch **only** `docs/lanes/controller-state.md` and `docs/lanes/task-ledger.tsv`
->   — **disjoint from all four files in this diff**, so no gate result was invalidated. Checked, not assumed.
-> - The diff is five files: `packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx`, `Features.md`,
->   `test-cases/16-remaining-doors.md`. `reference/` untouched. No product source changed.
+>   — **disjoint from every file in this diff**, so no gate result was invalidated. Checked, not assumed.
+>   (It has since moved AGAIN to `1391aef3`; those commits touch `README.md`, `docs/faq.md`, `docs/manual.md`,
+>   `docs/product-coverage-map.md`, `packages/app-core/src/help/content.generated.ts` and executor 2's own
+>   handoff — **again disjoint**, and `merge-tree --write-tree` predicts a CLEAN merge, exit 0, no markers.)
+> - The diff is **five files** — `packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx`,
+>   `Features.md`, `test-cases/16-remaining-doors.md`, and this file. **No product source changed.**
+>   `reference/` untouched. (`globals.css` was MUTATED by the reviewer and by me to plant M7, and both times
+>   restored by checksum-verified copy — `git status` is clean of it, verified after each restore.)
 >
 > ## CASE 16.83, AND THE EIGHT MUTATIONS
-> Pinned in `packages/ui/test/components.test.tsx`. **Mutation-witnessed six ways and each dies on ITS OWN
+> Pinned in `packages/ui/test/components.test.tsx`. **Eight now — the first six each died on ITS OWN
 > assertion** — rule deleted (`rule()` throws), fill swapped, `2.75rem → 32px`, a `[data-style="neo"]`
 > override added, `:disabled 0.4 → 0.55`, `<li>` taken off `display: flex` — with the unmutated control
 > GREEN and the file restored by **checksum-verified copy, never a blanket `git checkout`** (the #584 lesson).
