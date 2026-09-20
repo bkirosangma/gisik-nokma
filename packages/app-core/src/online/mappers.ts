@@ -1,10 +1,11 @@
-import { isRankKey } from '@gisik-nokma/domain';
+import { isRankKey, VISIBILITY_MODES } from '@gisik-nokma/domain';
 import type {
   FieldClaim,
   IngestResult,
   StateCategory,
   TicketState,
   TicketTypeDef,
+  VisibilityMode,
   WorkflowDef,
 } from '@gisik-nokma/domain';
 import type {
@@ -24,6 +25,7 @@ import type {
   MyWorkView,
   ParentRef,
   ProjectViewPrefs,
+  ResolvedVisibilityMode,
   RollupToViewer,
   RosterMember,
   SavedFilter,
@@ -31,6 +33,7 @@ import type {
   TicketHistoryEvent,
   TicketListView,
   TicketRead,
+  TicketVisibility,
   TransitionCause,
   UserPreferences,
   WorkItem,
@@ -1818,13 +1821,39 @@ function mapParentRef(raw: unknown, path: string): ParentRef {
  * set), and so is the visible parent's `title`, which the client's `ParentRef`
  * requires and which was not in the recorded absence list at all.
  *
- * ## The wire key is `ticketState`, and the client field is `ticket`
+ * ## Two wire keys, and BOTH are read
  *
  * The route kept its original `ticket` — the `proj_visibility` row whose column
  * allow-list is argued column by column in `routes/tickets.ts` — and added the
  * domain state beside it rather than swapping it out. Renaming a key is exactly
- * what this module is for, and it is not a serving gap; the visibility row is
- * read by nothing here.
+ * what this module is for, and it is not a serving gap.
+ *
+ * **⚠ CORRECTED 2026-09-20.** This paragraph ended *"...and it is not a serving
+ * gap; the visibility row is read by nothing here."* The second clause was true
+ * when written and is false now: the row's two MODE columns reach the sheet as
+ * `TicketRead.visibility` (`mapTicketVisibility` below).
+ *
+ * ## Two rosters, and only one of them is cut — an earlier draft of this
+ * ## paragraph conflated them, so the distinction is written down here
+ *
+ * `proj_visibility`'s `own_user_ids` / `resolved_user_ids` are **derived
+ * projection state**, and `toTicketView` cuts them at every call site
+ * (`routes/tickets.ts:111-114`: *"an explicit audience ROSTER, a disclosure no
+ * plan authorized"*). That is why `TicketVisibility` has no roster member: the
+ * absence is in the shape rather than papered over.
+ *
+ * ⚠ **But the roster as a CLAIM does leave the server, by design, and an earlier
+ * draft of this paragraph said it "never leaves the server at all" — that was
+ * false.** `visibility.set` carries `userIds` in its own payload
+ * (`packages/domain/src/events/visibility.ts:36`), and the history read serves
+ * payloads verbatim: `toHistoryEvent` maps `payload: row.payload` with no
+ * redaction (`routes/ticket-history.ts:176-194`), and `/events` does the same
+ * (`routes/tickets.ts:519-527`). **This is not a leak to close.** The route's own
+ * allow-list docblock draws the line and says which way to cut it — *"Those are
+ * PROVENANCE — an attributed claim somebody made ... Cut derived state; never cut
+ * a claim."* What is cut is the resolved COLUMN; what is served is the event that
+ * set it. Conflating those two is the one mistake this endpoint's docblock was
+ * written to prevent.
  *
  * ## The rule these titles are served under, named
  *
@@ -1834,6 +1863,57 @@ function mapParentRef(raw: unknown, path: string): ParentRef {
  * guard said yes about THIS ticket; the parent's travels only inside the branch
  * where it said yes about the PARENT. No new rule was authored to serve either.
  */
+/** The three `proj_visibility` can resolve to; `inherit` is not one of them. */
+const RESOLVED_VISIBILITY_MODES: readonly string[] = VISIBILITY_MODES.filter(
+  (mode) => mode !== 'inherit',
+);
+
+function asVisibilityMode(value: unknown, path: string): VisibilityMode {
+  const text = asString(value, path);
+  if (!(VISIBILITY_MODES as readonly string[]).includes(text)) {
+    throw new MappingError(path, `one of ${VISIBILITY_MODES.join('/')}`);
+  }
+  return text as VisibilityMode;
+}
+
+function asResolvedVisibilityMode(value: unknown, path: string): ResolvedVisibilityMode {
+  const mode = asVisibilityMode(value, path);
+  if (mode === 'inherit') {
+    throw new MappingError(path, `one of ${RESOLVED_VISIBILITY_MODES.join('/')}`);
+  }
+  return mode;
+}
+
+/**
+ * The `proj_visibility` row's two MODE columns, and only those.
+ *
+ * The route's own key for this row is `ticket` — the name the domain state used
+ * to hold alone before `ticketState` was added beside it — so a refusal here
+ * reads `ticket.own_mode`, the wire's spelling rather than this client's. That
+ * is what `MappingError` paths are for.
+ *
+ * ## Strict, on the same rule `assignedProvenance` is mapped under
+ *
+ * The route emits this row on EVERY answer of this endpoint, so a body without
+ * it is not a narrower server — it is a body this client cannot read. Tolerating
+ * it would fold "the field was missing" into the one thing `TicketRead.
+ * visibility`'s `null` is reserved for, *"this read carried no visibility row"*,
+ * which is the replica's honest answer and must not be reachable from a garbled
+ * response. Both columns are therefore REQUIRED.
+ *
+ * `resolved_mode` is refused when it says `inherit`: `proj_visibility` walks the
+ * inherit chain at write time and cannot produce one, so a wire that says it is
+ * not describing this product's projection. `own_mode` may say it — that is what
+ * a ticket is born with.
+ */
+function mapTicketVisibility(raw: unknown, path: string): TicketVisibility {
+  const row = asRecord(raw, path);
+  return {
+    ownMode: asVisibilityMode(row['own_mode'], `${path}.own_mode`),
+    resolvedMode: asResolvedVisibilityMode(row['resolved_mode'], `${path}.resolved_mode`),
+  };
+}
+
 export function mapTicketRead(raw: unknown, roster: ReadonlyMap<string, string> = new Map()): TicketRead {
   const record = asRecord(raw, 'ticket');
   return {
@@ -1848,6 +1928,10 @@ export function mapTicketRead(raw: unknown, roster: ReadonlyMap<string, string> 
       record['assignedProvenance'] === null
         ? null
         : mapProvenance(record['assignedProvenance'], 'ticket.assignedProvenance', roster),
+    // The audience MODE, finally read. `record['ticket']` has been on this wire
+    // since the endpoint existed and nothing on this side looked at it; the
+    // sheet's "Who can see this" section was the surface that needed it.
+    visibility: mapTicketVisibility(record['ticket'], 'ticket'),
     parent: mapParentRef(record['parent'], 'ticket.parent'),
     rollup: mapRollup(record['rollup'], 'ticket.rollup'),
   };

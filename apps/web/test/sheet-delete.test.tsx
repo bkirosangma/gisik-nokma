@@ -103,6 +103,8 @@ function ticketRead(): TicketRead {
       serverTime: '2026-09-19T08:00:00.000Z',
     },
     assignedProvenance: null,
+    // No case here reads the audience, and a fake carries no visibility row.
+    visibility: null,
     // A ROOT ticket with no children — the absent half of both refs, and the
     // shape `subtasksIncomplete` reads (`rollup === null` means zero expected).
     parent: null,

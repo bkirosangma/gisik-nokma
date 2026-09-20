@@ -306,15 +306,21 @@ describe('3.110 a refusal reaches the screen in the authority’s own words', ()
   });
 });
 
-describe('3.111 the standing audience is UNSERVED, and the absence says so', () => {
+describe('3.111 the standing audience — served where it is served, absent where it is not', () => {
   /**
-   * PLANTED DEFECT: drawing "Whatever the parent decided" for a read nobody
-   * served would be this component asserting a mode nobody claimed, on the one
-   * surface whose subject is who may see what. `inherit` is what a ticket is
-   * BORN with, so the invented default is also the plausible one — which is
-   * exactly why it must not be drawn.
+   * PLANTED DEFECT: drawing a MODE for a read that carried no row would be this
+   * component asserting an audience nobody claimed, on the one surface whose
+   * subject is who may see what. `inherit` is what a ticket is BORN with, so
+   * the invented default is also the plausible one — which is exactly why it
+   * must not be drawn.
+   *
+   * **⚠ 2026-09-20 — this case's REACH changed and its defect did not.** It used
+   * to describe every production state, because nothing read the audience mode
+   * off the wire. The mode is read now (`TicketRead.visibility`), so this arm is
+   * reached only by a read that carried no row at all — the offline replica, or
+   * a `null` override here. A defaulted mode is still a mode nobody claimed.
    */
-  it('renders the absence, and does NOT render a mode, when nothing served the current audience', () => {
+  it('3.111 renders the absence, and NOT a mode, when no read carried the audience', () => {
     mount({ current: null });
     expect(screen.getByRole('status')).toHaveTextContent('not being served yet');
     // The control labels exist (they are the picker); what must not exist is a
@@ -323,8 +329,12 @@ describe('3.111 the standing audience is UNSERVED, and the absence says so', () 
   });
 
   it('3.111 renders a served claim with its actor and the server’s clock', () => {
+    // The two modes DIFFER on purpose: the ticket claims `inherit` and the
+    // audience in force is the explicit list. A render that reported the own
+    // mode would say "Whatever the parent decided" here — see 3.170.
     const claim: VisibilityClaim = {
-      mode: 'explicit',
+      ownMode: 'inherit',
+      resolvedMode: 'explicit',
       userIds: [ANSELMA, DIPU],
       claim: {
         actorId: KIRO,
@@ -344,7 +354,8 @@ describe('3.111 the standing audience is UNSERVED, and the absence says so', () 
   it('3.111 names the people rather than counting them', () => {
     mount({
       current: {
-        mode: 'explicit',
+        ownMode: 'explicit',
+        resolvedMode: 'explicit',
         userIds: [ANSELMA],
         claim: {
           actorId: DIPU,
@@ -359,5 +370,98 @@ describe('3.111 the standing audience is UNSERVED, and the absence says so', () 
     expect(standing?.textContent).not.toContain('1 person');
     // A nameless actor renders by id, never blank and never "system".
     expect(standing?.textContent).toContain(DIPU);
+  });
+
+  /**
+   * 3.170 — the standing line answers "who can see this" with the audience IN
+   * FORCE, and `proj_visibility` is what resolved it.
+   *
+   * PLANTED DEFECT: reading `ownMode` here. "Whatever the parent decided" is a
+   * true statement about the ticket's own claim and a useless answer to the
+   * question the section asks — and on a ticket that HAS no parent it is not
+   * even informative.
+   */
+  it('3.170 reports the audience in force, not the mode the ticket itself claims', () => {
+    mount({ current: { ownMode: 'inherit', resolvedMode: 'project', userIds: null, claim: null } });
+    const standing = document.querySelector('.gn-visibility__standing');
+    expect(standing?.textContent).toContain('Everyone on the project');
+    expect(standing?.textContent).not.toContain('Whatever the parent decided');
+  });
+
+  /**
+   * 3.171 — the picker is seeded from the ticket's OWN claim.
+   *
+   * PLANTED DEFECT: seeding from the resolved audience. The picker is what a
+   * `visibility.set` on THIS ticket would assert, so a ticket whose own mode is
+   * `inherit` must not open with "Everyone on the project" checked — pressing
+   * Apply would then FILE that claim, and the user would have made it by not
+   * touching anything.
+   */
+  it('3.171 seeds the picker from the ticket’s own mode, never from the resolved audience', () => {
+    mount({ current: { ownMode: 'inherit', resolvedMode: 'project', userIds: null, claim: null } });
+    expect(screen.getByRole('radio', { name: 'Whatever the parent decided' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Everyone on the project' })).not.toBeChecked();
+  });
+
+  /**
+   * 3.172 — an `explicit` audience whose ROSTER is not served.
+   *
+   * The roster is cut from the wire by a standing disclosure ruling
+   * (`routes/tickets.ts:111-114`), so this is the production shape for every
+   * explicit ticket. The mode is named and the names are not, and the section
+   * has to SAY so: "Only: the people this ticket names" without the clause
+   * beside it is a partial answer wearing the shape of a complete one — a
+   * reader cannot tell a list withheld by policy from one nobody drew.
+   */
+  it('3.172 an explicit audience with no roster names the mode and says the list is not served', () => {
+    mount({
+      current: { ownMode: 'explicit', resolvedMode: 'explicit', userIds: null, claim: null },
+    });
+    const standing = document.querySelector('.gn-visibility__standing');
+    expect(standing?.textContent).toContain('Only: the people this ticket names');
+    expect(standing?.querySelector('.gn-visibility__roster-unserved')).not.toBeNull();
+    // NOT a dangling `Only: `, and never a name: nothing here knows one.
+    expect(standing?.textContent).not.toContain('Anselma Marak');
+    expect(standing?.textContent?.trim()).not.toBe('Only:');
+  });
+
+  /**
+   * 3.177 — an `explicit` audience whose roster is EMPTY, not `null`.
+   *
+   * The domain refuses this shape outright (`visibilitySetPayload`: an audience
+   * of nobody *"reads as a restriction that hides the ticket from everyone
+   * including its author"*) and the sheet passes `null`, never `[]` — so it is
+   * not reachable from a shipped read. It is asserted anyway because **the prop
+   * admits `string[]`**, and the defect it guards is the one two separate guards
+   * produce the moment they disagree: the sentence suppressing `Only: ` under
+   * one condition while the clause explaining the absence lives under another.
+   * The result is a dangling `Only: ` with nothing after it and nothing saying
+   * why — a partial answer that looks like a complete one, which is the exact
+   * failure the clause was added to prevent.
+   *
+   * Found by the reviewer on 2026-09-20 as a latent coupling, not a live defect.
+   */
+  it('3.177 an explicit audience with an EMPTY roster is treated as unserved, not as a dangling Only:', () => {
+    mount({ current: { ownMode: 'explicit', resolvedMode: 'explicit', userIds: [], claim: null } });
+    const standing = document.querySelector('.gn-visibility__standing');
+    expect(standing?.textContent).toContain('Only: the people this ticket names');
+    expect(standing?.querySelector('.gn-visibility__roster-unserved')).not.toBeNull();
+    expect(standing?.textContent?.trim()).not.toBe('Only:');
+  });
+
+  /**
+   * 3.173 — a read that served no provenance renders no attribution.
+   *
+   * PLANTED DEFECT: rendering the clause anyway. `claim` is `null` for every
+   * production read — who set the audience is on the LEDGER, not in the
+   * projection the ticket read is built from — so the alternatives are a
+   * non-null assertion that throws, or an actor invented to fill the gap.
+   */
+  it('3.173 renders no attribution clause when the read served no provenance', () => {
+    mount({ current: { ownMode: 'project', resolvedMode: 'project', userIds: null, claim: null } });
+    const standing = document.querySelector('.gn-visibility__standing');
+    expect(standing?.textContent).toContain('Everyone on the project');
+    expect(standing?.querySelector('.gn-visibility__standing-claim')).toBeNull();
+    expect(standing?.textContent).not.toContain('set by');
   });
 });

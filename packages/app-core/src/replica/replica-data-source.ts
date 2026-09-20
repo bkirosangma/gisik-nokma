@@ -1125,6 +1125,24 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
         title: titleOf(state),
         stateProvenance: claims.state,
         assignedProvenance: claims.assigned,
+        // `null` — the honest answer, and NOT a stand-in for a mode. The local
+        // read models are folded from the event stream by the domain reducer,
+        // and `visibility.set` is deliberately one of the three ticket-entity
+        // types that reducer does not fold (`ticket-state.ts`: it moves no head
+        // state). So a device knows the mode only if something else delivers it,
+        // and nothing does: the bootstrap backfill carries the event
+        // (`sync-routes.ts`'s `BOOTSTRAP_BACKFILL_TYPES`) but no folded column
+        // holds its result. Answering a mode here would mean the replica
+        // re-deriving visibility resolution — the inherit chain — locally, which
+        // is a second implementation of `proj_visibility` and the drift this
+        // client's one-decision-function rule exists to prevent.
+        //
+        // The consequence is visible and bounded: offline, the sheet's "Who can
+        // see this" section renders its absence sentence, exactly as it did
+        // before the online read carried the mode. Owner for delivering it
+        // offline, if that is wanted: whoever owns the replica's snapshot
+        // payload — the same door ruling P36 opened for state provenance.
+        visibility: null,
         parent,
         rollup: null,
       };

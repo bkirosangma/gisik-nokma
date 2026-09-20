@@ -93,6 +93,10 @@ const PARENT_READ: TicketRead = {
   // This fixture's ticket has never been assigned, so there is no claim
   // behind an assignee: `null` is the whole truth (`read/assigned-provenance.ts`).
   assignedProvenance: null,
+  // This fixture is about the close/reopen round-trip and no case here reads the
+  // audience; `null` is the honest "this fake carried no visibility row" rather
+  // than a mode invented for a ticket whose fixture says nothing about one.
+  visibility: null,
   parent: null,
   rollup: null,
 };
@@ -114,6 +118,8 @@ const CLOSED_PARENT_READ: TicketRead = {
   // This fixture's ticket has never been assigned, so there is no claim
   // behind an assignee: `null` is the whole truth (`read/assigned-provenance.ts`).
   assignedProvenance: null,
+  // As `PARENT_READ` above: no case in this file reads the audience.
+  visibility: null,
   parent: null,
   rollup: null,
 };

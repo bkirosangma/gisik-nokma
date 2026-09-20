@@ -159,6 +159,10 @@ function ticketRead(): TicketRead {
       serverTime: '2026-09-19T08:00:00.000Z',
     },
     assignedProvenance: null,
+    // No case here reads the audience, and this fixture stands in for a read
+    // that carried no visibility row — the honest `null` rather than a mode
+    // invented for a ticket whose fixture says nothing about one.
+    visibility: null,
     parent: { kind: 'ticket', id: PROJECT, title: 'Registrations' },
     rollup: null,
   };
