@@ -3,6 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BACKLOG_STATE_ID, type TicketTypeDef } from '@gisik-nokma/domain';
 import type { BoardCard, BoardView, ClaimProvenance, ListRow, TicketListView } from '@gisik-nokma/app-core';
+// Value import, deliberately: 13.1046 asserts the same string that renders rather
+// than a re-typed copy of it — two spellings of one sentence is how a copy change
+// passes a test it broke (`EMPTY_BOARD_COPY`'s own docblock, one constant over).
+import { EMPTY_COLUMN_COPY } from '@gisik-nokma/app-core';
 import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
 
@@ -233,6 +237,55 @@ describe('13.1043 the all-epic Board falls to the empty copy — recorded, owner
     await screen.findByRole('searchbox');
     expect(await screen.findByText('No tickets here yet — create one.')).toBeInTheDocument();
     expect(screen.queryByText('The epic')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 13.1046 — THE FOURTH EMPTY STATE, AND THE ONE `#602` DID NOT MINT.
+ *
+ * The SAME `boardNarrowing` pass that drops the epic from the grid drops it from
+ * `column.cards` too, so a column whose only card was an epic now renders
+ * `EMPTY_COLUMN_COPY`. `boardOf` above always builds a `Doing` column, so the fixture
+ * 13.1043 already uses **is** an all-epic board with a workflow attached — that case
+ * simply never asserts the region, which is how this site went unminted. **The two
+ * sentences render on ONE screen**: 13.1043's whole-board copy sits above a rail of
+ * columns, each saying this one.
+ *
+ * ⚠ ITS OWN ARM, DELIBERATELY — and this is a correction, not tidiness. The first
+ * version of this measurement asserted both sentences in ONE test with the BOARD
+ * first. Under a mutation the board assertion failed and aborted the test before this
+ * one ran, so the run proved the TEST was sensitive while leaving THIS claim
+ * unwitnessed. **An assertion above another masks it; a red test can be as silent as a
+ * green one about the line you care about.**
+ */
+describe('13.1046 the all-epic board draws a column, and that column says EMPTY_COLUMN_COPY — recorded, owner: the owner', () => {
+  it('draws the Doing region and renders EMPTY_COLUMN_COPY inside it', async () => {
+    render(
+      <Providers services={servedWorld({ cards: [EPIC_CARD] })}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByRole('searchbox');
+
+    // The rail must exist for the assertion below to be about it at all.
+    const doing = await screen.findByRole('region', { name: 'Doing' });
+    expect(within(doing).getByText(EMPTY_COLUMN_COPY)).toBeInTheDocument();
+  });
+
+  /**
+   * THE CONTROL, on the same fixture and one card different: with a TASK sitting in
+   * the column it is not empty and no column sentence renders. Without this arm the
+   * assertion above would be indistinguishable from a query that cannot fail.
+   */
+  it('13.1046 CONTROL — the same fixture with a TASK card renders no column sentence', async () => {
+    render(
+      <Providers services={servedWorld({ cards: [TASK_CARD] })}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByRole('searchbox');
+    expect(await screen.findByText('Restock the cold shelf')).toBeInTheDocument();
+    expect(screen.queryByText(EMPTY_COLUMN_COPY)).toBeNull();
   });
 });
 

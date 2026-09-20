@@ -2182,8 +2182,9 @@ question. All three read as green.
 
 ## An epic is a row in the List and nowhere else (owner, 2026-09-20)
 
-Block `13.1034`–`13.1049` is this executor's for this work; `13.1046`–`13.1049` are reserved and
-deliberately unused. Suite: `packages/app-core/test/calendar/calendar-model.test.ts`,
+Block `13.1034`–`13.1049` is this executor's for this work; `13.1047`–`13.1049` are reserved and
+deliberately unused. **`13.1046` was minted on the controller's instruction (2026-09-20)** — see that case
+for why the count of empty-state residuals is four and not the three the dispatch assumed. Suite: `packages/app-core/test/calendar/calendar-model.test.ts`,
 `packages/app-core/test/timeline/timeline-model.test.ts`,
 `apps/web/test/epics-not-rows.test.tsx`. All under Node v22.22.2.
 
@@ -2235,6 +2236,16 @@ as a narrowing, which keeps `CALENDAR_ALL_HIDDEN_COPY` gated off.
 - **13.1045** ❌ RECORDED, NOT FIXED — a calendar month or timeline window emptied only by this rule
   reaches a sentence whose list of causes does not name it. Owner: the owner, by way of whoever next owns
   those empty states. No test: the honest sentence would be new user-facing copy, and copy is the owner's.
+- **13.1046** ✅ RECORDED, NOT FIXED — a board COLUMN whose only ticket is an epic now reaches
+  `EMPTY_COLUMN_COPY` (*"No tickets in this column."*) over a column that holds one. **The same ruling makes
+  the same screen say it twice**: 13.1043's whole-board sentence renders above a rail of columns, and an
+  all-epic project with a workflow attached draws that rail, so one screen carries both. Its docblock
+  already concedes the sentence names no reason, and justifies the silence with *"it says only what is true
+  whether or not a filter is active"* — **this rule breaks that justification**, because no filter is
+  involved: the column holds a ticket the board will not draw. Owner: the owner, by way of whoever next owns
+  the board's empty states. ⚠ **Minted on the controller's instruction (2026-09-20) after this executor
+  measured the site and asked rather than assuming §6's "delta ZERO" covered the whole set** — `#602` minted
+  nothing for it, and the fourth sentence is part of the same owner question as the other three.
 
 ⚠ **THE MUTATION BATTERY IS THE EVIDENCE, AND IT FOUND THREE THINGS.** Eight mutations, one per view plus
 one that isolates each fold's count term; each reddens its OWN view's cases and no other's. **M3 survived

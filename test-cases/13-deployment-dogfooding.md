@@ -138,8 +138,8 @@ generalisation, 13.201–13.203, once `13.1–13.40` was confirmed exhausted; La
 the controller for another rather than borrowing a neighbour's.**
 
 **`13.1034`–`13.1049` is ALLOCATED to executor 1 (controller dispatch, 2026-09-20) for the owner's
-"epics leave the Board, Calendar, Timeline and Backlog" request — `13.1034`–`13.1045` minted by it,
-`13.1046`–`13.1049` reserved and deliberately unused.** The block was taken rather than derived: 13.1033
+"epics leave the Board, Calendar, Timeline and Backlog" request — `13.1034`–`13.1046` minted by it,
+`13.1047`–`13.1049` reserved and deliberately unused.** The block was taken rather than derived: 13.1033
 was the maximum in use in section 13 when it was cut, recounted at `origin/main`, and **a bare "next free
 N" is a reading that expires — which is why a lane takes a BLOCK.**
 
