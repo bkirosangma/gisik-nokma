@@ -323,10 +323,13 @@ export function buildCalendarModel(
   const hasItems = weeks.some((week) => week.items.length > 0);
   /**
    * The distinction the plan's model would have collapsed: if the grid is
-   * empty ONLY because the viewer hid the fields whose claims fall in it,
-   * saying "no claimed dates fall in this month" would tell them their own
-   * claims do not exist. Measured against the same grid bounds the tally
-   * uses, so the sentence and the switches describe the same set.
+   * empty ONLY because the viewer hid the fields whose claims fall in it, the
+   * fallback's "nothing is drawn here" would tell a viewer their own claims do
+   * not exist. Measured against the same grid bounds the tally uses, so the
+   * sentence and the switches describe the same set.
+   *
+   * ⚠ "ONLY" is doing load-bearing work and is NOT enforced across the page's
+   * upstream pruning — see the precedence note at the bottom of this function.
    */
   const hiddenInGrid = customItems.some(
     (item) =>
@@ -384,10 +387,29 @@ export function buildCalendarModel(
    *
    * The alternative — reaching `CALENDAR_ALL_HIDDEN_COPY` whenever
    * `hiddenInGrid`, guard deleted — is what "delete the sentence, keep nothing"
-   * would have produced. It is indistinguishable today (no app passes a filter,
-   * so `narrowedOutOfGrid` is false everywhere `hiddenInGrid` is measured) and
-   * becomes a lie the day a lane filter is wired, which is the day this arm was
-   * written for. `narrowedAway`/`excluded` above therefore still have a reader.
+   * would have produced, and it would be indistinguishable TODAY: no app passes
+   * a filter, so `narrowedOutOfGrid` is false everywhere `hiddenInGrid` is
+   * measured. `narrowedAway`/`excluded` above therefore still have a reader.
+   *
+   * ⚠ **BUT THIS GUARD IS INERT IN EVERY SHIPPED APP, AND THAT IS A LIVE
+   * OVERCLAIM RATHER THAN A FUTURE ONE — recorded by a reviewer 2026-09-20,
+   * measured, and NOT fixed here.** The guard can only see what the MODEL
+   * narrowed. The page's own `datesNarrowing` prunes rows UPSTREAM (a filter,
+   * and the closed-hidden-by-default rule), so those claims never reach
+   * `inputs`, never enter `excluded`, and never make `narrowedOutOfGrid` true —
+   * while `hiddenInGrid` is computed over what did arrive. A viewer who hides a
+   * legend field holding an in-grid claim, in a month that ALSO holds claims on
+   * closed or filtered-away jobs, therefore reaches "EVERY claimed date in this
+   * month belongs to a field you have hidden" — false on both clauses, and the
+   * one switch it offers does not bring the missing claims back.
+   *
+   * **Owner: the owner, by way of whoever next owns the calendar's empty
+   * states.** The repair is a design decision, not a typo: either the page
+   * tells the view that something was pruned before the model saw it (a coarse
+   * flag, and coarse in the direction the `CALENDAR_EMPTY_MONTH_COPY` note
+   * explains is not good enough for the FALLBACK sentence), or this sentence
+   * stops claiming exhaustivity. Fixing it in passing would pre-empt a ruling
+   * of the same shape as the one this branch exists to implement.
    */
   return {
     month: { year: opts.year, month: opts.month },

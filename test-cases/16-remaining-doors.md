@@ -567,13 +567,23 @@ the filter"*, on an item whose recorded shape was *"three sentences in code, two
   ⚠ **The assertion is on the WORD (`'your filter'`), and on the reference's honesty note surviving
   (`'Undated work is absent, not estimated'`).** Pinning the whole string would pin wording, not the
   ruling's property — and the second assertion is load-bearing for someone else's case: `11.186`/`11.187`
-  assert that same substring is ABSENT while a read is in flight, and would have gone vacuous had this
-  copy stopped containing it anywhere. Both `docs/manual.md` and `docs/faq.md` had **documented this
+  assert that same substring is ABSENT while a read is in flight; **that one assertion** would have gone
+  unfailable had this copy stopped containing the substring. (⚠ The first draft said "those cases would
+  have gone vacuous" — the reviewer refuted it: the `.gn-calendar` / `.gn-timeline` assertions in the
+  same cases still catch the defect they name. The refinement matters, because the stronger claim is the
+  one that overstated.) Both `docs/manual.md` and `docs/faq.md` had **documented this
   sentence as the product's known lie** ("the first one is wrong more often than it looks … trust the
   count in the strip instead"); both are corrected in the same change set, and `content.generated.ts` is
   regenerated (`check:help` 231 entries, delta 0 — no heading moved).
-  **No test watched the copied string before this case**, which is why nothing else objecting is not
-  evidence that the sentence was right.
+  ⚠ **Corrected 2026-09-20 by the reviewer, and the correction is the point.** This paragraph first
+  read *"No test watched the copied string before this case"* — **which was FALSE**, and false in the
+  direction that flatters a change. `claim-labels.test.ts`'s **11.1 pinned this exact string** before
+  the ruling, and this branch's diff *edits that expectation*: the sentence was watched, and the watch
+  had to be updated. The true statement is about the OTHER sentence in this dispatch — the
+  `page.tsx` project-creation refusal, for which **no test watched it in either direction** (measured
+  with a control that fired, and separately by a reviewer's gibberish-probe). Two different strings,
+  one paragraph, and conflating them is how a "nothing watched this" claim gets asserted where it
+  isn't true.
 
 ## `hig-per-screen/3b` — Members states (executor 1, 2026-09-20) — cases `16.61`–`16.80`
 

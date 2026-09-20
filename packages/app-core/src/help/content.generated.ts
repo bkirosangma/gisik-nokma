@@ -3519,7 +3519,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "When the legend is the only thing hiding your claims, it says so specifically instead"
+                    "text": "When a date field you switched off is hiding claims in this month, a different sentence says so"
                   },
                   {
                     "kind": "text",
@@ -3531,20 +3531,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — because that is the one case where the month is full and one switch brings all of it back."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
+                    "text": ". "
+                  },
                   {
                     "kind": "bold",
-                    "text": "So do not read the first sentence as \"nothing is here\"."
+                    "text": "Read that one carefully: it claims ALL of the month's claims, and the calendar only knows about the claims it was given."
                   },
                   {
                     "kind": "text",
-                    "text": " Trust the count in the strip as well: "
+                    "text": " If closed jobs, or work your filter removed, also have claims in this month, switching the field back on will not bring those back. "
                   },
                   {
                     "kind": "italic",
@@ -3552,7 +3547,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " means four jobs are there and something is hiding them."
+                    "text": " in the strip tells you what the filters left — that count cannot see the legend switches, because those live only in this view."
                   }
                 ]
               }
@@ -8918,7 +8913,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The sentence names what can hide a claim: your filter, closed jobs being hidden, or a date field you switched off with the legend switch. It also says \"Undated work is absent, not estimated\" — the calendar draws only what someone claimed. When the legend is the only thing hiding your claims it says so specifically instead, because that month is full and one switch brings all of it back — and the count in the strip tells you either way: if it shows fewer jobs than the project holds, something is hiding them."
+                    "text": "The sentence names what can hide a claim: your filter, closed jobs being hidden, or a date field you switched off with the legend switch. It also says \"Undated work is absent, not estimated\" — the calendar draws only what someone claimed. When a date field you switched off is hiding claims here, a different sentence says so, and it claims "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "ALL"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " of the month's claims — so treat that one carefully: the calendar only knows about the claims it was given, and closed or filtered-away jobs are not among them. The count in the strip tells you what the filters left behind; it cannot see the legend switches, which live only in this view."
                   }
                 ]
               }

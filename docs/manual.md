@@ -720,12 +720,12 @@ hidden, or a date field you switched off in the legend. It goes on to say *"Unda
 estimated"* — the calendar draws only what someone claimed, and an undated job is not estimated onto a day
 nobody gave it.
 
-**When the legend is the only thing hiding your claims, it says so specifically instead** — *"Every claimed
-date in this month belongs to a field you have hidden"* — because that is the one case where the month is
-full and one switch brings all of it back.
-
-**So do not read the first sentence as "nothing is here".** Trust the count in the strip as well:
-*"8 of 12 shown"* means four jobs are there and something is hiding them.
+**When a date field you switched off is hiding claims in this month, a different sentence says so** —
+*"Every claimed date in this month belongs to a field you have hidden"*. **Read that one carefully: it
+claims ALL of the month's claims, and the calendar only knows about the claims it was given.** If closed
+jobs, or work your filter removed, also have claims in this month, switching the field back on will not
+bring those back. *"8 of 12 shown"* in the strip tells you what the filters left — that count cannot see
+the legend switches, because those live only in this view.
 
 ### Timeline
 

@@ -77,23 +77,38 @@ export function contradictionCopy(start: AttributedDate, due: AttributedDate): s
  * or claims kept off the grid by something the model cannot see. The model
  * cannot see it because the narrowing happens UPSTREAM — `apps/web`'s
  * `datesNarrowing` (`page.tsx:706-713`) feeds `dateInputs` (`:1135-1146`)
- * already filtered, and it applies the page's own "closed hidden by default"
- * rule too, which no `FilterSpec` can express. So `visible === inputs` holds in
- * every app, `excluded` is `[]`, and the model is structurally unable to tell
- * "filtered away" from "never claimed".
+ * already filtered, so `visible === inputs` holds in every app, `excluded` is
+ * `[]`, and the model is structurally unable to tell "filtered away" from
+ * "never claimed".
+ *
+ * **Why "wire the filter down to the model" is not the repair, corrected
+ * 2026-09-20 by a reviewer who falsified the first draft of this note.** The
+ * first draft said the page's closed-hidden rule "cannot be expressed as a
+ * `FilterSpec`". That is FALSE: `closed?: boolean` is one of `FilterSpec`'s own
+ * axes (`view-types.ts:238-243`) and `matchesFilter` evaluates it
+ * (`filter/matches-filter.ts:89`) — the page already expresses that rule as a
+ * spec, `{ ...listFilterSpec, closed: effectiveClosed }`. The reason wiring
+ * fails is different and survives: **the view is handed ALREADY-NARROWED rows**,
+ * so passing the filter alongside them simply re-filters a filtered set and
+ * excludes nothing. Passing the UNFILTERED rows instead would make the model
+ * re-implement the page's row selection (`matchesListRow` over `ListRow`s,
+ * project scope included) — a second statement of one rule, free to drift from
+ * the first. That is this file's recurring objection, and it is the real one.
  *
  * It cannot be told either, and that was measured rather than assumed: a
  * page-LEVEL flag ("a filter is on") cannot answer the only question that
  * matters — whether THIS month was emptied by it — so such a flag would license
  * a sentence that is false whenever the filter is simply irrelevant to the
- * month. Passing the filter down while passing unfiltered rows would let the
- * model answer it, and would draw tickets the page hides on purpose.
+ * month.
  *
  * So the sentence does what this file's other narrow-copy does: it names the
  * SET. Naming the filter, closed jobs and the legend as the things that can
- * hold a claim off the grid is true whether one of them is set or none is,
- * which is the same reason `CALENDAR_ALL_HIDDEN_COPY` may only claim
- * exhaustivity when the legend is the sole cause.
+ * hold a claim off the grid is true whether one of them is set or none is —
+ * which is what makes it safe to reach WITHOUT knowing which one fired. The
+ * same reasoning is why `CALENDAR_ALL_HIDDEN_COPY` is gated on the legend
+ * rather than left to claim exhaustivity freely, **though that gate has a blind
+ * spot this file records in full below: it cannot see the page's upstream
+ * pruning, so the exhaustive sentence is reachable while false today.**
  *
  * ## Provenance
  *
@@ -112,22 +127,40 @@ export const CALENDAR_EMPTY_MONTH_COPY =
  *
  * NOT IN THE PLAN TEXT, and added because the plan's model would have told
  * this lie: with every claimed date belonging to a legend-hidden field, the
- * grid is empty and the copy above says "no claimed dates fall in this month"
- * — to a viewer whose own claims are sitting one switch away. "Nobody claimed
- * anything" and "you switched these off" are indistinguishable on screen under
- * one sentence, which is the exact failure this plan is named for. The legend
- * tally is already computed before hiding so the switch survives; this is the
- * same guarantee said in words for the case where the switch is all that is
- * left on screen.
+ * grid is empty and the fallback above tells the viewer nothing was claimed —
+ * while their own claims sit one switch away. "Nobody claimed anything" and
+ * "you switched these off" are indistinguishable on screen under one sentence,
+ * which is the exact failure this plan is named for. The legend tally is
+ * already computed before hiding so the switch survives; this is the same
+ * guarantee said in words for the case where the switch is all that is left on
+ * screen.
  *
  * IT CLAIMS EXHAUSTIVITY ("every claimed date"), so the model may only reach
  * for it when the legend is the ONLY thing standing between the viewer and
- * this month's claims. A month narrowed by a filter as well does NOT get this
- * sentence: it reaches `CALENDAR_EMPTY_MONTH_COPY` above, which names the set
- * of narrowings rather than picking one. **That gate is `narrowedOutOfGrid` in
- * the model, and it outlived the sentence that used to carry the both-case** —
- * see `calendar-model.ts`'s precedence note, and case 11.50, which witnesses
+ * this month's claims. A month narrowed by a filter the MODEL saw does NOT get
+ * this sentence: it reaches `CALENDAR_EMPTY_MONTH_COPY` above, which names the
+ * set of narrowings rather than picking one. **That gate is `narrowedOutOfGrid`
+ * in the model, and it outlived the sentence that used to carry the both-case**
+ * — see `calendar-model.ts`'s precedence note, and case 11.50, which witnesses
  * the gate against a mutation that would have removed it.
+ *
+ * ⚠ **THE GATE'S BLIND SPOT IS LIVE, NOT THEORETICAL — this sentence is
+ * reachable while FALSE today, and the first draft of this note understated it
+ * as a future risk.** `narrowedOutOfGrid` can only see what the MODEL narrowed.
+ * Rows pruned UPSTREAM by the page (its filter, and the closed-hidden-by-default
+ * rule) never arrive, so they cannot trip the gate — while `hiddenInGrid` is
+ * measured over what did arrive. Hide a legend field holding an in-grid claim,
+ * in a month that ALSO holds closed or filtered-away claims, and this exhaustive
+ * sentence renders over a month it is not true of: the other claims belong to no
+ * hidden field, and the one switch it offers does not bring them back.
+ *
+ * **Owner: the owner, via whoever next owns the calendar's empty states.** The
+ * repair is a design decision rather than a typo — either the page tells the
+ * view that something was pruned before the model saw it (a coarse flag, and
+ * coarse in the direction the `CALENDAR_EMPTY_MONTH_COPY` note explains is not
+ * good enough for the FALLBACK sentence), or this sentence stops claiming
+ * exhaustivity. Fixing it in passing would pre-empt a ruling of the same shape
+ * as the two this branch exists to implement.
  */
 export const CALENDAR_ALL_HIDDEN_COPY =
   'Every claimed date in this month belongs to a field you have hidden. Nothing was dropped — switch a field back on in the legend to see its claims again.';
@@ -177,9 +210,22 @@ export const TIMELINE_SIDE_LIST_UNDRAWABLE_COPY =
  * the model cannot see the filter (the page narrows `tickets` upstream before
  * the view is handed them), so this arm names the SET of things that can hold
  * a claim off the chart rather than asserting that nobody claimed one.
+ *
+ * ⚠ **IT NAMES TWO CAUSES, NOT THREE, AND THAT IS DELIBERATE.** The calendar's
+ * sentence also names "a field you switched off in the legend" — the timeline
+ * has NO legend. `TimelineViewProps` carries no hidden-field prop,
+ * `buildTimelineModel` has no `hiddenCustomFieldIds` option, and the product's
+ * only legend state is `CalendarView`'s own. Naming it here would be the SAME
+ * defect the owner deleted the lane sentence for one screen over: a word no
+ * surface can offer the reader. **A first draft of this change copied the
+ * calendar's clause across "for symmetry", and symmetry is what the copy is
+ * allowed to have — not what it may claim.** The two views are symmetric in the
+ * promise ("undated work is absent, not estimated") and NOT in the set of
+ * controls, because the controls are not the same. Guarded now by
+ * `timeline-view.test.tsx`'s "names only controls the TIMELINE has".
  */
 export const TIMELINE_EMPTY_COPY =
-  'No claimed dates are here to draw. Undated work is absent, not estimated — the timeline draws only the periods someone claimed. If a claim is here and not drawn, a narrowing kept it off these weeks without dropping it: your filter, closed jobs being hidden, or a field you switched off in the legend.';
+  'No claimed dates are here to draw. Undated work is absent, not estimated — the timeline draws only the periods someone claimed. If a claim is here and not drawn, a narrowing kept it off these weeks without dropping it: your filter, or closed jobs being hidden.';
 
 /**
  * The THIRD empty timeline, and the ONE case the component cannot reconstruct

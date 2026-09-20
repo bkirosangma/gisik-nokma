@@ -207,7 +207,7 @@ component's other mode, which the web does not use.
 
 | # | L | Bullet | Verdict | Where |
 |---|---|---|---|---|
-| 88 | 1780 | Calendar view | Covered | P§8 (drawn only from claimed days; bar for two dates, single marker for one, two markers and no bar for a contradiction; undated work absent; the sentences for the kinds of empty), R§8. The shipped model selects three of those sentences and only two can render — the third needs a `filter` or a lane that no screen passes |
+| 88 | 1780 | Calendar view | Covered | P§8 (drawn only from claimed days; bar for two dates, single marker for one, two markers and no bar for a contradiction; undated work absent; the sentences for the kinds of empty), R§8. **Two sentences ship** (2026-09-20): the fallback, which NAMES the narrowings that can empty a month, and a dedicated one for a month the legend alone emptied. The third — a per-cause sentence for a filter or a lane — was deleted on the owner's ruling: no screen passed either prop, and "lane" named a control the product does not offer |
 | 89 | 1781 | Custom date fields on Calendar and Timeline | Covered | R§8 is the clearer ("a start date, a due date, or a custom date field your business set up"); P§8 covers claimed dates generally |
 | 90 | 1782 | Claimed-date-field legend | Covered *(thin)* | P§8 lists the legend switch among the reasons a calendar can be empty; neither describes it as a per-field control that is named and counted |
 | 91 | 1783 | Timeline view | Covered | P§8 (four weeks at a time; a side list with a heading naming which of five reasons a job is not drawn as a bar), R§8 |
@@ -232,7 +232,7 @@ rather than denying it:
 1. **No way for a member or a guest to create a project.** The underlying record and its rules are
    reached from any screen by exactly one control — the **New project** form on the workspace page —
    and only an owner or admin is offered it (`apps/web/app/w/[workspaceId]/page.tsx:948-954`); a member
-   or guest gets the refusal sentence at `:921` instead. (The seed CLIs write `project.created` too,
+   or guest gets the refusal sentence at `:952` instead. (The seed CLIs write `project.created` too,
    through the ungated internal door — a different vocabulary from a screen.) A workspace whose owner
    and admins have not used it therefore has nowhere to put work.
 2. **No way to assign work on the phone or desktop apps.** On the **website** the job sheet's

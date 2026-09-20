@@ -126,8 +126,11 @@ describe("11.5 attributed labels (spec §7's exact shape — planted defect: the
   it('16.45 the reachable empty month names the filter, and still says undated work is absent', () => {
     expect(CALENDAR_EMPTY_MONTH_COPY).toContain('your filter');
     // The reference's honesty note survives: 11.186/11.187 assert its ABSENCE
-    // in the loading state, and would go vacuous if this string stopped
-    // existing anywhere.
+    // in the loading state. ⚠ Refined by a reviewer 2026-09-20 — losing this
+    // substring would not make those CASES vacuous (their `.gn-calendar` /
+    // `.gn-timeline` assertions still catch the defect they name); it would
+    // make that ONE assertion unfailable. The distinction matters because the
+    // stronger claim is the one that overstated.
     expect(CALENDAR_EMPTY_MONTH_COPY).toContain('Undated work is absent, not estimated');
   });
 

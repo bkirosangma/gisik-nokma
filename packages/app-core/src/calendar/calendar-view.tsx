@@ -289,11 +289,14 @@ export function CalendarView(props: CalendarViewProps) {
       </header>
 
       {/*
-        The model chose the sentence and it is rendered VERBATIM. Three arms —
-        nothing claimed, everything hidden by the legend, everything behind a
-        filter or a lane — because they are three different facts, and one
-        sentence over all three would tell a viewer their own claimed month
-        holds no claims. There is deliberately no bare "nothing here" branch.
+        The model chose the sentence and it is rendered VERBATIM. **TWO arms
+        since 2026-09-20** — nothing claimed (and that sentence NAMES the
+        narrowings that can also empty a month, since the model cannot tell
+        them apart), and everything hidden by the legend — because they are
+        different facts, and one sentence over both would tell a viewer their
+        own claimed month holds no claims. The third arm went with its sentence
+        on the owner's ruling; the model's precedence note says what survived
+        and what the guard cannot see.
       */}
       {model.emptyCopy !== null && (
         <p role="note" className="gn-calendar__empty">
