@@ -1,5 +1,156 @@
 # Serial executor — live state
 
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~19:0x IST. **THE SHEET'S THREE MISSING SURFACES ARE
+> # BUILT, REVIEWED, FIXED, REBASED AND GREEN AT THE FOLDED TREE. PR #594 IS OPEN; IT WAS SENT BACK
+> # FOR ONE REASON — NO REVIEWER PASS RECORDED — AND THAT PASS HAS NOW RUN AND IS WRITTEN UP BELOW.**
+> Branch **`exec/sheet-surfaces`**, **rebased THREE TIMES onto `origin/main`** — the controller's anchors
+> move while a lane works, so a fold is a snapshot rather than a resting state. The first fold was onto
+> `19c998e5` (`#592`/`#593`, verified docs-only here — two files under `docs/lanes/`). **The second was
+> onto `6f08452c`, AND IT CARRIED CODE:** the ticket-key round (`#595`) landed `view-types.ts`,
+> `online/mappers.ts`, `domain/prefix.ts` and a migration. **The third was onto `05c1b0f4` and was
+> docs-only again** (`docs/lanes/controller-state.md`, the controller's own cycle-24 anchor — measured
+> with THREE dots, because `A..B` lists this branch's own files as though main had changed them).
+> One PR, `--base main`. **You do not merge.**
+> **⚠ `19c998e5` IS NEWER THAN THE `e9c1a04f` THIS DISPATCH NAMES.** The controller ordered the fold so
+> that HEAD IS THE LANDING TREE and the forced gate runs at the tree that lands rather than at a
+> composite. After the rebase `rev-list --left-right --count origin/main...HEAD` reads **`0 5`**.
+> **No `pnpm install` was run and none was needed — verified, not assumed: no `package.json`,
+> `pnpm-lock.yaml` or `pnpm-workspace.yaml` appears in `origin/main..HEAD`.**
+> **⚠ THIS FILE'S PREVIOUS TOP BLOCK WAS STALE AND TOLD A RELAUNCHED EXECUTOR TO OPEN A PR THAT HAD
+> ALREADY MERGED.** It said `exec/sheet-footer`'s PR was "the only thing left"; **PR #591 merged at
+> 07:56Z** (`mergeCommit e9c1a04f`, `headRefOid 614649a2`) and `origin/main..HEAD` was EMPTY. That is the
+> recorded failure mode *"the handoff that exists to survive restarts told a relaunched executor to open
+> a PR that had already merged"*, hit again. **Check `gh pr view --json headRefOid,state` before acting on
+> any "open/paused/NEXT STEP" line in this file.**
+>
+> ## WHAT SHIPPED THIS ROUND — the owner's *"all 3 yes"*, all three built
+> 1. **The rich-text toolbar** — `B i code link list quote` + the prototype's markdown hint
+>    (`packages/editor/src/components/EditorToolbar.tsx`). **No door, no migration, no schema change**;
+>    the six commands verified against the INSTALLED packages (`extension-*` at 3.30.5). `link` gets an
+>    inline URL field because `toggleLink` with no `{href}` is a link to nowhere; an empty box is a
+>    cancel. Active marks reported via `aria-pressed`, re-read on the editor's own transaction (the
+>    `ImageWrapMenu` pattern). **A read-only composer gets neither strip nor hint.**
+> 2. **The inline title editor** — the header carries a borderless `<input>` (the prototype's own shape,
+>    `desktop.dc.html:1116`) over the door that already existed, `ticket.field_set {fieldId:'title'}`.
+>    **No client-side blank rule**: `checks/fields.ts:118-123` already refuses a spaces-only title, so the
+>    value travels as typed and the engine's answer is what the reader sees. An UNCHANGED title sends
+>    nothing. **`Sheet` gained `titleSlot`; `title` (string) still names the dialog.**
+> 3. **The breadcrumb** — `Workspace › Project › State`, three crumbs and no fourth (the key is another
+>    lane's in-flight branch). **Drawn whole or not at all.**
+>
+> ## ⚠ TWO MEASUREMENTS IN THE DISPATCH WERE WRONG, BOTH REPORTED, NEITHER A HOLD
+> - **§2(c) said the three crumbs are "already on the ticket read". THEY ARE NOT.** `TicketRead`
+>   (`view-types.ts:332-357`) is six fields — `ticket`, `title`, `stateProvenance`, `assignedProvenance`,
+>   `parent`, `rollup` — carrying **no workspace name, no project name and no state name**; `BoardView` is
+>   `{projectId, groups}` and `DataSourceQuery` has no `getProjects`. **Only the STATE is derived
+>   in-sheet** (`currentStateName`, already there for the state chip). **Conservative-default ruling
+>   taken: the two names travel as OPTIONAL PROPS from the host**, which already computes
+>   `useWorkspaceName`/`useProjectName` at `page.tsx:174-175`. The alternative priced and rejected: the
+>   sheet calling `getMyWorkspaces()` fetches every workspace and every project in them to name one
+>   project. **Written up in `gisik-nokma-lanes/EXEC-2026-09-20-sheet-surfaces-breadcrumb-measurement.md`
+>   and in the PR body for the owner to reverse — the call site is one prop list.**
+> - **§2(a)'s toolbar measurement was RIGHT and is confirmed** (six commands, all present at 3.30.5).
+>
+> ## ANCHORS, RECOUNTED AT THIS TREE — **AFTER the rebase onto `19c998e5`**
+> - **gate** `pnpm turbo run build test typecheck --concurrency=1`: **EXIT=0 · 33/33 · 36.5s** at the
+>   FINAL head — **32 of 33 tasks CACHED, which is the measurement that says the third fold changed no
+>   code**, and the per-package counts are byte-identical to the run before it (5,543). The fullest
+>   run was **EXIT=0 · 33/33 · 2m49.1s**, after the second fold, which DID carry code. (Earlier runs, all EXIT=0: `1m37.1s` after
+>   the first fold + fix round, `1m42.6s` after the first fold, `1m37.4s` pre-fold — **all four are this
+>   executor's evidence; the controller runs the forced gate.**)
+>   **Node `v22.22.2`** (`pnpm exec node --version` also v22.22.2 — the `pnpm` BINARY is v24's because
+>   v22's bin dir carries no pnpm; the node it spawns is v22, which is what the gate names).
+>   **server 1658 · app-core 1658 · web 601 · ui 373 · domain 548 · rule-engine 345 · editor 188 ·
+>   sync-client 90 · mcp-server 44 · mobile 29 · desktop 9 — 5,543 tests** at the final head. **The
+ticket-key fold moved them** (server 1640→1658, domain 525→548, web 598→601); the docs-only fold before
+it moved nothing, which is the measurement that distinguishes a history fold from a code fold.
+>   **Every delta against the pre-round baseline is exactly what this round added:** app-core 1645 →
+>   **1657** (+12 — ten from the three surfaces and two from the fix round), editor 178 → **188** (+10),
+>   ui 372 → **373** (+1). The four later counts are the FOLD's, not this branch's.
+> - **`check-case-ids` reads `2534 / 16.87`.** This branch minted `16.85`–`16.87` against a baseline of
+>   **2497 / 16.84** — **a delta asserted as exactly +3** (2497 → 2500, bold 1073 → 1076), never the word
+>   "ok" — and after BOTH folds each id still appears exactly once. The growth to 2534 is other lanes'
+>   cases arriving with the fold. **`16.88`–`16.99` remain free in exec 1's block.**
+> - **THE CITATION SWEEP, RUN LAST AND OVER THE DIFF RATHER THAN OVER MY OWN FILES.** Every `file:line`
+>   added by this branch was resolved BY CONTENT. **Five citations to `ticket-state.ts:150` were all
+>   stale — the write is at `:160`** — and four of those also named the `ticket.field_set` reduction as
+>   `:273-284` when it is at **`:299`**. They were ALREADY WRONG ON `origin/main` (that file is not in
+>   this diff); one of the five lived in `apps/web/test/description-editable.test.tsx`, a file this
+>   branch otherwise never opens, and was corrected anyway rather than left as the one unmade copy of
+>   five. **A sixth was MINE and had shifted under this very change**: `currentStateName` was at
+>   `:942-945` when I wrote the PR body and is at **`:1063`** now. A stale citation still RESOLVES, so
+>   nothing about reading it tells you it is wrong — that is why this is swept last.
+> - **seven repo checks pass**: `check:env`, `check:tasks`, `check:migrations`, `check:runbook`,
+>   `check:citations`, `check:help`, and `node scripts/check-case-ids.mjs` (**there is no
+>   `check:case-ids` npm script — it is run directly**).
+>   ⚠ **`check:db-tz` was NOT run** — it requires a provisioned `DATABASE_URL` and this worktree has none.
+>   Environment prerequisite, not a defect; the one check that did not run.
+> - **Case ids: `check-case-ids` reads `2500 unique, highest 16.87`.** Baseline before this round was
+>   **2497 / 16.84**, so the sweep moved by **exactly +3** (bold 1073 → 1076) — the guard SAW all three,
+>   which "ok" alone does not prove. All three are in **exec 1's block `16.81`–`16.99`**, which has
+>   `16.88`–`16.99` still free. **Next free id: `16.88`.**
+>
+> ## MUTATION WITNESSES — four, each killing its own site and NOTHING else
+> - **M-A** the bold command replaced with a no-op → killed exactly the two bold cases (document +
+>   `aria-pressed`).
+> - **M-B** `list` pointed at `toggleBlockquote` → killed exactly the bullet-list case.
+> - **M-C** the title payload's `fieldId` changed `title` → `description` → killed exactly the
+>   `ticket.field_set` case.
+> - **M-D** the breadcrumb gate relaxed `&&` → `||` → killed exactly the half-path case (the version that
+>   rendered `Workspace › Doing` for a caller that passed one name).
+> **Every file restored from a checksum-verified copy, verified by `shasum -a 256` against a pre-mutation
+> snapshot — NEVER `git checkout --`, which reverts to HEAD and would have destroyed uncommitted work
+> (that rule is in this repo's own memory and it cost four fixes on 2026-09-20).** `git status` after
+> restore shows only the intended files.
+>
+> ## THE INDEPENDENT REVIEW — RUN, RECORDED, AND ITS FINDINGS FIXED
+> **No Critical. Five Important, four Minor — FOUR of the five Importants were real
+> defects in what this branch shipped, and all are fixed with a witness each.**
+> 1. **I4 — the strip rendered `B i code list quote link`.** A hand-written `link`
+>    button was appended after the `marks.map`. **The component's comment claimed the
+>    right order, the case was NAMED for the right order, and its body asserted the
+>    wrong one** — green throughout. Found by reading the prototype
+>    (`desktop.dc.html:3670-3678`) and then the test file, not by running anything.
+> 2. **I3 — Escape in the title field closed the whole sheet.** ⚠ **AND THE REVIEWER'S
+>    STATED CAUSE WAS WRONG:** it said the field's branch *"calls `preventDefault()`"*,
+>    **and it did not.** I repeated that into `Sheet`'s docblock before reading the
+>    line; the new case stayed RED and that is the only reason the caller's half was
+>    found. Both halves are in now. **A peer's finding is a claim.**
+> 3. **I1 — `submitTitle` had no in-flight latch.** `disabled` is what makes a browser
+>    blur the focused control, so one Enter can fire a second commit out of the first
+>    one's own `onBlur` — a second `ticket.field_set` carrying the title the ledger
+>    already holds. `titleSubmittingRef`, mirroring Ruling 32.
+> 4. **I2 — the unchanged-title case passed without ever reaching its guard.**
+>    `click(field); tab()` leaves `titleDraft` null, so `submitTitle` is never called;
+>    the reviewer measured **deleting the guard left the suite at PASS(90)/FAIL(0).**
+> 5. **I5 — `ui.css` said `.gn-sheet__title` has "no product caller", and it has TWO**
+>    (`:470`, `:478` draw it on every read error and every not-yet-loaded sheet). A
+>    reader acting on that sentence would have deleted a live rule.
+> **Four Minor, all corrected in place:** the Enter commit path had no case; "not one
+> asserts that a control is on screen" was false of two of ten; "two early returns"
+> was true of one; "the fourth thing there" counted our three under the prototype's
+> five; and the crumb gate tested `!== null` where the docblock said "a real string".
+>
+> ## ⚠ TWO PROCESS HAZARDS THIS ROUND PRODUCED, BOTH WORTH CARRYING
+> - **The reviewer mutates THIS SHARED WORKING TREE**, so its mutations and my
+>   measurements can interleave. I checked rather than hoped: the gate log was written
+>   at 13:51:28 and its first mutation landed at 13:51:44 — **sixteen seconds later, so
+>   that gate measured an unmutated tree.** On a shared tree that timing check is the
+>   difference between a result and a coin toss.
+> - **`/tmp/pr-body.md` IS A SHARED PATH ACROSS LANES** (a peer lane overwrote it once
+>   already; the PR opened with the wrong body while every ref check passed). Everything
+>   this round writes to `/tmp` is prefixed `exec1-`, and **the PR body is READ BACK**
+>   with `gh pr view --json body` before it is trusted.
+>
+> ## NEXT, AND THIS IS ALL THAT IS LEFT
+> **commit the handoff → force-push `exec/sheet-surfaces` (the branch was rebased, so the push is NOT
+> fast-forward) → prove the push landed** (`gh pr view --json headRefOid` against
+> `git rev-parse HEAD` — a REJECTED push does not stop `gh pr create`, and #591 opened against a stale
+> head exactly that way) **→ write the reviewer section into the PR body → `gh pr edit 594 --body-file
+> <lane-unique path>` → READ THE BODY BACK.**
+> **PR #594 is already OPEN and was sent back for ONE reason: no reviewer pass was recorded. It was
+> run and is recorded in this file and in the new body. You do not merge.**
+
 **This file is the restart surface.** A controller that kills and relaunches the executor from its
 brief recovers only what is written here. Refreshed at every task boundary.
 

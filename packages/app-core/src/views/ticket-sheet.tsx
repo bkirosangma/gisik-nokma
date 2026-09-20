@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { newUlid, statesWithBacklog, type SubmittedEvent } from '@gisik-nokma/domain';
 import { Button, Chip, SegmentedControl, Select, Sheet } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
@@ -178,6 +178,46 @@ export type TicketSheetProps = {
    * owner.** Reversing this is one string in the host.
    */
   onDeleted?: (ticketId: string, title: string) => void;
+  /**
+   * The two names the breadcrumb above the title shows — the workspace's and
+   * the project's — supplied by the host, which already holds both.
+   *
+   * ## Why they are PROPS and not a read, measured at `e9c1a04f`
+   *
+   * **`TicketRead` carries neither.** It is exactly six fields
+   * (`view-types.ts:356-381`): `ticket`, `title`, `stateProvenance`,
+   * `assignedProvenance`, `parent`, `rollup`. `BoardView` is
+   * `{projectId, groups}` with no name, and `DataSourceQuery` has no
+   * `getProjects` and no `getWorkspace` — its one name-carrying method,
+   * `getMyWorkspaces()`, returns **every workspace and every project in them**,
+   * which is a large read to answer a question about one project, and it would
+   * arrive with its own loading and failure arms inside a component that
+   * already draws three ways.
+   *
+   * The host has both already: `apps/web`'s project page computes
+   * `useWorkspaceName(workspaceId)` and `useProjectName(workspaceId, projectId)`
+   * at `:174-175` and has rendered them since the page existed (`:1611-1614`).
+   * Passing them is also this sheet's own grain for host-supplied inputs —
+   * `editorSlot`, `uploadEvidence`, `attachments`, `visibility` are all the
+   * same shape.
+   *
+   * ## `undefined` and `null` both mean "no name", and ONE missing name drops the
+   * ## WHOLE breadcrumb
+   *
+   * Deliberately not told apart, because the host cannot tell them apart: the
+   * hooks return `null` while pending AND when the name is withheld
+   * (`page.tsx:172`), and a crumb is drawn only for a real string. See the
+   * derivation in the body for why printing the id — `my-work.tsx`'s rule for a
+   * SERVED withheld name — would be asserting something this component does not
+   * know here.
+   *
+   * And the nav is drawn WHOLE or not at all, because a crumb list missing its
+   * middle level states a hierarchy the product does not have. That is not a
+   * stylistic call: the failing version rendered `Workspace › State` for a
+   * caller that passed one name, and every crumb in it was individually correct.
+   */
+  workspaceName?: string | null;
+  projectName?: string | null;
 };
 
 /**
@@ -248,6 +288,8 @@ export function TicketSheet({
   canSetVisibility = true,
   onOpenTicket,
   onDeleted,
+  workspaceName,
+  projectName,
 }: TicketSheetProps) {
   const EditorSlot = editorSlot ?? PlainTextEditorSlot;
   const [tab, setTab] = useState<'details' | 'history'>('details');
@@ -290,6 +332,26 @@ export function TicketSheet({
    * is not a refusal of anything the person did.
    */
   const [editorError, setEditorError] = useState<string | null>(null);
+  /**
+   * The title control's draft — `null` MEANS "not editing", and that is the
+   * whole mechanism rather than a flag beside one.
+   *
+   * The input's value is `titleDraft ?? ticketRead.title`, so the server's title
+   * is what shows until somebody types, and a commit or an Escape returns to it
+   * by setting this back to `null`. **Nothing syncs the two with an effect, and
+   * that is deliberate:** an effect keyed on `ticketRead.title` would clobber an
+   * in-flight draft on every reload, and this sheet reloads after every commit
+   * and on every socket frame.
+   */
+  const [titleDraft, setTitleDraft] = useState<string | null>(null);
+  const [titleSaving, setTitleSaving] = useState(false);
+  /**
+   * The title edit's re-entrancy guard, and it must be a REF rather than the
+   * `titleSaving` state above — see `submitTitle`'s docblock for the measurement
+   * (a browser blurs the field when `disabled` lands, so one Enter can fire a
+   * second commit out of the first one's own `onBlur`).
+   */
+  const titleSubmittingRef = useRef(false);
   /**
    * Ruling 32 (fix round 1, 2026-09-17) — the double-submit latch for
    * Close/Reopen, mirroring `board.tsx`'s `MoveArrows.submitting`
@@ -746,6 +808,97 @@ export function TicketSheet({
     }
   };
 
+  /**
+   * The title, committed through the door that ALREADY exists.
+   *
+   * `ticket.field_set` is the only writer of a built-in field, and the title has
+   * lived in `state.fields['title']` since `ticket.created` wrote it
+   * (`packages/domain/src/ticket-state.ts:160`). So an editable title is a
+   * SURFACE over an existing door — there is no new event, no new route and no
+   * migration in this function, and that is a measurement rather than a hope:
+   * the reducer's own comment shows `{ fieldId: 'title' }` parsing.
+   *
+   * ## No client-side blank rule, and that is the REUSE rather than an omission
+   *
+   * A title of only spaces is refused by the SERVER, and the branch is old:
+   * `checks/fields.ts:118-123` answers `field.title-required` for `null` and
+   * `field.type-mismatch` for anything whose `value.trim().length` is 0. That
+   * is the same rule the New-ticket form leans on — `ticketCreatedPayload`'s
+   * *"must not be blank — a title of only spaces names nothing"* — so a second
+   * rule here would be a second, weaker door to one field, which is exactly
+   * what this sheet refuses elsewhere. The value travels AS TYPED and the
+   * engine's answer is what the reader sees.
+   *
+   * ## The first early return, and it is about not sending a claim nobody made
+   *
+   * An UNCHANGED value is not a claim, and `ticket.field_set` is append-only:
+   * a no-op commit would put a ledger line in the ticket's history saying
+   * somebody changed the title to what it already said. (The second early return
+   * below is a DIFFERENT fact — a claim that WAS sent to a server that did not
+   * answer — and an earlier version of this heading called both of them "about
+   * not sending a claim nobody made", which is true of one.)
+   *
+   * ## ⚠ THE IN-FLIGHT LATCH, WHICH THE FIRST CUT DID NOT HAVE
+   *
+   * `titleSaving` is render state and drives `disabled`; **it is useless as a
+   * re-entrancy guard, and here it is worse than useless.** Two commits in one
+   * React batch both read the same pre-commit `false` and both get through — the
+   * exact measurement Ruling 32 records for Close/Reopen (`submittingRef`'s own
+   * docblock, above). And `disabled` is itself what makes a browser blur the
+   * focused control: one Enter on a browser that blurs on disable fires
+   * `onBlur` into a SECOND `submitTitle` while the first is still awaiting, and
+   * a `ticket.field_set` carrying the title the ledger already has is exactly
+   * what the guard above exists to prevent. **jsdom does not blur on disable**,
+   * so this suite cannot see it: an independent reviewer measured `ingestCalls:
+   * 2` with `ingest` held pending and a `focusout` fired, where the branch's own
+   * Enter probe — unobstructed — reported 1.
+   *
+   * `titleSubmittingRef` is set SYNCHRONOUSLY before the first `await`, which is
+   * the only place a second call in the same tick can be seen, and reset in a
+   * `finally` so a rejected ingest cannot leave the field permanently dead.
+   */
+  const submitTitle = async (next: string): Promise<void> => {
+    if (next === ticketRead.title) {
+      setTitleDraft(null);
+      return;
+    }
+    if (titleSubmittingRef.current) return;
+    titleSubmittingRef.current = true;
+    setTitleSaving(true);
+    try {
+      const event = make({
+        workspaceId,
+        entity: { kind: 'ticket', id: ticketId },
+        type: 'ticket.field_set',
+        payload: { fieldId: 'title', value: next },
+      });
+      const results = await dataSource.ingest([event]);
+      const result = results[0];
+      if (result === undefined) {
+        setServerRefusal(null);
+        setTransportError('The server did not answer this change.');
+        return;
+      }
+      if (result.status === 'committed') {
+        setServerRefusal(null);
+        setTransportError(null);
+        setTitleDraft(null);
+        read.reload();
+        history.reload();
+        return;
+      }
+      // Refused: the draft STAYS on screen beside the answer. Clearing it would
+      // hand the reader back the old title next to a sentence refusing the new
+      // one, with their words gone — the same rule `TicketEditorSlot` states for
+      // a refused description.
+      if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
+      else setServerRefusal({ rule: result.code, reason: result.message });
+    } finally {
+      titleSubmittingRef.current = false;
+      setTitleSaving(false);
+    }
+  };
+
   /** Close/Reopen: the ticket's own state moved, so both reads are re-asked. */
   const closeOrReopen = (type: 'ticket.closed' | 'ticket.reopened'): Promise<void> =>
     submitTicketEvent(type, () => {
@@ -943,6 +1096,76 @@ export function TicketSheet({
     workflow.data == null
       ? state.stateId
       : statesWithBacklog(workflow.data).find((candidate) => candidate.id === state.stateId)?.name ?? state.stateId;
+
+  /**
+   * The three crumbs above the title — `Workspace › Project › State`, which is
+   * the prototype's own shape stopped one short of its end.
+   *
+   * ## What was MEASURED, because the dispatch's arithmetic was not right here
+   *
+   * The prototype builds `sheetCrumbs` from workspace → project → epic →
+   * parent → **the ticket key** — FIVE elements (`desktop.dc.html:3404-3420`) —
+   * and draws them as a `<nav>` immediately above the title input
+   * (`:1100-1116`). The dispatch says to build `Workspace › Project › State` and
+   * STOP: **the key is the FOURTH CRUMB OF OURS** (it would sit after these
+   * three), and it is another round's work. **So three, and the state is the
+   * third.**
+   *
+   * ⚠ **AND THE KEY SHIPPED WHILE THIS BRANCH WAS OPEN** (PR #595, merged
+   * `6f08452c`). The sentence here used to call it "another lane's in-flight
+   * branch"; that was true when written and is not now. **The fourth crumb is
+   * still not built, and the reason has changed rather than lapsed:**
+   * `TicketRead` does not carry the key either — it is the SAME six fields — so
+   * a fourth crumb would need a third host prop or a read, which is the round
+   * the dispatch scoped away. Nothing here is a placeholder for it.
+   *
+   * ⚠ "the fourth" is counted against OUR three, and an earlier version of this
+   * sentence said "the fourth thing THERE" directly after enumerating the
+   * prototype's five, which reads as a claim about `:3404-3420` and is false
+   * of it. An independent reviewer caught the ambiguity; `Features.md` had the
+   * same wording and is corrected with it.
+   *
+   * The state is the one crumb whose source is IN this component: it is
+   * `currentStateName` above, already derived for the state chip from the
+   * workflow this sheet has loaded. The two names are the props documented on
+   * `TicketSheetProps` — **they are NOT on `TicketRead`**, which is six fields
+   * and carries no name of any kind.
+   *
+   * ## A crumb is drawn only for a KNOWN name, and that is a correction
+   *
+   * My first cut printed the ID for `null`, on `my-work.tsx:226-234`'s rule
+   * ("id-only rather than blank") for a withdrawn name. **That rule does not
+   * transfer, and the difference is the data, not the taste.** There,
+   * `WorkItem.projectName === null` is a SERVED answer: the server sends the
+   * project with no name *because* the viewer may not be told it. Here the name
+   * arrives from `useProjectName`, whose own caller documents that it returns
+   * null "while pending or refused" (`page.tsx:172`) — **two different facts,
+   * one value — and the hook cannot tell them apart.** Printing an id would
+   * assert "you may not be told this project's name" during a load that is
+   * about to answer, which is a claim this component has no basis for.
+   *
+   * So the behaviour is the sibling surface's, not a new one: the project page
+   * renders its own title exactly this way — `{projectName !== null ? <h1>…</h1>
+   * : null}` (`page.tsx:1614`) — and the state crumb always renders, because it
+   * is derived here rather than fetched.
+   *
+   * ## An EMPTY string is not a name either, and the first cut let one through
+   *
+   * That version was `workspaceName ?? null`, and the gate below reads
+   * `!== null` — so a served `name: ''` would have rendered a blank crumb and a
+   * dangling separator. **Whether the server can send one is NOT established:**
+   * `asString` (`online/mappers.ts`) checks only `typeof`, so nothing between
+   * the wire and here refuses it, but an independent reviewer flagged that as a
+   * code reading rather than a demonstrated defect and I did not chase it. The
+   * `!== ''` costs nothing and makes this docblock's phrase "a real string" true
+   * of the code rather than of the intent.
+   */
+  const workspaceCrumb = workspaceName === undefined || workspaceName === null || workspaceName === ''
+    ? null
+    : workspaceName;
+  const projectCrumb = projectName === undefined || projectName === null || projectName === ''
+    ? null
+    : projectName;
   // OPTIONAL on `TicketState` (441 fixtures predate it, spec §1.2,
   // 2026-09-17); every reader spells the same `?? null`.
   const closed = state.closed ?? null;
@@ -1089,6 +1312,98 @@ export function TicketSheet({
       onClose={onClose}
       full={sheetFull}
       /*
+        THE HEADER'S OWN COLUMN: the location breadcrumb, then the title as a
+        CONTROL. Both are the prototype's (`desktop.dc.html:1101-1116` — a
+        `<nav>` of crumbs, then a borderless `<input>` carrying the title in
+        22px/600), and they are one `titleSlot` rather than two props because
+        the prototype draws them as one flex column with a 6px gap, and two
+        independent slots could not express that.
+
+        ⚠ `Sheet` still receives `title={ticketRead.title}` and that is NOT
+        redundant: it is the dialog's `aria-label`. The slot is what the reader
+        sees and edits; the string is what names the sheet to a screen reader,
+        and it stays the SERVER's title even while a draft is on screen — a
+        control mid-edit is not a name.
+      */
+      titleSlot={
+        <div className="gn-sheet__heading">
+          {/*
+            ⚠ THE WHOLE NAV IS GATED ON BOTH NAMES, and my first cut was wrong
+            in a way worth recording. It drew whatever crumbs it had — so a
+            caller that supplied a workspace but no project got
+            `Workspace › Doing`, which is not a path: the project is missing
+            from the MIDDLE, and a breadcrumb that skips a level states a
+            hierarchy the product does not have. A crumb list is a PATH or it is
+            nothing, so it is drawn whole or not at all.
+          */}
+          {workspaceCrumb !== null && projectCrumb !== null ? (
+            <nav className="gn-ticket-sheet__crumbs" aria-label="Ticket location">
+              <span className="gn-ticket-sheet__crumb">{workspaceCrumb}</span>
+              <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
+                ›
+              </span>
+              <span className="gn-ticket-sheet__crumb">{projectCrumb}</span>
+              <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
+                ›
+              </span>
+              {/* The third crumb is the CURRENT position, so it is the one the
+                  prototype draws plain-and-bold rather than as a link
+                  (`:1108-1110`) — there is nowhere further to go from here. */}
+              <span className="gn-ticket-sheet__crumb gn-ticket-sheet__crumb--current">
+                {currentStateName}
+              </span>
+            </nav>
+          ) : null}
+          {/*
+            `value` is the draft OR the server's title, never a second piece of
+            state — see `titleDraft`'s docblock. `onBlur` commits, `Enter`
+            commits, `Escape` abandons; there is no Save button because the
+            prototype has none, and a field that shows a Save control next to
+            text a reader may not have touched invents a step.
+
+            `aria-label` rather than a visible label: the field sits where a
+            heading sat, and the visible text is the title itself.
+          */}
+          <input
+            className="gn-ticket-sheet__title-input"
+            type="text"
+            aria-label="Ticket title"
+            value={titleDraft ?? ticketRead.title}
+            disabled={titleSaving}
+            onChange={(event) => setTitleDraft(event.target.value)}
+            onBlur={() => {
+              if (titleDraft !== null) void submitTitle(titleDraft);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                if (titleDraft !== null) void submitTitle(titleDraft);
+                return;
+              }
+              if (event.key === 'Escape') {
+                // ⚠ `preventDefault` IS LOAD-BEARING, and without it this branch
+                // did not do what its sentence said. `Sheet` registers a
+                // DOCUMENT-level Escape that calls `onClose`; the field's Escape
+                // runs first but did not consume the event, so the sheet closed
+                // and "abandon the draft" was true of an input being unmounted.
+                // An independent reviewer measured `onClose` called once.
+                //
+                // **The reviewer also said this branch ALREADY called
+                // `preventDefault`, and it did not** — I repeated that claim into
+                // `Sheet`'s docblock before checking it, and the case that
+                // caught the difference is the one asserting `onClose` was never
+                // called. A peer's finding is a claim; this is the half of it
+                // that was wrong.
+                //
+                // Nothing reaches the ledger either way.
+                event.preventDefault();
+                setTitleDraft(null);
+              }
+            }}
+          />
+        </div>
+      }
+      /*
         THE AUTHORITY'S `Full screen` CONTROL (`desktop.dc.html:1119-1120`): a
         pill in the header, 32px minimum height, fully round, the control-surface
         fill and shadow, accent ink at 13px/600, an icon and a LABEL that both
@@ -1159,6 +1474,75 @@ export function TicketSheet({
         aria-label="Ticket sections"
       />
 
+      {/*
+        THE THREE ANSWER SLOTS, and they render HERE rather than inside the
+        details tab — one site each, visible whichever tab is open.
+
+        ⚠ THIS MOVED with the editable title, and the reason is not tidiness.
+        The title control lives in the sheet HEADER (`titleSlot` above), which is
+        outside both tabs, and its refusals go to `serverRefusal`. While these
+        rendered inside `tab === 'details'`, a reader who committed a title from
+        the History tab was shown nothing at all — the server had answered, and
+        the answer was in the other tab's subtree. **An answer that is invisible
+        depending on which tab happens to be open is the failure the three-slot
+        split exists to prevent**, so the slots moved out rather than a second
+        copy being drawn for the header.
+
+        The gating on each is unchanged, including `!moveOpen` on the first two
+        and the mutual exclusivity argued on `serverRefusal` below.
+      */}
+      {/*
+        Close/Reopen's own refusal, shown OUTSIDE `TransitionDialog`.
+        `serverRefusal` is the same state `submitTransition` fills, and
+        `TransitionDialog` renders it too (`gn-refusal--server`, spec
+        citation on that prop) — but `Dialog` returns `null` whenever
+        `open` is false (`packages/ui/src/components/dialog.tsx:15`), so
+        that copy is invisible while `moveOpen` is false, which is exactly
+        when Close/Reopen fire. Gating this copy on `!moveOpen` keeps the
+        two from ever both being on screen: the Move dialog's `onClose`
+        already clears `serverRefusal` when it closes, and `submitTransition`
+        never sets it while `moveOpen` is false (the dialog does not close
+        itself on a refusal), so the two conditions are mutually exclusive
+        rather than a duplicate render of the same fact.
+
+        **The title's refusals land in this same slot, and that is deliberate:**
+        the slot is "the server adjudicated this claim", which is what
+        `checkTicketFieldSet` does to a blank or spaces-only title
+        (`checks/fields.ts:118-123`). No second sentence and no second rule.
+      */}
+      {serverRefusal !== null && !moveOpen ? (
+        <p role="alert" className="gn-refusal gn-refusal--server">
+          {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
+        </p>
+      ) : null}
+      {/*
+        Ruling 33 (fix round 2) — Close/Reopen's OWN transport slot,
+        never the same sentence or class as `serverRefusal` above (Ruling
+        27's own rule, repeated at the site that dropped it): a silence or
+        a dropped connection is not an adjudication. Gated identically to
+        `serverRefusal`'s copy, and for the identical reason — invisible
+        while the Move dialog is open, since that is not where this state
+        is set.
+      */}
+      {transportError !== null && !moveOpen ? (
+        <p role="alert" className="gn-refusal gn-refusal--transport">
+          {transportError}
+        </p>
+      ) : null}
+      {/*
+        The editor's own failures — a distinct fact with its own slot and
+        its own tone, for the reason Ruling 27 gives the two above. Nothing
+        here reached the server, so neither of those sentences is true of
+        it. Its commonest cause today is a capability this build has not
+        wired: a pasted image with no `uploadAttachment` is REFUSED rather
+        than silently dropped, and this is where that refusal is read.
+      */}
+      {editorError !== null ? (
+        <p role="alert" className="gn-refusal gn-refusal--editor">
+          {editorError}
+        </p>
+      ) : null}
+
       {tab === 'details' ? (
         <div className="gn-ticket-sheet__details">
           <div className="gn-ticket-sheet__state">
@@ -1223,53 +1607,6 @@ export function TicketSheet({
               <span className="gn-sheet__closed-note">Closed — reopen it first</span>
             ) : null}
           </div>
-
-          {/*
-            Close/Reopen's own refusal, shown OUTSIDE `TransitionDialog`.
-            `serverRefusal` is the same state `submitTransition` fills, and
-            `TransitionDialog` renders it too (`gn-refusal--server`, spec
-            citation on that prop) — but `Dialog` returns `null` whenever
-            `open` is false (`packages/ui/src/components/dialog.tsx:15`), so
-            that copy is invisible while `moveOpen` is false, which is exactly
-            when Close/Reopen fire. Gating this copy on `!moveOpen` keeps the
-            two from ever both being on screen: the Move dialog's `onClose`
-            already clears `serverRefusal` when it closes, and `submitTransition`
-            never sets it while `moveOpen` is false (the dialog does not close
-            itself on a refusal), so the two conditions are mutually exclusive
-            rather than a duplicate render of the same fact.
-          */}
-          {serverRefusal !== null && !moveOpen ? (
-            <p role="alert" className="gn-refusal gn-refusal--server">
-              {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
-            </p>
-          ) : null}
-          {/*
-            Ruling 33 (fix round 2) — Close/Reopen's OWN transport slot,
-            never the same sentence or class as `serverRefusal` above (Ruling
-            27's own rule, repeated at the site that dropped it): a silence or
-            a dropped connection is not an adjudication. Gated identically to
-            `serverRefusal`'s copy, and for the identical reason — invisible
-            while the Move dialog is open, since that is not where this state
-            is set.
-          */}
-          {transportError !== null && !moveOpen ? (
-            <p role="alert" className="gn-refusal gn-refusal--transport">
-              {transportError}
-            </p>
-          ) : null}
-          {/*
-            The editor's own failures — a distinct fact with its own slot and
-            its own tone, for the reason Ruling 27 gives the two above. Nothing
-            here reached the server, so neither of those sentences is true of
-            it. Its commonest cause today is a capability this build has not
-            wired: a pasted image with no `uploadAttachment` is REFUSED rather
-            than silently dropped, and this is where that refusal is read.
-          */}
-          {editorError !== null ? (
-            <p role="alert" className="gn-refusal gn-refusal--editor">
-              {editorError}
-            </p>
-          ) : null}
 
           {/*
             Three different facts, three different sentences. A RESTRICTED
@@ -1523,7 +1860,7 @@ export function TicketSheet({
               measuring the reducer rather than the sheet.
 
               `ticket.created` writes `fields: { title: claim(p.title, env) }`
-              and NOTHING else (`packages/domain/src/ticket-state.ts:150`), and
+              and NOTHING else (`packages/domain/src/ticket-state.ts:160`), and
               no other path writes a description except an explicit
               `ticket.field_set` (`create-ticket-flow.tsx:209` submits
               `ticket.created` alone). So on a ticket nobody has described there

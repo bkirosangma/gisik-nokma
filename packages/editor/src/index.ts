@@ -32,6 +32,11 @@ export {
   type AttachmentPasteOptions,
 } from './extensions/attachment-paste.js';
 export { TicketEditor, type TicketEditorProps } from './components/TicketEditor.js';
+export {
+  EditorToolbar,
+  MARKDOWN_HINT,
+  type EditorToolbarProps,
+} from './components/EditorToolbar.js';
 export { ImageWrapMenu } from './components/ImageWrapMenu.js';
 export {
   createBrowserPickerDeps,
