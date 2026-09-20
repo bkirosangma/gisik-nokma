@@ -1,4 +1,167 @@
-## ▲ TOP BLOCK — **THE ATTACHMENTS READ: A ROUTE OVER THE TABLE THAT HAD NO CALLER, THE SEAM BEHIND IT, AND THE MOUNT THAT FINALLY PASSES IT.** (2026-09-20)
+## ▲ TOP BLOCK — **THE TAP-TARGET CHECKER: TWO FLOORS INSTEAD OF ONE, A DECLARED CLASS, A GUARD THE REVIEW FOUND WOULD CONVICT A GOOD PAGE, AND A RATCHET THAT HAD BEEN RED ON `main` WHERE NOTHING COULD SEE IT.** (2026-09-20)
+
+### § 1 — WHERE TO FIND IT
+
+- **Dispatch: the controller's tap-target dispatch** (2026-09-20, cycle 25). Owner ruling, verbatim:
+  *"let the checker accept 24 for in-list controls, keep 44 for standalone buttons."*
+- **Branch `exec2/tap-target-density`**, cut from `origin/main` = `99f2a780` and **folded TWICE**, onto
+  `bd8b58ef` before the freeze. Guard: `git merge-base origin/main HEAD` equals `origin/main`.
+- ⚠ **`origin/main` moved TWICE while this branch ran** — `99f2a780` → `14965a51` (9 commits, `#602`) →
+  `bd8b58ef` (3 commits, `#603`). Both folds were clean; the only overlapping file each time was
+  `Features.md`, in regions that do not meet. **Nothing was hand-resolved.**
+- **The PR is opened at this head.** This file cannot carry its number — the handoff had to LAND before
+  the PR opened. One call settles it: `gh pr list --state all --head exec2/tap-target-density`.
+
+### § 2 — ANCHORS, RECOUNTED AT THE FOLDED TREE (not carried forward)
+
+| anchor | value |
+|---|---|
+| `git merge-base origin/main HEAD` | **`bd8b58ef` — equal to `origin/main`, FULLY FOLDED** |
+| **the code heads this reports on** | `9990c163` (the split) and `ceec1443` (the review round) |
+| **and on top of them** | `0dc95fd6` and `f03a7f7c` (the two fold merges), plus the handoff commit |
+| ahead / behind `origin/main` | **5 ahead / 0 behind** before the handoff commit |
+| tree | **clean** |
+| changed files vs `99f2a780` | **23** |
+| `check:case-ids` | **rc 0 — 2567 at this head, 2564 at the folded `origin/main`** (measured by exporting `origin/main` to `/tmp` and running the guard THERE, not by arithmetic). **Delta exactly +3** |
+| `check:citations` · `check:migrations` · `check:env` · `check:help` · `check:tasks` · `check:runbook` | **rc 0** each |
+| **`pnpm turbo run build test typecheck`** | **33/33 successful, `GATE_EXIT=0`** — run by THIS lane at the folded tree. ⚠ **THE FORCED GATE IS STILL THE CONTROLLER'S.** |
+| viewport suite | **30 passed / 1 failed**; the 1 is the PRE-EXISTING body-text failure, § 5. `/help` tap offenders **0 at 390 / 768 / 1512**. Node **v22.22.2** named |
+| mutation battery | **6 mutations (M1–M5b)**, each declaring its expected arm before it ran — § 4 |
+| review | **one independent falsifying reviewer at `0dc95fd6`: 12 findings (4 Important, 8 Minor), design NOT refuted, all addressed — § 5b. Read § 5b before trusting any sentence below about the guard.** |
+
+⚠ `check:db-tz` is **NOT run** (`DATABASE_URL is required`). This lane never runs `docker compose`: the
+stack on `:3001` belongs to executor 1.
+⚠ ⚠ **`check:case-ids` IS NOT A `pnpm` SCRIPT.** `pnpm check:case-ids` exits **254** — that is pnpm
+reporting an undefined script, **not a failing guard**. Run `node scripts/check-case-ids.mjs`. A future
+reader who loops the `check:*` names will read 254 as a red; it cost this lane one round.
+
+### § 3 — WHAT SHIPPED, AND THE ONE THING THAT MATTERS MOST
+
+1. **The checker's floor SPLITS: 24 for a control in the declared `DENSE_IN_LIST` table, 44 for every
+   other control.** The four entries and the membership rule are in `tap-targets.ts`'s docblock; the
+   three structural predicates that were tried and rejected are there too, each with the counterexample
+   that kills it. **The dangerous direction is guarded by leaving it alone: anything not in the table is
+   judged at 44.**
+2. **A required `witness` per entry**, which the review showed was necessary — see § 5b.
+3. **The `/help` ratchet re-baselined DOWN**: `phone-390` 10→0, `tablet-768` 16→0, `desktop-1512` 16→0.
+   Nothing rose, no key added, nothing else moved.
+4. **`apps/web/test/tap-target-density.test.ts`**, NEW and **on the gate** — pins both constants and
+   cross-checks the table against `ui.css`. ⚠ **It exists because the viewport suites are on NO gate.**
+5. `Features.md` and `test-cases/13-pre-launch-checklist.md` + `test-cases/13-settings-and-workflows.md`
+   move in the same change set.
+
+### § 4 — THE MUTATION BATTERY: 6 MUTATIONS
+
+| # | mutation | expected | observed |
+|---|---|---|---|
+| **M3** | `STANDALONE_FLOOR_PX` 44 → 24 (the blanket-24) | unit 13.990 red | **RED by name** |
+| **M3b** | …the viewport suite under that same mutation | *(the point)* | **pass/fail UNCHANGED — 30 passed / 1 failed, `/help` 0 offenders.** ⚠ Only the `rescued` diagnostic differs (0 vs 25) and **no assertion reads it**. The unit test is the ONLY automated catch |
+| **M1** | `.gn-help__search-input` (STANDALONE) `min-height` 2.75rem → 1.5rem | viewport red | **RED, `{"w":366,"h":24,"floor":44}` at all 3 viewports** |
+| **M2** | `.gn-help__pager-link` (IN-LIST) `min-height` 1.5rem → 1rem | viewport red | **RED, `h:23, floor:24` at all 3 viewports** |
+| **M4** | table control renamed `…pager-link` → `…pager-linkRenamed` | stale-entry guard fires | **RED, `stale entries=[".gn-help__pager-linkRenamed inside .gn-help__pager"]`, `[]` elsewhere.** Re-run AFTER the witness fix: still fires |
+| **M5** | FAQ page shape, produced by renaming the wrapper AND toggle classes in `packages/app-core/dist/help/help-browser.js` | FIXED guard silent | **`stale entries=[]` at all 3 viewports** |
+| **M5b** | …same page shape, guard predicate reverted to the pre-review version | OLD guard false-reds | **RED, `stale entries=[".gn-help__group-toggle inside .gn-help__groups"]` at all 3 viewports** |
+
+**M1 is the dispatch's §4 mutation verbatim.** Every restore was verified by `git status --short` empty
+**and** by re-reading the mutated site's content — ⚠ **never `git checkout --` on an uncommitted tree**,
+which is why the fix round was COMMITTED before M4/M5b ran.
+
+### § 5 — TWO FINDINGS THAT OUTLIVE THE TASK
+
+1. ⚠ **NEITHER VIEWPORT SUITE IS ON ANY GATE.** `pnpm turbo run build test typecheck` defines no task
+   that RUNS them (types ARE checked — `tsconfig.e2e.json` includes both dirs), and
+   `.github/workflows/ci.yml` runs `test:e2e:stack` only. **`viewport` does not occur in that file at
+   all** — measured, with a positive control in the same invocation (the same grep finds `e2e` 10×).
+   **Consequence, measured at `99f2a780` and reproduced on two independent runs: `/help` read 25 / 23 / 25
+   offenders against baselines of 10 / 16 / 16 — red on `main`, seen by nobody, for as long as the topic
+   sidebar has existed.** Owner: whoever next touches the CI gate. Not this change's to make.
+2. **A pre-existing failure this change does NOT fix and does NOT cause.** The suite is 30 passed /
+   1 failed **both before and after**. The 1 is `body copy under 16px at 390px` on `/help` —
+   `p.gn-help__eyebrow` at 12.48px plus 16 × `p.gn-help__section-eyebrow` at 13px. A DIFFERENT assertion
+   (`measureBodyText`), untouched by this diff. Owner: whoever next owns the body-text floor on `/help`.
+3. **`docs/lanes/executor-state.md:598-599` carries a sentence this change FALSIFIED** — that the checker
+   sweeps "against a hard 44px floor with no per-component exemption". It is executor 1's handoff, and
+   two writers on one handoff file is what the split prevents, so it is **RECORDED, not edited across the
+   lane boundary. Owner: whoever next writes that file.**
+
+### § 5b — THE REVIEW ROUND (12 findings: 4 Important, 8 Minor; design NOT refuted)
+
+One independent falsifying reviewer ran at `0dc95fd6`. Everything was verified at its line before
+acting, and two findings were re-measured. **The Important ones:**
+
+- ⚠ **THE STALE-ENTRY GUARD COULD FALSE-RED ON A LEGITIMATE PAGE — the worst finding, and it was
+  MINE.** `help-browser.tsx` renders a group whose `title` is `null` as a bare `<GroupItems>` with **no
+  toggle** ("Flat, with no toggle") inside `.gn-help__groups`. The FAQ declares no groups, so that
+  container renders non-empty with ZERO toggles, and the guard's original trigger ("any children")
+  convicted it. Its own docblock had argued that plus the empty case covered the ground; they did not.
+  **Fixed by a REQUIRED `witness` selector** — an entry states the context it expects instead of
+  inferring one, and there is no default, because a default is how the first version went wrong.
+  Witnessed on the compiled artifact both ways (M5/M5b above). ⚠ **The reachability argument ("the
+  document is client state, defaults to `manual`") is a reading that expires** the moment a `?doc=`
+  parameter or a default change lands — which is why it is fixed rather than recorded.
+- **Three sentences in the repo asserted the OPPOSITE of what this change does, and `ui.css` was never
+  opened** while commit 1's message advertised a citation sweep: `ui.css:5450-5452` and `:5213`,
+  `packages/ui/test/components.test.tsx`, `Features.md`, `test-cases/13-settings-and-workflows.md` all
+  said the checker has **"no per-component exemption"**. The declared table IS one. All four corrected,
+  each recording what it used to claim. All four also cited `tap-targets.ts:108`/`:102` — numbers that
+  **now land inside the table this change added**: a stale citation that still resolves.
+- **The new test's `ui.css` read was not a turbo input**, so a stylesheet edit would replay a cached
+  green log. `$TURBO_ROOT$/packages/ui/src/**` added to `@gisik-nokma/web#test`.
+  ⚠ **`members-styling.test.ts` was already exposed the same way and predates this change.**
+- **"no task that reaches it"** was loose (types ARE on-gate) and the surviving failure was described
+  without its 12.48px offender. Both corrected.
+
+**Minors, each verified then fixed:** "224 section links" had no source and the sweep contradicted it
+(removed); "six weeks" is twelve days; "identical output" under M3 was false (narrowed in § 4);
+the membership rule admitted controls whose CSS also claims 24 (rewritten to two clauses, with the three
+excluded controls **named** and `.gn-my-work__title` recorded as the closest thing to an error in the
+table); `denseMembers` was incremented after the inline-exempt `continue` (moved); `classify` was
+inclusive where the guard read descendants only (both now strict); and the table is **not self-policing**
+— a broad-class entry passes every assertion in the new test, which the docblock now says outright.
+
+**What the reviewer could NOT falsify**, kept because that is evidence too: all four entries genuinely
+declare 24 in their own rules (`.gn-attention__title` and `.gn-help__pager-link` really are
+`inline-flex`, so the old inline exemption really could not reach them); the re-baseline moved only
+downward; the suite is genuinely off-gate; the 25/23/25 reading; the `ui.css:1606-1616` citation; the
+745-head figure; the lazy-path refactor's behaviour-preservation; and that the guard can fail.
+
+### § 6 — WHAT IS NOT IN THIS CHANGE SET, NAMED RATHER THAN IMPLIED
+
+- **The signed-in baseline `stack-phone-390|/my-work` (6) was NOT re-measured.** `e2e-stack` runs against
+  the live stack on `:3001`, which is **executor 1's worktree** — a count taken here would not be a
+  measurement of this tree. Left at 6: **untouched is not loosened.** The attention strip's titles are
+  exactly what the split now classifies in-list, so whoever runs that suite against its own stack should
+  find a lower number and re-baseline DOWN.
+- **`.gn-my-work__title` belongs in `DENSE_IN_LIST` by the stated rule and is deliberately absent** —
+  recorded in the table's docblock with the reason and an owner. Leaving it judged at 44 is the
+  conservative side: too strict is loud and safe.
+- **The viewport suite is still on no gate**, and wiring it is not this change's to make (§ 5.1).
+- **No browser measurement beyond `/help`, `/privacy`, `/terms`, `/sign-in` and the 404** — the unauthed
+  suite's roster. The `:3021` viewport server is this lane's; `:3001` is not.
+
+### § 7 — CASE IDS: MY BLOCK IS `13.988`–`13.999`. USED `13.990`, `13.991`, `13.992`.
+
+`controller-state.md:633` is the allocation: exec 1 `13.976`–`13.987`, exec 2 `13.988`–`13.999`, and
+**`§13` is 24 ids from full — an emptied block is a STOP-AND-ASK.** Measured at the tip by case MARKER:
+`13.988` and `13.989` are used; **`13.990`–`13.999` were free**; three minted, none outside the block.
+⚠ **The delta was measured against the folded `origin/main` by exporting it and running the guard there:
+2564 → 2567, exactly +3.** Exec 1 minted `13.1034`+ on the parallel branch — past the `{3}` window, and
+outside my block, so no collision; `check:case-ids` is rc 0.
+
+### § 8 — WHAT THE NEXT SESSION SHOULD DO FIRST
+
+1. **Read § 5b before § 3.** The guard's prose in § 3 predates the fix only in the sense that the fix is
+   recorded in § 5b; the code is fixed.
+2. **Settle the PR in one call**: `gh pr list --state all --head exec2/tap-target-density`. This file
+   cannot name its own PR number — it is the tip commit, and a commit cannot know its own future.
+3. **Re-measure every anchor at the sha you report**, from a worktree pinned at that sha, with
+   `node scripts/check-case-ids.mjs` and NOT `pnpm check:case-ids` (see § 2's 254 warning).
+4. If the controller has merged it, the next dispatch is the handoff's: there is none outstanding in
+   this lane.
+
+---
+
+## ▼ SUPERSEDED BY THE BLOCK ABOVE — **THE ATTACHMENTS READ: A ROUTE OVER THE TABLE THAT HAD NO CALLER, THE SEAM BEHIND IT, AND THE MOUNT THAT FINALLY PASSES IT.** (2026-09-20)
 
 ### § 1 — WHERE TO FIND IT
 
