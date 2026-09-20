@@ -2,8 +2,9 @@ import { docToPlainText } from '@gisik-nokma/domain';
 import type { SubmittedEvent } from '@gisik-nokma/domain';
 import { describe, expect, it } from 'vitest';
 import { errandItems, readCcBoard, type CcItem } from '../../src/seed/cc-board.js';
-import { buildErrandEvents, errandDescriptionText, neededWeekEnd, type CcMapContext } from '../../src/seed/cc-map.js';
+import { buildErrandEvents, errandDescriptionParts, neededWeekEnd, type CcMapContext } from '../../src/seed/cc-map.js';
 import { seedUlid } from '../../src/seed/seed-ulid.js';
+import { plainTextDoc, seedDescriptionDoc } from '../../src/seed/doc-text.js';
 
 const boardPath = new URL('../../../../reference/convenience-corner-tracker/board.data.js', import.meta.url).pathname;
 const board = readCcBoard(boardPath);
@@ -33,6 +34,18 @@ const ctx: CcMapContext = {
 const eventsFor = (id: string): SubmittedEvent[] => buildErrandEvents(byId(id), ctx);
 const fieldSet = (events: SubmittedEvent[], fieldId: string): SubmittedEvent | undefined =>
   events.find((event) => event.type === 'ticket.field_set' && (event.payload as { fieldId: string }).fieldId === fieldId);
+
+/**
+ * The description as the single string the record holds, rebuilt from the parts.
+ * `errandDescriptionText` used to exist for this and was removed with the split:
+ * it had no production caller left, and a test-only export is a name that lives
+ * nowhere. Parts are joined with a blank line, which is the separator
+ * `seedDescriptionDoc` writes between them.
+ */
+const recordTextOf = (id: string): string =>
+  errandDescriptionParts(byId(id), titleById)
+    .map((part) => part.text)
+    .join('\n\n');
 
 /**
  * 13.64 — neededWeekEnd reproduces the tracker generator's own week
@@ -178,7 +191,7 @@ describe('the body carries the record verbatim', () => {
    * below) — one row, three tests.
    */
   it('body text, counterparty, ask text and attention schedule are all present and literal', () => {
-    const text = errandDescriptionText(byId('ops:duns'), titleById);
+    const text = recordTextOf('ops:duns');
     expect(text).toContain('tracker id: ops:duns');
     expect(text).toContain('origin: operations/registrations/duns.md');
     expect(text).toContain('counterparty: Dun & Bradstreet');
@@ -191,7 +204,7 @@ describe('the body carries the record verbatim', () => {
    * text (part of the same row as the tests above and below).
    */
   it('a question’s who and ask ride along (ops:accountant-cloud-gst)', () => {
-    const text = errandDescriptionText(byId('ops:accountant-cloud-gst'), titleById);
+    const text = recordTextOf('ops:accountant-cloud-gst');
     expect(text).toContain('who: Accountant');
     expect(text).toContain('ask (verbatim, as drafted in the record):');
     expect(text).toContain('reverse charge');
@@ -203,19 +216,93 @@ describe('the body carries the record verbatim', () => {
    * tests above).
    */
   it('blocked_by resolves to the blocking item’s human title', () => {
-    const text = errandDescriptionText(byId('ops:apple-developer'), titleById);
+    const text = recordTextOf('ops:apple-developer');
     expect(text).toContain('blocked by: Can the proprietorship enrol as an organisation');
     expect(text).toContain('(tracker id ops:owner-store-account-entity)');
   });
 
   /**
-   * 13.75 — the description event carries the text as a literal-text doc,
-   * round-tripped through the domain's own docToPlainText.
+   * 13.75 — REVERSED 2026-09-20, flipped rather than deleted. Until the owner's
+   * ruling (*"both"*) this case asserted the doc carried `**Gates:**` with its
+   * asterisks — the truth about a renderer that parsed nothing. It now asserts
+   * the other side of the reversal, and asserts it in TWO directions so a
+   * "parser" that simply DELETED the asterisks cannot pass: the text lost them,
+   * and a bold mark took their place.
    */
-  it('the description event carries the text as a literal-text doc', () => {
+  it('the description event carries a PARSED doc: the asterisks are gone and a bold mark has them', () => {
     const claim = fieldSet(eventsFor('ops:dlt-entity'), 'description');
-    const text = docToPlainText((claim?.payload as { value: unknown }).value);
-    expect(text).toContain('**Gates:** every SMS the platform will ever send');
+    const value = (claim?.payload as { value: unknown }).value;
+    const text = docToPlainText(value);
+
+    expect(text).toContain('Gates: every SMS the platform will ever send');
+    expect(text).not.toContain('**');
+
+    const marks: string[] = [];
+    const walk = (node: unknown): void => {
+      if (!node || typeof node !== 'object') return;
+      const candidate = node as { marks?: Array<{ type: string }>; content?: unknown[] };
+      for (const mark of candidate.marks ?? []) marks.push(mark.type);
+      if (Array.isArray(candidate.content)) candidate.content.forEach(walk);
+    };
+    walk(value);
+    expect(marks).toContain('bold');
+  });
+
+  /**
+   * ⚠ THE SPLIT, ASSERTED AT THE EVENT AND NOT ONLY AT THE BUILDER — because this is
+   * the doc the ledger stores, and the property that matters is about THAT. The
+   * record block rides through the same builder and must arrive with its
+   * characters intact, while the prose around it is parsed. Both halves in one
+   * case, so a change that parsed everything or parsed nothing fails here.
+   */
+  it('the same doc keeps the record block LITERAL while the prose around it is parsed', () => {
+    const claim = fieldSet(eventsFor('ops:accountant-cloud-gst'), 'description');
+    const value = (claim?.payload as { value: unknown }).value;
+    const text = docToPlainText(value);
+
+    expect(text).toContain('— tracker record —');
+    expect(text).toContain('tracker id: ops:accountant-cloud-gst');
+    expect(text).toContain('tracker attention schedule (authored in board.json, not origin truth): start 2026-08-19 · due 2026-08-20');
+    // The ask is prose and IS parsed: its numbered questions become a list, and
+    // the markdown the authors typed does not survive as characters.
+    expect(text).not.toContain('**');
+  });
+
+  /**
+   * 16.78 — a description is split into markdown PROSE and a LITERAL record block by
+   * construction, never by inspecting the text; a record note that looks like a
+   * list stays characters.
+   *
+   * ⛔ THE CASE THE SPLIT EXISTS FOR, and the one that makes the two above fail
+   * rather than pass by luck. **No RECORD line starts with a markdown BLOCK marker**
+   * — measured over all 172 of them, zero — so on real data alone a builder that
+   * parsed the whole string would look identical to one that split it, and the
+   * property would be untested decoration. A record note is free text the
+   * tracker's authors write, so this item is a shape the record can really take.
+   *
+   * ⚠ **THE SCOPE WORD IS "RECORD", NOT "CORPUS", AND AN INDEPENDENT REVIEW CAUGHT THE
+   * DIFFERENCE**: 64 PROSE lines in the shipped corpus DO start with a block
+   * marker (headings, bullets and numbered items — the constructs this parser is
+   * FOR). Narrowing the claim to the record block is what makes it true, and the
+   * record block is the only place the split has to hold.
+   *
+   * The control is IN THE SAME `it()`: the same two lines through the markdown
+   * renderer do become a list, so this case cannot pass by the renderer being
+   * broken or by the note never reaching a renderer at all.
+   */
+  it('a record note that LOOKS like a list stays literal, because the split is by construction', () => {
+    const item = { ...byId('ops:duns'), note: '- first thing\n- second thing' };
+    const parts = errandDescriptionParts(item, titleById);
+
+    expect(parts.find((part) => part.kind === 'literal')?.text).toContain('- first thing');
+
+    const types = (seedDescriptionDoc(parts).content as Array<{ type: string }>).map((block) => block.type);
+    expect(types).not.toContain('bulletList');
+
+    const throughMarkdown = (plainTextDoc('- first thing\n- second thing').content as Array<{ type: string }>).map(
+      (block) => block.type,
+    );
+    expect(throughMarkdown).toEqual(['bulletList']);
   });
 });
 

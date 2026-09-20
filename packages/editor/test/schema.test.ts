@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Fragment, Slice } from '@tiptap/pm/model';
 import { DOC_SCHEMA_VERSION, emptyDoc, isDocJson } from '../src/doc.js';
 import { createTestEditor } from './helpers/create-editor.js';
+import { typeText } from './helpers/type-text.js';
 
 /**
  * Document schema v1's vocabulary, stated once. The spec calls this set
@@ -339,6 +340,42 @@ describe('behavioural options that spec §2 constrains', () => {
   });
 
   /**
+   * 9.95 — a TYPED `[text](url)` becomes a link, and the text survives as the link's
+   * text. This is the behaviour the owner's 2026-09-20 ruling ("both") turned on by
+   * reversing `markdownLinks`.
+   *
+   * ⚠ ASSERTED ON THE TYPING PATH AND NOT THE PASTE ONE, and that is the whole
+   * design of the case: the sibling above MEASURES that a pasted plain URL becomes a
+   * link at EITHER value of `markdownLinks`, so a case that pasted would stay green
+   * with the option off and prove nothing about the reversal. `typeText` routes each
+   * character through `handleTextInput`, which is where input rules — and only input
+   * rules — fire.
+   *
+   * ⚠ AND IT RECORDS AN ASYMMETRY RATHER THAN ABSORBING IT: typing this link does NOT
+   * offer the escape suggestion that `**due soon**` offers, even though both fire an
+   * input rule and both are formatting the escape mechanic exists to let a user keep
+   * literal. Measured, not inferred — a probe typed both and read
+   * `getEscapeSuggestion` on each. **The cause is NOT established here, and this
+   * comment says so rather than guessing at one.** Owner: whoever next touches
+   * `extensions/escape-suggestion.ts`'s trigger coverage.
+   */
+  it('turns a TYPED [text](url) into a link, with its text intact', () => {
+    const editor = createTestEditor(undefined, emptyDoc());
+    typeText(editor, 'see [the doc](https://gst.gov.in) now');
+    const json = editor.getJSON();
+
+    expect(linkHrefsIn(json)).toEqual(['https://gst.gov.in']);
+    // The link's TEXT is what the reader sees, and the syntax must not survive into
+    // it: a rule that linked the whole literal would leave the brackets on screen.
+    expect(JSON.stringify(json)).toContain('"text":"the doc"');
+    expect(JSON.stringify(json)).not.toContain('[the doc]');
+    // The prose around it is untouched, so the rule consumed the link and not the
+    // sentence.
+    expect(editor.state.doc.textContent).toBe('see the doc now');
+    editor.destroy();
+  });
+
+  /**
    * The same path, and part of why Task 5's decision is bigger than links:
    * five configured extensions register seven paste rules between them
    * (`bold` 2, `italic` 2, `code` 1, `strike` 1, `link` 1). Its TYPED
@@ -429,8 +466,14 @@ describe('behavioural options that spec §2 constrains', () => {
     expect((byName.get('link') as { openOnClick?: unknown } | undefined)?.openOnClick).toBe(false);
     expect((byName.get('link') as { autolink?: unknown } | undefined)?.autolink).toBe(false);
     expect((byName.get('link') as { linkOnPaste?: unknown } | undefined)?.linkOnPaste).toBe(false);
+    // ⚠ REVERSED 2026-09-21 ON THE OWNER'S RULING ("both"), superseding the value
+    // this line pinned until then. It read `false`, citing spec §2's "nothing
+    // silently becomes markup" — but that option never delivered §2: a pasted plain
+    // URL becomes a link at EITHER value, which the sibling case above MEASURES
+    // rather than assumes. So the reversal does not weaken §2's hold; it widens what
+    // a user can TYPE. src/schema/extensions.ts carries the full argument.
     expect((byName.get('link') as { markdownLinks?: unknown } | undefined)?.markdownLinks).toBe(
-      false,
+      true,
     );
     expect((byName.get('table') as { resizable?: unknown } | undefined)?.resizable).toBe(false);
     editor.destroy();

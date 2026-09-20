@@ -1,5 +1,5 @@
 import type { SubmittedEvent } from '@gisik-nokma/domain';
-import { plainTextDoc } from './doc-text.js';
+import { seedDescriptionDoc } from './doc-text.js';
 import { readPlanSeries, type PlanDoc } from './plan-series.js';
 import type { CcSeedDeps, SeedReport } from './seed-convenience-corner.js';
 import { seedUlid } from './seed-ulid.js';
@@ -88,7 +88,13 @@ export function buildDevSeedEvents(docs: PlanDoc[], ownerUserId: string, clientT
         // field declaration needed, and none exists to declare it against
         // since this seed defines no ticket type of its own.
         fieldId: 'description',
-        value: plainTextDoc(`Goal: ${doc.goal}\n\nsource: docs/superpowers/plans/${doc.file}`),
+        // The plan's own goal is prose and is parsed (the owner's 2026-09-20
+        // ruling); the `source:` line is a RECORD line and is not, for the
+        // reason `doc-text.ts` gives — a path is not a sentence.
+        value: seedDescriptionDoc([
+          { kind: 'markdown', text: `Goal: ${doc.goal}` },
+          { kind: 'literal', text: `source: docs/superpowers/plans/${doc.file}` },
+        ]),
       });
     }
     for (const task of doc.tasks) {
@@ -111,7 +117,9 @@ export function buildDevSeedEvents(docs: PlanDoc[], ownerUserId: string, clientT
         'ticket.field_set',
         {
           fieldId: 'description',
-          value: plainTextDoc(`source: docs/superpowers/plans/${doc.file} § Task ${task.number}`),
+          value: seedDescriptionDoc([
+            { kind: 'literal', text: `source: docs/superpowers/plans/${doc.file} § Task ${task.number}` },
+          ]),
         },
       );
     }

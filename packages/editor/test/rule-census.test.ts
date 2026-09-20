@@ -54,6 +54,12 @@ const EXPECTED_INPUT_RULES: Record<string, number> = {
   orderedList: 1,
   strike: 1,
   horizontalRule: 1,
+  // ADDED 2026-09-21 with the `markdownLinks` reversal: the typed `[text](url)`
+  // input rule is now registered, so `link` joins the input census as an ELEVENTH
+  // extension and the total moves 18 -> 19. This line is the whole cost of the
+  // owner's ruling on the schema side, and it is stated as a per-extension count so
+  // that a future upgrade moving it cannot reconcile 19 === 19.
+  link: 1,
 };
 
 function census(field: 'addInputRules' | 'addPasteRules'): Record<string, number> {
@@ -100,24 +106,31 @@ describe('the rule census the schema origin states in prose', () => {
   it('registers exactly the input rules the comment block enumerates', () => {
     const counts = census('addInputRules');
     expect(counts).toEqual(EXPECTED_INPUT_RULES);
-    expect(total(counts)).toBe(18);
-    expect(Object.keys(counts)).toHaveLength(10);
+    expect(total(counts)).toBe(19);
+    expect(Object.keys(counts)).toHaveLength(11);
   });
 
   /**
-   * The two censused sets are DISJOINT — the comment block says so, and it is
-   * load-bearing for Task 5, because it is the reason no single lever
-   * (`enableInputRules` or `enablePasteRules`) settles spec §2. An extension
-   * appearing in both maps would not fail either case above.
+   * The two censused RULE SETS are disjoint — they live in different plugins, behind
+   * different `Editor` options (`enableInputRules` / `enablePasteRules`), and that is
+   * why no single lever settles spec §2.
+   *
+   * ⚠ AS SETS OF EXTENSIONS THEY ARE NOT DISJOINT, AND `link` IS WHY THAT NOW HAS TO
+   * BE SAID. Until 2026-09-21 `link` contributed a paste rule and no input rule, so
+   * `pasted \ typed` was always the one-element list `['link']`. With `markdownLinks`
+   * reversed, `link` contributes to BOTH censuses and that list is now EMPTY — a set
+   * that had never been empty in this file's life. **An empty list here is the
+   * measurement, not a broken assertion**, and the disjointness that carries the
+   * argument is by PLUGIN, which the two counts above still witness separately.
    */
-  it('keeps the two rule sets disjoint, which is why neither lever settles §2', () => {
+  it('keeps the two rule sets in separate plugins, which is why neither lever settles §2', () => {
     const pasted = new Set(Object.keys(census('addPasteRules')));
     const typed = new Set(Object.keys(census('addInputRules')));
-    // Disjoint as SETS OF RULES, not as sets of extensions: `bold`, `italic`,
-    // `code` and `strike` each contribute to both censuses. What is disjoint
-    // is which plugin the rules land in, and that is what the two gates read.
+    // Disjoint as SETS OF RULES, not as sets of extensions: five extensions now
+    // contribute to both censuses. What is disjoint is which PLUGIN each rule lands
+    // in, and that is what the two gates read.
     const both = [...pasted].filter((name) => typed.has(name)).sort();
-    expect(both).toEqual(['bold', 'code', 'italic', 'strike']);
-    expect([...pasted].filter((name) => !typed.has(name))).toEqual(['link']);
+    expect(both).toEqual(['bold', 'code', 'italic', 'link', 'strike']);
+    expect([...pasted].filter((name) => !typed.has(name))).toEqual([]);
   });
 });

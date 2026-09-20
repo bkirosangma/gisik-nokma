@@ -73,23 +73,43 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     //     (dist:486).
     //   - `linkOnPaste: false` — the pasteHandler plugin is not registered
     //     (dist:502).
-    //   - `markdownLinks: false` — the typed `[text](url)` input rule is not
-    //     registered (dist:434-435). NO value of this option stops a pasted
-    //     plain URL from becoming a link: both branches of `addPasteRules`
-    //     link plain URLs (dist:474 directly; dist:465 via
+    //   - `markdownLinks: TRUE SINCE 2026-09-21` — the typed `[text](url)`
+    //     input rule IS registered (dist:434-435). It sat at `false` until the
+    //     owner's ruling ("both") reversed it, and the §2 citation that held it
+    //     there was doing less work than it looked: **NO value of this option
+    //     stops a pasted plain URL from becoming a link** — both branches of
+    //     `addPasteRules` link plain URLs (dist:474 directly; dist:465 via
     //     `markdownLinkPasteRule`, which merges `findPlainUrls` matches in,
-    //     dist:225-234) — even inside pasted `[text](url)`, the URL half
-    //     gets linked.
+    //     dist:225-234), and even inside pasted `[text](url)` the URL half gets
+    //     linked. **So the property §2 names did not hold here BEFORE the
+    //     reversal, and the reversal does not break it** — which is why this is
+    //     recorded as a widening rather than a waiver. `test/schema.test.ts`
+    //     measures the paste half at either value rather than trusting this
+    //     paragraph, and pins the typed half (9.95) on the typing path, since a
+    //     paste-path case stays green with the option OFF and would prove
+    //     nothing about it.
+    //     ⚠ IT WIDENS THE RULE CENSUS BY EXACTLY ONE, AND IT DOES NOT WIDEN THE
+    //     ESCAPE MECHANIC: a typed link now fires an input rule, but typing one
+    //     offers no escape suggestion where `**due soon**` does. That asymmetry
+    //     is measured in `test/schema.test.ts` (9.95) with its cause left
+    //     unestablished rather than guessed — owner: whoever next touches the
+    //     trigger coverage in `extensions/escape-suggestion.ts`.
     //
     // Still live, counted on the extension list this function builds, at
     // tiptap 3.30.5: SEVEN PASTE RULES across five extensions (`bold` 2,
     // `italic` 2, `code` 1, `strike` 1, `link` 1), firing on external paste,
     // external drop, or an `applyPasteRules` meta (the guard at core
-    // dist:5121-5125); and EIGHTEEN INPUT RULES across ten extensions
+    // dist:5121-5125); and NINETEEN INPUT RULES across eleven extensions
     // (`heading` 6, `bold` 2, `italic` 2, `codeBlock` 2, `blockquote` 1,
     // `bulletList` 1, `code` 1, `orderedList` 1, `strike` 1,
-    // `horizontalRule` 1), firing from `handleTextInput` as text is typed
-    // (core dist:4834). So `**due soon**` arrives bold whether pasted,
+    // `horizontalRule` 1, `link` 1), firing from `handleTextInput` as text is
+    // typed (core dist:4834). **The counts were 18 and ten until 2026-09-21,
+    // and `link` is the one that moved** — with the option reversed it
+    // contributes to BOTH censuses, so `test/rule-census.test.ts`'s
+    // `pasted \ typed` set is now empty where it had always been `['link']`.
+    // Every number and every membership here is asserted per-extension by that
+    // file, so a future upgrade that moves one fails there naming the extension
+    // rather than reconciling two totals. So `**due soon**` arrives bold whether pasted,
     // dropped, or typed — through two different plugins, all three verified
     // on this list. The two censused sets are disjoint and sit behind two
     // separate `Editor` options, both defaulting true: `enablePasteRules`
@@ -98,18 +118,24 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     // the other set firing. This function returns `Extensions` and never
     // constructs an `Editor`, so it can reach neither option.
     //
-    // NOT DECIDED HERE, DELIBERATELY. How §2 should be honoured across those
-    // ten extensions and both levers is a product judgement, and TASK 5 —
-    // the escape-suggestion mechanic — owns it. Tests in test/schema.test.ts
-    // record the current behaviour truthfully, so Task 5's change is what
-    // makes them fail.
+    // NOT DECIDED HERE, DELIBERATELY — AND HALF OF IT NO LONGER NEEDS DECIDING.
+    // How §2 should be honoured across these extensions and both levers is a
+    // product judgement. TASK 5 — the escape-suggestion mechanic — owns the
+    // general question and closes it for the TYPED path by offering an escape;
+    // the LINK half was put to the owner on 2026-09-20 and answered ("both"),
+    // which is the reversal above. **What the reversal did NOT settle is the
+    // asymmetry it exposed**: a typed link fires an input rule but offers no
+    // escape, where a typed bold mark does. That is recorded with a named owner
+    // in `test/schema.test.ts` (9.95) rather than absorbed here. Tests in that
+    // file record the behaviour truthfully, which is why this reversal failed
+    // them and why they were FLIPPED rather than deleted.
     //
     // `openOnClick: false` keeps a click editing the link, not following it.
     Link.configure({
       openOnClick: false,
       autolink: false,
       linkOnPaste: false,
-      markdownLinks: false,
+      markdownLinks: true,
     }),
     Placeholder.configure({ placeholder: options.placeholder ?? 'Write…' }),
     Table.configure({ resizable: false }),
