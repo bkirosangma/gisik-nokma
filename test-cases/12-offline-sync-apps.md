@@ -1443,8 +1443,8 @@ failure this bucket has recorded before, caught here by a compiler instead of by
    `views/ticket-sheet.tsx`'s `submitTransition`, `submitAssignee`, `submitDescription`, `submitTitle`
    and `addSubtask`, `views/visibility-editor.tsx`'s `apply`, and `flows/guarded-child-event.ts:54`
    (`ingestOne`) await it without catching a rejection — **cited BY HANDLER and not by line, because
-   every one of these citations had rotted again: nine commits touched `ticket-sheet.tsx` in a single
-   day and moved all five of its citations off the sites they named.** `ticket-sheet`'s
+   every one of these citations had rotted again: nine commits have touched `ticket-sheet.tsx` since
+   that re-pointing and moved all five of its citations off the sites they named.** `ticket-sheet`'s
    `submitTicketEvent` is its one that DOES catch, and `submitTitle`/`addSubtask` are `try`/`finally`,
    which handles no rejection — so they stand with the five, not beside the one; and
    `apps/web/app/w/[workspaceId]/members/page.tsx:249` and `:342` neither await nor catch — they `void`
