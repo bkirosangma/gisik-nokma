@@ -31,6 +31,58 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 SUNDAY 2026-09-20 ~11:4x IST — **CYCLE 20: THE OWNER RULED ALL TEN OPEN ITEMS, THE LEDGER'S LAST REAL ROW IS FLIPPED, AND A CHECK THAT COULD NOT FAIL WAS REBUILT ON A PARSE TREE.** `main` is `0ea15006`; **zero open PRs**; ledger **307 done / 1 todo** — the remaining `todo` is the **permanently struck** `board-prototype-port/1`.
+
+### 📌 THE OWNER'S TEN RULINGS — TAKEN 2026-09-20 ~11:3x IST. **THIS IS THE NEWEST AUTHORITY IN THIS FILE.**
+Each was put with the controller's recommendation; **the owner's answer is recorded verbatim where the wording is load-bearing, and where it differed from the recommendation that is marked.**
+
+| # | the item | the owner's ruling |
+|---|---|---|
+| 1 | **The reviewer-pass bar clause** (written in the machinery block and `override-2026-09-18-deepseek-controller.md:8`; omitted from the 2026-09-19 override, which still called the bar *"unchanged"*) | **"keep it"** — **a reviewer pass runs and is recorded in the body before a PR opens, and a missing one is sent back.** It has now earned its place **five times in one night** (§ below). |
+| 2 | **Ledger `hig-per-screen/3b`** | **"flip 3b"** — **DONE** in this PR: `done`, `#575`, `cc59ce8f`, reason in the row. |
+| 3 | **The tap-target checker** (bars at 44; `ui.css:1506-1522` is the repo's own written rule that dense in-list controls get 24) | **"let the checker accept 24 for in-list controls, keep 44 for standalone buttons"** |
+| 4 | **The unstyled `button.ticket-type-list__move`** (NO CSS rule at all — renders as raw UA chrome) | **"style them, but refer to the prototype on how it is styled"** |
+| 5 | **The style axis** (`#572` claims its screenshot was `hig`; the running stack reads `neo`; no screenshot survives) | **"re-check the prototype on all styles"** |
+| 6 | **The sheet footer's `‹ Previous / Next ›`** (renders on no shipping screen — no caller passes `navigation`) | **"remove the navigation"** |
+| 7 | **Door `H`'s `Delete`** (no removal event exists; eleven kinds, none a removal) | **"yes i want the delete to exist (hoping it is a soft delete), build it"** — **the owner names SOFT DELETE.** A hard delete would destroy ledger history; a tombstone the reads filter out keeps the log append-only. |
+| 8 | **The pending-invitations heading** (`desktop.dc.html:725`; `pending.length` already in state) | **"build it"** |
+| 9 | **The calendar's empty-month copy** (three sentences in code, two renderable; `CALENDAR_NARROWED_MONTH_COPY` is dead) | **"the message should name the filter"** |
+| 10 | **The "lane" product copy** (two constants, neither able to render in any app) | **"delete the copy"** |
+
+**EVERY ITEM NAMED AS "THE OWNER'S" IN CYCLES 16–19 IS NOW RULED. There is no open ruling request on this board.**
+
+### THE TWO MERGES SINCE CYCLE 19
+| | `#585` (exec 2, nine false README claims) | `#584` (exec 1, the check that could not fail) |
+|---|---|---|
+| head, frozen at the gate | `ef9eb059` | `c86897b7` — **the second head; the first was SENT BACK for a missing reviewer pass** |
+| merged as | **`c8a57b46`** | **`0ea15006`** |
+| tree identity | **EXACT** | **EXACT** |
+| forced gate | `EXIT=0` · 33/33 · 0 cached · 2m06.2s | `EXIT=0` · 33/33 · 0 cached · 2m00.4s |
+| per-file blob identity | 5 / 5 identical | 9 / 9 identical |
+| ratchets | `check:help` **231, delta 0** as predicted | `check-case-ids` **2494** |
+
+### ⛔ THE REVIEWER CLAUSE'S STRONGEST EVIDENCE YET — AND IT IS `#584`
+**`#584` was sent back for a missing reviewer pass. The reviewer then found SIX defects in the repair itself across two rounds — and THREE OF THE FIRST FOUR were checks that cannot fail, the exact class the task existed to fix.**
+**The root cause is one sentence: THE FILE CONTAINED ITS OWN SCANNER — a regex over its own characters cannot tell code from the text that describes it.** Three sizes of the same defect: a **2,061-character / 93-line swallow** (a backtick inside a string literal opened a bogus template, **swallowing a real route so the check reddened FALSELY**); a **76-character single-line phantom** that walked past all three guards; and `const trap = '/*';` **deleting a whole register from the scanned universe.** **Repaired by replacing the mechanism rather than guarding it again: both sides now read a PARSE TREE**, where a comment is trivia, a string is a `StringLiteral` and a property is a `PropertyAssignment` — **unrepresentable rather than guarded.** All six survivors now die by mutation.
+**exec 1's own words, and the argument that settles §1: *"in round 1 my own mutation testing passed while all three of those mechanisms were broken, so 'I tested it myself' was not evidence."***
+
+### ⚠ THE PROTOTYPE THE OWNER ATTACHED IS NOT BYTE-IDENTICAL TO THE REPO'S AUTHORITY
+`/Users/kiro/Downloads/Gisik Nokma Desktop (1).html` — **mtime 2026-09-15, 565,271 B, sha256 `bf64cc44…`** — against the repo's cited authority `design-system/interactive/desktop.dc.html` — **mtime 2026-09-18, 320,109 B, sha256 `2cda054b…`**. **BUT every distinctive string the parity list names is present in BOTH** (`Attachments`, `Full screen`, `GN-1183`, `Pending invitations`, `No tickets yet`, `Exit full screen`, `Subtask of`, `Only an admin can`) **and both carry the same `:root` palette.** **So the likely reading is "the same design, exported self-contained vs split" — and exec 1 is dispatched to PROVE which it is and to STOP AND ASK if they are materially different.** ⚠ **This project has a recorded trap for exactly this shape** (cycle 13: an older export that *"matches our build much more closely"* and is cited by nothing).
+
+### WHAT IS QUEUED, AND IN WHAT ORDER
+1. **exec 1, running:** the **prototype round** — (4) style the reorder buttons from the prototype, (5) re-check the comparison **across all three styles** and settle which axis `#572`'s screenshot actually witnessed.
+2. **exec 2, running:** the **absolute-claims round** — the `manual.md:356/:359` family, `faq.md:433`, `coverage-map:249`, **and the project-creation claim in five documents** (repair is **viewer-scoped**, verified: `mayAdminister` gates the form and a member sees *"Only an admin can create a project in this workspace."*).
+3. **Behind those:** (6) remove the footer navigation · (3) the checker's 24/44 · (9) name the filter · (10) delete the copy · (8) build the pending-invitations heading · **(7) BUILD `Delete` AS A SOFT DELETE — the largest, and it gets its own round.**
+4. **And one the controller owes:** `packages/app-core/src/replica/replica-data-source.ts:205` says *"the six call sites `Features.md` §12 enumerates"* and §12 has grown — **a claim in product source contradicting its own authority.** ⚠ **The controller's own attempt to pin whether "six" means six call SITES or six LINES was inconclusive, so it is dispatched as MEASURE-THEN-DECIDE rather than with a number inherited from the controller.**
+
+### WHAT THE NEXT CONTROLLER SHOULD DO FIRST
+1. **Capture both panes** (`gisik:1`, `gisik:2`).
+2. **Re-measure every anchor at the sha you report.**
+3. **Do NOT measure from the primary checkout** — it is behind. Use `gisik-nokma-ctl` on a branch off `origin/main`.
+4. **CI is the billing-blocked shape** (every failing annotation: *"the job was not started because recent account payments have failed"*). **Owner-waived 2026-09-06, not treated as green, NOT to be re-asked.**
+5. ⚠ **THE LANES CAN BE DOWN AND LOOK BUSY.** On 2026-09-20 both executors sat on **`API Error: 402 Insufficient Balance`** from ~05:20 to ~10:50 IST while an idle-nudger pasted *"continue"* into both panes every sixteen minutes. **A 402 reads exactly like a lane that is thinking — check the pane's last error line, not the spinner.**
+6. **Then `gh pr list --state open`, and resume the loop.**
+
 ## 🔄 SUNDAY 2026-09-20 ~06:3x IST — **CYCLE 19: TWO MORE PRs MERGED AND GATED, A CONTRADICTION SETTLED BY MEASUREMENT, AND TWO CONTROLLER CORRECTIONS.** `main` is `3f37ffc4`; **zero open PRs**; ledger **306 done / 2 todo** — unchanged.
 
 ### Position — read this instead of the older tables, which this supersedes
