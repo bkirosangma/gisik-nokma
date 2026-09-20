@@ -82,17 +82,48 @@ import { signInWithPhone } from '../helpers/session.js';
  * anywhere**, so `canSee` answers false with no role fixture at all:
  * invisibility is the default for a non-member.
  *
- * ## NOT COVERED, named with its owner
+ * ## ⚠ THE ENUMERATION — every door that takes a ticket id or an attachment id
  *
- * - **`GET /v1/workspaces/:ws/tickets` has no soft-delete predicate**, and that
- *   is a recorded ruling rather than an omission (`visibility/visible-tickets.ts`:
- *   its SELECT has no `proj_tickets` in its FROM, so the column is unreachable
- *   without adding a join, and the route has no client consumer).
- * - **The history doors are deliberately left serving** — 16.96 asserts that
- *   rather than closing it.
- * - **`routes/my-work.ts:364`'s contested-claim title gate and the replica's two
- *   TypeScript applications of the rule** are named as survivors in case 16.90
- *   with their own owners. They are not attachment doors and are not touched.
+ * The reason `#591` missed a door is that it worked a PAIR one at a time. So the
+ * sweep is published with its scope, and it was run rather than assumed:
+ * `git grep -n 'ticketId' -- 'apps/server/src/routes/*.ts'` finds no route that
+ * takes a ticket id outside the three files below, and the attachment doors are
+ * the only two that take an attachment id. MEASURED at this tree; line numbers
+ * are the half that rots, so each entry names its file and its path.
+ *
+ * | door | carries the deleted guard | serves CONTENT |
+ * |---|---|---|
+ * | `GET …/tickets` (`tickets.ts`) — the workspace list | **NO** — a recorded ruling, below | names and ids, of tickets the viewer may see |
+ * | `GET …/tickets/:ticketId` (`tickets.ts`) — the detail | **YES**, and it had it already (`(state.deleted ?? null) !== null`) | the ticket |
+ * | `GET …/tickets/:ticketId/events` (`tickets.ts`) | **NO — DELIBERATE** | the ledger |
+ * | `GET …/tickets/:ticketId/attachments` (`tickets.ts`) | **CHANGED → yes, `ticketIsLive`** | file names, sizes, hashes |
+ * | `POST /v1/attachments` (`attachments.ts`) — ticketId in the body | **CHANGED → yes, `ticketIsLive`** | Writes bytes — the accrual door |
+ * | `GET /v1/attachments/:id` (`attachments.ts`) — the download | **CHANGED → yes, `ticketIsLive`** | **the file bytes themselves** |
+ * | `GET /v1/tickets/:id/history` (`ticket-history.ts`) | **NO — DELIBERATE, same reason as the events door** | the ledger, paged |
+ * | `POST /v1/events` (`events.ts`) | **YES, and it always had it** — the ENGINE's door | writes; `checkTicketDeleted` refuses a second delete (`already-deleted`) and `checkTicketRestored` is what makes the undo possible |
+ *
+ * Two entries are deliberately left as they are, and both are decisions rather
+ * than absences:
+ *
+ * - **The two HISTORY doors keep serving a tombstone**, because *"Its history is
+ *   retained, because other events cite it"* — the record, and what 16.96 pins.
+ *   The attachments route's own docblock claims the ledger and the files are
+ *   *"one question about one ticket."* **They are not, and that is the owner's
+ *   ruling on this change**: the ledger cites a ticket and must outlive it, the
+ *   files ARE the ticket's content and go with it.
+ * - **`GET …/tickets` has no soft-delete predicate**, which is a RECORDED ruling
+ *   rather than an omission (`visibility/visible-tickets.ts`: its SELECT has no
+ *   `proj_tickets` in its FROM at all, so the column is unreachable without
+ *   adding a join — and the same note records that the route has no client
+ *   consumer, measured by a sweep of both clients against a positive control).
+ *   A join for a surface nothing reads is not this change's to add.
+ *
+ * ## NOT COVERED HERE, named with its owner
+ *
+ * - **`routes/my-work.ts`'s contested-claim title gate and the replica's two
+ *   TypeScript applications of the rule** are named as MEASURED SURVIVORS in
+ *   case 16.90 with their own owners. They are bulk reads and client reads, not
+ *   doors that take one ticket id, and they are not touched.
  */
 
 type InjectResponse = Awaited<ReturnType<FastifyInstance['inject']>>;

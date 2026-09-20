@@ -19,8 +19,8 @@ import { signInWithPhone } from '../helpers/session.js';
  * has accepted an `attachments` prop since Plan 6, and the single mount in the
  * product (`apps/web`'s project page) never passed it.
  *
- * **THE PREDICATE IS THE ONE THE EVENTS DOOR ALREADY USES, and this file proves
- * it by AGREEMENT rather than by reading.** The events door
+ * **THE VISIBILITY PREDICATE IS THE ONE THE EVENTS DOOR ALREADY USES, and this
+ * file proves it by AGREEMENT rather than by reading.** The events door
  * (`routes/tickets.ts`, `/v1/workspaces/:workspaceId/tickets/:ticketId/events`)
  * guards with `loadTicketRow` → 404, then `canSee` → 404. This route is
  * registered beside it with the same two guards, in the same order, answering
@@ -30,6 +30,16 @@ import { signInWithPhone } from '../helpers/session.js';
  * weaker answer to "may this caller see this ticket" is the failure this shape
  * exists to make impossible: there is one predicate, `canSee`, and both doors
  * call it.
+ *
+ * ⚠ **THIS ROUTE NOW CARRIES A THIRD GUARD THE EVENTS DOOR DOES NOT**, added
+ * 2026-09-20: `ticketIsLive` → 404, which refuses a SOFT-DELETED ticket. The
+ * events door keeps serving a tombstone on purpose (*"Its history is retained,
+ * because other events cite it"*), so the two doors are no longer identical in
+ * guard count and this file's 16.52 cases — which are about VISIBILITY, and use
+ * live tickets throughout — still hold unchanged. The deleted arms are cases
+ * 16.96–16.99 in `test/integration/soft-deleted-attachments.test.ts`, which
+ * also pins the history doors' exception rather than leaving it to be
+ * discovered.
  *
  * ## Why the fixture asserts ROWS ARE ABSENT, not just present
  *
