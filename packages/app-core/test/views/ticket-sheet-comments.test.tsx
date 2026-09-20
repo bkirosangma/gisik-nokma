@@ -12,12 +12,17 @@ import type { TicketComment } from '../../src/views/comments-thread.js';
  * The comment box, AT THE SHEET — where the composer is mounted, gated, and
  * wired to the ledger.
  *
- * ## ⚠ NO CASE ID IS MINTED IN THIS FILE, AND THAT IS DELIBERATE
+ * ## Case 16.75 — MINTED 2026-09-21, after the block was reallocated
  *
- * The controller ruled on 2026-09-20 (mid-task) that executor 2 has no free
- * ids. The allocation is with the owner, the request is filed, and
- * `test-cases/` is untouched by this change set for that reason. The ids here
- * are OWED, not omitted.
+ * The controller ruled on 2026-09-20 (mid-task) that executor 2 had no free
+ * ids, so this file shipped with a header saying the id was OWED rather than
+ * omitted. **That is now discharged:** the block was reallocated on 2026-09-21
+ * (`16.72`–`16.80`) and the owed id is minted as **`16.75`** in
+ * `test-cases/16-remaining-doors.md` — see THE BLOCKS there.
+ *
+ * ⚠ **The id names the FILE, and the cases below are its ARMS.** §16's blocks
+ * mint one id per decisive property and name the arms inside the entry, so the
+ * `it` blocks below do not each carry their own number.
  *
  * ## The three things this file exists to pin, none of which the renderer's own
  * ## suite can see
