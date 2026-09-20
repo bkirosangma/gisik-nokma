@@ -125,10 +125,17 @@ export type PrefixClaim = {
  *
  * A derived prefix that is already taken moves down `collisionCandidates`:
  * `SO`, `SO2` … `SO9`, `SA` … `SZ`, then the three-letter space. **Every
- * candidate is within `PREFIX_MAX_LENGTH` and made of capitals, for every base
- * and any number of collisions** — see that generator for the sequence and for
- * the measured reason it replaced a loop whose docblock claimed a fallback the
- * code did not have.
+ * candidate is within `PREFIX_MAX_LENGTH`, for every base and any number of
+ * collisions, and no candidate is ever digit-ONLY** — see that generator for the
+ * sequence and for the measured reason it replaced a loop whose docblock claimed
+ * a fallback the code did not have.
+ *
+ * ⚠ **THE FIRST EIGHT SUFFIXES CONTAIN A DIGIT, and this sentence said "made of
+ * capitals" until a reviewer measured it.** 8 of every base's first 35 candidates
+ * are `SO2`…`SO9`, and none of those satisfies `prefixSchema`'s `^[A-Z]{1,3}$` — a
+ * consequence, not a contradiction, of the two schemas having different jobs: that
+ * one governs what may be ENTERED and this governs what is DERIVED when nobody
+ * entered anything. See `collisionCandidates` below, which says so at the digit.
  */
 export function resolveProjectPrefixes(claims: readonly PrefixClaim[]): string[] {
   const assigned: Array<string | null> = claims.map(() => null);
@@ -136,7 +143,7 @@ export function resolveProjectPrefixes(claims: readonly PrefixClaim[]): string[]
 
   // Pass 1 — every entered prefix, in order. A duplicate entered prefix is not
   // resolved here: the door refuses it (`checkPermission`'s
-  // `prefix.already-used`), so reaching this branch with two of them means a
+  // `project.prefix-taken`), so reaching this branch with two of them means a
   // ledger that predates the rule, and keeping the FIRST is the choice that
   // leaves the later project's own stored value untouched for a reader to
   // compare against.
@@ -194,8 +201,11 @@ export function resolveProjectPrefixes(claims: readonly PrefixClaim[]): string[]
  * So the sequence is explicit and every member is within the contract:
  *
  *   1. the bare base — `SO`;
- *   2. the base plus a digit, `SO2` … `SO9` — nine values, and the ONLY place a
- *      derived prefix may contain a digit;
+ *   2. the base plus a digit, `SO2` … `SO9` — EIGHT values, and the ONLY place a
+ *      derived prefix may contain a digit. (`'23456789'` is eight characters; this
+ *      line said nine until a reviewer counted the string against it, and the
+ *      generator's own total of 17,610 candidates is measured from the code, not
+ *      from this list.);
  *   3. the base's first letter plus any other letter — `SA` … `SZ`;
  *   4. the whole three-letter space, `AAA` … `ZZZ`, enumerated in a fixed order.
  *

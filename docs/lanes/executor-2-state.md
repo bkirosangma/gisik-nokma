@@ -176,7 +176,7 @@ prefix; and both founding forms gained an optional `Prefix` box that **upper-cas
 (`prefixSchema` refuses lower case rather than normalising it — a docblock already claimed the forms did
 this, and they did not).
 
-**Cases 13.1027–13.1033 are the witnesses.** 13.1027 is mutation-witnessed: reverting to
+**Cases 13.1027–13.1033 are the witnesses, and pass 2 (below) verified each can actually fail.** 13.1027 is mutation-witnessed: reverting to
 `derivePrefix(named)` reddens it and nothing else (1 failed / 10 passed).
 
 ⚠ **THE LESSON, and it is the one already recorded on this machine: a check's NAME is not its instrument.**
@@ -194,6 +194,34 @@ already written down and I broke it anyway.
 than what was added.** The guard matches an id only at the START of a bullet, so `13.1019`/`13.1020` written
 as one sentence, and later `13.1030–13.1033`, each left ids invisible while the suites counted them.
 **The delta now equals the minted count exactly: 2523 − 2496 = 27, then 2530 − 2496 = 34.**
+
+### § 7c — THE SCOPED RE-REVIEW (pass 2), AND ALL THREE FINDINGS WERE IN THE FIX ROUND'S OWN PROSE
+
+A second, scoped re-review ran over `acb1a91e..HEAD` — the fix round and the merge, and nothing else.
+**Verdict: all four fixes hold; the properties their cases name are true and the cases CAN fail.** It
+confirmed 13.1027 takes the derived branch, 13.1028 has a real control, 13.1029 is **not vacuous** (the
+reviewer replicated the REPLACED loop verbatim and ran the case's own assertions against it — it reddens at
+depth 100), and the entry half is carried end to end.
+
+**Three Minor findings, every one of them a false claim I had just written:**
+
+1. **`prefix.ts` said the digit block was "nine values"; `'23456789'` is EIGHT.** The reviewer also
+   measured the generator's true total — 17,610 candidates, which is `1 + 8 + 26 + 17576 − 1` — and that
+   arithmetic is what the sentence contradicted.
+2. **`prefix.ts` said every candidate is "made of capitals".** Measured: 8 of every base's first 35
+   candidates contain a digit. The same file's generator docblock already said the digit was deliberate,
+   so the file contradicted itself.
+3. **`test-cases/16-remaining-doors.md:522` asserts *"This product has no ticket key"*** — a sentence
+   `main` introduced, which THIS BRANCH FALSIFIES, and which my own `Features.md` and this file both cite
+   approvingly. **The citation sweep's universe was wrong again: the stale claim lived in a file the merge
+   brought in that I never opened.**
+
+All three are corrected in place, and a fourth found while fixing them: the same `prefix.ts` cited a rule id
+`prefix.already-used` that does not exist — the shipped id is `project.prefix-taken`.
+
+**The pattern held across both passes: every defect was a claim, not a mechanism.** The four Important
+findings were properties asserted by prose and unheld by code; the three Minor ones were counts and scopes
+asserted by prose and unheld by measurement. **Neither pass found a wrong algorithm.**
 
 ### § 8 — OPEN RULINGS: NONE.
 
