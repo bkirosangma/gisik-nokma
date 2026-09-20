@@ -49,8 +49,13 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  * | 3 | `routes/board.ts:115` | `readBoard` | **Arm 1** — `getBoard` |
  * | 4 | `routes/list.ts:137` | `readList` | **Arm 1** — `getTickets` |
  * | 5 | `routes/search.ts:137` | `readSearch` | **Arm 1** — `search` |
- * | 6 | `routes/my-work.ts:141` | `readMyWork` (shared) | **Arm 1** — `getMyWork` |
- * | 7 | `routes/my-work.ts:252` | `readMyWork` (rest) | **Arm 1** — `getMyWork` |
+ * | 6 | `routes/my-work.ts:141` | `readMyWork` — the **ASSIGNED** half | **Arm 1** — `getMyWork` |
+ * | 7 | `routes/my-work.ts:252` | `sharedWithMeRows` — the **SHARED** half | **Arm 1** — `getMyWork` + the explicit-shared case |
+ *
+ * ⚠ Rows 6 and 7 were **labelled the wrong way round** when this table was first written — `:141` read
+ * "shared" and `:252` read "rest". Corrected at the line, and the correction kept, because the two are
+ * the reason M04 below survived the first battery: a fixture that populates one half tells you nothing
+ * about the other, and a swapped label is how that stops being visible.
  * | 8 | `routes/attention.ts:191` | `readAttention` | **Arm 1** — `getAttention` + `getWorkspaceSettings` |
  * | 9 | `routes/builder-reads.ts:362` | `readStateOccupancy` | **THIS FILE** — case below |
  * | 10 | `routes/builder-reads.ts:438` | `readTypePopulation` | **THIS FILE** — case below |
@@ -59,14 +64,23 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  * | 13 | `notifications/sweep.ts:265` | `runNotificationSweep` (stale) | **THIS FILE** — case below |
  * | 14 | `visibility/rollup.ts:263` | `rollupFor` | **Arm 1** (the list row's `rollup`) **and** `test/read/soft-delete.test.ts` (the pre-existing function-level case) |
  *
- * ### Sites 9–13 are here because NO `DataSourceQuery` METHOD REACHES THEM
+ * ### Sites 2 and 9–13 are here because NO `DataSourceQuery` METHOD REACHES THEM, or needs its own fixture
  *
  * `state-occupancy` and `ticket-types/:typeId/population` are **admin-only
  * routes of their own** (`routes/builder-reads.ts:692`, `:714`) with no client
  * method beside them; the two sweeps are background jobs. **Arm 1 is
- * structurally blind to all five** — not under-covering them, blind: there is no
- * question the client can ask that reaches them. That is the whole reason this
- * arm exists, and it is why the completeness argument above cannot be reused.
+ * structurally blind to sites 9, 10, 11, 12 and 13** — not under-covering them,
+ * blind: there is no question the client can ask that reaches them. **Site 2 is a
+ * different case, and the difference is worth stating precisely**:
+ * `ticketVisibleProjectIds` IS reached by `getMyWorkspaces` — it feeds
+ * `nameRestrictedProjectCount`. But that consumer is a NUMBER, and
+ * `packages/app-core/src/view-types.ts` records that **an owner's is `0` by
+ * construction**, so an owner fixture cannot move it and a marker cannot reach it
+ * at all. Constraining it through Arm 1 would need a GUEST fixture plus an
+ * assertion on one derived integer; it gets a fixture of its own here instead,
+ * which is why it is in this file and not in that one. That distinction is the
+ * whole reason this arm exists, and it is why the completeness argument above
+ * cannot be reused.
  *
  * ### ⛔ WHAT NEITHER ARM COVERS, NAMED RATHER THAN LEFT AS AN ABSENCE
  *
