@@ -31,6 +31,54 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 MONDAY 2026-09-21 ~00:5x IST — **CYCLE 35: THE EXERCISE IS COMPLETE AND ITS DELIVERABLE IS LANDED. THE REVIEW PRODUCED FINDINGS, NOT TASKS — NO LANE HAS BEEN GIVEN NEXT WORK, AND THAT IS THE OWNER'S CALL.** `main` is **`9e68735e`**; **zero open PRs**; ledger **307 done / 1 todo**.
+
+⚠ **THIS IS THE NEWEST ENTRY, AND ITS DATE LABEL LOOKS EARLIER THAN CYCLE 34's — that is a defect in the labels above, not a reordering.** Measured: the clock is `IST (+0530)` and the year's day-of-week is `2026-09-20=Sunday, 2026-09-21=Monday, 2026-09-22=Tuesday`; **PR #625 merged at `2026-09-20T19:17:33Z` = `2026-09-21 00:47 IST`.** Cycle 34's own PR #624 pushed at `2026-09-20T18:45Z` = `2026-09-21 00:15 IST`, yet its heading reads *"TUESDAY 2026-09-22"*. **Cycles 31–34 are labelled exactly one day ahead of the clock.** Order this file **by position, newest first**; do not trust those dates.
+
+### 1. ✅ WHAT LANDED — PR #625 → `9e68735e`
+Verified by API (`state: MERGED`, `mergeCommit.oid 9e68735ef9e372ab8651a7c470cad10db6dff809`) **and by reachability** (`merge-base --is-ancestor 04c900c1 origin/main` → true), not by exit status. Four docs, nothing else:
+
+| file | lane | sha collected | bytes |
+|---|---|---|---|
+| `docs/lanes/review-ui-exec1.md` | exec 1 — UI | `ebcca2b50e5c` | 64,835 |
+| `docs/lanes/review-ux-exec2.md` | exec 2 — UX | `2eddb291773a` | 69,827 |
+| `docs/lanes/review-functionality-exec3.md` | exec 3 — functionality | `5e039f45652b` | 50,910 |
+| `docs/lanes/review-compiled-controller.md` | controller | — | 56,269 |
+
+**Read `review-compiled-controller.md` first** — it is the ruling on all 45 criticisms and it is the artifact this exercise exists to produce. Also verified: full-tree drop check (no path filter) **empty**, with a control proving the instrument sees a difference; blob identity exact on all four files.
+
+### 2. THE COUNTS — 45 raised, 44 accepted, 1 deferred, 0 rejected
+exec 1 **18** (18 accepted) · exec 2 **19** (19 accepted) · exec 3 **8** (7 accepted, 1 deferred). Verified mechanically over the document rather than by eye: 18/19/8 declared = 18/19/8 ruled, zero missing, zero extra.
+⚠ **Zero rejections is a claim about the reviews, not a courtesy** — the three near-misses are named in §1 of the compiled report so the rate is auditable.
+⚠ **NOT counted, correctly:** exec 2's ~40 sweep candidates (§2d/§2e — the lane explicitly refuses to call them findings: *"hypotheses by a machine"*), and exec 3's §7.6 (migrations never applied incrementally — the lane labels it *"observation, not a defect"*). Both are carried in the compiled report with their reasons. **Do not fold them into the sum, and do not rule them without opening the line.**
+⚠ **The compiled report rules 7 category-3 prototype divergences** (diverges/diverges-with-no-ruling-found). That is what cycle 33 §2 demanded and what the lanes could not close themselves; several of those rulings *are* the deliverable for their finding.
+
+### 3. ⛔ NO LANE WAS RELAUNCHED — AND NONE SHOULD BE, YET
+Cycle 34 §1 held for the whole landing: **a reviewer restarted mid-read loses everything it has read.** All three lanes are idle, and their reports are collected and merged.
+**The review produced FINDINGS, not tasks.** What the 45 rulings become — which are executed, in what order, by which lane — is the **owner's** decision and is not derivable from this file or from the compiled report. **A controller waking here must NOT invent a queue out of the compiled report's plans and dispatch it.** The report says *what would be done*; it does not order it, and every ruling in it is explicitly not a fix.
+
+### 4. MACHINERY — and the two measurements that would otherwise cost the next controller an hour
+- **Seven checks `rc=0`** at the frozen head `04c900c1`: `check:env` `check:tasks` `check:runbook` `check:citations` `check:help` `node scripts/check-case-ids.mjs` (**2606 unique ids, highest `17.006`, 25 files**) `check:migrations`.
+- ⚠ **RUN THEM UNDER NODE 22 OR THEY FAIL FOR THE WRONG REASON.** The box defaults to Node 24 while `engines` demands `>=22 <23`; the first run of all six `pnpm check:*` died on that refusal and it reads like a red gate. Export `$HOME/.nvm/versions/node/v22.22.2/bin` first. `locked-test.sh:192-194` pins Node 22 for the gate itself.
+- **Forced gate at the landing tree:** `Tasks: 33 successful, 33 total` · `Cached: 0 cached, 33 total` · `NODE=v22.22.2` · `'Unsupported engine'` → **0** · `no orphaned vitest workers` · `CHECK_ENV_EXIT=0` · `GATE_WRAPPER_EXIT=0` · **5700 tests passed** across 11 packages (`server` 166 files / 1727 passed | 5 skipped).
+- ⚠ **The gate took `1m59s`, not the 841 s (14 min) recorded on 2026-09-19.** That figure was measured with five lanes live; this gate ran on an idle box. **`Cached: 0` is the proof it was a real `--force` rebuild** — do not read a fast gate as a skipped step, and do not avoid gating out of fear of the 14 minutes.
+- ⚠ **The wrapper's `NODE=` line does NOT go into the log file.** `locked-test.sh` prints it to its console at `:195`, *before* the `"$@" > "$OUT"` redirect at `:211`. Grep the log for `NODE=` and you get a **silent empty** that reads as a missing gate.
+- ⚠ **`server:test` logs `Error: connect ECONNREFUSED 127.0.0.1:1` lines** that the wrapper lists for inspection. They are the suite's **own transport-failure fixtures**, not failures — the run reports zero failed. Read the per-package totals, not the grep.
+
+### 5. 📌 THREE INSTRUMENTS WERE CORRECTED THIS CYCLE — each was silently blind, and each has a general lesson
+1. **The PR watcher was blind.** The one inherited at session start (PID 13920, started Sep 19 17:01, orphaned at `ppid=1`) had **stdout AND stderr both `/dev/null`** — it could not have reported anything to anyone, and **"a watcher is running" is not evidence of coverage.** Killed and replaced; the replacement's detection path was controlled against something that *does* exist (a branch present on origin) before being trusted.
+2. **Cycle 34 §4's cron id was stale.** It names `651ad750`; the live `:13/:38` job in `.claude/scheduled_tasks.json` is **`436dfb0a`** (and the `:09/:29/:49` one is `f456f920`). Corrected here: the function was intact, only the identifier was wrong — which is how a successor concludes no cron is armed.
+3. **A lane that declares itself complete can push again.** exec 1's report was superseded mid-collection: `d53161a1` (50,696 B, **16** findings) → `ebcca2b5` (64,835 B, **18** findings, adding `P12` and `P13` and growing `P1` from six members to seven). **Re-measure every lane's sha at collection time — "complete" is a reading that expires.**
+
+### 6. ⚠ THE FINDING THAT MATTERS MOST, AND IT IS NOT IN THE CODE
+**`exec1-I1` (Critical), reproduced live by the controller on PR #625's own run `35531698376`: no CI run has been green since `2026-09-06T09:05:54Z`.** The runner never starts — every job carries `"steps": []` and `runner_name: ""`, `scope` fails, and `build`/`typecheck`/`server-tests`/`other-tests`/`e2e`/`viewport` are all `skipped` while `gate` reports failure.
+**Consequence the next controller must not miss:** the standing auto-merge authorization reads *"an independent CI run green"*, and **that clause is currently unsatisfiable for any PR.** PRs in this window landed on the local machinery alone, by cycle 34 §2's criterion (seven checks + forced gate). **Restoring the runner is an account/infrastructure action, not a code change — it is the one remedy among the 45 that the controller cannot execute.** Recorded here rather than left in the report because **a governance clause that can never be satisfied is not a check.**
+
+### 7. OWNER ACTION
+`git pull` in the primary checkout — it is on `main` at `6db8b6b8`, **117 commits behind** `origin/main` (`9e68735e`) as measured at this anchor, and every measurement taken there is a measurement of the wrong tree (the controller hit exactly this and recorded it in the compiled report's §2).
+
+---
+
 ## 🔄 TUESDAY 2026-09-22 ~00:1x IST — **CYCLE 34: THE QUEUE IS EMPTY, ALL EIGHT ITEMS ARE MERGED, AND THE THREE-REVIEWER EXERCISE IS RUNNING. THIS ENTRY IS FOR A CONTROLLER THAT WAKES UP MID-EXERCISE.** `main` is **`e4baa425`**; **zero open PRs**; ledger **307 done / 1 todo**.
 
 ### 1. 📌 THE EXERCISE IS LIVE — DO NOT RELAUNCH IT
