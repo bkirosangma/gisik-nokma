@@ -59,6 +59,8 @@ import type { Projection } from './registry.js';
  * | `ticket.transitioned` | the child's `state_category` | recompute its parent |
  * | `ticket.workflow_rebound` | the child's `state_category` AND `workflow_id` | recompute its parent |
  * | `ticket.reparented` | the child's `parent_id` — TWO parents, and the old one is already overwritten | recompute the whole project |
+ * | `ticket.deleted` | takes the child OUT of the counted set — the parent may lose its last one, and the parent is not named by the event | recompute the whole project (which is also the emptying path) |
+ * | `ticket.restored` | puts the child BACK into the counted set, with the same two properties | recompute the whole project |
  * | `workflow.defined` | every category on that workflow, with nobody touching a ticket | recompute every parent with a child on it |
  *
  * And the ones that provably cannot, which is why they are absent rather than
@@ -167,12 +169,18 @@ export async function getRollup(
  * proj_tickets. `NOT EXISTS` was therefore always false.
  *
  * The row of an emptied parent is removed by `recomputeProject`'s
- * project-scoped DELETE instead, and that is not an accident of layering: the
- * ONLY way a parent loses its last child is a `ticket.reparented` — nothing in
- * the vocabulary deletes a ticket — and a reparent is exactly the event that
- * recomputes the whole project. Should a delete or an archive event ever join
- * the vocabulary, it joins the trigger table in this file's header and brings
- * its own emptying path with it.
+ * project-scoped DELETE instead, and that is not an accident of layering: a
+ * parent loses its last child either by a `ticket.reparented` — which is
+ * exactly the event that recomputes the whole project — or, since 2026-09-20,
+ * by a `ticket.deleted`, which this file's header predicted would "join the
+ * trigger table in this file's header and bring its own emptying path with it".
+ * `ticket.deleted`/`ticket.restored` do exactly that: the same project-scoped
+ * recompute, whose trailing DELETE is the emptying path.
+ *
+ * **`deleted_at IS NULL` is in the count below, and that is what makes a
+ * deletion able to empty a parent at all.** The predicate is the same one every
+ * view applies (`read/visible-where.ts`'s `LIVE_TICKET_WHERE`): a soft-deleted
+ * ticket is in no view, and a parent's progress is a view of its children.
  *
  * The remaining statement's `HAVING count(*) > 0` is what declines to write a
  * row for a childless parent at all: the aggregate would otherwise return one
@@ -210,6 +218,7 @@ async function recomputeParent(
             count(*) FILTER (WHERE state_category = 'terminal')
        FROM proj_tickets
       WHERE workspace_id = $1 AND parent_id = $2
+        AND deleted_at IS NULL
      HAVING count(*) > 0
      ON CONFLICT (parent_ticket_id) DO UPDATE SET
        project_id = EXCLUDED.project_id,
@@ -278,9 +287,9 @@ async function recomputeParentOf(tx: PoolClient, event: LedgerEvent): Promise<vo
  * handles a detach to root: `ticketReparentedPayload.newParentId` is nullable,
  * and a ticket moved to project root is a child of nobody.
  *
- * That makes this one statement load-bearing for both ways a parent can lose
- * its last child, and a reparent is the only event that can do either — nothing
- * in the vocabulary deletes a ticket.
+ * That makes this one statement load-bearing for every way a parent can lose
+ * its last child — a reparent (both directions), and, since 2026-09-20, a
+ * `ticket.deleted`; the undo reaches it by the same call.
  */
 async function recomputeProject(
   tx: PoolClient,
@@ -307,7 +316,8 @@ async function recomputeProject(
       WHERE workspace_id = $1 AND project_id = $2
         AND parent_ticket_id NOT IN (
           SELECT parent_id FROM proj_tickets
-           WHERE workspace_id = $1 AND project_id = $2 AND parent_id IS NOT NULL)`,
+           WHERE workspace_id = $1 AND project_id = $2 AND parent_id IS NOT NULL
+             AND deleted_at IS NULL)`,
     [workspaceId, projectId],
   );
 }
@@ -379,6 +389,32 @@ export const rollupsProjection: Projection = {
       case 'ticket.workflow_rebound':
         await recomputeParentOf(tx, event);
         return;
+      // The soft-delete pair (2026-09-20). This is the case this file's header
+      // and `recomputeParent`'s docblock both PREDICTED — "Should a delete or an
+      // archive event ever join the vocabulary, it joins the trigger table in
+      // this file's header and brings its own emptying path with it" — and it is
+      // the same scope as a reparent for the same reason: a delete takes a child
+      // out of the set `recomputeParent` counts, and an undo puts it back, so
+      // BOTH directions change that set and neither names the parent whose row
+      // changes (the undo's ticket has no parent to read either).
+      //
+      // `recomputeProject` is the emptying path, and it is REQUIRED rather than
+      // tidy: `recomputeParent` writes nothing for a parent with no live child
+      // (`HAVING count(*) > 0`), so a parent whose last live child was just
+      // deleted would keep its pre-delete counts forever without the trailing
+      // DELETE.
+      case 'ticket.deleted':
+      case 'ticket.restored': {
+        const { rows } = await tx.query<{ project_id: string }>(
+          'SELECT project_id FROM proj_tickets WHERE workspace_id = $1 AND ticket_id = $2',
+          [event.workspaceId, event.entity.id],
+        );
+        const projectId = rows[0]?.project_id;
+        if (projectId !== undefined) {
+          await recomputeProject(tx, event.workspaceId, projectId);
+        }
+        return;
+      }
       // Two parents change and only one is still visible — see recomputeProject.
       case 'ticket.reparented': {
         const { rows } = await tx.query<{ project_id: string }>(

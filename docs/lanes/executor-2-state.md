@@ -84,7 +84,9 @@ and **I did not run `docker compose`** (the rule for this lane). The column land
 
 ### § 5 — WHAT SHIPS, WHAT DOES NOT, AND THE ONE SENTENCE I REFUSED TO WRITE
 
-**Ships:** the two payload fields; an OPTIONAL `Prefix` box on BOTH founding forms (`/workspaces` and `/w/<id>`), upper-casing as the owner types; the nullable `proj_projects.prefix` column and its migration; the
+**Ships:** the two payload fields; an OPTIONAL `Prefix` box on BOTH founding forms (`/workspaces` and `/w/<id>`), upper-casing as the owner types;
+
+⚠ **THE MERGE MOVED `main` UNDER THIS BRANCH — nine commits, one of them exec 1's sheet-footer (`e9c1a04f`). Everything in this file that speaks about `Delete` was written BEFORE that merge and two such sentences were false at the merged head; both are corrected in place above. A conflict in `check-permission.ts`'s import block was resolved by keeping BOTH imports.** the nullable `proj_projects.prefix` column and its migration; the
 projection writing it; the derivation and the two-pass resolver; the workspace identity fold (name and
 prefix from ONE query, opposite ends of the same `workspace_seq` order); `ticketNumbers`/`ticketNumber`;
 the directory's `WorkspaceRef.prefix` and `ProjectRef.prefix`; `POST /v1/workspaces` taking a `prefix`;
@@ -99,10 +101,17 @@ with a status column.** ⚠ This sentence said "seven of the eight" until an ind
 the list; the number was never measured, and a wrong count here is the symptom this repo treats as a
 structural tell rather than a typo. The four site names beyond the dispatch's list are the workspace and
 project prefixes ON THE WIRE and the composition itself, which is what "ships" means for a display task.
-One of the seven is the `Delete` toast, which **does not exist to wire** — `Delete` is exec 1's in-flight
-door, and measured at `origin/main` its copy appears only in the two prototype files and
-`test-cases/16-remaining-doors.md`, with `ticket-sheet.tsx:1596` still saying *"Only the navigation half is
-built."* Cycle 21 puts the
+⚠ **CORRECTED AT THE MERGE (2026-09-20): the `Delete` toast NOW EXISTS TO WIRE.** Exec 1's sheet-footer
+merged as `e9c1a04f` while this branch ran, so the sentence that stood here — *"does not exist to wire,
+`Delete` is exec 1's in-flight door"* — was true at this branch's base and false at the head it now
+reports. Measured on the merged tree: `packages/app-core/src/views/ticket-sheet.tsx` carries the
+`Delete` control and its footer docblock now says the footer is COMPLETE, and the soft-delete copy
+*"its history is retained"* is in `packages/domain/src/entity-state.ts`, `events/ticket-events.ts`,
+`ticket-state.ts` and `rule-engine/src/checks/deletion.ts`. **`test-cases/16-remaining-doors.md:522`
+names this site as wanting exactly what this task built** — the prototype's toast reads *"GN-1183
+deleted · its history is retained"*, and the file's own note says the product *"has no ticket key"*.
+**So it is a live display site awaiting the key, not a site that cannot be wired, and its owner is
+whoever next holds the sheet.** Cycle 21 puts the
 sheet's three-crumb breadcrumb in exec 1's NEXT queued task, so the fourth crumb belongs to whoever holds
 the sheet — **and that wire is now waiting for them.**
 
@@ -2597,7 +2606,9 @@ it here**: `gh pr list --head exec2/assignee-editable --state all`.
 1. **"A picker needs a roster, which is a SEVENTH thing to pass" — NO.** `TicketSheet` **already reads the
    roster itself** (`ticket-sheet.tsx:209-210`, `useLiveQuery(dataSource, workspaceId, workspaceId, () =>
    dataSource.query.getMembers(workspaceId))`) and already uses it for `nameOf` and `VisibilityEditor`. The
-   six-prop mount at `page.tsx:2346` is not a constraint. **Nothing is passed; nothing new is read.**
+   six-prop mount in `apps/web/app/w/[workspaceId]/page.tsx` — **cited by SYMBOL, not by offset: it
+   was `:2346` when written and that number now lands on a blank line, which is the failure mode
+   cycle 22 named — is not a constraint. **Nothing is passed; nothing new is read.** (⚠ MEASURE IT AGAIN before relying on it: replay the mount's prop list.)
 2. **And the sheet was collapsing a REFUSED roster into an empty one.** `members={members.data ?? []}` at
    `:617`, with **`members.error` read nowhere in the file** — the value `page.tsx:2495` names as the defect:
    *"never `[]`, which would claim this workspace has no members."* The page and its Filters sheet tell

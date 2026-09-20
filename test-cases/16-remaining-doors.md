@@ -460,52 +460,115 @@ ours — it is a pure CLIENT snapshot restore (`desktop.dc.html:3029`) and the p
   reach, and jsdom has no layout engine — it cannot tell a toast drawn at the foot of the screen from one
   drawn into nothing.
 
-## The sheet footer's `‹ Previous / Next ›` — and the half that is HELD (executor 2, 2026-09-20)
+## The sheet footer — `Delete` BUILT and the navigation REMOVED (executor 2 measured the door 2026-09-20; executor 1 closed it the same day)
 
 **The owner's ruling, verbatim (`controller-state.md:79`): _"The footer: Delete and ‹ Previous / Next ›:
 build it."_** `CTL-QUEUE:131` rules the `Delete` half *a HISTORY-RETAINING removal with undo, NOT a hard
-delete.*
+delete.* **Half of this row was then HELD on a measurement taken by executor 2, and the owner later RULED
+THE OTHER HALF OUT — so both halves now move in opposite directions and neither is a gap.**
 
-### ⛔ HALF OF THIS ROW IS HELD, and it is held on a MEASUREMENT: a history-retaining removal has no door
+### ✅ THE HOLD IS DISCHARGED: the door was measured, the owner authorised it, and it is BUILT
 
-- **The vocabulary has no word for it.** The ticket events are eleven — `created`, `assigned`, `field_set`,
-  `ranked`, `reparented`, `transitioned`, `closed`, `reopened`, `collaborator_added`,
-  `collaborator_removed`, `workflow_rebound`. **None is a removal.**
-- **Controlled sweep, control traversing the same path:** `ticket.deleted` → **0**, `ticket.removed` →
-  **0**, `ticket.archived` → **0**, while **`ticket.closed` → 110**. The zeros are real; the sweep can see
-  ticket events.
-- **`archived` is PROJECT-scoped** — `project.archived` / `project.restored`
-  (`apps/server/src/projections/proj-projects.ts:77`). Nothing equivalent exists for a ticket.
-- **`proj_tickets` carries no removal column** —
-  `apps/server/migrations/1787961800000_proj-tickets.sql:73-89`.
+Executor 2's hold was correct and is confirmed here rather than overturned — *"a history-retaining removal
+has no door"*, measured as: no removal in the ticket vocabulary, `archived` project-scoped only,
+`proj_tickets` carrying no removal column, and a controlled sweep reading `ticket.deleted` → 0 against
+`ticket.closed` → 110. **What changed is the ruling, not the measurement.** The owner's 2026-09-20
+*"yes i want the delete to exist (hoping it is a soft delete), build it"* authorises all of it.
 
-So the toast's *"its history is retained"* has nothing to point at, and the prototype proves nothing about
-ours: its `deleteTicket` is a pure **client** filter (`desktop.dc.html:3795`) in a prototype that has no
-server — the same finding `C`'s door measurement reached about the Undo. **Building it means a new event, a
-projection tombstone, a read filter and a route — doors the table does not name**, so it is held for a
-ruling rather than guessed: `gisik-nokma-lanes/EXEC2-RULING-REQUEST-2026-09-20-h-delete-door.md`.
+**The shape, and it is the repo's own `closed`/`reopened` pattern copied piece for piece:**
+`ticket.deleted` / `ticket.restored` (the pair named after the existing
+`project.archived`/`project.restored`) → `TicketState.deleted` → `proj_tickets.deleted_at`/`deleted_by`
+plus a partial index → a filter at every view-serving SELECT.
 
-### What IS built: the navigation half, which is a PROP and not a door
+- ⚠ **THERE IS NO ROUTE TO ADD, and the dispatch's list of four guessed one.** The ingest door is generic
+  (`POST /v1/events` → `evaluateEvent`'s switch, whose `default` arm accepts an unlisted type), so
+  registering the event is the whole of it. **Three doors, not four.**
+- ⚠ **THERE IS NO CHOKE POINT FOR THE READ FILTER EITHER, and the first reading of it was WRONG in
+  writing.** The ASSEMBLER is shared; the SELECTs are not — hand-written, and independent review counted **14 statements carrying the rule**, which is why no number is given here — and the repo's own
+  `closed_at IS NULL` exclusion lives inline at five separate sites with no helper. The filter is therefore
+  a single exported constant, `LIVE_TICKET_WHERE`, AND-ed in at each view site so that `grep` enumerates
+  the coverage.
+  **The near-miss is worth recording: folding it into `visibleTicketsWhere` instead would have COMPILED
+  and then died at runtime.** `visibility/visible-tickets.ts` selects `FROM proj_visibility v` with no `t`
+  in its FROM at all, so the predicate would have raised Postgres *"missing FROM-clause entry for table
+  t"* for that one caller. Verified at the line.
+- ⛔ **THE ENGINE'S OWN BY-ID READS MUST NOT FILTER, and this is the trap in the feature.** `getTicketStateFromDb`
+  feeds `EngineContext`; filter deleted rows there and `ticket.restored` — the UNDO — is refused with
+  `unknown-ticket`, so the delete works and cannot be reversed. **The exclusion belongs to the views; a
+  rule engine judging a claim ABOUT a ticket is not a view.**
+- ⚠ **AN AUTHORIZATION DOOR THAT NEITHER THE DISPATCH NOR ITS FOUR NAMED.** Nothing gated `ticket.deleted`
+  before this change: a workspace **guest named on one ticket could delete it**. It is now gated on
+  `hasProjectAdminRights` — the same call `visibility.set`, the neighbouring ticket-scoped privileged act,
+  already uses. **This is the executor's conservative default, and it is in the PR body for the owner to
+  reverse.**
 
-- **16.43** ✅ — **the footer walks the visible list.** `packages/app-core/test/views/ticket-sheet.test.tsx`.
-  **The list is the CALLER's** (`TicketSheetProps.navigation`), because the sheet opens on one `ticketId`
-  and no read model knows its neighbours — the same argument `onOpenTicket` makes for not resolving the
-  parent's project locally. **An end is a DISABLED button, never an absent one**, so the row's layout is
-  identical at every position and the control cannot vanish from under a reader who has just reached the
-  end; and **a step resets the open tab to `details`**, as the prototype does (`:3809-3810` sets
-  `sheetTab: "details"` alongside the new `sheetId`).
-  **Mutation-witnessed twice, each killing exactly ONE arm** — the property, not the plumbing: making the
-  end `disabled={false}` reddens the *GREYS rather than removing* arm alone, and deleting
-  `setTab('details')` reddens the *resets the tab* arm alone. A third arm asserts that **no `navigation`
-  means no footer at all**, on `onOpenTicket`'s precedent: a caller that cannot say what its list is gets
-  no control rather than two buttons that guess at one.
+### What is BUILT, and the two cases that carry it
 
-**⚠ ONE DELIBERATE DEPARTURE, recorded rather than smuggled.** The prototype grounds this strip in
-`--fill4` and runs it to the sheet's edges. It is drawn as a separator rule instead, because `Sheet` mounts
-**every** child inside `.gn-sheet__body` (`padding: 1rem 1.1rem`), so reaching the edge means hard-coding
-that inset as a negative margin — a **second copy of a value that lives in another rule and that nothing
-would keep in sync**. The structure is the prototype's; the fill and the full-bleed inset belong with the
-complete footer, alongside `Delete`.
+- **16.84** ✅ — **`Delete` is a history-retaining removal with an undo.**
+  `packages/app-core/test/views/ticket-sheet.test.tsx` (the sheet's half) and
+  `apps/web/test/sheet-delete.test.tsx` (the CALL SITE's half — the sentence, and the Undo posting
+  `ticket.restored` for the id it was offered for). **The sheet emits, closes ITSELF, and hands the
+  committed fact to the host**, which owns the toast: an undo offered inside a component that has just
+  removed itself is not an undo, and the close is the sheet's own so that a host which narrates nothing
+  still cannot leave a reader on a sheet for a ticket that is now in no view. A REFUSED delete keeps the
+  sheet open and shows the engine's own rule; a SILENT non-answer is a transport error and never a refusal.
+  **Mutation-witnessed ten times (a count of MUTATIONS, not arms — M8 kills two and M21 three), every one killing an arm on its own assertion, every file restored from a
+  checksum-verified copy** — the close removed, a refusal made to narrate, the emitted type swapped for
+  `ticket.closed`, a nav button re-added, a `[data-style]` fork planted in the stylesheet that WINS, a
+  duplicate rule appended at EOF, the nav rules restored, the wrong danger token, Dismiss wired to the
+  restore, and the page dropping `onDeleted` entirely. **The last one is why the call-site file exists:**
+  all three of its arms redden, while every assertion in the sheet's own suite stays green.
+  ⚠ **A DEPARTURE FROM THE PROTOTYPE'S COPY, recorded rather than smuggled.** The prototype toasts
+  `"GN-1183 deleted · its history is retained"` — a ticket KEY. **This product has no ticket key** (its ids
+  are ULIDs), so the sentence carries the ticket's TITLE. Reversing it is one interpolation in the host,
+  and the parity list already names a ticket key as the breadcrumb's own prerequisite.
+  - **The stylesheet half, and the ground the control really has.** It has a rule of its own: `packages/ui/test/components.test.tsx` pins the rule's existence, its roles, its 44px floor and
+  its `justify-content: space-between`; `packages/ui/test/tokens.test.ts` pins the CONTRAST PAIR.
+  **`--gn-danger` as TEXT measures 4.4013 on `surface` in hig/minimal light — below AA, a shortfall this
+  repo already records.** It is safe here because the footer's ground is `surface-raised`
+  (`.gn-sheet`'s own background), where the same ink measures **5.0511** and clears 4.5 in all six
+  style×theme combinations (worst `hig`/`minimal` DARK at 5.0392). **Two controls bind the figure** —
+  `colorOf` reproduces `tokens.test.ts`'s pinned primitives, and the same computation reproduces the
+  recorded 4.4013 — and the pair is ENFORCED rather than written into a comment, which is the criticism
+  16.83 earned.
+
+### 🚫 The navigation, RETIRED — a decided ABSENCE, not a gap and not a TODO
+
+- **16.43** 🚫 **RETIRED BY OWNER RULING.** The owner ruled the pair out on 2026-09-20 — *"remove the
+  navigation"*. **Its five arms retire with the control**, and `TicketSheetProps.navigation` no longer
+  exists, so no caller can bring it back. The property they asserted was real when they were written —
+  the list was the CALLER's, an end was a DISABLED button rather than an absent one, and a step reset the
+  open tab to `details` — and none of it is false now: it is simply about a control the product does not
+  draw. **What replaces it is the ABSENCE assertion in 16.84**, which reddens if a future edit re-adds the
+  markup or the rules without a caller.
+  ⚠ **Why it goes beyond unused: nothing computes a queue position.** `navigation` had ZERO call sites
+  repo-wide, so the footer drew `null` on every mount in the product — the pair never rendered anywhere.
+  **The prototype still draws them; the product does not, and that is the decision.**
+
+**⚠ ONE DELIBERATE DEPARTURE, RESTATED FOR THE COMPLETE FOOTER.** The prototype grounds this strip in
+`--fill4` and runs it to the sheet's edges. It is still a separator rule instead, and the reason is
+unchanged — but it is now MEASURED rather than asserted: `ui.css` contains **zero** negative margins,
+against 184 `margin` declarations in the same file, so reaching the edge for this one strip would be the
+repo's first. **A true full-bleed footer is a `Sheet` API change** — a `footer` slot rendered as a SIBLING
+of `.gn-sheet__body`, exactly the way `header` already is — and `justify-content: space-between` is kept
+in the meantime because it is the structure a second, right-hand control lands in.
+
+### ⚠ THE INDEPENDENT REVIEW, AND WHAT THE FIX ROUND CHANGED (2026-09-20)
+
+One reviewer, dispatched per the brief's cap, with restore verified by checksum on 20/20 files. **No Critical.** It re-derived the read-path coverage independently and confirmed the two prohibitions hold (the engine's reads do not filter, enforced — filtering `getTicketStateFromDb` kills the suite in `beforeAll`), agreed with the permission LEVEL, and reproduced the contrast figures with its own WCAG implementation.
+
+**Three Important, and all three are now fixed or recorded:**
+
+1. **I1 — THE SWEEP'S OWN UNIVERSE WAS THE BUG, AGAIN, IN THE SAME FILE.** `Features.md` carried a SECOND bullet, 300 lines down, still saying the navigation was BUILT and `Delete` was HELD — in the file this branch had just added the opposite bullet to. **Deleted, not tombstoned**, per the workspace rule. Two survivors remain in `docs/lanes/executor-2-state.md` and `docs/lanes/controller-state.md`, **neither in this branch's diff** — recorded with a named owner rather than reached into across lanes.
+2. **I2 — ELEVEN SITES CARRY THE PREDICATE AND NOTHING CONSTRAINS THEM.** The implementer disclosed this; the reviewer **proved it**: mutating each to `AND TRUE` leaves the whole server and app-core suites green, while `AND FALSE` reddens them — **so they are executed-but-unconstrained paths, not mutations that never ran**, which is the distinction that matters. **One is now covered:** a new `rollupFor` case makes `DELETED` and `RESTORED` children of `LIVE`, so a parent's child count is a reading of a real rollup, and mutating `visibility/rollup.ts`'s predicate now reddens it (`expected 2 to be 1`). **The other ten remain unconstrained**: `projections/rollups.ts:219`, `auto-close/sweep.ts:197`, `notifications/sweep.ts:187`/`:265`, `routes/builder-reads.ts:362`/`:438`, `read/workspace-counts.ts:223`, and `app-core/src/replica/replica-data-source.ts:888`/`:921`. **Named, not implied.**
+3. **I3 — THE DELETE PATH NEVER RE-ASKED THE LIST OR THE BOARD, WHILE THE RESTORE DID.** `page.tsx`'s `onDeleted` only set the notice, so with the `/v1/stream` socket absent the list kept showing a row the toast had just said was deleted. **Fixed**, and the fix has its own witness: a `getTickets` call-count case that reddens when the reload is removed (`expected 2 to be greater than 2`), which no other case in that file can see.
+
+**Four Minor were wrong COUNTS or wrong UNITS in this branch's own new prose, and each is corrected in place with the measurement and the reviewer's credit:**
+
+- **"184 `margin` declarations"** was the **LINE** count. Measured: 161 `margin*:` declarations, 186 occurrences, **zero negative** — the substantive half was right and the unit was the thing that was wrong.
+- **"eleven hand-written SELECTs"** is **withdrawn**: the reviewer measured 13 executable uses plus 1 hand-written predicate = **14 statements carry the rule**, and no reading of "hand-written" yields 11. **The grep is the enumeration; a bare number about an unpinned universe was the defect.**
+- **"zero call sites repo-wide"** overreached — case `16.43`'s own arms passed one five times. The claim that holds is **one product call site, and it passed none**.
+- **"Mutation-witnessed TEN ways, each killing its OWN arm"** conflated mutations with arms (M8 kills two, M21 three).
 
 ## The inviter card — ALREADY BUILT, and the half that was missing was the ABSENCE (executor 2, 2026-09-20)
 

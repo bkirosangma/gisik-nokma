@@ -872,6 +872,20 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       const stateNameOf = stateNameFrom(defs);
       const rows: ListRow[] = [];
       for (const state of inProject) {
+        // The soft delete, and it is a READ predicate applied here rather than a
+        // removal from `byId` — `confirmedById` also feeds the parent walk, and
+        // a parent pulled out of that map would turn every deleted epic into a
+        // `hasRestrictedParent` on its live children, which is a different
+        // statement ("you may not see this") than the true one.
+        //
+        // Mirrored from the server's own list read, which ANDs
+        // `LIVE_TICKET_WHERE` (`apps/server/src/read/visible-where.ts`) into the
+        // same query — this is the offline half of that one decision, and
+        // `(state.deleted ?? null) === null` is the same boundary read
+        // `state.closed ?? null` above takes, for the same reason: `deleted?` is
+        // optional on the domain type (every fixture predating the flag) while
+        // the predicate needs one answer for `undefined` and `null` alike.
+        if ((state.deleted ?? null) !== null) continue;
         if (!matchesFilter(state, filter)) continue;
         const pending = await outbox.pendingFor(state.id);
         rows.push(await rowOf(state, byId, types, isEpicType, stateNameOf, pending !== null));
@@ -883,14 +897,17 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
 
     /**
      * Settled cards only — offline-born tickets are absent; see
-     * `OFFLINE_BORN_ABSENCE`. Also excludes a BACKLOG ticket and a CLOSED one
-     * (backlog/closed spec §3.2, 2026-09-17), the same two bound conjuncts
-     * the server's `readBoard` applies (`apps/server/src/routes/board.ts`,
+     * `OFFLINE_BORN_ABSENCE`. Also excludes a BACKLOG ticket, a CLOSED one
+     * (backlog/closed spec §3.2, 2026-09-17) and a SOFT-DELETED one, the bound
+     * conjuncts the server's `readBoard` applies (`apps/server/src/routes/board.ts`,
      * case 13.574) — independently load-bearing there and mirrored the same
-     * way here: without this, a backlog ticket has no row in any published
-     * definition's `states` and falls into the straggler path as a stray
-     * column literally named `backlog`, which is the exact column the spec
-     * says a board must never show.
+     * way here: without the first two, a backlog ticket has no row in any
+     * published definition's `states` and falls into the straggler path as a
+     * stray column literally named `backlog`, which is the exact column the
+     * spec says a board must never show. The soft-delete conjunct is the third
+     * for the same reason and is `deleted`, not `closed`: a deleted ticket's
+     * `state_category` is whatever it was when it was deleted, so it would
+     * otherwise render as an ordinary card in whatever column it left off in.
      */
     async getBoard(projectId: string): Promise<BoardView> {
       const byId = await confirmedById(ownWorkspaceId);
@@ -898,7 +915,10 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
         (state) =>
           state.projectId === projectId &&
           state.stateId !== BACKLOG_STATE_ID &&
-          (state.closed ?? null) === null,
+          (state.closed ?? null) === null &&
+          // `state.deleted ?? null`, the same boundary read as `closed` one
+          // line up — `deleted?` is optional on the domain type.
+          (state.deleted ?? null) === null,
       );
       const defs = await defsFor(inProject);
       const pendingIds = new Set<string>();

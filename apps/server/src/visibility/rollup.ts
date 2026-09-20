@@ -225,12 +225,42 @@ export async function rollupFor(
   // both tables, so adding a workspace-scoped join condition would strip the
   // category off a cross-workspace child (case 6.84) and turn a known 'done'
   // into an `uncategorized`.
+  // This site writes the predicate LONGHAND rather than splicing
+  // `LIVE_TICKET_WHERE`, because it is the one view site whose `t` may be
+  // ABSENT (the point two paragraphs down). The constant is referenced here so
+  // `grep -rn "LIVE_TICKET_WHERE" apps/server/src/` still enumerates this file.
+  //
+  // `AND t.deleted_at IS NULL` is in the WHERE and NOT in the join's ON clause,
+  // and the difference is the whole reason this is spelled out rather than
+  // merged into the left join above. An ON-clause predicate cannot remove a row
+  // (that is what LEFT means) — it would leave the deleted child in `rows` with
+  // `state_category = null`, counted as `uncategorized`, which this file's own
+  // docblock defines as "always 0 for a ledger written through the shipped
+  // door". Soft-deleting a ticket would silently inflate a number that is
+  // documented as an integrity signal. So the child LEAVES the enumeration.
+  //
+  // `OR t.ticket_id IS NULL` keeps the left join's other job intact: a child
+  // `proj_tickets` has no row for (case 6.84, reachable today) has
+  // `t.deleted_at = NULL` by the join miss, and a bare `t.deleted_at IS NULL`
+  // in the WHERE would drop it — turning a cross-workspace child's
+  // `uncategorized` and its `restrictedCount` contribution into silence. The
+  // predicate is therefore "not known to be deleted", which is exactly the
+  // question a soft delete can answer.
+  //
+  // This is a DEPARTURE from the "the join may only ANNOTATE, never shrink"
+  // doctrine stated above, made deliberately and recorded here rather than
+  // quietly: that doctrine protects the count against VISIBILITY (a viewer must
+  // not shrink a true total), and a soft-deleted ticket is not a visibility
+  // question — it is absent from every view by the product's own definition, so
+  // a parent's progress that still counted it would be the "5 of 8" this file
+  // exists to keep honest reading "5 of 8" about a ticket nobody can reach.
   const { rows } = await db.query<ChildRow>(
     `SELECT v.ticket_id, v.workspace_id, v.project_id, v.resolved_mode, v.resolved_user_ids,
             t.state_category
      FROM proj_visibility v
      LEFT JOIN proj_tickets t ON t.ticket_id = v.ticket_id
      WHERE v.parent_id = $1
+       AND (t.deleted_at IS NULL OR t.ticket_id IS NULL)
      ORDER BY v.ticket_id`,
     [ticketId],
   );

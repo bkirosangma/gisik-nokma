@@ -119,6 +119,63 @@ export function visibleTicketsWhere(eff: EffectiveRole, userId: string, params: 
 }
 
 /**
+ * The soft-delete predicate: a ticket whose `ticket.deleted` has not been undone.
+ * Requires `proj_tickets` joined as alias `t`.
+ *
+ * ## Why this is a separate constant and NOT part of the predicate above
+ *
+ * A deleted ticket is in no view — the product's `Delete` is a
+ * history-retaining removal, and the FAQ says what changes is that *"The ticket
+ * stops appearing in views"* — but "deleted" and "may this viewer see it" are
+ * different questions with different answers, and merging them would break both.
+ *
+ * 1. **Deletion is not visibility.** `visibleTicketsWhere` is cross-checked
+ *    ticket-by-ticket against `canSeeResolved` in
+ *    `test/read/visible-where.test.ts`. Widening the visibility predicate to
+ *    also mean "not deleted" makes that test assert a different property than
+ *    the one it was written for, and the deletion rule would then have no test
+ *    of its own. A deleted ticket is still VISIBLE in the `canSee` sense — which
+ *    is exactly why the history endpoint keeps serving it (the FAQ: *"Its
+ *    history is retained, because other events cite it"*).
+ * 2. **Not every caller of that predicate has a `proj_tickets` join.**
+ *    `../visibility/visible-tickets.ts`'s `listVisibleTickets` selects from
+ *    `proj_visibility v` alone, with no `t` in its FROM at all. An
+ *    `AND t.deleted_at IS NULL` folded into the predicate would be a Postgres
+ *    "missing FROM-clause entry for table t" at runtime for that caller, not a
+ *    compile error.
+ * 3. **Being a separate constant is the point.** This repo's read paths are
+ *    hand-written SELECTs, not one shared assembler (the correction to the
+ *    soft-delete brief, 2026-09-20, which measured the premise wrong). The only
+ *    way to enumerate the coverage is `grep -rn "LIVE_TICKET_WHERE"
+ *    apps/server/src/` — one spelling, one list, and a view site that forgets it
+ *    is visible as an absence from that grep rather than as a silently reused
+ *    predicate nobody can audit.
+ *    ⚠ **This sentence gave a COUNT ("eleven") and it is withdrawn: neither the
+ *    author nor an independent reviewer could reproduce it.** Measured by the
+ *    reviewer: 13 executable uses of the constant (8 `${LIVE_TICKET_WHERE}`
+ *    + 5 `LIVE_TICKET_WHERE,` across 9 files) plus 1 hand-written predicate at
+ *    `../visibility/rollup.ts:261` = **14 statements carry the rule**, and no
+ *    reading of "hand-written" yields 11. The method is the thing that matters
+ *    and the method is the grep — a bare number here was a claim about a
+ *    universe nobody had pinned.
+ *
+ * AND it into every SELECT that serves a VIEW. Do NOT add it to
+ * `../projections/tickets.ts`'s `getTicketStateFromDb` /
+ * `getChildrenStatesFromDb` / `refreshTicketsForWorkflow`: those feed
+ * `EngineContext`, and an engine that cannot see a deleted ticket refuses its own
+ * undo (`ticket.restored`) with `unknown-ticket`. That file's docblock carries
+ * the full reason.
+ *
+ * ## Why `t.` and not a bare column name
+ *
+ * Every view site here joins `proj_tickets` as `t` (the alias is the house
+ * convention at all eleven of them), and the qualification is what makes a
+ * mis-aliased join a compile-time-invisible but immediate Postgres error rather
+ * than a predicate that silently reads some other table's column.
+ */
+export const LIVE_TICKET_WHERE = 't.deleted_at IS NULL';
+
+/**
  * The `'explicit'` COLUMN of the table above, on its own: this ticket's resolved
  * audience names this user.
  *

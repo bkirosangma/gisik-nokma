@@ -31,6 +31,94 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 SUNDAY 2026-09-20 ~13:1x IST — **CYCLE 22: THE OWNER ASKED WHY EVERY QUEUED TASK SAT ON ONE LANE — IT WAS DRIFT, NOT A CONSTRAINT — AND THE REGISTER'S FALSE MOUNT SENTENCE IS CORRECTED.** `main` is `4274b372`; **zero open PRs**; ledger **307 done / 1 todo** (struck).
+
+### 1. THE DEFECT THE OWNER CAUGHT
+The owner: *"why is everything queued to exec 1?"* **Measured — there was no reason.**
+- **§4's queue held SIX rows for exec 1 and ONE for exec 2**, counted on ONE basis, stated so it can be checked: at `origin/main` the table's lane column reads `exec 1` six times — item 1 in flight plus **five queued** (3, 4, 5, 6, 7) — `exec 2` once, item 2, **in flight, with nothing behind it**, and one HELD row on neither lane. **So exec 2 would have run dry the moment the ticket key landed, while exec 1 still held five.** That defeats the stated reason two executors exist (*"open up a 2nd executor to take things in parallel and finish this up quicker"*).
+- **NO STANDING LANE-ASSIGNMENT RULE EXISTED BEFORE THIS ENTRY.** A search of this file for one that assigns queued work to a lane, or balances the two, **found none before §3 below was written — and the same search now FINDS §3, which is the first.** What the file held until then is per-task history — re-tasks from the superseded four-lane topology, and two-executor-era one-offs (*"Assigned to exec 1 to correct"*, *"queued to exec 2"*). **Those record decisions; none of them is a rule, and none is generalizable.**
+- **The one written lane split on record was CONTRADICTED.** `CTL-QUEUE-2026-09-19-door-builds.md` Addendum 2 (*:133*): *"exec 1 takes **F → G**; exec 2 takes **H** after its renumber and its existing queue."* **Cycle 21 gave H — the footer — to exec 1**, which is the task exec 1 is running now.
+- **Item 3's dispatch names no lane at all**, only a branch (`exec/sheet-surfaces`) — so it landed on exec 1 by *prefix convention*, not by a decision. **Items 6 and 7 have no sheet affinity whatsoever** and were handed to exec 1 with nothing written to justify it.
+- **Nothing constrained them.** Exec 2's recorded limits are: no `docker compose`, no binding `:3001` (it uses `:3021`), `--concurrency=1`, never write `docs/lanes/executor-state.md`, and it does not run the forced gate. **None of items 3–7 needs docker, `:3001`, that handoff file, or a gate** — every gate is the controller's.
+
+### 2. 📌 THE OWNER'S RULING — *"go"*, 2026-09-20 ~13:1x IST, on the controller's recommendation. **NEWEST AUTHORITY.**
+**Items 5, 6 and 7 move from exec 1 to exec 2. Items 3 and 4 STAY on exec 1** — 3's dispatch is written `exec/`, and 4 is the same sheet mount exec 1 has just been inside.
+
+### 3. ⛔ THE RULE THIS WRITES DOWN — **LANE ASSIGNMENT IS BY AFFINITY, WRITTEN BESIDE THE TASK, NEVER IMPLIED**
+**A queued task's lane is assigned when it is queued, and the reason is written with it.** In order:
+1. **A task already inside a lane's working context goes to that lane** — the sheet's surfaces to whoever holds the sheet.
+2. **A task with no context affinity goes to the lane with the SHALLOWER queue** — never by default, never by prefix.
+3. **An `exec/`-prefixed branch name in a dispatch FIXES that task to exec 1. That is a decision, not a default** — write it deliberately or not at all.
+4. **Before dispatching, check that no lane is about to run dry while a peer holds a queue.** That is the failure this rule exists to prevent.
+
+### 4. THE REGISTER'S FALSE MOUNT SENTENCE — CORRECTED, AND THE COUNT WAS RIGHT WHILE THE ENUMERATION WAS WRONG
+Cycle 21 ordered this: `owner-holds.md` said the two remaining mount gaps are *"both owned by dispatches that exist"*. **FALSE — a search of all 117 `CTL-DISPATCH-*.md` files in `gisik-nokma-lanes/` finds neither.** ⚠ **Cycle 21's block below says *"all 114 dispatch files"*; measured on 2026-09-20 that total does not reproduce. A sweep's total is a reading, and it expires the moment a new brief is written — recount, never inherit.**
+**Measured at `4274b372` BEFORE writing (the correction was not to be written from the previous controller's count):** the mount (`page.tsx:2417`) passes **NINE props**. ⚠ **`TicketSheetProps` declares EIGHT optional props and the mount passes FOUR of them** (`cache`, `editorSlot`, `uploadEvidence`, `onOpenTicket`) — so *"the four optional props"* would name the wrong set. **Stated against the register's own enumeration instead: of the four gaps IT names — `editorSlot`, `attachments`, `uploadEvidence`, `visibility` — two are closed (`editorSlot`, `uploadEvidence`) and two remain (`attachments`, `visibility`).** **So its "two remain" was RIGHT and its own enumeration was the stale half** — that sentence named three unpassed props, and `uploadEvidence` closed after it was written. **Corrected in place, and the work now points at queue item 4 rather than at a dispatch that does not exist.**
+⚠ **THE CITATION WAS STALE TOO, AND IT STILL RESOLVED** — `page.tsx:2346-2353` now lands on a **selection-handler block**, not the mount. **A stale citation that resolves is worse than one that dangles, because the reader has no reason to doubt it.** Fixed in **both** places it appears in `owner-holds.md` (the mount paragraph *and* the Description row's evidence cell). ⚠ **The RANGE still survives in ONE file this PR deliberately does not edit** — `test-cases/13-second-wave-board-actions.md:1942`. ⚠ **A near-miss worth recording, because it is the same "count right, enumeration wrong" shape this very paragraph diagnoses: `docs/lanes/executor-2-state.md:2392` cites the single LINE `page.tsx:2346`, NOT the range** — and its `:4642` carries neither (that is a checked-case count). **The first is recorded rather than fixed, to keep this diff to the two files it corrects; the second is exec 2's live handoff, where editing across lanes would collide with that lane's next push.**
+⚠ **AND THIS EDIT MOVES EVERY LINE BELOW THAT PARAGRAPH IN `owner-holds.md` — SO DO NOT STATE THE SHIFT AS A NUMBER.** **This sentence's first draft said *"+9"*; a later edit in the same round made it 6.** (Measured — and it is this project's own recorded failure, *the act of fixing a thing invalidates the description of that thing*: the fix round's own `+6/-9` edit broke a count the original commit had measured correctly.) **A shift is an INSTRUCTION, so a wrong offset is worse than none — the reader re-points by it and lands on a citation that still resolves and still misleads.** **Cycle 21's order at §3 item 2 cites `owner-holds.md:138`; at this head that number is a BLANK LINE, and at `origin/main` it sat mid-sentence in the target.** ⚠ **Pin the SYMBOL, not the offset: the corrected paragraph is the one opening *"⚠ AND ITS STATE — RE-MEASURED 2026-09-20 at `4274b372`"*.**
+
+---
+
+## 🔄 SUNDAY 2026-09-20 ~13:1x IST — **CYCLE 21: THE OWNER'S SECOND SITTING — FOUR MORE SHEET RULINGS, A FULL TICKET-KEY SPEC, A REBUILD, AND A SWEEP THAT FOUND FOUR DEAD ENDS.** `main` is `e2db9730`; **zero open PRs**; ledger **307 done / 1 todo** (struck). ⚠ **THIS ENTRY EXISTS BECAUSE THE OWNER ASKED *"is your queue persisted?"* AND THE ANSWER WAS NO — the surface was a full day behind. Read §2 and §3 as the queue.**
+
+### 1. POSITION
+| lane | task | status |
+|---|---|---|
+| exec 1 | **The sheet footer** — remove `‹ Previous / Next ›`; build **`Delete` as a HISTORY-RETAINING removal with undo** | **IN FLIGHT** — `exec/sheet-footer`, Ctx 27 %; a sweep across ~49 files, **and exec 1 is independently auditing its own subagent's work** (it caught a `proj_rollups` consistency question and refused to propagate an unmeasured count) |
+| exec 2 | **The ticket key** — `CCSO-1183` | **IN FLIGHT** — `exec/ticket-key`, restarted at the fixed point, Ctx 6 % |
+**The environment was REBUILT this cycle** (`pull` + `pnpm dev:stack:rebuild`, owner-ordered): the primary checkout went `416ee1ff` → `1391aef3` (**118 commits, `--ff-only`**) and the served bundle now carries tonight's code — verified by `gn-sheet__full` **0 → 3 files** in `/app/apps/web/.next` against a control, and sign-in read **inside** the container (`GOOGLE_CLIENT_ID` len 72, `/v1/auth/methods` → `google:true`). **The rebuild took 2m27s, not the 841 s on record — that number was a cold build; the base layers were cached. VERIFY THE ARTIFACT, NOT THE DURATION.**
+
+### 2. 📌 THE OWNER'S SECOND SITTING — FOUR RULINGS + A FULL SPEC. **NEWEST AUTHORITY.**
+**The owner looked at the rebuilt app's ticket sheet and said: *"the built task details looks nothing like the prototype."*** **The controller measured the delta in a browser and put each item; all are now ruled.**
+| item | the owner's ruling | what it needs (measured) |
+|---|---|---|
+| **the rich-text toolbar** (`B i code list quote`) | **"all 3 yes"** | **NOTHING BUT THE COMPONENT** — `StarterKit` already ships bold/italic/code/codeBlock/bulletList/orderedList/blockquote/headings. **No door, no migration** |
+| **the inline title editor** | **"all 3 yes"** | **A SURFACE OVER AN EXISTING DOOR** — `ticket.field_set` already writes `fields[fieldId]`, and the title already lives there (`ticket.created` writes `fields: {title}`). The sheet renders it as DISPLAY (`title={ticketRead.title}` into the shared `Sheet`), so the header needs a control |
+| **the breadcrumb** | **"all 3 yes"** | **THE FIRST THREE CRUMBS NEED NOTHING NEW** (workspace/project/state are on the ticket read; the sheet already renders *"At project root"*). **Build three and STOP** — the fourth is the key |
+| **THE TICKET KEY** | **"the ticket key is also important. we shall take it."** then the FULL SPEC below | a MIGRATION + a durable public identifier |
+**⛔ THE TICKET KEY'S SPEC, VERBATIM: *"prefix will be decided at the creation of the workspace and project. i can enter up to 3 letters for the workspace and during project creation up to 3 letters for it. for example for convenience corner if i choose CC and then for the project Shop Operations i choose SO, the key will look something like CCSO-xxxx where the xx are the counter per project."***
+- **⚠ IT OVERRIDES THE PROTOTYPE, measured so the divergence is recorded:** the prototype's seed carries **five projects** (`delivery`, `callouts`, `pilot`, `site`, `standing`) and numbers `GN-1099`…`GN-1301` **straight across them**. **The owner's spec is the authority — never "correct" it back toward the file.**
+- **FOUR FOLLOW-UPS, ALL ANSWERED THE SAME HOUR:** **(1) project prefixes ARE unique per workspace** (*"yes project prefixes are unique per workspace"*) — a CONSTRAINT to enforce where the prefix is authored, not a hope. **(2) backfill:** *"backfill convenience corner with CC, the shop operations project with SO, and the other project with GG"* — **verified to exist in the dev DB**: workspace `0TZSS5W6ATCTF2YBPMWGGP9JF5` (Convenience Corner) → `CC`; project `0XB92YA4CGEBF9S285AH4SDXR1` ("Shop operations", 26 tickets) → `SO`; project `01M25DBPXAK3NC9YRVS95MB7J6` ("gggg", 1 ticket) → `GG`. ⚠ **A repo migration CANNOT hard-code those ids — it must give EVERY row a prefix deterministically; the three named rows are DEV DATA.** **(3) gaps:** *"go with what you recommend"* → **the controller recommends GAPS ARE ACCEPTABLE AND A NUMBER IS NEVER REUSED** (reusing a burned number would make a key that once named one ticket later name a different one). **(4) is the bare key enough where shown?** *"it is enough"* → enumerate the sites anyway, to prove the decision was applied.
+- **THE DOORS, for both prefixes — neither is a second door, and the repo has done this exact shape twice:** the **workspace prefix rides `workspace.created`** (as `workspace.renamed` carries the name; **workspaces are event-sourced — there is no `proj_workspaces` table**), and the **project prefix follows `#545`'s template** (a `proj_projects` column — `description` was added the same way — `projectCreatedPayload` is **`.strict()`**, so payload/projection/read/render move together, and **every `ProjectRef` site must carry it**; measured at the time as two production sites).
+
+### 3. ⚠ THE SWEEP THE OWNER ASKED FOR — FOUR DEAD ENDS, AND ONE IS A FALSE SENTENCE IN THE REGISTER
+**Sources swept: `owner-holds.md` §1–§4, the queue doc + its five addenda, all 114 dispatch files, both executor handoffs, the ledger, the catalogue, `Features.md`.**
+1. **THE PARITY'S REMAINING ITEMS** were **listed in a dispatch and never ruled** — now ruled (§2). **The root cause was that a stop-and-ask sat buried in a merged PR body**, which is not a question anyone answers.
+2. **`attachments` AND `visibility` ARE DECLARED BY `TicketSheet` AND NEVER PASSED BY ITS SINGLE MOUNT.** `owner-holds.md`'s mount paragraph (**cited here as `:138`; cycle 22's correction moves every line below it, so this number now lands on a BLANK LINE — ⚠ and do NOT apply an offset to fix it: resolve that paragraph by CONTENT, it opens *"⚠ AND ITS STATE — RE-MEASURED 2026-09-20"***) says the two remaining gaps are *"both owned by dispatches that exist"* — **and the controller could find NEITHER dispatch.** ⛔ **THAT SENTENCE IS FALSE AND MUST BE CORRECTED IN THE REGISTER**, or the next reader inherits the same dead end. `Attachments` is the prototype's third tab.
+3. **`prewarm-web-routes`** — the brief exists, **owner-ordered**, and `grep -rl prewarm apps/web` → **0**. Parked as "HELD" when the hot container looked likely to be removed; the container stayed.
+4. **THE DELTA AUDIT'S `TOKENS (every screen)` WIRE-GAP** (`docs/design/prototype-delta-2026-09-18.md:97`, against `packages/ui/src/tokens.ts`) — **no ledger row covers it.**
+**HELD, and NOT misses — do not re-sweep these:** **§4's contrast debts `13.690`–`13.692`** (owner 2026-09-18: *"leave the contrast debts on hold as well. record it."*); `board-prototype-port/1` (permanently STRUCK); `13.926`'s "Choose again" (a recorded absence with an owner); the legal copy (§3, a DECIDED STATE).
+**Checked and CLEAN:** the doors table's fifteen items are all built or settled (**including the two the controller could not recall — `isMcpTokens` naming has its migration + write; `isInvite` expiry reads `expires_at` where it used to discard it**); **`hig-per-screen/5b` IS done** (`#517` witnessed `13.304` at the real door — the controller's first read of that row was a TRUNCATION error, not a defect); `Features.md` has **zero** `?` unverified markers.
+
+### 4. THE QUEUE — **IN ORDER, WITH LANES. THIS IS THE QUEUE.**
+| # | task | lane | state |
+|---|---|---|---|
+| 1 | **The sheet footer** — nav removal + `Delete` (history-retaining, with undo) | exec 1 | **IN FLIGHT** |
+| 2 | **The ticket key** — the full spec in §2 | exec 2 | **IN FLIGHT** |
+| 3 | **The three sheet surfaces** — toolbar, editable title, three-crumb breadcrumb (`CTL-DISPATCH-2026-09-20-sheet-surfaces.md`) | exec 1 | **QUEUED — next on lane** |
+| 4 | **The two mount gaps** — `attachments`, `visibility` (measure-then-build; `Attachments` may be a read) | exec 1 | **QUEUED** |
+| 5 | **The pending-invitations heading** (`desktop.dc.html:725`; `pending.length` already in state) | exec 2 | **QUEUED** |
+| 6 | **The tap-target checker** — accept 24 for dense in-list, keep 44 standalone | exec 2 | **QUEUED** |
+| 7 | **`replica-data-source.ts:205`'s "six call sites"** — measure-then-decide; **no number inherited from the controller** (its own attempt was inconclusive) | exec 2 | **QUEUED** |
+| 8 | **`prewarm-web-routes`** · **the audit's `TOKENS (every screen)` gap** | — | **HELD** — neither user-visible, neither on the critical path |
+
+**⚠ RE-BALANCED 2026-09-20 ~13:1x IST (cycle 22, owner-authorized — *"go"*): items 5, 6 and 7 moved from exec 1 to exec 2.** They were on exec 1 by drift, not by any rule; the reasoning, and the lane-assignment rule this writes down, are in the cycle-22 block at the top of this file.
+
+### 5. INSTRUMENTS THAT LIED THIS CYCLE, ALL CAUGHT
+1. **A ZSH PARAMETER MODIFIER ATE A VARIABLE.** `"$M:test-cases/16-remaining-doors.md"` — zsh read `$M:t` as the *tail* modifier, so the path became garbage and the check **reported `MISSING` for lines that were present**. **Use `${M}:path`.**
+2. **A LEADING-DASH SEARCH STRING SILENCED ITSELF.** `grep -qF "$line"` where the line begins `- ` made grep read it as a FLAG (`invalid option --`) and report a miss. **`grep -qF -- "$line"`.**
+3. **THE TWO-DOTS TRAP, RE-DERIVED BY A LANE:** `git diff --shortstat origin/main HEAD` reads **14 files** on a branch whose real delta is **4** — the moved `main` counted as yours. **Three dots.**
+4. **A GATE'S DURATION IS NOT A CLAIM ABOUT THE BUILD** (2m27s vs 841 s — cached layers). **Verify the artifact.**
+5. ⚠ **`git checkout -- <file>` DESTROYS UNCOMMITTED WORK**, and it happened in **both** lanes within an hour (exec 1's scratch battery; exec 2's mutation restore). **A checksum restore, never a blanket checkout — and COMMIT THE MOMENT A FIX IS GREEN if the next step rewrites the same file.**
+6. ⚠ **THE CONTROLLER LET ITS PR WATCHER LAPSE** and a finished lane sat holding for a merge until the owner noticed. **Re-armed; the topology's one documented blind spot.**
+
+### 6. WHAT THE NEXT CONTROLLER SHOULD DO FIRST
+1. **Capture both panes** (`gisik:1`, `gisik:2`) and **read §4's queue** — it is the position.
+2. **Re-measure every anchor at the sha you report.**
+3. **CI is the billing-blocked shape** (annotation: *"the job was not started because recent account payments have failed"*). **Owner-waived 2026-09-06, not treated as green, NOT to be re-asked.**
+4. ⚠ **A LANE CAN BE DOWN AND LOOK BUSY:** on 2026-09-20 both executors sat on **`API Error: 402 Insufficient Balance`** for five hours while an idle-nudger pasted *"continue"* every sixteen minutes. **Check the pane's last ERROR line, not the spinner.**
+5. **The reviewer-pass bar clause is KEPT** (owner: *"keep it"*) — it has now earned its place six times, most sharply on `#584` where the reviewer found **six defects in the repair itself**, three of them checks that cannot fail.
+
 ## 🔄 SUNDAY 2026-09-20 ~11:4x IST — **CYCLE 20: THE OWNER RULED ALL TEN OPEN ITEMS, THE LEDGER'S LAST REAL ROW IS FLIPPED, AND A CHECK THAT COULD NOT FAIL WAS REBUILT ON A PARSE TREE.** `main` is `0ea15006`; **zero open PRs**; ledger **307 done / 1 todo** — the remaining `todo` is the **permanently struck** `board-prototype-port/1`.
 
 ### 📌 THE OWNER'S TEN RULINGS — TAKEN 2026-09-20 ~11:3x IST. **THIS IS THE NEWEST AUTHORITY IN THIS FILE.**

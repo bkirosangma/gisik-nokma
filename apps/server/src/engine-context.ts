@@ -290,6 +290,16 @@ export function createEngineContext(client: PoolClient): EngineContext {
       return { kind, id };
     },
     async getChildrenStates(ticketId) {
+      // NEITHER THIS NOR `getEntityState('ticket')` ABOVE FILTERS
+      // `proj_tickets.deleted_at`, deliberately. This context is the ENGINE's,
+      // not a view's: `ticket.restored` — the UNDO of the soft delete — resolves
+      // the ticket it restores through `getEntityState('ticket')`, so a context
+      // that could not see a deleted ticket would refuse its own undo with
+      // `unknown-ticket` and make the delete irreversible. `getTicketStateFromDb`
+      // carries the full reason; the short version is that the exclusion belongs
+      // to the views, and a rule engine judging a claim ABOUT a ticket is not a
+      // view.
+      //
       // DIRECT children, from proj_tickets, in the parent's own workspace. The
       // parent-terminal invariant (`parent-terminal-with-open-children`) is the
       // only caller and it is reached solely through a resolved TicketState, so

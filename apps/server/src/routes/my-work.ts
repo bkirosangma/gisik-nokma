@@ -14,7 +14,7 @@ import { READ_NOT_FOUND_BODY, requireMember } from '../read/membership.js';
 import { SqlParams } from '../read/sql-params.js';
 import { assembleTicketCards, PROJ_TICKET_COLUMNS, type ProjTicketRow } from '../read/ticket-cards.js';
 import { foldedDefKey, foldedWorkflowDefs } from '../read/workflow-defs.js';
-import { explicitAudienceWhere, visibleTicketsWhere } from '../read/visible-where.js';
+import { LIVE_TICKET_WHERE, explicitAudienceWhere, visibleTicketsWhere } from '../read/visible-where.js';
 import { canSee } from '../visibility/can-see.js';
 
 /**
@@ -135,6 +135,10 @@ export async function readMyWork(
     // not a bucket this viewer's groups filter afterwards — a closed ticket
     // never reaches `rows` at all.
     't.closed_at IS NULL',
+    // And neither is a deleted one: "my work" is a view, and the FAQ's "stops
+    // appearing in views" covers it. A conjunct over `t` beside the closed
+    // clause, never folded into the visibility predicate.
+    LIVE_TICKET_WHERE,
   ];
   const { rows } = await db.query<ProjTicketRow>(
     `SELECT ${PROJ_TICKET_COLUMNS}
@@ -244,6 +248,8 @@ async function sharedWithMeRows(
     // Same rule as the assigned half (backlog/closed spec §3.2): a closed
     // ticket handed to this viewer is not "shared with me" any more either.
     't.closed_at IS NULL',
+    // Same rule again for the soft delete — "shared with me" is a view.
+    LIVE_TICKET_WHERE,
   ];
   const { rows } = await db.query<ProjTicketRow>(
     `SELECT ${PROJ_TICKET_COLUMNS}
@@ -309,9 +315,23 @@ async function contestedFor(
     original_event: unknown;
     contested_at: Date;
     ticket_fields: Record<string, FieldClaim> | null;
+    deleted_at: Date | null;
   }>(
+    // `t.deleted_at` is selected and the LEFT JOIN is NOT filtered by it. The
+    // ROW must survive — a contest is the VIEWER's own refused claim, and the
+    // FAQ's reason for keeping history is *"other events cite it"*; dropping the
+    // row because the ticket it cites was deleted would strand a claim the
+    // person can never clear, from a route whose whole subject is their own
+    // open refusals. What must NOT survive is the deleted ticket's TITLE, so the
+    // flag is carried out and the title gate below consults it.
+    //
+    // Filtering the ON clause instead would be worse than wrong: `titleOf`
+    // throws when `ticket_fields` is null ("visible to this viewer but has no
+    // proj_tickets row"), and `canSee` knows nothing about deletion — so a
+    // deleted ticket with an open contest would 500 the whole My Work route for
+    // its claimant.
     `SELECT c.ticket_id, c.rule, c.reason, c.original_event, c.contested_at,
-            t.fields AS ticket_fields
+            t.fields AS ticket_fields, t.deleted_at
        FROM proj_contested c
        LEFT JOIN proj_tickets t
          ON t.ticket_id = c.ticket_id AND t.workspace_id = c.workspace_id
@@ -335,7 +355,15 @@ async function contestedFor(
     }
     contested.push({
       ticketId: row.ticket_id,
-      title: (await canSee(db, viewerId, row.ticket_id)) ? titleOf(row.ticket_fields, row.ticket_id) : null,
+      // Two ways to earn `null`, and they are the same register — "the claim is
+      // yours, the ticket's content is not": the viewer may no longer see the
+      // ticket (`canSee`), or the ticket has been soft-deleted. The second is
+      // `LIVE_TICKET_WHERE`'s rule reaching the one surface that cannot filter
+      // its row, so it is applied to the TITLE alone.
+      title:
+        row.deleted_at === null && (await canSee(db, viewerId, row.ticket_id))
+          ? titleOf(row.ticket_fields, row.ticket_id)
+          : null,
       rule: row.rule,
       reason: row.reason,
       claim: {

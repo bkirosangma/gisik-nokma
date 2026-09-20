@@ -1690,6 +1690,34 @@ function mapTicketState(raw: unknown, path: string): TicketState {
     // The VALUE is still policed: `string | null` is the whole type, so a
     // number is refused rather than coerced (13.724's final arm).
     reopenedAt: mapOptionalInstant(record['reopenedAt'], `${path}.reopenedAt`),
+    // The FOURTH member to fall through this hand-enumerated list, and the
+    // second time `mapClosed` has been the exact helper for it (soft delete,
+    // 2026-09-20). `TicketState.deleted` is `{ actorId, at } | null` — the
+    // IDENTICAL shape to `closed` — and `rowToTicketState` writes it
+    // UNCONDITIONALLY (`apps/server/src/projections/tickets.ts`), so the single
+    // read's `ticketState` body always carries the key and a mapper that does
+    // not read it silently drops a domain member.
+    //
+    // **Strict, not tolerant, and that is 13.603's lesson rather than a
+    // preference.** Every reader of this field spells `state.deleted ?? null`,
+    // so a DROPPED key and a `null` are indistinguishable — which is exactly
+    // how `closed` stayed dead across four surfaces in production while each
+    // surface's own tests stayed green (they seed a fake `DataSource` or a
+    // `ticketStateSeed` and never cross this mapper). `mapClosed` throws on an
+    // absent key; that throw is the tripwire, not a nuisance.
+    //
+    // The domain type carries `deleted?` OPTIONAL, on `closed?`'s exact rule —
+    // "for the literals' sake", not because the wire may omit it. The wire
+    // REQUIRES it here for `closed`'s own reason: `rowToTicketState` reads the
+    // columns unconditionally, so an absent key means the server stopped
+    // sending a domain member. `mapRank`'s docblock draws the same line for
+    // `rank`, and `reopenedAt` is the ONE member that takes the tolerant road
+    // with its reason stated (no comparator exists between this mapper's output
+    // and a folded replica state, so the tripwire would guard nothing). That
+    // reason does NOT apply here: this file's own `deleted` cannot be checked
+    // against the replica either, but `closed` — the field it is a flag beside
+    // — is strict, and the two are read by the same surfaces.
+    deleted: mapClosed(record['deleted'], `${path}.deleted`),
   };
 }
 

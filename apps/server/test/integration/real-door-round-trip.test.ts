@@ -806,6 +806,14 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — the single read'
         // client surface renders, but it still crosses this body, so it is
         // pinned here for the same reason as the two above.
         reopenedAt: null,
+        // The fourth of the family (soft delete, 2026-09-20): `rowToTicketState`
+        // writes it unconditionally, so a never-deleted ticket crosses the wire
+        // as `null` rather than as an absent key. The whole-state `toEqual` is
+        // what catches a producer that skips it — the same shape
+        // `packages/domain/test/ticket-state.test.ts` pins on the reducer, since
+        // the dual-client rig compares reducers and the wire against one
+        // another.
+        deleted: null,
       },
       title: 'Count the crates',
       stateProvenance: {

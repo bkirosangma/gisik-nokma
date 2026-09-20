@@ -175,6 +175,31 @@ export const ticketClosedPayload = z.object({}).strict();
 export const ticketReopenedPayload = z.object({}).strict();
 
 /**
+ * `ticket.deleted` — the SOFT delete. The ticket stops appearing in views; its
+ * ledger, and its row, stay. Producer of `TicketState.deleted`.
+ *
+ * The product's own FAQ already stated these semantics before this event
+ * existed (`design-system/interactive/desktop.dc.html`, the `faq-delete` entry):
+ *
+ * > "The ticket stops appearing in views. Its history is retained, because other
+ * > events cite it — a comment, a block, a workflow version."
+ * > "This is why the product says \"deleted\" rather than \"erased\"."
+ *
+ * The envelope carries the actor and the instant — the payload says nothing,
+ * exactly as `ticket.closed` does, and for the same reason: there is nothing
+ * here for a client to assert. `restored` is the name of the undo because the
+ * product already pairs `project.archived` with `project.restored`
+ * (`events/membership.ts`); a second word for the same act would be a second
+ * concept.
+ *
+ * Strict, and empty — the same construction as the closed pair, so a payload
+ * carrying anything at all is refused at the door rather than silently ignored.
+ */
+export const ticketDeletedPayload = z.object({}).strict();
+/** `ticket.restored` — the UNDO of `ticket.deleted`. Same empty, strict payload. */
+export const ticketRestoredPayload = z.object({}).strict();
+
+/**
  * `ticket.ranked` (spec §8.1) — one reorder is one event carrying the new key,
  * which is what makes a drag cost one claim instead of renumbering the column.
  * The key space is `isRankKey`'s, not `RANK_KEY_REGEX`'s, and the difference is

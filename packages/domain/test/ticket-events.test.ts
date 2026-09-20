@@ -3,8 +3,10 @@ import { parseEvent } from '../src/parse-event.js';
 import {
   ticketClosedPayload,
   ticketCreatedPayload,
+  ticketDeletedPayload,
   ticketFieldSetPayload,
   ticketReopenedPayload,
+  ticketRestoredPayload,
 } from '../src/events/ticket-events.js';
 import { makeEnvelope } from '../src/testing.js';
 import { domainRegistry } from '../src/vocabulary.js';
@@ -319,5 +321,52 @@ describe('13.567 start and the two flag payloads', () => {
   it('both types are registered on the ticket entity at version 1', () => {
     expect(domainRegistry.get('ticket.closed', 1)?.entityKind).toBe('ticket');
     expect(domainRegistry.get('ticket.reopened', 1)?.version).toBe(1);
+  });
+});
+
+/**
+ * The soft-delete pair's payloads — the same empty-and-strict shape 13.567 pins
+ * for the closed/reopened pair, and the emptiness is a decision rather than an
+ * unfinished schema.
+ *
+ * **A `reason` field was considered and is NOT here.** The FAQ's sentence is
+ * *"its history is retained, because other events cite it"*, so the fact worth
+ * keeping is WHO removed it and WHEN — and both already travel on the ENVELOPE
+ * (`actorId`, `serverTime`), which is where the reducer reads them from. A
+ * payload field duplicating either would be a second source for a fact the
+ * envelope already carries, and `.strict()` means an unnamed-by-schema field is
+ * refused at the door rather than quietly dropped.
+ *
+ * **`restored` is empty for the same reason `project.restored` is.** There is
+ * nothing to say about an undo beyond "it happened"; the ticket it applies to is
+ * the envelope's `entity.id`, and the state it restores to is whatever the head
+ * folded to before the delete. Any field here would be a claim nothing reads.
+ */
+describe('ticket.deleted / ticket.restored carry an empty, strict payload', () => {
+  it('both schemas accept {} and refuse any unknown key', () => {
+    expect(ticketDeletedPayload.parse({})).toEqual({});
+    expect(ticketRestoredPayload.parse({})).toEqual({});
+    // `.strict()`, not merely `.object({})`: without it zod STRIPS the unknown
+    // key and the parse succeeds, so `{ reason: 'x' }` would be accepted with
+    // the reason silently discarded. The assertion is on the THROW, which is
+    // the only thing that distinguishes the two.
+    expect(() => ticketDeletedPayload.parse({ reason: 'duplicate of #412' })).toThrow();
+    expect(() => ticketRestoredPayload.parse({ reason: 'x' })).toThrow();
+    // The same refusal through the real door, which is the parse site that
+    // matters (`parseEvent` is what the ingest route and the replica both call).
+    expect(refuses('ticket.deleted', 'ticket', { reason: 'x' })).toBe('invalid-payload');
+    expect(refuses('ticket.reopened', 'ticket', { reason: 'x' })).toBe('invalid-payload');
+  });
+
+  it('both round-trip through parseEvent on a ticket entity', () => {
+    roundTrips('ticket.deleted', 'ticket', {});
+    roundTrips('ticket.restored', 'ticket', {});
+  });
+
+  it('both are registered on the ticket entity at version 1', () => {
+    expect(domainRegistry.get('ticket.deleted', 1)?.entityKind).toBe('ticket');
+    expect(domainRegistry.get('ticket.deleted', 1)?.version).toBe(1);
+    expect(domainRegistry.get('ticket.restored', 1)?.entityKind).toBe('ticket');
+    expect(domainRegistry.get('ticket.restored', 1)?.version).toBe(1);
   });
 });

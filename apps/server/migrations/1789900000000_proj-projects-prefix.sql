@@ -4,9 +4,19 @@
 -- prefix that forms the second half of every ticket key it will hold —
 -- `CCSO-1183`.
 --
--- NUMBERS ABOVE 1789700000000, the highest applied migration, because a
+-- NUMBERS ABOVE 1789800000000, the highest applied migration, because a
 -- migration numbered below an applied one can never run — and
 -- `pnpm check:migrations` refuses the ordering before a database ever sees it.
+--
+-- ⚠ RENUMBERED FROM 1789800000000 AT THE MERGE (2026-09-20), and the reason is worth
+-- keeping: this file was written against a `main` whose highest migration was
+-- 1789700000000, and while this branch ran, `main` gained
+-- `1789800000000_proj-tickets-deleted.sql` — the SAME number. Two migrations sharing a
+-- prefix are ordered by FILENAME, so which ran first was undetermined; worse, a
+-- migration numbered AT the highest applied one can never run at all. A fresh test
+-- database applies both cleanly, so no test and no gate could see it —
+-- `pnpm check:migrations` is the only instrument that did, and it did it only because
+-- the branch was re-measured after the merge rather than assumed still valid.
 --
 -- ## NULL, and NOTHING IS BACKFILLED — and both halves of that are deliberate
 --

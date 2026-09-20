@@ -11,7 +11,7 @@ import type { EffectiveRole } from '../permissions/effective-role.js';
 import { READ_NOT_FOUND_BODY, requireMember, workspaceOfProject } from '../read/membership.js';
 import { SqlParams } from '../read/sql-params.js';
 import { assembleTicketCards, PROJ_TICKET_COLUMNS, type ProjTicketRow } from '../read/ticket-cards.js';
-import { visibleTicketsWhere } from '../read/visible-where.js';
+import { LIVE_TICKET_WHERE, visibleTicketsWhere } from '../read/visible-where.js';
 import { latestWorkflowDefs } from '../read/workflow-defs.js';
 
 /**
@@ -112,6 +112,7 @@ export async function readBoard(
         AND t.project_id = ${projectParam}
         AND t.state_id <> ${backlogParam}
         AND t.closed_at IS NULL
+        AND ${LIVE_TICKET_WHERE}
         AND ${visibleTicketsWhere(eff, viewerId, params)}
       ORDER BY t.ticket_id`,
     params.toArray(),

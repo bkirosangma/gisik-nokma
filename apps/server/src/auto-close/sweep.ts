@@ -2,6 +2,7 @@ import { istDayBounds, istDayOf, newUlid, SYSTEM_ACTOR_AUTO_CLOSE } from '@gisik
 import type { Queryable } from '../db/queryable.js';
 import type { IngestService } from '../ingest/ingest-service.js';
 import { isoDatePlusDays } from '../notifications/sweep.js';
+import { LIVE_TICKET_WHERE } from '../read/visible-where.js';
 import { getWorkspaceSettings } from '../projections/workspace-settings.js';
 
 /**
@@ -185,6 +186,15 @@ export async function runAutoCloseSweep(deps: AutoCloseDeps): Promise<AutoCloseR
           AND t.state_category = 'terminal'
           AND t.closed_at IS NULL
           AND t.reopened_at IS NULL
+          -- A soft-deleted ticket is not swept. The sweep APPENDS a
+          -- ticket.closed to the ledger and the ledger is append-only by
+          -- trigger, so closing one would be an unfalsifiable mutation against
+          -- a ticket that appears in no view — a write nobody can observe, for
+          -- a clock ("how long has this sat terminal") that means nothing for a
+          -- ticket nobody has. The undo restores a ticket in the state it was
+          -- deleted in, which is the state the person left it in, not one a
+          -- background job moved it to.
+          AND ${LIVE_TICKET_WHERE}
           AND entered.server_time < $2
         ORDER BY t.ticket_id`,
       [workspaceId, cutoff],

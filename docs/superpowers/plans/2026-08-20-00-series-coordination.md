@@ -6863,3 +6863,27 @@ actually establishes that Plan 9 Task 15 (reserving ids 11.1–11.47) has not ru
 > red. A presence assertion cannot see a fourth door — which is the same blindness, one level up,
 > that let a deleted `<InboxNavLink />` leave 125 tests green. The gap stays **UNOWNED**; only its
 > silence is fixed.
+
+## RULING E1 — the soft delete's AUTHORIZATION DOOR, and it names a class no document did (serial executor 1, 2026-09-20)
+
+**This is a conservative default taken by the executor under the brief's standing authority ("conservative-default rulings recorded in the coordination doc in the same change set"), and it is REPORTED rather than assumed — it is in the PR body for the owner to reverse.**
+
+### The door
+
+`ticket.deleted` and `ticket.restored` were **ungated**. Measured before the fix: `check-permission.ts` decides by TYPE, and a newly registered ticket event appears in none of its branches, so it fell to check 4 (`canSee`) and nothing else. **A workspace GUEST named on a single ticket could delete that ticket.**
+
+### The ruling, and the ground is the repo's own precedent rather than a preference
+
+**Both events gate on `hasProjectAdminRights(eff, projectId)`** (`permissions/effective-role.ts:145` — owner OR workspace admin OR that project's admin), reported as `PERMISSION_ROLE_RULE`.
+
+- `visibility.set` — the ticket-scoped privileged act that ALREADY exists — is gated at `check-permission.ts:930` by exactly that call, and `:292` states the model: *"a project admin runs their project's people and their tickets' visibility."* A delete is that same class of act on the same object.
+- `ADMIN_ONLY_TYPES` carries `project.archived` with the general principle (`:296-299`): *"Conservative in the reversible direction: widening this later … is one line and discloses nothing new, while an archive by someone the workspace did not intend cannot be un-seen by the people whose work vanished from their boards."* **A deleted ticket vanishes from boards, lists, search, My Work and the attention strip, so the same asymmetry holds.** Refusing a project admin who should have been allowed is one line to widen; letting the wrong person delete is not un-doable by us.
+- It is `hasProjectAdminRights` and NOT `ADMIN_ONLY_TYPES` because a single ticket is the project's business — `:293` says retiring the PROJECT is the workspace's.
+
+⚠ **The payload is EMPTY, so the `projectId` is not in it** — it is resolved from the ticket's own state through the ENGINE reader (`getTicketStateFromDb`), which is deliberately NOT filtered, and an unreadable ticket is refused with its own sentence rather than a role one.
+
+**Reversing this is one branch in `check-permission.ts`.** Named here so the owner's next read does not have to find it.
+
+### The class of door this belongs to, which no document named
+
+**"A NEW EVENT TYPE IS UNGATED UNTIL SOMEBODY REMEMBERS."** Every guard in that file is keyed on a type list written by hand, and `evaluateEvent`'s `default` arm accepts what nobody listed. So **the cost of adding an event type is not the event — it is remembering that `check-permission.ts`, `ADMIN_ONLY_TYPES` and `precheck.ts` each enumerate types separately and none of them fails loudly when one is missing.** The soft delete found it by accident: the question *"who may do this?"* was not in the dispatch, was not in the four doors the controller priced, and was not in the vocabulary's own comment. **Owner for a structural fix: a checker that fails when a registered `entityKind: 'ticket'` type is absent from the permission file's type sets — nobody owns it.**

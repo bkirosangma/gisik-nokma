@@ -13,7 +13,7 @@ import { FTS_CONFIG } from '../read/fts.js';
 import { READ_NOT_FOUND_BODY, requireMember } from '../read/membership.js';
 import { SqlParams } from '../read/sql-params.js';
 import { assembleTicketCards, PROJ_TICKET_COLUMNS, type ProjTicketRow } from '../read/ticket-cards.js';
-import { visibleTicketsWhere } from '../read/visible-where.js';
+import { LIVE_TICKET_WHERE, visibleTicketsWhere } from '../read/visible-where.js';
 
 /**
  * The size of the answer. Fifty, no pagination — pinned by the plan's Open
@@ -128,6 +128,13 @@ export async function readSearch(
     `t.workspace_id = ${params.add(workspaceId)}`,
     's.workspace_id = t.workspace_id',
     visibleTicketsWhere(eff, viewerId, params),
+    // Search is a view like any other, and this is the one route in the §5
+    // list that had NO closed-flag conjunct to sit beside — so the soft-delete
+    // clause is the first exclusion it carries, not the second. `proj_search`
+    // has no `deleted_at` column of its own (it is a derived text index, and
+    // `PROJ_TICKET_COLUMNS` deliberately does not grow for it), so the clause
+    // has to come from the `proj_tickets` join this query already carries.
+    LIVE_TICKET_WHERE,
   ];
   // ONE evaluation, spliced three times — the match, the ranking and the
   // snippet all ask the same question, and asking `params.add` again would bind
