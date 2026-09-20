@@ -31,6 +31,34 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 SUNDAY 2026-09-20 ~13:1x IST — **CYCLE 22: THE OWNER ASKED WHY EVERY QUEUED TASK SAT ON ONE LANE — IT WAS DRIFT, NOT A CONSTRAINT — AND THE REGISTER'S FALSE MOUNT SENTENCE IS CORRECTED.** `main` is `4274b372`; **zero open PRs**; ledger **307 done / 1 todo** (struck).
+
+### 1. THE DEFECT THE OWNER CAUGHT
+The owner: *"why is everything queued to exec 1?"* **Measured — there was no reason.**
+- **§4's queue held SIX rows for exec 1 and ONE for exec 2**, counted on ONE basis, stated so it can be checked: at `origin/main` the table's lane column reads `exec 1` six times — item 1 in flight plus **five queued** (3, 4, 5, 6, 7) — `exec 2` once, item 2, **in flight, with nothing behind it**, and one HELD row on neither lane. **So exec 2 would have run dry the moment the ticket key landed, while exec 1 still held five.** That defeats the stated reason two executors exist (*"open up a 2nd executor to take things in parallel and finish this up quicker"*).
+- **NO STANDING LANE-ASSIGNMENT RULE EXISTED BEFORE THIS ENTRY.** A search of this file for one that assigns queued work to a lane, or balances the two, **found none before §3 below was written — and the same search now FINDS §3, which is the first.** What the file held until then is per-task history — re-tasks from the superseded four-lane topology, and two-executor-era one-offs (*"Assigned to exec 1 to correct"*, *"queued to exec 2"*). **Those record decisions; none of them is a rule, and none is generalizable.**
+- **The one written lane split on record was CONTRADICTED.** `CTL-QUEUE-2026-09-19-door-builds.md` Addendum 2 (*:133*): *"exec 1 takes **F → G**; exec 2 takes **H** after its renumber and its existing queue."* **Cycle 21 gave H — the footer — to exec 1**, which is the task exec 1 is running now.
+- **Item 3's dispatch names no lane at all**, only a branch (`exec/sheet-surfaces`) — so it landed on exec 1 by *prefix convention*, not by a decision. **Items 6 and 7 have no sheet affinity whatsoever** and were handed to exec 1 with nothing written to justify it.
+- **Nothing constrained them.** Exec 2's recorded limits are: no `docker compose`, no binding `:3001` (it uses `:3021`), `--concurrency=1`, never write `docs/lanes/executor-state.md`, and it does not run the forced gate. **None of items 3–7 needs docker, `:3001`, that handoff file, or a gate** — every gate is the controller's.
+
+### 2. 📌 THE OWNER'S RULING — *"go"*, 2026-09-20 ~13:1x IST, on the controller's recommendation. **NEWEST AUTHORITY.**
+**Items 5, 6 and 7 move from exec 1 to exec 2. Items 3 and 4 STAY on exec 1** — 3's dispatch is written `exec/`, and 4 is the same sheet mount exec 1 has just been inside.
+
+### 3. ⛔ THE RULE THIS WRITES DOWN — **LANE ASSIGNMENT IS BY AFFINITY, WRITTEN BESIDE THE TASK, NEVER IMPLIED**
+**A queued task's lane is assigned when it is queued, and the reason is written with it.** In order:
+1. **A task already inside a lane's working context goes to that lane** — the sheet's surfaces to whoever holds the sheet.
+2. **A task with no context affinity goes to the lane with the SHALLOWER queue** — never by default, never by prefix.
+3. **An `exec/`-prefixed branch name in a dispatch FIXES that task to exec 1. That is a decision, not a default** — write it deliberately or not at all.
+4. **Before dispatching, check that no lane is about to run dry while a peer holds a queue.** That is the failure this rule exists to prevent.
+
+### 4. THE REGISTER'S FALSE MOUNT SENTENCE — CORRECTED, AND THE COUNT WAS RIGHT WHILE THE ENUMERATION WAS WRONG
+Cycle 21 ordered this: `owner-holds.md` said the two remaining mount gaps are *"both owned by dispatches that exist"*. **FALSE — a search of all 117 `CTL-DISPATCH-*.md` files in `gisik-nokma-lanes/` finds neither.** ⚠ **Cycle 21's block below says *"all 114 dispatch files"*; measured on 2026-09-20 that total does not reproduce. A sweep's total is a reading, and it expires the moment a new brief is written — recount, never inherit.**
+**Measured at `4274b372` BEFORE writing (the correction was not to be written from the previous controller's count):** the mount (`page.tsx:2417`) passes **NINE props**. ⚠ **`TicketSheetProps` declares EIGHT optional props and the mount passes FOUR of them** (`cache`, `editorSlot`, `uploadEvidence`, `onOpenTicket`) — so *"the four optional props"* would name the wrong set. **Stated against the register's own enumeration instead: of the four gaps IT names — `editorSlot`, `attachments`, `uploadEvidence`, `visibility` — two are closed (`editorSlot`, `uploadEvidence`) and two remain (`attachments`, `visibility`).** **So its "two remain" was RIGHT and its own enumeration was the stale half** — that sentence named three unpassed props, and `uploadEvidence` closed after it was written. **Corrected in place, and the work now points at queue item 4 rather than at a dispatch that does not exist.**
+⚠ **THE CITATION WAS STALE TOO, AND IT STILL RESOLVED** — `page.tsx:2346-2353` now lands on a **selection-handler block**, not the mount. **A stale citation that resolves is worse than one that dangles, because the reader has no reason to doubt it.** Fixed in **both** places it appears in `owner-holds.md` (the mount paragraph *and* the Description row's evidence cell). ⚠ **The RANGE still survives in ONE file this PR deliberately does not edit** — `test-cases/13-second-wave-board-actions.md:1942`. ⚠ **A near-miss worth recording, because it is the same "count right, enumeration wrong" shape this very paragraph diagnoses: `docs/lanes/executor-2-state.md:2392` cites the single LINE `page.tsx:2346`, NOT the range** — and its `:4642` carries neither (that is a checked-case count). **The first is recorded rather than fixed, to keep this diff to the two files it corrects; the second is exec 2's live handoff, where editing across lanes would collide with that lane's next push.**
+⚠ **AND THIS EDIT MOVES EVERY LINE BELOW THAT PARAGRAPH IN `owner-holds.md` — SO DO NOT STATE THE SHIFT AS A NUMBER.** **This sentence's first draft said *"+9"*; a later edit in the same round made it 6.** (Measured — and it is this project's own recorded failure, *the act of fixing a thing invalidates the description of that thing*: the fix round's own `+6/-9` edit broke a count the original commit had measured correctly.) **A shift is an INSTRUCTION, so a wrong offset is worse than none — the reader re-points by it and lands on a citation that still resolves and still misleads.** **Cycle 21's order at §3 item 2 cites `owner-holds.md:138`; at this head that number is a BLANK LINE, and at `origin/main` it sat mid-sentence in the target.** ⚠ **Pin the SYMBOL, not the offset: the corrected paragraph is the one opening *"⚠ AND ITS STATE — RE-MEASURED 2026-09-20 at `4274b372`"*.**
+
+---
+
 ## 🔄 SUNDAY 2026-09-20 ~13:1x IST — **CYCLE 21: THE OWNER'S SECOND SITTING — FOUR MORE SHEET RULINGS, A FULL TICKET-KEY SPEC, A REBUILD, AND A SWEEP THAT FOUND FOUR DEAD ENDS.** `main` is `e2db9730`; **zero open PRs**; ledger **307 done / 1 todo** (struck). ⚠ **THIS ENTRY EXISTS BECAUSE THE OWNER ASKED *"is your queue persisted?"* AND THE ANSWER WAS NO — the surface was a full day behind. Read §2 and §3 as the queue.**
 
 ### 1. POSITION
@@ -56,7 +84,7 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 ### 3. ⚠ THE SWEEP THE OWNER ASKED FOR — FOUR DEAD ENDS, AND ONE IS A FALSE SENTENCE IN THE REGISTER
 **Sources swept: `owner-holds.md` §1–§4, the queue doc + its five addenda, all 114 dispatch files, both executor handoffs, the ledger, the catalogue, `Features.md`.**
 1. **THE PARITY'S REMAINING ITEMS** were **listed in a dispatch and never ruled** — now ruled (§2). **The root cause was that a stop-and-ask sat buried in a merged PR body**, which is not a question anyone answers.
-2. **`attachments` AND `visibility` ARE DECLARED BY `TicketSheet` AND NEVER PASSED BY ITS SINGLE MOUNT.** `owner-holds.md:138` says the two remaining gaps are *"both owned by dispatches that exist"* — **and the controller could find NEITHER dispatch.** ⛔ **THAT SENTENCE IS FALSE AND MUST BE CORRECTED IN THE REGISTER**, or the next reader inherits the same dead end. `Attachments` is the prototype's third tab.
+2. **`attachments` AND `visibility` ARE DECLARED BY `TicketSheet` AND NEVER PASSED BY ITS SINGLE MOUNT.** `owner-holds.md`'s mount paragraph (**cited here as `:138`; cycle 22's correction moves every line below it, so this number now lands on a BLANK LINE — ⚠ and do NOT apply an offset to fix it: resolve that paragraph by CONTENT, it opens *"⚠ AND ITS STATE — RE-MEASURED 2026-09-20"***) says the two remaining gaps are *"both owned by dispatches that exist"* — **and the controller could find NEITHER dispatch.** ⛔ **THAT SENTENCE IS FALSE AND MUST BE CORRECTED IN THE REGISTER**, or the next reader inherits the same dead end. `Attachments` is the prototype's third tab.
 3. **`prewarm-web-routes`** — the brief exists, **owner-ordered**, and `grep -rl prewarm apps/web` → **0**. Parked as "HELD" when the hot container looked likely to be removed; the container stayed.
 4. **THE DELTA AUDIT'S `TOKENS (every screen)` WIRE-GAP** (`docs/design/prototype-delta-2026-09-18.md:97`, against `packages/ui/src/tokens.ts`) — **no ledger row covers it.**
 **HELD, and NOT misses — do not re-sweep these:** **§4's contrast debts `13.690`–`13.692`** (owner 2026-09-18: *"leave the contrast debts on hold as well. record it."*); `board-prototype-port/1` (permanently STRUCK); `13.926`'s "Choose again" (a recorded absence with an owner); the legal copy (§3, a DECIDED STATE).
@@ -69,10 +97,12 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 | 2 | **The ticket key** — the full spec in §2 | exec 2 | **IN FLIGHT** |
 | 3 | **The three sheet surfaces** — toolbar, editable title, three-crumb breadcrumb (`CTL-DISPATCH-2026-09-20-sheet-surfaces.md`) | exec 1 | **QUEUED — next on lane** |
 | 4 | **The two mount gaps** — `attachments`, `visibility` (measure-then-build; `Attachments` may be a read) | exec 1 | **QUEUED** |
-| 5 | **The pending-invitations heading** (`desktop.dc.html:725`; `pending.length` already in state) | exec 1 | **QUEUED** |
-| 6 | **The tap-target checker** — accept 24 for dense in-list, keep 44 standalone | exec 1 | **QUEUED** |
-| 7 | **`replica-data-source.ts:205`'s "six call sites"** — measure-then-decide; **no number inherited from the controller** (its own attempt was inconclusive) | exec 1 | **QUEUED** |
+| 5 | **The pending-invitations heading** (`desktop.dc.html:725`; `pending.length` already in state) | exec 2 | **QUEUED** |
+| 6 | **The tap-target checker** — accept 24 for dense in-list, keep 44 standalone | exec 2 | **QUEUED** |
+| 7 | **`replica-data-source.ts:205`'s "six call sites"** — measure-then-decide; **no number inherited from the controller** (its own attempt was inconclusive) | exec 2 | **QUEUED** |
 | 8 | **`prewarm-web-routes`** · **the audit's `TOKENS (every screen)` gap** | — | **HELD** — neither user-visible, neither on the critical path |
+
+**⚠ RE-BALANCED 2026-09-20 ~13:1x IST (cycle 22, owner-authorized — *"go"*): items 5, 6 and 7 moved from exec 1 to exec 2.** They were on exec 1 by drift, not by any rule; the reasoning, and the lane-assignment rule this writes down, are in the cycle-22 block at the top of this file.
 
 ### 5. INSTRUMENTS THAT LIED THIS CYCLE, ALL CAUGHT
 1. **A ZSH PARAMETER MODIFIER ATE A VARIABLE.** `"$M:test-cases/16-remaining-doors.md"` — zsh read `$M:t` as the *tail* modifier, so the path became garbage and the check **reported `MISSING` for lines that were present**. **Use `${M}:path`.**
