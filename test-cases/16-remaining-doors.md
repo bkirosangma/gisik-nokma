@@ -30,7 +30,18 @@ that is the rule whose breach made §13 go red twice.
 
 `16.1`, `16.2`, … `16.30`. **Do not reintroduce the `{3}` width** that §13 used: that width existed to
 stop `13.99` sorting above `13.649`, and ids here are not padded, so importing it would be the truncation
-trap in a new costume.
+trap in a new costume. ⚠ **READ THE SCOPE WORD THAT WAS MISSING FROM THIS SENTENCE (added 2026-09-20,
+executor 1, on cycle 29 §3):** the trap it names is **MIXING two widths inside ONE section** — `16.100`
+sorting below `16.99` — and it is **NOT a prohibition on padding as such**. Beside a padded `17.NNN` this
+read as forbidding §17's shape, and it does not. **§13 is the proof a uniform width works:** it ran
+`13.001`–`13.999` and minted 882 ids with no sort trap.
+
+## §17's SHAPE — ruled by the owner 2026-09-20 (cycle 29), recorded here because THIS file, not the controller's, is what a minting session trusts
+
+**§17 is uniformly 3-digit padded: `17.001`–`17.999`, ceiling 999.** §16's own minted ids stay unpadded
+and are NOT renumbered — 76 of them are merged, so padding is not retro-fittable. **The rule is therefore
+one width per section, and the widening that matters is the one WITHIN a section.** §17's block table row
+is the controller's to write, under the standing grant, when §16's window is spent.
 
 ## ⚠ THREE SPELLINGS `check-case-ids` CANNOT SEE — write cases as id LINES
 
