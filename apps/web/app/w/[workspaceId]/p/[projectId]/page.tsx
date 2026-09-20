@@ -2522,6 +2522,17 @@ function ProjectBoard() {
           */
           editorSlot={TicketEditorSlot}
           /*
+            THE SHEET'S BREADCRUMB NAMES. Both are already computed above for
+            this page's own header (`:174-175`) and already rendered there
+            (`:1611-1614`), so this passes values the page holds rather than
+            asking the sheet to fetch them — `TicketRead` carries no workspace
+            or project name, and there is no `getProjects` on `DataSourceQuery`.
+            See `TicketSheetProps.workspaceName` for the measurement and for why
+            a `null` draws no crumb rather than an id.
+          */
+          workspaceName={workspaceName}
+          projectName={projectName}
+          /*
             THE EVIDENCE UPLOAD. The sheet has accepted this prop all along
             (`TicketSheetProps.uploadEvidence`) and forwarded it to its own
             `TransitionDialog` (`ticket-sheet.tsx`); THIS CALL SITE never passed

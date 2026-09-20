@@ -9,6 +9,7 @@ import { emptyDoc, type DocJson } from '../doc.js';
 import type { UploadResult } from '../upload.js';
 import { ImageWrapMenu } from './ImageWrapMenu.js';
 import { UploadChips } from './UploadChips.js';
+import { EditorToolbar, MARKDOWN_HINT } from './EditorToolbar.js';
 
 export type TicketEditorProps = {
   initialDoc?: DocJson | null;
@@ -81,11 +82,15 @@ export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
     [],
   );
 
+  // Bound once so the editor's own `editable` and the chrome's cannot disagree
+  // about whether this composer may be typed into.
+  const editable = props.editable ?? true;
+
   const editor = useEditor({
     immediatelyRender: false, // SSR: render only after hydration (knowledge-base lesson)
     extensions,
     content: props.initialDoc ?? emptyDoc(),
-    editable: props.editable ?? true,
+    editable,
     onCreate: () => {
       propsRef.current.onEditorReady?.();
     },
@@ -104,7 +109,20 @@ export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
 
   return (
     <div className="ticket-editor">
+      {/* The formatting strip, ABOVE the content and sharing its top corners —
+          the prototype's own order (`desktop.dc.html:1166-1172`: the strip, then
+          the textarea, then the hint). It renders nothing when the editor is
+          read-only: `editable` is `false` for a viewer who may not write, and a
+          toolbar of commands that would each be refused is chrome for a door
+          that is shut. */}
+      <EditorToolbar editor={editor} editable={editable} />
       <EditorContent editor={editor} className="ticket-editor__content" />
+      {/* The prototype's hint line, BELOW the field (`:1173`) and outside the
+          strip, so the two keep the prototype's geometry rather than being one
+          block. Gated with the strip and for the same reason: it explains what
+          typing `**bold**` does HERE, which is a sentence addressed to someone
+          who can type, and a read-only composer has nobody to address. */}
+      {editable ? <p className="ticket-editor__hint">{MARKDOWN_HINT}</p> : null}
       <UploadChips chips={chips} />
       <ImageWrapMenu editor={editor} />
     </div>

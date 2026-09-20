@@ -1323,7 +1323,7 @@ describe('13.968 the Assignee row is editable, and a refused roster is not an em
  * would have made the fix look done while changing almost nothing:
  *
  *   `ticket.created` writes `fields: { title: claim(p.title, env) }` and
- *   NOTHING else (`packages/domain/src/ticket-state.ts:150`), and nothing else
+ *   NOTHING else (`packages/domain/src/ticket-state.ts:160`), and nothing else
  *   writes a description except an explicit `ticket.field_set`. The row lived
  *   INSIDE the `Object.entries(state.fields)` loop, so on every ticket nobody
  *   had described there was no row for an editor to mount into.
@@ -2213,5 +2213,339 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
     );
     expect(onDeleted).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 16.86 — the INLINE TITLE EDITOR.
+ *
+ * The owner's ruling (*"all 3 yes"*) made the title editable, and the dispatch
+ * measured the door: `ticket.field_set` already writes `fields[fieldId]`
+ * (`ticket-state.ts:299`) and `ticket.created` already puts the title there
+ * (`:150`). So nothing here asserts that an input EXISTS — every case drives a
+ * value into it and then reads the LEDGER EVENT the sheet sent, because a field
+ * that rendered and sent nothing is the shape this could fail in.
+ *
+ * `FakeDataSource.ingested` is the observation channel: it records each
+ * `ingest()` call, so `source.ingested.length` is a count of claims made.
+ */
+describe('TicketSheet — the editable title (16.86)', () => {
+  it('16.86 the title renders as a control carrying the ticket’s title', async () => {
+    renderSheet(ticketRead());
+    await settled();
+    const field = screen.getByRole('textbox', { name: 'Ticket title' }) as HTMLInputElement;
+    expect(field.value).toBe('File the GST return');
+  });
+
+  it('16.86 committing a changed title sends ticket.field_set for fieldId title', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead();
+    const source = renderSheet(read);
+    await settled();
+
+    const field = screen.getByRole('textbox', { name: 'Ticket title' });
+    await user.clear(field);
+    await user.type(field, 'File the GST return for August');
+    await user.tab();
+
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    const event = source.ingested[0]?.[0];
+    expect(event?.type).toBe('ticket.field_set');
+    expect(event?.payload).toEqual({ fieldId: 'title', value: 'File the GST return for August' });
+  });
+
+  /**
+   * The complement, and the reason the previous case is a claim about a CHANGE
+   * rather than about a field: the ledger is append-only, so a commit that
+   * re-sends the title it already has would put a line in the ticket's history
+   * saying somebody changed the title to what it already said.
+   *
+   * ## ⚠ THIS CASE USED TO PASS WITHOUT EVER REACHING THE GUARD IT NAMES
+   *
+   * Its first version was `click(field); tab()` — which leaves `titleDraft` at
+   * `null`, so the blur handler's `titleDraft !== null` check short-circuits and
+   * `submitTitle` is **never called at all**. An independent reviewer measured
+   * the consequence: **deleting the `next === ticketRead.title` guard entirely
+   * left this suite at PASS(90)/FAIL(0).** The case was green about an input
+   * nobody had typed into, while its own name claimed a property of the commit
+   * path.
+   *
+   * So it now TYPES THE SAME TITLE BACK, which is the only way to put a
+   * non-null draft equal to the server's title in front of the guard. Under that
+   * version the mutation above reddens it.
+   */
+  it('16.86 retyping the SAME title and committing sends nothing at all', async () => {
+    const user = userEvent.setup();
+    const source = renderSheet(ticketRead());
+    await settled();
+
+    const field = screen.getByRole('textbox', { name: 'Ticket title' }) as HTMLInputElement;
+    await user.clear(field);
+    await user.type(field, 'File the GST return');
+    await user.tab();
+
+    expect(source.ingested).toHaveLength(0);
+    // The draft is abandoned anyway: a value identical to the server's is not a
+    // claim, so there is nothing to keep on screen.
+    expect(field.value).toBe('File the GST return');
+  });
+
+  /**
+   * 16.86 — ENTER commits, and that path had no case at all.
+   *
+   * An independent reviewer measured it: deleting the `Enter` branch of the
+   * field's `onKeyDown` left this suite at PASS(90)/FAIL(0), because every other
+   * title case commits by blurring with `user.tab()`. Enter is the gesture the
+   * field's own docblock names first, so it gets its own witness — and the
+   * assertion is on the LEDGER, not on the key handler having run.
+   */
+  it('16.86 Enter commits the title as well as blur does', async () => {
+    const user = userEvent.setup();
+    const source = renderSheet(ticketRead());
+    await settled();
+
+    const field = screen.getByRole('textbox', { name: 'Ticket title' });
+    await user.clear(field);
+    await user.type(field, 'Filed for August{Enter}');
+
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    expect(source.ingested[0]?.[0]?.payload).toEqual({
+      fieldId: 'title',
+      value: 'Filed for August',
+    });
+  });
+
+  /**
+   * 16.86 — THE IN-FLIGHT LATCH, and this case exists because the first cut had
+   * no latch to test.
+   *
+   * A browser blurs the focused control when `disabled` lands on it, so **one
+   * Enter can fire a second commit out of the first one's own `onBlur`** while
+   * the first is still awaiting — and a second `ticket.field_set` carrying the
+   * title the ledger already holds is exactly what the unchanged-value guard
+   * exists to prevent. jsdom does not blur on disable, so the two gestures are
+   * driven explicitly here: Enter, then a blur, inside one in-flight window.
+   *
+   * The gate is what makes the window real. `ingest` is held pending, so both
+   * gestures land before either answer arrives; **without the latch this reads
+   * two ingests, with it one.**
+   */
+  it('16.86 a blur during an in-flight Enter commit does not send a second time', async () => {
+    const user = userEvent.setup();
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const read = ticketRead();
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      async (events) => {
+        await gate;
+        return events.map((event) => ({
+          status: 'committed' as const,
+          eventId: event.id,
+          seq: 1,
+          serverTime: '2026-08-20T09:00:00.000Z',
+        }));
+      },
+    );
+    renderSheet(read, source);
+    await settled();
+
+    const field = screen.getByRole('textbox', { name: 'Ticket title' });
+    await user.clear(field);
+    await user.type(field, 'Filed for August');
+    await user.keyboard('{Enter}');
+    await user.tab();
+
+    expect(source.ingested).toHaveLength(1);
+    release();
+  });
+
+  /**
+   * 16.86 — a REFUSED title keeps the reader's words and shows the server's own
+   * sentence. The refusal is the engine's (`checks/fields.ts:118-123`), not a
+   * second client-side rule, so this case passes a refusal through the fake and
+   * asserts the sheet renders exactly what came back.
+   */
+  it('16.86 a refused title keeps the draft and renders the server’s sentence', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead();
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      // `eventId` is the SUBMITTED event's own id, not a literal: `IngestResult`'s
+      // refused arm requires one, and a fixed string would be a result for an
+      // event this call never sent.
+      (events) => [
+        {
+          status: 'refused' as const,
+          eventId: events[0]?.id ?? '',
+          rule: 'field.type-mismatch',
+          reason: 'Title expects a text value.',
+        },
+      ],
+    );
+    renderSheet(read, source);
+    await settled();
+
+    const field = screen.getByRole('textbox', { name: 'Ticket title' }) as HTMLInputElement;
+    await user.clear(field);
+    await user.type(field, '   ');
+    await user.tab();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Refused by the server — field\.type-mismatch: Title expects a text value\./),
+      ).toBeInTheDocument(),
+    );
+    // The words stay: clearing the draft would hand the reader back the old
+    // title beside a sentence refusing the new one.
+    expect(field.value).toBe('   ');
+  });
+
+  /**
+   * 16.86 — Escape abandons the draft, sends nothing, AND DOES NOT CLOSE THE
+   * SHEET.
+   *
+   * ## ⚠ THE THIRD ASSERTION IS THE ONE THAT WAS MISSING, AND IT WAS A REAL DEFECT
+   *
+   * `Sheet` registers a DOCUMENT-level keydown that calls `onClose()` on any
+   * Escape. Nothing in it checked `defaultPrevented`, so the field's own Escape
+   * branch — which calls `preventDefault()` and resets the draft — did not stop
+   * the sheet from closing: **the documented behaviour was true of an input that
+   * was being unmounted.** An independent reviewer measured `onClose` called
+   * once and reproduced it with a scratch case.
+   *
+   * The branch's own suite could not see it, and the reason is worth stating:
+   * `renderSheet` passes `onClose: vi.fn()`, which never unmounts anything, so
+   * the sheet stayed on screen for the two assertions above to hold against. The
+   * fix is in `Sheet` (`if (event.defaultPrevented) return;`), and this
+   * assertion is its witness — **revert that line and this case reddens while
+   * the other two stay green.**
+   */
+  it('16.86 Escape abandons the draft, sends nothing, and does not close the sheet', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const source = renderSheet(ticketRead(), sheetSource(ticketRead()), { onClose });
+    await settled();
+
+    const field = screen.getByRole('textbox', { name: 'Ticket title' }) as HTMLInputElement;
+    await user.clear(field);
+    await user.type(field, 'Discard me');
+    await user.keyboard('{Escape}');
+
+    expect(field.value).toBe('File the GST return');
+    expect(source.ingested).toHaveLength(0);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 16.86 — the DIALOG'S NAME stays the server's title while a draft is on
+   * screen, and this is the case that would catch the obvious simplification.
+   *
+   * `Sheet` is given the string for `aria-label` as well as the slot, and wiring
+   * `aria-label` to the slot instead would name the sheet after a control's
+   * uncommitted value — a name that changes as somebody types, and that reads as
+   * empty the moment they clear the field.
+   */
+  it('16.86 the sheet’s accessible name stays the server’s title while editing', async () => {
+    const user = userEvent.setup();
+    renderSheet(ticketRead());
+    await settled();
+
+    const field = screen.getByRole('textbox', { name: 'Ticket title' });
+    await user.clear(field);
+    await user.type(field, 'Uncommitted');
+
+    expect(screen.getByRole('dialog', { name: 'File the GST return' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * 16.87 — the BREADCRUMB.
+ *
+ * `Workspace › Project › State`, drawn from the host-supplied names and the
+ * state this sheet already derives. **The dispatch's measurement of the SOURCE
+ * was wrong and that is recorded on the props**, so the interesting half of
+ * these cases is the arm where no name arrives: the prototype's fourth crumb is
+ * the ticket KEY and is deliberately not built.
+ */
+describe('TicketSheet — the location breadcrumb (16.87)', () => {
+  function crumbTexts(): string[] {
+    return Array.from(document.querySelectorAll('.gn-ticket-sheet__crumb')).map(
+      (el) => el.textContent ?? '',
+    );
+  }
+
+  it('16.87 draws workspace, project and state, in that order', async () => {
+    renderSheet(ticketRead(), sheetSource(ticketRead()), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+
+    expect(screen.getByRole('navigation', { name: 'Ticket location' })).toBeInTheDocument();
+    expect(crumbTexts()).toEqual(['Convenience Corner', 'Shop operations', 'Doing']);
+  });
+
+  /**
+   * With no names the crumb is OMITTED ENTIRELY — not drawn empty, and not
+   * drawn short. A crumb list is a PATH or it is nothing.
+   */
+  it('16.87 draws no breadcrumb at all when the host supplies no names', async () => {
+    renderSheet(ticketRead());
+    await settled();
+
+    expect(crumbTexts()).toEqual([]);
+    expect(screen.queryByRole('navigation', { name: 'Ticket location' })).toBeNull();
+  });
+
+  /**
+   * 16.87 — HALF a path is not a path, and this case exists because the first
+   * cut of the derivation got it wrong.
+   *
+   * That version drew whichever crumbs it had, so a caller with a workspace name
+   * and no project name rendered `Convenience Corner › Doing` — **the project
+   * missing from the middle**, which states a hierarchy the product does not
+   * have, and does it silently, because every crumb that IS drawn is correct.
+   * Comparing `items` rather than the rendered text is what makes the difference
+   * visible: an empty second crumb would satisfy a text check.
+   */
+  it('16.87 draws NO breadcrumb when only one of the two names arrives', async () => {
+    renderSheet(ticketRead(), sheetSource(ticketRead()), {
+      workspaceName: 'Convenience Corner',
+    });
+    await settled();
+
+    expect(crumbTexts()).toEqual([]);
+  });
+
+  /**
+   * 16.87 — the STATE crumb is the workflow's name for the state, not the raw
+   * id, which is the same lookup the state chip above makes. A fixture whose
+   * ticket sits in a state the definition does not hold is what the fallback is
+   * for, and this case pins the positive half: a definition that DOES hold it
+   * gets its name.
+   */
+  it('16.87 names the state rather than printing its id', async () => {
+    renderSheet(ticketRead(), sheetSource(ticketRead()), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+
+    const nav = screen.getByRole('navigation', { name: 'Ticket location' });
+    expect(nav.textContent).not.toContain('doing');
+    expect(crumbTexts().at(-1)).toBe('Doing');
   });
 });

@@ -134,6 +134,34 @@ describe('Sheet', () => {
     await user.click(screen.getByRole('button', { name: 'Close sheet' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  /**
+   * 16.86 — `titleSlot` replaces the HEADING, and `title` keeps NAMING the
+   * dialog.
+   *
+   * Both halves are asserted in one case because the tempting simplification is
+   * to wire `aria-label` to the slot as well, and that version passes any case
+   * that only checks the caller's node rendered. The negative — the `<h2>` is
+   * GONE, not merely accompanied — is the other half: a slot that rendered
+   * beside the heading would leave two titles on screen, and the sheet's own
+   * header has exactly one place to put one.
+   */
+  it('16.86 titleSlot replaces the heading while the string still names the dialog', () => {
+    render(
+      <Sheet
+        open
+        title="File the GST return"
+        onClose={vi.fn()}
+        titleSlot={<input aria-label="Ticket title" defaultValue="Uncommitted" />}
+      >
+        body
+      </Sheet>,
+    );
+    // The name is the STRING, not the control's value.
+    expect(screen.getByRole('dialog', { name: 'File the GST return' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Ticket title' })).toHaveValue('Uncommitted');
+    expect(document.querySelector('.gn-sheet__title')).toBeNull();
+  });
 });
 
 describe('Table', () => {

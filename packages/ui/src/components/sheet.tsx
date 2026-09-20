@@ -25,13 +25,66 @@ export type SheetProps = {
    * prototype's own 860px.
    */
   full?: boolean;
+  /**
+   * Replaces the `<h2>` heading with a caller-supplied node — the ticket
+   * sheet's editable title and the location breadcrumb above it.
+   *
+   * **`title` is still REQUIRED when this is passed, and it is still what names
+   * the dialog.** `aria-label={title}` is the sheet's accessible name, and it is
+   * deliberately NOT `titleSlot`: a control whose value is mid-edit, or empty
+   * because somebody cleared it, is not a name. The string is the ticket's
+   * current title as the server last served it; the slot is the control that
+   * proposes the next one.
+   *
+   * Optional so that no existing caller changes — `Sheet` has one product
+   * caller (`ticket-sheet.tsx`) plus tests, measured rather than assumed before
+   * adding a prop to a shared component.
+   */
+  titleSlot?: ReactNode;
 };
 
 /** A right-hand side panel with the same accessibility contract as Dialog. */
-export function Sheet({ open, title, onClose, children, headerActions, full = false }: SheetProps) {
+export function Sheet({
+  open,
+  title,
+  onClose,
+  children,
+  headerActions,
+  titleSlot,
+  full = false,
+}: SheetProps) {
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
+      /**
+       * ⚠ A child that has ALREADY handled this Escape keeps it.
+       *
+       * Without this line the sheet closes on ANY Escape, including one a
+       * control inside it consumed. The ticket sheet's title field is where that
+       * bites: its Escape branch abandons the draft, and while this line was
+       * absent the sheet ALSO closed, so the field's documented behaviour —
+       * *"Escape abandons the draft"* — was true of an input that was being
+       * unmounted. An independent reviewer measured `onClose` called once.
+       * **The branch's own case could not see it**: its `renderSheet` passes an
+       * `onClose` spy that never unmounts, so the sheet stayed on screen and the
+       * assertion held for a reason unrelated to what ships.
+       *
+       * ⚠ **THIS FIX IS ONLY HALF, AND THE OTHER HALF IS AT THE CALLER.** The
+       * reviewer's finding also said the title field's branch *"calls
+       * `preventDefault()`"* — **it did not**, and an earlier version of this
+       * docblock repeated that as fact without reading the line. A child that
+       * handles Escape must call `preventDefault()` for this guard to see it; the
+       * caller was changed in the same round, and the case that proves both
+       * halves is the ticket sheet's `Escape … does not close the sheet`, which
+       * stayed RED until the caller's half landed. **A peer's finding is a
+       * claim.**
+       *
+       * The React handler at the root container runs before this document-level
+       * native listener, so `defaultPrevented` is already set by the time this
+       * reads it. This is the standard escape-hatch contract, and the editor
+       * toolbar's own link field relies on the same one.
+       */
+      if (event.defaultPrevented) return;
       if (event.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKeyDown);
@@ -53,7 +106,7 @@ export function Sheet({ open, title, onClose, children, headerActions, full = fa
         onClick={(event) => event.stopPropagation()}
       >
         <header className="gn-sheet__header">
-          <h2 className="gn-sheet__title">{title}</h2>
+          {titleSlot ?? <h2 className="gn-sheet__title">{title}</h2>}
           {headerActions}
           <button type="button" className="gn-sheet__close" aria-label="Close sheet" onClick={onClose}>
             ×
