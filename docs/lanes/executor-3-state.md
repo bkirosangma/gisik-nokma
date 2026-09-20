@@ -99,7 +99,104 @@ conservative direction, because building them would be inventing scope:
 
 ### § 3 — WHAT SHIPPED
 
-<!-- filled at the freeze line -->
+**Branch `exec3/visibility-styling`, cut from `origin/main = 534c450b`.**
+
+**⚠ CORRECTED — THIS SENTENCE READ: *"`origin/main` has NOT moved since, so this head IS the landing
+tree and no fold was needed (`behind=0`, `merge-base == origin/main`)."* IT WAS TRUE WHEN WRITTEN AND
+FALSE BY THE TIME THE REVIEWER READ IT, AND THE REVIEWER CAUGHT IT RATHER THAN THE AUTHOR.** Measured:
+at `a959289d`'s commit time (`23:15:12`) the sentence held; `origin/main` moved to `52a04b8c` at
+`23:16:55` — **103 seconds later** — and to `fef20170` at `23:25:37`, i.e. **7 behind**. A peer lane had
+already folded main for this exact reason. **(The direction this fails in is the one nothing audits: the
+`git log --oneline origin/main..HEAD` check § 0 prescribes prints only this lane's own commits and is
+structurally BLIND to being BEHIND.)** The fold is done below and the head-state figures below are
+recounted after it.
+
+The commits, **by SUBJECT rather than by count** — a count is a reading that expires the moment this file
+lands:
+
+1. **`0baad90b` — this handoff**, opened with the gap measured before anything was built.
+2. **`a959289d` — the styling**, its cases, and the catalogue. Eight files: `packages/ui/src/ui.css`,
+   `packages/ui/test/components.test.tsx`, `packages/app-core/src/views/visibility-editor.tsx`,
+   `packages/app-core/test/views/visibility-editor.test.tsx`, `test-cases/17-open-work.md` (NEW — §17
+   opened), `test-cases/16-remaining-doors.md`, `Features.md`, and
+   `scripts/fixtures/check-case-citations-baseline.json`.
+
+**The change, in one paragraph.** `.gn-visibility*` gained the CSS rules it never had: the prototype row's
+right-aligned value column, its uppercase eyebrow and notes at **the row's own 12px**, and the control
+block's own `align-self:flex-start` opt-out. The standing audience became the prototype's dot-and-pill,
+with the dot toned by the **MODE** and never the roster. One wrapper element was added around the control
+block to carry the geometry; the dot span is the only other markup change.
+
+**The mutation battery — EIGHT mutations, all eight killed AT THEIR OWN SITE, all restored, and the run
+count asserted on every one.** M1 delete the section rule → `17.001`; M2 `0.75rem`→`0.8125rem` the
+"harmonise" edit → `17.002` alone; M3 drop the left opt-out → `17.003` alone; M4 swap the dot's default
+tone → `17.004`; M5 delete the restricted modifier → `17.004`; M6 append a duplicate rule at EOF →
+`17.005` alone; M7 re-key the dot onto `userIds` → `17.004` alone; M8 add a `<select>` the ruling cut →
+`17.006` alone. (M1 also reddens `17.005`, which is expected and explained: deleting the rule leaves the
+declared-exactly-once check with nothing to count.)
+
+⚠ **TWO DEFECTS WERE FOUND IN THE BATTERY HARNESS ITSELF, BOTH BEFORE IT WAS TRUSTED, AND BOTH ARE THE
+SAME CLASS THIS FILE WARNS ABOUT.**
+
+- **The runner's summary has THREE shapes, not two.** Under a name filter vitest prints
+  `Tests  1 failed | 42 skipped (43)` — not `failed | passed`. The first parser knew only the two
+  unfiltered shapes, so it called a genuine kill *unproven*. **It failed SAFE** (refusing to score a kill
+  it could not read, rather than printing SURVIVOR), which is the right direction, but it was still a
+  parser bug.
+- **The first site-extraction was a check that could not fail.** It ran `findall(17\.\d{3})` over the
+  whole FAIL line — and vitest's FAIL line carries the DESCRIBE TITLE, which here is `(17.001–17.005)`.
+  So **every** mutation reported `killed=['17.001','17.005']` as an artifact of the title, and the
+  "killed at its own site" assertion was satisfiable by the title for two of the six cases regardless of
+  what actually failed. Fixed by reading the id from the test-name segment only — the same discipline
+  this repo's own guards use, an id counted where it is a DECLARATION and not anywhere it appears.
+
+**Counts, recounted at the head rather than inherited:** `check-case-ids` **2588 unique, highest
+`17.006`** — up from **2582**, i.e. **exactly the six added**. `check-case-citations` reports
+`17-open-work.md: 6 cited / 0 uncited / 6 total`, and its baseline gained the entry the ratchet requires.
+
+⚠ **A BRIEF-LEVEL GOTCHA WORTH CARRYING FORWARD: `--concurrency=1` IS A JEST FLAG, NOT A VITEST ONE.**
+`vitest run --concurrency=1` exits with `CACError: Unknown option '--concurrency'` **before running a
+single test**, while a wrapper can still report a non-zero exit — i.e. it is indistinguishable from a
+red suite to anyone reading only the exit code. **The vitest spelling is `--no-file-parallelism`.** This
+lane hit it on its first run.
+
+⚠ **A SECOND GOTCHA: `rule()` THROWS on a GROUPED selector.** `packages/ui/test/components.test.tsx`'s
+`rule()` matches `selector\s*\{`, and a grouped rule's first member is followed by a comma. That is the
+safe direction (a throw, not a wrong answer), and `17.002` and `17.003` use a local `groupedRule` for the
+two grouped rules (the note/absence sentences, and the two fieldsets). **A case rewritten to route around
+the throw would silently stop asserting the thing it names.**
+
+### § 3a — THE PRE-CHECK GATE IS RED UNDER LOAD, AND THE FOUR FAILURES ARE NOT THIS CHANGE'S
+
+**`pnpm turbo run build test typecheck` at this head: 27 successful / 33 total, `GATE_EXIT=1`.** The red
+is **NOT** this change, and that is measured rather than argued — **every failing file passes in isolation
+on the SAME tree with the SAME dist:**
+
+| failing task | gate | in isolation |
+|---|---|---|
+| `app-core` — `test/ticket-types/ticket-types.test.tsx` (case 13.926) | 1 failed, **45.1 s** | **51 passed / 51** |
+| `app-core` — `test/workflow-builder/access.test.tsx` | 1 failed, **16.6 s** | **23 passed / 23** |
+| `web` — `test/members-page.test.tsx` | 1 failed, **29.8 s** | **37 passed / 37** |
+| `web` — `test/list-bulk-close.test.tsx` | 1 failed, **16.6 s** | **5 passed / 5** |
+| `web:build` | exit **130** (cancelled) | — |
+
+**The timings are the datum, not the verdicts:** the same files take **8 s** and **6 s** in isolation
+against **16–45 s** inside the gate. **None of the four is a file this change touches**, and their subjects
+(a ticket-type reorder, the builder's member access, the members page, a bulk close) are unrelated to
+`ui.css` or the Visibility section.
+
+⚠ **AND THE GATE NAMES A NODE THAT IS NOT THE ONE EXECUTING, WHICH IS WORTH CARRYING FORWARD.** Turbo's
+failure line reads `/Users/kiro/.nvm/versions/node/v24.11.1/bin/pnpm run test exited (1)` — **Node v24**,
+against the brief's v22.22.2. **It is not a runtime drift and the distinction was measured, not assumed:**
+there is **no `pnpm` in the v22 bin at all** (the box has only a v24 corepack shim and a v18 one), so the
+v24 path is the *launcher* shim while the *executing* Node is still v22.22.2 — `pnpm exec node -e
+"process.version"` answers **v22.22.2** from both the root and `packages/app-core`. **A reader who sees
+only the v24 path will conclude the gate ran off-toolchain; it did not.** (This is the shape the repo
+already records for the gate: a result is not evidence unless it names its Node — and naming it is not
+enough, the name has to be the one that EXECUTES.)
+
+**The controller runs the forced gate at its own tree.** This pre-check is reported so the controller does
+not receive a surprise, not as a claim about that gate.
 
 ### § 4 — OPEN RULINGS AND RECORDED ABSENCES
 
