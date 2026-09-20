@@ -80,3 +80,35 @@ export async function listTicketAttachments(db: Queryable, ticketId: string): Pr
   );
   return (result.rows as DbRow[]).map(toRow);
 }
+
+/**
+ * The attachments named by a set of ids, SCOPED TO ONE TICKET.
+ *
+ * The ticket predicate is not decoration and is not passed in: it is the same
+ * rule `gates/image-embed-gate.ts` enforces at WRITE time (`WHERE ticket_id = $1
+ * AND id = ANY($2::text[])`), restated at read time for the same reason that
+ * gate gives — an id is a claim of the caller's, and a lookup without the
+ * ticket predicate would turn this read into an existence oracle for every
+ * attachment in the deployment.
+ *
+ * The empty case returns before querying. That is a ROUND TRIP saved on the
+ * common path (a ticket whose comments embed nothing), not a behaviour: `id =
+ * ANY('{}'::text[])` selects no row either.
+ *
+ * Order is NOT the caller's order — the result is keyed by id by the caller,
+ * because `ANY` gives no ordering guarantee and inventing one here would be a
+ * second, weaker answer to "what order are these files in" (the document's own
+ * order is the one that means something, and it lives in the document).
+ */
+export async function listAttachmentsByIds(
+  db: Queryable,
+  ticketId: string,
+  ids: readonly string[],
+): Promise<AttachmentRow[]> {
+  if (ids.length === 0) return [];
+  const result = await db.query(
+    `SELECT ${COLUMNS} FROM attachments WHERE ticket_id = $1 AND id = ANY($2::text[])`,
+    [ticketId, [...ids]],
+  );
+  return (result.rows as DbRow[]).map(toRow);
+}

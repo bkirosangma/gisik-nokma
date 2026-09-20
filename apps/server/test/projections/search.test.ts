@@ -252,17 +252,28 @@ describe('proj_search', () => {
     expect(await ftsHits('GST')).toEqual([world.taskInEpicId]);
   });
 
-  it('is registered at the registry TAIL, after proj_tickets and proj_workspace_settings', () => {
+  it('is registered AFTER proj_tickets and proj_workspace_settings', () => {
     // The pin of record is test/projection-order.test.ts (DB-free), which
     // asserts the whole array; this is the local statement of what this
     // projection needs. See src/projections/index.ts for why appending is a
     // DEPENDENCY decision and not a coordination §8 position.
+    //
+    // ⚠ THE TAIL HALF IS GONE, AND IT WAS NEVER THE PROPERTY. This case read
+    // *"is registered at the registry TAIL, after proj_tickets and
+    // proj_workspace_settings"* and asserted `names.at(-1) === 'proj_search'`.
+    // `proj_ticket_comments` (executor 2's comment-thread dispatch, 2026-09-21)
+    // appends after it, and the assertion broke — which is correct behaviour
+    // from a stale claim, not a defect: **"last" was true of `proj_search`
+    // only while it happened to be the newest registrant**, and the two
+    // adjacencies above are the ones its `apply` actually needs (it reads no
+    // table at all, so it needs neither — see the registration's own comment).
+    // Restating it as "after" keeps the falsifiable half and drops a claim that
+    // was about the calendar rather than about the projection.
     const names = buildProjectionRegistry()
       .all()
       .map((projection) => projection.name);
     expect(names.indexOf('proj_search')).toBeGreaterThan(names.indexOf('proj_tickets'));
     expect(names.indexOf('proj_search')).toBeGreaterThan(names.indexOf('proj_workspace_settings'));
-    expect(names.at(-1)).toBe('proj_search');
   });
 
   /**

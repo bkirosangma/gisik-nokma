@@ -39,7 +39,7 @@ import { signInWithPhone } from '../helpers/session.js';
  *
  * So the enumeration here is **self-maintaining**. `absenceTripwire` returns its
  * argument typed as `AbsenceDecision`; `keyof DataSourceQuery` widening past
- * those fifteen members makes that return unassignable and `tsc` refuses it with
+ * those sixteen members makes that return unassignable and `tsc` refuses it with
  * TS2322. The device is not new — it is `paginationTripwire`
  * (`packages/app-core/test/views/list-model.test.ts:68`), which this file copies
  * in shape for the same reason: its docblock records that a widened
@@ -103,8 +103,15 @@ import { signInWithPhone } from '../helpers/session.js';
  *
  * ## The marker, and the control that keeps absence from being emptiness
  *
- * Every assertion below is about a unique marker planted in the CHILD's title
- * and carried into nothing else. Absence assertions are the weakest kind — a
+ * Every assertion below is about a unique marker planted in the CHILD's title.
+ * **⚠ CORRECTED 2026-09-21: this read "and carried into nothing else", and that
+ * expired when the comment read joined this walk.** The marker is now in exactly
+ * two places, both on the ticket the delete removes: the child's TITLE, and the
+ * body of one `comment.added` on that child. The second is load-bearing rather
+ * than incidental — a comment's content is the only child-read surface a fixture
+ * can PUT the marker into (an attachment row carries a filename, not text), so
+ * without it the `getTicketComments` row would be a `carries: false` row that
+ * constrains nothing while looking like coverage. Absence assertions are the weakest kind — a
  * reader that returned NOTHING satisfies all of them — so the file asserts the
  * marker's PRESENCE through the same call, in the same run, before the delete.
  * `carries: true` rows are exactly that promise, and a row that lied about it
@@ -361,6 +368,25 @@ beforeAll(async () => {
     });
   }
 
+  // ⚠ A COMMENT CARRYING THE MARKER, on the ticket that will be deleted, and it
+  // is here because WITHOUT it this file's `getTicketComments` row would be a
+  // `carries: false` row — vacuous in both passes, exactly like the attachments
+  // row beside it, and it would look like coverage while constraining nothing.
+  // A comment BODY is the one child-read surface whose content the fixture can
+  // choose, so the marker reaches it and the after-delete pass is a real
+  // assertion rather than an empty one.
+  await post({
+    workspaceId,
+    entity: { kind: 'ticket', id: childId },
+    type: 'comment.added',
+    payload: {
+      body: {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: `Boundary note ${MARKER}` }] }],
+      },
+    },
+  });
+
   TOMBSTONES.push(childId, sharedDeadId, dead2Id);
   baselineProjectTicketCount = await directoryTicketCount();
   baselineParentRollup = await parentRollup();
@@ -377,7 +403,7 @@ afterAll(async () => {
 });
 
 /**
- * THE FIFTEEN MEMBERS OF `DataSourceQuery`, spelled once.
+ * THE SIXTEEN MEMBERS OF `DataSourceQuery`, spelled once.
  *
  * This union is not documentation — it is the tripwire's other half. See the
  * file docblock: `absenceTripwire` cannot return a `keyof DataSourceQuery` that
@@ -391,6 +417,7 @@ type AbsenceDecision =
   | 'getTicket'
   | 'getTicketHistory'
   | 'getTicketAttachments'
+  | 'getTicketComments'
   | 'getWorkflowDef'
   | 'getTicketTypes'
   | 'search'
@@ -461,6 +488,18 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
     // which carries the measurement and the three doors it reaches.
     carries: false,
   },
+  getTicketComments: {
+    verdict: 'excluded',
+    // ✅ THE ONE CHILD-READ SURFACE WHOSE MARKER IS REAL, and the difference
+    // from the attachments row directly above is the whole reason this row is
+    // written this way. A comment BODY is authored text, so the fixture can put
+    // the marker in one — where an attachment's row carries only a filename.
+    // And the read REFUSES a deleted ticket rather than filtering it, so after
+    // the delete the call THROWS (`refused` below) and the marker is absent for
+    // a reason this walk can observe.
+    carries: true,
+    why: 'Guarded at the ROUTE by the third guard `routes/tickets.ts` adds over the attachments read: the folded `deleted` flag, read off `getTicketStateFromDb` — the SAME mechanism `getTicket` above uses, and NOT `LIVE_TICKET_WHERE`, because the constant filters rows and this door owes a refusal. Removing that guard makes the deleted ticket’s thread answer 200 with the marker in it, which reddens this case (measured: the battery mutation m3-third-guard).',
+  },
   getWorkflowDef: { verdict: 'excluded', carries: false },
   getTicketTypes: { verdict: 'excluded', carries: false },
   search: { verdict: 'excluded', carries: true },
@@ -492,6 +531,19 @@ function callers(ds: DataSourceQuery): Record<AbsenceDecision, () => Promise<unk
     getTicket: () => ds.getTicket(workspaceId, childId),
     getTicketHistory: () => ds.getTicketHistory(childId),
     getTicketAttachments: () => ds.getTicketAttachments(workspaceId, childId),
+    // The ONLY caller here that can THROW, and the catch is the measurement
+    // rather than a convenience: this read refuses a deleted ticket by
+    // rejecting with a 404, so "the marker is absent" and "the call refused"
+    // are the same reading for it. Coerced to a string so the walk compares
+    // like with like — and `'refused'` can never contain the marker, so the
+    // after-delete assertion is a real one.
+    getTicketComments: async () => {
+      try {
+        return await ds.getTicketComments(workspaceId, childId);
+      } catch {
+        return 'refused';
+      }
+    },
     getWorkflowDef: async () => {
       // The workflow id is the one the FOUNDING sequence minted; this file never
       // types one. It is read off the type definitions, which carry it, rather
@@ -535,12 +587,12 @@ const CARRIERS = MEMBERS.filter((key) => DECIDED[key].carries);
 
 it('TYPE TRIPWIRE: every member of DataSourceQuery is enumerated, or tsc refuses', () => {
   // The calls are what make the guard live in the test file rather than only in
-  // the type. If `DataSourceQuery` grew a sixteenth member, the return of
+  // the type. If `DataSourceQuery` grew a seventeenth member, the return of
   // `absenceTripwire` would stop being assignable to `AbsenceDecision` and the
   // three `Record`s below would stop being total.
   expect(absenceTripwire('getBoard')).toBe('getBoard');
   expect(absenceTripwire('getTicketHistory')).toBe('getTicketHistory');
-  expect(MEMBERS).toHaveLength(15);
+  expect(MEMBERS).toHaveLength(16);
   // A control on the control: a table where nothing carries would make the
   // positive pass below vacuous and the negative pass unfalsifiable.
   expect(CARRIERS.length).toBeGreaterThanOrEqual(7);

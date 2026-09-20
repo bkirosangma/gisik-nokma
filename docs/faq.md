@@ -425,21 +425,27 @@ about a job is, so the panel reads back who set it and when, and the job's histo
 each time it changed.
 
 **Is there a comment box?**
-Not on a job. The job screen's writing box now takes a description; it does not post comments, and
-nothing on the web shows a comment thread. **There is one comment box on the website, and it belongs to
-a Move:** if the move carries a "require a comment" rule, its dialog takes one, and what you type is
-recorded on the move.
+Yes, on a job. The job screen ends with the job's comments and a box under them: what you post is
+recorded against the job as an event citing you, so the thread reads back who wrote each comment and
+when. You can mention somebody by typing `@` — the mention is recorded on the comment and tells them,
+if they can see the job.
 
-**The phone app has a Comment button on a job and the website does not.** So the two-screen phone app
-can do something the full website cannot. Whichever way round that is meant to be, it is not this way
-round.
+**There is a second comment box on the website, and it belongs to a Move:** if the move carries a
+"require a comment" rule, its dialog takes one, and what you type is recorded on the move.
+
+**It used to be that the phone app had a Comment button on a job and the website did not.** That is
+settled — the website has one now, and the two record the same thing.
 
 **Can I attach a photo or a file to a job?**
-Not to the job itself. There is no attachment list on the web job sheet, and the writing box on the job
-screen — which is connected now, so you can write a description there — refuses a dropped file rather
-than quietly losing it. **One uploader does work on the web, and it belongs to a Move:** a move carrying
-the "require evidence" rule puts a file box in its dialog and stays blocked until the server has stored
-the file. So a file can be attached to a move, and not to a job for its own sake.
+Through a comment, and the file travels with the comment that carries it. Drop an image into the comment
+box and it is stored and put inside what you are writing; the comment then names it, and the chip under
+the comment is how you reach it. **A file that is not an image cannot be put inside a comment** — it is
+stored against the job instead and appears in the job's list of files, not in your comment. That split
+is the product's own rule rather than a limitation of the box: a comment's files are the ones its own
+text carries, so a comment can never be missing a file it was written with.
+
+**A file can also be attached to a Move:** a move carrying the "require evidence" rule puts a file box
+in its dialog and stays blocked until the server has stored the file.
 
 **When it does become reachable, what should I expect?**
 

@@ -44,6 +44,13 @@ export function createFakeDataSource(
     // imitating (a 404 from a real route) is the online source's, and this file
     // is not that source (see this file's header).
     getTicketAttachments: async () => [],
+    // `[]`, on the same argument as the attachments default one line up: a view
+    // test that has not stubbed this read is rendering a ticket nobody has
+    // commented on, which is a state the product produces constantly. A case
+    // about the FAILED read must override it — this default cannot refuse,
+    // because the refusal it would imitate is a 404 from a real route and this
+    // file is not that source (see this file's header).
+    getTicketComments: async () => [],
     getWorkflowDef: async () => null,
     // NOT `[]`, and this default is the one that is deliberately non-empty. Plan
     // 4's bootstrap materialises the four built-ins as real

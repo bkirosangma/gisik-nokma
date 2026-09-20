@@ -6,6 +6,7 @@ import { stateProvenanceFor } from '../read/state-provenance.js';
 import { assignedProvenanceFor } from '../read/assigned-provenance.js';
 import { listTicketAttachments } from '../attachments/attachment-repo.js';
 import { sanitizeFilename } from '../attachments/filename.js';
+import { listTicketComments } from '../read/ticket-comments.js';
 import { canSee } from '../visibility/can-see.js';
 import { rollupFor, type RollupView } from '../visibility/rollup.js';
 import { listVisibleTickets } from '../visibility/visible-tickets.js';
@@ -647,6 +648,96 @@ export function registerTicketRoutes(
           mime: row.mime,
           size: row.size,
           sha256: row.sha256,
+        })),
+      };
+    },
+  );
+
+  /**
+   * One ticket's comments — the read `comment.added` has never had.
+   *
+   * `comment.added` was fully wired (vocabulary, reducer, mention fan-out,
+   * sync, a `require-comment` seed rule) and reached no surface: the only place
+   * its text landed was `proj_search.comments`, a CONCATENATED TEXT column built
+   * for full-text search with no author, no time and no per-comment identity.
+   * It cannot serve a thread and is not press-ganged into one.
+   *
+   * ## THE THIRD GUARD, AND WHY IT IS NOT IN THE SELECT
+   *
+   * The two guards above are the ledger's and the attachments read's — same
+   * order, same body, because "may this caller see this ticket" is asked in
+   * exactly one place (`../visibility/can-see.ts:227`). **This door carries a
+   * third one that the attachments read does not, and that difference is the
+   * point:** a soft-deleted ticket's FILES are served today (case `16.90(a)`,
+   * measured, owned by whoever next picks up the attachment surface). The rule
+   * is `LIVE_TICKET_WHERE`'s (`../read/visible-where.ts:191`) — *"The ticket
+   * stops appearing in views"* — and this route applies it.
+   *
+   * **It is applied HERE and not as the constant in `listTicketComments`'s
+   * SELECT, deliberately.** The constant FILTERS ROWS; a route must REFUSE. A
+   * predicate in that SELECT would answer `200 {comments: []}` — a thread with
+   * nothing in it, which is a claim about the ticket — where a deleted ticket
+   * owes the same 404 an invisible one gets. Rendering an absence where the
+   * product means a refusal is the failure this repo records most often, and a
+   * second predicate here would be worse than either: the route check is
+   * evaluated first, so the SQL one could never fire, and a check that cannot
+   * fail reads exactly like protection.
+   *
+   * The mechanism is the one `GET /tickets/:id` already uses at `:365` — the
+   * folded `deleted` flag off `getTicketStateFromDb`, which is the same rule the
+   * constant spells in SQL, reached through the reader that folds it. That makes
+   * this the SECOND TypeScript application of the rule beside
+   * `routes/my-work.ts:364`, and it is named rather than left to be rediscovered:
+   * a sweep for `deleted_at` does not find either.
+   *
+   * ## The files
+   *
+   * Joined on the comment's OWN DOCUMENT, never on `attachment.added` — see
+   * `../read/ticket-comments.ts`, which carries the measurement and the reason
+   * at length. An `attachment.added` event belongs to the ticket; attributing it
+   * to whichever comment was open would invent an attribution.
+   */
+  app.get<{ Params: { workspaceId: string; ticketId: string } }>(
+    '/v1/workspaces/:workspaceId/tickets/:ticketId/comments',
+    { preHandler: requireSession },
+    async (request, reply) => {
+      const { workspaceId, ticketId } = request.params;
+      if ((await loadTicketRow(deps.pool, workspaceId, ticketId)) === undefined) {
+        return reply.code(404).send(NOT_FOUND_BODY);
+      }
+      if (!(await canSee(deps.pool, request.currentUserId, ticketId))) {
+        return reply.code(404).send(NOT_FOUND_BODY);
+      }
+
+      // The third guard. Read AFTER `canSee` said yes, like the detail route's,
+      // so an invisible ticket and a deleted one are indistinguishable from
+      // outside — both answer the same 404 body with nothing else.
+      const state = await getTicketStateFromDb(deps.pool, workspaceId, ticketId);
+      if (state === null) {
+        throw new Error(
+          `readTicketComments: proj_visibility holds ${ticketId} in workspace ${workspaceId} and proj_tickets does not — the two projections disagree`,
+        );
+      }
+      if ((state.deleted ?? null) !== null) {
+        return reply.code(404).send(NOT_FOUND_BODY);
+      }
+
+      const comments = await listTicketComments(deps.pool, ticketId);
+      return {
+        comments: comments.map((comment) => ({
+          commentId: comment.commentId,
+          authorId: comment.authorId,
+          body: comment.body,
+          recordedAt: comment.recordedAt,
+          files: comment.files.map((file) => ({
+            attachmentId: file.attachmentId,
+            // Sanitized for the same reason the attachments list sanitizes: the
+            // stored name is a claim the uploader made, and a filename that
+            // reaches a rendering surface unsanitized is how a stored name
+            // becomes a rendered one.
+            filename: sanitizeFilename(file.filename),
+            mime: file.mime,
+          })),
         })),
       };
     },
