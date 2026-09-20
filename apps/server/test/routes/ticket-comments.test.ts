@@ -48,20 +48,24 @@ import { signInWithPhone } from '../helpers/session.js';
  * events — see `read/ticket-comments.ts` for the measurement — so the two file
  * cases pin the two ways that could leak.
  *
- * ## ⚠ NO CASE ID IS MINTED IN THIS FILE, AND THAT IS DELIBERATE
+ * ## Case 16.72 — MINTED 2026-09-21, after the block was reallocated
  *
- * The controller ruled on 2026-09-20 (mid-task) that executor 2 has no free
- * ids: its own block `16.41`–`16.60` is fully minted, `16.63`–`16.80` and
- * `16.91`–`16.99` are executor 1's by the block table in
- * `test-cases/16-remaining-doors.md`, and the *"this lane's id block is
- * `16.88`–`16.99`"* line in this lane's handoff and in §16 contradicts that
- * table with no reallocation recorded anywhere. The allocation is with the
- * owner, and the request is filed.
+ * The controller ruled on 2026-09-20 (mid-task) that executor 2 had no free
+ * ids: its own block `16.41`–`16.60` was fully minted, and the tail belonged
+ * to executor 1 by the block table in `test-cases/16-remaining-doors.md`. **So
+ * the id was OWED rather than omitted, and that is now discharged:** the block
+ * was reallocated on 2026-09-21 (`16.72`–`16.80`) and this file's id is
+ * **`16.72`** in that file — see THE BLOCKS there.
  *
- * **So the ids are OWED, not omitted.** Each case below is written to take one
- * the moment a block is ruled — the case text is already in its own words here —
- * and the catalogue half is HELD, which is why `test-cases/` is untouched by
- * this change set. The PR body names the same thing.
+ * ⚠ **The id names the FILE, and the cases below are its ARMS.** §16's blocks
+ * mint one id per decisive property and name the arms inside the entry, so the
+ * `it` blocks below do not each carry their own number.
+ *
+ * ⚠ **ONE THING THIS HEADER USED TO SAY IS STILL TRUE AND IS NOT SETTLED
+ * HERE:** the *"this lane's id block is `16.88`–`16.99`"* line in this lane's
+ * handoff and in §16 overlapped executor 1's block with no reallocation
+ * recorded. That overlap was flagged to the owner and remains theirs; the
+ * reallocation above is a different decision and does not resolve it.
  */
 
 type InjectResponse = Awaited<ReturnType<FastifyInstance['inject']>>;

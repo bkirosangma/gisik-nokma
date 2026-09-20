@@ -8,14 +8,18 @@ import {
 /**
  * The comment thread renderer.
  *
- * ## ⚠ NO CASE ID IS MINTED IN THIS FILE, AND THAT IS DELIBERATE
+ * ## Case 16.74 — MINTED 2026-09-21, after the block was reallocated
  *
- * The controller ruled on 2026-09-20 (mid-task) that executor 2 has no free
- * ids — its own block `16.41`–`16.60` is fully minted and `16.63`–`16.80` /
- * `16.91`–`16.99` are executor 1's by the block table in
- * `test-cases/16-remaining-doors.md`. The allocation is with the owner and the
- * request is filed; the ids here are OWED, not omitted, and `test-cases/` is
- * untouched by this change set for that reason. The PR body says the same.
+ * The controller ruled on 2026-09-20 (mid-task) that executor 2 had no free
+ * ids — its own block `16.41`–`16.60` was fully minted and the tail belonged
+ * to executor 1 by the block table in `test-cases/16-remaining-doors.md` — so
+ * this file shipped with a header saying the id was OWED rather than omitted.
+ * **That is now discharged:** the block was reallocated on 2026-09-21
+ * (`16.72`–`16.80`) and the owed id is minted as **`16.74`** in that file.
+ *
+ * ⚠ **The id names the FILE, and the cases below are its ARMS.** §16's blocks
+ * mint one id per decisive property and name the arms inside the entry, so the
+ * `it` blocks below do not each carry their own number.
  *
  * ## What this file is for
  *
