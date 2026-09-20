@@ -2220,7 +2220,8 @@ as a narrowing, which keeps `CALENDAR_ALL_HIDDEN_COPY` gated off.
   `N of M` strip. `1 of 2 shown` is asserted absent by NAME, because it is exactly what an implementation
   that drops the card and keeps the count prints.
 - **13.1039** ✅ The Backlog draws no epic ROW, still heads its section with the epic's NAME, and still
-  draws the child.
+  draws the child. The header half holds under the EPIC grouping, which is the default; a stored
+  status/assignee/type/flat grouping has no epic header at all, as it did not before.
 - **13.1040** ✅ The List still draws the epic as a row — the ruling's other half, and the control that
   makes 13.1039 a measurement rather than an assumption about a testid.
 - **13.1041** ✅ On the page, the Calendar omits the epic's entry and keeps its child's; the child is

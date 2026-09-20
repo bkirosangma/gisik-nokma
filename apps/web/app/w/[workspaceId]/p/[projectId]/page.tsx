@@ -878,6 +878,27 @@ function ProjectBoard() {
    * click, rank, start or drag on this tab. **Read as: visible as a NAME,
    * absent as a ticket.**
    *
+   * ⚠ **"A SECTION IS STILL HEADED BY ITS EPIC" IS TRUE UNDER THE EPIC
+   * GROUPING, AND THE PRODUCT'S DEFAULT IS NOT THE ONLY GROUPING.** A section is
+   * headed by an epic only because `groupRows` (`list-model.ts`) is grouping on
+   * the `epic` axis, which `DEFAULT_GROUPING` makes the resting state — not
+   * because anything here guarantees it. Under a person's stored `status`,
+   * `assignee`, `type` or `flat` grouping there is no epic header at all, and
+   * there was none before this change either. **So this ruling neither creates
+   * nor removes that**: it removes the ROW, and on the epic axis the header it
+   * leaves is the only name for the group. (Correction taken from an independent
+   * review, 2026-09-20.)
+   *
+   * ⚠ **AND THE PREDICATE HAS A REPLICA EDGE THIS FOLD CANNOT SEE.** A row's
+   * `typeRank` comes from the roster the read resolved against, and
+   * `replica-data-source.ts:759` fills an UNKNOWN type with `?? 0` — so an epic
+   * the replica's own type table does not hold arrives as rank 0 and is drawn on
+   * this tab. That is the conservative direction (it draws MORE, never less, and
+   * a row whose type nothing can name is one nothing can honestly exclude) and
+   * it is RECORDED rather than fixed: excluding it would need the replica to
+   * answer a question about a type it does not have. Owner: whoever next touches
+   * the replica's type table.
+   *
    * It survives by CONSTRUCTION here rather than by a second guard: `total` is
    * read off `list.rows`, and this memo never touches it, so
    * `labels.epicTitle` still resolves every child's `epicId`; that is what
@@ -1264,11 +1285,16 @@ function ProjectBoard() {
    *
    * ⚠ **THIS MEMO SITS *AFTER* THE ROSTER BLOCK ON PURPOSE, AND THE POSITION IS
    * LOAD-BEARING.** It was declared above `boardFilter`'s own section until
-   * 2026-09-20; `isEpicType` is a `const` declared here, so a `useMemo` whose
-   * callback reads it from ABOVE this line would throw a `ReferenceError` on
-   * first render (the callback runs during the render that reaches it). Moving
-   * the DECLARATION was the smaller change than moving the roster read up past
-   * `useBoard`/`useTicketList`, and the two orders are not equivalent.
+   * 2026-09-20; `isEpicType` is a `const` declared here, and ⚠ **the throw comes
+   * from the DEPS ARRAY, not from the callback** — `useMemo(fn, deps)` evaluates
+   * `deps` as an argument at the call, on EVERY render, before `fn` is reached,
+   * so a memo above this line would throw unconditionally rather than only when
+   * its callback happened to run. *(This paragraph said "the callback runs
+   * during the render that reaches it" until an independent review corrected the
+   * mechanism; the file's own line numbers were re-read before the correction
+   * was taken.)* Moving the DECLARATION was the smaller change than moving the
+   * roster read up past `useBoard`/`useTicketList`, and the two orders are not
+   * equivalent.
    */
   const boardNarrowing = useMemo(() => {
     if (board.data === null) return null;
@@ -1417,7 +1443,10 @@ function ProjectBoard() {
 
   /**
    * THE REMOVABLE CHIP HALF of the disclosure invariant — built from
-   * `boardFilter` itself (declared above, alongside `boardNarrowing`), one
+   * `boardFilter` itself (declared above, in its own section — ⚠ **`boardNarrowing`
+   * is no longer beside it**: that fold moved down to the roster block on
+   * 2026-09-20, because it needs `isEpicType` and a `const` cannot be read
+   * above its own declaration), one
    * chip per axis actually set, covering all SIX of `BoardFilterSpec`'s
    * fields rather than only `text`. See `buildFilterChips`'s own
    * docblock in `board-search-scope.ts` for why this single-enumeration
@@ -1764,8 +1793,11 @@ function ProjectBoard() {
                 one workflow's GROUP — a different granularity from every
                 control on this row, which narrow CARDS — so its state
                 (`workflowFilter`) and its fold into `boardNarrowing` are
-                declared beside `boardFilter`/`boardNarrowing` above, not
-                beside `filter`. `All workflows` is the first `<option>` and
+                declared beside `boardFilter` above, not beside `filter`.
+                ⚠ `boardNarrowing` itself — the fold this sentence names — moved
+                down to the roster block on 2026-09-20 for the reason recorded
+                there; the STATE this paragraph is about did not move.
+                `All workflows` is the first `<option>` and
                 `workflowFilter`'s own initial value, so the picker's resting
                 state IS the default (R3) with no extra wiring to keep them
                 in sync.
@@ -2277,7 +2309,9 @@ function ProjectBoard() {
                   userName={nameOf}
                   onOpenTicket={openTicket}
                   /* LIVE, unlike the calendar's above: `timeline-model.ts` reads
-                     `isEpicType` for its GROUPING (`:273`, `:320`) and not only
+                     `isEpicType` for its GROUPING (`timeline-model.ts:310`, the
+                     `lane-heading` guard, and `:357`, the `epicAncestorOf` that
+                     fills a row's `epicId`) and not only
                      for a lane filter, so a rank-1 predicate reaching here
                      changes the lane heading on screen. Witnessed at 11.165. */
                   {...(isEpicType === undefined ? {} : { isEpicType })}
