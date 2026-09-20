@@ -11,6 +11,8 @@ import {
 } from './accessible-names.js';
 import {
   LABEL_FLOOR_PX,
+  LABEL_IN_BODY,
+  LABEL_IN_BODY_SELECTOR,
   measureTypeScale,
   readTypeScaleBaseline,
   recordTypeScaleBaseline,
@@ -280,6 +282,14 @@ type BodyText = {
   rawMatches: number;
   examined: number;
   skipped: number;
+  /**
+   * Matched this sweep's selector and were DECLARED LABELS — handed to
+   * `type-scale.ts`'s `LABEL_IN_BODY` population instead of being judged at
+   * 16px. Carried out so the hand-off is visible in every run rather than
+   * inferred: if this number goes to 0 the declaration stopped applying, and a
+   * silent 0 here looks exactly like a route with no labels on it.
+   */
+  labelSkipped: number;
   offenders: { selector: string; fontSizePx: number; text: string }[];
   smallest: { selector: string; fontSizePx: number; text: string } | null;
 };
@@ -305,8 +315,8 @@ type BodyText = {
  * `0.92em` as a typographic contrast, which is a different question from body
  * legibility.
  */
-async function measureBodyText(page: Page): Promise<BodyText> {
-  return page.evaluate(() => {
+async function measureBodyText(page: Page, declaredLabels: string): Promise<BodyText> {
+  return page.evaluate((declaredLabels) => {
     const SELECTOR = 'p, li, dd, dt, td, figcaption, label';
     const describe = (el: Element): string => {
       const cls =
@@ -318,6 +328,7 @@ async function measureBodyText(page: Page): Promise<BodyText> {
     const offenders: { selector: string; fontSizePx: number; text: string }[] = [];
     const all: { selector: string; fontSizePx: number; text: string }[] = [];
     let skipped = 0;
+    let labelSkipped = 0;
 
     const matched = Array.from(document.querySelectorAll(SELECTOR));
     for (const el of matched) {
@@ -342,6 +353,38 @@ async function measureBodyText(page: Page): Promise<BodyText> {
         skipped += 1;
         continue;
       }
+      /**
+       * ═══════════════════════════════════════════════════════════════════
+       * A DECLARED PARAGRAPH LABEL IS NOT BODY COPY — owner ruling 2026-09-20.
+       * ═══════════════════════════════════════════════════════════════════
+       *
+       * This sweep's selector is `p, li, dd, dt, td, figcaption, label`, and
+       * `/help`'s two eyebrow labels are `<p>` elements — so they were being
+       * judged by a BODY-COPY floor of 16px while the product had already
+       * declared a 12px floor for label text. Seventeen offenders on `main`,
+       * every one of them an uppercase label at a value the design guide
+       * specifies, and the whole suite red on a floor those elements were never
+       * meant to carry.
+       *
+       * The ruling SPLITS the floor rather than dropping it, and these are the
+       * two halves:
+       *
+       *   * Declared in `type-scale.ts`'s `LABEL_IN_BODY` → handed to that
+       *     sweep, which judges them at `LABEL_FLOOR_PX` and RATCHETS them.
+       *     They are still covered; they are covered by the rule for their role.
+       *   * **Anything not declared is still judged at 16px, hard.** Nothing
+       *     reaches the lower floor by accident, and forgetting to declare a
+       *     label reddens loudly rather than passing quietly.
+       *
+       * ⚠ The selector is IMPORTED, never re-typed, so a third label added to
+       * the table cannot be excused here and left uncovered there. And the
+       * count is carried out as `labelSkipped`, because a hand-off that stopped
+       * happening reads identically to a route that has no labels.
+       */
+      if (el.matches(declaredLabels)) {
+        labelSkipped += 1;
+        continue;
+      }
       const entry = {
         selector: describe(el),
         fontSizePx: Number.parseFloat(cs.fontSize),
@@ -353,8 +396,15 @@ async function measureBodyText(page: Page): Promise<BodyText> {
 
     const smallest =
       all.length === 0 ? null : all.reduce((a, b) => (a.fontSizePx <= b.fontSizePx ? a : b));
-    return { rawMatches: matched.length, examined: all.length, skipped, offenders, smallest };
-  });
+    return {
+      rawMatches: matched.length,
+      examined: all.length,
+      skipped,
+      labelSkipped,
+      offenders,
+      smallest,
+    };
+  }, declaredLabels);
 }
 
 type Contrast = {
@@ -626,7 +676,7 @@ for (const route of UNAUTHED_ROUTES) {
     const sig = await measureSignature(page);
     const overflow = await measureOverflow(page);
     const taps = await measureTapTargets(page);
-    const body = await measureBodyText(page);
+    const body = await measureBodyText(page, LABEL_IN_BODY_SELECTOR);
     const typeScale = await measureTypeScale(page);
     const contrast = await measureContrast(page);
 
@@ -1016,6 +1066,67 @@ for (const route of UNAUTHED_ROUTES) {
         `elements reports zero offenders and looks identical to a clean page. The population ` +
         `includes \`div\`, so a rendered document cannot honestly produce 0 here.`,
     ).toBeGreaterThan(0);
+
+    /**
+     * ⚠ THE PARAGRAPH-LABEL HAND-OFF, MEASURED FROM BOTH ENDS.
+     *
+     * Owner ruling 2026-09-20 (executor 2's ruling request): `/help`'s two eyebrow
+     * labels are `<p>` elements, so section 4 judged them at a BODY floor of 16px
+     * while the product had declared 12px for label text. The ruling SPLITS the
+     * floor — they move to the label population, and the 16px floor stays hard for
+     * everything not declared in `type-scale.ts`'s `LABEL_IN_BODY`.
+     *
+     * ⚠ AND THE RULING ASKED ONE QUESTION BE CHECKED RATHER THAN ASSUMED, because
+     * it decides whether the fix is a second selector or an exemption:
+     *
+     *     BODY_SELECTOR  = 'p, li, dd, dt, td, figcaption, label'
+     *     LABEL_SELECTOR = 'span, small, div, …'
+     *     'p' in body: true     'p' in label: false     intersection: (none)
+     *
+     * `p` is in NEITHER, so simply removing these from section 4 would have left
+     * them with **no floor at all, silently**. The fix is a SECOND SELECTOR, and
+     * this assertion is what proves the second selector is real rather than
+     * nominal: the body sweep's count of what it handed over must EQUAL the label
+     * sweep's count of what it received by declaration.
+     *
+     * An exemption would leave the left number non-zero and the right one zero and
+     * look exactly like a clean route. Two numbers that describe the same elements
+     * from opposite sides are the only way to tell "covered by the other rule" from
+     * "quietly dropped by both".
+     */
+    expect
+      .soft(
+        body.labelSkipped,
+        `section 4 handed ${body.labelSkipped} declared label(s) to the label sweep on ` +
+          `${route.path}, but the label sweep says it received ${typeScale.labelInBodyExamined} ` +
+          `by declaration. These describe the same elements from opposite sides: a mismatch means ` +
+          `either the exemption stopped applying (the element is being judged at 16px again and ` +
+          `section 4 will also be red) or the element is in NEITHER population — which reads ` +
+          `green and has no floor. Declared: ${JSON.stringify(LABEL_IN_BODY.map((e) => e.label))}`,
+      )
+      .toBe(typeScale.labelInBodyExamined);
+
+    /**
+     * THE STALE-ENTRY GUARD — the half a declaration table makes invisible.
+     *
+     * A renamed label stops matching this sweep AND stays exempt from section 4,
+     * so it leaves both populations and no floor applies to it at all. That is
+     * the dangerous direction, and it is the price of declaring membership: the
+     * table goes on reading as though it were doing work while the element it
+     * names is judged by nothing. Reported only when the container AND its
+     * witness both rendered, so a route the label is not on cannot redden this —
+     * the same three-part test `DENSE_IN_LIST`'s guard applies.
+     */
+    expect
+      .soft(
+        typeScale.brokenLabelEntries,
+        `a LABEL_IN_BODY entry's container AND witness both rendered on ${route.path}, but its ` +
+          `label selector matched nothing — the entry has stopped classifying anything, so the ` +
+          `element it names is exempt from section 4's 16px floor and covered by NOTHING. Fix ` +
+          `the selector in apps/web/e2e-viewport/type-scale.ts, or remove the entry. ` +
+          `Stale: ${JSON.stringify(typeScale.brokenLabelEntries)}`,
+      )
+      .toEqual([]);
 
     /**
      * The disjointness claim, MEASURED rather than asserted in prose.

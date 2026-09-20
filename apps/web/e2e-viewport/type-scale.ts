@@ -76,8 +76,105 @@ const BODY_SELECTOR = 'p, li, dd, dt, td, figcaption, label';
  * shipped as proof. Headings stay out, matching the body sweep's own reasoning:
  * they are the responsive signature's business and are larger by construction.
  */
-const LABEL_SELECTOR =
+const LABEL_SELECTOR_BASE =
   'span, small, div, strong, em, b, i, time, output, abbr, dfn, a, button, summary, th';
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * PARAGRAPH LABELS — THE SECOND SELECTOR, AND WHY AN EXEMPTION WOULD NOT DO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Owner ruling, 2026-09-20, on executor 2's `EXEC-RULING-REQUEST-2026-09-20-
+ * viewport-gate-body-text-floor.md`, and the shape is `#604`'s one assertion
+ * over: **the floor SPLITS, it does not drop.** `measureBodyText`'s 16px floor
+ * stays HARD and UNCHANGED for anything not declared here; what moves is which
+ * population a DECLARED label is judged by.
+ *
+ * THE FINDING. `/help` at 390px was the single red on `main` in the viewport
+ * suite: 17 offenders, and every one an uppercase eyebrow LABEL —
+ * `p.gn-help__eyebrow` at 12.48px ×1 and `p.gn-help__section-eyebrow` at 13px
+ * ×16. Neither size is an accident: `c21246b0` (2026-09-15) moved 0.8125rem →
+ * 0.78rem under the owner's own direction *"lets move the styling towards the
+ * guide"*, and the 13px is annotated "all from the reference" at
+ * `packages/ui/src/ui.css:4201-4205`. **Both sit inside the `0.78rem-1.3rem`
+ * band this file's own docblock calls the legitimate scale**, and both clear
+ * `LABEL_FLOOR_PX`. They were red only because they are `<p>` elements, which
+ * puts them in the BODY sweep.
+ *
+ * ⚠ WHY THIS IS A SECOND SELECTOR AND NOT A SKIP, MEASURED RATHER THAN ASSUMED
+ * (the ruling asks this question explicitly, and the answer decides the fix):
+ *
+ *     BODY_SELECTOR  = 'p, li, dd, dt, td, figcaption, label'
+ *     LABEL_SELECTOR = 'span, small, div, …'          ← `p` is in NEITHER list above
+ *     'p' in body: true     'p' in label: false     intersection: (none)
+ *
+ * So a `<p>` label is currently visible to the BODY sweep and **invisible to
+ * this one**. Deleting it from the body sweep without adding it here would not
+ * re-classify it — **it would leave it with no floor of any kind, silently**,
+ * which is precisely the loss the ruling forbids. Hence the `label` column
+ * below is a SECOND SELECTOR, and the tables are what make the element still
+ * covered rather than merely excused.
+ *
+ * THE DANGEROUS DIRECTION IS GUARDED BY LEAVING IT ALONE, exactly as
+ * `DENSE_IN_LIST` guards it: **an element not declared in this table is still
+ * judged at 16px, hard.** Forgetting to declare a label reddens loudly; there
+ * is no way to opt out of the floor by accident. The mirror of the tap-target
+ * stale-entry guard is here too — a declared `label` whose container and
+ * witness rendered but which matched nothing is reported, because that is the
+ * only way to tell "renamed out of classification" from "not on this route".
+ */
+export type LabelInBody = {
+  /** The class that makes a body-tagged element a LABEL rather than body copy. */
+  readonly label: string;
+  /** The wrapper that renders wherever the label can render. */
+  readonly container: string;
+  /**
+   * A sibling only that container renders. Checked before the label is, so an
+   * empty shell of a container is not read as a dead entry — the same reason
+   * `DENSE_IN_LIST` carries one.
+   */
+  readonly witness: string;
+  /** Which rule sets the size, and who decided it. */
+  readonly why: string;
+};
+
+export const LABEL_IN_BODY: readonly LabelInBody[] = [
+  {
+    label: '.gn-help__eyebrow',
+    container: '.gn-help__nav',
+    witness: '.gn-help__nav-link',
+    why:
+      "The /help sidebar's `Topics` label — the accessible name of the nav region, uppercase, " +
+      '600 weight, tracked. 0.78rem (12.48px), set there by `c21246b0` under the owner\'s ' +
+      'direction "lets move the styling towards the guide", and above `LABEL_FLOOR_PX`.',
+  },
+  {
+    label: '.gn-help__section-eyebrow',
+    container: '.gn-help__section',
+    witness: '.gn-help__h2',
+    why:
+      'The `MANUAL · <group>` label above each section heading. 0.8125rem (13px), and its own ' +
+      'rule records the provenance — "13px/18px/600 with 0.4px tracking … all from the ' +
+      'reference" (`packages/ui/src/ui.css:4201-4205`). Above `LABEL_FLOOR_PX`.',
+  },
+];
+
+/**
+ * The declared labels, as one selector. The second half of what this sweep sees.
+ *
+ * EXPORTED because the body sweep must subtract exactly this set and no more:
+ * `responsive.spec.ts` imports it rather than re-typing the two class names, so
+ * a third label added to the table cannot be exempted from the 16px floor in
+ * one file and left uncovered in the other.
+ */
+export const LABEL_IN_BODY_SELECTOR = LABEL_IN_BODY.map((e) => e.label).join(', ');
+
+/**
+ * Everything this sweep examines: the inline/generic carriers plus the declared
+ * paragraph labels. Built from the table rather than typed out, so a label
+ * cannot be declared into `LABEL_IN_BODY` and left uncovered here.
+ */
+const LABEL_SELECTOR = `${LABEL_SELECTOR_BASE}, ${LABEL_IN_BODY_SELECTOR}`;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -141,6 +238,28 @@ export type TypeScale = {
    * grown into each other and their counts have stopped being separable.
    */
   bodyOwned: TextSample[];
+  /**
+   * ⚠ THE STALE-ENTRY GUARD for `LABEL_IN_BODY`, and the half that is invisible
+   * without it.
+   *
+   * A declared label that gets RENAMED stops being matched by this sweep — and
+   * because it is also exempt from the body sweep, it does not fall back to the
+   * 16px floor either. It leaves the population entirely and **no floor applies
+   * to it at all**, which reads identically to a clean route. That is the
+   * dangerous direction, and it is the one a declaration table creates.
+   *
+   * Reported only when the container AND its witness both rendered, so a route
+   * the label simply is not on cannot redden this. Non-empty names the entries
+   * that have stopped classifying anything.
+   */
+  brokenLabelEntries: string[];
+  /**
+   * How many elements this sweep examined BECAUSE `LABEL_IN_BODY` declared
+   * them — the receiving end of the hand-off the body sweep reports as
+   * `BodyText.labelSkipped`. The spec asserts the two numbers are EQUAL; see
+   * the note in `measureTypeScale`.
+   */
+  labelInBodyExamined: number;
   /**
    * Examined elements whose computed `font-family` is NOT the one `body`
    * resolves to — i.e. text painted in the BROWSER's font rather than the
@@ -245,7 +364,7 @@ export type TypeScale = {
  */
 export async function measureTypeScale(page: Page): Promise<TypeScale> {
   return page.evaluate(
-    ({ labelSelector, bodySelector, floor }) => {
+    ({ labelSelector, bodySelector, floor, declaredLabelSelector, labelInBody }) => {
       const describe = (el: Element): string => {
         const cls =
           typeof el.className === 'string' && el.className !== ''
@@ -260,6 +379,18 @@ export async function measureTypeScale(page: Page): Promise<TypeScale> {
       const bodyOwned: Sample[] = [];
       const uaFont: Sample[] = [];
       let skipped = 0;
+      /**
+       * Elements that reached `examined` BY DECLARATION — a `<p>` the body
+       * sweep handed over because `LABEL_IN_BODY` names its class.
+       *
+       * Carried out so the hand-off is MEASURED FROM BOTH ENDS. The body sweep
+       * reports how many it skipped as declared labels; this reports how many
+       * arrived. The spec asserts the two are equal, which is the only way to
+       * tell "the element is covered by the label rule instead" from "the
+       * element quietly fell out of both sweeps" — two states that otherwise
+       * read identically, both green.
+       */
+      let labelInBodyExamined = 0;
 
       /* The product's own resolved stack, read from the live document rather
          than hardcoded here — a literal copy of `body`'s declaration would go
@@ -296,11 +427,26 @@ export async function measureTypeScale(page: Page): Promise<TypeScale> {
           text: directText.slice(0, 40),
           fontFamily: cs.fontFamily,
         };
-        if (el.matches(bodySelector)) {
+        /**
+         * Matched BOTH selectors. Ordinarily that is the drift this field
+         * reports: the two populations have grown into each other and their
+         * counts have stopped being separable.
+         *
+         * A DECLARED paragraph label is the one legitimate overlap, and it is
+         * the whole reason the table exists — it is a `<p>` (so the body
+         * selector matches it) that is a LABEL (so this sweep is the one that
+         * must judge it). It falls through to be examined at `LABEL_FLOOR_PX`.
+         *
+         * The exemption is the DECLARATION and nothing else: an undeclared `<p>`
+         * still lands in `bodyOwned` and still reddens the disjointness
+         * assertion. Nothing reaches the lower floor by accident.
+         */
+        if (el.matches(bodySelector) && !el.matches(declaredLabelSelector)) {
           bodyOwned.push(entry);
           continue;
         }
         examined.push(entry);
+        if (el.matches(declaredLabelSelector)) labelInBodyExamined += 1;
         if (entry.fontSizePx < floor) offenders.push(entry);
         if (entry.fontFamily !== bodyFamily) uaFont.push(entry);
       }
@@ -310,18 +456,40 @@ export async function measureTypeScale(page: Page): Promise<TypeScale> {
           ? null
           : examined.reduce((a, b) => (a.fontSizePx <= b.fontSizePx ? a : b));
 
+      /**
+       * The stale-entry guard for `LABEL_IN_BODY`. Container AND witness must
+       * both have rendered before a missing label means anything: without the
+       * witness, a route the label simply is not on would report every entry
+       * as dead. Same three-part test `DENSE_IN_LIST`'s guard applies.
+       */
+      const brokenLabelEntries: string[] = [];
+      for (const e of labelInBody) {
+        if (document.querySelectorAll(e.container).length === 0) continue;
+        if (document.querySelectorAll(e.witness).length === 0) continue;
+        if (document.querySelectorAll(e.label).length > 0) continue;
+        brokenLabelEntries.push(`${e.label} inside ${e.container}`);
+      }
+
       return {
         rawMatches: matched.length,
         examined,
         offenders,
         bodyOwned,
+        brokenLabelEntries,
+        labelInBodyExamined,
         uaFont,
         bodyFamily,
         skipped,
         smallest,
       };
     },
-    { labelSelector: LABEL_SELECTOR, bodySelector: BODY_SELECTOR, floor: LABEL_FLOOR_PX },
+    {
+      labelSelector: LABEL_SELECTOR,
+      bodySelector: BODY_SELECTOR,
+      floor: LABEL_FLOOR_PX,
+      declaredLabelSelector: LABEL_IN_BODY_SELECTOR,
+      labelInBody: LABEL_IN_BODY,
+    },
   );
 }
 
