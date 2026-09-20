@@ -1,5 +1,6 @@
 import type { EffectiveRole } from '../permissions/effective-role.js';
 import type { Queryable } from '../db/queryable.js';
+import { resolveProjectPrefixes } from '@gisik-nokma/domain';
 
 export type VisibleProject = {
   projectId: string;
@@ -21,6 +22,20 @@ export type VisibleProject = {
    * made by the filter, and this column introduces no new rule of its own.
    */
   description: string | null;
+  /**
+   * The second half of every ticket key in this project — `SO` in `CCSO-1183`
+   * (owner spec 2026-09-20). **Never null, and that is the whole design:** the
+   * column is nullable because no founding event before 2026-09-20 could carry
+   * one, but a project with no stored prefix still needs a key, so a reader
+   * resolves the two cases with ONE rule — the stored value where there is one,
+   * `derivePrefix(name)` where there is not (`packages/domain/src/prefix.ts`).
+   * What comes out is a value no read site has to think about, which is the
+   * only way an enumeration of eight render sites stays honest.
+   *
+   * **Resolved across the WHOLE workspace, before the role filter**, because
+   * the half must be unique within one — see the call below.
+   */
+  prefix: string;
 };
 
 /**
@@ -79,17 +94,34 @@ export async function visibleProjects(
     name: string;
     archived: boolean;
     description: string | null;
+    prefix: string | null;
   }>(
-    `SELECT project_id, name, archived, description FROM proj_projects
+    `SELECT project_id, name, archived, description, prefix FROM proj_projects
       WHERE workspace_id = $1
       ORDER BY project_id`,
     [workspaceId],
+  );
+  // RESOLVED OVER EVERY ROW IN THE WORKSPACE, before the role filter below and
+  // deliberately so. A project's prefix is UNIQUE WITHIN ITS WORKSPACE, so a
+  // derivation that only saw the rows THIS caller may name would let two
+  // projects collide in one viewer's answer and not in another's — the same
+  // project would then read `SO` to its owner and `SO2` to a guest, and a key
+  // that names one thing to one person and a different thing to the next is
+  // worse than no key. `visibleProjects`' own rule is that the filter decides
+  // what is NAMED, never what is TRUE, and this keeps it.
+  //
+  // The order is the query's `ORDER BY project_id`, which is the order
+  // `resolveProjectPrefixes` documents as its input contract: a ULID compares
+  // by creation, so the answer is a function of the SET and reproduces on
+  // replay.
+  const resolved = resolveProjectPrefixes(
+    rows.map((row) => ({ name: row.name, prefix: row.prefix })),
   );
   // The workspace predicate is in the SQL and the ROLE decision is not: this
   // function restates nothing about who may see what, it asks `eff` — which is
   // what makes it an application of `resolveEffectiveRole` rather than a second,
   // quieter visibility rule living in a query.
-  const visible = rows.map((row) => ({
+  const visible = rows.map((row, index) => ({
     projectId: row.project_id,
     name: row.name,
     archived: row.archived,
@@ -97,6 +129,7 @@ export async function visibleProjects(
     // mistake the projection refuses one layer down, one layer closer to the
     // render.
     description: row.description,
+    prefix: resolved[index]!,
   }));
   if (eff.workspaceRole === 'owner') return visible;
   return visible.filter((project) => eff.projects.has(project.projectId));

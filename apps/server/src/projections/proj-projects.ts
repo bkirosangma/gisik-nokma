@@ -94,8 +94,8 @@ export const projProjects: Projection = {
     }
     const payload = projectCreatedPayload.parse(event.payload);
     await tx.query(
-      `INSERT INTO proj_projects (project_id, workspace_id, name, description, created_by, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO proj_projects (project_id, workspace_id, name, description, prefix, created_by, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT (project_id) DO NOTHING`,
       [
         event.entity.id,
@@ -106,6 +106,15 @@ export const projProjects: Projection = {
         // the absence this column stores. `?? ''` would write the CLAIM "no
         // description" for every project founded before this field existed.
         payload.description ?? null,
+        // Same `?? null`, and here it is load-bearing in a second way: this
+        // branch is taken by EVERY project in the ledger today, so a `??` that
+        // derived a prefix instead would put a claim in the column that no
+        // event made — and, because the derivation is not what the ledger says,
+        // the shadow rebuild in `tools/verify-projections.ts` would be the only
+        // thing that noticed. The derivation belongs to the READER
+        // (`packages/domain/src/prefix.ts`), which is where it can be applied to
+        // a NULL without pretending the column said it.
+        payload.prefix ?? null,
         event.actorId,
         event.serverTime,
       ],

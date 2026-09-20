@@ -55,6 +55,43 @@ describe('workspaceCreatedPayload', () => {
     // And the claim survives verbatim: refusing blanks must not become trimming.
     expect(workspaceCreatedPayload.parse({ name: '  Corner  ' })).toEqual({ name: '  Corner  ' });
   });
+
+  /**
+   * The workspace prefix (owner spec 2026-09-20). The COMPATIBILITY half is the
+   * load-bearing one: every workspace in the ledger was founded before this
+   * field existed, so a schema that required it would refuse the entire
+   * existing ledger at `parseEvent` — before any of this plan's code ran.
+   */
+  it('13.1000 — accepts an optional prefix, and an absent one parses unchanged', () => {
+    expect(workspaceCreatedPayload.parse({ name: 'Convenience Corner', prefix: 'CC' })).toEqual({
+      name: 'Convenience Corner',
+      prefix: 'CC',
+    });
+    // THE COMPATIBILITY HALF — a founding event with no prefix at all.
+    expect(workspaceCreatedPayload.parse({ name: 'Convenience Corner' })).toEqual({
+      name: 'Convenience Corner',
+    });
+    // ...and genuinely ABSENT rather than present-and-undefined: a reader using
+    // `in` must see "nobody mentioned one", not "mentioned, value unknown".
+    expect('prefix' in workspaceCreatedPayload.parse({ name: 'Corner' })).toBe(false);
+    // The CONTROL for the line above, same call shape: a key that IS sent is
+    // present. Without it, `'prefix' in …` would also pass on a schema that
+    // dropped every optional key.
+    expect('prefix' in workspaceCreatedPayload.parse({ name: 'Corner', prefix: 'CC' })).toBe(true);
+  });
+
+  it('13.1001 — refuses a prefix that is not one to three capitals, and does not upper-case one that is lower', () => {
+    for (const prefix of ['ABCD', 'C1', '', '   ', 'C C', 'CC ']) {
+      expect(workspaceCreatedPayload.safeParse({ name: 'Corner', prefix }).success).toBe(false);
+    }
+    expect(
+      rejectionIssues(workspaceCreatedPayload.safeParse({ name: 'Corner', prefix: 'cc' })),
+    ).toContainEqual({ path: ['prefix'], message: 'must be 1 to 3 capital letters, A to Z' });
+    // The refusal must not have quietly rewritten the claim into a legal one.
+    expect(
+      workspaceCreatedPayload.safeParse({ name: 'Corner', prefix: 'cc' }).success,
+    ).toBe(false);
+  });
 });
 
 describe('workspaceRenamedPayload', () => {
@@ -141,6 +178,39 @@ describe('projectCreatedPayload', () => {
       projectCreatedPayload.parse({ name: 'Delivery', description: '  Sprint work  ' })
         .description,
     ).toBe('  Sprint work  ');
+  });
+
+  /**
+   * The project prefix (owner spec 2026-09-20) — `description`'s shape exactly,
+   * for `description`'s reason: `.strict()` turns "optional" into "the caller
+   * said nothing", and every `project.created` written before this field
+   * existed must still parse.
+   */
+  it('13.1002 — accepts an optional prefix, and an absent one parses unchanged', () => {
+    expect(projectCreatedPayload.parse({ name: 'Shop operations', prefix: 'SO' })).toEqual({
+      name: 'Shop operations',
+      prefix: 'SO',
+    });
+    // THE COMPATIBILITY HALF — every project in the ledger today.
+    expect(projectCreatedPayload.parse({ name: 'Shop operations' })).toEqual({
+      name: 'Shop operations',
+    });
+    expect('prefix' in projectCreatedPayload.parse({ name: 'Shop operations' })).toBe(false);
+    // CONTROL, same call shape: a key that IS sent is present.
+    expect('prefix' in projectCreatedPayload.parse({ name: 'Shop operations', prefix: 'SO' })).toBe(
+      true,
+    );
+  });
+
+  it('13.1003 — describes and a prefix COEXIST, and a bad prefix is refused by name', () => {
+    // The two optional fields are independent; a schema that let the second
+    // clobber the first would pass every single-field test above.
+    expect(
+      projectCreatedPayload.parse({ name: 'Delivery', description: 'Sprint work', prefix: 'DE' }),
+    ).toEqual({ name: 'Delivery', description: 'Sprint work', prefix: 'DE' });
+    expect(
+      rejectionIssues(projectCreatedPayload.safeParse({ name: 'Delivery', prefix: 'delivery' })),
+    ).toContainEqual({ path: ['prefix'], message: 'must be 1 to 3 capital letters, A to Z' });
   });
 });
 
