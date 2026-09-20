@@ -4,20 +4,28 @@
 
 - **Dispatch: the controller's "three false things the PRODUCT says" paste** (2026-09-20 ~12:0x IST).
   **Base named as `main` = the `#587` merge.**
-- **Branch `exec2/product-copy`**, cut from `1391aef3` (= `origin/main` = the `#587` merge, verified
-  `git rev-parse origin/main`). **HEAD `a9931ab2`** — `b99bdfea` (the change) + `a9931ab2` (the prose
-  sweep, six descriptions of these sentences that the change itself falsified).
+- **Branch `exec2/product-copy`**, cut from `1391aef3` (= `origin/main` at the time = the `#587`
+  merge). **HEAD `b698961b`** — five commits: `b99bdfea` (the change), `a9931ab2` (the prose sweep),
+  `f69ec6d4` (the handoff), `bda9980c` (fix round 1 — **amended in place from `615ef96b` to correct a
+  count in its own message; tree identical**), `b698961b` (fix round 2).
 - **The PR opens as the last step of this dispatch.** If you are reading this from `main`, settle it in
   one call: `gh pr list --state all --head exec2/product-copy`.
 
-### § 2 — ANCHORS, RECOUNTED AT `a9931ab2` (not carried forward)
+### § 2 — ANCHORS, RECOUNTED AT `b698961b` (not carried forward)
 
 | anchor | value |
 |---|---|
 | `git merge-base origin/main HEAD` | `1391aef37d96e7fcbc07cbf39104009a8af83ad4` |
-| **HEAD** | `a9931ab29ada2c72926c8c9aa5ffe61a242edb0f` |
-| ahead / behind `origin/main` | **2 / 0** (`git rev-list --left-right --count origin/main...HEAD` → `0 2`) |
+| **HEAD** | `b698961b80496fb8507c28752eadf47d6bc38c57` |
+| ahead / behind `origin/main` | **4 / 5** (`git rev-list --left-right --count origin/main...HEAD` → `5 4`) |
+| `origin/main` | **`bbbd5cda4877fcb0357cf2e97475905f3ab43336`** — **it MOVED while this branch ran** (`1391aef3` → `bbbd5cda`, 5 commits); see the merge section below |
 | tree | **clean** |
+
+⚠ **THE COMMIT CARRYING THIS FILE SITS ON TOP OF THAT HEAD.** Every anchor above is stated at the
+**CODE** head (`b698961b`), never at this file's own commit — so
+`git log -1 --format=%h -- docs/lanes/executor-2-state.md` will name a sha that is NOT the one in the
+table, and that is correct rather than stale. Re-reading this file is not the same as re-measuring the
+tree; recount at the sha you are reporting.
 | `check:citations` / `check:env` / `check:runbook` / `check:tasks` | **all exit 0** |
 | `check:help` | **ok** — 2 documents, 29 sections, **231 entries**. **Delta PREDICTED 0 before regenerating and measured 0** (no heading added or removed; only text moved) |
 | `check:case-ids` | ok — **2495** unique ids (was 2494). **Delta +1, exactly the one case added (`16.45`)**; highest `16.82` |
@@ -56,12 +64,19 @@ the answer is that this family is NOT wrong together:**
 **(b) The reachable sentence, NOT the dead constant — and it was decided by elimination.**
 The owner ruled *"the message should name the filter"*. **Shape chosen: rewrite the REACHABLE sentence
 (`CALENDAR_EMPTY_MONTH_COPY`).** Wiring the dead constant was (i) **foreclosed** by the owner's own
-ruling 10 in the same sitting and (ii) **would not have worked anyway**: the page filters UPSTREAM — 
-`datesNarrowing` feeds `dateInputs` already narrowed, applying the page's own closed-hidden-by-default
-rule which no `FilterSpec` can express — so `visible === inputs` in every app and passing the filter down
-would re-filter a filtered set and exclude nothing. **A page-LEVEL "a filter is on" flag was considered
-and rejected, with the reason recorded in the source**: it cannot answer whether THIS month was emptied,
-so it would license a sentence that is false whenever the filter is merely irrelevant to the month.
+ruling 10 in the same sitting and (ii) **would not have worked anyway**: the page filters UPSTREAM —
+`datesNarrowing` feeds `dateInputs` already narrowed — so `visible === inputs` in every app and passing
+the filter down would re-filter a filtered set and exclude nothing.
+⚠ **THE REASON STATED HERE IN THE FIRST VERSION WAS FALSE AND A REVIEWER CAUGHT IT:** it said the
+page's closed-hidden rule "cannot be expressed as a `FilterSpec`". It can — `closed?: boolean` is one
+of `FilterSpec`'s own axes and `matchesFilter` evaluates it, and the page already expresses it as one,
+`{ ...listFilterSpec, closed: effectiveClosed }`. What makes wiring the wrong repair is that the view
+receives ALREADY-NARROWED rows, not that the rule is inexpressible. **A false reason attached to a
+right answer is worse than no reason: it is the part a successor would have checked and found sound.**
+The source docblock carries the corrected version with its citations. **A page-LEVEL "a filter is on"
+flag was considered and rejected, with the reason recorded in the source**: it cannot answer whether
+THIS month was emptied, so it would license a sentence that is false whenever the filter is merely
+irrelevant to the month.
 The sentence names the SET — *"your filter, closed jobs being hidden, or a field you switched off in the
 legend"* — which stays true whether one is set or none is.
 
@@ -133,6 +148,62 @@ is "in four different sentences … four reasons". That count was ALREADY WRONG 
 sentences, four doors — case 11.50) and this change would have made it wrong a second way. The count is
 **dropped** rather than corrected: it was never load-bearing to the argument, which needs "more than
 one".
+
+### § 7b — THE REVIEW RECORD: TWO PASSES, FIFTEEN FINDINGS, AND THE ONE WHERE I COMMITTED THE DEFECT INSIDE ITS OWN FIX
+
+**Pass 1 (whole branch, briefed to falsify) — 9 findings, every one verified by reading the line
+before it was fixed.** It CONFIRMED the branch's central claim (`CALENDAR_EMPTY_MONTH_COPY` is true
+wherever it renders) and then found, in order of consequence: the symmetric copy naming a control the
+timeline does not have; the `narrowedOutOfGrid` guard's blind spot being LIVE rather than future; the
+documents inheriting that overclaim; my stated reason for rejecting the filter-wiring repair being
+simply FALSE; two render-site comments and a coverage-map row still announcing three arms/sentences; a
+citation whose bare `:921` form my sweep's pattern could not see; and a false "no test watched it"
+claim in my own case block. **Fix round 1 = `bda9980c`.**
+
+**Pass 2 (scoped to the fix round's own new prose and its new test) — all nine CONFIRMED fixed, the
+recovery from the destroyed fix round confirmed COMPLETE, plus 6 more.** The important one: **I wrote
+the F2 correction into the two files I was already editing and left three other places asserting the
+condition I had just measured as unenforced — and two of those three I had written myself, earlier the
+same day, in the course of fixing F2.** That is the "sweep's universe is the files you already edited"
+defect, which this project has now recorded three times, committed here *inside its own fix*. Pass 2
+also measured a SECOND blind spot in the same guard (its bounds are the six-week GRID, the sentence
+says "this month" — a 2 Sep claim is a trailing August cell) and caught a docblock disagreeing with a
+paragraph three lines below it, because I added the second without re-reading the first.
+**Fix round 2 = `b698961b`.**
+
+**⚠ A PROCESS FAILURE OF MINE, RECORDED BECAUSE IT COST REAL WORK.** I restored a mutation with
+`git checkout -- claim-labels.ts` while the FIX ROUND WAS UNCOMMITTED, which reverted the file to HEAD
+and destroyed F1/F2/F4/F9a in it. Recovered by redoing the edits and verifying each by grep, and pass 2
+independently confirmed no half-applied edit survived. **The rule this project already has is the one I
+broke: commit before mutating.** It was written down, I had followed it once, and I still walked into
+it — which is the argument for the rule being a *step* rather than a *reminder*.
+
+**Mutations, all against a committed tree, each killing its own site and nothing else:** the
+`narrowedOutOfGrid` month-key shortcut (kills 11.50's padding-cell arm); dropping the timeline's guard
+(kills 11.61's outranks case); reverting the copy (kills 11.1 + 16.45); re-adding the legend clause to
+the timeline copy (kills the new "names only controls the TIMELINE has" assertion). All restored; tree
+clean.
+
+### § 7c — `origin/main` MOVED WHILE THIS RAN, AND THE ONE FILE WE SHARE WAS CHECKED FOR AN ID COLLISION
+
+`origin/main` went `1391aef3` → **`bbbd5cda`** (5 commits). Main touched FIVE files:
+`Features.md`, `docs/lanes/executor-state.md`, `packages/ui/src/ui.css`,
+`packages/ui/test/components.test.tsx`, `test-cases/16-remaining-doors.md`. **Exactly one of those is
+also mine**, and it is the dangerous one — that file carries the CASE-ID BLOCK ALLOCATION.
+
+- **No id collision.** Main's insert is **`16.83`**, inside exec 1's `16.81`–`16.99` block. Main's
+  highest id inside **my** block (`16.41`–`16.60`) is still **`16.44`**, and main's allocation table is
+  unchanged, so `16.45` is free on both sides. **Read from the allocation table and the id lines, not
+  assumed from the absence of a conflict.**
+- **`content.generated.ts` is NOT stale:** main did not touch `docs/manual.md` or `docs/faq.md`.
+- **`Features.md` owes nothing:** main changed it, I did not, and `:2304`'s calendar bullet says only
+  that an empty month "says why" — still true, and now truer.
+- `git merge-tree --write-tree origin/main HEAD` → **clean (exit 0)**. **No rebase was run**, matching
+  this lane's precedent: a clean merge plus a verified non-collision, with the shas kept stable for the
+  PR body and the two review passes' citations.
+
+⚠ **THE TWO-DOT TRAP IS LIVE ON THIS TREE**: `git diff --stat origin/main HEAD` lists MAIN's commits as
+ours. Use `origin/main...HEAD` (22 files, +741/−208).
 
 ### § 8 — WHAT IS *NOT* COVERED, NAMED RATHER THAN IMPLIED
 
