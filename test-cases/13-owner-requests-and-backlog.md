@@ -2179,3 +2179,68 @@ naming: each was a case that PASSED while the property it was named for was fals
 instrument.** 13.1012 was named for rename-immutability and exercised the stored branch; the docblock named
 a fallback the loop did not have; the gate was named `checkProjectPrefixUnique` and asked a subtly different
 question. All three read as green.
+
+## An epic is a row in the List and nowhere else (owner, 2026-09-20)
+
+Block `13.1034`–`13.1049` is this executor's for this work; `13.1046`–`13.1049` are reserved and
+deliberately unused. Suite: `packages/app-core/test/calendar/calendar-model.test.ts`,
+`packages/app-core/test/timeline/timeline-model.test.ts`,
+`apps/web/test/epics-not-rows.test.tsx`. All under Node v22.22.2.
+
+The owner, twice and in this order: *"epics should never show up in the board, timeline and calendar
+views. they can only be in the list views"*, then *"it shouldnt show up in the backlog either. only in
+the list view."* The controller put the one question the ruling leaves open to the owner rather than
+letting a lane guess — the Backlog and the List are the SAME component (`<TicketList>`) and the Backlog's
+sections are headed BY THE EPIC, so does removing the row also remove the header? — and the answer was
+***"Row only."*** **The epic is VISIBLE AS A NAME and ABSENT AS A TICKET**, in the Backlog's section
+headers and (for the same reason, through the same mechanism) in the Timeline's lane headings.
+
+The exclusion is PER VIEW and the shared read is untouched: `list.rows` stays unnarrowed, so the parent
+picker still offers every ticket and `labels.epicTitle` still resolves a surviving child's epic. In the
+two models it sits INSIDE `visible` — `byId` is built from the complete input set before `visible`
+narrows, which is what keeps the Timeline's lanes named, and joining `visible` makes a removed epic count
+as a narrowing, which keeps `CALENDAR_ALL_HIDDEN_COPY` gated off.
+
+- **13.1034** ✅ `buildCalendarModel` with `hideEpicRows` drops the rank-1 ticket's bar and markers and
+  keeps its child's; the CONTROL arm asserts the epic draws with the option absent, from the same fixture
+  and one word different. A second arm proves it reads the view's own rank-1 predicate: a type id the
+  built-in default does not name survives, and the same ticket goes once the shell says that type is the
+  epic.
+- **13.1035** ✅ A hidden epic counts as a NARROWING, so a grid emptied only by this rule reaches
+  `CALENDAR_EMPTY_MONTH_COPY` and never the exhaustive `CALENDAR_ALL_HIDDEN_COPY`. The CONTROL moves one
+  date — the epic's claim off this grid — and the same fixture then DOES reach the exhaustive sentence,
+  which is what proves the epic is what was holding it off.
+- **13.1036** ✅ `buildTimelineModel` with `hideEpicRows` drops a fully dated epic's own bar AND KEEPS the
+  lane it names: the child's row survives under a heading titled with the epic's own title. Asserting the
+  TITLE rather than merely that a group exists is deliberate — a lane falling back to `NO_EPIC_TITLE` is
+  still one group, and is exactly the drawn absence this case forbids.
+- **13.1037** ✅ A HALF-dated epic leaves the side list too — the view, not one of its two outputs — while
+  a TRULY undated epic is still neither a row nor missing work.
+- **13.1038** ✅ The Board draws no epic card, and BOTH counts move with it: the column's badge and the
+  `N of M` strip. `1 of 2 shown` is asserted absent by NAME, because it is exactly what an implementation
+  that drops the card and keeps the count prints.
+- **13.1039** ✅ The Backlog draws no epic ROW, still heads its section with the epic's NAME, and still
+  draws the child. The header half holds under the EPIC grouping, which is the default; a stored
+  status/assignee/type/flat grouping has no epic header at all, as it did not before.
+- **13.1040** ✅ The List still draws the epic as a row — the ruling's other half, and the control that
+  makes 13.1039 a measurement rather than an assumption about a testid.
+- **13.1041** ✅ On the page, the Calendar omits the epic's entry and keeps its child's; the child is
+  asserted FIRST so the negative is about the epic and not about a month that drew nothing.
+- **13.1042** ✅ On the page, the Timeline omits the epic's row and keeps its lane heading, asserted by
+  ROLE (`h3`) so a row carrying the same string cannot satisfy it.
+- **13.1043** ✅ RECORDED, NOT FIXED — a Board whose only non-closed tickets are epics now reaches
+  `EMPTY_BOARD_COPY` over a project holding one. Owner: the owner, by way of whoever next owns the board's
+  empty states.
+- **13.1044** ✅ RECORDED, NOT FIXED — the same for the Backlog's own empty copy.
+- **13.1045** ❌ RECORDED, NOT FIXED — a calendar month or timeline window emptied only by this rule
+  reaches a sentence whose list of causes does not name it. Owner: the owner, by way of whoever next owns
+  those empty states. No test: the honest sentence would be new user-facing copy, and copy is the owner's.
+
+⚠ **THE MUTATION BATTERY IS THE EVIDENCE, AND IT FOUND THREE THINGS.** Eight mutations, one per view plus
+one that isolates each fold's count term; each reddens its OWN view's cases and no other's. **M3 survived
+its first run** — the Backlog's rows dropped while its `total` still counted epics — which is why 13.1039
+asserts the strip; a case that never reads the count cannot see a wrong one. **M6 and M7 also reported as
+survivors and were not**: they mutate `packages/app-core`, which `apps/web` imports BY PACKAGE NAME
+through `./dist`, so the web suite was reading a stale artifact and the mutation never ran. The battery now
+greps the DIST — not the source — and a mutation that never ran is indistinguishable from a killed one
+from the outside.
