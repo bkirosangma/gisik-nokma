@@ -519,6 +519,11 @@ describe('13.371 the shape the directory already served is unchanged', () => {
     expect(entry).toEqual({
       workspaceId,
       name: 'Unchanged Corner',
+      // The ticket key (2026-09-20). DERIVED — `found()` enters no prefix — so
+      // 'Unchanged Corner' initials to `UC`. Asserted inside the exact
+      // `toEqual` for the reason the comment below gives about `description`:
+      // a new field on this route must be impossible to add by accident.
+      prefix: 'UC',
       role: 'member',
       memberCount: 2,
       // Task 18. Zero here for the reason 13.382 measures at length: this
@@ -535,6 +540,9 @@ describe('13.371 the shape the directory already served is unchanged', () => {
         {
           projectId,
           name: 'Shop operations',
+          // Also derived, from the project's own name, at the resolved end of
+          // the stored-or-derived fork (`read/visible-projects.ts`).
+          prefix: 'SO',
           archived: false,
           description: null,
           ticketCount: 0,

@@ -408,8 +408,13 @@ describe('GET /v1/me/workspaces — the directory', () => {
         // count served to EVERY caller, so an absent key here would be a route
         // that had started withholding it — which is what a guest-guard copied
         // from `visibleMemberCount` would look like from this door.
-        { workspaceId: a, name: 'Alpha', role: 'owner', memberCount: 1, nameRestrictedProjectCount: 0, projects: [] },
-        { workspaceId: b, name: 'Beta', role: 'owner', memberCount: 1, nameRestrictedProjectCount: 0, projects: [] },
+        // `prefix` since 2026-09-20: the directory carries the first half of
+        // every ticket key in the workspace, and it is a REQUIRED key — an
+        // absent one is a route that stopped serving it, which the client's
+        // mapper refuses outright. Both are DERIVED here, because `found()`
+        // enters no prefix: 'Alpha' -> AL, 'Beta' -> BE.
+        { workspaceId: a, name: 'Alpha', prefix: 'AL', role: 'owner', memberCount: 1, nameRestrictedProjectCount: 0, projects: [] },
+        { workspaceId: b, name: 'Beta', prefix: 'BE', role: 'owner', memberCount: 1, nameRestrictedProjectCount: 0, projects: [] },
       ].sort((x, y) => x.workspaceId.localeCompare(y.workspaceId)),
     );
     expect(workspaces.map((w) => w.workspaceId)).not.toContain(theirs);
@@ -468,7 +473,12 @@ describe('GET /v1/me/workspaces — the directory', () => {
       // absent from this same object one line above. The two sitting side by
       // side is Task 18's ruling stated in the smallest possible fixture.
       workspaces: [
-        { workspaceId, name: 'Hosted', role: 'guest', nameRestrictedProjectCount: 0, projects: [] },
+        // `prefix` is served to a GUEST where `memberCount` one line above is
+        // withheld, and the difference is real rather than an oversight: a
+        // prefix is not a count and not a name of something they cannot see —
+        // it is half of every key they will read on a ticket they ARE shown,
+        // and a guest holding one ticket needs it to say which ticket it is.
+        { workspaceId, name: 'Hosted', prefix: 'HO', role: 'guest', nameRestrictedProjectCount: 0, projects: [] },
       ],
     });
   });
@@ -507,6 +517,9 @@ describe('GET /v1/me/workspaces — the directory', () => {
       // has already stopped believing.
       memberCount: 1,
       nameRestrictedProjectCount: 0,
+      // Derived from 'Leaving' — the workspace was founded by `found()` with a
+      // name and no prefix.
+      prefix: 'LE',
       projects: [],
     });
   });
