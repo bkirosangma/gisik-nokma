@@ -31,6 +31,28 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 TUESDAY 2026-09-22 ~00:2x IST — **CYCLE 33: THREE AMENDMENTS TO THE REVIEW SPEC — THE PROTOTYPE IS A COMPARISON SURFACE, THE CONTROLLER RULES ON EVERYTHING, AND NOTHING IS BUILT.** `main` is `b05889b6`; zero open PRs.
+
+### 1. 📌 THE OWNER'S WORDS
+> *"all 3 executors make sure to compare very thoroughly with the prototype. no need to ask me for any rulings anywhere. the controller has the ability to make all rulings in this review. this is only review. no writing code. so everything is fine."*
+
+### 2. ⚠ EVERY FINDING IS COMPARED AGAINST THE PROTOTYPE — AND THE COMPARISON SURFACE IS BIGGER THAN ONE FILE
+**The prototype artefacts, measured:** `design-system/interactive/desktop.dc.html` (**320 KB — the main one**), the per-screen prototypes **`design-system/prototypes/{TicketSheet,McpAuthorize,Calendar,SignIn,Workspaces}.dc.html`**, and **`design-system/{tokens.json,neo-tokens.json,MASTER.md}`**. **Reference it by CONTENT and name the sha you read it at — this file's whole citation discipline applies to a 320 KB HTML file that moves under transcription.**
+⛔ **AND A DIVERGENCE FROM THE PROTOTYPE IS NOT AUTOMATICALLY A DEFECT — IT MUST BE CLASSIFIED.** This product carries **many deliberate divergences with rulings behind them** (the 44px tap target overriding the prototype's 32/36; the audience roster cut from the wire by the owner's own (b); the state crumb the sheet has and the authority's chain does not). **So every comparison says which of the three it is:**
+1. **MATCHES** the prototype;
+2. **DIVERGES AND THE DIVERGENCE IS RULED** — name the ruling, quote it, and say whether the divergence still serves it;
+3. ⛔ **DIVERGES WITH NO RULING FOUND** — **this is a finding**, and the search that failed to find a ruling is part of it. **A divergence nobody ruled and nobody recorded is the shape this project keeps paying for.**
+⚠ **Category 3 is where the value is. A report that lists only category 1 proves nothing; a report that calls every category 2 a defect is wrong.**
+
+### 3. ⛔ THE CONTROLLER RULES ON ALL OF IT — **THIS REVERSES CYCLE 31 §4's ESCALATION CLAUSE**
+Cycle 31 §4 said a criticism the controller cannot resolve is **escalated to the owner**. **The owner has now removed that: *"the controller has the ability to make all rulings in this review."*** **So the escalation bucket is DELETED** — every criticism gets a ruling, and *"I could not decide"* is not one. ⚠ **The owner still requires the defence**: *"if it rejects the criticism or gives a very good reason"* remains the bar a rejection must clear, and **every ruling still cites the measurement it rests on.**
+**The ruling buckets, and the counts still sum:** **ACCEPTED** (and what would be done) · **REJECTED** (and the defence) · **ACCEPTED-DEFERRED** (a real finding, consciously not now — name when it would be taken up). ⛔ **`accepted + rejected + deferred` MUST EQUAL `raised`**, per criticism, because this file has a whole family of recorded failures about a total that did not match its parts.
+
+### 4. ⛔ NOTHING IS BUILT — AND THAT MAKES THE RULING THE DELIVERABLE
+***"this is only review. no writing code. so everything is fine."*** **No lane writes a fix; no lane opens a fix branch; the controller lands no product change from this exercise.** ⚠ **So an ACCEPTED ruling must say WHAT WOULD BE DONE — the file, the shape, the risk — precisely enough that a later exercise can execute it without re-deriving the finding.** **A ruling that says only "yes, fix it" has thrown the review's value away**, because the finding's measurement and its three parts (what / why / what would have been better) are already written above it in the report.
+
+---
+
 ## 🔄 TUESDAY 2026-09-22 ~00:0x IST — **CYCLE 32: THE REVIEW'S SCOPE IS THE ENTIRE CODEBASE, AND THIS ENTRY NAMES THE UNIVERSE SO THE LANES CANNOT SAMPLE IT.** `main` is `a12f370e`; **zero open PRs**; ledger **307 done / 1 todo**.
 
 ### 1. 📌 THE OWNER'S ADDITION, VERBATIM
