@@ -128,13 +128,19 @@ block's own `align-self:flex-start` opt-out. The standing audience became the pr
 with the dot toned by the **MODE** and never the roster. One wrapper element was added around the control
 block to carry the geometry; the dot span is the only other markup change.
 
-**The mutation battery — EIGHT mutations, all eight killed AT THEIR OWN SITE, all restored, and the run
+**The mutation battery — TEN mutations, all ten killed AT THEIR OWN SITE, all restored, and the run
 count asserted on every one.** M1 delete the section rule → `17.001`; M2 `0.75rem`→`0.8125rem` the
 "harmonise" edit → `17.002` alone; M3 drop the left opt-out → `17.003` alone; M4 swap the dot's default
 tone → `17.004`; M5 delete the restricted modifier → `17.004`; M6 append a duplicate rule at EOF →
 `17.005` alone; M7 re-key the dot onto `userIds` → `17.004` alone; M8 add a `<select>` the ruling cut →
 `17.006` alone. (M1 also reddens `17.005`, which is expected and explained: deleting the rule leaves the
 declared-exactly-once check with nothing to count.)
+
+**M9 and M10 are the REVIEWER'S TWO SURVIVORS, promoted into mutations.** M9 appends a duplicate of the
+**pill** rule — the selector `17.005`'s own comment named while its check counted only the base — and M10
+**draws the roster as a chip row under another class name**, which `17.006`'s `[class*="chip"]` search
+could not see. Both survived the first version of these cases and both die now; **they stay in the battery
+so a regression in the strengthened checks reddens here rather than at the next reviewer.**
 
 ⚠ **TWO DEFECTS WERE FOUND IN THE BATTERY HARNESS ITSELF, BOTH BEFORE IT WAS TRUSTED, AND BOTH ARE THE
 SAME CLASS THIS FILE WARNS ABOUT.**
@@ -198,6 +204,26 @@ enough, the name has to be the one that EXECUTES.)
 
 **The controller runs the forced gate at its own tree.** This pre-check is reported so the controller does
 not receive a surprise, not as a claim about that gate.
+
+### § 3b — THE REVIEW, AND THE ONE THING THIS LANE DID TO ITSELF
+
+**One reviewer, at `a959289d`, read-only with restores sha-verified. It could not falsify the
+transcription or ruling (b) and it falsified ELEVEN things around them — every one fixed at `787707f7`,
+and the full account is in `test-cases/17-open-work.md`.** The **Critical** was the `origin/main` claim
+above. The two that matter most are **two checks that could not fail for the failure their own comments
+named** (`17.005` counted one selector while naming another; `17.006` searched for the class name `chip`),
+both now mutations M9/M10. **Four of the eleven were in prose written the same day as the code it
+describes.**
+
+⚠ **AND THIS LANE THEN DID THE THING ITS OWN OPERATING MEMORY WARNS ABOUT, WHICH IS RECORDED HERE BECAUSE
+A RESTART WILL HIT THE SAME TRAP.** The ten-mutation battery restores each mutation with
+`git checkout -- <file>`. Run once with the review's fixes **UNCOMMITTED**, that restore reverted both
+source files to HEAD and **destroyed every uncommitted prose fix in `ui.css` and `visibility-editor.tsx`,
+silently — `git status` read clean afterwards and the only signal was the battery's own
+`restored=NO!` flag on the two mutations that had touched those files.** They were re-applied from the
+edits still in context and re-verified with a positive control per anchor; the battery was then re-run
+**with the fixes committed**, and all ten restored cleanly. **The rule is a precondition, not a memory:
+COMMIT BEFORE MUTATING.** A lane that trusts "I'll restore it" has no restore point.
 
 ### § 4 — OPEN RULINGS AND RECORDED ABSENCES
 
