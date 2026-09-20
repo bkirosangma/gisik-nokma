@@ -1472,8 +1472,11 @@ failure this bucket has recorded before, caught here by a compiler instead of by
    store. OWNER: unassigned — a `Replica.workspaceId()` and a `Replica.getWorkflowDef(id, version?)`
    would let both come off the deps.
 5. **The enumeration above is SCOPED BY ITS GREP, and the scope does not reach `apps/mobile` or
-   `apps/desktop` — both of which mount the replica.** `createReplicaDataSource` has five construction
-   sites repo-wide and two are these apps (`apps/mobile/src/app.tsx:40`, `apps/desktop/src/app.tsx:56`);
+   `apps/desktop` — both of which mount the replica.** `createReplicaDataSource` has SIX invocation
+   sites repo-wide, **counted rather than guessed: two production and four in tests** (`rig.ts:434` and
+   three in `replica-data-source.test.ts`), and two of the six are these apps
+   (`apps/mobile/src/app.tsx:40`, `apps/desktop/src/app.tsx:56`) — **this read "five" for the length of
+   one edit, written without pinning the unit, which is the very defect this change set is about**;
    `apps/mobile/src/screens/ticket-screen.tsx` holds **one production `.ingest(` call site** that the
    three-directory grep cannot return. Nothing is broken — **it already catches `OfflineAcceptError` and
    treats the throw as the expected offline outcome** — so this is an under-enumeration, not an unmapped
