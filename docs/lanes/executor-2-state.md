@@ -1,4 +1,114 @@
-## ▲ TOP BLOCK — **THE DELETE FILTER IS NOW HELD BY A TYPE, NOT BY CONVENTION — AND AN INDEPENDENT REVIEW REFUTED THE ENUMERATION TWICE.** (2026-09-20, cycle 25/26, task 2)
+## ▲ TOP BLOCK — **THE COMMENT THREAD: THE READ `comment.added` NEVER HAD, AND TWO PREMISES OF ITS DISPATCH THAT THE LEDGER REFUTES.** (2026-09-21, executor 2)
+
+### § 0 — WHERE TO FIND IT
+
+- **Branch `exec2/comment-thread`**, cut from **`origin/main = fed9a588`**, **folded TWICE**: once onto
+  `fd14c48d` and again onto **`origin/main = 3d40ac68`**. `git merge-base HEAD origin/main` equals
+  `3d40ac68` exactly — **this head IS the landing tree**, and `origin/main` has not moved since.
+- Four commits, all of them mine and all prose-verified: `d89db1df` (the change), `590254d0` (the first
+  merge), `6a69f5df` (the fold's four corrections), `13c91c78` (the second merge).
+- The PR is opened at this head; this file cannot carry its number because the handoff lands before the
+  PR opens. One call settles it: `gh pr list --state all --head exec2/comment-thread`.
+- ⚠ **THE WINDOW: this file adds itself to its own figures.** Every count below is measured at `13c91c78`,
+  the folded head, **before this handoff commit** — so a restart that measures one commit more than § 2
+  says is seeing **this file's own landing**, not a foreign push. `git log --oneline origin/main..HEAD`
+  and match the subjects before concluding anything.
+
+### § 1 — WHAT SHIPPED, AND THE PART THAT WAS REFUTED RATHER THAN BUILT
+
+Dispatch `CTL-DISPATCH-2026-09-20-comment-thread.md`, owner ruling **(A): a projection + a route**.
+`comment.added` was fully wired and reached no surface; its text landed only in `proj_search.comments`, a
+CONCATENATED TEXT column that cannot serve a thread. Now: `proj_ticket_comments` + a route + the mapper,
+the view type, the thread renderer and the composer, in the sheet's details tab.
+
+**⛔ PREMISE 1 — "a comment's files are `attachment.added` events" — IS FALSE, AND THE JOIN DOES NOT
+EXIST.** `comment.added` is `{body}`; `attachment.added` names no comment; the `attachments` table has no
+`comment_id`; a sweep finds none. The only per-comment file relation that exists is **the comment's own
+document** (`image` nodes carrying `attrs.attachmentId`, gate-checked at the door) — so that is what the
+read joins on, ticket-scoped, with an unresolved id rendered **as itself** rather than dropped. The
+ticket's files are never attributed to a comment. **The composer therefore gets an uploader**, which makes
+this the product's **first `attachment.added` producer**.
+
+**⛔ PREMISE 2 — "`#594`'s toolbar is the prototype's toolbar plus the `@` mention button" — IS FALSE.**
+`packages/editor/src/components/EditorToolbar.tsx:123-176` has **six** controls and no seventh. Mentions
+work by TYPING `@` (shipped, `extensions/mention.ts:226`); the BUTTON is not built and is **named as an
+absence rather than faked** — a control that inserted `@` programmatically would not open the picker.
+**Both premises and three asks are filed:** `gisik-nokma-lanes/EXEC2-RULING-REQUEST-2026-09-20-comment-files-and-mention.md`.
+
+**THE THIRD GUARD, AND THE FOLD THAT CHANGED IT.** A comment read must refuse a soft-deleted ticket. I
+hand-rolled it off `getTicketStateFromDb`'s folded flag; **exec 1's `#610` landed mid-branch with
+`read/live-ticket.ts` (`ticketIsLive`), which is the same rule in its one route-level spelling**, so the
+fold replaced my version with the shared helper. `#610` also **closed the attachments leak this branch's
+commit message cited as open** — that sentence is corrected at the line, in the route docblock and in the
+invariant's `getTicketAttachments` row. **The mutation witness was re-measured rather than carried**: the
+old mutation targeted a line that no longer exists.
+
+### § 2 — ANCHORS, RECOUNTED AT THIS TREE (not carried forward)
+
+| anchor | value |
+|---|---|
+| `git merge-base HEAD origin/main` | **`3d40ac68` — equal to `origin/main`** (folded twice) |
+| ahead / behind | **4 / 0** — nothing behind, so this head IS the landing tree |
+| tree | clean (`git status --porcelain` empty) |
+| `test-cases/` vs `origin/main` | **EMPTY diff**, with a control (`Features.md` shows +1) — **no id was minted** |
+| `check-case-ids` | **2577 unique / highest 16.99**, identical on both sides of the fold; all four new ids are exec 1's |
+| `check:help` · `check:citations` · `check:migrations` · `check:tasks` · `check:runbook` · `check:env` | rc 0 each |
+| **suites** | **server 1696 · app-core 1696 · web 622 — all green, 0 failed** |
+| **the batteries** | **6/6 SQL+projection mutations KILLED · 6/6 client mutations KILLED**, each naming its own case |
+| ⚠ the forced gate | **NOT run — it is the controller's.** |
+
+### § 3 — THE REVIEW (recorded in the PR body BEFORE it opened)
+
+One independent reviewer, told to falsify. **Its findings and verdict are recorded in the PR body**, per
+the standing rule that the review pass is written down before the PR exists rather than summarised after.
+
+### § 4 — OPEN, AND WHAT IS OWED
+
+1. **THE CASE IDS ARE OWED, AND THIS BRANCH MINTS NONE.** The controller ruled mid-task that executor 2
+   has no free ids (`16.41`–`16.60` spent; `16.63`–`16.80` and `16.91`–`16.99` are exec 1's by `§16`'s
+   table). **Cycle 29 settled §17's SHAPE (`17.NNN`, uniformly 3-digit padded, ceiling 999) and did NOT
+   open it** — §16's window is not spent. **So four shipped test files carry no case id at all**, each
+   saying so in its own header, and `test-cases/` is untouched. When a block is ruled, the mint is
+   mechanical: the case text is already in the files.
+2. **AN OWED SENTENCE, NOT MINE TO WRITE.** Cycle 29 §4 owes a lane **one sentence in
+   `test-cases/16-remaining-doors.md`'s header** recording §17's shape and scoping the existing `{3}`
+   prohibition to *within* a section. I did **not** take it, deliberately: my change set touches no
+   `test-cases/` file, that promise is what keeps this branch's no-mint claim checkable, and exec 1 has a
+   `test-cases/`-touching task in flight. **It rides with the next `test-cases/` change.**
+3. **THE `@` MENTION BUTTON** — ruled or deferred; the request is filed (premise 2 above).
+4. **The replica serves NO comments.** `getTicketComments` refuses with a `ReplicaGapError`, because a
+   comment's FILES are resolved against a server table the replica does not hold and the renderer draws an
+   image as nothing — so a ledger-derived thread would draw a comment that embeds a file as one that
+   embeds none. The bodies alone are derivable; the attribution is not. **Named, not silent.**
+
+### § 5 — WHAT IS NOT COVERED, NAMED RATHER THAN IMPLIED
+
+- **No viewport run was attempted**, and the hot stack on `:3001` is exec 1's. The comment block is not in
+  the viewport suite's routes, so a run would prove nothing about it.
+- **`.editor-slot` and `.editor-slot__submit` remain UNSTYLED** — pre-existing, recorded at
+  `apps/web/e2e-viewport/type-scale.ts:355-357` with the grep. The comment box inherits it exactly as the
+  description row already does. **Not introduced here, not fixed here.**
+- **The composer's footer sentence renders as a LINE UNDER the composer** rather than inside a footer row
+  with `Attach` and `Post` as the prototype draws it: our composer is `packages/editor`'s
+  `TicketEditorSlot`, which draws its own submit control and cannot have one injected.
+- **A comment's files are chips, not inline images.** The body renders through `docToPlainText`, which
+  draws an `image` node as NOTHING — which is exactly why the chip row is load-bearing and why dropping it
+  would draw an absence as a fact.
+
+### § 6 — RULES THAT BIND THIS BRANCH (carried forward, unchanged)
+
+- **Never `docker compose`** and **never bind `:3001`**; `--maxWorkers=1`; **never `| head`**.
+- **Do not run the forced gate** — the controller does. **Do not edit `task-ledger.tsv`.**
+- **Never `AskUserQuestion`**: a question for the owner is a file plus a one-line pointer, then a hold.
+- **A mutation must be a REAL change**: both batteries refuse a pattern that matches more than once,
+  because the first `ORDER BY workspace_seq` mutation hit a **docblock's quotation** of the string and left
+  the SQL intact — a "survivor" that was a mutation which never ran.
+- **A reviewer mutates your tree.** The change set was COMMITTED before the review was dispatched, so any
+  mutation shows as a dirty tree against a known baseline.
+
+---
+
+## ▼ PREVIOUS BLOCK — **THE DELETE FILTER IS NOW HELD BY A TYPE, NOT BY CONVENTION — AND AN INDEPENDENT REVIEW REFUTED THE ENUMERATION TWICE.** (2026-09-20, cycle 25/26, task 2)
 
 ### § 0 — WHERE TO FIND IT
 
