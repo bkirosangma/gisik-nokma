@@ -3,10 +3,14 @@
 > # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~19:0x IST. **THE SHEET'S THREE MISSING SURFACES ARE
 > # BUILT, REVIEWED, FIXED, REBASED AND GREEN AT THE FOLDED TREE. PR #594 IS OPEN; IT WAS SENT BACK
 > # FOR ONE REASON — NO REVIEWER PASS RECORDED — AND THAT PASS HAS NOW RUN AND IS WRITTEN UP BELOW.**
-> Branch **`exec/sheet-surfaces`**, **rebased TWICE onto `origin/main`.** The first fold was onto
+> Branch **`exec/sheet-surfaces`**, **rebased THREE TIMES onto `origin/main`** — the controller's anchors
+> move while a lane works, so a fold is a snapshot rather than a resting state. The first fold was onto
 > `19c998e5` (`#592`/`#593`, verified docs-only here — two files under `docs/lanes/`). **The second was
 > onto `6f08452c`, AND IT CARRIED CODE:** the ticket-key round (`#595`) landed `view-types.ts`,
-> `online/mappers.ts`, `domain/prefix.ts` and a migration. One PR, `--base main`. **You do not merge.**
+> `online/mappers.ts`, `domain/prefix.ts` and a migration. **The third was onto `05c1b0f4` and was
+> docs-only again** (`docs/lanes/controller-state.md`, the controller's own cycle-24 anchor — measured
+> with THREE dots, because `A..B` lists this branch's own files as though main had changed them).
+> One PR, `--base main`. **You do not merge.**
 > **⚠ `19c998e5` IS NEWER THAN THE `e9c1a04f` THIS DISPATCH NAMES.** The controller ordered the fold so
 > that HEAD IS THE LANDING TREE and the forced gate runs at the tree that lands rather than at a
 > composite. After the rebase `rev-list --left-right --count origin/main...HEAD` reads **`0 5`**.
@@ -48,8 +52,10 @@
 > - **§2(a)'s toolbar measurement was RIGHT and is confirmed** (six commands, all present at 3.30.5).
 >
 > ## ANCHORS, RECOUNTED AT THIS TREE — **AFTER the rebase onto `19c998e5`**
-> - **gate** `pnpm turbo run build test typecheck --concurrency=1`: **EXIT=0 · 33/33 · 2m49.1s**, run at
->   the FINAL head, after BOTH folds and after the fix round. (Earlier runs, all EXIT=0: `1m37.1s` after
+> - **gate** `pnpm turbo run build test typecheck --concurrency=1`: **EXIT=0 · 33/33 · 36.5s** at the
+>   FINAL head — **32 of 33 tasks CACHED, which is the measurement that says the third fold changed no
+>   code**, and the per-package counts are byte-identical to the run before it (5,543). The fullest
+>   run was **EXIT=0 · 33/33 · 2m49.1s**, after the second fold, which DID carry code. (Earlier runs, all EXIT=0: `1m37.1s` after
 >   the first fold + fix round, `1m42.6s` after the first fold, `1m37.4s` pre-fold — **all four are this
 >   executor's evidence; the controller runs the forced gate.**)
 >   **Node `v22.22.2`** (`pnpm exec node --version` also v22.22.2 — the `pnpm` BINARY is v24's because
