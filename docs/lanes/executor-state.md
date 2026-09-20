@@ -3,9 +3,10 @@
 > # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~19:0x IST. **THE SHEET'S THREE MISSING SURFACES ARE
 > # BUILT, REVIEWED, FIXED, REBASED AND GREEN AT THE FOLDED TREE. PR #594 IS OPEN; IT WAS SENT BACK
 > # FOR ONE REASON — NO REVIEWER PASS RECORDED — AND THAT PASS HAS NOW RUN AND IS WRITTEN UP BELOW.**
-> Branch **`exec/sheet-surfaces`**, **rebased onto `origin/main` = `19c998e5`** (the `#592`/`#593`
-> merges — verified docs-only here: the four commits touch `docs/lanes/controller-state.md` and
-> `docs/lanes/owner-holds.md` and NO other file), one PR, `--base main`. **You do not merge.**
+> Branch **`exec/sheet-surfaces`**, **rebased TWICE onto `origin/main`.** The first fold was onto
+> `19c998e5` (`#592`/`#593`, verified docs-only here — two files under `docs/lanes/`). **The second was
+> onto `6f08452c`, AND IT CARRIED CODE:** the ticket-key round (`#595`) landed `view-types.ts`,
+> `online/mappers.ts`, `domain/prefix.ts` and a migration. One PR, `--base main`. **You do not merge.**
 > **⚠ `19c998e5` IS NEWER THAN THE `e9c1a04f` THIS DISPATCH NAMES.** The controller ordered the fold so
 > that HEAD IS THE LANDING TREE and the forced gate runs at the tree that lands rather than at a
 > composite. After the rebase `rev-list --left-right --count origin/main...HEAD` reads **`0 5`**.
@@ -47,21 +48,23 @@
 > - **§2(a)'s toolbar measurement was RIGHT and is confirmed** (six commands, all present at 3.30.5).
 >
 > ## ANCHORS, RECOUNTED AT THIS TREE — **AFTER the rebase onto `19c998e5`**
-> - **gate** `pnpm turbo run build test typecheck --concurrency=1`: **EXIT=0 · 33/33 · 1m37.1s**, run at
->   the FINAL head, after the rebase AND after the fix round. (Earlier runs: `1m42.6s` post-rebase,
->   `1m37.4s` pre-rebase, both EXIT=0 — **all three are this executor's evidence; the controller runs
->   the forced gate.**)
+> - **gate** `pnpm turbo run build test typecheck --concurrency=1`: **EXIT=0 · 33/33 · 2m49.1s**, run at
+>   the FINAL head, after BOTH folds and after the fix round. (Earlier runs, all EXIT=0: `1m37.1s` after
+>   the first fold + fix round, `1m42.6s` after the first fold, `1m37.4s` pre-fold — **all four are this
+>   executor's evidence; the controller runs the forced gate.**)
 >   **Node `v22.22.2`** (`pnpm exec node --version` also v22.22.2 — the `pnpm` BINARY is v24's because
 >   v22's bin dir carries no pnpm; the node it spawns is v22, which is what the gate names).
->   **server 1640 · app-core 1657 · web 598 · ui 373 · domain 525 · rule-engine 345 · editor 188 ·
->   sync-client 90 · mcp-server 44 · mobile 29 · desktop 9 — 5,498 tests.**
->   **The counts were byte-identical across the rebase** (5,496 both sides), which is the measurement
->   that says the fold moved history and nothing else; the fix round then took app-core 1655 → **1657**
->   (+2 — the Enter-commit case and the in-flight-latch case).
+>   **server 1658 · app-core 1658 · web 601 · ui 373 · domain 548 · rule-engine 345 · editor 188 ·
+>   sync-client 90 · mcp-server 44 · mobile 29 · desktop 9 — 5,543 tests** at the final head. **The
+ticket-key fold moved them** (server 1640→1658, domain 525→548, web 598→601); the docs-only fold before
+it moved nothing, which is the measurement that distinguishes a history fold from a code fold.
 >   **Every delta against the pre-round baseline is exactly what this round added:** app-core 1645 →
->   **1657** (+12), editor 178 → **188** (+10), ui 372 → **373** (+1). Nothing else moved.
-> - **`check-case-ids` UNMOVED at 2500 / 16.87** — the fix round minted no ids, and the assertion is the
->   DELTA (2497 → 2500 = +3 from the three minted cases, bold 1073 → 1076), never the word "ok".
+>   **1657** (+12 — ten from the three surfaces and two from the fix round), editor 178 → **188** (+10),
+>   ui 372 → **373** (+1). The four later counts are the FOLD's, not this branch's.
+> - **`check-case-ids` reads `2534 / 16.87`.** This branch minted `16.85`–`16.87` against a baseline of
+>   **2497 / 16.84** — **a delta asserted as exactly +3** (2497 → 2500, bold 1073 → 1076), never the word
+>   "ok" — and after BOTH folds each id still appears exactly once. The growth to 2534 is other lanes'
+>   cases arriving with the fold. **`16.88`–`16.99` remain free in exec 1's block.**
 > - **THE CITATION SWEEP, RUN LAST AND OVER THE DIFF RATHER THAN OVER MY OWN FILES.** Every `file:line`
 >   added by this branch was resolved BY CONTENT. **Five citations to `ticket-state.ts:150` were all
 >   stale — the write is at `:160`** — and four of those also named the `ticket.field_set` reduction as
