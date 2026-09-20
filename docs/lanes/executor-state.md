@@ -1,7 +1,90 @@
 # Serial executor — live state
 
-> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~19:0x IST. **THE SHEET'S THREE MISSING SURFACES ARE
-> # BUILT, REVIEWED, FIXED, REBASED AND GREEN AT THE FOLDED TREE. PR #594 IS OPEN; IT WAS SENT BACK
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~21:0x IST. **BOTH MOUNT GAPS NEED A RULING. I BUILT
+> # NOTHING AND I AM HOLDING.** Branch `exec/mount-gaps` off `origin/main` = **`db3ad3c7`** (the `#594`
+> # merge). One docs-only PR carries this record; no code, no route, no migration.
+>
+> ## ⚠ FIRST: THE BLOCK BELOW THIS ONE WAS ALREADY STALE WHEN I RELAUNCHED — `#594` IS MERGED
+> It said "PR #594 IS OPEN". **`#594` merged at `08:56Z`; `mergeCommit = db3ad3c7` = current `main`**,
+> verified `gh pr view 594 --json state,mergeCommit`. `5a590db6` (the old head) is contained in
+> `origin/main` and its TREE is byte-identical to main's (`2ef5e433` both) — so the squash landed exactly
+> the reviewed tree. This is the recorded failure mode *"the handoff that exists to survive restarts told
+> a relaunched executor to open a PR that had already merged"*, hit for the **fourth** time. **Check
+> `gh pr view --json state,mergeCommit` before acting on any "open/paused/NEXT STEP" line in this file.**
+>
+> ## THE DISPATCH: the sheet's two mount gaps. MEASURED, NOT BUILT. Ruling requested.
+> Full write-up: **`gisik-nokma-lanes/EXEC-2026-09-20-mount-gaps-measurement.md`**. Summary:
+> - **`visibility` is THREE questions, not one — and my first draft got the load-bearing half WRONG.**
+>   ⚠ **(a) The MODE is already on the wire and the CLIENT drops it.** `toTicketView`
+>   (`routes/tickets.ts:132-142`) serves `{ticket_id, workspace_id, project_id, parent_id, own_mode,
+>   resolved_mode, seq}`; `mapTicketRead` (`mappers.ts:1784`) reads `record['ticketState']` and never
+>   `record['ticket']` — its own docblock says *"the visibility row is read by nothing here"*
+>   (`mappers.ts:1769-1771`). **(b) The explicit roster is CUT by a standing disclosure ruling**
+>   (`routes/tickets.ts:111-114`: *"an explicit audience ROSTER, a disclosure no plan authorized"*) —
+>   reversing that is the owner's, not mine. **(c)** The provenance is on the ledger (`visibility.set` is
+>   a ticket event). **Rule (a) and (b) SEPARATELY — different risks.** A "no" on (b) is still a shippable
+>   state, because the absence sentence already renders.
+> - **`attachments` — the capability exists THREE times server-side. No per-ticket list route.**
+>   `listTicketAttachments` (`attachments/attachment-repo.ts:76`) is written, tested, **zero production
+>   callers**; `GET /v1/workspaces/:ws/tickets/:id/events` (`routes/tickets.ts:501-528`) serves the
+>   **complete unpaged** ledger with **no `DataSourceQuery` method**; and ⚠ **the sync bootstrap** —
+>   `BOOTSTRAP_BACKFILL_TYPES` carries `attachment.added` AND `visibility.set`
+>   (`sync/sync-routes.ts:77-83`), reachable through a real client seam, `bootstrapTicket()`
+>   (`sync-client/src/net/http-transport.ts:180`) on a package `app-core` already depends on.
+>   Only `POST /v1/attachments` and `GET /v1/attachments/:id` are attached routes — swept twice.
+> - **The obvious surface shortcut is DISHONEST and I did not take it:** deriving from the sheet's own
+>   history read (`ticket-sheet.tsx:396`) gets the **OLDEST 200 events** (`ticket-history.ts:300-307`,
+>   `ORDER BY seq ASC LIMIT`), and `AttachmentList` returns `null` on empty (`attachment-list.tsx:79-83`),
+>   so a long ticket's recent attachments — or all of them — would vanish as a **drawn absence**.
+> - Mount confirmed: **one production mount**, `page.tsx:2496`, 12 props, passing **neither** prop.
+>   `canSetVisibility` untouched per §2.
+>
+> ## THREE SELF-CORRECTIONS — one by re-reading, one by control, one ONLY by the reviewer
+> 1. **`attachmentAddedPayload` is NOT "identical" to `AttachmentListEntry`.** The upload arm's `sha256`
+>    is **required** lowercase-hex-64 in the event (`ticket-events.ts:128`) and **`string | null`** in the
+>    entry (`attachment-list.tsx:64`). The event payload is assignable to the entry and not conversely —
+>    the right direction for a derivation, but not identity. Corrected in the lane file before commit.
+> 2. **The dispatch's §1 anchor `page.tsx:2417` is NOT a moved line — it was already wrong.** The mount
+>    is at `:2496` at `db3ad3c7` **and at the controller's own `05c1b0f4`** (ancestor of `main`, exit 0;
+>    file 3085 → 3096 lines, the 11-line insertion is below the mount; negative control on the same path
+>    returns 0). "The line moved" is the benign reading and it is the wrong one — the anchor was stale
+>    when written.
+> 3. ⚠ **THE BIGGEST ONE, AND I DID NOT FIND IT — the reviewer did.** My first draft said `visibility`
+>    "needs a field on `TicketRead` because the wire doesn't carry it". **The wire carries it.** The mode
+>    is served and discarded in the client mapper. **I had written a conclusion about a serving gap from a
+>    docblock that asserts the same thing, without opening the route's allow-list or the mapper** — the
+>    recorded failure mode *"a verdict must cite a line you read"*, on the one claim where the docblock
+>    turned out to disagree with the code. The reviewer caught it because it was told to falsify.
+>
+> ## THE INDEPENDENT REVIEW — RUN BEFORE THE PR OPENED, AND IT EARNED ITS KEEP
+> One verifier agent, **told to falsify rather than confirm**, over twelve load-bearing claims, each
+> answered `CONFIRMED / REFUTED / IMPRECISE` with the `file:line` it read: **8 confirmed, 2 imprecise, 0
+> refuted, plus 6 findings I had missed** — **three of which changed this report** (the served-and-dropped
+> visibility mode, the sync-bootstrap door, the editor twin of the attachment union). I re-read each at the
+> line before adopting it.
+> ⚠ **And one of its supplementary findings I REFUTED on check** — it said *"no production code parses
+> either payload; `visibilitySetPayload` only from a docblock"*, and the server parses it at
+> `check-permission.ts:1042` and `proj-visibility.ts:281`. The narrower client-side statement is true and
+> is what the lane file keeps. **A verifier's finding is a claim like any other; only the line settles it.**
+>
+> ## RECORDED, NOT FIXED — five stale sentences, and the mechanism they share
+> `visibility-editor.tsx:94` says `view-types.ts:115` and "**five** fields" (actual `:356`, six);
+> `:97-98` says the route wraps `{ticket, parent, rollup}` (actual: seven keys, `routes/tickets.ts:489-497`);
+> `:101-102` and **`ticket-sheet.tsx:94`** say the wrapper *"carries no provenance block"* (it carries
+> `stateProvenance` and `assignedProvenance`). **Every conclusion survives; every cited reason is stale**,
+> in the direction that would make a reader doubt the gap exists. `:99-100` shows the mechanism on itself:
+> a 2026-09-20 correction fixed the *"getTicket refuses"* half of that bullet and left the other half
+> standing — **a correction that fixes one clause of a sentence certifies its neighbours by association.**
+> Owner: whoever takes Gap 1. Not touched — a docblock naming a served shape moves with that shape.
+>
+> ## ANCHORS AT THIS TREE
+> - branch `exec/mount-gaps`, cut from `origin/main` = `db3ad3c7`; working tree carries this docs change
+>   only. **No gate run this round** — nothing executable changed, and the controller runs the forced gate.
+> - The previous block's gate/anchor figures are `#594`'s and remain true of the merged tree.
+>
+> # ▣ SUPERSEDED BY THE BLOCK ABOVE — SUNDAY 2026-09-20, ~19:0x IST. **THE SHEET'S THREE MISSING SURFACES ARE
+> # BUILT, REVIEWED, FIXED, REBASED AND GREEN AT THE FOLDED TREE. PR #594 WAS OPEN (⚠ CORRECTED
+> # 2026-09-20 ~21:0x IST — IT MERGED at `08:56Z` as `db3ad3c7`); IT WAS SENT BACK
 > # FOR ONE REASON — NO REVIEWER PASS RECORDED — AND THAT PASS HAS NOW RUN AND IS WRITTEN UP BELOW.**
 > Branch **`exec/sheet-surfaces`**, **rebased THREE TIMES onto `origin/main`** — the controller's anchors
 > move while a lane works, so a fold is a snapshot rather than a resting state. The first fold was onto
