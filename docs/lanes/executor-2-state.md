@@ -32,7 +32,7 @@
 | app-core suite | **95 files, 1643 tests, all pass** (`--maxWorkers=1`) |
 | web suite | **54 files, 594 tests, all pass** (`--maxWorkers=1`) — run by the dispatched fixture agent at the final tree |
 | `pnpm turbo run typecheck` | **17/17**, web cache-missed so it was a fresh reading |
-| server suite | **157/157 files, 1636 passed / 5 skipped, all pass** — run in FIVE foreground chunks (`routes+integration+http` 33/521 · `sync+projections+read+permissions+visibility` 36/347 · `auth+attachments+ops+mcp+tools+tooling` 34/254+5 skipped · `seed+dual-client+notifications+notification-preferences+gates+stream+alerts+auto-close` 26/266 · `ci+deploy+docs+helpers` plus the 23 root files 28/248). **33+36+34+26+28 = 157, the exact file count**, so nothing was left out |
+| server suite | **157/157 files, 1644 passed / 5 skipped, all pass** (re-run after the fix round; the earlier run in the same five-chunk shape was 1636) — run in FIVE foreground chunks (`routes+integration+http` 33/521 · `sync+projections+read+permissions+visibility` 36/347 · `auth+attachments+ops+mcp+tools+tooling` 34/254+5 skipped · `seed+dual-client+notifications+notification-preferences+gates+stream+alerts+auto-close` 26/266 · `ci+deploy+docs+helpers` plus the 23 root files 28/248). **33+36+34+26+28 = 157, the exact file count**, so nothing was left out |
 
 ⚠ **THE FORCED GATE IS THE CONTROLLER'S.** Everything above is my own build/typecheck/test.
 
@@ -84,7 +84,7 @@ and **I did not run `docker compose`** (the rule for this lane). The column land
 
 ### § 5 — WHAT SHIPS, WHAT DOES NOT, AND THE ONE SENTENCE I REFUSED TO WRITE
 
-**Ships:** the two payload fields; the nullable `proj_projects.prefix` column and its migration; the
+**Ships:** the two payload fields; an OPTIONAL `Prefix` box on BOTH founding forms (`/workspaces` and `/w/<id>`), upper-casing as the owner types; the nullable `proj_projects.prefix` column and its migration; the
 projection writing it; the derivation and the two-pass resolver; the workspace identity fold (name and
 prefix from ONE query, opposite ends of the same `workspace_seq` order); `ticketNumbers`/`ticketNumber`;
 the directory's `WorkspaceRef.prefix` and `ProjectRef.prefix`; `POST /v1/workspaces` taking a `prefix`;
@@ -146,6 +146,45 @@ distinguished" — earned its keep twice in one sweep.**
   the name already was. Owner: whoever grows a workspace projection.
 - **The dev database has no `prefix` column until the next container rebuild.** Owner: the controller's
   next `pnpm dev:stack:rebuild`.
+
+### § 7b — THE REVIEW ROUND, AND WHAT IT FOUND (2026-09-20)
+
+An independent reviewer ran against `6afa490e`'s parent: **four Important defects and two Minor**, all now
+fixed. **Three of the four were in MY OWN reasoning, and every one of them was a case that PASSED while the
+property it was named for was false.**
+
+| # | what it was | the case that could not see it |
+|---|---|---|
+| 1 | **A rename moved the DERIVED prefix** — `CC`→`CE` on renaming `Convenience Corner`, rewriting every ticket key in the workspace under readers who had quoted them. Reachable on EVERY workspace in the ledger, since none carries a stored prefix. | 13.1012 is named for exactly this and passed, because its fixture stores `XY` and never enters the derived branch. |
+| 2 | **A re-delivered `project.created` was refused by its OWN prefix** — `project.prefix-taken` where the ledger answers `duplicate-event-id`, on `POST /v1/events` and `/v1/sync`. | every other case uses a FRESH project id. |
+| 3 | **The suffix loop produced illegal prefixes** (`S10`, `100`, `S1000`) while its docblock claimed a fallback it did not have. Found by me AND the reviewer. | unreachable at scale; the CLAIM is what mattered. |
+| 4 | **The ENTRY half was unreachable** — neither founding form had a prefix box. | no test drove `POST /v1/workspaces` with a prefix at all. |
+
+Fixes: the derivation reads the FOUNDING name (immutable, because `events` refuses UPDATE);
+`projectPrefixesInWorkspace` returns a **Map keyed by project id** so the gate can ask "held by somebody
+ELSE"; a total `collisionCandidates` generator replaces the loop and THROWS rather than emitting an illegal
+prefix; and both founding forms gained an optional `Prefix` box that **upper-cases as the owner types**
+(`prefixSchema` refuses lower case rather than normalising it — a docblock already claimed the forms did
+this, and they did not).
+
+**Cases 13.1027–13.1033 are the witnesses.** 13.1027 is mutation-witnessed: reverting to
+`derivePrefix(named)` reddens it and nothing else (1 failed / 10 passed).
+
+⚠ **THE LESSON, and it is the one already recorded on this machine: a check's NAME is not its instrument.**
+13.1012 was named for rename-immutability and exercised the stored branch; the docblock named a fallback no
+code had; `checkProjectPrefixUnique` asked a subtly different question than its name says. **A mutation
+sweep did not catch any of them**, because I mutated the code and the cases were green for reasons
+unrelated to their names.
+
+⚠ **AND THE FIX WAS BRIEFLY LOST.** Reverting a mutation with `git checkout --` reverted to HEAD, not to the
+working tree, so an UNCOMMITTED fix was destroyed silently and `git status` read clean. The checksum taken
+before the mutation is the only reason it was noticed. **Commit the fix BEFORE mutating it** — the rule was
+already written down and I broke it anyway.
+
+⚠ **`check-case-ids` caught me TWICE in this change set, both times by the same tell: the delta was smaller
+than what was added.** The guard matches an id only at the START of a bullet, so `13.1019`/`13.1020` written
+as one sentence, and later `13.1030–13.1033`, each left ids invisible while the suites counted them.
+**The delta now equals the minted count exactly: 2523 − 2496 = 27, then 2530 − 2496 = 34.**
 
 ### § 8 — OPEN RULINGS: NONE.
 

@@ -2128,3 +2128,54 @@ failed to run: one of them refused to run at first and the refusal is recorded b
   property witnessed by a REAL scheduled race rather than asserted in prose: the lock is what makes the
   numbers unique, and the constraint is the backstop that turns a lost lock into a loud failure instead
   of two tickets sharing a key.
+
+### The review round, and what it found that my own tests could not
+
+An independent reviewer ran at `6afa490e`'s parent and found four Important defects and two Minor ones.
+**Three of the four Important defects were in the AUTHOR'S OWN reasoning**, and the pattern is worth
+naming: each was a case that PASSED while the property it was named for was false.
+
+- **13.1027 — a rename moved the DERIVED prefix.** `workspaceIdentityFromLedger` derived from the LAST
+  naming event's name, so renaming `Convenience Corner` to `Corner Emporium` moved `CC` to `CE` and
+  rewrote every ticket key in the workspace under readers who had quoted them — the exact thing this
+  module's docblock says a key may not do. **Reachable on EVERY workspace in the ledger**, since no
+  workspace carries a stored prefix and every one of them therefore took the derived branch. 13.1012 is
+  the case written for this property and it PASSED, because its fixture stores `XY` and so never enters
+  the derived branch at all: *a case named for a property, exercising the other branch.* The fix reads the
+  FOUNDING name, which is immutable for the same reason the prefix is — `events` refuses UPDATE. Mutation:
+  reverting to `derivePrefix(named)` reddens 13.1027 and nothing else (1 failed / 10 passed).
+- **13.1028 — a project's OWN `project.created`, re-delivered, was refused** with `project.prefix-taken`
+  instead of the ledger's `duplicate-event-id`, because `projectPrefixesInWorkspace` resolves the project
+  the event names and its row already exists. The gate runs before `insertEvent`, so the idempotent path
+  was unreachable for any prefixed project — on `POST /v1/events` and on `POST /v1/sync`, where a retry is
+  how a client recovers from a lost response. No case here could have seen it: **every other case uses a
+  FRESH project id.** The reader now returns a Map keyed by project id, because "is this value held by
+  somebody ELSE" is the question the gate actually has and a Set cannot ask it. The case carries its own
+  control — a DIFFERENT project asking for the same prefix is still refused.
+- **13.1029 — the suffix loop produced illegal prefixes.** Found independently by the author and the
+  reviewer. Measured: twelve same-base projects gave `S10`, a hundred gave `100` (a digit where a letter
+  belongs), a thousand gave `S1000`, four characters where the maximum is three. The docblock claimed a
+  "next free single letter" fallback the code never had. Unreachable at product scale; **the claim is what
+  made it worth fixing.**
+- **13.1030 — the ENTRY half was unreachable.** The spec says the prefix is *entered at creation*, and
+  neither founding form had a box: `FoundingGateway` posted `{ name }` only and `foundingSeeds` built
+  `project.created` with no prefix. Both forms now carry an optional `Prefix` input.
+- **13.1031** ✅ The **new-project form** authors the prefix: typing `so` produces
+  `project.created` with `prefix: 'SO'` — upper-cased at the keyboard, because `prefixSchema`
+  REFUSES lower case rather than normalising it. A second submission with the box left untouched sends
+  NO `prefix` key at all.
+- **13.1032** ✅ The **new-workspace form** passes the prefix through `foundWorkspace(name, prefix)`,
+  upper-cased the same way.
+- **13.1033** ✅ An **untouched** prefix box passes `undefined` and never `''` — asserted on the argument
+  reaching the gateway, since `''` would arrive at the door as a present-but-wrong value rather than as
+  "nobody entered one".
+
+  ⚠ **These four bullets exist as four LINES for a measured reason.** They were written as one bullet
+  reading `13.1030–13.1033`, and `check-case-ids` matches an id only at the START of a bullet — so the
+  count moved by 4 for 7 minted ids, and this is the SECOND time in this change set that spelling cost a
+  count. Both times the tell was the same: **the delta was smaller than what was added.**
+
+**The lesson these share, and it is the one already recorded on this machine: a check's NAME is not its
+instrument.** 13.1012 was named for rename-immutability and exercised the stored branch; the docblock named
+a fallback the loop did not have; the gate was named `checkProjectPrefixUnique` and asked a subtly different
+question. All three read as green.
