@@ -101,6 +101,21 @@ let COMMENT_ONE_SERVER_TIME = '';
 
 /** An image ON `TICKET`, embedded by one comment's own document. */
 const PROOF_ID = newUlid();
+/**
+ * A stored filename `sanitizeFilename` CHANGES, embedded by its own comment.
+ *
+ * ⚠ **THIS FIXTURE EXISTS BECAUSE A REVIEWER MEASURED THAT NOTHING NEEDED IT
+ * TO.** Replacing the route's `sanitizeFilename(file.filename)` with the raw
+ * `file.filename` reddened nothing — 6/6 route cases green and the whole server
+ * suite green — because the only name any case reached was `gst-receipt.png`,
+ * which the sanitizer passes through unchanged. The sibling attachments route
+ * carries exactly this case (`ticket-attachments.test.ts:332` over its `:77`),
+ * so the new route had the docblock without the witness.
+ */
+const UNSAFE_ID = newUlid();
+const UNSAFE_FILENAME = 'bad"name.png';
+/** The name the route must serve for it — `"` is stripped, and nothing else is. */
+const UNSAFE_SERVED = 'badname.png';
 /** An image ON `SIBLING`, named by a comment filed against `TICKET`. */
 const CROSS_TICKET_ID = newUlid();
 /** An id named by a comment's document that resolves NOWHERE. */
@@ -109,6 +124,8 @@ const GHOST_IMAGE_ID = newUlid();
 const COMMENT_ONE = newUlid();
 const COMMENT_TWO = newUlid();
 const COMMENT_WITH_FILE = newUlid();
+/** Embeds the file whose stored NAME is unsafe. Posted second, like its sibling. */
+const COMMENT_WITH_UNSAFE_FILE = newUlid();
 /** Written straight into the projection — the door refuses this shape. */
 const COMMENT_GHOST_FILE = newUlid();
 const COMMENT_CROSS_TICKET = newUlid();
@@ -345,6 +362,7 @@ beforeAll(async () => {
   // one ticket away in the same workspace, the id a read without a ticket
   // predicate would happily resolve.
   await attach(PROOF_ID, WS, TICKET, 'gst-receipt.png');
+  await attach(UNSAFE_ID, WS, TICKET, UNSAFE_FILENAME);
   await attach(CROSS_TICKET_ID, WS, SIBLING, 'other-tickets-file.png');
 
   // Three comments on TICKET, in this order, then one on the sibling.
@@ -364,6 +382,7 @@ beforeAll(async () => {
   );
   COMMENT_ONE_SERVER_TIME = claimedAt.serverTime;
   await postComment(COMMENT_WITH_FILE, WS, TICKET, docWithImage('Evidence attached.', PROOF_ID), memberToken, memberUserId);
+  await postComment(COMMENT_WITH_UNSAFE_FILE, WS, TICKET, docWithImage('A badly named file.', UNSAFE_ID), memberToken, memberUserId);
   await postComment(COMMENT_TWO, WS, TICKET, doc('Confirmed — it is the proxy header.'), memberToken, memberUserId);
   await postComment(COMMENT_ON_SIBLING, WS, SIBLING, doc('A comment on the other ticket.'), memberToken, memberUserId);
 
@@ -425,6 +444,7 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId/comments', () => {
     expect(comments.map((c) => c.commentId)).toEqual([
       COMMENT_ONE,
       COMMENT_WITH_FILE,
+      COMMENT_WITH_UNSAFE_FILE,
       COMMENT_TWO,
       COMMENT_GHOST_FILE,
       COMMENT_CROSS_TICKET,
@@ -478,6 +498,14 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId/comments', () => {
 
     expect(byId.get(COMMENT_WITH_FILE)?.files).toEqual([
       { attachmentId: PROOF_ID, filename: 'gst-receipt.png', mime: 'image/png' },
+    ]);
+    // ⚠ THE SANITIZER, WITNESSED. The name above is one `sanitizeFilename`
+    // passes through UNCHANGED, so it cannot tell the call from its absence —
+    // measured by a reviewer: replacing the call with the raw name reddened
+    // nothing. This is the fixture that does, and it is the same shape the
+    // sibling attachments route already had (`ticket-attachments.test.ts:332`).
+    expect(byId.get(COMMENT_WITH_UNSAFE_FILE)?.files).toEqual([
+      { attachmentId: UNSAFE_ID, filename: UNSAFE_SERVED, mime: 'image/png' },
     ]);
     // The control for the fallback below: a real name IS resolved, so the
     // id-only case is about an unresolvable id and not about a broken lookup.

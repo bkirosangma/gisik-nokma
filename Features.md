@@ -1490,7 +1490,7 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   name an attachment id: the `attachments` table row, and a ledger `attachment.added` event
   (`payload->>'attachmentId'`, the same shape `evidence-gate.ts` already reads). The union is deliberate and
   the more conservative of the two possible readings — **the web client does not currently post the ledger
-  event at all**, so treating it as the only survival signal would flag nearly every live attachment as an
+  event at all** — ⚠ **CORRECTED 2026-09-21: this is no longer true, and this change set is what made it false.** The comment composer now posts `attachment.added` when an upload is attached to a comment (`TicketSheet.emitAttachmentAdded`, `packages/app-core/src/views/ticket-sheet.tsx`), so the event IS produced — though only on that one path, and the union below is still the right design for the reason it gives**, so treating it as the only survival signal would flag nearly every live attachment as an
   orphan, while treating the table row as the only signal risks the opposite the day some other path
   registers an attachment through the ledger alone. Keys are only ever considered if they have the exact
   shape `w/<workspaceId>/a/<id>`; anything else — including a torn-write `.tmp-<pid>-<ms>` leftover, which

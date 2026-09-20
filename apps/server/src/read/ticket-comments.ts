@@ -16,11 +16,19 @@ import type { Queryable } from '../db/queryable.js';
  *    (or the drive-reference arm) — it names the ticket it belongs to through
  *    its ENTITY, and no comment.
  *  - `attachments` is `(id, workspace_id, ticket_id, uploader_id, filename,
- *    mime, size, object_key, sha256, created_at)`
- *    (`apps/server/migrations/1788356858695_attachments.sql:3-13`) — there is
- *    no `comment_id` column. `grep -rn 'comment_id\|commentId'` over
- *    `apps/server/src`, `packages/domain/src` and `packages/app-core/src`
- *    returns nothing.
+ *    mime, size, object_key, created_at)` — **there is no `comment_id` column**.
+ *    ⚠ **THE COLUMN LIST SPANS TWO MIGRATIONS, and citing one was wrong until a
+ *    reviewer caught it**: `1788356858695_attachments.sql:3-13` declares NINE
+ *    columns and no `sha256`; `sha256` arrives in
+ *    `1788362657940_attachment-sha256.sql`. A citation that resolves is not a
+ *    citation that is right.
+ *
+ *    **And the sweep is stated so that it is reproducible against THIS tree.** It
+ *    read *"`grep -rn 'comment_id\|commentId'` … returns nothing"*, which is
+ *    false of the tree the sentence lives in — this change set's own files are
+ *    full of `commentId`. What was MEASURED is that **nothing PRE-EXISTED**: at
+ *    the branch's cut point the sweep returned nothing outside the new files, and
+ *    the `attachments` CREATE TABLE has never had such a column.
  *
  * So an `attachment.added` event CANNOT be attributed to the comment that was
  * on screen when the file was chosen, and rendering the ticket's files under a

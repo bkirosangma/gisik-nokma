@@ -185,9 +185,19 @@ export function CommentsThread({
         <div className="gn-comments__composer">
           {composer}
           {/*
-            The prototype's footer sentence (`desktop.dc.html:1329`), verbatim.
-            ⚠ It renders as a LINE UNDER the composer rather than inside a footer
-            row with `Attach` and `Post`, because our composer is
+            The prototype's footer sentence (`desktop.dc.html:1329`), in its
+            ONLINE arm: the element renders `{{ cmtHint }}`, defined at `:3717` as
+            `s.online ? "Posting records an event citing you." : "Offline — the
+            comment queues until this device reconnects."` ⚠ **An earlier version
+            of this comment said "verbatim", which was wrong — one arm of a
+            conditional is transcribed, not the sentence.** The offline arm is
+            deliberately NOT transcribed: an online-only client reaching it would
+            be promising a queue it does not have, which is the same reason
+            `PlainTextEditorSlot` says a build without an editor cannot write
+            rather than offering a control that discards what is typed.
+
+            ⚠ And it renders as a LINE UNDER the composer rather than inside a
+            footer row with `Attach` and `Post`, because our composer is
             `packages/editor`'s `TicketEditorSlot`, which draws its own submit
             control and cannot have one injected into its markup. A deviation
             from the drawing, flagged rather than hidden.

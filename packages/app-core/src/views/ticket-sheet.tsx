@@ -2215,6 +2215,23 @@ export function TicketSheet({
             one cannot. So the box appears exactly when something can write to
             it, and a build with no editor shows the thread and no box — the
             absence named by the shape of the screen rather than by a lie.
+
+            ⚠ **AND THE BOX STAYS WHEN THE THREAD READ FAILED — a deliberate
+            choice, raised by an independent reviewer and stated here rather than
+            left to look accidental.** The two are different questions: the read
+            asks *what has been said*, the composer asks *can I say something*,
+            and a failed read does not answer the second. A comment is a WRITE
+            through `POST /v1/events`, a door that does not consult this read at
+            all — so hiding the box would withhold a working affordance because
+            an unrelated one is broken. If the write is refused, the refusal
+            lands in the sheet's own refusal slot, in the server's words.
+
+            **What that costs, named:** on a 404 — an invisible or deleted
+            ticket — the box is offered and the post will be refused. The
+            alternative was measured and rejected the other way: gating the box
+            on `comments.error` would hide a working control every time a
+            transient read failed, which is the more common case and the more
+            expensive mistake.
           */}
           <CommentsThread
             comments={comments.data ?? []}

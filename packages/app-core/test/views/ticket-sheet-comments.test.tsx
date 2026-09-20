@@ -22,9 +22,17 @@ import type { TicketComment } from '../../src/views/comments-thread.js';
  * ## The three things this file exists to pin, none of which the renderer's own
  * ## suite can see
  *
- *  1. **The sheet READS the thread and reloads it after a post.** `read` and
- *     `history` are reloaded too, and a comment changes neither head state nor
- *     the description — posting is where that wiring is either right or wrong.
+ *  1. **The sheet READS the thread and RELOADS THE THREAD after a post.**
+ *     `history` is reloaded too. **`read` is deliberately NOT** — a comment
+ *     changes no head state, so that reload could not return a different answer
+ *     (`ticket-sheet.tsx`'s `submitComment` carries the argument). ⚠ **CORRECTED
+ *     2026-09-21 BY AN INDEPENDENT REVIEWER: this read *"`read` and `history` are
+ *     reloaded too"*, which contradicted the implementation docblock in the same
+ *     change set — two halves of one change describing different code, with the
+ *     test half being the wrong one.** And the reload is now PINNED rather than
+ *     described: the reviewer measured that commenting out `comments.reload()`
+ *     left all 107 tests in the three comment suites green, so the case below
+ *     counts the reads instead.
  *  2. **No composer without a real editor.** `EditorSlot` falls back to
  *     `PlainTextEditorSlot`, which cannot compose; a comment box drawn from it
  *     would be a composer-shaped thing with no control in it. This is asserted
@@ -256,6 +264,37 @@ describe('TicketSheet — the comment thread and its box', () => {
     // editor reports it through `onError`, which the sheet draws.
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(/no/);
+  });
+
+  it('RELOADS the thread after a post, so the author sees their own comment', async () => {
+    // ⚠ THIS CASE EXISTS BECAUSE A REVIEWER MEASURED THAT NOTHING PINNED IT:
+    // with `comments.reload()` commented out, all 107 tests across the three
+    // comment suites stayed green. The reload is not decoration — the sheet owns
+    // the thread read (unlike `attachments`, which the page owns), so a write
+    // that did not reload it would show the author a thread without their own
+    // comment until something else happened to refetch.
+    //
+    // Counted rather than inferred: the fake answers a constant fixture, so
+    // "the thread still renders" cannot distinguish a refetch from no refetch.
+    let reads = 0;
+    const sheetSource = renderSheet(
+      source({
+        getTicketComments: async () => {
+          reads += 1;
+          return [COMMENT];
+        },
+      }),
+      { editorSlot: fakeEditorSlot({ modes: [] }) },
+    );
+    const section = await screen.findByTestId('sheet-comments');
+    await waitFor(() => expect(reads).toBeGreaterThan(0));
+    const before = reads;
+
+    const user = userEvent.setup();
+    await user.click(within(section).getByRole('button', { name: 'Post' }));
+
+    await waitFor(() => expect(sheetSource.ingested).toHaveLength(1));
+    await waitFor(() => expect(reads).toBeGreaterThan(before));
   });
 
   it('draws a FAILED thread read as a sentence, not as "No comments yet."', async () => {
