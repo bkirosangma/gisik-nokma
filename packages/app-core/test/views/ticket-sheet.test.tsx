@@ -1840,7 +1840,7 @@ describe('F — the subtasks section', () => {
  * right about a payload this client built wrong.
  *
  * **The ladder below is the owner's own**, read from the dev database on
- * 2026-09-20 (`proj_ticket_types`, workspace `0TZSS5W6ATCTCF2YBPMWGGP9JF5`):
+ * 2026-09-20 (`proj_ticket_types`, workspace `0TZSS5W6ATCTF2YBPMWGGP9JF5`):
  * `errand` and `task` BOTH sit at rank 3, and `sub-task` at 4. So `errand` is a
  * WORKSPACE-DEFINED type sharing a built-in's rank, and it is the case a fix
  * hard-coded to `BUILTIN_TICKET_TYPE_SEEDS` gets wrong — it would agree with a

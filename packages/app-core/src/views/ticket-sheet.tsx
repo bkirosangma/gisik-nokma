@@ -1169,15 +1169,15 @@ export function TicketSheet({
    * `Features.md:88`'s rule for the New-ticket control, *"asks before it
    * offers"*.
    *
-   * **Three states, not two, and the third is the one that matters.** "No type
-   * is deeper" and "the ladder has not been read" are different facts, and
-   * rendering the first for the second asserts an absence this client has not
-   * measured — the same rule, one notch quieter: the dialog *"is TOLD the
-   * parent list is unavailable rather than handed an empty one"*. So an UNREAD
-   * ladder offers nothing and claims nothing; an unreadable ladder and an
-   * unknown type each get their own sentence; only a READ ladder with a legal
-   * child draws the form. A disabled control is never one of the answers — it
-   * still asserts the action exists.
+   * **Three ladder states, but FIVE render outcomes, and the extra ones are
+   * the point.** "No type is deeper" and "the ladder has not been read" are
+   * different facts, and rendering the first for the second asserts an absence
+   * this client has not measured — the same rule, one notch quieter: the dialog
+   * *"is TOLD the parent list is unavailable rather than handed an empty one"*.
+   * So an UNREAD ladder renders NOTHING and claims nothing; a ladder read but
+   * unusable — the read FAILED, this ticket's type is ABSENT from it, or no
+   * type is deeper — renders its own sentence for each; a READ ladder with a
+   * legal child draws the form. A disabled control is never one of the answers.
    *
    * ⚠ **The ladder is read OVER THE WIRE (`getTicketTypes`), not off
    * `ClientStateCache` — and that is the difference between this and

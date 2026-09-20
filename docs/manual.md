@@ -515,7 +515,8 @@ under the job you are looking at, and otherwise the nearest kind below that job 
 types allows. That is the same rank rule as above — a child's rank has to be strictly bigger than its
 parent's — read against *your* types rather than the built-in ones, so a kind you defined yourself is
 weighed exactly as the standard ones are. Two jobs at the same rank cannot nest, which is why an
-**Errand** gets a **Sub-task** and never another Errand.
+**Errand cannot take another Errand** — and in the ladder this project ships, the kind below it is a
+**Sub-task**.
 
 **Where nothing at all is smaller, the row is not drawn.** You get a sentence instead — *"This is a
 Sub-task — nothing smaller can sit under it."* — rather than a box and a button that could only end in

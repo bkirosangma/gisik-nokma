@@ -2497,11 +2497,11 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "Errand"
+                    "text": "Errand cannot take another Errand"
                   },
                   {
                     "kind": "text",
-                    "text": " gets a "
+                    "text": " — and in the ladder this project ships, the kind below it is a "
                   },
                   {
                     "kind": "bold",
@@ -2509,7 +2509,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " and never another Errand."
+                    "text": "."
                   }
                 ]
               },
