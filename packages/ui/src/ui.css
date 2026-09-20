@@ -1820,6 +1820,232 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-ticket-sheet__history-empty { color: var(--gn-text-muted); margin: 0; }
 .gn-ticket-sheet__history-partial { color: var(--gn-text-muted); font-size: 0.8rem; margin: 0.6rem 0 0; }
 
+/* ══ The ticket sheet's `Visibility` section — "Who can see this" (spec §6) ══
+
+   THE AUTHORITY IS THE PROTOTYPE'S ROW, and the row is transcribed rather than
+   re-designed: `design-system/interactive/desktop.dc.html`, the `>Visibility</dt>`
+   at `:1207`, its `<dd>` at `:1208`, the control at `:1209` (`visBtnStyle` /
+   `visDotStyle` / `visLabel`, defined `:3781`-`:3786`), the note at `:1210`
+   (`visNote`), the uppercase eyebrow "Who can see it" at `:1213`. Resolved BY
+   CONTENT — the numbers move.
+
+   ⛔ WHAT IS TRANSCRIBED AND WHAT IS DELIBERATELY NOT. The prototype draws a
+   CHIP PER VIEWER (the `×` button, `:1214`-`:1224`), an "Add someone who can see
+   it…" `<select>` over `viewerCandidates` (`:1225`-`:1229`) and a closing guest
+   note (`:1230`). The owner's standing ruling on `visibility` is **(a) BUILD,
+   (b) KEEP THE RULING**, and (b) keeps the explicit audience ROSTER cut:
+   `apps/server/src/routes/tickets.ts:115-118` refuses to serve `own_user_ids` /
+   `resolved_user_ids` — *"an explicit audience ROSTER, a disclosure no plan
+   authorized."* **So three of the row's parts have no data behind them and are
+   NOT BUILT — a picker over an empty set is the same defect as a form that can
+   only be refused.** What survives (b) is what is styled here: the control's
+   dot-and-label treatment, the note, the eyebrow, and the column geometry.
+
+   ⚠ THE 12px IS THE PROTOTYPE'S OWN OUTLIER, MEASURED RATHER THAN INHERITED —
+   AND THE MEASUREMENT IS NARROWER THAN THE FIRST DRAFT OF THIS COMMENT CLAIMED.
+   That draft read: *"This row is the ONLY place in `desktop.dc.html` with a
+   12px/16px uppercase eyebrow."* **False, and a reviewer falsified it: 61 other
+   lines in that file carry `12px/16px`** (a weekday header at `:497` and many
+   others), so "the only 12px" is wrong by a factor of sixty. The claim that IS
+   measured, and the one this rule rests on: **of the 13 lines in the file
+   carrying `letter-spacing:0.6px` — the eyebrow constant — twelve are
+   `13px/18px` and exactly one, `:1213` (this row), is `12px/16px`.** Verified
+   by enumerating the pattern, not by sampling it.
+
+   The row's own secondary text is consistently 12px/16px — its `visNote`
+   (`:1210`) and its closing note (`:1230`) — so this is the row's scale, not a
+   slip. ⚠ **That consistency is the ROW'S SECONDARY TEXT and nothing more; the
+   same row also draws a 13px/18px chip (`:1216`), a 15px `<select>` (`:1224`)
+   and a 15px `<dt>` (`rowLabelB`, `:3755`).** The narrower statement is the
+   true one and it is the one carried.
+
+   It is carried deliberately, and the 1px difference from `.gn-comments__heading`
+   BELOW (which transcribed the 13px/18px constant) is the prototype's
+   divergence rather than an invention here. **A future reader who "harmonises"
+   the two is deleting the authority's own row scale, which is why the number is
+   pinned by a test.**
+
+   NO `[data-style]` FORK, deliberately: **no colour literal appears below** —
+   every colour resolves through a `--gn-*` token, so all three styles are served
+   by this ONE unconditional block, the same property case 16.83 asserts for
+   `.ticket-type-list__move`. (The lengths, radii and `999px` below are plain
+   CSS values, not tokens — that has always been this file's convention and is
+   not what the no-fork property rests on.) */
+.gn-visibility {
+  /* The prototype's `rowValueB` (`:3756`) is the right-aligned value column:
+     `display:flex; flex-direction:column; gap:4px; align-items:flex-end`.
+     ⚠ THIS READ *"It is taken WHOLE, `gap` included"*, WHICH OVERCLAIMS AND IS
+     CORRECTED RATHER THAN LEFT: `rowValueB` carries nine declarations and four
+     are taken. The four taken ARE taken exactly (`gap: 0.25rem` = its 4px), but
+     `margin: 0` becomes `margin-top: 0.8rem`, and its `background:var(--fill4)`
+     + `border-radius:0 8px 8px 0` are deliberately NOT taken — this is a
+     standalone `<section>` in the sheet body, not a `<dd>` inside the sheet's
+     `<dl>` with a label cell beside it, which is the structural divergence the
+     lane doc's § 2.1 records. **`text-align: right` is likewise NOT inherited
+     by the sentences below it** — only `.gn-visibility__standing` sets it, so
+     the owner note and the absence sentences wrap left-ragged where the
+     prototype's note inherits right-alignment. Named rather than fixed: jsdom
+     computes no cascade, so no test in this repo can see the difference. */
+  margin-top: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: flex-end;
+}
+.gn-visibility__heading {
+  font-size: 0.75rem; /* 12px — this row's own scale; see the block comment */
+  line-height: 1rem;
+  margin: 0;
+  color: var(--gn-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+/* The standing audience, and it is the product's counterpart of the prototype's
+   control (`visBtnStyle`, `:3786`): a pill carrying a dot and a label. It is
+   styled as ONE and is deliberately NOT a `<button>` — in this product it is a
+   DISPLAY, and the control that changes the audience is the radio group below.
+   A pill that looked pressable and did nothing would be a control that cannot
+   act, which is the defect `AttachmentList`'s null-on-empty docblock and case
+   16.83 both refuse. */
+.gn-visibility__standing {
+  margin: 0;
+  text-align: right;
+  color: var(--gn-text-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  text-wrap: pretty;
+}
+/* ⚠ TWO COMMENTS NAMED DIFFERENT ELEMENTS AS "THE PROTOTYPE'S CONTROL", AND A
+   REVIEWER CAUGHT THE DISAGREEMENT RATHER THAN THE AUTHOR. `visBtnStyle`
+   (`:3786`) belongs to the PILL — that is the element it styles — and it
+   carries `align-self:flex-start` (LEFT, inside a right-aligned column). The
+   comment on `.gn-visibility__controls` above attaches *"the prototype's own
+   `align-self:flex-start`"* to the FORM WRAPPER, which is not the element that
+   property was transcribed from.
+
+   BOTH STATEMENTS ARE NOW TRUE, AND THE SECOND IS A MOVE RATHER THAN A
+   TRANSCRIPTION: the opt-out is applied to the control BLOCK because this
+   product's control is the radio fieldset, not a button — so the wrapper is
+   where "the controls sit left" has to live. The pill keeps the prototype's
+   fill, radius, height and weight and does NOT take its `align-self`, so it
+   sits at the right edge of the column, which is where a right-aligned value
+   column's own readout belongs. A reader auditing this against the prototype
+   would otherwise "restore" `align-self:flex-start` to the pill and break the
+   alignment this block exists to assert.
+
+   ⚠ AND THE TINTED FILL IS NOT TRANSCRIBED, for a reason that lives elsewhere
+   and is named here so the omission does not read as an oversight: the
+   prototype paints the restricted pill `--tintPurple`/`--purple` and the open
+   one `--tintSuccess`/`--success`. **This product has no tint role for either**
+   — `tokens.ts` records that the export's `--tintDanger`/`--tintPink`/
+   `--tintPurple`/`--tintSuccess` washes were deliberately not ported, and
+   `tintWarning` is the only wash that exists. Inventing a purple wash to match
+   a prototype would be adding a token on a styling task's authority, so the
+   pill takes a neutral fill and the TONE is carried by the dot alone. */
+.gn-visibility__standing-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.25rem; /* 36px — the prototype's own `visBtnStyle` */
+  padding: 0 0.8125rem;
+  border-radius: 999px;
+  background: var(--gn-fill-quaternary);
+  color: var(--gn-text);
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 600;
+}
+/* The dot. `aria-hidden` on the element (see the component): the label beside it
+   states the same fact in words, so the dot is decorative and 1.4.11's
+   "convey information" obligation is met by the text.
+   ⚠ NAMED RATHER THAN IMPLIED: no `CONTRAST_PAIRS` row covers a dot on
+   `--gn-fill-quaternary`, so this pair is NOT contrast-proven. The nearest
+   declared row is `customMarker` on `surface` (4.5), and `restricted` shares
+   `customMarker`'s primitives — that is a neighbouring guarantee, not this one.
+   Recorded so a later reader does not read the token choice as a measurement. */
+.gn-visibility__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  flex: none;
+  background: var(--gn-success);
+}
+.gn-visibility__standing-mode--restricted .gn-visibility__dot { background: var(--gn-restricted); }
+/* The notes. `visNote` (`:3782`) is the prototype's, and `text-wrap:pretty` is
+   the prototype's own declaration on the same line. */
+.gn-visibility__owner-note,
+.gn-visibility__unserved,
+.gn-visibility__read-only {
+  margin: 0;
+  color: var(--gn-text-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  text-wrap: pretty;
+}
+/* The whole control block, and it OPTS OUT to the left with the prototype's own
+   `align-self:flex-start` (`visBtnStyle`, `:3786`) — the one part of this row
+   that is not right-aligned, in the authority itself. A form that right-aligned
+   its own radio labels would be a transcription nobody could read. */
+.gn-visibility__controls {
+  align-self: flex-start;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 100%;
+}
+/* The UA fieldset box, reset for the reason `.gn-filters__section` states at
+   `:4804` — a border and an inset padding neither the spec nor this row's
+   metrics ask for. That comment names THIS selector as one it assumed would
+   "inherit a house rule already"; there is no such rule, which is why the reset
+   is written here rather than inherited. */
+.gn-visibility__modes,
+.gn-visibility__people {
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.gn-visibility__modes > legend,
+.gn-visibility__people > legend {
+  padding: 0;
+  color: var(--gn-text-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+.gn-visibility__mode,
+.gn-visibility__person { display: inline-flex; align-items: center; gap: 0.5rem; }
+.gn-visibility__no-roster {
+  margin: 0;
+  color: var(--gn-text-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  text-wrap: pretty;
+}
+/* The self-lockout warning is the product's own affordance — the prototype's
+   binary toggle cannot express "you are about to remove yourself", so there is
+   nothing here to transcribe. It therefore borrows the repo's ONE warning
+   recipe rather than inventing a second: `.gn-refusal--preview`'s exact
+   declarations (fill + an inset tone rule + `--gn-text`), which is how every
+   other warning and refusal in this file is drawn since ruling R1(c) removed
+   the hairline. Tone on the rule, legibility on the text. */
+.gn-visibility__lockout,
+.gn-visibility__refusal {
+  align-self: flex-start;
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-secondary);
+  color: var(--gn-text);
+  text-align: left;
+}
+.gn-visibility__lockout { box-shadow: inset 4px 0 0 var(--gn-warning); }
+.gn-visibility__refusal { box-shadow: inset 4px 0 0 var(--gn-danger); }
+.gn-visibility__refusal-rule { font-weight: 600; margin-right: 0.4rem; }
+
 .gn-editor-slot--plain { white-space: pre-wrap; }
 .gn-editor-slot__placeholder { color: var(--gn-text-muted); }
 

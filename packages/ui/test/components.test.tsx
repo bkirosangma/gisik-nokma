@@ -918,3 +918,226 @@ describe('13.900 — InfoTip', () => {
     expect(screen.getByRole('note')).toHaveTextContent(panelText);
   });
 });
+
+/**
+ * §17 — the ticket sheet's `Visibility` section, styled to the prototype's row.
+ *
+ * ## The defect these cases exist for, MEASURED before anything was built
+ *
+ * Every queue row naming this item said only *"the visibility section styling"*,
+ * and nobody had measured what the section already matched. Measured at
+ * `534c450b`: `git grep -nE '^\s*\.gn-visibility' -- '*.css'` answered **0**,
+ * against a **positive control in the same sweep path** (`.gn-filters__body` →
+ * 3, same file). The single occurrence of the string anywhere in a stylesheet
+ * was a COMMENT (`ui.css:4810`) naming `.gn-visibility__modes` /
+ * `.gn-visibility__people` **hypothetically** — assuming they inherit a house
+ * rule this file does not have. **So the section rendered as raw user-agent
+ * chrome**, the identical defect class case 16.83 records for
+ * `.ticket-type-list__move`. `17.001` is that case.
+ *
+ * ## Why `groupedRule` exists rather than `rule()`
+ *
+ * `rule()` (above) matches `selector\s*\{`, which a GROUPED selector cannot
+ * satisfy — its first selector is followed by a comma, not a brace. Passing
+ * `.gn-visibility__modes` to `rule()` does not return the wrong answer, it
+ * THROWS, and a case rewritten to route around the throw would silently stop
+ * asserting the thing it names. This helper takes the literal selector LIST, so
+ * a grouped rule is asserted as the group it is.
+ */
+const groupedRule = (selectorList: string): string => {
+  const m = UI_CSS.match(
+    new RegExp(
+      selectorList.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*') + '\\s*\\{([^}]*)\\}',
+    ),
+  );
+  if (m?.[1] === undefined) throw new Error(`no grouped rule for ${selectorList}`);
+  return m[1];
+};
+
+describe('the Visibility section is styled to the prototype row (17.001–17.005)', () => {
+  /**
+   * The authority is `design-system/interactive/desktop.dc.html`'s own row,
+   * resolved BY CONTENT (the line numbers move): the `>Visibility</dt>` at
+   * `:1207`, its `<dd>` at `:1208`, the control at `:1209`, the note at `:1210`,
+   * the eyebrow at `:1213`, and `visBtnStyle`/`visDotStyle`/`visNote` defined at
+   * `:3781`–`:3786`. The three parts of the row that draw the audience ROSTER —
+   * the chips (`:1214`–`:1224`), the picker (`:1225`–`:1229`) and the closing
+   * guest note (`:1230`) — are NOT transcribed: the owner's standing ruling on
+   * `visibility` is **(a) BUILD, (b) KEEP THE RULING**, and (b) keeps the
+   * explicit audience roster cut at the wire
+   * (`apps/server/src/routes/tickets.ts:115-118`).
+   */
+  it('17.001 the section has a rule AT ALL, and takes the prototype row’s own column geometry', () => {
+    // This is the whole defect. Every other assertion in this describe is about
+    // a class that had no rule, which is why this one is first.
+    const body = rule('.gn-visibility');
+    // The prototype's `rowValueB` (`:3756`), taken whole including its `gap`:
+    // `display:flex; flex-direction:column; gap:4px; align-items:flex-end`.
+    expect(body).toMatch(/display:\s*flex/);
+    expect(body).toMatch(/flex-direction:\s*column/);
+    expect(body).toMatch(/align-items:\s*flex-end/);
+  });
+
+  it('17.002 the eyebrow and the notes carry the row’s OWN 12px scale', () => {
+    // ⚠ THE 12px IS THE PROTOTYPE'S OUTLIER, MEASURED RATHER THAN ASSUMED.
+    // `desktop.dc.html` carries the identical uppercase eyebrow declaration at
+    // 13px/18px TWELVE times; this row's `:1213` at 12px/16px is the ONLY 12px
+    // instance in the file, and the row is internally consistent about it (its
+    // `visNote` at `:1210` and its closing note at `:1230` are both 12px/16px).
+    // So the row has its own dense scale. The gap against
+    // `.gn-comments__heading` — which transcribed the 13px/18px constant — is
+    // the PROTOTYPE's divergence, and this assertion exists so that a later
+    // "harmonise the two" edit reddens HERE rather than landing quietly.
+    const heading = rule('.gn-visibility__heading');
+    expect(heading).toMatch(/font-size:\s*0\.75rem/); // 12px
+    expect(heading).toMatch(/line-height:\s*1rem/); // 16px
+    expect(heading).toMatch(/text-transform:\s*uppercase/);
+    expect(heading).toMatch(/letter-spacing:\s*0\.6px/);
+    expect(heading).toMatch(/color:\s*var\(--gn-text-muted\)/);
+    // …and the sentences are the same scale, `text-wrap:pretty` included
+    // because the prototype declares it on the same line it declares the note.
+    // ⚠ THE CHOICE `rule()` COULD NOT SILENTLY MAKE FOR US: the owner note is
+    // grouped with the two absence sentences, so `rule('.gn-visibility__owner-note')`
+    // THROWS rather than answering — a grouped selector's first member is
+    // followed by a comma, not a brace. Asserting the group instead of the name
+    // would let the owner note be DROPPED from the group while this case stayed
+    // green, so both are asserted: the group carries the declarations, and the
+    // selector list is held to naming the note.
+    const sentences = groupedRule(
+      '.gn-visibility__owner-note, .gn-visibility__unserved, .gn-visibility__read-only',
+    );
+    expect(sentences).toMatch(/font-size:\s*0\.75rem/);
+    expect(sentences).toMatch(/line-height:\s*1rem/);
+    expect(sentences).toMatch(/text-wrap:\s*pretty/);
+    expect(sentences).toMatch(/color:\s*var\(--gn-text-muted\)/);
+  });
+
+  it('17.003 the CONTROL block opts out to the left, and the UA fieldset box is reset', () => {
+    // The prototype's row is right-aligned EXCEPT its control, which carries
+    // `align-self:flex-start` (`visBtnStyle`, `:3786`). That mixed geometry is
+    // the authority's own, and the wrapper is what carries it — otherwise every
+    // control in the block would need it separately and the next one added
+    // would miss it.
+    expect(rule('.gn-visibility__controls')).toMatch(/align-self:\s*flex-start/);
+    // The reset `ui.css:4804` PREDICTED this selector would inherit and which
+    // no rule in this file ever provided — the comment names
+    // `.gn-visibility__modes`/`.gn-visibility__people` by name while the file
+    // has no such rule, which is the same defect one level up.
+    const fieldsets = groupedRule('.gn-visibility__modes, .gn-visibility__people');
+    expect(fieldsets).toMatch(/border:\s*none/);
+    expect(fieldsets).toMatch(/margin:\s*0/);
+    expect(fieldsets).toMatch(/padding:\s*0/);
+  });
+
+  it('17.004 the standing line is the prototype’s control — a pill, and the dot is MODIFIER-toned', () => {
+    const pill = rule('.gn-visibility__standing-mode');
+    expect(pill).toMatch(/display:\s*inline-flex/);
+    expect(pill).toMatch(/border-radius:\s*999px/);
+    expect(pill).toMatch(/min-height:\s*2\.25rem/); // 36px — `visBtnStyle`'s own
+    expect(pill).toMatch(/background:\s*var\(--gn-fill-quaternary\)/);
+    // The dot defaults to the NOT-restricted tone and is flipped by a modifier,
+    // so BOTH failure directions are visible in the CSS: a component that never
+    // sets the modifier paints every ticket green, and one that never clears it
+    // paints every ticket restricted. The component half of this case is in
+    // `packages/app-core/test/views/visibility-editor.test.tsx`.
+    expect(rule('.gn-visibility__dot')).toMatch(/background:\s*var\(--gn-success\)/);
+    expect(
+      rule('.gn-visibility__standing-mode--restricted .gn-visibility__dot'),
+    ).toMatch(/background:\s*var\(--gn-restricted\)/);
+  });
+
+  it('17.005 no [data-style] block forks the section, and each rule is declared exactly ONCE', () => {
+    // 13.340's positive scan, repeated for this family (the shape 16.83 uses).
+    // `apps/web/app/layout.tsx` imports `ui.css` and THEN `globals.css`, so a
+    // `[data-style]` override appended there WINS at equal specificity — a scan
+    // of `ui.css` alone is a check that cannot fail.
+    for (const [name, css] of [
+      ['ui.css', UI_CSS],
+      ['globals.css', GLOBALS_CSS],
+    ] as const) {
+      const styleBlocks = [...css.matchAll(/\[data-style="[a-z]+"\][^{]*\{([^}]*)\}/g)];
+      if (name === 'ui.css') {
+        expect(
+          styleBlocks.length,
+          'the scan found no [data-style] block in ui.css at all — it is reading nothing',
+        ).toBeGreaterThan(0);
+      }
+      for (const [fullMatch] of styleBlocks) {
+        expect(fullMatch, `${name}: ${fullMatch}`).not.toMatch(/\.gn-visibility\b/);
+      }
+    }
+
+    // …AND EVERY SELECTOR THIS CASE ASSERTS ON IS DECLARED EXACTLY ONCE,
+    // because `rule()` answers the FIRST match: an appended duplicate would
+    // beat the assertions above while they all stayed green.
+    //
+    // ⚠ THE FIRST VERSION OF THIS HALF WAS A CHECK THAT COULD NOT FAIL FOR THE
+    // FAILURE ITS OWN COMMENT NAMED, AND IT WAS MEASURED FAILING THAT WAY BY A
+    // REVIEWER BEFORE THIS LINE WAS WRITTEN. It counted
+    // `/^\.gn-visibility\s*\{/gm` — the BASE selector only — while the comment
+    // sitting over it named `.gn-visibility__standing-mode` as the example.
+    // Reviewer's mutation: append
+    // `.gn-visibility__standing-mode { background: var(--gn-danger); }` at EOF
+    // → **43 passed / 43, this case GREEN**, the pill repainting danger-red in
+    // a browser. The negative control in the same run (appending a duplicate
+    // `.gn-visibility` instead) reddened correctly, so the case COULD fail —
+    // it simply did not fail for the selector its text names. **A count over
+    // one member of a family is not a count over the family**, which is why the
+    // list below is enumerated rather than inferred from the base selector.
+    // EXACTLY the selectors `rule()` is asked for above — and nothing else.
+    // The list is the assertion's own reach, not the class family: a selector
+    // this case never resolves through `rule()` cannot be beaten by a duplicate
+    // of itself here, so counting it would be asserting something unrelated.
+    // ⚠ TWO FAMILY MEMBERS ARE DELIBERATELY ABSENT BECAUSE THEY ARE DECLARED
+    // TWICE ON PURPOSE — `.gn-visibility__lockout` and `.gn-visibility__refusal`
+    // each take a shared rule for the fill and a per-variant one for the inset
+    // tone rule. The first draft of this list included them and the check
+    // caught it on its first run (`declares .gn-visibility__lockout in 2
+    // rule(s)`), which is the correct answer to the wrong question.
+    const FAMILY = [
+      '.gn-visibility',
+      '.gn-visibility__heading',
+      '.gn-visibility__standing',
+      '.gn-visibility__standing-mode',
+      '.gn-visibility__dot',
+      '.gn-visibility__controls',
+    ];
+    /**
+     * How many rule DECLARATIONS name this selector, counted as a member of a
+     * selector LIST.
+     *
+     * ⚠ THE OBVIOUS SPELLING OF THIS — `^selector\s*\{` per line — IS WRONG,
+     * AND IT FAILED LOUD ON ITS FIRST RUN, ON THIS FILE'S OWN CSS. A grouped
+     * rule puts every member but the last on a line of its own, so
+     * `.gn-visibility__refusal,` is followed on the NEXT line by
+     * `.gn-visibility__people {` — and the anchored pattern counts THAT as a
+     * declaration of the previous member. Measured: it reported
+     * *"ui.css declares .gn-visibility__refusal as a rule of its own 2 time(s)"*
+     * against CSS that declares it once. The comment is stripped first so a
+     * brace inside prose cannot open a phantom prelude.
+     */
+    const rulePreludes = (css: string): string[] =>
+      [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{/g)].map((m) => m[1] ?? '');
+    const declarationsOf = (css: string, selector: string): number =>
+      rulePreludes(css)
+        .flatMap((prelude) => prelude.split(','))
+        .filter((member) => member.trim() === selector).length;
+
+    for (const [name, css] of [
+      ['ui.css', UI_CSS],
+      ['globals.css', GLOBALS_CSS],
+    ] as const) {
+      for (const selector of FAMILY) {
+        const decls = declarationsOf(css, selector);
+        expect(
+          decls,
+          `${name} declares ${selector} in ${decls} rule(s)`,
+        ).toBe(name === 'ui.css' ? 1 : 0);
+      }
+    }
+    // POSITIVE CONTROL for the enumerator itself: it must SEE a selector that
+    // genuinely is declared twice, or every `1` above is a scan reading nothing.
+    expect(declarationsOf(`${UI_CSS}\n.gn-visibility { margin-top: 9rem; }`, '.gn-visibility')).toBe(2);
+    expect(declarationsOf(UI_CSS, '.gn-visibility__no-such-class-exists')).toBe(0);
+  });
+});
