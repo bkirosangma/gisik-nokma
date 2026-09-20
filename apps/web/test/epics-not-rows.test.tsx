@@ -305,7 +305,7 @@ describe('13.1039 the Backlog loses the epic ROW and keeps the epic SECTION HEAD
    * `ticket-card-*` is the wrong testid, or because the epic row never renders
    * for some unrelated reason, this arm would fail.
    */
-  it('the List still draws the epic as a row — the ruling\'s other half', async () => {
+  it('13.1040 — the List still draws the epic as a row, the ruling\'s other half', async () => {
     render(
       <Providers services={servedWorld({ rows: [BACKLOG_EPIC, BACKLOG_CHILD] })}>
         <ProjectPage />
