@@ -125,7 +125,7 @@ headline**, which is why it is worth reading in full.
 | item | ruling | evidence |
 |---|---|---|
 | **Assignee** | **BUILD — editable.** Owner: *"assignee should not be read only."* | `SERVER EXISTS → SURFACE`. `ticket.assigned` is wired end to end — payload `events/ticket-events.ts:50` (an UNASSIGNMENT is the same event with `null`), projected `projections/tickets.ts:436,466`, a read `read/assigned-provenance.ts`, fan-out `notifications/fanout.ts:225`, synced `sync/snapshot-writer.ts:95`, and an MCP write tool `mcp/write-tools.ts:167-173`. **✅ BUILT — `#530` (`be72fb18`). This row's closing sentence was TRUE when written and went stale the moment `#530` landed: the web rendered it read-only at `ticket-sheet.tsx:573`, and no longer does.** |
-| **Description** | **✅ BUILT — `#544` (`2c28f6bc`), case `13.989`.** Owner: *"description should be editable."* | `SERVER EXISTS → SURFACE`, **and the fix turned out to be a PROP *and* a ROW — the dispatch named only the prop, and the missing row is the half that mattered.** The door exists (`compose-editor-submission.ts:14,29`) and the sheet already submits `ticket.field_set` (`ticket-sheet.tsx:284`) — **but the web never passed `editorSlot`** (`page.tsx:2346-2353`), *and* the description row lived **inside** the `Object.entries(state.fields)` loop while `ticket.created` writes `fields: { title }` and nothing else (`packages/domain/src/ticket-state.ts:150`), so on a ticket nobody had described **there was no row for an editor to mount into**. Enabling the composer alone would have changed almost nothing. Both are fixed; the row is now drawn unconditionally on the assignee row's precedent. |
+| **Description** | **✅ BUILT — `#544` (`2c28f6bc`), case `13.989`.** Owner: *"description should be editable."* | `SERVER EXISTS → SURFACE`, **and the fix turned out to be a PROP *and* a ROW — the dispatch named only the prop, and the missing row is the half that mattered.** The door exists (`compose-editor-submission.ts:14,29`) and the sheet already submits `ticket.field_set` (`ticket-sheet.tsx:284`) — **but the web never passed `editorSlot`** (**cited as `page.tsx:2346-2353`; that range is STALE — it now lands on a selection-handler block, and the mount is at `:2417`**), *and* the description row lived **inside** the `Object.entries(state.fields)` loop while `ticket.created` writes `fields: { title }` and nothing else (`packages/domain/src/ticket-state.ts:150`), so on a ticket nobody had described **there was no row for an editor to mount into**. Enabling the composer alone would have changed almost nothing. Both are fixed; the row is now drawn unconditionally on the assignee row's precedent. |
 | **State dropdown** | **REFUSED — no second door** | The chip + "Move…" and a dropdown are **two presentations of the same legal-transition set**. A restyle, not a gap. |
 
 **⚠ THE FINDING THAT EXPLAINS MOST OF THE SHEET, and it is one line:** the web mounts `TicketSheet` at
@@ -138,14 +138,11 @@ and two of the four have since closed.**
 
 **⚠ AND ITS STATE — RE-MEASURED 2026-09-20 at `4274b372` (cycle 22), because the sentence above is a reading
 and reads have been expiring all day:** the mount at `page.tsx:2417` now passes **nine props** — the original
-six, plus **`editorSlot`** (closed by `#544`, `2c28f6bc`), **`uploadEvidence`**, and `onOpenTicket`. **So of
-the four optional props, `editorSlot` and `uploadEvidence` ARE passed, and `attachments` and `visibility` are
-NOT — "two remain" was right, and THIS PARAGRAPH'S OWN ENUMERATION WAS THE STALE HALF** (it named three
-unpassed props; `uploadEvidence` closed after it was written).
-⛔ **AND NEITHER REMAINING GAP HAS A DISPATCH.** This paragraph previously ended *"both owned by dispatches
-that exist"* — **that is FALSE**: a search of all 114 dispatch files finds neither, and cycle 21 ordered this
-correction. The two are **queued as item 4 of the controller's queue** (`controller-state.md` §4), **not
-dispatched**. Re-measure before quoting this line.
+six, plus **`editorSlot`** (closed by `#544`, `2c28f6bc`), **`uploadEvidence`**, and `onOpenTicket`. ⚠ **`TicketSheetProps` declares EIGHT optional props and the mount passes FOUR of them** (`cache`, `editorSlot`, `uploadEvidence`, `onOpenTicket`) — so do not read the set below as "the optional props". **Of the four gaps THIS PARAGRAPH names — `editorSlot`, `attachments`, `uploadEvidence`, `visibility` — `editorSlot` and `uploadEvidence` ARE passed and `attachments` and `visibility` are NOT**, so *"two remain"* was right and **this paragraph's own enumeration was the stale half** (it named three unpassed props; `uploadEvidence` closed after it was written).
+⛔ **AND NEITHER REMAINING GAP HAS A DISPATCH.** This sentence previously ended *"both owned by dispatches
+that exist"* — **that is FALSE**: a search of all **117** `CTL-DISPATCH-*.md` files in `gisik-nokma-lanes/`
+finds neither, and cycle 21 ordered this correction. The two are **queued as item 4 of the controller's
+queue** (`controller-state.md` §4), **not dispatched**. Re-measure before quoting this line.
 
 **⚠ THE COMMENTS CORRECTION — the controller's own headline was WRONG and is recorded wrong here.**
 `comment.added` is fully wired on the server (vocabulary `:195`, state machine, projections, search index,
