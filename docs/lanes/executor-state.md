@@ -1,8 +1,8 @@
 # Serial executor — live state
 
-> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~18:0x IST. **THE SHEET'S THREE MISSING SURFACES ARE BUILT,
-> # GATED AND GREEN AT THE FOLDED TREE. PR #594 IS OPEN AND WAS SENT BACK FOR ONE REASON: NO REVIEWER
-> # PASS WAS RECORDED IN ITS BODY. THAT PASS IS IN FLIGHT.**
+> # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~19:0x IST. **THE SHEET'S THREE MISSING SURFACES ARE
+> # BUILT, REVIEWED, FIXED, REBASED AND GREEN AT THE FOLDED TREE. PR #594 IS OPEN; IT WAS SENT BACK
+> # FOR ONE REASON — NO REVIEWER PASS RECORDED — AND THAT PASS HAS NOW RUN AND IS WRITTEN UP BELOW.**
 > Branch **`exec/sheet-surfaces`**, **rebased onto `origin/main` = `19c998e5`** (the `#592`/`#593`
 > merges — verified docs-only here: the four commits touch `docs/lanes/controller-state.md` and
 > `docs/lanes/owner-holds.md` and NO other file), one PR, `--base main`. **You do not merge.**
@@ -47,16 +47,21 @@
 > - **§2(a)'s toolbar measurement was RIGHT and is confirmed** (six commands, all present at 3.30.5).
 >
 > ## ANCHORS, RECOUNTED AT THIS TREE — **AFTER the rebase onto `19c998e5`**
-> - **gate** `pnpm turbo run build test typecheck --concurrency=1`: **EXIT=0 · 33/33 · 1m42.6s**, run at
->   the REBASED head (the pre-rebase run at `e9c1a04f` was EXIT=0 · 33/33 · 1m37.4s; **both are this
->   executor's evidence — the controller runs the forced gate**).
+> - **gate** `pnpm turbo run build test typecheck --concurrency=1`: **EXIT=0 · 33/33 · 1m37.1s**, run at
+>   the FINAL head, after the rebase AND after the fix round. (Earlier runs: `1m42.6s` post-rebase,
+>   `1m37.4s` pre-rebase, both EXIT=0 — **all three are this executor's evidence; the controller runs
+>   the forced gate.**)
 >   **Node `v22.22.2`** (`pnpm exec node --version` also v22.22.2 — the `pnpm` BINARY is v24's because
 >   v22's bin dir carries no pnpm; the node it spawns is v22, which is what the gate names).
->   **server 1640 · app-core 1655 · web 598 · ui 373 · domain 525 · rule-engine 345 · editor 188 ·
->   sync-client 90 · mcp-server 44 · mobile 29 · desktop 9 — 5,496 tests**, **byte-identical before and
->   after the rebase**, which is the measurement that says the fold changed nothing but history.
+>   **server 1640 · app-core 1657 · web 598 · ui 373 · domain 525 · rule-engine 345 · editor 188 ·
+>   sync-client 90 · mcp-server 44 · mobile 29 · desktop 9 — 5,498 tests.**
+>   **The counts were byte-identical across the rebase** (5,496 both sides), which is the measurement
+>   that says the fold moved history and nothing else; the fix round then took app-core 1655 → **1657**
+>   (+2 — the Enter-commit case and the in-flight-latch case).
 >   **Every delta against the pre-round baseline is exactly what this round added:** app-core 1645 →
->   **1655** (+10), editor 178 → **188** (+10), ui 372 → **373** (+1). Nothing else moved.
+>   **1657** (+12), editor 178 → **188** (+10), ui 372 → **373** (+1). Nothing else moved.
+> - **`check-case-ids` UNMOVED at 2500 / 16.87** — the fix round minted no ids, and the assertion is the
+>   DELTA (2497 → 2500 = +3 from the three minted cases, bold 1073 → 1076), never the word "ok".
 > - **THE CITATION SWEEP, RUN LAST AND OVER THE DIFF RATHER THAN OVER MY OWN FILES.** Every `file:line`
 >   added by this branch was resolved BY CONTENT. **Five citations to `ticket-state.ts:150` were all
 >   stale — the write is at `:160`** — and four of those also named the `ticket.field_set` reduction as
@@ -89,24 +94,53 @@
 > (that rule is in this repo's own memory and it cost four fixes on 2026-09-20).** `git status` after
 > restore shows only the intended files.
 >
-> ## WHAT THE REVIEWER SHOULD AIM AT FIRST
-> 1. **The toolbar's commands are the prototype's SET but not its MECHANICS** — the prototype splices
->    markdown into a `<textarea>`; these toggle ProseMirror marks. Is the set right, and is `link`'s
->    inline URL field the right answer where the prototype's `[text](https://)` puts brackets on screen?
-> 2. **`editor.css` could not take the prototype's `--fill4` / `--cardBg` / `--cardShadow`** — that file is
->    structural-only by its own header (no token from `tokens.ts` is reachable from `packages/editor`), so
->    the strip is drawn with `currentColor` edges like every control there. **Is the visual departure
->    acceptable, or should the surface live in `ui.css`?**
-> 3. **The three answer slots MOVED out of the details tab** (below the tab control) so the title's
->    refusal is visible whichever tab is open. **No test pinned their old position** — verify that.
-> 4. **The breadcrumb's `&&` gate**: a withheld OR pending project name drops the whole nav. Is that
->    better than the id-only rule `my-work.tsx` applies to a SERVED withheld name?
+> ## THE INDEPENDENT REVIEW — RUN, RECORDED, AND ITS FINDINGS FIXED
+> **No Critical. Five Important, four Minor — FOUR of the five Importants were real
+> defects in what this branch shipped, and all are fixed with a witness each.**
+> 1. **I4 — the strip rendered `B i code list quote link`.** A hand-written `link`
+>    button was appended after the `marks.map`. **The component's comment claimed the
+>    right order, the case was NAMED for the right order, and its body asserted the
+>    wrong one** — green throughout. Found by reading the prototype
+>    (`desktop.dc.html:3670-3678`) and then the test file, not by running anything.
+> 2. **I3 — Escape in the title field closed the whole sheet.** ⚠ **AND THE REVIEWER'S
+>    STATED CAUSE WAS WRONG:** it said the field's branch *"calls `preventDefault()`"*,
+>    **and it did not.** I repeated that into `Sheet`'s docblock before reading the
+>    line; the new case stayed RED and that is the only reason the caller's half was
+>    found. Both halves are in now. **A peer's finding is a claim.**
+> 3. **I1 — `submitTitle` had no in-flight latch.** `disabled` is what makes a browser
+>    blur the focused control, so one Enter can fire a second commit out of the first
+>    one's own `onBlur` — a second `ticket.field_set` carrying the title the ledger
+>    already holds. `titleSubmittingRef`, mirroring Ruling 32.
+> 4. **I2 — the unchanged-title case passed without ever reaching its guard.**
+>    `click(field); tab()` leaves `titleDraft` null, so `submitTitle` is never called;
+>    the reviewer measured **deleting the guard left the suite at PASS(90)/FAIL(0).**
+> 5. **I5 — `ui.css` said `.gn-sheet__title` has "no product caller", and it has TWO**
+>    (`:470`, `:478` draw it on every read error and every not-yet-loaded sheet). A
+>    reader acting on that sentence would have deleted a live rule.
+> **Four Minor, all corrected in place:** the Enter commit path had no case; "not one
+> asserts that a control is on screen" was false of two of ten; "two early returns"
+> was true of one; "the fourth thing there" counted our three under the prototype's
+> five; and the crumb gate tested `!== null` where the docblock said "a real string".
+>
+> ## ⚠ TWO PROCESS HAZARDS THIS ROUND PRODUCED, BOTH WORTH CARRYING
+> - **The reviewer mutates THIS SHARED WORKING TREE**, so its mutations and my
+>   measurements can interleave. I checked rather than hoped: the gate log was written
+>   at 13:51:28 and its first mutation landed at 13:51:44 — **sixteen seconds later, so
+>   that gate measured an unmutated tree.** On a shared tree that timing check is the
+>   difference between a result and a coin toss.
+> - **`/tmp/pr-body.md` IS A SHARED PATH ACROSS LANES** (a peer lane overwrote it once
+>   already; the PR opened with the wrong body while every ref check passed). Everything
+>   this round writes to `/tmp` is prefixed `exec1-`, and **the PR body is READ BACK**
+>   with `gh pr view --json body` before it is trusted.
 >
 > ## NEXT, AND THIS IS ALL THAT IS LEFT
-> **commit the handoff → `git push -u origin exec/sheet-surfaces` → prove the push landed**
-> (`gh pr view --json headRefOid` against `git rev-parse HEAD` — a REJECTED push does not stop
-> `gh pr create`) **→ `gh pr create --base main`.** The PR body is at **`/tmp/pr-body.md`**.
-> **You do not merge.**
+> **commit the handoff → force-push `exec/sheet-surfaces` (the branch was rebased, so the push is NOT
+> fast-forward) → prove the push landed** (`gh pr view --json headRefOid` against
+> `git rev-parse HEAD` — a REJECTED push does not stop `gh pr create`, and #591 opened against a stale
+> head exactly that way) **→ write the reviewer section into the PR body → `gh pr edit 594 --body-file
+> <lane-unique path>` → READ THE BODY BACK.**
+> **PR #594 is already OPEN and was sent back for ONE reason: no reviewer pass was recorded. It was
+> run and is recorded in this file and in the new body. You do not merge.**
 
 **This file is the restart surface.** A controller that kills and relaunches the executor from its
 brief recovers only what is written here. Refreshed at every task boundary.
