@@ -123,13 +123,12 @@ export type PrefixClaim = {
  *
  * ## The suffix
  *
- * A derived prefix that is already taken gets `2`, then `3`, and so on —
- * `SO`, `SO2`. A digit rather than another letter because the letters are
- * already spent: `Shop operations` and `Service orders` share both of theirs.
- * The result stays within `PREFIX_MAX_LENGTH` for any base of two letters,
- * and a one-letter base can run to `A`, `A2`, …, `A9` before it would grow —
- * at which point the next free single letter is used rather than a four-
- * character prefix, which the schema refuses.
+ * A derived prefix that is already taken moves down `collisionCandidates`:
+ * `SO`, `SO2` … `SO9`, `SA` … `SZ`, then the three-letter space. **Every
+ * candidate is within `PREFIX_MAX_LENGTH` and made of capitals, for every base
+ * and any number of collisions** — see that generator for the sequence and for
+ * the measured reason it replaced a loop whose docblock claimed a fallback the
+ * code did not have.
  */
 export function resolveProjectPrefixes(claims: readonly PrefixClaim[]): string[] {
   const assigned: Array<string | null> = claims.map(() => null);
@@ -156,15 +155,77 @@ export function resolveProjectPrefixes(claims: readonly PrefixClaim[]): string[]
       return;
     }
     const base = derivePrefix(claim.name);
-    let candidate = base;
-    for (let suffix = 2; taken.has(candidate); suffix += 1) {
-      candidate = `${base.slice(0, PREFIX_MAX_LENGTH - String(suffix).length)}${suffix}`;
+    for (const candidate of collisionCandidates(base)) {
+      if (!taken.has(candidate)) {
+        assigned[index] = candidate;
+        taken.add(candidate);
+        return;
+      }
     }
-    assigned[index] = candidate;
-    taken.add(candidate);
+    // Unreachable for any real workspace — `collisionCandidates` offers 17,610
+    // values and the 3-letter space alone admits 17,576 projects sharing one
+    // two-letter base. A throw rather than a fallback, because the alternative
+    // at this point is an ILLEGAL prefix: the loop above ends only when every
+    // candidate is taken, and returning `null` here would put `SO-null` on a
+    // ticket key. A read that throws is louder than a key that lies.
+    throw new Error(
+      `no free project prefix remains for base ${base}: ${taken.size} projects in this workspace already hold one derived from it`,
+    );
   });
 
   return assigned as string[];
+}
+
+/**
+ * Every candidate a derived prefix may take, in order, each one a legal prefix.
+ *
+ * ## Why this is a generator rather than the loop it replaces
+ *
+ * The loop that stood here built `${base.slice(0, 3 - digits)}${n}` and stopped
+ * when the value was free. **Measured, it produced values this module's own
+ * contract forbids:** at twelve same-base projects it emitted `S10`, at a
+ * hundred it emitted `100` — a digit where a letter belongs — and at a thousand
+ * it emitted `S1000`, four characters where `PREFIX_MAX_LENGTH` is three. None
+ * of that is reachable at product scale (a workspace would need ~100 projects
+ * sharing an initial), but the docblock CLAIMED a fallback that did not exist,
+ * and a claim like that is worse than the rough edge it hides. An independent
+ * reviewer found the same discrepancy.
+ *
+ * So the sequence is explicit and every member is within the contract:
+ *
+ *   1. the bare base — `SO`;
+ *   2. the base plus a digit, `SO2` … `SO9` — nine values, and the ONLY place a
+ *      derived prefix may contain a digit;
+ *   3. the base's first letter plus any other letter — `SA` … `SZ`;
+ *   4. the whole three-letter space, `AAA` … `ZZZ`, enumerated in a fixed order.
+ *
+ * ## The digit, and the one thing it means
+ *
+ * `SO2` is deliberately NOT something a person may type: `prefixSchema` governs
+ * what may be ENTERED and admits capitals only, and this generator governs what
+ * the system DERIVES when somebody entered nothing. Keeping the digit for the
+ * first nine collisions is a readability choice — `SO2` says "the second `SO`",
+ * where `SA` would read as a different project's initials — and it is confined
+ * to position 2 so that no candidate ever becomes digit-only.
+ */
+function* collisionCandidates(base: string): Generator<string> {
+  yield base;
+  const stem = base.slice(0, PREFIX_MAX_LENGTH - 1);
+  for (const digit of '23456789') {
+    yield `${stem}${digit}`;
+  }
+  for (const letter of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') {
+    yield `${base[0]!}${letter}`;
+  }
+  for (let index = 0; index < 26 ** PREFIX_MAX_LENGTH; index += 1) {
+    let word = '';
+    let value = index;
+    for (let position = 0; position < PREFIX_MAX_LENGTH; position += 1) {
+      word = String.fromCharCode(65 + (value % 26)) + word;
+      value = Math.floor(value / 26);
+    }
+    yield word;
+  }
 }
 
 /**

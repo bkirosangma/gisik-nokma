@@ -131,6 +131,29 @@ describe('resolveProjectPrefixes', () => {
     ]);
   });
 
+  it('13.1029 — every derived prefix is LEGAL at every collision depth, which the loop it replaced was not', () => {
+    // MEASURED ON THE OLD LOOP: twelve same-base projects produced `S10`, a
+    // hundred produced `100` (a digit where a letter belongs), and a thousand
+    // produced `S1000`, four characters where the maximum is three. The
+    // docblock claimed a "next free single letter" fallback that the code did
+    // not have. None of this is reachable at product scale; the claim is what
+    // made it worth fixing, and this case is what holds it fixed.
+    for (const depth of [3, 9, 10, 12, 34, 100, 1000]) {
+      const prefixes = resolveProjectPrefixes(
+        Array.from({ length: depth }, () => ({ name: 'Shop operations' })),
+      );
+      expect(prefixes).toHaveLength(depth);
+      expect(new Set(prefixes).size).toBe(depth);
+      for (const prefix of prefixes) {
+        expect(prefix).toMatch(/^[A-Z0-9]{1,3}$/);
+        expect(prefix.length).toBeLessThanOrEqual(PREFIX_MAX_LENGTH);
+        // No candidate is digit-ONLY: the digit is confined to position 2, so
+        // it can never displace the letters that make a prefix readable.
+        expect(prefix).toMatch(/[A-Z]/);
+      }
+    }
+  });
+
   it('is order-stable: the same input in the same order gives the same answer', () => {
     const once = resolveProjectPrefixes([{ name: 'Site' }, { name: 'Standing' }, { name: 'gggg' }]);
     const twice = resolveProjectPrefixes([{ name: 'Site' }, { name: 'Standing' }, { name: 'gggg' }]);
