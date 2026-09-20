@@ -5,8 +5,20 @@
 - **Branch `exec2/comment-thread`**, cut from **`origin/main = fed9a588`**, **folded TWICE**: once onto
   `fd14c48d` and again onto **`origin/main = 3d40ac68`**. `git merge-base HEAD origin/main` equals
   `3d40ac68` exactly — **this head IS the landing tree**, and `origin/main` has not moved since.
-- Four commits, all of them mine and all prose-verified: `d89db1df` (the change), `590254d0` (the first
-  merge), `6a69f5df` (the fold's four corrections), `13c91c78` (the second merge).
+- **The commits, by SUBJECT rather than by count** — a count is a reading that expires the moment this
+  file lands, and the shas below are the ones measured at `13c91c78`:
+  1. `d89db1df` — the change itself.
+  2. `590254d0` — the first merge of `origin/main`.
+  3. `6a69f5df` — the fold's four corrections (the shared guard, the closed leak's stale citation, the
+     re-aimed mutation, the second copy of the marker claim).
+  4. `13c91c78` — the second merge.
+  5. `cbea3c3e` — this handoff.
+  6. **the citation sweep's fix** (`doc-text.ts:44-50` resolved to `BLOCK_NODE_TYPES`).
+  7. **the `Features.md` replica-refusal count** (`NINE` → `TEN`, with the membership).
+  **Anything on `origin/main..HEAD` that is not one of these subjects is a foreign push: re-run
+  `git rev-list --oneline origin/main..HEAD` and match before concluding anything.** ⚠ **`git log` rather
+  than `git rev-list` shows FIVE of these seven** — it simplifies the two merges away, so the log is the
+  one command that under-reports this branch; measured both ways.)
 - The PR is opened at this head; this file cannot carry its number because the handoff lands before the
   PR opens. One call settles it: `gh pr list --state all --head exec2/comment-thread`.
 - ⚠ **THE WINDOW: this file adds itself to its own figures.** Every count below is measured at `13c91c78`,
