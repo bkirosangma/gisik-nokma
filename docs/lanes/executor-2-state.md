@@ -44,7 +44,8 @@ literal `deleted_at` reports ZERO in the two sweeps because they splice the name
 | anchor | value |
 |---|---|
 | `git merge-base origin/main HEAD` | **`a5b58c4a` — equal to `origin/main` at the cut** |
-| the commits | `798fcc82` (both arms) · `737a203f` (cases 16.88–16.90) · *this handoff* |
+| the commits | `798fcc82` (both arms) · `737a203f` (cases 16.88–16.90) · `3aa09ec2` (handoff) · `1367b675` (the citation sweep's four prose defects) · `eab29ad3` (rows 6–7 relabelled) · *this handoff* |
+| ahead / behind | **6 ahead / 0 behind** ▸ counts-as-of `eab29ad3`; **+1** for the commit carrying this line |
 | tree | clean apart from the two new test files until they were committed |
 | **this lane's id BLOCK** | **`16.88`–`16.99`** — minted `16.88`–`16.90`, next free **`16.91`** |
 | `check:case-ids` | **2572 unique / highest 16.90** here; **2569 / 16.87** at `origin/main` — **delta exactly +3**; same-file control 69 → 72 markers |
