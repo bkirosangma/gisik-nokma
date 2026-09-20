@@ -45,6 +45,14 @@ import { signInWithPhone } from '../helpers/session.js';
  * in shape for the same reason: its docblock records that a widened
  * `TicketListView` fails the typecheck rather than a test.
  *
+ * ⚠ **The tripwire is only as strong as `app-core` having been REBUILT, and an
+ * independent reviewer measured the weak direction rather than assuming it.**
+ * The type resolves through `packages/app-core/dist/index.d.ts`, not through
+ * `src` — so widening `DataSourceQuery` and running the typecheck against a
+ * STALE `dist` compiles **GREEN**. The guard fires on the day it matters, because
+ * a real widening has to be built for anything to consume it; but a reader who
+ * mutates `src` alone and sees green has learned nothing. Measured both ways.
+ *
  * ⚠ **The tripwire is the load-bearing half. A method that is never visited is a
  * surface nobody checked, and a green suite cannot say whether it was skipped or
  * passed.** Two tables below are `Record<AbsenceDecision, …>` — `DECIDED` and
@@ -78,7 +86,9 @@ import { signInWithPhone } from '../helpers/session.js';
  *
  * **Arm 1 gets its completeness from the type system. Arm 2
  * (`test/read/soft-delete-background-paths.test.ts`) does not, and nothing
- * gives it.** The full enumeration of the fourteen sites that carry the rule,
+ * gives it.** The full enumeration of the seventeen SQL statements that carry the
+ * rule — plus the one TypeScript application and the three attachment doors that
+ * no arm constrains —
  * which arm constrains each, and which are constrained by NEITHER — including
  * one measured leak with a named owner — is in Arm 2's docblock, because that
  * is the file whose coverage is a list rather than an inheritance.
@@ -129,11 +139,34 @@ let parentId: string;
  */
 let sharedLiveId: string;
 let sharedDeadId: string;
+/**
+ * A SECOND parent, with one child that survives and one that is deleted.
+ *
+ * ⚠ **This exists because a mutation SURVIVED without it.**
+ * `projections/rollups.ts:221`'s recompute and `:320`'s stale-row DELETE are
+ * MUTUALLY MASKING on the single-child parent above: un-filter the recompute and
+ * it writes a row for the tombstoned child, and the DELETE then removes that row
+ * anyway because the parent has no live children at all — so the observable is
+ * identical and the mutation is invisible.
+ *
+ * The reachable shape is a parent that KEEPS a row: one live child plus one
+ * deleted one. There the recompute's predicate is the only thing standing
+ * between `total_children: 1` and `total_children: 2` — the "5 of 8" this whole
+ * family of counts exists to keep honest.
+ */
+let parent2Id: string;
+let live2Id: string;
+let dead2Id: string;
+
+/** Every ticket this file deletes. The count assertions are derived from it. */
+const TOMBSTONES: string[] = [];
 
 /** Baselines captured BEFORE any delete, so no case depends on run order. */
 let baselineProjectTicketCount: number;
 let baselineRowCount: number;
 let baselineParentRollup: number | null;
+/** Rows in `proj_rollups` for the parent — the PROJECTION half of the same fact. */
+let baselineRollupRow: number;
 
 /** Exactly the three members `online/http.ts`'s `send` reads, and no more. */
 function injectFetch(headers: { authorization: string }): FetchLike {
@@ -283,6 +316,28 @@ beforeAll(async () => {
     payload: { fieldId: 'dueDate', value: { date: tomorrow } },
   });
 
+  // THE SECOND PARENT PAIR — see `parent2Id`. A parent that keeps a row.
+  parent2Id = newUlid();
+  await post({
+    workspaceId,
+    entity: { kind: 'ticket', id: parent2Id },
+    type: 'ticket.created',
+    payload: { typeId: 'epic', projectId, parentId: null, title: 'Surface parent two' },
+  });
+  live2Id = newUlid();
+  dead2Id = newUlid();
+  for (const [id, title] of [
+    [live2Id, 'Surface two live'],
+    [dead2Id, 'Surface two dead'],
+  ] as const) {
+    await post({
+      workspaceId,
+      entity: { kind: 'ticket', id },
+      type: 'ticket.created',
+      payload: { typeId: 'task', projectId, parentId: parent2Id, title },
+    });
+  }
+
   // THE `shared` HALF OF MY WORK. Roots, so they never touch the parent's
   // rollup; explicit by NAME, so they land in `sharedWithMeRows` and nowhere
   // else. SHARED_LIVE is the control that proves the bucket is reachable at all.
@@ -306,8 +361,10 @@ beforeAll(async () => {
     });
   }
 
+  TOMBSTONES.push(childId, sharedDeadId, dead2Id);
   baselineProjectTicketCount = await directoryTicketCount();
   baselineParentRollup = await parentRollup();
+  baselineRollupRow = await rollupRowCount();
   const { rows } = await db.pool.query<{ n: string }>(
     'SELECT count(*) AS n FROM proj_tickets WHERE project_id = $1 AND deleted_at IS NULL',
     [projectId],
@@ -392,7 +449,7 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
   getTicketHistory: {
     verdict: 'retained',
     carries: true,
-    why: 'DELIBERATE, and the FAQ says so: *"Its history is retained, because other events cite it."* `read/visible-where.ts:138-140` states the same — a deleted ticket is still VISIBLE in the `canSee` sense. Asserting absence here would be asserting a lie.',
+    why: 'DELIBERATE, and the FAQ says so: *"Its history is retained, because other events cite it."* `read/visible-where.ts:137-139` states the same — a deleted ticket is still VISIBLE in the `canSee` sense. Asserting absence here would be asserting a lie.',
   },
   getTicketAttachments: {
     verdict: 'excluded',
@@ -504,7 +561,7 @@ describe('AFTER the delete — the invariant', () => {
   beforeAll(async () => {
     // THE DELETE, through the product's own door, exactly once — for BOTH
     // tombstones this fixture plants.
-    for (const id of [childId, sharedDeadId]) {
+    for (const id of TOMBSTONES) {
       await post({
         workspaceId,
         entity: { kind: 'ticket', id },
@@ -540,13 +597,18 @@ describe('AFTER the delete — the invariant', () => {
   });
 
   it('the workspaces directory’s per-project ticketCount drops by exactly the child', async () => {
-    // 4 live rows before (parent, child, and the two explicitly-shared roots);
-    // 2 after. The parent and SHARED_LIVE survive, so the drop is exactly the
-    // number of tombstones planted — pinned to a known membership rather than
-    // to a magnitude.
-    expect(baselineRowCount).toBe(4);
-    expect(baselineProjectTicketCount).toBe(4);
-    expect(await directoryTicketCount()).toBe(baselineProjectTicketCount - 2);
+    // The drop is derived from the list of tombstones actually planted, not
+    // from a number in this comment: `TOMBSTONES.length` is 3 and both counts
+    // must fall by exactly that. A magnitude written here would go stale the
+    // next time the fixture grows — which it did, twice, in this task.
+    expect(TOMBSTONES.length).toBe(3);
+    expect(baselineRowCount).toBeGreaterThan(0);
+    expect(await directoryTicketCount()).toBe(baselineProjectTicketCount - TOMBSTONES.length);
+    const { rows } = await db.pool.query<{ n: string }>(
+      'SELECT count(*) AS n FROM proj_tickets WHERE project_id = $1 AND deleted_at IS NULL',
+      [projectId],
+    );
+    expect(Number(rows[0]?.n)).toBe(baselineRowCount - TOMBSTONES.length);
   });
 
   /**
@@ -569,7 +631,7 @@ describe('AFTER the delete — the invariant', () => {
     expect(text, 'a deleted explicitly-shared ticket must leave the bucket').not.toContain(sharedDeadId);
   });
 
-  it('a deleted child leaves its parent’s rollup — and the rollup then reads null, not zero', async () => {
+  it('a deleted child leaves its parent’s rollup — on the list row AND in proj_rollups', async () => {
     // MEASURED, both halves, in one run: the parent's rollup is
     // `{totalChildren: 1}` before and `null` after — not `{totalChildren: 0}`.
     // `read/ticket-cards.ts:126` is where that spelling comes from: *"`rollup:
@@ -579,8 +641,57 @@ describe('AFTER the delete — the invariant', () => {
     // A rollup that still counted the tombstone is the "5 of 8" this count
     // exists to keep honest reading about a ticket nobody can reach.
     expect(await parentRollup()).toBeNull();
+
+    // THE PROJECTION HALF — sites 16 and 17 (`projections/rollups.ts:221`, the
+    // recompute's `HAVING count(*) > 0`, and `:320`, the DELETE that removes a
+    // parent whose children are all tombstoned). One row before, NONE after:
+    // `rollups.ts`'s own docblock says a childless parent is ABSENT from
+    // `proj_rollups`, never zeroed. Both mutations redden this line.
+    expect(baselineRollupRow).toBe(1);
+    expect(await rollupRowCount()).toBe(0);
+
+    // THE REACHABLE SHAPE FOR THE RECOMPUTE — see `parent2Id`. A parent that
+    // KEEPS its row because one child survives, so the stale-row DELETE cannot
+    // mask the recompute's own predicate. 2 -> 1, and a recompute that counted
+    // the tombstone reads 2.
+    const two = await db.pool.query<{ total_children: number }>(
+      'SELECT total_children FROM proj_rollups WHERE parent_ticket_id = $1',
+      [parent2Id],
+    );
+    expect(two.rows).toHaveLength(1);
+    expect(two.rows[0]?.total_children).toBe(1);
+
+    // ...AND THE SAME FACT ON THE CLIENT SURFACE, so the two ends of one number
+    // are asserted in one run rather than believed to agree.
+    const list = (await query().getTickets(projectId, {}, 'status')) as unknown;
+    const card = findCard(list, parent2Id);
+    expect(card?.rollup?.totalChildren).toBe(1);
   });
 });
+
+/**
+ * `proj_rollups` rows for the parent — the projection half of the same fact.
+ *
+ * ⚠ **This assertion exists because an independent reviewer found TWO SITES the
+ * first enumeration missed**, both longhand predicates in
+ * `projections/rollups.ts` (`:221` the recompute, `:320` the stale-row DELETE).
+ * The sweep this work published searched for the CONSTANT, and "the constant" is
+ * not "the rule" — *the universe is the bug*. Both were measured SURVIVORS
+ * against 89 tests across 7 files before this existed.
+ *
+ * Arm 2 is the arm for paths a client query cannot reach, but this fixture is
+ * the one that has a parent whose only child is deleted, and re-deriving Arm 2's
+ * counts to move the pair there is exactly the kind of arithmetic that has
+ * already been wrong twice in this task. So it is asserted HERE, and the case's
+ * title says so.
+ */
+async function rollupRowCount(): Promise<number> {
+  const { rows } = await db.pool.query<{ n: string }>(
+    'SELECT count(*) AS n FROM proj_rollups WHERE parent_ticket_id = $1',
+    [parentId],
+  );
+  return Number(rows[0]?.n);
+}
 
 /** A shape-tolerant search for one card, so a board regrouping does not break this. */
 function findCard(
