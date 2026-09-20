@@ -125,16 +125,16 @@ headline**, which is why it is worth reading in full.
 | item | ruling | evidence |
 |---|---|---|
 | **Assignee** | **BUILD — editable.** Owner: *"assignee should not be read only."* | `SERVER EXISTS → SURFACE`. `ticket.assigned` is wired end to end — payload `events/ticket-events.ts:50` (an UNASSIGNMENT is the same event with `null`), projected `projections/tickets.ts:436,466`, a read `read/assigned-provenance.ts`, fan-out `notifications/fanout.ts:225`, synced `sync/snapshot-writer.ts:95`, and an MCP write tool `mcp/write-tools.ts:167-173`. **✅ BUILT — `#530` (`be72fb18`). This row's closing sentence was TRUE when written and went stale the moment `#530` landed: the web rendered it read-only at `ticket-sheet.tsx:573`, and no longer does.** |
-| **Description** | **✅ BUILT — `#544` (`2c28f6bc`), case `13.989`.** Owner: *"description should be editable."* | `SERVER EXISTS → SURFACE`, **and the fix turned out to be a PROP *and* a ROW — the dispatch named only the prop, and the missing row is the half that mattered.** The door exists (`compose-editor-submission.ts:14,29`) and the sheet already submits `ticket.field_set` (`ticket-sheet.tsx:284`) — **but the web never passed `editorSlot`** (**cited as `page.tsx:2346-2353`; that range is STALE — it now lands on a selection-handler block, and the mount is at `:2417`**), *and* the description row lived **inside** the `Object.entries(state.fields)` loop while `ticket.created` writes `fields: { title }` and nothing else (`packages/domain/src/ticket-state.ts:150`), so on a ticket nobody had described **there was no row for an editor to mount into**. Enabling the composer alone would have changed almost nothing. Both are fixed; the row is now drawn unconditionally on the assignee row's precedent. |
+| **Description** | **✅ BUILT — `#544` (`2c28f6bc`), case `13.989`.** Owner: *"description should be editable."* | `SERVER EXISTS → SURFACE`, **and the fix turned out to be a PROP *and* a ROW — the dispatch named only the prop, and the missing row is the half that mattered.** The door exists (`compose-editor-submission.ts:14,29`) and the sheet already submits `ticket.field_set` (**`ticket-sheet.tsx:486`**; cited as `:284`, which is `uploadAttachment` docblock prose — **another stale citation that resolves, in the same file as the one this branch corrects**) — **but the web never passed `editorSlot`** (**cited as `page.tsx:2346-2353`; that range is STALE — it now lands on a selection-handler block, and the mount is at `:2417`**), *and* the description row lived **inside** the `Object.entries(state.fields)` loop while `ticket.created` writes `fields: { title }` and nothing else (`packages/domain/src/ticket-state.ts:150`), so on a ticket nobody had described **there was no row for an editor to mount into**. Enabling the composer alone would have changed almost nothing. Both are fixed; the row is now drawn unconditionally on the assignee row's precedent. |
 | **State dropdown** | **REFUSED — no second door** | The chip + "Move…" and a dropdown are **two presentations of the same legal-transition set**. A restyle, not a gap. |
 
 **⚠ THE FINDING THAT EXPLAINS MOST OF THE SHEET, and it is one line:** the web mounts `TicketSheet` at
-`page.tsx` (**`:2417` at `4274b372`**; this line cited `:2346-2353` when it was written, and that range
-**still resolves — to a selection-handler block, not the mount**) with **six props and NONE of the four
-optional ones** — no `editorSlot` (so the real editor never mounts and the description falls back to
-`readOnly`), no `attachments` (so `<AttachmentList>` renders empty), no `uploadEvidence`, no `visibility`.
-**One mount, four gaps.** ⚠ **That was the reading THEN. The paragraph immediately below is its state NOW,
-and two of the four have since closed.**
+`page.tsx` (**`:2417`**; cited as `:2346-2353` when this was written, and that range **still resolves — to a
+selection-handler block, not the mount**). **AT THAT TIME it passed six props and NONE of the four optional
+ones** — no `editorSlot` (so the real editor never mounts and the description falls back to `readOnly`), no
+`attachments` (so `<AttachmentList>` renders empty), no `uploadEvidence`, no `visibility`. **One mount, four
+gaps.** ⚠ **THAT WAS THE READING THEN — the paragraph immediately below is its state NOW, and two of the four
+have since closed.**
 
 **⚠ AND ITS STATE — RE-MEASURED 2026-09-20 at `4274b372` (cycle 22), because the sentence above is a reading
 and reads have been expiring all day:** the mount at `page.tsx:2417` now passes **nine props** — the original
