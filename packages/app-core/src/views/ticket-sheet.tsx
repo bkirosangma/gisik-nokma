@@ -146,39 +146,38 @@ export type TicketSheetProps = {
    */
   onOpenTicket?: (ticketId: string) => void;
   /**
-   * The footer's `‹ Previous` / `Next ›`, which walk the visible ticket list —
-   * the prototype's footer (`desktop.dc.html:1370-1373`, handlers `:3809-3810`).
+   * The footer's `Delete` committed — the ticket is now SOFT-deleted and the
+   * host is told what it was, so it can say so.
    *
-   * ## Why the LIST is the caller's and not this sheet's
+   * ## Why the HOST owns the message and the undo
    *
-   * The sheet is opened on ONE ticket (`ticketId` above) and the read behind it
-   * says nothing about its neighbours — there is no "the ticket next to this
-   * one" in any read model. The list these buttons walk is the CALLER's, and
-   * this sheet must not reconstruct it: two answers to "what is in this list"
-   * are free to drift, which is exactly the argument `onOpenTicket` above makes
-   * for not resolving the parent's project here. So the caller passes the two
-   * neighbour IDs it already knows and the callback that moves.
+   * The prototype's `deleteTicket` (`desktop.dc.html:3795`) closes the sheet,
+   * toasts *"<id> deleted · its history is retained"* and offers an Undo. **Two
+   * of those three cannot happen here**: a sheet that closed cannot draw a toast
+   * (`ticket-sheet.tsx` unmounts with it), and the Undo must outlive it. So this
+   * component emits the event — it owns `dataSource`, and the refusal and
+   * transport-error surfaces a REJECTED delete needs — and hands the committed
+   * fact to its host, which owns closing, the toast, and `ticket.restored`.
    *
-   * ## `null` is a DISABLED button, absent is NO footer
+   * That split is the same one the inbox's bulk action records: *"the toast is
+   * `position: fixed`, so its place in the tree is … an undo offered inside a
+   * component whose own empty/loading/refused arms change underneath it"*.
+   * Here it is stronger than a preference — the component is GONE by then.
    *
-   * **`null` on a neighbour means "there is no such ticket"**, and that is the
-   * disabled arm rather than an absent one, because the prototype draws both
-   * buttons at all times and greys the one that cannot move
-   * (`sheetAtStart: sheetIdx <= 0`; `sheetAtEnd: sheetIdx < 0 || sheetIdx >=
-   * vis.length - 1`; both styled `opacity:0.4;cursor:not-allowed`). **A control
-   * that disappears at the end of a list makes the footer's layout jump on every
-   * step** — the reader loses the button under their pointer at exactly the
-   * moment they reach the end.
+   * **Called ONLY on `committed`.** A refused or unanswered delete leaves the
+   * sheet open with its own notice, and the host is told nothing: there is no
+   * deletion to narrate.
    *
-   * **Absent means no footer is drawn at all**, on `onOpenTicket`'s and
-   * `canSetVisibility`'s precedent: a caller that cannot say what its list is
-   * does not get two buttons that guess at it.
+   * ## `title`, not an id, and that is a departure from the prototype
+   *
+   * The prototype toast says `"GN-1183 deleted · …"` — a ticket KEY. **This
+   * product has no ticket key**; its ids are ULIDs (`01J9GEVT…`), which are not
+   * something a person reads back. The title is the only human name a ticket has
+   * here, so it is what the sentence carries. **Recorded rather than silent: a
+   * key is a migration, and the parity list already names the breadcrumb as its
+   * owner.** Reversing this is one string in the host.
    */
-  navigation?: {
-    previousTicketId: string | null;
-    nextTicketId: string | null;
-    onNavigate: (ticketId: string) => void;
-  };
+  onDeleted?: (ticketId: string, title: string) => void;
 };
 
 /**
@@ -248,7 +247,7 @@ export function TicketSheet({
   visibility,
   canSetVisibility = true,
   onOpenTicket,
-  navigation,
+  onDeleted,
 }: TicketSheetProps) {
   const EditorSlot = editorSlot ?? PlainTextEditorSlot;
   const [tab, setTab] = useState<'details' | 'history'>('details');
@@ -692,7 +691,10 @@ export function TicketSheet({
    * belt-and-braces for a synchronous double-invoke, not the primary defence
    * — the `disabled` attribute is).
    */
-  const closeOrReopen = async (type: 'ticket.closed' | 'ticket.reopened'): Promise<void> => {
+  const submitTicketEvent = async (
+    type: 'ticket.closed' | 'ticket.reopened' | 'ticket.deleted',
+    onCommitted: () => void,
+  ): Promise<void> => {
     if (submitting) return;
     setSubmitting(true);
     try {
@@ -720,8 +722,13 @@ export function TicketSheet({
       if (result.status === 'committed') {
         setServerRefusal(null);
         setTransportError(null);
-        read.reload();
-        history.reload();
+        // What a COMMITTED event does next is the caller's — Close/Reopen
+        // re-read (the ticket's own state moved), Delete closes and narrates
+        // (the ticket is gone from every view). Everything before this line is
+        // shared on purpose: the refusal and transport-error slots, the
+        // `submitting` latch, and the three-outcome split are one decision, and
+        // a delete that grew its own private copy of them is how the two drift.
+        onCommitted();
         return;
       }
       setTransportError(null);
@@ -738,6 +745,43 @@ export function TicketSheet({
       setSubmitting(false);
     }
   };
+
+  /** Close/Reopen: the ticket's own state moved, so both reads are re-asked. */
+  const closeOrReopen = (type: 'ticket.closed' | 'ticket.reopened'): Promise<void> =>
+    submitTicketEvent(type, () => {
+      read.reload();
+      history.reload();
+    });
+
+  /**
+   * `Delete` — the SOFT delete, and the sheet's only removal.
+   *
+   * ## It CLOSES the sheet itself, and that is the fail-safe half
+   *
+   * The prototype's handler closes the sheet and toasts (`desktop.dc.html:3795`),
+   * and this product splits those: `onClose()` here, the toast in the host. **The
+   * close is called by the SHEET rather than left to the host**, even though the
+   * host owns `onDeleted`, because the two failures are not symmetric: a host
+   * that narrates without closing leaves a reader looking at a sheet for a
+   * ticket they just removed from every view, while a host that ignores
+   * `onDeleted` entirely still gets the sheet closed here. Optional callbacks
+   * must not be load-bearing.
+   *
+   * ## It is offered on every ticket, and the SERVER decides who may
+   *
+   * `ticket.deleted` is gated on project-admin rights (`check-permission.ts`'s
+   * check 6) — but this control is NOT hidden for anyone, deliberately. The
+   * repo's rule is that the ingest door is the only party that knows
+   * (`editorSlot`'s comment above says so at length), so a non-admin who presses
+   * Delete gets the engine's own refusal in `gn-refusal--server` rather than a
+   * button that silently is not there. **A hidden control cannot explain
+   * itself.**
+   */
+  const deleteTicket = (): Promise<void> =>
+    submitTicketEvent('ticket.deleted', () => {
+      onClose();
+      onDeleted?.(ticketId, ticketRead.title);
+    });
 
   const state = ticketRead.ticket;
   /**
@@ -1593,51 +1637,44 @@ export function TicketSheet({
         <HistoryTab result={history} nameOf={nameOf} />
       )}
 
-      {/* The prototype's footer. **Only the navigation half is built.** `Delete`
-          is NOT, and deliberately so: measured, a history-retaining removal has
-          no door in this product — no `ticket.deleted` event (the vocabulary's
-          eleven events contain no removal; control: `ticket.closed` = 110
-          hits), `archived` is project-scoped only, and `proj_tickets` carries no
-          removal column. It is held for a ruling rather than guessed at, and its
-          slot here is simply empty so it can land without moving the nav.
+      {/* The prototype's footer (`desktop.dc.html:1371-1373`), and it is now the
+          COMPLETE footer rather than half of one: `Delete` is built and the
+          navigation is gone.
 
-          The row is the prototype's `justify-content:space-between`
-          (`desktop.dc.html:1371`) with only its right-hand child built, and
-          `.gn-ticket-sheet__nav`'s `margin-left:auto` is what keeps the buttons
-          where the prototype puts them in the meantime. */}
-      {navigation !== undefined ? (
-        <footer className="gn-ticket-sheet__footer">
-          <div className="gn-ticket-sheet__nav">
-            <button
-              type="button"
-              disabled={navigation.previousTicketId === null}
-              onClick={() => {
-                if (navigation.previousTicketId === null) return;
-                // The prototype resets the open tab on every step — `:3809-3810`
-                // sets `sheetTab: "details"` alongside the new `sheetId` — so
-                // walking the list can never leave a reader on one ticket's
-                // History while a different ticket's sheet is open. The guard
-                // above is also what narrows the union for `onNavigate`.
-                setTab('details');
-                navigation.onNavigate(navigation.previousTicketId);
-              }}
-            >
-              ‹ Previous
-            </button>
-            <button
-              type="button"
-              disabled={navigation.nextTicketId === null}
-              onClick={() => {
-                if (navigation.nextTicketId === null) return;
-                setTab('details');
-                navigation.onNavigate(navigation.nextTicketId);
-              }}
-            >
-              Next ›
-            </button>
-          </div>
-        </footer>
-      ) : null}
+          ## ⛔ THE NAVIGATION IS REMOVED BY RULING, NOT MISSING
+          The owner ruled it out on 2026-09-20 — *"remove the navigation"*. It had
+          never rendered anywhere: `TicketSheetProps.navigation` had zero call
+          sites repo-wide, so this footer drew `null` on every mount in the
+          product. **The prototype still draws `‹ Previous / Next ›`; the product
+          does not, and that is the decision rather than a gap or a TODO.** The
+          prop, its two neighbour ids, its `onNavigate`, the `setTab('details')`
+          reset each step performed, the `.gn-ticket-sheet__nav` rules and case
+          `16.43`'s five tests all went with it — a control that cannot be
+          honoured is not carried "in case".
+
+          ## Why the row is drawn UNCONDITIONALLY now
+          It used to be `navigation !== undefined ? … : null`, on `onOpenTicket`'s
+          precedent that a caller who cannot say what its list is gets no control
+          that guesses. **That precedent does not reach `Delete`**: deleting does
+          not need to know anything the sheet lacks — it names the ticket this
+          sheet is already open on. So the footer draws on every mount, and
+          `onDeleted` (the host's half) is optional and NOT load-bearing: the
+          close happens here, and a host that narrates nothing still gets a closed
+          sheet. See `deleteTicket`'s docblock.
+
+          The strip's fill and its full-bleed inset remain the recorded departure
+          `ui.css` carries beside `.gn-ticket-sheet__footer` — the reason is a
+          `Sheet` API change, measured there rather than asserted here. */}
+      <footer className="gn-ticket-sheet__footer">
+        <button
+          type="button"
+          className="gn-ticket-sheet__delete"
+          disabled={submitting}
+          onClick={() => void deleteTicket()}
+        >
+          Delete
+        </button>
+      </footer>
 
       {workflow.data != null ? (
         <TransitionDialog

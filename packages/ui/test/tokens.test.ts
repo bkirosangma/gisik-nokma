@@ -1429,6 +1429,56 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
       ).toBeGreaterThanOrEqual(4.5);
     }
   });
+
+  /**
+   * 16.84 — `danger` as TEXT on **`surfaceRaised`**, which is the ground the
+   * ticket sheet's `Delete` control actually sits on.
+   *
+   * ## Why this pair is asserted when `danger` on `surface` is recorded as BELOW AA
+   *
+   * The case above measures `danger` on `surface` at **4.4013** in hig/minimal
+   * light and records it, un-blessed, with no `CONTRAST_PAIRS` row naming the
+   * pair. **That is not the ground this control has.** The sheet's own footer
+   * sits inside `.gn-sheet`, which is `background: var(--gn-surface-raised)`
+   * (`ui.css:353`), and the prototype's `Delete` is danger INK on a transparent
+   * ground (`desktop.dc.html:1372`). Measured there, the pair clears 4.5 in all
+   * six style×theme combinations.
+   *
+   * ## Why it is ENFORCED rather than written into a comment
+   *
+   * The `ui.css` block states the figures, and a figure that lives only in a
+   * comment is the shape 16.83 was criticised for: recorded and nowhere
+   * enforced, so a token edit could cross the floor with every suite green.
+   * **Two controls bind this reading, and both are in the assertions below:**
+   * `colorOf` must still answer the values `tokens.test.ts` pins elsewhere
+   * (`#9e2a20` neo light, `#d70015` hig light), and the SAME computation must
+   * still reproduce the recorded `surface` shortfall at 4.4013 — if either
+   * drifts, this case is measuring a different token table and says so.
+   *
+   * 5.0392 is the worst of the six and is `hig`/`minimal` DARK — not the light
+   * pair a reader would guess, which is why the loop asserts every combination
+   * rather than the two light ones.
+   */
+  it('16.84 danger-as-ink on surfaceRaised clears AA in all six combinations, on the ground the Delete control really has', () => {
+    // CONTROL 1 — the pinned primitive values, from the cases above.
+    expect(colorOf('light', 'danger', 'neo')).toBe('#9e2a20');
+    expect(colorOf('light', 'danger', 'hig')).toBe('#d70015');
+    // CONTROL 2 — the same computation reproduces the RECORDED `surface`
+    // shortfall, so this is reading the table the rest of this file reads.
+    expect(
+      contrastRatio(colorOf('light', 'danger'), colorOf('light', 'surface')),
+      'danger on surface in hig/minimal light — the recorded 4.4013',
+    ).toBeLessThan(4.5);
+
+    for (const style of ['hig', 'minimal', 'neo'] as const) {
+      for (const theme of ['light', 'dark'] as const) {
+        expect(
+          contrastRatio(colorOf(theme, 'danger', style), colorOf(theme, 'surfaceRaised', style)),
+          `${style}/${theme}: danger as ink on surfaceRaised — the Delete control's ground`,
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
 });
 
 /**

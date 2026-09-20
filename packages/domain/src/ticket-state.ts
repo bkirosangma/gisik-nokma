@@ -9,10 +9,12 @@ import {
   ticketClosedPayload,
   ticketCollaboratorPayload,
   ticketCreatedPayload,
+  ticketDeletedPayload,
   ticketFieldSetPayload,
   ticketRankedPayload,
   ticketReopenedPayload,
   ticketReparentedPayload,
+  ticketRestoredPayload,
   ticketWorkflowReboundPayload,
 } from './events/ticket-events.js';
 import type { TicketTypeDef } from './ticket-types.js';
@@ -55,7 +57,7 @@ export type TicketStateDeps = {
 };
 
 /**
- * The event types this reducer folds — THIRTEEN of the SIXTEEN registered against
+ * The event types this reducer folds — FIFTEEN of the EIGHTEEN registered against
  * `entityKind: 'ticket'`, not all of them. **This is not the ticket-entity
  * set**, and reading it as one has already cost a defect: `visibility.set`,
  * `claim.contested` and `claim.contested_resolved` are filed against a ticket
@@ -65,6 +67,13 @@ export type TicketStateDeps = {
  * account for those three separately; a reader who believed this list was
  * exhaustive dropped `visibility.set` from a replica's payload and the omission
  * was invisible for a whole task.
+ *
+ * The count is FIFTEEN of EIGHTEEN because the soft-delete pair moved both
+ * numbers together: `ticket.deleted` and `ticket.restored` are registered
+ * against `entityKind: 'ticket'` and are folded below, so they belong here.
+ * It is stated as a count rather than left implicit because this docblock's
+ * whole job is to stop a reader mistaking the list for the entity set, and a
+ * stale count is the first half of that mistake.
  *
  * `ticket-type.defined` is deliberately absent for a different reason: it is
  * about a ticket TYPE, has its own entity kind and its own stream, and changing
@@ -83,6 +92,8 @@ export const TICKET_EVENT_TYPES = [
   'ticket.closed',
   'ticket.reopened',
   'ticket.ranked',
+  'ticket.deleted',
+  'ticket.restored',
   'comment.added',
   'attachment.added',
 ] as const;
@@ -181,6 +192,14 @@ export function applyTicketEvent(
       // reopened-then-transitioned ticket are the same state as far as this
       // field is concerned, and both read `null`.
       reopenedAt: null,
+      // Creation writes the null for the same measured reason as `rank: null`
+      // above: the dual-client rig compares whole `TicketState`s with
+      // `toEqual`, so a reducer that omitted this key would force
+      // `rowToTicketState` to omit it too. A never-deleted ticket and a
+      // deleted-then-restored ticket are the same state as far as this field is
+      // concerned, and both read `null` — which is what the undo
+      // (`ticket.restored`) folds BACK to, not a third value.
+      deleted: null,
     };
   }
 
@@ -350,6 +369,33 @@ export function applyTicketEvent(
       // nobody made into the transition log four-eyes reads.
       const p = ticketRankedPayload.parse(env.payload);
       return { ...state, rank: p.rank };
+    }
+    case 'ticket.deleted': {
+      // The soft delete: a FLAG on head state, exactly as `ticket.closed` is,
+      // and orthogonal to `stateId` for the same reason. The ledger and the
+      // projection row both stay — the product's own FAQ already stated these
+      // semantics before this event existed
+      // (`design-system/interactive/desktop.dc.html`'s `faq-delete` entry: "The
+      // ticket stops appearing in views. Its history is retained, because other
+      // events cite it"). Nothing is erased here and nothing may be.
+      //
+      // Whether the ticket may be deleted AT ALL is the engine's door
+      // (checkTicketDeleted), not the reducer's: this fold replays what the
+      // engine already accepted, per this function's header.
+      ticketDeletedPayload.parse(env.payload);
+      return { ...state, deleted: { actorId: env.actorId, at: env.serverTime } };
+    }
+    case 'ticket.restored': {
+      // The UNDO, and the reason `deleted` is a nullable flag rather than a
+      // boolean: the flag has to be able to go back to the same `null` creation
+      // wrote, so a never-deleted ticket and a restored one are indistinguishable
+      // in head state — which is exactly what "the undo put it back" means.
+      //
+      // `serverTime`, never `clientTime`, for the same reason `ticket.reopened`
+      // records `serverTime`: the instant this flag carries is when the RECORD
+      // says the ticket left the views, and a claim's own clock is the claim's.
+      ticketRestoredPayload.parse(env.payload);
+      return { ...state, deleted: null };
     }
     case 'comment.added':
     case 'attachment.added':

@@ -21,6 +21,7 @@ import type { EffectiveRole } from '../permissions/effective-role.js';
 import { getWorkflowDefFromProjection } from '../projections/workflows.js';
 import { READ_NOT_FOUND_BODY, requireMember } from '../read/membership.js';
 import { ROSTER_VISIBLE_CLAUSE, isWorkspaceAdmin } from '../read/membership-roster.js';
+import { LIVE_TICKET_WHERE } from '../read/visible-where.js';
 import { latestWorkflowDefs } from '../read/workflow-defs.js';
 
 /**
@@ -348,11 +349,18 @@ export async function readStateOccupancy(
   for (const state of def.states) {
     counts.set(state.id, 0);
   }
+  // The occupant badge is a VIEW of the workflow, so a soft-deleted ticket is
+  // not an occupant: leaving it in would make the builder demand a target state
+  // for a ticket nobody can reach, and the admin would be mapping a state whose
+  // only ticket is invisible to them. Aliased `t` so the one predicate constant
+  // applies verbatim — see its docblock for why it is not folded into the
+  // visibility predicate and why this grep is the coverage list.
   const { rows } = await db.query<{ state_id: string; occupants: number }>(
-    `SELECT state_id, count(*)::int AS occupants
-       FROM proj_tickets
-      WHERE workspace_id = $1 AND workflow_id = $2
-      GROUP BY state_id`,
+    `SELECT t.state_id, count(*)::int AS occupants
+       FROM proj_tickets t
+      WHERE t.workspace_id = $1 AND t.workflow_id = $2
+        AND ${LIVE_TICKET_WHERE}
+      GROUP BY t.state_id`,
     [workspaceId, def.id],
   );
   for (const row of rows) {
@@ -425,8 +433,9 @@ export async function readTypePopulation(
 ): Promise<number> {
   const { rows } = await db.query<{ population: number }>(
     `SELECT count(*)::int AS population
-       FROM proj_tickets
-      WHERE workspace_id = $1 AND type_id = $2 AND workflow_id = $3`,
+       FROM proj_tickets t
+      WHERE t.workspace_id = $1 AND t.type_id = $2 AND t.workflow_id = $3
+        AND ${LIVE_TICKET_WHERE}`,
     [workspaceId, typeId, workflowId],
   );
   return rows[0]?.population ?? 0;
@@ -482,10 +491,17 @@ export async function readTypePopulation(
  */
 export async function readTicketCounts(db: Queryable, workspaceId: string): Promise<Record<string, number>> {
   const { rows } = await db.query<{ type_id: string; count: number }>(
+    // The soft-delete predicate written LONGHAND on the `k` alias — this is the
+    // one builder read whose `t` is already taken, by `proj_ticket_types`. It is
+    // `LIVE_TICKET_WHERE`'s clause on a different alias, and it is in the JOIN's
+    // ON clause rather than the WHERE, deliberately: this is a LEFT JOIN whose
+    // whole job is to report a count of ZERO for a type that has no tickets, and
+    // a WHERE on the right-hand alias would turn a zero into an absent row.
     `SELECT t.type_id, count(k.ticket_id)::int AS count
        FROM proj_ticket_types t
        LEFT JOIN proj_tickets k
          ON k.workspace_id = t.workspace_id AND k.type_id = t.type_id
+        AND k.deleted_at IS NULL
       WHERE t.workspace_id = $1
       GROUP BY t.type_id`,
     [workspaceId],

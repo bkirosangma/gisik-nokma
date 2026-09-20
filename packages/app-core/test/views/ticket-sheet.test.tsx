@@ -2073,98 +2073,145 @@ describe('G — Priority, Due and Type as rows', () => {
 });
 
 /**
- * 16.43 — the sheet footer's `‹ Previous / Next ›` (the prototype's footer row,
- * `desktop.dc.html:1370-1373`, handlers `:3809-3810`).
+ * 16.84 — the sheet footer's `Delete`: the SOFT delete, and the removal of the
+ * `‹ Previous / Next ›` pair the owner ruled out.
  *
- * **`Delete` is NOT built** — measured, a history-retaining removal has no door
- * in this product (no `ticket.deleted` in the eleven-event vocabulary, no
- * removal column on `proj_tickets`) and is held for a ruling rather than guessed
- * at. Nothing below asserts anything about it.
+ * ## What 16.43 WAS, and why it is retired rather than left standing
+ * `16.43` walked the visible list through `TicketSheetProps.navigation`. **The
+ * owner ruled the pair out on 2026-09-20 — *"remove the navigation"* — and it had
+ * never rendered anywhere anyway**: `navigation` had ZERO call sites repo-wide, so
+ * that footer drew `null` on every mount in the product. Its five arms retire with
+ * the control, and the case is marked 🚫 in `test-cases/16-remaining-doors.md`
+ * carrying the ruling as its reason. **A green case over a deleted feature is the
+ * failure this retirement exists to avoid.** The prop no longer exists, so no
+ * caller can bring the pair back; what is left to assert about it is its ABSENCE.
  *
- * The property these arms are built around: **the list these buttons walk is the
- * CALLER's**, so the sheet never invents a neighbour — and **an end is a
- * DISABLED button, not an absent one**, because the prototype greys the control
- * it cannot move past (`sheetAtStart: sheetIdx <= 0`) and a button that vanished
- * would jump the row's layout at exactly the moment a reader reaches the end.
+ * ## The property these arms are built around
+ * **`Delete` is a history-retaining removal, not an erasure.** The sheet emits
+ * `ticket.deleted` with an empty, strict payload and hands the committed fact to
+ * its host, which owns the toast and the Undo (`ticket.restored`). **The CLOSE is
+ * the sheet's own**, and that asymmetry is deliberate: a host that narrates
+ * nothing must still not leave a reader on a sheet for a ticket that is now in no
+ * view, while a host that narrates something it was never told is impossible.
  */
-describe('16.43 — the sheet footer walks the visible list', () => {
-  it('16.43 sends the caller the neighbour IT was given, and never invents one', async () => {
-    const user = userEvent.setup();
-    const onNavigate = vi.fn();
-    renderSheet(ticketRead(), undefined, {
-      navigation: { previousTicketId: 'TICKET_PREV', nextTicketId: 'TICKET_NEXT', onNavigate },
-    });
-    await settled();
+describe('16.84 — the sheet footer deletes the ticket, and the navigation is gone', () => {
+  /** The footer's own strip, so `Delete` cannot be satisfied by the action row. */
+  function footer(): HTMLElement {
+    return document.querySelector('.gn-ticket-sheet__footer') as HTMLElement;
+  }
 
-    await user.click(screen.getByRole('button', { name: 'Next ›' }));
-    expect(onNavigate).toHaveBeenCalledWith('TICKET_NEXT');
-
-    await user.click(screen.getByRole('button', { name: '‹ Previous' }));
-    expect(onNavigate).toHaveBeenCalledWith('TICKET_PREV');
-    // Two calls, two DIFFERENT ids: a sheet that resolved its own neighbours
-    // would have to invent them, and both of these come from the caller.
-    expect(onNavigate).toHaveBeenCalledTimes(2);
-  });
-
-  it('16.43 GREYS the end it cannot move past rather than removing it', async () => {
-    const user = userEvent.setup();
-    const onNavigate = vi.fn();
-    renderSheet(ticketRead(), undefined, {
-      navigation: { previousTicketId: null, nextTicketId: 'TICKET_NEXT', onNavigate },
-    });
-    await settled();
-
-    // PRESENT is the assertion that matters — a `toBeDisabled()` on its own
-    // would also pass for a control that had been dropped from the tree and
-    // re-found somewhere else.
-    const previous = screen.getByRole('button', { name: '‹ Previous' });
-    expect(previous).toBeInTheDocument();
-    expect(previous).toBeDisabled();
-    // The other end is untouched by its neighbour's state.
-    expect(screen.getByRole('button', { name: 'Next ›' })).toBeEnabled();
-
-    await user.click(previous);
-    expect(onNavigate).not.toHaveBeenCalled();
-  });
-
-  it('16.43 with no neighbour at the far end, NEXT is the greyed one', async () => {
-    const user = userEvent.setup();
-    const onNavigate = vi.fn();
-    renderSheet(ticketRead(), undefined, {
-      navigation: { previousTicketId: 'TICKET_PREV', nextTicketId: null, onNavigate },
-    });
-    await settled();
-
-    const next = screen.getByRole('button', { name: 'Next ›' });
-    expect(next).toBeInTheDocument();
-    expect(next).toBeDisabled();
-    await user.click(next);
-    expect(onNavigate).not.toHaveBeenCalled();
-  });
-
-  it('16.43 walking the list resets the open tab to Details', async () => {
-    const user = userEvent.setup();
-    renderSheet(ticketRead(), undefined, {
-      navigation: { previousTicketId: 'TICKET_PREV', nextTicketId: 'TICKET_NEXT', onNavigate: vi.fn() },
-    });
-    await settled();
-
-    await user.click(screen.getByRole('tab', { name: 'History' }));
-    expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true');
-
-    await user.click(screen.getByRole('button', { name: 'Next ›' }));
-    // The prototype sets `sheetTab: "details"` alongside the new `sheetId`
-    // (`:3809-3810`), so a step can never leave one ticket's History standing
-    // under another ticket's sheet.
-    expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true');
-  });
-
-  it('16.43 with NO `navigation` there is no footer at all', async () => {
-    // The `onOpenTicket` precedent: a caller that cannot say what its list is
-    // gets no control, rather than two buttons that guess at one.
+  it('16.84 draws Delete, and the ruled-out navigation is ABSENT', async () => {
     renderSheet(ticketRead());
     await settled();
-    expect(screen.queryByRole('button', { name: 'Next ›' })).toBeNull();
+
+    expect(within(footer()).getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    // The ABSENCE is the assertion rather than a formality: nothing computes a
+    // queue position, so these could only ever be drawn disabled on every mount
+    // — which is what they were, for the whole life of the prop.
     expect(screen.queryByRole('button', { name: '‹ Previous' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Next ›' })).toBeNull();
+  });
+
+  it('16.84 pressing Delete ingests ONE ticket.deleted for THIS ticket with {} — then closes and narrates', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onDeleted = vi.fn();
+    const source = renderSheet(ticketRead(), undefined, { onClose, onDeleted });
+    await settled();
+
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+
+    const batch = source.ingested[0]!;
+    expect(batch).toHaveLength(1);
+    expect(batch[0]!.type).toBe('ticket.deleted');
+    // Empty AND strict, the same construction `ticket.closed` uses: the envelope
+    // carries the actor and the instant, and the payload says nothing.
+    expect(batch[0]!.payload).toEqual({});
+    expect(batch[0]!.entity).toEqual({ kind: 'ticket', id: TICKET });
+    expect(batch[0]!.actorId).toBe('user_kiro');
+    expect(batch[0]!.origin).toBe('web');
+
+    // BOTH halves. The title, not an id: this product has no ticket KEY, and a
+    // ULID is not something a person reads back.
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(onDeleted).toHaveBeenCalledWith(TICKET, 'File the GST return');
+  });
+
+  it('16.84 closes even when the host passes NO onDeleted — the close is not the host\'s to forget', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const source = renderSheet(ticketRead(), undefined, { onClose });
+    await settled();
+
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
+
+  it('16.84 a REFUSED delete keeps the sheet open and shows the server\'s OWN rule', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onDeleted = vi.fn();
+    const read = ticketRead();
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      // The real engine's refusal for a non-admin: check 6 in
+      // `apps/server/src/permissions/check-permission.ts`, reported as
+      // `permission.role` — the same id every neighbouring write refusal uses.
+      (events) =>
+        events.map((event) => ({
+          status: 'refused' as const,
+          eventId: event.id,
+          rule: 'permission.role',
+          reason: 'Only a project admin can delete a ticket in this project.',
+        })),
+    );
+    renderSheet(read, source, { onClose, onDeleted });
+    await settled();
+
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Only a project admin can delete a ticket in this project\./),
+      ).toBeInTheDocument(),
+    );
+    // Nothing was deleted, so there is nothing to narrate and nothing to close:
+    // closing here would hide the refusal from the only person who can act on it.
+    expect(onDeleted).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('16.84 a SILENT non-answer is a transport error, never a refusal', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onDeleted = vi.fn();
+    const read = ticketRead();
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      // One event submitted, zero results — Ruling 27/33's typed case. Dressing
+      // this in "Refused by the server" would claim an adjudication that never
+      // happened, which is exactly what the shared `submitTicketEvent` prevents.
+      () => [],
+    );
+    renderSheet(read, source, { onClose, onDeleted });
+    await settled();
+
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await waitFor(() =>
+      expect(screen.getByText(/The server did not answer this change\./)).toBeInTheDocument(),
+    );
+    expect(onDeleted).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

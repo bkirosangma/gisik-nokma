@@ -20,10 +20,12 @@ import {
   ticketClosedPayload,
   ticketCollaboratorPayload,
   ticketCreatedPayload,
+  ticketDeletedPayload,
   ticketFieldSetPayload,
   ticketRankedPayload,
   ticketReopenedPayload,
   ticketReparentedPayload,
+  ticketRestoredPayload,
   ticketWorkflowReboundPayload,
 } from './events/ticket-events.js';
 import { visibilitySetPayload } from './events/visibility.js';
@@ -189,6 +191,33 @@ domainRegistry.register({
   version: 1,
   entityKind: 'ticket',
   payloadSchema: ticketRankedPayload,
+});
+
+/**
+ * The soft-delete pair, filed against the ticket whose flag it sets exactly as
+ * the closed pair above is. Neither moves `stateId` — the flag and the state
+ * are orthogonal, the same split `ticket.closed` records.
+ *
+ * `ticket.deleted` is the product's `Delete` — a history-retaining removal with
+ * an undo, not an erasure (`design-system/interactive/desktop.dc.html`'s
+ * `faq-delete` entry: *"The ticket stops appearing in views. Its history is
+ * retained, because other events cite it"*). `ticket.restored` is that undo.
+ * Both are in `TICKET_EVENT_TYPES` for the reason the closed pair and
+ * `ticket.ranked` are: each moves head state (`deleted`) and leaves `stateId`
+ * alone, so any replay reader iterating that list must see them.
+ */
+domainRegistry.register({
+  type: 'ticket.deleted',
+  version: 1,
+  entityKind: 'ticket',
+  payloadSchema: ticketDeletedPayload,
+});
+
+domainRegistry.register({
+  type: 'ticket.restored',
+  version: 1,
+  entityKind: 'ticket',
+  payloadSchema: ticketRestoredPayload,
 });
 
 domainRegistry.register({

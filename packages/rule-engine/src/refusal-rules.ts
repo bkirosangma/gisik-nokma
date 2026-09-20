@@ -26,6 +26,8 @@ export const REFUSAL_RULES = {
   alreadyClosed: 'already-closed',
   notClosed: 'not-closed',
   closedTicket: 'closed-ticket',
+  alreadyDeleted: 'already-deleted',
+  notDeleted: 'not-deleted',
   rankRequiresBacklog: 'rank-requires-backlog',
   lastOwner: 'last-owner',
   grantOwnerRequiresOwner: 'grant-owner-requires-owner',

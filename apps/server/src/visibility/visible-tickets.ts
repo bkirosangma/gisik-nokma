@@ -66,6 +66,18 @@ export async function listVisibleTickets(
   const params = new SqlParams();
   const workspaceClause = `v.workspace_id = ${params.add(workspaceId)}`;
   const visibleClause = visibleTicketsWhere(eff, userId, params);
+  // NO soft-delete predicate here, and it is a recorded ruling rather than an
+  // omission (`docs/lanes/executor-state.md`'s "NAMED, NOT COVERED", item 4).
+  // The reason is structural: this SELECT has no `proj_tickets` in its FROM at
+  // all, so the column is not reachable without adding a join — and the same
+  // note records that the route this feeds, `GET /v1/workspaces/:ws/tickets`,
+  // **has no client consumer** (a controlled sweep of `apps/web/src`,
+  // `apps/web/app`, `packages/app-core/src` and `packages/mcp-server/src` for
+  // the collection URL returns empty, against a positive control through the
+  // same pattern). A join added here would be a filter for a surface nothing
+  // reads. Named so a later reader does not re-derive it; the docblock's own
+  // "when a caller needs ticket columns" note is where the join lands the day
+  // one exists.
   const { rows } = await db.query<Record<string, unknown>>(
     `SELECT v.* FROM proj_visibility v
       WHERE ${workspaceClause} AND ${visibleClause}

@@ -1581,51 +1581,93 @@
    the class had no other reference anywhere in the repo — its only remaining
    mentions were the rules themselves. Dead CSS is a reader's trap: it looks like
    the live treatment and is not. */
-/* The sheet's footer row — the prototype's `‹ Previous / Next ›` bar
-   (`desktop.dc.html:1371`: `padding:16px 24px;background:var(--fill4);
-   justify-content:space-between`, whose left-hand `Delete` is NOT built — see
-   `ticket-sheet.tsx`'s footer).
+/* The sheet's footer row — the prototype's footer bar (`desktop.dc.html:1371`:
+   `padding:16px 24px;background:var(--fill4);justify-content:space-between`),
+   now carrying the one control this product draws: `Delete`.
 
-   ## One deliberate departure, and why it is not smuggled
+   ## ⛔ `‹ Previous / Next ›` IS GONE, AND ITS ABSENCE IS A DECISION
+   The owner ruled it out on 2026-09-20 — *"remove the navigation"*. **Nothing in
+   the product computes a queue position**, so the pair rendered on no shipping
+   screen: **`TicketSheet` has exactly ONE product call site (`apps/web`'s
+   project page) and it passed no `navigation`, so the footer drew `null` on
+   every mount in the product.** ⚠ **"Zero call sites repo-wide" was the first
+   wording and it overreaches** — case `16.43`'s own arms in
+   `packages/app-core/test/views/ticket-sheet.test.tsx` passed one five times
+   (independent review, 2026-09-20). The substantive claim is the ONE PRODUCT
+   CALL SITE, and it holds. The prop, its two ids, that case's five arms and the
+   `.gn-ticket-sheet__nav` rules went with it. **The prototype still draws them;
+   the product does not, and that is the decision, not a gap and not a TODO.**
+   `16.43` is retired to 🚫 in `test-cases/16-remaining-doors.md` carrying this
+   ruling as its reason.
 
+   ## One deliberate departure, restated for the COMPLETE footer
    The prototype grounds this strip in `--fill4` (`--gn-fill-quaternary`) and
-   runs it to the sheet's edges. **Reproduced as a separator rule instead**,
-   because `Sheet` mounts EVERY child inside `.gn-sheet__body`, whose
-   `padding: 1rem 1.1rem` is the only thing between this strip and the sheet's
-   edge: reaching it means hard-coding that inset as a negative margin, which is
-   a SECOND copy of a value that lives in the rule above and that nothing would
-   keep in sync. The prototype's fill and its full-bleed inset belong with the
-   complete footer, alongside `Delete`; this row carries the STRUCTURE — a
-   footer, below the body, with the controls at the end the prototype puts them.
-   The `margin-left:auto` below is what holds them there while the left slot is
-   empty, so `Delete` landing changes nothing about where the nav sits. */
+   runs it to the sheet's edges. It is still a separator rule instead, and the
+   reason has not changed: `Sheet` mounts EVERY child inside `.gn-sheet__body`,
+   whose `padding: 1rem 1.1rem` is the only thing between this strip and the
+   sheet's edge, so reaching the edge means hard-coding that inset as a negative
+   margin — a SECOND copy of a value that lives in another rule and that nothing
+   would keep in sync. **Measured rather than assumed, because the earlier
+   version of this comment only asserted it: `ui.css` contains ZERO negative-
+   margin DECLARATIONS, against 161 positive-or-zero `margin*:` declarations and
+   186 occurrences of the word (⚠ the first version of this sentence said "184
+   `margin` declarations", which is the LINE count, not the declaration count —
+   independent review, 2026-09-20, and the unit is the thing that was wrong).** A true
+   full-bleed footer is therefore a `Sheet` API change — a `footer` slot
+   rendered as a SIBLING of `.gn-sheet__body`, exactly the way the `header`
+   already is — and not a margin trick here. Named for whoever wants it.
+
+   `justify-content: space-between` is the prototype's own and is KEPT although
+   it currently has a single child: it is the structure a second, right-hand
+   control lands in, and dropping it would turn re-adding one into a layout
+   change rather than a content change. */
 .gn-ticket-sheet__footer {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  justify-content: space-between;
   margin-top: 1.2rem;
   padding-top: 1rem;
   border-top: 1px solid var(--gn-border);
 }
-.gn-ticket-sheet__nav { display: flex; gap: 0.6rem; margin-left: auto; }
-.gn-ticket-sheet__nav button {
+/* `Delete`, transcribed from the prototype's own control (`desktop.dc.html:1372`):
+   `min-height:44px;padding:0 18px;border:none;border-radius:var(--ctlR);
+   background:transparent;color:var(--danger);font-weight:600`. A TRANSPARENT
+   ground with danger INK — which is why this is a bare button plus a scoped
+   rule and NOT `.gn-button--danger`, whose ground is `--gn-danger` FILLED. That
+   is also what this row's own buttons did before it.
+
+   ## Why `--gn-danger` as TEXT is safe HERE though it is not safe on `surface`
+   `packages/ui/test/tokens.test.ts:1412` records that `danger` as text measures
+   **4.4013 against `surface` in hig/minimal light — below AA, with no
+   `CONTRAST_PAIRS` row naming the pair.** This control's ground is NOT
+   `surface`: the footer sits inside `.gn-sheet`, which is
+   `background: var(--gn-surface-raised)` (`ui.css:353`). **Measured on that
+   ground, `danger` clears 4.5 in all six style×theme combinations** — worst
+   `hig`/`minimal` DARK at **5.0392**; the full set is 5.0511 · 5.0392 · 5.0511 ·
+   5.0392 · 6.2792 · 5.4702 (hig light · hig dark · minimal light · minimal dark
+   · neo light · neo dark). The two controls that bind the figure: `colorOf`
+   reproduces `tokens.test.ts`'s own pinned `#9e2a20` (neo light) and `#d70015`
+   (hig light), and the same computation reproduces the recorded `surface` pair
+   at **4.4013** exactly. **Same shape as case 16.83's glyph** — the control's
+   ground is the sheet, not the `surface` a neighbouring case pins — so the
+   number is taken on the real composite rather than inherited.
+
+   The prototype's `44px` is `2.75rem` here, the same conversion and for the same
+   reason `.gn-board-card__move` records: a touch target that scales with the
+   reader's text size rather than against it. */
+.gn-ticket-sheet__delete {
   font: inherit;
   font-weight: 600;
-  /* The prototype's own touch target (`min-height:44px`), kept in rem so it
-     scales with the reader's text size rather than against it. */
   min-height: 2.75rem;
-  padding: 0 1.1rem;
+  padding: 0 1.125rem;
   border: none;
   border-radius: var(--gn-radius-control);
-  background: var(--gn-surface-sunken);
-  color: var(--gn-accent);
+  background: transparent;
+  color: var(--gn-danger);
   cursor: pointer;
 }
-/* The prototype GREYS the end it cannot move past rather than removing it
-   (`sheetAtStart`/`sheetAtEnd` add `opacity:0.4;cursor:not-allowed`), so the
-   row's layout is identical at every position in the list and the control does
-   not vanish from under a reader who has just reached the end. */
-.gn-ticket-sheet__nav button:disabled { opacity: 0.4; cursor: not-allowed; }
+.gn-ticket-sheet__delete:disabled { opacity: 0.4; cursor: not-allowed; }
 .gn-ticket-sheet__state { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }
 .gn-ticket-sheet__provenance { color: var(--gn-text-muted); font-size: 0.85rem; }
 .gn-ticket-sheet__parent { margin: 0.6rem 0; color: var(--gn-text-muted); }

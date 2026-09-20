@@ -9,6 +9,7 @@ import {
 import { REFUSAL_RULES, type Refusal } from '@gisik-nokma/rule-engine';
 import type { Queryable } from '../db/queryable.js';
 import { projectExists } from '../projections/proj-projects.js';
+import { getTicketStateFromDb } from '../projections/tickets.js';
 import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
 import { hasProjectAdminRights, resolveEffectiveRole, type EffectiveRole } from './effective-role.js';
 
@@ -130,6 +131,35 @@ export const TICKET_NOT_VISIBLE_REASON = 'This ticket is not visible to you.';
 /** Task 9 check 5. Reported as `permission.role`: it is authority, not audience. */
 export const VISIBILITY_AUTHORITY_REASON =
   "Only a project admin or the ticket's creator can change who sees this ticket.";
+/**
+ * Soft delete's authority refusal, and it is a FUNCTION rather than a constant
+ * for the same reason `parentTerminalRefusal` is one in the rule engine: the
+ * sentence is otherwise identical for the flag's two acts, and the one word
+ * that differs — whether the actor was trying to delete or to restore — is the
+ * word they need in order to understand what just happened. A single constant
+ * saying "delete" would tell somebody whose UNDO was refused that they may not
+ * delete, which is the opposite of what they asked for.
+ *
+ * It names a person who can act, which is what makes it remediable: the sheet's
+ * `serverRefusal` surface renders `rule: reason` verbatim, and the UI does not
+ * gate on role at all — this door is the only party that knows.
+ */
+export function ticketDeleteAuthorityReason(act: 'delete' | 'restore'): string {
+  return `Only a project admin can ${act} a ticket.`;
+}
+/**
+ * `ticket.deleted` / `ticket.restored` on a ticket whose row `proj_tickets` does
+ * not hold, while `proj_visibility` says the actor may see it.
+ *
+ * Unreachable through the shipped door (one ingest transaction writes both
+ * projections or rolls back), so this is a projection/ledger disagreement
+ * rather than a user error — the single-ticket route throws on the same pair
+ * (`routes/tickets.ts`). It is refused rather than thrown here because this is
+ * the ingest gate: a 500 on a corrupt row would be a worse answer than a
+ * refusal, and refusing is the direction that cannot widen anyone's authority.
+ */
+export const TICKET_DELETE_UNRESOLVED_REASON =
+  'This ticket could not be read, so it cannot be deleted or restored.';
 /**
  * Task 14. `invite.accepted` is refused from EVERY client envelope-origin, at
  * every role including owner.
@@ -845,7 +875,7 @@ async function getTicketCreator(db: Queryable, ticketId: string): Promise<string
  * reads projections and the ledger; runs after `checkRolePermission` and after
  * `checkProjectExists`, still before the rule engine.
  *
- * ## The five checks, in the order a refusal should be met
+ * ## The six checks, in the order a refusal should be met
  *
  * 1. **Ticket-entity events only.** Everything else passed the role gate
  *    already and has no audience to ask about.
@@ -860,15 +890,22 @@ async function getTicketCreator(db: Queryable, ticketId: string): Promise<string
  *    ask yet. `proj_visibility` keys on the entity regardless (case 6.55), so
  *    without this refusal one ticket's stream authors another ticket's audience.
  * 4. **Everything else about a ticket** — transition, assign, comment, field
- *    set, reparent, and `visibility.set` itself — requires `canSee`. This is
- *    also exactly the guest constraint: a guest's `canSee` is true only for
- *    tickets an explicit list names them in, so "guests may only act on tickets
- *    explicitly visible to them" falls out of the same line rather than needing
- *    a guest branch of its own.
+ *    set, reparent, `ticket.deleted`/`ticket.restored`, and `visibility.set`
+ *    itself — requires `canSee`. This is also exactly the guest constraint: a
+ *    guest's `canSee` is true only for tickets an explicit list names them in,
+ *    so "guests may only act on tickets explicitly visible to them" falls out of
+ *    the same line rather than needing a guest branch of its own.
  * 5. **`visibility.set` authority.** Project-admin rights on the ticket's own
  *    project, or ticket creatorship. Reported as `permission.role`.
+ * 6. **`ticket.deleted` / `ticket.restored` authority.** Project-admin rights on
+ *    the ticket's own project, with no creator shortcut — the soft delete hides
+ *    the ticket from everyone, which is a wider act than changing its audience
+ *    and is not the creator's to make alone. Reported as `permission.role`.
+ *    Measured before it existed: without it a GUEST named on one ticket could
+ *    delete it. See the branch's own docblock for why this level and not
+ *    `ADMIN_ONLY_TYPES`.
  *
- * ## Why checks 2 and 5 report `permission.role` from HERE
+ * ## Why checks 2, 5 and 6 report `permission.role` from HERE
  *
  * They are write-AUTHORITY questions, not audience questions, and the register
  * in `checkRolePermission` above says such refusals are owed by the role check.
@@ -931,6 +968,66 @@ export async function checkVisibilityPermission(
       ctx.sessionUserId === creatorId;
     if (!allowed) {
       return refuse(VISIBILITY_AUTHORITY_REASON);
+    }
+  }
+
+  /**
+   * Soft delete: a PROJECT-ADMIN act, on the same footing as `visibility.set`
+   * directly above and for the reason `effective-role.ts` gives for
+   * `hasProjectAdminRights` — *"a project admin runs their project's people and
+   * their tickets' visibility."* Deleting a ticket is that same class of act on
+   * that same object: it takes the ticket out of every board, list, search,
+   * My Work and attention reading (the FAQ's own sentence:
+   * *"The ticket stops appearing in views"*).
+   *
+   * ## Measured, not assumed: without this branch the event is ungated
+   *
+   * Check 4 above admits ANY actor who can see the ticket. A newly registered
+   * ticket event appears in no other branch of this module, so before this code
+   * existed a workspace GUEST, named on one ticket, could delete it. The
+   * `ticket.created` guest guard (`checkRolePermission`) does not reach here,
+   * and `ADMIN_ONLY_TYPES` is workspace-scoped.
+   *
+   * ## Why `hasProjectAdminRights` and not `ADMIN_ONLY_TYPES`
+   *
+   * That set is for acts on the WORKSPACE — `project.archived` sits in it with
+   * the note that retiring the project "is the workspace's decision, not
+   * [the project admin's]". One ticket is the project's business, which is the
+   * line `visibility.set` already draws.
+   *
+   * The asymmetry `project.archived`'s note names applies here unchanged, and it
+   * is why the level was chosen conservatively rather than generously: refusing
+   * a project admin who should have been allowed is one line to widen and
+   * discloses nothing new, while a delete by somebody the project did not
+   * intend cannot be un-seen by the people whose work vanished from their
+   * boards — every reading list, until the undo runs.
+   *
+   * ## Where the project id comes from, and why it is not the payload
+   *
+   * The payload is EMPTY, like `ticket.closed`'s: the envelope carries the actor
+   * and the instant, and there is no project for a client to assert. So the
+   * project is read from the ticket's own row through `getTicketStateFromDb` —
+   * the reader that deliberately does NOT filter deleted rows, because
+   * filtering it would refuse `ticket.restored` with "no such ticket" and the
+   * undo could never run.
+   *
+   * It is `proj_tickets.project_id` and not `proj_visibility.project_id`, which
+   * is the neighbouring `visibility.set` check's source. The two can disagree —
+   * a stale `project_id` in `proj_visibility` is a recorded, unrefused
+   * corruption class (case 6.57) — and the question here is "may this actor act
+   * on the project this TICKET is in", so the ticket's own row is the subject.
+   *
+   * This sits AFTER check 4 for check 5's own reason: run first it would answer
+   * differently for a ticket that does not exist and one that exists but is
+   * invisible, rebuilding one layer down the existence oracle Task 8 removed.
+   */
+  if (env.type === 'ticket.deleted' || env.type === 'ticket.restored') {
+    const ticket = await getTicketStateFromDb(ctx.db, env.workspaceId, env.entity.id);
+    if (ticket === null) {
+      return refuse(TICKET_DELETE_UNRESOLVED_REASON);
+    }
+    if (!hasProjectAdminRights(ctx.eff, ticket.projectId)) {
+      return refuse(ticketDeleteAuthorityReason(env.type === 'ticket.deleted' ? 'delete' : 'restore'));
     }
   }
 

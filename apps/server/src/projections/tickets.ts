@@ -98,6 +98,14 @@ type TicketRow = {
    * ticket never reopened, or one transitioned since its last reopen.
    */
   reopened_at: Date | null;
+  /**
+   * `TicketState.deleted`'s columns — both NULL for a live ticket. The row is
+   * NOT removed when these are set: the soft delete keeps the ledger and this
+   * row, and the views are what exclude it (see `read/visible-where.ts`'s
+   * `LIVE_TICKET_WHERE`). Nothing in this file filters on them.
+   */
+  deleted_at: Date | null;
+  deleted_by: string | null;
 };
 
 /**
@@ -178,10 +186,53 @@ export function rowToTicketState(row: TicketRow): TicketState {
     // spec §8.2): it reaches a client only through this route's `ticketState`,
     // because the only reader that cares is the sweep on the server.
     reopenedAt: row.reopened_at === null ? null : row.reopened_at.toISOString(),
+    // The soft-delete flag, on `closed`'s exact rule and for its exact reason:
+    // both NULL is the common case, `??` alone is not enough because a row
+    // holding one NULL and one attributed value cannot happen through
+    // `upsertTicket` (both columns are written from the same `next.deleted`)
+    // but this reader does not assume that of every row it is handed, and the
+    // instant is `timestamptz` against a domain field that is an ISO string —
+    // so `null.toISOString()` has to be spelled around rather than defaulted.
+    //
+    // Read UNCONDITIONALLY, so EVERY row carries the key: this is what keeps
+    // this read model the same SHAPE as the reducer's output (the property the
+    // dual-client rig compares with `toEqual`), and the `null` a live ticket
+    // reads here is the same `null` the reducer writes at creation and folds
+    // back on `ticket.restored`. The flag is NOT a filter here — see
+    // `getTicketStateFromDb` below for why the engine's own reads must see
+    // deleted tickets.
+    deleted:
+      row.deleted_at === null || row.deleted_by === null
+        ? null
+        : { actorId: row.deleted_by, at: row.deleted_at.toISOString() },
   };
 }
 
-/** This workspace's ticket, or null. */
+/**
+ * This workspace's ticket, or null.
+ *
+ * ## This read does NOT filter `deleted_at`, and that is load-bearing
+ *
+ * This reader is the ENGINE's own by-id read: it is what `engine-context.ts`
+ * hands `EngineContext.getEntityState('ticket')`, which is how
+ * `checkTicketRestored` resolves the ticket its UNDO names. Filter deleted rows
+ * here and the undo refuses its own ticket with `unknown-ticket` — "no such
+ * ticket is known" — and the soft delete becomes irreversible from the product
+ * side while the ledger keeps insisting it can be reversed. The feature would
+ * be broken in the one direction nobody tests, because the DELETE still works.
+ *
+ * The distinction is the FAQ's own: *"The ticket stops appearing in views. Its
+ * history is retained, because other events cite it"* — the exclusion belongs
+ * to the VIEWS, and a rule engine judging a claim ABOUT a ticket is not a view.
+ * `ticket.closed` set the same precedent from the other side: the reducer and
+ * this reader keep serving a closed ticket to every check.
+ *
+ * The same prohibition covers `getChildrenStatesFromDb` below (the parent's
+ * child set, which the hierarchy guard reads) and the refresh-on-publish read
+ * further down this file. If a caller needs "live tickets only", that is the
+ * caller's predicate to add (`read/visible-where.ts`'s `LIVE_TICKET_WHERE`),
+ * never this function's.
+ */
 export async function getTicketStateFromDb(
   db: Queryable,
   workspaceId: string,
@@ -226,8 +277,8 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
     `INSERT INTO proj_tickets
        (ticket_id, workspace_id, project_id, type_id, parent_id, workflow_id, workflow_version,
         state_id, state_category, assignee_id, collaborator_ids, fields, transitions,
-        closed_at, closed_by, rank, reopened_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        closed_at, closed_by, rank, reopened_at, deleted_at, deleted_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
      ON CONFLICT (ticket_id) DO UPDATE SET
        project_id = EXCLUDED.project_id,
        type_id = EXCLUDED.type_id,
@@ -243,7 +294,9 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
        closed_at = EXCLUDED.closed_at,
        closed_by = EXCLUDED.closed_by,
        rank = EXCLUDED.rank,
-       reopened_at = EXCLUDED.reopened_at`,
+       reopened_at = EXCLUDED.reopened_at,
+       deleted_at = EXCLUDED.deleted_at,
+       deleted_by = EXCLUDED.deleted_by`,
     [
       next.id,
       next.workspaceId,
@@ -280,6 +333,18 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
       // this function through a real event always carries a value or an
       // explicit null.
       next.reopenedAt ?? null,
+      // Both from the SAME `next.deleted`, on `closed`'s exact rule: a delete
+      // writes both, the undo (which folds to `deleted: null`) clears both, and
+      // the ON CONFLICT list above is what makes the CLEARING reach an existing
+      // row rather than leaving it holding a stale delete forever — which is
+      // the whole mechanism of the undo, since nothing here ever DELETEs a row.
+      //
+      // `?? null` for the same reachability reason as `rank`/`reopenedAt`
+      // above: `TicketState.deleted?` is optional on the TYPE because hundreds
+      // of test literals predate it, while the reducer writes an explicit null
+      // at creation and on every restore.
+      next.deleted?.at ?? null,
+      next.deleted?.actorId ?? null,
     ],
   );
 }
@@ -359,6 +424,13 @@ async function refreshTicketsForWorkflow(db: PoolClient, event: LedgerEvent): Pr
   // so untouched rows never leave Postgres. `foldTicketToWorkflowVersion` holds
   // the same guard because Plan 10's replica has no SQL to hold it in — neither
   // copy is redundant, and deleting either breaks a different caller.
+  //
+  // NO `deleted_at` predicate, deliberately — see `getTicketStateFromDb`'s
+  // docblock for the rule and the reason. A deleted ticket is still a ticket, a
+  // republish still redefines the states it may be shown in, and the undo has
+  // to find it in the shape its own workflow version says. Filtering here would
+  // leave restored tickets landing on a stale `state_category`, which rollups,
+  // board columns and the overdue sweep all then repeat.
   const { rows } = await db.query<TicketRow>(
     `SELECT * FROM proj_tickets
       WHERE workspace_id = $1 AND workflow_id = $2 AND workflow_version < $3

@@ -17,6 +17,7 @@ import {
   TicketList,
   TicketSheet,
   TimelineView,
+  makeSubmittedFactory,
   matchesBoardCard,
   matchesListRow,
   sortByRank,
@@ -33,7 +34,7 @@ import {
   type TicketDatesInput,
 } from '@gisik-nokma/app-core';
 import { TicketEditorSlot, uploadAttachmentHttp } from '@gisik-nokma/editor';
-import { Avatar, Switch } from '@gisik-nokma/ui';
+import { Avatar, Switch, Toast } from '@gisik-nokma/ui';
 import { AppNav } from '../../../../../src/app-nav.js';
 import { startTargetFor } from '../../../../../src/backlog-start.js';
 import { BacklogStartButton } from '../../../../../src/backlog-start-button.js';
@@ -375,6 +376,30 @@ function ProjectBoard() {
   const [parentOpenNotice, setParentOpenNotice] = useState<{
     channel: 'server' | 'transport';
     text: string;
+  } | null>(null);
+  /**
+   * The ticket sheet's soft delete, narrated — and the ONE way back.
+   *
+   * ## Why this lives on the PAGE and not in the sheet
+   *
+   * `TicketSheet` calls `onDeleted` and closes itself, so by the time there is
+   * anything to say the sheet is unmounted. **An undo offered inside a component
+   * that has just been removed is not an undo.** The inbox's bulk action made
+   * the same move for the same reason (*"the toast is `position: fixed`, so its
+   * place in the tree is …"*), and this is stronger: not a component whose arms
+   * change underneath, but one that is GONE.
+   *
+   * ## `undoFor` is the whole state machine, and `null` is the fail-closed arm
+   *
+   * A notice with `undoFor: null` INFORMS — it is a delete that went through or
+   * a restore that did not, and neither offers a second click. **The Undo is
+   * rendered from `undoFor` and from nothing else**, so a toast with nothing to
+   * take back cannot be drawn by mistake — the same rule the inbox's `undoable`
+   * states for its own bulk action.
+   */
+  const [deleteNotice, setDeleteNotice] = useState<{
+    message: string;
+    undoFor: string | null;
   } | null>(null);
   const applyRankOverride = useCallback((ticketId: string, rank: string | null) => {
     setRankOverrides((current) => {
@@ -811,6 +836,60 @@ function ProjectBoard() {
     setSelectedIds(new Set());
     list.reload();
   }, [list.reload]);
+
+  /**
+   * The soft delete's other half: the sentence, and the Undo that actually
+   * restores.
+   *
+   * ## The Undo is a real write, not an optimistic un-hide
+   *
+   * `ticket.deleted` is an event, so the way back is its inverse event —
+   * `ticket.restored` — and not a client that puts a row back into an array.
+   * **That is the whole difference between this product's delete and the
+   * prototype's**: `desktop.dc.html:3795` restores a saved `tickets` array
+   * because a prototype has no server, and nothing here can. It is also why the
+   * message says *"its history is retained"* and means it — the ledger never
+   * stopped holding the ticket, so the restore is an ordinary claim about it.
+   *
+   * ## Both reads are re-asked, and the sheet is NOT reopened
+   *
+   * A restored ticket is back in the list and the board, so both reload. The
+   * sheet is deliberately left closed: the reader dismissed it by deleting, and
+   * a restore that also re-opened it would move the page under them.
+   *
+   * ## A failed restore gets its OWN sentence and NO Undo
+   *
+   * Ruling 27's split, applied to the second half as well: a refusal and a
+   * transport failure are different facts, and `undoFor: null` is what keeps a
+   * second click off a toast whose first one did not take.
+   */
+  const restoreDeletedTicket = useCallback(
+    async (ticketId: string): Promise<void> => {
+      setDeleteNotice(null);
+      const make = makeSubmittedFactory({ actorId: currentUserId, origin: 'web' });
+      try {
+        const results = await dataSource.ingest([
+          make({ workspaceId, entity: { kind: 'ticket', id: ticketId }, type: 'ticket.restored', payload: {} }),
+        ]);
+        const result = results[0];
+        if (result === undefined) {
+          setDeleteNotice({ message: 'The server did not answer the restore.', undoFor: null });
+          return;
+        }
+        if (result.status === 'committed') {
+          list.reload();
+          board.reload();
+          return;
+        }
+        const reason = result.status === 'refused' ? result.reason : result.message;
+        setDeleteNotice({ message: `The ticket could not be restored — ${reason}`, undoFor: null });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setDeleteNotice({ message: `We could not reach the server to restore it — ${message}`, undoFor: null });
+      }
+    },
+    [board.reload, currentUserId, dataSource, list.reload, workspaceId],
+  );
 
   /**
    * THE BACKLOG NARROWING (Task 10, backlog/closed spec §5.4) — the Backlog
@@ -2467,6 +2546,39 @@ function ProjectBoard() {
             notifications with, asked the same question.
           */
           onOpenTicket={openParentTicket}
+          /*
+            THE SOFT DELETE'S NARRATION. The sheet emits `ticket.deleted`, closes
+            itself, and calls this on `committed` only — so a refused or
+            unanswered delete leaves the sheet up with its own notice and this is
+            never called. What it hands back is the ticket's TITLE, not an id:
+            the prototype's toast says `"GN-1183 deleted · …"`, and this product
+            has no ticket key (a ULID is not something a person reads back). See
+            `TicketSheetProps.onDeleted` for the full reasoning; reversing it is
+            the one interpolation below.
+          */
+          onDeleted={(ticketId, title) => {
+            setDeleteNotice({
+              message: `${title} deleted · its history is retained`,
+              undoFor: ticketId,
+            });
+            /*
+              ⚠ BOTH READS ARE RE-ASKED HERE, and the deletion's correction must
+              not depend on the stream. **Found by independent review
+              (2026-09-20): this handler used to only set the notice, while
+              `restoreDeletedTicket` reloaded — so with the `/v1/stream` socket
+              absent the list still showed a row the toast had just said was
+              deleted, and nothing in the tree covered it** (the web stub's list
+              is static, so no test could have seen it).
+
+              `list.reload()` rather than `reloadListClearingSelection()`: the
+              selection is a claim on rows the reader CHOSE, and deleting one
+              ticket through the sheet does not invalidate the others. The
+              restore below takes the same pair for the same reason, so the two
+              halves of one gesture cannot drift apart again.
+            */
+            list.reload();
+            board.reload();
+          }}
         />
       ) : null}
 
@@ -2487,6 +2599,34 @@ function ProjectBoard() {
           {parentOpenNotice.text}
         </p>
       ) : null}
+
+      {/*
+        THE HERITAGE OF THE SHEET'S DELETE. It is mounted HERE, on the page,
+        because the sheet that caused it is unmounted by the time it can render —
+        `TicketSheet.deleteTicket` closes itself on `committed`, and an undo
+        offered inside a component that just removed itself is not an undo. The
+        inbox's bulk action records the same reasoning from the other side
+        (*"the toast is `position: fixed`, so its place in the tree is …"*).
+        Position in this subtree is therefore irrelevant to how it LOOKS and load-
+        bearing only for surviving the arms above it.
+
+        `undoFor` is the whole state machine: present means an Undo is offered,
+        `null` means the notice only informs. The key is `undoFor` so that a
+        second delete inside the first toast's 15 s window is a NEW toast with a
+        fresh window — the inbox's own reason for keying its toast on the action,
+        and its one-slot cost is the prototype's too.
+      */}
+      <Toast
+        key={deleteNotice?.undoFor ?? deleteNotice?.message ?? 'none'}
+        open={deleteNotice !== null}
+        message={deleteNotice?.message ?? ''}
+        undo={
+          deleteNotice?.undoFor != null
+            ? { onUndo: () => void restoreDeletedTicket(deleteNotice.undoFor as string) }
+            : null
+        }
+        onDismiss={() => setDeleteNotice(null)}
+      />
 
       {/*
         Rendered unconditionally on `expired` (matching `TicketSheet` just
