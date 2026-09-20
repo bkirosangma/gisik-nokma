@@ -1,4 +1,180 @@
-## ▲ TOP BLOCK — **THE TICKET KEY: `CCSO-1183`, COMPOSED FROM THE LEDGER BECAUSE IT CANNOT BE STORED IN IT.** (2026-09-20)
+## ▲ TOP BLOCK — **THE PENDING-INVITATIONS HEADING: BUILT, AND A MUTATION FOUND ONE OF MY OWN CLAIMS FALSE.** (2026-09-20)
+
+### § 1 — WHERE TO FIND IT
+
+- **Dispatch: the controller's cycle-23 dispatch** (2026-09-20 ~14:4x IST) — *"the authority draws it, the data
+  already serves it, and the product renders no heading at all"*. Cycle 24's anchor (`docs/lanes/controller-state.md`,
+  queue row 5) names this task and this lane. `test-cases/16-remaining-doors.md` recorded the omission with the
+  controller as its owner **"for a dispatch"** — **this is that dispatch.**
+- **Branch `exec2/pending-heading`**, cut from `origin/main` = `6f08452c` (the `#595` merge).
+- **⚠ THE PR IS OPENED AT THIS EXACT HEAD** — `exec2/pending-heading` → `main`, `--base main`.
+  **This file does not carry its number, because the handoff had to LAND before the PR opened.** Settle any
+  question about it in one call: `gh pr list --state all --head exec2/pending-heading`. **It is the
+  controller's to merge; I do not merge it.**
+
+### § 2 — ANCHORS, RECOUNTED AT `97d91974` (not carried forward)
+
+| anchor | value |
+|---|---|
+| `git merge-base origin/main HEAD` | `db3ad3c7c599ecc99fe2399f0155babe89bc49d9` — **equal to `origin/main`, so this branch is FULLY FOLDED onto the current main** |
+| **HEAD** | `97d91974e738d72f577dbdbef6428b45595f262c` |
+| ahead / behind `origin/main` | **7 ahead / 0 behind** (`git rev-list --left-right --count` → `0  7`) |
+| `origin/main` | **`db3ad3c7`** (the `#594` merge). It moved **three times** while this branch ran |
+| tree | **clean** — the only dirty path when this was written was this file |
+| changed files | **5** — `Features.md`, `apps/web/app/w/[workspaceId]/members/page.tsx`, `apps/web/test/members-page.test.tsx`, `test-cases/16-remaining-doors.md`, `docs/hig-reconciliation-audit.md` |
+| `check:case-ids` | **rc 0 — 2535 unique ids**, highest `16.87`. Every figure measured: **2531** at my cut (`6f08452c`), **2532** after my one mint, **2535** once `#594`'s three (`16.85`–`16.87`) arrived with the fold. **This branch's own delta is exactly the one id it minted** |
+| `check:citations` | **rc 0** — 16-remaining-doors.md **54 cited / 0 uncited / 54** |
+| `check:migrations` · `check:env` · `check:help` · `check:runbook` · `check:tasks` | **rc 0** each |
+| `pnpm turbo run build` | **11/11 successful**, under **Node v22.22.2**, after the fold |
+| `apps/web` suite | **55 files, 605 tests, 0 failed** (`--maxWorkers=1`, read from vitest's **JSON reporter** — the console output collapses to `PASS (n) FAIL (0)`, which is a count and not evidence of WHICH tests ran) |
+| `pnpm turbo run typecheck` | **17/17** |
+| mutation battery | **7 mutations, each declaring its expected arms BEFORE it ran; 1 survivor on the first run, now closed — see §4** |
+| review | **one independent reviewer at `3645f30d`** — 1 Critical, 2 Important, 2 Minor, all fixed — §7 |
+
+⚠ **THE FORCED GATE IS THE CONTROLLER'S.** Everything above is my own build/typecheck/test. ⚠ `check:db-tz` is
+**NOT run** (`DATABASE_URL is required`) — it needs a live database and this lane never runs `docker compose`.
+
+### § 3 — WHAT SHIPPED, AND THE ONE DECISION IN IT
+
+`PendingList` (`apps/web/app/w/[workspaceId]/members/page.tsx`) now draws
+`<h2 className="gn-invite-pending__heading">` reading `` `Pending invitations · ${rows.length}` `` — the authority's
+own string (`desktop.dc.html:725`, defined at `:3091` as `"Pending invitations · " + s.invites.length`), which the
+product had rendered **no heading for at all**. **No read and no route were needed**: the count was in state.
+
+**The count is `rows.length` — THE SAME ARRAY the `<ul>` maps, read in the same expression.** That is why the
+heading is in the COMPONENT and not beside it at the call site: a count fed from anywhere else is a second, weaker
+answer to a question the list already answers, and the two can disagree. Here they cannot.
+
+**The decision this dispatch asked for — the EMPTY case — is that it renders, reading `· 0`.** The authority
+draws the heading unconditionally inside its `isInviteAdmin` block (`:722`–`:725`), above the `noInvites`
+sentence (`:741`); and the empty sentence below **already claims the list is empty**, so `· 0` repeats a claim
+the list was making rather than adding one. Hiding it at zero would leave the section unnamed exactly when a
+reader most needs to know what the empty thing is.
+
+`<h2>` and not the authority's `<p>`, because this screen's other heading is the authority's own identically-styled
+`17px/600` heading (`:747`) and the product already renders that one as an `<h2>` (`page.tsx:781`).
+
+### § 4 — ⚠ THE MUTATION BATTERY FOUND A CLAIM OF MINE THAT WAS FALSE, AND THE CASE COULD NOT SEE IT
+
+Seven mutations, each **declaring the arms it should redden before it ran**. Six behaved exactly as declared:
+the middot swapped for a hyphen; the count pinned to the constant `2` (**A1 stays green — which is exactly why
+A2 exists**); the heading deleted; the heading **hoisted out of the admin gate** so a member sees it; the `<ul>`
+truncated to `rows.slice(0, 1)`; and the count off by one. Each died on **its own** arm; the source was restored
+by `git checkout --` and verified **by sha256**, with the commit made a precondition so restore could not destroy
+uncommitted work.
+
+**The seventh SURVIVED, and it killed my own docblock.** Rebuilding the string as
+`` {'Pending invitations · '}<span>{rows.length}</span> `` — the label-plus-span composition **the dispatch
+specifically warned about** — left the accessible name `Pending invitations · 2` **unchanged and all four arms
+GREEN**. So the sentence "an accessible name inserts a space between sibling elements, so a composed name would
+not be the authority's string" was **false as stated**, in this case's own environment. The one-node form is
+KEPT (it is what the dispatch asked for); **the composition is now pinned by an assertion instead of argued in
+prose** — the case asserts the heading has exactly one child node and holds no element. Re-run, the seventh
+mutation reddens A1. **A real-browser measurement was NOT taken.**
+
+### § 5 — WHAT IS *NOT* IN THIS CHANGE SET, NAMED RATHER THAN IMPLIED
+
+The same `test-cases/16` paragraph names **three more** things the authority draws and we do not. **None is in
+this change set**, in its own decreasing order of data-backing: the pending row's **project scope** (`:732` —
+`PendingInvite.projectIds` is served, project *names* are not); the minted card's **`Copy link` and `Done`**
+(`:788-789`); and **four static sentences** (`:726`, `:778`, `:780`, `:793`). They remain recorded where they were.
+
+⚠ **`gn-invite-pending*` still has NO CSS RULE** — a scope call `Features.md` already records with a named owner.
+**The new heading joins that family rather than opening a second one**; styling one heading and not its sibling
+would be a divergence this change invented. It means the heading renders at the UA default for `<h2>`, not the
+authority's `17px/600`. **That is stated, not hidden.**
+
+### § 6 — CASE IDS: MY BLOCK IS `16.41`–`16.60`. USED `16.46`.
+
+Recounted, not assumed: `16.41`–`16.45` are used on `origin/main`, **`16.46` was free** (control: `16.45` = 23
+hits, `16.45`-adjacent controls fire). The highest id anywhere is exec 1's `16.87`. **`check:case-ids` moved
+2531 → 2532 — a delta of exactly one**, from a re-run, not from arithmetic. The id is written as an id LINE
+(`- **16.46** ✅ …`), the only spelling the guard can see.
+
+### § 7 — THE REVIEW ROUND
+
+**One independent reviewer, run against `3645f30d`, restoring by sha256 on every mutation. One Critical, two
+Important, two Minor — all five fixed** in `e064d808`. A pass RAN and is RECORDED; `#594` was sent back for
+the difference between this and a section that merely invites one.
+
+- **CRITICAL — the catalogue bullet re-asserted, as the LIVE reason, the exact sentence the same bullet
+  declares measured FALSE eleven lines above.** I corrected the docblock and the mutation notes and left the
+  twin standing in the bullet's own description. This is *the act of fixing a thing invalidates the
+  description of that thing*, and it survived because I re-read the part I had edited instead of the whole
+  bullet.
+- **IMPORTANT — "the page's only `<h2>` is `Invite somebody`" was in the present tense** inside a bullet whose
+  own header says BUILT. There are two at this head. The same change set fixed the sibling sentence in
+  `Features.md` and missed this one.
+- **IMPORTANT — `page.tsx` cited `Features.md` §6** for the missing-CSS-family scope call. It is **§3**
+  (*"## 3. Foundation & event ledger"*), in the bullet *"The people page, gated by the server's own 403"*.
+  **The citation resolved and misled** — the class this branch's own previous commit was written about — and
+  "§6" was taken from a sentence about the TICKET KEY, an unrelated section, without checking it.
+  ⚠ **And this entry is written WITHOUT a line number on purpose, having just watched one rot:** an earlier
+  draft of this very sentence cited `Features.md:336` and `:368`, both measured before the fold. `#594`'s
+  three new bullets pushed the people-page bullet to **`:339`** and §4's heading to **`:372`**, so `:336` now
+  resolves to a *passkey-client* path in a different bullet. **A line number in `Features.md` is a reading,
+  and this file gains bullets constantly** — cite the section and the bullet's own text instead. `page.tsx`'s
+  docblock already does.
+- **MINOR — `:740` cited for "the `noInvites` sentence"**; `:740` is the `<sc-if value="{{ noInvites }}">`
+  guard and `:741` is the sentence. Off by one on the same axis this branch had already corrected twice.
+- **MINOR — the row-count comment claimed it compares the heading to the list.** It compares the LIST to a
+  literal, so a count pinned to a constant leaves it green — the very mutation already recorded as leaving
+  that arm green. Reworded to what it actually catches, and the catalogue mirrors it.
+
+⚠ **What the reviewer could NOT falsify, recorded because that is evidence too.** It re-derived **five of the
+seven mutations independently** and each matched its declared arm set exactly, and it reproduced the
+surviving mutation's two-phase story including that **removing the structural assertion returns all four
+arms to green**. It agreed the count is one population (`setPending` and `setAdminGate` are set in the same
+arm, so `pending` is never `null` behind the open gate), that `· 0` adds no claim the empty sentence was not
+already making (heading and sentence share one ternary; a failed read or a 403 takes a branch where neither
+renders), and the ratchet argument. **It could NOT confirm the hoist mutation** — its own reconstruction
+duplicated the heading rather than moving it — so that one rests on my run alone.
+
+⚠ **TWO PROCESS HAZARDS THIS ROUND PRODUCED, BOTH MINE.**
+1. **The reviewer's diff universe was a moment, and my tree moved under it.** It took
+   `git diff origin/main...HEAD` before the audit commit landed, so the diff omitted
+   `docs/hig-reconciliation-audit.md` entirely — it found the file by enumerating the range separately and
+   verified its content, so the change **is** covered, but only because the reviewer went looking. **I
+   committed during a review.**
+2. **And then the recorded failure bit me directly, hours after I read the memory about it.** Re-running the
+   surviving mutation needed `git checkout --` to restore, which reverted `page.tsx` to HEAD and **silently
+   discarded two uncommitted fixes**; `git status` came back clean and read as success. Both are re-applied
+   and **the commit is now the precondition it should have been all along** — the rule was already written
+   in the dispatch I was executing.
+
+### § 8 — THREE RATCHETS I COULD NOT RUN, AND WHY THEY CANNOT MOVE
+
+There is no `/members` floor in `apps/web/e2e-viewport` (`UNAUTHED_ROUTES` is `/help`, `/privacy`, `/terms`,
+`/sign-in` and a 404 probe). The **stack** suite does cover `/members`, and **neither it nor any compose action
+was run from this lane** — the hot stack is executor 1's. What follows is read off the sweep code, and is
+labelled as reasoning rather than measurement:
+
+- **accessible names** (`apps/web/e2e-stack/accessible-names-baseline.json`, `stack-phone-390|/members`):
+  `sweepAccessibleNames` counts exactly `aria-label`, `role`, `aria-selected`, `aria-describedby`, and
+  `rawMatches` is its **un-ratcheted control**. A plain `<h2>` carries **none of the four**, so no ratcheted count
+  can move. **No baseline file was touched.** `/members` is also absent from `MUST_NAME`/`MUST_EXAMINE`, whose
+  probe type does not admit a `heading` role — so nothing there can guard this heading either, **which is why the
+  case is not claimed to be seen by that ratchet.**
+- **type scale** (`type-scale-baseline.json`, `stack-phone-390|/members`: `0`, an offender count): the heading is
+  unclassed, so it renders at the UA default for `<h2>` (~24px), **above** the 12px floor. It cannot add an offender
+  to a count of `0`.
+- **non-text contrast** (`non-text-contrast-roster.json`): `sweepBorders` scores borders; an unclassed `<h2>` has
+  none to score.
+
+### Rules that bind this branch
+- **Never `docker compose`** (any subcommand) and **never bind `:3001`** — a peer's hot stack is there.
+  Viewport work would use `:3021`, and **none was attempted**: the suite does not cover this route.
+- Test runs at `--maxWorkers=1`. **Never pipe a run into `head`.** **Do not run the forced gate** — the controller does.
+- **Do not edit `task-ledger.tsv`** — it is `main`'s; the controller flips rows after each merge.
+- `Features.md` and `test-cases/16-remaining-doors.md` changed **in the same change set** as the code.
+- **Never `AskUserQuestion`** in this topology. A question for the owner is a file plus a one-line pointer, then a hold.
+- ⚠ **`/tmp/pr-body.md` bit this lane on `#595`.** Use a lane-unique path and **read the body back**.
+  ⚠ **In zsh, `"$TREE:path"` is NOT a git spec** — `:t` is zsh's *tail* modifier and the command dies with `bad
+  substitution`. Brace-quote it: `"${TREE}:path"`. Cost one wasted invocation this round.
+
+---
+
+## ▼ PREVIOUS BLOCK — **THE TICKET KEY: `CCSO-1183`, COMPOSED FROM THE LEDGER BECAUSE IT CANNOT BE STORED IN IT.** (2026-09-20)
 
 ### § 1 — WHERE TO FIND IT
 
