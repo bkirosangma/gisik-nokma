@@ -9,8 +9,19 @@
   ⚠ **It was cut as `exec2/ticket-key` and RENAMED.** The topology table says this lane's prefix is
   `exec2/`; the dispatch AND cycle 21 both say `exec/ticket-key`. The newer, task-specific pair won, and
   nothing was pushed under the old name.
-- **The PR opens as the last step of this dispatch.** One call settles it:
-  `gh pr list --state all --head exec/ticket-key`.
+- **⚠ THE PR IS OPEN: #595 — `https://github.com/bkirosangma/gisik-nokma/pull/595`**, `--base main`,
+  head `75a3abce`, **verified: `headRefOid` == local `HEAD`, `baseRefName` == `main`**. Two review passes are
+  recorded in its body, both run BEFORE it opened. **It is awaiting the controller's merge; you do not merge
+  it.** Settle any question about it in one call: `gh pr list --state all --head exec/ticket-key`.
+- ⚠ **A CROSS-LANE HAZARD THIS COST, worth more than the task: `/tmp/pr-body.md` is a CONTENDED PATH.**
+  That body was written there, and the PEER LANE overwrote it before `gh pr create` read it — so #595 first
+  opened carrying **exec 1's** body (*"The three surfaces the owner ruled"*) under **this** branch and
+  **this** title. `gh pr create` reported success; `headRefOid` and `baseRefName` were both correct, so
+  **every ref-shaped check passed and only the body was wrong.** It was caught because a python patch
+  asserted on a string it could not find — a coincidence, not a check. Fixed by `gh pr edit` from a
+  lane-unique path. **#594 was checked and is intact** (none of this branch's phrases appear in it), so the
+  damage was one-directional. **Use `/tmp/exec2-<task>-<thing>.md`, and READ THE BODY BACK after any
+  `gh pr create`/`edit` — a ref check does not cover content.**
 
 ### § 2 — ANCHORS, RECOUNTED AT `4d11d8f8` (not carried forward)
 
