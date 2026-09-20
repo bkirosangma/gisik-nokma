@@ -129,10 +129,26 @@ async function openTheSheet(): Promise<void> {
       {
         id: WORKSPACE,
         name: 'Garo Hills Logistics',
+        // The ticket key's first half (2026-09-20). REQUIRED: `mapWorkspaceRefs`
+        // reads it as a plain string and refuses an absent one, so a stub
+        // without it takes the page down and reads as a layout failure.
+        prefix: 'GH',
         role: 'owner',
         memberCount: 1,
         nameRestrictedProjectCount: 0,
-        projects: [{ id: PROJECT, name: 'Errand tracking', archived: false, ticketCount: 1, blockedCount: 0 }],
+        projects: [
+          {
+            id: PROJECT,
+            name: 'Errand tracking',
+            // The second half, likewise required. `ET` is what this name
+            // derives, which is what the product would serve for a project
+            // founded without an entered prefix.
+            prefix: 'ET',
+            archived: false,
+            ticketCount: 1,
+            blockedCount: 0,
+          },
+        ],
       },
     ],
     getTicket: async () => ticketRead(),

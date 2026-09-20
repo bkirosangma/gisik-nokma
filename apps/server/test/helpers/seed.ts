@@ -107,6 +107,13 @@ export async function seedProject(
   projectId: string,
   name = `Project ${projectId}`,
   description?: string,
+  /**
+   * The project prefix (owner spec 2026-09-20). ABSENT when the caller does not
+   * mention one, exactly as `description` is — and absent is the shape that
+   * matters here, because it is what EVERY project in the ledger today looks
+   * like and therefore the case the read has to derive a prefix for.
+   */
+  prefix?: string,
 ): Promise<void> {
   await applyAll(pool, [
     testEnvelope({
@@ -116,7 +123,11 @@ export async function seedProject(
       // ABSENT when there is none, so a fixture that does not mention a
       // description founds a project nobody has described — the same shape
       // `foundingSeeds` builds when the form's box is left untouched.
-      payload: { name, ...(description === undefined ? {} : { description }) },
+      payload: {
+        name,
+        ...(description === undefined ? {} : { description }),
+        ...(prefix === undefined ? {} : { prefix }),
+      },
       actorId: SEED_ACTOR,
     }),
   ]);

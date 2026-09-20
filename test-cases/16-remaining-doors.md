@@ -519,9 +519,15 @@ plus a partial index → a filter at every view-serving SELECT.
   restore, and the page dropping `onDeleted` entirely. **The last one is why the call-site file exists:**
   all three of its arms redden, while every assertion in the sheet's own suite stays green.
   ⚠ **A DEPARTURE FROM THE PROTOTYPE'S COPY, recorded rather than smuggled.** The prototype toasts
-  `"GN-1183 deleted · its history is retained"` — a ticket KEY. **This product has no ticket key** (its ids
-  are ULIDs), so the sentence carries the ticket's TITLE. Reversing it is one interpolation in the host,
-  and the parity list already names a ticket key as the breadcrumb's own prerequisite.
+  `"GN-1183 deleted · its history is retained"` — a ticket KEY.
+  ⚠ **CORRECTED 2026-09-20: THE PRODUCT NOW HAS A TICKET KEY.** This sentence read *"This product has no
+  ticket key (its ids are ULIDs)"*, and that was true when written. The ticket key landed on
+  `exec/ticket-key` (`CCSO-1183`: a workspace prefix, a project prefix, and a per-project number), so
+  **the toast's sentence is now reachable as the prototype wrote it** — the remaining work is one
+  interpolation in the host, which reads the key off the same read that already carries the title.
+  Until then the sentence carries the ticket's TITLE, and that is a live departure rather than a
+  standing one. The parity list's note that the breadcrumb needs a ticket key is satisfied by the same
+  change.
   - **The stylesheet half, and the ground the control really has.** It has a rule of its own: `packages/ui/test/components.test.tsx` pins the rule's existence, its roles, its 44px floor and
   its `justify-content: space-between`; `packages/ui/test/tokens.test.ts` pins the CONTRAST PAIR.
   **`--gn-danger` as TEXT measures 4.4013 on `surface` in hig/minimal light — below AA, a shortfall this

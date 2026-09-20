@@ -596,6 +596,13 @@ function FoundingForm() {
   const router = useRouter();
   const { founding } = useAppServices();
   const [name, setName] = useState('');
+  /**
+   * The workspace prefix — `CC` in `CCSO-1183` (owner spec 2026-09-20): *"i can
+   * enter up to 3 letters for the workspace"*. UPPER-CASED AS TYPED, because
+   * `prefixSchema` REFUSES a lower-case one rather than normalising it, and the
+   * keyboard is the one place that repair belongs.
+   */
+  const [prefix, setPrefix] = useState('');
   const [sending, setSending] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
 
@@ -603,7 +610,7 @@ function FoundingForm() {
     event.preventDefault();
     setSending(true);
     setRefusal(null);
-    void founding.foundWorkspace(name).then(
+    void founding.foundWorkspace(name, prefix === '' ? undefined : prefix).then(
       ({ workspaceId }) => router.push(`/w/${workspaceId}/my-work`),
       (cause: unknown) => {
         setSending(false);
@@ -627,6 +634,21 @@ function FoundingForm() {
           placeholder="Garo Hills Logistics"
           value={name}
           onChange={(event) => setName(event.target.value)}
+        />
+      </label>
+      {/* The workspace's half of every ticket key (owner spec 2026-09-20).
+          OPTIONAL, like the project form's box: a workspace founded without one
+          still gets a prefix for its keys — derived from the name, which is why
+          *this* owner's own three rows already read `CC`, `SO` and `GG` without
+          anybody having entered anything. */}
+      <label className="gn-field" htmlFor="gn-founding-prefix">
+        <span className="gn-field__label">Prefix (optional)</span>
+        <input
+          id="gn-founding-prefix"
+          className="gn-field__input"
+          placeholder="e.g. CC"
+          value={prefix}
+          onChange={(event) => setPrefix(event.target.value.toUpperCase())}
         />
       </label>
       <Button

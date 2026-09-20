@@ -69,6 +69,7 @@ describe('the project page names itself from the same read AppNav already makes'
             {
               id: WORKSPACE,
               name: 'Garo Hills Logistics',
+              prefix: 'GH',
               role: 'owner',
               memberCount: 3,
               nameRestrictedProjectCount: 0,
@@ -76,6 +77,7 @@ describe('the project page names itself from the same read AppNav already makes'
                 {
                   id: PROJECT,
                   name: 'Errand tracking',
+                  prefix: 'ET',
                   archived: false,
                   ticketCount: 4,
                   blockedCount: 0,

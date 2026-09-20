@@ -94,8 +94,8 @@ export const projProjects: Projection = {
     }
     const payload = projectCreatedPayload.parse(event.payload);
     await tx.query(
-      `INSERT INTO proj_projects (project_id, workspace_id, name, description, created_by, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO proj_projects (project_id, workspace_id, name, description, prefix, created_by, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT (project_id) DO NOTHING`,
       [
         event.entity.id,
@@ -106,6 +106,27 @@ export const projProjects: Projection = {
         // the absence this column stores. `?? ''` would write the CLAIM "no
         // description" for every project founded before this field existed.
         payload.description ?? null,
+        // Same `?? null`, and here it is load-bearing in a second way: this
+        // branch is taken by EVERY project in the ledger today, so a `??` that
+        // derived a prefix instead would put a claim in the column that no
+        // event made — and, because the derivation is not what the ledger says,
+        // the shadow rebuild in `tools/verify-projections.ts` would be the only
+        // thing that noticed. The derivation belongs to the READER
+        // (`packages/domain/src/prefix.ts`), which is where it can be applied to
+        // a NULL without pretending the column said it.
+        payload.prefix ?? null,
+        // ⚠ MEASURED LIMITATION, and it is why this line is a DECISION rather
+        // than a style. Writing `?? derivePrefix(payload.name)` here instead
+        // **reddens nothing at all** — not the reads, not the door, and not
+        // `tools/verify-projections`. The verifier diffs live against a rebuilt
+        // shadow, and the derivation is a PURE FUNCTION, so both sides compute
+        // the same value and `EXCEPT` has nothing to report: **that tool
+        // constrains a column to be REPRODUCIBLE, never to be ATTRIBUTED.** So
+        // the rule "the column holds only what an event said" is held by THIS
+        // comment and by review, not by a gate — which is exactly the kind of
+        // claim a successor should be told rather than left to infer from a
+        // green suite. (See `test-cases/13-owner-requests-and-backlog.md`,
+        // mutation M4.)
         event.actorId,
         event.serverTime,
       ],

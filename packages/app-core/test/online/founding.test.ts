@@ -32,6 +32,29 @@ describe('3.100 createHttpFoundingGateway', () => {
     expect(http.calls).toEqual([{ path: '/v1/workspaces', body: { name: 'Convenience Corner' } }]);
   });
 
+  it('13.1030 — carries the workspace PREFIX when the form supplies one, and OMITS the key when it does not', async () => {
+    // The owner's spec: *"i can enter up to 3 letters for the workspace"* — and
+    // this is the whole of the client's part in it. Asserted as the BODY, not as
+    // a call count: the point is the shape that crosses the wire.
+    const withPrefix = fakeHttp({ workspaceId: 'ws_new' });
+    await createHttpFoundingGateway(withPrefix).foundWorkspace('Convenience Corner', 'CC');
+    expect(withPrefix.calls).toEqual([
+      { path: '/v1/workspaces', body: { name: 'Convenience Corner', prefix: 'CC' } },
+    ]);
+
+    // THE ABSENCE HALF, and it is a different claim from `prefix: undefined`:
+    // `workspaceCreatedPayload` is `.strict()`, and the route's body schema
+    // admits the property only as a string — so a key present-and-undefined is
+    // a body the door may refuse, while an absent one means "nobody entered
+    // one", which is every workspace founded before today.
+    const withoutPrefix = fakeHttp({ workspaceId: 'ws_new' });
+    await createHttpFoundingGateway(withoutPrefix).foundWorkspace('Convenience Corner');
+    expect(withoutPrefix.calls).toEqual([
+      { path: '/v1/workspaces', body: { name: 'Convenience Corner' } },
+    ]);
+    expect('prefix' in (withoutPrefix.calls[0]!.body as Record<string, unknown>)).toBe(false);
+  });
+
   /**
    * 3.101 PLANTED DEFECT — the name is sent AS TYPED.
    *

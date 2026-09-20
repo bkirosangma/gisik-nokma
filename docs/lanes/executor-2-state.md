@@ -1,4 +1,260 @@
-## ▲ TOP BLOCK — **THREE PRODUCT SENTENCES: ONE FALSE, ONE DEAD, ONE NAMING A CONTROL NO SCREEN CAN OFFER — AND THE TWO OWNER RULINGS THAT PULLED IN OPPOSITE DIRECTIONS.** (2026-09-20)
+## ▲ TOP BLOCK — **THE TICKET KEY: `CCSO-1183`, COMPOSED FROM THE LEDGER BECAUSE IT CANNOT BE STORED IN IT.** (2026-09-20)
+
+### § 1 — WHERE TO FIND IT
+
+- **Dispatch: the controller's `<WORKSPACE><PROJECT>-<n>` ticket-key spec** (2026-09-20 ~13:2x IST),
+  carrying the owner's spec verbatim and four follow-ups. Cycle 21's anchor (`docs/lanes/controller-state.md`,
+  queue row 2) names this task and this lane.
+- **Branch `exec/ticket-key`**, cut from `origin/main` = `e2db9730` (the `#589` merge).
+  ⚠ **It was cut as `exec2/ticket-key` and RENAMED.** The topology table says this lane's prefix is
+  `exec2/`; the dispatch AND cycle 21 both say `exec/ticket-key`. The newer, task-specific pair won, and
+  nothing was pushed under the old name.
+- **⚠ THE PR IS OPEN: #595 — `https://github.com/bkirosangma/gisik-nokma/pull/595`**, `--base main`,
+  head `75a3abce`, **verified: `headRefOid` == local `HEAD`, `baseRefName` == `main`**. Two review passes are
+  recorded in its body, both run BEFORE it opened. **It is awaiting the controller's merge; you do not merge
+  it.** Settle any question about it in one call: `gh pr list --state all --head exec/ticket-key`.
+- ⚠ **A CROSS-LANE HAZARD THIS COST, worth more than the task: `/tmp/pr-body.md` is a CONTENDED PATH.**
+  That body was written there, and the PEER LANE overwrote it before `gh pr create` read it — so #595 first
+  opened carrying **exec 1's** body (*"The three surfaces the owner ruled"*) under **this** branch and
+  **this** title. `gh pr create` reported success; `headRefOid` and `baseRefName` were both correct, so
+  **every ref-shaped check passed and only the body was wrong.** It was caught because a python patch
+  asserted on a string it could not find — a coincidence, not a check. Fixed by `gh pr edit` from a
+  lane-unique path. **#594 was checked and is intact** (none of this branch's phrases appear in it), so the
+  damage was one-directional. **Use `/tmp/exec2-<task>-<thing>.md`, and READ THE BODY BACK after any
+  `gh pr create`/`edit` — a ref check does not cover content.**
+
+### § 2 — ANCHORS, RECOUNTED AT `4d11d8f8` (not carried forward)
+
+| anchor | value |
+|---|---|
+| `git merge-base origin/main HEAD` | `e2db9730b063ed1b51832a4d227e89cf44f7cfdb` |
+| **HEAD** | `4d11d8f80be9a351d75f8825a2ec43a45f4fa459` |
+| ahead / behind `origin/main` | **4 / 2** (`git rev-list --left-right --count origin/main...HEAD` → `2 4`) |
+| `origin/main` | **`4274b372`** — **it MOVED while this branch ran** (`e2db9730` → `4274b372`) |
+| tree | **clean** |
+| `check:citations` | **exit 0** |
+| `check:migrations` | **exit 0** — 30 migrations, 1 new, numbered above `1789700000000` |
+| `check:case-ids` | **exit 0 — 2523 unique ids (was 2496 at `origin/main`). Delta +27, exactly the ids minted** |
+| `check:help` | **exit 0** — 2 documents, 29 sections, **231 entries**, unchanged |
+| `check:runbook` | **exit 0** — 33 references, 21 distinct |
+| `check:env` | **exit 0** |
+| `pnpm turbo run build` | **11/11 successful**, under **Node v22.22.2** |
+| domain suite | **31 files, 538 tests, all pass** (`--maxWorkers=1`) |
+| app-core suite | **95 files, 1643 tests, all pass** (`--maxWorkers=1`) |
+| web suite | **54 files, 594 tests, all pass** (`--maxWorkers=1`) — run by the dispatched fixture agent at the final tree |
+| `pnpm turbo run typecheck` | **17/17**, web cache-missed so it was a fresh reading |
+| server suite | **157/157 files, 1644 passed / 5 skipped, all pass** (re-run after the fix round; the earlier run in the same five-chunk shape was 1636) — run in FIVE foreground chunks (`routes+integration+http` 33/521 · `sync+projections+read+permissions+visibility` 36/347 · `auth+attachments+ops+mcp+tools+tooling` 34/254+5 skipped · `seed+dual-client+notifications+notification-preferences+gates+stream+alerts+auto-close` 26/266 · `ci+deploy+docs+helpers` plus the 23 root files 28/248). **33+36+34+26+28 = 157, the exact file count**, so nothing was left out |
+
+⚠ **THE FORCED GATE IS THE CONTROLLER'S.** Everything above is my own build/typecheck/test.
+
+⚠ **`origin/main` gained exactly one file while this ran — `docs/lanes/controller-state.md` (cycle 21).**
+Measured as an INTERSECTION against my own changed-file set: **empty**, so nothing here needs a rebase.
+
+### § 3 — THE FINDING THAT SHAPED THE WHOLE CHANGE
+
+**The dispatch prescribed a counter allocated at append plus a migration backfilling the rows that
+predate it. Both halves are foreclosed, and I measured before building rather than after.**
+
+1. **`events` refuses UPDATE and DELETE.** `1787841717635_events-and-snapshots.sql` installs
+   `events_append_only` as a `BEFORE UPDATE OR DELETE` trigger that **RAISES**. No migration can put a
+   prefix or a number into a founding event.
+2. **A projection column must be reproducible from the ledger.** `tools/verify-projections.ts` diffs
+   every `proj_` table against a rebuilt shadow with `EXCEPT` in **both** directions. A backfilled value
+   the replay cannot reproduce is a verifier failure — and it would be right.
+3. **There is no `created_at` on `proj_tickets`** to order a ticket backfill by. The dispatch said the
+   controller could not confirm one; it could not, because it does not exist.
+
+**So the key is composed from three LEDGER facts and stored in none of them:**
+
+- a prefix a person **entered** — rides `workspace.created` / `project.created` (optional, `.strict()`);
+- a prefix nobody entered — **derived** from the name by `derivePrefix` / `resolveProjectPrefixes`
+  (`packages/domain/src/prefix.ts`): initials of the first two words, first two letters of a one-word name;
+- the number — the ticket's **position among its project's creations, ordered by `workspace_seq`**
+  (`apps/server/src/read/ticket-numbers.ts`). That is a TOTAL ORDER with
+  `events_workspace_seq_unique` behind it, assigned under `lockWorkspace` — the precedent the dispatch
+  told me to look for is `nextWorkspaceSeq`, and this consumes its output instead of adding a mechanism
+  beside it.
+
+### § 4 — ⚠ PROVEN AGAINST THE REAL DEV DATABASE, NOT AGAINST TYPED STRINGS
+
+Read-only, over the repo's own `pg`, against `localhost:**54330**` — ⚠ **the DEV database is 54330, not
+the 54329 this brief names: `docker-compose.dev.yml`'s own header says 54329 is the shared TEST Postgres
+five lanes use.** The shipped `derivePrefix` was applied to the dev rows:
+
+| row | id | name | derived |
+|---|---|---|---|
+| workspace | `0TZSS5W6ATCTF2YBPMWGGP9JF5` | Convenience Corner | **CC** |
+| project | `0XB92YA4CGEBF9S285AH4SDXR1` | Shop operations (26 tickets) | **SO** |
+| project | `01M25DBPXAK3NC9YRVS95MB7J6` | gggg (1 ticket) | **GG** |
+
+**All three are exactly the values the owner named by hand, and the ids match the controller's verified
+set.** So the running app will read `CCSO-1`…`CCSO-26` and `CCGG-1` — **and NO dev-database data step is
+owed anyone**, which is the one place the dispatch expected me to need one.
+⚠ `proj_projects.prefix` does **not** exist in the dev database yet: migrations run at container start
+and **I did not run `docker compose`** (the rule for this lane). The column lands on the next rebuild.
+
+### § 5 — WHAT SHIPS, WHAT DOES NOT, AND THE ONE SENTENCE I REFUSED TO WRITE
+
+**Ships:** the two payload fields; an OPTIONAL `Prefix` box on BOTH founding forms (`/workspaces` and `/w/<id>`), upper-casing as the owner types;
+
+⚠ **THE MERGE MOVED `main` UNDER THIS BRANCH — nine commits, one of them exec 1's sheet-footer (`e9c1a04f`). Everything in this file that speaks about `Delete` was written BEFORE that merge and two such sentences were false at the merged head; both are corrected in place above. A conflict in `check-permission.ts`'s import block was resolved by keeping BOTH imports.** the nullable `proj_projects.prefix` column and its migration; the
+projection writing it; the derivation and the two-pass resolver; the workspace identity fold (name and
+prefix from ONE query, opposite ends of the same `workspace_seq` order); `ticketNumbers`/`ticketNumber`;
+the directory's `WorkspaceRef.prefix` and `ProjectRef.prefix`; `POST /v1/workspaces` taking a `prefix`;
+the door's `project.prefix-taken` refusal; the mapper's required-field refusals; `Features.md` and
+`test-cases/`.
+
+**Does NOT ship — the display half, and `Features.md` says so at the bullet rather than in a footnote.**
+The key composes, is served and is enforced; **no screen renders it yet.** `Features.md` §6 carries a
+per-site enumeration with an owner. **It has NINE entries — TWO implemented (`-`, the two the wire
+delivers) and SEVEN not (`·`) — and the dispatch named seven of them, so this is not the dispatch's list
+with a status column.** ⚠ This sentence said "seven of the eight" until an independent reviewer counted
+the list; the number was never measured, and a wrong count here is the symptom this repo treats as a
+structural tell rather than a typo. The four site names beyond the dispatch's list are the workspace and
+project prefixes ON THE WIRE and the composition itself, which is what "ships" means for a display task.
+⚠ **CORRECTED AT THE MERGE (2026-09-20): the `Delete` toast NOW EXISTS TO WIRE.** Exec 1's sheet-footer
+merged as `e9c1a04f` while this branch ran, so the sentence that stood here — *"does not exist to wire,
+`Delete` is exec 1's in-flight door"* — was true at this branch's base and false at the head it now
+reports. Measured on the merged tree: `packages/app-core/src/views/ticket-sheet.tsx` carries the
+`Delete` control and its footer docblock now says the footer is COMPLETE, and the soft-delete copy
+*"its history is retained"* is in `packages/domain/src/entity-state.ts`, `events/ticket-events.ts`,
+`ticket-state.ts` and `rule-engine/src/checks/deletion.ts`. **`test-cases/16-remaining-doors.md:522`
+names this site as wanting exactly what this task built** — the prototype's toast reads *"GN-1183
+deleted · its history is retained"*, and the file's own note says the product *"has no ticket key"*.
+**So it is a live display site awaiting the key, not a site that cannot be wired, and its owner is
+whoever next holds the sheet.** Cycle 21 puts the
+sheet's three-crumb breadcrumb in exec 1's NEXT queued task, so the fourth crumb belongs to whoever holds
+the sheet — **and that wire is now waiting for them.**
+
+⚠ **THE SENTENCE I REFUSED TO WRITE.** The dispatch asked the number's docblock to say a gap means *"a
+creation was abandoned"*. **With the number as a POSITION that sentence is false**: a refused creation
+leaves no event and consumes no position, so a project's numbers are contiguous and a gap is
+unconstructible rather than merely unhappened. The property the sentence protected is kept absolutely —
+**a number is NEVER REUSED**, because `workspace_seq` never repeats. The true statement is in the
+docblock and the divergence is recorded here.
+
+### § 6 — THE MUTATION SWEEP, INCLUDING ONE SURVIVOR
+
+Six mutations, each applied to a **committed** tree, restored with `git checkout --` and the restore
+confirmed by **SHA-256 comparison** — never a shell `diff`.
+
+| # | mutation | result |
+|---|---|---|
+| M1 | door check reads the stored column only | **reddens 13.1015 only**; 13.1014 green (runner's counts: 1 failed / 4 passed) |
+| M2 | resolver collapses to one pass | **reddens 13.1024 only** |
+| M3 | id filter inside the window | **reddens 13.1006 and 13.1007** — real over-broad effect, recorded |
+| M4 | projection writes the DERIVED prefix into the column | ⚠ **SURVIVED — reddens NOTHING, including `verify-projections`** |
+| M5 | `ticketKey` drops the workspace half | **reddens 13.1025** |
+| M6 | `lockWorkspace` removed from `commitOne` | **reddens 13.1026 LIVE**: `duplicate key value violates unique constraint "events_workspace_seq_unique"` |
+
+**M4 is the finding worth carrying.** The derivation is a PURE FUNCTION, so the live row and the rebuilt
+shadow compute the SAME value and `EXCEPT` has nothing to report — **the verifier constrains a column to
+be REPRODUCIBLE, never to be ATTRIBUTED.** The rule "the column holds only what an event said" is held by
+a comment and by review, **not by a gate**, and that is now written in `proj-projects.ts` itself.
+
+⚠ **TWO MUTATIONS DID NOT RUN BEFORE THEY WERE FIXED, and both read as passes.** The first sweep used
+`--filter gisik-nokma-server` (no `@gisik-nokma/` scope): it ran nothing and exited 0. M4 referenced
+`derivePrefix` without importing it, so the file did not compile. **The recorded rule — "a survivor with
+no explanation is either an unconstrained path or a mutation that never ran, and those must be
+distinguished" — earned its keep twice in one sweep.**
+
+### § 7 — OUT OF SCOPE, RECORDED WITH NAMED OWNERS (not fixed)
+
+- **Every display site of the key.** Owner: **whoever next holds the ticket sheet** (exec 1, whose queue
+  row 3 builds the breadcrumb).
+- **`proj_workspaces` does not exist and is not created here.** The workspace prefix is a ledger fold, as
+  the name already was. Owner: whoever grows a workspace projection.
+- **The dev database has no `prefix` column until the next container rebuild.** Owner: the controller's
+  next `pnpm dev:stack:rebuild`.
+
+### § 7b — THE REVIEW ROUND, AND WHAT IT FOUND (2026-09-20)
+
+An independent reviewer ran against `6afa490e`'s parent: **four Important defects and two Minor**, all now
+fixed. **Three of the four were in MY OWN reasoning, and every one of them was a case that PASSED while the
+property it was named for was false.**
+
+| # | what it was | the case that could not see it |
+|---|---|---|
+| 1 | **A rename moved the DERIVED prefix** — `CC`→`CE` on renaming `Convenience Corner`, rewriting every ticket key in the workspace under readers who had quoted them. Reachable on EVERY workspace in the ledger, since none carries a stored prefix. | 13.1012 is named for exactly this and passed, because its fixture stores `XY` and never enters the derived branch. |
+| 2 | **A re-delivered `project.created` was refused by its OWN prefix** — `project.prefix-taken` where the ledger answers `duplicate-event-id`, on `POST /v1/events` and `/v1/sync`. | every other case uses a FRESH project id. |
+| 3 | **The suffix loop produced illegal prefixes** (`S10`, `100`, `S1000`) while its docblock claimed a fallback it did not have. Found by me AND the reviewer. | unreachable at scale; the CLAIM is what mattered. |
+| 4 | **The ENTRY half was unreachable** — neither founding form had a prefix box. | no test drove `POST /v1/workspaces` with a prefix at all. |
+
+Fixes: the derivation reads the FOUNDING name (immutable, because `events` refuses UPDATE);
+`projectPrefixesInWorkspace` returns a **Map keyed by project id** so the gate can ask "held by somebody
+ELSE"; a total `collisionCandidates` generator replaces the loop and THROWS rather than emitting an illegal
+prefix; and both founding forms gained an optional `Prefix` box that **upper-cases as the owner types**
+(`prefixSchema` refuses lower case rather than normalising it — a docblock already claimed the forms did
+this, and they did not).
+
+**Cases 13.1027–13.1033 are the witnesses, and pass 2 (below) verified each can actually fail.** 13.1027 is mutation-witnessed: reverting to
+`derivePrefix(named)` reddens it and nothing else (1 failed / 10 passed).
+
+⚠ **THE LESSON, and it is the one already recorded on this machine: a check's NAME is not its instrument.**
+13.1012 was named for rename-immutability and exercised the stored branch; the docblock named a fallback no
+code had; `checkProjectPrefixUnique` asked a subtly different question than its name says. **A mutation
+sweep did not catch any of them**, because I mutated the code and the cases were green for reasons
+unrelated to their names.
+
+⚠ **AND THE FIX WAS BRIEFLY LOST.** Reverting a mutation with `git checkout --` reverted to HEAD, not to the
+working tree, so an UNCOMMITTED fix was destroyed silently and `git status` read clean. The checksum taken
+before the mutation is the only reason it was noticed. **Commit the fix BEFORE mutating it** — the rule was
+already written down and I broke it anyway.
+
+⚠ **`check-case-ids` caught me TWICE in this change set, both times by the same tell: the delta was smaller
+than what was added.** The guard matches an id only at the START of a bullet, so `13.1019`/`13.1020` written
+as one sentence, and later `13.1030–13.1033`, each left ids invisible while the suites counted them.
+**The delta now equals the minted count exactly: 2523 − 2496 = 27, then 2530 − 2496 = 34.**
+
+### § 7c — THE SCOPED RE-REVIEW (pass 2), AND ALL THREE FINDINGS WERE IN THE FIX ROUND'S OWN PROSE
+
+A second, scoped re-review ran over `acb1a91e..HEAD` — the fix round and the merge, and nothing else.
+**Verdict: all four fixes hold; the properties their cases name are true and the cases CAN fail.** It
+confirmed 13.1027 takes the derived branch, 13.1028 has a real control, 13.1029 is **not vacuous** (the
+reviewer replicated the REPLACED loop verbatim and ran the case's own assertions against it — it reddens at
+depth 100), and the entry half is carried end to end.
+
+**Three Minor findings, every one of them a false claim I had just written:**
+
+1. **`prefix.ts` said the digit block was "nine values"; `'23456789'` is EIGHT.** The reviewer also
+   measured the generator's true total — 17,610 candidates, which is `1 + 8 + 26 + 17576 − 1` — and that
+   arithmetic is what the sentence contradicted.
+2. **`prefix.ts` said every candidate is "made of capitals".** Measured: 8 of every base's first 35
+   candidates contain a digit. The same file's generator docblock already said the digit was deliberate,
+   so the file contradicted itself.
+3. **`test-cases/16-remaining-doors.md:522` asserts *"This product has no ticket key"*** — a sentence
+   `main` introduced, which THIS BRANCH FALSIFIES, and which my own `Features.md` and this file both cite
+   approvingly. **The citation sweep's universe was wrong again: the stale claim lived in a file the merge
+   brought in that I never opened.**
+
+All three are corrected in place, and a fourth found while fixing them: the same `prefix.ts` cited a rule id
+`prefix.already-used` that does not exist — the shipped id is `project.prefix-taken`.
+
+**The pattern held across both passes: every defect was a claim, not a mechanism.** The four Important
+findings were properties asserted by prose and unheld by code; the three Minor ones were counts and scopes
+asserted by prose and unheld by measurement. **Neither pass found a wrong algorithm.**
+
+### § 8 — OPEN RULINGS: NONE.
+
+Nothing here needs the owner. The one thing that LOOKS like a divergence — "a durable public identifier
+was asked for and the number is derived rather than stored" — is answered by §3 with the two walls that
+forced it, and the derived number is durable in the sense the owner asked for: it names one ticket,
+forever, and is never reused.
+
+### RULES THAT BIND THIS BRANCH
+- **Never `docker compose`** (any subcommand) and **never bind `:3001`**. That is why the dev-database
+  read in §4 was done over `pg` and not through the stack.
+- **Do not run the forced gate** — the controller does.
+- **Never `AskUserQuestion`** in this topology. A question for the owner is a file plus a pointer, then a
+  hold.
+- **`Features.md` and `test-cases/` move in the same change set** as the code — they did, twice.
+- **A commit cannot name its own sha.** Every anchor in §2 is stated at the CODE head `4d11d8f8`; the
+  commit carrying THIS file sits above it, so `git log -1 --format=%h -- docs/lanes/executor-2-state.md`
+  names a DIFFERENT sha and that is correct rather than stale.
+
+---
+
+## ▼ PREVIOUS BLOCK — **THREE PRODUCT SENTENCES: ONE FALSE, ONE DEAD, ONE NAMING A CONTROL NO SCREEN CAN OFFER — AND THE TWO OWNER RULINGS THAT PULLED IN OPPOSITE DIRECTIONS.** (2026-09-20)
 
 ### § 1 — WHERE TO FIND IT
 
@@ -2389,7 +2645,9 @@ it here**: `gh pr list --head exec2/assignee-editable --state all`.
 1. **"A picker needs a roster, which is a SEVENTH thing to pass" — NO.** `TicketSheet` **already reads the
    roster itself** (`ticket-sheet.tsx:209-210`, `useLiveQuery(dataSource, workspaceId, workspaceId, () =>
    dataSource.query.getMembers(workspaceId))`) and already uses it for `nameOf` and `VisibilityEditor`. The
-   six-prop mount at `page.tsx:2346` is not a constraint. **Nothing is passed; nothing new is read.**
+   six-prop mount in `apps/web/app/w/[workspaceId]/page.tsx` — **cited by SYMBOL, not by offset: it
+   was `:2346` when written and that number now lands on a blank line, which is the failure mode
+   cycle 22 named — is not a constraint. **Nothing is passed; nothing new is read.** (⚠ MEASURE IT AGAIN before relying on it: replay the mount's prop list.)
 2. **And the sheet was collapsing a REFUSED roster into an empty one.** `members={members.data ?? []}` at
    `:617`, with **`members.error` read nowhere in the file** — the value `page.tsx:2495` names as the defect:
    *"never `[]`, which would claim this workspace has no members."* The page and its Filters sheet tell

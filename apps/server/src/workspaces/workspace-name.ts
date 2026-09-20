@@ -1,4 +1,5 @@
 import type { Queryable } from '../db/queryable.js';
+import { derivePrefix } from '@gisik-nokma/domain';
 
 /**
  * A workspace's current name, read straight from its ledger.
@@ -46,13 +47,90 @@ export async function workspaceNameFromLedger(
   db: Queryable,
   workspaceId: string,
 ): Promise<string | null> {
-  const { rows } = await db.query<{ payload: { name?: unknown } }>(
+  // ONE query for both halves of the identity — see `workspaceIdentityFromLedger`,
+  // which this delegates to. The pair is read together on every directory row,
+  // and a second round trip per row to fetch the prefix would be a cost paid on
+  // the hot path for no answer the first query could not carry.
+  const { name } = await workspaceIdentityFromLedger(db, workspaceId);
+  return name;
+}
+
+/**
+ * A workspace's name AND the prefix that forms the first half of every ticket
+ * key it holds — `CC` in `CCSO-1183` (owner spec 2026-09-20).
+ *
+ * ## One query, one order, two ends of it
+ *
+ * The two halves of the identity are read from OPPOSITE ENDS of the same
+ * workspace_seq-ordered list, and that is the only thing that makes the pair
+ * coherent:
+ *
+ * - the NAME is the LAST naming event — a rename is a later claim about what
+ *   the workspace is called;
+ * - the PREFIX is the FIRST naming event that carries one — because a prefix is
+ *   IMMUTABLE. `workspace.renamed` does not carry one and deliberately cannot
+ *   (`events/membership.ts`): moving the prefix on a rename would change every
+ *   ticket key in the workspace under readers who had already quoted one, and a
+ *   key's whole job is to name one thing durably.
+ *
+ * A single `ORDER BY workspace_seq DESC LIMIT 1`, which the name's own fold used
+ * before this function existed, cannot answer the prefix at all once a rename
+ * has happened — the latest event has no prefix on it. So the query takes the
+ * whole naming history for the workspace (two event types, and in practice two
+ * rows) and the two ends are read off it.
+ *
+ * ## The prefix is never absent for a NAMED workspace
+ *
+ * `prefix` is `null` only where `name` is `null` — a workspace with no naming
+ * event at all, which has nothing to derive from and nothing to render. For
+ * every named workspace the answer is the stored prefix where the founding
+ * claim carried one, and `derivePrefix` of the FOUNDING name where it did not.
+ *
+ * **The derivation is a READER'S rule, not a column's.** Nothing writes it
+ * back: every workspace in the ledger today was founded before the field
+ * existed, and the founding event cannot be amended (`events` refuses UPDATE —
+ * `events_append_only`), so a stored prefix could only ever be what a founding
+ * claim actually said. Deriving here keeps the answer a pure function of the
+ * ledger, which is what makes it stable across replays — and it is why the
+ * owner's three named rows come out right without a data migration:
+ * `Convenience Corner` → `CC`, `Shop operations` → `SO`, `gggg` → `GG`.
+ */
+export async function workspaceIdentityFromLedger(
+  db: Queryable,
+  workspaceId: string,
+): Promise<{ name: string | null; prefix: string | null }> {
+  const { rows } = await db.query<{ payload: { name?: unknown; prefix?: unknown } }>(
     `SELECT payload FROM events
       WHERE workspace_id = $1 AND type IN ('workspace.created', 'workspace.renamed')
-      ORDER BY workspace_seq DESC
-      LIMIT 1`,
+      ORDER BY workspace_seq ASC`,
     [workspaceId],
   );
-  const name = rows[0]?.payload.name;
-  return typeof name === 'string' ? name : null;
+  const name = rows.at(-1)?.payload.name;
+  const named = typeof name === 'string' ? name : null;
+  if (named === null) {
+    return { name: null, prefix: null };
+  }
+  // `?? null` over the FIRST row and not `Array.prototype.find`: a founding
+  // claim written before the field existed has no key at all, so `find` would
+  // walk the history looking for a prefix no later event can carry — there is
+  // exactly one candidate and it is the first.
+  const stored = rows[0]?.payload.prefix;
+  // ⚠ THE DERIVATION READS THE **FOUNDING** NAME, NOT THE CURRENT ONE, and that
+  // is a defect fix rather than a tidy-up. Deriving from `named` made the
+  // prefix a function of whatever the workspace is called TODAY: renaming
+  // `Convenience Corner` to `Corner Emporium` moved `CC` to `CE` and rewrote
+  // every ticket key in the workspace — after readers had quoted them — which
+  // is the single thing this module's docblock and `membership.ts` both say a
+  // key may not do. **It was reachable on EVERY workspace in the ledger**,
+  // because none of them carries a stored prefix, so every one of them was on
+  // this branch; it took an independent reviewer to see it, and the case that
+  // was supposed to catch it (13.1012) passed because its fixture stores a
+  // prefix and therefore never took the derived path at all.
+  //
+  // The founding name is immutable in the same way the prefix is: no event
+  // rewrites a `workspace.created` payload (`events` refuses UPDATE). So
+  // reading it makes the derived half exactly as stable as the stored one.
+  const foundingName = rows[0]?.payload.name;
+  const derived = derivePrefix(typeof foundingName === 'string' ? foundingName : named);
+  return { name: named, prefix: typeof stored === 'string' ? stored : derived };
 }

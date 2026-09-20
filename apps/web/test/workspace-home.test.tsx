@@ -62,13 +62,14 @@ function workspaceAs(role: string, over: Partial<WorkspaceRef> = {}): WorkspaceR
   return {
     id: WORKSPACE,
     name: 'Convenience Corner',
+    prefix: 'CC',
     role,
     memberCount: 5,
     nameRestrictedProjectCount: 2,
     projects: [
-      { id: 'p1', name: 'Shop operations', archived: false, ticketCount: 9, blockedCount: 3 },
-      { id: 'p2', name: 'Deliveries', archived: false, ticketCount: 4, blockedCount: 0 },
-      { id: 'p3', name: 'Old signage', archived: true, ticketCount: 7, blockedCount: 1 },
+      { id: 'p1', name: 'Shop operations', prefix: 'SO', archived: false, ticketCount: 9, blockedCount: 3 },
+      { id: 'p2', name: 'Deliveries', prefix: 'DL', archived: false, ticketCount: 4, blockedCount: 0 },
+      { id: 'p3', name: 'Old signage', prefix: 'OS', archived: true, ticketCount: 7, blockedCount: 1 },
     ],
     ...over,
   };
@@ -217,7 +218,7 @@ describe('13.384 the workspace home lists projects with the caller’s own count
         workspaceAs('guest', {
           memberCount: null,
           projects: [
-            { id: 'p1', name: 'Shop operations', archived: false, ticketCount: null, blockedCount: null },
+            { id: 'p1', name: 'Shop operations', prefix: 'SO', archived: false, ticketCount: null, blockedCount: null },
           ],
         }),
       ],
@@ -246,7 +247,7 @@ describe('13.384 the workspace home lists projects with the caller’s own count
       [
         workspaceAs('member', {
           projects: [
-            { id: 'p1', name: 'Shop operations', archived: false, ticketCount: 9, blockedCount: 3 },
+            { id: 'p1', name: 'Shop operations', prefix: 'SO', archived: false, ticketCount: 9, blockedCount: 3 },
           ],
         }),
       ],
@@ -337,8 +338,8 @@ describe('13.386 archive hides a project and restore returns it — read from th
         [
           workspaceAs('admin', {
             projects: [
-              { id: 'p1', name: 'Shop operations', archived: true, ticketCount: 9, blockedCount: 3 },
-              { id: 'p2', name: 'Deliveries', archived: false, ticketCount: 4, blockedCount: 0 },
+              { id: 'p1', name: 'Shop operations', prefix: 'SO', archived: true, ticketCount: 9, blockedCount: 3 },
+              { id: 'p2', name: 'Deliveries', prefix: 'DL', archived: false, ticketCount: 4, blockedCount: 0 },
             ],
           }),
         ],
@@ -346,8 +347,8 @@ describe('13.386 archive hides a project and restore returns it — read from th
         [
           workspaceAs('admin', {
             projects: [
-              { id: 'p1', name: 'Shop operations', archived: false, ticketCount: 9, blockedCount: 3 },
-              { id: 'p2', name: 'Deliveries', archived: false, ticketCount: 4, blockedCount: 0 },
+              { id: 'p1', name: 'Shop operations', prefix: 'SO', archived: false, ticketCount: 9, blockedCount: 3 },
+              { id: 'p2', name: 'Deliveries', prefix: 'DL', archived: false, ticketCount: 4, blockedCount: 0 },
             ],
           }),
         ],
@@ -591,7 +592,7 @@ describe('13.395 the header reads only served numbers, and its tint is keyed on 
         workspaceAs('guest', {
           memberCount: null,
           projects: [
-            { id: 'p1', name: 'Shop operations', archived: false, ticketCount: null, blockedCount: null },
+            { id: 'p1', name: 'Shop operations', prefix: 'SO', archived: false, ticketCount: null, blockedCount: null },
           ],
         }),
       ],
@@ -619,7 +620,7 @@ describe('13.395 the header reads only served numbers, and its tint is keyed on 
         workspaceAs('guest', {
           memberCount: 7,
           projects: [
-            { id: 'p1', name: 'Shop operations', archived: false, ticketCount: null, blockedCount: null },
+            { id: 'p1', name: 'Shop operations', prefix: 'SO', archived: false, ticketCount: null, blockedCount: null },
           ],
         }),
       ],
@@ -740,9 +741,9 @@ describe('13.413 each project card is one door, with the admin control outside t
       [
         workspaceAs('admin', {
           projects: [
-            { id: 'p1', name: 'Shop operations', archived: false, ticketCount: 9, blockedCount: 3 },
-            { id: 'p2', name: 'Old signage', archived: true, ticketCount: 7, blockedCount: 1 },
-            { id: 'p3', name: 'Deliveries', archived: false, ticketCount: 4, blockedCount: 0 },
+            { id: 'p1', name: 'Shop operations', prefix: 'SO', archived: false, ticketCount: 9, blockedCount: 3 },
+            { id: 'p2', name: 'Old signage', prefix: 'OS', archived: true, ticketCount: 7, blockedCount: 1 },
+            { id: 'p3', name: 'Deliveries', prefix: 'DL', archived: false, ticketCount: 4, blockedCount: 0 },
           ],
         }),
       ],
@@ -775,7 +776,7 @@ describe('13.413 each project card is one door, with the admin control outside t
  */
 describe('13.397 no archived projects means no archived control, on the home too', () => {
   it('renders neither the toggle nor an archived list when nothing is archived', async () => {
-    mount([[workspaceAs('member', { projects: [{ id: 'p1', name: 'Shop operations', archived: false, ticketCount: 2, blockedCount: 0 }] })]]);
+    mount([[workspaceAs('member', { projects: [{ id: 'p1', name: 'Shop operations', prefix: 'SO', archived: false, ticketCount: 2, blockedCount: 0 }] })]]);
     await screen.findByTestId('project-row-p1');
     expect(screen.queryByRole('button', { name: /archived/i })).toBeNull();
   });
@@ -817,6 +818,7 @@ describe('13.984-13.985 the project card draws the description, and draws nothin
             {
               id: 'p1',
               name: 'Delivery',
+              prefix: 'DL',
               archived: false,
               ticketCount: 2,
               blockedCount: 0,
@@ -842,10 +844,11 @@ describe('13.984-13.985 the project card draws the description, and draws nothin
       [
         workspaceAs('member', {
           projects: [
-            { id: 'p1', name: 'Delivery', archived: false, ticketCount: 2, blockedCount: 0 },
+            { id: 'p1', name: 'Delivery', prefix: 'DL', archived: false, ticketCount: 2, blockedCount: 0 },
             {
               id: 'p2',
               name: 'Site readiness',
+              prefix: 'SR',
               archived: false,
               ticketCount: 1,
               blockedCount: 0,
@@ -919,6 +922,41 @@ describe('13.986 the new-project form authors an optional description', () => {
     // assertion and fail only on the server, as a refusal of a field the person
     // never filled in.
     expect('description' in payload).toBe(false);
+  });
+
+  it('13.1031 — the new-project form authors the PREFIX, upper-cases it as typed, and omits the key when untouched', async () => {
+    // Owner spec 2026-09-20: *"during project creation up to 3 letters for it"*
+    // — `SO` in `CCSO-1183`.
+    const events: SubmittedEvent[] = [];
+    mount([[workspaceAs('admin')]], { ingest: (sent) => events.push(...sent) });
+
+    await userEvent.type(await screen.findByPlaceholderText('e.g. Phase 2 rollout'), 'Shop operations');
+    // LOWER CASE TYPED ON PURPOSE. `prefixSchema` REFUSES lower case rather than
+    // normalising it, so a form that passed the keystrokes through would earn a
+    // refusal whose remedy is "type it again in capitals". The upper-casing is
+    // the form's job, and this line is what holds it there — remove it from the
+    // `onChange` and this case fails on `so` rather than passing on `SO`.
+    await userEvent.type(screen.getByPlaceholderText('e.g. SO'), 'so');
+    await userEvent.click(screen.getByRole('button', { name: 'Create project' }));
+    await waitFor(() => expect(events.some((e) => e.type === 'project.created')).toBe(true));
+
+    expect(created(events).payload).toEqual({ name: 'Shop operations', prefix: 'SO' });
+
+    // SECOND SUBMISSION — the prefix box left untouched. The form clears every
+    // field on success, and an untouched optional box makes NO CLAIM: the key
+    // must be absent, so that the half is derived from the name rather than the
+    // project being founded with an empty prefix.
+    events.length = 0;
+    await userEvent.type(await screen.findByPlaceholderText('e.g. Phase 2 rollout'), 'Site readiness');
+    await userEvent.click(screen.getByRole('button', { name: 'Create project' }));
+    await waitFor(() => expect(events.some((e) => e.type === 'project.created')).toBe(true));
+
+    const payload = created(events).payload as Record<string, unknown>;
+    expect(payload['name']).toBe('Site readiness');
+    // ABSENT, asserted with `in` — for the reason the description case above
+    // gives in its own words: `toEqual({name})` does not catch a key left on the
+    // object as `undefined`.
+    expect('prefix' in payload).toBe(false);
   });
 });
 

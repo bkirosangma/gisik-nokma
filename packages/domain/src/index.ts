@@ -14,6 +14,7 @@ export * from './workflows/errand-with-waits.js';
 export * from './advise-workflow.js';
 export * from './entity-state.js';
 export * from './rank.js';
+export * from './prefix.js';
 export * from './system-actors.js';
 export * from './ist-day.js';
 export * from './doc-text.js';

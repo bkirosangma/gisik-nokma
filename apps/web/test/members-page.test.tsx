@@ -57,7 +57,7 @@ const ROSTER: RosterMember[] = [
 
 /** A `WorkspaceRef` for the name lookup only — the summary line is its one caller here. */
 function workspaceRef(name: string): WorkspaceRef {
-  return { id: WS, name, role: 'owner', memberCount: 2, nameRestrictedProjectCount: 0, projects: [] };
+  return { id: WS, name, prefix: 'CC', role: 'owner', memberCount: 2, nameRestrictedProjectCount: 0, projects: [] };
 }
 
 const PENDING: PendingInvite = {

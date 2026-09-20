@@ -38,12 +38,13 @@ beforeEach(() => {
 });
 
 function project(over: Partial<ProjectRef> & { id: string }): ProjectRef {
-  return { name: `Project ${over.id}`, archived: false, ticketCount: 0, blockedCount: 0, ...over };
+  return { name: `Project ${over.id}`, prefix: 'PJ', archived: false, ticketCount: 0, blockedCount: 0, ...over };
 }
 
 function workspace(over: Partial<WorkspaceRef> & { id: string }): WorkspaceRef {
   return {
     name: 'Convenience Corner',
+    prefix: 'CC',
     role: 'owner',
     memberCount: 3,
     nameRestrictedProjectCount: 0,
@@ -111,9 +112,9 @@ describe('useWorkspaceProjects — the served project list for one workspace', (
     const seen = await probe(servicesFor([workspace({ id: 'ws_1', projects })]), 'ws_1');
 
     expect(settled(seen)).toEqual([
-      { id: 'p_b', name: 'Beta', archived: false, ticketCount: 0, blockedCount: 0 },
-      { id: 'p_a', name: 'Alpha', archived: true, ticketCount: 0, blockedCount: 0 },
-      { id: 'p_c', name: 'Gamma', archived: false, ticketCount: 0, blockedCount: 0 },
+      { id: 'p_b', name: 'Beta', prefix: 'PJ', archived: false, ticketCount: 0, blockedCount: 0 },
+      { id: 'p_a', name: 'Alpha', prefix: 'PJ', archived: true, ticketCount: 0, blockedCount: 0 },
+      { id: 'p_c', name: 'Gamma', prefix: 'PJ', archived: false, ticketCount: 0, blockedCount: 0 },
     ]);
   });
 

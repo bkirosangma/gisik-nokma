@@ -266,6 +266,7 @@ describe('the workspace-name subtitle keeps its pinned size (ROUTED 3)', () => {
               {
                 id: WORKSPACE,
                 name: 'Garo Hills Logistics',
+                prefix: 'GH',
                 role: 'admin',
                 memberCount: 1,
                 nameRestrictedProjectCount: 0,

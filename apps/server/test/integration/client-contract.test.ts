@@ -1331,10 +1331,16 @@ describe('GET /v1/me/workspaces vs WorkspaceRef', () => {
     // `memberCount` it is here for EVERY caller, guests included — the owner's
     // 2026-09-09 ruling — so this sorted key set is the same for a guest,
     // minus `memberCount`.
+    // `prefix` joined at 2026-09-20 (the ticket key) and IS read by the client
+    // (`WorkspaceRef.prefix`, a plain `string`). Like `nameRestrictedProjectCount`
+    // it is served to EVERY caller, guests included: it is not a count and not a
+    // name of something the caller cannot see, it is half of every key on a
+    // ticket they ARE shown.
     expect(Object.keys(ref).sort()).toEqual([
       'memberCount',
       'name',
       'nameRestrictedProjectCount',
+      'prefix',
       'projects',
       'role',
       'workspaceId',

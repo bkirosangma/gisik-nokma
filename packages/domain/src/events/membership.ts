@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { WorkspaceRole } from '../entity-state.js';
 import { ulidString } from '../envelope.js';
+import { prefixSchema } from '../prefix.js';
 
 /**
  * The payload shapes of the workspace, project and membership vocabulary
@@ -40,7 +41,32 @@ const displayName = z
   .min(1)
   .refine((value) => value.trim() !== '', 'must not be blank — a name of only spaces names nothing');
 
-export const workspaceCreatedPayload = z.object({ name: displayName }).strict();
+/**
+ * The workspace prefix (owner spec 2026-09-20): up to three capital letters,
+ * entered when the workspace is created, and the first half of every ticket key
+ * the workspace will ever hold — `CCSO-1183`.
+ *
+ * **OPTIONAL, and `.strict()` is what makes that safe** — `projectCreatedPayload`'s
+ * `description` is the precedent. Every `workspace.created` written before this
+ * field existed parses unchanged, which a `.strict()` schema would otherwise
+ * turn into a hard refusal of the entire ledger.
+ *
+ * **Absent means NOT ENTERED**, and the key's first half is then DERIVED from
+ * the name (`../prefix.ts`) rather than left off — because a key with no
+ * workspace half names nothing. That is also why the field is not REQUIRED even
+ * going forward: a caller who mentions no prefix is a caller whose project
+ * still needs a key, and refusing them would make the key a precondition of
+ * founding a workspace rather than a consequence of it.
+ *
+ * **IMMUTABLE after creation.** `workspace.renamed` carries a name and NOT a
+ * prefix, deliberately: a rename is a claim about what the workspace is
+ * CALLED, and a key is not a name. If a rename could move the prefix, every
+ * ticket key in the workspace would change under readers who had already
+ * quoted one — which is the one thing a key may not do.
+ */
+export const workspaceCreatedPayload = z
+  .object({ name: displayName, prefix: prefixSchema.optional() })
+  .strict();
 export type WorkspaceCreatedPayload = z.infer<typeof workspaceCreatedPayload>;
 
 export const workspaceRenamedPayload = z.object({ name: displayName }).strict();
@@ -80,6 +106,30 @@ export const projectCreatedPayload = z.object({
    * spell "none" is how a reader ends up unable to say which happened.
    */
   description: descriptionText.optional(),
+  /**
+   * The project prefix (owner spec 2026-09-20): up to three capital letters,
+   * entered when the project is created, and the second half of every ticket
+   * key this project will ever hold — `CCSO-1183`.
+   *
+   * **OPTIONAL, for `description`'s reason exactly**: every `project.created`
+   * in the ledger written before this field existed parses unchanged, and an
+   * event that mentions no prefix is an event whose project still needs a key,
+   * so the key's half is DERIVED from the name (`../prefix.ts`) rather than
+   * omitted. Required-ness would make the key a precondition of founding a
+   * project rather than a consequence of it, and would refuse the whole
+   * pre-existing ledger in the same breath.
+   *
+   * **IMMUTABLE after creation**, and there is no `project.renamed` to carry
+   * one even if it were not: `proj_projects` has no rename handler at all
+   * (`projections/proj-projects.ts`), so this rides with `name` and is
+   * permanent in exactly the same way.
+   *
+   * **UNIQUE WITHIN THE WORKSPACE** (owner ruling 2026-09-20). That is a
+   * constraint on the value, not a shape this schema can express — a payload
+   * schema sees one event and the rule spans a workspace's projects — so it is
+   * enforced at the door and resolved at read time; see `../prefix.ts`.
+   */
+  prefix: prefixSchema.optional(),
 }).strict();
 export type ProjectCreatedPayload = z.infer<typeof projectCreatedPayload>;
 

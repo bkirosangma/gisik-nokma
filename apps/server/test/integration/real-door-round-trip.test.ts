@@ -447,6 +447,12 @@ describe('GET /v1/me/workspaces — the directory', () => {
         {
           workspaceId,
           name: 'Round Trip Corner',
+          // The ticket key's first half (2026-09-20), and this is the ONE place
+          // it is asserted against a world built entirely through the real
+          // doors: the founding event this run posted carried a NAME and no
+          // prefix, so `RT` here is the derivation running on the far side of a
+          // real `POST /v1/workspaces`.
+          prefix: 'RT',
           role: 'owner',
           // Task 16's counts, and this file is the one place they are asserted
           // against a world built ENTIRELY through the real doors — the
@@ -472,6 +478,9 @@ describe('GET /v1/me/workspaces — the directory', () => {
             {
               projectId,
               name: 'Shop floor',
+              // The second half, likewise derived from a name that crossed the
+              // wire in this same run.
+              prefix: 'SF',
               archived: false,
               description: 'Sprint work for the rollout',
               ticketCount: 2,

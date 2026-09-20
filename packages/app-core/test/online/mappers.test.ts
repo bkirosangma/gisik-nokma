@@ -2004,7 +2004,7 @@ describe('13.357 mapWorkspaceRefs reads role, the server field the client used t
   function body(role: string): { workspaces: unknown[] } {
     return {
       workspaces: [
-        { workspaceId: 'ws1', name: 'Convenience Corner', role, nameRestrictedProjectCount: 0, projects: [] },
+        { workspaceId: 'ws1', name: 'Convenience Corner', prefix: 'CC', role, nameRestrictedProjectCount: 0, projects: [] },
       ],
     };
   }
@@ -2013,6 +2013,10 @@ describe('13.357 mapWorkspaceRefs reads role, the server field the client used t
     expect(mapWorkspaceRefs(body('admin'))[0]).toEqual({
       id: 'ws1',
       name: 'Convenience Corner',
+      // The workspace prefix (owner spec 2026-09-20). Read as a REQUIRED
+      // string, never a nullable one — see the mapper. `toEqual` is exact, so
+      // this line is also what fails if the mapper ever starts defaulting it.
+      prefix: 'CC',
       role: 'admin',
       // Task 16. This body carries no `memberCount`, and an absent count is
       // WITHHELD — `null`, never 0. `toEqual` is exact, so this line is also
@@ -2049,7 +2053,7 @@ describe('13.357 mapWorkspaceRefs reads role, the server field the client used t
  */
 describe('13.982-13.983 mapWorkspaceRefs reads the project description', () => {
   function row(extra: Record<string, unknown>): Record<string, unknown> {
-    return { projectId: 'p1', name: 'Delivery', archived: false, description: null, ...extra };
+    return { projectId: 'p1', name: 'Delivery', prefix: 'DE', archived: false, description: null, ...extra };
   }
   function body(projects: Record<string, unknown>[]): { workspaces: unknown[] } {
     return {
@@ -2057,6 +2061,7 @@ describe('13.982-13.983 mapWorkspaceRefs reads the project description', () => {
         {
           workspaceId: 'ws1',
           name: 'Meghalaya Rollout',
+          prefix: 'MR',
           role: 'member',
           nameRestrictedProjectCount: 0,
           projects,
@@ -2131,7 +2136,7 @@ describe('13.372 mapWorkspaceRefs distinguishes a WITHHELD count from a counted 
     // body the server can produce, and every case below would fail on the
     // missing key rather than on the count it is actually about. `...extra`
     // spreads LAST, so a case can still override it.
-    return { projectId: 'p1', name: 'Shop operations', archived: false, description: null, ...extra };
+    return { projectId: 'p1', name: 'Shop operations', prefix: 'SO', archived: false, description: null, ...extra };
   }
   function withProjects(
     workspace: Record<string, unknown>,
@@ -2142,6 +2147,7 @@ describe('13.372 mapWorkspaceRefs distinguishes a WITHHELD count from a counted 
         {
           workspaceId: 'ws1',
           name: 'Convenience Corner',
+          prefix: 'CC',
           role: 'guest',
           // A GUEST body, and it carries this count — which is the owner's
           // ruling in one line. `...workspace` spreads AFTER, so a case that
@@ -2199,6 +2205,10 @@ describe('13.372 mapWorkspaceRefs distinguishes a WITHHELD count from a counted 
     expect(mapWorkspaceRefs(withProjects({}, [project({ archived: true })]))[0]!.projects[0]).toEqual({
       id: 'p1',
       name: 'Shop operations',
+      // The project prefix (owner spec 2026-09-20) — `SO` in `CCSO-1183`.
+      // REQUIRED and never null: there is no "not entered" state on the wire,
+      // because the server resolves stored-or-derived before it answers.
+      prefix: 'SO',
       archived: true,
       ticketCount: null,
       blockedCount: null,

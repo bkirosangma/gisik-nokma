@@ -181,6 +181,14 @@ async function stubApi(page: Page): Promise<void> {
           {
             workspaceId: WS,
             name: 'Convenience Corner',
+            // The ticket key's first half (2026-09-20), and REQUIRED like the
+            // count below: `mapWorkspaceRefs` reads it as a plain string and
+            // throws on an absent key. ⚠ THIS STUB WAS STALE FOR A DAY BEFORE
+            // ANYTHING SAID SO — it was already missing `description` on the
+            // project below, added 2026-09-19, because `apps/web/e2e` is on NO
+            // GATE. The mapper only ever reports the FIRST missing key, so the
+            // older omission stayed invisible behind the newer one.
+            prefix: 'CC',
             role: 'admin',
             memberCount: 3,
             // Task 18, and REQUIRED on the wire for every caller — an admin
@@ -192,7 +200,13 @@ async function stubApi(page: Page): Promise<void> {
               {
                 projectId: PRJ,
                 name: 'Shop operations',
+                // The second half of the key, and again required.
+                prefix: 'SO',
                 archived: false,
+                // Door A (2026-09-19) and required-with-a-null-spelling: the
+                // mapper refuses a project row that omits the key rather than
+                // reading the omission as "not described".
+                description: null,
                 ticketCount: 2,
                 blockedCount: 0,
               },
