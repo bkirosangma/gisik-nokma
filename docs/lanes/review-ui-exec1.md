@@ -168,7 +168,7 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 
 ---
 
-### P8 — **IMPORTANT** — `Dialog` and `Sheet` both declare `aria-modal="true"`, and nothing in the product implements containment
+### P8 — **MINOR (product) / IMPORTANT (follow-on)** — `Dialog` and `Sheet` declare `aria-modal="true"`; the product records the missing containment as a named follow-on
 
 **WHAT.** Both modal components tell assistive tech that the rest of the document is inert. Neither moves focus into the dialog, traps it, or restores it on close — and no focus trap or `inert` attribute exists anywhere in the product.
 
@@ -178,9 +178,17 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 - **Nothing anywhere implements containment:** `grep -rn "inert\|focus-trap\|focusTrap\|trapFocus"` over `packages apps` (excluding `node_modules`/`dist`/tests) returns **only prose uses of the word "inert"** — zero hits on the HTML attribute or a trap helper. **Positive control in the same command: `Escape` handlers are found in both `dialog.tsx:9` and `sheet.tsx:58`**, so the greps traverse the right tree.
 - **No caller supplies it either:** the four `<Dialog>` sites (`transition-dialog.tsx:382`, `bulk-close-dialog.tsx:242`, `new-ticket-dialog.tsx:126`, `reopen-dialog.tsx:64`) were checked for focus management; the only `useRef` among them is `bulk-close-dialog.tsx:161`'s `attemptRef`, a retry counter.
 
-**WHY IT IS WRONG.** `aria-modal="true"` is a stronger claim than `role="dialog"` — it asserts that content outside the dialog is unavailable. A screen-reader user is told the background is gone, then Tab moves focus into it: the dialog's own boundary is described as a wall that is not there. The product already has the good example next door: `InfoTip` documents *"No focus trap and no `role="menu"`"* and explains why each omission is correct **for a non-modal popover** (`info-tip.tsx:43-47`). These two components make the modal claim without the modal work.
+**⚠ IS THIS ALREADY RECORDED? YES — and this finding is rewritten because of it.** The product states the gap in its own words, in `packages/app-core/src/views/board.tsx:394-397`:
 
-**WHAT WOULD HAVE BEEN BETTER.** Either implement containment — move focus to the dialog on open, restrict Tab to it, restore focus to the opener on close — or drop `aria-modal` to `role="dialog"` alone and be honest about it. The second is one attribute and is not a worse product; the current state is the only one that is *wrong*, because it asserts the property rather than merely lacking it.
+> *"(Dropping `aria-modal`'s focus escape itself is the shared `Dialog`'s business — **it ships no focus trap and no portal** — and is **recorded as a named follow-on** rather than repaired from here.)"*
+
+So this is **not a discovery**, and reporting it as one would be the exact error this exercise warns against. It is a **recorded, deliberately-deferred item with a named owner**. What I am adding is the measurement that the record is still accurate today, and the count of what rests on it: four `<Dialog>` call sites plus the ticket sheet.
+
+**WHY IT IS STILL WORTH A ROW — the asymmetry, not the gap.** The codebase contains its own counter-example, and it is a *less* used surface than the ones that lack it. The project page's filters sheet (`page.tsx:3304`) is a third modal that declares `aria-modal="true"`, moves focus into itself on open, restores it to the exact opening control on close, and **asserts both** — `filters-sheet.test.tsx:153` is `describe('13.445 the sheet is a real dialog, and focus moves into it on open')`, asserting `expect(dialog.contains(document.activeElement)).toBe(true)` with a comment explaining that the precondition is what makes the assertion non-vacuous. So the standard exists in this repository, it has case ids (`13.445`, `13.446`), and it has a *copyable* test.
+
+**Why that matters even though the gap is recorded:** a deferred item with a named owner is fine; a deferred item whose remedy already exists in-repo, tested, two files away, is one nobody has had a reason to pick up. The honest severity is therefore **lower than a fresh defect of the same shape** — I would put it at **MINOR as a finding, IMPORTANT as a follow-on** — and the report says so rather than banking credit for re-finding it.
+
+**WHAT WOULD HAVE BEEN BETTER.** Port what the filters sheet already does, and its test: move focus to the dialog on open, contain Tab, restore focus to the opener on close. The pattern, the assertions and the case ids all exist at `page.tsx:3189-3310` and `filters-sheet.test.tsx:153-200`. **`aria-modal` is also asserted only for the filters sheet** — a `grep` for `aria-modal` across `packages` and `apps` finds it in the two shared components, in the filters sheet, and in **one test**, with `aria-selected` (19) and focus assertions (16) as the controls proving the search traverses test files.
 
 ---
 
@@ -414,18 +422,17 @@ So the two instances together make the shape concrete: **a surface the sweeps ca
 **CRITICAL — 1**
 - `I1` no browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate structurally cannot run one
 
-**IMPORTANT — 9**
+**IMPORTANT — 8**
 - `I2` the `e2e-stack` contrast roster records a defect fixed eight hours later, with no provenance
 - `I3` `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by its own docblock
 - `P1` seven interactive controls styled by no rule at all (raw UA chrome)
 - `P2` the board's whole-board empty state has no prototype counterpart and no styling
-- `P8` `Dialog` and `Sheet` declare `aria-modal="true"`; nothing implements containment
 - `P9` `SegmentedControl` carries ARIA tab semantics with none of the tab keyboard model, in 7 places
 - `P11` two surfaces are outside every sweep's population (the `Select` panel; and `.gn-comment__file-ext`, where a floor is breached) — for independent reasons
 - `P12` every screen in the product has the same document title (WCAG 2.4.2, Level A)
 - `P14` the prototype-delta queue reads 11 items outstanding; 7 of them have shipped, including its own row 0
 
-**MINOR — 9**
+**MINOR — 10**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
 - `I5` my own handoff carries two contradicting position blocks; the pointer that found it is itself stale
 - `P3` the parent crumb cannot show the parent's key; the prototype's does; no ruling found
@@ -434,9 +441,10 @@ So the two instances together make the shape concrete: **a surface the sweeps ca
 - `P6` mobile: two of three screens have no styling while the third is themed
 - `P7` desktop's task list has no rules
 - `P10` the accessible-name ratchet's unit is an attribute; its message claims a property of assistive tech
+- `P8` `Dialog` and `Sheet` declare `aria-modal="true"`; the missing containment is recorded as a named follow-on (counted here, not under IMPORTANT — see the note)
 - `P13` no skip link; a keyboard-only user Tabs the nav on every navigation (WCAG 2.4.1)
 
-**Total 19.** `raised` and `sum by severity` agree by enumeration above. ⚠ **One id carries two severities on purpose and is counted once:** `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 19.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` is **MINOR as a product finding** (the gap is already recorded in the product, with a named follow-on, so it is not a discovery) and **IMPORTANT as a follow-on** (the remedy exists in-repo, tested, two files away). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
