@@ -37,7 +37,7 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 
 **⛔ NOT REACHED — and this is the honest boundary, stated as a list:**
 1. **No painted DOM anywhere. No browser ran, no screenshot was taken.** Every rendering claim below is a measurement of *source and stylesheets*. Section 5's last row says why a live run would have measured a different product. **A static claim is weaker than a painted one and I am not going to dress it up.**
-2. Not reviewed file-by-file: `apps/web/app/*` route bodies (25 modules); the ~55 `apps/web/test/*` files; `packages/app-core/src/views/*` beyond `ticket-sheet`/`board`/`attachment-list`; `packages/editor`'s components beyond the class sweep; `apps/mobile`'s editor webview and both storage engines; `apps/desktop`'s Tauri config and storage; `apps/web/e2e/` (the mock-only suite). **`packages/ui/src/components/*` WAS read** — `button`, `card`, `chip`, `segmented-control`, `avatar`, `dialog`, `switch` in full, and `sheet`/`toast`/`info-tip`/`table` grepped; **`select/select.tsx` (597 lines, the product's largest shared control) was NOT read** and is the biggest single hole in this lane's coverage.
+2. Not reviewed file-by-file: `apps/web/app/*` route bodies (25 modules); the ~55 `apps/web/test/*` files; `packages/app-core/src/views/*` beyond `ticket-sheet`/`board`/`attachment-list`; `packages/editor`'s components beyond the class sweep; `apps/mobile`'s editor webview and both storage engines; `apps/desktop`'s Tauri config and storage; `apps/web/e2e/` (the mock-only suite). **`packages/ui` WAS read** — `button`, `card`, `chip`, `segmented-control`, `avatar`, `dialog`, `switch` in full; `sheet`/`toast`/`info-tip`/`table` grepped; `select/select.tsx` read for its structure, markup and sweep-visibility (it is built on React Aria — `useSelect`/`useComboBox`/`useListBox`/`useOption`/`HiddenSelect` — so its keyboard and role model comes from the library rather than from this repo, which is why P9's hand-rolled tabs stand out beside it). **Remaining largest hole: `apps/web/app/*`'s 25 route bodies.**
 3. Prototype comparison performed for **two** surfaces only (the ticket-sheet breadcrumb, the board empty states). The other ~20 prototype files were not compared.
 4. §16's 97 case ids were **not** each opened. `check:citations` was run (§7) and its limit is stated there.
 
@@ -191,6 +191,22 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 
 ---
 
+### P11 — **IMPORTANT** — The `Select` panel is outside the population of every rendered-property sweep, for two independent reasons
+
+**WHAT.** `Select` is the product's most-migrated shared control (the members Channel/Role fields, the style and theme toggles, the ticket-type editors). Its option rows have never been measured for tap-target size, label-text floor, accessible-name contribution or non-text contrast — and could not have been.
+
+**MEASUREMENT — reason 1, the panel is never on screen when a sweep runs.** The listbox is portaled to `document.body` and renders only while open (`select.tsx:530`, `<ul {...resolvedListBoxProps}>` inside a `createPortal`). The stack spec's own comment records it: *"the listbox and its options render only while open, portaled to `document.body`, so a closed-page sweep sees none of them"* (`e2e-stack/viewport.spec.ts:696`). **No spec opens a Select before sweeping** — `grep` for a click on the trigger across `e2e-viewport/*.ts` and `e2e-stack/*.spec.ts` returns only that comment, never a call.
+
+**MEASUREMENT — reason 2, even open, the rows match no arm of the tap-target selector.** `tap-targets.ts:268-280` selects `a[href]`, `button`, `input:not([type="hidden"])`, `select`, `textarea`, `summary`, `[role="button"|"link"|"tab"|"checkbox"|"switch"]`, and `[tabindex]:not([tabindex="-1"])`. An option row is `<li {...optionProps} className="gn-select__option">` (`select.tsx:582`) — an `<li>` with `role="option"` from `useOption`, which is the listbox pattern's non-tabbable row. **`[role="option"]` and `[role="listbox"]` occur 0 times in each of the four sweep modules** (`tap-targets.ts`, `type-scale.ts`, `accessible-names.ts`, `helpers/non-text-contrast.ts`).
+
+**WHY IT IS WRONG.** These are the two independent reasons the brief names as this lane's characteristic blind spot: *a sweep that cannot see a class is a sweep that reports zero offenders.* `.gn-select__panel` (`ui.css:2530`), `.gn-select__option` (`:2558`) and `.gn-select__chip` (`:2508`) are fully styled — someone did the work — and **no instrument has ever checked that the work holds**. The four sweeps report confident numbers for every other surface while this one contributes nothing to any denominator.
+
+**WHAT WOULD HAVE BEEN BETTER.** Add `[role="option"]` (and `[role="listbox"]`) to the tap-target selector, and have the stack spec open one Select before at least one sweep so the panel enters the population. Opening the style toggle on `/account` is one click and it is already on a swept route. Until then, say in the sweep's own output which surfaces it cannot reach — a stated blind spot is worth more than a silent zero.
+
+**Not measured:** whether the panel's rows would actually *fail* any floor. I did not open a panel in a browser (no browser ran, §2). **This finding is about coverage, not about a violation.**
+
+---
+
 ### P10 — **MINOR** — The accessible-name ratchet's unit is an attribute; its failure message claims a property of assistive tech
 
 **WHAT.** `ariaLabel` counts **elements carrying the attribute**, and the assertion that consumes it tells the reader something stronger.
@@ -319,13 +335,14 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 **CRITICAL — 1**
 - `I1` no browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate structurally cannot run one
 
-**IMPORTANT — 6**
+**IMPORTANT — 7**
 - `I2` the `e2e-stack` contrast roster records a defect fixed eight hours later, with no provenance
 - `I3` `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by its own docblock
 - `P1` six interactive controls styled by no rule at all (raw UA chrome)
 - `P2` the board's whole-board empty state has no prototype counterpart and no styling
 - `P8` `Dialog` and `Sheet` declare `aria-modal="true"`; nothing implements containment
 - `P9` `SegmentedControl` carries ARIA tab semantics with none of the tab keyboard model, in 7 places
+- `P11` the `Select` panel is outside every sweep's population, for two independent reasons
 
 **MINOR — 8**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
@@ -337,7 +354,7 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 - `P7` desktop's task list has no rules
 - `P10` the accessible-name ratchet's unit is an attribute; its message claims a property of assistive tech
 
-**Total 15.** `raised` and `sum by severity` agree by enumeration above.
+**Total 16.** `raised` and `sum by severity` agree by enumeration above. ⚠ **One id carries two severities on purpose and is counted once:** `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
