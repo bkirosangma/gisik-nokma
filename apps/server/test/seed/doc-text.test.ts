@@ -175,14 +175,29 @@ describe('seedDescriptionDoc — the prose/record split, which is the decision t
 
 describe('the parse over the REAL 23 descriptions', () => {
   /**
-   * The corpus is the whole point of the cases below, so its size is asserted
-   * before anything is concluded from it. 23 is the dev database's own count of
-   * rows holding a description (measured read-only on 54330), and every one of
-   * those rows equalled this build's output character for character.
+   * 16.77 — the corpus IS the database's: 23 descriptions, and every one of them carries
+   * a `literal` record part beside at least one `markdown` part.
+   *
+   * ⚠ THE EQUALITY WITH THE STORED ROWS IS A FACT ABOUT THE PRE-CHANGE BUILD, NOT ABOUT
+   * THIS ONE, and this comment said it in the present tense until an independent
+   * review measured the difference. Measured read-only on 54330: the 23 stored
+   * descriptions are all LITERAL-TEXT docs, and the text this build's parts join
+   * to reproduces them **23 of 23** — which is what makes the corpus real. The
+   * DOCS this build renders are the parsed shape and therefore match **0 of 23**,
+   * deliberately: that is the change. The dev rows keep the old shape because the
+   * seed is idempotent on `seedUlid`; the remedy and its owner are recorded in
+   * `test-cases/16-remaining-doors.md`.
    */
-  it('is the corpus the database holds — 23 descriptions, three parts deep', () => {
+  it('is the corpus the database holds — 23 descriptions, each with a record part', () => {
     expect(descriptions).toHaveLength(23);
-    expect(markdownParts.length + literalParts.length).toBeGreaterThanOrEqual(23 * 2);
+    expect(descriptions.every((parts) => parts.some((part) => part.kind === 'literal'))).toBe(true);
+    expect(descriptions.every((parts) => parts.some((part) => part.kind === 'markdown'))).toBe(true);
+    // One markdown part for the body, and a SECOND for the quoted ask — so the
+    // markdown count is 23 plus the number of records that carry an ask, which is
+    // derived here rather than pinned as a number that would drift silently.
+    const withAsk = descriptions.filter((parts) => parts.some((part) => part.text.startsWith('ask (verbatim')));
+    expect(withAsk.length).toBeGreaterThan(0);
+    expect(markdownParts.length).toBe(23 + withAsk.length);
   });
 
   /**
@@ -203,29 +218,32 @@ describe('the parse over the REAL 23 descriptions', () => {
 
   /**
    * 16.77 — the parse is LOSSLESS over the 23 real descriptions: every prose character
-   * survives, and the marks the corpus holds are produced.
+   * survives.
    *
-   * ⛔ THE CASE THE DISPATCH PUTS FIRST: the parse must be LOSSLESS over the real
-   * strings. `proseOf` is written from the syntax rules and never calls the
-   * parser, so this can fail — and it fails for a lost character, a reordered
-   * word, or a delimiter the parser consumed without producing a mark, because
-   * the parser's output is compared against the ORIGINAL with syntax removed.
+   * ⛔ THE CASE THE DISPATCH PUTS FIRST, and its control is INSIDE IT rather than
+   * beside it: if `proseOf` were an identity, losslessness would be satisfied by
+   * a parser that did nothing at all, so the non-identity is asserted first, in
+   * the same `it()`. ⚠ **This was two sibling cases until an independent review
+   * measured that the control was not in the same invocation at all — they are
+   * separate rows to vitest, the guarded case reddens while the control stays
+   * green, and deleting the control changes nothing. A control that gates
+   * nothing is a sentence, not a check.**
+   *
+   * ⚠ AND WHAT THIS CASE CANNOT CATCH, stated because the comment claimed it could: it
+   * compares TEXT, so a mark silently dropped — every `**bold**` losing its
+   * `bold` — leaves it GREEN. Measured by mutation. **The net for mark loss is
+   * the census case below, not this one**; they fail for different reasons and
+   * neither substitutes for the other.
    */
   it('LOSSLESS: every prose character of all 23 survives the parse', () => {
+    // The control, FIRST and in this same invocation.
+    const raw = markdownParts.reduce((sum, part) => sum + part.text.length, 0);
+    const stripped = markdownParts.reduce((sum, part) => sum + proseOf(part.text).join('\n').length, 0);
+    expect(raw - stripped, 'the oracle is an identity — this case would prove nothing').toBeGreaterThan(1000);
+
     for (const part of markdownParts) {
       expect(linesOf(plainTextDoc(part.text)), `lost prose in: ${part.text.slice(0, 60)}`).toEqual(proseOf(part.text));
     }
-  });
-
-  /**
-   * The control for the case above, in the SAME invocation: if `proseOf` were an
-   * identity the losslessness assertion would be satisfied by a parser that did
-   * nothing at all. It is not one — it removes a measured number of characters.
-   */
-  it('control: the oracle actually strips syntax (it is not an identity)', () => {
-    const raw = markdownParts.reduce((sum, part) => sum + part.text.length, 0);
-    const stripped = markdownParts.reduce((sum, part) => sum + proseOf(part.text).join('\n').length, 0);
-    expect(raw - stripped).toBeGreaterThan(1000);
   });
 
   /**

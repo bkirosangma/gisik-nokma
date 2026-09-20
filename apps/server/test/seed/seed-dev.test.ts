@@ -158,10 +158,17 @@ describe('buildDevSeedEvents — the calendar stays empty', () => {
 
   /**
    * 16.80 — the PLAN seed's descriptions obey the same split as the tracker seed's:
-   * the `Goal:` prose is parsed, and the `source:` line beside it is not. The
-   * fixture's goal carries a `**bold**` phrase and a `` `code` `` run so the
-   * parse is visible here — an unmarked goal would make this case pass under a
-   * renderer that parsed nothing.
+   * the `Goal:` prose is parsed, and the `source:` line beside it is not.
+   *
+   * ⚠ **THIS CASE READS THE REAL PLAN SERIES** (`docs = readPlanSeries(plansDir)`,
+   * `plansDir` = the repo's `docs/superpowers/plans`), which is why it can prove
+   * the real corpus is parsed. It first asserted against a MARKED FIXTURE goal,
+   * and that was changed for exactly this reason — **a fixture cannot show that
+   * the real series is parsed.** What the real series supplies is measured: **3
+   * of the 11 goals carry markdown**, and plan 06 — the one asserted on — carries
+   * backticked package names and no `**`. ⚠ The docblock above this case still
+   * described the deleted fixture until an independent review read it; the
+   * correction had reached the case and not its comment.
    */
   it('the plan descriptions split too: Goal is parsed, the source line is not', () => {
     const descriptions = events.filter(
@@ -179,7 +186,14 @@ describe('buildDevSeedEvents — the calendar stays empty', () => {
     // byte-for-byte, whichever plan or task it belongs to.
     for (const doc of docs) {
       const source = `source: docs/superpowers/plans/${doc.file}`;
-      expect(textOf(descriptions.find((event) => textOf(event).includes(source)) ?? descriptions[0]!)).toContain(source);
+      const carrying = descriptions.find((event) => textOf(event).includes(source));
+      // ⚠ NO `?? descriptions[0]` FALLBACK. It was there to keep the loop from
+      // throwing, and it turned "some event carries this source line" into
+      // "descriptions[0] does" — satisfied whether or not the predicate ever
+      // matched, and turning a whole-series loss into a confusing one-line
+      // mismatch. A missing source line should say so.
+      expect(carrying, `no description carries ${source}`).toBeDefined();
+      expect(textOf(carrying!)).toContain(source);
     }
 
     // THE PROSE HALF, on a plan that really carries markdown: three of the eleven

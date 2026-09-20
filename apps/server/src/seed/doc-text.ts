@@ -13,7 +13,7 @@ import { markdownToDoc } from './markdown-doc.js';
  * What was here, verbatim:
  *
  * > Seed bodies are the record's text, verbatim and literal. No markdown
- * > parsing: a `'**'` in the frozen record renders as typed characters, which
+ * > parsing: a '**' in the frozen record renders as typed characters, which
  * > is the editor's own literal-text honesty (spec §2) applied to seeds.
  * >
  * > Built from `@gisik-nokma/domain`'s own `plainTextToDoc`, which already

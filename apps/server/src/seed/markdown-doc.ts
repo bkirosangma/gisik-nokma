@@ -28,10 +28,22 @@
  *             and `enroling_in_apple_developer_program`, so a naive `_…_` rule
  *             would emphasise an intraword run that no reader wrote as markup.
  *             (`*` is safe here precisely because it has no intraword use.)
- *             `~~strike~~`, `> quote`, ``` fences ```, `---` rules, tables —
- *             none appears in the measured corpus, and each is left literal
- *             rather than guessed at. A bare URL is NOT autolinked: this parser
- *             reads delimiters, it does not discover URLs.
+ *             `~~strike~~`, `> quote`, ``` fences ```, `---` rules and TABLES
+ *             are refused too, and each is left literal rather than guessed at.
+ *             A bare URL is NOT autolinked: this parser reads delimiters, it
+ *             does not discover URLs.
+ *
+ * ⚠ ONE REFUSED CONSTRUCT *IS* IN THE CORPUS, AND THIS PARAGRAPH SAID IT WAS NOT.
+ * It read "`~~strike~~`, `> quote`, fences, `---` rules, tables — none appears in
+ * the measured corpus". An independent review measured it: the other four are
+ * absent, and **a markdown table is not** — `ops:duns` carries one, **8 lines
+ * beginning with `|`**, two of them holding a `**bold**` inside a cell. The
+ * behaviour is still the conservative one, and it is a CASE rather than a claim
+ * (`test/markdown-doc.test.ts`): those lines arrive as ordinary paragraphs with
+ * their pipes **and their cell marks** intact, because a table is a whole-node
+ * construct this parser does not have. It is named here rather than dropped,
+ * because **a refusal list that quietly omits the one construct the data really
+ * holds is exactly the kind of sentence this file exists to refuse.**
  *
  * ## Unmatched delimiters stay characters, and that is the rule that matters
  *

@@ -156,6 +156,29 @@ describe('markdownToDoc — the constructs it REFUSES, and why', () => {
     expect(docToPlainText(doc('---'))).toBe('---');
   });
 
+  it('leaves a TABLE as paragraphs with its pipes intact — and its cell marks still apply', () => {
+    // ⚠ THIS CASE EXISTS BECAUSE THE TABLE IS THE ONE REFUSED CONSTRUCT THE CORPUS
+    // REALLY HOLDS, and the parser's own docblock claimed otherwise until an
+    // independent review measured it: `ops:duns` carries a table, 8 lines beginning
+    // with `|`, two of them with a `**bold**` inside a cell. A table is a
+    // whole-node construct this parser does not have, so the honest refusal is
+    // "the lines stay paragraphs" — and, because the INLINE pass still runs on
+    // them, the cell's mark survives. Both halves are asserted, so a change that
+    // started eating pipes or dropping the cell's bold reddens here.
+    const table = '| Field | What to enter |\n|---|---|\n| Legal entity name | The **own legal name** exactly |';
+    const out = blocks(table);
+
+    // Three lines in, three paragraphs out — the table is NOT a node.
+    expect(out.map((node) => node.type)).toEqual(['paragraph', 'paragraph', 'paragraph']);
+    // The header row keeps its pipes, both of them.
+    expect(out[0]?.content).toEqual([{ type: 'text', text: '| Field | What to enter |' }]);
+    // The delimiter row is characters, not a horizontal rule.
+    expect(docToPlainText(doc('|---|---|'))).toBe('|---|---|');
+    // And the cell's mark still applies, because the INLINE pass runs on a
+    // paragraph whether or not that paragraph came from a table line.
+    expect(marksIn('| Legal entity name | The **own legal name** exactly |')).toEqual(['bold']);
+  });
+
   it('keeps a bare URL as characters — nothing here autolinks', () => {
     // The seed never typed a link into a record that already holds a bare URL, and
     // the parser must not invent one: `markdownToDoc` reads delimiters, not URLs.

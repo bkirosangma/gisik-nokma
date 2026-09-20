@@ -274,14 +274,21 @@ describe('the body carries the record verbatim', () => {
    * list stays characters.
    *
    * ⛔ THE CASE THE SPLIT EXISTS FOR, and the one that makes the two above fail
-   * rather than pass by luck. No line in the shipped corpus starts with a
-   * markdown BLOCK marker, so on real data alone a builder that parsed the whole
-   * string would look identical to one that split it — the property would be
-   * untested and the split would be decoration. A record note is free text the
+   * rather than pass by luck. **No RECORD line starts with a markdown BLOCK marker**
+   * — measured over all 172 of them, zero — so on real data alone a builder that
+   * parsed the whole string would look identical to one that split it, and the
+   * property would be untested decoration. A record note is free text the
    * tracker's authors write, so this item is a shape the record can really take.
-   * The control is IN THE SAME RUN: the same two lines through the markdown
+   *
+   * ⚠ **THE SCOPE WORD IS "RECORD", NOT "CORPUS", AND AN INDEPENDENT REVIEW CAUGHT THE
+   * DIFFERENCE**: 64 PROSE lines in the shipped corpus DO start with a block
+   * marker (headings, bullets and numbered items — the constructs this parser is
+   * FOR). Narrowing the claim to the record block is what makes it true, and the
+   * record block is the only place the split has to hold.
+   *
+   * The control is IN THE SAME `it()`: the same two lines through the markdown
    * renderer do become a list, so this case cannot pass by the renderer being
-   * broken.
+   * broken or by the note never reaching a renderer at all.
    */
   it('a record note that LOOKS like a list stays literal, because the split is by construction', () => {
     const item = { ...byId('ops:duns'), note: '- first thing\n- second thing' };
