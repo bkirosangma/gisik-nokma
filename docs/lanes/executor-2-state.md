@@ -17,7 +17,8 @@
 | anchor | value |
 |---|---|
 | `git merge-base origin/main HEAD` | `db3ad3c7c599ecc99fe2399f0155babe89bc49d9` — **equal to `origin/main`, so this branch is FULLY FOLDED onto the current main** |
-| **HEAD** | `97d91974e738d72f577dbdbef6428b45595f262c` |
+| **the code head this reports on** | `97d91974e738d72f577dbdbef6428b45595f262c` |
+| ⚠ **and everything on top of it** | **Touches only THIS FILE.** Committing a handoff moves HEAD, so a row naming HEAD as its own tip is false the moment it lands — check it rather than trust it: `git diff --name-only 97d91974..HEAD` returns `docs/lanes/executor-2-state.md` and nothing else, however many handoff commits follow |
 | ahead / behind `origin/main` | **7 ahead / 0 behind** (`git rev-list --left-right --count` → `0  7`) |
 | `origin/main` | **`db3ad3c7`** (the `#594` merge). It moved **three times** while this branch ran |
 | tree | **clean** — the only dirty path when this was written was this file |
