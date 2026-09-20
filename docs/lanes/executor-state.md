@@ -6,8 +6,8 @@
 > **Every sha written in prose anywhere in this file is unreliable.** The anchors are the four lines below, and they are a READING at a moment. `git branch --contains` (not `cat-file`, which passes on reflog-only commits) is what settles reachability; `gh pr view <n> --json state,mergeCommit` is what settles whether a PR is open — **check that before acting on any "open/paused/NEXT STEP" line, which is a failure this file has now produced four times.**
 >
 > ## ANCHORS AT THIS TREE (recounted here, not carried forward)
-> - **branch `exec/visibility-mode`**, cut from `origin/main`, then **folded** onto `origin/main = 7b75b2dc` (`#599`). `rev-list --left-right --count origin/main...HEAD` reads **`0 6`** — nothing behind, so HEAD IS THE LANDING TREE. **Re-read that count before trusting it; if `origin/main` has moved since, FOLD AGAIN before the PR.**
-> - **HEAD = `19bcf216`** at this writing; the commit carrying THIS BLOCK is its child. **Do not read a sha out of this file — run `git rev-parse HEAD`.**
+> - **branch `exec/visibility-mode`**, cut from `origin/main`, then **folded** onto `origin/main = 7b75b2dc` (`#599`). `rev-list --left-right --count origin/main...HEAD` reads **`0 8`** at the GATED sha below — nothing behind, so that sha IS the landing tree. **Re-read both numbers before trusting them; if `origin/main` has moved since, FOLD AGAIN.** ⚠ The commit carrying THIS BLOCK is one past the gated sha, so the count here is one short of HEAD by construction — the gate applies to the tree, and this block is prose in it.
+> - **The gated and pushed sha is `021ea2e0`**, and it is what **PR #600** carries. **Do not read a sha out of this file — run `git rev-parse HEAD`, and `gh pr view 600 --json state,mergeCommit` to learn whether it has landed.**
 > - **working tree clean**, no untracked files.
 > - **The fold carried NO dependency change** — verified, not assumed: `git diff --name-only f32f453c..origin/main -- '**/package.json' pnpm-lock.yaml pnpm-workspace.yaml` returns ZERO files, so no `pnpm install` was run and none was needed.
 >
