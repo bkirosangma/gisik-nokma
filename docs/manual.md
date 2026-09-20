@@ -16,15 +16,18 @@ Read these five. They are the ones that catch everybody.
 1. **Sign in with the email link.** It is what the screen opens on, and on this deployment it is the
    way in. A **Phone** tab appears only where SMS delivery is configured, and it is not configured
    here — so the screen does not offer it. (§1)
-2. **You cannot create a project.** There is no button for it anywhere. If your workspace has no
-   projects, there is nowhere to put work, and somebody will have to add a project for you another
-   way. (§3)
+2. **You cannot create a project unless you are an owner or an admin.** Those two roles get a **New
+   project** form on the workspace page; a member or a guest is told why it is not there instead of
+   being shown a button that fails. If you are neither an owner nor an admin and your workspace has no
+   projects, there is nowhere to put work, and one of them will have to add one for you. (§3)
 3. **You can put a job on a person only on the website — and you cannot set a due date anywhere.**
    The website's job panel has an "Assignee" picker. The phone and desktop apps have no Assignee row
    at all, so there you can neither see who a job is on nor set it. Due dates have no control on any
    screen. (§5)
-4. **You cannot leave a comment on the website.** The job screen shows the description and lets you
-   write one; there is no box for a comment. (§5)
+4. **You cannot leave a comment on a job on the website.** The job screen shows the description and
+   lets you write one; there is no free-standing box for a comment. The one comment the website does
+   take is a **Move's**: a move carrying a "require a comment" rule puts a box on the Move dialog, and
+   what you type is recorded on the move. (§5)
 5. **Every date in the product is on Indian time**, wherever you are. "Today" changes over at midnight
    in India — which is early evening in the UK and late morning on the American west coast. (§14)
 
@@ -161,9 +164,12 @@ You become the **owner** of that workspace. It also sets you up with:
 
 ### The project problem
 
-**A brand-new workspace has no projects, and there is no button anywhere in the product that makes
-one.** Not on the Workspaces page, not inside a workspace, not on any settings screen, not in the top
-bar. It is not hidden — it has not been built.
+**A brand-new workspace has no projects.** Whether you can make one depends on your role. An **owner or
+admin** gets a **New project** form inside the workspace, and that is the only control that creates
+one. Everybody else gets a sentence saying so instead of a button that fails — the app's own wording,
+which names only the admin: *"Only an admin can create a project in this workspace."* For a member the
+control is not hidden; it is not offered.
+Nowhere else offers it: not the Workspaces page, not a settings screen, not the top bar.
 
 Jobs live inside projects. So a workspace with no projects has nowhere to put work.
 
@@ -353,10 +359,15 @@ This is the honest list. Each one is an absence, not a hidden button.
   Type into the description on the job panel and save it; the panel reads back who set it and when.
   The same box handles formatting and mentions; dropping a file into it is refused rather than
   quietly lost.
-- **You cannot leave a comment.** The writing box takes a description and not a comment, and nothing
-  on the web lists comments. **The phone app has a Comment button on a job and the website does
-  not.**
-- **You cannot attach a file.**
+- **You cannot leave a comment on a job.** The writing box takes a description and not a comment, and
+  nothing on the web shows a comment thread. **The one comment the website does take is a Move's** — a
+  move carrying the "require a comment" rule puts a box on the Move dialog (§7), and what you type is
+  recorded on the move rather than shown back as a thread. **The phone app has a Comment button on a
+  job and the website does not.**
+- **You cannot attach a file to a job.** There is no attachment list on the web job sheet, and a file
+  dropped into the description box is refused rather than quietly lost. **The one upload the website
+  does take is a Move's** — a move carrying the "require evidence" rule puts a file box on the Move
+  dialog and stays blocked until the server has stored the file (§7).
 - **You cannot rename a job.**
 - **You cannot delete a job.** If your stages include a "won't do" or "cancelled" stage, moving it
   there is the nearest thing available.

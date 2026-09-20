@@ -71,13 +71,17 @@ A workspace is your whole business — everybody in it and all the work undernea
 bucket of work inside it: "Residential jobs", "Shop operations". Jobs live inside projects.
 
 **Can I create a project?**
-**No.** There is no button for it on any screen — not the Workspaces page, not inside a workspace, not
-in settings, not in the top bar. This is the biggest hole in the product and it sits right at the
-start of the journey. A brand-new workspace has stages, job types and you as its owner, and nowhere to
-put a job. Until this is built, ask whoever is setting you up to add a project another way.
+**Only if you are an owner or an admin.** Those two roles get a **New project** form on the workspace
+page; everybody else gets a sentence saying so instead of a button that fails — the app's own wording,
+which names only the admin: *"Only an admin can create a project in this workspace."* For anyone, there
+is no button on the Workspaces page, in
+settings, or in the top bar. A brand-new workspace has stages, job types and you as its owner, and
+nowhere to put a job until an owner or admin adds one. For a member this is still the biggest hole in
+the product, and it sits right at the start of the journey.
 
 **Then how does anybody have projects?**
-The ones that exist were put there when a system was set up, not created by somebody clicking.
+An owner or admin creates one, with the **New project** form on the workspace page. Any that were
+already there when you arrived were put there when the system was set up.
 
 **Can I have more than one workspace?**
 Yes. The Workspaces page lists them all, each with its projects underneath as links.
@@ -422,17 +426,21 @@ about a job is, so the panel reads back who set it and when, and the job's histo
 each time it changed.
 
 **Is there a comment box?**
-Not on the website. The job screen's writing box now takes a description; it does not post comments,
-and nothing on the web lists them.
+Not on a job. The job screen's writing box now takes a description; it does not post comments, and
+nothing on the web shows a comment thread. **There is one comment box on the website, and it belongs to
+a Move:** if the move carries a "require a comment" rule, its dialog takes one, and what you type is
+recorded on the move.
 
 **The phone app has a Comment button on a job and the website does not.** So the two-screen phone app
 can do something the full website cannot. Whichever way round that is meant to be, it is not this way
 round.
 
 **Can I attach a photo or a file to a job?**
-Not from the website. The upload machinery works and is tested — but nothing on the web job screen
-reaches it. The writing box on the job screen is connected now, so you can write a description there;
-dropping a file into it is refused rather than quietly lost.
+Not to the job itself. There is no attachment list on the web job sheet, and the writing box on the job
+screen — which is connected now, so you can write a description there — refuses a dropped file rather
+than quietly losing it. **One uploader does work on the web, and it belongs to a Move:** a move carrying
+the "require evidence" rule puts a file box in its dialog and stays blocked until the server has stored
+the file. So a file can be attached to a move, and not to a job for its own sake.
 
 **When it does become reachable, what should I expect?**
 
