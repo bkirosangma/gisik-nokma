@@ -59,9 +59,11 @@ speed.
 
 This is the part a marketing page would leave out. Read it before you decide anything.
 
-- **You cannot create a project.** There is no button anywhere in the product that makes one. A brand
-  new workspace comes with stages, job types and you as its owner — and nowhere to put a job. Until
-  this is built, projects have to be put there for you.
+- **You cannot create a project unless you are an admin.** An admin — and the owner — get a **New
+  project** form on the workspace page. Everybody else is told why it is not there, in words rather
+  than a button that fails: *"Only an admin can create a project in this workspace."* A brand new
+  workspace comes with stages, job types and you as its owner — and, until an admin adds one, nowhere
+  to put a job.
 - **You cannot assign a job to anybody on the phone or desktop apps.** The website can, from the job
   sheet's **Assignee** picker — which also offers **Unassigned**, so an assignment can be cleared as
   well as set. The board shows who a job is on, the Inbox tells you when you have been assigned

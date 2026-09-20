@@ -117,7 +117,7 @@ component's other mode, which the web does not use.
 | 20 | 133 | Session hygiene | Covered | P§1 — signing out really ends it on the next action, and signing in never adopts something already sitting on the machine |
 | 21 | 137 | Ingest enforces visibility: nobody may act on a ticket they cannot see | Covered | P§10, R§5 |
 | 22 | 138 | Who may retarget a ticket's audience, and who may create one | Covered | P§10 (a project admin of *that* job's project, or whoever created it), R§5 |
-| 23 | 141 | A founded workspace arrives usable | Covered | P§2 — you become owner, you get a simple to-do/doing/done arrangement and four built-in job types. **Note:** the bullet's own phrase "found, create a project" describes an intention; no screen creates a project |
+| 23 | 141 | A founded workspace arrives usable | Covered | P§2 — you become owner, you get a simple to-do/doing/done arrangement and four built-in job types. **Note:** the bullet's own phrase "found, create a project" describes an intention; the **New project** form on the workspace page is what reaches it, and only an owner or admin is offered that form (`page.tsx:917-923`) |
 | 24 | 142 | Founding cannot be used to seize an existing workspace | No user-observable surface | Attack-path guard |
 | 25 | 143 | Event submission requires a session | Covered *(thin)* | P§1 — signed out, the next thing you try is refused straight away |
 | 26 | 149 | Reads enforce visibility, and an invisible ticket is indistinguishable from one that never existed | Covered | P§10, R§5 — both explain that "not found" is deliberately the same answer for both cases, and why |
@@ -228,10 +228,14 @@ component's other mode, which the web does not use.
 The map above runs one way. Run it the other way and four things stand out — real, load-bearing
 absences that no `✅` bullet claims, because there is nothing to claim:
 
-1. **No way to create a project.** Nothing in the app creates one. The underlying record and its rules
-   exist; no screen reaches them. A new workspace therefore has nowhere to put work.
-2. **No way to assign work to anybody.** Assignment is shown everywhere — on cards, in the Inbox, in
-   My Work, as a grouping in the list — and no screen sets it.
+1. **No way to create a project, unless you are an admin.** The underlying record and its rules are
+   reached by exactly one door — the **New project** form on the workspace page — and only an owner or
+   admin is offered it (`page.tsx:917-923`); a member or guest gets the refusal sentence at `:921`
+   instead. A workspace whose admins have not used it therefore has nowhere to put work.
+2. **No way to assign work on the phone or desktop apps.** On the **website** the job sheet's
+   "Assignee" row is a picker (`ticket-sheet.tsx:979`), with an **Unassigned** option that clears it
+   (`:984`). Assignment is shown everywhere — on cards, in the Inbox, in My Work, as a grouping in the
+   list — and the two native apps set it nowhere.
 3. **No way to set a due date.** The calendar, the timeline and the "due soon" list are built entirely
    around claimed dates, and nothing offers to claim one.
 
@@ -246,6 +250,6 @@ absences that no `✅` bullet claims, because there is nothing to claim:
    the Inbox both read the built-in due date only. So the near-miss puts a day on a calendar and
    chases nobody. The manual and FAQ state it that way; an earlier draft of this map presented it as
    a workaround and was wrong.
-4. **No way to leave a comment on the web.** The first half of this is fixed: the description is writable on the web since 2026-09-19 (C3, corrected). Comments are not — and nothing on the web renders a comment thread either.
+4. **No way to leave a comment on a job on the web.** The first half of this is fixed: the description is writable on the web since 2026-09-19 (C3, corrected). A free-standing comment box on a job is not there, and nothing on the web renders a comment thread. The exception is a **Move's** required comment — the transition dialog takes one when a `require-comment` rule carries it (`transition-dialog.test.tsx:251`) — and it is recorded on the move rather than shown back as a thread.
 
 A smaller one in the same shape: nothing links to the six settings screens (C5).

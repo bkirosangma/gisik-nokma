@@ -72,11 +72,19 @@ export const HELP_CONTENT: HelpContent = [
               [
                 {
                   "kind": "bold",
-                  "text": "You cannot create a project."
+                  "text": "You cannot create a project unless you are an admin."
                 },
                 {
                   "kind": "text",
-                  "text": " There is no button for it anywhere. If your workspace has no projects, there is nowhere to put work, and somebody will have to add a project for you another way. (§3)"
+                  "text": " An admin — and the owner — get a "
+                },
+                {
+                  "kind": "bold",
+                  "text": "New project"
+                },
+                {
+                  "kind": "text",
+                  "text": " form on the workspace page; a member or a guest is told why it is not there instead of being shown a button that fails. If you are not an admin and your workspace has no projects, there is nowhere to put work, and an admin will have to add one for you. (§3)"
                 }
               ],
               [
@@ -92,11 +100,19 @@ export const HELP_CONTENT: HelpContent = [
               [
                 {
                   "kind": "bold",
-                  "text": "You cannot leave a comment on the website."
+                  "text": "You cannot leave a comment on a job on the website."
                 },
                 {
                   "kind": "text",
-                  "text": " The job screen shows the description and lets you write one; there is no box for a comment. (§5)"
+                  "text": " The job screen shows the description and lets you write one; there is no free-standing box for a comment. The one comment the website does take is a "
+                },
+                {
+                  "kind": "bold",
+                  "text": "Move's"
+                },
+                {
+                  "kind": "text",
+                  "text": ": a move carrying a \"require a comment\" rule puts a box on the Move dialog, and what you type is recorded on the move. (§5)"
                 }
               ],
               [
@@ -870,11 +886,35 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "A brand-new workspace has no projects, and there is no button anywhere in the product that makes one."
+                    "text": "A brand-new workspace has no projects."
                   },
                   {
                     "kind": "text",
-                    "text": " Not on the Workspaces page, not inside a workspace, not on any settings screen, not in the top bar. It is not hidden — it has not been built."
+                    "text": " Whether you can make one depends on your role. An "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "owner or admin"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " gets a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "New project"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " form inside the workspace, and that is the only place a project can be created. Everybody else gets a sentence saying so instead of a button that fails — "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Only an admin can create a project in this workspace.\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " For a member the control is not hidden; it is not offered. Nowhere else creates one: not the Workspaces page, not a settings screen, not the top bar."
                   }
                 ]
               },
@@ -1838,11 +1878,19 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "You cannot leave a comment."
+                      "text": "You cannot leave a comment on a job."
                     },
                     {
                       "kind": "text",
-                      "text": " The writing box takes a description and not a comment, and nothing on the web lists comments. "
+                      "text": " The writing box takes a description and not a comment, and nothing on the web shows a comment thread. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "The one comment the website does take is a Move's"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — a move carrying the \"require a comment\" rule puts a box on the Move dialog (§7), and what you type is recorded on the move rather than shown back as a thread. "
                     },
                     {
                       "kind": "bold",
@@ -1852,7 +1900,19 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "You cannot attach a file."
+                      "text": "You cannot attach a file to a job."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " There is no attachment list on the web job sheet, and a file dropped into the description box is refused rather than quietly lost. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "The one upload the website does take is a Move's"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — a move carrying the \"require evidence\" rule puts a file box on the Move dialog and stays blocked until the server has stored the file (§7)."
                     }
                   ],
                   [
@@ -6900,11 +6960,27 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "No."
+                    "text": "Only if you are an admin."
                   },
                   {
                     "kind": "text",
-                    "text": " There is no button for it on any screen — not the Workspaces page, not inside a workspace, not in settings, not in the top bar. This is the biggest hole in the product and it sits right at the start of the journey. A brand-new workspace has stages, job types and you as its owner, and nowhere to put a job. Until this is built, ask whoever is setting you up to add a project another way."
+                    "text": " An owner or admin gets a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "New project"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " form on the workspace page; everybody else gets a sentence saying so instead of a button that fails — "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Only an admin can create a project in this workspace.\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " For anyone, there is no button on the Workspaces page, in settings, or in the top bar. A brand-new workspace has stages, job types and you as its owner, and nowhere to put a job until an admin adds one. For a member this is still the biggest hole in the product, and it sits right at the start of the journey."
                   }
                 ]
               }
@@ -6919,7 +6995,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The ones that exist were put there when a system was set up, not created by somebody clicking."
+                    "text": "An admin creates one, with the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "New project"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " form on the workspace page. Any that were already there when you arrived were put there when the system was set up."
                   }
                 ]
               }
@@ -8238,7 +8322,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Not on the website. The job screen's writing box now takes a description; it does not post comments, and nothing on the web lists them."
+                    "text": "Not on a job. The job screen's writing box now takes a description; it does not post comments, and nothing on the web shows a comment thread. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "There is one comment box on the website, and it belongs to a Move:"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " if the move carries a \"require a comment\" rule, its dialog takes one, and what you type is recorded on the move."
                   }
                 ]
               },
@@ -8266,7 +8358,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Not from the website. The upload machinery works and is tested — but nothing on the web job screen reaches it. The writing box on the job screen is connected now, so you can write a description there; dropping a file into it is refused rather than quietly lost."
+                    "text": "Not to the job itself. There is no attachment list on the web job sheet, and the writing box on the job screen — which is connected now, so you can write a description there — refuses a dropped file rather than quietly losing it. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "One uploader does work on the web, and it belongs to a Move:"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " a move carrying the \"require evidence\" rule puts a file box in its dialog and stays blocked until the server has stored the file. So a file can be attached to a move, and not to a job for its own sake."
                   }
                 ]
               }
