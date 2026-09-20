@@ -2,7 +2,9 @@
 
 > # ▣ CURRENT POSITION — SUNDAY 2026-09-20, ~21:0x IST. **BOTH MOUNT GAPS NEED A RULING. I BUILT
 > # NOTHING AND I AM HOLDING.** Branch `exec/mount-gaps` off `origin/main` = **`db3ad3c7`** (the `#594`
-> # merge). One docs-only PR carries this record; no code, no route, no migration.
+> # merge). **`#597` MERGED as `f32f453c` while this lane was still writing** — this branch
+> # (`exec/mount-gaps-correction`) carries one follow-up docs commit and nothing else. No code, no route,
+> # no migration, in either PR.
 >
 > ## ⚠ FIRST: THE BLOCK BELOW THIS ONE WAS ALREADY STALE WHEN I RELAUNCHED — `#594` IS MERGED
 > It said "PR #594 IS OPEN". **`#594` merged at `08:56Z`; `mergeCommit = db3ad3c7` = current `main`**,
@@ -39,7 +41,7 @@
 > - Mount confirmed: **one production mount**, `page.tsx:2496`, 12 props, passing **neither** prop.
 >   `canSetVisibility` untouched per §2.
 >
-> ## THREE SELF-CORRECTIONS — one by re-reading, one by control, one ONLY by the reviewer
+> ## FOUR SELF-CORRECTIONS — two by re-reading, one by control, one ONLY by the reviewer
 > 1. **`attachmentAddedPayload` is NOT "identical" to `AttachmentListEntry`.** The upload arm's `sha256`
 >    is **required** lowercase-hex-64 in the event (`ticket-events.ts:128`) and **`string | null`** in the
 >    entry (`attachment-list.tsx:64`). The event payload is assignable to the entry and not conversely —
@@ -67,15 +69,19 @@
 > `check-permission.ts:1042` and `proj-visibility.ts:281`. The narrower client-side statement is true and
 > is what the lane file keeps. **A verifier's finding is a claim like any other; only the line settles it.**
 >
-> ## RECORDED, NOT FIXED — five stale sentences, and the mechanism they share
-> `visibility-editor.tsx:94` says `view-types.ts:115` and "**five** fields" (actual `:356`, six);
-> `:97-98` says the route wraps `{ticket, parent, rollup}` (actual: seven keys, `routes/tickets.ts:489-497`);
-> `:101-102` and **`ticket-sheet.tsx:94`** say the wrapper *"carries no provenance block"* (it carries
-> `stateProvenance` and `assignedProvenance`). **Every conclusion survives; every cited reason is stale**,
-> in the direction that would make a reader doubt the gap exists. `:99-100` shows the mechanism on itself:
-> a 2026-09-20 correction fixed the *"getTicket refuses"* half of that bullet and left the other half
-> standing — **a correction that fixes one clause of a sentence certifies its neighbours by association.**
-> Owner: whoever takes Gap 1. Not touched — a docblock naming a served shape moves with that shape.
+> ## RECORDED, NOT FIXED — two stale citations, and ⚠ a claim of mine I OVERSTATED
+> **FIRM:** `visibility-editor.tsx:94` cites `view-types.ts:115` for `TicketRead` and says "**five**
+> fields" — actual `:356`, **six**; and **`:115` is prose in a DIFFERENT docblock**, so the citation
+> resolves into unrelated text. `:97-98` says the route wraps `{ticket, parent, rollup}` — actual **seven**
+> keys (`routes/tickets.ts:489-497`).
+> **⚠ WITHDRAWN:** I claimed `:101-102` and **`ticket-sheet.tsx:94`** were FALSE for saying the wrapper
+> *"carries no provenance block"*. **They are defensible in context** — their bullet is about visibility
+> throughout and means no *visibility* provenance, which is true. **I quoted the phrase out of its bullet
+> and called it false against provenance fields it was never about** — the same failure this round is
+> about, one level down: *a sentence read without its subject*. Recorded, not fixed; **owner: whoever
+> takes Gap 1.** `:99-100` still shows the real mechanism on itself: a 2026-09-20 correction fixed the
+> *"getTicket refuses"* half of that bullet and left the other half standing — **a correction that fixes
+> one clause of a sentence certifies its neighbours by association.**
 >
 > ## ANCHORS AT THIS TREE
 > - branch `exec/mount-gaps`, cut from `origin/main` = `db3ad3c7`; working tree carries this docs change
