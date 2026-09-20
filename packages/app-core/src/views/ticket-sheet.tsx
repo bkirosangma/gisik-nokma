@@ -825,12 +825,28 @@ export function TicketSheet({
    * naming an attachment that no event ever recorded into the document, and the
    * next Post would carry it.
    *
-   * **This is the product's FIRST `attachment.added` producer.** `Features.md`
-   * §9 records that the web client uploaded bytes without ever posting the
-   * claim; the payload here is the SERVER-SNIFFED truth the upload answered
-   * with, which is exactly what the schema requires (`kind: 'upload'`, a ULID
-   * `attachmentId`, a mime, a size and a lowercase-hex `sha256`) — nothing here
-   * is inferred from the file the user chose.
+   * **This is the first MOUNTED producer of `attachment.added` — MEASURED, and
+   * the wording is exact because the looser claim is false.** The claim is
+   * COMPOSED elsewhere already: `packages/editor/src/drive/attachment-claims.ts`
+   * exports `composeUploadAttachmentAdded` and `composeDriveReferenceAdded`,
+   * both tested. **Neither has a production caller** — the symbol sweep returns
+   * their tests, their export and one docblock citation, and nothing else — and
+   * neither does `EvidencePicker`, the other path that would emit one. Mobile
+   * has no wiring for the event at all. So the code to make a claim existed and
+   * was never reachable from a screen; this mount is where it becomes reachable.
+   *
+   * ⚠ **AND THE PAYLOAD IS COMPOSED A SECOND TIME HERE, which is a divergence
+   * worth naming rather than hiding.** `composeUploadAttachmentAdded` does
+   * exactly this job, and app-core **cannot import it**: the dependency runs
+   * `apps/web → editor`, and app-core sits below it (`views/editor-slot.tsx`
+   * re-declares the submission union for that same reason). The honest home for
+   * one composer both packages can reach is `packages/domain`, beside
+   * `attachmentUploadedPayload` — which is the schema this payload must satisfy
+   * anyway. **Named owner: whoever next touches `attachment-claims.ts`.**
+   *
+   * The values are the SERVER-SNIFFED truth the upload answered with (`kind:
+   * 'upload'`, a ULID `attachmentId`, a mime, a size, a lowercase-hex
+   * `sha256`) — nothing here is inferred from the file the user chose.
    */
   const emitAttachmentAdded = async (uploaded: EditorSlotUpload): Promise<void> => {
     const event = make({
