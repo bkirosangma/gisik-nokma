@@ -538,6 +538,54 @@ plus a partial index → a filter at every view-serving SELECT.
   recorded 4.4013 — and the pair is ENFORCED rather than written into a comment, which is the criticism
   16.83 earned.
 
+### The sheet's three missing surfaces — the toolbar, the editable title, the breadcrumb
+
+**Owner ruling, 2026-09-20: *"all 3 yes."*** Branch `exec/sheet-surfaces`, cut from `origin/main` =
+`e9c1a04f` (the `#591` merge). ⚠ **The `#591` round changed this file's subject underneath the dispatch:**
+the footer's `‹ Previous / Next ›` is GONE and `Delete` EXISTS, so `16.43` is a retired absence and `16.84`
+is built. Nothing here re-adds, re-wires or re-tests the navigation.
+
+- **16.85** ✅ — **The editor's rich-text toolbar: `B i code link list quote` and the markdown hint.**
+  `packages/editor/test/editor-toolbar.test.tsx`. **No door, no migration, no schema change** — measured,
+  not assumed: `StarterKit` carries bold/italic/code/bulletList/blockquote and all six commands were
+  checked against the INSTALLED packages (`extension-bold`/`-italic`/`-code`/`-blockquote`/`-link` at
+  3.30.5, `toggleBulletList` in `@tiptap/core` 3.30.5). **Ten cases, and NOT ONE asserts that a control is
+  on screen** — the dispatch names the trap in one line (*"a test asserting a button exists proves nothing
+  about whether pressing it changes the document"*), so every case clicks a control and reads the
+  serialized ProseMirror JSON. A button that rendered and did nothing passes every "exists" assertion and
+  fails all of these. **Mutation-witnessed twice, each killing its own site and nothing else:** the bold
+  command replaced with a no-op killed exactly the two bold cases; pointing `list` at
+  `toggleBlockquote` killed exactly the bullet-list case. Both files restored from a checksum-verified
+  copy. **`link` needs a destination, so it gets an inline URL field** (`toggleLink` with no `{href}`
+  would leave an anchor going nowhere), and an EMPTY box is a cancel rather than a link to `''`. Active
+  marks are reported through `aria-pressed`, asserted in BOTH directions so a hard-wired value cannot
+  pass. A read-only composer gets neither the strip nor the hint.
+- **16.86** ✅ — **The ticket sheet's inline title editor.** `packages/app-core/test/views/ticket-sheet.test.tsx`
+  (the sheet's half) and `packages/ui/test/components.test.tsx` (the `Sheet` contract's half). **A surface
+  over a door that already existed:** `ticket.field_set` with `fieldId: 'title'`, so the case asserts the
+  EMITTED EVENT (`source.ingested`), not the input's presence — a field that rendered and sent nothing is
+  the shape this could fail in. **Mutation-witnessed:** changing the payload's `fieldId` to `description`
+  killed exactly the `ticket.field_set` case and nothing else. **An UNCHANGED title sends NOTHING** — the
+  ledger is append-only, so re-sending the current title would put a line in the ticket's history saying
+  somebody changed it to what it already said. **A refused title KEEPS the reader's words** beside the
+  server's own sentence, and **no client-side blank rule is written**: the engine's
+  `checks/fields.ts:118-123` already refuses a spaces-only title, so the value travels AS TYPED — the same
+  reuse the New-ticket form's rule stands on. **The dialog's `aria-label` stays the SERVER's title while a
+  draft is on screen**, which is the case that catches the tempting simplification of naming the sheet
+  after a control's uncommitted value.
+- **16.87** ✅ — **The location breadcrumb: `Workspace › Project › State`, and no fourth crumb.**
+  `packages/app-core/test/views/ticket-sheet.test.tsx`. **Three crumbs and STOP** — the prototype's fourth
+  is the ticket KEY (`desktop.dc.html:3404-3420`), which is a separate round and another lane's in-flight
+  branch, so nothing is stubbed for it. ⚠ **THE DISPATCH'S MEASUREMENT OF THE SOURCE WAS FALSE:** it said
+  all three crumbs are *"already on the ticket read"*, and `TicketRead` (`view-types.ts:332-357`) is six
+  fields carrying no workspace name, no project name and no state name; `BoardView` is
+  `{projectId, groups}` and `DataSourceQuery` has no `getProjects`. **Only the STATE is derived here**;
+  the two names are host props, which is recorded as the executor's conservative default on
+  `TicketSheetProps.workspaceName` and in the PR body. **Mutation-witnessed:** relaxing the nav's gate from
+  `&&` to `||` killed exactly the half-path case — the version that drew `Workspace › Doing` for a caller
+  that passed one name, a crumb list missing its MIDDLE level and stating a hierarchy the product does not
+  have, with every crumb in it individually correct.
+
 ### 🚫 The navigation, RETIRED — a decided ABSENCE, not a gap and not a TODO
 
 - **16.43** 🚫 **RETIRED BY OWNER RULING.** The owner ruled the pair out on 2026-09-20 — *"remove the
