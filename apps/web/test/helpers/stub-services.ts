@@ -122,6 +122,12 @@ export function stubServices(
     getTickets: unstubbed('getTickets'),
     getTicket: unstubbed('getTicket'),
     getTicketHistory: unstubbed('getTicketHistory'),
+    // UNSTUBBED, same rule (2026-09-20), and this one has a second reason: the
+    // sheet draws NOTHING for an empty list — `AttachmentList` returns `null`
+    // so as not to promise there are none — so `[]` here would be this helper
+    // asserting the ticket has no files, and a case that meant to prove "the
+    // list is drawn" could pass against a read nobody stubbed.
+    getTicketAttachments: unstubbed('getTicketAttachments'),
     getWorkflowDef: unstubbed('getWorkflowDef'),
     // UNSTUBBED, not `[]`, even though the shipped server serves this one. The
     // rule above holds for a SERVED read exactly as for a refusing one: `[]`

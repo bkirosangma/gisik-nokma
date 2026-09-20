@@ -17,6 +17,7 @@ import {
   mapMyWork,
   mapPreferences,
   mapSearchHits,
+  mapTicketAttachments,
   mapTicketRead,
   mapTicketTypes,
   mapWorkflowDef,
@@ -278,6 +279,37 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
       const suffix = params.size > 0 ? `?${params.toString()}` : '';
       const raw = await http.get(`/v1/tickets/${ticketId}/history${suffix}`);
       return raw === null ? [] : mapHistory(raw);
+    },
+
+    /**
+     * The attachments read — a 404 re-raised rather than folded into an empty
+     * value.
+     *
+     * **⚠ CORRECTED 2026-09-20.** This read *"the ONE method in this file whose
+     * 404 is re-raised rather than folded into an empty value"*, and that is
+     * false: `getBoard` (`:168`), `getTickets` (`:243`), `getTicketTypes`
+     * (`:331`) and `getPreferences` (`:439`) re-raise too — five sites, and
+     * `getTicketTypes` argues the same choice at length for an array-returning
+     * signature. Re-raising is this file's ordinary handling of "no such thing,
+     * or not yours". What is particular here is the CONSEQUENCE of folding,
+     * stated below and not shared with those four.
+     *
+     * `Promise<AttachmentListEntry[]>` HAS an absence value, `[]`, and using it
+     * here is the trap this method exists to avoid. `[]` is the TRUE answer for
+     * a visible ticket with no files, and `AttachmentList` renders `null` for
+     * it — *"must not promise there are none"* — so folding a refusal into `[]`
+     * would draw the same nothing for "this ticket has no attachments" and "we
+     * could not read them". The two are exactly the states the sheet has to
+     * tell apart, so a `null` body is raised as the STATUS it was, which is the
+     * same decision `getBoard` makes one method family up and the opposite of
+     * `getMembers`' and `getTicketHistory`'s `[]`-on-404, for their stated
+     * reasons.
+     */
+    getTicketAttachments: async (workspaceId, ticketId) => {
+      const path = `/v1/workspaces/${workspaceId}/tickets/${ticketId}/attachments`;
+      const raw = await http.get(path);
+      if (raw === null) throw new HttpError(404, path);
+      return mapTicketAttachments(raw);
     },
 
     getWorkflowDef: async (workspaceId, workflowId, version) => {

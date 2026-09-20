@@ -1813,6 +1813,10 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    retry, not a permanent serving gap. */
 .gn-ticket-sheet__history-loading { color: var(--gn-text-muted); margin: 0; }
 .gn-ticket-sheet__history-error { color: var(--gn-danger); margin: 0; }
+/* The attachments read's failure sentence — `gn-ticket-sheet__history-error`'s
+   twin, and the same rule for the same reason: a failed read is drawn in the
+   danger colour, where an EMPTY list is drawn as nothing at all. */
+.gn-ticket-sheet__attachments-error { color: var(--gn-danger); margin: 0; }
 .gn-ticket-sheet__history-empty { color: var(--gn-text-muted); margin: 0; }
 .gn-ticket-sheet__history-partial { color: var(--gn-text-muted); font-size: 0.8rem; margin: 0.6rem 0 0; }
 

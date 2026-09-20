@@ -432,11 +432,17 @@ describe('12.182-12.184 the replica-only surface, and what it confesses', () => 
 });
 
 describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
-  it('12.185 EIGHT methods refuse, enumerated by id rather than counted', async () => {
+  it('12.185 NINE methods refuse, enumerated by id rather than counted', async () => {
     const { ds } = await fixture();
     const refusals: Array<[string, () => Promise<unknown>]> = [
       ['getMyWorkspaces', () => ds.query.getMyWorkspaces()],
       ['getMembers', () => ds.query.getMembers(WS)],
+      // Added 2026-09-20 with the attachments read. The entry's POSITION here
+      // matters: the assertion below is `toEqual(Object.keys(REPLICA_GAPS))`,
+      // which is order-sensitive, and `REPLICA_GAPS` gained this key directly
+      // under `getMembers`. Enumerated rather than counted, as the comment
+      // above says, so the name travels with the list.
+      ['getTicketAttachments', () => ds.query.getTicketAttachments(WS, newUlid())],
       ['search', () => ds.query.search(WS, 'x')],
       ['getMyWork', () => ds.query.getMyWork(WS)],
       ['getAttention', () => ds.query.getAttention(WS)],
@@ -1079,5 +1085,56 @@ describe('13.704 the replica list row carries the folded rank', () => {
     // so a row builder that hardcoded `null` — or read `rank` off the wrong
     // source — fails here rather than passing on "some string was present".
     expect((await rowOf())?.rank).toBe('i');
+  });
+});
+
+/**
+ * The attachments read at the replica (2026-09-20).
+ *
+ * ## Why this is a case of its own rather than one more name in 12.185
+ *
+ * 12.185 proves the SHAPE of every refusal is right — a `ReplicaGapError` whose
+ * absences carry exactly `{field, because, owner}` and an owner under `Plan 10`.
+ * It says nothing about whether any particular refusal was JUSTIFIED, and this
+ * one is the only refusal in the file with a tempting alternative: the local
+ * ledger really does carry `attachment.added`, so the list looks derivable on
+ * the spot. The case below is that temptation, measured: the event is applied
+ * to a real replica, the history door serves it, and the attachments door
+ * refuses anyway — with an absence that names the table it cannot read and the
+ * plan that owns closing it.
+ */
+describe('16.56 the attachments read refuses although the local ledger holds the event', () => {
+  it('16.56 refuses with a named absence while getTicketHistory serves the same fact', async () => {
+    const { ds, replica, taskId } = await fixture();
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: taskId }, 'attachment.added', {
+        kind: 'upload',
+        attachmentId: newUlid(),
+        filename: 'gst-receipt.pdf',
+        mime: 'application/pdf',
+        size: 48211,
+        sha256: 'a'.repeat(64),
+      }),
+    );
+
+    // THE POSITIVE CONTROL, and it is the whole point of the case: the local
+    // ledger really does hold the fact, and a door on the same source serves it.
+    // Without this line, the refusal below would be evidence of nothing — an
+    // empty replica refuses an empty list for the wrong reason.
+    const history = await ds.query.getTicketHistory(taskId);
+    expect(history.map((event) => event.type)).toContain('attachment.added');
+
+    const err = await ds.query.getTicketAttachments(WS, taskId).then(
+      () => null,
+      (cause: unknown) => cause,
+    );
+    expect(err).toBeInstanceOf(ReplicaGapError);
+    const absence = (err as ReplicaGapError).absences[0];
+    // The absence names WHAT cannot be filled, WHY the ledger cannot stand in
+    // for it, and WHO closes it — an absence with no owner is a gap that gets
+    // dropped rather than deferred.
+    expect(absence?.field).toContain('AttachmentListEntry');
+    expect(absence?.because).toContain('attachments table');
+    expect(absence?.owner).toMatch(/^Plan 10 — /);
   });
 });

@@ -2636,3 +2636,59 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
     expect(crumbTexts().at(-1)).toBe('Doing');
   });
 });
+
+/**
+ * The attachments section (2026-09-20) — the prop the product's mount never
+ * passed, and the two states it has to keep apart.
+ *
+ * ## The property is a THREE-WAY, and the third arm is the one that was missing
+ *
+ * `AttachmentList` returns `null` for an empty list — *"must not promise there
+ * are none"* — so a ticket with no files draws NOTHING, which is the component's
+ * deliberate silence rather than a claim. A read that FAILED used to draw the
+ * same nothing: `TicketSheetProps.attachments` had no way to carry a reason, so
+ * "this ticket has no attachments" and "we could not read them" were one screen.
+ * `attachmentsUnavailable` is that reason, and this case pins all three arms in
+ * one run — entries, empty, failed — because any two of them alone would pass
+ * against a component that drew a single thing for both.
+ */
+describe('16.57 the attachments section keeps an empty list and a failed read apart', () => {
+  const ENTRY: AttachmentListEntry = {
+    kind: 'upload',
+    attachmentId: '01J9GATA000000000000000000',
+    filename: 'gst-receipt.pdf',
+    mime: 'application/pdf',
+    size: 48211,
+    sha256: null,
+  };
+
+  it('16.57 draws the entries, draws nothing for an empty list, and draws a sentence for a failure', async () => {
+    // ARM ONE — the entries. This is also the control for everything below: the
+    // section does render when it has something to render.
+    renderSheet(ticketRead(), sheetSource(ticketRead()), { attachments: [ENTRY] });
+    await settled();
+    expect(screen.getByText('gst-receipt.pdf')).toBeInTheDocument();
+    expect(screen.queryByTestId('sheet-attachments-unavailable')).toBeNull();
+    cleanup();
+
+    // ARM TWO — a real empty list. Nothing at all, and crucially no sentence:
+    // the component must not turn "there are none" into a warning.
+    renderSheet(ticketRead(), sheetSource(ticketRead()), { attachments: [] });
+    await settled();
+    expect(screen.queryByText('gst-receipt.pdf')).toBeNull();
+    expect(screen.queryByTestId('sheet-attachments-unavailable')).toBeNull();
+    cleanup();
+
+    // ARM THREE — the read failed. A sentence, and it carries the REASON rather
+    // than the sheet inventing one: the `error` string is the transport's own.
+    const reason = 'HTTP 404 for /v1/workspaces/ws/tickets/tk/attachments';
+    renderSheet(ticketRead(), sheetSource(ticketRead()), { attachmentsUnavailable: reason });
+    await settled();
+    const notice = screen.getByTestId('sheet-attachments-unavailable');
+    expect(notice).toHaveTextContent("This ticket's attachments could not be read");
+    expect(notice).toHaveTextContent(reason);
+    // And the reason is not dressed as a wait — the failure arm this sheet
+    // already draws for the ticket read and the ledger tab is the model.
+    expect(notice.textContent).not.toContain('Loading');
+  });
+});

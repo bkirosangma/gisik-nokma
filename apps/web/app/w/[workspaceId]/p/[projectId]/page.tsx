@@ -1076,6 +1076,38 @@ function ProjectBoard() {
   ]);
 
   const openTicketId = searchParams.get('ticket');
+  /**
+   * THE OPEN TICKET'S FILES — the read behind `TicketSheet`'s `attachments` prop.
+   *
+   * That prop has existed since Plan 6 and this mount never passed it, because
+   * nothing served it: `listTicketAttachments` was written and tested by Plan 7
+   * with zero production callers, so the sheet's attachment list could only ever
+   * be empty. The route now exists
+   * (`GET /v1/workspaces/:ws/tickets/:id/attachments`, registered beside the
+   * events door and riding the same two guards) and this is the seam that
+   * reaches it — views never speak HTTP (coordination amendment 10).
+   *
+   * **`error` is passed down as well as `data`, and that is the half that
+   * matters.** The query THROWS on a refusal rather than answering `[]`,
+   * precisely so that "this ticket has no files" and "the files could not be
+   * read" stay two states; the sheet draws the first as nothing — the list
+   * component's own honest silence — and the second as a sentence. Passing only
+   * `data` would collapse the two again on the last hop, which is exactly where
+   * the distinction was won.
+   *
+   * The key carries the ticket id, so opening another ticket refetches rather
+   * than showing the previous ticket's files under the new one's heading — the
+   * failure `useLiveQuery`'s `queryKey` exists to prevent (ruling P17).
+   */
+  const openTicketAttachments = useLiveQuery(
+    dataSource,
+    workspaceId,
+    `${openTicketId ?? 'none'}:attachments`,
+    async () =>
+      openTicketId === null
+        ? []
+        : dataSource.query.getTicketAttachments(workspaceId, openTicketId),
+  );
   const openTicket = (ticketId: string) =>
     router.push(`/w/${workspaceId}/p/${projectId}?ticket=${ticketId}`);
   const closeTicket = () => router.push(`/w/${workspaceId}/p/${projectId}`);
@@ -2676,6 +2708,22 @@ function ProjectBoard() {
           workspaceId={workspaceId}
           ticketId={openTicketId}
           currentUserId={currentUserId}
+          /*
+            THE ATTACHMENTS — the prop this mount never passed, for the same
+            reason `editorSlot` above was never passed: nothing served the read,
+            so the sheet's list could only ever be empty. It is served now (the
+            route beside the events door) and `openTicketAttachments` reaches it
+            through the amendment-10 seam; the page speaks no HTTP for it.
+
+            `attachmentsUnavailable` travels BESIDE the entries rather than
+            instead of them, so the two states stay apart all the way to the
+            screen: `data` is `[]` for a ticket with no files (drawn as nothing,
+            which `AttachmentList` does by design), and a failed read hands down
+            its reason, which the sheet draws as a sentence. Passing `data`
+            alone would have folded them together here, on the last hop.
+          */
+          attachments={openTicketAttachments.data ?? undefined}
+          attachmentsUnavailable={openTicketAttachments.error ?? undefined}
           onClose={closeTicket}
           /*
             THE REAL EDITOR — the prop this mount never passed, which is why the
