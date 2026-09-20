@@ -31,6 +31,70 @@ Six checks raw 0 at the frozen head; the forced gate run by the **controller onl
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
 
+## 🔄 SUNDAY 2026-09-20 ~21:5x IST — **CYCLE 27: THE PREVIOUS SESSION MERGED TWO PRs AND RESTARTED BOTH LANES, THEN ENDED WITHOUT ITS ANCHOR. THIS ENTRY IS THAT ANCHOR — AND IT CARRIES A MEASURED ALLOCATION BREACH THAT NO CHECK CAN SEE.** `main` is `fed9a588`; **zero open PRs**; ledger **307 done / 1 todo**; `check-case-ids` **2573 unique, highest `16.90`**.
+
+### 0. READ THIS BEFORE TRUSTING THE ENTRY BELOW IT
+**Cycle 26's text says `main` is `a5b58c4a`; it is `fed9a588` now, and the difference is THREE merges — the two in §1 plus `0bb8d95f` (`#608`), the cycle-26 anchor itself, which is the commit that carried that text onto `main`** (cycle 26's text lists items 1 and 2 as IN FLIGHT). **Everything else in cycle 26 stands**: its queue, its five rulings, and its §3 measurement.
+⚠ **AND THE PRIMARY CHECKOUT WAS BEHIND AGAIN — `6db8b6b8`, THIRTY-FIVE commits** (`rev-list --count 6db8b6b8..fed9a588` = 35; `--no-merges` = 30). That is the **same cause** cycle 25 §5 named for five stale citations. **Every reading in this entry was taken in `gisik-nokma-ctl`, a worktree cut from `origin/main`, never the primary checkout**; every sha was resolved with `/usr/bin/git`, never the `rtk` proxy.
+⚠ **THIS ENTRY FIRST SAID "fifteen", AND THE NUMBER CAME FROM A DIFFERENT MEASUREMENT** — `behind=15` was the distance of the **lane branch** `exec2/soft-delete-constraint` from `main`, not the checkout's. **A count is evidence only once its UNIT is named**, and two numbers of the same shape sitting in one session's output is how they get swapped.
+⚠ **AN INDEPENDENT PASS FALSIFIED SIX SENTENCES IN THIS ENTRY'S FIRST VERSION** — the commit count, the "two merges" delta, the lanes' commit state, "both copies agree", the "nothing anywhere records it" sweep, and one superseded reading called false. **All six are corrected in place below.** A position document is a claim like any other, and this one had not been measured by anyone but its author.
+
+### 1. THE TWO MERGES SINCE CYCLE 26'S TEXT — each verified **by API, in the same invocation as a control**
+| PR | lane | head | merged as | base | reachability |
+|---|---|---|---|---|---|
+| `#607` the empty-state sentences | exec 1 | `6fefa640` | **`fb3a6ebd`** | `main` | `compare/fb3a6ebd...main` → **ahead, behind_by=0** |
+| `#609` the soft-delete constraint | exec 2 | `3f9f858f` | **`fed9a588`** | `main` | `compare/fed9a588...main` → **identical** |
+**Control, derived in the SAME invocation** (`branch -r --no-merged origin/main`): `origin/ctl/lift-and-decide` → **diverged, behind_by=1**. It fires, so the two readings above are measurements and not a matcher that cannot fail.
+⚠ **A FIRST CONTROL WAS INVALID AND WAS DISCARDED.** `origin/exec2/tap-target-density` also returned `ahead` — **a merged branch is an ancestor, so it is not a negative control.** The control must be derived from `--no-merged`, never picked from the branch list.
+⚠ **I did not run the forced gate at either landing tree, and I do not claim their gates.** The gate for THIS anchor is run at its own landing tree and recorded in the anchor PR's body — **at the landing tree, never transferred from an earlier one.**
+
+### 2. THE QUEUE, IN DISPATCH ORDER — cycle 26 §1 with its first two rows made true
+| # | task | lane | state |
+|---|---|---|---|
+| 1 | the five empty-state sentences | exec 1 | **DONE** — `#607` → `fb3a6ebd` |
+| 2 | the soft-delete constraint — a `keyof`-guarded invariant | exec 2 | **DONE** — `#609` → `fed9a588` |
+| 3 | **the attachments leak** — three doors, incl. the download route that serves the bytes | exec 1 | **IN FLIGHT** — `exec/attachments-deleted-guard` |
+| 4 | the comment box + thread — option **(A)** | exec 2 | **IN FLIGHT** — `exec2/comment-thread` |
+| 5 | the Add-subtask affordance | — | **QUEUED** |
+| 6 | the breadcrumb hierarchy + the parent-indicator merge | — | **QUEUED** |
+| 7 | the visibility section styling | — | **QUEUED** (no dispatch written) |
+| 8 | markdown editing — typed links ON, and the seeds PARSED | — | **QUEUED** |
+| 9 | `prewarm-web-routes` · the `TOKENS (every screen)` gap · the contrast debts | — | **HELD by the owner** |
+**Both lanes were restarted onto items 3 and 4 before this session began**: each branch was cut from `fed9a588` and read **0 ahead / 0 behind at 21:45**. ⚠ **That is a reading, not a state, and it expired inside the hour — by 21:57 exec 1 was TWO COMMITS AHEAD** (`exec/attachments-deleted-guard` @ `15641bb6`; `rev-list --left-right --count fed9a588...HEAD` → `0 2`) **while exec 2 still read `0 0`.** **Neither branch is on `origin`** (`git ls-remote origin refs/heads/<branch>` → empty for both), **so a lane that has not pushed is invisible from `main`** — which is why this row is written here at all. **Items 5–8 still carry no lane** — cycle 22 §3's rule (assign by affinity, write the reason WITH the task) is the one to apply when they are dispatched.
+
+### 3. ⛔ A MEASURED ALLOCATION BREACH — AND THE GUARD IS STRUCTURALLY BLIND TO IT
+**The allocation's own instrument is the block table in `test-cases/16-remaining-doors.md`, and it agrees with the block arithmetic in this file's Cycle 14 entry** (*"...exec 2 `41`–`60`, 3b `61`–`80`, parity `81`–`99`. **When `16.99` is reached, the controller opens §17 — standing authority.**"*) — **exec 1 `16.81`–`16.99`**, **exec 2 `16.41`–`16.60`** — **and with the FOUR other places this file repeats it** — ⚠ **five in total, one of which is the Cycle 14 arithmetic itself; the independent pass said "six" and its sixth line is the `16.61`–`16.80` block, which is a different allocation. A count is right only when its MEMBERSHIP is right.** **No reallocation of `16.88`–`16.99` to exec 2 is recorded in any of them, nor in the unversioned `gisik-nokma-lanes/*.md`.** ⚠ **A first version of this paragraph concluded "nothing anywhere records it" on a search that had not covered `docs/lanes/` — and `docs/lanes/` is precisely where the rival allocation IS recorded, by the lane that made it. See item 2 below, which the first version omitted entirely.**
+**Measured at `fed9a588` with the guard's OWN two regexes** (`ID_LINE`, `ID_LINE_BOLD_BACKTICK`, lifted verbatim from `scripts/check-case-ids.mjs`) **applied to the same 24 files it scans** — and the cross-check that this is the same path is that the script's total, **2573**, equals the total the guard itself reports:
+⚠ **A FIRST ATTEMPT AT THIS MEASUREMENT WAS WRONG, AND ONLY ITS CONTROL CAUGHT IT.** A `grep` for a bold id *anywhere* in the file over-counts — **the guard matches bullet lines only, `^-\s+…`, so a bold id in running prose or in an unbulleted line is invisible to it.** The control written in that same wrong spelling (appending `**16.90**` with no bullet) **did not fire and therefore proved nothing**; re-written as `- **16.90** …` it reddens the guard with *`DUPLICATE case ids found (union 2573 < sum 2574)`*. **A control must be written in the SAME spelling as the measurement or it tests a check nobody runs.**
+- **exec 2's block `16.41`–`16.60` is FULLY MINTED — all twenty** (`**16.41**` … `**16.60**`). **Exec 2 has no ids left.**
+- **exec 1's block `16.81`–`16.99` has `16.81`–`16.90` minted** — `16.81`–`16.87` by exec 1, and **`16.88`–`16.90` by EXEC 2**, merged in `#609`.
+- **`16.91`–`16.99` (nine ids) are unminted, and the table assigns them to exec 1.**
+**So the allocation is CONTRADICTED in two merged documents, and stale in a third place:**
+1. **`test-cases/16-remaining-doors.md` asserts *"This lane's id block is `16.88`–`16.99`"*** in the body of `#609`'s case section — **contradicted by the block table at the top of the same file.** It is exec 2's own sentence, and **this is the durable one: it sits in a merged case file, and the next minting session will read it.**
+2. **exec 2's own handoff records the rival allocation from the BREACHING side** — its position block reads *"this lane's id BLOCK | **`16.88`–`16.99`** — minted `16.88`–`16.90`, next free **`16.91`**"*. **So the breach IS recorded — by the lane that made it, in a versioned file that was never reconciled against the table.** **Two documents on `main` disagree about the same ids, and nothing detects it.**
+3. **exec 1's handoff still names `16.88` as free** (*"`16.88`–`16.99` remain free in exec 1's block"*, *"Next free id: `16.88`"*). ⚠ **Those lines sit inside a block the file itself heads "SUPERSEDED BY THE BLOCK ABOVE", so they are STALE rather than false — they were true when written.** They are listed because a lane greps its own file for a next-free id and finds them; that is why the correction was sent by paste, not left here to be discovered.
+⚠ **`check-case-ids` CANNOT SEE ANY OF IT, BY CONSTRUCTION — AND THAT WAS DEMONSTRATED, NOT ARGUED.** It counts unique ids and collisions (this run: **2573 unique, union == sum, highest `16.90`**, rc=0) and **has no notion of blocks or lanes anywhere in its source**. Appending a **benign duplicate** reddens it (*`DUPLICATE case ids found (union 2573 < sum 2574)`*, rc=1); appending a **fresh id that the allocation gives to nobody — `- **16.91** …` — leaves it GREEN** (*`ok (2574 unique ids, highest 16.91)`*, rc=0), restored to `2573 / 16.90` afterwards. **A breached allocation is green, and so is an invented one.** This is the `checks-that-cannot-fail` family: the instrument works, and this is not the property it measures.
+
+### 4. WHAT THE NEXT CONTROLLER SHOULD DO FIRST
+1. **Capture both panes** (`gisik:1`, `gisik:2`) — and **read a lane's pane for the QUESTION, not for progress** (cycle 26 §4.3): **a lane can be holding on a question and nothing else will tell you.**
+2. **Read §2 — it is the queue** — then re-measure every anchor at the sha you report, from a worktree pinned at that sha.
+3. ⚠ **A LANE CAN BE DOWN AND LOOK BUSY** — check the pane's last ERROR line, not the spinner.
+4. **CI is the billing-blocked shape** — not a code verdict; **the forced gate is the only evidence.** Do not re-ask the owner about it.
+5. ⚠ **RE-ARM THE PR WATCHER** — it exits on firing **and on its 2-hour timeout.**
+6. ⚠ **`--delete-branch` still exits 1 while a worktree holds the branch — verify a merge by API, never by exit status.**
+
+### 5. ⛔ ONE QUESTION IS PUT TO THE OWNER, AND NOTHING IS DISPATCHED ON IT
+**Exec 2 has no case-id block left, and `16.91`–`16.99` is exec 1's.** The three readings that bound that statement are in §3. ⚠ **AND THE UNMINTED POOL IS BIGGER THAN THAT TAIL — measured with the same instrument:** exec 1's `3b` allocation **`16.61`–`16.80` holds only `16.61` and `16.62`**, so **`16.63`–`16.80` (eighteen ids) is also unminted and also exec 1's**; `16.91`–`16.99` is nine more. **So the options are the owner's, not mine to invent: (a) split the remaining `16.91`–`16.99` between the lanes; (b) open §17 early for exec 2; (c) reallocate part of exec 1's unminted `16.63`–`16.80`; (d) leave the tail to exec 1 and let exec 2 stop until `16.99` is reached.** The lane is on item 4 and **has not minted**; exec 1 was told its next free id is `16.91` so it does not mint a duplicate.
+
+### 6. LANES AT HANDOVER — **measured 21:57, and deliberately not dressed up as a state**
+| lane | branch | state |
+|---|---|---|
+| exec 1 | `exec/attachments-deleted-guard` @ `15641bb6` — **2 ahead of `fed9a588`, not pushed** | **WORKING** item 3 — the refusal repair and its pin |
+| exec 2 | `exec2/comment-thread` @ `fed9a588` — **0 ahead / 0 behind, not pushed** | **WORKING** item 4 — the comment/attachment payload schemas |
+⚠ **A LANE'S HEAD IS A READING TOO, and this table's first version had both lanes at `fed9a588` with nothing committed — true at 21:45, false at 21:57.** **Re-measure before acting on it.**
+
+---
+
 ## 🔄 SUNDAY 2026-09-20 ~21:3x IST — **CYCLE 26: A SECOND SITTING — THE OWNER RULED THE SHEET, THE PARENT INDICATOR, THE EDITOR AND THE LEAK, AND THE QUEUE IS NOW EIGHT DEEP WITH A DISPATCH FOR EVERY ITEM.** `main` is `a5b58c4a`; **zero open PRs**; ledger **307 done / 1 todo** (struck).
 
 ### 1. 📌 THE POSITION AND **THE QUEUE, IN DISPATCH ORDER — THIS IS THE QUEUE**
