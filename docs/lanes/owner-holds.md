@@ -129,14 +129,23 @@ headline**, which is why it is worth reading in full.
 | **State dropdown** | **REFUSED — no second door** | The chip + "Move…" and a dropdown are **two presentations of the same legal-transition set**. A restyle, not a gap. |
 
 **⚠ THE FINDING THAT EXPLAINS MOST OF THE SHEET, and it is one line:** the web mounts `TicketSheet` at
-`page.tsx:2346-2353` with **six props and NONE of the four optional ones** — no `editorSlot` (so the real
-editor never mounts and the description falls back to `readOnly`), no `attachments` (so `<AttachmentList>`
-renders empty), no `uploadEvidence`, no `visibility`. **One mount, four gaps.**
+`page.tsx` (**`:2417` at `4274b372`**; this line cited `:2346-2353` when it was written, and that range
+**still resolves — to a selection-handler block, not the mount**) with **six props and NONE of the four
+optional ones** — no `editorSlot` (so the real editor never mounts and the description falls back to
+`readOnly`), no `attachments` (so `<AttachmentList>` renders empty), no `uploadEvidence`, no `visibility`.
+**One mount, four gaps.** ⚠ **That was the reading THEN. The paragraph immediately below is its state NOW,
+and two of the four have since closed.**
 
-**⚠ AND ITS STATE, because the sentence above is a reading and reads have been expiring all day:** as of
-`#544` (`2c28f6bc`) **`editorSlot` is passed and `attachments`, `uploadEvidence` and `visibility` are still
-not** — so **two of the four gaps are closed** (the description, and the row it needed) and **two remain**,
-both owned by dispatches that exist. Re-measure before quoting this line.
+**⚠ AND ITS STATE — RE-MEASURED 2026-09-20 at `4274b372` (cycle 22), because the sentence above is a reading
+and reads have been expiring all day:** the mount at `page.tsx:2417` now passes **nine props** — the original
+six, plus **`editorSlot`** (closed by `#544`, `2c28f6bc`), **`uploadEvidence`**, and `onOpenTicket`. **So of
+the four optional props, `editorSlot` and `uploadEvidence` ARE passed, and `attachments` and `visibility` are
+NOT — "two remain" was right, and THIS PARAGRAPH'S OWN ENUMERATION WAS THE STALE HALF** (it named three
+unpassed props; `uploadEvidence` closed after it was written).
+⛔ **AND NEITHER REMAINING GAP HAS A DISPATCH.** This paragraph previously ended *"both owned by dispatches
+that exist"* — **that is FALSE**: a search of all 114 dispatch files finds neither, and cycle 21 ordered this
+correction. The two are **queued as item 4 of the controller's queue** (`controller-state.md` §4), **not
+dispatched**. Re-measure before quoting this line.
 
 **⚠ THE COMMENTS CORRECTION — the controller's own headline was WRONG and is recorded wrong here.**
 `comment.added` is fully wired on the server (vocabulary `:195`, state machine, projections, search index,
