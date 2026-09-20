@@ -262,6 +262,18 @@ describe('SegmentedControl (13.288)', () => {
 // `test/helpers/colour-scan.ts`'s identical note). Resolving the path after
 // converting `import.meta.url` on its own avoids the rewrite.
 const UI_CSS = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../src/ui.css'), 'utf8');
+/**
+ * The OTHER stylesheet a rule for any of these classes could hide in.
+ * `apps/web/app/layout.tsx` imports `ui.css` and then `globals.css`, so a rule
+ * appended there WINS at equal specificity — which is why a "no style forks
+ * this" scan over `ui.css` alone is a check that cannot fail. Case 13.893
+ * (`attention-styling.test.ts:44-49`) reached the same conclusion for its own
+ * class and scans both; 16.83 does the same.
+ */
+const GLOBALS_CSS = readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), '../../../apps/web/app/globals.css'),
+  'utf8',
+);
 const rule = (selector: string): string => {
   const m = UI_CSS.match(new RegExp(selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{([^}]*)\\}'));
   if (!m) throw new Error(`no rule for ${selector}`);
@@ -386,6 +398,129 @@ describe('R1(c) at the component layer', () => {
       );
       expect(base, selector).toMatch(/background:\s*var\(--gn-surface-sunken\)/);
       expect(neo, selector).toMatch(/box-shadow:\s*var\(--gn-shadow-sunken\)/);
+    }
+  });
+
+  /**
+   * 16.83 — the ticket-type list's ↑/↓ reorder control.
+   *
+   * ## The defect this exists to keep closed
+   *
+   * `button.ticket-type-list__move` had NO RULE OF ITS OWN. Not "styled badly" —
+   * the class appeared in `ui.css` and in `globals.css` zero times each, against a
+   * positive control of `.ticket-type-list__row` in the same sweep. Two rules of no
+   * class did reach it (`* { box-sizing }`, `button { font: inherit }`); the rest was
+   * Chromium on the live stack measuring raw user-agent chrome: `border: 2px outset`,
+   * `background: rgba(239,239,239,0.3)`, `border-radius: 0px`,
+   * `font-weight: 400`, `28.2 × 29.2`. **A case asserting "it looks right" could
+   * not have been written against that**, which is why the first assertion below
+   * is the plain one: the rule must EXIST. That is the assertion that was
+   * missing, and a class with no rule is invisible to every instrument that
+   * measures a property rather than a presence.
+   *
+   * ## Why the rest is shape-pinned rather than colour-pinned
+   *
+   * The fill, the label and the radius are all ROLES, and the prototype's own
+   * three styles resolve those roles differently at the token layer
+   * (`fillWarmHig3`/`fillWarmNeo3`, `radii.hig.control`/`radii.neo.control`).
+   * Measured in Chromium, this one unconditional rule therefore renders
+   * `hig`/`minimal` at `rgba(39,58,99,0.11)` + 8px and `neo` at
+   * `rgba(176,152,132,0.16)` + 14px — **the three styles for free, with no
+   * `[data-style]` block.** The scan at the end asserts no such block exists, so
+   * a future edit cannot quietly fork the control per style; that is 13.340's
+   * argument applied to this control, and it is the POSITIVE half here for the
+   * same reason it is there.
+   *
+   * ## The size is a RECORDED divergence, and it is pinned so it stays recorded
+   *
+   * The prototype draws `min-height:32px; min-width:36px` (`desktop.dc.html:3152`,
+   * the shared control constant, byte-equal to the one `.gn-board-card__move`
+   * was ported from at `:2501`). This rule takes **2.75rem — 44px** — because
+   * `apps/web/e2e-viewport/tap-targets.ts:108` sweeps every `button` against a
+   * hard 44px floor with no per-component exemption, which is the same
+   * divergence, for the same reason, that control already made. Asserted rather
+   * than merely commented: a re-transcription of the prototype's 32px is the
+   * most likely future edit here, and it is the one that reddens the viewport
+   * suite rather than this one.
+   *
+   * **It does NOT settle the owner's 2026-09-20 24px-dense-in-list ruling**, and
+   * deliberately so — that ruling's second half is a WIDER checker that does not
+   * exist yet, so a case pinning 24 here would be pinning a floor nothing
+   * enforces. The open question is named in `ui.css`'s own block.
+   */
+  it('16.83 the reorder control has a rule at all, carries the shared control roles, and forks for no style', () => {
+    const body = rule('.ticket-type-list__move');
+
+    // The rule EXISTS — the whole defect. Every assertion below is about a class
+    // that rendered as UA chrome precisely because this one was false.
+    expect(body).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
+    expect(body).toMatch(/color:\s*var\(--gn-text-accent\)/);
+    expect(body).toMatch(/border-radius:\s*var\(--gn-radius-control\)/);
+    expect(body).toMatch(/border:\s*none/);
+
+    // The recorded 44px divergence, on BOTH axes, so the prototype's 36px
+    // width is pinned too and not only its 32px height.
+    expect(body).toMatch(/min-height:\s*2\.75rem/);
+    expect(body).toMatch(/min-width:\s*2\.75rem/);
+    expect(body).not.toMatch(/min-(height|width):\s*(32|36)px/);
+
+    // The prototype's OWN disabled number for this control (`:3161-3162`),
+    // not `.gn-button`'s generic 0.55 — the distinction it shares with
+    // `.gn-board-card__move:disabled`.
+    expect(rule('.ticket-type-list__move:disabled')).toMatch(/opacity:\s*0\.4/);
+
+    // The pair sits BESIDE the row door, which is what the component's own
+    // comment claims and what nothing honoured while `<li>` was
+    // `display: list-item`: the row is `width: 100%`, so the pair rendered on
+    // its own line ABOVE the row (measured: pair top 205.7, row top 234.8).
+    expect(rule('.ticket-type-list__rows li')).toMatch(/display:\s*flex/);
+
+    // 13.340's positive scan, for this control: one unconditional rule IS the
+    // whole story, in every style.
+    //
+    // ⚠ OVER BOTH STYLESHEETS, and the second one is the one that WINS.
+    // `apps/web/app/layout.tsx` imports `@gisik-nokma/ui/ui.css` and then
+    // `./globals.css`, so a `[data-style]` override appended to `globals.css`
+    // beats anything here at equal specificity. A scan of `ui.css` alone
+    // therefore passes while the rendered control is forked — **measured, not
+    // reasoned: a reviewer planted exactly that rule in `globals.css` against the
+    // first version of this case and it stayed GREEN.** Case 13.893
+    // (`attention-styling.test.ts:44-49`) records the identical gap and closed it
+    // the same way; this case re-introduced it and now closes it too.
+    for (const [name, css] of [
+      ['ui.css', UI_CSS],
+      ['globals.css', GLOBALS_CSS],
+    ] as const) {
+      const styleBlocks = [...css.matchAll(/\[data-style="[a-z]+"\][^{]*\{([^}]*)\}/g)];
+      if (name === 'ui.css') {
+        expect(
+          styleBlocks.length,
+          'the scan found no [data-style] block in ui.css at all — it is reading nothing',
+        ).toBeGreaterThan(0);
+      }
+      for (const [fullMatch] of styleBlocks) {
+        expect(fullMatch, `${name}: ${fullMatch}`).not.toMatch(/\.ticket-type-list__move\b/);
+      }
+    }
+
+    // …AND THE BODY MUST BE DECLARED EXACTLY ONCE ACROSS BOTH, because every
+    // assertion above goes through `rule()`, which answers the FIRST match only.
+    // This block is appended at EOF precisely so that future edits land AFTER it,
+    // so the most likely edit is one that beats `rule()`'s answer while leaving
+    // every colour assertion green — **also measured: a reviewer appended a second
+    // `.ticket-type-list__move { background: … }` at EOF and this case stayed
+    // GREEN.** 13.893 generalises the same property for the same reason ("`ruleFor`
+    // answers the FIRST rule for a name, so a later duplicate would beat the colour
+    // this file pins while every assertion above stayed green").
+    for (const [name, css] of [
+      ['ui.css', UI_CSS],
+      ['globals.css', GLOBALS_CSS],
+    ] as const) {
+      const decls = [...css.matchAll(/^\.ticket-type-list__move\s*\{/gm)];
+      expect(
+        decls.length,
+        `${name} declares .ticket-type-list__move as a rule of its own ${decls.length} time(s)`,
+      ).toBe(name === 'ui.css' ? 1 : 0);
     }
   });
 
