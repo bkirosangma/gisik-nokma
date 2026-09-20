@@ -48,6 +48,10 @@ over-reaches its own code.
 /w/[workspaceId]/settings/workflows{,/new,/[workflowId],/[workflowId]/history}
 ```
 Measured with `find apps/web/app -type f \( -name '*.tsx' -o -name '*.ts' \) | wc -l` → **25**.
+⚠ **UNIT, because two numbers are both right here.** 25 is every `.ts`/`.tsx` under `app/`; narrowing to
+`page.tsx`/`layout.tsx` gives **24**, because `not-found.tsx` is neither. A parallel sweep reported "24,
+not the brief's 25" as a correction; both figures are correct and the denominator was the difference.
+**My §1.1 list is the 25-file set.**
 
 ### 1.2 The view layer a person actually sees (`packages/app-core/src/views/`, 21 files)
 `board.tsx` (91 KB) · `ticket-list.tsx` (60 KB) · `ticket-sheet.tsx` (141 KB) · `transition-dialog.tsx`
@@ -90,6 +94,10 @@ the prototype. Every prototype citation below names a file in the staged export.
 ## 2. FINDINGS — nine, five parts each
 
 Counted by severity, members named: **Important 4** (F1, F2, F3, F4), **Minor 5** (F5, F6, F7, F8, F9).
+
+**§2b adds six more that came from a dispatched state sweep and that I then opened and verified myself:**
+**Critical 1** (V2), **Important 4** (V1, V3, V4, V5), **Minor 1** (V6).
+**Whole-report total: 15 findings — Critical 1, Important 8, Minor 6.**
 
 ---
 
@@ -443,6 +451,208 @@ measured.**
 
 ---
 
+## 2b. FINDINGS FROM THE DISPATCHED STATE SWEEP, EACH OPENED AND VERIFIED BY ME
+
+A read-only sweep was dispatched over every user-facing surface's ten states. **I did not adopt its
+report.** Its claims are its own; the six below I re-opened and measured myself, and on two of them my
+severity differs from the sweep's. The rest of its output is indexed in §2c and is **unverified by me.**
+
+---
+
+### V1 — IMPORTANT · The Board's empty states invite a person to create a ticket, and no caller in the web app wires the control
+
+**WHAT.** The empty-board banner renders `EMPTY_BOARD_COPY` = *"No tickets here yet — create one."*, and
+the "Create a ticket" button beneath it is gated on `onCreateTicket !== undefined`
+(`board.tsx:490-497`). The empty-column state renders a decorative `+` glyph
+(`board.tsx:746-758`, `aria-hidden="true"`) with copy *"No tickets in this column."* and an
+"Add a ticket" button gated the same way (`:762-764`).
+
+**MEASUREMENT — and this is the finding.** `onCreateTicket` is declared and guarded in
+`packages/app-core/src/views/board.tsx` (18 hits), and across **`apps/web/app` + `apps/web/src` — 63
+files scanned — it has 0 hits.** No web caller passes it, so the sentence tells the reader to create a
+ticket and the control that would let them is not rendered. The `+` glyph still paints.
+
+**WHY it is wrong.** The product's own recorded rule — quoted in this very sheet at
+`ticket-sheet.tsx:1308-1311` — is that a control *"asks before it offers"*. This is the inverse: copy
+that offers what the screen withholds. A person on a brand-new project reads an instruction and finds
+nothing to press, and the decorative `+` makes a sighted reader believe there was a control that failed
+to load.
+
+**WHAT WOULD HAVE BEEN BETTER.** Either pass `onCreateTicket` from the project page's existing create
+region (which is already gated correctly at
+`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1720-1789`), or make the copy conditional so an
+unwired board states the situation instead of instructing. The `+` glyph should never render
+unaccompanied — it is the one part of the empty column that reads as a control.
+
+**SEVERITY: Important.** The sweep rated this **Critical**; I decline that. The person can still create a
+ticket from the page's create region, so nothing is lost and no false write occurs — the defect is a
+promise the surface cannot keep.
+
+---
+
+### V2 — CRITICAL · A failed pending-list re-read destroys a one-time invitation URL that cannot be recovered
+
+**WHAT.** `MintForm` holds the minted invitation in its own state (`members/page.tsx:746`), sets it
+(`:765`), and then calls `onMinted()` (`:766`) — which is `loadPending` (`:553`), a **network re-read**.
+If that read fails, `loadPending` sets `adminGate` to `'failed'` (`:213-216`) or `'member'`
+(`:205-211`); the **only** arm that renders `MintForm` is the final `else` (`:551`). `MintForm`
+unmounts and `minted` — the URL — dies with it. The screen had just said, in its own exported constant:
+`COPY_IT_NOW = 'Copy it now — it is not stored and cannot be shown again'` (`:24`, rendered at `:894`).
+
+**WHY it is wrong.** The URL is unrecoverable **by construction** — that is what a one-time link is. An
+unrelated read, on a different resource, deletes the only copy. And the failure is asymmetric in the
+worst direction: the mint **succeeded** server-side, so an invitation is live and usable by nobody,
+because its link is gone. A 403 arm makes this reachable by an ordinary role change, not just a blip.
+
+**WHAT WOULD HAVE BEEN BETTER.** Two independent, cheap fixes: hoist `minted` into the page so it
+outlives the gate's re-render (`MintForm` is presentational; the credential is not its business), and/or
+make the post-mint refresh non-destructive — never let a failed refresh unmount the surface whose only
+job is to show the link. The same file already treats a *revoke* refusal as worth a sentence; a *mint*
+success is worth more.
+
+**MEASUREMENT.** Opened: `members/page.tsx:24` (`COPY_IT_NOW`), `:205-216` (both failure arms),
+`:542-554` (the three gate arms and the single `MintForm` mount), `:744-770` (`minted` state, `submit`).
+
+**SEVERITY: Critical.** The sweep and I agree.
+
+---
+
+### V3 — IMPORTANT · A rejected visibility write leaves Apply permanently disabled and silent
+
+**WHAT.** `VisibilityEditor.apply` begins by setting `{kind:'sending'}` (`visibility-editor.tsx:274`),
+then `await`s `dataSource.ingest([…])` (`:288`) with **no `try`/`catch`**, and the call site is
+`onClick={() => void apply()}` (`:428`) — a `void`, so the rejection is discarded entirely. The Apply
+button is `disabled={explicitNamesNobody || submission.kind === 'sending'}` (`:427`), and the only
+sentence the component can render is under `submission.kind === 'refused'` (`:433`), which is now
+unreachable. **Measured: the file contains 0 lines matching `try {` or `catch`.**
+
+**WHY it is wrong.** The author handled the *absent answer* carefully — there is a whole `no-answer`
+refusal with a docblock explaining why silence is not a commit (`:291-297`) — and left the sibling case,
+a **rejection**, with no slot at all. The user cannot distinguish "your change is being sent" from "this
+screen is broken", and cannot retry without remounting. This is a permission surface, which is where a
+stuck control costs most.
+
+**WHAT WOULD HAVE BEEN BETTER.** `try`/`catch` inside `apply`, restoring `submission` to `idle` and
+routing the rejection to a transport sentence — the shape `BulkCloseDialog` already uses two files away.
+
+**MEASUREMENT.** Opened: `visibility-editor.tsx:273-309` (the whole `apply`), `:427-428` (the control),
+`:433-438` (the only sentence arm); plus a count of `try`/`catch` lines in the file → **0**.
+
+**SEVERITY: Important.** The sweep rated it Critical; I decline — no data is lost and no false write is
+made, but a dead control with no explanation is grave on this surface.
+
+---
+
+### V4 — IMPORTANT · The comment thread reports a still-loading read as "Comments · 0" and "No comments yet."
+
+**WHAT.** The sheet passes `comments={comments.data ?? []}` and
+`commentsUnavailable={comments.error ?? undefined}` (`ticket-sheet.tsx:2555-2556`).
+`useLiveQuery` initialises `data` to `null` (`use-live-query.ts:41`), so during the load window `[]` and
+`undefined` reach the thread. `CommentsThread` decides `answered = commentsUnavailable === undefined`
+(`comments-thread.tsx:159`) — true while loading — and the answered branch renders
+`` `Comments · ${comments.length}` `` (`:163`) and *"No comments yet."* (`:169`).
+
+**WHY it is wrong.** `CommentsThread`'s own docblock (`:41`) says *"No comments yet."* is *"a claim
+about the ticket"*, and the collapse on the last hop reintroduces exactly the false claim the component
+was written to prevent. The same file's History tab does it right, three arms apart: `result.data ===
+null` → *"Loading…"*, `[]` → its own sentence (`ticket-sheet.tsx:2719-2723`). Two tabs, one file, two
+disciplines, and the one that is wrong is the one that makes a statement about a ticket's content.
+
+**WHAT WOULD HAVE BEEN BETTER.** Pass the pending signal the way History receives it and give
+`CommentsThread` a wait arm; do not collapse `data === null` into `[]` at the boundary.
+
+**MEASUREMENT.** Opened: `use-live-query.ts:41`; `ticket-sheet.tsx:2555-2556` and `:2719-2723`;
+`comments-thread.tsx:159, 163, 169`.
+
+**SEVERITY: Important.**
+
+---
+
+### V5 — IMPORTANT · A "My contested claims" title button is a dead click, under a comment claiming all four sections resolve
+
+**WHAT.** `MyWork` renders a title button for the contested section that calls
+`onOpenTicket(contested.ticketId)` (`my-work.tsx:145-151`). The shell's resolver
+(`app/w/[workspaceId]/my-work/page.tsx:41-45`) searches `assigned`, `inTransit` and `shared` — **three
+arms** — under a comment at `:39-40` reading *"Every section this component renders a title button for
+must be resolvable here, and that is now all four."*
+
+**WHY it is wrong.** A contested claim is one the engine **refused**, so the ticket state did not change
+— which means the ticket may be in none of the three searched lists. `find` answers `undefined`, the
+`if` swallows it, and the click does nothing: no navigation, no error, no way to tell it from a slow
+page. That is verbatim the defect the comment says was fixed for `shared` — and the comment's "all
+four" is a claim the code does not support, which is the kind that stops the next reader from checking.
+
+**WHAT WOULD HAVE BEEN BETTER.** Add the fourth arm, or make the resolver exhaustive over the view's own
+members so a fifth section cannot reintroduce this.
+
+**MEASUREMENT.** Both files opened by me: `app/w/[workspaceId]/my-work/page.tsx:39-45` (the resolver and
+its comment) and `my-work.tsx:136-151` (`ContestedCard`, and its button).
+
+**SEVERITY: Important.**
+
+---
+
+### V6 — MINOR · Five tab-loading arms on the project page carry no role, in a file that uses one three times
+
+**WHAT.** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` renders a bare `<p>Loading…</p>` for the
+calendar, timeline, board, backlog and list tabs — at lines **2390, 2428, 2515, 2650, 2769** — while the
+create region in the same file uses `role="status"` at **:1732, :1741, :1783**.
+
+**WHY it is wrong.** The board is stream-refetched; a tab going from loading to loaded is a state change
+a screen reader should learn about, and here it is silent. The inconsistency inside one file is the tell
+that this is an oversight rather than a decision.
+
+**MEASUREMENT.** A single grep for `Loading…` in that file returns exactly those five lines, none with a
+role; a grep for `role="status"` in the same file returns the create region's three.
+
+**SEVERITY: Minor individually; I am reporting the five as one finding because they are one habit.**
+The sweep rated the group Important; I decline.
+
+---
+
+## 2c. THE REST OF THE SWEEP'S OUTPUT — CARRIED, NOT VERIFIED
+
+The sweep returned a further ~35 candidate findings. **I did not open the code for these and I am not
+asserting them.** They are listed so the controller knows what exists and can spend its budget where it
+chooses; each names the file the sweep cited. **Treat every one as a hypothesis until someone opens the
+line.**
+
+Its Critical claims beyond V1 and V2: two screens stuck on "Loading ticket types…" forever because a
+`Promise.all` has no rejection handler (`ticket-type-list-screen.tsx:175-181/199`,
+`ticket-type-editor-screen.tsx:189-193/244`); a rejected type migration stranding the editor with the
+dialog gone and the control disabled (`ticket-type-editor-screen.tsx:271-278/509/546`); and
+`saveName` coercing a message-less refusal to `null`, which the consumer reads as success
+(`account/page.tsx:210-213`, `profile-section.tsx:34`).
+
+Its Important claims: `Dialog` declares `aria-modal="true"` with no focus move, no trap and no focus
+return (`packages/ui/src/components/dialog.tsx`, read in full by the sweep); the state-mapping dialog
+unmounted before the server answers (`publish-controls.tsx:65/117`); comment carry-over across two
+different moves (`transition-dialog.tsx:226/329-358/376`); two `aria-modal` dialogs open at once, one
+Escape closing both (`create-ticket-flow.tsx:250-253/359-370`, `dialog.tsx:11`); four submit buttons
+with no in-flight latch (`transition-dialog.tsx:515`, `new-ticket-dialog.tsx:280`,
+`reopen-dialog.tsx:102`); the sheet's read error and load arms carrying no role
+(`ticket-sheet.tsx:618-628`); `typeId`/`parentId`/`mode`/`toStateId` seeded once and never reconciled
+against a list that changes under the mounted dialog (`new-ticket-dialog.tsx:97/280/296`,
+`visibility-editor.tsx:237-238`, `reopen-dialog.tsx:62/102`); a draft never cleared across a close
+(`new-ticket-dialog.tsx`); `passkeys-section.tsx:96-97` asserting "You have no passkeys yet." over a
+failed read; two account sections with no `error` prop
+(`sessions-section.tsx:5-8`, `notifications-section.tsx:12-15`); single-row mark-read and its Undo
+failing silently (`inbox/page.tsx:269-278/344-357`); five components written for offline states and
+mounted nowhere (`UnreadBadge`, `SyncStatusBar`, `ClockSkewBadge`, `SavedFiltersMenu`,
+`ContestBanner`); an unrecognised sync status reported as "Live" (`sync-status-bar.tsx:11-16`); and a
+bulk-close offline acceptance reported as "could not reach the server", inviting a duplicate
+(`bulk-close-dialog.tsx:230-233`).
+
+**One thing the sweep got right by reporting a negative.** It hypothesised that
+`results.find(…)` with no length check (`board.tsx:1712-1722`, `ticket-sheet.tsx:732-739`) reads an
+empty ingest answer as a successful move — then traced reachability and **withdrew it**:
+`mappers.ts:903-911` throws when the result count differs from the submitted count, and the replica
+answers one result per event. It reported the measurement instead of the hypothesis. That is the
+behaviour this review wants, and it is worth the controller's attention that it happened in the same
+run that produced the two inflated Criticals.
+
+---
+
 ## 3. THE PROTOTYPE — classified, per the brief's three categories
 
 | Surface | Class | Note |
@@ -519,6 +729,12 @@ arms), the ticket sheet's parent indicator, subtask section, comment mount and v
    as a whole; attachments; the delete/undo round trip) — a background sweep was dispatched for these
    and **had not returned when this report was finalised**; if it lands after, its findings belong in
    the controller's compiled report and not in this file.
+
+   **A separate state sweep DID return, mid-report.** Its six findings I opened and verified myself are
+   §2b; its remaining ~35 candidates are indexed in §2c and marked unverified. **Two of the six came
+   back rated Critical and I lowered both** (V1, V3) after reading the code — the sweep's severity
+   calibration runs optimistic-severe, which is the right direction to be wrong in, but it means its
+   §2c list should not be planned against at face value.
 4. **`apps/mobile`** — untouched. The manual's claim (e) contrasts the phone and the web; I verified the
    web half only.
 5. **`apps/desktop`** — untouched.
@@ -546,6 +762,9 @@ workspace rule says counts are readings that expire):
 
 ## 7. WHAT I AM LEAST SURE OF — aim here first
 
+0. **§2c as a whole.** It is a list of hypotheses by a machine, not findings. If the controller rules on
+   any of them without someone opening the line first, this report will have caused exactly the failure
+   it documents. **Verify before ruling; the two Criticals I did check were both overstated.**
 1. **F3's classification.** The thread's plain renderer is declared; the composer's toolbar is not
    addressed by anything I found. If a ruling exists that I missed, F3 becomes category 2 and should be
    rejected. **This is the finding most likely to be wrong and the most expensive to leave wrong.**
@@ -575,4 +794,7 @@ nine findings are themselves comments that a fix round wrote.
 
 ---
 
-*executor 2 — UX. Report complete. Branch `exec2/review-ux` pushed for the controller to collect.*
+*executor 2 — UX. **Report complete.** 15 findings — Critical 1 (V2) · Important 8 (F1–F4, V1, V3–V5) ·
+Minor 6 (F5–F9, V6) — plus ~35 unverified candidates indexed in §2c and one flows sweep still
+outstanding, both stated rather than implied. Branch `exec2/review-ux` pushed for the controller to
+collect. **No PR opened, no file changed except this report.***
