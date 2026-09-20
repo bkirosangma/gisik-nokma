@@ -40,8 +40,17 @@ read as forbidding §17's shape, and it does not. **§13 is the proof a uniform 
 
 **§17 is uniformly 3-digit padded: `17.001`–`17.999`, ceiling 999.** §16's own minted ids stay unpadded
 and are NOT renumbered — 76 of them are merged, so padding is not retro-fittable. **The rule is therefore
-one width per section, and the widening that matters is the one WITHIN a section.** §17's block table row
-is the controller's to write, under the standing grant, when §16's window is spent.
+one width per section, and the widening that matters is the one WITHIN a section.**
+
+**✅ §17 HAS OPENED — 2026-09-21.** The controller exercised the standing grant *"open 17 if 16 runs out"*
+and §17 opens with executor 3's sheet-`Visibility` styling task; **its file is
+`test-cases/17-open-work.md`**, which now carries the shape above as its own primary source, the block
+table, and this lane's block (`17.001`–`17.020`, of which `17.001`–`17.006` are minted). ⚠ **A reader
+measuring §16 for themselves will find ids that look "not run out", and both readings are true of
+different questions:** cycle 29 (`docs/lanes/controller-state.md`) measured **23 of §16's 99 ids
+UNMINTED** (`16.91`–`16.95`, `16.63`–`16.80`) while **every one of the 99 is ALLOCATED** to a lane. The
+standing order says *"runs out"*; the controller read it as allocation. **Recorded with both numbers so
+the next reader meets the discrepancy rather than concluding the premise was false.**
 
 ## ⚠ THREE SPELLINGS `check-case-ids` CANNOT SEE — write cases as id LINES
 

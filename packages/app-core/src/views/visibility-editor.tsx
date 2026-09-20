@@ -252,6 +252,24 @@ export function VisibilityEditor({
   const willLockSelfOut = mode === 'explicit' && !userIds.includes(currentUserId);
   const explicitNamesNobody = mode === 'explicit' && userIds.length === 0;
 
+  /**
+   * The dot's tone, and it is the MODE's fact rather than the roster's.
+   *
+   * A restricted ticket whose names were not served is STILL restricted, so this
+   * reads `resolvedMode` and never `namedAudience` — keying the tone on the
+   * roster would paint "not restricted" over the one state this section exists
+   * to disclose. `null` (no read carried the row) draws no pill at all and so
+   * has no dot to tone; the guard is here rather than in the JSX because the
+   * tone is a fact about the claim, not about which branch rendered.
+   *
+   * The dot is DECORATIVE and `aria-hidden` in the markup below: the label
+   * beside it states the same fact in words, so WCAG 1.4.11's "convey
+   * information" obligation is discharged by the text and the dot carries no
+   * meaning a screen reader would lose. It is also why the dot needs no
+   * accessible name of its own.
+   */
+  const restricted = current !== null && current.resolvedMode === 'explicit';
+
   const apply = async (): Promise<void> => {
     setSubmission({ kind: 'sending' });
     const make = makeSubmittedFactory({ actorId: currentUserId, origin: 'web' });
@@ -301,7 +319,16 @@ export function VisibilityEditor({
         </p>
       ) : (
         <p className="gn-visibility__standing">
-          <span className="gn-visibility__standing-mode">{standingSentence(current, nameOf)}</span>
+          <span
+            className={
+              restricted
+                ? 'gn-visibility__standing-mode gn-visibility__standing-mode--restricted'
+                : 'gn-visibility__standing-mode'
+            }
+          >
+            <span className="gn-visibility__dot" aria-hidden="true" />
+            {standingSentence(current, nameOf)}
+          </span>
           {current.resolvedMode === 'explicit' && namedAudience(current) === null ? (
             // The MODE is served and the LIST is not (ruling: the roster stays
             // cut). "Only the people this ticket names" without this clause
@@ -332,7 +359,15 @@ export function VisibilityEditor({
       <p className="gn-visibility__owner-note">{OWNER_ALWAYS_SEES_COPY}</p>
 
       {canEdit ? (
-        <>
+        // ONE wrapper, for the geometry and not for grouping semantics: the
+        // section is the prototype's right-aligned value column, and this block
+        // is the ONE part of the row that opts out to the left — the
+        // prototype's own `align-self:flex-start` on its control
+        // (`visBtnStyle`, `desktop.dc.html:3786`). Without a single element to
+        // hang that on, the fieldsets, the warning and the Apply button would
+        // each have to carry it separately, and the next control added to this
+        // block would silently miss it.
+        <div className="gn-visibility__controls">
           <fieldset className="gn-visibility__modes">
             <legend>Change who can see this</legend>
             {VISIBILITY_MODES.map((candidate) => (
@@ -393,7 +428,7 @@ export function VisibilityEditor({
               {submission.reason}
             </p>
           ) : null}
-        </>
+        </div>
       ) : (
         <p className="gn-visibility__read-only">
           Only a project admin, or whoever created this ticket, can change who sees it.
