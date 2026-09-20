@@ -1434,12 +1434,19 @@ failure this bucket has recorded before, caught here by a compiler instead of by
 **RECORDED, NOT FIXED — Task 12's additions, with owners.**
 
 0. **`ingest`'s CONTRACT CHANGE reaches call sites that do not catch — the sites THIS BULLET names,
-   not all twenty the grep returns.** The read path is interchangeable; the write door is not:
-   `grep -rn "\.ingest(" packages/app-core/src apps/web/src apps/web/app` matches TWENTY-TWO lines
-   at 2026-09-20, where this read *"returns six"* (twenty call sites, two docblock mentions).
+   not all twenty-two the grep returns.** The read path is interchangeable; the write door is not:
+   `grep -rn "\.ingest(" packages/app-core/src apps/web/src apps/web/app` matches TWENTY-FOUR lines
+   re-measured 2026-09-20 at `14965a51`, where this read *"returns six"* (twenty-two call sites, two
+   docblock mentions) and, before that, TWENTY-TWO — **the two extra are NOT a recount: two call sites
+   LANDED between the two readings, both on the same day.** Re-run the command before quoting the number.
    `cache-feed.ts:17` and `apps/web/src/authoring/data-source-gateway.ts:327` pass the promise through;
-   `views/ticket-sheet.tsx:501`, `:543` and `:585`, `views/visibility-editor.tsx:189` and
-   `flows/guarded-child-event.ts:54` (`ingestOne`) await it without catching a rejection; and
+   `views/ticket-sheet.tsx`'s `submitTransition`, `submitAssignee`, `submitDescription`, `submitTitle`
+   and `addSubtask`, `views/visibility-editor.tsx`'s `apply`, and `flows/guarded-child-event.ts:54`
+   (`ingestOne`) await it without catching a rejection — **cited BY HANDLER and not by line, because
+   every one of these citations had rotted again: nine commits touched `ticket-sheet.tsx` in a single
+   day and moved all five of its citations off the sites they named.** `ticket-sheet`'s
+   `submitTicketEvent` is its one that DOES catch, and `submitTitle`/`addSubtask` are `try`/`finally`,
+   which handles no rejection — so they stand with the five, not beside the one; and
    `apps/web/app/w/[workspaceId]/members/page.tsx:249` and `:342` neither await nor catch — they `void`
    the promise and hang a `.then` off it. **FOUR of the six citations here had drifted; their obsolete
    numbers are BARE so a sweep matches nothing: :299, :176, :137, :296.** Nothing mounts a view on the
@@ -1464,8 +1471,16 @@ failure this bucket has recorded before, caught here by a compiler instead of by
    with; and a version-accurate workflow lookup is `workflowVersionsOf(storage, …)`, which takes the
    store. OWNER: unassigned — a `Replica.workspaceId()` and a `Replica.getWorkflowDef(id, version?)`
    would let both come off the deps.
-
-
+5. **The enumeration above is SCOPED BY ITS GREP, and the scope does not reach `apps/mobile` or
+   `apps/desktop` — both of which mount the replica.** `createReplicaDataSource` has five construction
+   sites repo-wide and two are these apps (`apps/mobile/src/app.tsx:40`, `apps/desktop/src/app.tsx:56`);
+   `apps/mobile/src/screens/ticket-screen.tsx` holds **one production `.ingest(` call site** that the
+   three-directory grep cannot return. Nothing is broken — **it already catches `OfflineAcceptError` and
+   treats the throw as the expected offline outcome** — so this is an under-enumeration, not an unmapped
+   hazard, and it is recorded rather than fixed because widening the grep changes what the enumeration
+   IS: the docblock's phrase covers what §12 enumerates, and §12 enumerates this scope, deliberately and
+   re-measurably. OWNER: **whoever next re-measures the enumeration** — say the scope aloud beside the
+   count, or the next reader will hear "every call site".
 - 12.188 ✅ **the fourth door, and the one where INCLUSION is correct.** The same offline-born ticket
   12.187 keeps out of both settled listings IS returned by `searchOfflineCopy` under a needle matching
   its title, while `getTickets` still omits it in the same case. *Written because 12.187 pinned three

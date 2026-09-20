@@ -202,10 +202,19 @@ export type OfflineListEntry =
  * `Features.md` §12 carried the qualification and this docblock did not — the
  * correction itself landed on one door of a pair, which is this codebase's
  * signature defect. `ingest` THROWS `OfflineAcceptError` where the online
- * source returns an `IngestResult[]`, so the six call sites `Features.md` §12
+ * source returns an `IngestResult[]`, so the call sites `Features.md` §12
  * enumerates see a rejection where they saw an array. Assignability is a
  * compile-time fact (12.172); "runs unchanged" is a claim about behaviour and
  * it is true of reads alone.
+ *
+ * **THE COUNT IS DELIBERATELY NOT REPEATED HERE, and that is the second half of
+ * the same correction.** It read "the six call sites" until 2026-09-20 — a
+ * fossil of an enumeration §12 has since re-measured from the grep it
+ * publishes, and §12's own text records that number as one it had already
+ * disowned. The figure then moved twice more inside a single day as two call
+ * sites landed. **A number one hop from its own authority is a reading that
+ * expires**, so §12 and `test-cases/12-offline-sync-apps.md` carry it WITH the
+ * command that produces it and this sentence names the authority and stops.
  */
 export type ReplicaOnlyQuery = {
   /** Confirmed tickets plus offline-born ones, every one badged. */
