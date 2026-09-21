@@ -2361,6 +2361,21 @@ path ten lines below handles failure with real care (`:142-157`): a 404 gets its
 that says the server did not say why. So the author wrote the handler for the write and, for the read,
 wrote a handler that deletes the distinction between "you have none" and "I could not find out".
 
+**And the very same collapse is handled correctly elsewhere in this codebase, which settles that this is
+an omission and not a house style.** I swept every rejection handler in the shipping client that sets state
+to `[]`/`null`: **four real ones, and this is the only one that lies.**
+
+| site | the collapse | what the person is shown |
+|---|---|---|
+| `apps/web/app/account/page.tsx:91` → `sessions-section.tsx:55-63` | `sessionsClient.list().then(setSessions, () => setSessions([]))` | *"No signed-in devices **to show**."* — **hedged on purpose**, and the component's own docblock names the collapse: *"'to show' is therefore the honest claim; 'You have no other devices' would assert a fact about the account that an empty array does not establish."* |
+| `apps/web/app/account/page.tsx:67` | `getMyWorkspaces().then(setWorkspaces, () => setWorkspaces([]))` | a **convenience** list whose collapse is disclosed at `:60-66` with its reasoning, and whose rendering claims nothing about the account |
+| `apps/web/app/account/page.tsx:180` → `passkeys-section.tsx:96-97` | `passkeyClient.list().then(setPasskeys, () => setPasskeys([]))` | *"You have no passkeys yet."* — **the one I already filed as `E2-23`** |
+| `apps/web/src/mcp-tokens-screen.tsx:123` | `http.get(…).then(…, () => setTokens([]))` | *"**No assistants are connected.**"* — **this finding** |
+
+Two of the four hedge or disclose; **two assert, and they are the two whose lists are credentials.** That
+pairing is the finding's real shape: the codebase knows the treatment, applies it to the sessions list in
+the same page, and drops it where the list grants access.
+
 **WHAT WOULD HAVE BEEN BETTER.** A third arm: keep `tokens` as `null` on a rejection and render a failure
 sentence in place of the list — the shape `:234-235` already has for loading, one branch over. The screen
 already imports `refusalText` and already distinguishes `HttpError` bodies in two other places, so the
@@ -2512,6 +2527,19 @@ purpose is to ignore the capability props (its docblock at `editor-slot.tsx:120-
 filed** — a defect that no surface can exhibit is a style preference, and I would rather the judge spend
 its budget on the nineteen above.
 
+### ❌ The account page's own collapse-to-empty handlers (`:67`, `:91`) — **disclosed and hedged; not defects**
+
+I swept every rejection handler in the shipping client that sets state to an empty value (four real ones)
+because that collapse has already produced two findings. **Two of the four are correct and I am recording
+why rather than filing them:** `apps/web/app/account/page.tsx:91` collapses the sessions list, and
+`packages/app-core/src/account/sessions-section.tsx:55-63` hedges the copy on purpose with its own
+docblock naming the collapse — *"'to show' is therefore the honest claim; 'You have no other devices'
+would assert a fact about the account that an empty array does not establish."* And `account/page.tsx:67`
+collapses the workspaces list, disclosed at `:60-66` with its reasoning (a convenience list, not primary
+content) and rendered without claiming anything about the account. **The other two are `E2-23` and
+`E2-44` — and that pairing is what makes `E2-44` a finding rather than a style: the codebase knows the
+treatment, applies it on this very page, and drops it where the list is a credential.** Neither of these
+two is filed.
 ### ⏳ Still unverified at this push, and named rather than implied
 
 `M2` (a failed stream reload leaves stale `data` — **the file already records it as F6 with an owner**,
@@ -2581,6 +2609,8 @@ the graph pointed, it did not verify.
 ---
 
 *executor 2 — UX, round 2. Phase 1 complete for this lane's current state: **19 new findings
-(`E2-20`–`E2-38`, 9 Important and 10 Minor) on top of the landed 19 (`E2-1`–`E2-19`), one withdrawal
-(`E2-9`), one standing-up against a ruling (`E2-7`), and five candidates examined and deliberately not
-filed — each with its reason.** Branch `exec2/review-ux-r2`, pushed at every checkpoint. **No fix, no PR.***
+**26 new findings** (`E2-20`–`E2-45`; **16 Important, 10 Minor**) on top of the landed 19
+(`E2-1`–`E2-19`) — **45 in the report** — with one withdrawal (`E2-9`), one standing-up against a ruling
+(`E2-7`), every candidate I examined and deliberately did not file recorded individually in §R2.11 with
+its measurement, one omission recorded as mine, and no refutations, because I read all three concurrent reports and could not falsify one.** Branch
+`exec2/review-ux-r2`, pushed at every checkpoint. **No fix, no PR.***
