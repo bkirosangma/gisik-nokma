@@ -1152,6 +1152,12 @@ what was looked at and found sound, not only what was found wrong.
   not an oracle. The owner's control read the marker (200). *Observation, not filed:* three refusal vocabularies
   for one fact (`not_found`, `forbidden`, empty 200) is the same divergence class 16.96 records for
   `not_found`/`not-found`; nothing leaks through it.
+- **The same sweep as a GUEST named on one ticket and not on another: no leak on 25 doors** (same probe with the
+  peer as `guest` and a `visibility.set` explicit list; file identical to Appendix P but for those lines, run once,
+  1 passed). The unshared ticket's title and comment appear in no body; the 200s carry the shared ticket
+  (`/v1/workspaces/:ws/tickets`, board, list, search, attention, my-work, detail, bootstrap — bootstrap also
+  carries every workflow and type definition, which is case 6.94's recorded gap, not a new one) and `members`
+  answers 404 to a guest.
 - **The ingest pipeline's order is what the docblocks say.** `ingest-service.ts:164-360`: workspace lock →
   entity lock → entity↔workspace guard → permission gate (through the transaction's `client`, `:235-245`) →
   contest coherence → engine → server gates → append → refresh-on-publish → projections → COMMIT. Read at the
