@@ -766,6 +766,42 @@ the residual note, `:416` `WITH RECURSIVE`, `:423`/`:433` the two `${visible}` h
 defect is that the record calls undecided what its own commit decided, and the list is now the one door out of
 four that shows the content.
 
+### E6-12 — IMPORTANT — Two ❌ cases in `06-auth-visibility.md` declare guest admissions the product closed weeks ago, one of them security-relevant and with a named owner; a third declares "nothing rate-limits issuance" after the limiter shipped
+
+**WHAT.** Three open-gap declarations, each measured against the product today (Appendix K for the guest doors;
+1 file / 1 test passed):
+
+| case | what it declares (written) | the product today | since |
+|---|---|---|---|
+| **6.77** ❌ (`06-auth-visibility.md:107`) | *"A workspace GUEST is still ADMITTED for `workspace.renamed`, measured and deliberately not closed … nothing anywhere asks who may rename a workspace"* | guest `workspace.renamed` → **refused** `permission.role: Only a workspace owner or admin can rename a workspace.` (`check-permission.ts:730`) | `37292c1e`, 2026-09-19 (*"The rename ruling"*; ✅ case 13.962) |
+| **6.51** ❌ (`:93`) | *"A workspace guest is admitted today for `ticket.created`, `visibility.set`, `workspace.renamed` and `comment.added` … `visibility.set` matters most: … a guest could permanently retarget any ticket they can see to workspace-wide. Owner: Plan 4 Task 9."* | `ticket.created` → **refused** (`Guests cannot create tickets.`, `:704`); `visibility.set` → **refused** (`Only a project admin or the ticket's creator can change who sees this ticket.`); `workspace.renamed` → **refused**; `comment.added` → committed (a guest named on the ticket, which is the admission a guest role exists for) | `dd7bfcfd`, 2026-09-01 (guest create, visibility authority) and `37292c1e` |
+| **6.123** ❌ (`:201`) | *"Nothing rate-limits issuance, and nothing bounds how many live credentials one workspace holds."* | `POST /v1/workspaces/:workspaceId/invites` is behind `inviteLimiter` (`app.ts:485`, `:588-595`, `RATE_LIMIT_INVITE_MAX`) — the first half is closed; the second (no bound on live credentials) I did not measure and do not claim | `935f5d66`, 2026-09-06 |
+
+**WHY it is wrong.** The common brief's §5: *"a case that asserts a property the product has quietly stopped
+having is worse than no case."* These assert the opposite — gaps the product has quietly *closed* — and the
+round-1 ruling already priced that class: `exec3-F1` (ACCEPTED, Important) for *"an open-gap section still
+declares a closed security-relevant leak … a named owner pointing at finished work"*, because *"a stale reading is
+pre-authorised work"*. 6.51 names an owner (Plan 4 Task 9) for a door that has been closed for twenty days, and
+calls `visibility.set` the one that "matters most" — the reader who picks it up will build a refusal that exists.
+6.77's whole sentence, including *"deliberately not closed"* and *"a product decision no plan in this series has
+taken"*, is contradicted by a ruling with a ✅ case of its own (13.962). And the catalogue's own checker cannot
+see any of this: `check-case-citations.mjs` walks ✅ ids only (its docblock: *"a checked ('checkmark') case id
+must appear literally"*), so a ❌ line is never asked whether it is still open.
+
+**WHAT WOULD HAVE BEEN BETTER.** The supersession marker the catalogue already uses (`16-remaining-doors.md:923`,
+*"STATUS CHANGED 2026-09-20: (a) is FIXED — cases …"*) on 6.51, 6.77 and 6.123, pointing at 13.962 and the
+`ADMIN_ONLY_TYPES`/guest lines — one line each, in the PR that closed the door. And the cheap general detector
+the round-1 ruling proposed for F1: *"a 'known gap' paragraph should be greppable by the number it is built on"*
+— here, the rule constant it says is absent.
+
+**MEASUREMENT.** Appendix K (guest actor through `POST /v1/events`, with a positive control that the guest can
+read the ticket they are refused on). Lines opened: `06-auth-visibility.md:93`, `:107`, `:201`;
+`check-permission.ts:704`, `:730`; `app.ts:485`, `:588-595`; `13-neomorphism-and-workspace-screens.md:2091`
+(13.962); `git log -S` dates above; `check-case-citations.mjs:11-14`.
+
+**SEVERITY: Important.** By the precedent the judge set for exec3-F1: a closed security-relevant gap still
+declared open with a named owner. Filed as one finding for three lines because the mechanism is one.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
@@ -2010,6 +2046,131 @@ describe('exec6 probe: a deleted epic as a list group header', () => {
     out.push(`after delete: list body contains the deleted epic's title: ${list.body.includes('SECRET EPIC TITLE')}`);
     const search = await app.inject({ method: 'GET', url: `/v1/search?workspaceId=${WS}&q=SECRET`, headers: auth(ownerToken) });
     out.push(`after delete: search "SECRET" -> ${search.statusCode}; contains title: ${search.body.includes('SECRET EPIC TITLE')}`);
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix K — probe for E6-12 — the four guest doors 6.51/6.77 declare admitted
+
+File path in the tree: `apps/server/test/zz-exec6-probe-guest.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-guest.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: are the four guest admissions case 6.51/6.77 record still admitted today?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'guest' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: ownerId, projectAdmin: true }, ownerId, ownerToken)).status).toBe('committed');
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 probe: the guest admissions cases 6.51 / 6.77 assert', () => {
+  it('records the door answer for a GUEST actor', async () => {
+    const out: string[] = [];
+    const say = (k: string, r: { status: string; rule?: string; reason?: string }) => out.push(`${k.padEnd(52)} -> ${r.status}${r.rule ? ` (${r.rule}: ${r.reason})` : ''}`);
+    // A ticket the guest is explicitly named on, so canSee is true for them.
+    const T = newUlid();
+    expect((await post(WS, { kind: 'ticket', id: T }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title: 'shared with guest' }, ownerId, ownerToken)).status).toBe('committed');
+    expect((await post(WS, { kind: 'ticket', id: T }, 'visibility.set', { ticketId: T, mode: 'explicit', userIds: [ownerId, peerId] }, ownerId, ownerToken)).status).toBe('committed');
+    const see = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${T}`, headers: auth(peerToken) });
+    out.push(`guest GET shared ticket -> ${see.statusCode}`);
+    say('guest: workspace.renamed', await post(WS, { kind: 'workspace', id: WS }, 'workspace.renamed', { name: 'renamed by guest' }, peerId, peerToken));
+    say('guest: ticket.created', await post(WS, { kind: 'ticket', id: newUlid() }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title: 'by guest' }, peerId, peerToken));
+    say('guest: comment.added on the shared ticket', await post(WS, { kind: 'ticket', id: T }, 'comment.added', { body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'hi' }] }] } }, peerId, peerToken));
+    say('guest: visibility.set on the shared ticket -> workspace', await post(WS, { kind: 'ticket', id: T }, 'visibility.set', { ticketId: T, mode: 'workspace' }, peerId, peerToken));
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
   });
