@@ -23,7 +23,13 @@ export const IST_OFFSET_MINUTES = 330;
 const MS_PER_MINUTE = 60_000;
 const MS_PER_DAY = 86_400_000;
 
-/** A day claim: `YYYY-MM-DD`, the shape `dueDate`/`startDate` carry. */
+/**
+ * A day claim: `YYYY-MM-DD`, the shape `dueDate`/`startDate` carry.
+ *
+ * SHAPE only. `2026-02-30`, `2026-13-45` and `0000-00-00` all match; whether a
+ * day EXISTS is `isRealIstDay` below, and a door that admits a day claim asks
+ * both (E6-19).
+ */
 export const IST_DAY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
@@ -62,20 +68,54 @@ export function istDayBounds(day: string): { startUtc: string; endUtc: string } 
   if (!IST_DAY_REGEX.test(day)) {
     throw new RangeError(`not a YYYY-MM-DD day claim: ${day}`);
   }
+  const startMs = istDayStartMs(day);
+  if (startMs === null) {
+    throw new RangeError(`not a real calendar day: ${day}`);
+  }
+  return { startUtc: new Date(startMs).toISOString(), endUtc: new Date(startMs + MS_PER_DAY).toISOString() };
+}
+
+/**
+ * Is this a day a calendar has — one `istDayBounds` can place?
+ *
+ * The one definition of "real" for a day claim, shared by the write doors
+ * (`dueDateValueSchema` for the two built-ins, the rule engine's custom
+ * `date` arm) and by `istDayBounds`, so the door cannot admit a day the
+ * bounds function then throws on. Before this (E6-19, 2026-09-21) the doors
+ * checked `IST_DAY_REGEX` alone: `2026-02-30`, `2026-13-45` and `0000-00-00`
+ * committed as due dates, the attention strip compared them as strings and
+ * said "Needed by 0000-00-00 — due within 7 days", and the notifications
+ * sweep repeated the sentence in the inbox and the mail.
+ *
+ * "Real" is the round trip `istDayBounds` has always made — `Date.UTC`, then
+ * `istDayOf`, then compare — so it refuses exactly what that function refuses:
+ * a month or day-of-month the calendar lacks, and a year below `0100`, which
+ * `Date.UTC` reads as `19xx` and so cannot round-trip. The year floor is
+ * therefore not a product rule but the placement function's own limit, and
+ * the door now agrees with it rather than storing a claim the calendar and
+ * the filters throw on. Shape is checked first so a non-day string answers
+ * `false` rather than throwing.
+ */
+export function isRealIstDay(day: string): boolean {
+  return IST_DAY_REGEX.test(day) && istDayStartMs(day) !== null;
+}
+
+/**
+ * IST midnight of `day` as a UTC millisecond instant, or `null` when the day
+ * is not one the calendar has. `Date.UTC` silently rolls 2026-02-30 into
+ * March and reads 0099 as 1999; round-tripping through `istDayOf` refuses
+ * both instead of inventing a day. Expects a string that already matches
+ * `IST_DAY_REGEX`.
+ */
+function istDayStartMs(day: string): number | null {
   const year = Number.parseInt(day.slice(0, 4), 10);
   const month = Number.parseInt(day.slice(5, 7), 10);
   const date = Number.parseInt(day.slice(8, 10), 10);
   const startMs = Date.UTC(year, month - 1, date) - IST_OFFSET_MINUTES * MS_PER_MINUTE;
   if (Number.isNaN(startMs)) {
-    throw new RangeError(`not a real calendar day: ${day}`);
+    return null;
   }
-  const startUtc = new Date(startMs).toISOString();
-  // Date.UTC silently rolls 2026-02-30 into March and reads 0099 as 1999.
-  // Round-tripping through istDayOf refuses both instead of inventing a day.
-  if (istDayOf(startUtc) !== day) {
-    throw new RangeError(`not a real calendar day: ${day}`);
-  }
-  return { startUtc, endUtc: new Date(startMs + MS_PER_DAY).toISOString() };
+  return istDayOf(new Date(startMs).toISOString()) === day ? startMs : null;
 }
 
 /** `YYYY-MM-DD` of a Date's UTC fields — the shifted clock, never the local one. */

@@ -134,3 +134,12 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E6-10 | done | 2437eb174844fef73953a28a18a41a58c6ce012a | builder-reads.test.ts 7.266 (RED [1,1] → GREEN [2,0]) |
 | T-E6-3 | done | 58d51ed67ffc2d7b2d2a6a0fdd5857cb03b9c444 | decision recorded (occupancy doctrine binds): ticket-types.test.tsx 10.120 RED→GREEN; ticket-type-rerank.test.ts 5.80 witness |
 | T-E6-8 | done | 35bba9569e9933d0048b5a53e6ddd1a2beacb627 | close-with-open-children.test.ts (6) + sweep.test.ts 13.1167 + precheck.test.ts (3) |
+| B16 | claimed | 2026-09-21 21:18 | /Users/kiro/my_projects/gisik-nokma-exec6 |
+| T-E6-13 | done | 6f5d5780e747ef47c82f46e32d2dda8ca7260f2f | verify-projections.test.ts E6-13 x2 (case 3.960; both re-bind orders, RED drift + RED throw → GREEN) |
+| T-E6-22 | done | 1ffb32df94bdd9c6687cea11cacfcff5ac1e8a59 | prose only: canSee docblock + Features.md canSee bullet record the divergence and the inert door |
+| T-E6-23 | done | 58197f25ba7a1b9e7145ddebee43cda2c76ee81e | schedule.test.ts 13.1200 (planted defect, RED→GREEN) + 13.1201 control |
+| T-E6-5 | done | 226645af1bf35e6180851131d27e4f7673404d3e | outbox.test.ts E6-5/12.960 (RED overtake → GREEN due-prefix) + 12.961 control; server half (contest on unknown ticket) needs-owner — see case 12.960 |
+| T-E6-17 | done | 1a5967d042ab35baf8cded278f46ab226199340e | check-visibility-permission.test.ts 6.151 (planted defect, RED→GREEN) + 6.152 controls; server package, not domain (brief header discrepancy noted in commit) |
+| T-E6-19 | done | 3fdb357810fa0a98567df6f146084fb8256ca56f | ist-day.test.ts 3.961 + ticket-types.test.ts 5.77 + rule-engine fields.test.ts 5.78 (RED→GREEN); filter bounds left shape-only, reason in commit |
+| T-E6-20 | done | ba15105f3641100aaede255662a27ca27056b895 | workflow-schema.test.ts 4.55 + ticket-types.test.ts 5.79 (RED→GREEN); displayName exported once from display-name.ts |
+| T-E6-20 | done | 89c3af84f21b9c46e283dcd43090422a0b56102c | follow-up on the merged tree: displayName reports an empty name once (main E4-29 listed three items); app-core 1730/1730, server 1733, web 657, domain 553, rule-engine 346 |

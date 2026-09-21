@@ -234,3 +234,33 @@ safe right now. `3.900`–`3.999` confirmed unused on every branch at mint time.
   display label — proving the fix closes the gap in BOTH directions the finding named (channels offered
   that the door refuses, and the channel the door accepts that was never offered), not just the
   options-list half 3.902 covers. — `apps/web/test/members-page.test.tsx`
+
+**`3.960` (release batch B16, 2026-09-21) was minted before the controller's 22:0x rule for sections
+without a block table — *the next free id is the max over `origin/main` AND every `origin/rel/*` head,
+plus one* — from an anchored cross-branch grep (`git grep -E '(^|[^0-9])3\.96[0-9]'` over every `origin/*`
+branch, 404 of them: zero hits, with `**3.900**` on B01's unmerged branch as the positive control that the
+needle can find a mint). It collides with nothing and stays; it claims NO block — later mints in this
+section follow the controller's rule, so the next free id after B16 is one past the max over those heads.**
+
+- **3.960** ✅ E6-13 — `verify:projections` is CLEAN on a correct database after a ticket type is re-bound
+  to another workflow, in BOTH orders the re-bind can take, and `rebuildProjection('proj_tickets')`
+  reproduces the live row. Order A (the second workflow published BEFORE the ticket, the finding's
+  Appendix L): RED reported `DRIFT DETECTED — proj_tickets: 1 row(s) missing from live, 1 extra in live`
+  because the rebuild resolved the type's NEW binding for a ticket the live path bound to the old one.
+  Order B (the second workflow published AFTER the ticket — the type editor's ordinary act): RED THREW
+  `applyTicketEvent: workflow "…" is not defined — the engine must refuse ticket.created before it
+  reaches a projection`, no report at all, because the rebuild asked for a workflow not yet in force at
+  the ticket's position. Both measured with a scratch probe through the internal ingest door before the
+  fix, then RED→GREEN on the product test. Fix: `getTicketTypeLadderFromDb` takes the event's
+  `workspace_seq` and, for a type whose `proj_ticket_types` row post-dates the event — reachable only in
+  a replay, since ingest serialises `workspace_seq` per workspace under `pg_advisory_xact_lock` — answers
+  from the ledger's own `ticket-type.defined` at that position; the table's key and
+  `getTicketTypeFromDb` are untouched. The live-path control (the row stays on the first workflow, "a
+  re-binding affects new tickets only") is asserted in the same case and was green before and after.
+  Each order runs in its own database. — `apps/server/test/verify-projections.test.ts`
+- **3.961** ✅ E6-19 — `isRealIstDay` is the one definition of a day the calendar has, and it agrees with
+  `istDayBounds` on every input: what one refuses (`2026-02-30`, `2026-13-45`, `0000-00-00`, `2026-00-10`,
+  `2026-04-31`, `2027-02-29`, `0099-01-01`) the other throws on; what one accepts (`2028-02-29`, month ends,
+  `0100-01-01`, `9999-12-31`, all 365 days of 2026) the other places. The wrong shape answers `false`
+  without throwing. Next free after `3.960` by the controller's 22:0x rule. —
+  `packages/domain/test/ist-day.test.ts`

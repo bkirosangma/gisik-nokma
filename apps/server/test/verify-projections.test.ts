@@ -347,3 +347,154 @@ describe('formatReport', () => {
     expect(text).toContain('extra in live: {"head_seq":999}');
   });
 });
+
+/**
+ * 3.960 — E6-13: the verifier after a ticket type is re-bound to another
+ * workflow, in BOTH orders the re-bind can take. Each order gets its own
+ * database: a re-bind in the shared seed above would change what the
+ * planted-defect cases count.
+ *
+ * Before the fix (`getTicketTypeLadderFromDb` read the type's binding as of
+ * NOW), measured on 2026-09-21 with a scratch probe through this same door:
+ *
+ *   order A — WF2 published BEFORE the ticket, type re-bound after it:
+ *     verify-projections: DRIFT DETECTED | proj_tickets: 1 row(s) missing from live, 1 extra in live
+ *     (the rebuild put the ticket on WF2; live holds WF1 — the finding's Appendix L)
+ *   order B — WF2 published AFTER the ticket, then the type re-bound (the type
+ *   editor's ordinary act: define a new workflow, move a type onto it):
+ *     verifyProjections THREW: applyTicketEvent: workflow "<WF2>" is not defined —
+ *     the engine must refuse ticket.created before it reaches a projection
+ *     (the rebuild resolved WF2 and asked for it as of the ticket's position,
+ *     where it was not yet in force — no report at all, a stack trace)
+ *
+ * The runbook's restore drill "passes only on the clean line and exit 0", so
+ * both orders failed the drill on a correct database. The `rebuildProjection`
+ * control is the same defect's other face: the live repair tool wrote the WF2
+ * row over a correct one in order A and threw in order B.
+ *
+ * `rank: 2` on the custom type is load-bearing for the fixture, not decoration:
+ * a custom type at the ladder's deepest rank is refused
+ * `hierarchy.deepest-rank-parent-required` on a parentless `ticket.created`.
+ */
+describe('E6-13: a type re-bound to another workflow after a ticket was created', () => {
+  function typeDefined(workspaceId: string, workflowId: string): SubmittedEvent {
+    return {
+      id: newUlid(),
+      workspaceId,
+      entity: { kind: 'ticket-type', id: newUlid() },
+      type: 'ticket-type.defined',
+      version: 1,
+      payload: { id: 'feature', name: 'Feature', icon: 'flag', rank: 2, workflowId, fields: [] },
+      actorId: newUlid(),
+      origin: 'web',
+      clientTime: '2026-08-20T09:00:00.000Z',
+    };
+  }
+  function projectCreated(workspaceId: string, projectId: string): SubmittedEvent {
+    return {
+      id: newUlid(),
+      workspaceId,
+      entity: { kind: 'project', id: projectId },
+      type: 'project.created',
+      version: 1,
+      payload: { name: 'Seed project', prefix: 'SP' },
+      actorId: newUlid(),
+      origin: 'web',
+      clientTime: '2026-08-20T09:00:00.000Z',
+    };
+  }
+  function ticketCreated(workspaceId: string, ticketId: string, projectId: string): SubmittedEvent {
+    return {
+      id: newUlid(),
+      workspaceId,
+      entity: { kind: 'ticket', id: ticketId },
+      type: 'ticket.created',
+      version: 1,
+      payload: { typeId: 'feature', projectId, parentId: null, title: 'born on WF1' },
+      actorId: newUlid(),
+      origin: 'web',
+      clientTime: '2026-08-20T09:00:00.000Z',
+    };
+  }
+
+  /**
+   * One world per order. `publishSecondWorkflowBeforeTicket` is the only
+   * difference between the two: where WF2's `workflow.defined` sits relative
+   * to the ticket's `ticket.created` in the workspace stream.
+   */
+  async function reboundWorld(publishSecondWorkflowBeforeTicket: boolean): Promise<{
+    world: TestDatabase;
+    ticketId: string;
+    firstWorkflowId: string;
+    secondWorkflowId: string;
+  }> {
+    const world = await createTestDatabase();
+    const ingest = createIngestService({
+      pool: world.pool,
+      evaluate: evaluateEvent,
+      projections: buildProjectionRegistry(),
+    });
+    const home = submittedWorkspaceCreated();
+    const workspaceId = home.workspaceId;
+    const first = submittedWorkflowDefined(workspaceId);
+    const second = submittedWorkflowDefined(workspaceId);
+    const firstWorkflowId = (first.payload as { id: string }).id;
+    const secondWorkflowId = (second.payload as { id: string }).id;
+    const projectId = newUlid();
+    const ticketId = newUlid();
+    const before = [home, first, ...(publishSecondWorkflowBeforeTicket ? [second] : []), projectCreated(workspaceId, projectId), typeDefined(workspaceId, firstWorkflowId), ticketCreated(workspaceId, ticketId, projectId)];
+    const after = [...(publishSecondWorkflowBeforeTicket ? [] : [second]), typeDefined(workspaceId, secondWorkflowId)];
+    for (const batch of [before, after]) {
+      const results = await ingest.ingestBatch(batch);
+      const refused = results.find((result) => result.status !== 'committed');
+      if (refused !== undefined) {
+        throw new Error(`E6-13 seed refused: ${JSON.stringify(refused)}`);
+      }
+    }
+    return { world, ticketId, firstWorkflowId, secondWorkflowId };
+  }
+
+  async function liveWorkflowId(world: TestDatabase, ticketId: string): Promise<string> {
+    const { rows } = await world.pool.query<{ workflow_id: string }>(
+      'SELECT workflow_id FROM proj_tickets WHERE ticket_id = $1',
+      [ticketId],
+    );
+    return rows[0]!.workflow_id;
+  }
+
+  it.each([
+    ['A: the second workflow was published BEFORE the ticket', true],
+    ['B: the second workflow was published AFTER the ticket', false],
+  ])(
+    'order %s — the live row stays on the first workflow, the verifier is clean, and a rebuild reproduces the live row',
+    async (_label, publishSecondWorkflowBeforeTicket) => {
+      const { world, ticketId, firstWorkflowId, secondWorkflowId } = await reboundWorld(publishSecondWorkflowBeforeTicket);
+      try {
+        // The owner's rule, as a control on the live path: "a re-binding
+        // affects new tickets only" (2026-08-26). This half was green before
+        // the fix and must stay green after it — the fix is to the REPLAY,
+        // and a change that reached the live path would show here first.
+        expect(await liveWorkflowId(world, ticketId)).toBe(firstWorkflowId);
+        expect(secondWorkflowId).not.toBe(firstWorkflowId);
+
+        // RED before: order A reported DRIFT DETECTED on proj_tickets (1
+        // missing, 1 extra); order B threw from inside the reducer, so there
+        // was no report to read at all.
+        const report = await verifyProjections({ pool: world.pool, projections: buildProjectionRegistry() });
+        expect(formatReport(report)).toBe(
+          'verify-projections: clean — every projection matches its rebuild from the ledger',
+        );
+        expect(report).toEqual({ clean: true, diffs: [] });
+
+        // The repair tool is the same replay. Before the fix a rebuild after a
+        // re-bind either wrote the WF2 row over a correct live one (order A)
+        // or threw (order B); now it reproduces the live row.
+        const { rebuildProjection } = await import('../src/projections/rebuild.js');
+        await rebuildProjection('proj_tickets', { pool: world.pool, projections: buildProjectionRegistry() });
+        expect(await liveWorkflowId(world, ticketId)).toBe(firstWorkflowId);
+      } finally {
+        await world.drop();
+      }
+    },
+  );
+});

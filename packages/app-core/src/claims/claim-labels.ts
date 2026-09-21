@@ -256,9 +256,10 @@ export const TIMELINE_OUT_OF_WINDOW_COPY =
 /**
  * A claimed day that no calendar has, named rather than silently dropped.
  *
- * `IST_DAY_REGEX` is a SHAPE check, and the write path (`dueDateValueSchema`,
- * and Plan 3's bare-string custom date) validates nothing beyond it — so
- * `2026-02-30` is a storable claim that `dateMs` refuses to place. (`0099-01-01`
+ * `IST_DAY_REGEX` is a SHAPE check, and until E6-19 (2026-09-21) the write
+ * path (`dueDateValueSchema`, and Plan 3's bare-string custom date) validated
+ * nothing beyond it — so `2026-02-30` was a storable claim that `dateMs`
+ * refuses to place, and one committed before that fix still is. (`0099-01-01`
  * used to be named here as a second one; it is NOT — `dateMs` places it. See
  * the `dateMs` docblock, which carried the same error and now records the
  * measurement.) The timeline is the first surface that converts a claim to a NUMBER

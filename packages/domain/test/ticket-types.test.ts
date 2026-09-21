@@ -35,6 +35,28 @@ describe('customFieldDefSchema', () => {
   });
 
   /**
+   * 5.79 — E6-20, planted defect: a ticket-type name, a custom-field name and
+   * a select option of only spaces are refused with ruling P15's sentence,
+   * from the one `displayName` schema the workspace and project names use.
+   * Before the fix all three were `z.string().min(1)`: through
+   * `POST /v1/events` a type named `" "` committed and `GET ticket-types`
+   * listed it, and a `" "` option was a choice with no label. RED: `parse`
+   * returned the value on all three. The padded control keeps this a refusal,
+   * not a trim.
+   */
+  it('planted defect: a type, field or option name of only spaces names nothing', () => {
+    const sentence = /a name of only spaces names nothing/;
+    expect(() => customFieldDefSchema.parse({ id: 'notes', name: ' ', type: 'text' })).toThrow(sentence);
+    expect(() =>
+      customFieldDefSchema.parse({ id: 'stage', name: 'Stage', type: 'select', options: ['Draft', ' '] }),
+    ).toThrow(sentence);
+    expect(() =>
+      ticketTypeDefSchema.parse({ id: 'feature', name: ' ', icon: 'flag', rank: 2, workflowId: 'wf', fields: [] }),
+    ).toThrow(sentence);
+    expect(customFieldDefSchema.parse({ id: 'notes', name: '  Notes  ', type: 'text' }).name).toBe('  Notes  ');
+  });
+
+  /**
    * 13.781 — `required: true` survives the parse.
    *
    * The witness for the schema member being LOAD-BEARING rather than
@@ -162,6 +184,23 @@ describe('dueDateValueSchema', () => {
 
   it('refuses a timestamp — a due date is a day, not a moment', () => {
     expect(() => dueDateValueSchema.parse({ date: '2026-08-30T10:00:00Z' })).toThrow();
+  });
+
+  /**
+   * 5.77 — E6-19, planted defect: a due date that is the right SHAPE and no
+   * day at all is refused. Before the fix `IST_DAY_REGEX` was the whole check:
+   * `2026-02-30`, `2026-13-45` and `0000-00-00` committed through
+   * `POST /v1/events`, the board served them, and the attention strip said
+   * "Needed by 0000-00-00 — due within 7 days" (a STRING compare, so
+   * `0000-00-00` is due-soon forever and `2026-13-45` never). RED: `parse`
+   * returned the value. The leap-day control keeps the refinement from being a
+   * "February has 28 days" rule.
+   */
+  it('planted defect: refuses a day no calendar has — the right shape is not a day', () => {
+    for (const date of ['2026-02-30', '2026-13-45', '0000-00-00']) {
+      expect(() => dueDateValueSchema.parse({ date }), date).toThrow(/a day the calendar has/);
+    }
+    expect(dueDateValueSchema.parse({ date: '2028-02-29' })).toEqual({ date: '2028-02-29' });
   });
 });
 

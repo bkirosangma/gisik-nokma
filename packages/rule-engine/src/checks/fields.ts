@@ -1,14 +1,15 @@
 import type { CustomFieldDef, EventEnvelope } from '@gisik-nokma/domain';
-import { IST_DAY_REGEX, dueDateValueSchema, ticketFieldSetPayload } from '@gisik-nokma/domain';
+import { dueDateValueSchema, isRealIstDay, ticketFieldSetPayload } from '@gisik-nokma/domain';
 import type { Accept, EngineContext, Refusal } from '../engine.js';
 import { REFUSAL_RULES, malformedPayloadDetail } from '../refusal-rules.js';
 import { getTicketState, getTicketTypeDef } from './context-helpers.js';
 import { ACCEPT, fieldKindRefusal, refuse } from './refusals.js';
 
 // A custom `date` field claims the same kind of day the built-ins do, so it is
-// held to the same shape from the same origin — `IST_DAY_REGEX`, imported, not
-// restated. A second copy here would be a second answer to "what is a day",
-// and the two would drift the moment either moved.
+// held to the same shape and the same calendar from the same origin —
+// `isRealIstDay` (which tests `IST_DAY_REGEX` first), imported, not restated.
+// A second copy here would be a second answer to "what is a day", and the two
+// would drift the moment either moved.
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -37,7 +38,11 @@ function customFieldVerdict(field: CustomFieldDef, value: unknown): Accept | Ref
         ? ACCEPT
         : refuse('field.type-mismatch', fieldKindRefusal(field.name, 'a number'));
     case 'date':
-      return typeof value === 'string' && IST_DAY_REGEX.test(value)
+      // `isRealIstDay` is the shape check AND the calendar check (E6-19): a
+      // custom date field refuses `2026-02-30` with the same sentence as
+      // `30/08/2026`, exactly as the two built-ins do through
+      // `dueDateValueSchema`.
+      return typeof value === 'string' && isRealIstDay(value)
         ? ACCEPT
         : refuse('field.type-mismatch', fieldKindRefusal(field.name, 'a date in YYYY-MM-DD form'));
     case 'select':

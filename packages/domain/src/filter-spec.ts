@@ -147,9 +147,11 @@ export const filterSpecSchema = z
      * this bound as TEXT against `t.fields -> 'dueDate' -> 'value' ->> 'date'`,
      * and what makes a text `<=` mean a chronological `<=` is fixed-width
      * zero-padding — precisely what this pattern constrains, and all it needs
-     * to. Demanding a real calendar day here would also make the FILTER
-     * stricter than the STORAGE schema that admits the values being compared,
-     * i.e. a bound the store would hold but the door would refuse to name.
+     * to. A bound is an endpoint of a comparison, not a claim about a day,
+     * so it is deliberately NOT held to `isRealIstDay` (E6-19) even now that
+     * the write doors are: the ledger is append-only, so a due date committed
+     * before that fix can still read `2026-02-30`, and a filter must remain
+     * able to name a bound on either side of it.
      * Anchored at both ends because an unanchored pattern would accept
      * `'nonsense 2026-08-31 nonsense'`, which is not a day at all and would
      * compare as a plain string meaning something nobody asked for. The `\d`

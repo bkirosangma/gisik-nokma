@@ -654,15 +654,17 @@ describe('proj_tickets', () => {
   });
 
   // NOTE, so neither case above is read as proving more than it does: both
-  // assert the LIVE path. On a RE-DERIVATION a re-bound type still resolves its
-  // NEW workflow for a ticket the live path bound to the old one — `loadDeps`
-  // reads `proj_ticket_types`, which is last-definition-wins with no history to
-  // ask as-of. That is the plan's Open question 11, scoped out deliberately,
-  // and it is the one place the "pure function of the ledger prefix" claim does
-  // not hold. It is NOT asserted here: the only rebuild case in this file is
-  // also the only one that writes to `events` (see its docstring below), and a
-  // second writer would replay through the first. Recorded UNASSIGNED in
-  // `docs/plan-3-chain-b-handoff.md`; `tickets.ts`' header carries the reasoning.
+  // assert the LIVE path. The RE-DERIVATION half — a rebuild after a re-bind
+  // reproducing the live row rather than resolving the type's NEW workflow for
+  // a ticket the live path bound to the old one — is NOT asserted here: the
+  // only rebuild case in this file is also the only one that writes to
+  // `events` (see its docstring below), and a second writer would replay
+  // through the first. It is asserted in `test/verify-projections.test.ts`
+  // (E6-13, both orders a re-bind can take), since `loadDeps` answers the type
+  // ladder as of the event: `proj_ticket_types` is still last-definition-wins
+  // with no history, and a row that post-dates the event is answered from the
+  // ledger instead. `tickets.ts`' header carries the reasoning, and the plan's
+  // Open question 11 in `docs/plan-3-chain-b-handoff.md` carries the dated note.
 
   // Refresh on publish — owner decision 2026-08-26, design decision 10.
 

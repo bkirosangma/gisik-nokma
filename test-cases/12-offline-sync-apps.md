@@ -905,7 +905,8 @@ mutations were run; **none survived**.
 
 - 12.144 ✅ enqueue order is preserved and `nextBatch(limit)` respects the limit; the ids are
   enumerated in order, because a batch that lost the order would send a `field_set` for a ticket the
-  server has not been told about.
+  server has not been told about. (Within one fully-due queue; the order ACROSS a backoff boundary is
+  12.960–12.961, which this case's sentence claimed and did not test.)
 - 12.145 ✅ a `committed` answer folds the claim into the local ledger through `applyServerItem` — with
   the SERVER's `serverTime`, printed — and clears the row; the ticket stops being a pending creation.
 - 12.146 ✅ a `contested` answer records the contest locally from the response and clears the row. The
@@ -916,6 +917,32 @@ mutations were run; **none survived**.
 - 12.148 ✅ `recordFailure` is TRANSIENT: it backs off, holds the batch until due, and **leaves the row
   `queued`** — the assertion that stops a future reader "tidying" it into a `failed` write and
   stranding every retryable claim on the device forever.
+- 12.960 ✅ E6-5 — **a claim enqueued AFTER a transient failure cannot overtake the backing-off claims
+  it depends on.** `nextBatch` returns the longest DUE PREFIX of the queue in position order — never the
+  set of due rows. Batch `[CREATE, RENAME-1]` fails transiently (`recordFailure`, backoff 2 s); RENAME-2 on
+  the same ticket is enqueued; 500 ms later `nextBatch` is `[]`; at `backoffMs(1) + 1` it is
+  `[CREATE, RENAME-1, RENAME-2]`, and `nextBatch(2)` cuts that prefix to `[CREATE, RENAME-1]`. RED before
+  the fix: `expected [ { position: 3, …(5) } ] to deeply equal []` — RENAME-2 was offered ALONE, a
+  `field_set` for a ticket the server had never been told about; the sync door refused it as invisible,
+  filed a `claim.contested` against the user's own ticket two seconds before it existed, and the outbox
+  recorded that contest and dropped the edit (the reviewer's Appendices D, G and S). Liveness is
+  unchanged: no timer retries a backing-off head — `flush()` runs on enqueue and on catch-up — so the
+  head already waited for the next trigger and the tail now waits with it. **Ids `12.960`–`12.961`
+  (release batch B16, 2026-09-21)** were minted before the controller's 22:0x rule for sections without a
+  block table (next free = max over `origin/main` and every `origin/rel/*` head, plus one): section 12's
+  declared ids ran to `12.399`, and an anchored cross-branch grep for `12.9xx` over every `origin/*` branch
+  found zero hits against a same-loop control of 3,167 hits for `12.39x`. They collide with nothing and
+  claim NO block; later mints in this section follow the controller's rule. **The finding's second half — the sync door should not
+  file a contest on a ticket the ledger has never seen — is NOT done here, and the reason is a security
+  one rather than effort:** the read routes answer an unknown ticket and an invisible one identically
+  (404) on purpose, and `/v1/sync` today contests both; answering `refused` for the unknown one and
+  `contested` for the invisible one would let a probing client tell the two apart through the sync
+  door. Owner ruling needed on which the door should do for BOTH. — `packages/sync-client/test/outbox.test.ts`
+- 12.961 ✅ the control for 12.960, on the shape 12.960 cannot see: a not-due row in the MIDDLE of the
+  queue (`[A due, B backing off, C due]`, a state a device may hold from before this rule) offers `[A]`
+  alone — the prefix stops at the first row not yet due — and `[A, B, C]` once B is due. RED before the
+  fix: `[A, C]`, the middle skipped. Without it, "empty while the head is not due" passes equally well
+  against the old due-subset filter plus a head check. — `packages/sync-client/test/outbox.test.ts`
 - 12.149 ✅ a claim that came home through a RE-BOOTSTRAP is still cleared by its own answer.
   `loadBootstrap` inserts the device's already-committed claim into `events` and touches the outbox not
   at all, so `applyServerItem` then returns `{applied: false}` and RETURNS BEFORE its own

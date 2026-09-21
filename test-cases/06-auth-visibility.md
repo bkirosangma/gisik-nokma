@@ -338,3 +338,28 @@ restored **byte-identical**, verified by sha256 before and after.
   **admin** side only (`invites-admin.ts`'s `MintedInvite`/`PendingInvite`). **Owner: whoever next touches
   the invitee-facing `/invite/[token]` surface** — and note the audience rule that surface must respect, in
   addendum 5 below: it is session-less, so anything shown there is shown to whoever holds the URL.
+
+## The person an assignment names must be in the workspace (release batch B16, E6-17, 2026-09-21)
+
+Ids `6.151`–`6.152` are the next free in this section by the controller's 22:0x rule — the max over
+`origin/main` (`6.149`) and every `origin/rel/*` head (`6.150`, on B01's branch), plus one.
+
+- **6.151** ✅ E6-17, planted defect — `ticket.assigned` and `ticket.collaborator_added` naming someone
+  with no role in the workspace are refused `permission.role` with *"That person is not in this
+  workspace."*: a fresh ULID nobody owns, a signed-up person who is a member of a DIFFERENT workspace
+  (so the lookup is tenancy-scoped, not "does this id exist anywhere"), and the string `nobody-here`,
+  through both event types. MEASURED before the fix through `POST /v1/events` as the owner: all four
+  committed, the board rendered `"assigneeId":"nobody-here"` on the card, the list's `assigneeId` filter
+  matched it, and the MCP `assign_ticket` tool forwarded any non-empty string. RED: `assign <ulid>:
+  expected null to deeply equal { refused: true, …(2) }` — the gate admitted it. GREEN after one branch
+  in `checkVisibilityPermission`, placed AFTER the `canSee` check, resolving the NAMED person through
+  the same `resolveEffectiveRole` the gate reads the actor's through and refusing `null` only. —
+  `apps/server/test/permissions/check-visibility-permission.test.ts`
+- **6.152** ✅ the controls for 6.151, each on a line the refusal could have been written to catch by
+  mistake: a MEMBER and a GUEST may both be named (a guest is in the workspace; whether they can SEE
+  the ticket is the read side's question, 7.27); `assigneeId: null` names nobody and passes;
+  `ticket.collaborator_removed` of a non-member is a cleanup and passes; and an actor who cannot see the
+  ticket (a member of this workspace not on the ticket's project, the ticket in project mode, naming
+  `nobody-here`) gets `permission.visibility` / *"This ticket is not visible to you."* — the audience
+  refusal comes FIRST, so the door never discloses whether somebody is in the workspace to a person
+  with no standing on the ticket. — `apps/server/test/permissions/check-visibility-permission.test.ts`
