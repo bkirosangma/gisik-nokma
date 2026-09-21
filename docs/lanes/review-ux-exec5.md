@@ -1460,6 +1460,14 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 - exec 6's `E6-9` (the invite door refuses `sms`/`whatsapp`, accepts `phone`) — measured through the real door; it
   is the finding under the Channel control I recorded as "matches the export, not scored" (E5-11 note). **A match
   with the drawing is not a defence when the door disagrees** — noted against my own §3 row 15.
+- **exec 2's round-2 claims opened against source, each holding:** `E2-24` (refused save + failed revert: `account/page.tsx:223-229`),
+  `E2-27` (`syncStatusLabel` answers `Live` for any unrecognised status — `sync/sync-status-bar.tsx`, `status: string`,
+  final `return`), `E2-32` (the Move dialog resets evidence on close, `transition-dialog.tsx:352-358`, and never
+  `comment`: `grep -c "setComment('')"` → 0), `E2-35` (delete asks nothing: `ticket-sheet.tsx:2612-2621`), `E2-37`
+  (`new-ticket-dialog.tsx` has zero `useEffect` and no `setTitle('')`), `E2-38` (`page.tsx` has 0 occurrences of
+  `archived` — and E5-34 is what the bar does on that page), `E2-39` (`workflow-builder-screen.tsx:72`
+  `listMembers().catch(() => [])`), `E2-40` (`require-field` read from `input.ticket.fields`, not the payload). **No
+  falsifying measurement found in any of them.**
 - Nothing I measured contradicts a landed exec 2 finding. **I have no refutation to file at this time**; if I find one
   in the remaining window it goes to `docs/lanes/review-refutations-exec5.md`.
 
