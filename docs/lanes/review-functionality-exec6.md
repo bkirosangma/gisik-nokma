@@ -703,6 +703,46 @@ names as the real fix. And 7.45 should carry a fourth arm: an admin not on one p
 **SEVERITY: Important.** A documented "cannot happen" that happens for an ordinary admin, producing a
 half-migrated type, a false refusal, and no way forward from the page.
 
+### E6-11 — IMPORTANT — The list serves a soft-deleted epic's title as a group header, while the detail, search and crumb doors withhold it — a view-serving statement with no delete predicate, outside the round-1 enumeration
+
+**WHAT.** `GET /v1/projects/:id/tickets?groupBy=epic` labels each group with the epic's title
+(`routes/list.ts:274-278`, `titleOfEpic`), resolved by `epicAncestors` (`:404-452`): a recursive walk up
+`proj_tickets` joined to `proj_visibility`, filtered by `${visible}` at every hop and by **nothing about
+`deleted_at`** (`:416-441`). Measured through the real doors (Appendix J; 1 file / 1 test passed):
+
+```
+before delete: list groups = [{"label":"SECRET EPIC TITLE","cards":2}]
+delete the epic                                            -> committed
+after delete: GET epic detail                              -> 404
+after delete: GET task detail -> 200; parent={"kind":"restricted",…}; epic={"kind":"restricted",…}
+after delete: list groups = [{"label":"SECRET EPIC TITLE","cards":1}]      ← the deleted epic's title, as a header
+after delete: list body contains the deleted epic's title: true
+after delete: search "SECRET"                              -> 200; contains title: false
+```
+
+**WHY it is wrong.** The product has already decided what a deleted ticket's title is: `routes/tickets.ts:419-431`
+withholds a deleted *parent's* title from the child's crumb because *"the parent's TITLE is the deleted ticket's
+content, and the FAQ's 'stops appearing in views' is exactly a statement about content"*, answering `restricted`
+instead. The same request, one door over, prints that content at the top of the list — the product's primary
+view — for as long as the epic has a live child. Search and the detail door agree with the crumb; the list
+disagrees with all three. And this site is invisible to every sweep the repo records: `visible-where.ts:157-172`
+enumerates "13 constant uses + 4 longhand `deleted_at IS NULL` + 1 TypeScript" and exec 3 §7.1 mutated those 18;
+this statement carries **no** predicate to mutate, so *"a sweep is only as complete as its pattern"* applies in
+the direction the repo's own note warns about — the rule is absent, not unconstrained.
+
+**WHAT WOULD HAVE BEEN BETTER.** `AND ${LIVE_TICKET_WHERE}` on the recursive member of `epicAncestors` (alias
+`t` is already the `proj_tickets` join), so a deleted ancestor ends the walk exactly as an invisible one does —
+the group then lands under "No epic", or better under a `restricted`-style label the client already knows how to
+render. Plus a soft-delete case in `test/read/soft-delete*.test.ts` that deletes an epic with a live child and
+asserts the list header, so the 18-site enumeration gains its 19th member as a *witnessed* one.
+
+**MEASUREMENT.** Appendix J, run from `apps/server`. Lines opened: `list.ts:274-278`, `:282-289`, `:404-452`
+(`:416` `WITH RECURSIVE ancestry AS`, `:423` and `:433` the two `${visible}` hops, no `deleted_at`);
+`list-cards.ts:125`; `routes/tickets.ts:419-431`; `visible-where.ts:157-172`.
+
+**SEVERITY: Important.** The one view the FAQ's promise is about, serving the one field the product has ruled is
+the deleted ticket's content, reached by the ordinary path of deleting an epic that has children.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
@@ -1811,6 +1851,142 @@ describe('exec6 probe: bulk rebind, partial refusal by the permission gate', () 
     const res2 = await app.inject({ method: 'POST', url: `/v1/workspaces/${WS}/ticket-types/task/migrate`, headers: auth(ownerToken),
       payload: { fromWorkflowId: WF1, toWorkflowId: WF2, stateMap: { todo: 'todo', doing: 'doing', done: 'done' } } });
     out.push(`control: POST migrate as owner -> HTTP ${res2.statusCode} ${res2.body}`);
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix J — probe for E6-11 — a deleted epic as a list group header
+
+File path in the tree: `apps/server/test/zz-exec6-probe-epic.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-epic.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: does the list's epic grouping serve a soft-deleted epic's title as a group header?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 probe: a deleted epic as a list group header', () => {
+  it('records what the list and the detail door say about the deleted epic', async () => {
+    const out: string[] = [];
+    const E = newUlid(); const T = newUlid();
+    const mk = (id: string, typeId: string, parentId: string | null, title: string) =>
+      post(WS, { kind: 'ticket', id }, 'ticket.created', { typeId, projectId: PRJ, parentId, title }, ownerId, ownerToken);
+    expect((await mk(E, 'epic', null, 'SECRET EPIC TITLE')).status).toBe('committed');
+    expect((await mk(T, 'task', E, 'a task under the epic')).status).toBe('committed');
+    const listBefore = await app.inject({ method: 'GET', url: `/v1/projects/${PRJ}/tickets?groupBy=epic`, headers: auth(ownerToken) });
+    const groupsBefore = listBefore.json<{ groups: Array<{ key: string; label: string; cards: unknown[] }> }>().groups;
+    out.push(`before delete: list groups = ${JSON.stringify(groupsBefore.map((g) => ({ label: g.label, cards: g.cards.length })))}`);
+    expect((await post(WS, { kind: 'ticket', id: E }, 'ticket.deleted', {}, ownerId, ownerToken)).status).toBe('committed');
+    const detail = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${E}`, headers: auth(ownerToken) });
+    out.push(`after delete: GET epic detail -> ${detail.statusCode}`);
+    const tDetail = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${T}`, headers: auth(ownerToken) });
+    const td = tDetail.json<Record<string, unknown>>();
+    out.push(`after delete: GET task detail -> ${tDetail.statusCode}; parent=${JSON.stringify(td['parent'])}; epic=${JSON.stringify(td['epic'])}`);
+    const list = await app.inject({ method: 'GET', url: `/v1/projects/${PRJ}/tickets?groupBy=epic`, headers: auth(ownerToken) });
+    const groups = list.json<{ groups: Array<{ key: string; label: string; cards: unknown[] }> }>().groups;
+    out.push(`after delete: list groups = ${JSON.stringify(groups.map((g) => ({ label: g.label, cards: g.cards.length })))}`);
+    out.push(`after delete: list body contains the deleted epic's title: ${list.body.includes('SECRET EPIC TITLE')}`);
+    const search = await app.inject({ method: 'GET', url: `/v1/search?workspaceId=${WS}&q=SECRET`, headers: auth(ownerToken) });
+    out.push(`after delete: search "SECRET" -> ${search.statusCode}; contains title: ${search.body.includes('SECRET EPIC TITLE')}`);
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
   });
