@@ -2667,3 +2667,56 @@ than a *member*. The other six are in §20.1, §15 and §31: the `routes/*.ts` d
 file", "called in `app.ts`", the 439-hit assertion sweep, the `(claimed)` suffix, and now the duplicate
 table. **Each was caught by a case whose answer was already known; none reached the judge.** This one did
 reach a pushed commit message, and that is the difference worth holding on to.
+
+---
+
+## 36. AN INDEPENDENT CONFIRMATION OF **EXECUTOR 6'S `E6-8`** — and what it does for `E3-19`
+
+Not a refutation: **I tried to falsify the competing lane's `E6-8` and could not — it holds.** Recorded because
+the result bears on my own `E3-19`, and because a corroboration from the lane that would benefit from it
+failing is worth more to the judge than either report alone.
+
+**What I tested.** `E6-8` claims a workflow **republish** can put a parent with open children into a terminal
+state, in two shapes, and that `ticket.closed` then accepts. Its central, load-bearing sentence is that
+`workflow-defined.ts`'s guard *"refuses the **demotion** of a kept terminal state … it does not look at
+**promotion** (`active`/`open` → `terminal`)"*. I ran that one claim at the engine, over a memory context
+holding a published v1 and one ticket:
+
+```
+PROBE promote-kept  v2a : {"refused":false}                     <-- CLAIM CONFIRMED
+PROBE drop-and-map v2b : {"refused":true, "rule":"workflow-structure",
+                          "reason":"… Termal state \"Done\" has no transition leading into it …"}
+PROBE CONTROL demote   : {"refused":true, "rule":"workflow-structure",
+                          "reason":"… This workflow has no terminal state …"}
+```
+
+**The first line confirms their claim: promoting a kept state from `open` to `terminal` IS accepted**, which is
+the mechanism their whole finding rests on. **The other two lines are MY probes being malformed, not their
+claims failing** — my v2b and my demotion-control were both refused by the *structure* validator for reasons
+unrelated to what I was testing (*"no transition leading into it"*, *"no terminal state"*), so **they measure
+nothing about the category-change guards. I am reporting them as my mistakes rather than as evidence**, and I
+did not test their second shape or their `ticket.closed` consequence at all. **One of their three claims,
+independently reproduced; two untested.**
+
+**WHAT IT DOES FOR MY `E3-19`.** `E3-19` is that a **child** can be moved out of terminal under a terminal
+parent, after which the parent can be closed with open work. `E6-8` reaches the same *state* — a terminal
+parent with open children — through the **republish** door, and the two are independently measured through
+different mechanisms. **So the state is reachable by at least two unrelated routes, and neither report found
+the other's.** That matters for the judge in two directions:
+
+- **It weakens the "maybe this needs a wildcard edge" bound I put on `E3-19`.** A republish needs no
+  `from: '*'` at all — it needs only a category change on a state tickets already sit in, which is an ordinary
+  authoring act. **My bound was too tight, and the competing lane's finding is what loosened it.** I am saying
+  so rather than letting `E3-19` stand on the narrower reachability claim I wrote.
+- **It does not make them duplicates.** Their doors are `workflow.defined` promotions and dropped-state
+  mappings; mine is `ticket.transitioned` leaving a terminal state. The fixes live in different files, and a
+  repair of one leaves the other open — which is exactly the test for whether two findings are one.
+
+**And it is the second corroboration in this round that ran this way** — §23 records five failed refutations,
+and this is the sixth attack, on a different lane's finding, that also failed. **Six attacks, six failures**
+is the most favourable thing I can honestly say about the field: every competing finding I have tried to
+falsify has named a line that said what it claimed.
+
+**MEASUREMENT.** Probe at `packages/rule-engine/test/zz-e3-probe-promote.test.ts`, created, run and deleted in
+the same shell invocation (`git status --porcelain` empty). `evaluateEvent` and `buildMemoryContext` imported
+by **relative path** so nothing resolved through a stale `dist`. `Tests 1 passed`.
