@@ -1261,8 +1261,8 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
   `grep -c onCreateTicket apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` → 0 at `a7b6292b`, and my painted
   empty columns showed the `+` glyph with *"No tickets in this column."* and no button. Not a refutation.
 - exec 4's `E4-23` (a `404` ticket opens a sheet stuck on "Loading…") — **checked and it HOLDS**, and it is in MY edge
-  classes (SOFT-DELETED, ERROR): `online/http.ts` resolves a READ's 404 to `null`, `online-data-source.ts:272-274`
-  `getTicket` returns `null`, and `ticket-sheet.tsx:611-617` renders `Loading…` whenever `read.data === null &&
+  classes (SOFT-DELETED, ERROR): `online/http.ts` resolves a READ's 404 to `null`, `online-data-source.ts:271-274`
+  `getTicket` returns `null`, and `ticket-sheet.tsx:626-631` renders `Loading…` whenever `read.data === null &&
   read.error === null`. So a deep link to a soft-deleted ticket (after the 15-s undo lapses) or to one the viewer may
   not see is a spinner that never stops. **I missed it and learned of it from exec 4's pushed report; I am not filing
   it**, on the same rule exec 2 applied to my E5-8 — filing after reading cannot be separated from copying.
