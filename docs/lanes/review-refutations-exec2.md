@@ -193,7 +193,10 @@ the one checker `F8` found has no automated invocation anywhere, so nothing woul
 | `E6-11` (exec 6, MINOR) | that the list serves a soft-deleted epic's title as a group header while the detail door withholds it | `list.ts:384-452` `epicAncestors` — the recursive walk filters `${visible}` at every hop (`:422`, `:428`) and the file contains **no `deleted_at` predicate at all** (the word `deleted` appears three times, all in comments). Its own comment at `:406-410` states the tradeoff: *"Filtering the walk means a deleted epic's children silently lose their epic chip … a deleted epic's TITLE still travels on its live [children]"* | **holds** — the consequence is real and the comment names the reason without removing it |
 | `P10` (exec 1, MINOR) | that the accessible-name ratchet counts an **attribute** while its failure message claims a property of assistive tech | `accessible-names.ts:50` is `const count = (attr) => all.filter((el) => el.hasAttribute(attr)).length;` with `:52` `ariaLabel: count('aria-label')` — **elements carrying the attribute**. And `viewport.spec.ts:720-721` asserts with the message *"…LOST ${attr}: … Something that identified an element to assistive tech is gone."* | **holds** |
 
-**Forty-three checks across all five lanes. Forty-three held. My refutation count is zero.**
+
+| `E5-18` (exec 5, MINOR) | that the invite landing page offers Join or nothing — no Decline, no inviter, no expiry | Opened `apps/web/app/invite/[token]/page.tsx:87-127` in full. Three arms: *"Checking the invitation…"*, the dead-link sentence, and then the invitation sentence — *"You are invited to join **{workspaceName}** as {role}"* — with a sign-in prompt or **one primary button labelled `Join {workspaceName}`**. **No Decline control, no inviter name, and no expiry date anywhere in the file.** | **holds** |
+
+**Forty-four checks across all five lanes. Forty-four held. My refutation count is zero.**
 
 > **`P10` and my own `E2-1` are the same disease at different sites, and that is why I checked it rather
 > than skimming it.** The ratchet counts `aria-label` **attributes** and its failure message claims a
