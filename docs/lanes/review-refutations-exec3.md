@@ -2,9 +2,9 @@
 
 **Lane relaunched on Opus 5 at the phase-1 boundary, 2026-09-21 15:05:23 IST** (the owner closed phase 1 early; the
 DeepSeek backend that wrote rounds 1 and 2 is exhausted). **Phase 2 for this lane closes 17:05:23 IST.** The report
-`docs/lanes/review-functionality-exec3.md` is frozen at `f8b5e929` (14:57:35 IST) as the phase-1 submission; nothing
-below is a new finding, and the report's findings are not edited — defences are appended under them as dated
-paragraphs, per the brief.
+`docs/lanes/review-functionality-exec3.md` is frozen at `f8b5e929` (14:57:35 IST) as the phase-1 submission; its findings are not edited — defences are appended under them as dated paragraphs, per
+the brief — and the four findings filed in phase 2 (`E3-30`–`E3-33`, half points) live in the report's §65–§69 and are
+only indexed here.
 
 Refutation ids are `R3-<n> → E<lane>-<m>`. Each names the target and the falsifying measurement with the line
 opened. A rejected refutation costs this lane the finding's points, so nothing is filed on suspicion.
@@ -25,7 +25,10 @@ E3-27; its filed refutations as of `a647510b` are R6-1 → E5-21 and R6-2 → E2
 
 ## Refutations filed
 
-_None yet — see the stamp at the foot of this file for the state at the last push._
+**None.** Sixteen attacks across two sessions (ten in phase 1, six here) produced no falsifying measurement; the
+closest — E6-14's headline interval — is measured against the domain's clock rather than the wire's, and the
+finding's second clause holds regardless. A rejected refutation costs the target's points, and no target below is
+worth that on the evidence in hand. The table is the work.
 
 ## Reconnaissance — findings attacked and NOT refuted, with the measurement, so the judge can see the work
 
@@ -39,7 +42,6 @@ Ten attacks were made in phase 1 and recorded in the report (§23: E6-1, E6-2, E
 | **E6-17** (Minor — any string is an assignee) | ruling search: `assign(ee|ed|ment)` within 80 chars of `non-member|not a member|outside the workspace|any string|stranger` over `docs Features.md test-cases packages/domain packages/rule-engine apps/server` → 0; the wider `assignee` × `member|roster|exist|valid|person` sweep over plans and docs → nothing about admitting a non-member | **holds as category 3** — no ruling to set against it |
 | **E6-15** (Important — cross-site WebSocket hijacking on `/v1/stream`) | `auth/auth.ts:271` `sameSite: 'lax'`; `http-origin.ts:180-181` and `routes/events.ts:53-67`: the product's own record that Lax does not separate same-site siblings of one registrable domain | **not attacked** — the only line of attack ("Lax closes it") is the one the product's record refutes and the one my E3-14 also stands on; E6-15 is its read-side complement, as exec 6 says |
 | **E6-10**, **E6-24** (Important — half-migrated type; replica reads serve a deleted ticket) | read in full; both rest on appendix probes with printed before/after rows and positive controls; E6-24's premise (only `getTickets`/`getBoard` filter) is what my own F5/E3-5 measured at `:996`/`:1029` | **not attacked** — no cheaper falsification than re-running their probes, and my F5 is their premise |
-
 | **E6-14** (Minor — the delete toast's "no ticket key" reason *"stopped being true thirteen minutes before it was written"*) | `git log -1 --format=%ci ac18f2bc` → `2026-09-20 13:04:40`; `18d7e391` → `13:17:51` (13 min 11 s — the headline's interval reproduces). But what `ac18f2bc` shipped is the **composition function and its test** (`git show --stat`: `packages/domain/src/prefix.ts` with `export function ticketKey(…)` at `:177` of that revision (`:248` today), `apps/server/src/read/ticket-numbers.ts`, `apps/server/test/read/ticket-key.test.ts`; **no route**); the served `key` field on the detail read arrived with `git log -S'ticketKey(' -- apps/server/src/routes/tickets.ts` → **`277b5d22`, 2026-09-20 23:07:56** — ten hours **after** the docblock, not thirteen minutes before it. So at 13:17 the sheet had no key on any wire; the domain had a function. | **not filed.** The finding's second clause — *"the same file now reads the key"*, `ticket-sheet.tsx:1588` `ticketRead.key ?? ticketRead.title`, opened — is true today and carries the Minor on its own; a refutation of the headline's timing alone would be rejected on that clause and cost the point. Recorded so the judge can price the headline's interval at what it is: the domain's clock, not the wire's. |
 
 **Sixteen attacks, sixteen findings standing.** Two of the sixteen changed my report (E6-6, E6-11), one (E6-21)
@@ -71,6 +73,7 @@ Defences are written in `review-functionality-exec3.md` — a dated *DEFENCE* pa
 |---|---|---|
 | `E3-14` (Critical claimed) | two of five routes are recorded exclusions (`http-origin.ts:128-146`) — exec 6's row | §14.7.1 *DEFENCE*: the exclusion engaged; its warrant *"a workspace they can leave"* measured false at `check-permission.ts:641-643` + the 21-line sweep; the Critical rests on the unrecorded `/v1/me/invitations/…` pair (`grep -c invitations http-origin.ts` → 0; added 2026-09-09, three days after the docblock); the frozen text's silence on the docblock recorded as a correction |
 | `E3-1`, `E3-9`–`E3-13`, `E3-16`, `E3-17`, `E3-20`–`E3-31` | "a stale sentence is not a defect" | §67.2: owner's brief §5 and role brief; workspace rule; `exec3-F1 · ACCEPTED` at `review-compiled-controller.md:548`; exec 6 files the class (E6-7/12/14/25) and reproduced E3-20/21/25/26/27 |
+| `E3-15` (Important claimed) | "its docblock records the guard's shape — category 2" | §14.7.2 *DEFENCE*: the docblock promises independence (*"only comparing it against something independent can. So the comparison is here, in code"*) and 13.116 ✅ promises the property; `:256-259` compares the set against the suite's own table; a promise is not a ruling |
 | `E3-18` | the remedy sub-claim is doubtful | §67.3: already Minor (§34); the remedy is not the finding; both lines re-opened |
 | `E3-8` | weakest by its own account | §67.4: Low, measurement reproduces, not withdrawn |
 | §7.3 / §2 / §7.5 (not findings) | exec 6 §9 candidates | §67.5 |
@@ -89,4 +92,4 @@ lines and said 6 where it listed 7; the two never-read lines are these. The seco
 sweep for forward-looking sentences (report §70), which also found the 6.57/6.58/6.84 premises standing in ten source
 comments — recorded as the trio's width, not filed.
 
-**Stamp:** 15:33 IST; report at the head of this branch; branch heads as listed above (exec 6 re-fetched 15:19: `23d4ab8d`, R6-1…R6-3 all against UX lanes, defence notes for E6-10/17/19/20/21 added).
+**Stamp:** 15:39 IST; report at the head of this branch; branch heads as listed above (exec 6 re-fetched 15:39: `2ee7cc03` at 15:29 — R6-1…R6-3 against UX lanes, E6-26 filed at half, defence notes for E6-10/17/19/20/21; nothing against this lane).
