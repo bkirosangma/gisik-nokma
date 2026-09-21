@@ -531,6 +531,14 @@ answered `200` locally. Client-side navigation to `/account` via `window.next.ro
 you"* → captured `PUT /v1/me/notification-preferences` body **`{"mutedKinds":["assignment"]}`**. Had the person
 previously muted `mention` and `contest`, this body un-mutes both.
 
+**Second reproduction, no injection (devtools browser, isolated context, 390 px emulated, signed OUT):** open
+`/account` with no session. The three reads answer **401** (`fetch` from the page: `prefs: 401, workspaces: 401,
+sessions: 401`) and the page paints *"Your account — This is you, across every workspace"*, the Notifications
+section with **five toggles `checked: true, disabled: false`**, a *"Your workspaces"* heading over nothing, and
+*"No signed-in devices to show."* — for a visitor who is nobody. Only the newest section says the truth:
+*"Connected assistants — Sign in to see and revoke…"*. A visitor who flips a toggle sends the same guessed PUT (it
+gets a 401 and reverts silently — `exec2-E2-24`'s arm).
+
 **WHY.** The page's own comment (`:74-80`) says the literal *"merely renders every kind as on for this visit, without
 asserting that fact about the account"* — and then `toggleKind` asserts it to the server. The sessions section
 (`sessions-section.tsx:56-63`) hedges its empty sentence for the same collapsed read — *"this component cannot tell
@@ -1055,6 +1063,36 @@ sentences at `workflow-list-screen.tsx:200`, `workflow-builder-screen.tsx:89-91`
 
 ---
 
+### E5-31 — IMPORTANT · The signed-out app bar offers Workspaces, Account, an Inbox icon and "No workspace selected — pick one…" to a visitor who cannot use any of them, and no Sign in; the legal pages' bar offers Sign in `[BROWSER, devtools isolated context, 390 px]` `[SOURCE]` — FIRST-RUN / PERMISSION-REFUSED
+
+**WHAT.** Signed out on `/help` (the route `app-nav.tsx:325-331` calls *"the route most likely to be wanted by
+someone who cannot get in"*), the bar paints: `Workspaces -> /workspaces`, `Help`, `Account -> /account`, an
+unlabelled inbox link `-> /inbox`, and the scope note *"No workspace selected — pick one to reach its board, members
+and settings."* (`[BROWSER]`, nav links and text). No **Sign in**. `app-nav.tsx:333-342` is the `user === null` arm:
+Help + Account, nothing else. The legal bar has the arm the app bar lacks: `legal-nav.tsx:96-99` `user === null ? <Link
+className="gn-nav__signin" href="/sign-in">Sign in</Link>`. Pressing **Workspaces** signed out lands on `/sign-in`
+by a 401 bounce (`[BROWSER]`: `location.pathname` → `/sign-in`, no `next=`); pressing **Account** paints the page
+E5-13's second reproduction describes.
+
+**WHY.** A person who cannot get in reads the help, wants to sign in, and the bar offers them a workspace picker
+sentence, an inbox and an account page — every one of which presupposes the session they do not have — while the
+one control they need is on `/privacy` and `/terms` only. The `app-nav.tsx` comment says the fallback exists *"so
+they fall back to being bar links exactly as they were before Round 24"* — a record of what was kept, not a ruling
+on what a signed-out bar should say. The scope note's own rule (`:343-345`) is that it reads `workspaceId` alone so a
+slow lookup cannot make it lie; a missing SESSION makes it lie in the same words.
+
+**WHAT WOULD HAVE BEEN BETTER.** The legal bar's arm: `user === null` → Help + **Sign in** (with `next=`), and
+withhold the scope note and the inbox icon until there is someone to scope.
+
+**MEASUREMENT.** `[BROWSER]` (devtools MCP, its own Chrome, isolated context `exec5`, `emulate 390x844x3,mobile`):
+`/help` nav links and `navText` as quoted; `/workspaces` → `/sign-in`; `/account` as in E5-13. `[SOURCE]`
+`app-nav.tsx:312-345`, `legal-nav.tsx:96-105`.
+
+**SEVERITY: Important** (claimed). Every offered control refuses, the needed one is absent, on the one page the
+product expects a locked-out person to reach.
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -1116,15 +1154,15 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**30 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 30). By claimed severity, read from the
-heading text: **Critical 1 · Important 20 · Minor 9** (1 + 20 + 9 = 30).
+**31 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 31). By claimed severity, read from the
+heading text: **Critical 1 · Important 21 · Minor 9** (1 + 21 + 9 = 31).
 
 - **Critical (1):** E5-13
-- **Important (20):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28
+- **Important (21):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28, E5-31
 - **Minor (9):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24 = 19 of 30. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31 = 20 of 31. **Reproduced with an injected failure, zero server writes:** E5-13,
 E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
@@ -1282,5 +1320,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 30 findings — Critical 1 · Important 20 · Minor 9 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 31 findings — Critical 1 · Important 21 · Minor 9 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
