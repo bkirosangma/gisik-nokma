@@ -159,6 +159,15 @@ upload and ingest, which is an incident, not a cleanup.
 > can run is not a recovery procedure, and demanding three auth secrets to read a scratch database invites
 > an operator to invent production-shaped values while holding a restored copy of production.
 
+> **Step 4 used to fail on a correct database after a ticket type was re-bound to another workflow**
+> (E6-13, 2026-09-21). The rebuild resolved the type's binding as of NOW, so a ticket the live path had
+> bound to the old workflow came back on the new one — `DRIFT DETECTED` on `proj_tickets` when the new
+> workflow pre-dated the ticket, and a thrown `applyTicketEvent: workflow "…" is not defined` (no report
+> at all) when it post-dated it, which is the type editor's ordinary act. The type ladder is now resolved
+> as of the event in a replay (`apps/server/src/projections/ticket-types.ts`), both orders verify clean
+> (case 3.960), and the clean line means what this step says — for any dump, since the ledger inside it
+> carries the history the rebuild now reads.
+
 **After a real restore into a real database** (not a drill): re-run
 `ALTER DATABASE <db> SET timezone TO 'Asia/Kolkata'`, then `pnpm check:db-tz`. A `createdb` produces a
 database with the cluster's default zone, and `pg_restore` restores objects, not the database-level
