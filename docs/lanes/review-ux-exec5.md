@@ -1734,7 +1734,14 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
   rows.length !== expected` with no `subtasks.data !== null` gate, `:591` the key re-keys on the ticket read's
   `projectId`, and `use-live-query.ts:91-96` `setData(null)` on every key change. Not painted (CCSO-3 has no
   children; the browser was lost before a parent was opened).
-- exec 2's `F9` reachability (comment box on a refused post) — not tested.
+- exec 2's `F9` reachability (comment box on a refused post) — **checked in source: the premise holds, the path it
+  names does not.** `F9` says the 404 arm is reached *"from a notification or a stale deep link for a ticket that has
+  since been deleted or made invisible"*. That link lands on the TICKET read's 404 first — `online-data-source.ts:271-274`
+  answers `null`, `ticket-sheet.tsx:626-631` returns `Loading…` before the composer mounts (`exec4-E4-23`) — so the
+  composer is never offered on that path. The comments read (`routes/tickets.ts:913-925`) sits behind the same `canSee` +
+  soft-delete gate as the detail read (`:353-378`), so it can only 404 when the ticket is deleted or hidden BETWEEN the
+  two reads or before a later reload — the CONCURRENT class, a narrower door than F9 named. Not a refutation: F9 marked
+  its reachability "reasoned, not measured", and the code comment it rests on is real.
 - exec 2's `V1` (empty board invites a create; no web caller wires `onCreateTicket`) — **checked and it HOLDS**:
   `grep -c onCreateTicket apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` → 0 at `a7b6292b`, and my painted
   empty columns showed the `+` glyph with *"No tickets in this column."* and no button. Not a refutation.
