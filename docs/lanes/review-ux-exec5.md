@@ -144,6 +144,50 @@ handed me its copy constants by name (`BULK_REFUSED_COPY`, `BULK_UNREACHED_COPY`
 
 ## 2. FINDINGS
 
+### 2.0 Index — every finding, its surface, the edge class it sits in, the instrument, and its sibling in another lane
+
+| id | sev | surface | edge class(es) | instrument | sibling elsewhere |
+|---|---|---|---|---|---|
+| E5-1 | Imp | help ↔ board | copy | browser + source | class of `exec2-F1` |
+| E5-2 | Imp | board card | — (prototype cat. 3) | browser + source | — |
+| E5-3 | Imp | sheet crumb | — (prototype cat. 3) | browser + wire + source | `exec4-E4-1` |
+| E5-4 | Imp | assignee picker, mentions, Filters | EMPTY (a nameless member) | browser + wire + source | `exec4-E4-18` |
+| E5-5 | Imp | Filters sheet | offers-then-refuses | browser + source | — |
+| E5-6 | Imp | sheet Due row | first-run of a flow (prototype cat. 3) | browser + source | — |
+| E5-7 | Imp | Move dialog | SERVER-REFUSES-WHILE-CLIENT-BELIEVES (inverted: client refuses while the door would accept) | browser + source | `exec2-E2-40` (`require-field`) |
+| E5-8 | Imp | History tab | — (prototype cat. 3) | browser + source | `exec4-E4-19` |
+| E5-9 | Imp | sheet Delete | PERMISSION-REFUSED (geometry) | browser + source | `exec2-E2-35` (confirmation angle) |
+| E5-10 | Imp | inbox | ERROR (silent) | source | `exec2-E2-26` |
+| E5-11 | Imp | invite form | — (prototype cat. 3) | browser + source | — |
+| E5-12 | Min | `/workspaces` vs `/account` | copy (units) | browser + source | — |
+| E5-13 | **Crit** | `/account` | ERROR → SERVER-ACCEPTS-WHAT-THE-CLIENT-GUESSED | browser, injected + signed-out | `exec2-E2-23/24` (adjacent arms) |
+| E5-14 | Min | ticket-type list | offers-then-refuses (hover-only reason) | browser + source | — |
+| E5-15 | Imp | `/settings` | ERROR (loading for ever) | browser, injected | `exec2-E2-20` |
+| E5-16 | Imp | New-ticket dialog | FIRST-RUN default (prototype cat. 3) | browser + source | — |
+| E5-17 | Min | `/mcp/tokens` | navigation (orphan) | browser + source | — |
+| E5-18 | Min | `/invite/[token]` | FIRST-RUN, ERROR arm (prototype cat. 3) | source + browser (dead arm) | — |
+| E5-19 | Min | `/account` Save name | ERROR (silent) | source | — |
+| E5-20 | Imp | Move dialog + sheet | CONCURRENT controls (two Escape listeners) | source (+ pair observed) | `exec2-E2-34` |
+| E5-21 | Imp | phone Comment + help | SERVER-REFUSES-WHILE-CLIENT-BELIEVES | source | `exec2-E2-42` |
+| E5-22 | Min | subtask form | copy (silent type) | browser + source | — |
+| E5-23 | Min | workspace home | FIRST-RUN | source | — |
+| E5-24 | Imp | help (4 passages) | copy | browser + source | `exec6-E6-1` (delete row) |
+| E5-25 | Imp | every write catch (9) | ERROR (401 painted as transport) | source | — |
+| E5-26 | Imp | desktop first screen | FIRST-RUN | source | — |
+| E5-27 | Imp | Move submit | ERROR (silent), CONCURRENT (no latch) | source | `exec2-E2-29` |
+| E5-28 | Imp | workflow Publish | ERROR (stuck) | source | `exec2-E2-22` (mapping half) |
+| E5-29 | Min | state-mapping dialog | copy | source | — |
+| E5-30 | Min | shell refusal panel (5 routes) | ERROR (copy) | source | — |
+| E5-31 | Imp | signed-out app bar | PERMISSION-REFUSED / FIRST-RUN | browser (2nd, 390 px) + source | — |
+| E5-32 | Imp | signed-out deep link + help | FIRST-RUN (copy) | browser (2nd) + source | — |
+| E5-33 | Min | `/sign-in` | ERROR (copy) | browser (2nd, 390 px) + source | — |
+
+**Edge classes reached, by finding:** EMPTY (E5-4) · ERROR (E5-10, 13, 15, 18, 19, 25, 27, 28, 30, 33) ·
+PERMISSION-REFUSED (E5-9, 31) · OFFLINE/REPLICA-DEGRADED (**not reached** — web is online-only; phone/desktop read at two
+screens) · SOFT-DELETED (**not reached** by me; `exec4-E4-23` holds it, §6.6) · CONCURRENT (E5-20, 27) · NARROW
+VIEWPORT (signed-out only: E5-31, 33) · FIRST-RUN (E5-6, 16, 18, 23, 26, 31, 32) · SERVER-REFUSES-WHILE-CLIENT-BELIEVES
+(E5-7 inverted, 13, 21).
+
 Export cited throughout as `EXPORT` = `/Users/kiro/my_projects/gisik-nokma-lanes/prototype-2026-09-20/Gisik Nokma - Desktop.dc.html`
 (sha256 `3d142d464a070b33…`, measured `shasum -a 256`). Browser = the owner's `gisik-nokma-dev-web-1` on `:3001`,
 signed in as the owner, project `Shop operations` (`/w/0TZSS5W6ATCTF2YBPMWGGP9JF5/p/0XB92YA4CGEBF9S285AH4SDXR1`).
