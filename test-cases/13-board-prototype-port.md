@@ -2074,3 +2074,20 @@ live stack; record with `UPDATE_*_BASELINE=1` and commit the file.** This lane c
 its own `next dev`, and this lane runs in push-only mode with no stack. `viewports.ts` was reverted to
 `HEAD` for the RED run and restored from a sha256-compared backup. Web suite 650; `pnpm turbo run typecheck`
 17/17, which is what covers `tsconfig.e2e.json`.
+
+## The accessible-name ratchet's message says what it measures (lane ds1, 2026-09-21, batch B10) — P10, no case id
+
+**The finding, round 2 `P10`, MINOR, judged VALID.** The ratchet's unit is an ATTRIBUTE and its failure
+message claimed a PROPERTY OF ASSISTIVE TECH. `accessible-names.ts:49` counts
+`all.filter((el) => el.hasAttribute(attr)).length`, and the assertion at `e2e-stack/viewport.spec.ts:720`
+ended *"Something that identified an element to assistive tech is gone."* — a stronger claim than the
+number supports. **A live site where the two differ is named in the finding:** an `aria-label` that left an
+element and was replaced by visible text elsewhere reddens this exactly as a genuine loss does.
+
+**Sentence corrected, no product test, per the finding's own DONE WHEN.** The message now reads *"An
+`${attr}` ATTRIBUTE left the document — that is all this measured, and whether it still named anything is
+not what it measured."*, and the counter's own docblock records the limits (`aria-labelledby`, visible
+text) in the same place the count is taken. **The finding's own instruction is kept — keep the count, it is
+cheap and it does catch a dropped attribute** — so this is a wording fix, not a relaxation.
+`pnpm turbo run typecheck` 17/17 (the web package's `tsconfig.e2e.json` covers the edited spec); web suite
+652.

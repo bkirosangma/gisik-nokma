@@ -717,8 +717,18 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
       for (const attr of RATCHETED) {
         expect(
           names[attr],
+          // P10 (2026-09-21). The old message ended "Something that identified an
+          // element to assistive tech is gone.", which claims a PROPERTY OF
+          // ASSISTIVE TECH from a count of an ATTRIBUTE. `sweepAccessibleNames`
+          // counts `el.hasAttribute(attr)` — nothing more — so an `aria-label`
+          // that left an element and was replaced by visible text elsewhere
+          // reddens this exactly as a genuine loss does, and the sentence named
+          // the first as the second. What the number measures is stated instead,
+          // because a count read as a property is how a real loss gets argued
+          // away by someone who knows the label is still announced.
           `13.287: ${route.path} LOST ${attr}: baseline ${accessibleBaseline[attr]}, now ` +
-            `${names[attr]}. Something that identified an element to assistive tech is gone. ` +
+            `${names[attr]}. An \`${attr}\` ATTRIBUTE left the document — that is all this ` +
+            `measured, and whether it still named anything is not what it measured. ` +
             `If this is intended, delete the key from e2e-stack/accessible-names-baseline.json ` +
             `in a commit that says which element and why.`,
         ).toBeGreaterThanOrEqual(accessibleBaseline[attr]);
