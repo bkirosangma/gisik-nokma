@@ -1488,6 +1488,58 @@ depends on.
 the controller directed. **Severity: Minor** — nothing is broken by an unused export; what is wrong is a
 public symbol with an unclosed gap whose owner is named as a caller that does not exist, inside a sweep that
 counted its neighbours and not it.
+### E2-48 (r2) — IMPORTANT · The phone shell's startup has no rejection handler either — the sibling of `E2-43`, and the symptom here is an empty board with no error
+
+**WHAT.** `apps/mobile/src/app.tsx:28-60`:
+
+```
+useEffect(() => {
+  if (workspaceId === '' || TOKEN === '') return;
+  let stop: (() => void) | undefined;
+  void (async () => {
+    const storage = await createOpSqliteStorage();      // :32
+    const replica = await createReplica({ storage });   // :33
+    const outbox  = createOutbox({ storage, replica }); // :34
+    const engine  = createSyncEngine({ … });            // :35-39
+    const dataSource = createReplicaDataSource({ … });  // :40
+    setDs(dataSource);                                  // :41
+    …
+  })();
+  return () => stop?.();
+}, [workspaceId]);
+```
+
+**No `catch`, no `.catch`, nothing.** `ds` is set **only on success**, and every consumer is gated on it:
+`BoardScreen`'s effect opens `if (ds === null) return;` (`board-screen.tsx:22`), and `TicketScreen` returns
+`<Text>Opening…</Text>` while `ds === null` (`ticket-screen.tsx:31`).
+
+**WHY it is wrong, and what makes it reachable — the last link.** `createOpSqliteStorage`
+(`storage/op-sqlite-storage.ts:43-46`) is `const { open } = await import('@op-engineering/op-sqlite'); return
+wrapOpSqliteDatabase(open({ name }));` — **a dynamic import of a NATIVE module, then a database open**. Both
+reject: a dynamic import fails when the native module is not linked or not present for the platform, and
+`open` throws when the database cannot be created. **So the phone's first await is genuinely rejectable, and
+nothing catches it** — the app renders, `ds` stays `null`, and the Board is an empty list with no row, no
+sentence and no error, for ever. A person sees a workspace with no work in it.
+
+**This is the sibling of `E2-43`, and I am filing it separately for one reason: the symptom is different.**
+There, the desktop shell showed *"Opening local replica…"* — a loading sentence that never resolves, which
+at least says *something is happening*. Here the shell shows **an empty board**, which is a claim about the
+workspace. The same absent `catch` produces a persistent lie in one and a persistent wait in the other, and a
+fix applied to one shell would leave the other.
+
+**WHAT WOULD HAVE BEEN BETTER.** A `catch` on the IIFE writing into an error state the shell renders in place
+of the Board — the shape `E2-43` asks for on desktop. The two shells share their architecture (`createReplica
+→ createOutbox → createSyncEngine → createReplicaDataSource`, then `setDs`) and differ only in the storage
+adapter, so one pattern read twice would fix both.
+
+**MEASUREMENT.** Opened: `apps/mobile/src/app.tsx:1-97` (the env tokens, the effect and its four awaits, the
+`setDs` at `:41`, the two screens' gates); `apps/mobile/src/storage/op-sqlite-storage.ts:43-46` (the dynamic
+import and `open`); `apps/mobile/src/screens/board-screen.tsx:22` and `ticket-screen.tsx:31` (the gates).
+⚠ **Not driven:** I did not run the app, so I claim the code path and the rejectability of the first await,
+not a reproduction.
+
+**Source:** `apps/mobile` beyond the two screens `E2-41`/`E2-42` needed — reached by working my own coverage
+list as the controller directed. **Severity: Important.**
 
 ---
 
