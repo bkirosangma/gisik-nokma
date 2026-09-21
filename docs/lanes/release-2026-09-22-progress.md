@@ -60,3 +60,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E3-16 | done | c0606d63 | citation sweep: 11 live sites cite the roster-cut clause by its words (ui 57, app-core 25) |
 | T-E3-17 | done | c97c7f31 | prose-only: outbox docblock drops the derived total (sync-client 90) |
 | T-E3-18 | done | 88f5a1ff | prose-only: replica dangling-parent comment stops claiming parity (app-core 1730) |
+| T-E3-20 | done | 0b13801a | prose-only: case 6.82 partially closed in place (term landed, open/active absent) |
