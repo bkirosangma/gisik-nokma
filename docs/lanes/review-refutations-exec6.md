@@ -240,6 +240,42 @@ build. Filed against a Minor, with that bound stated.
 IS found, the online constructor IS found); lines opened: `bulk-close-dialog.tsx:224-234`,
 `replica-data-source.ts:1406`, `apps/web/src/providers.tsx:21`, `:108`, `apps/desktop/src/app.tsx:120-123`.
 
+## Phase-2 findings (half points, rules §2)
+
+### E6-26 — MINOR — `proj_rollups` is recomputed inside every ticket, workflow and reparent transaction, replayed by the release-gate verifier, and read by nothing in the product
+
+**WHAT.** Measured at `a7b6292b`:
+
+```
+SQL readers of proj_rollups outside projections/rollups.ts (FROM/JOIN, non-test):   0   (control: `FROM proj_tickets` → 15 files)
+callers of getRollup() outside tests/dist/the projection itself:                    0   (control: rollupFor() → read/ticket-cards.ts:159, routes/tickets.ts:451)
+what writes it: rollups.ts:372-420 — workflow.defined (every parent whose workflow matches, :362-367), ticket.created,
+                ticket.transitioned, ticket.workflow_rebound, ticket.deleted, ticket.restored, ticket.reparented (both parents)
+who verifies it: tools/verify-projections.ts replays the whole registry (index.ts:25 lists proj_rollups at position 6)
+```
+
+Every card's `rollup` and the detail route's rollup come from `visibility/rollup.ts` at read time — a fresh
+enumeration of `proj_visibility` joined to `proj_tickets` — and `rollup.ts:79-96` records why the cards do not read
+`proj_rollups` (the two tables do not enumerate the same children, case 6.83/7.78). Nothing records that, after
+that decision, the table has no reader at all.
+
+**WHY it matters.** A table with no reader still costs: a `workflow.defined` recomputes one row per parent on that
+workflow inside the publish transaction (E6-8's door), every transition recomputes the parent, and the verifier —
+the restore drill's gate (E6-13) — can report `DRIFT DETECTED` on a table whose contents no route serves, which
+is the false-red shape E6-13 already documents for `proj_tickets`. `Features.md:408` describes the table's
+derivation and its load-bearing registration order and names no consumer, so the catalogue is not wrong, only
+silent; a reader of it would assume a consumer exists.
+
+**WHAT WOULD HAVE BEEN BETTER.** Either read it — `rollupFor` could take its category counts from it once the
+enumeration mismatch (6.83) is resolved — or drop the projection and its verifier row, and say in `Features.md:408`
+which. A projection kept "in case" is the rule the repo states for controls and components (E2-25 quotes it).
+
+**MEASUREMENT.** The four greps above with their controls; lines opened: `projections/rollups.ts:362-367`,
+`:372-420`; `visibility/rollup.ts:79-96`; `read/ticket-cards.ts:159`; `routes/tickets.ts:445-456`;
+`projections/index.ts:25`; `tools/verify-projections.ts:5-8`; `Features.md:408`.
+
+**SEVERITY: Minor.** Cost and a false-red surface, no wrong answer to a person. Phase-2, half points.
+
 **Stamp:** written 2026-09-21 11:25 IST, E3-14 row amended 12:00 IST after E6-21; phase 1; branch heads as listed above.
 **Phase 2:** R6-1 filed 15:10 IST against `origin/exec5/review-ux` at `1641161d`; R6-2 filed 15:16 IST against
-`origin/exec2/review-ux-r2` at `778a6439` (same probe); R6-3 filed 15:20 IST against the same head.
+`origin/exec2/review-ux-r2` at `778a6439` (same probe); R6-3 filed 15:20 IST against the same head; E6-26 (phase-2, half) filed 15:30 IST.
