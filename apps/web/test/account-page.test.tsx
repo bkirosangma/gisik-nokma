@@ -197,7 +197,9 @@ describe('AccountPage — Profile', () => {
     const user = userEvent.setup();
     mount();
     await user.click(await screen.findByRole('button', { name: 'Save name' }));
-    expect(await screen.findByRole('status')).toHaveTextContent('Name saved');
+    // Scoped to the section's own status: the shell's route announcer (B05,
+    // `role="status"`) is a second status element on every page.
+    expect(await screen.findByText('Name saved')).toHaveAttribute('role', 'status');
   });
 
   it('E5-19 a refusal with NO message states a fallback, rather than reading as success', async () => {
@@ -212,7 +214,7 @@ describe('AccountPage — Profile', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'The server refused this change and did not say why.',
     );
-    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByText('Name saved')).toBeNull();
   });
 
   it('E5-19 editing the name again clears a stale "Name saved"', async () => {
@@ -221,9 +223,9 @@ describe('AccountPage — Profile', () => {
     mount();
     const nameInput = await screen.findByLabelText('Name');
     await user.click(screen.getByRole('button', { name: 'Save name' }));
-    await screen.findByRole('status');
+    await screen.findByText('Name saved');
     await user.type(nameInput, '.');
-    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByText('Name saved')).toBeNull();
   });
 });
 
