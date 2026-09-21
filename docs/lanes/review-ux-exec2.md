@@ -2135,8 +2135,8 @@ is not misled about the outcome, only about the fields.
 >
 > **What survives, stated narrower:** the explicit `read.reload()` is absent from the refusal arm (`:739-745`,
 > unchanged), so the correction depends entirely on the stream. When the socket is down — the
-> OFFLINE / REPLICA-DEGRADED class, which this product's stream can enter (`sync/sync-status-bar.tsx` exists to
-> say so) — the sheet shows the old field beside a refusal about the new state, for as long as the socket stays
+> OFFLINE / REPLICA-DEGRADED class, which the web stream anticipates with a reconnect backoff of up to 30 s
+> (`online/stream.ts:21-30`, opened) — the sheet shows the old field beside a refusal about the new state, for as long as the socket stays
 > down. The always-reachable case is a window of one debounce plus one fetch. Filed as Minor; the judge may
 > weigh the surviving arm as narrower than the finding claimed, and I do not contest that.
 
