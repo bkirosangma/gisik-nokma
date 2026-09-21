@@ -22,7 +22,7 @@ a measurement it lacks is added, and where that happens the finding says so.
 
 ## 0. THE ONE-LINE ANSWER
 
-**No Critical claimed.** Fifteen findings, eleven Important, every one measured through a door the product ships. The recurring
+**No Critical claimed.** Sixteen findings, twelve Important, every one measured through a door the product ships. The recurring
 shape is **a door that accepts what every read surface says cannot be happening**: writes on a soft-deleted ticket
 (E6-2), a deleted open child blocking its parent while the board shows zero (E6-4), a type re-rank and a workflow
 republish that leave hierarchies the engine then refuses to reproduce (E6-3, E6-8), a bulk migration refused
@@ -30,7 +30,7 @@ part-way while the client is told nothing moved (E6-10), an offline edit turned 
 user's own ticket (E6-5), and an invite form whose channels the door refuses (E6-9). The second shape is **a record
 that describes a world the product has left**: the in-app help denying `Delete` (E6-1), three ❌ cases declaring
 guest admissions closed weeks ago (E6-12), and a "named, not decided" residual whose own commit decided it
-(E6-11), and a release-gate instrument that reports drift on a correct database after an ordinary admin act, recorded as an unassigned open question since before its trigger shipped (E6-13). The third shape has one member and it is the one I would put first: **the cross-site defence covers writes and not the socket** — a cookie plus a foreign Origin is refused on `POST /v1/events` and served the victim's whole visible ledger on `/v1/stream` (E6-15). The round-1 lane's coverage boundary was the map: all eleven Important findings are in the packages or the
+(E6-11), and a release-gate instrument that reports drift on a correct database after an ordinary admin act, recorded as an unassigned open question since before its trigger shipped (E6-13). The third shape has one member and it is the one I would put first: **the cross-site defence covers writes and not the socket** — a cookie plus a foreign Origin is refused on `POST /v1/events` and served the victim's whole visible ledger on `/v1/stream` (E6-15) — and beside it, an MCP token that can approve its own successor, so revoking it does not revoke it (E6-16). The round-1 lane's coverage boundary was the map: all twelve Important findings are in the packages or the
 paths it said it did not reach.
 
 ---
@@ -1036,6 +1036,56 @@ origin hook (`httpOriginRefused({ method: request.method, routeUrl: request.rout
 the product's own security notes treat as real. Filed at Important rather than Critical because a same-site
 attacker page is required and the socket reads only what the victim may read; the judge may weigh it with E3-14.
 
+### E6-16 — IMPORTANT — An MCP token can approve a new device code, so one token mints a successor that survives its own revocation; the consent page's "It lasts until you revoke it" is false, and the same token mints admin invitations
+
+**WHAT.** `auth/require-session.ts:60-80`: every `requireSession` route accepts `Authorization: Bearer <mcp
+token>` as the user (`:95`, the fallback to `resolveMcpToken`). `POST /v1/mcp/device/approve` is a
+`requireSession` route (`routes/mcp-device.ts:83-105`). Measured through the doors (Appendix N; 1 file / 1 test
+passed):
+
+```
+T1 minted by the owner's session; GET /v1/me/workspaces with Bearer T1 -> 200
+T2 minted with the APPROVE step authenticated by Bearer T1 (an MCP token) -> issued
+Bearer T1: POST mint ADMIN invite                     -> 201
+Bearer T1: GET /v1/me/mcp-tokens                      -> 200, 2 token(s) listed
+owner revokes the first-listed token                  -> 204
+after revocation: Bearer T1 -> 401; Bearer T2 (the successor) -> 200
+owner's token list now: 1 token(s)                    ← T2, which no person approved
+```
+
+**WHY it is wrong.** The consent page states the contract in two sentences, and the second is false:
+`apps/web/app/mcp/authorize/page.tsx:181-183` — *"An assistant that acts as you, with exactly your permissions.
+It can see and change whatever you can … **It lasts until you revoke it.**"* Revoking the token the person
+approved does not end the assistant's access if the assistant has approved a successor first — and it can,
+because "exactly your permissions" includes the permission to approve device codes. The migration's own
+comment names the invariant this breaks: `1788600000000_mcp-device-auth.sql:31` — `approved_user_id` is *"NULL
+until a **signed-in person** approves"* — and a bearer MCP token is not a signed-in person. Nothing in the
+`mcp_device_codes` row records *how* the approval was authenticated, so the person's token list cannot tell a
+token they approved from one their assistant approved for itself. The same width lets the token mint an
+**admin invitation** (201 above) — a second credential of a different kind.
+
+**The width is the product's decision; the durability claim is not honoured by it.** The prototype's consent is
+narrower (`design-system/prototypes/McpAuthorize.dc.html:70-76`: *"Read tickets, boards and comments · Only in
+workspaces you belong to · Create tickets and move them between states"*; the export's own copy at
+`Gisik Nokma - Desktop.dc.html:962`: *"Tokens let an assistant read and write tickets as you. They carry your
+permissions, not more."*) and the product's page deliberately says "exactly your permissions" instead — a
+category-2 divergence I do not contest. What I contest is that a credential which can mint credentials cannot
+also promise *"lasts until you revoke it"*, and the page promises both.
+
+**WHAT WOULD HAVE BEEN BETTER.** Two lines in `mcp-device.ts`'s approve (and deny) handlers: refuse when the
+session was resolved through the MCP fallback rather than a better-auth session — `requireSession` knows which
+branch answered and can stamp `request.authKind`. The same fence belongs on `DELETE /v1/me/mcp-tokens/:id`
+(a token revoking its siblings) and, arguably, on the invite mint. Then record `approved_via` on the device-code
+row so the token list can say *"approved by you, in the browser"* against *"approved by an assistant"*.
+
+**MEASUREMENT.** Appendix N, run from `apps/server`. Lines opened: `require-session.ts:57-80`, `:94-99`;
+`mcp-device.ts:83-105`, `:160-181`; `mcp/token-store.ts:60-80`; `mcp/authorize/page.tsx:148-156`, `:178-183`;
+`1788600000000_mcp-device-auth.sql:21`, `:31`; `McpAuthorize.dc.html:70-76`; export `:962`.
+
+**SEVERITY: Important.** A revocation that does not revoke, on the one credential the product hands to software,
+with the contradiction printed on the consent page. Not Critical: it needs a token that is already abused, and
+the successor is visible in the list to a person who looks.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
@@ -1142,9 +1192,9 @@ the table.
 | severity | count | members |
 |---|---|---|
 | Critical | **0** | — |
-| Important | **11** | E6-1, E6-2, E6-3, E6-4, E6-5, E6-8, E6-9, E6-10, E6-12, E6-13, E6-15 |
+| Important | **12** | E6-1, E6-2, E6-3, E6-4, E6-5, E6-8, E6-9, E6-10, E6-12, E6-13, E6-15, E6-16 |
 | Minor | **4** | E6-6, E6-7, E6-11, E6-14 |
-| **total** | **15** | E6-1 … E6-15, no gaps in the numbering |
+| **total** | **16** | E6-1 … E6-16, no gaps in the numbering |
 | unverified (0-point) items | 3 | the migrate route's stale pre-flight read under concurrency (§6), the online path's non-idempotent manual retry (§6), 6.123's "no bound on live credentials" half (E6-12) — each marked *unverified* where it appears and not counted above |
 
 Every Important finding above rests on a probe in Appendices A–K or on a printed line; the three Minors rest on
@@ -2825,6 +2875,158 @@ describe('exec6 probe: cross-site WebSocket hijacking on /v1/stream', () => {
     // 5. Control for the HTTP-Origin hook: the same cookie + foreign Origin on POST /v1/events is refused.
     const forged = await app.inject({ method: 'POST', url: '/v1/events', headers: { cookie, origin: 'https://evil.artsourced.in' }, payload: { events: [] } });
     out.push(`control POST /v1/events with cookie + foreign Origin -> ${forged.statusCode} ${forged.body.slice(0, 80)}`);
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix N — probe for E6-16 — an MCP token approving its successor
+
+File path in the tree: `apps/server/test/zz-exec6-probe-mcp-succ.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-mcp-succ.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A. (`ownerToken` here is the better-auth bearer token `signInWithPhone` returns —
+a real session, the documented approval path; `t1.token` is the MCP token the device flow issued.)
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: can an MCP token approve a NEW device code (mint a successor token), and does the successor survive the original's revocation?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+async function mint(bearerForApprove: string): Promise<{ token: string; userCode: string }> {
+  const code = await app.inject({ method: 'POST', url: '/v1/mcp/device/code', payload: {} });
+  expect(code.statusCode, code.body).toBe(200);
+  const { deviceCode, userCode } = code.json<{ deviceCode: string; userCode: string }>();
+  const approve = await app.inject({ method: 'POST', url: '/v1/mcp/device/approve', headers: { authorization: `Bearer ${bearerForApprove}` }, payload: { userCode } });
+  if (approve.statusCode !== 200) throw new Error(`approve -> ${approve.statusCode} ${approve.body}`);
+  const poll = await app.inject({ method: 'POST', url: '/v1/mcp/device/token', payload: { deviceCode } });
+  expect(poll.statusCode, poll.body).toBe(200);
+  const body = poll.json<{ status: string; token?: string }>();
+  if (body.status !== 'issued' || body.token === undefined) throw new Error(`token -> ${poll.body}`);
+  return { token: body.token, userCode };
+}
+
+describe('exec6 probe: an MCP token approving a successor', () => {
+  it('records whether the successor outlives the original', async () => {
+    const out: string[] = [];
+    // T1: approved by the owner's real session (the documented path).
+    const t1 = await mint(ownerToken);
+    out.push(`T1 minted by the owner's session; GET /v1/me/workspaces with Bearer T1 -> ${(await app.inject({ method: 'GET', url: '/v1/me/workspaces', headers: { authorization: `Bearer ${t1.token}` } })).statusCode}`);
+    // T2: approved by T1 — an MCP token approving a new device code.
+    let t2: { token: string } | null = null;
+    try { t2 = await mint(t1.token); out.push(`T2 minted with the APPROVE step authenticated by Bearer T1 (an MCP token) -> issued`); }
+    catch (e) { out.push(`T2 mint via Bearer T1 -> ${(e as Error).message}`); }
+    // Also: what else can T1 do? mint an admin invite; list and revoke tokens.
+    const inv = await app.inject({ method: 'POST', url: `/v1/workspaces/${WS}/invites`, headers: { authorization: `Bearer ${t1.token}` }, payload: { address: 'x@example.com', channel: 'email', role: 'admin' } });
+    out.push(`Bearer T1: POST mint ADMIN invite -> ${inv.statusCode}`);
+    const list = await app.inject({ method: 'GET', url: '/v1/me/mcp-tokens', headers: { authorization: `Bearer ${t1.token}` } });
+    const tokens = list.json<{ tokens: Array<{ id: string; createdAt: string }> }>().tokens;
+    out.push(`Bearer T1: GET /v1/me/mcp-tokens -> ${list.statusCode}, ${tokens.length} token(s) listed`);
+    // Revoke T1 through the owner's session (the product's "revoke" path), then test both tokens.
+    const t1Row = tokens.sort((a, b) => a.createdAt < b.createdAt ? -1 : 1)[0]!;
+    const rev = await app.inject({ method: 'DELETE', url: `/v1/me/mcp-tokens/${t1Row.id}`, headers: auth(ownerToken) });
+    out.push(`owner revokes the first-listed token (${t1Row.id.slice(0, 8)}…) -> ${rev.statusCode}`);
+    const afterT1 = (await app.inject({ method: 'GET', url: '/v1/me/workspaces', headers: { authorization: `Bearer ${t1.token}` } })).statusCode;
+    const afterT2 = t2 === null ? 'n/a' : (await app.inject({ method: 'GET', url: '/v1/me/workspaces', headers: { authorization: `Bearer ${t2.token}` } })).statusCode;
+    out.push(`after revocation: Bearer T1 -> ${afterT1}; Bearer T2 (the successor) -> ${afterT2}`);
+    const left = await app.inject({ method: 'GET', url: '/v1/me/mcp-tokens', headers: auth(ownerToken) });
+    out.push(`owner's token list now: ${left.json<{ tokens: unknown[] }>().tokens.length} token(s)`);
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
   });
