@@ -177,7 +177,7 @@ only — it refreshes on publish at `:285`, `:420`). `scripts/` — `check-case-
 in the log): writes on a deleted ticket; type re-rank; deleted children/parents; outbox overtake and overlay
 reversion; ghost ticket on both doors; invite channels; bulk rebind under an admin not on a project; deleted epic
 header; guest doors; the verifier after a re-bind; cross-site WebSocket; MCP token successor; non-member
-assignee; two full read-door sweeps (non-member, guest); the stream and bootstrap after a delete; U+0000 on 19
+assignee; three full read-door sweeps (non-member, guest, member off the project); the stream and bootstrap after a delete; U+0000 on 19
 doors and 11 hostile payload shapes; the upload door; impossible due dates; blank names; leaving a workspace.
 
 **Case ids:** every ✅ id in the eight core files is cited by name in a test (`check-case-citations` ratchet:
@@ -1396,6 +1396,12 @@ what was looked at and found sound, not only what was found wrong.
   declared as PNG and an HTML file are 415 by content sniffing; a filename with a NUL, a 5,000-character filename
   and `../../etc/passwd.png` are accepted and stored under the attachment's ULID (the name is data, not a path);
   a missing `ticketId` or file is a 400 with the reason. The one blemish is E6-18's fifth site.
+- **The third sweep — a MEMBER of the workspace who is NOT on the project — 27 doors, no leak** (Appendix Z;
+  1 file / 1 test passed). The project-mode ticket's title and comment appear in no body; `PRJ`'s board and list
+  answer 200 with no cards for that member (the visibility predicate, as 7.113 records for an admin), the ticket
+  doors 404, `population`/`counts-by-type`/`state-occupancy` are 404 for a plain member, and the ticket in the
+  project they *are* on is served. With Appendices P and Q this is the stranger / guest / member-off-project
+  triple; the owner's control read the marker in each.
 - **The ingest pipeline's order is what the docblocks say.** `ingest-service.ts:164-360`: workspace lock →
   entity lock → entity↔workspace guard → permission gate (through the transaction's `client`, `:235-245`) →
   contest coherence → engine → server gates → append → refresh-on-publish → projections → COMMIT. Read at the
@@ -4910,6 +4916,152 @@ describe('exec6 probe: leaving a workspace', () => {
     out.push(`DELETE /v1/me/workspaces/:ws -> ${del.statusCode}`);
     const del2 = await app.inject({ method: 'DELETE', url: `/v1/workspaces/${WS}/members/${guest.userId}`, headers: auth(guest.token) });
     out.push(`DELETE /v1/workspaces/:ws/members/:me -> ${del2.statusCode}`);
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix Z — the member-not-on-project read sweep (positive finding, §5)
+
+File path in the tree: `apps/server/test/zz-exec6-probe-member-sweep.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-member-sweep.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A. (First run failed on its own fixture: the owner creating a ticket in a project
+they had not joined — refused by the documented "no admin shortcut" rule; the fixture now adds the owner to `Q`.)
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: does any read door show a MEMBER who is NOT on a project a project-mode ticket of that project?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  (globalThis as unknown as { __otp: unknown }).__otp = built.otp;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: ownerId, projectAdmin: true }, ownerId, ownerToken)).status).toBe('committed');
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 sweep: every read door, as a member not on the project', () => {
+  it('records status and whether any workspace content leaks', async () => {
+    const out: string[] = [];
+    const S = auth(peerToken);
+    // A second project Q the member IS on, with a MARKER-free ticket, so the doors have something legitimate to serve.
+    const Q = newUlid();
+    expect((await post(WS, { kind: 'project', id: Q }, 'project.created', { name: 'Q' }, ownerId, ownerToken)).status).toBe('committed');
+    for (const uid of [ownerId, peerId]) { const r = await post(WS, { kind: 'project', id: Q }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken); expect(r.status, JSON.stringify(r)).toBe('committed'); }
+    const TQ = newUlid();
+    expect((await post(WS, { kind: 'ticket', id: TQ }, 'ticket.created', { typeId: 'task', projectId: Q, parentId: null, title: 'in Q' }, ownerId, ownerToken)).status).toBe('committed');
+    const T = newUlid();
+    expect((await post(WS, { kind: 'ticket', id: T }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title: 'MARKER-TITLE-7' }, ownerId, ownerToken)).status).toBe('committed');
+    expect((await post(WS, { kind: 'ticket', id: T }, 'comment.added', { body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'MARKER-COMMENT-7' }] }] } }, ownerId, ownerToken)).status).toBe('committed');
+    const wf = await db.pool.query<{ workflow_id: string }>("SELECT workflow_id FROM proj_ticket_types WHERE workspace_id = $1 AND type_id = 'task'", [WS]);
+    const WF1 = wf.rows[0]!.workflow_id;
+    const doors: Array<[string, string]> = [
+      ['GET', `/v1/workspaces/${WS}/tickets/${T}`], ['GET', `/v1/workspaces/${WS}/tickets/${T}/attachments`], ['GET', `/v1/workspaces/${WS}/tickets/${T}/comments`],
+      ['GET', `/v1/workspaces/${WS}/tickets/${T}/events`], ['GET', `/v1/tickets/${T}/history`], ['GET', `/v1/workspaces/${WS}/tickets`],
+      ['GET', `/v1/projects/${PRJ}/board`], ['GET', `/v1/projects/${PRJ}/tickets`], ['GET', `/v1/search?workspaceId=${WS}&q=MARKER`],
+      ['GET', `/v1/workspaces/${WS}/attention`], ['GET', `/v1/me/work?workspaceId=${WS}`], ['GET', `/v1/workspaces/${WS}/members`],
+      ['GET', `/v1/workspaces/${WS}/invites`], ['GET', `/v1/workspaces/${WS}/ticket-types`], ['GET', `/v1/workspaces/${WS}/ticket-types/task/population`],
+      ['GET', `/v1/workspaces/${WS}/ticket-counts-by-type`], ['GET', `/v1/workspaces/${WS}/workflows`], ['GET', `/v1/workspaces/${WS}/workflows/${WF1}`],
+      ['GET', `/v1/workspaces/${WS}/workflows/${WF1}/state-occupancy`], ['GET', `/v1/sync/bootstrap?workspaceId=${WS}`], ['GET', `/v1/sync/bootstrap/ticket?workspaceId=${WS}&ticketId=${T}`],
+      ['GET', `/v1/contests?workspaceId=${WS}`], ['POST', `/v1/sync/reconcile`], ['GET', `/v1/sync/bootstrap?workspaceId=${WS}`], ['GET', `/v1/workspaces/${WS}/tickets/${TQ}`], ['GET', `/v1/workspaces/${WS}/ticket-counts-by-type`],
+    ];
+    for (const [method, url] of doors) {
+      const res = await app.inject({ method, url, headers: S, ...(method === 'POST' ? { payload: { workspaceId: WS, heldIds: [T] } } : {}) });
+      const leak = res.body.includes('MARKER-TITLE-7') || res.body.includes('MARKER-COMMENT-7') || res.body.includes('Exec6 probe');
+      out.push(`${res.statusCode} ${leak ? 'LEAK ' : 'ok   '} ${method} ${url.replace(WS, ':WS').replace(PRJ, ':PRJ').replace(T, ':T').replace(WF1, ':WF')}  ${res.body.slice(0, 60).replace(/\n/g, ' ')}`);
+    }
+    // control: the owner sees the marker on the detail door
+    const own = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${T}`, headers: auth(ownerToken) });
+    out.push(`control owner GET detail -> ${own.statusCode} marker present: ${own.body.includes('MARKER-TITLE-7')}`);
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
   });
