@@ -25,9 +25,10 @@ the mutation**, never by `git diff` alone. Every restore printed `RESTORED ident
 
 > **⚠ A NOTE ON READING THIS FILE, added at phase-1 close.** §0–§12 are **round 1**, written at
 > `e4baa425` and landed in `#625`. **`# ROUND 2 — the relook`** begins at §13 and is the current
-> submission; **§16 is the round-2 severity table** with every member named, and **§24 is the strongest
-> evidence for the Critical**. A reader with limited budget should read §16, then `E3-14` (§14.7) and its
-> re-measurement (§24), then `E3-19` (§21).
+> submission; **§16 is the round-2 severity table** with every member named, and **§32 is the strongest
+> evidence for the Critical — a forged-Origin request that actually made a victim a member of a
+> workspace.** A reader with limited budget should read §16, then `E3-14` (§14.7) and the exploit (§32),
+> then `E3-19` (§21).
 
 ### Round 1
 
@@ -1379,7 +1380,7 @@ I read the patterns against the tree rather than trusting the empty result.
 
 | severity | count | members |
 |---|---|---|
-| **Critical (claimed)** | **1** | `E3-14` — five cookie-authenticated mutating routes outside `HTTP_ORIGIN_PROTECTED_ROUTES`, **re-measured against a real authenticated session (§24)** |
+| **Critical (claimed)** | **1** | `E3-14` — five cookie-authenticated mutating routes outside `HTTP_ORIGIN_PROTECTED_ROUTES`; **re-measured against a real session (§24) and then DEMONSTRATED end to end (§32): a forged-Origin request made the victim a member of a workspace, appending three ledger events, with the trusted follow-up answering 404 because the forgery had already spent the single-use invite** |
 | **Important (claimed)** | **9** | `E3-15` (drift guard compares the set to its own table) · `E3-16` (roster-cut citation drifted twice; the correction note now misdirects the fix) · `E3-18` (the replica invents an ancestor the online read reports as absent — **reproduced**, §19) · `E3-19` (the parent-terminal invariant is one-directional; a parent can be closed with an open child — **reproduced**, §21–22) · `E3-20` (case 6.82: *"cannot ship"* / *"ABSENT from the type"* — it shipped) · `E3-21` (case 6.84: *"no check compares them"* — two do) · `E3-22` (case 6.58's own cycle reproduction uses the event `hierarchy.cycle` refuses) · `E3-23` (case 6.124: unconstrained URL variable — `config.ts` names the case number as closed) · `E3-24` (case 6.66: *"existence-versus-the-row, not existence-versus-title"* — the shipped branch carries the title; **the only one whose staleness could cause a reader to REMOVE a shipped behaviour**) |
 | **Minor** | **7** | `E3-25` (case 6.96: `SyncItem` "three members" vs four) · `E3-9` (envelope "thirteen fields" vs 11) · `E3-10` (registry "SIXTEEN/thirteen" vs 18/15) · `E3-11` (`Features.md` "84 fixtures" vs 86) · `E3-12` (`Features.md` "eleven checks" vs 12) · `E3-13` (citation resolves to the wrong line) · `E3-17` (outbox refactor total 8, its own bullets sum to 9) |
 | **Round-1 findings, re-validated and standing** | **8** | `E3-1` … `E3-8` (§13) — **none withdrawn** |
