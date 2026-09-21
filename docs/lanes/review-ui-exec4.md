@@ -9,7 +9,7 @@
 
 ## 0. THE ONE-LINE ANSWER
 
-**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Nineteen of the twenty-two findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a 21-px close glyph, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), and the phone-width shell (a 310-px nav). Text contrast, by contrast, is clean everywhere I measured — 26 route×theme passes, one third-party watermark failing — because a contrast instrument existed and was run at least once.
+**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Twenty of the twenty-three findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a 21-px close glyph, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast, by contrast, is clean everywhere I measured — 26 route×theme passes, one third-party watermark failing — because a contrast instrument existed and was run at least once.
 
 ---
 
@@ -376,6 +376,21 @@ curl -s http://localhost:3041/v1/me/workspaces      # → {"error":"unauthentica
 
 ---
 
+
+### E4-23 — **IMPORTANT** — A ticket the server answers `404` for — never existed, soft-deleted, or invisible to this viewer — opens a sheet that says **"Loading…"** forever: the client believes it is waiting while the server has already refused
+
+**WHAT.** `…/p/<projectId>?ticket=01EXF5XW3ZZZV7PD0P6B5HWGP0` (one character off a real id). The sheet opens titled *Ticket*, body **`Loading…`**, and stays there.
+
+**MEASUREMENT (painted, 1512).** `[role=dialog]` `aria-label="Ticket"`, `innerText = "Ticket\n×\n\nLoading…"` at 2.5 s, **8.5 s and 18.5 s**; in the same window `fetch('/v1/workspaces/<ws>/tickets/01EXF5XW3ZZZV7PD0P6B5HWGP0')` from the page → **`404 {"error":"not_found"}`**, and the console shows the same 404 for the page's own request. Mechanism, opened: `packages/app-core/src/online/http.ts:92-97` — *"404 answers `null` on a GET, and ONLY on a GET … 404-as-`null` is a READ affordance"*; `online-data-source.ts:271-274` — `getTicket` returns `raw === null ? null : mapTicketRead(…)`; `ticket-sheet.tsx:618-631` — `read.error !== null` → the refusal sentence, **`read.data === null` → `Loading…`**. A 404 arrives as `data: null, error: null`, which is the loading arm. The server gives that answer for **three** conditions with one body (`apps/server/src/routes/tickets.ts:300-302`: *"Every refusal on this surface is the same 404 … A direct read of an invisible ticket is `404 {error:'not_found'}`"*; `:377`: *"A SOFT-DELETED ticket is 404 on its own detail route"*), so a deleted ticket's stale link and a colleague's restricted ticket both paint an endless wait. **Contrast, same session:** a bad project id paints `The board cannot be shown yet. HTTP 404 for /v1/projects/…/board` (`p.gn-shell__refusal`), a bad workspace paints *"This is not one of your workspaces…"*, a bad invite token paints *"This invitation link does not open anything…"* — the product knows how to refuse; the sheet is the surface that does not.
+
+**THE PRODUCT'S OWN WORDS.** `ticket-sheet.tsx:391-395`: *"a failure drawn under the word 'Loading…' is a wait that never ends dressed as a wait that will"*; `:404-405`: *"`data` is null on a failure AND on a real absence, and an error must never render as an absence."* The docblock names the *absence* case and the component gives it no arm — the three-way distinction it claims (answer / wait / failure) has no fourth state for "the server said there is nothing here", and the second one absorbs it.
+
+**WHY IT IS WRONG.** This is the brief's ninth edge class verbatim — *the server refuses while the client believes*. The person sees a spinner-equivalent with no way to learn the ticket is gone or restricted, on the product's most-used overlay, and every stale link in a comment, an email or the browser history lands here.
+
+**WHAT WOULD HAVE BEEN BETTER.** Let `getTicket`'s `null` reach the sheet as a distinct state — `read.data === null && read.settled` → *"This ticket is not here — it may have been deleted, or you may not be able to see it."* (the server's one-body refusal means the sentence must name both), with the `Loading…` arm reserved for `!settled`. `useLiveQuery` already knows when a read resolved; it only needs to say so. One painted case at `?ticket=<never>` asserting the sentence.
+
+---
+
 ## 4. MATCHES AND RULED DIVERGENCES CHECKED
 
 _(so §3 is not a list of defects — each row is a measurement I took that came back clean or ruled)_
@@ -457,11 +472,11 @@ The owner ordered graph-first. I did: `graphify-out/GRAPH_REPORT.md` header, hub
 | claimed severity | count | members |
 |---|---|---|
 | **Critical** | **0** | — |
-| **Important** | **16** | E4-1 · E4-2 · E4-3 · E4-4 · E4-5 · E4-7 · E4-8 · E4-9 · E4-11 · E4-12 · E4-13 · E4-14 · E4-17 · E4-18 · E4-19 · E4-21 |
+| **Important** | **17** | E4-1 · E4-2 · E4-3 · E4-4 · E4-5 · E4-7 · E4-8 · E4-9 · E4-11 · E4-12 · E4-13 · E4-14 · E4-17 · E4-18 · E4-19 · E4-21 · E4-23 |
 | **Minor** | **6** | E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 |
-| **total** | **22** | `16 + 6 = 22`; ids `E4-1` … `E4-22` with no gaps |
+| **total** | **23** | `17 + 6 = 23`; ids `E4-1` … `E4-23` with no gaps |
 
-**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20. Category 2 argued against the record: E4-6, E4-8, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility or instrument: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22.
+**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20. Category 2 argued against the record: E4-6, E4-8, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23.
 
 **Overlap with round 1, stated:** E4-10 and E4-15 are new members of P1's class found by widening the population (class-less tags; classes whose rule forgot the border) and painted; E4-12 widens P11's scope from one component to the suite's population; E4-2 carries a painted reproduction of P8's focus finding as corroboration only. Nothing else overlaps.
 
