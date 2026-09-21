@@ -4183,9 +4183,21 @@ invariant rather than an open gap.
 `grep -n projectId packages/domain/src/events/ticket-events.ts` → one line. **Control:** `6.71` at `:87`, read at the
 same depth, holds (as §27 recorded).
 
-**SEVERITY: Minor (claimed), scored at half.** A conditional the owner decided against, left standing in two
-places; softer than `E3-30` because the case's mechanism sentence is still true and nothing reports false coverage —
-it reports an impossibility as open.
+**ADDENDUM, 15:35 IST — the same false premise stands in two code comments, and one of them was false the day it was
+written.** `apps/server/test/routes/tickets-read.test.ts:465`: *"Nothing refuses a cross-project parent today (case
+6.57)."* — written in `dd7bfcfd` (2026-09-01, #57), **one day after** `6b2fc768` shipped `hierarchy.cross-project`;
+the fixture beneath it builds the cross-project child by writing projection rows directly, which is the only way it
+can now be built. And `apps/server/src/visibility/rollup.ts:204-209` names *"the family of unrefused corrupt parent
+links already recorded (6.57 the stale `project_id`, 6.58 the parent cycle)"* beside 6.84's *"no check compares
+them"* — **all three members of that family are refused today** at `hierarchy.ts:125`/`:274` (cross-project),
+`:237`/`:257-258` (cycle, `E3-22`) and `:124`/`:250` (a parent outside the workspace → `hierarchy.unknown-parent`,
+`E3-21`). So the catalogue line, a test comment and a source docblock carry one premise the engine contradicts at
+six lines. Neither comment was cited by `E3-21` or `E3-22` (`grep -c "family of unrefused" review-functionality-exec3.md`
+→ 0 before this addendum); they are recorded here as the wider true scope of the trio.
+
+**SEVERITY: Minor (claimed), scored at half.** A conditional the owner decided against, left standing in the
+catalogue, the migration's column comment, a test comment and a docblock; softer than `E3-30` because the case's
+mechanism sentence is still true and nothing reports false coverage — it reports an impossibility as open.
 
 ## 67. DEFENCES — written pre-emptively, because this lane's phase 2 closes at 17:05:23 IST and the opponent's at 18:41:50
 
