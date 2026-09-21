@@ -838,6 +838,31 @@ the owner's database.
 
 ---
 
+### E5-24 — IMPORTANT · Four more passages of the help describe a product that no longer exists — "no change role", "you cannot rename a job", "you cannot delete a job", "you cannot see what [visibility] is currently set to" `[BROWSER]` `[SOURCE]` — sibling of `exec2-F1`, none of its eight rows
+
+| # | the sentence | where | falsified by |
+|---|---|---|---|
+| a | *"**You can see, and you cannot change.** … That role is read-only: there is no "remove", and no "change role"."* and `faq.md:143-147` *"Where do I change somebody's role, or take them off? Nowhere on screen."* | `docs/manual.md:299-300`, `docs/faq.md:143-147` | `[BROWSER]` `/w/…/members` paints a `Role` select per row (`Role for accountant@e2e.gisik-nokma.local`, options admin/member/guest); `members/page.tsx:334-350` `changeRole` submits it. **"no remove" is still true** (`grep -n 'Remove' members/page.tsx` → 0 controls); the sentence is half-right and states the half that changed as unchanged. |
+| b | *"**You cannot rename a job.**"* | `docs/manual.md:371` | `ticket-sheet.tsx:1818` `aria-label="Ticket title"` — an editable input; `:1806-1810` *"`onBlur` commits, `Enter` commits, `Escape` abandons"*; `[BROWSER]` `textbox "Ticket title"` in the sheet's accessibility tree. |
+| c | *"**You cannot delete a job.** If your stages include a "won't do" or "cancelled" stage, moving it there is the nearest thing available."* | `docs/manual.md:372-373` | `ticket-sheet.tsx:2612-2621` the footer `Delete` (E5-9); `[BROWSER]` `button "Delete"` on the sheet. |
+| d | *"**You can set who sees a job. You cannot see what it is currently set to.** On the one screen whose entire subject is who can see what, the current audience is shown as unavailable rather than guessed."* | `docs/manual.md:989-993` | `routes/tickets.ts:78-90` serves `own_mode`/`resolved_mode` on the detail read; `mappers.ts:1992` maps it; `ticket-sheet.tsx:649-653` builds `standingVisibility` from it and passes `current=` (`:2512`); `visibility-editor.tsx:315-330` renders the *unserved* arm only when `current === null` and otherwise `standingSentence(current, nameOf)`. `[BROWSER]` the wire for `CCSO-3`'s parent object carried `own_mode: "inherit", resolved_mode: "project"`. |
+
+**WHY.** The same defect and the same direction as `exec2-F1` (accepted, Important): the product's own help makes it
+look less capable than it is — here on the four most basic acts a person takes on a ticket and a person (rename,
+delete, set a role, read who can see). `check:help` cannot see any of these (`exec2-F2`). `F1`'s rows a–h are the
+nav, sign-out, the theme toggle, the workspace card, comments, attachments and the settings links; none is these
+four passages, so this is a wider true scope with its own measurements.
+
+**WHAT WOULD HAVE BEEN BETTER.** The corpus's own convention (`docs/manual.md:355-359`): keep each entry, mark it
+superseded, say what is now true. For (a), keep "no remove" and drop "no change role".
+
+**MEASUREMENT.** Each cell above names the line opened. `[BROWSER]` controls from the members-page and sheet
+accessibility trees recorded earlier in this report.
+
+**SEVERITY: Important** (claimed) — `F1`'s severity for `F1`'s class.
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -899,15 +924,15 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**23 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 23). By claimed severity, read from the
-heading text: **Critical 1 · Important 15 · Minor 7** (1 + 15 + 7 = 23).
+**24 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 24). By claimed severity, read from the
+heading text: **Critical 1 · Important 16 · Minor 7** (1 + 16 + 7 = 24).
 
 - **Critical (1):** E5-13
-- **Important (15):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21
+- **Important (16):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24
 - **Minor (7):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22 = 18 of 23. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24 = 19 of 24. **Reproduced with an injected failure, zero server writes:** E5-13,
 E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
@@ -1039,5 +1064,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 23 findings — Critical 1 · Important 15 · Minor 7 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 24 findings — Critical 1 · Important 16 · Minor 7 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
