@@ -10,7 +10,9 @@ step() { if bash -c "$2" > /dev/null 2>&1; then echo "  ok   $1"; else echo "  F
 step "hook self-test"        "python3 '$HERE/hooks/ctl-scripts-only.py' --self-test"
 step "lib tests"             "bash '$HERE/test/lib.test.sh'"
 step "checks --dry-run"      "'$HERE/ctl' checks --repo '$repo' --dry-run"
-step "gate --dry-run"        "'$HERE/ctl' gate \$(/usr/bin/git -C '$repo' rev-parse HEAD) --repo '$repo' --dry-run || /usr/bin/git -C '$repo' status --porcelain | grep -q ."
+# gate refuses a dirty tree and a HEAD that does not contain origin/main before dry-running; both are the verb working, so
+# only those two named refusals are accepted here — any other non-zero exit is a red step.
+step "gate --dry-run"        "out=\$('$HERE/ctl' gate \$(/usr/bin/git -C '$repo' rev-parse HEAD) --repo '$repo' --dry-run 2>&1); [ \$? -eq 0 ] || printf '%s' \"\$out\" | grep -q 'tree is dirty\\|is not an ancestor of HEAD'"
 step "pr open --dry-run refuses main" "! '$HERE/ctl' pr open main --title t --body '$HERE/README.md' --repo '$repo' --dry-run"
 step "land refuses a merged PR" "'$HERE/ctl' land 638 --repo '$repo' --dry-run; [ \$? -eq 1 ]"
 step "anchor --dry-run"      "'$HERE/ctl' anchor 0 --title t --body '$HERE/README.md' --repo '$repo' --dry-run"
