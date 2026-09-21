@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { VISIBILITY_MODES, type VisibilityMode } from '@gisik-nokma/domain';
+import { VISIBILITY_MODES, type IngestResult, type VisibilityMode } from '@gisik-nokma/domain';
 import { Button } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatDateTime } from '../provenance.js';
@@ -56,6 +56,26 @@ export const LOCKOUT_WARNING_COPY =
  */
 export const READ_ONLY_COPY =
   'Only a project admin, a workspace owner or admin, or whoever created this ticket, can change who sees it.';
+
+/**
+ * The TRANSPORT sentence, for a write that never reached a server (V3,
+ * 2026-09-21) — the shape `BulkCloseDialog`'s `transportError` slot already uses
+ * two files away, including carrying the cause's own words without paraphrase.
+ *
+ * It exists because `apply` had NO try/catch and its call site is
+ * `onClick={() => void apply()}`, so a rejected `ingest` was discarded entirely:
+ * `submission` stayed `{kind:'sending'}`, which is the state the Apply button is
+ * `disabled` on, and the component's only sentence lived under
+ * `submission.kind === 'refused'` — unreachable from there. A person saw a
+ * control go dead with nothing said, for ever.
+ *
+ * It says WHO CAN SEE THIS IS UNCHANGED because that is the reader's next
+ * question, and the honest answer is that nothing was recorded.
+ */
+export function writeUnreachedCopy(cause: unknown): string {
+  const message = cause instanceof Error ? cause.message : String(cause);
+  return `We could not reach the server for this change — ${message}. Who can see this ticket is unchanged.`;
+}
 
 /**
  * How the ticket's audience stands now, as somebody's claim rather than a
@@ -269,6 +289,13 @@ export function VisibilityEditor({
   const [mode, setMode] = useState<VisibilityMode>(current?.ownMode ?? 'inherit');
   const [userIds, setUserIds] = useState<string[]>(current?.userIds ?? []);
   const [submission, setSubmission] = useState<Submission>({ kind: 'idle' });
+  /**
+   * A write that never reached a server (V3, 2026-09-21) — its own slot, and NOT
+   * a `Submission` state, because a transport failure is not a refusal: no
+   * authority judged it and no rule names it. `BulkCloseDialog` keeps the same
+   * split for the same reason.
+   */
+  const [transportError, setTransportError] = useState<string | null>(null);
 
   const nameOf = (userId: string): string =>
     actorLabel(userId, members.find((member) => member.id === userId)?.name ?? null);
@@ -317,9 +344,29 @@ export function VisibilityEditor({
      */
     const payload: Record<string, unknown> =
       mode === 'explicit' ? { ticketId, mode, userIds } : { ticketId, mode };
-    const [result] = await dataSource.ingest([
-      make({ workspaceId, entity: { kind: 'ticket', id: ticketId }, type: 'visibility.set', payload }),
-    ]);
+    /**
+     * ⚠ **THE AWAIT IS WRAPPED, AND ITS ABSENCE WAS V3 (2026-09-21).** This call
+     * site is `onClick={() => void apply()}`, so a REJECTED `ingest` — a dropped
+     * connection, a 500, an unparseable body — was discarded entirely: nothing
+     * caught it, `submission` stayed `{kind:'sending'}`, and that is exactly the
+     * state the Apply button is `disabled` on. The component's only sentence sits
+     * under `submission.kind === 'refused'`, so the person got a control that
+     * never came back and no explanation. **`submission` returns to `idle` here
+     * rather than becoming a refusal**, because nothing was refused — no server
+     * judged this — and dressing a transport failure as the engine's words is the
+     * thing the refusal slot exists to prevent.
+     */
+    let result: IngestResult | undefined;
+    try {
+      [result] = await dataSource.ingest([
+        make({ workspaceId, entity: { kind: 'ticket', id: ticketId }, type: 'visibility.set', payload }),
+      ]);
+    } catch (cause) {
+      setSubmission({ kind: 'idle' });
+      setTransportError(writeUnreachedCopy(cause));
+      return;
+    }
+    setTransportError(null);
     if (result === undefined) {
       // An empty results array is not a commit. The door answers one result per
       // event; nothing coming back means the claim's fate is unknown, and
@@ -468,6 +515,16 @@ export function VisibilityEditor({
               {submission.reason}
             </p>
           ) : null}
+
+          {transportError === null ? null : (
+            /* `role="alert"`, like the refusal beside it: this is the answer to a
+               click, and a reader who cannot see the button re-enable needs to be
+               told. It carries no rule name — there is no rule — which is why it
+               does not reuse the refusal's `<span class="…__refusal-rule">`. */
+            <p role="alert" className="gn-visibility__unreached">
+              {transportError}
+            </p>
+          )}
         </div>
       ) : (
         /*

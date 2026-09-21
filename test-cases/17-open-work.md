@@ -26,7 +26,7 @@ never saw.
 | lane | block |
 |---|---|
 | **exec 3** | **`17.001`–`17.020`** (taken 2026-09-21 for the sheet's `Visibility` section styling) — **minted: `17.001`–`17.006`** |
-| **release batch B09** (lane ds5) | **`17.061`–`17.080`** (allocated by the controller 2026-09-21 21:0x, recorded in the cycle-46 anchor PR on `main`) — **minted: `17.061`–`17.063`** |
+| **release batch B09** (lane ds5) | **`17.061`–`17.080`** (allocated by the controller 2026-09-21 21:0x, recorded in the cycle-46 anchor PR on `main`) — **minted: `17.061`–`17.065`** |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** A block is a longer-lived reading than a "next free
 N", but it still expires when the controller reallocates. **Re-read it before minting, and if your own
@@ -204,3 +204,33 @@ about `canSetVisibility`, not about this sentence**, and the sheet's own docbloc
 argument for showing the control and letting the door refuse. **Owner: whoever next revisits
 `canSetVisibility`.** The sentence was corrected regardless: a wrong permission statement is not made
 less wrong by being unreachable, and the prop is a declared part of this component's public surface.
+
+## The visibility editor's write: a transport failure left Apply dead and silent — cases `17.064`–`17.065` (V3, 2026-09-21)
+
+**The defect.** `apply` set `{kind:'sending'}` and then awaited `dataSource.ingest([…])` with **no
+`try`/`catch`**, and its call site is `onClick={() => void apply()}` — a `void`, so the rejection was
+discarded entirely. Nothing caught it, so `submission` stayed `'sending'`, and that is exactly the state
+the Apply button is `disabled` on (`disabled={explicitNamesNobody || submission.kind === 'sending'}`).
+The component's only sentence lives under `submission.kind === 'refused'`, which the throw had made
+unreachable. A dropped connection therefore left a control that never came back and nothing said — the
+shape `BulkCloseDialog` two files away already handles with a dedicated `transportError` slot.
+
+- **17.064** ✅ A rejected write says so, and Apply comes back. Asserted on the PAIR, because the two
+  halves are one state: a component that re-enabled the control and said nothing, or one that spoke and
+  left the control dead, would each satisfy one half alone. The sentence carries the cause's own words
+  and says WHO CAN SEE THIS IS UNCHANGED — the reader's next question, whose honest answer is that
+  nothing was recorded. — (`packages/app-core/test/views/visibility-editor.test.tsx`)
+- **17.065** ✅ A COMMITTED write says nothing about the server being unreachable, and `onChanged`
+  still fires. Without it the fix could be "always render the transport sentence", which would be false
+  of every write that landed. — (`packages/app-core/test/views/visibility-editor.test.tsx`)
+
+**`submission` returns to `idle`, NOT to `refused`.** Nothing was refused — no server judged this — and
+dressing a transport failure in the engine's words is the thing the refusal slot exists to prevent. The
+transport sentence is its own slot (`transportError`), with its own CSS rule and deliberately no coloured
+inset marker: the two markers this section carries mean something (danger = refused, warning = you are
+about to lose access) and this is neither.
+
+**RED was observed against a MUTATION rather than against `HEAD`**, because the true pre-fix file has no
+`writeUnreachedCopy` at all and the spec imports it — the run would have died on the import, which is the
+"a mutation that cannot parse runs zero tests" shape. The first attempt at that mutation did not parse
+either (a `perl` template ate the quoting around `.ticket.`), and it was discarded rather than counted.
