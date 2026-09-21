@@ -2345,3 +2345,25 @@ to pick something the bar was not offering. The legal pages' bar had the right a
   `next=<where they were>`), and withholds `Workspaces`, `Account`, the inbox icon and the scope note —
   with the signed-in arm re-asserted in the same case as the positive control, so a bar that rendered
   nothing signed out cannot pass it. — (`apps/web/test/app-nav.test.tsx`)
+
+## The expired-session redirect dropped the destination — case `13.1160` (E5-32, 2026-09-21)
+
+**Ids from B11's §13 block `13.1157`–`13.1166`** (controller, 2026-09-21 22:0x; see the E5-25 section
+above). `13.1160` is minted here.
+
+**The defect.** `apps/web/src/expired-session.tsx:72` read `if (expired) router.push('/sign-in');` — no
+`next=` — and that hook is the ONE author of the 401 redirect for `/workspaces`, `/w/[workspaceId]`,
+`/w/…/my-work`, `/w/…/p/[projectId]` and `/inbox`. **Every one of the five dropped where the person was
+going**, while `docs/manual.md:109-110` promises the opposite in as many words, and the four sibling arms
+that keep a destination (`/invite/<token>`, `/mcp/authorize`, the settings shell, the nav's own Sign in
+link) showed the shape was already the house's.
+
+- **13.1160** ✅ A 401 on any of those five pages pushes
+  `/sign-in?next=<path + ?query>`, encoded by the SAME `signInWithNext` the product uses — asserted at
+  `/workspaces`, My Work, the project page and `/inbox`, so the case cannot pass on a redirect that
+  carries the destination for one page and not the others. The write guard's redirect carries it too
+  (`providers.tsx`), so a session that ends mid-write lands back where the write was. —
+  (`apps/web/test/page-refusals.test.tsx`, `apps/web/test/inbox-page.test.tsx`)
+
+**The manual was NOT edited.** The ruling offered *"or correct `docs/manual.md:109` to 'an invitation'"*;
+the code moved instead, so both manual sentences stay true as written.

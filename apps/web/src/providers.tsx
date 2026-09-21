@@ -28,7 +28,7 @@ import {
 import { authClient } from './auth-client.js';
 import { createWebAuthoringGateway } from './authoring/data-source-gateway.js';
 import { createHttpTicketLocator, type TicketLocator } from './ticket-location.js';
-import { withSignInOnExpiredWrite } from './expired-session.js';
+import { signInWithNext, withSignInOnExpiredWrite } from './expired-session.js';
 
 /**
  * The shell's whole world, in one object.
@@ -130,7 +130,12 @@ export function Providers({
     // (E5-25) — see `withSignInOnExpiredWrite`'s own docblock for why this is
     // not repeated at each of the nine write sites.
     const dataSource = withSignInOnExpiredWrite(withCacheFeed(online, cache), () =>
-      push.current('/sign-in'),
+      // The destination is carried, as it is on the read path (E5-32) — read
+      // off `window` at the moment of the redirect, which is the only moment the
+      // answer is right. No `usePathname` here: `Providers` is mounted once
+      // above every route and holds no pathname of its own; `window.location` is
+      // the URL the person is actually on.
+      push.current(signInWithNext(window.location.pathname + window.location.search)),
     );
     return {
       dataSource,

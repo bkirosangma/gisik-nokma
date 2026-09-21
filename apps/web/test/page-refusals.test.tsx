@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HttpError, LIST_TOO_LARGE_ABSENCE, ServingGapError } from '@gisik-nokma/app-core/online';
 import { Providers } from '../src/providers.js';
-import { EXPIRED_SESSION_COPY, isExpiredSession } from '../src/expired-session.js';
+import { EXPIRED_SESSION_COPY, isExpiredSession, signInWithNext } from '../src/expired-session.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
@@ -43,6 +43,12 @@ import { stubServices } from './helpers/stub-services.js';
  */
 
 const push = vi.fn();
+/**
+ * E5-32 — the redirect carries the destination. Built from the SAME
+ * `signInWithNext` the hook uses, so this asserts the URL the product builds
+ * rather than a re-typed paraphrase of it that would pass after a rename.
+ */
+const SIGN_IN_WITH_NEXT = signInWithNext('/w/01J9WORKSPACE0000000000000/p/01J9PROJECT000000000000000');
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
   useParams: () => ({ workspaceId: '01J9WORKSPACE0000000000000', projectId: '01J9PROJECT000000000000000' }),
@@ -205,7 +211,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
     ).not.toBeInTheDocument();
   });
 
-  it('Workspaces: a 401 is NOT a refusal — it sends the viewer to sign in', async () => {
+  it('13.1160 Workspaces: a 401 is NOT a refusal — it sends the viewer to sign in, remembering where they were', async () => {
     render(
       <Providers
         services={stubServices({
@@ -221,7 +227,10 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
         <WorkspacesPage />
       </Providers>,
     );
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/sign-in'));
+    // E5-32: `/workspaces` is the page this rule was FIRST written for, and it
+    // kept the destination all along — the assertion now pins that, so a future
+    // edit cannot quietly drop it back to a bare `/sign-in`.
+    await waitFor(() => expect(push).toHaveBeenCalledWith(SIGN_IN_WITH_NEXT));
     expect(screen.queryByText(/cannot be shown yet/)).not.toBeInTheDocument();
     expect(await screen.findByText(EXPIRED_SESSION_COPY)).toBeInTheDocument();
     // Not a spinner either. With the refusal suppressed the page falls through
@@ -621,7 +630,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
 describe('3.141 an expired session sends the viewer to sign in — on ALL THREE data-reading pages', () => {
   const expired = (path: string) => () => Promise.reject(new HttpError(401, path));
 
-  it('My Work: both reads 401, and the page says so instead of refusing', async () => {
+  it('13.1160 My Work: both reads 401, and the page says so instead of refusing', async () => {
     render(
       <Providers
         services={stubServices({
@@ -632,14 +641,20 @@ describe('3.141 an expired session sends the viewer to sign in — on ALL THREE 
         <MyWorkPage />
       </Providers>,
     );
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/sign-in'));
+    // E5-32: the destination is CARRIED, not dropped — the manual promises the
+    // person is put back on the page they were trying to reach.
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith(
+        `/sign-in?next=${encodeURIComponent('/w/01J9WORKSPACE0000000000000/p/01J9PROJECT000000000000000')}`,
+      ),
+    );
     expect(await screen.findByText(EXPIRED_SESSION_COPY)).toBeInTheDocument();
     // The half that makes it a test: the sentence this page used to show.
     expect(screen.queryByText(/cannot be shown yet/)).not.toBeInTheDocument();
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
   });
 
-  it('Project page: every read this page makes 401s, and one notice stands in for all of them', async () => {
+  it('13.1160 Project page: every read this page makes 401s, and one notice stands in for all of them', async () => {
     // **The stub set was FIVE reads and the page makes THREE, and that gap is
     // the reason this case was renamed rather than left alone.** It read "every
     // read 401s, and one notice stands in for all four" — a count that was true
@@ -664,7 +679,7 @@ describe('3.141 an expired session sends the viewer to sign in — on ALL THREE 
         <ProjectPage />
       </Providers>,
     );
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/sign-in'));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(SIGN_IN_WITH_NEXT));
     // ONE, printed as a list: three reads failed together and they are one event.
     const texts = (await screen.findAllByRole('status')).map((node) => node.textContent ?? '');
     expect(texts).toEqual([EXPIRED_SESSION_COPY]);

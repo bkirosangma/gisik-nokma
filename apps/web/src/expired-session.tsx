@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   SESSION_EXPIRED_COPY,
   SessionExpiredError,
@@ -72,10 +72,28 @@ export function isExpiredSession(message: string | null): boolean {
  */
 export function useSignInOnExpiredSession(messages: ReadonlyArray<string | null>): boolean {
   const router = useRouter();
+  const pathname = usePathname();
   const expired = messages.some(isExpiredSession);
   useEffect(() => {
-    if (expired) router.push('/sign-in');
-  }, [expired, router]);
+    if (!expired) return;
+    // E5-32: the destination is CARRIED, not dropped. This hook was the ONE
+    // author of the 401 redirect and pushed a bare `/sign-in`, while
+    // `docs/manual.md` promises the opposite in two places — *"it puts you back
+    // on the page you were trying to reach"* and *"The same is true if you
+    // click a link (an invitation, or a link to a job) while signed out: it
+    // remembers where you were headed and sends you there afterwards."* The
+    // invitation/consent/settings arms already kept theirs; now every one of the
+    // hook's five callers does.
+    //
+    // The PATH comes from `usePathname` (which strips any query) and the QUERY
+    // is read off `window` inside the effect rather than taken from
+    // `useSearchParams`, deliberately: a hook that calls the latter puts every
+    // caller behind a `Suspense` boundary, and this runs only in the browser, at
+    // the moment the redirect is decided — exactly when the current URL is what
+    // is wanted. `sign-in/page.tsx` constrains `next` to a path on this site, so
+    // nothing here can widen it.
+    router.push(signInWithNext(pathname + window.location.search));
+  }, [expired, pathname, router]);
   return expired;
 }
 
@@ -131,6 +149,17 @@ export function ExpiredSessionNotice() {
  * the sentence is the view's, and swallowing the throw here would leave a view
  * rendering a success it never had.
  */
+/**
+ * The `/sign-in` URL that remembers where the person was (E5-32).
+ *
+ * One builder for the read hook and the write guard, so the two cannot drift
+ * about what a remembered destination looks like — and `sign-in/page.tsx`'s
+ * guard is the only thing that has to accept it.
+ */
+export function signInWithNext(pathAndSearch: string): string {
+  return `/sign-in?next=${encodeURIComponent(pathAndSearch)}`;
+}
+
 export function withSignInOnExpiredWrite(source: DataSource, onExpired: () => void): DataSource {
   return {
     ...source,

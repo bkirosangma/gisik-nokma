@@ -245,7 +245,7 @@ describe('/inbox — four states, because the plan’s two collapse the one that
     expect(screen.queryByText(EMPTY_INBOX_COPY)).not.toBeInTheDocument();
   });
 
-  it('11.150 sends a 401 to sign-in rather than calling an ended session a refusal', async () => {
+  it('13.1160/11.150 sends a 401 to sign-in, remembering where they were, rather than calling an ended session a refusal', async () => {
     render(
       <Providers
         services={stubServices(
@@ -264,7 +264,10 @@ describe('/inbox — four states, because the plan’s two collapse the one that
     );
 
     expect(await screen.findByText(EXPIRED_SESSION_COPY)).toBeInTheDocument();
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/sign-in'));
+    // E5-32: `/inbox` was one of the five pages that kept the destination — the
+    // assertion pins the URL, so a future edit cannot drop it back to a bare
+    // `/sign-in` and leave the manual's promise false.
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/sign-in?next=%2Finbox'));
     expect(screen.queryByText(/Your inbox cannot be shown yet\./)).not.toBeInTheDocument();
   });
 
