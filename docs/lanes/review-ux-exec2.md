@@ -2253,8 +2253,9 @@ site.
 
 ---
 
-*Running total of round-2 new findings: `E2-20`–`E2-43` (24) — 14 Important, 10 Minor. No refutations
-filed, by measurement rather than by omission.*
+*Running total at this point in the round: 24 new findings. **No refutations filed, by measurement rather
+than by omission.** The authoritative count is the closing line of the report, which carries the number
+as the round finally stands.*
 
 ---
 
@@ -2322,7 +2323,7 @@ screen was not: `E2-44` is the finding. **The lesson I would keep: "I am finding
 reading about the files already opened, not about the files not yet opened** — and I nearly used it to skip
 two.
 
-**What phase 1 leaves, stated as the boundary:** 25 new findings on the landed 19, one withdrawal, one
+**What phase 1 leaves, stated as the boundary:** 26 new findings on the landed 19, one withdrawal, one
 standing-up against a ruling, five candidates examined and rejected with their measurements, one omission
 recorded as mine, and no refutations — because I read all three concurrent reports and could not falsify
 one.
@@ -2376,7 +2377,59 @@ reproduction.
 
 ---
 
-*Running total of round-2 new findings: `E2-20`–`E2-44` (25) — 15 Important, 10 Minor.*
+*Running total of round-2 new findings: `E2-20`–`E2-45` (26) — 16 Important, 10 Minor.*
+
+---
+
+### E2-45 (r2) — IMPORTANT · "Sign out" can fail silently, and the menu closes either way
+
+**WHAT.** `apps/web/src/account-menu.tsx:189-194`:
+```
+onClick={() => {
+  close(false);
+  void authClient.signOut().then(() => {
+    router.push('/sign-in');
+  });
+}}
+```
+**One callback, no rejection handler** — and `close(false)` runs *first*, so the menu closes before the
+request is even sent. If `signOut()` rejects (offline, a 5xx, a dropped connection), nothing is pushed,
+no sentence is rendered, and **the session stays live** while the only visible change — the menu closing —
+reads as success.
+
+**WHY it is wrong — the product itself frames this as a safety act.** `docs/manual.md:112-114`: *"Signing
+out really does end it — the next thing you try on that device is refused immediately, not 'at some point
+later'. **That matters if you have signed in on somebody else's laptop.**"* So the manual tells the person
+this control is what protects them on a shared machine, and the control's failure mode is the exact one
+that sentence warns about: a person clicks Sign out, sees the menu close, walks away, and the session is
+still open. The failure is reachable through the ordinary case the product is built for — a flaky
+connection — and it is silent in both channels: no `role="alert"`, no navigation, no state change.
+
+⚠ **Severity, argued rather than asserted.** By the letter of my own stated scale this edges toward
+Critical — a person *acts on a falsehood about access* when they leave a shared machine believing they are
+signed out. I am claiming **Important** because the product never *states* the falsehood; the menu simply
+closes and the person infers, which is the absence-of-feedback shape I have rated Important everywhere else
+in this report. **If the judge weighs the shared-machine case as access rather than as feedback, this is
+the finding of mine to upgrade** — and I would not argue against it. Side note: `E2-1(b)` already records
+that the manual describes this control's *location* wrongly ("the Sign out button on the right"); this is
+the same sentence's other half being wrong about what the control guarantees.
+
+**WHAT WOULD HAVE BEEN BETTER.** Two callbacks: on rejection, keep the session and say so — either
+re-render the menu with a failure sentence, or route to a state that tells the person they are still signed
+in. `close(false)` should not run before the answer if the closing *is* the confirmation.
+
+**MEASUREMENT.** Opened: `apps/web/src/account-menu.tsx:184-197` (the control, the `close` before the
+await, the single-callback `.then`); `docs/manual.md:112-114`.
+
+Found by a sweep of all **56 `.then(` sites** in the shipping client for calls with **no second callback**.
+**8 matched, and all 8 are accounted for here:** **5** are better-auth's `{ error }`-in-the-*resolution*
+convention (`apps/web/app/sign-in/page.tsx:320,342,384,456,472`), which has no rejection path by design
+and is therefore not a defect; **1** is `E2-24`'s `account/page.tsx:228`, already filed; **1** is the
+`caught-up` callback at `replica-data-source.ts:1489`, which I examined in R2.11 and declined (the depth
+needed to establish the user-visible consequence exceeded what the point was worth); and **this is the
+eighth**.
+
+**Severity: Important**, with the Critical reading stated above.
 
 ---
 
