@@ -265,8 +265,8 @@ enumeration of `proj_visibility` joined to `proj_tickets` — and `rollup.ts:79-
 **Correction, 16:10 IST, before anyone else found it:** the absence IS recorded. `Features.md:408` (blame `6cb631d0`,
 2026-09-01) says, verbatim: *"Nothing reads it yet: Plan 4's `RollupView` (`src/visibility/rollup.ts`) still ships
 without the open/active/terminal half, and its cases 6.82 and 6.83 remain open."* — an interim state with a
-reason. The reason has expired on all three counts: `rollup.ts` now carries the category half (`RollupView.terminal`
-and `.uncategorized`, `:126-132`, counted at `:276`); 6.83 is measured (case 7.78, `ticket-cards.test.ts:507`, exec 3's
+reason. The reason has expired on all three counts: `rollup.ts` now carries the category half as far as the cards use it (`RollupView.terminal` and
+`.uncategorized`, `:126-132`, counted at `:276`; open and active are the remainder of `total`); 6.83 is measured (case 7.78, `ticket-cards.test.ts:507`, exec 3's
 E3-30); 6.82's capability shipped (exec 3's E3-20). So the finding is narrower than its first sentence: not "an
 unrecorded dead table" but "an interim recorded on 2026-09-01 whose stated reason is gone, and whose 'yet' has
 become twenty days with no reader" — the same class as E6-25's sentences, in the catalogue rather than the deploy
