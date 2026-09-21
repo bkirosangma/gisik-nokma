@@ -523,6 +523,28 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     expect(await screen.findAllByRole('button', { name: 'Edit Invoice' })).not.toHaveLength(0);
   });
 
+  it('E5-14 the page says why the arrows are disabled, not only in a hover title', async () => {
+    render(<TicketTypeListScreen
+        workspaceId={newUlid()}
+        session={{ userId: newUlid(), role: 'owner' }}
+        gateway={createFakeGateway({ workflows: [kanbanPublished], ticketTypes: [...builtins, invoice, errand] })}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />);
+    await screen.findByText('Invoice');
+    const note = await screen.findByTestId('ticket-type-reorder-note');
+    // The reason all ten arrows are dead, as VISIBLE text. It lived only in each
+    // button's `title` attribute, which a phone cannot show and a keyboard cannot
+    // reach — so a reader met ten dead controls with no explanation on the page.
+    expect(note.textContent).toContain(
+      'Built-in types keep their rank; custom types reorder among themselves.',
+    );
+    // And the other half of the finding: the shipped seed already puts two types
+    // at rank 3, and the sentence says how a tie is drawn rather than leaving a
+    // reader to infer precedence from two rows that both read "rank 3".
+    expect(note.textContent).toContain('Two types that share a rank are drawn in id order.');
+  });
+
   /**
    * 13.935 — a second click cannot land while the first swap is still in flight.
    *

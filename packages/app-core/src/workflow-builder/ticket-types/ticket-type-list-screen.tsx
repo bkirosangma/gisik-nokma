@@ -422,6 +422,25 @@ export function TicketTypeListScreen(props: {
             </li>
           ))}
         </ul>
+        {/*
+          E5-14 — WHY THE ARROWS DO NOTHING. All ten ↑/↓ controls render disabled,
+          and the reason lived only in each button's `title` attribute
+          (`moveBlocker`, "Built-in types keep their rank.") — a hover tooltip,
+          with no touch or keyboard equivalent. A reader on a phone met ten dead
+          controls and no explanation anywhere on the page.
+
+          The second sentence is the tie, which is the same finding's other half:
+          the shipped seed already puts two types at rank 3, and the two-event
+          swap exists precisely to prevent a tie. `orderedTypes` breaks one by id
+          (`.sort((a, b) => a.rank - b.rank || (a.id < b.id ? -1 : …))`), so a tie
+          draws in a fixed order that says nothing about precedence — which is
+          worth a reader knowing rather than inferring from two rows that read
+          "rank 3".
+        */}
+        <p className="ticket-type-list__reorder-note" data-testid="ticket-type-reorder-note">
+          Built-in types keep their rank; custom types reorder among themselves. Two types that share
+          a rank are drawn in id order.
+        </p>
       </Card>
     </section>
   );

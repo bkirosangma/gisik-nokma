@@ -2598,6 +2598,17 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    leading and sat visibly lighter and smaller than the drawing. */
 .ticket-type-list__title { margin: 0; font-size: 1.25rem; line-height: 1.5625rem; font-weight: 600; }
 .ticket-type-list__summary { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
+/* E5-14 — the on-screen reason the ↑/↓ controls are disabled, and the tie-break
+   under it. Muted and small like the summary above it, because it is an aside
+   about the controls rather than a message: it renders whether or not any arrow
+   is disabled, so a reader who CAN reorder still learns which types they cannot
+   move. `margin-top` and not a gap — `.ticket-type-list__rows` is the flex
+   column, and this sits outside it. */
+.ticket-type-list__reorder-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.8rem;
+  color: var(--gn-text-muted);
+}
 .ticket-type-list__card { padding: 0.5rem; }
 .ticket-type-list__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
 /* The row IS the door now (owner: "remove [Edit] and open on just clicking
