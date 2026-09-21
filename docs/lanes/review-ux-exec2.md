@@ -1446,11 +1446,19 @@ honest fallback: return the queue sentence, which is the part that is true.
 verbatim (as `board-screen.tsx` already does for `failed`).
 
 **MEASUREMENT.** Opened: `sync-status-bar.tsx:1-17` (the docblock and the whole function);
-`apps/mobile/src/screens/board-screen.tsx:44-54` for the live call site (`syncStatusLabel(props.status,
-props.queued)`), which is where an unknown value would reach a person today.
+`apps/mobile/src/screens/board-screen.tsx:11,44-54` for the live call site (`syncStatusLabel(props.status,
+props.queued)`).
 
-**Source:** carried candidate (round-1 §2d). **Severity: Minor** — no case in the product passes an
-unrecognised status today; the defect is what the arm would do when one does.
+**And the widened parameter is not hypothetical — the live caller types it that way.**
+`apps/mobile/src/screens/board-screen.tsx:11` declares **`status: string;`** — the bare `string` the
+helper's own docblock says it widened for — so an unrecognised value is a shape a shell already admits
+rather than one I invented. I checked this specifically because the same question killed another
+candidate of mine (`M4`, R2.11): there, the only supplier was total and the input **could not** occur.
+Here it can, and the surface it reaches is a person's board.
+
+**Source:** carried candidate (round-1 §2d). **Severity: Minor** — the unknown arm is not exercised by any
+call site today, so nothing is misreported right now; what is wrong is the direction the fallback fails
+in when one is added.
 
 ---
 
