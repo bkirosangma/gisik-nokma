@@ -2382,6 +2382,44 @@ which the comment names; the placeholder must not be a colleague.
 member id can actually occupy `assigneeId` at the moment a comment is sent — both would need the app run
 against a real workspace. I claim the code path and the attribution semantics, not a reproduction.
 
+> **DEFENCE — phase 2, 2026-09-21 15:12 IST (Opus, inheriting the lane).** Written before any refutation of this
+> finding has landed, because the lane's own pushed refutations file (row `E5-21`, commit `ad054454`, 10:52 IST)
+> already concedes the half of this finding that is false, and a judge reading the title alone would not see the
+> concession. **Stated plainly: two sentences in this finding are FALSE as frozen** — the title's *"is recorded as
+> the ASSIGNEE's words"* and the WHY paragraph's *"is written to the ledger as that person's claim"*. Neither
+> happens. The correction block above (commit `0dff77cd`, 10:41 IST, four hours before the 15:05 freeze) says so;
+> this paragraph asks the judge to rule on the **narrowed claim**, which I re-measured today at `778a6439`:
+>
+> - **The door refuses, every time.** `apps/server/src/permissions/check-permission.ts:542-544` — `if (env.actorId
+>   !== ctx.sessionUserId) return refuse(IDENTITY_SPOOF_REASON)`; `:71` `IDENTITY_SPOOF_REASON = 'You cannot submit
+>   a claim as another person.'` The phone's `actorId` is `state.assigneeId ?? 'me'` (`ticket-screen.tsx:49`) — a
+>   value that equals the session user only by coincidence. The ledger is never written. (Opened.)
+> - **The composer can never learn the refusal.** `packages/app-core/src/replica/replica-data-source.ts:1391-1407`:
+>   the replica's `ingest` enqueues locally, fires `void engine.flush().catch(() => undefined)` un-awaited, and
+>   **throws `OfflineAcceptError` whenever any claim was queued** — its own docblock at `:1387-1389`: *"this method
+>   can never return `committed`, under any input"*. The phone's handler catches exactly that error and returns
+>   (`ticket-screen.tsx:54` *"queued locally — the expected offline outcome"*), so the `setError` arm at `:55`
+>   fires only for a LOCAL precheck refusal, never for the server's. The server's answer arrives later, inside
+>   the swallowed flush. (Opened.)
+> - **What the person is then told.** The outbox marks the row `status = 'failed'` with `last_error =
+>   'identity-spoof: You cannot submit a claim as another person.'` (`packages/sync-client/src/outbox/outbox.ts:411-412`),
+>   under a comment that says the person *"is owed the fact that it was refused and the words it was refused in"*
+>   (`:408-409`). The phone renders that debt as **`{failed} needs attention`** on the BOARD screen
+>   (`board-screen.tsx:53`) — a count, on a different screen from the one the words were typed on, with no reason,
+>   no ticket and no words. The ticket screen (`ticket-screen.tsx:124-127`) renders nothing after the press: the
+>   draft is not cleared, no sentence appears, and the Comment button remains offered. (Opened.) ⚠ So my
+>   correction block's *"no screen says so"* is itself over-broad by one count on one other screen; the precise
+>   sentence is the one just given.
+>
+> **The narrowed claim, for the judge to rule on:** the phone's Comment control **offers what can only be refused**
+> (every claim carries an `actorId` the door compares against a session the shell does not have), the refusal
+> **arrives after the press and off-screen**, and the words are lost — the SERVER-REFUSES-WHILE-CLIENT-BELIEVES
+> class the role brief names as this product's most expensive, in the form the brief states first: *"a refusal
+> that arrives after the press is a defect, even when the refusal is correct."* Severity claimed unchanged
+> (Important); if the judge scores the finding as frozen — title included — the ×3 penalty is the rule's and I do
+> not argue it. What I argue is that the record shows the false half was found and named by this lane, in phase 1,
+> before any peer filed against it. Sibling: exec 5's `E5-21`, independently measured, same door.
+
 ---
 
 *Running total of round-2 new findings: `E2-20`–`E2-42` (23) — 13 Important, 10 Minor.*
