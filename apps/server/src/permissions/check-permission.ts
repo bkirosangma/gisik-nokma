@@ -3,6 +3,8 @@ import {
   membershipGrantedPayload,
   membershipRevokedPayload,
   projectCreatedPayload,
+  ticketAssignedPayload,
+  ticketCollaboratorPayload,
   ticketCreatedPayload,
   visibilitySetPayload,
   type EventEnvelope,
@@ -138,6 +140,16 @@ export const VISIBILITY_CLAIM_MISMATCH_REASON = 'This claim does not name the ti
  * rebuild the existence oracle Task 8's 404s removed one layer up.
  */
 export const TICKET_NOT_VISIBLE_REASON = 'This ticket is not visible to you.';
+/**
+ * E6-17 (2026-09-21). The person a `ticket.assigned` or
+ * `ticket.collaborator_added` NAMES must hold a role in the ticket's workspace.
+ * Reported as `permission.role` because it is a role question — the named
+ * person's, resolved through the same `resolveEffectiveRole` the gate reads
+ * the actor's through — and never as a visibility one: whether the actor may
+ * act on the ticket was already settled a line above, and nothing about the
+ * ticket is disclosed by a sentence about somebody's membership.
+ */
+export const NAMED_PERSON_NOT_IN_WORKSPACE_REASON = 'That person is not in this workspace.';
 /** Task 9 check 5. Reported as `permission.role`: it is authority, not audience. */
 export const VISIBILITY_AUTHORITY_REASON =
   "Only a project admin or the ticket's creator can change who sees this ticket.";
@@ -1047,6 +1059,48 @@ export async function checkVisibilityPermission(
 
   if (!(await canSee(ctx.db, ctx.sessionUserId, env.entity.id))) {
     return refuseWith(PERMISSION_VISIBILITY_RULE, TICKET_NOT_VISIBLE_REASON);
+  }
+
+  /**
+   * INVARIANT (E6-17): a `ticket.assigned` or `ticket.collaborator_added` may
+   * name only a person who holds a role in this workspace — a non-member, a
+   * fresh ULID nobody owns and the string `nobody-here` are all refused with
+   * the same sentence.
+   *
+   * Before this, the payloads were `z.string().min(1)`, `evaluateEvent` has no
+   * case for either type, and this gate asked only whether the ACTOR may act on
+   * the ticket — so the door answered `committed` to a question it never asked,
+   * and the read side served the string: `mappers.ts` renders
+   * `roster.get(id) ?? id` as an assignee NAME, the list's `assigneeId` filter
+   * matches it, and `groupBy=assignee` makes a column for it. Through the MCP
+   * `assign_ticket` tool an agent's typo became a permanent, attributed claim
+   * naming nobody. Measured 2026-09-21 through `POST /v1/events`.
+   *
+   * The lookup is the one `checkMembershipOwnerAuthority` already makes for
+   * ITS target, and it refuses `null` only: a guest is a member of the
+   * workspace, and whether a guest can SEE the ticket they are assigned is the
+   * read side's question (case 7.27), not this door's. `collaborator_removed`
+   * is deliberately not here — removing someone who has since left the
+   * workspace is a cleanup this door must keep accepting. `assigneeId: null`
+   * (unassign) names nobody and passes. A payload that does not parse is
+   * passed through to the engine's `malformed-payload`, as the membership
+   * pass does, so a shape problem is not reported as a role problem.
+   *
+   * AFTER the `canSee` check, on purpose: an actor who cannot see the ticket
+   * gets that sentence and nothing else, so the named person's membership is
+   * never disclosed to someone with no standing on the ticket.
+   */
+  if (env.type === 'ticket.assigned' || env.type === 'ticket.collaborator_added') {
+    const named =
+      env.type === 'ticket.assigned'
+        ? ticketAssignedPayload.safeParse(env.payload).data?.assigneeId ?? null
+        : ticketCollaboratorPayload.safeParse(env.payload).data?.userId ?? null;
+    if (named !== null) {
+      const namedRole = await resolveEffectiveRole(ctx.db, named, env.workspaceId);
+      if (namedRole.workspaceRole === null) {
+        return refuse(NAMED_PERSON_NOT_IN_WORKSPACE_REASON);
+      }
+    }
   }
 
   if (env.type === 'visibility.set') {

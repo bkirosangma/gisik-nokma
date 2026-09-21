@@ -3,6 +3,7 @@ import { newUlid, type EventEnvelope } from '@gisik-nokma/domain';
 import {
   checkPermission,
   GUESTS_CANNOT_CREATE_TICKETS_REASON,
+  NAMED_PERSON_NOT_IN_WORKSPACE_REASON,
   NOT_ON_PROJECT_REASON,
   PERMISSION_ROLE_RULE,
   PERMISSION_VISIBILITY_RULE,
@@ -785,6 +786,93 @@ describe('check 6 — who may delete or restore a ticket', () => {
       refused: true,
       rule: PERMISSION_ROLE_RULE,
       reason: TICKET_DELETE_UNRESOLVED_REASON,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// E6-17 — who may be NAMED by an assignment or a collaborator add. Reported as
+// `permission.role`: it is the named person's role, resolved through the same
+// `resolveEffectiveRole` the gate reads the actor's through.
+// ---------------------------------------------------------------------------
+describe('E6-17 — the person an assignment names must be in the workspace', () => {
+  /** A member on a project, and a ticket in it every member can see. */
+  async function assignableTicket() {
+    const { workspaceId, projectId } = await workspace();
+    const member = newUlid();
+    const ticketId = newUlid();
+    await seedMember(db.pool, workspaceId, member, 'member', [{ projectId, projectAdmin: false }]);
+    await seedTicket(db.pool, { workspaceId, projectId, ticketId, createdBy: member });
+    await applyAll(db.pool, [setVisibilityEnv(workspaceId, ticketId, 'workspace')]);
+    return { workspaceId, projectId, member, ticketId };
+  }
+  const assign = (workspaceId: string, ticketId: string, actorId: string, assigneeId: string | null) =>
+    ticketEvent(workspaceId, 'ticket.assigned', ticketId, actorId, { assigneeId });
+  const addCollaborator = (workspaceId: string, ticketId: string, actorId: string, userId: string) =>
+    ticketEvent(workspaceId, 'ticket.collaborator_added', ticketId, actorId, { userId });
+
+  /**
+   * 6.151 — planted defect: `ticket.assigned` and `ticket.collaborator_added`
+   * naming someone with no role in the workspace — a fresh ULID nobody owns,
+   * a signed-up person who is not a member, the string `nobody-here` — are
+   * refused `permission.role` with the named person's sentence. MEASURED
+   * before the fix through `POST /v1/events` as the owner: all four committed,
+   * and the board rendered `"assigneeId":"nobody-here"` on the card.
+   */
+  it('planted defect: naming a non-member, a fresh ULID or "nobody-here" is refused, and says so', async () => {
+    const { workspaceId, ticketId, member } = await assignableTicket();
+    const refusal = { refused: true, rule: PERMISSION_ROLE_RULE, reason: NAMED_PERSON_NOT_IN_WORKSPACE_REASON };
+    // A signed-up person with no membership here: seeded as a member of a
+    // DIFFERENT workspace, so the lookup is tenancy-scoped and not a bare
+    // "does this id exist anywhere".
+    const strangerElsewhere = newUlid();
+    await seedMember(db.pool, newUlid(), strangerElsewhere, 'member');
+    for (const named of [newUlid(), strangerElsewhere, 'nobody-here']) {
+      expect(await gate(assign(workspaceId, ticketId, member, named), member), `assign ${named}`).toEqual(refusal);
+      expect(
+        await gate(addCollaborator(workspaceId, ticketId, member, named), member),
+        `collaborator ${named}`,
+      ).toEqual(refusal);
+    }
+  });
+
+  /**
+   * 6.152 — the controls for 6.151, each on a line the refusal above could
+   * have been written to catch by mistake: a MEMBER and a GUEST are both in
+   * the workspace and pass (whether a guest can see the ticket is the read
+   * side's question, case 7.27); `assigneeId: null` names nobody and passes;
+   * `collaborator_removed` of a non-member is a cleanup and passes; and an
+   * actor who cannot see the ticket is answered with the audience sentence
+   * BEFORE the named person's membership is consulted, so the door never
+   * discloses whether somebody is in the workspace to a person with no
+   * standing on the ticket.
+   */
+  it('a member or guest may be named, unassigning and removing pass, and the audience refusal comes first', async () => {
+    const { workspaceId, projectId, ticketId, member } = await assignableTicket();
+    const other = newUlid();
+    const guest = newUlid();
+    await seedMember(db.pool, workspaceId, other, 'member', [{ projectId, projectAdmin: false }]);
+    await seedGuest(db.pool, workspaceId, guest);
+    expect(await gate(assign(workspaceId, ticketId, member, other), member)).toBeNull();
+    expect(await gate(assign(workspaceId, ticketId, member, guest), member)).toBeNull();
+    expect(await gate(addCollaborator(workspaceId, ticketId, member, guest), member)).toBeNull();
+    expect(await gate(assign(workspaceId, ticketId, member, null), member)).toBeNull();
+    expect(
+      await gate(ticketEvent(workspaceId, 'ticket.collaborator_removed', ticketId, member, { userId: 'nobody-here' }), member),
+    ).toBeNull();
+
+    // Ordering: an admin of ANOTHER workspace naming a non-member on a ticket
+    // they cannot see gets the audience refusal, not the membership one — the
+    // role gate refuses a non-member actor even earlier, so the actor here is
+    // a member of THIS workspace who is not on the ticket's project, with the
+    // ticket in project mode.
+    const outsider = newUlid();
+    await seedMember(db.pool, workspaceId, outsider, 'member');
+    await applyAll(db.pool, [setVisibilityEnv(workspaceId, ticketId, 'project')]);
+    expect(await gate(assign(workspaceId, ticketId, outsider, 'nobody-here'), outsider)).toEqual({
+      refused: true,
+      rule: PERMISSION_VISIBILITY_RULE,
+      reason: TICKET_NOT_VISIBLE_REASON,
     });
   });
 });
