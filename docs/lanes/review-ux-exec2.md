@@ -1217,15 +1217,19 @@ myself**. Status at this push:
 | Single-row mark-read and its Undo fail silently | ✅ **filed — `E2-26`** |
 | Unrecognised sync status reports "Live" | ✅ **filed — `E2-27`** |
 | Bulk-close offline acceptance reported as "could not reach" | ✅ **filed — `E2-28`** |
-| `Dialog`: `aria-modal="true"` with no focus move, trap or return | ⏳ verifying (overlaps exec 1's `P8`, which the judge already ruled — see below) |
-| Comment carry-over across two different moves | ⏳ verifying |
-| Two `aria-modal` dialogs at once; one Escape closes both | ⏳ verifying |
-| Four submit buttons with no in-flight latch | ⏳ verifying (partly covered by my own `E2-19`) |
-| Sheet read arms carry no role | ⏳ verifying (partly covered by my own `E2-15`) |
-| `typeId`/`parentId`/`mode`/`toStateId` seeded once | ⏳ verifying |
+| Move has no transport surface, and no in-flight latch | ✅ **filed — `E2-29`** |
+| The 15-second toast is the only way back from a delete | ✅ **filed — `E2-30`** |
+| `if (submitting) return` cannot fire | ✅ **filed — `E2-31`** |
+| Comment carry-over across two different moves | ✅ **filed — `E2-32`** |
+| `typeId`/`toStateId`/`mode` seeded once, guarded by emptiness | ✅ **filed — `E2-33`** (three sites, one defect) |
+| Two `aria-modal` dialogs at once; one Escape closes both | ✅ **filed — `E2-34`** |
+| `Dialog`: `aria-modal="true"` with no focus move, trap or return | ❌ **NOT filed** — exec 1's `P8`, already ruled; see below |
+| Sheet read arms carry no role | ❌ **NOT filed** — already inside my own `E2-15` (`V6`) |
+| Partly committed batch never reloads | ⏳ verifying |
+| Delete has no confirmation | ⏳ verifying |
 | Draft never cleared across a close | ⏳ verifying |
 | `M1`–`M9` (archived not disclosed; stale-data reload; no narrow rules; calendar throw; `aria-controls`; `AttachmentList`; history flattening; `PlainTextEditorSlot`; reopen seed) | ⏳ verifying |
-| `E2-20`'s two siblings from §2e (Move has no transport surface; partly-committed batch never reloads; Delete has no confirmation; the 15-second undo is the only way back; `if (submitting) return` cannot fire; `AttachmentListItem` has no caller) | ⏳ verifying |
+| `AttachmentListItem` has no caller | ⏳ verifying (may fold into `E2-25`) |
 
 ⚠ **One candidate I am deliberately NOT filing, and the reason is a rule.** The sweep's `Dialog` finding
 (`aria-modal="true"`, no focus trap) overlaps **exec 1's `P8`, which this judge already ruled on** —
@@ -1477,7 +1481,7 @@ so the person is not left without information — they are left with a contradic
 
 ---
 
-*Batch 2 filed. Running total of round-2 new findings: `E2-20`–`E2-28` (9) — 4 Important, 5 Minor.*
+*Batch 2 filed. Running total of round-2 new findings: `E2-20`–`E2-28` (9) — 5 Important, 4 Minor.*
 
 ---
 
@@ -1637,4 +1641,115 @@ they are not told to look.
 
 ---
 
-*Batch 3 filed. Running total of round-2 new findings: `E2-20`–`E2-32` (13) — 6 Important, 7 Minor.*
+*Batch 3 filed. Running total of round-2 new findings: `E2-20`–`E2-32` (13) — 7 Important, 6 Minor.*
+
+---
+
+# R2.9 — NEW FINDINGS, BATCH 4
+
+---
+
+### E2-33 (r2) — IMPORTANT · Three dialogs seed a choice once from a prop and guard it by emptiness rather than membership, so a later prop change leaves the screen and the payload disagreeing
+
+**WHAT.** **Measured structural fact first: all three files contain ZERO `useEffect` occurrences** —
+`new-ticket-dialog.tsx` 0, `reopen-dialog.tsx` 0, `visibility-editor.tsx` 0. So every `useState`
+initialiser in them runs once, and no prop change is ever re-read.
+
+**(a) `new-ticket-dialog.tsx` — the type.**
+`:97` `const [typeId, setTypeId] = useState(typeOptions[0]?.id ?? '');`
+The caller **swaps the list's identity**, `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1482-1485`:
+```
+const typeOptions = ticketTypes.data === null
+  ? BUILTIN_TYPE_LADDER
+  : ticketTypes.data.map((type) => ({ id: type.id, name: type.name }));
+```
+It is `BUILTIN_TYPE_LADDER` while the read is in flight and the workspace's real types afterwards. Nothing
+re-seeds `typeId`, and the gate is a *string test*, not a membership test: `:280`
+`disabled={title.trim() === '' || typeId === ''}`.
+**Consequence.** `packages/ui/src/select/select.tsx:250` resolves the shown label with
+`options.find((option) => option.value === props.value) ?? null`, and `:255` renders
+`selected ? selected.label : placeholder`. So with a ladder id still in state and the real list in
+`options`, **the control draws the placeholder — "no type chosen" — while `typeId` is non-empty and
+Create is enabled.** The screen and the payload disagree, which is the exact defect this component's own
+docblock exists to refuse (it fixed that for `parentId`). With a genuinely empty list at mount the mirror
+case holds: `typeId` stays `''`, Create is disabled for ever, and no sentence says why.
+
+**(b) `reopen-dialog.tsx` — the destination.** `:62`
+`const [toStateId, setToStateId] = useState(reopenStates[0]?.id ?? '');` with the same emptiness gate at
+`:102` `disabled={toStateId === ''}`. Same shape.
+
+**(c) `visibility-editor.tsx` — the audience.** `:237-238` seeds `mode` and `userIds` from `current`
+(`current?.ownMode ?? 'inherit'`, `current?.userIds ?? []`). The docblock elsewhere in this sheet records
+that the sheet's own read is reloaded on a successful change and by the stream — while the controls keep
+their seeded values, so the standing sentence (`:330`, rendered from `current`) and the fieldset
+(`:379-414`, rendered from stale state) can show **two different modes**, and Apply then submits the stale
+one.
+
+**WHY it is wrong.** All three are the same defect in one codebase idiom: a selection seeded once from a
+prop that legitimately changes, guarded on its own emptiness rather than on membership in the list being
+offered. The consequence is always the same and is the one this product refuses by name — the screen says
+one thing and the payload does another. (a) is the sharpest because the placeholder actively says "nothing
+chosen" while the wire carries a type, and because the swap is on the ordinary path: the ladder is a
+**placeholder list** that is always replaced.
+
+**WHAT WOULD HAVE BEEN BETTER.** Re-seed on the list's identity change (a `useEffect` keyed on
+`typeOptions`/`reopenStates`, or a `key` on the dialog), and gate the submit on membership
+(`!options.some(o => o.id === typeId)`) rather than on emptiness. For (c), reconcile the seeded values when
+`current` changes, so the fieldset cannot outlive the sentence it contradicts.
+
+**MEASUREMENT.** Opened: `new-ticket-dialog.tsx:96-106` (the four `useState`, no latch) and `:96-118`
+(the seed and `noUsableParent`), `:280`; `page.tsx:1482-1485`; `packages/ui/src/select/select.tsx:250,255`;
+`reopen-dialog.tsx:55-64` and `:102`; `visibility-editor.tsx:237-238`, `:330`, `:379-414`.
+`useEffect` counts per file are the grep above.
+
+⚠ **Reachability, stated per site.** (a) is reachable on every ticket creation where the type read has not
+answered by first paint — I have **not** driven it in a browser, so I claim the mechanism, not a
+reproduction. (b) needs a second prompt mounted while one is live, which `E2-34` shows is possible; I did
+**not** construct it. (c) needs a refetch of the ticket read; `useLiveQuery`'s reload keeps `data` (so
+`current` updates) — measured at `use-live-query.ts:64-95`, where a key change clears and a reload does not.
+
+**Source:** carried candidate (round-1 §2d, four separate leads folded into one finding because they are
+one defect). **Severity: Important.**
+
+---
+
+### E2-34 (r2) — MINOR · Two `aria-modal` dialogs open at once, and one Escape press closes both
+
+**WHAT.** `packages/app-core/src/views/create-ticket-flow.tsx:250-253` — when the server answers
+`needs-reopen`, the flow opens the reopen offer **and returns without closing the New-ticket dialog**:
+```
+if (outcome.kind === 'needs-reopen' && draft.parentId !== null) {
+  await openReopenPrompt(childEvent, draft.parentId, outcome.refusal, 'server');
+  return;
+}
+```
+`dialogOpen` is untouched, and both surfaces render from the same fragment: `:360` `<NewTicketDialog
+open={dialogOpen} … />` and `:371` `<ReopenDialog open … />`.
+
+**WHY it is wrong.** `packages/ui/src/components/dialog.tsx:6-13` installs a **document-level** Escape
+listener per open dialog, each calling its own `onClose`. So one Escape press fires **both** handlers: the
+reopen offer is dismissed **and** the drafted ticket is discarded, from one keypress, with neither
+described. Two simultaneously-mounted `aria-modal="true"` elements is also a violation of the primitive's
+own claim (the attribute promises the rest of the page is inert) — independent of the keypress.
+The concrete harm is small — a typed title and a chosen type — but it is the same shape as the draft-loss
+family, and it is reachable on an ordinary path: creating a subtask under a finished parent makes the
+server answer `needs-reopen`.
+
+⚠ **This is NOT a re-raise of exec 1's `P8`** (`aria-modal` with no focus trap / no `inert`), which the
+round-1 judge already ruled. I make no claim about focus here; the claim is **two live modals and a shared
+Escape listener**, which `P8`'s ruling does not touch.
+
+**WHAT WOULD HAVE BEEN BETTER.** Close the New-ticket dialog when the offer opens, or render the offer in
+place of it — one modal at a time is the invariant the primitive assumes. A single document-level Escape
+listener owned by the topmost dialog would also do it, and would keep hidden state from accumulating.
+
+**MEASUREMENT.** Opened: `create-ticket-flow.tsx:244-256` and `:355-372`;
+`packages/ui/src/components/dialog.tsx:1-24` (the listener, the scrim's own `onClick={onClose}`, and
+`aria-modal="true"`).
+
+**Source:** carried candidate (round-1 §2d). **Severity: Minor** — the loss is one keypress's worth of
+typed draft, and both surfaces are visible at once so the person can see what happened.
+
+---
+
+*Batch 4 filed. Running total of round-2 new findings: `E2-20`–`E2-34` (15) — 8 Important, 7 Minor.*
