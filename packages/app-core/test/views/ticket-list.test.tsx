@@ -241,7 +241,10 @@ describe('3.51 TicketList — Asana-shaped, honest to the row set', () => {
 
   /**
    * The summary is a NUMBER; this is the rendering. Every row the view was
-   * given appears exactly once ACROSS THE SECTIONS under all five groupings.
+   * given appears exactly once ACROSS THE SECTIONS under all SIX groupings —
+   * `priority` joined them with the built-in (spec 2026-09-22), and the loop
+   * below reads `GROUPINGS`, so this claim moves with the union rather than
+   * beside it.
    *
    * Scoped to `.gn-list__section` on purpose: *Recently assigned* is an extra
    * surface pinned above, so a document-wide count would report `t2` twice and
@@ -1200,12 +1203,23 @@ describe('13.647 the selection checkbox column and the controls slot (packages/a
  * narrows this to "the declaration exists and says the right thing"; it does not
  * close it.
  *
- * The five chips, the five grouping keys and the `Group by` accessible name are
+ * The SIX chips, the SIX grouping keys and the `Group by` accessible name are
  * the three HARD CONSTRAINTS of this task that are also the three things a
  * restyle can silently take away: a tray rewritten as a `<details>`, a picker
- * rebuilt on a new component, five keys quietly grown to six. Each has its own
- * case, and 13.659's negative assertion (`workflow` is ABSENT) is the half that
- * a `toEqual` over five names cannot make on its own.
+ * rebuilt on a new component, a key quietly dropped or renamed. Each has its
+ * own case, and 13.659's negative assertion (`workflow` is ABSENT) is the half
+ * that a `toEqual` over the legal names cannot make on its own.
+ *
+ * ⚠ **THIS PARAGRAPH READ *"The five chips, the five grouping keys … five keys
+ * quietly grown to six"* UNTIL 2026-09-22, AND THAT SENTENCE'S MEANING HAS
+ * INVERTED rather than merely aged.** It was written when five was the correct
+ * count and a sixth key could only be a restyle ACCIDENT — the failure mode the
+ * hard constraint existed to catch. The priority built-in (spec 2026-09-22)
+ * made six correct, so "grown to six" now describes the intended state. The
+ * count is corrected and the warning is rephrased to what it always meant (a
+ * key dropped or renamed), because leaving it would have left a docblock
+ * warning against the shipped behaviour — the one form of stale prose a reader
+ * cannot argue with, since both readings are defensible from the sentence.
  */
 
 /** A due date claimed by Kiro, and the closed twin of it (13.666). */

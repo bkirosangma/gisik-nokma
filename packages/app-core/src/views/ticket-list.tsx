@@ -286,9 +286,10 @@ export type TicketListProps = {
  * The Asana-shaped list, and the three ways it refuses to lie.
  *
  * 1. **Grouping is a REARRANGEMENT, never a filter.** Every row this view is
- *    given renders exactly once ACROSS THE SECTIONS, under all five groupings.
- *    A grouping that drops a row is a filter wearing a grouping's name, and the
- *    ticket it dropped is gone with nothing saying so.
+ *    given renders exactly once ACROSS THE SECTIONS, under all SIX groupings
+ *    (the fifth of the six arrived with the priority built-in, spec
+ *    2026-09-22). A grouping that drops a row is a filter wearing a grouping's
+ *    name, and the ticket it dropped is gone with nothing saying so.
  *
  *    "Exactly once across the sections" and not "exactly once on the page":
  *    *Recently assigned* is an additional SURFACE pinned above them, so a row

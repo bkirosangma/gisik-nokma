@@ -2640,29 +2640,41 @@ describe('the `Subtask of {parent}` chip', () => {
 });
 
 /**
- * Door G, 2026-09-19 — PRIORITY, DUE and TYPE as first-class rows. Cases
- * `16.23`–`16.30`.
+ * Door G, 2026-09-19 — PRIORITY, DUE, START and TYPE as first-class rows.
+ * Cases `16.23`–`16.30` and `16.100`–`16.105`.
  *
- * **The three are NOT the same kind of thing, and that is the point of the
- * task.** Type is a domain concept; Due is a domain concept AND a built-in
- * field; Priority has **no domain concept at all** and is a custom-field
- * convention. A section that drew all three as though they were alike would be
- * the defect the dispatch names — *"a difference in what the sheet CLAIMS TO
- * BE, not just layout"*.
+ * **They are NOT all the same kind of thing, and that is the point of the
+ * task.** Type is a domain concept; Due and Start are domain concepts AND
+ * built-in fields; Priority WAS a custom-field convention with no domain
+ * concept at all, and is the **fifth built-in** since spec 2026-09-22. A
+ * section that drew them as though they were alike would be the defect the
+ * dispatch names — *"a difference in what the sheet CLAIMS TO BE, not just
+ * layout"*.
  *
- * **And two of the prototype's three are EDITORS there, which is a separate
- * door.** `16.29` asserts the READ-ONLY half so that making them editable later
- * is a decision rather than a drift — the same shape as F's `16.22`.
+ * **And two of the prototype's three are EDITORS there, which was a separate
+ * door.** `16.29` asserted the READ-ONLY half so that making them editable
+ * later would be a decision rather than a drift — the same shape as F's
+ * `16.22`.
  *
- * **THAT DECISION WAS TAKEN FOR DUE (ruling E5-6, 2026-09-21), and `16.29` now
- * pins the split rather than the uniform absence.** The record above is kept
- * because it is what made the change a decision on the record instead of a
- * drift: every surface in this product READS a due date — My Work's overdue
- * count, the List's due column, the Calendar, the Timeline, the due-soon
- * notification — and none could set one, while the deferral lived in a
- * catalogue record and the manual rather than in front of the person. The
- * editor's own write behaviour is `13.1178`. **Priority is STILL that unbuilt
- * door** and `16.29` still asserts it as an absence.
+ * **THAT DECISION WAS TAKEN, TWICE, AND THIS DOCBLOCK IS THE RECORD OF IT.**
+ * Due first (ruling E5-6, 2026-09-21): every surface in this product READS a
+ * due date — My Work's overdue count, the List's due column, the Calendar, the
+ * Timeline, the due-soon notification — and none could set one, while the
+ * deferral lived in a catalogue record and the manual rather than in front of
+ * the person. Then Priority and Start (spec 2026-09-22), which closed the door
+ * outright. The editor's own write behaviour is `13.1178` for Due; `16.100`–
+ * `16.103` cover Priority's control and Start's box.
+ *
+ * ⚠ **THIS PARAGRAPH ENDED *"Priority is STILL that unbuilt door and `16.29`
+ * still asserts it as an absence"* UNTIL 2026-09-22, and that sentence was
+ * FALSE FROM THE MOMENT TASK 7 OF THE PRIORITY PLAN LANDED.** It is corrected
+ * here rather than deleted because it is the record of what made each half a
+ * decision on the record — and because the source file's door G docblock was
+ * rewritten in that same commit while this file's copy, one level up from the
+ * cases it describes, was missed: prose is the one artifact no check reads,
+ * and the spec that ordered the rewrite named the SOURCE file's line range.
+ * **Type is the ONE row left read-only on both sides**, which is what the
+ * prototype draws.
  */
 /**
  * SHEET PROTOTYPE PARITY, 2026-09-20 — cases `16.81`–`16.99`.

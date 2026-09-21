@@ -1847,18 +1847,24 @@ these numbers are not 13.658-era numbers: the 2026-09-18 refresh moved every lin
 constant: 176→180, 477→481, 1827→1905, 2584→2779), so every citation here was re-measured against the new
 file rather than shifted by a delta.
 
-- ✅ **13.659 — `Group by` keeps its accessible name and exactly its five keys.** The chip tray and the
+- ✅ **13.659 — `Group by` keeps its accessible name and exactly its six keys.** ⚠ **It said FIVE until
+  2026-09-22, and the correction is not a number-shuffle: the priority built-in added `priority` to the
+  union (spec 2026-09-22), so six is now the CORRECT count and the old "no sixth key" negative became
+  "no SEVENTH" — the same sentence, one place along.** A count whose meaning moves with the product is
+  the reason this entry states the enumeration rather than only the number. The chip tray and the
   picker are the two things a restyle silently rewrites, so the picker is asserted twice over: the
-  `aria-label` attribute verbatim (`Group by`) and the panel offering `epic/status/assignee/type/flat`
-  and **no sixth key** — the negative half is the one a `toEqual` over five names cannot make, because it
-  is the half that catches a key quietly grown to six. Measured and recorded, not "fixed": the COMPUTED
+  `aria-label` attribute verbatim (`Group by`) and the panel offering
+  `epic/status/assignee/type/priority/flat` and **no seventh key** — the negative half is the one a
+  `toEqual` over the legal names cannot make, because it is the half that catches a key no view serves
+  (`workflow`) riding along. Measured and recorded, not "fixed": the COMPUTED
   accessible name is `epic Group by`, since React Aria composes `aria-labelledby` from the value and the
   label and that wins over the explicit `aria-label`. Pre-existing, and the constraint pins the attribute.
   (`packages/app-core/src/views/ticket-list.tsx`)
 
-- ✅ **13.660 — the tray renders five chips, each with its own accessible name and checked state.**
-  `Status/Assignee/Due date/Type/Progress` as five real checkboxes, checked exactly where the preferences
-  say, so "five chips" is a count of CONTROLS and not of decorated spans. The CONTROL arm asserts both
+- ✅ **13.660 — the tray renders six chips, each with its own accessible name and checked state.**
+  `Status/Assignee/Due date/Type/Progress/Priority` as six real checkboxes — **five until 2026-09-22,
+  when the Priority column landed (spec 2026-09-22)** — checked exactly where the preferences
+  say, so "six chips" is a count of CONTROLS and not of decorated spans. The CONTROL arm asserts both
   answers in one run — including that the chips are MOUNTED while the tray is closed, which is what the
   `hidden` attribute (rather than a `{open ? … : null}` conditional) buys and what an existing case in
   this file depends on. A `hidden` subtree is out of the accessible tree, so the closed-tray arm reads the
