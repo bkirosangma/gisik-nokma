@@ -254,6 +254,59 @@ describe('tap-target density — case 13.991', () => {
     listbox.remove();
   });
 
+  it('13.991 — every project-page VIEW is reached by the route loop, not only the default', () => {
+    const stackPath = SPEC_PATHS['e2e-stack/viewport.spec.ts'] as string;
+    const source = readFileSync(stackPath, 'utf8');
+    const MARKER = "key: 'stack-phone-390";
+
+    /**
+     * P34 (2026-09-21). The project page draws FIVE views — Backlog, Board, List,
+     * Calendar, Timeline — as `role="tab"` buttons that switch component state
+     * and leave the route unchanged. The suite's population was a list of
+     * ROUTES, so one visit to `/p/:projectId` rendered the DEFAULT view (`board`)
+     * and measured it five times' worth of nothing for the other four.
+     *
+     * The half a `vitest` run can hold: each non-default view has an entry, and
+     * that entry declares a `reach`. That a reach CLICKS and PROVES the view
+     * changed needs a browser — the spec asserts `aria-selected` for exactly that
+     * reason, and this file cannot be the only guard on either half.
+     */
+    const defaultAt = source.indexOf(`${MARKER}|/p/:projectId'`);
+    expect(defaultAt, 'the project-page route entry is gone from the stack suite').toBeGreaterThan(-1);
+
+    /** The text of the entry starting at `at`, up to the next entry's key. */
+    const entryAt = (at: number): string => {
+      const next = source.indexOf(MARKER, at + MARKER.length);
+      return source.slice(at, next === -1 ? source.length : next);
+    };
+
+    // THE CONTROL, and it is the assertion that makes the loop below mean
+    // something: the DEFAULT view's entry carries NO reach, because `goto`
+    // renders it. If it ever declares one, this window would contain `reach:`
+    // and the per-view assertions below would pass for a reason unrelated to the
+    // views.
+    expect(
+      entryAt(defaultAt),
+      'the default-view entry now sets a reach, so "has a reach" no longer distinguishes a reached ' +
+        'view from the one the page renders by itself.',
+    ).not.toContain('reach:');
+
+    for (const view of ['backlog', 'list', 'calendar', 'timeline']) {
+      const at = source.indexOf(`${MARKER}|/p/:projectId#${view}'`);
+      expect(
+        at,
+        `the "${view}" view has no route entry. It is a TAB, so no route entry reaches it and ` +
+          'nothing measures it — which is P34.',
+      ).toBeGreaterThan(-1);
+      expect(
+        entryAt(at),
+        `the "${view}" entry sets no \`reach\`, so the loop navigates to the project page and sweeps ` +
+          `whichever view it defaults to while reporting "${view}"'s key: a board measurement wearing ` +
+          'another view\'s name.',
+      ).toContain('reach:');
+    }
+  });
+
   it('13.991 — the signed-in tap-target population is the ROUTE LIST, not one route', () => {
     const stackName = 'e2e-stack/viewport.spec.ts';
     const stackPath = SPEC_PATHS[stackName];

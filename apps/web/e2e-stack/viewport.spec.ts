@@ -481,9 +481,112 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
     ],
   };
 
+  /**
+   * P34 (2026-09-21) — THE VIEWS ARE TABS, SO A ROUTE LIST CANNOT REACH THEM.
+   *
+   * The project page renders FIVE views — Backlog, Board, List, Calendar,
+   * Timeline — as `role="tab"` buttons that switch component state and leave the
+   * route unchanged (`page.tsx`: `role="tab"`, `aria-selected={selected}`,
+   * `onClick={() => setView(tab)}`). This suite's population was a list of
+   * ROUTES and it visited `/p/:projectId` ONCE, so it rendered the default view
+   * — `board`, stated twice in the page's own docblocks — and the other four
+   * were measured by nothing at all.
+   *
+   * The mechanism was already here and already typed: the route objects carry
+   * `reach?: () => Promise<void>`, so this is one property per view rather than a
+   * new instrument. The alternative — making the four views routes — is larger
+   * and would change the product to suit its test.
+   *
+   * ⚠ **THE REACH PROVES ITSELF OR IT IS WORSE THAN NOTHING.** A `reach` that
+   * clicks and misses leaves the default board rendered, and then every number
+   * the loop prints for that entry is a board measurement wearing the view's
+   * label — the failure this file's own `innerWidth` re-read exists to prevent
+   * one level up. So the tab is clicked and its `aria-selected` is read back
+   * before any sweep runs.
+   */
+  const openView = async (label: string): Promise<void> => {
+    const tab = page.getByRole('tab', { name: label, exact: true });
+    await tab.click();
+    await expect(
+      tab,
+      `clicking the "${label}" view tab did not select it, so every number below would be a ` +
+        `measurement of whatever view was already rendered, wearing "${label}"'s name.`,
+    ).toHaveAttribute('aria-selected', 'true');
+  };
+
+  /** A reach must do its own navigation — the loop skips `page.goto` when one exists. */
+  const reachView =
+    (label: string | null) =>
+    async (): Promise<void> => {
+      await page.goto(projectHref, { waitUntil: 'networkidle' });
+      if (label !== null) await openView(label);
+    };
+
+  /**
+   * The List view, AND the `Select` panel open — the other half of P11.
+   *
+   * `Select` portals its panel to `document.body` and renders it only while
+   * open, so a closed-page sweep sees none of its option rows; the selector now
+   * carries `[role="option"]`/`[role="listbox"]` (P11) but an arm nobody renders
+   * is still nothing. The List view is the one swept view carrying a `Select` on
+   * the page itself, so this is where the two findings meet.
+   *
+   * ⚠ THE PANEL IS OPENED ONLY IF THE TRIGGER IS ENABLED, AND SAID OUT LOUD WHEN
+   * IT IS NOT. The grouping control is `disabled={!prefsEditable}`, and this
+   * suite cannot be run from the worktree that wrote this (the only stack
+   * listening on `:3001` belongs to another checkout). So an enabled trigger must
+   * produce a visible listbox — an assertion, not a hope — and a DISABLED one is
+   * reported: a stated blind spot is worth more than a silent zero, and much more
+   * than a reach that quietly measures the closed page.
+   */
+  const reachListWithSelectOpen = async (): Promise<void> => {
+    await page.goto(projectHref, { waitUntil: 'networkidle' });
+    await openView('List');
+    const trigger = page.locator('.gn-select__trigger').first();
+    if (!(await trigger.isEnabled())) {
+      /* eslint-disable-next-line no-console */
+      console.log(
+        `[stack-phone-390] /p/:projectId#list — the grouping Select is DISABLED here, so its ` +
+          `portalled panel was not opened and its option rows are in this route's population on ` +
+          `NO account. Stated, not silently absent.`,
+      );
+      return;
+    }
+    await trigger.click();
+    await expect(
+      page.locator('[role="listbox"]').first(),
+      `the grouping Select's trigger was clicked and no [role="listbox"] appeared. If the trigger ` +
+        `moved, fix the locator HERE rather than deleting this reach: the panel renders only while ` +
+        `open, so without it every option row is outside every sweep's population (P11).`,
+    ).toBeVisible();
+  };
+
   const routes: { path: string; key: string; reach?: () => Promise<void> }[] = [
     { path: `/w/${workspaceId}/my-work`, key: 'stack-phone-390|/my-work' },
     { path: projectHref, key: 'stack-phone-390|/p/:projectId' },
+    /* P34: the four views that are NOT the default. Keys carry the view name so
+       each one's numbers are its own — the same reason the tap-target and
+       type-scale baselines key on the route. */
+    {
+      path: projectHref,
+      key: 'stack-phone-390|/p/:projectId#backlog',
+      reach: reachView('Backlog'),
+    },
+    {
+      path: projectHref,
+      key: 'stack-phone-390|/p/:projectId#list',
+      reach: reachListWithSelectOpen,
+    },
+    {
+      path: projectHref,
+      key: 'stack-phone-390|/p/:projectId#calendar',
+      reach: reachView('Calendar'),
+    },
+    {
+      path: projectHref,
+      key: 'stack-phone-390|/p/:projectId#timeline',
+      reach: reachView('Timeline'),
+    },
     { path: `/w/${workspaceId}/members`, key: 'stack-phone-390|/members' },
     {
       path: `/w/${workspaceId}/settings/ticket-types`,
