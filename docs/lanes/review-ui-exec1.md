@@ -2,6 +2,8 @@
 
 **Lane:** exec 1 · branch `exec1/review-ui`, cut from `origin/main = e4baa425966b331fdc1b189e3d1c86b667e30acc` · 2026-09-21
 **Method:** enumerate → cover → state coverage including what was **not** reached. No fix branch, no fix commit, no PR.
+**ROUND 2 (2026-09-21).** Branch `exec1/review-ui-r2`, cut from `origin/main = a7b6292b`. Round-1 findings **stay and are re-scored**; revisions are marked **⚠ r2**; new findings continue the numbering and are marked **r2**. Independent duplicates with the Opus lane both score, per `REVIEW-R2-RULES-2026-09-21.md` §3 — I have not read that lane's report and do not coordinate with it.
+
 **Prototype authority:** the staged export at `/Users/kiro/my_projects/gisik-nokma-lanes/prototype-2026-09-20/`.
 Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`**, cited by line. Bundle `Gisik Nokma Desktop.html` = `bf64cc446880281f…` (matches the `bf64cc446880` the owner's ruling names). **The repo's `design-system/interactive/desktop.dc.html` was NOT used as the comparison surface.**
 
@@ -55,6 +57,7 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 - `gh api repos/bkirosangma/gisik-nokma/actions/runs` across 12 pages (1,200 runs): the **last successful run is `34023679658` at `2026-09-06T09:05:54Z`**. Every run from `2026-09-06T11:52:24Z` to `2026-09-20T18:33:45Z` is `failure`. Pages 1–9 (900 runs) contain **zero** successes.
 - It is not a failing step — **the runner never starts.** `gh api …/runs/35529457412/jobs` → **every one of the 14 jobs has `"steps": []`, `"runner_name": ""`**, and `scope` shows `started_at …18:33:46Z → completed_at …18:33:48Z` (2 s). `gh run view --log-failed` → `log not found`.
 - The cascade: `scope` fails → `build`/`typecheck`/`server-tests`/`other-tests`/`e2e`/`viewport` are all **`skipped`**; `gate` (which treats `skipped` as fine) reports **`failure`**. `e2e` and `viewport` are `skipped` in **25 of 25** checked runs.
+- **⚠ r2 RE-MEASURED 2026-09-21, AND IT STILL HOLDS — the window is now 15 days and the failure mode is unchanged.** `gh run list --limit 6` → the newest six runs (down to `2026-09-21T02:23Z`) are all `failure`; `gh api .../runs/<newest>/jobs` → **all fourteen jobs still report `"steps": 0`**; and the last success is still **`2026-09-06T09:05:54Z`**. Nothing about this finding decayed in the day between rounds.
 - The local substitute cannot cover it: **`test:e2e` appears `0` times in `turbo.json`** (control: `build`, `test`, `typecheck` all present), so `pnpm turbo run build test typecheck` cannot invoke either suite. Verified by running it — **33/33, `Cached: 0`, `EXIT=0`.**
 - **AND I RAN THE SIGNED-OUT SUITE MYSELF, BY HAND, BECAUSE NOTHING ELSE WOULD.** `pnpm run test:e2e:viewport --workers=1` → **`31 passed, 2 skipped (1.1m)`, `EXIT=0`.** (The 2 skips are `responsive.spec.ts:1657`'s documented one-project-only guard, which drives its own viewports — not a defect.) Per route × viewport: **15 tap-target sweeps, all `offenders=0`, all `stale entries=[]`; 15 contrast sweeps, all `failures=0`; 15 viewport self-assertions, 5 at 390, 5 at 768, 5 at 1512.** The suite tore down its own `next dev` — port 3021 released, no orphaned workers. **This is the point of the finding, not an exception to it: the only way this lane could obtain a painted measurement of its own product was to run the suite by hand, because no automated path runs it.**
 
@@ -168,7 +171,7 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 
 ---
 
-### P8 — **IMPORTANT** — `Dialog` and `Sheet` both declare `aria-modal="true"`, and nothing in the product implements containment
+### P8 — **MINOR (product) / IMPORTANT (follow-on)** ⚠ **r2 REVISION** — `Dialog` and `Sheet` declare `aria-modal="true"`, and the missing containment is RECORDED as a named follow-on that the remedy already exists for
 
 **WHAT.** Both modal components tell assistive tech that the rest of the document is inert. Neither moves focus into the dialog, traps it, or restores it on close — and no focus trap or `inert` attribute exists anywhere in the product.
 
@@ -178,7 +181,19 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 - **Nothing anywhere implements containment:** `grep -rn "inert\|focus-trap\|focusTrap\|trapFocus"` over `packages apps` (excluding `node_modules`/`dist`/tests) returns **only prose uses of the word "inert"** — zero hits on the HTML attribute or a trap helper. **Positive control in the same command: `Escape` handlers are found in both `dialog.tsx:9` and `sheet.tsx:58`**, so the greps traverse the right tree.
 - **No caller supplies it either:** the four `<Dialog>` sites (`transition-dialog.tsx:382`, `bulk-close-dialog.tsx:242`, `new-ticket-dialog.tsx:126`, `reopen-dialog.tsx:64`) were checked for focus management; the only `useRef` among them is `bulk-close-dialog.tsx:161`'s `attemptRef`, a retry counter.
 
-**WHY IT IS WRONG.** `aria-modal="true"` is a stronger claim than `role="dialog"` — it asserts that content outside the dialog is unavailable. A screen-reader user is told the background is gone, then Tab moves focus into it: the dialog's own boundary is described as a wall that is not there. The product already has the good example next door: `InfoTip` documents *"No focus trap and no `role="menu"`"* and explains why each omission is correct **for a non-modal popover** (`info-tip.tsx:43-47`). These two components make the modal claim without the modal work.
+**⚠ IS THIS ALREADY RECORDED? YES — and round 1 filed it as a discovery, which it is not.** The product states the gap in its own words at `packages/app-core/src/views/board.tsx:394-397`:
+
+> *"(Dropping `aria-modal`'s focus escape itself is the shared `Dialog`'s business — **it ships no focus trap and no portal** — and is **recorded as a named follow-on** rather than repaired from here.)"*
+
+Under **§3** that is the shape a judge must look at hardest: *"the 'defect' is the product behaving as ruled with no argument against the ruling."* So the r2 revision does two things — it **drops the claim from Important to Minor as a product finding**, and it **makes the argument the owner's rule asks for**, which is why the *follow-on* half stays Important.
+
+**THE ARGUMENT, AND IT IS A CONNECTED ONE, NOT A PREFERENCE.** The record calls this a *named follow-on*. A follow-on whose remedy already exists in this repository, **tested, with case ids, two files away**, is not being followed on — and that is the measured claim, not an opinion:
+
+- The project page's filters sheet (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:3304`) is a **third** modal that declares `aria-modal="true"`, moves focus into itself on open, restores it to the exact opening control on close, and **asserts both**.
+- `apps/web/test/filters-sheet.test.tsx:153` is literally named *"13.445 the sheet is a real dialog, and focus moves into it on open"*; it asserts `expect(dialog.contains(document.activeElement)).toBe(true)` with a comment recording that the precondition is what keeps the assertion from being vacuous, and `13.446` covers the focus return.
+- **So the standard exists in-repo, it is tested, and it is on the LESS used surface.** The two components that lack it are the *more* used ones: four `<Dialog>` call sites plus the ticket sheet.
+
+**The connected consequence, which is what makes this weigh more than a preference:** the gap is not inert. `board.tsx:385-393` shows the product *reasoning about the leak* — a column action reached while a dialog is open is judged to have been *"reached behind a modal — a keyboard-focus escape"*, and the code **refuses the interaction rather than serving it** (case 13.793). So a workaround exists specifically because focus escapes the modal. **That is a measured behavioural consequence of the uncontained focus, recorded in the same file that records the follow-on.**
 
 **WHAT WOULD HAVE BEEN BETTER.** Either implement containment — move focus to the dialog on open, restrict Tab to it, restore focus to the opener on close — or drop `aria-modal` to `role="dialog"` alone and be honest about it. The second is one attribute and is not a worse product; the current state is the only one that is *wrong*, because it asserts the property rather than merely lacking it.
 
@@ -316,13 +331,15 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 
 ---
 
-### P13 — **MINOR** — There is no bypass mechanism; a keyboard user Tabs the nav on every navigation
+### P13 — **MINOR** ⚠ **r2 REVISION — the WCAG 2.4.1 CLAIM IS WITHDRAWN** — no skip link; a keyboard-only user Tabs the nav on every navigation
 
 **WHAT.** No skip link exists anywhere in the product.
 
 **MEASUREMENT.** `grep -rniE 'skip[ -]?(to|link)|gn-skip'` over `apps/web`, `packages/app-core/src`, `packages/ui/src` (all `.tsx`/`.css`, excluding tests) → **no matches** — a genuinely empty result, and the same sweep shape returns hits for other tokens, so it traverses.
 
-**WHY IT IS WRONG — and where I am deliberately *not* overclaiming.** WCAG 2.4.1 *Bypass Blocks* is Level A, but **the `<main>` landmark this product does render is itself a conforming bypass mechanism for assistive-technology users**: every route that renders content wraps it in `<main>` (verified — 24 route modules, and the only exception, `app/page.tsx`, is a bare `redirect('/workspaces')`). So the person affected is the **keyboard-only, non-AT user** — typically someone with a motor impairment — who must Tab through `AppNav`'s workspace-scoped links on every single navigation with no way past them.
+**⚠ ROUND 1 FILED THIS UNDER WCAG 2.4.1 AND THAT WAS WRONG — WITHDRAWN IN r2.** 2.4.1 *Bypass Blocks* is satisfied by a landmark as well as by a skip link: **ARIA11 ("Using ARIA landmarks to identify regions of a page") is a sufficient technique**, and this product renders `<main>` on every content route — verified, 24 route modules, the sole exception being `apps/web/app/page.tsx`, a bare `redirect('/workspaces')`. **So the product very likely CONFORMS, and claiming a Level A failure was an overstatement.** A finding that overstates a conformance failure is exactly what §3 prices at triple, so it is withdrawn rather than defended.
+
+**WHAT SURVIVES, AND IT IS STILL TRUE.** The person a skip link serves is the **keyboard-only, non-AT user** — typically someone with a motor impairment — who must Tab through `AppNav`'s workspace-scoped links on every navigation. A landmark is a bypass for someone who can *invoke* one; a keyboard user without a screen reader has to walk the links. **That is a convenience finding, not a conformance finding**, and it is filed as Minor on that basis.
 
 **WHAT WOULD HAVE BEEN BETTER.** A visually-hidden-until-focused "Skip to content" link as the first focusable element in `layout.tsx`, targeting the `<main>`. That is the standard remedy, it is about ten lines, and it is the one element in this report that a keyboard user would notice immediately.
 
@@ -375,17 +392,16 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 **CRITICAL — 1**
 - `I1` no browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate structurally cannot run one
 
-**IMPORTANT — 8**
+**IMPORTANT — 7**
 - `I2` the `e2e-stack` contrast roster records a defect fixed eight hours later, with no provenance
 - `I3` `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by its own docblock
 - `P1` seven interactive controls styled by no rule at all (raw UA chrome)
 - `P2` the board's whole-board empty state has no prototype counterpart and no styling
-- `P8` `Dialog` and `Sheet` declare `aria-modal="true"`; nothing implements containment
 - `P9` `SegmentedControl` carries ARIA tab semantics with none of the tab keyboard model, in 7 places
 - `P11` the `Select` panel is outside every sweep's population, for two independent reasons
 - `P12` every screen in the product has the same document title (WCAG 2.4.2, Level A)
 
-**MINOR — 9**
+**MINOR — 10**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
 - `I5` my own handoff carries two contradicting position blocks; the pointer that found it is itself stale
 - `P3` the parent crumb cannot show the parent's key; the prototype's does; no ruling found
@@ -393,10 +409,11 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 - `P5` an owner-requested type selector was neither built nor reported
 - `P6` mobile: two of three screens have no styling while the third is themed
 - `P7` desktop's task list has no rules
+- `P8` `Dialog`/`Sheet` declare `aria-modal="true"`; the missing containment is recorded as a named follow-on whose remedy exists in-repo (counted here, not under IMPORTANT — see the note)
 - `P10` the accessible-name ratchet's unit is an attribute; its message claims a property of assistive tech
 - `P13` no skip link; a keyboard-only user Tabs the nav on every navigation (WCAG 2.4.1)
 
-**Total 18.** `raised` and `sum by severity` agree by enumeration above. ⚠ **One id carries two severities on purpose and is counted once:** `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 18.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
