@@ -160,7 +160,11 @@ evidence-gate.ts`, `auth/auth.ts:150-360` and `apps/server/src/app.ts:477-612` (
 `deploy/do/app.yaml:1-10`, `:119`, `routes/search.ts:143-215` (the FTS query shape and the hit's columns), `http/rate-limit.ts:96-125`
 (`rateLimitKeyFor`, rightmost XFF entry — sound), `attachments/sniff.ts` (behaviour measured, Appendix U),
 `domain/src/{parse-event,ids,prefix,submit,registry}.ts` (whole, code lines), `routes/{events,auth-methods,
-preferences,notification-preferences}.ts` (whole), `visibility/visible-tickets.ts` (whole, + one probe), `domain/src/ist-day.ts:27-47`, `domain/src/events/membership.ts:39-42`, `:68-72`, `rule-engine/src/checks/fields.ts:25-60`,
+preferences,notification-preferences}.ts` (whole), `visibility/visible-tickets.ts` (whole, + one probe), `sync/{stream-seq,ledger-deps}.ts` and
+`ledger/{event-store,snapshot-store}.ts` (the exported functions and every SQL statement), `mcp-server/src/{config,
+device-login,lazy-session,main,login-prompt}.ts` (whole), `app-core/src/online/stream.ts:95-160`, `:273-324` (frame
+parsing and cursor advance), `sync-client/src/replica/replica.ts:1050-1103`, `:1254-1290` (purge, scope-revoked,
+reach-granted arms), `domain/src/ist-day.ts:27-47`, `domain/src/events/membership.ts:39-42`, `:68-72`, `rule-engine/src/checks/fields.ts:25-60`,
 `:116-138`, `routes/attention.ts:255-266`, `apps/web/app/privacy/page.tsx:140-170`, `apps/web/app/mcp/authorize/page.tsx:148-192`,
 `routes/my-invitations.ts:105-190` (address binding), `domain/src/preferences.ts:20-140` (bounds),
 `sync/snapshot-refresh.ts:185-192` and `visibility/visible-events-for.ts:14` (grep: both carry deleted tickets by
@@ -210,26 +214,25 @@ size: 6 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ 
 - `packages/domain`: 30 of 41 files, including `entity-state.ts`, `ticket-state.ts` outside the reducer's event
   cases (`:1-98`, `:200-496` — `foldTicketToWorkflowVersion` in particular, used by the probes and not read), `submit.ts`, `parse-event.ts`, `envelope.ts`, `ids.ts`, `prefix.ts`, `ist-day.ts`,
   `doc-*.ts`, `simple-kanban.ts`, `stream-frames.ts`, `read-models.ts`, `notification*.ts`, `preferences.ts`.
-- `packages/sync-client`: `replica/replica.ts` (1,312 lines; two lines grepped), `storage/*`, `engine/sync-engine.ts` outside the
+- `packages/sync-client`: `replica/replica.ts` outside the three arms named in §2.2 (≈1,200 lines), `storage/*`, `engine/sync-engine.ts` outside the
   flush loop (bootstrap, subscribe, reconcile, `stall`).
-- `packages/mcp-server`: `device-login.ts`, `lazy-session.ts`, `login-prompt.ts`, `main.ts`, `config.ts`.
+- `packages/mcp-server`: nothing left unread (`register.ts` skimmed; `session.ts`/`http-client.ts` grep only).
 - `packages/app-core/src/online/`: `mappers.ts` outside `:903-1001` (≈2,350 lines), `stream.ts`, `http.ts`
   (grep only), `founding.ts`, `invites.ts`, `my-invitations.ts`, `notification-preferences.ts`,
   `notifications.ts`; `replica/replica-data-source.ts` outside `:1388-1408`.
-- `apps/server/src`: 9 of 19 route modules not opened beyond a grep (listed in the bullet below; `mcp-tokens`,
+- `apps/server/src`: 5 of 19 route modules not opened beyond a grep (listed in the bullet below; `mcp-tokens`,
   `my-invitations` and `search` were read in part); projections other than the three named; `read/` other than the two named;
-  `sync/{contests-route,snapshot-*,stream-seq,sync-routes,ledger-deps}.ts`; `ledger/event-store.ts` beyond
-  `readLedger`, `ledger/snapshot-store.ts`;
+  `sync/{contests-route,snapshot-writer,snapshot-refresh,sync-routes}.ts` (the last grep only);
   `ops/*`; `seed/*`; `http/{security-headers,hsts,rate-limit}.ts` beyond a grep; `auth/*` other than `auth.ts` and `synthetic-address.ts` (whose guard hides a synthetic
   address in rosters and is not consulted by the magic-link door — safe only because `.invalid` never resolves;
   noted, not filed); `tools/{sweep-invite-tokens,sweep-notifications,
-  sweep-user-preferences}.ts`; `visibility/{grant-backfill,rollup,visible-events-for,
-  visible-tickets}.ts` (rollup opened at `:258-266` only); `alerts/`, `workspaces/`.
+  sweep-user-preferences}.ts`; `visibility/{grant-backfill,rollup,visible-events-for}.ts` as code (rollup opened at `:258-266`,
+  `:68-108`; the other two exercised by Appendix AE, not read); `alerts/`, `workspaces/`.
 - **No browser, no pixel, no `apps/web` beyond `members/page.tsx:720-856`, no `apps/mobile`, no
   `apps/desktop`.**
-- `apps/server/src/routes/`: after the sweeps, every route module has been *called* (Appendices P/Q hit all 23
-  read doors) but `attention.ts`, `board.ts`, `events.ts`, `my-work.ts`, `ticket-history.ts`, `workspaces.ts`,
-  `preferences.ts`, `notification-preferences.ts`, `auth-methods.ts` were still not **read** beyond a grep.
+- `apps/server/src/routes/`: after the sweeps, every route module has been *called* (Appendices P/Q/Z hit all 23
+  read doors); `attention.ts`, `board.ts`, `my-work.ts`, `ticket-history.ts`, `workspaces.ts` were still not
+  **read** beyond a grep (the other four small ones were read whole).
 - **No full server suite run**, deliberately (rules §4); every measurement is a single probe file, so
   "the suite stays green with X mutated" is a sentence this report never says — exec 3 owns those.
 - **Migrations:** numbering and the dev DB's applied set (E6-7, Appendix E) only; no migration's SQL was read for
