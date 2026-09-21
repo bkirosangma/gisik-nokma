@@ -141,7 +141,7 @@ answered by a probe (Appendices A–H).
 deletion,context-helpers}.ts`, `rules/{require-different-user,restrict-to,require-evidence,require-comment,
 require-field}.ts` (14 of 28 files). `packages/domain/src/` — `vocabulary.ts` (registrations), `validate-workflow.ts`,
 `workflow.ts:151-191`, `rank.ts`, `clock-skew.ts`, `events/{invites,workspace-settings,visibility,ticket-events}.ts`
-(schemas), `filter-spec.ts:115-168`, `ticket-types.ts:98-160` (10 of 41). `packages/sync-client/src/` —
+(schemas), `filter-spec.ts:115-168`, `domain/src/ticket-types.ts:98-160` (10 of 41). `packages/sync-client/src/` —
 `outbox/outbox.ts` (whole), `engine/sync-engine.ts:844-972` (flush), `precheck/local-context.ts:120-160`,
 `net/http-transport.ts` (skimmed), `storage/*` (not opened) — 3 of 13. `packages/mcp-server/src/` —
 `tools/{write-tools,read-tools}.ts`, `token-cache.ts`, `http-client.ts`/`session.ts` (grep only) — 4 of 12.
@@ -153,7 +153,7 @@ functions and the membership branches; ~400 of 1,342 lines), `visibility/can-see
 attachments,tickets,notifications,mcp-device}.ts` (the routes named in findings; not every handler),
 `read/{visible-where,restricted-parents}.ts`, `notifications/{fanout,sweep,store}.ts` (grep + the cited blocks),
 `auto-close/sweep.ts:176-206`, `sync/{sync-service,reconcile-route}.ts`, `stream/hub.ts:213-387`, `gates/
-evidence-gate.ts`, `auth/auth.ts:150-360` and `app.ts:477-612` (rate limits), `mcp/token-store.ts:1-80`,
+evidence-gate.ts`, `auth/auth.ts:150-360` and `apps/server/src/app.ts:477-612` (rate limits), `mcp/token-store.ts:1-80`,
 `tools/sweep-orphans.ts:100-125`, `tools/verify-projections.ts` (whole), `attachments/sniff.ts:36-50`,
 `sync/contest-coherence.ts` (whole), `read/ancestry.ts` (whole), `http/http-origin.ts:128-172`, `:255-265`
 (the set, its exclusions and the predicate), `stream/routes.ts:262-267`, `test/helpers/stream.ts` (used),
@@ -357,7 +357,7 @@ ticket answers **404**.
    (`notifications/sweep.ts` filters at the source)"*. Measured: there is no race — the delete committed *before*
    the assignment and the door still committed it; `canSee` is not "live" (the repo says so itself:
    `visible-where.ts:137-138` *"A deleted ticket is still VISIBLE in the `canSee` sense"*); and `sweep.ts` is not
-   the read that renders notifications — it is the due-soon/stale *producer*; the read is `store.ts:128` and it
+   the read that renders notifications — it is the due-soon/stale *producer*; the read is `notifications/store.ts:128` and it
    filters nothing.
 3. **The engine asks about `deleted` in exactly one file.** `grep -rn deleted packages/rule-engine/src` (code
    lines only) → `checks/deletion.ts:64` (`already-deleted`) and `:85` (`not-deleted`); no other check reads the
@@ -427,7 +427,7 @@ PROBE proj_tickets row after writes: {"state_id":"doing","deleted_at":"2026-09-2
 ```
 Lines opened: `evaluate.ts:26-69` (dispatch, `:67-68` `default: return { refused: false }`), `check-permission.ts:1048`
 (`canSee` gate), `can-see.ts:227-234` (reads `proj_visibility` only), `fanout.ts:101-107`, `:122`,
-`sweep.ts:175-177`, `store.ts:128-130`, `deletion.ts:64`/`:85`, `write-tools.ts:144`/`:163`/`:185`.
+`notifications/sweep.ts:175-177`, `notifications/store.ts:128-130`, `checks/deletion.ts:64`/`:85`, `write-tools.ts:144`/`:163`/`:185`.
 Set difference: `grep -oE "^\s*type: '[^']+'" packages/domain/src/vocabulary.ts` (34) vs
 `grep -oE "case '[^']+'" packages/rule-engine/src/evaluate.ts` (16) → 18 pass-through.
 
@@ -461,7 +461,7 @@ refusal copy in `refusals.ts` says *"always belongs to a parent ticket"*, presen
 ticket of the type). The type-definition door walks around all four: after a re-rank, the product holds a task
 under a feature it says a task cannot go under, and a root feature it says always has a parent. The user-facing
 dead end is concrete: drag `T` out of `F` and try to put it back — refused with a sentence that describes the
-placement it just came from. The editor's own copy (`rank.ts:38`, rendered at `ticket-type-editor-screen.tsx:594` as
+placement it just came from. The editor's own copy (`workflow-builder/ticket-types/rank.ts:38`, rendered at `ticket-type-editor-screen.tsx:594` as
 `data-testid="rank-implications"`) makes the promise in the present tense as the admin types the new rank —
 *"tickets of this type always belong to something bigger"* — and nothing makes it true for the tickets that exist.
 
@@ -488,7 +488,7 @@ is to record the decision that they are write-time-only and say so in the editor
 **MEASUREMENT.** Appendix B, run from `packages/rule-engine` with `pnpm exec vitest run
 test/zz-exec6-probe-rerank.test.ts --no-file-parallelism` (imports `../src/*.js` relatively — no `dist` in the
 path). Lines opened: `ticket-type.ts:50-64`; `hierarchy.ts:108`/`:228` (`type.rank >= DEEPEST_RANK`),
-`:133`/`:281` (`type.rank <= parentType.rank`); `ticket-type-editor-screen.tsx:336-345`; `rank.ts:38`; `refusals.ts:86`;
+`:133`/`:281` (`type.rank <= parentType.rank`); `ticket-type-editor-screen.tsx:336-345`; `workflow-builder/ticket-types/rank.ts:38`; `refusals.ts:86`;
 `domain/src/ticket-types.ts:98` (`rank: z.number().int().min(1)` — no upper bound either) and `:136`
 (`DEEPEST_RANK = 4`); `test-cases/05-tickets-hierarchy.md:25` (5.9), `:52` (5.36).
 
@@ -819,12 +819,12 @@ common brief's category 3 for the door (no ruling found: `grep -rn whatsapp test
 docs/lanes/review-*.md` → nothing), and the product's own form/door disagreement is the defect underneath it.
 
 **WHAT WOULD HAVE BEEN BETTER.** One source: the select's options built from `INVITE_CHANNELS` (exported from
-`@gisik-nokma/domain`, `invites.ts:70`), with `phone` labelled for people (*"Phone (SMS)"*). And
+`@gisik-nokma/domain`, `domain/src/events/invites.ts:70`), with `phone` labelled for people (*"Phone (SMS)"*). And
 a page test that submits each offered option and asserts the door's answer — the assertion the role select
 already has.
 
 **MEASUREMENT.** Appendix H, run from `apps/server`. Lines opened: `members/page.tsx:728-729`, `:847-856`;
-`invites.ts:70`, `:73-75`; `routes/invites.ts:296-352` (the mint route: body schema `channel: { type: 'string' }`
+`domain/src/events/invites.ts:70`, `:73-75`; `routes/invites.ts:296-352` (the mint route: body schema `channel: { type: 'string' }`
 at `:312`, the 422 at `:352`); `members-page.test.tsx:66`, `:244`, `:263`; export `:754`, mobile `:1524`,
 `github.md:12`.
 
@@ -941,7 +941,7 @@ four that shows the content.
 |---|---|---|---|
 | **6.77** ❌ (`06-auth-visibility.md:107`) | *"A workspace GUEST is still ADMITTED for `workspace.renamed`, measured and deliberately not closed … nothing anywhere asks who may rename a workspace"* | guest `workspace.renamed` → **refused** `permission.role: Only a workspace owner or admin can rename a workspace.` (`check-permission.ts:730`) | `37292c1e`, 2026-09-19 (*"The rename ruling"*); the server test `check-visibility-permission.test.ts:330-340` says *"THIS CASE USED TO ASSERT THE OPPOSITE, AND ITS INVERSION IS THE RULING … the entry it cites is still in `check-permission.ts` — struck through, with the closure recorded"* and `:378-389` asserts the guest refusal |
 | **6.51** ❌ (`:93`) | *"A workspace guest is admitted today for `ticket.created`, `visibility.set`, `workspace.renamed` and `comment.added` … `visibility.set` matters most: … a guest could permanently retarget any ticket they can see to workspace-wide. Owner: Plan 4 Task 9."* | `ticket.created` → **refused** (`Guests cannot create tickets.`, `:704`); `visibility.set` → **refused** (`Only a project admin or the ticket's creator can change who sees this ticket.`); `workspace.renamed` → **refused**; `comment.added` → committed (a guest named on the ticket, which is the admission a guest role exists for) | `dd7bfcfd`, 2026-09-01 (guest create, visibility authority) and `37292c1e` |
-| **6.123** ❌ (`:201`) | *"Nothing rate-limits issuance, and nothing bounds how many live credentials one workspace holds."* | `POST /v1/workspaces/:workspaceId/invites` is behind `inviteLimiter` (`app.ts:485`, `:588-595`; `index.ts:188` wires it to `RATE_LIMIT_AUTH_MAX`, 10/min by default) — the first half is closed; the second (no bound on live credentials) I did not measure and do not claim | `935f5d66`, 2026-09-06 |
+| **6.123** ❌ (`:201`) | *"Nothing rate-limits issuance, and nothing bounds how many live credentials one workspace holds."* | `POST /v1/workspaces/:workspaceId/invites` is behind `inviteLimiter` (`apps/server/src/app.ts:485`, `:588-595`; `apps/server/src/index.ts:188` wires it to `RATE_LIMIT_AUTH_MAX`, 10/min by default) — the first half is closed; the second (no bound on live credentials) I did not measure and do not claim | `935f5d66`, 2026-09-06 |
 
 **WHY it is wrong.** The common brief's §5: *"a case that asserts a property the product has quietly stopped
 having is worse than no case."* These assert the opposite — gaps the product has quietly *closed* — and the
@@ -962,7 +962,7 @@ the round-1 ruling proposed for F1: *"a 'known gap' paragraph should be greppabl
 
 **MEASUREMENT.** Appendix K (guest actor through `POST /v1/events`, with a positive control that the guest can
 read the ticket they are refused on). Lines opened: `06-auth-visibility.md:93`, `:107`, `:201`;
-`check-permission.ts:704`, `:730`; `app.ts:485`, `:588-595`; `check-visibility-permission.test.ts:330-340`, `:378-389`; `git log -S` dates above;
+`check-permission.ts:704`, `:730`; `apps/server/src/app.ts:485`, `:588-595`; `check-visibility-permission.test.ts:330-340`, `:378-389`; `git log -S` dates above;
 `check-case-citations.mjs:13`.
 
 **SEVERITY: Important.** By the precedent the judge set for exec3-F1: a closed security-relevant gap still
@@ -983,7 +983,7 @@ after re-bind: verify-projections: DRIFT DETECTED
 
 The live table is right by the owner's rule (`projections/tickets.ts:46-47`: *"the owner's own 'a re-binding
 affects new tickets only' (2026-08-26)"*); the verifier's shadow rebuild resolves the ticket's type **as of now**
-(`getTicketTypeLadderFromDb` takes no sequence number; `tickets.ts:37-40`) and so puts the old ticket on the new
+(`getTicketTypeLadderFromDb` takes no sequence number; `projections/tickets.ts:37-40`) and so puts the old ticket on the new
 workflow, then reports the correct live row as drift.
 
 **This is recorded — as an unassigned open question, not a ruling.** `projections/tickets.ts:37-53` and
@@ -1224,7 +1224,7 @@ OTHER DOORS, same byte (Appendix V):
   500  GET /v1/tickets/:id/history            500  GET /v1/attachments/:id               500  GET /v1/projects/:id/board
   500  GET /v1/sync/bootstrap/ticket?ticketId=
   — and the doors that refine or hash first: 400 PUT /v1/me/preferences (noNul) · 400 GET /v1/search?q= (noNul) ·
-    404 GET|POST /v1/invites/:token[/accept] (token hashed) · 404 POST /v1/me/invitations/:id/accept (the id is matched in JS against the caller's pending list, `my-invitations.ts:165-172`, and never reaches SQL) ·
+    404 GET|POST /v1/invites/:token[/accept] (token hashed) · 404 POST /v1/me/invitations/:id/accept (the id is matched in JS against the caller's pending list, `routes/my-invitations.ts:165-172`, and never reaches SQL) ·
     404 POST /v1/mcp/device/token (hashed) · 404 …/migrate stateMap key (the probe's fresh `toWorkflowId` 404s at `builder-reads.ts:907` before the map is read — the key itself was not tested)
 ```
 
@@ -1233,7 +1233,7 @@ Underlying Postgres answers, measured directly (Appendix T's header): `SELECT $1
 sequence`. The product knows this byte: `domain/src/filter-spec.ts:45-51` defines `noNul` *"stated once"* with
 exactly the `22P05` explanation, and applies it to filters, search terms and preferences — **not** to
 `ticketCreatedPayload.title`, `ticketFieldSetPayload.value`, `commentAddedPayload.body` (`ticket-events.ts:45-48`,
-`:98-103`, `:108`), and not to the three raw query strings above (`list.ts:558-559`, `notifications.ts:71`,
+`:98-103`, `:108`), and not to the three raw query strings above (`list.ts:558-559`, `routes/notifications.ts:71`,
 `builder-reads.ts:726`).
 
 **WHY it is wrong.** Four things happen, and the first two are the brief's most expensive shape:
@@ -1241,7 +1241,7 @@ exactly the `22P05` explanation, and applies it to filters, search terms and pre
 1. **The write door reports failure for claims it committed.** `ingest-service.ts:381` rethrows any non-duplicate
    error out of `commitOne`; `ingestAll` (`:409`) is a plain `for` loop, so the throw aborts the batch after the
    claims before the poison one have each committed in their own transaction, and the route's error handler
-   (`app.ts:388`, the 500 body at `:50-52`) answers for the whole batch. A client that retries the batch with fresh
+   (`apps/server/src/app.ts:388`, the 500 body at `:50-52`) answers for the whole batch. A client that retries the batch with fresh
    ids lands the first claim twice; a client that trusts the 500 believes nothing landed.
 2. **On the sync door the same claim is a poison message.** `/v1/sync` answers 500; the sync client treats a
    transport error as transient (`recordFailure`, E6-5), so the outbox retries the claim every `backoffMs`
@@ -1268,8 +1268,8 @@ the MCP server, `write-tools.ts:163`, which is one way an agent hands the byte o
 parameters, answering 400 like their siblings. Neither is more than the refinement the domain already exports.
 
 **MEASUREMENT.** Appendices T, U and V, run from `apps/server`. Lines opened: `filter-spec.ts:45-51`; `ticket-events.ts:45-48`,
-`:98-103`, `:108`; `ingest-service.ts:361-386`, `:396-412`; `app.ts:50-52`, `:388`; `list.ts:558-559`;
-`notifications.ts:71`; `builder-reads.ts:726`; the `pg` probe in Appendix T's header (`22021` / `22P05`).
+`:98-103`, `:108`; `ingest-service.ts:361-386`, `:396-412`; `apps/server/src/app.ts:50-52`, `:388`; `list.ts:558-559`;
+`routes/notifications.ts:71`; `builder-reads.ts:726`; the `pg` probe in Appendix T's header (`22021` / `22P05`).
 
 **SEVERITY: Important.** One byte, pasteable from ordinary sources and passable by an agent, turns a claim into a
 500 that both misreports the batch and poisons the offline queue, and 500s nineteen doors from a path segment or a body string;
@@ -1279,7 +1279,7 @@ disclosed or lost, and every 500 is a rolled-back transaction.
 ### E6-19 — MINOR — A due date only has to look like `YYYY-MM-DD`: `2026-02-30`, `2026-13-45` and `0000-00-00` commit, and the attention strip then says "Needed by 0000-00-00 — due within 7 days"
 
 **WHAT.** `packages/domain/src/ist-day.ts:27` `IST_DAY_REGEX = /^\d{4}-\d{2}-\d{2}$/` is the whole of what a due
-or start date must satisfy (`ticket-types.ts:179-181` `dueDateValueSchema`; `rule-engine/src/checks/fields.ts:39-42`
+or start date must satisfy (`domain/src/ticket-types.ts:179-181` `dueDateValueSchema`; `rule-engine/src/checks/fields.ts:39-42`
 for a custom `date` field, `:135-138` for `dueDate`/`startDate`). Measured through the door (Appendix W; 1 file /
 1 test passed):
 
@@ -1296,15 +1296,15 @@ day strings lexicographically (`attention.ts:261` `if (due.date > horizon) conti
 forever, `2026-13-45` is never due, and `2026-02-30` is due "within 7 days" of a day that does not exist; the
 notifications sweep's due-soon digest works over the same column with the same comparison, so the same three
 sentences reach the inbox and the mail. The product already distinguishes shape from existence for instants —
-`envelope.ts:64` `isRealCalendarDatetime` refuses a `clientTime` on a day that does not exist — and `ist-day.ts:47`
+`domain/src/envelope.ts:64` `isRealCalendarDatetime` refuses a `clientTime` on a day that does not exist — and `ist-day.ts:47`
 reuses it for instants, while the day schema beside it does not.
 
 **WHAT WOULD HAVE BEEN BETTER.** One refinement on `IST_DAY_REGEX`'s users — parse the three fields, rebuild the
 string, compare (the same trick `isRealCalendarDatetime` uses) — so `2026-02-30` is refused with the sentence the
 door already has. Two lines in `ist-day.ts`, shared by the two checks and the two filter bounds.
 
-**MEASUREMENT.** Appendix W, run from `apps/server`. Lines opened: `ist-day.ts:27`, `:37-47`; `ticket-types.ts:179-181`;
-`fields.ts:39-42`, `:135-138`; `attention.ts:255-266`; `notifications/sweep.ts:188`; `envelope.ts:64`.
+**MEASUREMENT.** Appendix W, run from `apps/server`. Lines opened: `ist-day.ts:27`, `:37-47`; `domain/src/ticket-types.ts:179-181`;
+`rule-engine/src/checks/fields.ts:39-42`, `:135-138`; `attention.ts:255-266`; `notifications/sweep.ts:188`; `domain/src/envelope.ts:64`.
 
 **SEVERITY: Minor.** Data quality with a user-visible sentence; no loss, no leak, and the client picker presumably
 never sends one — the API and MCP doors do.
@@ -1323,9 +1323,9 @@ GET workflows -> 200; a workflow named " " is listed: true      GET ticket-types
 
 **WHY it is wrong.** The rule is written down and applied by name: `domain/src/events/ticket-events.ts:18-24`
 (*"Ruling P15. `.min(1)` alone admits `'   '`, and a title of only spaces titles nothing while looking like a
-title everywhere it is displayed — a board, a breadcrumb, a notification …"*) and `membership.ts:39-42`
-(`displayName`, the same refinement, for workspace and project names) and `invites.ts:95` (address). The names
-that head a board column (`workflow.ts:8`, state `name`), a workflow (`:86`), a ticket type (`ticket-types.ts:96`),
+title everywhere it is displayed — a board, a breadcrumb, a notification …"*) and `domain/src/events/membership.ts:39-42`
+(`displayName`, the same refinement, for workspace and project names) and `domain/src/events/invites.ts:95` (address). The names
+that head a board column (`workflow.ts:8`, state `name`), a workflow (`:86`), a ticket type (`domain/src/ticket-types.ts:96`),
 a custom field (`:78`) and a select option (`:79`, `options: z.array(z.string().min(1))`) are `min(1)` alone —
 the exact shape P15 says admits the defect. A state named `" "` is a column with no header on every board that
 uses the workflow; a select option `" "` is a choice with no label; and the builder's `validateWorkflowDef`
@@ -1336,8 +1336,8 @@ not.
 **WHAT WOULD HAVE BEEN BETTER.** Export P15's refinement once (`displayName` already exists in `membership.ts`) and
 use it for the five name fields, so the refusal reads the same sentence everywhere.
 
-**MEASUREMENT.** Appendix X, run from `apps/server`. Lines opened: `ticket-events.ts:18-24`; `membership.ts:39-42`;
-`workflow.ts:8`, `:86`; `ticket-types.ts:78-79`, `:96`; `validate-workflow.ts` (no `name` check — read whole).
+**MEASUREMENT.** Appendix X, run from `apps/server`. Lines opened: `ticket-events.ts:18-24`; `domain/src/events/membership.ts:39-42`;
+`workflow.ts:8`, `:86`; `domain/src/ticket-types.ts:78-79`, `:96`; `validate-workflow.ts` (no `name` check — read whole).
 
 **SEVERITY: Minor.** A recorded rule applied to some of its subjects; the consequence is a blank label, reachable
 from the API and MCP doors.
@@ -1566,7 +1566,7 @@ what was looked at and found sound, not only what was found wrong.
   typeId`) and the keys `toClientFilterSpec` reads (`mappers.ts:942-1001`) are the same set; `blocked` and a
   non-`eq` field op throw `ServingGapError` rather than being dropped.
 - **Invites match the export's `github.md` on role and project scope.** `inviteRoleSchema` refuses `owner`
-  (`invites.ts:64-67`), `inviteSentPayload` refuses `projectIds` on a guest (`:120-127`), and acceptance grants no
+  (`domain/src/events/invites.ts:64-67`), `inviteSentPayload` refuses `projectIds` on a guest (`domain/src/events/invites.ts:120-127`), and acceptance grants no
   project rows to a guest (`acceptance.ts:189-191`). *Channel* does not match — E6-9.
 - **`closed ⇒ terminal` holds at the direct rebind door too.** `checks/workflow-rebind.ts:147-148` refuses a
   `ticket.workflow_rebound` that would move a closed ticket to a non-terminal state — so Ruling 56's invariant is
@@ -1575,7 +1575,7 @@ what was looked at and found sound, not only what was found wrong.
 - **The evidence gate binds the attachment to the ticket** (`gates/evidence-gate.ts`, `SELECT 1 FROM attachments
   WHERE id = $1 AND ticket_id = $2`) and refuses a drive reference as evidence by rule.
 - **OTP and device-code doors are bounded.** better-auth's phone plugin caps verification at 3 attempts per code
-  (`routes.mjs:505-514` in the installed 1.7.2), the sign-in path is IP-limited (`app.ts:519-520`), the MCP
+  (`routes.mjs:505-514` in the installed 1.7.2), the sign-in path is IP-limited (`apps/server/src/app.ts:519-520`), the MCP
   user code is 8 symbols over a 28-symbol alphabet (`token-store.ts:18`, `:33-40`, ≈3.8×10¹¹), approve and deny
   are `requireSession`-gated and single-shot (`UPDATE … WHERE approved_user_id IS NULL`) — where "session"
   includes a bearer MCP token, which is E6-16.
@@ -1598,7 +1598,7 @@ what was looked at and found sound, not only what was found wrong.
   sweep (33 references, 21 distinct, all resolve at `a7b6292b`). File restored byte-identical.
 - **`check:db-tz` passes on both live databases** (`Asia/Kolkata` on 54329 and 54330).
 - **Rate limits cover the credential and write doors** (`/api/auth/*`, `/v1/events`, `/v1/sync`,
-  `/v1/sync/bootstrap`, `/v1/attachments`, the invite mint, the three MCP device doors — `app.ts:505-600`).
+  `/v1/sync/bootstrap`, `/v1/attachments`, the invite mint, the three MCP device doors — `apps/server/src/app.ts:505-600`).
   *Observation, not filed:* `POST /v1/workspaces` (founding), `/v1/sync/reconcile`, `…/migrate` and the
   notification-read doors are outside the limited set; founding runs the whole bootstrap sequence per call. I did
   not measure the per-call cost, so this is an absence read at the line, in the class of 6.123.
@@ -1622,7 +1622,7 @@ rests on; **unverified** means I did not measure it and say why.
 | **bulk rebind** (`…/migrate`) | zero tickets → `migrated, count 0` (read at `:1041`, `:1054`) | pre-flight refusals append nothing (7.45) | **gate refusal mid-batch, client told "refused", server moved k — E6-10** | n/a | selection includes deleted rows (`:935-940`, no predicate) — noted, not filed: they must move with the type for restore to work | pre-flight reads without a lock; a ticket transitioned between pre-flight and its event is rebound to the state its *old* state mapped to — **unverified**, read at `:976-978` (`toStateIdFor` reads the pre-flight row's `state_id`), not measured | n/a | — | E6-10 |
 | **rule engine** | unknown ticket → `ticket.unknown`; unknown workflow → `unknownWorkflow` | malformed payload → `malformedPayload` with the zod detail | authority is not the engine's (by design, `evaluate.ts:52-55`, the comment on the delete pair) | the replica runs the same `evaluateEvent` (`outbox.ts:311-315`) | **reads `deleted` in one file only — E6-2, E6-4** | n/a (pure) | n/a | first `workflow.defined` must be v1 (`workflow-defined.ts:53-59`) | **type re-rank / republish promotion leave states the engine then refuses — E6-3, E6-8** |
 | **notifications** | inbox `[]`, `nextCursor: null` | — | fanout suppresses a letter the assignee cannot see (`fanout.ts:122`) | — | **assignment on a deleted ticket manufactures a letter into a 404 — E6-2**; delivered letters stay by ruling (item 1) | dedupe key per event (`assignment:<eventId>`) | n/a | — | — |
-| **list / board / search / detail** | `groups: []` | 404 for unknown-or-invisible (one answer, `can-see.ts:220-226` docblock, `:227-234` body) | `restricted` parent/epic (`tickets.ts:419-441`) | replica gates in TS (exec 3 F5) | detail/search/crumb withhold; **list header shows a deleted epic's title — E6-11** | — | UI lane | — | — |
+| **list / board / search / detail** | `groups: []` | 404 for unknown-or-invisible (one answer, `can-see.ts:220-226` docblock, `:227-234` body) | `restricted` parent/epic (`routes/tickets.ts:419-441`) | replica gates in TS (exec 3 F5) | detail/search/crumb withhold; **list header shows a deleted epic's title — E6-11** | — | UI lane | — | — |
 | **invites** | — | `422` with the domain's message | `admins-only` mint; `owner` not invitable | — | — | 6.130 (revoke during accept) recorded ❌, **unverified** here | UI lane | founding | **form offers `sms`/`whatsapp`, door refuses both — E6-9** |
 | **outbox / sync engine** | `nextBatch` → `[]` | transient → backoff (12.148); terminal → `failed` (12.147) | refusal → `failed`, dropped from overlay (`local-context.ts:126`) | **head-of-line not blocked — E6-5** | replica TS gate (exec 3 F5) | one drain at a time (`sync-engine.ts:845`) | n/a | bootstrap once (12.156) | E6-5 |
 | **MCP tools** | `list_tickets` pages; `search` capped at 50, stated in the tool text | refused/invalid → thrown with rule and reason (`write-tools.ts:28-36`) | server's answer relayed verbatim | n/a | **`assign_ticket` on a deleted id → `committed` while `get_ticket` → not found — E6-2** | no read-before-write | n/a | device-code login (`device-login.ts`) | E6-2 |
@@ -1640,9 +1640,9 @@ not pixels — the three `.md` spec documents and the Invite screen's data model
 
 | claim in the export | product | class | where |
 |---|---|---|---|
-| `github.md:12` — *"`owner` is NOT an invitable role (the mint refuses it)"* | `inviteRoleSchema` refuses `owner` (`invites.ts:64-67`) | **1 MATCHES** | §5 |
-| `github.md:12` — *"a guest gets no project association … 'cannot put a guest on a project; share tickets with visibility.set instead'"* | `inviteSentPayload` superRefine (`invites.ts:120-127`); `acceptance.ts:189-191` | **1 MATCHES** | §5 |
-| `github.md:12` — *"an invite carries `address`, `channel` (email/sms/whatsapp), `role`, optional `projectIds`"*; Desktop `:754` offers `email/sms/whatsapp` | door: `email` or `phone` only (`invites.ts:70`); web form: `email/sms/whatsapp` | **3 DIVERGES, NO RULING FOUND** — search: `grep -rn whatsapp test-cases/*.md Features.md docs/lanes/review-*.md` → nothing | **E6-9** |
+| `github.md:12` — *"`owner` is NOT an invitable role (the mint refuses it)"* | `inviteRoleSchema` refuses `owner` (`domain/src/events/invites.ts:64-67`) | **1 MATCHES** | §5 |
+| `github.md:12` — *"a guest gets no project association … 'cannot put a guest on a project; share tickets with visibility.set instead'"* | `inviteSentPayload` superRefine (`domain/src/events/invites.ts:120-127`); `invites/acceptance.ts:189-191` | **1 MATCHES** | §5 |
+| `github.md:12` — *"an invite carries `address`, `channel` (email/sms/whatsapp), `role`, optional `projectIds`"*; Desktop `:754` offers `email/sms/whatsapp` | door: `email` or `phone` only (`domain/src/events/invites.ts:70`); web form: `email/sms/whatsapp` | **3 DIVERGES, NO RULING FOUND** — search: `grep -rn whatsapp test-cases/*.md Features.md docs/lanes/review-*.md` → nothing | **E6-9** |
 | `github.md:4` — epics are the rank-1 type, children carry `epicId`, list groups by epic | `EPIC_RANK`, `epicAncestors`, `groupBy=epic` (`list.ts`) | 1 MATCHES on the mechanism; the deleted-epic header is **E6-11** (recorded residual) | E6-11 |
 | `github.md:2-3` (faq-delete) — *"The ticket stops appearing in views. Its history is retained, because other events cite it"* | reads: yes (16.96); writes: **not refused — E6-2**; help: **denied — E6-1** | the prototype's own FAQ entry is the model the product's help should have followed | E6-1, E6-2 |
 | `github.md:8` — *"a global Account screen (profile, notification prefs, workspaces, devices)"*; `workspaces-gap.md:16` item 6 | server has `/v1/me/*` reads (preferences, notification-preferences, workspaces, mcp tokens) | not this lane's surface to classify (UX/UI) — the **routes exist**, noted so the UX lane's finding can cite them | — |
