@@ -17,6 +17,11 @@ if [ "$CTL_DRY_RUN" = 1 ]; then echo "DRY: gh pr comment $pr (gate $E $T $N); gh
 gh pr comment "$pr" --body "**Forced gate at \`${head:0:12}\`** (\`ctl gate\`): \`$E\` · \`$T\` · \`$N\` — log \`$glog\`. Merging by \`ctl land\` on the checks + this gate." >/dev/null || ctl_fail land "comment failed"
 now="$(gh pr view "$pr" --json headRefOid --jq .headRefOid)"
 [ "$now" = "$head" ] || ctl_fail land "head moved to $now after the gate at $head — re-gate"
+# The gate proved the tree at $head with origin/main as an ancestor; if main has moved since, the --merge tree would be a
+# union the gate never saw (#642's failure, one step later) and the tree check below would only redden AFTER the merge.
+# Re-read the ancestry immediately before acting, against a fresh origin/main (design §8).
+/usr/bin/git fetch -q origin; main_now="$(/usr/bin/git rev-parse origin/main)"
+/usr/bin/git merge-base --is-ancestor "$main_now" "$head" || ctl_fail land "origin/main moved to ${main_now:0:12} since the gate and is not an ancestor of the gated head ${head:0:12} — not merging. Remedy on the branch: git merge --no-edit origin/main && git push, then ctl gate \$(git rev-parse HEAD) and ctl land again"
 gh pr merge "$pr" --merge > "$(ctl_log land)" 2>&1 || ctl_fail land "gh pr merge failed"
 read -r st mc < <(gh pr view "$pr" --json state,mergeCommit --jq '"\(.state) \(.mergeCommit.oid)"')
 [ "$st" = "MERGED" ] || ctl_fail land "state after merge is $st"

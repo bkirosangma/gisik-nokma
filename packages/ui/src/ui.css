@@ -2493,6 +2493,22 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   color: inherit;
 }
 .gn-select__trigger--searchable input:focus { outline: none; }
+/* E4-21 — the removal above is the product's OWN declaration, so no user-agent
+   default survives it: this control, the one whose entire job is to be typed
+   into, had no visible focus indicator at all (WCAG 2.2 §2.4.7 *Focus Visible*,
+   Level AA). The ring goes on the WRAPPER, keyed on `:focus-within`, because the
+   wrapper div carries no `tabIndex` of its own — the inner input is what takes
+   focus — and `outline-offset: 1px` is `.gn-field__input`'s own value, so the
+   searchable and non-searchable branches of this control look identical while
+   focused. The rule's own selector text is deliberately NOT written out in this
+   comment: `rule()` in `components.test.tsx` does a raw brace-matching scan with
+   no awareness of comments, so repeating it here would hand that helper an
+   earlier match than the real rule — the same footgun the docblock on
+   `.gn-select__trigger--multiple` below already warns about, for the same helper. */
+.gn-select__trigger--searchable:focus-within {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
 
 /* N chips plus the open button (non-searchable) or the filter input (searchable) overflow
    horizontally without this — the base `.gn-select__trigger` has no `flex-wrap` since the
