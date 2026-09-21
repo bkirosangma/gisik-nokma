@@ -250,6 +250,11 @@ export function CreateTicketFlow({
         // silence. `NewTicketDraft.start` is itself required (never
         // optional) for the identical reason, one layer up.
         start: draft.start,
+        // Spec 2026-09-22, and the same reasoning the line above records: the
+        // birth priority is ALWAYS sent, never left to the wire's
+        // absence-means-P2 fallback. `NewTicketDraft.priority` is itself
+        // required, so an omission upstream is a compile error.
+        priority: draft.priority,
       },
     });
 

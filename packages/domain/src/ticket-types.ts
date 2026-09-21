@@ -5,7 +5,7 @@ import { IST_DAY_REGEX, isRealIstDay } from './ist-day.js';
 export const CUSTOM_FIELD_KINDS = ['text', 'number', 'date', 'select', 'person'] as const;
 export type CustomFieldKind = (typeof CUSTOM_FIELD_KINDS)[number];
 
-export const BUILTIN_FIELD_IDS = ['title', 'description', 'dueDate', 'startDate'] as const;
+export const BUILTIN_FIELD_IDS = ['title', 'description', 'dueDate', 'startDate', 'priority'] as const;
 export type BuiltinFieldId = (typeof BUILTIN_FIELD_IDS)[number];
 
 /**
@@ -190,3 +190,18 @@ export const dueDateValueSchema = z.object({
   note: z.string().optional(),
 });
 export type DueDateValue = z.infer<typeof dueDateValueSchema>;
+
+/**
+ * Priority is a BUILT-IN with three properties the other four built-ins do not
+ * share (owner ruling 2026-09-22, spec `docs/superpowers/specs/2026-09-22-priority-builtin-design.md`):
+ * it is ALWAYS present (no never-claimed state, no clearing), it STARTS AT P2
+ * (the reducer writes the claim on `ticket.created`, attributed to the creator),
+ * and its value set is CLOSED. This is the ONE origin of the three spellings —
+ * the engine, the filter spec, the sheet's control and the new-ticket dialog all
+ * import from here and none restates the list.
+ */
+export const PRIORITIES = ['P1', 'P2', 'P3'] as const;
+export const prioritySchema = z.enum(PRIORITIES);
+export type Priority = z.infer<typeof prioritySchema>;
+/** Where every ticket starts (owner: "everything starts at p2 the middle"). Applied by the REDUCER, never at parse. */
+export const DEFAULT_PRIORITY: Priority = 'P2';

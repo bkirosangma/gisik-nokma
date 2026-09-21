@@ -594,7 +594,15 @@ describe('12.249 a newer local assignment beats the shipped block', () => {
               kind: 'ticket', id: TICKET, workspaceId: WS, projectId: PROJECT,
               typeId: TYPE_TASK, parentId: null, workflowId: WF, workflowVersion: 1,
               stateId: wfV1.initialStateId, stateCategory: 'open',
-              assigneeId: USER_B, collaboratorIds: [], fields: {}, transitions: [],
+              assigneeId: USER_B, collaboratorIds: [],
+              // The birth claim the reducer writes on every `ticket.created`
+              // (spec 2026-09-22). A snapshot carrying NO claim is a replica
+              // whose reducer predates the field — which `priorityOf` THROWS on,
+              // deliberately. This case is about `assignedProvenance`, so the
+              // snapshot here has to be a state the product can actually
+              // produce, or it fails for a reason it is not testing.
+              fields: { priority: { value: 'P2', actorId: USER_A, clientTime: CLIENT_TIME, serverTime: SERVER_TIME } },
+              transitions: [],
             },
             provenance: { state: OLD, assigned: OLD },
           },
@@ -1090,6 +1098,95 @@ describe('13.704 the replica list row carries the folded rank', () => {
     // so a row builder that hardcoded `null` — or read `rank` off the wrong
     // source — fails here rather than passing on "some string was present".
     expect((await rowOf())?.rank).toBe('i');
+  });
+});
+
+describe('3.970 the replica carries the birth priority claim, on the row and on the card', () => {
+  it('a ticket created through the replica reads P2, attributed to its creator with both clocks', async () => {
+    const { ds, replica } = await fixture();
+    const bornId = newUlid();
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: bornId }, 'ticket.created', {
+        typeId: TYPE_TASK,
+        projectId: PROJECT,
+        parentId: null,
+        title: 'Order me',
+      }),
+    );
+
+    const row = (await ds.query.getTickets(PROJECT, {}, 'flat')).rows.find(
+      (candidate) => candidate.ticketId === bornId,
+    );
+    // Positive control: the row is reachable, so what follows is about the
+    // field and not about a row that was never served.
+    expect(row).toBeDefined();
+    // `actorName: null` is exact, not a stand-in: this source is handed the local
+    // ledger and no roster, which is the same lossless absence `dueDateOf` and
+    // every other claim here carry (provenance.ts renders the raw id for it).
+    expect(row?.priority).toEqual({
+      value: 'P2',
+      claim: {
+        actorId: USER_A,
+        actorName: null,
+        clientTime: CLIENT_TIME,
+        serverTime: SERVER_TIME,
+      },
+    });
+
+    // The CARD, off the same state — the claim is read by one reader at both
+    // sites, so a card and a row for one ticket cannot disagree about it.
+    const card = (await ds.query.getBoard(PROJECT)).groups
+      .flatMap((group) => group.columns)
+      .flatMap((column) => column.cards)
+      .find((candidate) => candidate.ticketId === bornId);
+    expect(card).toBeDefined();
+    expect(card?.priority).toEqual(row?.priority);
+  });
+
+  it('3.971 a state whose reducer predates the field makes the read THROW, never default to P2', async () => {
+    const { ds, replica, storage } = await fixture();
+    const bornId = newUlid();
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: bornId }, 'ticket.created', {
+        typeId: TYPE_TASK,
+        projectId: PROJECT,
+        parentId: null,
+        title: 'Order me',
+      }),
+    );
+
+    // POSITIVE CONTROL FIRST, and deliberately above the mutation: a control
+    // placed after the subject is masked by it, and a control in a sibling
+    // `it` is not a control at all. Asserted on THIS row and not on the page
+    // length — the fixture seeds two tickets of its own, so a length here would
+    // be a fact about the fixture rather than about the read.
+    const before = (await ds.query.getTickets(PROJECT, {}, 'flat')).rows;
+    expect(before.some((candidate) => candidate.ticketId === bornId)).toBe(true);
+
+    // The stale state is MANUFACTURED, the way the server-side case manufactures
+    // one: the reducer that predates the field no longer exists to write a row
+    // for this test, so the claim is stripped out of the stored state instead.
+    // Asserted, not assumed — a strip that silently did nothing would leave the
+    // positive control green and prove nothing.
+    const stored = await storage.all('SELECT state FROM tickets WHERE ticket_id = ?', [bornId]);
+    const state = JSON.parse(stored[0]?.['state'] as string) as { fields: Record<string, unknown> };
+    expect(state.fields['priority']).toBeDefined();
+    delete state.fields['priority'];
+    await storage.run('UPDATE tickets SET state = ? WHERE ticket_id = ?', [
+      JSON.stringify(state),
+      bornId,
+    ]);
+    expect(
+      JSON.parse(
+        (await storage.all('SELECT state FROM tickets WHERE ticket_id = ?', [bornId]))[0]?.[
+          'state'
+        ] as string,
+      ).fields['priority'],
+    ).toBeUndefined();
+
+    // THROWN, not defaulted: filling in P2 here would print a value with no
+    // claim line beside it, and would put the ladder in a second place.
+    await expect(ds.query.getTickets(PROJECT, {}, 'flat')).rejects.toThrow(/no priority claim/);
   });
 });
 

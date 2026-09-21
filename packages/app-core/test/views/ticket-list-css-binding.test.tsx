@@ -160,7 +160,14 @@ const LABELS: GroupLabels = {
   typeName: (id) => id,
 };
 
-const ALL_COLUMNS: ListColumnId[] = ['status', 'assignee', 'dueDate', 'progress', 'type'];
+/**
+ * EVERY column the component can draw, and the fixture's own docblock says why
+ * it must be maximal: the class-parity case below compares this render's class
+ * set against `ui.css`'s in BOTH directions, so a column missing here would
+ * report its cell's class as "styled but rendered by nothing". `priority` joined
+ * the list with the Priority column (spec 2026-09-22).
+ */
+const ALL_COLUMNS: ListColumnId[] = ['status', 'assignee', 'dueDate', 'progress', 'type', 'priority'];
 
 /**
  * THE FIXTURE, and it has to be the MAXIMAL one: every conditional class this
@@ -468,7 +475,11 @@ describe('13.671 the column chips keep a keyboard focus ring, and it is drawn wh
     // take the whole keyboard path with it and leave the rule above unsatisfiable.
     const { container } = render(listOf({}));
     const chips = [...container.querySelectorAll<HTMLElement>('.gn-list__column-option')];
-    expect(chips.length).toBe(5);
+    // SIX since spec 2026-09-22 added the Priority column. Kept as a literal
+    // rather than derived from `chips.length`: this number is what stops an
+    // all-zero query — a renamed class, a tray that failed to render — from
+    // satisfying `every` below vacuously.
+    expect(chips.length).toBe(6);
     const shapes = chips.map((chip) => {
       const input = chip.querySelector<HTMLInputElement>('input[type="checkbox"]');
       const box = chip.querySelector<HTMLElement>('.gn-list__column-box');
@@ -478,7 +489,7 @@ describe('13.671 the column chips keep a keyboard focus ring, and it is drawn wh
       };
     });
     expect(shapes).toEqual(
-      Array.from({ length: 5 }, () => ({ focusable: true, boxFollowsInput: true })),
+      Array.from({ length: 6 }, () => ({ focusable: true, boxFollowsInput: true })),
     );
   });
 });

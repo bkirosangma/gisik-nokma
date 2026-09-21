@@ -2216,4 +2216,70 @@ than repeated: the finding's *"`.gn-help__nav-link` first appears 2026-09-15"* m
   rebuild, so the revert reached the compiled artifact) and restored from sha256-compared backups. Package
   suites: ui 426, app-core 1731, web 654.
 
+## Priority is a built-in — the server assembler and the projection rebuild CLI (spec 2026-09-22, Task 3)
+
+- **13.1227** ✅ `pnpm --filter @gisik-nokma/server rebuild:projection proj_tickets` restores the birth
+  priority claim on a `proj_tickets` row written before the reducer learned to write one: the stale row is
+  manufactured by stripping the key from an otherwise real, ledger-created ticket, and `rebuildProjection`
+  replays the whole ledger into the live table inside one transaction, putting the claim back attributed to
+  the creator. — `apps/server/test/tools/rebuild-projection.test.ts`
+
 **No `Features.md` bullet.** This corrects an existing sentence's announcement; it adds no affordance.
+
+## Priority is a built-in — the dev seed (spec 2026-09-22, Task 4)
+
+- **13.1228** ✅ The dev seed spreads the three levels: every seeded `ticket.created` carries an explicit
+  `priority` cycling P1 → P2 → P3 off the ticket's position in the series, so a fresh database shows the
+  whole ladder instead of only the reducer's birth default. Read back from `proj_tickets` rather than from
+  the built events, so the claim is proved to survive ingest and projection and not merely to be spelled in
+  a payload. Deterministic off position, never random — the seed is a fixture and a re-run must rebuild
+  byte-identical payloads. — `apps/server/test/seed/seed-dev.test.ts`
+
+## Priority is a built-in — the list: grouping, column and filter (spec 2026-09-22, Task 6)
+
+- **13.1229** ✅ The `priorities` axis narrows a list row to the levels it names and refuses the ones it
+  does not, and its exclude half drops the levels it names; an absent list and an empty list both narrow
+  nothing — the same rule every other id axis follows. — `packages/app-core/test/filter/list-filter.test.ts`
+- **13.1230** ✅ Grouping by priority yields sections P1, P2, P3 in THAT order — the LADDER's order, not the
+  order the levels are first met while walking the rows — holding every row exactly once, with the level
+  itself as both the key and the label. CONTROL: a level nobody holds yields NO empty section, because
+  `flatMap` over the ladder emits only the levels with rows (rows drive sections, the ladder only orders
+  them). — `packages/app-core/test/views/list-model.test.ts`
+- **13.1231** ✅ `columnLabel('priority')` is `Priority`. — `packages/app-core/test/views/list-model.test.ts`
+- **13.1232** ✅ The priority column draws the level WITH its claimant — `P1 — Kiro's claim`, the same
+  attribution sentence the due cell uses — so the column cannot degrade into a bare token. —
+  `packages/app-core/test/views/ticket-list.test.tsx`
+
+**A gap in this block is deliberate: `13.1233` is minted by nothing in this plan.** Task 6's own file-map
+line names the range `13.1229`–`13.1233` while its Step 5 (the enumeration of what to flip to ✅) names
+`13.1229`–`13.1232`, and the four cases its Step 1 writes carry those four ids. The number is left UNUSED
+rather than filled with a case invented to close it, per the catalogue's own rule that a deleted or skipped
+number is never renumbered.
+
+## Priority is a built-in — the new-ticket dialog (spec 2026-09-22, Task 8)
+
+- **13.1234** ✅ The dialog offers exactly `P1`, `P2`, `P3` as ONE segmented control (`tablist` named
+  `Priority`, after the Type picker — the prototype's own placement), **preselected at the MIDDLE**: the
+  owner's ruling was about where a ticket starts, not merely that a control exists. The labels are asserted
+  in order, so a control offering them out of order passes a count and fails here. —
+  `packages/app-core/test/views/new-ticket-dialog.test.tsx`
+- **13.1235** ✅ A level chosen in the dialog leaves in the draft: the `onCreate` payload carries
+  `priority: 'P1'`. — `packages/app-core/test/views/new-ticket-dialog.test.tsx`
+- **13.1236** ✅ `CreateTicketFlow.create` sends the DRAFT's level onto the `ticket.created` payload, read
+  by the KEY's presence rather than by value — a `create()` that dropped the `priority:` line produces a
+  payload with no such key, which a value comparison cannot tell from one holding `undefined` (the same
+  reading `13.592` gives `start`). The chosen-P1 case is what separates "the draft travels" from "the door
+  mints a constant": the two `13.592` cases assert the default, which a hard-coded `'P2'` satisfies
+  perfectly. — `packages/app-core/test/views/reopen-flow.test.tsx`
+
+## Priority is a built-in — the board card badge (spec 2026-09-22, Task 9)
+
+- **13.1237** ✅ The board card draws the priority badge with the claimant as its `title` — the same
+  `'s claim` sentence the due label and every sheet claim line use — and `P1` carries
+  `gn-board-card__priority--p1`, the danger tone the late due label takes on the same measured pair. —
+  `packages/app-core/test/views/board.test.tsx`
+- **13.1238** ✅ CONTROL — `P2` and `P3` are drawn WITHOUT the tone, and the badge is on EVERY card: two
+  cards, two badges. **There is no absence arm to test** and that is the case's point — P2 is the birth
+  default, so a card without a level is not a state this product has; a one-armed assertion would be
+  satisfied by a tone that is always on and by one that is never on alike. —
+  `packages/app-core/test/views/board.test.tsx`

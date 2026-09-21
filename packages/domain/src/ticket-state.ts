@@ -17,7 +17,7 @@ import {
   ticketRestoredPayload,
   ticketWorkflowReboundPayload,
 } from './events/ticket-events.js';
-import type { TicketTypeDef } from './ticket-types.js';
+import { DEFAULT_PRIORITY, type TicketTypeDef } from './ticket-types.js';
 // `ticket.transitioned`'s schema lives in workflow.ts, not with the rest of the
 // ticket vocabulary: Plan 2 shipped it there because the engine parses it, and
 // events/ticket-events.ts says so in its own header. Its destination field is
@@ -157,7 +157,15 @@ export function applyTicketEvent(
       stateCategory: category,
       assigneeId: null,
       collaboratorIds: [],
-      fields: { title: claim(p.title, env) },
+      fields: {
+        title: claim(p.title, env),
+        // The birth priority (spec 2026-09-22). `?? DEFAULT_PRIORITY` is the ONE place a
+        // default exists in this product, and it is attributed to THIS event's actor
+        // and clocks — creating the ticket at the default IS the claim. A v1 event
+        // without the member replays to P2 under its creator's name, which is what
+        // every reader downstream relies on (they throw on an absent claim).
+        priority: claim(p.priority ?? DEFAULT_PRIORITY, env),
+      },
       transitions: [],
       closed: null,
       // `rank: null` — creation writes it, and this is the decision Task 1

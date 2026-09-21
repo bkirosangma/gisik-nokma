@@ -26,6 +26,9 @@ const ROWS: ListRow[] = [
     stateId: 'done',
     stateName: 'Done',
     stateCategory: 'terminal',
+    // Spec 2026-09-22: two rows carry a level other than the seed's P2, so the
+    // priority grouping has three levels to order rather than one.
+    priority: { value: 'P1', claim: claim() },
   }),
   listRowSeed({
     ticketId: 't2',
@@ -44,10 +47,11 @@ const ROWS: ListRow[] = [
     title: 'Loose task',
     assignee: { id: 'me', name: 'Kiro' },
     assignedProvenance: claim({ serverTime: '2026-08-20T07:00:00.000Z' }),
+    priority: { value: 'P3', claim: claim() },
   }),
 ];
 
-const GROUPINGS: Grouping[] = ['epic', 'status', 'assignee', 'type', 'flat'];
+const GROUPINGS: Grouping[] = ['epic', 'status', 'assignee', 'type', 'priority', 'flat'];
 
 /**
  * THE TRIPWIRE UNDER CLIENT-SIDE GROUPING. `groupRows` partitions a set and
@@ -133,6 +137,34 @@ describe('3.48 grouping arranges truth; it never changes it (spec §7 List)', ()
       listRowSeed({ ticketId: 'o1', stateCategory: 'open' }),
     ];
     expect(countRows(rows)).toEqual({ total: 4, terminal: 1 });
+  });
+
+  /**
+   * 13.1230 — grouping by priority (spec 2026-09-22). `ROWS` holds one P1
+   * (`t1`), one P3 (`t4`) and the rest P2, so the expected order is the LADDER
+   * and not the order the levels happen to be first met in the input: the
+   * partition is built by walking rows, so a `groupRows` that only partitioned
+   * would answer in ENCOUNTER order here — `epicA` (P2) is the first row — and
+   * this case is what tells the two apart.
+   */
+  it('13.1230 grouping by priority yields sections P1, P2, P3 in THAT order, every row exactly once, and labels are the level', () => {
+    const sections = groupRows(ROWS, 'priority', LABELS);
+    expect(sections.map((section) => section.label)).toEqual(['P1', 'P2', 'P3']);
+    expect(sections.flatMap((section) => section.rows).map((row) => row.ticketId).sort()).toEqual(
+      ROWS.map((row) => row.ticketId).sort(),
+    );
+    // The level is the label AND the key is the level, not an index into the
+    // ladder: the two must not be able to drift when the ladder is reordered.
+    expect(sections[0]?.key).toBe('priority:P1');
+  });
+
+  it('13.1230 CONTROL — a level nobody holds yields NO empty section (rows drive sections, not the ladder)', () => {
+    const onlyP2 = ROWS.map((row) => ({ ...row, priority: { value: 'P2' as const, claim: claim() } }));
+    expect(groupRows(onlyP2, 'priority', LABELS).map((section) => section.label)).toEqual(['P2']);
+  });
+
+  it('13.1231 columnLabel names the priority column', () => {
+    expect(columnLabel('priority')).toBe('Priority');
   });
 });
 

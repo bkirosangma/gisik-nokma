@@ -337,9 +337,23 @@ function expectedCard(over: {
     collaboratorIds: [],
     title: over.title,
     dueDate: { state: 'never-claimed' },
+    // The birth priority (spec 2026-09-22): every ticket in this file is created
+    // with no explicit priority, so it is P2, attributed like the title claim.
+    priority: {
+      value: 'P2',
+      actorId: member.userId,
+      clientTime: 'CLIENT-TIME',
+      serverTime: 'SERVER-TIME',
+    },
     fields: {
       title: {
         value: over.title,
+        actorId: member.userId,
+        clientTime: 'CLIENT-TIME',
+        serverTime: 'SERVER-TIME',
+      },
+      priority: {
+        value: 'P2',
         actorId: member.userId,
         clientTime: 'CLIENT-TIME',
         serverTime: 'SERVER-TIME',
@@ -779,6 +793,15 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — the single read'
         fields: {
           title: {
             value: 'Count the crates',
+            actorId: member.userId,
+            clientTime: 'CLIENT-TIME',
+            serverTime: 'SERVER-TIME',
+          },
+          // The birth priority (spec 2026-09-22): this ticket's `ticket.created`
+          // named none, so the reducer's default P2 is the claim, attributed
+          // like the title claim above.
+          priority: {
+            value: 'P2',
             actorId: member.userId,
             clientTime: 'CLIENT-TIME',
             serverTime: 'SERVER-TIME',

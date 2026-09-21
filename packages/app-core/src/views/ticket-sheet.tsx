@@ -1,7 +1,10 @@
 import { useRef, useState, type ReactElement, type ReactNode } from 'react';
 import {
+  PRIORITIES,
   newUlid,
+  prioritySchema,
   statesWithBacklog,
+  type Priority,
   type SubmittedEvent,
   type TicketTypeDef,
 } from '@gisik-nokma/domain';
@@ -560,6 +563,31 @@ export function TicketSheet({
   const [dueDraft, setDueDraft] = useState<string | null>(null);
   const [dueSaving, setDueSaving] = useState(false);
   const dueSubmittingRef = useRef(false);
+  /**
+   * The Priority row's segmenting, and the Start row's date editor (spec
+   * 2026-09-22). Two pairs of guards with the Due row's reasons verbatim —
+   * `prioritySubmittingRef`/`startSubmittingRef` are synchronous re-entrancy
+   * guards and are REFS rather than read off `…Saving`, which is render state
+   * and useless for the job: two commits inside one React batch both read the
+   * pre-commit `false`.
+   *
+   * Priority has NO draft, and that is the difference from Due rather than an
+   * omission: a segmented control has no half-typed state — a click IS the
+   * value — so there is nothing to hold between the press and the answer.
+   */
+  const [prioritySaving, setPrioritySaving] = useState(false);
+  const prioritySubmittingRef = useRef(false);
+  /**
+   * START'S OWN DRAFT, and a second copy of Due's state is the price of two
+   * rows rather than an oversight: the two are TWINS by design (the same
+   * `<input type="date">`, the same commit-on-blur-and-Enter, the same
+   * Escape-abandons-draft, the same absent copy), and each needs its own draft
+   * or editing one would visibly type into the other. A shared hook would be
+   * the right shape for a third row and is not worth the indirection for two.
+   */
+  const [startDraft, setStartDraft] = useState<string | null>(null);
+  const [startSaving, setStartSaving] = useState(false);
+  const startSubmittingRef = useRef(false);
   /**
    * Ruling 32 (fix round 1, 2026-09-17) — the double-submit latch for
    * Close/Reopen, mirroring `board.tsx`'s `MoveArrows.submitting`
@@ -1568,6 +1596,110 @@ export function TicketSheet({
     }
   };
 
+  /**
+   * The Priority row's WRITE (spec 2026-09-22). It is deliberately NOT
+   * `submitDueDate` with a different `fieldId`; the differences are the point:
+   *
+   * - **There is no clearing claim.** A ticket always has a priority, so the
+   *   payload is always `{ fieldId: 'priority', value: next }` and never `null`.
+   *   The engine refuses `null` for this field (`field.priority-required`), so a
+   *   row able to send one would be offering a gesture that can only be refused.
+   * - **There is no draft.** The no-op guard is the only guard, and it matters
+   *   for the reason every other row's does: the ledger is append-only, so a
+   *   commit that changed nothing would record a claim nobody made.
+   * - **The rest is `submitDueDate`'s, verbatim** — a synchronous REF before the
+   *   first `await` (`disabled` is render state and is what makes a browser blur
+   *   the control into a second commit), and a REFUSED answer that leaves the
+   *   previous segment selected rather than adopting a level the server did not
+   *   record.
+   */
+  const submitPriority = async (next: Priority): Promise<void> => {
+    if (next === priorityValue) return;
+    if (prioritySubmittingRef.current) return;
+    prioritySubmittingRef.current = true;
+    setPrioritySaving(true);
+    try {
+      const event = make({
+        workspaceId,
+        entity: { kind: 'ticket', id: ticketId },
+        type: 'ticket.field_set',
+        payload: { fieldId: 'priority', value: next },
+      });
+      const results = await dataSource.ingest([event]);
+      const result = results[0];
+      if (result === undefined) {
+        setServerRefusal(null);
+        setTransportError('The server did not answer this change.');
+        return;
+      }
+      if (result.status === 'committed') {
+        setServerRefusal(null);
+        setTransportError(null);
+        read.reload();
+        history.reload();
+        return;
+      }
+      if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
+      else setServerRefusal({ rule: result.code, reason: result.message });
+    } finally {
+      prioritySubmittingRef.current = false;
+      setPrioritySaving(false);
+    }
+  };
+
+  /**
+   * The Start row's WRITE — `submitDueDate`'s twin, copied rather than shared.
+   *
+   * The two rows are identical in every respect the spec names (the same
+   * `<input type="date">`, the same commit on blur and on Enter, the same
+   * Escape that abandons the draft without closing the sheet, the same
+   * `null`-for-empty payload) and their state is what would have to be shared:
+   * a hook taking `(fieldId, draft, setDraft, …)` would thread six values to
+   * save fourteen lines, and the two rows would then be unable to diverge the
+   * day one of them genuinely needs to — which is the bet this file declines to
+   * make on two instances. **If a THIRD date row ever lands, this is the pair to
+   * extract, and the extraction is the review's, not the third row's.**
+   */
+  const submitStartDate = async (next: string): Promise<void> => {
+    if (next === (startDate?.date ?? '')) {
+      setStartDraft(null);
+      return;
+    }
+    if (startSubmittingRef.current) return;
+    startSubmittingRef.current = true;
+    setStartSaving(true);
+    try {
+      const event = make({
+        workspaceId,
+        entity: { kind: 'ticket', id: ticketId },
+        type: 'ticket.field_set',
+        // `''` is the clearing claim, never an empty-string date — the same
+        // `v || null` shape `submitDueDate` gives for the same reason.
+        payload: { fieldId: 'startDate', value: next === '' ? null : { date: next } },
+      });
+      const results = await dataSource.ingest([event]);
+      const result = results[0];
+      if (result === undefined) {
+        setServerRefusal(null);
+        setTransportError('The server did not answer this change.');
+        return;
+      }
+      if (result.status === 'committed') {
+        setServerRefusal(null);
+        setTransportError(null);
+        setStartDraft(null);
+        read.reload();
+        history.reload();
+        return;
+      }
+      if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
+      else setServerRefusal({ rule: result.code, reason: result.message });
+    } finally {
+      startSubmittingRef.current = false;
+      setStartSaving(false);
+    }
+  };
+
   /** Close/Reopen: the ticket's own state moved, so both reads are re-asked. */
   const closeOrReopen = (type: 'ticket.closed' | 'ticket.reopened'): Promise<void> =>
     submitTicketEvent(
@@ -1627,58 +1759,71 @@ export function TicketSheet({
 
   const state = ticketRead.ticket;
   /**
-   * Door G, 2026-09-19 — PRIORITY, DUE and TYPE as rows that are always drawn.
+   * Door G, 2026-09-19 — PRIORITY, DUE, START and TYPE as rows that are always
+   * drawn.
    *
    * ## What each one actually IS, measured rather than inferred
    *
-   * The three are NOT the same kind of thing, and rendering them as though they
+   * They are NOT all the same kind of thing, and rendering them as though they
    * were would be the defect:
    *
    * - **Type** is a DOMAIN CONCEPT — `state.typeId` (`entity-state.ts:29`). The
    *   human name is not on the ticket at all, so it comes from the workspace's
    *   type ladder (`ticketTypes` above), falling back to the ID — the same
    *   fallback `readMyWork`'s project names use, and for the same reason: an id
-   *   is a worse label than a name and a far better one than nothing.
-   * - **Due** is a DOMAIN CONCEPT and a BUILT-IN field — `ticket-events.ts:66`
-   *   names it among *"built-ins title/description/dueDate/startDate"*. It is
-   *   read through `dateClaimOf`, the ONE place that resolves a date claim
-   *   (`claims/ticket-dates.ts`, whose own docblock: *"There is NO other source
-   *   of dates — absence is absence"*) rather than by reinterpreting
+   *   is a worse label than a name and a far better one than nothing. **It is
+   *   the ONE row on this sheet with no editor**, which is exactly what the
+   *   prototype draws (`<span>{{ sheetType }}</span>`) and what makes it worth
+   *   saying rather than assuming.
+   * - **Due and Start** are DOMAIN CONCEPTS and BUILT-IN fields —
+   *   `ticket-events.ts` names them among the built-ins, and since spec
+   *   2026-09-22 that list is *title/description/dueDate/startDate/priority*.
+   *   Both are read through `dateClaimOf`, the ONE place that resolves a date
+   *   claim (`claims/ticket-dates.ts`, whose own docblock: *"There is NO other
+   *   source of dates — absence is absence"*) rather than by reinterpreting
    *   `state.fields['dueDate'].value` here.
-   * - **Priority** is NEITHER: it has **no domain concept at all** (measured —
-   *   `priority` appears in zero files of `packages/domain`, against 9 for
-   *   `assignee` and 6 for `dueDate` in the same run). It is a CUSTOM-FIELD
-   *   CONVENTION: it exists when a ticket's type declares such a field, and the
-   *   row says so plainly when it does not rather than implying the ticket
-   *   carries a priority of zero.
+   * - **Priority** WAS a CUSTOM-FIELD CONVENTION and IS a BUILT-IN since spec
+   *   2026-09-22. This bullet is kept rather than deleted because it is the
+   *   record of what the row used to be, and because the superseded reading is
+   *   the reason the row is drawn the way it is: the old text measured
+   *   *"`priority` appears in zero files of `packages/domain`"* and concluded
+   *   the row must say *No priority claimed* whenever a type declared no such
+   *   field. That state is GONE — every ticket carries a claim from birth, the
+   *   engine refuses to clear one, and the value set is closed — so the row is
+   *   the prototype's segmented editor and its absence arm now names the only
+   *   condition that can still produce one: a read whose projection predates the
+   *   field.
    *
-   * ## ⚠ Two of the prototype's three rows are EDITORS there — and since
-   * ## ruling E5-6, so is one of them here
+   * ## ⚠ The prototype's three rows were EDITORS there — and now ALL THREE
+   * ## that can be are editors here
    *
    * `desktop.dc.html:1192-1205` draws Priority as a segmented control whose
    * options carry `on-click` handlers, and Due as an `<input type="date">`. Only
    * **Type** is read-only there (`<span>{{ sheetType }}</span>`).
    *
-   * **DUE IS NOW AN EDITOR IN THIS PRODUCT TOO (ruling E5-6, 2026-09-21)** —
-   * see `submitDueDate` and the row's own comment. This paragraph used to say
-   * the dispatch's scope was *"the three ROWS … not editing them"*, that this
-   * was therefore the read half, and that the editors were "named as an unbuilt
-   * door in the PR body and the catalogue"; the first clause was true of the
-   * dispatch it describes, and the conclusion drawn from it was the defect
-   * E5-6 names — a due date every other surface READS, computes lateness from
-   * and notifies about could not be SET anywhere, and the deferral was recorded
-   * rather than ruled. **Priority is still that unbuilt door** and is still
-   * recorded as one; the sentence above is kept rather than deleted because it
-   * is the record of why the read half shipped alone in the first place.
+   * **DUE BECAME AN EDITOR UNDER RULING E5-6 (2026-09-21)**, which is the
+   * ruling that named the defect here: this paragraph used to say the
+   * dispatch's scope was *"the three ROWS … not editing them"*, and the
+   * deferral that followed was recorded rather than ruled — a due date every
+   * other surface READS, computes lateness from and notifies about could not be
+   * SET anywhere. **PRIORITY AND START CLOSE THE REMAINDER (spec 2026-09-22)**:
+   * priority is the prototype's segmented control, and Start is a built-in the
+   * sheet never drew at all until this change — which is why it is a new row
+   * rather than a second editor on an existing one. The paragraph above is kept
+   * because it is the record of why the read half shipped alone in the first
+   * place, and because the words *"Priority is still that unbuilt door"* stood
+   * here until this change and are now false.
    *
-   * ## The absent-value copy is the prototype's own
+   * ## The absent-value copy, and what each absence now MEANS
    *
    * `No date claimed` is transcribed (`:2362`/`:2853`/`:3587` — the prototype
-   * uses that exact sentence for the same absence). `No priority claimed` is the
-   * same construction for the field the prototype always has and we often do
-   * not, and it is worded to be TRUE of a ticket whose type declares no such
-   * field — not "none", which would be a claim about a field that does not
-   * exist in the type at all.
+   * uses that exact sentence for the same absence) and is drawn by BOTH date
+   * rows, which is the prototype's own behaviour for the pair. **`No priority
+   * claimed` is GONE** (spec 2026-09-22): it was the custom-field convention's
+   * absence, worded to be true of a ticket whose TYPE declares no such field,
+   * and there is no longer such a ticket. The only absence this row can now
+   * show is a read whose projection predates the field, and that sentence says
+   * so and names the repair — see the row.
    */
   const ticketTypeName =
     (ticketTypes.data ?? []).find((def) => def.id === state.typeId)?.name ?? state.typeId;
@@ -1690,7 +1835,26 @@ export function TicketSheet({
    * placeholder.
    */
   const dueDate = dateClaimOf({ state, pendingFieldIds: [] }, 'dueDate');
+  const startDate = dateClaimOf({ state, pendingFieldIds: [] }, 'startDate');
   const priorityClaim = state.fields['priority'];
+  /**
+   * The level the SELECTED segment shows, or `null` when this read carries no
+   * claim (a stale projection — see the row). **Never `?? DEFAULT_PRIORITY`:**
+   * the sheet is a READER, and the default belongs to the reducer that applied
+   * it to the creation event, attributed to that event's actor. Substituting it
+   * here would print a level with no claim line beside it, which is the thing
+   * invariant 4 forbids — and it would hide the one condition this product has
+   * to be able to see, that a projection predates the field.
+   *
+   * The ladder is re-checked through `prioritySchema` rather than trusted: an
+   * off-ladder value in the projection is a defect the segment control could
+   * only misdraw (no segment selected, no sentence saying why), and nulling it
+   * routes the row down the same "no claim" arm the absence does.
+   */
+  const priorityValue: Priority | null =
+    priorityClaim !== undefined && prioritySchema.safeParse(priorityClaim.value).success
+      ? (priorityClaim.value as Priority)
+      : null;
   /**
    * The children, RECONCILED against the count the server sent (door F).
    *
@@ -2903,25 +3067,43 @@ export function TicketSheet({
                 <span className="gn-ticket-sheet__claim">{assigneeRow.claim}</span>
               </dd>
             </div>
-            {/* Door G — PRIORITY, DUE and TYPE, drawn ALWAYS and in the
+            {/* Door G — PRIORITY, DUE, START and TYPE, drawn ALWAYS and in the
                 prototype's own order (Assignee, Priority, Due, Type, Visibility
-                — `desktop.dc.html:1183-1205`). Read-only here; the prototype's
-                two editors are a separate door, argued in the derivations
-                above. */}
+                — `desktop.dc.html:1183-1205`), with Start beside Due since the
+                two are the same kind of fact (spec 2026-09-22). Every one that
+                the prototype makes an editor is an editor here; Type is the one
+                row that is read-only on both, argued in the derivations above. */}
             <div className="gn-ticket-sheet__field" data-testid="field-priority">
               <dt>Priority</dt>
               <dd>
-                {/* A CONVENTION, not a built-in: absent whenever the ticket's
-                    type declares no such field. The sentence says exactly that
-                    rather than "none", which would be a claim about a field the
-                    type does not have. */}
+                {/* The prototype's segmented control (`desktop.dc.html:1192-1198`)
+                    on the SHARED `SegmentedControl`. Priority is a built-in that
+                    is ALWAYS present (spec 2026-09-22), so there is no clear
+                    affordance: clicking the selected segment does nothing,
+                    because there is nothing to clear to.
+
+                    `value` is the claim, or the empty string when this read
+                    carries none — a value matching NO option, which is the
+                    component's documented fallback (nothing selected, first tab
+                    still focusable). It is NOT `DEFAULT_PRIORITY`: preselecting
+                    P2 here would print a level with no claim line beside it,
+                    which is the reader-side default the spec rejected. The
+                    sentence below says why nothing is selected in that case. */}
+                <SegmentedControl
+                  options={PRIORITIES.map((level) => ({ value: level, label: level }))}
+                  value={priorityValue ?? ('' as Priority)}
+                  onChange={(next) => {
+                    if (!prioritySaving && next !== priorityValue) void submitPriority(next);
+                  }}
+                  aria-label="Priority"
+                />
                 {priorityClaim === undefined ? (
-                  <span className="gn-ticket-sheet__absent">No priority claimed</span>
+                  <span className="gn-ticket-sheet__refusal">
+                    This ticket carries no priority claim — the server’s projection has not been
+                    rebuilt since priority became built-in.
+                  </span>
                 ) : (
-                  <>
-                    <span>{renderFieldValue(priorityClaim.value)}</span>
-                    <span className="gn-ticket-sheet__claim">{`set by ${nameOf(priorityClaim.actorId)} on ${formatDate(priorityClaim.serverTime)}`}</span>
-                  </>
+                  <span className="gn-ticket-sheet__claim">{`set by ${nameOf(priorityClaim.actorId)} on ${formatDate(priorityClaim.serverTime)}`}</span>
                 )}
               </dd>
             </div>
@@ -2990,6 +3172,52 @@ export function TicketSheet({
                      prototype's ("No date claimed") — that sentence is about
                      the DATE, and the claim line is about the ACTOR. */
                   <span className="gn-ticket-sheet__claim">{`set by ${nameOf(dueDate.actorId)} on ${formatDate(dueDate.serverTime)}`}</span>
+                )}
+              </dd>
+            </div>
+            {/* START — a built-in that has been on every ticket since Plan 3 and
+                that this sheet never drew (spec 2026-09-22). It sits between Due
+                and Type, and it is Due's TWIN in every respect the spec names:
+                the same `<input type="date">`, the same commit on blur and on
+                Enter, the same Escape that abandons the draft without closing
+                the sheet, the same `null`-for-empty payload, and the same
+                absent copy — `No date claimed`, which is the PROTOTYPE's own
+                sentence for either date and not a second wording invented for
+                this row. `submitStartDate` says why the two are copies rather
+                than one shared hook. */}
+            <div className="gn-ticket-sheet__field" data-testid="field-start">
+              <dt>Start</dt>
+              <dd>
+                <input
+                  className="gn-field__input gn-ticket-sheet__start-input"
+                  type="date"
+                  aria-label="Start date"
+                  value={startDraft ?? startDate?.date ?? ''}
+                  disabled={startSaving}
+                  onChange={(event) => setStartDraft(event.target.value)}
+                  onBlur={() => {
+                    if (startDraft !== null) void submitStartDate(startDraft);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      if (startDraft !== null) void submitStartDate(startDraft);
+                      return;
+                    }
+                    if (event.key === 'Escape') {
+                      // Load-bearing for the reason the Due row's own branch
+                      // records: `Sheet` registers a DOCUMENT-level Escape, so
+                      // an unconsumed one would close the sheet and make
+                      // "abandon the draft" true of an input being unmounted.
+                      event.preventDefault();
+                      setStartDraft(null);
+                    }
+                  }}
+                />
+                {startDate === null ? (
+                  <span className="gn-ticket-sheet__absent">No date claimed</span>
+                ) : (
+                  <span className="gn-ticket-sheet__claim">{`set by ${nameOf(startDate.actorId)} on ${formatDate(startDate.serverTime)}`}</span>
                 )}
               </dd>
             </div>
@@ -3080,14 +3308,21 @@ export function TicketSheet({
               // SECOND editor over one claim and make `field-description`
               // ambiguous to `getByTestId` — two controls for one field.
               //
-              // `dueDate` and `priority` join it for door G, and the reason is
-              // the same one rung less severe: both are drawn as their OWN rows
-              // above, so a second pass would render **two rows for one claim**.
-              // Without this the sheet shows a `field-dueDate` beside the
-              // `field-due` this task adds, which is exactly the ambiguity the
-              // description line exists to prevent — and it would be INVISIBLE
-              // on any fixture whose ticket carries no such field.
-              if (fieldId === 'description' || fieldId === 'dueDate' || fieldId === 'priority') {
+              // `dueDate`, `startDate` and `priority` join it for door G, and the
+              // reason is the same one rung less severe: all three are drawn as
+              // their OWN rows above, so a second pass would render **two rows
+              // for one claim**. Without this the sheet shows a `field-dueDate`
+              // beside the `field-due` this task adds, which is exactly the
+              // ambiguity the description line exists to prevent — and it would
+              // be INVISIBLE on any fixture whose ticket carries no such field.
+              // `startDate` is the third (spec 2026-09-22) and the newest: the
+              // rows above are `field-due`, `field-start` and `field-priority`.
+              if (
+                fieldId === 'description' ||
+                fieldId === 'dueDate' ||
+                fieldId === 'startDate' ||
+                fieldId === 'priority'
+              ) {
                 return null;
               }
               return (

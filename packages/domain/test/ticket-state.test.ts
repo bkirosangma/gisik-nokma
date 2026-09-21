@@ -183,7 +183,7 @@ function fold(events: EventEnvelope[]): TicketState {
 }
 
 describe('applyTicketEvent', () => {
-  it('creation enters the workflow initial state and records the title as an attributed claim', () => {
+  it('creation enters the workflow initial state and records the title and the P2 priority as attributed claims', () => {
     expect(createdState()).toEqual({
       kind: 'ticket',
       id: TICKET,
@@ -220,6 +220,12 @@ describe('applyTicketEvent', () => {
       fields: {
         title: {
           value: 'File the GST return',
+          actorId: 'user-kiro',
+          clientTime: '2026-08-20T09:00:00.000Z',
+          serverTime: '2026-08-20T09:00:00.100Z',
+        },
+        priority: {
+          value: 'P2',
           actorId: 'user-kiro',
           clientTime: '2026-08-20T09:00:00.000Z',
           serverTime: '2026-08-20T09:00:00.100Z',
@@ -640,6 +646,47 @@ describe('13.565 ticket.created lands in backlog when start says so', () => {
   });
   it('no start at all (a v1 event) → focus — the additive-field rule', () => {
     expect(fold([createdWith({})]).stateId).toBe('todo');
+  });
+});
+
+describe('3.965 ticket.created writes the priority claim — every ticket has one from birth', () => {
+  it('no priority on the event (a v1 event) → P2, attributed to the CREATOR and the creation clocks', () => {
+    const state = createdState();
+    expect(state.fields.priority).toEqual({
+      value: 'P2',
+      actorId: 'user-kiro',
+      clientTime: '2026-08-20T09:00:00.000Z',
+      serverTime: '2026-08-20T09:00:00.100Z',
+    });
+  });
+  it('an explicit priority on the event is the claim, same attribution', () => {
+    const state = fold([createdWith({ priority: 'P1' })]);
+    expect(state.fields.priority?.value).toBe('P1');
+    expect(state.fields.priority?.actorId).toBe(createdWith({}).actorId);
+  });
+  it('CONTROL — the title claim is unchanged by the new member, so the two are written side by side', () => {
+    const state = fold([createdWith({ priority: 'P3' })]);
+    expect(Object.keys(state.fields).sort()).toEqual(['priority', 'title']);
+  });
+  it('3.966 a later field_set on priority replaces the birth claim and keeps the new actor', () => {
+    const state = applyTicketEvent(
+      createdState(),
+      makeEnvelope({
+        type: 'ticket.field_set',
+        entity: { kind: 'ticket', id: TICKET },
+        payload: { fieldId: 'priority', value: 'P1' },
+        actorId: 'user-anselma',
+        clientTime: '2026-08-21T08:00:00.000Z',
+        serverTime: '2026-08-21T08:00:00.900Z',
+      }),
+      deps,
+    );
+    expect(state.fields.priority).toEqual({
+      value: 'P1',
+      actorId: 'user-anselma',
+      clientTime: '2026-08-21T08:00:00.000Z',
+      serverTime: '2026-08-21T08:00:00.900Z',
+    });
   });
 });
 

@@ -108,6 +108,9 @@ const BOARD_WITH_DONE = {
               // Ruling E5-2 made this REQUIRED on `BoardCard`; `null` is "this
               // ticket claims no date", the same default `boardCardSeed` uses.
               dueDate: null,
+              // REQUIRED since spec 2026-09-22 (see the same member on the
+              // local `row(...)` helper below).
+              priority: { value: 'P2' as const, claim: PROVENANCE_387 },
               cause: null,
               rollup: null,
               pending: false,
@@ -507,6 +510,9 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
       assignee: null,
       assignedProvenance: null,
       dueDate: null,
+      // REQUIRED since spec 2026-09-22 and never nullable; the birth default,
+      // attributed to the same seeded claimant `PROVENANCE_387` names.
+      priority: { value: 'P2' as const, claim: PROVENANCE_387 },
       fields: {},
       rollup: null,
       hasRestrictedParent: false,

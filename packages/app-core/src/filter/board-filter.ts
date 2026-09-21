@@ -17,7 +17,7 @@ import { excludedBy, narrowsTo } from './id-axes.js';
  */
 export type BoardIdAxes = Pick<
   IdAxes,
-  'assigneeIds' | 'typeIds' | 'stateIds' | 'stateCategories' | 'projectIds'
+  'assigneeIds' | 'typeIds' | 'stateIds' | 'stateCategories' | 'priorities' | 'projectIds'
 >;
 
 /**
@@ -42,6 +42,7 @@ export function matchesBoardCard(
   if (!narrowsTo(spec.typeIds, card.typeId)) return false;
   if (!narrowsTo(spec.stateIds, column.stateId)) return false;
   if (!narrowsTo(spec.stateCategories, column.category)) return false;
+  if (!narrowsTo(spec.priorities, card.priority.value)) return false;
   if (!narrowsTo(spec.projectIds, projectId)) return false;
   if (spec.text !== undefined && spec.text.trim() !== '') {
     if (!card.title.toLowerCase().includes(spec.text.trim().toLowerCase())) return false;
@@ -51,6 +52,7 @@ export function matchesBoardCard(
   if (excludedBy(exclude.typeIds, card.typeId)) return false;
   if (excludedBy(exclude.stateIds, column.stateId)) return false;
   if (excludedBy(exclude.stateCategories, column.category)) return false;
+  if (excludedBy(exclude.priorities, card.priority.value)) return false;
   if (excludedBy(exclude.projectIds, projectId)) return false;
   return true;
 }

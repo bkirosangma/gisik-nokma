@@ -95,7 +95,7 @@ describe('preferencesDocSchema', () => {
 
   it('refuses unknown groupings and unknown top-level keys', () => {
     expect(() =>
-      preferencesDocSchema.parse({ savedFilters: [], listColumns: {}, grouping: { [PRJ]: 'priority' } }),
+      preferencesDocSchema.parse({ savedFilters: [], listColumns: {}, grouping: { [PRJ]: 'workflow' } }),
     ).toThrow();
     expect(() =>
       preferencesDocSchema.parse({ savedFilters: [], listColumns: {}, grouping: {}, theme: 'dark' }),
@@ -109,10 +109,10 @@ describe('preferencesDocSchema', () => {
       expect(() => preferencesDocSchema.parse(partial)).toThrow();
     }
 
-    // Positive control for all five refusals above: the five legal groupings all
-    // parse in this position, so what was refused is `priority` and not the
+    // Positive control for all five refusals above: the six legal groupings all
+    // parse in this position, so what was refused is `workflow` and not the
     // record.
-    for (const grouping of ['epic', 'status', 'assignee', 'type', 'flat']) {
+    for (const grouping of ['epic', 'status', 'assignee', 'type', 'priority', 'flat']) {
       expect(
         preferencesDocSchema.parse({ savedFilters: [], listColumns: {}, grouping: { [PRJ]: grouping } })
           .grouping[PRJ],

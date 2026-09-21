@@ -8,7 +8,13 @@ import type {
   TicketTypeDef,
   WorkflowDef,
 } from '@gisik-nokma/domain';
-import { BACKLOG_STATE_ID, IST_DAY_REGEX, statesWithBacklog } from '@gisik-nokma/domain';
+import {
+  BACKLOG_STATE_ID,
+  IST_DAY_REGEX,
+  PRIORITIES,
+  statesWithBacklog,
+  type Priority,
+} from '@gisik-nokma/domain';
 import {
   isSyncInstruction,
   workflowVersionsOf,
@@ -35,6 +41,7 @@ import type {
   Grouping,
   ListRow,
   ParentRef,
+  PriorityView,
   TicketHistoryEvent,
   TicketListView,
   TicketRead,
@@ -748,6 +755,31 @@ function dueDateOf(state: TicketState): { date: string; claim: ClaimProvenance }
 }
 
 /**
+ * The birth claim `applyTicketEvent` writes on every `ticket.created` (spec
+ * 2026-09-22). Unlike `dueDateOf` above there is NO null arm and no lenient
+ * parse: priority is always present, so a state without one is a replica that
+ * replayed under an older reducer — THROWN, not defaulted, for the reason
+ * `online/mappers.ts`'s `mapPriority` gives (a default here would print a value
+ * with no claim line, which invariant 4 forbids, and would put the ladder in a
+ * second place).
+ *
+ * `actorName` is `null` for the same reason every other claim here is: this
+ * source holds the local ledger and no roster.
+ */
+function priorityOf(state: TicketState): PriorityView {
+  const claim = state.fields['priority'];
+  if (claim === undefined || !PRIORITIES.includes(claim.value as Priority)) {
+    throw new Error(
+      `replica: no priority claim on ticket ${state.id} — every ticket.created writes one since 2026-09-22, so this replica replayed under an older reducer; re-bootstrap`,
+    );
+  }
+  return {
+    value: claim.value as Priority,
+    claim: { actorId: claim.actorId, actorName: null, clientTime: claim.clientTime, serverTime: claim.serverTime },
+  };
+}
+
+/**
  * `{id, name: id}` when nothing better is known — the substitution
  * `online/mappers.ts`'s `mapAssignee` already makes, for the reason it gives:
  * "the id is a fact the server sent, and `actorLabel(id, null)` renders it that
@@ -879,6 +911,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       assignee: actorOf(state.assigneeId),
       assignedProvenance: claims.assigned,
       dueDate: dueDateOf(state),
+      priority: priorityOf(state),
       fields: state.fields,
       // `restrictedCount` is the count of children this viewer may NOT see, and
       // a replica cannot know how many it was not sent. `null` is the type's own
@@ -1083,6 +1116,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
           // ruling E5-2: a board card and a list row for one ticket must not
           // disagree about whether a date is claimed.
           dueDate: dueDateOf(state),
+          priority: priorityOf(state),
           pending: pendingIds.has(state.id),
         };
       }

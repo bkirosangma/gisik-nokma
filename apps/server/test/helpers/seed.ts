@@ -427,6 +427,16 @@ async function insertTicketHead(
           clientTime: created.clientTime,
           serverTime: created.serverTime,
         },
+        // The birth priority (spec 2026-09-22), mirroring what `applyTicketEvent`
+        // would have written from the very `ticket.created` above: `testEnvelope`
+        // never sets `priority`, so the reducer's default — P2, attributed to the
+        // creation event's own actor and clocks — is what this INSERT mirrors too.
+        priority: {
+          value: 'P2',
+          actorId: created.actorId,
+          clientTime: created.clientTime,
+          serverTime: created.serverTime,
+        },
       }),
       JSON.stringify([]),
     ],

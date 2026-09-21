@@ -413,6 +413,45 @@ describe('assembleTicketCards', () => {
     expect(byId.get(virginId)?.dueDate).toEqual({ state: 'never-claimed' });
   });
 
+  /** 7.268 — every card carries a priority claim; a v1 ticket replays to P2 under its creator. */
+  it('7.268 the priority claim is on every card: P2 attributed to the creator when the event named none, the set level otherwise', async () => {
+    const bornId = newUlid();
+    const raisedId = newUlid();
+    await applyCommitted(db.pool, [
+      created({ id: bornId, actorId: world.owner }),
+      created({ id: raisedId, actorId: world.owner }),
+      makeCommitted({
+        workspaceId: world.workspaceId,
+        actorId: world.member,
+        clientTime: '2026-08-15T05:00:00.000Z',
+        serverTime: '2026-08-15T05:00:02.000Z',
+        entity: { kind: 'ticket', id: raisedId },
+        type: 'ticket.field_set',
+        payload: { fieldId: 'priority', value: 'P1' },
+      }),
+    ]);
+    const rows = await fetchTicketRows(db.pool, [bornId, raisedId]);
+    const cards = await assembleTicketCards(db.pool, world.owner, rows);
+    const byId = new Map(cards.map((c) => [c.ticketId, c]));
+    expect(byId.get(bornId)?.priority.value).toBe('P2');
+    expect(byId.get(bornId)?.priority.actorId).toBe(world.owner);
+    expect(byId.get(raisedId)?.priority).toEqual({
+      value: 'P1',
+      actorId: world.member,
+      clientTime: '2026-08-15T05:00:00.000Z',
+      serverTime: '2026-08-15T05:00:02.000Z',
+    });
+  });
+
+  it('7.269 a row with NO priority claim THROWS — an absence means the projection was not rebuilt, and an assembler that filled in P2 would be the default the spec rejected', async () => {
+    const staleId = newUlid();
+    await applyCommitted(db.pool, [created({ id: staleId, actorId: world.owner })]);
+    // Simulate a projection row written by the pre-change reducer.
+    await db.pool.query(`UPDATE proj_tickets SET fields = fields - 'priority' WHERE ticket_id = $1`, [staleId]);
+    const rows = await fetchTicketRows(db.pool, [staleId]);
+    await expect(assembleTicketCards(db.pool, world.owner, rows)).rejects.toThrow(/no priority claim on ticket .* rebuild/);
+  });
+
   /**
    * 7.77 — the rollup counts terminal children the viewer CANNOT see and names the restriction beside them, rather than silently narrowing the denominator.
    */

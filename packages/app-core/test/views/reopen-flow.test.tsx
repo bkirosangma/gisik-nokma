@@ -564,6 +564,14 @@ describe('13.592 CreateTicketFlow.create always sends `start` on ticket.created'
     const payload = source.ingested[0]?.[0]?.payload as Record<string, unknown>;
     expect(payload.start).toBe('backlog');
     expect(Object.keys(payload)).toContain('start');
+    // Spec 2026-09-22, and read the SAME way `start` is read one line up: the
+    // key's PRESENCE is the assertion, because a `create()` that dropped the
+    // `priority:` line from its payload literal would leave no key at all, and a
+    // value comparison cannot tell that from one holding `undefined`. The wire's
+    // absence-means-P2 rule exists for events written before the field; this
+    // client was built after it, so leaving it out would be a choice.
+    expect(payload.priority).toBe('P2');
+    expect(Object.keys(payload)).toContain('priority');
     expect(onCreated).toHaveBeenCalled();
   });
 
@@ -579,6 +587,34 @@ describe('13.592 CreateTicketFlow.create always sends `start` on ticket.created'
     const payload = source.ingested[0]?.[0]?.payload as Record<string, unknown>;
     expect(payload.start).toBe('focus');
     expect(Object.keys(payload)).toContain('start');
+    // The priority default is independent of the parent: an in-focus parent
+    // moves `start`, and it must move nothing else.
+    expect(payload.priority).toBe('P2');
+    expect(onCreated).toHaveBeenCalled();
+  });
+
+  /**
+   * 13.1236 — the flow sends the DRAFT's level, not a constant (spec 2026-09-22).
+   *
+   * The two cases above assert the DEFAULT, which a `create()` hard-coding
+   * `priority: 'P2'` would satisfy perfectly. This one chooses a different level
+   * through the dialog's own control and reads it back off the payload, so the
+   * value is proved to travel from the draft rather than be minted at the door.
+   */
+  it('13.1236 choosing P1 in the dialog carries P1 all the way onto the payload — the value is the draft’s', async () => {
+    const user = userEvent.setup();
+    const source = createFakeDataSource({}, (events) => events.map((event) => committed(event.id)));
+    const onCreated = renderFlow(source, { parentCandidates: [] });
+    await user.click(screen.getByRole('button', { name: 'New ticket' }));
+    await user.type(screen.getByLabelText('Title'), 'Renew the trade licence');
+    await user.click(
+      within(screen.getByRole('tablist', { name: 'Priority' })).getByRole('tab', { name: 'P1' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    const payload = source.ingested[0]?.[0]?.payload as Record<string, unknown>;
+    expect(payload.priority).toBe('P1');
     expect(onCreated).toHaveBeenCalled();
   });
 });

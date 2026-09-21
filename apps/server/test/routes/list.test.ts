@@ -487,6 +487,42 @@ describe('GET /v1/projects/:projectId/tickets — groupings', () => {
     expect(type['task']?.cards).toEqual([read.world.taskInEpicId, read.world.sharedTaskId].sort());
   });
 
+  it('7.271 groupBy=priority buckets by level, labels each with the level, and rearranges the SAME card set', async () => {
+    // The sixth grouping, added by the priority built-in (spec 2026-09-22). The
+    // route validates `groupBy` with the SHARED `groupingSchema`, so the moment
+    // `GROUPINGS` grew `'priority'` this door accepted a value `groupCards` had
+    // no bucket for: the switch fell through and the 200 carried
+    // `groups: undefined`, which `byKey` cannot even read. That fall-through —
+    // not the bucket order — is what this case pins first.
+    const flat = byKey(await listOf('member', read.world.projectId, { groupBy: 'flat' }));
+    const before = byKey(await listOf('member', read.world.projectId, { groupBy: 'priority' }));
+    // Every seeded ticket is born P2 (`applyTicketEvent` writes the birth claim),
+    // so before any `field_set` the honest shape is ONE bucket.
+    expect(Object.keys(before)).toEqual(['P2']);
+    expect(before['P2']?.label).toBe('P2');
+
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        workspaceId: read.world.workspaceId,
+        actorId: read.world.member,
+        clientTime: '2026-08-15T05:00:00.000Z',
+        serverTime: '2026-08-15T05:00:02.000Z',
+        entity: { kind: 'ticket', id: read.world.epicId },
+        type: 'ticket.field_set',
+        payload: { fieldId: 'priority', value: 'P1' },
+      }),
+    ]);
+
+    const after = byKey(await listOf('member', read.world.projectId, { groupBy: 'priority' }));
+    expect(Object.keys(after).sort()).toEqual(['P1', 'P2']);
+    // The label is the level itself, the way `type`'s is the type id — this route
+    // reads no ladder vocabulary and invents no name.
+    expect(after['P1']).toEqual({ label: 'P1', cards: [read.world.epicId] });
+    // The route's own contract, said as a property: grouping ARRANGES truth and
+    // never changes which tickets match, so the union is the flat set exactly.
+    expect(Object.values(after).flatMap((group) => group.cards).sort()).toEqual(flat['all']?.cards);
+  });
+
   it('7.19 a status key is COMPOSITE: two workflows sharing the state id `todo` are two groups, each with its own label', async () => {
     // The seeded project has ONE workflow, so its status keys pin the FORMAT
     // and nothing else — a route keyed on the bare state id passes there. The
@@ -1087,7 +1123,13 @@ describe('GET /v1/projects/:projectId/tickets — the door', () => {
       [{ filter: 'not json' }, 'invalid_filter'],
       [{ filter: { velocity: 9 } as unknown as FilterSpec }, 'invalid_filter'],
       [{ filter: { assigneeId: '' } as FilterSpec }, 'invalid_filter'],
-      [{ groupBy: 'priority' }, 'invalid_grouping'],
+      // `'priority'` was this row's exemplar before the priority built-in (spec
+      // 2026-09-22) made it a genuinely legal grouping at the schema door. It is
+      // NOT re-added here: this array is the REFUSAL set, and `groupBy=priority`
+      // is ANSWERED now — `groupCards` grew the arm its switch needed, and the
+      // case below (7.271) is what pins it. `'workflow'` stays as the
+      // unknown-grouping exemplar, a value `groupingSchema` still refuses.
+      [{ groupBy: 'workflow' }, 'invalid_grouping'],
       [{ groupBy: '' }, 'invalid_grouping'],
       [{ limit: 0 }, 'invalid_limit'],
       [{ limit: 999 }, 'invalid_limit'],

@@ -92,6 +92,9 @@ function card(overrides: Partial<BoardCard> = {}): BoardCard {
     // claims no date", the same default `boardCardSeed` uses. No case in this
     // file is about the due label.
     dueDate: null,
+    // REQUIRED since spec 2026-09-22 and never nullable: the birth default, and
+    // no case in this file is about the priority either.
+    priority: { value: 'P2', claim: claim() },
     cause: null,
     rollup: null,
     pending: false,
@@ -163,6 +166,8 @@ function listRow(overrides: Partial<ListRow> = {}): ListRow {
     assignee: null,
     assignedProvenance: null,
     dueDate: null,
+    // REQUIRED since spec 2026-09-22 (see `card()` above).
+    priority: { value: 'P2', claim: claim() },
     fields: {
       title: {
         value: 'A ticket the list can see',

@@ -35,8 +35,15 @@ import { formatRollup } from './rollup-text.js';
 import { useLiveQuery } from './use-live-query.js';
 import { usePreferences } from './use-preferences.js';
 
-const GROUPING_OPTIONS: Grouping[] = ['epic', 'status', 'assignee', 'type', 'flat'];
-const AVAILABLE_COLUMNS: ListColumnId[] = ['status', 'assignee', 'dueDate', 'type', 'progress'];
+const GROUPING_OPTIONS: Grouping[] = ['epic', 'status', 'assignee', 'type', 'priority', 'flat'];
+const AVAILABLE_COLUMNS: ListColumnId[] = [
+  'status',
+  'assignee',
+  'dueDate',
+  'type',
+  'progress',
+  'priority',
+];
 
 /**
  * What a group's title NAMES, transcribed from the prototype's own grouping
@@ -51,6 +58,15 @@ const AVAILABLE_COLUMNS: ListColumnId[] = ['status', 'assignee', 'dueDate', 'typ
  * spells on the section title itself (`list-model.ts`: "No epic",
  * "Unassigned") — naming the absence twice on one band would read as two facts.
  *
+ * **`priority` is a FIFTH word and NOT one of the prototype's seven** (spec
+ * 2026-09-22): the prototype's grouping table (`desktop.dc.html:2902-2913`)
+ * branches on epic / workflow / type / status / assignee and has no priority
+ * case at all, so there is no prototype wording to transcribe. `'priority'` is
+ * chosen the way `type: 'type'` already reads — the meta names what KIND of
+ * thing the title is, and the title is the level itself ("P1"). The alternative
+ * reading, that the title is already the whole fact and the word adds nothing,
+ * would leave `exclude`-typed entries sparse and the band unreadable.
+ *
  * `flat` has no entry because it has no band: `groupRows` answers one section
  * whose rows are the whole set, and `TicketList` has never rendered a heading
  * for it.
@@ -60,6 +76,7 @@ const GROUP_META: Record<Exclude<Grouping, 'flat'>, string> = {
   status: 'state',
   assignee: 'assignee',
   type: 'type',
+  priority: 'priority',
 };
 
 /**
@@ -269,9 +286,10 @@ export type TicketListProps = {
  * The Asana-shaped list, and the three ways it refuses to lie.
  *
  * 1. **Grouping is a REARRANGEMENT, never a filter.** Every row this view is
- *    given renders exactly once ACROSS THE SECTIONS, under all five groupings.
- *    A grouping that drops a row is a filter wearing a grouping's name, and the
- *    ticket it dropped is gone with nothing saying so.
+ *    given renders exactly once ACROSS THE SECTIONS, under all SIX groupings
+ *    (the fifth of the six arrived with the priority built-in, spec
+ *    2026-09-22). A grouping that drops a row is a filter wearing a grouping's
+ *    name, and the ticket it dropped is gone with nothing saying so.
  *
  *    "Exactly once across the sections" and not "exactly once on the page":
  *    *Recently assigned* is an additional SURFACE pinned above them, so a row
@@ -1121,6 +1139,17 @@ function ListCell({ row, columnId }: { row: ListRow; columnId: ListColumnId }) {
         </span>
       );
     }
+    case 'priority':
+      // A CLAIM, attributed exactly like the due cell above (spec 2026-09-22):
+      // the level with whose claim it is, so nobody reads a priority as a fact
+      // the system established. There is no absence arm — `ListRow.priority` is
+      // required and its mapper THROWS rather than defaulting to P2, so a row
+      // reaching this switch always has a level and a claimant.
+      return (
+        <span className="gn-list__priority">
+          {row.priority.value} — {actorLabel(row.priority.claim.actorId, row.priority.claim.actorName)}&apos;s claim
+        </span>
+      );
     case 'type':
       return <span>{row.typeId}</span>;
     case 'progress':

@@ -1,7 +1,7 @@
 import type { FieldClaim, WorkspaceRole } from './entity-state.js';
 import type { PublishedWorkflowDef, StateCategory } from './workflow.js';
 import type { Grouping } from './filter-spec.js';
-import type { TicketTypeDef } from './ticket-types.js';
+import type { Priority, TicketTypeDef } from './ticket-types.js';
 import type { WorkspaceSettings } from './events/workspace-settings.js';
 
 /**
@@ -129,6 +129,19 @@ export type TicketDueDate =
   | { state: 'never-claimed' };
 
 /**
+ * A ticket's priority: the value plus who claimed it and when. NEVER nullable and
+ * NEVER a three-state union like `TicketDueDate` — there is no never-claimed or
+ * cleared state to represent, because `ticket.created` writes the claim
+ * (`applyTicketEvent`) and the engine refuses `value: null` for this field.
+ */
+export type PriorityClaim = {
+  value: Priority;
+  actorId: string;
+  clientTime: string;
+  serverTime: string;
+};
+
+/**
  * One ticket as a board, list, search or My Work response carries it.
  *
  * Field-by-field, what each value means when the underlying fact was withheld,
@@ -160,6 +173,7 @@ export type TicketDueDate =
  *   ledger disagree, and the assembler throws rather than emitting `''` — the
  *   empty string would be a title nobody typed sitting where a real one goes.
  * - `dueDate` — the three-state union above; never a bare null.
+ * - `priority` — always a claim; an assembler that finds none THROWS (the projection was not rebuilt).
  * - `fields` — every claim verbatim, each carrying its own actor and clocks. An
  *   ABSENT key means never claimed; a present key whose `value` is `null` means
  *   cleared by that claim's actor. The map preserves the distinction the
@@ -189,6 +203,7 @@ export type TicketCard = {
   collaboratorIds: string[];
   title: string;
   dueDate: TicketDueDate;
+  priority: PriorityClaim;
   fields: Record<string, FieldClaim>;
   stateProvenance: StateProvenance;
   rollup: TicketRollup | null;

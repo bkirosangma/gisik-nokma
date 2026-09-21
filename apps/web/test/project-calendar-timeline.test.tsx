@@ -121,6 +121,18 @@ function row(overrides: Partial<ListRow> = {}): ListRow {
     assignee: null,
     assignedProvenance: null,
     dueDate: null,
+    // REQUIRED since spec 2026-09-22. Spelled out rather than routed through
+    // `claim(...)`: that helper is the `fields`-entry factory and carries its own
+    // `value` key, while `PriorityView` nests the claim under `claim`.
+    priority: {
+      value: 'P2',
+      claim: {
+        actorId: 'user_kiro',
+        actorName: 'Kiro',
+        clientTime: '2026-08-19T10:00:00.000Z',
+        serverTime: '2026-08-19T10:00:01.000Z',
+      },
+    },
     fields: { title: claim('Restock the cold shelf') },
     rollup: null,
     hasRestrictedParent: false,

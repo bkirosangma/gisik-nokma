@@ -266,7 +266,7 @@ one screen up makes with `workflowId@version`.
 - **The `Subtask of {parent}` chip is out of scope**, not tested and not built — see `16.22`, which asserted its ABSENCE rather than its behaviour — **UNTIL 2026-09-20, when the chip was ruled in and built; its behaviours are `16.38`–`16.40` below, and `16.22` flipped to assert its presence.**
 - **The paste/move of a child between parents is not covered.** `ticket.reparented` exists and moves `parentId`, but nothing in this row changes a child's parent, so `16.19`'s filter is asserted for the CREATE path only.
 
-## Door G — Priority, Due and Type as rows (executor 1, 2026-09-19) — cases `16.23`–`16.30`
+## Door G — Priority, Due, Start and Type as rows (executor 1, 2026-09-19; extended 2026-09-22) — cases `16.23`–`16.30`, `16.100`–`16.105`
 
 **The classification came first, and it is the deliverable the dispatch demanded.** The queue's row G
 warns this is *"a difference in what the sheet CLAIMS TO BE, not just layout"*, and asks which of the
@@ -277,7 +277,8 @@ inferred from the prototype:**
 |---|---|---|
 | **Type** | a **DOMAIN CONCEPT** | `TicketState.typeId` (`entity-state.ts:29`). Its NAME is not on the ticket; it comes from the ladder the sheet now reads — `getTicketTypes(workspaceId)` (`data-source.ts:147`), which already ships. |
 | **Due** | a **DOMAIN CONCEPT** and a **BUILT-IN field** | `ticket-events.ts:66`: *"built-ins title/description/dueDate/startDate ride this same event"*. Typed `{date, note?}`, own schema, on `WorkItem` as `{date, claim} \| null`, and in `DEFAULT_LIST_COLUMNS`. Read through `dateClaimOf`, the declared single source of dates. |
-| **Priority** | **NEITHER — a CUSTOM-FIELD CONVENTION** | **Zero hits for `priority` in `packages/domain`**, against 9 files for `assignee` and 6 for `dueDate` in the same run. No new schema is needed (the `ticket.field_set` mechanism carries it), but it exists only when a ticket's TYPE declares such a field. |
+| **Priority** | ⚠ **a CUSTOM-FIELD CONVENTION *when this table was written*, and a BUILT-IN since spec 2026-09-22** | The measurement stood when taken: **zero hits for `priority` in `packages/domain`**, against 9 files for `assignee` and 6 for `dueDate` in the same run. The owner's 2026-09-22 ruling made it the fifth built-in — `BUILTIN_FIELD_IDS`, `PRIORITIES`/`DEFAULT_PRIORITY`, a claim the REDUCER writes on `ticket.created` — so the zero is now a historical reading, and the row is an editor. **This table is kept with the superseded value struck rather than deleted**, because the classification was the deliverable the dispatch demanded and a table silently rewritten reads as though it had always said so. |
+| **Start** | a **DOMAIN CONCEPT** and a **BUILT-IN field** — and it was on every ticket while this door was being built | Same line of `ticket-events.ts` as Due, and named in it. **It has no row in the table above because door G never drew it** — the gap spec 2026-09-22 closes. It reads through the same `dateClaimOf`, and it is Due's twin in every respect the spec names. |
 
 **⛔ No migration, no route, no new schema** — so nothing here was a stop-and-ask.
 
@@ -286,27 +287,44 @@ inferred from the prototype:**
 handlers, and Due as an `<input type="date">` **with a note line**; only Type is read-only
 (`<span>{{ sheetType }}</span>`). The dispatch's scope is *the three ROWS … not editing them*, so
 **this is the read half** and the editors are named as an unbuilt door. `16.29` asserts the read-only
-half, the same way `16.22` ASSERTED F's chip absence.
+half, the same way `16.22` ASSERTED F's chip absence. **(The door was built in two rulings, below —
+E5-6 for Due, spec 2026-09-22 for Priority and Start. `16.29` was amended both times rather than
+retired, which is the point of the sentence above.)**
 
-**✅ THE DUE HALF OF THAT DOOR IS NOW BUILT — ruling E5-6 (release 2026-09-22, batch B13).** The record
+**✅ THE DUE HALF OF THAT DOOR WAS BUILT BY RULING E5-6 (release 2026-09-22, batch B13).** The record
 above is kept rather than deleted because it is what the ruling overrode: every surface in this product
 READS a due date — My Work's overdue count, the List's due column, the Calendar, the Timeline, the
 due-soon notification — and until E5-6 none could SET one, so the fact was visible in four places and
 claimable in none. The job panel's **Due** row is now a date box mirroring the export's own
 (`desktop.dc.html:3599`: `{ due: v || null }` — an emptied control CLEARS the claim, which is
-`value: null` on `ticket.field_set`). **PRIORITY IS STILL THE UNBUILT DOOR** and is still the read half
-only; `16.29` was amended to pin that SPLIT rather than the uniform absence it used to pin, which is
-the outcome its own suite docblock asked for (*"16.29 asserts the READ-ONLY half so that making them
-editable later is a decision rather than a drift"*). The editor's write behaviour is **`13.1178`**.
+`value: null` on `ticket.field_set`). The editor's write behaviour is **`13.1178`**.
 
-- **16.23** ✅ All three rows are drawn **ALWAYS**, even on a ticket claiming none of them — the state this task exists to end. Each absence carries its own sentence.
+**✅ AND THE DOOR IS NOW CLOSED — spec 2026-09-22 made PRIORITY an editor and gave START a row.** The
+paragraph above ended, for one release, with *"PRIORITY IS STILL THE UNBUILT DOOR and is still the read
+half only"*; that sentence is now false and is replaced rather than left standing, which is the outcome
+`16.29`'s own suite docblock asked for (*"16.29 asserts the READ-ONLY half so that making them editable
+later is a decision rather than a drift"* — the decision was taken). Priority renders the prototype's
+segmented control (`desktop.dc.html:1192-1198`) with NO clear affordance, because it is a built-in that
+is always present and the engine refuses `null` for it (`field.priority-required`), and Start is a date
+editor between Due and Type. **The `No priority claimed` sentence is GONE** — it was the
+custom-field-convention absence and there is no longer a ticket it is true of; the row's only absence
+arm now names a stale projection and says so. **Type is the ONE row left read-only**, which is exactly
+what the prototype draws there.
+
+- **16.23** ✅ All rows are drawn **ALWAYS**, even on a ticket claiming none of them — the state this task exists to end. Each absence carries its own sentence. **AMENDED 2026-09-22:** it asserted `No priority claimed` inside `field-priority`; that sentence is gone, so the case now pins only that the row is DRAWN — its control is the prototype's `tablist` named `Priority` — and adds the new **Start** row and its `No date claimed`.
 - **16.24** ✅ Due renders the claimed day **and** its claim line — a value is never a standing property, the rule every other row on this sheet keeps. **AMENDED BY E5-6:** the day half used to be `getByText('30 Aug 2026')` over a read-only span; the export's row draws a date input and no such span, so it is now asserted as that control's VALUE (`toHaveValue('2026-08-30')`). The "both halves" substance is unchanged.
 - **16.25** ✅ Type renders the **NAME from the workspace ladder**, not the raw id.
 - **16.26** ✅ Type **falls back to the id** when the ladder does not hold it — the control for 16.25, without which a hard-coded name would pass.
-- **16.27** ✅ Priority renders the claim when the ticket carries one: it is a CONVENTION, so the claimed case arrives by the ticket carrying the field, exactly as a custom field would.
-- **16.28** ✅ **No second row for a field that now has its own** — `dueDate` is skipped by the generic field loop, so one claim is not drawn twice. **AMENDED BY E5-6:** the "one node, not two" assertion read `getAllByText('30 Aug 2026')` with a length of 1; the day is no longer loose text on this sheet, so the same property is now asserted on the nodes the row draws — ONE date control, and NO second rendering of the day as text.
-- **16.29** ✅ The rows are **READ-ONLY except the one E5-6 made an editor**: Priority and Type carry no `input`, `select` or `button`, and Due's own editor is asserted POSITIVELY so the case cannot pass by the control silently disappearing.
-- **16.30** ✅ They are drawn in the prototype's **order** — Assignee, Priority, Due, Type — compared by document position, not by markup index.
+- **16.27** ✅ Priority renders the claim as the **SELECTED segment**, with its claim line. **AMENDED 2026-09-22** — it read *"it is a CONVENTION, so the claimed case arrives by the ticket carrying the field"*, and the retitle is the amendment: priority is a built-in, so the claimed case is the ORDINARY one, and the value renders through the control rather than as loose text. All three segments' `aria-selected` states are asserted, not only `P1`'s, so a control that marked every segment selected — or none — cannot pass.
+- **16.28** ✅ **No second row for a field that now has its own** — `dueDate` is skipped by the generic field loop, so one claim is not drawn twice. **AMENDED BY E5-6:** the "one node, not two" assertion read `getAllByText('30 Aug 2026')` with a length of 1; the day is no longer loose text on this sheet, so the same property is now asserted on the nodes the row draws — ONE date control, and NO second rendering of the day as text. **AMENDED 2026-09-22:** `startDate` joins the exclusion, asserted as `queryByTestId('field-startDate')` being null, and `field-priority` is asserted to appear exactly ONCE via `getAllByTestId` — an absence assertion would pass for a sheet that drew no priority row at all.
+- **16.29** ✅ Priority, Due and Start are **EDITORS**; **Type is the one row read-only**. **AMENDED TWICE:** by E5-6 (2026-09-21) this stopped pinning a uniform read-only absence and started pinning a split, and spec 2026-09-22 took the other half of the prototype's own shape — priority's segmented control and the Start row. Each editor is asserted POSITIVELY (its own control is present) so the case cannot pass by a control silently disappearing, and Type's read-only-ness is asserted as an absence the way `16.22` does for F's chip.
+- **16.30** ✅ They are drawn in the prototype's **order** — Assignee, Priority, Due, Type — compared by document position, not by markup index. **EXTENDED 2026-09-22:** Start joins the rows between Due and Type, which is where the spec places it and where its twin is.
+- **16.100** ✅ Clicking a segment other than the selected one submits exactly ONE `ticket.field_set` carrying `{ fieldId: 'priority', value }`. The payload is asserted with `toEqual`, never `toMatchObject`, so a row that re-spelled the fieldId or wrapped the level in an object is a different claim about the ledger. — `packages/app-core/test/views/ticket-sheet.test.tsx`
+- **16.101** ✅ CONTROL — clicking the segment ALREADY selected submits nothing. The ledger is append-only, so a commit that changed nothing would record a claim nobody made; and there is nothing to clear to, which is why priority has no clearing gesture at all while its twin Due does. — `packages/app-core/test/views/ticket-sheet.test.tsx`
+- **16.102** ✅ A REFUSED priority prints the server's own sentence beside the row and leaves the PREVIOUS segment selected — a control that adopted the refused level would be showing a value nobody recorded. — `packages/app-core/test/views/ticket-sheet.test.tsx`
+- **16.103** ✅ The Start row is a date editor: a changed day submits one `ticket.field_set` carrying `{ fieldId: 'startDate', value: { date } }`, committed on blur, exactly as Due's does. — `packages/app-core/test/views/ticket-sheet.test.tsx`
+- **16.104** ✅ A ticket read with NO priority claim says the projection is stale — naming the rebuild — with NO segment selected, and never says `No priority claimed` and never preselects `P2`. Preselecting the birth default would print a level with no claim line beside it, which is the reader-side default the spec rejected; this is the visible half of that rejection. — `packages/app-core/test/views/ticket-sheet.test.tsx`
+- **16.105** ✅ The Start row draws its claim line when the date is claimed — `set by Anselma Marak on 18 Aug 2026` — so a date on this sheet is never a standing property. — `packages/app-core/test/views/ticket-sheet.test.tsx`
 - **13.1178** ✅ **The Due row's WRITE (ruling E5-6, 2026-09-21)** — the door this record's Due half was. Committing a changed day submits exactly one `ticket.field_set` carrying `{ fieldId: 'dueDate', value: { date } }`; **clearing the box submits `value: null`** — the clearing claim, which is the export's own reading of an emptied control (`desktop.dc.html:3599`, `{ due: v || null }`), never `{ date: '' }`; and Enter commits the draft exactly as the title field's own Enter does. The id is from **B13's allocated §13 block (13.1177–13.1186)**, not from this file's 16.x series, because §13 ids became per-release-batch — the case still lives here, beside the Door G record it belongs to. **Two controls, because the write path has two ways to be wrong and one of them was, measured:** an **UNCHANGED** day sends nothing at all (this event is append-only, so a commit of the value the ticket already has would put a history line in the ticket claiming a date nobody touched), and a ticket claiming **NO** date can still be given its **first** one — the arm the defect was loudest in, since a ticket born without a due date could never acquire one before this ruling. **⚠ THE UNCHANGED CONTROL WAS VACUOUS ON ITS FIRST WRITING AND THE MUTATION WITNESS FOUND IT:** it made ONE `change` to the value the input already held, which fires no React `onChange` at all, so the draft stayed `null`, `onBlur`'s `dueDraft !== null` gate short-circuited, `submitDueDate` was never called, and the case **passed against a `submitDueDate` with its no-op guard deleted**. It now makes TWO real changes — out to a different day and back — and a THIRD case exists purely as its precondition, proving the same two-change dance reaches the write when the final value differs. **Mutation-witnessed with two distinct signatures:** dropping the clearing arm reddens the clearing case alone (`Tests 1 failed | 113 passed`), and deleting the no-op guard reddens the unchanged case alone (`Tests 1 failed | 114 passed`). — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
 
 **Mutation witnesses, run and recorded rather than predicted.** Dropping `dueDate` from the generic
@@ -315,9 +333,12 @@ state.typeId` fallback reddens **16.26 alone** — the row renders an empty span
 ladder-miss case would look like undetected.
 
 **⚠ The absent copy is the prototype's own.** `No date claimed` is transcribed
-(`desktop.dc.html:2362`/`:2853`/`:3587`); `No priority claimed` is the same construction for the field
-the prototype always has and we often do not — worded to be TRUE of a ticket whose type declares no such
-field, rather than "none", which would be a claim about a field the type does not have.
+(`desktop.dc.html:2362`/`:2853`/`:3587`) and is now drawn by BOTH date rows, which is the prototype's own
+behaviour for the pair. **`No priority claimed` is GONE (spec 2026-09-22):** it was the same construction
+for the field the prototype always has and we often did not, worded to be TRUE of a ticket whose type
+declares no such field — and there is no longer such a ticket, since every `ticket.created` writes a
+claim. The row's only absence arm now reports a stale projection and names the repair, which is the one
+condition that can still produce a missing claim.
 
 **⚠ And the claim line uses the sheet's OWN wording.** The first draft said `claimed by …`; every other
 field row on this sheet says `set by …`, and one surface with two provenance phrasings is the drift this

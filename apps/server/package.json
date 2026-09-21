@@ -10,6 +10,7 @@
     "dev": "tsx src/index.ts",
     "migrate": "node-pg-migrate up --migrations-dir migrations",
     "verify:projections": "tsx src/tools/verify-projections.ts",
+    "rebuild:projection": "tsx src/tools/rebuild-projection.ts",
     "auth:schema": "tsx src/tools/auth-schema.ts",
     "sweep:notifications": "tsx src/tools/sweep-notifications.ts",
     "sweep:invite-tokens": "tsx src/tools/sweep-invite-tokens.ts",

@@ -17,8 +17,10 @@ import { claimText, excludedBy, narrowsTo } from './id-axes.js';
  * discloses it.
  *
  * `BoardIdAxes` is reused rather than re-declared: a list row answers
- * exactly the five id axes a board card does, and a second `Pick` naming the
- * same five would be one more list to keep in step.
+ * exactly the SIX id axes a board card does (the sixth is `priorities`, spec
+ * 2026-09-22 — both views read the claim, so neither has to hold the axis back),
+ * and a second `Pick` naming the same six would be one more list to keep in
+ * step.
  */
 export type ListFilterSpec = Pick<FilterSpec, 'text' | 'dueBefore' | 'dueAfter' | 'fields' | 'closed'> &
   BoardIdAxes & { exclude?: BoardIdAxes };
@@ -37,6 +39,10 @@ export function matchesListRow(row: ListRow, projectId: string, spec: ListFilter
   if (!narrowsTo(spec.typeIds, row.typeId)) return false;
   if (!narrowsTo(spec.stateIds, row.stateId)) return false;
   if (!narrowsTo(spec.stateCategories, row.stateCategory)) return false;
+  // The level the row HOLDS (spec 2026-09-22). Never absent: `ListRow.priority`
+  // is required and its mapper throws rather than defaulting, so there is no
+  // "unknown level" case for this axis to be lenient about.
+  if (!narrowsTo(spec.priorities, row.priority.value)) return false;
   if (!narrowsTo(spec.projectIds, projectId)) return false;
   if (spec.text !== undefined && spec.text.trim() !== '') {
     if (!row.title.toLowerCase().includes(spec.text.trim().toLowerCase())) return false;
@@ -55,6 +61,7 @@ export function matchesListRow(row: ListRow, projectId: string, spec: ListFilter
   if (excludedBy(exclude.typeIds, row.typeId)) return false;
   if (excludedBy(exclude.stateIds, row.stateId)) return false;
   if (excludedBy(exclude.stateCategories, row.stateCategory)) return false;
+  if (excludedBy(exclude.priorities, row.priority.value)) return false;
   if (excludedBy(exclude.projectIds, projectId)) return false;
   return true;
 }

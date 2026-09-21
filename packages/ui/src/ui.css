@@ -1163,6 +1163,13 @@ button.gn-ticket-sheet__crumb--link {
    small label needs 4.5, and the pair is the same one.  */
 .gn-board-card__due { color: var(--gn-text-muted); font-size: 0.8rem; }
 .gn-board-card__due--late { color: var(--gn-danger); font-weight: 600; }
+/* Spec 2026-09-22: every card carries a priority, and P1 takes the SAME ink the
+   late due label uses — the pair measured in the block above, on the same
+   ground, clearing 4.5 in all six style×theme combinations. P2 is the default
+   and is drawn (the level is a fact on every card) but not emphasised: a badge
+   that shouted on every card would say nothing. */
+.gn-board-card__priority { color: var(--gn-text-muted); font-size: 0.8rem; font-weight: 600; }
+.gn-board-card__priority--p1 { color: var(--gn-danger); }
 .gn-board-card__provenance {
   font: inherit;
   font-size: 0.78rem;
@@ -1659,6 +1666,13 @@ button.gn-ticket-sheet__crumb--link {
    A danger tone with no clock behind it would paint every past date the same
    colour as every future one. */
 .gn-list__due { color: var(--gn-text-muted); }
+/* The priority cell (spec 2026-09-22), muted for the due cell's own reason: the
+   cell's content is a CLAIM plus its claimant, and the value itself is not a
+   warning. P1 is NOT given `--gn-danger` here, unlike the board card's badge —
+   on the board the badge is the only signal on a dense grid, while the list
+   already carries the level in a column beside a state chip, and the spec names
+   the danger tone for the BADGE only. */
+.gn-list__priority { color: var(--gn-text-muted); }
 /* Board prototype port Task 9 (2026-09-16), spec List `:405-479`,
    "Container": `cardBg + cardShadow; radius cardR; overflow:auto`. Wraps
    `<Table>` (`@gisik-nokma/ui`) FROM THE OUTSIDE — `ticket-list.tsx`'s
@@ -2135,6 +2149,18 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    flex COLUMN whose default `stretch` would run a date input the full width of
    the sheet. */
 .gn-ticket-sheet__due-input { align-self: start; }
+/* START'S TWIN of the rule above, and the same declaration for the same reason
+   (spec 2026-09-22). A separate class rather than a shared `.gn-ticket-sheet__
+   date-input`: the two rows are deliberately two rows, and a shared class would
+   be the first step toward the shared component `submitStartDate`'s docblock
+   declines to extract on two instances. */
+.gn-ticket-sheet__start-input { align-self: start; }
+/* The Priority row's segmented control (spec 2026-09-22), `inline-flex` to
+   match the prototype's own (`desktop.dc.html:1192`) — `.gn-ticket-sheet__field
+   dd` is a flex COLUMN whose default `stretch` would otherwise run the three
+   segments the full width of the sheet, which is the defect the due input's
+   `align-self` above exists to prevent on the other axis. */
+.gn-ticket-sheet__field .gn-segmented { display: inline-flex; }
 /* Three states of the History tab, three renderings. `__history-error` is NOT
    `__refusal`: getTicketHistory answers, so a rejection is a failure that may
    retry, not a permanent serving gap. */

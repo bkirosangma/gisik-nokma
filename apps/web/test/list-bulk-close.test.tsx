@@ -75,6 +75,9 @@ function row(overrides: Partial<ListRow> = {}): ListRow {
     assignee: null,
     assignedProvenance: null,
     dueDate: null,
+    // REQUIRED since spec 2026-09-22; the birth default, attributed to the same
+    // seeded claimant `PROVENANCE` names. No case in this file is about it.
+    priority: { value: 'P2', claim: PROVENANCE },
     fields: {},
     rollup: null,
     hasRestrictedParent: false,

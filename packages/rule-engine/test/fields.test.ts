@@ -178,6 +178,29 @@ describe('checkTicketFieldSet', () => {
     });
   });
 
+  it('3.967 priority: the three levels are accepted on ANY ticket type, null is refused as required, anything else is a mismatch', async () => {
+    for (const level of ['P1', 'P2', 'P3']) {
+      expect(await checkTicketFieldSet(fieldSet('priority', level), ctx()), level).toEqual({ refused: false });
+    }
+    // Built-ins are answered BEFORE the type is resolved: a ticket whose type is gone still takes a priority.
+    expect(await checkTicketFieldSet(fieldSet('priority', 'P1'), ctxWithoutTheTicketsType())).toEqual({ refused: false });
+    expect(await checkTicketFieldSet(fieldSet('priority', null), ctx())).toEqual({
+      refused: true,
+      rule: 'field.priority-required',
+      reason: 'A ticket always has a priority. Change it instead of clearing it.',
+    });
+    expect(await checkTicketFieldSet(fieldSet('priority', 'P4'), ctx())).toEqual({
+      refused: true,
+      rule: 'field.type-mismatch',
+      reason: '"Priority" needs one of P1, P2 or P3.',
+    });
+    expect(await checkTicketFieldSet(fieldSet('priority', 2), ctx())).toEqual({
+      refused: true,
+      rule: 'field.type-mismatch',
+      reason: '"Priority" needs one of P1, P2 or P3.',
+    });
+  });
+
   it('planted defect: a non-text title, a non-document description, a timestamp due date', async () => {
     expect(await checkTicketFieldSet(fieldSet('title', 42), ctx())).toEqual({
       refused: true,

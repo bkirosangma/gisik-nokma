@@ -306,13 +306,23 @@ describe('ticket.created title must not be blank', () => {
 
 /** 13.567 — the payload schemas (spec §1.2/§1.3). */
 describe('13.567 start and the two flag payloads', () => {
+  const base = { typeId: 'task', projectId: PROJECT, parentId: null, title: 'x' };
   it('ticketCreatedPayload accepts start backlog|focus and its absence, refuses anything else', () => {
-    const base = { typeId: 'task', projectId: PROJECT, parentId: null, title: 'x' };
     expect(ticketCreatedPayload.parse({ ...base, start: 'backlog' }).start).toBe('backlog');
     expect(ticketCreatedPayload.parse({ ...base, start: 'focus' }).start).toBe('focus');
     expect(ticketCreatedPayload.parse(base).start).toBeUndefined();
     expect(() => ticketCreatedPayload.parse({ ...base, start: 'parked' })).toThrow();
   });
+  it('3.964 ticketCreatedPayload accepts priority P1|P2|P3 and its absence, refuses anything else', () => {
+    expect(ticketCreatedPayload.parse({ ...base, priority: 'P1' }).priority).toBe('P1');
+    expect(ticketCreatedPayload.parse({ ...base, priority: 'P3' }).priority).toBe('P3');
+    // Absent stays ABSENT at parse — the default is applied by the reducer against the
+    // creation event, never written into the stored payload (spec, "Why creation writes the claim").
+    expect(ticketCreatedPayload.parse(base).priority).toBeUndefined();
+    expect(() => ticketCreatedPayload.parse({ ...base, priority: 'P4' })).toThrow();
+    expect(() => ticketCreatedPayload.parse({ ...base, priority: null })).toThrow();
+  });
+
   it('ticket.closed and ticket.reopened carry an empty, strict payload', () => {
     expect(ticketClosedPayload.parse({})).toEqual({});
     expect(() => ticketClosedPayload.parse({ reason: 'x' })).toThrow();

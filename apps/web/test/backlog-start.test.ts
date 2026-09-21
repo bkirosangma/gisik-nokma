@@ -24,6 +24,18 @@ function row(overrides: Partial<ListRow> = {}): ListRow {
     assignee: null,
     assignedProvenance: null,
     dueDate: null,
+    // REQUIRED since spec 2026-09-22: every row carries a priority, and the
+    // fixture's is the birth default the reducer writes. `startTargetFor` reads
+    // neither it nor `dueDate`, so this is fixture completeness.
+    priority: {
+      value: 'P2',
+      claim: {
+        actorId: 'user_kiro',
+        actorName: 'Kiro',
+        clientTime: '2026-09-17T09:00:00.000Z',
+        serverTime: '2026-09-17T09:00:01.000Z',
+      },
+    },
     fields: {},
     rollup: null,
     hasRestrictedParent: false,

@@ -1,3 +1,4 @@
+import { PRIORITIES } from '@gisik-nokma/domain';
 import { actorLabel } from '../provenance.js';
 import type { Grouping, ListColumnId, ListRow } from '../view-types.js';
 
@@ -83,7 +84,9 @@ export function recentlyAssignedRows(rows: ListRow[], currentUserId: string): Li
  * narrowing into a closure over a parameter, so the switch is non-exhaustive,
  * the arrow can fall through to `undefined`, and the file does not compile
  * under `strict`. Narrowing into a `const` before the closure is what makes
- * the four-case switch exhaustive — the same four cases, one binding earlier.
+ * the switch exhaustive — the same cases, one binding earlier. (`priority`
+ * joined the switch in Task 5 of the 2026-09-22 priority plan, which is why the
+ * count in this sentence is no longer four; the shape is unchanged.)
  */
 export function groupRows(rows: ListRow[], grouping: Grouping, labels: GroupLabels): ListSection[] {
   if (grouping === 'flat') return [{ key: 'all', label: 'All tickets', rows: [...rows] }];
@@ -102,6 +105,11 @@ export function groupRows(rows: ListRow[], grouping: Grouping, labels: GroupLabe
           : [`assignee:${row.assignee.id}`, actorLabel(row.assignee.id, row.assignee.name)];
       case 'type':
         return [`type:${row.typeId}`, labels.typeName(row.typeId)];
+      case 'priority':
+        // The label is the level itself (spec 2026-09-22): there is no name to
+        // resolve, and `GroupLabels` carries none for it — the ladder is three
+        // closed tokens, not a roster this view could be handed a name from.
+        return [`priority:${row.priority.value}`, row.priority.value];
     }
   };
   const sections = new Map<string, ListSection>();
@@ -110,6 +118,19 @@ export function groupRows(rows: ListRow[], grouping: Grouping, labels: GroupLabe
     const section = sections.get(key) ?? { key, label, rows: [] };
     section.rows.push(row);
     sections.set(key, section);
+  }
+  if (axis === 'priority') {
+    // THE LADDER'S order, not encounter order (spec 2026-09-22). `sections` is
+    // built by WALKING the rows, so its insertion order is the order the levels
+    // happen to be met in the input — a page whose P2 rows come first would
+    // answer P2, P1, P3. `PRIORITIES` is imported rather than re-typed here for
+    // the one-origin rule the ladder is under.
+    //
+    // `flatMap` over the ladder and not `PRIORITIES.map(...)`: a level nobody
+    // holds yields `?? []`, which flattens away. An empty section would assert
+    // there is something to look for in a bucket that has nothing in it — the
+    // rule the list route states for an empty page, applied one level down.
+    return PRIORITIES.flatMap((level) => sections.get(`priority:${level}`) ?? []);
   }
   return [...sections.values()];
 }
@@ -173,6 +194,7 @@ const BUILTIN_COLUMN_LABELS: Record<Exclude<ListColumnId, `field:${string}`>, st
   dueDate: 'Due date',
   type: 'Type',
   progress: 'Progress',
+  priority: 'Priority',
 };
 
 export function columnLabel(id: ListColumnId): string {

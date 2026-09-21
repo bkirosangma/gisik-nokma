@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ISO_DATETIME_REGEX, isRealCalendarDatetime, ulidString } from '../envelope.js';
 import { RANK_KEY_REGEX, isRankKey } from '../rank.js';
+import { prioritySchema } from '../ticket-types.js';
 
 /**
  * The payload shapes of the ticket vocabulary (spec §3). Schemas only — the
@@ -54,6 +55,16 @@ export const ticketCreatedPayload = z.object({
    * client always sends it.
    */
   start: z.enum(['backlog', 'focus']).optional(),
+  /**
+   * The birth priority (spec 2026-09-22). OPTIONAL, and ABSENT MEANS `DEFAULT_PRIORITY`
+   * (P2): every event written before this member existed meant P2, and an additive
+   * field must not change the meaning of stored events — the same rule `start` above
+   * follows. The default is applied by `applyTicketEvent`, NOT here: a parse-time
+   * default would write `P2` into every stored payload as a claim its author never
+   * made (see `ticket-types.ts`'s `required` docblock for the same argument). The
+   * product's own client always sends it.
+   */
+  priority: prioritySchema.optional(),
 });
 
 export const ticketAssignedPayload = z.object({ assigneeId: z.string().min(1).nullable() });
@@ -63,7 +74,7 @@ export const ticketCollaboratorPayload = z.object({ userId: z.string().min(1) })
 /**
  * Shape-only at the door: {fieldId, value}. Semantics (does the field exist,
  * does the value fit its kind) are the engine's job — see checkTicketFieldSet.
- * value: null is the clearing claim; built-ins title/description/dueDate/startDate ride
+ * value: null is the clearing claim; built-ins title/description/dueDate/startDate/priority ride
  * this same event, and a due date value is always { date, note? } — a claim.
  *
  * `value` is REQUIRED, and `z.unknown()` alone does not make it so: probed

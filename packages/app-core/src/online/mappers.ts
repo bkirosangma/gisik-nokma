@@ -1,7 +1,8 @@
-import { isRankKey, VISIBILITY_MODES } from '@gisik-nokma/domain';
+import { isRankKey, PRIORITIES, VISIBILITY_MODES } from '@gisik-nokma/domain';
 import type {
   FieldClaim,
   IngestResult,
+  Priority,
   StateCategory,
   TicketState,
   TicketTypeDef,
@@ -24,6 +25,7 @@ import type {
   ListRow,
   MyWorkView,
   ParentRef,
+  PriorityView,
   ProjectViewPrefs,
   ResolvedVisibilityMode,
   RollupToViewer,
@@ -297,10 +299,17 @@ function asBoolean(value: unknown, path: string): boolean {
 
 const STATE_CATEGORIES: readonly string[] = ['open', 'active', 'terminal'];
 
-const GROUPINGS: readonly string[] = ['epic', 'status', 'assignee', 'type', 'flat'];
+const GROUPINGS: readonly string[] = ['epic', 'status', 'assignee', 'type', 'priority', 'flat'];
 
-/** `ListColumnId`'s closed members; the sixth arm is the open `field:${string}`. */
-const LIST_COLUMN_IDS: readonly string[] = ['status', 'assignee', 'dueDate', 'type', 'progress'];
+/** `ListColumnId`'s closed members; the seventh arm is the open `field:${string}`. */
+const LIST_COLUMN_IDS: readonly string[] = [
+  'status',
+  'assignee',
+  'dueDate',
+  'type',
+  'progress',
+  'priority',
+];
 
 function asGrouping(value: unknown, path: string): Grouping {
   const text = asString(value, path);
@@ -564,6 +573,7 @@ function mapBoardCard(raw: unknown, path: string, roster: ReadonlyMap<string, st
     // E5-2. `TicketCard.dueDate` was already on every card the board is
     // projected from; this mapper was the one place that did not look at it.
     dueDate: mapDueDate(record['dueDate'], `${path}.dueDate`, roster),
+    priority: mapPriority(record['priority'], `${path}.priority`, roster),
     // `pending` is client-side truth: set only between submit and the server's
     // answer, so anything off the wire is settled by definition.
     pending: false,
@@ -969,6 +979,17 @@ export function toClientFilterSpec(raw: unknown, path: string): FilterSpec {
     spec.stateIds = [asString(record['stateId'], `${path}.stateId`)];
   if (record['stateCategory'] !== undefined)
     spec.stateCategories = [asStateCategory(record['stateCategory'], `${path}.stateCategory`)];
+  if (record['priority'] !== undefined) {
+    // The reverse of the `singular('priorities', …, 'priority')` above, and it
+    // validates through the same reader the cards use rather than casting: a
+    // stored filter naming a level off the ladder is refused here, not rendered
+    // as a criterion nothing can match.
+    const priority = asString(record['priority'], `${path}.priority`);
+    if (!PRIORITIES.includes(priority as Priority)) {
+      throw new MappingError(`${path}.priority`, `one of ${PRIORITIES.join('/')}`);
+    }
+    spec.priorities = [priority as Priority];
+  }
   if (record['due'] !== undefined) {
     const due = asRecord(record['due'], `${path}.due`);
     if (due['before'] !== undefined) spec.dueBefore = asString(due['before'], `${path}.due.before`);
@@ -1057,6 +1078,10 @@ export function toServerFilterSpec(filter: FilterSpec): Record<string, unknown> 
   singular('typeIds', filter.typeIds, 'typeId');
   singular('stateIds', filter.stateIds, 'stateId');
   singular('stateCategories', filter.stateCategories, 'stateCategory');
+  // Spec 2026-09-22. Singular like `stateCategory` and for the same reason: the
+  // wire has ONE `priority` term, so two levels are an
+  // `UnexpressibleFilterError` rather than a silent narrowing to the first.
+  singular('priorities', filter.priorities, 'priority');
   if (filter.projectIds !== undefined && filter.projectIds.length > 0) {
     throw new UnexpressibleFilterError(
       'projectIds',
@@ -1489,6 +1514,33 @@ function mapDueDate(
 }
 
 /**
+ * `TicketCard.priority` → `PriorityView`. ALWAYS present on the wire (spec
+ * 2026-09-22), so there is no `null` arm and no absent-key tolerance here the
+ * way `mapDueDate` has both: `applyTicketEvent` writes the birth claim on every
+ * `ticket.created`, and `assembleTicketCards` THROWS rather than serve a card
+ * without one.
+ *
+ * **A missing or off-ladder value is a `MappingError`, never a silent P2.** The
+ * only way the server sends one is a `proj_tickets` that predates the reducer
+ * and was never rebuilt, and filling in the default here would be the
+ * reader-side default the spec rejected — it would also print a value with no
+ * claim line beside it, which is the thing invariant 4 forbids. `PRIORITIES` is
+ * imported rather than restated: this package holds no copy of the ladder.
+ */
+function mapPriority(
+  raw: unknown,
+  path: string,
+  roster: ReadonlyMap<string, string>,
+): PriorityView {
+  const record = asRecord(raw, path);
+  const value = asString(record['value'], `${path}.value`);
+  if (!PRIORITIES.includes(value as Priority)) {
+    throw new MappingError(`${path}.value`, `one of ${PRIORITIES.join('/')}`);
+  }
+  return { value: value as Priority, claim: mapProvenance(record, path, roster) };
+}
+
+/**
  * `TicketCard.closed` → `ListRow.closed`, unchanged: REQUIRED on both sides
  * (backlog/closed spec §1.2/§3.3, 2026-09-17), `null` meaning never closed or
  * reopened. The same shape `mapCause` takes — `null` survives as the truth,
@@ -1580,6 +1632,7 @@ function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, stri
         ? null
         : mapProvenance(record['assignedProvenance'], `${path}.assignedProvenance`, roster),
     dueDate: mapDueDate(record['dueDate'], `${path}.dueDate`, roster),
+    priority: mapPriority(record['priority'], `${path}.priority`, roster),
     fields: mapFieldClaims(record['fields'], `${path}.fields`),
     rollup: mapRollup(record['rollup'], `${path}.rollup`),
     hasRestrictedParent: asBoolean(
