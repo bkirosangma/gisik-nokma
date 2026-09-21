@@ -211,6 +211,35 @@ the ledger" sentence is false in both directions (never written for another pers
 **MEASUREMENT.** R6-1's probe and log, verbatim above; lines opened as listed there plus
 `review-ux-exec2.md:2334-2389`.
 
+### R6-3 → E2-28 (exec 2, Minor) — REACHABILITY: the sentence E2-28 describes cannot be rendered by any shipped shell
+
+**What E2-28 claims** (`review-ux-exec2.md:1650-1693` at `778a6439`): *"A bulk close that was ACCEPTED and queued is
+reported as 'We could not reach the server'"* — `bulk-close-dialog.tsx:230-233`'s catch prefixes the replica's
+`OfflineAcceptError` message with the transport sentence.
+
+**What is false, measured.** The catch exists (`bulk-close-dialog.tsx:230-233`, opened), but no shipped shell can
+put an `OfflineAcceptError` into it:
+
+```
+BulkCloseDialog mounts (non-test, non-dist):   apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx, packages/app-core/src/views/board.tsx  (+ its own file)
+BulkCloseDialog in apps/mobile + apps/desktop:  0 lines
+DataSource the web constructs:                 apps/web/src/providers.tsx:108  createOnlineDataSource(…)   — createReplicaDataSource in apps/web → 0
+OfflineAcceptError in online-data-source.ts:   0   (the online source never answers `pending`; it returns the server's results)
+createReplicaDataSource constructor sites:     apps/mobile/src/app.tsx:40, apps/desktop/src/app.tsx:56 only (E6-24's enumeration)
+```
+
+The only `DataSource` whose `ingest` throws `OfflineAcceptError` (`replica-data-source.ts:1406`) is constructed by
+the two minimal shells, and neither mounts `BulkCloseDialog` (or any app-core view — `apps/desktop/src/app.tsx:120-123`
+says so in words). The web mounts the dialog and feeds it the online source, whose `ingest` cannot throw that error.
+So the self-contradictory sentence is a property of a branch no product path reaches today; "is reported" is not
+a sentence a person can be shown. The code contradiction E2-28 reads is real as code and will become reachable
+the day Plan 6's views mount on the replica — which is a note for that day, not a defect a person meets on this
+build. Filed against a Minor, with that bound stated.
+
+**MEASUREMENT.** The five greps above (each with the neighbouring positive result as its control: the web mount
+IS found, the online constructor IS found); lines opened: `bulk-close-dialog.tsx:224-234`,
+`replica-data-source.ts:1406`, `apps/web/src/providers.tsx:21`, `:108`, `apps/desktop/src/app.tsx:120-123`.
+
 **Stamp:** written 2026-09-21 11:25 IST, E3-14 row amended 12:00 IST after E6-21; phase 1; branch heads as listed above.
 **Phase 2:** R6-1 filed 15:10 IST against `origin/exec5/review-ux` at `1641161d`; R6-2 filed 15:16 IST against
-`origin/exec2/review-ux-r2` at `778a6439` (same probe).
+`origin/exec2/review-ux-r2` at `778a6439` (same probe); R6-3 filed 15:20 IST against the same head.
