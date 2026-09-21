@@ -3917,3 +3917,42 @@ nowhere else.**
 **Remaining unchecked in §3: 59 of 68 candidate countable bullets.** And my own running total for the round is now
 **nine wrong numbers of my own against nine clean §3 claims** — the ratio that makes me distrust any count in this
 report that did not come with a control in the same command.
+
+## 61. Round 2 — §3 reaches twelve checks, and the two I was about to get wrong
+
+### 61.1 `Features.md:355` — *"UPDATE/DELETE/TRUNCATE are refused by trigger"*. **Verified clean — and I was one step from filing the opposite.**
+
+`apps/server/migrations/1787841717635_events-and-snapshots.sql` creates **two** triggers over one function:
+`events_no_update_no_delete` (**`BEFORE UPDATE OR DELETE`**, `FOR EACH ROW`) at `:35-37`, and —
+**separately** — `events_no_truncate` (**`BEFORE TRUNCATE`**, **`FOR EACH STATEMENT`**) at `:39-41`, both calling
+`events_append_only()`, which raises `'events is append-only: % refused'` with `TG_OP`. The down migration drops
+all four objects in order.
+
+**Why this one matters as a check rather than a confirmation.** A row-level `BEFORE UPDATE OR DELETE` trigger
+**does not fire on TRUNCATE at all** — TRUNCATE is a statement-level operation and needs its own trigger with
+`FOR EACH STATEMENT`. So a bullet claiming all three, backed by a migration carrying only the row-level trigger,
+would have been a textbook *"a check that cannot fail"*: the sentence reads enforced, the artifact looks like an
+enforcer, and `TRUNCATE events` would have emptied the ledger. **I had the finding written and the trigger block
+open when I read the next eight lines.** The migration does it correctly. **Verified clean** — and recorded
+because the near-miss is the most useful thing in this section: §56.1, §57 and §59.2 are three cases this round
+where the code was right and my reading was wrong, and this is the fourth where checking one step further was the
+whole difference.
+
+### 61.2 `Features.md:67` and `Features.md:85` — *"The strip is mounted on `/my-work` and NOWHERE ELSE"*
+
+`AttentionStrip` is **rendered at exactly one site** in the shipped client:
+`apps/web/app/w/[workspaceId]/my-work/page.tsx:67`. Every other occurrence of the name in `apps/web` is a
+docblock (`shell-refusal.tsx:24`, `expired-session.tsx:29`) or a test comment. **Verified clean.**
+
+**And `:85` corroborates it from the other direction, with the history attached** — the app-shell bullet records
+that the strip *"was removed from this route on 2026-09-18 — owner: 'the attention section should not be there in
+the project page. its already there in the my work page' — and lives on `/w/[workspaceId]/my-work` alone, cases
+13.881/13.882."* **Two bullets in the same section agree, one of them naming the case ids that pin it**, which is
+the cross-document consistency this report keeps finding absent elsewhere. **Verified clean.**
+
+### 61.3 §3 at twelve
+
+**Twelve countable claims checked, twelve exact** (§54.1–54.3, §55, §59.1–59.2, §60.1–60.2, §61.1–61.2).
+**§3 has produced no finding.** Fifty-six of its 68 candidate countable bullets remain unchecked, and the
+running count of wrong numbers I have produced inside §3 stands at **nine against twelve clean claims** — a ratio
+I am reporting rather than hiding, because it is the reason every count in this report names a control.
