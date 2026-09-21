@@ -1,0 +1,26 @@
+# REVIEW ROUND 2 — EXECUTOR 4 (UI): PHASE-2 REFUTATIONS AND CORROBORATIONS
+
+**Lane:** exec 4 · branch `exec4/review-ui` · phase 2 window as re-timed by the controller: **15:05:23 → 17:05:23 IST, 2026-09-21** (phase 1 closed early by the owner). **Written after 15:05:23.** Instrument: the same `:3041` shell of `a7b6292b` described in `review-ui-exec4.md` §3, driven with real key events where a claim is about keys.
+
+## 0. What this file claims for points
+
+**No scored refutation.** Every peer finding I could reach with the painted instrument held (§1). The rules make a rejected refutation cost the target's points; I will not file one I cannot falsify with a line I opened. What follows is unscored: painted corroborations the judge can cite, and two factual notes.
+
+## 1. Corroborations — painted, NOT claimed for points, recorded so the judge has a line to open
+
+| target | what I painted | result |
+|---|---|---|
+| `exec1-P19` (tablist with no name) | board, 1512: `[role=tablist].gn-segmented` → `aria-label` null, `aria-labelledby` null, 5 tabs | **holds** |
+| `exec1-P24` (danger on surfaceSunken 3.84:1, computed by its author) | `/settings/ticket-types/new`, `data-style=hig`/`minimal` set client-side: `.ticket-type-editor__issues li` `rgb(215,0,21)` on `rgb(228,216,204)`, 12.8 px → **3.84:1**; `neo` → 6.28:1 | **holds at paint** |
+| `exec1-P18` (route change announces nothing) | every `window.next.router.push` in my sweeps left `document.activeElement === BODY` | **holds** |
+| `exec2-V4` (Comments · 0 while loading) | MutationObserver from t=0 on the epic's sheet: `Comments · 0` is the first heading text at t=1087 ms | **holds** |
+| `exec2-V8` (false subtasks alert) | same observer: `role="alert"` *"…0 could be read — so this list is not shown rather than shown short."* present t=1087→1111 ms (~24 ms), then 10 rows | **holds; duration measured** |
+| `exec5-E5-20` (Escape in Move dialog closes the sheet) | focus on the dialog's *Cancel*, one real Escape → both `[role=dialog]`s gone, `?ticket=` left the URL | **holds** |
+| `exec5-E5-4` (blank rows) | assignee listbox: third option `""` 184×13 — **holds**; @mention popup with `@`: the nameless member is **excluded** (*"1 person matches"*, Kiro only), not blank — the finding's body already says *"if listed"* | holds; one clause narrower |
+| `exec1-P24` (danger on surfaceSunken) — see row 2 | also measured in the same pass: `neo` light 6.28:1 (passes), so the failure is `hig`/`minimal` only, as P24 says | holds |
+
+## 2. Notes that are not refutations
+
+- **Independent overlap, timestamps stated:** exec 5's `E5-3` / `E5-4` / `E5-8` and my `E4-1` / `E4-18` / `E4-19` describe the same painted facts; theirs were pushed first (10:02–10:06), mine at 10:16–10:43, and I first read their branch at 11:35. The measurements differ (mine carry the dev-DB ancestor query and the 23/26 count, the server walk, the `184×13` box, the six-row tally). The concurrent-duplicate clause is the judge's to apply; I state the order so the judge does not have to reconstruct it.
+
+- `exec1-P2`'s WHY sentence — *"the first-run surface … is a sentence in inherited text and a UA button"* — describes a button (`gn-board__empty-create`) that `apps/web` never renders: it is gated on `onCreateTicket !== undefined` (`board.tsx:493`) and `grep -rn onCreateTicket apps/web/app apps/web/src` → 0 (exec 2's `V1` is the same measurement). P2's WHAT (three classes with zero selector blocks) is unaffected; its first-run consequence is the sentence only.
