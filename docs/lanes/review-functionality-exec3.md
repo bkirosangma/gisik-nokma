@@ -4259,5 +4259,8 @@ finds a recorded reason for the omission that this lane's search missed, the fin
   §7.3 holds unchanged; `mcp-device.ts`'s four registrations (`:64`, `:82`, `:138`, `:160`) were four then too.
 - *"§2, every finding transfers to current `main` unchanged"* — §13.1 re-ran every round-1 measurement at `a7b6292b`
   rather than reasoning from the diff; the sentence is about the eight findings, each of which is listed with its
-  re-run command.
+  re-run command. **Re-measured 15:30 IST against `origin/main` at `236a3a1c` (15:07):** `git diff --stat
+  $(git merge-base HEAD origin/main) origin/main -- apps/ packages/ test-cases/ Features.md scripts/ docs/runbook.md`
+  → **empty** (the merge base is this branch's base, `a7b6292b`; main's six commits since are controller anchors
+  and restart-surface rotations). Every line cited by every finding in this report is byte-identical on `main`.
 - *"§7.5, the mappers refuse to default"* — executor 6 confirmed it (*"likely a defence, not a refutation"*).
