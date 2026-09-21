@@ -2,7 +2,7 @@
 
 **Lane:** executor 6 (Opus 5) · **branch:** `exec6/review-functionality` · **base:** `origin/main`
 **Started:** 2026-09-21 09:42:10 IST (T0 recorded by the controller: 09:41:50 IST; phase 1 closes 15:41:50 IST, phase 2 closes 18:41:50 IST)
-**Last phase-1 edit:** 2026-09-21 14:53 IST — findings E6-1 … E6-25 and Appendices A–AF were all written and pushed before the phase-1 boundary; the commit that carries this line is the one to read.
+**Last phase-1 edit:** 2026-09-21 14:55 IST — findings E6-1 … E6-25 and Appendices A–AF were all written and pushed before the phase-1 boundary; the commit that carries this line is the one to read.
 **Every measurement in this report was taken at `a7b6292b78c50208e8055c9f8639b1e8dcf4caa0`**
 (`Merge pull request #630 from bkirosangma/ctl/cycle36-rotation`) in
 `/Users/kiro/my_projects/gisik-nokma-exec6`, with `node v22.22.2` in `PATH`, unless a finding says otherwise.
@@ -174,7 +174,7 @@ read the phone and desktop shells call, + Appendix AF) and `sync-client/src/repl
 against `attachments` — the engine rule's string check is not the last word), `read/{compile-filter,fts}.ts` (whole:
 every filter value parameterised, `likePattern` escapes `\ % _`), `projections/{contested,proj-visibility,proj-invites,search}.ts` and `read/ticket-comments.ts`, `workspaces/workspace-name.ts`, `read/{workspace-counts,live-ticket,ticket-numbers,state-provenance,membership-roster}.ts`, `alerts/error-alerter.ts`,
 `workspaces/bootstrap-workspace.ts`, `http/{security-headers,hsts}.ts`, `http/rate-limit.ts:74-135` (+ E6-25's
-calls), `auth/select-senders.ts`, `deploy/do/app.yaml:56-66`, `:95-120`, `deploy/do/README.md:40-44`, `:69-72`,
+calls), `auth/{select-senders,otp-sender}.ts`, `routes/auth-methods.ts` (again, whole), `deploy/do/app.yaml:56-66`, `:95-120`, `deploy/do/README.md:40-44`, `:69-72`,
 `:110-117`, `.env.example:5-40`, `:232-240`, `apps/server/src/db.ts:44-50`, `:144-150`, `apps/server/src/index.ts:100-108`,
 `:160-225`, `apps/server/src/app.ts:490-500`, `.github/workflows/ci.yml:454-492`, `docs/runbook.md:214` (whole:
 resolution is refused for an unknown, wrong-ticket or already-resolved contest at `rule-engine/src/contests.ts:60-75`;
@@ -232,9 +232,9 @@ doors and 11 hostile payload shapes; the upload door; impossible due dates; blan
 external person on an explicit list; the replica's five reads after a delete.
 
 **Citations, resolved mechanically at the end (13:50 IST, re-run 14:25 IST after E6-24):** every backticked
-`file:line` or `file:a-b` in this report was extracted (343 distinct at the last re-run, 14:55; 280 at 13:50) and checked
+`file:line` or `file:a-b` in this report was extracted (344 distinct at the last re-run, 14:58; 280 at 13:50) and checked
 against the tree — the file must resolve to exactly one path under `git ls-files` and the line must be within
-`wc -l`. **335 resolve; the 8 that do not are the staged export's
+`wc -l`. **336 resolve; the 8 that do not are the staged export's
 `github.md` / `workspaces-gap.md` (outside the repo, cited by their staged path in prose) and one
 `node_modules` line (better-auth's `routes.mjs`, version stated).** Two ranges had overrun their files by one
 or two lines and 32 basenames were ambiguous across packages; all were corrected in `2afaf4e2` and earlier.
@@ -1695,20 +1695,23 @@ keys on the rightmost entry, which the caller cannot write (`rate-limit.ts:89-99
 main" and "open on whatever is on main"; the change set that landed #190 owned that edit under the workspace
 rule that a record moves with the code. A `check-runbook`-style sweep for "not yet on main" / "not yet landed"
 across `deploy/`, `Features.md` and `test-cases/` (E3-27 found the same phrase in two more files) would have
-caught all three.
+caught the two `deploy/` sentences the phrase matches; the other four need a reader, which is what this finding is.
 
 **MEASUREMENT.** The five `node -e` calls above against `apps/server/dist/http/rate-limit.js` (dist checked
 with the code-only needle first); `sed -n 95,106p deploy/do/app.yaml`; `git blame -L 95,103 deploy/do/app.yaml`;
 `git log --format='%h %ad %s' -- deploy/do/app.yaml` (four commits, timed with `--date=iso`); `git log -1 935f5d66`; lines opened:
 `rate-limit.ts:74-99`, `:112-123`; `apps/server/src/app.ts:490-500`; `apps/server/src/index.ts:100-108`, `:160-225`; `auth/select-senders.ts:32-38`;
+`auth/otp-sender.ts:88-95` and `routes/auth-methods.ts` (whole: the null sender throws a named error and
+`/v1/auth/methods` reports `phone: false` for it — consistent, not filed);
 `apps/server/src/db.ts:44-50`, `:144-150`; `apps/server/src/config.ts:212`; `.env.example:5-40`, `:232-240`;
 `deploy/do/README.md:40-44`, `:69-72`, `:110-117`; `test-cases/13-plan11-seams-and-scheduler.md:72-75` (13.121), `:90`
 (13.126 ❌, the unit-test gap, which is a different sentence and still true). Not previously filed: `grep -c "not yet on main\|forged-header\|TRUST_PROXY"` over the six lanes' review reports
-at their latest pushes (exec 1–5 and the compiled controller review) → 0 each; the same needle over this report → 10 lines,
-as the control that the path can match (measured after this sentence was written).
+at their latest pushes (exec 1–5 and the compiled controller review) → 0 each; the same needle over this report → 12 lines,
+as the control that the path can match (measured after the finding's last edit).
 
-**SEVERITY: Minor.** A stale comment in a deploy spec; nothing misbehaves. Filed rather than folded into E6-12
-because it is a security claim in the operator's own file, in the direction that invites a second fix.
+**SEVERITY: Minor.** Stale comments in the deploy spec and `.env.example`; nothing misbehaves. Filed rather than
+folded into E6-12 because two of the six are security claims in the operator's own files, in the direction that
+invites a second fix.
 
 ---
 
