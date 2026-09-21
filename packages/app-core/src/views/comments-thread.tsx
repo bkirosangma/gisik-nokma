@@ -76,7 +76,20 @@ export type TicketComment = {
 };
 
 export type CommentsThreadProps = {
-  comments: TicketComment[];
+  /**
+   * V4 — `null` means THE READ HAS NOT ANSWERED, and it is NOT the same as an
+   * empty thread. `useLiveQuery` initialises `data` to `null` and leaves it
+   * there while the request is in flight, so a caller that collapsed it to `[]`
+   * at the boundary made a still-loading read render as *"Comments · 0"* and
+   * *"No comments yet."* — the exact claim this component's own docblock says
+   * it exists to prevent, because *"No comments yet."* is a statement about the
+   * TICKET and nobody had asked the ticket yet.
+   *
+   * The collapse is therefore removed AT THE BOUNDARY rather than compensated
+   * for here: `null` arrives as `null`, and the three arms below tell it apart
+   * from both `[]` and a failure.
+   */
+  comments: TicketComment[] | null;
   /** The read's failure reason. Absent means the read answered. */
   commentsUnavailable?: string;
   /** The sheet's one actor-name join, the same `nameOf` every other row uses. */
@@ -161,29 +174,50 @@ export function CommentsThread({
   nameOf,
   composer,
 }: CommentsThreadProps): ReactElement {
-  const answered = commentsUnavailable === undefined;
+  // THREE FACTS, THREE ARMS — and the ORDER of these two lines is the whole
+  // fix. A failure outranks a wait: `useLiveQuery` leaves `data` at `null` after
+  // a rejection too, so a document that failed must not be read as one that has
+  // not answered yet. Once the failure is excluded, `comments === null` can
+  // only mean "still in flight".
+  // `comments === null` is tested INLINE rather than hoisted into a `pending`
+  // boolean, and that is not a style choice: the compiler narrows `comments`
+  // through the ternary chain only when the null test is one of its own
+  // conditions. A hoisted boolean narrows nothing, and the list arm then needs
+  // an `?? []` — which is the collapse this fix removed, reintroduced in the
+  // type system's name.
+  const failed = commentsUnavailable !== undefined;
   return (
     <section className="gn-comments" data-testid="sheet-comments">
       <p className="gn-comments__heading">
-        {answered ? `Comments · ${comments.length}` : 'Comments'}
+        {/* A count appears only when there is one to give. `Comments · 0` over a
+            read that failed — or over one that has not answered — is a count
+            nobody measured, which is why the heading drops it in BOTH cases
+            rather than only the one the failure arm already handled. */}
+        {failed || comments === null ? 'Comments' : `Comments · ${comments.length}`}
       </p>
 
-      {answered ? (
-        <>
-          {comments.length === 0 ? (
-            <p className="gn-comments__empty">No comments yet.</p>
-          ) : (
-            <ul className="gn-comments__list">
-              {comments.map((comment) => (
-                <CommentItem key={comment.commentId} comment={comment} nameOf={nameOf} />
-              ))}
-            </ul>
-          )}
-        </>
-      ) : (
+      {failed ? (
         <p className="gn-comments__error" role="alert" data-testid="sheet-comments-unavailable">
           {`This ticket's comments could not be read — ${commentsUnavailable}. That is a failure of this read, not a statement about the ticket: it may answer on a retry.`}
         </p>
+      ) : comments === null ? (
+        /*
+          V4 — the wait arm. The same word the History tab three arms away uses
+          for the same state, so the two tabs do not describe one read's progress
+          two different ways. Nothing about the ticket is claimed here: an empty
+          thread is a fact, and this is not one yet.
+        */
+        <p className="gn-comments__loading" data-testid="sheet-comments-loading">
+          Loading…
+        </p>
+      ) : comments.length === 0 ? (
+        <p className="gn-comments__empty">No comments yet.</p>
+      ) : (
+        <ul className="gn-comments__list">
+          {comments.map((comment) => (
+            <CommentItem key={comment.commentId} comment={comment} nameOf={nameOf} />
+          ))}
+        </ul>
       )}
 
       {composer === undefined ? null : (

@@ -5,19 +5,18 @@ import { renderCommentBody, safeHref } from '../../src/views/comment-body.js';
 /**
  * F3 — the comment body as the DOCUMENT the composer wrote.
  *
- * ## ⚠ THE §16 CASE ID FOR THIS FILE IS OWED, not omitted
+ * ## CASE `17.021` — MINTED IN §17, BECAUSE THE §16 DOOR'S BLOCK WAS SPENT
  *
- * §16's blocks mint one id per decisive property, and **exec 2's block is fully
- * spent**: `test-cases/16-remaining-doors.md`'s allocation table records
- * `16.72`–`16.80` as minted on 2026-09-21 and says *"its next free ids are NOT
- * `16.81`–`16.99` (exec 1's, fully spent too): it must be reallocated by the
- * controller before the next mint"*. That file's own rule is *"When your block
- * is empty, STOP AND ASK. Do not mint from the tip and do not borrow a
- * neighbour's — that is the rule whose breach made §13 go red twice."* So no id
- * is minted here, and the property is recorded as owed. **The precedent is in
- * this very feature:** `comments-thread.test.tsx` shipped once with a header
- * saying its id was OWED rather than omitted, and it was discharged when the
- * controller reallocated.
+ * This property belongs to **§16's comment-thread door**, and its id could not be
+ * minted there: `test-cases/16-remaining-doors.md` records exec 2's block as
+ * fully spent and its own rule is *"When your block is empty, STOP AND ASK. Do
+ * not mint from the tip and do not borrow a neighbour's — that is the rule whose
+ * breach made §13 go red twice."* So the property shipped with its id recorded
+ * as **OWED** — the same discharge pattern `comments-thread.test.tsx` itself
+ * used before `16.74` was minted for it — and the controller allocated
+ * `17.021`–`17.040` to this lane on 2026-09-21 21:0x, directing the mint into
+ * §17. **§16 was not touched to mint it.** The §16 door is named above, so a
+ * reader arriving from that file's comments-thread section can find this one.
  *
  * ## What this file is for
  *

@@ -2593,7 +2593,14 @@ export function TicketSheet({
             expensive mistake.
           */}
           <CommentsThread
-            comments={comments.data ?? []}
+            // V4 — `comments.data` VERBATIM, never `?? []`. The collapse was
+            // here, at the boundary, and it is what turned a read still in
+            // flight into "Comments · 0" and "No comments yet." — a claim about
+            // the ticket made before anyone had asked it. `CommentsThread` now
+            // takes `null` and has an arm for it; the History tab three arms up
+            // has always done it this way, with `result.data === null` drawn as
+            // its own state rather than as an empty ledger.
+            comments={comments.data}
             commentsUnavailable={comments.error ?? undefined}
             nameOf={nameOf}
             composer={

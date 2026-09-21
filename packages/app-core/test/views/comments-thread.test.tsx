@@ -195,9 +195,9 @@ describe('CommentsThread', () => {
    * anchor did not exist and the destination was unrecoverable from anywhere on
    * the surface — the finding's worst row.
    *
-   * ⚠ THE §16 CASE ID FOR THIS ARM IS OWED: exec 2's block is fully spent and
-   * `test-cases/16-remaining-doors.md` forbids minting from the tip. See the
-   * header of `comment-body.test.tsx` for the full record.
+   * Case `17.021` — minted in §17 because exec 2's §16 block is fully spent;
+   * this is §16's comment-thread door and `17-open-work.md` names it as such.
+   * See the header of `comment-body.test.tsx` for the full record.
    */
   it('renders a comment’s link as an anchor — the destination survives the round trip', () => {
     const linked: TicketComment = {
@@ -231,5 +231,56 @@ describe('CommentsThread', () => {
     // The sentence around it is intact, so the link was lifted out of the text
     // rather than the text being rebuilt around it.
     expect(body.textContent).toContain('See the doc for the rates.');
+  });
+
+  /**
+   * V4 — A STILL-LOADING READ IS NOT AN EMPTY THREAD.
+   *
+   * `useLiveQuery` initialises `data` to `null` and leaves it there while the
+   * request is in flight. The sheet collapsed it — `comments={comments.data ??
+   * []}` — so during the load window the thread rendered `Comments · 0` and
+   * *"No comments yet."*. Both are claims about the TICKET, and this component's
+   * own docblock names *"No comments yet."* as exactly such a claim: it was
+   * written to prevent it, and the collapse on the last hop reintroduced it.
+   * The History tab three arms away has always done this correctly.
+   *
+   * The two controls are here because the three arms are only distinguishable
+   * together: a wait arm that also swallowed the empty case would satisfy the
+   * first assertion and break the ticket.
+   *
+   * Case `17.022` — minted in §17, same file and same reason as the link arm
+   * above. The §16 door is the comment thread's empty/failed/loading split.
+   */
+  it('V4: a read still in flight draws a WAIT, never “Comments · 0” and never “No comments yet.”', () => {
+    render(<CommentsThread comments={null} nameOf={nameOf} />);
+
+    // A count nobody has measured is not printed…
+    expect(screen.getByText('Comments')).toBeInTheDocument();
+    expect(screen.queryByText(/Comments · \d/)).toBeNull();
+    // …the empty-ticket claim is not made…
+    expect(screen.queryByText('No comments yet.')).toBeNull();
+    // …no failure is claimed either — nobody refused anything…
+    expect(screen.queryByTestId('sheet-comments-unavailable')).toBeNull();
+    // …and the state the person is actually in is on screen.
+    expect(screen.getByTestId('sheet-comments-loading')).toHaveTextContent('Loading…');
+  });
+
+  it('V4 CONTROL: an ANSWERED empty read still says “No comments yet.” with a count of 0', () => {
+    render(<CommentsThread comments={[]} nameOf={nameOf} />);
+    // The wait arm must not have swallowed the real empty state — that would be
+    // the same defect in the opposite direction.
+    expect(screen.getByText('Comments · 0')).toBeInTheDocument();
+    expect(screen.getByText('No comments yet.')).toBeInTheDocument();
+    expect(screen.queryByTestId('sheet-comments-loading')).toBeNull();
+  });
+
+  it('V4 CONTROL: a FAILED read outranks the wait — null data plus an error is the failure, not a load', () => {
+    // `useLiveQuery` leaves `data` at `null` after a rejection too, so a thread
+    // that tested `comments === null` FIRST would draw a wait over a document
+    // that had already failed — a spinner for a read that is never coming back.
+    render(<CommentsThread comments={null} commentsUnavailable="the route answered 404" nameOf={nameOf} />);
+    expect(screen.getByTestId('sheet-comments-unavailable')).toHaveTextContent('the route answered 404');
+    expect(screen.queryByTestId('sheet-comments-loading')).toBeNull();
+    expect(screen.queryByText('No comments yet.')).toBeNull();
   });
 });

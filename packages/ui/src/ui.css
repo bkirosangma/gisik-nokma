@@ -5977,6 +5977,10 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 /* Mirrors `.gn-ticket-sheet__attachments-error` (the sibling read's sentence)
    rather than inventing a second treatment for the same kind of fact. */
 .gn-comments__error { color: var(--gn-danger); margin: 0; }
+/* V4 — the WAIT arm. Deliberately the muted ink of `.gn-comments__empty` and
+   not the danger tone of `__error`: a read in flight is a state, not a fault,
+   and painting it red would be the same misreading in the other direction. */
+.gn-comments__loading { color: var(--gn-text-muted); font-size: 0.9375rem; line-height: 1.25rem; margin: 0; }
 .gn-comments__composer {
   margin-top: 0.9rem;
   border-radius: var(--gn-radius-control);
