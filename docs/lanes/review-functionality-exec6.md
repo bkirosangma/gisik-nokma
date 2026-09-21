@@ -243,7 +243,8 @@ size: 6 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ 
 - **No browser, no pixel, no `apps/web` beyond `members/page.tsx:720-856`, no `apps/mobile`, no
   `apps/desktop`.**
 - `apps/server/src/routes/`: every route module has now been both *called* (Appendices P/Q/Z hit all 23 read
-  doors) and *read* — 16 whole (code lines), 3 in part (`mcp-tokens`, `my-invitations`, `search`).
+  doors) and *opened as code* — all 19; three of them (`mcp-tokens`, `my-invitations`, `search`) in part only, and
+  the large ones (`tickets`, `builder-reads`, `list`, `invites`, `attachments`) at the ranges §2.2 cites rather than whole.
 - **No full server suite run**, deliberately (rules §4); every measurement is a single probe file, so
   "the suite stays green with X mutated" is a sentence this report never says — exec 3 owns those.
 - **Migrations:** numbering and the dev DB's applied set (E6-7, Appendix E) only; no migration's SQL was read for
