@@ -1228,7 +1228,7 @@ the same shell invocation** (`git status --porcelain` empty afterwards). It impo
 adds the recording `onRequest` hook, and `app.inject`s each row above. Its `console.log` lines are the
 table.
 
-**DEFENCE — 2026-09-21 15:20 IST, phase 2 (lane relaunched on Opus 5; the finding's text above is frozen).**
+**DEFENCE — 2026-09-21 15:14 IST, phase 2 (lane relaunched on Opus 5; the finding's text above is frozen).**
 Executor 6's refutations file (`origin/exec6/review-functionality:docs/lanes/review-refutations-exec6.md`, row
 *E3-14* of its "candidates examined and NOT refuted" table) observes that two of the five routes —
 `POST /v1/invites/:token/accept` and `PUT /v1/me/preferences` — are **recorded exclusions** at
@@ -4079,3 +4079,110 @@ catalogue is not unaware of the problem. That is precisely what makes §5:397 a 
 countable bullets remain unchecked. **Ten wrong numbers of my own against fifteen clean claims** — and §63.1 is
 the first place in this report where I have written *"read, not verified"* **instead of** finding a countable proxy
 and treating it as the claim, which is the substitution that produced most of the ten.
+
+---
+
+# PHASE 2 — 2026-09-21, lane relaunched on Opus 5 at 15:05:23 IST
+
+**Everything above this line is the frozen phase-1 submission (`f8b5e929`, 14:57:35 IST).** Below: two findings
+filed in phase 2 at **half points** (rules §2), the correction that produced them, and the defences the brief
+permits. No finding above is edited; the only insertions above this line are dated *DEFENCE* paragraphs under
+`E3-14` (§14.7.1).
+
+## 64. Correction 8 — §30.1's "fully enumerated" table classifies **18** of its twenty lines, and says **6** where it lists **7**
+
+**WHAT I got wrong.** §30.1 says *"THE FILE IS NOW FULLY ENUMERATED — twenty open declarations"* and
+*"all twenty lines read in full … each checked."* Its table's five rows carry the counts **6 · 3 · 6 · 1 · 1**.
+Measured this session, by **membership rather than size** (the rule in [[a-wrong-count-marks-a-structural-defect]]):
+the ids at the twenty line numbers the section itself lists (`sed -n '<n>p' test-cases/06-auth-visibility.md`
+for each of `73 77 82 87 93 95 97 98 107 115 116 117 129 131 193 198 199 201 202 203`) are
+`6.61 6.65 6.66 6.71 6.51 6.53 6.57 6.58 6.77 6.82 6.83 6.84 6.94 6.96 6.130 6.31 6.41 6.123 6.124 6.125`.
+The table names **18** of them: the "live" row's count says **6** and its cell lists **seven** (`6.31`, `6.41`,
+`6.53`, `6.65`, `6.71`, `6.125`, `6.130`), and **`6.57` (`:97`) and `6.83` (`:116`) appear in no row at all.**
+6 + 3 + 7 + 1 + 1 = **18**, not 20. The section's count was reproduced by executor 6 (its refutations file:
+*"20, at the same twenty line numbers"*) — the **twenty** is right; the claim that all twenty were classified was
+not, and a count that matched hid the two that were never read. **Both are read below, and both are stale** —
+which is what the table's *"45 %"* was about, and it is now **11 of 20**.
+
+Also in the same section's neighbour, §27's measurement paragraph says *"four lines checked in one file give two
+live and three stale"* — 2 + 3 = 5 (`6.71`, `6.125` live; `6.58`, `6.82`, `6.84` stale). The arithmetic is wrong;
+the members are right. Recorded rather than edited, because the finding's text is frozen.
+
+## 65. `E3-30` (phase 2, HALF) — **IMPORTANT (claimed)** — Case 6.83 is ❌ asking for a measurement; the measurement exists, is named *"MEASURES case 6.83"* in the test, is recorded ✅ as case 7.78, and is cited by the code — since 2026-09-02
+
+**WHAT.** `test-cases/06-auth-visibility.md:116` — case **6.83**, still **❌**: *"When `proj_rollups` lands this is
+not a column rename … the two totals have **different sources** … and nothing guarantees the sets are equal. So the
+substitution must be MEASURED rather than assumed to be a no-op. Owner: Plan 3 Task 11."*
+
+**WHY it is wrong — the ❌ describes a missing measurement that has existed for nineteen days, under the case's own
+number.**
+
+- `apps/server/test/read/ticket-cards.test.ts:507` — `it('MEASURES case 6.83: proj_visibility and proj_rollups do
+  not enumerate the same children, so the counts come from ONE of them', …)`, and `:462` a second test naming
+  `(case 6.83)`. Landed in `563c983e` (2026-09-02, #67, Plan 5).
+- `test-cases/07-api-realtime-search.md:101` — **7.78 ✅** *"Case 6.83 MEASURED rather than argued: `proj_visibility`
+  and `proj_rollups` do not enumerate the same children … 2 against 1 on one executed fixture."* Same commit.
+- `apps/server/src/visibility/rollup.ts:82-85` — *"case 6.83 asked for the reason to be MEASURED rather than assumed.
+  **It now has been** (`test/read/ticket-cards.test.ts`, "MEASURES case 6.83")."*
+- `proj_rollups` landed with **exactly the seven columns 6.83 predicted** (`migrations/1787961900000_proj-rollups.sql:66-73`)
+  and a constraint the case did not foresee: `:76-77` `CHECK (total_children = open_children + active_children +
+  terminal_children)` — the "different sources" question is answered in the schema for the one table, and in the
+  test for the two.
+- File 06 has been edited **three times since** (`2f18f3f7` 2026-09-06, `c2c8be1c` 2026-09-17, `3a3a7ad4` 2026-09-19;
+  `git log -- test-cases/06-auth-visibility.md`) without the marker moving. The workspace rule is *"flip the status
+  marker in the same commit as the test that covers it"* (`/Users/kiro/my_projects/CLAUDE.md`, §test-cases).
+
+This is the `E3-23` shape exactly (a ❌ whose closer names the case by number) with one more witness: a sibling
+**✅ case in another file** that says the ❌ is measured. A reader of file 06 is told the rollup substitution is
+unmeasured; a reader of file 07 is told it is; the code agrees with 07.
+
+**WHAT WOULD HAVE BEEN BETTER.** Flip 6.83 to ✅ citing `ticket-cards.test.ts:507` and 7.78 — one line. And the
+detector `E6-12`/`E3-22` already ask for: a ❌ line whose number appears in a test name is a ❌ that must answer for
+itself; `grep -rn "case 6\.83" apps/server/test` → 2 lines is the whole instrument.
+
+**MEASUREMENT.** Lines opened: `06-auth-visibility.md:116`; `ticket-cards.test.ts:462`, `:505-507`;
+`07-api-realtime-search.md:101`; `rollup.ts:79-85`; `1787961900000_proj-rollups.sql:66-78`; `git log -S"MEASURES
+case 6.83" -- apps/server/test/read/ticket-cards.test.ts` → `563c983e 2026-09-02`. **Not run:** the test itself (it
+needs the shared test Postgres; one file of one package is within the rules, and I chose the four documentary
+witnesses over the run because the claim is about the marker, not the test's verdict). **Control:** at the same
+depth `6.61` (`:73`) read again holds partially as §30.1 says — its observation stands and only its reason is aged.
+
+**SEVERITY: Important (claimed), scored at half per rules §2.** Same class and same file as `E3-20`–`E3-25`; not
+Critical, nothing misbehaves.
+
+## 66. `E3-31` (phase 2, HALF) — **MINOR (claimed)** — Case 6.57 conditions on *"if Plan 3 admits a reparent that crosses projects"*; Plan 3 refused it on 2026-08-31 at both doors, and no event can move a ticket's project at all
+
+**WHAT.** `test-cases/06-auth-visibility.md:97` — case **6.57**, still **❌**: *"`proj_visibility.project_id` is
+written only at `ticket.created` and is never updated afterwards … **If Plan 3 admits a reparent that crosses
+projects, this column goes stale** … Owner: Plan 3 (whether a cross-project reparent is legal at all)."* The same
+conditional is in the schema: `migrations/1787961300000_proj-visibility.sql:39` `COMMENT ON COLUMN
+proj_visibility.project_id … "if Plan 3 ever admits a cross-project reparent this column goes stale"`.
+
+**WHY it is wrong.** The owner it names answered, and the answer closes the scenario:
+
+- `packages/rule-engine/src/checks/hierarchy.ts:274` — `if (newParent.projectId !== ticket.projectId) return
+  refuse('hierarchy.cross-project');` on `ticket.reparented`; `:125` the same refusal on `ticket.created`. Landed
+  `6b2fc768` (2026-08-31, #38, Plan 3 Chain A). Witnessed: `rule-engine/test/hierarchy.test.ts:92`, `:393`; case
+  **5.40 ✅** (*"Reparenting inherits both rulings the create path was corrected by"*, `05-tickets-hierarchy.md:56`).
+- No other door can move a ticket's project: across the thirteen `ticket.*` payloads in `packages/domain/src/events`,
+  `projectId` appears once — in `ticket.created` (`ticket-events.ts:43`). So the column the case worries about
+  **cannot** go stale through any event the engine accepts; its "written only at `ticket.created`" is not a gap but
+  the whole of the design.
+- The case was amended **twice** after 2026-08-31 to strike Task 7 and Task 8 from its owner line (its own
+  parenthetical, `:97`), and neither amendment recorded the one answer that mattered — Plan 3's. The column comment
+  in the migration carries the same unresolved conditional.
+
+**WHAT WOULD HAVE BEEN BETTER.** Strike 6.57 with the rule id and 5.40 as the witness (*"cross-project reparent is
+refused — `hierarchy.cross-project`, `hierarchy.ts:274`; the column cannot drift"*), and amend the column comment
+the next time that migration file is touched. The projection's `project_id` staying write-once is then a documented
+invariant rather than an open gap.
+
+**MEASUREMENT.** Lines opened: `06-auth-visibility.md:97`; `1787961300000_proj-visibility.sql:39`;
+`hierarchy.ts:124-125`, `:250`, `:274`; `hierarchy.test.ts:83-92`, `:382-393`; `05-tickets-hierarchy.md:56`;
+`ticket-events.ts:43`; `grep -rhoE "ticket\.[a-z_]+" packages/domain/src/events/*.ts | sort -u` → 13 names, and
+`grep -n projectId packages/domain/src/events/ticket-events.ts` → one line. **Control:** `6.71` at `:87`, read at the
+same depth, holds (as §27 recorded).
+
+**SEVERITY: Minor (claimed), scored at half.** A conditional the owner decided against, left standing in two
+places; softer than `E3-30` because the case's mechanism sentence is still true and nothing reports false coverage —
+it reports an impossibility as open.
