@@ -62,7 +62,8 @@
 > - ⚠ **The reviewer is running against this tree RIGHT NOW** (one read-only falsifier). **DO NOT REBASE OR EDIT THE CHANGED FILES UNTIL IT RETURNS** — a rebase moves the tree under it and a review is a reading at a version.
 >
 > ## THE ID BLOCK
-> - This lane minted **`16.91`–`16.95`** — all five, the exact remainder the block table assigns to exec 1. **The block `16.81`–`16.99` is now FULLY SPENT**; exec 1's next free ids are **`16.63`–`16.80`**. The table in `test-cases/16-remaining-doors.md` says so.
+> - This lane minted **`16.91`–`16.95`** — all five, the exact remainder the block table assigns to exec 1. ⚠ **THE ALLOCATION THIS SENTENCE STATES IS SUPERSEDED — do not mint from it.** It read *"The block `16.81`–`16.99` is now FULLY SPENT; exec 1's next free ids are `16.63`–`16.80`. The table in `test-cases/16-remaining-doors.md` says so."* — and **the warrant it names says the opposite**: that same table records the controller's 2026-09-21 reallocation (`16.72`–`16.80` → exec 2) and that exec 1's block is narrowed to `16.61`–`16.71` with nine of those minted (`16.63`–`16.71`). **The live position is in the block ABOVE this one** (`## THE ID BLOCK`, near the top of this file): exec 1 has **NO free ids and must ASK before minting**. This block is history.
+> - **The rule this correction is for, stated once: one position block per fact.** An older block points FORWARD to the current one rather than restating an allocation, because the restated allocation is the half that expires first — and the forward pointer is the half that stays true. The same applies to any `file:line` citation into a file that grows: name the STRING to find, not the line, because a line is a claim that decays.
 > - ⚠ **§17 is `17.NNN`, uniformly 3-digit padded, ceiling 999** (owner, cycle 29) — recorded in that same header.
 >
 > ## WHERE I AM / WHAT IS IN FLIGHT
