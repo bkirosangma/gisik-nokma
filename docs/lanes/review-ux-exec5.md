@@ -1645,8 +1645,10 @@ Filters `:784-830`, History `:408-419`, invitations `:205-240`) · `docs/faq.md`
 4. **Permissions as a member or guest** — I held only the owner's session. Every refusal path was reproduced by
    injecting a failure client-side (E5-13, E5-15) or read from source; none was observed as a real 403/422.
 5. **`/my-work`** — not opened; `/help`, `/sign-in`, `/privacy`, `/terms` and the 404 were reached signed out in the second browser; `/w/[workspaceId]` home read in source only (`:660-680`, `:860-890`, `:950-1000`).
-6. **Backlog / List / Calendar / Timeline** — not driven; the List's due column, the Backlog arm (`page.tsx:925-960`,
-   E5-40) and the Calendar/Timeline empty sentences read in source only.
+6. **Backlog / List / Calendar / Timeline** — not driven; read in source: the List's due column, the Backlog arm
+   (`page.tsx:925-960`, E5-40), the Calendar/Timeline empty sentences, the dated views' *"Closed: hidden"* chip
+   (`page.tsx:1660-1680` — consistent with `docs/manual.md:724-734`, no finding), and the Filters rows' tri-state
+   control (`tri-state-choice.tsx` — state carried in the accessible name, no finding beyond E5-4).
 7. **`test-cases/13-*.md`** — not verified id by id.
 8. **exec 2's remaining §2e candidates** (~30) beyond the three I verified — not opened.
 9. **`check:help` / `scripts/help-content.mjs`** — **run at 13:53**: `self-test passed (12 cases, 5 of them planted
