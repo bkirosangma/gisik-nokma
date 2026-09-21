@@ -9,7 +9,7 @@
 
 ## 0. THE ONE-LINE ANSWER
 
-**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Thirty-one of the thirty-four findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast is clean everywhere I measured in the shipped `neo` style — 26 route×theme passes, one third-party watermark failing — and switching the style axis to `hig`/`minimal` client-side found two AA failures of my own (E4-31, a ghost button on a sunken row at 3.99:1 that case 13.360's two assertions do not reach; E4-32) beside the one exec 1 computed (P24), which I painted and confirmed for them.
+**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Thirty-two of the thirty-five findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast is clean everywhere I measured in the shipped `neo` style — 26 route×theme passes, one third-party watermark failing — and switching the style axis to `hig`/`minimal` client-side found two AA failures of my own (E4-31, a ghost button on a sunken row at 3.99:1 that case 13.360's two assertions do not reach; E4-32) beside the one exec 1 computed (P24), which I painted and confirmed for them.
 
 ---
 
@@ -525,6 +525,19 @@ curl -s http://localhost:3041/v1/me/workspaces      # → {"error":"unauthentica
 
 ---
 
+
+### E4-35 — **MINOR** — `.gn-segmented__item` sets no horizontal padding, so where the track is content-sized the *All* tab on `/inbox` paints **31 px wide** — the prototype's segment carries `padding:0 16px`
+
+**MEASUREMENT (painted, `/inbox`, 1512, owner).** `[role=tablist][aria-label="Filter notifications"]` → `All` **31×44**, `Unread` 64×44, `Mentions` 78×44; each item `padding: 1px 6px` (the UA's), `min-width: auto`. On the board the same class paints 92×44 because that track fills its row (`flex: 1` shares free space); in `div.gn-inbox__header` (`globals.css:2880-2886`, `display:flex; justify-content: space-between`) the track is content-sized and `flex: 1` has nothing to share. Source: `packages/ui/src/ui.css:4648-4662` — `.gn-segmented__item` declares `min-height: 2.75rem` and no `padding`/`min-width`; its docblock (`:4641-4647`) records the 2.5rem→2.75rem HEIGHT fix and says nothing about width.
+
+**PROTOTYPE.** `Desktop.dc.html:2588` (`seg`): `display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 16px;…` — the inbox tabs at `:614-617` use it inside an `inline-flex` track, i.e. content-sized like the product's, and 16 px of padding a side is what keeps a three-letter tab ~63 px wide. **Category 3: no ruling on the width.**
+
+**WHY IT IS WRONG.** `test-cases/13-pre-launch-checklist.md:604-611` already taught this exact lesson for the nav's inbox icon — *"39x44 … tall enough, six pixels too NARROW … A tap target is a box, a short word is a narrow target"* — and fixed it with `min-width`. The shared segmented item has the same gap, and the only route where the track is content-sized (`/inbox`) is in no sweep.
+
+**WHAT WOULD HAVE BEEN BETTER.** `padding: 0 1rem` on `.gn-segmented__item` (the prototype's 16 px), which changes nothing on the board (the track already fills) and makes *All* ~63 px on `/inbox`.
+
+---
+
 ## 4. MATCHES AND RULED DIVERGENCES CHECKED
 
 _(so §3 is not a list of defects — each row is a measurement I took that came back clean or ruled)_
@@ -595,7 +608,7 @@ Screenshots taken and **committed** under `docs/lanes/exec4-paint/`: `board-1512
 
 **Prototype comparisons made (all against the staged export, shas in the header):** sheet crumbs (`:3404-3425`), sheet close (`:1121`), sheet width (`:3398`), description field (`:1165-1173`, `:1580`), descTools/cmtTools (`:3669-3680`), history rows (`:1337-1343`, `:3733-3737`), calendar nav (`:483-486`), timeline nav (`:509-511`), builder canvas/crumb (`:1012-1028`), New-ticket title (`:1580`); the mobile export's tab bar (`:1194-1203`) and header (`:99-114`). The three spec `.md` files were opened and none bears on a finding here.
 
-**Case ids opened by hand:** `13.420`, `13.423`, `13.445`, `13.446`, `13.461`, `13.523`, `13.351`, `13.288` (holds for the component; the board's tablist at `page.tsx:2058` is hand-rolled and is exec 1's P19), `13.289`, `13.360` (holds as written; E4-31 is the composite it does not assert), `16.63`, `16.64`, `16.83`, `11.121`, `15.31`, the tap-target section of `13-pre-launch-checklist.md` (`:555-640`) and its parent record (`docs/pre-launch-checklist.md:586-600`). **Every one still holds and is witnessed** as far as I checked; the finding about them is the negative space — no case sets `parent.id === epic.id` (E4-1), no case names `Select`'s focus return (E4-17), no baseline key exists for any tap-target route but `/my-work` (E4-12).
+**Case ids opened by hand:** `13.420`, `13.423`, `13.445`, `13.446`, `13.461`, `13.523`, `13.351`, `13.288` (holds for the component; the board's tablist at `page.tsx:2058` is hand-rolled and is exec 1's P19), `13.289`, `13.302` (holds), `13.360` (holds as written; E4-31 is the composite it does not assert), `16.63`, `16.64`, `16.83`, `11.121`, `15.31`, the tap-target section of `13-pre-launch-checklist.md` (`:555-640`) and its parent record (`docs/pre-launch-checklist.md:586-600`). **Every one still holds and is witnessed** as far as I checked; the finding about them is the negative space — no case sets `parent.id === epic.id` (E4-1), no case names `Select`'s focus return (E4-17), no baseline key exists for any tap-target route but `/my-work` (E4-12).
 
 ### 6.2 NOT REACHED — the honest boundary, as a list
 
@@ -619,7 +632,7 @@ Screenshots taken and **committed** under `docs/lanes/exec4-paint/`: `board-1512
 4. **Signed-out routes** beyond `/sign-in` (`/help` I did paint signed-in; `/privacy`, `/terms`, the 404, `/invite/<token>`, `/mcp/authorize`) were not re-measured — round 1 ran the signed-out suite (31 passed) and its port `:3021` is not mine.
 5. **`apps/mobile` and `apps/desktop`** were not rendered (no simulator, no Tauri build); one source finding each (E4-22; the desktop list is round 1's P7).
 6. **The 41 `app-core` non-view components** were reached only where a painted route mounted them (builder, type editor, help, inbox shell, account sections); `calendar-view.tsx`, `timeline-view.tsx`, the inspectors and rule editors were **not read**, only painted.
-7. **Case ids:** of my stated subset (~700 across the six UI files plus `3.1–3.144`), **17 were opened**. The rest were not. `check:citations` was not run.
+7. **Case ids:** of my stated subset (~700 across the six UI files plus `3.1–3.144`), **18 were opened**. The rest were not. `check:citations` was not run.
 8. **200 % zoom / `prefers-reduced-motion` / high-contrast / RTL** — not measured.
 9. **The `.gn-*` families that were never in a campaign** — enumerated after the first freeze (E4-27's roster: 18 bordered selectors, 13 neo-overridden classes, 14 bordered families with no override, 4 of them controls). The timeline nav (E4-15) and the editor strip (E4-8) were found by paint before that sweep existed; the sweep found the Publish twin.
 
@@ -633,10 +646,10 @@ The owner ordered graph-first. I did: `graphify-out/GRAPH_REPORT.md` header, hub
 |---|---|---|
 | **Critical** | **0** | — |
 | **Important** | **19** | E4-1 · E4-3 · E4-4 · E4-5 · E4-7 · E4-8 · E4-9 · E4-11 · E4-12 · E4-13 · E4-14 · E4-17 · E4-18 · E4-19 · E4-21 · E4-23 · E4-28 · E4-30 · E4-31 |
-| **Minor** | **15** | E4-2 · E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 · E4-24 · E4-25 · E4-26 · E4-27 · E4-29 · E4-32 · E4-33 · E4-34 |
-| **total** | **34** | `19 + 15 = 34`; ids `E4-1` … `E4-34` with no gaps |
+| **Minor** | **16** | E4-2 · E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 · E4-24 · E4-25 · E4-26 · E4-27 · E4-29 · E4-32 · E4-33 · E4-34 · E4-35 |
+| **total** | **35** | `19 + 16 = 35`; ids `E4-1` … `E4-35` with no gaps |
 
-**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20, E4-24, E4-27, E4-29, E4-30. Category 2 argued against the record: E4-6, E4-8, E4-25, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23, E4-28, E4-31, E4-32, E4-33, E4-34. Matches the prototype, fails the product's own later rule: E4-26.
+**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20, E4-24, E4-27, E4-29, E4-30, E4-35. Category 2 argued against the record: E4-6, E4-8, E4-25, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23, E4-28, E4-31, E4-32, E4-33, E4-34. Matches the prototype, fails the product's own later rule: E4-26.
 
 **Overlap with round 1, stated:** E4-10 and E4-15 are new members of P1's class found by widening the population (class-less tags; classes whose rule forgot the border) and painted; E4-12 widens P11's scope from one component to the suite's population; E4-2 carries a painted reproduction of P8's focus finding as corroboration only. Nothing else overlaps.
 
