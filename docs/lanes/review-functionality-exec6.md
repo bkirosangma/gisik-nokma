@@ -141,7 +141,9 @@ attachments,tickets,notifications,mcp-device}.ts` (the routes named in findings;
 `auto-close/sweep.ts:176-206`, `sync/{sync-service,reconcile-route}.ts`, `stream/hub.ts:213-420`, `gates/
 evidence-gate.ts`, `auth/auth.ts:150-360` and `app.ts:477-612` (rate limits), `mcp/token-store.ts:1-80`,
 `tools/sweep-orphans.ts:100-125`, `tools/verify-projections.ts` (whole), `attachments/sniff.ts:36-50`,
-`sync/contest-coherence.ts` (whole), `read/ancestry.ts` (whole), `routes/tickets.ts:396-446`, `:548-560`,
+`sync/contest-coherence.ts` (whole), `read/ancestry.ts` (whole), `http/http-origin.ts:128-172`, `:255-265`
+(the set, its exclusions and the predicate), `stream/routes.ts:262-267`, `test/helpers/stream.ts` (used),
+`deploy/do/app.yaml:1-10`, `:119`, `routes/tickets.ts:396-446`, `:548-560`,
 `:617-670`, `routes/mcp-tokens.ts:72-80`, `auth/synthetic-address.ts` (whole), `ledger/event-store.ts:135-156`.
 `packages/rule-engine/src/contests.ts:1-45`; `packages/domain/src/ticket-state.ts:99-200` (the reducer's cases);
 `packages/sync-client/src/replica/replica.ts` (grep for `workflow.defined` / `foldTicketToWorkflowVersion`
@@ -185,7 +187,7 @@ size: 5 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ 
   `ticket-history`, `workspaces`); projections other than the three named; `read/` other than the two named;
   `sync/{contests-route,snapshot-*,stream-seq,sync-routes,ledger-deps}.ts`; `ledger/event-store.ts` beyond
   `readLedger`, `ledger/snapshot-store.ts`;
-  `ops/*`; `seed/*`; `auth/*` other than `auth.ts` and `synthetic-address.ts` (whose guard hides a synthetic
+  `ops/*`; `seed/*`; `http/{security-headers,hsts,rate-limit}.ts` beyond a grep; `auth/*` other than `auth.ts` and `synthetic-address.ts` (whose guard hides a synthetic
   address in rosters and is not consulted by the magic-link door — safe only because `.invalid` never resolves;
   noted, not filed); `tools/{sweep-invite-tokens,sweep-notifications,
   sweep-user-preferences}.ts`; `visibility/{grant-backfill,rollup,visible-events-for,
@@ -1162,6 +1164,14 @@ see, each with the measurement I would run — **none is filed here**, per rules
   #625–#630. `git diff --name-only 33f14386 a7b6292b` against the files its findings cite.
 - **exec3 §7.5, "the mappers refuse to default"** — confirmed by me for `FilterSpec` (§5); a refutation would need
   a `??` that substitutes, and I found none in `:903-1001`. Likely a defence, not a refutation.
+- **exec3's round-2 `E3-14` (claimed Critical: five cookie-authenticated mutating routes outside
+  `HTTP_ORIGIN_PROTECTED_ROUTES`).** Read at 11:0x from `origin/exec3/review-functionality-r2`. I opened the file:
+  two of its five routes (`POST /v1/invites/:token/accept`, `PUT /v1/me/preferences`) are **recorded exclusions
+  with reasons and owners** in the same docblock (`http-origin.ts:128-146`, *"excluded here rather than silently
+  omitted"*), and the reasoning there (*"a workspace they can leave"*) prices the invitation-accept variant the
+  finding's Critical rests on. The other three are genuinely unmentioned. **Not a refutation** — the finding is
+  valid for three routes and the judge sets severity — but the recorded half is what a refuter would cite, and my
+  E6-15 is the read-side complement measured independently (its §"Relation" paragraph says so).
 - **Where I would defend:** E6-2's weakest joint is *"committed is not a defect; the FAQ promises only views"* —
   the answer is `notifications/sweep.ts:175-177` (the product's own rule that a notification is a view) plus the
   measured letter, and the attachment-upload precedent (`ticketIsLive` at the upload door). E6-11's weakest joint
