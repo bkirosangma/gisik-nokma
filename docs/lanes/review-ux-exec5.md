@@ -911,18 +911,19 @@ the owner's database.
 
 ---
 
-### E5-24 — IMPORTANT · Four more passages of the help describe a product that no longer exists — "no change role", "you cannot rename a job", "you cannot delete a job", "you cannot see what [visibility] is currently set to" `[BROWSER]` `[SOURCE]` — sibling of `exec2-F1`, none of its eight rows
+### E5-24 — IMPORTANT · Five more passages of the help describe a product that no longer exists — "no change role", "you cannot rename a job", "you cannot delete a job", "you cannot see what [visibility] is currently set to" `[BROWSER]` `[SOURCE]` — sibling of `exec2-F1`, none of its eight rows
 
 | # | the sentence | where | falsified by |
 |---|---|---|---|
 | a | *"**You can see, and you cannot change.** … That role is read-only: there is no "remove", and no "change role"."* and `faq.md:143-147` *"Where do I change somebody's role, or take them off? Nowhere on screen."* | `docs/manual.md:299-300`, `docs/faq.md:143-147` | `[BROWSER]` `/w/…/members` paints a `Role` select per row (`Role for accountant@e2e.gisik-nokma.local`, options admin/member/guest); `members/page.tsx:334-350` `changeRole` submits it. **"no remove" is still true** (`grep -n 'Remove' members/page.tsx` → 0 controls); the sentence is half-right and states the half that changed as unchanged. |
 | b | *"**You cannot rename a job.**"* | `docs/manual.md:371` | `ticket-sheet.tsx:1818` `aria-label="Ticket title"` — an editable input; `:1806-1810` *"`onBlur` commits, `Enter` commits, `Escape` abandons"*; `[BROWSER]` `textbox "Ticket title"` in the sheet's accessibility tree. |
 | c | *"**You cannot delete a job.** If your stages include a "won't do" or "cancelled" stage, moving it there is the nearest thing available."* | `docs/manual.md:372-373` | `ticket-sheet.tsx:2612-2621` the footer `Delete` (E5-9); `[BROWSER]` `button "Delete"` on the sheet. |
+| e | *"**Inbox** — with a small number badge on it when you have unread messages."* and *"**The unread badge** … keeps the last number"* | `docs/manual.md:124`, `:913` | The visible signal is a **dot**, not a number — `inbox-nav-link.tsx` renders `<span className="gn-nav__inbox-dot" aria-hidden="true" />` when `unread > 0` and puts the count only in the accessible name (`\`Inbox, ${unread} unread notification…\``), by owner ruling quoted in the file: *"dot visually, count in the accessible name"*. A sighted reader never sees a number. Category 2 for the product; the help was not moved with the ruling. |
 | d | *"**You can set who sees a job. You cannot see what it is currently set to.** On the one screen whose entire subject is who can see what, the current audience is shown as unavailable rather than guessed."* | `docs/manual.md:989-993` | `routes/tickets.ts:78-90` serves `own_mode`/`resolved_mode` on the detail read; `mappers.ts:1992` maps it; `ticket-sheet.tsx:649-653` builds `standingVisibility` from it and passes `current=` (`:2512`); `visibility-editor.tsx:315-330` renders the *unserved* arm only when `current === null` and otherwise `standingSentence(current, nameOf)`. `[BROWSER]` the wire for `CCSO-3`'s parent object carried `own_mode: "inherit", resolved_mode: "project"`. |
 
 **WHY.** The same defect and the same direction as `exec2-F1` (accepted, Important): the product's own help makes it
 look less capable than it is — here on the four most basic acts a person takes on a ticket and a person (rename,
-delete, set a role, read who can see). `check:help` cannot see any of these (`exec2-F2`). `F1`'s rows a–h are the
+delete, set a role, read who can see) plus the one chrome element the manual describes by its shape. `check:help` cannot see any of these (`exec2-F2`). `F1`'s rows a–h are the
 nav, sign-out, the theme toggle, the workspace card, comments, attachments and the settings links; none is these
 four passages, so this is a wider true scope with its own measurements.
 
