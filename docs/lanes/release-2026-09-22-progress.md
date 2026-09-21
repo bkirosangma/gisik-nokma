@@ -11,3 +11,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E6-15 | done | 871065c3 | security-middleware.test.ts 13.1100-13.1103 (stream origin check) |
 | T-E6-16 | done | a4063bb5 | device-flow.test.ts 14.112-14.112b (authKind fence) |
 | T-E6-18 | done | 3570edf1 | ingest.test.ts 3.900-3.901 (invalid-byte, narrow scope stated) |
+| T-E6-21 | done | f4cb7c19 | check-role-permission.test.ts 6.150 (self-leave) |
