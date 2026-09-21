@@ -204,6 +204,8 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 
 **⚠ AND THE ONE MEMBER THAT *WAS* PAINTED-MEASURED IS THE ONE THAT GOT WITHDRAWN.** The `<Link>`-widened sweep's seventh member, `gn-nav__signin`, is the only one the viewport suite renders where I could read it — and it came back **77×44, `offenders=0`, because `.gn-nav a` styles it**. So the single painted data point I had pointed at the member that did not belong, and the six that remain have none. **The honest position for the finding as it now stands: six static measurements, zero painted confirmations, and a mechanism proven by precedent on a different class.** That is why it is Important and not higher, and I would not defend it as more than that.
 
+
+**Defence (phase 2, 2026-09-21 15:25 IST) — two things a refuter would reach for, answered with the line.** (1) *The two `<a>` members are painted by a global rule, so by the seventh member's logic they should go too.* The withdrawn seventh was reached by `.gn-nav a` (`globals.css:1968`): radius, padding, weight, colour, `text-decoration: none` — a DESIGNED rule that leaves nothing to the UA. The rule that reaches `gn-attachment__link` and `attachment-item__name` is `globals.css:39` `a { color: var(--gn-text-accent); }` — colour only, opened again in phase 2; the underline, the focus ring and every box property stay the UA's. The finding already states this distinction in its MEASUREMENT paragraph; the four `<button>` members have no rule of any kind. (2) *Nothing was painted.* Exec 4's painted UA-chrome detector (`E4-10`'s measurement) flagged `editor-slot__submit` — a P1 member — on the routes it visited, and flagged no other class in P1's list because none of the other five is on a route it painted (the empty board, the attachment list and the evidence picker need states its pass did not enter). That is one painted confirmation where the finding had none; it moves nothing else. I also re-enumerated every descendant selector ending in a bare `button`/`a`/`input` across the three stylesheets in phase 2 (`.gn-nav a`, `.gn-nav button`, `.gn-settings__sidebar a`, `.gn-legal a`, `.gn-legal__toc a`, `.gn-sign-in__legal a`, `.gn-builder-crumb a`, and the three `input` rules named in my refutation file) — none is an ancestor of the six.
 ---
 
 ### P2 — **IMPORTANT** — The board's whole-board empty state has no prototype counterpart, and is the one board empty state with no styling
@@ -222,6 +224,8 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 
 **WHAT WOULD HAVE BEEN BETTER.** Style the three classes from the prototype's shared control constant (the same constant `981aa92b` reused for `.ticket-type-list__move` — fill-tertiary + text-accent + control radius, no border), and record the whole-board banner as a deliberate addition in `Features.md` with its rationale, so a later reader does not "correct" it back toward a prototype that has no such state.
 
+
+**Defence (phase 2, 2026-09-21 15:25 IST) — a clause of the WHY narrowed, the WHAT untouched.** Exec 4's refutation file (`ccd60196`, §2) notes that the WHY sentence's *"a UA button"* names `gn-board__empty-create`, which `apps/web` never renders: `board.tsx:493` gates it on `onCreateTicket !== undefined`, and `grep -rn onCreateTicket apps/web/app apps/web/src apps/desktop/src apps/mobile/src` → **0** at `a07a7fc2` (re-run by me). **That is correct.** So for the shipped web host the first-run consequence is the sentence in inherited text alone; the UA button is the consequence for any host that passes the callback, which today is none. The measured claim — three classes, zero selector blocks, the only two mentions in `ui.css` being comments, no `.gn-board…` descendant rule reaching them — is unchanged, and so is the classification: an unstyled product addition beside a styled per-column sibling. I do not lower the severity myself; the judge has the narrowed consequence.
 ---
 
 ### P8 — **MINOR (product) / IMPORTANT (follow-on)** ⚠ **r2 REVISION** — `Dialog` and `Sheet` declare `aria-modal="true"`, and the missing containment is RECORDED as a named follow-on that the remedy already exists for
@@ -811,6 +815,14 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 
 **WHAT WOULD HAVE BEEN BETTER.** `generate-editor-html.mjs` gaining a `--check` mode that regenerates into a temp file and diffs, wired as one step in the mobile package's `test` — the same shape `check:help` already uses for the in-app manual (*"the in-app manual and FAQ must match the documents they are generated from"*), which is this repository's own precedent for exactly this problem. **And the header should say the bundle must be rebuilt first**, since its current instruction would produce a second stale artefact and look like a fix.
 
+
+**Corroboration (phase 2, 2026-09-21 15:25 IST).** Exec 4's refutation file (`ccd60196`, §1) painted it on `:3041`: *"every `window.next.router.push` in my sweeps left `document.activeElement === BODY`"* — the paint this finding said it lacked. Attributed; not claimed as my measurement.
+
+**Corroboration (phase 2, 2026-09-21 15:25 IST).** Exec 4 (`ccd60196`, §1) painted the board at 1512: `[role=tablist].gn-segmented` → `aria-label` null, `aria-labelledby` null, 5 tabs. Attributed.
+
+**Corroboration (phase 2, 2026-09-21 15:25 IST).** Exec 4 (`674decb2`, §1) opened the account menu on `:3041`: `[role=menu]` attributes are exactly `id`, `role`, `class` — no `aria-label`, no `aria-labelledby`. Attributed.
+
+**Corroboration (phase 2, 2026-09-21 15:25 IST) — the paint this finding said it did not have.** Exec 4 (`ccd60196`, §1) set `data-style` client-side on `/settings/ticket-types/new` and measured `.ticket-type-editor__issues li`: `rgb(215,0,21)` on `rgb(228,216,204)` at 12.8 px → **3.84:1** in `hig` and `minimal`; `neo` → 6.28:1. The computed number and the painted number agree to the second decimal. Attributed.
 ---
 
 ### P31 — **IMPORTANT** ⚠ **r2 NEW** — The top bar renders as an UNNAMED `navigation` landmark beside a named one on at least seven routes
