@@ -1504,3 +1504,70 @@ result there proves nothing about content. The three corrections in §17.1 and t
 **content** checks — `sed -n "${line}p"` compared against a string I expected to find — which I ran over
 the citations my findings and classifications rest on, not over all 21. **The ones I did not
 content-check are listed here as unchecked rather than implied to be right.**
+
+---
+
+## 18. `E3-17` (r2) — MINOR — A docblock that says "re-run the stated command before trusting either number" gives a total its own two bullets contradict
+
+**WHAT.** `packages/sync-client/src/outbox/outbox.ts`'s opening docblock prices a refactor — moving
+`SyncEventResult`/`SyncInvalidCode` into `@gisik-nokma/domain` — and publishes the command that measures
+it. Three sentences in it are numbers:
+
+> - **`apps/server`: 3 files** — `sync/sync-service.ts` (the declaration and its docblock),
+>   `sync/sync-routes.ts`, and `test/dual-client/rig.ts` (`:36` a type import, `:229` a return-type
+>   annotation — both CODE uses).
+> - **`packages/sync-client`: 6 files** — **this one**, `engine/sync-engine.ts`, `net/http-transport.ts`,
+>   `index.ts`, `test/sync-engine.test.ts`, and `replica/sync-item.ts`. … the stated command returns six
+>   …
+> - So the move's cost by the stated measure is **8 files**, not the seven the closing line used to
+>   claim — and five-plus-two if only code is counted.
+
+**WHY it is wrong.** **3 + 6 = 9**, and the docblock's own command returns exactly that:
+
+```
+$ grep -rln 'SyncEventResult\|SyncInvalidCode' --include='*.ts' packages apps
+apps/server/src/sync/sync-routes.ts
+apps/server/src/sync/sync-service.ts
+apps/server/test/dual-client/rig.ts
+packages/sync-client/src/engine/sync-engine.ts
+packages/sync-client/src/index.ts
+packages/sync-client/src/net/http-transport.ts
+packages/sync-client/src/outbox/outbox.ts
+packages/sync-client/src/replica/sync-item.ts
+packages/sync-client/test/sync-engine.test.ts
+```
+
+`apps/server` = **3** ✓ (as claimed). `packages/sync-client` = **6** ✓ (as claimed). **Total = 9**, and the
+paragraph says 8. It also says *"five-plus-two if only code is counted"*, which should be **5 + 3 = 8**
+by its own labels (five sync-client code uses, and `rig.ts`'s two uses are explicitly *"both CODE
+uses"*) — **so both arithmetic statements are wrong and both of their inputs are right.**
+
+**AND THE MECHANISM IS WRITTEN IN THE SAME PARAGRAPH — this is why it is a drift and not a slip.**
+The bullet above it records a correction: *"This bullet said 2, and was re-signed at 2 by the change set
+… Re-run the stated command before trusting either number."* The sync-client bullet records another:
+*"This bullet said 5 and enumerated 5 … the stated command returns six."* **Two corrections landed. The
+total moved for the first and not the second:** 7 = 2 + 5 → the apps/server bullet was corrected to 3, so
+the total was written as **8 = 3 + 5** → the sync-client bullet was then corrected to 6 and **the total
+was not touched.** The stale number is not the one anybody re-derived; it is the one nobody did, which is
+the shape this repo has recorded more than any other.
+
+**⚠ AND I CONSIDERED THE ONE READING THAT WOULD MAKE 8 RIGHT, because it is not absurd:** a cost might
+exclude the file the comment lives in, and 9 − 1 = 8. **That reading is refuted by the bullet's own
+text** — it says *"`packages/sync-client`: 6 files — **this one**, `engine/sync-engine.ts`, …"*, i.e. it
+counts `outbox.ts` IN. So the total is inconsistent with the count it is summing, under either reading of
+what "cost" means.
+
+**WHAT WOULD HAVE BEEN BETTER.** The paragraph already contains the right rule and does not apply it to
+itself: *"Re-run the stated command before trusting either number."* Applied to the total, it would have
+caught this. **The durable form is to stop stating a total at all** — the two package counts are checkable
+against the command, the total is a derived fact a reader can add in their head, and it is the derived
+fact that drifted.
+
+**SEVERITY: Minor.** Documentation only; nothing behaves differently. Filed because it is a count in a
+paragraph whose whole purpose is to let a future reader price a refactor, the command to check it is
+printed beside it, and this is the third instance in this round of a number that no instrument maintains
+(`E3-9`, `E3-10`, `E3-11`, `E3-12` are the others).
+
+**MEASUREMENT.** The command above, run from the repo root at this sha — **the docblock's own command,
+verbatim**, which is the strongest available form of this check. `node_modules`/`dist` filtered out (the
+docblock's own parenthetical does the same and says so).
