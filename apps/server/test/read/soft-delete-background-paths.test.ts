@@ -117,10 +117,22 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  *
  * ### ⛔ WHAT NEITHER ARM COVERS, NAMED RATHER THAN LEFT AS AN ABSENCE
  *
- * **FOUR surfaces, every one of them MEASURED as a survivor rather than
- * suspected.** Three are the attachment doors and one is a TypeScript gate.
+ * ⚠ **THIS COUNT IS HISTORY, AND IT IS QUOTED RATHER THAN EDITED:** it read
+ * *"FOUR surfaces, every one of them MEASURED as a survivor rather than
+ * suspected. Three are the attachment doors and one is a TypeScript gate."*
+ * **The three attachment doors are CLOSED** — cases `16.96`-`16.99`, 2026-09-20
+ * — and subsection (a) is kept below as history rather than as a live gap. What
+ * remains open, each MEASURED as a survivor rather than suspected, is the
+ * TypeScript gates in **(b)** and **(c)**. No total is restated here, because
+ * the one that was here is the thing that went stale.
  *
- * #### (a) A soft-deleted ticket's ATTACHMENTS are served by THREE doors, and the third serves the BYTES
+ * #### (a) A soft-deleted ticket's ATTACHMENTS were served by THREE doors, and the third serves the BYTES — ⚠ **CLOSED 2026-09-20; cases `16.96`-`16.99`**
+ *
+ * **READ THIS AS HISTORY: the leak is closed.** Each of the three doors below
+ * now refuses a tombstoned ticket, by its own case and each with a live positive
+ * control — the LIST (`16.97`), the UPLOAD (`16.98`, which asserts both that the
+ * request was refused AND that nothing accreted), and the DOWNLOAD (`16.99`, the
+ * one serving the BYTES).
  *
  * MEASURED 2026-09-20 for the list: one ticket, deleted through the real door,
  * `GET …/tickets/:id` → **404** while `GET …/tickets/:id/attachments` → **200**
@@ -142,8 +154,13 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  * ⚠ **The grep, with its control: `routes/attachments.ts` contains the word
  * `deleted` ZERO times, while the same grep finds it 6 times in
  * `routes/tickets.ts` — an absence at the file, not a missed line.**
+ * **Both numbers are stale now and both are corrected rather than deleted,
+ * because a gap paragraph is greppable by the number it is built on:**
+ * `grep -c deleted` gives **5** for `routes/attachments.ts` and **13** for
+ * `routes/tickets.ts` at the tree this was re-read on.
  * Write-up: `gisik-nokma-lanes/EXEC-2026-09-20-softdelete-attachment-leak.md`.
- * **Named owner: whoever next picks up the attachment surface.**
+ * **Named owner: none — built by the lane that picked up the attachment
+ * surface.**
  *
  * #### (b) `routes/my-work.ts:364` — the CONTESTED-claim title gate, in TypeScript
  *
