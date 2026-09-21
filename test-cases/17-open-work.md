@@ -26,7 +26,7 @@ never saw.
 | lane | block |
 |---|---|
 | **exec 3** | **`17.001`–`17.020`** (taken 2026-09-21 for the sheet's `Visibility` section styling) — **minted: `17.001`–`17.006`** |
-| **release batch B09** (lane ds5) | **`17.061`–`17.080`** (allocated by the controller 2026-09-21 21:0x, recorded in the cycle-46 anchor PR on `main`) — **minted: `17.061`–`17.071`** |
+| **release batch B09** (lane ds5) | **`17.061`–`17.080`** (allocated by the controller 2026-09-21 21:0x, recorded in the cycle-46 anchor PR on `main`) — **minted: `17.061`–`17.072`** |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** A block is a longer-lived reading than a "next free
 N", but it still expires when the controller reallocates. **Re-read it before minting, and if your own
@@ -318,3 +318,28 @@ suggestion, not with the finding's substance** — the substance, that the failu
 - **17.071** ✅ The row renders its OWN sentence and the bulk path's is absent — both halves asserted,
   because a page rendering the bulk sentence would satisfy a check that only looked for "a sentence".
   — (`apps/web/test/inbox-bulk.test.tsx`)
+
+## A committed move does not carry its comment into the next one — case `17.072` (E2-32, 2026-09-21)
+
+**The defect.** `TransitionDialog` holds `comment` and `fieldValues`, and neither reset clears them: the
+destination-change effect clears `evidenceAttachmentId`/`uploadError`, and the `!open` effect does the same
+on close. The docblock beside the latter defends keeping the comment — *"typing into a dialog and losing it
+to a stray Cancel is a real cost"* — **and that argument names CANCEL while the effect serves Cancel and
+Commit alike.** The dialog is mounted for the sheet's whole life (`open={moveOpen}`), so after a committed
+move — which only calls `setMoveOpen(false)` — the comment is still in state, and `submit` puts it on the
+wire for the NEXT move: **a comment written about move A is recorded as the comment for move B.**
+
+- **17.072** ✅ After one committed move, reopening the dialog and choosing the same destination finds an
+  EMPTY comment box. The first move's arm is the control — its comment REACHES THE WIRE, asserted on the
+  ingested payload — without which "empty on reopen" would be satisfiable by a box that never held
+  anything. — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+
+**The fix is NOT inside the dialog, and the reason is the property rather than the file.** The `!open`
+effect cannot tell a Cancel from a Commit, and giving it a flag would be the component guessing at a fact
+only the caller has. `TicketSheet` bumps a `movesCommitted` counter on the success path and uses it as the
+dialog's `key`, so a committed move REMOUNTS the dialog — discarding the whole finished attempt and
+nothing else. **Cancel does not change the key, so the cost the docblock defends is untouched**, which is
+the half of the finding's own remedy that says *"while keeping preserve-on-Cancel"*.
+
+The dialog's docblock is corrected in the same change set: it named only Cancel while its effect served
+both closes, and that sentence is where the defect was legible.

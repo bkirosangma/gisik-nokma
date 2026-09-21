@@ -454,6 +454,15 @@ export function TicketSheet({
    */
   const [sheetFull, setSheetFull] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
+  /**
+   * How many moves have COMMITTED. Bumped beside `setMoveOpen(false)` on the
+   * success path and used as `TransitionDialog`'s `key`, so a committed move is a
+   * fresh dialog the next time it opens (E2-32, 2026-09-21) while a Cancel —
+   * which does not bump it — still preserves what was typed. The reason is at the
+   * bump site; the short version is that the dialog's own `!open` effect serves
+   * Cancel and Commit alike and can only honour one of them.
+   */
+  const [movesCommitted, setMovesCommitted] = useState(0);
   const [serverRefusal, setServerRefusal] = useState<{ rule: string; reason: string } | null>(null);
   /**
    * Ruling 33 (fix round 2, 2026-09-17) — Close/Reopen's OWN transport-error
@@ -772,6 +781,17 @@ export function TicketSheet({
     if (failed === undefined) {
       setServerRefusal(null);
       setMoveOpen(false);
+      // **A COMMITTED move is a fresh dialog next time (E2-32, 2026-09-21).**
+      // The dialog's own `!open` effect deliberately keeps `comment` and
+      // `fieldValues` across a close — *"typing into a dialog and losing it to a
+      // stray Cancel is a real cost"* — and that argument is about CANCEL, while
+      // the effect serves Commit alike. The dialog is mounted for the sheet's
+      // whole life, so without this the next Move carried the previous move's
+      // words onto the wire: a comment written about move A recorded as move B's.
+      // Bumping this KEY remounts the dialog, which discards the whole abandoned
+      // attempt and nothing else — Cancel does not bump it, so the cost the
+      // docblock defends is untouched.
+      setMovesCommitted((count) => count + 1);
       read.reload();
       history.reload();
       return;
@@ -2664,6 +2684,14 @@ export function TicketSheet({
 
       {workflow.data != null ? (
         <TransitionDialog
+          /*
+            ⚠ THE KEY IS LOAD-BEARING (E2-32, 2026-09-21). A committed move
+            remounts this dialog, which is what discards the finished move's
+            `comment` and `fieldValues`; the dialog cannot do it itself, because
+            its only close-time effect must also preserve them for a Cancel.
+            Cancel does not change the key, so nothing typed is lost to one.
+          */
+          key={movesCommitted}
           open={moveOpen}
           workflow={workflow.data}
           fromStateId={state.stateId}

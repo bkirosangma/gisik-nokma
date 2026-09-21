@@ -3349,3 +3349,52 @@ describe('13.1112 the ticket read ANSWERS null (E4-23)', () => {
     expect(screen.queryByTestId('sheet-ticket-absent')).toBeNull();
   });
 });
+
+describe('17.072 a committed move does not carry its comment to the next one (E2-32)', () => {
+  /**
+   * 17.072 — E2-32. `comment` and `fieldValues` are cleared by neither reset
+   * effect: the destination-change effect clears `evidenceAttachmentId`/
+   * `uploadError`, and the `!open` effect does the same on close. The docblock
+   * beside the latter defends keeping the comment — *"typing into a dialog and
+   * losing it to a stray Cancel is a real cost"* — and that argument is about
+   * CANCEL, while the effect serves Cancel and Commit alike. The dialog is mounted
+   * for the sheet's whole life (`open={moveOpen}`), so after a committed move —
+   * which only calls `setMoveOpen(false)` — the comment is still in state, and
+   * `submit` puts it on the wire for the NEXT move: **a comment written about move
+   * A is recorded as the comment for move B.**
+   *
+   * Asserted on the state the person can SEE: after one committed move, reopening
+   * the dialog and choosing the same destination must find an EMPTY box. The
+   * first move's arm is the control — its comment reaches the wire — without
+   * which "empty on reopen" would be satisfiable by a box that never held
+   * anything.
+   */
+  it('17.072 the comment box is empty on the next Move, and the first comment still reaches the wire', async () => {
+    const user = userEvent.setup();
+    const source = renderSheet(ticketRead());
+    await settled();
+
+    // ARM ONE — pick Done, write the comment, commit.
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.type(
+      screen.getByLabelText('Comment (required by this transition)'),
+      'shipped on the morning van',
+    );
+    await user.click(screen.getByRole('button', { name: 'Move' }));
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    // THE CONTROL: the comment really reached the wire for the move it belonged to.
+    expect(source.ingested[0]![0]!.payload).toEqual({
+      to: 'done',
+      comment: { text: 'shipped on the morning van' },
+    });
+
+    // ARM TWO — reopen and pick the SAME destination again.
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+
+    expect(screen.getByLabelText('Comment (required by this transition)')).toHaveValue('');
+  });
+});
