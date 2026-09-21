@@ -6436,15 +6436,31 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    `--fieldBg` and `--ctlR` do not exist here — `tokens.ts` is the origin):
    `fillPrimary`, `fillQuaternary`, `textMuted`, `surface`, `radiusControl`.
 
-   ⚠ WHAT THIS BLOCK DELIBERATELY DOES NOT STYLE: the composer's own chrome. The
-   editor is `packages/editor`'s `.ticket-editor*` and it is styled by that
-   package's `styles/editor.css`, imported once in `apps/web/app/layout.tsx` —
-   `packages/ui` styling another package's internals is the duplication this
-   repo refuses. `.editor-slot` and `.editor-slot__submit` (the wrapper and the
-   Save/Post control) are UNSTYLED, and that is PRE-EXISTING and already
+   ⚠ WHAT THIS BLOCK DELIBERATELY DOES NOT STYLE: the composer's own chrome —
+   and the word to hold onto is BY THIS FILE. The editor is `packages/editor`'s
+   `.ticket-editor*` and it is styled by that package's `styles/editor.css`,
+   imported once in `apps/web/app/layout.tsx`; `packages/ui` styling another
+   package's internals is the duplication this repo refuses.
+
+   **⚠ CORRECTED 2026-09-22 — THIS PARAGRAPH USED TO REPORT A GAP THAT IS NOW
+   CLOSED.** It read: *"`.editor-slot` and `.editor-slot__submit` (the wrapper
+   and the Save/Post control) are UNSTYLED, and that is PRE-EXISTING and already
    recorded at `apps/web/e2e-viewport/type-scale.ts:355-357`, which names the
    same grep. The comment box inherits that gap exactly as the description row
-   already does; it is not introduced here and is not fixed here. */
+   already does; it is not introduced here and is not fixed here."*
+   **That grep no longer returns nothing.** Task 2 of the sheet-prototype-parity
+   plan gave both classes their rules in `packages/editor/src/styles/editor.css`:
+   `.editor-slot` is the composer's sunken chrome (radius, `--gn-surface-sunken`,
+   `--gn-shadow-sunken`, `overflow: hidden`) and `.editor-slot__submit` is the
+   accent-filled `Save description` / `Post` control at the 44-px floor. The gap
+   is closed — and closed in the RIGHT file, by the package that owns the markup,
+   which is the arrangement this paragraph exists to defend. The same correction
+   is made at `apps/web/e2e-viewport/type-scale.ts`, which carried the identical
+   measurement.
+
+   What remains true, and is why this paragraph stays: `ui.css` styles NEITHER
+   class. This block names the comment box's own parts — the heading, the list,
+   the rows, the empty/wait/error sentences — and stops at the slot's edge. */
 .gn-comments { margin-top: 1.4rem; padding-bottom: 0.5rem; }
 .gn-comments__heading {
   font-size: 0.8125rem; /* 13px */

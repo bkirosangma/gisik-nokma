@@ -188,7 +188,28 @@ export function CommentsThread({
   const failed = commentsUnavailable !== undefined;
   return (
     <section className="gn-comments" data-testid="sheet-comments">
-      <p className="gn-comments__heading">
+      {/*
+        TWO CLASSES ON THE HEADING, and the second one is the sheet's caption —
+        the prototype draws `Comments · {count}` and `SUBTASKS · …` in the SAME
+        eyebrow style (`desktop.dc.html:1250`, `:1236`), so the shared class is
+        the name for that style and `.gn-comments__heading` is this block's own.
+
+        ⚠ **THE SHARED CLASS CARRIES NO RULE YET, AND THAT IS NOT AN OVERSIGHT.**
+        `.gn-ticket-sheet__caption` is created by Task 4 of the sheet-prototype-
+        parity plan, which runs on the TAIL lane after the priority built-in work
+        lands; this task's job is to put the name on the element so that lane has
+        one fewer edit to make. **Measured: the heading is styled identically
+        either way today**, because `.gn-comments__heading` (`ui.css:6449`)
+        already declares the whole eyebrow — `font-size: 0.8125rem`,
+        `line-height: 1.125rem`, `text-transform: uppercase`,
+        `letter-spacing: 0.6px`, `var(--gn-text-muted)` — and the planned shared
+        rule is a transcription of exactly those declarations. So this is a NAME
+        being introduced, not a look being changed, and the duplicate declarations
+        under `.gn-comments__heading` are the tail lane's to remove once the
+        shared rule exists. Removing them BEFORE that rule lands would leave the
+        heading with no style at all.
+      */}
+      <p className="gn-comments__heading gn-ticket-sheet__caption">
         {/* A count appears only when there is one to give. `Comments · 0` over a
             read that failed — or over one that has not answered — is a count
             nobody measured, which is why the heading drops it in BOTH cases
@@ -235,11 +256,29 @@ export function CommentsThread({
             `PlainTextEditorSlot` says a build without an editor cannot write
             rather than offering a control that discards what is typed.
 
-            ⚠ And it renders as a LINE UNDER the composer rather than inside a
-            footer row with `Attach` and `Post`, because our composer is
-            `packages/editor`'s `TicketEditorSlot`, which draws its own submit
-            control and cannot have one injected into its markup. A deviation
-            from the drawing, flagged rather than hidden.
+            ⚠ **THE DEVIATION THIS PARAGRAPH USED TO BLAME IS NOW CLOSED, AND
+            THE BLAME WAS CORRECT WHEN IT WAS WRITTEN.** It read: *"it renders as
+            a LINE UNDER the composer rather than inside a footer row with
+            `Attach` and `Post`, because our composer is `packages/editor`'s
+            `TicketEditorSlot`, which draws its own submit control and cannot
+            have one injected into its markup."* The reason has expired —
+            `TicketEditorSlot` now draws a footer row whose LEFT is the
+            `footerNote` slot (`packages/editor`, Task 2 of this same plan), which
+            is precisely where this sentence belongs.
+
+            ⚠ **SO THE MOVE IS OWED RATHER THAN REFUSED, AND IT IS HELD HERE FOR
+            ONE REASON.** Handing the sentence over is a one-line edit passing
+            `footerNote="Posting records an event citing you."` at the sheet's
+            comment `EditorSlot` mount in `ticket-sheet.tsx` — the file this lane
+            is explicitly barred from touching, because the priority built-in lane
+            and this plan's tail lane both edit it. **Deleting this paragraph
+            FIRST would lose the sentence from the product**, since nothing else
+            draws it: the tail lane makes the deletion and the mount edit
+            together. `ticket-sheet-comments.test.tsx`'s case `16.127` — *the
+            sentence is handed to the composer as its footer note, and the thread
+            draws no second copy* — is therefore recorded `❌` in
+            `test-cases/16-remaining-doors.md` rather than written here, because a
+            case written now could only assert the opposite of its own name.
           */}
           <p className="gn-comments__hint">Posting records an event citing you.</p>
         </div>

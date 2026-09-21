@@ -325,4 +325,60 @@ describe('TicketSheet — the comment thread and its box', () => {
     expect(screen.queryByText('No comments yet.')).toBeNull();
     expect(screen.queryByText('Comments · 0')).toBeNull();
   });
+
+  /**
+   * 16.126 / 16.128 — THE HEADING WEARS THE SHEET'S CAPTION CLASS.
+   * (sheet prototype parity, 2026-09-22; spec decision 11)
+   *
+   * The prototype draws `Comments · {count}` and the sheet's `SUBTASKS · …` in the
+   * SAME eyebrow style (`desktop.dc.html:1250`, `:1236`), so that style gets one
+   * name — `.gn-ticket-sheet__caption` — instead of a copy per section. These two
+   * cases pin the NAME on this element.
+   *
+   * ⚠ **AND THE NAME IS ALL THAT MOVES TODAY, WHICH IS THE MEASUREMENT THAT
+   * MATTERS AND WAS TAKEN RATHER THAN ASSUMED.** `.gn-comments__heading`'s rule
+   * (`packages/ui/src/ui.css:6449`) already declares the whole eyebrow —
+   * `font-size: 0.8125rem`, `line-height: 1.125rem`, `text-transform: uppercase`,
+   * `letter-spacing: 0.6px`, `var(--gn-text-muted)` — and the shared rule the
+   * plan gives Task 4 is a transcription of exactly those declarations. So the
+   * Comments heading changes its LOOK by nothing at all; what it gains is the
+   * second name a later task will hang the shared rule on.
+   *
+   * ⚠ **THE SHARED CLASS HAS NO RULE YET, AND THAT IS WHY 16.128 EXISTS.** A
+   * class a test asserts the presence of, with no rule behind it, is a hook —
+   * and a hook is a legitimate thing to pin as long as pinning it cannot be
+   * mistaken for pinning the look. 16.128 is the other half of the same fact:
+   * the heading ADOPTED the name and was not RENAMED into it. That distinction
+   * is invisible to 16.126, whose `toContain` passes just as happily over a
+   * heading whose own class was dropped — and dropping it today would leave the
+   * element with NO effective style at all.
+   *
+   * ⚠ **THE CSS HALF IS DELIBERATELY NOT ASSERTED HERE.** A case reading
+   * `.gn-comments__heading`'s declarations out of `ui.css` would have to be
+   * rewritten by the tail lane when it folds those declarations into the shared
+   * rule, and a case that exists to be edited is a liability rather than a
+   * guard. The order the tail lane must observe — land the shared rule BEFORE
+   * removing the duplicate declarations — is recorded in the source
+   * (`comments-thread.tsx`'s heading comment) rather than enforced by a case
+   * that would expire.
+   */
+  it('16.126 the Comments heading wears the sheet caption class', async () => {
+    renderSheet();
+    const section = await screen.findByTestId('sheet-comments');
+    expect(within(section).getByText(/^Comments/).className).toContain('gn-ticket-sheet__caption');
+  });
+
+  it('16.128 CONTROL — the heading ADOPTED the caption class; it was not RENAMED into it', async () => {
+    renderSheet();
+    const section = await screen.findByTestId('sheet-comments');
+    const heading = within(section).getByText(/^Comments/);
+    // The block's own class is still worn, which is the only thing keeping this
+    // element styled while the shared rule does not exist yet. A rename would
+    // satisfy 16.126 and strip the heading bare.
+    expect(heading.className).toContain('gn-comments__heading');
+    // …and the element really is the heading, so neither assertion above is a
+    // reading of some other node that happens to start with the word.
+    expect(heading.tagName).toBe('P');
+    expect(heading.textContent).toBe('Comments · 1');
+  });
 });
