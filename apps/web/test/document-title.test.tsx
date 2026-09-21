@@ -8,7 +8,7 @@ import { DocumentTitle } from '../src/document-title.js';
 
 /**
  * **P12 — every route names its view, and the product's name is not the answer.**
- * Case `13.1050` (`test-cases/13-hig-per-screen.md`).
+ * Case `13.1057` (`test-cases/13-hig-per-screen.md`).
  *
  * The finding, measured: `app/layout.tsx` set `{ title: 'Gisik Nokma' }` and
  * nothing else in the product set a title, so `/sign-in`, `/inbox`, `/help`, a

@@ -4,6 +4,36 @@ Part of bucket 13 (`Features.md` §13) — one part-file of the catalogue split 
 Index and id-block allocation: [`13-deployment-dogfooding.md`](./13-deployment-dogfooding.md).
 Case ids are unchanged and are never renumbered by the split.
 
+## THE BLOCKS — take from yours, never from the tip
+
+Allocated by the controller 2026-09-21 22:0x (cycle 46) after B03/B05 minted `13.1050`–`13.1052` twice
+from one base. Mirrors `17-open-work.md`: **blocks are per RELEASE BATCH (the branch that lands), not
+per lane session** — a lane runs several batches in one worktree tonight, and a block that follows the
+session would be shared by two branches landing in either order.
+
+| release batch | §13 block |
+|---|---|
+| **B03** (`rel/b03-accessible-names`) | **`13.1057`–`13.1066`** — minted: `13.1057`–`13.1059` (moved from `13.1050`–`13.1052`); `13.1053`–`13.1056` predate the blocks and are uncontested |
+| **B04** (`rel/b04-help-corpus-and-copy`) | **`13.1067`–`13.1076`** |
+| **B01** (`rel/b01-server-doors-security-and-refusa`) | **`13.1077`–`13.1086`** |
+| **B02** (`rel/b02-account-page-workflow-builder-dr`) | **`13.1087`–`13.1096`** |
+| **B06** (`rel/b06-new-ticket-and-move-dialogs`) | **`13.1097`–`13.1106`** |
+| **B09** (`rel/b09-failure-states-on-the-web-reads-`) | **`13.1107`–`13.1116`** |
+| **B08** (`rel/b08-ticket-sheet-crumbs-history-comm`) | **`13.1117`–`13.1126`** |
+| **B07** (`rel/b07-soft-delete-integrity-engine-rep`) | **`13.1127`–`13.1136`** |
+| **B10** (`rel/b10-paint-ua-chrome-phone-width-cont`) | **`13.1137`–`13.1156`** |
+| **B11** (`rel/b11-session-expiry-and-dead-controls`) | **`13.1157`–`13.1166`** |
+| **B12** (`rel/b12-workflow-and-type-invariants-in-`) | **`13.1167`–`13.1176`** |
+| **B13** (`rel/b13-due-date-soft-delete-undo-member`) | **`13.1177`–`13.1186`** |
+| **B14** (`rel/b14-minimal-shells-phone-and-desktop`) | **`13.1187`–`13.1196`** |
+| **B16** (`rel/b16-outbox-ordering-projection-verif`) | **`13.1197`–`13.1206`** |
+
+**⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** Re-read it before minting, and if your own
+allocation changes, change it HERE in the same action. **When your block is empty, STOP AND ASK.** Do
+not mint from the tip and do not borrow a neighbour's — that is the rule whose breach made §13 go red
+twice, and a third time tonight (`13.1050`–`13.1052`, B03 and B05, one base). **Ids already minted on
+`main` are never renumbered — the branch's move.**
+
 ## The HIG palette adoption (2026-09-08) — block `13.281`–`13.320`
 
 *Both cases pin a place where the adoption deliberately did NOT follow Apple. Neither departure is
@@ -206,9 +236,9 @@ the gate would have stayed 33/33.*
 > is the copy rule, which is a person's judgement. This gate catches the LOSS, which is the half that
 > can be mechanised and the half a delegated implementer is most likely to cause by accident.
 
-## Every route names its view (exec1 P12, 2026-09-21) — case `13.1050`
+## Every route names its view (exec1 P12, 2026-09-21) — case `13.1057`
 
-**Id `13.1050`, and the number is derived rather than guessed.** `13.922` — this file's next free id above
+**Id `13.1057`, and the number is derived rather than guessed.** `13.922` — this file's next free id above
 its own last line — was ALREADY TAKEN in `13-settings-and-workflows.md:577`, and the guard caught it.
 `13.x` is ONE space across every `13-*.md` file, so the tip is the global high-water mark (`13.1046`), and
 the block `13.1034`–`13.1049` is another executor's with `13.1047`–`13.1049` recorded as reserved and
@@ -217,7 +247,7 @@ must not be taken, so the first genuinely free id is the one after the block. **
 request for an allocated block, first recorded under `13.969`, is still open** — this task was dispatched
 without one, as that one was.
 
-- **13.1050** ✅ Every routing file under `app/` is titled by a SERVER mechanism — its own
+- **13.1057** ✅ Every routing file under `app/` is titled by a SERVER mechanism — its own
   `metadata`/`generateMetadata`, or a SIBLING `layout.tsx` exporting `metadata`, which is a server
   component even when the page under it is `'use client'`. A second arm reddens on any non-dynamic route
   that titles itself from `<DocumentTitle>` with a literal topic, and a third pins the two dynamic
