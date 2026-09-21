@@ -1142,7 +1142,10 @@ and settings."* (`[BROWSER]`, nav links and text). No **Sign in**. `app-nav.tsx:
 Help + Account, nothing else. The legal bar has the arm the app bar lacks: `legal-nav.tsx:96-99` `user === null ? <Link
 className="gn-nav__signin" href="/sign-in">Sign in</Link>`. Pressing **Workspaces** signed out lands on `/sign-in`
 by a 401 bounce (`[BROWSER]`: `location.pathname` → `/sign-in`, no `next=`); pressing **Account** paints the page
-E5-13's second reproduction describes.
+E5-13's second reproduction describes. The 404 (`apps/web/app/not-found.tsx`) is a third signed-out surface with
+the same shape: its three doors are *Go to your workspaces*, *Search the manual*, *Open your inbox*
+(`[BROWSER]`, `/this-route-does-not-exist` signed out) — two of the three need the session the visitor lacks, and
+none is Sign in.
 
 **WHY.** A person who cannot get in reads the help, wants to sign in, and the bar offers them a workspace picker
 sentence, an inbox and an account page — every one of which presupposes the session they do not have — while the
@@ -1602,7 +1605,7 @@ Filters `:784-830`, History `:408-419`, invitations `:205-240`) · `docs/faq.md`
    needs a write against the owner's database. I read the code at the seams (E5-7, E5-9) and did not drive them.
 4. **Permissions as a member or guest** — I held only the owner's session. Every refusal path was reproduced by
    injecting a failure client-side (E5-13, E5-15) or read from source; none was observed as a real 403/422.
-5. **`/help` at paint**, `/sign-in`, `/privacy`, `/terms`, `/my-work` — not opened; `/w/[workspaceId]` home read in source only (`:660-680`, `:860-890`, `:950-1000`).
+5. **`/my-work`** — not opened; `/help`, `/sign-in`, `/privacy`, `/terms` and the 404 were reached signed out in the second browser; `/w/[workspaceId]` home read in source only (`:660-680`, `:860-890`, `:950-1000`).
 6. **Backlog / List / Calendar / Timeline** — not driven; the List's due column, the Backlog arm (`page.tsx:925-960`,
    E5-40) and the Calendar/Timeline empty sentences read in source only.
 7. **`test-cases/13-*.md`** — not verified id by id.
