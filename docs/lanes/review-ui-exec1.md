@@ -12,7 +12,7 @@
 | **I1** | CRITICAL, 14 days | **CRITICAL, re-measured at 15 days** | a day passed and a Critical carries 15 points of downside; re-ran the three commands. Unchanged. |
 | **P1** | IMPORTANT, seven controls | **IMPORTANT, SIX controls** ⚠ **r2 CORRECTION** | the `<Link>`-widened sweep's seventh member (`gn-nav__signin`) is **styled by `.gn-nav a`** — a DESCENDANT rule from an ancestor, which a sweep testing an element's own classes cannot see. Withdrawn; the other six re-checked against every `a`/`button` descendant selector in the three stylesheets and standing. |
 | **P15** | — | **MINOR — filed IMPORTANT, corrected DOWN in the same round** | filed as *"the repo's prototype copy is a broken camelCase transform whose icons do not draw"*. **The mechanism is false**: `support.js:365-370`/`:422-423` show `sc-camel-*` is the prototype runtime's own reversible encoding, so the copy renders. What survives is Minor and measured — a constant **one-line offset** against the export, with **71 files citing the copy by line**. **The round-2 brief hands all six lanes the same false inference.** |
-| **P16–P20** | — | **5 NEW findings** | the truncating-scanner negative assertion (P16, Important); the heading-level skip (P17, Minor); navigation announces nothing (P18, Important); the unnamed `tablist` (P19, Important); the calendar's missing grid semantics (P20, Minor). |
+| **P16–P21** | — | **6 NEW findings** | the truncating-scanner negative assertion (P16, Important); the heading-level skip (P17, Minor); navigation announces nothing (P18, Important); the unnamed `tablist` (P19, Important); the calendar's missing grid semantics (P20, Minor); the description editor's unnamed content area (P21, Important). |
 | **§5** | — | **3 new clean-check rows** | every `<button>` named; every direct `.gn-button` sets `type`; the three style axes. |
 
 **Findings the round-1 report carried are otherwise unchanged and still stand**, re-checked for validity under §3 before anything new was added.
@@ -538,6 +538,21 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 
 **WHAT WOULD HAVE BEEN BETTER.** The APG's calendar grid pattern: `role="grid"` on the container, `role="row"` per week, `role="columnheader"` with `aria-label` on the seven labels, `role="gridcell"` on the day cells. The markup is already grouped exactly that way — grid → weekday-head → week → days → day — so the roles are an attribute apiece on a structure that already exists.
 
+### P21 — **IMPORTANT** ⚠ **r2 NEW** — The description editor's content area has no role and no accessible name, and its visible label is not associated with it
+
+**WHAT.** The ticket sheet's description composer is a `contenteditable` host with **no `role` and no accessible name**, sitting inside a `<dl>` whose `<dt>description</dt>` is not programmatically attached to it. The toolbar directly above it is fully labelled; the field itself is not.
+
+**MEASUREMENT — five checks, each opening the artefact.**
+1. **The host.** `packages/editor/src/components/TicketEditor.tsx:119` renders `<EditorContent editor={editor} className="ticket-editor__content" />` inside `<div className="ticket-editor">` (`:111`). **No `aria-label`, no `role` on either.**
+2. **Nothing adds one above it.** `grep -rn "editorProps|attributes:"` over `packages/editor/src`, `apps/web/src` and `packages/app-core/src` → **no matches**, so the product never overrides the editor's DOM attributes. `TicketEditorSlot.tsx` and `editor-slot.tsx` were checked too: neither supplies an `aria-label`.
+3. **The library does not supply a role either.** `prosemirror-view@1.42.3`'s `dist/index.js` contains **no `textbox`, no `role:` assignment and no `aria-multiline`** — the terms do not appear — while `contenteditable` appears 29 times. So the element is editable and unnamed on all three counts.
+4. **The visible label exists and is not attached.** `ticket-sheet.tsx:2404-2405` renders `<div className="gn-ticket-sheet__field" data-testid="field-description"><dt>description</dt>`. **The `<dt>` carries no `id`**, and `grep -c 'aria-labelledby'` over `ticket-sheet.tsx` and `TicketEditor.tsx` returns **0 for both** — so nothing points at it. **A visible label is not an accessible name**, and this is exactly the case that distinction exists for.
+5. **And the means is already in the product.** `aria-labelledby` is used deliberately elsewhere — `attention-strip.tsx:88-89` reasons about *"the region from the `<p>` via `aria-labelledby`, and the reason is measured rather than stylistic"*, and `help-browser.tsx:505` uses it *"on the landmark rather than an `aria-label`"*. `packages/editor/src` labels **five** other things: `EvidencePicker`'s dialog (`:117`), the mention popup's listbox (`mention-popup.ts:164`), `EditorToolbar`'s `role="toolbar" aria-label="Formatting"` plus every button and the link URL field (`:179`, `:189`, `:208`), and `ImageWrapMenu`'s toolbar and alt-text field (`:29`, `:46`).
+
+**WHY IT IS WRONG.** The ticket sheet carries **several text surfaces** — the title control, this composer, and the comment box — and a person using a screen reader who tabs into the description hears an editable region with nothing saying which one it is. **The pattern is not unknown to this codebase; the toolbar immediately above this very element uses it.** Same shape as P18 and P19: an absence beside a product that does the thing properly everywhere else is a gap, not a house style.
+
+**WHAT WOULD HAVE BEEN BETTER.** Either `aria-label="Description"` on the editor host, or an `id` on the `<dt>` plus `aria-labelledby` — the second is better because it keeps one source for the words, and it is the mechanism the product already reaches for. Either is one attribute at `TicketEditor.tsx:119` or one prop threaded through `editorProps.attributes`.
+
 ---
 
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
@@ -592,7 +607,7 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 **CRITICAL — 1**
 - `I1` no browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate structurally cannot run one
 
-**IMPORTANT — 10**
+**IMPORTANT — 11**
 - `I2` the `e2e-stack` contrast roster records a defect fixed eight hours later, with no provenance
 - `I3` `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by its own docblock
 - `P1` six interactive controls styled by no rule of their own (raw UA chrome) **(filed as seven; the seventh was refuted by an ancestor rule and withdrawn)**
@@ -600,6 +615,7 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 - `P9` `SegmentedControl` carries ARIA tab semantics with none of the tab keyboard model, in 7 places
 - `P11` the `Select` panel is outside every sweep's population, for two independent reasons
 - `P12` every screen in the product has the same document title (WCAG 2.4.2, Level A)
+- `P21` ⚠ r2 — the description editor's content area has no role and no accessible name
 - `P16` ⚠ r2 — `neo-card-radius.test.ts` asserts a declaration is ABSENT through a truncating scanner, so it cannot fail
 - `P18` ⚠ r2 — a client-side navigation announces nothing: no title change, no focus move, no live region
 - `P19` ⚠ r2 — the project page's view switcher is an unnamed `tablist`; the sheet's identical one was fixed
@@ -619,7 +635,7 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 - `P17` ⚠ r2 — `/my-work`'s outline skips level 2, and nothing measures heading level or order
 - `P20` ⚠ r2 — the month grid and week columns carry no grid/table semantics, so day↔weekday is lost to AT
 
-**Total 24.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 25.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
