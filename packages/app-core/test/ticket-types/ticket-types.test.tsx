@@ -742,6 +742,22 @@ describe('TicketTypeListScreen — the `"N tickets"` segment (Task 8, built 2026
 });
 
 describe('TicketTypeEditorScreen — creating a custom type', () => {
+  it('E4-29 an empty form names the FIELDS it is about, not the library default', async () => {
+    renderEditor(null);
+    // `freshDef()` starts `name` and `workflowId` at `''` and the schema is
+    // `z.string().min(1)` on both, so exactly two issues render.
+    await waitFor(() =>
+      expect(document.querySelectorAll('.ticket-type-editor__issues li')).toHaveLength(2),
+    );
+    const items = Array.from(document.querySelectorAll('.ticket-type-editor__issues li')).map(
+      (li) => li.textContent,
+    );
+    expect(items).toEqual(['Name is required', 'Workflow is required']);
+    // The library's own phrasing must not reach the screen: it named no field, so
+    // a reader was told twice that something was wrong and never what.
+    expect(document.body.textContent).not.toContain('String must contain');
+  });
+
   it('builds and submits ticket-type.defined from the filled form', async () => {
     const user = userEvent.setup();
     const { gateway, onSaved } = renderEditor(null);
