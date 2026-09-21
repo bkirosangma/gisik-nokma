@@ -358,14 +358,14 @@ test/zz-exec6-probe-children.test.ts --no-file-parallelism`, `rtk proxy` for raw
 listed way to find the blocker), reachable from the ordinary path: delete a child, then finish the parent. Not
 Critical: no data lost, workaround exists for someone who knows the cause.
 
-### E6-5 — IMPORTANT — After a transient sync failure, a later claim overtakes the backing-off claim it depends on; the server refuses it `ticket.unknown`, and that refusal is terminal — an offline edit is lost to a network blip
+### E6-5 — IMPORTANT — After a transient sync failure, a later claim overtakes the backing-off claim it depends on; the sync door turns it into a false, unresolved contest on the user's own ticket, and the edit is dropped
 
 **WHAT.** `packages/sync-client/src/outbox/outbox.ts:333` selects the next batch as
 `WHERE status = 'queued' AND next_attempt_at <= ? ORDER BY position LIMIT ?`. `recordFailure` (transient — a
-transport throw, a short answer, a misaligned answer; `sync-engine.ts:870`, `:897`, `:907`) pushes `next_attempt_at` of the
-**failed batch** out by `backoffMs(attempts)` (2 s on the first failure). A claim enqueued *after* the failure
-carries the schema's epoch default and is due immediately. So the next flush — and the product flushes on every
-enqueue, `replica-data-source.ts:1405` `void engine.flush()` — offers the newer claim **alone**, ahead of the
+transport throw, a short answer, a misaligned answer; `sync-engine.ts:870`, `:897`, `:907`) pushes `next_attempt_at`
+of the **failed batch** out by `backoffMs(attempts)` (2 s on the first failure). A claim enqueued *after* the
+failure carries the schema's epoch default and is due immediately. So the next flush — and the product flushes on
+every enqueue, `replica-data-source.ts:1405` `void engine.flush()` — offers the newer claim **alone**, ahead of the
 older claims it depends on. Measured on the outbox with its own fixtures (Appendix D; 1 file / 1 test passed):
 
 ```
@@ -374,38 +374,55 @@ PROBE batch2 (t0+500ms)  = [RENAME-2]                ← offered to the server B
 PROBE batch3 (t0+2.5s)   = [CREATE, RENAME-1, RENAME-2]
 ```
 
-The server answers a `ticket.field_set` on a ticket it has never been told about with `ticket.unknown`
-(`rule-engine/src/checks/fields.ts:116`), and the outbox treats a refusal as **terminal**: `outbox.ts:412`
-`UPDATE outbox SET status = 'failed'` — pinned as intended by case 12.147 (*"a refused answer is TERMINAL: the row
-is visibly failed and no longer offered"*). The pending overlay folds only `queued` rows
-(`precheck/local-context.ts:126`), so the user's second rename **disappears from their own screen**, marked
-failed with a reason (*"no such ticket is known"*) about a ticket they are looking at, while the create and the
-first rename land two seconds later.
+**And what the server then does with it — measured through the real doors, not read** (Appendix G; 1 file /
+1 test passed):
 
-**WHY it is wrong.** The product states the property and then breaks it at the one boundary that matters. Case
-12.144 (`12-offline-sync-apps.md:905-907`): *"enqueue order is preserved … because a batch that lost the order
-would send a `field_set` for a ticket the server has not been told about."* `sync-engine.ts:845`: *"one drain at
-a time, so order holds."* `replica-data-source.ts:1404`: *"the outbox already owns ordering and retry."* All three
-are true **within one due set** and false across a backoff boundary — 12.144 tests only a fully-due queue, 12.148
-(`outbox.test.ts:226`, *"backs off, holds the batch"*) tests only that the failed batch is held, and no case
-enqueues **after** a failure. The realistic path is ordinary: work offline, connectivity returns flaky, the
-first push throws, the user keeps editing the ticket they can see, the next push carries only the new edit.
+```
+/v1/events field_set on never-created ticket -> refused (permission.visibility: This ticket is not visible to you.)
+/v1/sync   field_set alone                   -> HTTP 200 {"status":"contested","rule":"permission.visibility",
+                                                "reason":"This ticket is not visible to you.","contestEventId":…}
+/v1/sync   create + rename-1 (2 s later)     -> committed, committed
+proj_contested rows for the ticket: 1  {"rule":"permission.visibility","reason":"This ticket is not visible to you.","resolved":false}
+ticket title now: "first rename"                                       ← the second rename is gone
+GET /v1/me/work -> 200 … "contested":[{"ticketId":<the ticket>,"title":"first rename",
+                                       "rule":"permission.visibility","reason":"This ticket is not visible to you." …
+```
+
+The gate refuses the unknown ticket as *invisible* (`check-permission.ts:1048` runs before the engine, and
+`can-see.ts` answers unknown and invisible identically by design); `sync-service.ts:407-409` turns **every**
+refusal of a ticket-entity event on the sync door into a `claim.contested`; the outbox records the contest and
+clears the row (case 12.146). Net effect on the user's own screen: their second rename reverts, and **My Work shows
+an unresolved contest on their own ticket saying it is not visible to them**, filed two seconds before the ticket
+existed and false from the moment it did.
+
+**WHY it is wrong.** The product states the ordering property and breaks it at the one boundary that matters.
+Case 12.144 (`12-offline-sync-apps.md:905-907`): *"enqueue order is preserved … because a batch that lost the
+order would send a `field_set` for a ticket the server has not been told about."* `sync-engine.ts:845`: *"one
+drain at a time, so order holds."* `replica-data-source.ts:1404`: *"the outbox already owns ordering and retry."*
+All three are true **within one due set** and false across a backoff boundary — 12.144 tests only a fully-due
+queue, 12.148 (`outbox.test.ts:226`) tests only that the failed batch is held, and no case enqueues **after** a
+failure. The realistic path is ordinary: work offline, connectivity returns flaky, the first push throws, the user
+keeps editing the ticket they can see, the next push carries only the new edit. And the contest it manufactures is
+the worst kind of record: a permanent, unresolved `claim.contested` whose reason is false and whose subject is the
+claimant's own work.
 
 **WHAT WOULD HAVE BEEN BETTER.** Head-of-line blocking is what "a queue preserves order" means for a dependent
-stream: `nextBatch` should return nothing while the earliest queued row is not yet due — i.e. `WHERE status =
-'queued' ORDER BY position LIMIT ?` and then check the head's `next_attempt_at` (or `MIN(next_attempt_at)` over
-queued rows) against `now`. Alternatively, treat `ticket.unknown` / `hierarchy.unknown-parent` on a claim whose
-target is itself queued as transient rather than terminal. And 12.144 should enqueue after a `recordFailure` and
-assert the batch is empty until the head is due.
+stream: `nextBatch` should return nothing while the earliest queued row is not yet due — `ORDER BY position` first,
+then compare the head's `next_attempt_at` (or `MIN(next_attempt_at)` over queued rows) against `now`. Independently,
+the sync door should not contest a claim whose target ticket **does not exist** — `contest()` files a contest on a
+ticket id the ledger has never seen, which is the *"existence claim with no evidence"* shape the brief names — a
+plain `refused` there would let the outbox keep the row `failed` and visible instead of minting a false contest.
+And 12.144 should enqueue after a `recordFailure` and assert the batch is empty until the head is due.
 
-**MEASUREMENT.** Appendix D, run from `packages/sync-client` (`pnpm exec vitest run
-test/zz-exec6-probe-overtake.test.ts --no-file-parallelism`; imports `../src/*.js` relatively). Lines opened:
-`outbox.ts:333`, `:412`; `sync-engine.ts:845`, `:870`, `:897`, `:907`; `replica-data-source.ts:1404-1405`;
-`local-context.ts:126`; `fields.ts:116`; `outbox.test.ts:119`, `:201`, `:226`; `12-offline-sync-apps.md:905-907`.
+**MEASUREMENT.** Appendix D (outbox, `packages/sync-client`, relative imports) and Appendix G (server doors,
+`apps/server`, shared test Postgres). Lines opened: `outbox.ts:333`, `:412`; `sync-engine.ts:845`, `:870`, `:897`,
+`:907`; `replica-data-source.ts:1404-1405`; `local-context.ts:126`; `check-permission.ts:1048`;
+`sync-service.ts:407-409`; `outbox.test.ts:119`, `:167`, `:201`, `:226`; `12-offline-sync-apps.md:905-907`.
 
-**SEVERITY: Important.** A user's edit reverts on their own screen with a nonsensical reason after a transient
-network error, on the headline offline path. Not filed as Critical because the claim is retained in
-`failedItems` with its error and can be redone by a user who notices.
+**SEVERITY: Important.** A user's edit reverts on their own screen and a false, unresolved contest appears against
+their own ticket, after a transient network error, on the headline offline path. Filed at Important rather than
+Critical only because the dropped claim is retained verbatim inside the contest row (`original_event`) and nothing
+is lost from the ledger.
 
 ### E6-6 — MINOR — `check-no-silent-skips.mjs` prints `ok` on an empty report: an instrument with no positive control on its own universe
 
@@ -1219,6 +1236,152 @@ describe('exec6 probe: republish promotion versus the parent-terminal invariant 
     say('after v2b: ticket.closed on P (terminal, child C still open)', await evaluateEvent(ev('ticket.closed', { kind: 'ticket', id: P }, {}), ctxB));
 
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix G — probe for E6-5 (server half) — the overtaken rename on `/v1/events` and `/v1/sync`
+
+File path in the tree: `apps/server/test/zz-exec6-probe-ghost.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-ghost.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question (E6-5's server half): what does the door answer to a ticket.field_set on a ticket it has never been told about?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+async function sync(events: unknown[], token: string) {
+  const res = await app.inject({ method: 'POST', url: '/v1/sync', headers: auth(token), payload: { events } });
+  return { status: res.statusCode, body: res.json<{ results: Array<Record<string, unknown>> }>() };
+}
+function raw(entity: { kind: string; id: string }, type: string, payload: unknown, actorId: string) {
+  return { id: newUlid(), workspaceId: WS, entity, type, version: 1, payload, actorId, origin: 'mobile', clientTime: new Date().toISOString() };
+}
+
+describe('exec6 probe: the overtaken rename, end to end on /v1/sync', () => {
+  it('records what the sync door does with it, then what lands', async () => {
+    const ghost = newUlid();
+    // 1. /v1/events control: the gate's answer for an unknown ticket.
+    const r = await post(WS, { kind: 'ticket', id: ghost }, 'ticket.field_set', { fieldId: 'title', value: 'second rename' }, ownerId, ownerToken);
+    console.log(`PROBE /v1/events field_set on never-created ticket -> ${r.status} (${r.rule ?? ''}: ${r.reason ?? ''})`);
+    // 2. /v1/sync: the overtaken RENAME-2 arrives alone.
+    const s1 = await sync([raw({ kind: 'ticket', id: ghost }, 'ticket.field_set', { fieldId: 'title', value: 'second rename' }, ownerId)], ownerToken);
+    console.log(`PROBE /v1/sync field_set alone -> HTTP ${s1.status} ${JSON.stringify(s1.body.results[0])}`);
+    // 3. Two seconds later the CREATE and RENAME-1 arrive.
+    const s2 = await sync([
+      raw({ kind: 'ticket', id: ghost }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title: 'born offline' }, ownerId),
+      raw({ kind: 'ticket', id: ghost }, 'ticket.field_set', { fieldId: 'title', value: 'first rename' }, ownerId),
+    ], ownerToken);
+    console.log(`PROBE /v1/sync create+rename1 -> HTTP ${s2.status} ${s2.body.results.map((x) => x['status']).join(',')}`);
+    // 4. What does the ledger / projections hold about the contest?
+    const contests = await db.pool.query<{ rule: string; reason: string; resolved: boolean | null; ticket_id: string }>(
+      'SELECT rule, reason, resolved, ticket_id FROM proj_contested WHERE ticket_id = $1', [ghost]);
+    console.log(`PROBE proj_contested rows for the ticket: ${contests.rows.length} ${JSON.stringify(contests.rows)}`);
+    const title = await db.pool.query<{ title: string | null }>("SELECT fields->'title'->>'value' AS title FROM proj_tickets WHERE ticket_id = $1", [ghost]);
+    console.log(`PROBE ticket title now: ${JSON.stringify(title.rows[0])}`);
+    // 5. Does the contest show on the owner's surfaces?
+    const mine = await app.inject({ method: 'GET', url: `/v1/me/work?workspaceId=${WS}`, headers: auth(ownerToken) });
+    console.log(`PROBE my-work -> ${mine.statusCode}; mentions contested: ${mine.body.includes('contested')}; excerpt: ${mine.body.slice(0, 400)}`);
+    const att = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/attention`, headers: auth(ownerToken) });
+    console.log(`PROBE attention -> ${att.statusCode}; mentions ghost: ${att.body.includes(ghost)}; excerpt: ${att.body.slice(0, 400)}`);
     expect(true).toBe(true);
   });
 });
