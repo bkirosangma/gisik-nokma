@@ -105,3 +105,16 @@ comments — recorded as the trio's width, not filed.
 **Heartbeat 16:31 IST:** five lanes re-scanned (`exec6` `e0cac297` 16:20, `exec5` `fee03f0e`, `exec4` `0fdd9382`, `exec1` `b128286d`, `exec2` `4f2793d3`) — no refutation names an E3 finding.
 **Heartbeat 16:40 IST:** five lanes re-scanned (`exec6` `b32c796e` 16:36, `exec5` `2daa4007`, `exec4` `0fdd9382`, `exec1` `082734fa`, `exec2` `a189be67`) — no refutation names an E3 finding.
 **Heartbeat 16:48 IST:** five lanes re-scanned (`exec6` `b32c796e` 16:36, `exec5` `81cc041c`, `exec4` `fe35c41b`, `exec1` `082734fa`, `exec2` `471a657c`) — no refutation names an E3 finding.
+
+## CLOSING STATE — 16:57 IST, ahead of this lane's 17:05:23 boundary
+
+| | |
+|---|---|
+| report | `docs/lanes/review-functionality-exec3.md` — phase-1 text frozen at `f8b5e929`; phase-2 insertions: *DEFENCE* under `E3-14` (§14.7.1) and `E3-15` (§14.7.2); §64–§72 appended |
+| findings | round 1 `E3-1`–`E3-8` (8, none withdrawn) · round 2 `E3-9`–`E3-29` (21) · phase 2 `E3-30`–`E3-34` (5, half points: 2 Important, 3 Minor) — ids contiguous, no gaps |
+| refutations filed | **0** — fourteen attacks and three examinations, all recorded above with the line opened; exec 6 adopted the E6-14 interval measurement as a correction (`a53a6929`) |
+| refutations received | **0** — final scan 16:57 of every lane's `review-refutations-exec*.md` (`exec6` `c14c8a05` 16:52 *"nothing against this lane"*, `exec5` `81cc041c`, `exec4` `fe35c41b`, `exec1` `0d8217c1`, `exec2` `84ce91d6`): zero `→ E3-` headings |
+| corrections to this report in phase 2 | 2 (§64; the `E3-14` defence's own admission) |
+| what a late refutation meets | §14.7.1, §14.7.2, §67 — written pre-emptively; the opponent's file states its phase 2 runs to 18:41:50, so anything pushed after 17:05:23 is unanswered by the clock, not conceded |
+
+Everything on this branch was pushed at or before this stamp; nothing is held in the worktree.
