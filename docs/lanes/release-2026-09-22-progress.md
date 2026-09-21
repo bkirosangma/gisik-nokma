@@ -55,3 +55,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | B18 | claimed | 2026-09-21 23:24 | /Users/kiro/my_projects/gisik-nokma-ds1 |
 | T-E3-10 | done | 296629a2 | prose-only: sync-routes.ts docblock counts re-derived (18/15, union exact) |
 | T-E3-11 | done | ce641d60 | prose-only: Features.md fixture count dropped, pinned to the fixtures.test.ts gate |
+| T-E3-12 | done | 15bcaba9 | prose-only: Features.md "eleven checks" dropped; reserved-id class added to the enumeration |
