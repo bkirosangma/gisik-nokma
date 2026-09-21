@@ -2264,6 +2264,13 @@ extended the check to the ones I could falsify by reading. **Every one holds.**
 | `E5-3` / `E4-1` (both lanes, independently) | the sheet renders the same ancestor twice when the direct parent is the epic | `view-types.ts:529` *"The walk starts at `parentId`"*; `ticket-sheet.tsx:1772-1787` renders both crumbs with no `epic.id !== parent.id` guard | **holds** |
 | `E5-2` (lane 5) | the board card carries no key, no due date, no lateness | `view-types.ts:204-214` `BoardCard` = `{ticketId, title, typeId, assignee, stateProvenance, cause, rollup, pending}`; `board.tsx:1035-1062` draws title, avatar, pending/cause chips, rollup, provenance | **holds** |
 
+| `E4-2` (lane 4) | the sheet/dialog Close glyph has **no rule giving it a size** | `ui.css:719-728` = `.gn-dialog__close, .gn-sheet__close { font: inherit; font-size: 1.2rem; line-height: 1; border: none; background: none; color: …; cursor: pointer; }` — **no `min-height`, `min-width`, `padding` or `display`**, exactly as claimed | **holds** |
+| `E4-3` (lane 4) | every board card's `who · when` toggle is under the floor **and no rule admits it** | `ui.css:990-998` = `.gn-board-card__provenance { font: inherit; font-size: 0.78rem; border: none; background: none; color: …; cursor: pointer; padding: 0.2rem 0 0; text-align: left; }` — **no min size** | **holds** |
+
+**Nine peer findings checked across all three lanes; nine hold.** Their painted measurements I cannot
+reproduce (no browser here), but every *source* clause they rest on — the one thing I can test — is exact,
+including two where I went looking for the falsifying CSS rule and found the rule says what they say it
+says.
 ⚠ **And one I nearly filed and did not.** `E5-17`'s *title* suggested the revoke surface was unreachable, and I had a falsifying measurement ready: `McpTokensScreen` **is** mounted on `/account`
 (`account/page.tsx:16` and `:305` `<McpTokensScreen heading="h2" variant="account" />`), which the account menu links to. **Then I read the finding, and it does not make that claim** — it is scoped to the *route's* chrome and names `/account` as the shelled sibling. My measurement addressed something the finding never said. **A refutation built from a title is a refutation of nothing**, and it would have cost me the finding's points.
 
