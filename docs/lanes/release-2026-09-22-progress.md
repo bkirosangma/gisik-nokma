@@ -19,3 +19,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E2-47 | done | e5f5bd7a | prose-only: sweep names four; editor 10 + app-core 111 tests green |
 | T-E4-34 | done | 61f90bc4 | app-core ticket-types 52 tests green; guest row says Open |
 | T-E2-54 | done | c9bd3942 | prose-only: shell-refusal inference narrowed; page-refusals 14 tests green |
+| T-E4-29 | done | baf2e833 | app-core ticket-types 53 tests green; issues name the field |
