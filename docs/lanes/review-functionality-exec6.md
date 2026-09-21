@@ -1663,7 +1663,8 @@ is *"not yet in config.ts's zod schema … inert until [Task 1 lands]"* — it i
 added by the same `935f5d66`; and `README.md:71` says to run the seed scripts *"once Task 11 lands them"* — the
 seed CLIs landed at 08:27 that morning (`de882483`, #154, `apps/server/src/seed/cli-seed-convenience-corner.ts`)
 and `docs/runbook.md:214` already gives the command. Four forward-looking sentences in a two-file deploy directory,
-all four resolved by 14:02 on the day they were written, none re-read by the two later edits. (The fifth
+all four resolved by 14:02 on the day they were written, none corrected by the edits that followed (`app.yaml`
+at 18:50 and on 2026-09-08; `README.md` at 19:41). (The fifth
 forward-looking sentence, `app.yaml:112-117` on `OPTIONS` not being mounted on the auth catch-all, is still
 true: `auth/routes.ts` registers `method: ['GET', 'POST']` only.) (Sweep: `git grep -n -i "not yet on main\|not yet landed\|until .* lands"` over `apps packages deploy
 Features.md test-cases scripts` minus `dist` and tests → 10 lines: these two, E3-27's `Features.md:452`, five where "until … lands" is a runtime sentence about a frame,
