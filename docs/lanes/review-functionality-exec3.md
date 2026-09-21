@@ -1381,13 +1381,13 @@ I read the patterns against the tree rather than trusting the empty result.
 | severity | count | members |
 |---|---|---|
 | **Critical (claimed)** | **1** | `E3-14` — five cookie-authenticated mutating routes outside `HTTP_ORIGIN_PROTECTED_ROUTES`; **re-measured with a real session (§24), then DEMONSTRATED on three of the five (§32, §33)**: a forged-Origin request made the victim a member of a workspace (memberships 1→2, three ledger events), a second declined their invitation, a third joined by token — with the trusted follow-up answering 404 because the forgery had already spent the single-use invite. ⚠ **BOUNDED AND STATED (§33.1): all three need an id or token the attacker does not obviously have, which I did not establish a way to obtain. The two `PUT`s need no secret and are preflight-bounded (§14.8). **A judge weighing severity by what was demonstrated should rule Important; Critical rests on the project's own criterion for this set.** |
-| **Important (claimed)** | **8** | `E3-15` (drift guard compares the set to its own table) · `E3-16` (roster-cut citation drifted twice; the correction note now misdirects the fix) · `E3-19` (the parent-terminal invariant is one-directional; a parent can be closed with an open child — **reproduced**, §21–22) · `E3-20` (case 6.82: *"cannot ship"* / *"ABSENT from the type"* — it shipped) · `E3-21` (case 6.84: *"no check compares them"* — two do) · `E3-22` (case 6.58's own cycle reproduction uses the event `hierarchy.cycle` refuses) · `E3-23` (case 6.124: unconstrained URL variable — `config.ts` names the case number as closed) · `E3-24` (case 6.66: *"existence-versus-the-row, not existence-versus-title"* — the shipped branch carries the title; **the only one whose staleness could cause a reader to REMOVE a shipped behaviour**) |
+| **Important (claimed)** | **9** |  `E3-15` (drift guard compares the set to its own table) · `E3-16` (roster-cut citation drifted twice; the correction note now misdirects the fix) · `E3-19` (the parent-terminal invariant is one-directional; a parent can be closed with an open child — **reproduced**, §21–22) · `E3-20` (case 6.82: *"cannot ship"* / *"ABSENT from the type"* — it shipped) · `E3-21` (case 6.84: *"no check compares them"* — two do) · `E3-22` (case 6.58's own cycle reproduction uses the event `hierarchy.cycle` refuses) · `E3-23` (case 6.124: unconstrained URL variable — `config.ts` names the case number as closed) · `E3-24` (case 6.66: *"existence-versus-the-row, not existence-versus-title"* — the shipped branch carries the title; **the only one whose staleness could cause a reader to REMOVE a shipped behaviour**) · `E3-26` (`Features.md`:2350 says nothing links to the authoring routes and `AppNav` has no settings entry — the nav renders a Settings link and a `/settings` shell pointing at all six) |
 | **Minor** | **8** | `E3-18` (**revised DOWN from Important, §34** — the replica's dangling-parent divergence is real and reproduced, but its trigger is corrupt data: no door can set a dangling `parent_id`) · `E3-25` (case 6.96: `SyncItem` "three members" vs four) · `E3-9` (envelope "thirteen fields" vs 11) · `E3-10` (registry "SIXTEEN/thirteen" vs 18/15) · `E3-11` (`Features.md` "84 fixtures" vs 86) · `E3-12` (`Features.md` "eleven checks" vs 12) · `E3-13` (citation resolves to the wrong line) · `E3-17` (outbox refactor total 8, its own bullets sum to 9) |
 | **Round-1 findings, re-validated and standing** | **8** | `E3-1` … `E3-8` (§13) — **none withdrawn** |
 | **Instrument defects in my own method** | **2** | §15 — the 439-hit sweep, not filed as findings · §24.1 — the cookie probe whose controls did not fire, recorded rather than discarded |
 | **Corrections to this report's own claims** | **5** | §17.1 (three `Features.md` lines) · §17.2 (my §7.2 `tickets.ts` citation) · §14.4 (**`check-no-silent-skips` does not refuse an empty universe** — exec6's `E6-6` was right and I was wrong) |
 
-**Round-2 total: 17 new findings** (1 Critical claimed, 8 Important claimed, 8 Minor) — **including one revised DOWN by me before a judge could, §34**, plus 8 round-1
+**Round-2 total: 18 new findings** (1 Critical claimed, 9 Important claimed, 8 Minor) — **including one revised DOWN by me before a judge could, §34**, plus 8 round-1
 findings re-validated, 15 verified-clean claims (§20), and 5 corrections to this report's own claims.
 
 **Nine of the fifteen are measured by RUNNING something** — `E3-14` by injection at the assembled app with
@@ -2924,3 +2924,63 @@ worth noting for what it says about the exercise**: the rules allow a lane to re
 only cross-concern findings I could test were the ones whose claim was about the PRODUCT — a due date that
 cannot be set, a crumb that repeats a level — rather than about how something looks. **A rendering finding is
 not automatically out of my reach; it is out of my reach exactly when its claim is visual.**
+
+---
+
+## 42. `E3-26` (r2) — **IMPORTANT (claimed)** — `Features.md` says "Nothing in the app links to any of them yet" and "`AppNav` … no settings entry"; the nav renders a Settings link and a `/settings` shell with a sidebar pointing at all of them
+
+**WHAT.** `Features.md:2350`, a **✅** bullet cataloguing the authoring routes:
+
+> ✅ **`apps/web` — the six authoring routes, and the door one of them used to leave open** — Routes: … **Nothing
+> in the app links to any of them yet.** `AppNav` offers *Workspaces* and *My Work* and **no settings entry**,
+> and a sweep of `apps/web/app` and `apps/web/src` for `settings/workflows`/`settings/ticket-types` finds **no
+> `href` outside these six files' own back-links** — so today they are reached by typing the URL. A settings nav
+> entry is recorded in the coordination doc as unowned …
+
+**WHY it is wrong — three stated particulars, each measured, all false:**
+
+| the bullet says | measured at this sha |
+|---|---|
+| "**Nothing in the app links to any of them yet**" | `apps/web/app/settings/page.tsx:182-193` renders `<Link href={tabHref(workspaceId, 'ticket-types')}>` and `<Link href={tabHref(workspaceId, 'workflows')}>`, and `:377-379` pushes `/w/<id>/settings/workflows/<workflowId>`, `…/history` and `…/new` |
+| "`AppNav` offers *Workspaces* and *My Work* and **no settings entry**" | `apps/web/src/app-nav.tsx:299` renders `<Link href={\`/settings?workspaceId=${effectiveWorkspaceId}\`}>`, and the file's own docblock at `:84` calls it *"the nav's `Settings`"* |
+| "a sweep … finds **no `href` outside these six files' own back-links**" | the sweep's own path list would have caught `/settings/page.tsx`; it is not one of the six, and it is full of them |
+
+**AND THE WORK THAT CLOSED IT IS RECORDED IN THE FILE THAT CLOSED IT.** `app/settings/page.tsx:55-77` is a
+docblock describing exactly this: a persistent sidebar (`settingsNav`: Ticket types / Workflows / MCP tokens),
+a content pane that swaps inside one shell, and *"Round 19c's first draft … still sent Workflows to
+`/w/<id>/settings/workflows` … **That round inlined all four sub-screens the prototype's `isSettingsShell`
+names**."* `app-nav.tsx:62-76` carries the matching note, including *"`/settings` is the shell built to
+replace it"*. **So the bullet's closing sentence — *"A settings nav entry is recorded in the coordination doc
+as unowned"* — describes a gap that has been built, by a round whose own artefacts say so.**
+
+**WHY THIS IS MORE THAN A STALE COUNT, and why I am claiming Important rather than Minor.** The bullet is not
+merely wrong about a number: **it tells a reader that a navigation surface does not exist and that its entry
+is unowned.** The class is the one the judge has already priced twice — round 1's `E3-1` (a stale open-gap
+declaration) and this round's `E6-12` (three ❌ lines declaring closed gaps) — and `E3-1`'s own wording applies
+unchanged: **a stale gap is pre-authorised work.** A lane acting on this bullet builds a settings entry that is
+already rendered, and the only thing that would stop them is opening `app-nav.tsx`.
+
+**⚠ AND IT IS A ✅, WHICH IS THE PART WORTH NAMING.** `E3-20`–`E3-25` are all ❌ lines, and a ✅ is normally the
+safe direction — `check-case-citations.mjs` asks a ✅ **case id** for its test, and there is no equivalent
+checker for `Features.md` at all (§20's note). **So a ✅ bullet here is unchecked in both directions**: nothing
+verifies it against the product, and its tick invites a reader to treat it as confirmed. **This is the same
+asymmetry `E3-11`/`E3-12` recorded for two counts in §4, extended to a bullet's central factual claim.**
+
+**WHAT WOULD HAVE BEEN BETTER.** The bullet should say what `/settings` is and that the nav entry landed —
+pointing at `app/settings/page.tsx` and `app-nav.tsx:299` — and drop the "unowned" sentence, in the change set
+that built it, per the workspace rule that `Features.md` moves with the code *"never a follow-up"*. **And the
+durable fix is the one §30.1 named for `test-cases/`: the missing instrument.** `Features.md` is the workspace's
+declared source of truth and is the one such document with no checker (§20's own note); a `href` claim in it
+could be checked the way `check:runbook` checks that every command a runbook names resolves.
+
+**SEVERITY: Important (claimed).** It is a false negative about a shipped surface, in the document every lane is
+told to trust, on a bullet that names a next owner for work that is done — and it is the class already priced
+at Important twice. Not Critical: nothing misbehaves at runtime.
+
+**MEASUREMENT.** Lines opened: `Features.md:2350` (full bullet); `apps/web/app/settings/page.tsx:55-77`, `:182-193`,
+`:365-379`; `apps/web/src/app-nav.tsx:62-84`, `:299`; `find apps/web/app -path '*settings*' -name page.tsx`
+(eight pages, including `/settings/page.tsx`, which the bullet's sweep would have to have visited to make its
+claim). **Control on the same bullet:** its own list of six routes — I checked all six exist, and **all six do**
+(`/w/[workspaceId]/settings/{workflows,workflows/new,workflows/[workflowId],ticket-types,ticket-types/new,ticket-types/[typeId]}`),
+so **the bullet is right about the routes and wrong about everything it says surrounding them** — which is why
+the finding is filed on the sentences and not on the list.
