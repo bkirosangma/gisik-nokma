@@ -1,6 +1,7 @@
 # Refutations — executor 6 (Opus 5, functionality lane), round 2 phase 2
 
-**Phase 2 opens 2026-09-21 15:41:50 IST and closes 18:41:50 IST.** This file was written during phase 1 (last
+**Phase 2 opened EARLY at 15:05:23 IST (owner) and closes 17:05:23 IST; the report is frozen at `737294ae`.**
+This file was written during phase 1 (last
 edit stamped below) because this lane has no guarantee of a turn at the boundary and push is durability. If a
 turn comes in phase 2, the "Refutations" section is finalised then; if not, **what is below is this lane's
 phase-2 position as of the stamp**, and nothing in it is a new finding.
@@ -58,7 +59,119 @@ E6-8, E6-9, E6-11: all "hold") read; E3-25, E3-26, E3-27 re-measured below.
 
 ## Refutations
 
-_None filed as of the stamp below. If a phase-2 turn comes, this section is revisited against the branches'
-final pushes; a refutation without a falsifying measurement will not be added._
+### R6-1 → E5-21 (exec 5, Important) — PARTIAL: the finding's absolute and its stated mechanism are false; its core survives
+
+**What E5-21 claims** (`review-ux-exec5.md:843-875` at `1641161d`): the phone's Comment button files `comment.added`
+with `actorId: state.assigneeId ?? 'me'`, and *"what it files can never be committed — the actor on the event is not
+the session's, and `IDENTITY_SPOOF_REASON` exists to refuse exactly that, so the refusal is guaranteed by
+construction."*
+
+**What is false, measured.** The phone's replica syncs through `POST /v1/sync`, not `/v1/events`. On that door,
+with the PEER assigned to the ticket, three envelopes shaped exactly as `ticket-screen.tsx:36-57` shapes them:
+
+```
+self-assigned  (actorId = assigneeId = session user)  -> committed  (seq 3, workspaceSeq 14) — and the thread door serves it
+other-assignee (actorId = assigneeId ≠ session user)  -> invalid: actor-mismatch "A synced claim must belong to the signed-in user."
+actorId='me'   (unassigned ticket)                     -> invalid: malformed-envelope "actorId: must be a ULID"
+```
+
+So (1) **a person commenting on a ticket assigned to THEM commits** — the case the phone's own list surfaces
+first (`myWork.assigned`) — which falsifies "can never be committed" and "guaranteed by construction"; and (2)
+the refusal the finding names, `IDENTITY_SPOOF_REASON` (`check-permission.ts:71`, `:544`, the `/v1/events` gate),
+is not the one the phone meets: the sync door answers `invalid` with `actor-mismatch` (`sync-service.ts:325`) before
+any gate runs, and the `'me'` shape never reaches even that — it fails the envelope parse. An `invalid` result is
+terminal in the outbox (`outbox.ts:412`, `status = 'failed'`), which is a different fate from a refusal (a refused
+ticket claim on the sync door becomes a contest, `sync-service.ts:416-417`) — so the sentence "sit in a local queue
+that will be refused at the first sync" describes the wrong outcome too: they fail, once, and are not retried.
+
+**What survives.** The manual sentence is still wrong in the direction E5-21 says; an UNASSIGNED ticket's comment
+and a comment on SOMEONE ELSE's ticket never post, and the phone's only failure arm (`:54`) swallows nothing here —
+`ds.ingest` resolves for a queued claim and the `invalid` arrives later on the sync engine, where the ticket screen
+reads nothing back. The severity is the judge's; this refutation narrows the finding to "comments on tickets not
+assigned to you", it does not remove it.
+
+**MEASUREMENT.** `apps/server/test/zz-exec6-probe-phone-comment.test.ts` (never committed; verbatim below), run
+from `apps/server` with `pnpm exec vitest run test/zz-exec6-probe-phone-comment.test.ts --no-file-parallelism`
+(node v22.22.2), 1 file / 1 test passed. Lines opened: `apps/mobile/src/screens/ticket-screen.tsx:21`, `:36-57`,
+`:45`, `:49` (`draft` is an `EditorDoc`, so the body is well-formed); `domain/src/events/ticket-events.ts:108`
+(`body: z.record(...)`); `sync/sync-service.ts:29`, `:318-326`, `:416-417`; `permissions/check-permission.ts:71`,
+`:544`; `sync-client/src/outbox/outbox.ts:412`.
+
+```ts
+// EXEC6 PHASE-2 PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question (R6 -> E5-21): does a comment filed under the ASSIGNEE's id ever commit?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase; let app: FastifyInstance;
+let ownerToken = ''; let ownerId = ''; let peerToken = ''; let peerId = ''; let WS = ''; let PRJ = ''; let T = '';
+function auth(token: string) { return { authorization: `Bearer ${token}` }; }
+function env(entity: { kind: string; id: string }, type: string, payload: unknown, actorId: string) {
+  return { id: newUlid(), workspaceId: WS, entity, type, version: 1, payload, actorId, origin: 'mobile', clientTime: new Date().toISOString() };
+}
+async function events(e: unknown, token: string) {
+  const res = await app.inject({ method: 'POST', url: '/v1/events', headers: auth(token), payload: { events: [e] } });
+  return res.json<{ results: Array<Record<string, unknown>> }>().results[0]!;
+}
+async function sync(e: unknown, token: string) {
+  const res = await app.inject({ method: 'POST', url: '/v1/sync', headers: auth(token), payload: { events: [e] } });
+  return res.statusCode === 200 ? res.json<{ results: Array<Record<string, unknown>> }>().results[0]! : { status: `HTTP ${res.statusCode}`, body: res.body.slice(0, 120) };
+}
+function doc(text: string) { return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] }; }
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db); app = built.app; await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000701'); ownerToken = owner.token; ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000702'); peerToken = peer.token; peerId = peer.userId;
+  const res = await app.inject({ method: 'POST', url: '/v1/workspaces', headers: auth(ownerToken), payload: { name: 'Exec6 phase2' } });
+  expect(res.statusCode, res.body).toBe(201); WS = res.json<{ workspaceId: string }>().workspaceId;
+  expect((await events(env({ kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId), ownerToken)).status).toBe('committed');
+  PRJ = newUlid();
+  expect((await events(env({ kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId), ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) expect((await events(env({ kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId), ownerToken)).status).toBe('committed');
+  T = newUlid();
+  expect((await events(env({ kind: 'ticket', id: T }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title: 'phone comment target' }, ownerId), ownerToken)).status).toBe('committed');
+  // the PEER is the assignee
+  expect((await events(env({ kind: 'ticket', id: T }, 'ticket.assigned', { assigneeId: peerId }, ownerId), ownerToken)).status).toBe('committed');
+});
+afterAll(async () => { await app.close(); await db.drop(); });
+
+describe('exec6 phase-2 probe: a phone comment filed under state.assigneeId ?? "me"', () => {
+  it('measures the three actor shapes the phone can produce, on the sync door', async () => {
+    // (1) the assignee themself comments: actorId = assigneeId = session user
+    const self = await sync(env({ kind: 'ticket', id: T }, 'comment.added', { body: doc('from the assignee') }, peerId), peerToken);
+    // (2) somebody else (the owner) comments on the peer's ticket: actorId = assigneeId != session user
+    const other = await sync(env({ kind: 'ticket', id: T }, 'comment.added', { body: doc('from the owner, filed as the peer') }, peerId), ownerToken);
+    // (3) an unassigned ticket: actorId = 'me'
+    const me = await sync(env({ kind: 'ticket', id: T }, 'comment.added', { body: doc('from me') }, 'me'), peerToken);
+    console.log('PROBE self-assigned  ->', JSON.stringify(self));
+    console.log('PROBE other-assignee ->', JSON.stringify(other));
+    console.log("PROBE actorId='me'   ->", JSON.stringify(me));
+    // did the self comment land in the thread?
+    const thread = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${T}/comments`, headers: auth(peerToken) });
+    const bodies = JSON.stringify(thread.json());
+    console.log('PROBE thread has "from the assignee":', bodies.includes('from the assignee'), '| has "filed as the peer":', bodies.includes('filed as the peer'));
+    expect(self.status).toBe('committed');
+    expect(other.status).not.toBe('committed');
+    expect(me.status).not.toBe('committed');
+  });
+});
+```
+
+```
+PROBE self-assigned  -> {"status":"committed","eventId":"01M31N8T186WBH81395TSW4637","seq":3,"workspaceSeq":14,"serverTime":"2026-09-21T09:38:03.950Z"}
+PROBE other-assignee -> {"status":"invalid","eventId":"01M31N8T1KA6879EMBFETHQMXX","code":"actor-mismatch","message":"A synced claim must belong to the signed-in user."}
+PROBE actorId='me'   -> {"status":"invalid","eventId":"01M31N8T1PN5036NA93NCJRP57","code":"malformed-envelope","message":"event envelope is malformed at actorId: must be a ULID"}
+PROBE thread has "from the assignee": [33mtrue[39m | has "filed as the peer": [33mfalse[39m
+ ✓ test/zz-exec6-probe-phone-comment.test.ts (1 test) 831ms
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+```
 
 **Stamp:** written 2026-09-21 11:25 IST, E3-14 row amended 12:00 IST after E6-21; phase 1; branch heads as listed above.
+**Phase 2:** R6-1 filed 15:10 IST against `origin/exec5/review-ux` at `1641161d`.
