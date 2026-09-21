@@ -228,6 +228,64 @@ describe('P8 — Dialog and Sheet contain focus while they claim aria-modal', ()
       await waitFor(() => expect(trigger).toHaveFocus());
     });
 
+    it(`P8: ${kind} contains Tab WITHOUT swallowing a portalled popover's own focus`, async () => {
+      /**
+       * The interaction this batch introduced and nothing else covered.
+       *
+       * `contain` holds focus inside the panel, and a `Select` panel is
+       * portalled to `document.body` — outside the panel in the DOM. Left alone,
+       * containment reads that as an escape and drags focus back off the option
+       * row.
+       *
+       * **Measured, not reasoned.** Removing E4-17's `FocusScope` from
+       * `SelectPanel` and re-running this shape leaves focus on
+       * `button.gn-select__trigger` with the option row never focused at all —
+       * the picker degrades silently inside every dialog in the product. With it,
+       * focus lands on `li.gn-select__option`. The mechanism is React Aria's
+       * scope TREE rather than the DOM: the panel's `FocusScope` is a child of
+       * the dialog's through React context, which crosses the portal, so
+       * `isElementInChildScope` answers true and `contain` leaves it be.
+       *
+       * So the two rulings in this batch hold each other up, and that is exactly
+       * the kind of coupling that breaks quietly when one half is later tidied
+       * away as a redundant wrapper. This case is the wire between them.
+       */
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      const options = [
+        { value: 'apple', label: 'Apple' },
+        { value: 'banana', label: 'Banana' },
+      ];
+      const inner = (
+        <>
+          <button type="button">First action</button>
+          <Select options={options} value={null} onChange={onChange} aria-label="Type" />
+        </>
+      );
+      function WithPicker() {
+        return kind === 'dialog' ? (
+          <Dialog open title="New ticket" onClose={vi.fn()}>
+            {inner}
+          </Dialog>
+        ) : (
+          <Sheet open title="New ticket" onClose={vi.fn()}>
+            {inner}
+          </Sheet>
+        );
+      }
+      render(<WithPicker />);
+      const trigger = screen.getByRole('button', { name: /Type/ });
+      trigger.focus();
+      await user.keyboard('{Enter}');
+      const listbox = await screen.findByRole('listbox');
+      // Give any containment pull-back a chance to happen before reading.
+      await waitFor(() => expect(listbox.contains(document.activeElement)).toBe(true));
+
+      await user.keyboard('{ArrowDown}{Enter}');
+      expect(onChange).toHaveBeenCalledWith('banana');
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    });
+
     it(`P8: ${kind} keeps Tab inside itself`, async () => {
       const user = userEvent.setup();
       render(<Opener kind={kind} />);
