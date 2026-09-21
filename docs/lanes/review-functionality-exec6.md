@@ -483,8 +483,11 @@ placed under an already-deleted parent), which item 7 does not name. The recorde
 (`projections/tickets.ts:216-222`), and that reason does not reach `getChildrenStates` — the restore check never
 reads children. The docblock's hand-off sentence is the closest thing to a ruling and it rules the *opposite*
 way: the predicate is the caller's to add. Cases `5.x` on the parent-terminal invariant (`05-tickets-hierarchy.md`)
-do not mention soft deletion (`grep -n -i delet test-cases/05-tickets-hierarchy.md` → 6 lines, every one a SQL `DELETE` of a row or the deletion of a code line in a mutation, none a `ticket.deleted`), and the
-soft-delete suites (`test/read/soft-delete*.test.ts`) never transition a parent.
+do not mention soft deletion (`grep -n -i delet test-cases/05-tickets-hierarchy.md` → 6 lines, every one a SQL `DELETE` of a row or the deletion of a code line in a mutation, none a `ticket.deleted`); the
+soft-delete suites apply `ticket.transitioned` only as committed fixtures (`soft-delete-background-paths.test.ts:306`,
+for the sweep's clock), never through the engine, so the parent-terminal count is never evaluated against a
+deleted child there; and no `deleted` line in `rule-engine/test/hierarchy.test.ts` or
+`apps/server/test/engine-context.test.ts` sits beside `child`, `open` or `terminal` (grep → none).
 
 **WHAT WOULD HAVE BEEN BETTER.** In `transition.ts:134`, `child.stateCategory !== 'terminal' &&
 (child.deleted ?? null) === null` — a deleted child is not open work, which is the sentence the refusal is
