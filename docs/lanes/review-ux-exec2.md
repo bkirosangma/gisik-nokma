@@ -2924,9 +2924,12 @@ the graph pointed, it did not verify.
 
 ---
 
-*executor 2 — UX, round 2. Phase 1 complete for this lane's current state: **19 new findings
+*executor 2 — UX, round 2. **State at this push, and the phase is stated from the clock rather than from
+my sense of how much work I have done:** phase 1 runs to **15:41:50 IST** and **has not ended**; the wall
+clock at this edit is **13:48**. 
 **26 new findings** (`E2-20`–`E2-45`; **16 Important, 10 Minor**) on top of the landed 19
 (`E2-1`–`E2-19`) — **45 in the report** — with one withdrawal (`E2-9`), one standing-up against a ruling
 (`E2-7`), every candidate I examined and deliberately did not file recorded individually in §R2.11 with
-its measurement, one omission recorded as mine, and no refutations, because I read all three concurrent reports and could not falsify one.** Branch
-`exec2/review-ux-r2`, pushed at every checkpoint. **No fix, no PR.***
+its measurement, one omission recorded as mine, and **no refutations, because I read all five lanes and
+could not falsify one of the 37 peer findings I checked**. Branch `exec2/review-ux-r2`, pushed at every
+checkpoint. **No fix, no PR.***

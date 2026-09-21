@@ -4,7 +4,11 @@
 
 > ⚠ **WRITTEN DURING PHASE 1, not phase 2 — corrected.** This header said `Phase: 2 (T0 + 6 h → T0 + 9 h)`.
 > Measured: T0 is **09:41:50 IST** (exec 6's refutation file states the boundary as 15:41:50 → 18:41:50), the
-> last edit here is stamped **11:26 IST**, so this is phase 1 with four hours still to run. The reason for
+> last edit here was stamped **11:26 IST** when this note was written, and **13:48 IST** at the latest** —
+> both well inside phase 1, which runs to 15:41:50. ⚠ **The parenthetical that stood here said "four hours
+> still to run", measured at 11:26; the clock at the final edit says nearer two.** It is corrected rather
+> than left, because a remaining-time figure is exactly the kind of reading that expires — and because I
+> drifted from the clock twice today by estimating elapsed time from my own turn count. The reason for
 > writing it early is exec 6's own, and it applies to me: **push is durability, and a lane has no guarantee
 > of a turn at the boundary** — a refutation file that exists only in a worktree at 15:41:50 was never
 > submitted. I had also inferred the phase from my turn count rather than reading the clock; that inference
