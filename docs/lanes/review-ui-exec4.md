@@ -453,7 +453,21 @@ Screenshots taken and **committed** under `docs/lanes/exec4-paint/`: `board-1512
 
 ### 6.2 NOT REACHED — the honest boundary, as a list
 
-1. **Seven of the nine edge classes at paint.** I measured EMPTY (the inbox, the whole-board empty columns) and NARROW VIEWPORT thoroughly. **ERROR, PERMISSION-REFUSED, OFFLINE / REPLICA-DEGRADED, SOFT-DELETED, CONCURRENT, FIRST-RUN and SERVER-REFUSES-WHILE-CLIENT-BELIEVES were not painted**: each needs a second role, a killed server, a deleted ticket or a contested claim, and producing any of them writes to the owner's dev database, which I would not do from a review lane. Their renderers (`shell-refusal.tsx`, `sync-status-bar.tsx`, `contest-banner.tsx`, `expired-session.tsx`, the sheet's refusal arms) were **not read**.
+1. **The nine edge classes — what was painted and what was not.**
+
+   | edge class | painted? | result |
+   |---|---|---|
+   | EMPTY | yes | inbox (empty), the board's empty columns, My Work's four empty sections — all draw a sentence; no finding |
+   | ERROR | yes, by URL | bad project → `The board cannot be shown yet. HTTP 404 for /v1/projects/…/board` (`p.gn-shell__refusal`; the word *yet* on a 404 is a small overclaim I note and do not file); bad workspace → *"This is not one of your workspaces…"*; bad ticket → **E4-23** |
+   | PERMISSION-REFUSED | partly | the bad-workspace and bad-invite sentences above; a real second role (guest/member) was **not** taken — it needs an invitation or a role change, which writes to the owner's DB |
+   | OFFLINE / REPLICA-DEGRADED | yes (`emulate networkConditions: Offline`) | a client-side navigation while offline falls through to Chrome's `ERR_INTERNET_DISCONNECTED` page; no in-app indication. **Ruled**: `docs/manual.md:1215` *"The browser version is online-only. It has no offline queue at all"* — category 2, not filed. The replica apps were not run. |
+   | SOFT-DELETED | by mechanism | the server answers a deleted ticket's detail route with the same `404` (`routes/tickets.ts:377`), so it paints E4-23's endless `Loading…`; I did not delete a ticket to paint it directly |
+   | CONCURRENT / INTERLEAVED | no | needs a second writer; `contest-banner.tsx` and the sheet's contest arms were **not read** |
+   | NARROW VIEWPORT | yes, thoroughly | E4-7, E4-9, E4-11, E4-20 |
+   | FIRST-RUN | no | needs a workspace with no projects / a fresh account; not created |
+   | SERVER REFUSES WHILE CLIENT BELIEVES | yes | **E4-23**; also observed but not filed: the bad-project page keeps `New ticket`, `Filters` and the five view tabs live under the refusal, and the bad-workspace page keeps `My Work / Members / Settings` links pointing into the refused workspace |
+
+   `shell-refusal.tsx`, `sync-status-bar.tsx`, `contest-banner.tsx`, `expired-session.tsx` were **not read**; the sheet's refusal arms were (E4-23). One functionality observation handed across concerns rather than claimed here: while the page sat open the console logged `WebSocket connection to 'ws://localhost:3000/v1/stream' failed: … Unexpected response code: 429` **90 times in ~20 s** — the live-stream reconnect loop is being rate-limited by its own server, which is exec 3/6's territory.
 2. **Overlays not opened:** the bulk-close dialog, the reopen dialog, the workflow-rebind dialog, the state-mapping dialog, the transition dialog's field/evidence arms, the evidence picker, upload chips, the image-wrap menu, the mention popup, the saved-filters menu, the InfoTip, the Toast. `packages/ui`'s `avatar`, `card`, `chip`, `info-tip`, `table`, `toast`, `tokens.ts` were **not read**.
 3. **The classic (non-neo) style axis** was not measured — the seed owner's preference is `neo` and switching it writes a preference. Every painted number here is `data-style="neo"`.
 4. **Signed-out routes** beyond `/sign-in` (`/help` I did paint signed-in; `/privacy`, `/terms`, the 404, `/invite/<token>`, `/mcp/authorize`) were not re-measured — round 1 ran the signed-out suite (31 passed) and its port `:3021` is not mine.
