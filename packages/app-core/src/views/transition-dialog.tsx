@@ -155,6 +155,7 @@ export type TransitionDialogProps = {
     toStateId: string,
     evidenceAttachmentId?: string | null,
     fieldValues?: Record<string, string>,
+    comment?: string,
   ) => Promise<PrecheckResult>;
   /** The authority's answer, shown VERBATIM whenever present. */
   serverRefusal: { rule: string; reason: string } | null;
@@ -297,7 +298,7 @@ export function TransitionDialog({
     setPreview(null);
     if (toStateId === '') return;
     let cancelled = false;
-    void precheckRef.current(toStateId, evidenceAttachmentId, fieldValues).then((result) => {
+    void precheckRef.current(toStateId, evidenceAttachmentId, fieldValues, comment).then((result) => {
       if (!cancelled) setPreview(result);
     });
     return () => {
@@ -313,7 +314,13 @@ export function TransitionDialog({
     // carries it — so typing into a field the dialog itself asked for has to
     // re-ask, or the refusal the person just answered stays on screen beside an
     // enabled Move for ever.
-  }, [toStateId, evidenceAttachmentId, fieldValues]);
+    //
+    // `comment` joins them for the third rule kind, and for the reason the
+    // evidence fix already recorded: the box appears because `require-comment`
+    // is on this edge, typing clears `blocked`, and the preview beside it was
+    // still answering "none was provided" because the candidate had never been
+    // told what the box holds.
+  }, [toStateId, evidenceAttachmentId, fieldValues, comment]);
 
   /**
    * ⚠ **EVIDENCE IS PER-MOVE, AND THE CLAIM IS NOW REACHABLE FOR THE FIRST TIME.**

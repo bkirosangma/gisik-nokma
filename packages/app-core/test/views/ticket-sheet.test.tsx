@@ -608,6 +608,45 @@ describe('TicketSheet — the instant pre-check, with a cache to evaluate agains
   });
 
   /**
+   * 3.179 (E5-7). The candidate carries `{ to }` and nothing else, so the
+   * preview is
+   * asked a question the submission does not ask: the dialog shows
+   * `Comment (required by this transition)`, its own `blocked` clears the
+   * moment the person types, Move becomes ENABLED — and the refusal sentence
+   * beside it stays. `evaluateRequireComment` reads `payload.comment?.text`, so
+   * the comment is the one rule kind whose value the CANDIDATE can carry; the
+   * evidence fix beside it did exactly this and was never extended to the
+   * comment box.
+   */
+  it('PLANTED DEFECT: the require-comment preview stops refusing once the comment its own box asked for is typed', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead();
+    renderSheet(read, sheetSource(read), { cache: cacheForTicket() });
+    await settled();
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    // doing → done declares require-comment.
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+
+    // The CONTROL: nothing typed yet, so this refusal is CORRECT — the person
+    // has not answered, and Move is disabled. The case below is about the
+    // refusal CLEARING, not about it never having fired.
+    expect(await screen.findByText(/instant check/)).toHaveTextContent('require-comment');
+
+    const box = screen.getByLabelText('Comment (required by this transition)');
+    await user.type(box, 'review note');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move' })).toBeEnabled());
+    expect(document.querySelector('.gn-refusal--preview')).toBeNull();
+
+    // …and a comment that is only WHITESPACE is not a comment: the submission
+    // sends `comment.trim()`, and `evaluateRequireComment` trims what it reads,
+    // so the two agree on every value that can change the verdict.
+    await user.clear(box);
+    await user.type(box, '   ');
+    expect(await screen.findByText(/instant check/)).toHaveTextContent('require-comment');
+  });
+
+  /**
    * 3.178 (E2-40). `require-field` reads the value out of the TICKET STATE
    * (`rule-engine/src/rules/require-field.ts:9`), not out of the candidate's
    * payload — which is why the real path sends the field claims FIRST, in one

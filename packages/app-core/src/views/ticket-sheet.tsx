@@ -682,16 +682,23 @@ export function TicketSheet({
     toStateId: string,
     evidenceAttachmentId?: string | null,
     fieldValues?: Record<string, string>,
+    comment?: string,
   ): Promise<PrecheckResult> => {
     if (cache === undefined) return { kind: 'not-evaluated', why: 'missing-local-state' };
     // The candidate must carry WHAT THE SUBMISSION WILL CARRY, or the engine
     // evaluates a claim nobody is about to make — and `require-evidence` is
     // exactly that case: an absent id reads as "none was provided" and the
-    // preview refused a move the user had just satisfied.
+    // preview refused a move the user had just satisfied. `require-comment` is
+    // the second case of the same omission, read off the payload by
+    // `evaluateRequireComment`, so it rides the payload too — with the SAME
+    // trim the submission applies, so a whitespace-only comment is unset on
+    // both paths rather than on one.
     const payload: Record<string, unknown> = { to: toStateId };
     if (evidenceAttachmentId !== undefined && evidenceAttachmentId !== null) {
       payload['evidenceAttachmentId'] = evidenceAttachmentId;
     }
+    const text = comment?.trim() ?? '';
+    if (text !== '') payload['comment'] = { text };
     const candidate: SubmittedEvent = make({
       workspaceId,
       entity: { kind: 'ticket', id: ticketId },
