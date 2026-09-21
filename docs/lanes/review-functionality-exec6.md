@@ -2,7 +2,7 @@
 
 **Lane:** executor 6 (Opus 5) · **branch:** `exec6/review-functionality` · **base:** `origin/main`
 **Started:** 2026-09-21 09:42:10 IST (T0 recorded by the controller: 09:41:50 IST; phase 1 closes 15:41:50 IST, phase 2 closes 18:41:50 IST)
-**Last phase-1 edit:** 2026-09-21 14:43 IST — findings E6-1 … E6-25 and Appendices A–AF were all written and pushed before the phase-1 boundary; the commit that carries this line is the one to read.
+**Last phase-1 edit:** 2026-09-21 14:46 IST — findings E6-1 … E6-25 and Appendices A–AF were all written and pushed before the phase-1 boundary; the commit that carries this line is the one to read.
 **Every measurement in this report was taken at `a7b6292b78c50208e8055c9f8639b1e8dcf4caa0`**
 (`Merge pull request #630 from bkirosangma/ctl/cycle36-rotation`) in
 `/Users/kiro/my_projects/gisik-nokma-exec6`, with `node v22.22.2` in `PATH`, unless a finding says otherwise.
@@ -230,9 +230,9 @@ doors and 11 hostile payload shapes; the upload door; impossible due dates; blan
 external person on an explicit list; the replica's five reads after a delete.
 
 **Citations, resolved mechanically at the end (13:50 IST, re-run 14:25 IST after E6-24):** every backticked
-`file:line` or `file:a-b` in this report was extracted (314 distinct at the re-run; 280 at 13:50) and checked
+`file:line` or `file:a-b` in this report was extracted (331 distinct at the last re-run, 14:47; 280 at 13:50) and checked
 against the tree — the file must resolve to exactly one path under `git ls-files` and the line must be within
-`wc -l`. **306 resolve; the 8 that do not are the staged export's
+`wc -l`. **323 resolve; the 8 that do not are the staged export's
 `github.md` / `workspaces-gap.md` (outside the repo, cited by their staged path in prose) and one
 `node_modules` line (better-auth's `routes.mjs`, version stated).** Two ranges had overrun their files by one
 or two lines and 32 basenames were ambiguous across packages; all were corrected in `2afaf4e2` and earlier.
@@ -1654,7 +1654,7 @@ security property rather than a feature count.
 **The second sentence, same directory, same morning, same fix.** `deploy/do/README.md:115-116`: *"until that lands on
 `main`, a `DATABASE_CA_CERT` set here has no effect"* — "that" being `withoutSslParameters` in `apps/server/src/db.ts`.
 `git log -S withoutSslParameters -- apps/server/src/db.ts` → one commit, `935f5d66` (#190, 14:02), the same PR;
-the function is at `db.ts:50` and the pool is built from it at `:148`. The README's two lines are `56cd0913`
+the function is at `apps/server/src/db.ts:50` and the pool is built from it at `:148`. The README's two lines are `56cd0913`
 (07:50) by blame, and the file was edited again at 19:41 that day (`003dfdc8`) with the sentence intact. An
 operator reading the deploy directory today is told that the CA they set does nothing and that the rate limiter
 can be forged around — two "until it lands" sentences whose "it" landed within seven hours of their being
