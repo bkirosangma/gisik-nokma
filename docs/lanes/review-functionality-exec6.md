@@ -1551,7 +1551,9 @@ its callers are those two shells. The two reads that drop the deleted ticket are
 (`listTicketSummaries`, rendered at `:152-153` as `ticket-list__row`s). The phone's ticket screen's read,
 `getTicketWithPending`, is measured too: after the delete it still **serves** the deleted ticket (printed:
 `served`, keys `ticketId, confirmed, contests, pending`) — the server's detail door answers 404 for the same
-ticket (`read/live-ticket.ts:58`, case 16.96) — so a deleted ticket tapped from the phone's list opens. The phone's `FlatList`
+ticket (`read/live-ticket.ts:58`, case 16.96) — so a deleted ticket tapped from the phone's list opens, and neither shell reads the flag anywhere
+(`grep -n deleted apps/mobile/src/screens/*.tsx apps/desktop/src/app.tsx` → 0; `pending` in `ticket-screen.tsx` → 2
+as the control), so nothing marks it as deleted once open. The phone's `FlatList`
 (`board-screen.tsx:56-59`) is fed by `listTicketSummaries` — so after a delete the deleted ticket is still a
 row on the phone's only ticket list, still a row on the desktop shell's list, and still a hit in the phone's
 search.
