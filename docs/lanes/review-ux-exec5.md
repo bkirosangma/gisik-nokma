@@ -1762,6 +1762,15 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
   channel list as `email/sms/whatsapp` "corrected to the door's own rules"; `exec6-E6-9` shows the door says
   `email|phone`, i.e. the note copied the form. Nothing else in it contradicts a measurement here.
 
+- **Author-acknowledged gaps.** `grep -rn -i 'RECORDED, NOT FIXED\|recorded for its owner\|Named as an absence\|not fixed
+  here\|Owner: whoever'` over the views, the web app/src, the builder, inbox and account → **13 hits in 7 files**, each
+  opened: E5-40 (`page.tsx:939`), E5-43 (`:1237`), E5-41 (`workflow-builder-screen.tsx:117`); the rest are a ruled
+  admin-visibility case (`w/[workspaceId]/page.tsx:167`, P32/P38), a one-frame name cache the note itself scopes to a
+  value both viewers may see (`use-workspace-projects.ts:62`), a test-design note (`visibility-editor.tsx:200`), two
+  named owners for adapters (`ticket-sheet.tsx:908`, `:961`), a create-flow actor window the page's own session gate
+  closes (`page.tsx:2776`, `:1739`), and a type-picker note (`:913`). **Method:** an author's "not fixed here" is the
+  cheapest pointer to a defect a person meets, and it names its own line.
+
 ### 6.4b Hypotheses opened and KILLED by reading — recorded so the judge can see the method, not just the hits
 
 - **"An epic band titled by a ULID under a Filters-sheet narrowing"** — `labels.epicTitle` (`page.tsx:1179-1200`)
