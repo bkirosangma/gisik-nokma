@@ -1071,7 +1071,7 @@ sentences at `workflow-list-screen.tsx:200`, `workflow-builder-screen.tsx:89-91`
 
 ### E5-31 — IMPORTANT · The signed-out app bar offers Workspaces, Account, an Inbox icon and "No workspace selected — pick one…" to a visitor who cannot use any of them, and no Sign in; the legal pages' bar offers Sign in `[BROWSER, devtools isolated context, 390 px]` `[SOURCE]` — FIRST-RUN / PERMISSION-REFUSED
 
-**WHAT.** Signed out on `/help` (the route `app-nav.tsx:325-331` calls *"the route most likely to be wanted by
+**WHAT.** Signed out on `/help` (the route `app-nav.tsx:330-332` calls *"the route most likely to be wanted by
 someone who cannot get in"*), the bar paints: `Workspaces -> /workspaces`, `Help`, `Account -> /account`, an
 unlabelled inbox link `-> /inbox`, and the scope note *"No workspace selected — pick one to reach its board, members
 and settings."* (`[BROWSER]`, nav links and text). No **Sign in**. `app-nav.tsx:333-342` is the `user === null` arm:
