@@ -2679,6 +2679,34 @@ small:**
    existing one confirmed where it renders.
 4. **The painted half of the peer corpus.** Roughly thirty peer findings rest on `[BROWSER]` evidence I can
    read and not reproduce; that boundary is stated in §6 and in the refutations file.
+## R2.17e — THE CATALOGUE REACHED MECHANICALLY: 474 CITATIONS, NONE DEAD
+
+The catalogue cannot be read id by id in a review of this size, but **part of it can be reached for all 26
+files at once, and that is what this pass did**: every `file:line` citation into `apps/`, `packages/`,
+`design-system/`, `scripts/` or `docs/` was extracted from all 26 catalogue files and checked.
+
+| measurement | result |
+|---|---|
+| catalogue files scanned | **26** (every file in `test-cases/`) |
+| source citations found | **474** |
+| paths that no longer exist | **0** |
+| citations whose line is genuinely past the end of its file | **0** |
+
+⚠ **And my first run reported 7 out-of-range, which was a false positive of my own unit — the tenth of the
+day.** All seven were inside `16-remaining-doors.md:1048-1052`, which is a **lane reporting its OWN
+citation-repair pass** and quoting the rotted citations as examples. **My sweep counted prose ABOUT
+citations as citations.** The distinction is the whole thing: a citation is a pointer a reader will follow;
+a quoted one is evidence in a narrative. I read all seven sites before concluding, which is what turned the
+result from a finding into a null.
+
+**What that file records is itself worth naming, because it is the practice this null rests on**
+(`16-remaining-doors.md:1048-1052`): a population of `file:line` citations into `ticket-sheet.tsx` had
+rotted when 171 lines were added; the lane **measured** the shift rather than sweeping it, repointed one,
+**withdrew a second when an independent review caught the repoint as wrong**, withdrew a third on the same
+rule, and recorded that four of the remainder are **deliberately historical** and must not be counted as
+wrong. **A catalogue that maintains its citations this carefully is why 474 of them resolve today**, and
+the honest form of this coverage claim is that I checked the mechanical half — the paths and the ranges —
+and not the half that needs judgement, which is whether each cited line still says what its case claims.
 ## R2.18 — THE LAST UNREAD SCREENS, AND WHY I STOPPED HUNTING
 
 Two surfaces I had never opened — the **Calendar** (`calendar-view.tsx`, 514 lines) and the **Timeline**
