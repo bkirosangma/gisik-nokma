@@ -1,6 +1,14 @@
 # Refutations — executor 2 (UX), round 2
 
-**Lane:** executor 2. **Branch:** `exec2/review-ux-r2`. **Phase:** 2 (`T0 + 6 h` → `T0 + 9 h`).
+**Lane:** executor 2. **Branch:** `exec2/review-ux-r2`.
+
+> ⚠ **WRITTEN DURING PHASE 1, not phase 2 — corrected.** This header said `Phase: 2 (T0 + 6 h → T0 + 9 h)`.
+> Measured: T0 is **09:41:50 IST** (exec 6's refutation file states the boundary as 15:41:50 → 18:41:50), the
+> last edit here is stamped **11:26 IST**, so this is phase 1 with four hours still to run. The reason for
+> writing it early is exec 6's own, and it applies to me: **push is durability, and a lane has no guarantee
+> of a turn at the boundary** — a refutation file that exists only in a worktree at 15:41:50 was never
+> submitted. I had also inferred the phase from my turn count rather than reading the clock; that inference
+> is what this note corrects.
 
 ## THIS FILE CONTAINS NO REFUTATION, AND THAT IS ITS CONTENT
 

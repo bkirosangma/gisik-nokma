@@ -248,7 +248,7 @@ whose own name is *"THE JITTER. Owner: 'the nav bar item jitters on changing pag
 link is not merely present in the source; it is rendered by a suite the gate collects.
 
 **PAINTED CONFIRMATION, added after filing, from the browser I had said I did not have.** I did not open
-the app during round 1 or most of round 2; my report said so in three places. Late in phase 2 I found that
+the app during round 1 or most of round 2; my report said so in three places. partway through round 2 I found that
 a browser *is* available to this lane, and the first thing worth doing with it was the page my largest
 finding is about. **Navigated read-only to `/help` on the owner's running dev stack** (`localhost:3001`),
 which serves the primary checkout at `e2769d60` — **code-identical to this report's base `a7b6292b`**,
@@ -1042,7 +1042,7 @@ arms), the ticket sheet's parent indicator, subtask section, comment mount and v
 8. **`test-cases/13-*.md`** — not verified id by id (see §5).
 9. **A browser — CORRECTED, because the original of this paragraph was wrong and said I had none.** It
    read: *"**No running browser.** I did not open the app."* A browser **is** available to this lane, and
-   late in phase 2 I used it: read-only, against `localhost:3001` (`e2769d60`, code-identical to this
+   I used it once, read-only, against `localhost:3001` (`e2769d60`, code-identical to this
    report's base). What remains true is the **bound**: the browser has **no session**, and the dev stack's
    sign-in needs a credential this lane does not hold, so I could measure only the **signed-out** surfaces
    — which is exactly one page, `/help`, and it was enough to paint the contradiction `E2-1` (row (a) and
@@ -2311,9 +2311,9 @@ than filing a weak refutation to look active.**
 | `E6-1` (the help says a job cannot be deleted) | `docs/manual.md:372` says exactly that (*"**You cannot delete a job.**"*), against the shipped `Delete` at `ticket-sheet.tsx:2612-2621` | **holds** — same corpus and same section as my `E2-1`, different row |
 | `E5-8` (the History tab prints raw event names) | `history-list.tsx:45` `{event.type}` — I read that file in full in round 1 and did not file it | **holds, and I will not file it** — see `E2-35`'s note; filing it now could not be separated from copying |
 
-### The check, extended at the phase-2 boundary — three lanes, seven findings, seven true
+### The check, as the other lanes filed hard — three lanes, seven findings, seven true
 
-The other lanes filed hard at the boundary (exec 4 went 0 → 17, exec 5 9 → 19, exec 6 3 → 11), so I
+The other lanes filed hard through the morning (exec 4 went 0 → 17, exec 5 9 → 19, exec 6 3 → 11), so I
 extended the check to the ones I could falsify by reading. **Every one holds.**
 
 | finding | the claim I tested | what I opened | outcome |
@@ -2337,11 +2337,17 @@ says.
 ⚠ **And one I nearly filed and did not.** `E5-17`'s *title* suggested the revoke surface was unreachable, and I had a falsifying measurement ready: `McpTokensScreen` **is** mounted on `/account`
 (`account/page.tsx:16` and `:305` `<McpTokensScreen heading="h2" variant="account" />`), which the account menu links to. **Then I read the finding, and it does not make that claim** — it is scoped to the *route's* chrome and names `/account` as the shelled sibling. My measurement addressed something the finding never said. **A refutation built from a title is a refutation of nothing**, and it would have cost me the finding's points.
 
-### Why I will file no further findings in phase 2, stated as arithmetic rather than as fatigue
+### Why I did not file two further candidates, stated as arithmetic rather than as fatigue
 
-Round-2 §2 scores **new findings in phase 2 at half**, and §3 prices an invalid one at **three times its
-claimed severity** — the penalty is not halved with the credit. So an Important filed now earns **1.5** if
-upheld and costs **9** if not: it is worth filing only above **~86 %** confidence. I have two candidates
+⚠ **CORRECTED. This paragraph originally said *"new findings in phase 2 at half"* and used a ~86 % bar. The
+clock says otherwise: at the time of writing it is **11:41 IST**, T0 was 09:41:50, and phase 1 runs to
+15:41:50 — so this is phase 1 and a new finding earns FULL value, not half.** I had been inferring elapsed
+time from my own turn count rather than reading the clock, and the paragraph above was built on that
+inference. Corrected here rather than left standing, because a decision justified by a wrong number is the
+shape this report files six times elsewhere. **The restated arithmetic:** §3 prices an invalid finding at
+three times its claimed severity, so a Minor earns **1** if upheld and costs **3** if not — it is worth
+filing above **75 %** confidence. **Both of my remaining candidates are argued below against that bar, and
+one of them now clears it.** I have two candidates
 left that I judge true but not certain — the Calendar/Timeline collaborator axis matching nothing
 (`ticket-dates-input.ts:42,56-57`, conditional on the axis being wired to those tabs at all, which I did
 not establish) and the `caught-up` callback whose missing consequence I could not pin down. **Both sit
@@ -2679,6 +2685,53 @@ purpose is to ignore the capability props (its docblock at `editor-slot.tsx:120-
 filed** — a defect that no surface can exhibit is a style preference, and I would rather the judge spend
 its budget on the nineteen above.
 
+### ❌ The Calendar/Timeline collaborator axis (`M3`'s neighbour) — **killed by its last link, the same way `M4` was**
+
+This is the candidate I had twice declined to file because it rested on a condition I had not established —
+and it is worth writing down in full, because **the last link is what killed it, and finding last links is the
+single most productive thing I did with the extra time the clock correction gave me.**
+
+**The chain, four links, all measured:**
+
+1. `apps/web/src/ticket-dates-input.ts:87` sets `collaboratorIds: []` on **every** row the Calendar and
+   Timeline receive, documented at `:42` as *"dropped by `ListRow`"* — and its own docblock at `:56-57`
+   warns: *"is wired onto the calendar or timeline tab, its `collaboratorIds` axis will **silently match
+   nothing**."*
+2. `calendar-model.ts:117,317-318` and `timeline-model.ts:148,246-247` **do** take a `filter?: FilterSpec`
+   and apply it themselves: `matchesFilter(input.state, opts.filter)`.
+3. `matches-filter.ts:39` evaluates the axis: `if (!narrowsToAny(spec.collaboratorIds,
+   state.collaboratorIds)) return false;`.
+4. So a collaborator filter would empty both views — and `docs/manual.md:826-828` says the opposite:
+   *"You can set it and the filter keeps it, but **nothing narrows by it**."*
+
+**Links 1–3 hold. Link 4 does not exist.** `calendar-view.tsx:54` and `timeline-view.tsx:79` declare the
+prop **optional** and forward it only if present (`:228`, `:200`
+`...(props.filter === undefined ? {} : { filter: props.filter })`) — and **the page supplies none**:
+`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2332-2336` passes `tickets`, `today`, `userName` and
+`onOpenTicket` to `<CalendarView>` and no `filter`. So `opts.filter` is `undefined` in the shipped app,
+`matchesFilter` is never reached from either view, and **the axis cannot empty anything.** The
+`ticket-dates-input` sentence is a hypothetical about wiring that does not exist, written honestly as one
+(“**is** wired onto …”).
+
+**Not filed, and the near-miss is the instructive part:** three links of a four-link chain reproduce, which
+is exactly the shape that reads as verified. I first judged this candidate ~90 % likely to be valid. It is
+0 % valid. **This is the third candidate I have killed on its last link** (with `M4`'s unreachable throw and
+`M3`'s coverage-elsewhere), and it is the reason the remaining candidates in this report are named rather
+than filed.
+
+### AND THE SAME TEST APPLIED TO MY OWN THREE LOAD-BEARING FINDINGS — they pass it
+
+The link that killed that candidate is a **reachability** link: is the code path actually reached by a
+caller? Two of my most load-bearing new findings have the same exposure, so I ran the same test on them.
+
+| finding | the last link | opened | verdict |
+|---|---|---|---|
+| `E2-20` (two ticket-type screens stuck on "Loading…" for ever) | is `TicketTypeListScreen` rendered by a route? | `apps/web/app/w/[workspaceId]/settings/ticket-types/page.tsx:4,24` imports and renders it | **reachable** |
+| `E2-21` (a rejected migration strands the editor) | is `TicketTypeEditorScreen` rendered? it is reached through a *pane* | `apps/web/src/ticket-type-editor-pane.tsx:9,114` — the pane imports and renders it | **reachable** (the link is one hop longer than it looked, which is precisely why it needed opening) |
+| `E2-39` (a failed roster read becomes "nobody is in this workspace") | is `WorkflowBuilderScreen` mounted? | `apps/web/app/w/[workspaceId]/settings/workflows/[workflowId]/page.tsx:6,92` | **reachable** |
+
+**Three of three pass.** Their reachability is now searched for rather than assumed — and `E2-21`'s is the
+one that would have been easiest to get wrong, because the route names a *pane* that names the screen.
 ### ❌ The account page's own collapse-to-empty handlers (`:67`, `:91`) — **disclosed and hedged; not defects**
 
 I swept every rejection handler in the shipping client that sets state to an empty value (four real ones)
