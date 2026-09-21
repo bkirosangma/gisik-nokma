@@ -160,7 +160,7 @@ evidence-gate.ts`, `auth/auth.ts:150-360` and `apps/server/src/app.ts:477-612` (
 `deploy/do/app.yaml:1-10`, `:119`, `routes/search.ts:143-215` (the FTS query shape and the hit's columns), `http/rate-limit.ts:96-125`
 (`rateLimitKeyFor`, rightmost XFF entry — sound), `attachments/sniff.ts` (behaviour measured, Appendix U),
 `domain/src/{parse-event,ids,prefix,submit,registry}.ts` (whole, code lines), `routes/{events,auth-methods,
-preferences,notification-preferences}.ts` (whole), `domain/src/ist-day.ts:27-47`, `domain/src/events/membership.ts:39-42`, `:68-72`, `rule-engine/src/checks/fields.ts:25-60`,
+preferences,notification-preferences}.ts` (whole), `visibility/visible-tickets.ts` (whole, + one probe), `domain/src/ist-day.ts:27-47`, `domain/src/events/membership.ts:39-42`, `:68-72`, `rule-engine/src/checks/fields.ts:25-60`,
 `:116-138`, `routes/attention.ts:255-266`, `apps/web/app/privacy/page.tsx:140-170`, `apps/web/app/mcp/authorize/page.tsx:148-192`,
 `routes/my-invitations.ts:105-190` (address binding), `domain/src/preferences.ts:20-140` (bounds),
 `sync/snapshot-refresh.ts:185-192` and `visibility/visible-events-for.ts:14` (grep: both carry deleted tickets by
@@ -1562,6 +1562,11 @@ what was looked at and found sound, not only what was found wrong.
   case 7.158 🟡 is measured still true:** removing the guest from the list sent **no purge frame**, and a later
   edit on the narrowed ticket sent **0 frames** and leaked nothing — the recorded gap (no purge, stale local copy)
   holds exactly as its marker and owner line say, and the withholding half holds too.
+- *Observation, not filed:* `GET /v1/workspaces/:ws/tickets` (`visibility/visible-tickets.ts`, `proj_visibility`
+  alone) **lists a soft-deleted ticket's visibility row** — id, project, mode, audience; no title — while the
+  detail door 404s it (one probe, 1 passed). The Delete PR's item 4 records the door as *"served from
+  `proj_visibility` alone and has no client consumer"*, and `visible-where.ts:139-143` records why the live
+  predicate cannot be ANDed there. Same family as E6-11 (recorded; metadata only); left as a note.
 - **The ingest pipeline's order is what the docblocks say.** `ingest-service.ts:164-360`: workspace lock →
   entity lock → entity↔workspace guard → permission gate (through the transaction's `client`, `:235-245`) →
   contest coherence → engine → server gates → append → refresh-on-publish → projections → COMMIT. Read at the
