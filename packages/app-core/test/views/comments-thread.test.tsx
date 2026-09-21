@@ -169,11 +169,20 @@ describe('CommentsThread', () => {
     expect(screen.queryByRole('link', { name: '01NOATTACHMENTROW' })).toBeNull();
   });
 
-  it('draws the composer only when one is supplied, and always with the prototype’s sentence', () => {
+  it('draws the composer only when one is supplied', () => {
+    // ⚠ THIS CASE WAS *"...and always with the prototype's sentence"* UNTIL
+    // 2026-09-22, and the sentence assertions are gone with the `<p>` that drew
+    // them (plan Task 7, the permitted fixture edit for this file). **The sentence
+    // is the COMPOSER's now, not the thread's:** it arrives as the host's
+    // `footerNote` and is drawn inside the composer's own footer row, so a thread
+    // asked for it here would be asserting a fact about a control it does not own
+    // — and a stub composer that draws nothing is the correct thing for this file
+    // to hand it. The passing of the sentence is case `16.127`'s, in
+    // `ticket-sheet-comments.test.tsx`, where the sheet's real mount is the
+    // subject. What is LEFT here is the property this file owns: a thread with no
+    // composer draws no control.
     const { rerender } = render(<CommentsThread comments={[PLAIN]} nameOf={nameOf} />);
-    // No composer, no sentence: "Posting records an event citing you." is a
-    // claim about a control that is not on the screen.
-    expect(screen.queryByText('Posting records an event citing you.')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Post' })).toBeNull();
 
     rerender(
       <CommentsThread
@@ -183,7 +192,6 @@ describe('CommentsThread', () => {
       />,
     );
     expect(screen.getByRole('button', { name: 'Post' })).toBeInTheDocument();
-    expect(screen.getByText('Posting records an event citing you.')).toBeInTheDocument();
   });
 
   /**

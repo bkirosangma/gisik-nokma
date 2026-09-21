@@ -3506,6 +3506,26 @@ export function TicketSheet({
                   uploadAttachment={uploadAttachment}
                   emitAttachmentAdded={emitAttachmentAdded}
                   onError={reportEditorError}
+                  /*
+                    THE POSTING SENTENCE, IN THE FOOTER ROW (spec decision 8; the
+                    prototype's `cmtHint` slot at `desktop.dc.html:1329`). It is
+                    handed over rather than drawn by `CommentsThread`, which used
+                    to render its own copy as a line under the composer and whose
+                    own paragraph recorded the move as OWED — the move needed a
+                    one-line change HERE, in the file that lane was barred from
+                    touching, so the two landed in one change.
+
+                    ⚠ IT IS PASSED AS DATA AND NOT AS A CHILD OR A `cloneElement`.
+                    The alternative considered and refused was having
+                    `CommentsThread` clone the composer element it is given and
+                    inject the sentence: that works, and it creates a SILENT
+                    DOUBLE SOURCE — a later caller passing its own `footerNote`
+                    here would be overwritten by the thread's copy, and nothing
+                    would fail. One field, one direction, and the composer's own
+                    contract (`EditorSlotProps.footerNote`) is the only place the
+                    words live.
+                  */
+                  footerNote="Posting records an event citing you."
                 />
               )
             }

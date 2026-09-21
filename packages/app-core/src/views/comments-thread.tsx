@@ -194,20 +194,18 @@ export function CommentsThread({
         eyebrow style (`desktop.dc.html:1250`, `:1236`), so the shared class is
         the name for that style and `.gn-comments__heading` is this block's own.
 
-        ⚠ **THE SHARED CLASS CARRIES NO RULE YET, AND THAT IS NOT AN OVERSIGHT.**
-        `.gn-ticket-sheet__caption` is created by Task 4 of the sheet-prototype-
-        parity plan, which runs on the TAIL lane after the priority built-in work
-        lands; this task's job is to put the name on the element so that lane has
-        one fewer edit to make. **Measured: the heading is styled identically
-        either way today**, because `.gn-comments__heading` (`ui.css:6449`)
-        already declares the whole eyebrow — `font-size: 0.8125rem`,
-        `line-height: 1.125rem`, `text-transform: uppercase`,
-        `letter-spacing: 0.6px`, `var(--gn-text-muted)` — and the planned shared
-        rule is a transcription of exactly those declarations. So this is a NAME
-        being introduced, not a look being changed, and the duplicate declarations
-        under `.gn-comments__heading` are the tail lane's to remove once the
-        shared rule exists. Removing them BEFORE that rule lands would leave the
-        heading with no style at all.
+        ⚠ **THIS PARAGRAPH SAID THE SHARED CLASS CARRIED NO RULE YET, AND IT DOES
+        NOW.** It read: *"`.gn-ticket-sheet__caption` is created by Task 4 … which
+        runs on the TAIL lane … so this task's job is to put the name on the
+        element so that lane has one fewer edit to make. Measured: the heading is
+        styled identically either way today … and the duplicate declarations under
+        `.gn-comments__heading` are the tail lane's to remove once the shared rule
+        exists. Removing them BEFORE that rule lands would leave the heading with
+        no style at all."* **Every clause of that was true when written and the
+        last one was a guard rather than a description** — Task 4 landed the
+        shared rule, so the tail lane removed the six duplicate declarations in
+        the same change (spec decision 11). The element keeps BOTH class names:
+        this one is its own hook, and `.gn-ticket-sheet__caption` is the style.
       */}
       <p className="gn-comments__heading gn-ticket-sheet__caption">
         {/* A count appears only when there is one to give. `Comments · 0` over a
@@ -242,45 +240,32 @@ export function CommentsThread({
       )}
 
       {composer === undefined ? null : (
+        /*
+          ⚠ THE HINT PARAGRAPH WAS HERE AND IS NOT ANY MORE (2026-09-22), and the
+          paragraph that blamed a deviation is CLOSED rather than moved.
+
+          It read *"it renders as a LINE UNDER the composer rather than inside a
+          footer row with `Attach` and `Post`, because our composer is
+          `packages/editor`'s `TicketEditorSlot`, which draws its own submit
+          control and cannot have one injected into its markup"* — true when
+          written. `TicketEditorSlot` now draws that footer row, and its LEFT is
+          `EditorSlotProps.footerNote`, which is precisely where this sentence
+          belongs. The sentence itself is drawn THERE now, handed over by the
+          sheet's comment mount (`ticket-sheet.tsx`), and **this component no
+          longer knows it exists** — which is the point rather than a side effect:
+          the thread renders a composer it is given, and what that composer says
+          about posting is the composer's business.
+
+          ⚠ **THE DELETION AND THE MOUNT ARE ONE CHANGE, and that is why the
+          paragraph above stood here for a day rather than being tidied away.**
+          Removing this `<p>` without the mount passing `footerNote` would have
+          LOST the sentence from the product, since nothing else drew it. Case
+          `16.127` reads both halves — the note reached the seam AND the section
+          shows it exactly once — so a change that did one without the other
+          reddens there rather than shipping a sentence drawn twice or not at all.
+        */
         <div className="gn-comments__composer">
           {composer}
-          {/*
-            The prototype's footer sentence (`desktop.dc.html:1329`), in its
-            ONLINE arm: the element renders `{{ cmtHint }}`, defined at `:3717` as
-            `s.online ? "Posting records an event citing you." : "Offline — the
-            comment queues until this device reconnects."` ⚠ **An earlier version
-            of this comment said "verbatim", which was wrong — one arm of a
-            conditional is transcribed, not the sentence.** The offline arm is
-            deliberately NOT transcribed: an online-only client reaching it would
-            be promising a queue it does not have, which is the same reason
-            `PlainTextEditorSlot` says a build without an editor cannot write
-            rather than offering a control that discards what is typed.
-
-            ⚠ **THE DEVIATION THIS PARAGRAPH USED TO BLAME IS NOW CLOSED, AND
-            THE BLAME WAS CORRECT WHEN IT WAS WRITTEN.** It read: *"it renders as
-            a LINE UNDER the composer rather than inside a footer row with
-            `Attach` and `Post`, because our composer is `packages/editor`'s
-            `TicketEditorSlot`, which draws its own submit control and cannot
-            have one injected into its markup."* The reason has expired —
-            `TicketEditorSlot` now draws a footer row whose LEFT is the
-            `footerNote` slot (`packages/editor`, Task 2 of this same plan), which
-            is precisely where this sentence belongs.
-
-            ⚠ **SO THE MOVE IS OWED RATHER THAN REFUSED, AND IT IS HELD HERE FOR
-            ONE REASON.** Handing the sentence over is a one-line edit passing
-            `footerNote="Posting records an event citing you."` at the sheet's
-            comment `EditorSlot` mount in `ticket-sheet.tsx` — the file this lane
-            is explicitly barred from touching, because the priority built-in lane
-            and this plan's tail lane both edit it. **Deleting this paragraph
-            FIRST would lose the sentence from the product**, since nothing else
-            draws it: the tail lane makes the deletion and the mount edit
-            together. `ticket-sheet-comments.test.tsx`'s case `16.127` — *the
-            sentence is handed to the composer as its footer note, and the thread
-            draws no second copy* — is therefore recorded `❌` in
-            `test-cases/16-remaining-doors.md` rather than written here, because a
-            case written now could only assert the opposite of its own name.
-          */}
-          <p className="gn-comments__hint">Posting records an event citing you.</p>
         </div>
       )}
     </section>

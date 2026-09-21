@@ -6615,14 +6615,16 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    class. This block names the comment box's own parts — the heading, the list,
    the rows, the empty/wait/error sentences — and stops at the slot's edge. */
 .gn-comments { margin-top: 1.4rem; padding-bottom: 0.5rem; }
-.gn-comments__heading {
-  font-size: 0.8125rem; /* 13px */
-  line-height: 1.125rem;
-  margin: 0;
-  color: var(--gn-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-}
+/* ⚠ THE SIX DECLARATIONS THAT STOOD HERE ARE GONE, NOT MOVED. They were the
+   eyebrow transcription — `0.8125rem`, `1.125rem`, `margin: 0`,
+   `var(--gn-text-muted)`, `uppercase`, `letter-spacing: 0.6px` — and
+   `.gn-ticket-sheet__caption` above now declares the same six for the sheet's
+   shared section headings, which this heading wears BESIDE this class
+   (`comments-thread.tsx`). Two identical rules for one element is the drift this
+   file's comments exist to prevent, and the element keeps this class as its own
+   hook. The removal was handed to the tail lane by the lane that added the shared
+   NAME, on the condition that it happen only AFTER the shared RULE existed —
+   which it does, as of Task 4, in this same change set. */
 .gn-comments__list {
   list-style: none;
   margin: 0.6rem 0 0;
@@ -6706,11 +6708,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    not the danger tone of `__error`: a read in flight is a state, not a fault,
    and painting it red would be the same misreading in the other direction. */
 .gn-comments__loading { color: var(--gn-text-muted); font-size: 0.9375rem; line-height: 1.25rem; margin: 0; }
-.gn-comments__composer {
-  margin-top: 0.9rem;
-  border-radius: var(--gn-radius-control);
-  background: var(--gn-surface);
-  box-shadow: var(--gn-shadow-raised);
-  overflow: hidden;
-}
-.gn-comments__hint { font-size: 0.75rem; line-height: 1rem; color: var(--gn-text-muted); margin: 0; padding: 0.5rem 0.6rem; }
+/* ⚠ MARGIN ONLY, and the four declarations that used to sit here were the
+   composer's CHROME — radius, `--gn-surface` ground, `--gn-shadow-raised` and
+   `overflow: hidden`. The chrome moved to `.editor-slot` in `packages/editor`'s
+   own stylesheet (plan Task 2: sunken body, toolbar tray, footer row), so leaving
+   a second raised surface under the slot would draw a box inside a box. What is
+   left is the spacing this block owns. `.gn-comments__hint` was here too and is
+   DELETED rather than emptied: the sentence it painted is the composer's footer
+   note now, drawn inside the slot (plan Task 7). */
+.gn-comments__composer { margin-top: 0.9rem; }
