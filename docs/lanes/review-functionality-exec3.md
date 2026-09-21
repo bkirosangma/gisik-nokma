@@ -4365,22 +4365,27 @@ order) matches `index.ts:24`'s list word for word.
 **SEVERITY: Minor (claimed), scored at half.** A registration-order comment stale since the day it was written; no
 runtime consequence (`projection-order.test.ts` pins the real order).
 
-## 70. Phase-2 sweep — three refused premises still asserted in eleven source comments (15:35 IST; coverage, not a finding)
+## 70. Phase-2 sweep — three refused premises still asserted in ten source comments (15:35 IST; coverage, not a finding)
 
 `grep -rniE "nothing on this branch|nothing (anywhere )?refuses|no check compares|does not exist yet|not yet landed"`
 over `apps/server/src`, `packages/*/src`, `apps/web/app` (dist excluded) → 18 lines. Besides the two findings above,
-**eleven** restate a premise the engine now refuses, each read at the line:
+**ten** restate a premise the engine now refuses, each opened at the line (the eight not already cited by
+`E3-31`'s addendum were opened after this table was first drafted, and that read moved one line out of it — see
+the note below the table):
 
 | premise (refused at) | where it still stands |
 |---|---|
 | *"nothing refuses a cross-project parent"* — case 6.57, refused `hierarchy.ts:125`/`:274` (`E3-31`) | `read/restricted-parents.ts:39` · `routes/tickets.ts:116` · `app-core/src/views/ticket-sheet.tsx:259` · `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1142` · `test/routes/tickets-read.test.ts:465` · `visibility/rollup.ts:208` |
-| *"nothing on this branch refuses the cycle"* — case 6.58, refused `hierarchy.ts:237`/`:257-258` (`E3-22`) | `visibility/grant-backfill.ts:226` · `projections/proj-visibility.ts:196` · `routes/list.ts:367` · `projections/tickets.ts:496` (*"nothing refuses a …"* — read: the cycle case) |
+| *"nothing on this branch refuses the cycle"* — case 6.58, refused `hierarchy.ts:237`/`:257-258` (`E3-22`) | `visibility/grant-backfill.ts:226` · `projections/proj-visibility.ts:196` · `routes/list.ts:367` |
 | *"no check compares them"* (workspace of parent vs child) — case 6.84, refused `hierarchy.ts:124`/`:250` (`E3-21`) | `visibility/rollup.ts:204-206` |
 
-The remaining lines of the 18 are true or self-correcting (`bootstrap-workspace.ts:44` describes an intended
-non-refusal; `check-permission.ts:249`, `:374` describe the founding window by design; `online/index.ts:9` is a docblock
-that records its own correction; `draft-store.ts:90` and `page.tsx:1330` are UI-lane sentences not checked here).
-**These eleven are not filed separately**: each is the same premise as a finding already filed, and the judge asked
+The remaining lines of the 18 are true, self-correcting, or unchecked and said so: `bootstrap-workspace.ts:44`
+describes an intended non-refusal; `check-permission.ts:249`, `:374` describe the founding window by design;
+`online/index.ts:9` records its own correction; `draft-store.ts:90` and `page.tsx:1330` are UI-lane sentences not
+checked here; and **`projections/tickets.ts:496`** — *"nothing refuses a `ticket.assigned` … for a ticket that does
+not exist"* — is a **different premise** (an assignment of a never-created ticket), which the first draft of this
+table mis-filed under the cycle row before the line was opened; whether the permission gate's `canSee` now refuses
+it is **not measured here** and it is left out rather than counted. **These ten are not filed separately**: each is the same premise as a finding already filed, and the judge asked
 that the trio be rulable as one mechanism (§27). They are the trio's true width — three catalogue lines, one column
-comment, eleven source comments — and the reason a fix to the three case lines alone would leave the premise alive
+comment, ten source comments — and the reason a fix to the three case lines alone would leave the premise alive
 in the code that readers open first.
