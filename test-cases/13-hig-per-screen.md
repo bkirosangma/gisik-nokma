@@ -308,6 +308,48 @@ adopt here**. P19's remedy worked because the component was already there with `
 required; the product's three menus share no component, and writing one is a refactor beyond this
 finding. So both menus carry the attribute and the SWEEP is what prevents the recurrence.
 
+## Every navigation landmark is named (exec1 P31, 2026-09-21) — case `13.1053`
+
+- **13.1053** ✅ No product source renders a `<nav>` without an `aria-label` or `aria-labelledby` in the
+  SAME OPENING TAG, swept over six source trees with comments stripped and whole tags rather than lines.
+  Positive control: the sweep found more than three NAMED navs, so a green cannot be "the regex matched
+  nothing". Two runtime arms read the name off the RENDERED bar rather than the source —
+  `getByRole('navigation', { name: 'Main' })` in `app-nav.test.tsx` and `{ name: 'Legal' }` in
+  `not-found-and-legal.test.tsx` — because the accessible-name ratchet counts ATTRIBUTES and cannot judge
+  one name against another. (`apps/web/test/nav-landmark-name.test.tsx`)
+
+**The finding, in its own count.** Nine `<nav>` elements in product source; **seven carried a name and two
+did not** — `apps/web/src/app-nav.tsx:232` and `apps/web/src/legal-nav.tsx:68`, both rendering
+`<nav className="gn-nav">` with neither `aria-label` nor `aria-labelledby`. **Both co-render with a SECOND,
+already-labelled `<nav>` on the same page**, so a screen-reader user who opens the landmark list meets two
+`navigation` regions and only one of them says what it is. Named neighbours, for the pattern:
+`settings/page.tsx:180` *"Settings sections"*, `w/[workspaceId]/page.tsx:570` *"Workspace sections"*,
+`workflows/[workflowId]/page.tsx:80` and `history/page.tsx:39` *"Breadcrumb"*,
+`legal-chrome.tsx:115` *"On this page"*.
+
+**One attribute each:** `aria-label="Main"` on the product's primary bar, `aria-label="Legal"` on the legal
+chrome — the reviewer's own words, and the house's: the component is `LegalNav` and its class family is
+`.gn-legal*`.
+
+### A case this change HAD to move, and why that is not a widened assertion
+
+**`13.685`** asserted the legal pages carry **exactly ONE** `aria-label` — `['On this page']` — because its
+job was to record the swap that kept `BackButton`'s departure from taking the ratchet's `ariaLabel` count
+to 0. P31's whole point is that the bar above the TOC was a second, UNNAMED landmark on those very routes,
+so naming it makes the page carry **two**, and the expectation becomes `['Legal', 'On this page']`. The
+property `13.685` actually guards — the TOC's label is present and is exactly `On this page` — is
+unchanged and still asserted; what is gone is the incidental *"and nothing else on this page is
+labelled"*, which was never about the TOC. The reason is written into the case rather than the number
+quietly edited.
+
+### The ratchet RISES, and a rise is the direction nothing checks
+
+`e2e-viewport` and `e2e-stack` both assert `toBeGreaterThanOrEqual(baseline[attr])` — **read in both spec
+files rather than assumed**, because a rise that failed would break the e2e gate. The `ariaLabel` count
+rises on every route `AppNav` renders and 1 → 2 on `/privacy` and `/terms`. It is recorded here, in
+`legal-chrome.tsx`'s own note (whose paragraph said *"the top bar and this row"* while the top bar was
+still unnamed — the correction names the half that was missing), and in the PR body, rather than absorbed.
+
 ## Task 1 of the HIG per-screen plan (2026-09-08) — the four shared pieces every screen reuses
 
 - **13.288** ✅ `SegmentedControl` renders `role=tablist` (named by a required `aria-label`), one

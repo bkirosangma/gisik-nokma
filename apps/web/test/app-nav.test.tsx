@@ -797,6 +797,25 @@ describe('Round 24 the account menu', () => {
    * fixture has no second menu, so `getByRole('menu')` alone would stay green
    * against an unnamed menu.
    */
+  it('13.1053 the top bar is a named "Main" landmark, reached by role and name', async () => {
+    currentPath = '/workspaces';
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+
+    // POSITIVE CONTROL: the bar rendered a navigation landmark at all, so a
+    // green below cannot mean "there was no landmark to name".
+    expect(screen.getByRole('navigation')).toBeInTheDocument();
+
+    // THE WITNESS — `Unable to find an accessible element with the role
+    // "navigation" and name "Main"` before the fix. This bar co-renders with a
+    // second, already-labelled `<nav>` on several routes, which is exactly why
+    // the name is the only thing telling a reader which one they are in.
+    expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
+  });
+
   it('13.1052 the account menu is named "Account", reached by role and name', async () => {
     currentPath = '/workspaces';
     render(
