@@ -812,6 +812,32 @@ type picker over the legal set when more than one qualifies.
 
 ---
 
+### E5-23 — MINOR · A brand-new owner's workspace home says "No projects you can open are active here" — a sentence written for the excluded member, read by the founder above the form that makes the first project `[SOURCE]` — FIRST-RUN
+
+**WHAT.** `apps/web/app/w/[workspaceId]/page.tsx:883-887`: when `shown.length === 0` the home renders *"No projects
+you can open are active here."* The comment above it (`:884-886`) says why: *"A member outside every project has an
+empty live list in a workspace full of them, and 'there are no projects' would be a claim about the workspace."*
+Correct for that member. An owner who founded the workspace seconds ago (`exec2-F5`'s person, arriving from
+`/my-work`'s four negatives) has `shown = []` for the other reason — the workspace has none — and reads a sentence
+that says the opposite ("you can open" presupposes projects they cannot), directly above `<NewProjectForm>`
+(`:958-959`, rendered for `isAdmin`).
+
+**WHY.** The nine edge classes include FIRST-RUN, and the recorded rule for this file is that *"'there are no
+projects' would be a claim about the workspace"* — a claim the OWNER is entitled to, since an owner's list IS the
+workspace's list (`isAdmin` sees everything). The one sentence serves two facts and is true of one. Controller ruling
+§4 #4 ordered a first-run pointer on `/my-work`; this is the sibling surface the founder lands on next, and it has
+the form but not the sentence.
+
+**WHAT WOULD HAVE BEEN BETTER.** Branch on `isAdmin && projects.length === 0`: *"No projects yet — create the first
+one below."*; keep the member's sentence for the member.
+
+**MEASUREMENT.** `[SOURCE]` `:666` (`shown`), `:883-887`, `:958-962`. Not driven — I will not found a workspace in
+the owner's database.
+
+**SEVERITY: Minor** (claimed).
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -873,15 +899,15 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**22 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 22). By claimed severity, read from the
-heading text: **Critical 0 · Important 16 · Minor 6** (16 + 6 = 22).
+**23 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 23). By claimed severity, read from the
+heading text: **Critical 0 · Important 16 · Minor 7** (16 + 7 = 23).
 
 - **Important (16):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-13, E5-15, E5-16, E5-20, E5-21
-- **Minor (6):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22
+- **Minor (7):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22 = 18 of 22. **Reproduced with an injected failure, zero server writes:** E5-13,
-E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21.
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22 = 18 of 23. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
 sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever), E5-20 (stacked dialogs and
@@ -953,7 +979,7 @@ Filters `:784-830`, History `:408-419`, invitations `:205-240`) · `docs/faq.md`
    needs a write against the owner's database. I read the code at the seams (E5-7, E5-9) and did not drive them.
 4. **Permissions as a member or guest** — I held only the owner's session. Every refusal path was reproduced by
    injecting a failure client-side (E5-13, E5-15) or read from source; none was observed as a real 403/422.
-5. **`/help` at paint**, `/sign-in`, `/privacy`, `/terms`, `/w/[workspaceId]` home, `/my-work` — not opened.
+5. **`/help` at paint**, `/sign-in`, `/privacy`, `/terms`, `/my-work` — not opened; `/w/[workspaceId]` home read in source only (`:660-680`, `:860-890`, `:950-1000`).
 6. **Backlog / List / Calendar / Timeline** — not driven; the List's due column was read in source only.
 7. **`test-cases/13-*.md`** — not verified id by id.
 8. **exec 2's remaining §2e candidates** (~30) beyond the three I verified — not opened.
@@ -1009,5 +1035,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 22 findings — Critical 0 · Important 16 · Minor 6 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 23 findings — Critical 0 · Important 16 · Minor 7 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
