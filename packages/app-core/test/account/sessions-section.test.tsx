@@ -87,7 +87,7 @@ describe('SessionsSection', () => {
    * fix is this `error` prop, the same one-prop shape `PasskeysSection`'s
    * add/remove refusal already carries.
    */
-  it('a revoke refusal renders verbatim in a role="alert"', () => {
+  it('11.220 a revoke refusal renders verbatim in a role="alert"', () => {
     render(<SessionsSection sessions={SESSIONS} onRevoke={vi.fn()} error="Session not found" />);
     expect(screen.getByRole('alert')).toHaveTextContent('Session not found');
   });
