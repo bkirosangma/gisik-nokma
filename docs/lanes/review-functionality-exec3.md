@@ -972,3 +972,133 @@ about the schema.
   `vocabulary.ts` + `ticket-state.ts`), which is cheaper than a BFS for a question that already has a
   pointer. Where the graph would have paid — *"what else reads this constant?"* — `grep` was cheaper
   still, and I used it with a positive control on every sweep.
+
+---
+
+## 14.6 MORE ROUND-2 FINDINGS
+
+## 14.6.1 — `E3-11` (r2) — MINOR — `Features.md` says the fixture suite holds **84**; it holds **86**
+
+**WHAT.** `Features.md:377`, the "Planted-defect fixture suite" bullet in §4:
+
+> ⚙️ **Planted-defect fixture suite** — **84 JSON fixtures**, one per refusal path plus accepting twins,
+> run by an in-memory harness…
+
+**WHY it is wrong.** The suite holds **86** fixtures, measured three independent ways that agree:
+
+| measurement | result |
+|---|---|
+| `ls packages/rule-engine/fixtures/*.json \| wc -l` | **86** |
+| the harness's own loader — `harness.ts:146-148` reads the directory and filters `.endsWith('.json')`, **non-recursively** (`:141`: *"Fixtures live FLAT in `fixtures/`: the scan is non-recursive"*) | **all 86 load** |
+| `pnpm exec vitest run test/fixtures.test.ts` → **`PASS (87) FAIL (0)`** — the file runs one `it()` per fixture plus its own twin-audit case | **86 + 1 = 87** ✓ |
+
+There are no subdirectories and no non-fixture JSON, so the universe is unambiguous: every `.json` in
+that directory is a fixture the suite runs.
+
+**WHY THIS ONE IS WORTH FILING even though `Features.md` is not code.** The workspace's own standing
+rule calls `Features.md` *"the canonical catalogue of every user-facing feature and internal sub-system"*
+and *"the source of truth"*, and requires it to be updated in the same change set as the code. **It is
+the only source-of-truth document in this repository with no checker among the nine**: `test-cases/` has
+`check-case-ids` and `check-case-citations`; the runbook has `check:runbook`; the env contract has
+`check:env`; help has `check:help`; the migrations have `check:migrations`; the task ledger has
+`check:tasks`. **Nothing verifies a single number in `Features.md`** — so a count there has no maintainer
+and no instrument, which is the exact condition the repo already names elsewhere
+(`http-origin.ts:252-258`: *"A count in a comment about a PAST decision has no maintainer"*).
+
+**WHAT WOULD HAVE BEEN BETTER.** Say what the suite is rather than how big it is — *"one fixture per
+refusal path plus accepting twins"* is the load-bearing half and is already there; "84" adds nothing and
+decays. If the number is wanted, it needs the same treatment `test-cases/` got: a checker, or a
+derivation, not a literal.
+
+**SEVERITY: Minor.** No behaviour; a stale count in documentation. Filed because `Features.md` is the
+artifact every lane is told to trust and it is the one artifact with no gate.
+
+**MEASUREMENT.** As tabulated above. Nothing here was inferred from the other two — the file count, the
+loader's own filter, and the runner's case count were each read separately, and they agree.
+
+---
+
+## 14.6.2 — `E3-12` (r2) — MINOR — "eleven plain-language checks" — there are **twelve**, and the twelfth is the section's own neighbouring feature
+
+**WHAT.** `Features.md:378`, the "Structural validation" bullet:
+
+> ⚙️ **Structural validation** — `validateWorkflowDef`, pure and I/O-free so the future builder UI shares
+> it: **eleven plain-language checks** covering workflows that cannot finish, states that cannot be
+> reached or entered, duplicate ids/edges, and rules that can never fire or be satisfied — including
+> `rdu-unenterable-state`…
+
+**WHY it is wrong.** `packages/domain/src/validate-workflow.ts` emits **twelve** distinct codes:
+
+```
+:15  no-states            :86  unknown-initial-state
+:27  duplicate-state-id   :112 unreachable-state
+:40  reserved-state-id    :130 terminal-no-inbound
+:47  no-terminal-state    :145 empty-restrict-to
+:56  unknown-transition-state  :154 rdu-unknown-state
+:73  duplicate-transition      :169 rdu-unenterable-state
+```
+
+**AND THE TWELFTH IS IDENTIFIABLE, WHICH IS WHAT MAKES THIS A DRIFT AND NOT A MISC0UNT.**
+`reserved-state-id` (`:40-43`) refuses a definition that declares `BACKLOG_STATE_ID` in states or
+transitions — *"`backlog` is reserved — every workflow has it without declaring it."* That check belongs
+to the **Universal Backlog state** work, dated **2026-09-17**, and `Features.md`'s very next bullet in
+the same section records it: *"**Universal Backlog state** … backlog/closed spec §1.1, 2026-09-17"*.
+**So the count in one bullet went stale when the feature named in the bullet beside it landed.** The
+claim's own list of what the checks cover — "workflows that cannot finish, states that cannot be reached
+or entered, duplicate ids/edges, and rules that can never fire or be satisfied" — also does not describe
+a reserved-id check, which is the tell.
+
+**WHAT WOULD HAVE BEEN BETTER.** Either drop the number (the list of what is covered is the useful half),
+or add the reserved-id class to the enumeration so the sentence and the count move together. The same
+conclusion as `E3-11`, and the same root: **`Features.md` counts have no instrument.**
+
+**SEVERITY: Minor.**
+
+**MEASUREMENT.** `grep -nE "code: '[a-z0-9-]+'" packages/domain/src/validate-workflow.ts` → 12 lines,
+12 distinct codes, listed above. Positive control on the same path: `adviseWorkflowDef`'s two codes are
+found by the same pattern and **do** match their claim (`Features.md:379`, "Two codes", measured 2:
+`rdu-bypassable`, `rule-bypassable`) — so the pattern distinguishes a right count from a wrong one in the
+same file.
+
+---
+
+## 14.6.3 — `E3-13` (r2) — MINOR — A citation in `visible-where.ts` resolves and points at the wrong line
+
+**WHAT.** `apps/server/src/read/visible-where.ts:48-52`, the paragraph establishing that the owner row of
+the visibility table is its own row and that the plan text was wrong about it:
+
+> The oracle is the implemented Plan 4 code, which says the opposite in three places:
+> `can-see.ts:101` (`case 'owner': return true`), `can-see.ts`'s own table (owner is its own yes/yes/yes
+> row, disclosed by owner decision 2026-08-27), and **`test/visibility/visible-tickets.test.ts:88`
+> ("from the bypass alone")**.
+
+**WHY it is wrong.** The quoted text is **not at `:88`**. Measured:
+
+```
+grep -rn "from the bypass alone" apps/server/test/ apps/server/src/
+  → test/visibility/visible-tickets.test.ts:91:  [owner, allTickets], // from the bypass alone
+  → src/read/visible-where.ts:51:  * …`:88` ("from the bypass alone").
+sed -n '88p' test/visibility/visible-tickets.test.ts
+  → [memberOn1, [tktWs, tktP1]],
+```
+
+**`line 88` is a different fixture's expectation.** The citation **resolves** — line 88 exists and is a
+real line of that file — which is exactly why it has survived: a reader who checks that the file exists
+and the line is plausible finds nothing wrong. The quote sits **three lines below**.
+
+**The other two citations hold, and I checked them rather than the paragraph as a whole:**
+`can-see.ts:101` is `case 'owner':` with `return true;` at `:102` (the claim writes them as one clause,
+which is a fair paraphrase of adjacent lines), and `can-see.ts:34` is the four-column table's
+`| owner | yes | yes | yes |` row. **So this is one wrong citation out of three in a sentence that is
+otherwise correct and load-bearing** — the reason I file it at Minor rather than higher.
+
+**WHAT WOULD HAVE BEEN BETTER.** Cite by content where the content is the point: *"the fixture commented
+`from the bypass alone`"* — which is also more robust, because the comment is the thing being quoted.
+This repo has the rule already; `soft-delete-background-paths.test.ts` states it at its own `:169-171`:
+*"which is why this file cites by what the line READS rather than by where it sat."*
+
+**SEVERITY: Minor.** Documentation only, and the property it supports is true.
+
+**MEASUREMENT.** The three commands above, each run from the repo root. Control on the same path: the
+same `grep -rn` for the quoted string returns **two** hits, one in the test and one in the citing file —
+so the sweep is not silent and the quote is unique to one line.
