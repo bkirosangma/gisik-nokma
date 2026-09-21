@@ -2,7 +2,7 @@
 
 **Lane:** executor 6 (Opus 5) · **branch:** `exec6/review-functionality` · **base:** `origin/main`
 **Started:** 2026-09-21 09:42:10 IST (T0 recorded by the controller: 09:41:50 IST; phase 1 closes 15:41:50 IST, phase 2 closes 18:41:50 IST)
-**Last phase-1 edit:** 2026-09-21 14:48 IST — findings E6-1 … E6-25 and Appendices A–AF were all written and pushed before the phase-1 boundary; the commit that carries this line is the one to read.
+**Last phase-1 edit:** 2026-09-21 14:49 IST — findings E6-1 … E6-25 and Appendices A–AF were all written and pushed before the phase-1 boundary; the commit that carries this line is the one to read.
 **Every measurement in this report was taken at `a7b6292b78c50208e8055c9f8639b1e8dcf4caa0`**
 (`Merge pull request #630 from bkirosangma/ctl/cycle36-rotation`) in
 `/Users/kiro/my_projects/gisik-nokma-exec6`, with `node v22.22.2` in `PATH`, unless a finding says otherwise.
@@ -329,7 +329,7 @@ the line I opened) · **SEVERITY** (Critical / Important / Minor). Where I could
 | E6-22 | Minor | Export's "ticket-only access for someone outside the workspace": product has no such tier; naming accepted, inert | App. AA |
 | E6-23 | Minor | `BACKUP_TIME_UTC=25:00`/`99:99` accepted and scheduled elsewhere (99:99 → +4 days); `9:00` throws | script in the finding |
 | E6-24 | Important | Phone board / desktop list / phone search keep a soft-deleted ticket; the replica filter sits on the two reads the shells never call | App. AF |
-| E6-25 | Minor | `deploy/do/{app.yaml,README.md}`: four "until it lands" sentences (forged-XFF bypass "open on main", `DATABASE_CA_CERT` "no effect"/"not in the schema", seeds "once Task 11 lands") — all landed the day they were written | five calls + git in the finding |
+| E6-25 | Minor | `deploy/do/{app.yaml,README.md}` + `.env.example`: five "until it lands" sentences (forged-XFF bypass "open on main", `DATABASE_CA_CERT` "no effect"/"not in the schema", seeds "once Task 11 lands") — all landed the day they were written | five calls + git in the finding |
 
 ### E6-1 — IMPORTANT — The in-app help tells the user a job cannot be deleted; the product ships `Delete`
 
@@ -1625,7 +1625,7 @@ floor; the defect and its one-line fix stand either way.
 
 ---
 
-### E6-25 — MINOR — The deploy directory tells the operator that a forged `X-Forwarded-For` still buys a private rate-limit bucket ("Plan 11 T2 (not yet on main)"), that `DATABASE_CA_CERT` "has no effect" and is "not yet in config.ts's zod schema", and that the seed scripts are still to land; all four landed the day the sentences were written, and both files were edited since without the sentences moving
+### E6-25 — MINOR — The deploy directory tells the operator that a forged `X-Forwarded-For` still buys a private rate-limit bucket ("Plan 11 T2 (not yet on main)"), that `DATABASE_CA_CERT` "has no effect" and is "not yet in config.ts's zod schema", that the seed scripts are still to land, and (`.env.example`) that `SMTP_URL` does nothing until the SMTP sender lands; all five landed the day the sentences were written — one in the very commit that wrote the sentence — and the files were edited since without the sentences moving
 
 **WHAT.** `deploy/do/app.yaml:95-101`, the comment above `TRUST_PROXY: "true"`, verbatim: *"…lets a caller pick
 its own rate-limit bucket via a forged leftmost X-Forwarded-For entry — Plan 11 T2 (not yet on main) fixes
@@ -1664,9 +1664,14 @@ added by the same `935f5d66`; and `README.md:71` says to run the seed scripts *"
 seed CLIs landed at 08:27 that morning (`de882483`, #154, `apps/server/src/seed/cli-seed-convenience-corner.ts`)
 and `docs/runbook.md:214` already gives the command. Four forward-looking sentences in a two-file deploy directory,
 all four resolved by 14:02 on the day they were written, none corrected by the edits that followed (`app.yaml`
-at 18:50 and on 2026-09-08; `README.md` at 19:41). (The fifth
-forward-looking sentence, `app.yaml:112-117` on `OPTIONS` not being mounted on the auth catch-all, is still
-true: `auth/routes.ts` registers `method: ['GET', 'POST']` only.) (Sweep: `git grep -n -i "not yet on main\|not yet landed\|until .* lands"` over `apps packages deploy
+at 18:50 and on 2026-09-08; `README.md` at 19:41). (The other
+forward-looking sentence in `app.yaml`, `:112-117` on `OPTIONS` not being mounted on the auth catch-all, is still
+true: `auth/routes.ts` registers `method: ['GET', 'POST']` only.) **And a fifth, in `.env.example:234-238`, was
+false the moment it was written:** *"CONSUMED by the SMTP magic-link sender task. Until that lands the log sender is
+what sends, whatever is set here"* — `git blame -L 236,236` → `935f5d66`, and `git show 935f5d66 --stat` lists
+`apps/server/src/auth/smtp-magic-link-sender.ts` (+99) and `select-senders.ts` (+52) in that same commit;
+`selectMagicLinkSender` (`select-senders.ts:5-11`) returns the SMTP sender whenever `SMTP_URL` is set. An operator
+reading `.env.example` today is told that setting `SMTP_URL` changes nothing. (Sweep: `git grep -n -i "not yet on main\|not yet landed\|until .* lands"` over `apps packages deploy
 Features.md test-cases scripts` minus `dist` and tests → 10 lines: these two, E3-27's `Features.md:452`, five where "until … lands" is a runtime sentence about a frame,
 a roster or a sweep (`Features.md:463`, `:2345`, `:2932`, `p/[projectId]/page.tsx:1330`,
 `13-second-wave-roles-and-navigation.md:609`), `scripts/check-skipif-coverage.mjs:14` (verified still TRUE: `.github/workflows/ci.yml:454-492`'s `other-tests`
