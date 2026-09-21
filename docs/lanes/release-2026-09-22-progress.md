@@ -9,3 +9,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E3-15 | done | 9c6655ec | security-middleware.test.ts 13.198 (onRoute seam) |
 | T-E3-32 | done | deab2aa0 | check-permission.test.ts 12.398 (docblock content assertion) |
 | T-E6-15 | done | 871065c3 | security-middleware.test.ts 13.1100-13.1103 (stream origin check) |
+| T-E6-16 | done | a4063bb5 | device-flow.test.ts 14.112-14.112b (authKind fence) |
