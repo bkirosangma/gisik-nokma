@@ -2146,6 +2146,18 @@ origin: 'mobile',
 *"The one client-side envelope builder. **Everything a client claims is here**"*, with `actorId` a required
 field of the envelope (`:14`).
 
+> **⚠ CORRECTED AFTER FILING, and the mechanism I first stated was WRONG.** I wrote that the comment
+> *"is written to the ledger as that person's claim"* — **it is not.** Lane 5's `E5-21`, an extension of
+> my own `E2-1(e)` on the phone half, sent me to the door: `apps/server/src/permissions/check-permission.ts:542-545`
+> `if (env.actorId !== ctx.sessionUserId) return refuse(IDENTITY_SPOOF_REASON);`, where
+> `IDENTITY_SPOOF_REASON` is `'You cannot submit a claim as another person.'` (`:71`). **So the claim is REFUSED,
+> never committed — the ledger is not falsified.** The real outcome is worse for the person and better for the
+> record: the comment queues in the phone's outbox (`OfflineAcceptError`, swallowed at `ticket-screen.tsx:53`
+> as *"the expected offline outcome"*) and is then refused at the first sync that has a session, so the words
+> are lost and no screen says so. **The finding stands — a phone comment that cannot succeed and reports
+> nothing — but the sentence above about the ledger was mine and it was false.** Recording it rather than
+> quietly rewriting, because a mechanism only has to be plausible to be repeated, and I repeated one I had
+> not opened the door for.
 **WHY it is wrong — the choice, not the absence, is the defect.** The comment records that the session id
 is not wired, so *some* placeholder is needed; the defect is **which** one. `state.assigneeId` is a **real
 member of the workspace**, so a comment typed by the phone's user is written to the ledger **as that
