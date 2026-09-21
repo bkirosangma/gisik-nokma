@@ -2,7 +2,7 @@
 
 **Lane:** executor 6 (Opus 5) · **branch:** `exec6/review-functionality` · **base:** `origin/main`
 **Started:** 2026-09-21 09:42:10 IST (T0 recorded by the controller: 09:41:50 IST; phase 1 closes 15:41:50 IST, phase 2 closes 18:41:50 IST)
-**Last phase-1 edit:** 2026-09-21 14:46 IST — findings E6-1 … E6-25 and Appendices A–AF were all written and pushed before the phase-1 boundary; the commit that carries this line is the one to read.
+**Last phase-1 edit:** 2026-09-21 14:48 IST — findings E6-1 … E6-25 and Appendices A–AF were all written and pushed before the phase-1 boundary; the commit that carries this line is the one to read.
 **Every measurement in this report was taken at `a7b6292b78c50208e8055c9f8639b1e8dcf4caa0`**
 (`Merge pull request #630 from bkirosangma/ctl/cycle36-rotation`) in
 `/Users/kiro/my_projects/gisik-nokma-exec6`, with `node v22.22.2` in `PATH`, unless a finding says otherwise.
@@ -230,9 +230,9 @@ doors and 11 hostile payload shapes; the upload door; impossible due dates; blan
 external person on an explicit list; the replica's five reads after a delete.
 
 **Citations, resolved mechanically at the end (13:50 IST, re-run 14:25 IST after E6-24):** every backticked
-`file:line` or `file:a-b` in this report was extracted (331 distinct at the last re-run, 14:47; 280 at 13:50) and checked
+`file:line` or `file:a-b` in this report was extracted (336 distinct at the last re-run, 14:49; 280 at 13:50) and checked
 against the tree — the file must resolve to exactly one path under `git ls-files` and the line must be within
-`wc -l`. **323 resolve; the 8 that do not are the staged export's
+`wc -l`. **328 resolve; the 8 that do not are the staged export's
 `github.md` / `workspaces-gap.md` (outside the repo, cited by their staged path in prose) and one
 `node_modules` line (better-auth's `routes.mjs`, version stated).** Two ranges had overrun their files by one
 or two lines and 32 basenames were ambiguous across packages; all were corrected in `2afaf4e2` and earlier.
