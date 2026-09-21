@@ -123,9 +123,15 @@ Absolutely. That link appears once, on that screen, at that moment. It is not in
 is nowhere else. Close the tab and you have to withdraw the invitation and start over. **Paste it into
 your email before you do anything else.**
 
-**What do I put in the "Projects" box on the invite form?**
-Nothing. It asks for a comma-separated list of identifiers — long strings of letters and numbers you
-would have to go and find. It is not usable by a person as it stands. Leave it empty.
+**What do I put in the "Project access" box on the invite form?**
+**All projects in this workspace**, unless the invitation is genuinely for one project only — in which
+case pick the project by NAME from the same dropdown. It is a list of names; you never type an
+identifier.
+
+**⚠ It used to ask you to type identifiers, and this answer said to leave it empty.** Until 2026-09-21
+the box was labelled *"Projects (comma-separated ids, optional)"* and wanted long strings of letters
+and numbers you would have to go and find. The old answer is kept here so a reader who remembers it
+finds the correction where they last saw it.
 
 **Is an admin the same as "sees everything"?**
 No, and this surprises everybody. **Admin is a "can change things" role, not a "can see things"
@@ -198,13 +204,15 @@ is on, the Inbox tells you when you have been assigned something, My Work is bui
 list can group by it.
 
 **Can I set a due date?**
-**No control does it.** The calendar and timeline are built entirely around claimed dates and the
-"due soon" list depends on them, and nothing offers to claim one.
+**Yes — on the website's job panel.** Open a job and its **Due** row is a date box: pick a day and it
+is claimed under your name, with the row reading back who set it and when. **Clear the box to take the
+claim off** — that is recorded as a clearing rather than as a blank date. The calendar, the timeline,
+the list's due column and the "due soon" notice all read the same claim, so the date you set here is
+the date those screens show.
 
-There is one place that accepts a typed field value, and it will not give you a due date. If an admin
-puts a **"Require a field to be set"** rule on one of your moves, the Move dialog puts a plain typing
-box on screen for that field and will not let the move through until you fill it in. That is the only
-place in the product that takes a field value from a person.
+There is also a place that accepts a TYPED field value, and it works differently. If an admin puts a
+**"Require a field to be set"** rule on one of your moves, the Move dialog puts a plain typing box on
+screen for that field and will not let the move through until you fill it in.
 
 **The built-in due date and start date will not go in that box.** They expect a day *and* an optional
 note about it, together, and a single typing box cannot produce that. You get refused with something
@@ -215,7 +223,8 @@ Calendar and Timeline, labelled with your field's name — but a custom date nev
 the calendar (that still needs the two built-in dates), and the "due soon" list and Inbox message only
 ever look at the built-in due date. So it will put a day on a calendar and it will not chase anybody.
 
-Worth knowing about. Not a substitute for a due date.
+Worth knowing about — but it is no longer the only way to put a date on a calendar, and it is not how
+you set the built-in due date.
 
 **Can I rename a job?**
 Yes. Open the job and type into the title at the top of the sheet. **Enter** or clicking away saves it;

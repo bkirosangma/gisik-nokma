@@ -560,6 +560,10 @@ function mapBoardCard(raw: unknown, path: string, roster: ReadonlyMap<string, st
     // on the card. One level, not one meaning.
     cause: mapCause(provenance['cause'], `${provenancePath}.cause`),
     rollup: mapRollup(record['rollup'], `${path}.rollup`),
+    // The SAME reader the list card uses, over the same wire field — ruling
+    // E5-2. `TicketCard.dueDate` was already on every card the board is
+    // projected from; this mapper was the one place that did not look at it.
+    dueDate: mapDueDate(record['dueDate'], `${path}.dueDate`, roster),
     // `pending` is client-side truth: set only between submit and the server's
     // answer, so anything off the wire is settled by definition.
     pending: false,

@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
+import { act } from 'react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ListRow, RosterMember, TicketListView } from '@gisik-nokma/app-core';
@@ -462,6 +463,95 @@ describe('the project page mounts four views over one list read', () => {
     expect(container.querySelector('[data-day="2026-08-20"]')?.hasAttribute('data-today')).toBe(
       false,
     );
+  });
+
+  /**
+   * 13.1179 — ruling E5-43: the shell RE-DERIVES `today`, so a tab left open
+   * across IST midnight stops keeping yesterday's ring.
+   *
+   * `11.164` above pins that the day is computed in IST at the instant the two
+   * spellings disagree; this case is about WHEN it is computed at all, which is
+   * the half the note that stood at `page.tsx` deferred with a named owner. The
+   * clock is advanced across the SAME boundary 11.164 uses — 18:30Z is IST
+   * midnight — so a fix that merely added a second reading of the same wrong
+   * rule would satisfy neither case.
+   *
+   * The ring is read through `[data-today="true"]`'s own `data-day`, never by
+   * cell position: a ring that appeared on the RIGHT cell for the wrong reason
+   * (a re-render that recomputed the day by a UTC shortcut) would still be
+   * caught, because the expected value is `istToday`'s own answer for the
+   * instant rather than a hand-typed day.
+   */
+  describe('13.1179 the today-ring is re-derived when the page is shown again', () => {
+    /** The instant one minute BEFORE IST midnight on 2026-08-20. */
+    const BEFORE = new Date('2026-08-20T18:29:00.000Z');
+    /** One minute later: the IST day rolls to the 21st, UTC still says the 20th. */
+    const AFTER = new Date('2026-08-20T18:30:00.000Z');
+
+    async function openCalendarOn(instant: Date): Promise<HTMLElement> {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.setSystemTime(instant);
+      const { container } = render(
+        <Providers services={servedList([row()])}>
+          <ProjectPage />
+        </Providers>,
+      );
+      await openTab('Calendar');
+      await waitFor(() => expect(container.querySelector('[data-today="true"]')).not.toBeNull());
+      return container;
+    }
+
+    const ringDay = (container: HTMLElement): string | null =>
+      container.querySelector('[data-today="true"]')?.getAttribute('data-day') ?? null;
+
+    it('13.1179 a visibilitychange across IST midnight moves the ring to the new IST day', async () => {
+      expect(istToday(() => BEFORE)).toBe('2026-08-20');
+      expect(istToday(() => AFTER)).toBe('2026-08-21');
+      const container = await openCalendarOn(BEFORE);
+      expect(ringDay(container)).toBe('2026-08-20');
+
+      vi.setSystemTime(AFTER);
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      await waitFor(() => expect(ringDay(container)).toBe('2026-08-21'));
+    });
+
+    it('13.1179 a focus event re-derives it too — the other half of the listener pair', async () => {
+      // Both listeners are registered because a browser is not obliged to fire
+      // either one alone: a desktop window that was never hidden comes back by
+      // FOCUS, and a tab that was hidden comes back by `visibilitychange`.
+      const container = await openCalendarOn(BEFORE);
+      expect(ringDay(container)).toBe('2026-08-20');
+
+      vi.setSystemTime(AFTER);
+      await act(async () => {
+        window.dispatchEvent(new Event('focus'));
+      });
+
+      await waitFor(() => expect(ringDay(container)).toBe('2026-08-21'));
+    });
+
+    it('13.1179 CONTROL — with NO event the advanced clock does not move the ring', async () => {
+      // THE CONTROL THAT MAKES THE TWO CASES ABOVE MEAN SOMETHING. Same render,
+      // same clock advance, no event: the ring must stay on yesterday's day,
+      // because that IS the defect E5-43 names. Without this, both cases above
+      // would pass against an implementation that read the clock on every
+      // render — `today` as a plain `const` — and neither would be testing the
+      // listener at all. This is the same paired positive/negative shape
+      // `13.515`/`13.516` use for the board's scroll-into-view.
+      const container = await openCalendarOn(BEFORE);
+      expect(ringDay(container)).toBe('2026-08-20');
+
+      vi.setSystemTime(AFTER);
+      // Nothing dispatched. The day is STATE now, so even a re-render for some
+      // other reason would keep it — that is the point of it being state.
+      expect(ringDay(container)).toBe('2026-08-20');
+      expect(container.querySelector('[data-day="2026-08-21"]')?.hasAttribute('data-today')).toBe(
+        false,
+      );
+    });
   });
 
   /**

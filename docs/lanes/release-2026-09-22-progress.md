@@ -143,3 +143,13 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E6-19 | done | 3fdb357810fa0a98567df6f146084fb8256ca56f | ist-day.test.ts 3.961 + ticket-types.test.ts 5.77 + rule-engine fields.test.ts 5.78 (RED→GREEN); filter bounds left shape-only, reason in commit |
 | T-E6-20 | done | ba15105f3641100aaede255662a27ca27056b895 | workflow-schema.test.ts 4.55 + ticket-types.test.ts 5.79 (RED→GREEN); displayName exported once from display-name.ts |
 | T-E6-20 | done | 89c3af84f21b9c46e283dcd43090422a0b56102c | follow-up on the merged tree: displayName reports an empty name once (main E4-29 listed three items); app-core 1730/1730, server 1733, web 657, domain 553, rule-engine 346 |
+| B13 | claimed | 2026-09-21 21:52 | /Users/kiro/my_projects/gisik-nokma-ds3 |
+| T-E5-2 | done | 049c8c60628a97ec697b3656f9878155223f48d1 | board.test.tsx 13.1177 x6; 2 mutations, distinct signatures |
+| T-E5-6 | done | 0f9005c603ec2931987c4dfc131c003a97315645 | ticket-sheet.test.tsx 13.1178 x6; 2 mutations (one SURVIVED first, case was vacuous, fixed) |
+| T-E5-43 | done | 13308826a93f325620e65fc873820f41fc42bd44 | project-calendar-timeline.test.tsx 13.1179 x3; 2 mutations, distinct signatures |
+| T-E2-30 | done | dcfd11c44ebf9c63714f2f7b7f18e8639db8c54b | sheet-delete.test.tsx 13.1180 x4; 2 mutations, both single-case |
+| T-E5-11 | done | d47193c315ed0344f80523deb873ee640275076c | members-page.test.tsx 13.1181 x3; 2 mutations (3-fail / 1-fail) |
+| T-E2-31 | done | a8ad9ff7483a0e5ed3acfb269deb4cfc7c5dfa0d | ticket-sheet.test.tsx 13.1182 x1; mutation B RE-ADDED the removed guard and reddened identically — inertness measured |
+| T-E2-35 | done | f0ba7753536f9d5d7eb9dd4ccdad1fb9bfaccf64 | ticket-sheet.test.tsx 13.1183 x3; 2 mutations (3-fail / 1-fail) |
+| T-E2-51 | done | ba7f52236e97d42b0c7730262099121a279d2a8e | prose-only: case 13.761 re-pointed, both citation sets verified; no suite moves |
+**§13 id block for B13 (controller allocation, 2026-09-21 22:0x): `13.1177`–`13.1186`** — §13 ids are now per release batch like §17; the block table lands in `test-cases/13-hig-per-screen.md`. B13 mints §13 ids only from this block, and inside the block in order. **Spent: `13.1177` (T-E5-2). Next free: `13.1178`.** If `check-case-ids` ever reds on a collision with `main`, `main`'s ids never move — renumber OURS into the block. For any section with no block table, the next free id is the max over `origin/main` AND every `origin/rel/*` head, verified by union==sum.

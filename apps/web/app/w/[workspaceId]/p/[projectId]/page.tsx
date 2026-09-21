@@ -466,6 +466,47 @@ function ProjectBoard() {
     message: string;
     undoFor: string | null;
   } | null>(null);
+  /**
+   * RULING E2-30 (2026-09-21) — THE DURABLE HALF OF THE WAY BACK FROM A DELETE.
+   *
+   * ## What was wrong
+   *
+   * Every view excludes a soft-deleted ticket (`LIVE_TICKET_WHERE`, the single
+   * `deleted_at IS NULL` predicate in `apps/server/src/read/visible-where.ts`),
+   * and the inverse event has exactly ONE producer in the client: the Undo
+   * button inside `deleteNotice`'s toast. That toast caps itself at
+   * `TOAST_DEFAULT_DURATION_MS` (15 s, an OWNER RULING — so this does not touch
+   * it), which left a person who deleted by mistake at twenty seconds with **no
+   * recourse inside the product at all**, while the server was perfectly able to
+   * put the ticket back. `check-permission.ts` gates `ticket.deleted` on
+   * project-admin rights: the gate protected the DOING and not the UNDOING,
+   * which is backwards.
+   *
+   * ## What this is, and what it deliberately is not
+   *
+   * One slot — the last ticket deleted from this page — rendered as an inline
+   * strip that does not expire, beside the toast rather than instead of it. The
+   * toast stays exactly as it was, because a transient message at the foot of
+   * the screen IS the right shape for a quick reversal; this is the route for
+   * the person who looked away.
+   *
+   * **One slot, not a list, and that is the prototype's own shape**: the notice
+   * state above is one-slot for the same reason ("a second delete inside the
+   * first toast's window is a NEW toast"). A LIST would be a deletion history,
+   * which is the surface E2-30 measures as absent everywhere; claiming this is
+   * one would repeat the defect the sentence at `onDeleted` is being fixed for.
+   * A second delete therefore REPLACES this, and the replace is stated on the
+   * strip's own sentence so a person is never told a ticket is reachable when it
+   * has been superseded.
+   *
+   * **Client-only, which is the finding's own claim** — "neither needs anything
+   * the server does not already do": `restoreDeletedTicket` already submits the
+   * gated `ticket.restored` event and already reloads both reads. The other arm
+   * the finding offers, a "Deleted" section on the List, would need the server
+   * to serve rows every read path currently excludes by that one predicate, and
+   * that is a visibility door rather than a client affordance.
+   */
+  const [durableUndo, setDurableUndo] = useState<{ ticketId: string; title: string } | null>(null);
   const applyRankOverride = useCallback((ticketId: string, rank: string | null) => {
     setRankOverrides((current) => {
       const next = new Map(current);
@@ -886,6 +927,11 @@ function ProjectBoard() {
           return;
         }
         if (result.status === 'committed') {
+          // Ruling E2-30 — the durable strip goes ONLY on a committed restore.
+          // A failed one keeps it, because the route back is still there and
+          // the person may want to try again; clearing it here would take the
+          // affordance away at the exact moment it proved useful.
+          setDurableUndo(null);
           list.reload();
           board.reload();
           return;
@@ -1286,17 +1332,48 @@ function ProjectBoard() {
    * thing allowed to make this decision; an ISO slice would ring yesterday's
    * cell for five and a half hours every night.
    */
-  const today = istToday();
-  /*
-   * RECORDED, NOT FIXED: `today` is computed once per RENDER and never
-   * re-derived on its own, so a tab left open across IST midnight keeps
-   * yesterday's ring until something else re-renders this page. The day
-   * COMPUTATION is right — 11.164 pins it at the instant the UTC and IST
-   * spellings disagree — and this is only about when it is recomputed.
-   * Deliberately not fixed here: the fix is a timer, and a timer is a
-   * re-render mechanism that needs its own case, its own cleanup and its own
-   * argument about cadence. OWNER: whoever next opens this page's date wiring.
+  const [today, setToday] = useState(() => istToday());
+  /**
+   * RULING E5-43 (2026-09-21) — `today` is now RE-DERIVED, and this replaces the
+   * "RECORDED, NOT FIXED" note that stood here. That note was accurate about the
+   * defect it named: the day was computed once per RENDER and never on its own,
+   * so a tab left open across IST midnight kept yesterday's ring until something
+   * else re-rendered this page. The day COMPUTATION was always right — 11.164
+   * pins it at the instant the UTC and IST spellings disagree — and the note
+   * deferred only WHEN it is recomputed, to "whoever next opens this page's date
+   * wiring". This is that change.
+   *
+   * ## Why an EVENT and not a tick
+   *
+   * The finding allows either. This takes the event because it needs no cadence
+   * argument: a tick must answer "how often is often enough", and every answer
+   * is wrong in one direction — a minute is 1440 wake-ups a day to move one
+   * value, an hour leaves a ring stale for up to an hour after midnight. A
+   * visibility or focus event instead fires exactly when the page is ABOUT to be
+   * looked at again, which is the only moment the ring's staleness can be seen,
+   * and a background tab's ring is not being looked at. It is also what the
+   * finding names first.
+   *
+   * ## Why state rather than a `let`
+   *
+   * A re-derivation only reaches the two views through a render, so the day has
+   * to be state. Setting the SAME day is free — React bails out on an identical
+   * value — so a person switching tabs ten times across a quiet afternoon costs
+   * ten comparisons and no render.
+   *
+   * Both listeners are removed on cleanup; neither is registered on the server,
+   * because this file is a client component (`'use client'` at the top) and the
+   * effect never runs there.
    */
+  useEffect(() => {
+    const refresh = (): void => setToday(istToday());
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
 
   /**
    * The roster resolved into the two things the views need from it, and BOTH are
@@ -2147,6 +2224,58 @@ function ProjectBoard() {
             />
 
             {/*
+              RULING E2-30 — THE DURABLE WAY BACK FROM A DELETE, rendered as a
+              direct child of `.gn-project` so it is on EVERY tab rather than
+              inside the one that happened to be open: deleting a ticket removes
+              it from the Board, the List, the Calendar and the Timeline at
+              once, so the route back belongs to the page and not to a tab.
+
+              `role="status"`, not `alert`: this is a state the page is in, and
+              it was entered by the reader's own action — the same choice the
+              toast makes, and the reason a screen reader announces it once
+              rather than interrupting.
+
+              `data-testid` on both the strip and its Undo, because the toast
+              renders an Undo too and a test that matched by role and name alone
+              would find two of them.
+            */}
+            {durableUndo !== null ? (
+              <div className="gn-project__deleted" role="status" data-testid="deleted-undo">
+                <span className="gn-project__deleted-text">
+                  {`${durableUndo.title} is deleted. Undo here until you delete another ticket or reload the page.`}
+                </span>
+                <button
+                  type="button"
+                  className="gn-project__deleted-undo"
+                  data-testid="deleted-undo-button"
+                  /*
+                    NAMED FOR THE TICKET, and not merely "Undo". The toast is on
+                    screen at the same moment and ITS control is called "Undo"
+                    too, so two identically-named buttons would be on one page —
+                    ambiguous to a screen-reader user and unaddressable by role
+                    and name. The visible word stays "Undo" and the accessible
+                    name CONTAINS it, so WCAG 2.5.3 (Label in Name) holds; the
+                    same containment question the bulk-close button's
+                    `Close all (2)` does NOT hold, which is recorded on that
+                    control rather than silently repeated here.
+                  */
+                  aria-label={`Undo the deletion of ${durableUndo.title}`}
+                  onClick={() => void restoreDeletedTicket(durableUndo.ticketId)}
+                >
+                  Undo
+                </button>
+                <button
+                  type="button"
+                  className="gn-project__deleted-dismiss"
+                  aria-label="Dismiss the deleted-ticket message"
+                  onClick={() => setDurableUndo(null)}
+                >
+                  ×
+                </button>
+              </div>
+            ) : null}
+
+            {/*
               THE DISCLOSURE STRIP (Step 3/4, the shared mechanism Task 8's
               workflow picker also feeds) — ONE strip, rendered once, with
               PER-TAB inputs since 2026-09-17 (exclude-mode spec §3): Board
@@ -2539,6 +2668,15 @@ function ProjectBoard() {
                     passes `false` and keeps "No tickets here yet — create one."
                   */
                   epicsHidden={boardNarrowing.epicsDropped > 0}
+                  /*
+                    RULING E5-2 — the board's one relation to the present. The
+                    SAME `today` the Calendar and Timeline tabs are handed two
+                    blocks up: one `istToday()` per render, so the three views
+                    cannot disagree about which day it is. `Board` draws the
+                    late tone from it and draws nothing extra without it (its
+                    own `BoardProps.today` docblock).
+                  */
+                  today={today}
                   /*
                     THE MOVE ARROWS' CAPABILITY (board-prototype-port Task
                     13). Gated on `session.kind === 'signed-in'`, the SAME
@@ -2979,9 +3117,25 @@ function ProjectBoard() {
           */
           onDeleted={(ticketId, title) => {
             setDeleteNotice({
-              message: `${title} deleted · its history is retained`,
+              /*
+                ⚠ THE SENTENCE NAMES THE DURABLE ROUTE (ruling E2-30, 2026-09-21).
+                It read `${title} deleted · its history is retained` — TRUE of
+                the ledger, and MISLEADING about what the person can do, because
+                the retained history had no screen: no deleted view, no filter
+                axis, no search arm. A sentence that promises a record nobody
+                can reach is worse than one that says nothing, and the fix the
+                finding asks for is exactly this: name where the way back is.
+                The route named is real from the same moment — the strip below
+                is rendered with this toast, not after it.
+              */
+              message: `${title} deleted · you can also undo this on the page`,
               undoFor: ticketId,
             });
+            // One slot: a second delete replaces the first ticket's strip, the
+            // same one-slot rule the toast above keeps. Said plainly on the
+            // strip's own sentence, so nobody is told a ticket is still
+            // reachable when it has been superseded.
+            setDurableUndo({ ticketId, title });
             /*
               ⚠ BOTH READS ARE RE-ASKED HERE, and the deletion's correction must
               not depend on the stream. **Found by independent review

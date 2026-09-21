@@ -373,6 +373,42 @@ not silently.
   padding, only the radius literal is asserted absent, so the board card falls through to `.gn-card`'s
   token-driven radius rather than pinning 12px under every style. Mutation-witnessed: a planted literal
   `border-radius` on the rule is caught by the same test. — (`packages/ui/test/components.test.tsx`)
+- **13.1177** ✅ A board card draws a CLAIMED due date in its meta line, and draws a date that has
+  PASSED in the danger tone (`.gn-board-card__due--late`) — ruling **E5-2** (release 2026-09-22, batch
+  B13), from `docs/lanes/review-ux-exec5.md:242`. **The id comes from B13's ALLOCATED §13 BLOCK,
+  `13.1177`–`13.1186`** (controller allocation, 2026-09-21 22:0x: `§13` ids are now per release batch,
+  the same shape `§17` already had; the block table lands in `test-cases/13-hig-per-screen.md`).
+  `13.1177` is the block's first id and is free across `origin/main` AND every `origin/rel/*` head.
+  **The reading this paragraph replaced is the one the block exists to retire**, and it was wrong in a
+  way worth recording: it took the "next id free in the shared space" and measured it with
+  `git grep -cw` — which returned a confident ZERO for `13.520` while `13.520a` and `13.520b` were
+  ALREADY in `13-owner-requests-and-backlog.md`. A word-boundary match is blind to the letter-suffixed
+  form, and the guard's own regex admits that form (`\d+\.\d+[a-z]?`), so the two tools disagree about
+  what "taken" means. `13.1177` was re-verified with `git grep -w` across `origin/main` AND every
+  `origin/rel/*` head (a `13.517` positive control in the same invocation returned 160 hits while
+  `13.1177` and `13.1176` both returned none, so the search provably reaches the ids it claims are
+  absent). (Separately: `\b` inside `-E` returns a silent empty on BSD grep — a same-run positive control
+  is what catches it, and `13.517` is the control used here.)
+  **The defect this pins:** until the ruling the Board drew NO due date at all — `BoardCard` carried
+  none while `TicketCard.dueDate` was already on every card the board is projected from and
+  `ListRow.dueDate` read it off the same wire — so a ticket a week overdue was indistinguishable from an
+  undated one on the project's DEFAULT tab (`page.tsx:193` "The default stays `'board'`"), while the
+  sheet, the List, My Work, the Calendar and the Timeline all carried the date. The label is
+  `formatDate(due.date)` and the claimant rides along as the span's `title`. **The tone is computed from
+  a `today` PROP, never a device clock** — `apps/web`'s project page hands `Board` the same
+  `istToday()` it already hands the Calendar and Timeline tabs — and the case carries FOUR controls,
+  because a tone always on and a tone never on both satisfy a single-armed assertion: a FUTURE date
+  draws the label without the tone; a date due TODAY is not late (the comparison is `<`); with no
+  `today` the label still draws and the tone does not; and a card claiming NO date draws no label at
+  all, which is what stops the positive case passing on a span that is simply always rendered. The
+  export's OTHER meta bit, the ticket key, is deliberately NOT drawn and IS a real wire gap: it is
+  composed on the single-ticket read (`apps/server/src/routes/tickets.ts`), and `TicketCard` carries no
+  prefix and no per-project number to compose one from. **Mutation-witnessed twice, with two distinct
+  signatures:** forcing the label's condition false reddens the five label-and-tone cases and leaves the
+  "no date → no label" control green (`Tests 5 failed | 49 passed`), and forcing `late` to a constant
+  reddens EXACTLY the tone case and nothing else (`Tests 1 failed | 53 passed`) — the second is what
+  proves the tone assertion is discriminating rather than carried by the label's own presence. —
+  (`packages/app-core/test/views/board.test.tsx`)
 
 ## Task 7 — the per-column empty state and Ruling R6 (board-prototype-port plan, 2026-09-16)
 

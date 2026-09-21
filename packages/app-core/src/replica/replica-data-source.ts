@@ -1079,6 +1079,10 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
           // otherwise know.*
           cause: claim === null ? null : causeOf(claim),
           rollup: null,
+          // The same reader the offline LIST row uses, off the same state —
+          // ruling E5-2: a board card and a list row for one ticket must not
+          // disagree about whether a date is claimed.
+          dueDate: dueDateOf(state),
           pending: pendingIds.has(state.id),
         };
       }

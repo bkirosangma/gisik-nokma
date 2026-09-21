@@ -99,6 +99,9 @@ const BOARD_WITH_DONE = {
               typeId: 'task',
               assignee: null,
               stateProvenance: PROVENANCE_387,
+              // Ruling E5-2 made this REQUIRED on `BoardCard`; `null` is "this
+              // ticket claims no date", the same default `boardCardSeed` uses.
+              dueDate: null,
               cause: null,
               rollup: null,
               pending: false,

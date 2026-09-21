@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { IngestResult, TicketTypeDef, WorkflowDef } from '@gisik-nokma/domain';
@@ -169,8 +169,11 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     expect(within(titleRow).getByText('File the GST return')).toBeInTheDocument();
     const dueDateRow = screen.getByTestId('field-due');
     expect(within(dueDateRow).getByText('set by Kiro on 18 Aug 2026')).toBeInTheDocument();
-    // The due DAY CLAIM renders as claimed, through the one renderer.
-    expect(within(dueDateRow).getByText('30 Aug 2026')).toBeInTheDocument();
+    // The due DAY CLAIM renders as claimed — as the editor's own VALUE since
+    // ruling E5-6, which is the ISO day a `type="date"` input holds. This
+    // assertion used to read `getByText('30 Aug 2026')` over a read-only span
+    // the ruling replaced; the claim line above is unchanged.
+    expect(within(dueDateRow).getByLabelText('Due date')).toHaveValue('2026-08-30');
   });
 
   it('PLANTED DEFECT: a nameless actor is attributed by id — never blank, never "system"', async () => {
@@ -2650,6 +2653,16 @@ describe('the `Subtask of {parent}` chip', () => {
  * **And two of the prototype's three are EDITORS there, which is a separate
  * door.** `16.29` asserts the READ-ONLY half so that making them editable later
  * is a decision rather than a drift — the same shape as F's `16.22`.
+ *
+ * **THAT DECISION WAS TAKEN FOR DUE (ruling E5-6, 2026-09-21), and `16.29` now
+ * pins the split rather than the uniform absence.** The record above is kept
+ * because it is what made the change a decision on the record instead of a
+ * drift: every surface in this product READS a due date — My Work's overdue
+ * count, the List's due column, the Calendar, the Timeline, the due-soon
+ * notification — and none could set one, while the deferral lived in a
+ * catalogue record and the manual rather than in front of the person. The
+ * editor's own write behaviour is `13.1178`. **Priority is STILL that unbuilt
+ * door** and `16.29` still asserts it as an absence.
  */
 /**
  * SHEET PROTOTYPE PARITY, 2026-09-20 — cases `16.81`–`16.99`.
@@ -2788,7 +2801,15 @@ describe('G — Priority, Due and Type as rows', () => {
     // BOTH, in one case: a row that drew the day without the claim would be a
     // standing property rather than a claim, which is the rule every other row
     // on this sheet keeps.
-    expect(within(row).getByText('30 Aug 2026')).toBeInTheDocument();
+    //
+    // ⚠ AMENDED BY RULING E5-6 (2026-09-21). The day half used to be
+    // `getByText('30 Aug 2026')` over a read-only span. The export's row draws
+    // an `<input type="date">` and no such span (`desktop.dc.html:1200-1203`),
+    // so the day now renders as that control's value — the ISO day, which is
+    // what a `type="date"` holds and what the event carries. The "both halves"
+    // assertion is unchanged in substance: the day is still drawn, and the
+    // attribution still travels with it.
+    expect(within(row).getByLabelText('Due date')).toHaveValue('2026-08-30');
     expect(within(row).getByText('set by Kiro on 18 Aug 2026')).toBeInTheDocument();
     // And the absence copy is NOT present, so the two arms are distinguished.
     expect(within(row).queryByText('No date claimed')).toBeNull();
@@ -2852,24 +2873,182 @@ describe('G — Priority, Due and Type as rows', () => {
     expect(screen.getByTestId('field-due')).toBeInTheDocument();
     expect(screen.queryByTestId('field-dueDate')).toBeNull();
     // And one node, not two: the date appears exactly once on the sheet.
-    expect(screen.getAllByText('30 Aug 2026')).toHaveLength(1);
+    //
+    // ⚠ AMENDED BY RULING E5-6. This read `getAllByText('30 Aug 2026')` and
+    // asserted a length of 1. The due day is no longer loose text on this sheet
+    // at all — it is the editor's value (see 16.24) — so the same "one node,
+    // not two" property is asserted on the nodes the row actually draws: ONE
+    // date control, and NO second rendering of the day as text, which is the
+    // second row's signature.
+    expect(screen.getAllByLabelText('Due date')).toHaveLength(1);
+    expect(screen.queryByText('30 Aug 2026')).toBeNull();
   });
 
-  it('16.29 the three rows are READ-ONLY — the prototype’s editors are a separate door', async () => {
+  it('16.29 the rows are READ-ONLY except the one ruling E5-6 made an editor', async () => {
     // The prototype draws Priority as a segmented control with click handlers
     // and Due as an `<input type="date">` (`desktop.dc.html:1192-1205`); only
-    // Type is read-only there. The dispatch's scope is the ROWS, not editing
-    // them — so this asserts the absence, the same way `16.22` does for F's
-    // chip. Without it, "read-only" is a claim nobody checked.
+    // Type is read-only there.
+    //
+    // ⚠ AMENDED BY RULING E5-6 (2026-09-21), and this is the amendment the
+    // case's own suite docblock asked for: it said 16.29 "asserts the READ-ONLY
+    // half so that making them editable later is a decision rather than a
+    // drift". The decision was taken — `apps/web` could read a due date in four
+    // places and set it in none — so **Due now HAS an editor and Priority does
+    // not**, and this case pins both halves of that split rather than the
+    // uniform absence it used to pin. The loop that used to run over all three
+    // rows would now fail on `field-due`, which is exactly the reddening the
+    // docblock wanted: it forced this to be a decision on the record.
     renderSheet(ticketRead());
     await settled();
 
-    for (const id of ['field-priority', 'field-due', 'field-type']) {
+    // DUE — the editor, asserted POSITIVELY so the case cannot pass by the
+    // control silently disappearing.
+    expect(screen.getByTestId('field-due').querySelector('input')).not.toBeNull();
+
+    // PRIORITY and TYPE — still read-only, asserted as an absence, the same way
+    // `16.22` does for F's chip. Without it, "read-only" is a claim nobody
+    // checked.
+    for (const id of ['field-priority', 'field-type']) {
       const row = screen.getByTestId(id);
       expect(row.querySelector('input'), id).toBeNull();
       expect(row.querySelector('select'), id).toBeNull();
       expect(row.querySelector('button'), id).toBeNull();
     }
+  });
+
+  /**
+   * 13.1178 — ruling E5-6: the Due row's WRITE. The row this batch's sibling
+   * case `13.1177` put a due date on the board's card; this one is the door
+   * that lets a person put one there in the first place.
+   *
+   * The payload shape is asserted with `toEqual`, never `toMatchObject`, for
+   * the reason the description door's own case gives: the envelope must carry
+   * EXACTLY the composition, so a sheet that re-spelled the fieldId, dropped
+   * `value`, or sent `{ date: '' }` where the export sends `null` would be a
+   * different claim about the ledger.
+   *
+   * `fireEvent.change` rather than `userEvent.type`: a `type="date"` control's
+   * value is set wholesale (a date is not typed glyph by glyph in jsdom), and
+   * the commit path under test is the SAME one either way — the row commits on
+   * `onBlur`/Enter, not on change.
+   */
+  describe('13.1178 the Due row accepts a date, and clears one', () => {
+    const dueInput = (): HTMLElement => screen.getByLabelText('Due date');
+
+    it('13.1178 committing a changed date submits one ticket.field_set carrying that day', async () => {
+      const source = renderSheet(ticketRead());
+      await settled();
+      fireEvent.change(dueInput(), { target: { value: '2026-09-14' } });
+      fireEvent.blur(dueInput());
+      await waitFor(() => expect(source.ingested).toHaveLength(1));
+      expect(source.ingested[0]![0]!.type).toBe('ticket.field_set');
+      expect(source.ingested[0]![0]!.payload).toEqual({
+        fieldId: 'dueDate',
+        value: { date: '2026-09-14' },
+      });
+    });
+
+    it('13.1178 CONTROL — the two-change dance below reaches the write, proved with a DIFFERENT final value', async () => {
+      // ⚠ THIS CASE EXISTS BECAUSE THE ONE BELOW WAS VACUOUS, and the mutation
+      // witness is what found it. The unchanged-value control first read a
+      // single `change` to the value the input ALREADY held, then a blur. A
+      // single change to an identical value fires no React `onChange` at all,
+      // so the draft stayed `null`, `onBlur`'s own `dueDraft !== null` gate
+      // short-circuited, and `submitDueDate` was never called — **the case
+      // passed against a `submitDueDate` with its no-op guard deleted
+      // (`Tests 114 passed`), so it was asserting nothing.**
+      //
+      // This is the precondition that makes the next case mean something: the
+      // SAME two changes with a final value that DIFFERS must reach the write.
+      // If this case fails, the next one's zero is silence rather than the
+      // guard.
+      const source = renderSheet(ticketRead());
+      await settled();
+      fireEvent.change(dueInput(), { target: { value: '2026-08-30' } });
+      fireEvent.change(dueInput(), { target: { value: '2026-09-14' } });
+      fireEvent.blur(dueInput());
+      await waitFor(() => expect(source.ingested).toHaveLength(1));
+      expect(source.ingested[0]![0]!.payload).toEqual({
+        fieldId: 'dueDate',
+        value: { date: '2026-09-14' },
+      });
+    });
+
+    it('13.1178 CONTROL — an UNCHANGED date sends nothing at all', async () => {
+      // The no-op guard `submitTitle` also carries, and the ledger reason it
+      // carries it: this event is append-only, so a commit of the value the
+      // ticket already has would put a history line in the ticket saying
+      // somebody claimed the date they did not touch.
+      //
+      // The draft is made genuinely non-null in TWO REAL changes — out to a
+      // different day, then back to the claimed one — for the measured reason
+      // the case above records. That leaves `dueDraft` set to the claimed day
+      // with the field otherwise untouched, so the guard is the ONLY thing that
+      // can keep the ingest away, and deleting it reddens this case.
+      const source = renderSheet(ticketRead());
+      await settled();
+      fireEvent.change(dueInput(), { target: { value: '2026-09-14' } });
+      fireEvent.change(dueInput(), { target: { value: '2026-08-30' } });
+      fireEvent.blur(dueInput());
+      await settled();
+      expect(source.ingested).toHaveLength(0);
+    });
+
+    it('13.1178 clearing the input submits value null — the clearing claim, not an empty date', async () => {
+      // The export's own reading of an emptied control (`desktop.dc.html:3599`:
+      // `{ due: v || null }`, noted "Due date cleared"), and the shape this
+      // event's door docblock names for a cleared field.
+      const source = renderSheet(ticketRead());
+      await settled();
+      fireEvent.change(dueInput(), { target: { value: '' } });
+      fireEvent.blur(dueInput());
+      await waitFor(() => expect(source.ingested).toHaveLength(1));
+      expect(source.ingested[0]![0]!.payload).toEqual({ fieldId: 'dueDate', value: null });
+    });
+
+    it('13.1178 CONTROL — a ticket claiming NO date can still be given its first one', async () => {
+      // The dateless arm is the one the defect is loudest in: before this
+      // ruling a ticket born without a due date could never acquire one, so
+      // this is the case that proves the editor is not merely an amend path.
+      const source = renderSheet(
+        ticketRead({
+          ticket: ticketStateSeed({
+            fields: {
+              title: {
+                value: 'File the GST return',
+                actorId: 'user_kiro',
+                clientTime: '2026-08-18T07:59:00.000Z',
+                serverTime: '2026-08-18T08:00:00.000Z',
+              },
+            },
+          }),
+        }),
+      );
+      await settled();
+      // The absence sentence is still drawn beside the empty control — the
+      // prototype's own copy, and the whole point of the row before this case.
+      expect(screen.getByTestId('field-due').textContent).toContain('No date claimed');
+      expect(dueInput()).toHaveValue('');
+      fireEvent.change(dueInput(), { target: { value: '2026-10-02' } });
+      fireEvent.blur(dueInput());
+      await waitFor(() => expect(source.ingested).toHaveLength(1));
+      expect(source.ingested[0]![0]!.payload).toEqual({
+        fieldId: 'dueDate',
+        value: { date: '2026-10-02' },
+      });
+    });
+
+    it('13.1178 Enter commits the draft, exactly as the title field’s own Enter does', async () => {
+      const source = renderSheet(ticketRead());
+      await settled();
+      fireEvent.change(dueInput(), { target: { value: '2026-12-01' } });
+      fireEvent.keyDown(dueInput(), { key: 'Enter' });
+      await waitFor(() => expect(source.ingested).toHaveLength(1));
+      expect(source.ingested[0]![0]!.payload).toEqual({
+        fieldId: 'dueDate',
+        value: { date: '2026-12-01' },
+      });
+    });
   });
 
   it('16.30 draws them in the prototype’s order: Assignee, Priority, Due, Type', async () => {
@@ -2922,6 +3101,23 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
     return document.querySelector('.gn-ticket-sheet__footer') as HTMLElement;
   }
 
+  /**
+   * ⚠ AMENDED BY RULING E2-35 (2026-09-21) — the delete is now TWO presses.
+   *
+   * The footer's `Delete` used to perform the delete on one press. It opens a
+   * confirmation now (`Dialog`, `BulkCloseDialog`'s shape), so every arm below
+   * that was one click is two. The helper exists rather than four inlined pairs
+   * so the change of shape is stated once, and so no arm can accidentally assert
+   * against a dialog still standing open.
+   *
+   * The confirm is queried PAGE-WIDE, not `within(footer())`: the dialog renders
+   * outside the footer, which is the whole point of it.
+   */
+  async function pressDelete(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Delete ticket' }));
+  }
+
   it('16.84 draws Delete, and the ruled-out navigation is ABSENT', async () => {
     renderSheet(ticketRead());
     await settled();
@@ -2941,7 +3137,7 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
     const source = renderSheet(ticketRead(), undefined, { onClose, onDeleted });
     await settled();
 
-    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await pressDelete(user);
     await waitFor(() => expect(source.ingested).toHaveLength(1));
 
     const batch = source.ingested[0]!;
@@ -2966,7 +3162,7 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
     const source = renderSheet(ticketRead(), undefined, { onClose });
     await settled();
 
-    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await pressDelete(user);
     await waitFor(() => expect(source.ingested).toHaveLength(1));
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
@@ -2997,7 +3193,7 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
     renderSheet(read, source, { onClose, onDeleted });
     await settled();
 
-    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await pressDelete(user);
     await waitFor(() =>
       expect(
         screen.getByText(/Only a project admin can delete a ticket in this project\./),
@@ -3029,7 +3225,7 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
     renderSheet(read, source, { onClose, onDeleted });
     await settled();
 
-    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await pressDelete(user);
     await waitFor(() =>
       expect(screen.getByText(/The server did not answer this change\./)).toBeInTheDocument(),
     );
@@ -3903,6 +4099,32 @@ describe('E5-9 a refused Delete answers beside the button that was pressed', () 
   it('PLANTED DEFECT: ONE sentence, inside the footer, not at the head of the body', async () => {
     const user = userEvent.setup();
     const read = ticketRead();
+ * 13.1182 — ruling E2-31: THE GUARD THAT ACTUALLY HOLDS.
+ *
+ * `submitTicketEvent` carried `if (submitting) return;` at its top, with a
+ * docblock claiming it guarded "a second click landing on the same render pass
+ * as the first, before React has re-rendered the `disabled` attribute onto the
+ * DOM". It could not: `submitting` is RENDER STATE, so two calls in one render
+ * pass both close over the same pre-commit `false`. A guard whose stated purpose
+ * is unreachable is indistinguishable from a working one to every reader, so the
+ * line is removed and the docblock now says what holds instead — **the
+ * `disabled` attribute**, on both buttons.
+ *
+ * This case pins that, and it is the reason removing the line is safe rather
+ * than merely tidy: with the first Close held pending, a SECOND click posts
+ * nothing. It is a real assertion about the surviving guard, not a restatement
+ * of the deleted one — deleting `disabled={submitting}` reddens it.
+ *
+ * **It is deliberately NOT the composer's `submittingRef` fix.** That precedent
+ * (`TicketEditorSlot.tsx`) reached its handler from TWO sources — a Save button
+ * and a blur/Enter commit — and the `disabled` landing on the field is what
+ * fired the second. Close/Reopen has one source and no blur-commit, so copying
+ * that fix here would install a second guard that also cannot fire.
+ */
+describe('13.1182 one Close in flight, and a second click that is not a click', () => {
+  function heldSource(read: TicketRead) {
+    /** Called to let the held ingest answer. */
+    let release: (() => void) | null = null;
     const source = createFakeDataSource(
       {
         getTicket: async () => read,
@@ -3930,6 +4152,51 @@ describe('E5-9 a refused Delete answers beside the button that was pressed', () 
     // is the structural claim; the pixel claim is the lane's measurement above,
     // which a jsdom sheet cannot make (it lays nothing out).
     expect(refusal.closest('footer')).not.toBeNull();
+        new Promise((resolve) => {
+          release = () =>
+            resolve(
+              events.map((event) => ({
+                status: 'committed' as const,
+                eventId: event.id,
+                seq: 1,
+                serverTime: '2026-08-20T09:00:00.000Z',
+              })),
+            );
+        }),
+    );
+    return { source, release: () => release?.() };
+  }
+
+  it('13.1182 a second click while the first Close is in flight posts NOTHING', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead({
+      ticket: ticketStateSeed({ stateId: 'done', stateCategory: 'terminal', closed: null }),
+    });
+    const { source, release } = heldSource(read);
+    renderSheet(read, source);
+    // NOT `settled()`: that waits for the DEFAULT ticket's provenance line
+    // ("marked Doing …"), and this fixture is terminal. The Close control is
+    // the better signal anyway — it only draws once the workflow has named the
+    // state's category, which is the read this case needs.
+    const close = (): HTMLElement => screen.getByRole('button', { name: 'Close' });
+    await waitFor(() => expect(close()).toBeInTheDocument());
+
+    await user.click(close());
+    // The first click's own `setSubmitting(true)` has re-rendered the control
+    // DISABLED. That attribute is the guard the finding's paragraph now names.
+    await waitFor(() => expect(close()).toBeDisabled());
+    expect(source.ingested).toHaveLength(1);
+
+    // A second click, dispatched while the first ingest is still unanswered.
+    // `disabled` is what stops it: without that attribute this click reaches
+    // the handler and posts a SECOND `ticket.closed`.
+    await user.click(close());
+    expect(source.ingested).toHaveLength(1);
+
+    release();
+    await waitFor(() => expect(close()).not.toBeDisabled());
+    // And the single event is the one the first click made.
+    expect(source.ingested[0]![0]!.type).toBe('ticket.closed');
   });
 });
 
@@ -4076,6 +4343,28 @@ describe('17.072 a committed move does not carry its comment to the next one (E2
    * anything.
    */
   it('17.072 the comment box is empty on the next Move, and the first comment still reaches the wire', async () => {
+ * 13.1183 — ruling E2-35: THE DELETE ASKS FIRST.
+ *
+ * The footer's `Delete` performed the delete on ONE press, while the product
+ * reaches the SAME soft delete on many tickets through a whole confirmation
+ * surface (`bulk-close-dialog.tsx`). So a multi-ticket close needed a decision
+ * point and a single-ticket delete did not — although the single one is the
+ * harder to notice and easier to trigger by accident, and it is gated on
+ * project-admin rights. This case pins the ask.
+ *
+ * **It does NOT pin a local `precheck` gate, and that is a decision rather than
+ * an omission**: the deletion door's own docblock
+ * (`packages/rule-engine/src/checks/deletion.ts`) states that authority "is not
+ * a pure function of the envelope — this engine's context carries no membership
+ * at all", so a local gate would answer every question about this delete except
+ * the one that makes it consequential. The server stays the authority.
+ */
+describe('13.1183 Delete asks first', () => {
+  function footer(): HTMLElement {
+    return document.querySelector('.gn-ticket-sheet__footer') as HTMLElement;
+  }
+
+  it('13.1183 pressing Delete ASKS, and asks nothing of the server', async () => {
     const user = userEvent.setup();
     const source = renderSheet(ticketRead());
     await settled();
@@ -4102,5 +4391,55 @@ describe('17.072 a committed move does not carry its comment to the next one (E2
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
 
     expect(screen.getByLabelText('Comment (required by this transition)')).toHaveValue('');
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Delete this ticket?' });
+    // It names the ticket and the consequence, INCLUDING the two ways back —
+    // "its history is retained" alone would be the misleading half E2-30
+    // corrected in the toast's own sentence.
+    expect(within(dialog).getByText(new RegExp(ticketRead().title))).toBeInTheDocument();
+    expect(dialog.textContent).toContain('the Board, the List, the Calendar and the Timeline');
+    expect(dialog.textContent).toContain('15 seconds');
+    // THE ASK IS NOT THE ACT.
+    expect(source.ingested).toHaveLength(0);
+
+    // And the confirm is NOT a second button called "Delete": the footer's is
+    // called that, and two identically-named buttons on one screen are
+    // ambiguous to a screen-reader user and unaddressable by role and name.
+    expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1);
+  });
+
+  it('13.1183 CONTROL — Cancel closes the ask and still posts nothing', async () => {
+    // Without this arm, a Cancel wired to the delete would pass the case above.
+    const user = userEvent.setup();
+    const source = renderSheet(ticketRead());
+    await settled();
+
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await screen.findByRole('dialog', { name: 'Delete this ticket?' });
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete this ticket?' })).toBeNull());
+    expect(source.ingested).toHaveLength(0);
+    // The sheet is still here — a Cancel that closed it would be a delete by
+    // another name.
+    expect(within(footer()).getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+  });
+
+  it('13.1183 the CONFIRM is what deletes — one ticket.deleted, this ticket, {}', async () => {
+    const user = userEvent.setup();
+    const source = renderSheet(ticketRead());
+    await settled();
+
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await screen.findByRole('dialog', { name: 'Delete this ticket?' });
+    await user.click(screen.getByRole('button', { name: 'Delete ticket' }));
+
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    const batch = source.ingested[0]!;
+    expect(batch).toHaveLength(1);
+    expect(batch[0]!.type).toBe('ticket.deleted');
+    expect(batch[0]!.entity).toEqual({ kind: 'ticket', id: TICKET });
+    expect(batch[0]!.payload).toEqual({});
   });
 });

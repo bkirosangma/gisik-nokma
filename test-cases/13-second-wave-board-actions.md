@@ -51,11 +51,36 @@ were never in scope for a client whose route cannot serve them.
   column out" must not quietly become "we left the table out". The role is asserted as `owner` /
   `member`, NOT as a prettified label, because that is what the row carries — `role` is a plain
   `string` on `RosterMember` (never a second `WorkspaceRole` list to drift from), and a case expecting
-  "Owner" would assert a mapping nobody wrote. The case also pins the ABSENCE of a per-row control:
-  no `combobox`, no `button` inside the table, because the prototype's role cell is a `<select>` under
-  `canEditRole` (`:679-685`) and no route accepts a role change on this branch — a picker here would be
-  a control that cannot be honoured. (`apps/web/app/w/[workspaceId]/members/page.tsx:253`, `:256`,
-  `:259`, `:294`, `apps/web/test/members-page.test.tsx:446`)
+  "Owner" would assert a mapping never written — `role` is a plain `string` on `RosterMember`, never a
+  second `WorkspaceRole` list to drift from, so a case expecting "Owner" would assert a mapping nobody
+  wrote.
+  **⚠ RE-POINTED 2026-09-21 (ruling E2-51), because the sentence that stood here asserted an absence the
+  product had REVERSED.** It read: *"The case also pins the ABSENCE of a per-row control: no `combobox`,
+  no `button` inside the table, because the prototype's role cell is a `<select>` under `canEditRole`
+  (`:679-685`) and **no route accepts a role change on this branch** — a picker here would be a control
+  that cannot be honoured."* The reason was already false when written (the role-change door ships, and
+  the guard — not the door — was what had been missing), and the test had ALREADY been re-pointed in the
+  same change that made it false, so only this prose still carried it.
+  **What the case asserts now, which is the property rather than its proxy:** each row shows the wire's
+  own token; a row the viewer may edit carries a control named for its person, and a row they may not
+  chips the token instead. Both arms are asserted on one render: the owner's row (whose role the control
+  cannot state) carries NO button, and the member's row carries one whose accessible name is
+  `Role for Anselma Marak` and whose text is `member` — so a prettified label anywhere in either arm
+  fails it. `isEditableRole` (`apps/web/app/w/[workspaceId]/members/page.tsx:601`) is the predicate that
+  decides which arm a row takes.
+  **⚠ AND THE CITATION MOVED, to `apps/web/test/members-page.test.tsx:754-783`.** This line cited
+  `:446`, which resolves to an unrelated line inside the `3.138` docblock — the finding measured that.
+  The re-pointed test is in the `13.761` describe, and **it is not at the finding's own `:602` either**:
+  this batch's task 5 (ruling E5-11) added ~180 lines to that file earlier in the same session, so a
+  line number read before it does not resolve after it. `.754-783` is where the describe and its two
+  assertions are TODAY, measured against the tree.
+  **⚠ AND THE SOURCE CITATIONS ARE RE-POINTED TOO, for the same reason the sentence was:**
+  `page.tsx:253`, `:256`, `:259` and `:294` were the OLD absence claim's citations (the invite/revoke
+  ingest and the role-guard comment) and none of them supports the sentence that now stands. The three
+  that do are verified against the tree: **`:511`** and **`:519`** are the two arms of one ternary (the
+  `Select` named `Role for <label>`, and the chip carrying `member.role` verbatim), and **`:601`** is
+  `isEditableRole`, the predicate that decides between them.
+  — (`apps/web/app/w/[workspaceId]/members/page.tsx:511`, `:519`, `:601`)
 
 - ✅ **13.762 — the monogram draws one capital and does not repeat it to a screen reader.** The
   prototype's disc repeats the person's first letter BESIDE their name (`:674-675`), so read aloud the

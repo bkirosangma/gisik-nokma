@@ -5,7 +5,7 @@ import {
   type SubmittedEvent,
   type TicketTypeDef,
 } from '@gisik-nokma/domain';
-import { Button, Chip, SegmentedControl, Select, Sheet } from '@gisik-nokma/ui';
+import { Button, Chip, Dialog, SegmentedControl, Select, Sheet } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
@@ -537,6 +537,23 @@ export function TicketSheet({
    */
   const titleSubmittingRef = useRef(false);
   /**
+   * RULING E5-6 (2026-09-21) — the Due row's EDITOR, which until this ruling
+   * was the product's clearest example of a fact it acts on and cannot accept.
+   *
+   * The state is the title control's, one row down and for the same reasons:
+   * `dueDraft === null` MEANS "not editing" rather than travelling beside a
+   * flag, `dueSaving` drives `disabled`, and `dueSubmittingRef` is the
+   * synchronous re-entrancy guard `submitDueDate`'s docblock explains — a REF,
+   * because `disabled` is what makes a browser blur the field and fire a second
+   * commit out of the first one's own `onBlur`.
+   *
+   * The draft holds the input's own value, an IST day (`YYYY-MM-DD`) or the
+   * empty string a cleared `type="date"` reports — never the formatted label.
+   */
+  const [dueDraft, setDueDraft] = useState<string | null>(null);
+  const [dueSaving, setDueSaving] = useState(false);
+  const dueSubmittingRef = useRef(false);
+  /**
    * Ruling 32 (fix round 1, 2026-09-17) — the double-submit latch for
    * Close/Reopen, mirroring `board.tsx`'s `MoveArrows.submitting`
    * (`:956`/`:1029-1035`'s own docblock on why `finally`). Without it a
@@ -547,6 +564,56 @@ export function TicketSheet({
    * dialog with its own submit and its own concerns, untouched here.
    */
   const [submitting, setSubmitting] = useState(false);
+  /**
+   * RULING E2-35 (2026-09-21) — WHETHER THE DELETE'S CONFIRMATION IS OPEN.
+   *
+   * Declared HERE, with the sheet's other state, and that placement is
+   * load-bearing rather than tidy: the sheet returns EARLY while its read is
+   * erroring or loading (`:635`, `:643`), so a `useState` declared beside the
+   * footer it opens would be a hook called after a conditional return. Measured
+   * — putting it there took **112 of 116 cases** red with *"React has detected a
+   * change in the order of Hooks called by TicketSheet"*.
+   *
+   * ## What the confirmation is for
+   *
+   * The footer's `Delete` performed the delete on ONE press. Its own docblock
+   * argues the control is offered to everyone and the SERVER decides — an
+   * argument about PERMISSION that says nothing about confirmation. Meanwhile
+   * the product reaches **the same soft delete** on many tickets through a whole
+   * confirmation surface (`bulk-close-dialog.tsx`: a dialog, per-row outcomes,
+   * its own failure copy, "confirm" five times). So a multi-ticket close needed
+   * a decision point and a single-ticket delete did not — although the single
+   * one is the harder to notice and easier to trigger by accident, and it is
+   * gated on project-admin rights, which is the product's own signal that the
+   * act is consequential. Two measured facts make the press costly: it removes
+   * the ticket from every view (`LIVE_TICKET_WHERE`), and its inverse used to
+   * expire with the toast alone (this batch's E2-30 added the page-level route).
+   *
+   * ## What this does NOT do, and why each omission is deliberate
+   *
+   * **The control is NOT hidden** — the docblock beside `deleteTicket` is right
+   * that a hidden control cannot explain itself, and the finding says so in as
+   * many words. This asks; it does not conceal.
+   *
+   * **The accept is NOT gated on a local `precheck`, though the finding offers
+   * that.** `precheck` runs the shared engine, and the deletion door's own
+   * docblock (`packages/rule-engine/src/checks/deletion.ts`) states what that
+   * engine cannot see: *"AUTHORIZATION is not here. 'Only a project admin can
+   * delete a ticket' is `checkVisibilityPermission`'s sixth check … because
+   * authority is resolved from membership and **is not a pure function of the
+   * envelope — this engine's context carries no membership at all**."* A local
+   * gate would therefore answer every question about this delete EXCEPT the one
+   * that makes it consequential, and would add a second refusal site whose
+   * wording could differ from the server's. The server stays the authority, and
+   * its refusal still renders verbatim in this sheet's own slot.
+   *
+   * **The dialog's own sentence names what a person can actually DO.** Two
+   * routes back, because that is what the product now has: the toast's Undo for
+   * the ruled 15 seconds (the host owns it) and the page strip this batch added.
+   * Saying "its history is retained" alone would be the same misleading half
+   * E2-30 corrected in the toast's own sentence.
+   */
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   /**
    * The new-subtask field (door F, 2026-09-19), and its own double-submit
    * latch and refusal slot — the same pair `submitting`/`editorError` keep for
@@ -1208,12 +1275,33 @@ export function TicketSheet({
    * reset in a `finally`, mirroring `board.tsx`'s `submitDirect`
    * (`:1029-1035`'s own docblock on why `finally` rather than after the
    * `await`): a REJECTED ingest must not leave Close/Reopen disabled forever,
-   * which resetting only on the happy path would do. The early `if
-   * (submitting) return` guards against a second click landing on the same
-   * render pass as the first, before React has re-rendered the `disabled`
-   * attribute onto the DOM (`userEvent`'s own await notwithstanding, this is
-   * belt-and-braces for a synchronous double-invoke, not the primary defence
-   * — the `disabled` attribute is).
+   * which resetting only on the happy path would do.
+   *
+   * ⚠ **THE `if (submitting) return` THAT STOOD AT THE TOP OF THIS FUNCTION IS
+   * GONE (ruling E2-31, 2026-09-21), and this paragraph is what the finding
+   * asked to put in its place.** It claimed to guard *"a second click landing on
+   * the same render pass as the first, before React has re-rendered the
+   * `disabled` attribute onto the DOM"* — and it **cannot** do that, because
+   * `submitting` is RENDER STATE: two calls in one render pass both close over
+   * the same pre-commit `false` and both get through. That is precisely the case
+   * render state is blind to. A guard whose stated purpose is unreachable is
+   * indistinguishable from a working one to every future reader, so it is
+   * removed rather than kept as belt-and-braces.
+   *
+   * **What actually holds is `disabled={submitting}`**, on both buttons
+   * (`:2154`, `:2159`): a second click in a real browser lands on a control
+   * React has already re-rendered, so this handler is never called at all. Case
+   * `13.1182` pins exactly that — two clicks with the first ingest held pending
+   * post ONE event — and deleting the `disabled` term reddens it.
+   *
+   * **And this is NOT the composer's defect wearing a different hat.** The
+   * measured precedent (`packages/editor/src/components/TicketEditorSlot.tsx`:
+   * *"MEASURED, two `comment.added` events for one comment"*) reached its
+   * handler from TWO sources — a Save button AND a blur/Enter commit — and the
+   * `disabled` landing on the field is what fired the second one. Close/Reopen
+   * has one source and no blur-commit, so copying that fix here would install a
+   * second guard that also cannot fire. The finding offers both remedies and
+   * names this one first; the reasoning above is why it is the one taken.
    */
   const submitTicketEvent = async (
     type: 'ticket.closed' | 'ticket.reopened' | 'ticket.deleted',
@@ -1250,7 +1338,6 @@ export function TicketSheet({
       setFooterRefusal(null);
       setFooterTransport(null);
     };
-    if (submitting) return;
     setSubmitting(true);
     try {
       const event = make({
@@ -1391,6 +1478,87 @@ export function TicketSheet({
     }
   };
 
+  /**
+   * RULING E5-6 — the due date's WRITE, and the door the product already had.
+   *
+   * ## What was wrong, and why this is the remedy rather than a second record
+   *
+   * Every surface in this product READS a due date — My Work's overdue count,
+   * the List's due column, the Calendar, the Timeline, the due-soon
+   * notification — and until this ruling no surface could SET one. The door was
+   * recorded as unbuilt (`test-cases/16-remaining-doors.md`, Door G) with a
+   * named owner, so the deferral was known; what the ruling holds is that a
+   * RECORD is not a RULING, and the person in the product was never told, since
+   * only `docs/manual.md` said it. The write path was never the missing half:
+   * `ticket.field_set` has carried `dueDate` since the built-ins were
+   * registered (`ticket-events.ts`'s payload docblock names
+   * `title/description/dueDate/startDate`, and a due date value "is always
+   * `{ date, note? }` — a claim").
+   *
+   * ## The shape is the export's, transcribed rather than invented
+   *
+   * `desktop.dc.html:3599` is the whole of the behaviour: *"const v =
+   * e.target.value; … patch(sheet.id, { due: v || null }, v ? 'Due date
+   * claimed' : 'Due date cleared', true)"* — an EMPTIED input CLEARS the claim,
+   * which is `value: null` on this event. So the payload is `null` for the
+   * empty string and `{ date: next }` otherwise, and there is no third state to
+   * invent.
+   *
+   * ## The two guards `submitTitle` has, and for the same measured reasons
+   *
+   * An UNCHANGED value is not a claim, and this event is append-only: a no-op
+   * commit would put a ledger line in the ticket's history saying somebody
+   * claimed the date it already carried. And `dueSubmittingRef` is set
+   * SYNCHRONOUSLY before the first `await` — a REF and not the `dueSaving`
+   * state, which is render state and useless as a re-entrancy guard: two
+   * commits in one React batch both read the pre-commit `false`, and the
+   * `disabled` that lands on the field makes a real browser blur it, firing
+   * `onBlur` into a second commit while the first is still awaiting.
+   *
+   * A REFUSED answer keeps the draft on screen beside the refusal, exactly as
+   * `submitTitle` does — clearing it would hand the reader back the old date
+   * next to a sentence refusing the new one, with their entry gone.
+   */
+  const submitDueDate = async (next: string): Promise<void> => {
+    if (next === (dueDate?.date ?? '')) {
+      setDueDraft(null);
+      return;
+    }
+    if (dueSubmittingRef.current) return;
+    dueSubmittingRef.current = true;
+    setDueSaving(true);
+    try {
+      const event = make({
+        workspaceId,
+        entity: { kind: 'ticket', id: ticketId },
+        type: 'ticket.field_set',
+        // `''` is the clearing claim, never an empty-string date: the export's
+        // own `v || null`, and the shape this event's door docblock names.
+        payload: { fieldId: 'dueDate', value: next === '' ? null : { date: next } },
+      });
+      const results = await dataSource.ingest([event]);
+      const result = results[0];
+      if (result === undefined) {
+        setServerRefusal(null);
+        setTransportError('The server did not answer this change.');
+        return;
+      }
+      if (result.status === 'committed') {
+        setServerRefusal(null);
+        setTransportError(null);
+        setDueDraft(null);
+        read.reload();
+        history.reload();
+        return;
+      }
+      if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
+      else setServerRefusal({ rule: result.code, reason: result.message });
+    } finally {
+      dueSubmittingRef.current = false;
+      setDueSaving(false);
+    }
+  };
+
   /** Close/Reopen: the ticket's own state moved, so both reads are re-asked. */
   const closeOrReopen = (type: 'ticket.closed' | 'ticket.reopened'): Promise<void> =>
     submitTicketEvent(
@@ -1475,14 +1643,24 @@ export function TicketSheet({
    *   row says so plainly when it does not rather than implying the ticket
    *   carries a priority of zero.
    *
-   * ## ⚠ Two of the prototype's three rows are EDITORS there, and that is a
-   * ## separate door — this row builds the READ
+   * ## ⚠ Two of the prototype's three rows are EDITORS there — and since
+   * ## ruling E5-6, so is one of them here
    *
    * `desktop.dc.html:1192-1205` draws Priority as a segmented control whose
    * options carry `on-click` handlers, and Due as an `<input type="date">`. Only
-   * **Type** is read-only there (`<span>{{ sheetType }}</span>`). The dispatch's
-   * scope is *the three ROWS … not editing them*, so this is the read half, and
-   * the editors are named as an unbuilt door in the PR body and the catalogue.
+   * **Type** is read-only there (`<span>{{ sheetType }}</span>`).
+   *
+   * **DUE IS NOW AN EDITOR IN THIS PRODUCT TOO (ruling E5-6, 2026-09-21)** —
+   * see `submitDueDate` and the row's own comment. This paragraph used to say
+   * the dispatch's scope was *"the three ROWS … not editing them"*, that this
+   * was therefore the read half, and that the editors were "named as an unbuilt
+   * door in the PR body and the catalogue"; the first clause was true of the
+   * dispatch it describes, and the conclusion drawn from it was the defect
+   * E5-6 names — a due date every other surface READS, computes lateness from
+   * and notifies about could not be SET anywhere, and the deferral was recorded
+   * rather than ruled. **Priority is still that unbuilt door** and is still
+   * recorded as one; the sentence above is kept rather than deleted because it
+   * is the record of why the read half shipped alone in the first place.
    *
    * ## The absent-value copy is the prototype's own
    *
@@ -2741,22 +2919,68 @@ export function TicketSheet({
             <div className="gn-ticket-sheet__field" data-testid="field-due">
               <dt>Due</dt>
               <dd>
+                {/*
+                  THE EDITOR (ruling E5-6, 2026-09-21), transcribed from the
+                  export's own row (`desktop.dc.html:1200-1203`): an
+                  `<input type="date">` followed by a note line. `value` is the
+                  draft OR the claimed day, never a second piece of state — the
+                  same `titleDraft` shape one row up — and it is the ISO day
+                  (`2026-08-30`), never `formatDate`'s label, because that is
+                  what a `type="date"` input holds and what the event carries.
+                  `onBlur` commits, `Enter` commits, `Escape` abandons the
+                  draft without closing the sheet; there is no Save button
+                  because the export has none.
+
+                  ⚠ **WHAT THIS REPLACED, AND WHY THE OLD ASSERTION MOVED.** The
+                  row used to render `formatDate(due.date)` — *"30 Aug 2026"* —
+                  as read-only text. Case 16.24 pinned that spelling as one of
+                  its "both halves"; the export's row has no such span, so the
+                  case was amended rather than left asserting a rendering this
+                  door replaces. The CLAIM line below is unchanged and still
+                  carries the attribution the old sentence carried.
+                */}
+                <input
+                  className="gn-field__input gn-ticket-sheet__due-input"
+                  type="date"
+                  aria-label="Due date"
+                  value={dueDraft ?? dueDate?.date ?? ''}
+                  disabled={dueSaving}
+                  onChange={(event) => setDueDraft(event.target.value)}
+                  onBlur={() => {
+                    if (dueDraft !== null) void submitDueDate(dueDraft);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      if (dueDraft !== null) void submitDueDate(dueDraft);
+                      return;
+                    }
+                    if (event.key === 'Escape') {
+                      // `preventDefault` is LOAD-BEARING here for the reason
+                      // the title field's own Escape branch records: `Sheet`
+                      // registers a DOCUMENT-level Escape that closes it, so an
+                      // unconsumed Escape would close the sheet and make
+                      // "abandon the draft" true of an input being unmounted.
+                      event.preventDefault();
+                      setDueDraft(null);
+                    }
+                  }}
+                />
                 {/* The prototype's own sentence for this absence
-                    (`desktop.dc.html:2853`), transcribed rather than re-worded:
-                    an unclaimed date is not an empty one. */}
+                    (`desktop.dc.html:1203`, via `sheetDueNote`'s
+                    `: "No date claimed"` arm), transcribed rather than
+                    re-worded: an unclaimed date is not an empty one. It is the
+                    NOTE LINE the export puts under the same input. */}
                 {dueDate === null ? (
                   <span className="gn-ticket-sheet__absent">No date claimed</span>
                 ) : (
-                  <>
-                    <span>{formatDate(dueDate.date)}</span>
-                    {/* The SAME wording every other field row on this sheet uses
-                        (`set by … on …`), because one surface with two
-                        provenance phrasings is the drift this file's claim-line
-                        comment exists to prevent. The ABSENT copy stays the
-                        prototype's ("No date claimed") — that sentence is about
-                        the DATE, and the claim line is about the ACTOR. */}
-                    <span className="gn-ticket-sheet__claim">{`set by ${nameOf(dueDate.actorId)} on ${formatDate(dueDate.serverTime)}`}</span>
-                  </>
+                  /* The SAME wording every other field row on this sheet uses
+                     (`set by … on …`), because one surface with two
+                     provenance phrasings is the drift this file's claim-line
+                     comment exists to prevent. The ABSENT copy stays the
+                     prototype's ("No date claimed") — that sentence is about
+                     the DATE, and the claim line is about the ACTOR. */
+                  <span className="gn-ticket-sheet__claim">{`set by ${nameOf(dueDate.actorId)} on ${formatDate(dueDate.serverTime)}`}</span>
                 )}
               </dd>
             </div>
@@ -3072,11 +3296,52 @@ export function TicketSheet({
           type="button"
           className="gn-ticket-sheet__delete"
           disabled={submitting}
-          onClick={() => void deleteTicket()}
+          onClick={() => setConfirmingDelete(true)}
         >
           Delete
         </button>
       </footer>
+
+      {/*
+        RULING E2-35 — the confirmation, in `BulkCloseDialog`'s shape: a `Dialog`
+        with a title, the consequence, and Cancel beside a primary confirm.
+        Rendered HERE, beside `TransitionDialog`'s own mount, so the sheet owns
+        both of its modal decisions from one place.
+
+        ⚠ THE CONFIRM IS NAMED **Delete ticket**, not "Delete". The footer's
+        control is called "Delete", and a second button with the same accessible
+        name on one screen is ambiguous to a screen-reader user and
+        unaddressable by role and name — the same collision this batch's E2-30
+        hit on the deleted-ticket strip's Undo.
+
+        ⚠ AND THE CONFIRM CARRIES NO `disabled`. It unmounts on its own click
+        (`setConfirmingDelete(false)` runs before the submit), so a disabled
+        state there is a term nobody can ever observe — which is exactly the
+        defect E2-31 removed one function up. The guard for the submit in flight
+        is the FOOTER's own `disabled={submitting}`, which is set before the
+        first await and blocks a second press from opening this dialog again.
+      */}
+      <Dialog
+        open={confirmingDelete}
+        title="Delete this ticket?"
+        onClose={() => setConfirmingDelete(false)}
+      >
+        <p>
+          {`${ticketRead.title} will stop appearing in the Board, the List, the Calendar and the Timeline. Nothing is erased — its history is kept — and you can put it back for 15 seconds from the message that follows, or from the message on the page until you delete another ticket.`}
+        </p>
+        <div>
+          <Button onClick={() => setConfirmingDelete(false)}>Cancel</Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setConfirmingDelete(false);
+              void deleteTicket();
+            }}
+          >
+            Delete ticket
+          </Button>
+        </div>
+      </Dialog>
 
       {workflow.data != null ? (
         <TransitionDialog

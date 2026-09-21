@@ -1334,6 +1334,34 @@ id that stays true. **`13.889` joined the set later in the same change set**, wh
   the handler is the other one. Mutation-witnessed: removing `className="gn-field__input"` from the
   address input reddens this case ALONE (1 failed / 37), and un-wrapping the projects field back to the
   bare pair reddens it alone as well.
+  ⚠ **AMENDED BY RULING E5-11 (2026-09-21) — the projects half is no longer a NATIVE field.** It is the
+  shared `Select` now, so it wears the pattern the way `Channel`/`Role` do (inside a `.gn-field` with a
+  `.gn-field__label`, the component's own trigger carrying `gn-field__input`), and the case asserts the
+  same three things about the same three things. Its title's "two NATIVE fields" is now one native
+  (the address) and one `Select`; the title is kept because it is what the case was minted as, and the
+  live state is this note. **The queries are REGEXES** — `queryAllByRole('button', { name:
+  'Project access' })` returns 0 on this trigger while `/Project access/` returns 1, measured — which
+  is also why this file's own `Role` queries have always been regexes.
+
+- ✅ **13.1181 — the invite form's project field offers project NAMES, not identifiers (ruling E5-11,
+  2026-09-21).** `apps/web/test/members-page.test.tsx`. It was a text box labelled *"Projects
+  (comma-separated ids, optional)"*, so a person had to transcribe project ULIDs from somewhere else;
+  `docs/manual.md` said so in as many words — *"In practice this box is not usable by a person"* — and
+  the finding's judge measured a form whose own docblock already refused to "offer a choice the door
+  will reject" for two of its three choices while the third had no honest input at all. It is now the
+  export's `<select>` (`desktop.dc.html:768-772`), fed from `useWorkspaceProjects` — the SAME
+  `GET /v1/me/workspaces` read the workspace name beside it already makes. **Three cases:** the option
+  list is *All projects in this workspace* first, then one *Only `<name>`* per project in SERVED order,
+  with the ID as the option's VALUE and never its label (the whole ruling is that a person chooses a
+  name and the wire still carries the id); a CONTROL that an UNANSWERED projects read offers only *All
+  projects* — the hook holds `null` and not `[]`, and `[]` would be the claim "this workspace has no
+  projects", so without this arm a select falling back to the id would pass the case above; and a
+  CONTROL that the default choice sends NO `projectIds` key (the door refuses `[]` exactly as it refuses
+  a guest's). **Mutation-witnessed with two distinct signatures:** labelling the options with the ID
+  reddens the three cases that choose by name (`Tests 3 failed | 37 passed`), and dropping the
+  `all`-omits-the-key term reddens the omitted-key control alone (`Tests 1 failed | 39 passed`). The
+  id is from **B13's allocated §13 block (13.1177–13.1186)**, not this file's 13.88x series, because
+  §13 ids became per-release-batch; the case still lives here, beside its siblings. — (`apps/web/test/members-page.test.tsx`)
 
 - ✅ **13.887 — the roster's zebra, on the rows the prototype actually tints.**
   `apps/web/test/members-styling.test.ts:167`. FOUR claims, and each is there because a different defect

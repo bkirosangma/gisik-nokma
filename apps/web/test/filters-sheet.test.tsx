@@ -79,6 +79,10 @@ function card(overrides: Partial<BoardCard> = {}): BoardCard {
     typeId: 'task',
     assignee: null,
     stateProvenance: claim(),
+    // Ruling E5-2 made this REQUIRED on `BoardCard`; `null` is "this ticket
+    // claims no date", the same default `boardCardSeed` uses. No case in this
+    // file is about the due label.
+    dueDate: null,
     cause: null,
     rollup: null,
     pending: false,
