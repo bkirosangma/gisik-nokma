@@ -145,7 +145,19 @@ export function AccountMenu() {
         <Avatar size="small" name={user.name} />
       </button>
       {open ? (
-        <div ref={menuRef} id={menuId} role="menu" className="gn-nav__menu">
+        <div
+          ref={menuRef}
+          id={menuId}
+          role="menu"
+          /* exec1 P22: a `menu` is a name-requiring role and this one had none,
+             so a screen reader announced "menu" with nothing about whose. The
+             words are the trigger's own ("Account menu for …"), minus the
+             person: the header below names WHO, and repeating the name here
+             would make the menu's name change with the session rather than
+             saying what the menu is. */
+          aria-label="Account"
+          className="gn-nav__menu"
+        >
           <div className="gn-nav__menu-header">
             <span className="gn-nav__menu-name">{user.name}</span>
             {/* Omitted, never blank — see the docblock. */}

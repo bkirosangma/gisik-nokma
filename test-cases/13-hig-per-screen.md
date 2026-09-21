@@ -279,6 +279,35 @@ now says so with the name it does carry.
 `PROJECT_TABS` without words fails `typecheck` rather than rendering an unlabelled segment — a property
 the hand-written `as const` tuple array this replaced did not have.
 
+## Every menu is named (exec1 P22, 2026-09-21) — case `13.1052`
+
+- **13.1052** ✅ No product source declares `role="menu"` without an `aria-label` or `aria-labelledby` in
+  the SAME OPENING TAG — swept over six source trees with comments stripped, taking each element's whole
+  tag rather than its line so an attribute added on a continuation line counts and a multi-line tag is not
+  missed. Positive control: the sweep found at least three menus, so a green cannot be "the regex matched
+  nothing". Two runtime arms read the name off the RENDERED menu instead of the source —
+  `getByRole('menu', { name: 'Account' })` in `app-nav.test.tsx` and
+  `getByRole('menu', { name: 'Add rule' })` in `workflow-builder/inspectors.test.tsx` — because the
+  accessible-name ratchet cannot see either menu: it counts attributes on routes it paints, and the
+  builder's menu is only in the DOM while open. (`apps/web/test/menu-accessible-name.test.tsx`)
+
+**The finding.** Two menus declared `role="menu"` with **no `aria-label` and no `aria-labelledby`** —
+`apps/web/src/account-menu.tsx:148` and
+`packages/app-core/src/workflow-builder/ui/rule-editors/add-rule-menu.tsx:47` — while a THIRD menu in the
+same product, `apps/web/src/last-project-nav.tsx:249`'s `aria-label="Projects"`, showed the pattern the
+other two were missing. The reviewer's control for the sweep was that same named twin: the grep that
+found the unnamed menus also surface the named one.
+
+**The words are each trigger's own.** The account menu is `"Account"` — not `Account menu for {name}`,
+because the menu's own header names WHO and a label that changed with the session would describe the
+person rather than the menu. The builder's is `"Add rule"`, the trigger's exact text three lines above it.
+
+**What was NOT taken, named rather than passed over:** the reviewer's stronger remedy — a shared menu
+component whose label is required by type, the shape `SegmentedControl` gave P19 — **does not exist to
+adopt here**. P19's remedy worked because the component was already there with `'aria-label': string`
+required; the product's three menus share no component, and writing one is a refactor beyond this
+finding. So both menus carry the attribute and the SWEEP is what prevents the recurrence.
+
 ## Task 1 of the HIG per-screen plan (2026-09-08) — the four shared pieces every screen reuses
 
 - **13.288** ✅ `SegmentedControl` renders `role=tablist` (named by a required `aria-label`), one

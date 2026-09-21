@@ -11,7 +11,7 @@ import { createFakeGateway } from '../../src/workflow-builder/fake-gateway.js';
 import { draftFromTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builder/templates.js';
 import { BuilderProvider, type BuilderEnvironment } from '../../src/workflow-builder/ui/builder-context.js';
 import { InspectorPanel } from '../../src/workflow-builder/ui/inspector-panel.js';
-import { defaultRuleFor } from '../../src/workflow-builder/ui/rule-editors/add-rule-menu.js';
+import { AddRuleMenu, defaultRuleFor } from '../../src/workflow-builder/ui/rule-editors/add-rule-menu.js';
 
 const kanban = WORKFLOW_TEMPLATES.find((template) => template.id === 'simple-kanban')!;
 
@@ -180,5 +180,42 @@ describe('TransitionInspector', () => {
     expect(screen.getByText('Must carry an attachment as evidence.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add rule' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Delete transition' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 13.1052 — exec1 P22 — **the builder's rule menu carries a NAME.**
+ *
+ * `role="menu"` requires an accessible name and this one had none, so a screen
+ * reader announced "menu" with nothing about whose — while a third menu in the
+ * same product (`apps/web/src/last-project-nav.tsx`'s `aria-label="Projects"`)
+ * already showed the pattern. The declaration is swept in
+ * `apps/web/test/menu-accessible-name.test.tsx`; THIS is the arm that reads the
+ * name off the rendered element, so a label declared but never reaching the DOM
+ * reddens here. The accessible-name ratchet cannot see it: it counts ATTRIBUTES
+ * on routes it paints, and the builder's menu is only in the DOM while open.
+ *
+ * Queried by role AND name on purpose. `getByRole('menu')` alone stays green
+ * against an unnamed menu, which is the whole defect.
+ */
+describe('AddRuleMenu', () => {
+  it('13.1052 the rule menu is named "Add rule", reached by role and name', async () => {
+    const store = createDraftStore(draftFromTemplate(kanban));
+    // The trigger's own text is `Add rule` too, so the assertions below are
+    // distinguished by ROLE — a `button` named `Add rule` and a `menu` named
+    // `Add rule` are different elements and both are expected here.
+    render(
+      <BuilderProvider store={store} env={env()}>
+        <AddRuleMenu transitionIndex={0} />
+      </BuilderProvider>,
+    );
+
+    // POSITIVE CONTROL: the trigger opened a menu at all.
+    await userEvent.click(screen.getByRole('button', { name: 'Add rule' }));
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+
+    // THE WITNESS — `Unable to find an accessible element with the role "menu"
+    // and name "Add rule"` before the fix.
+    expect(screen.getByRole('menu', { name: 'Add rule' })).toBeInTheDocument();
   });
 });
