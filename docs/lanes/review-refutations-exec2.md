@@ -121,7 +121,21 @@ does not rest on reading a line.
 | `F1` (exec 3, IMPORTANT) | that an open-gap section still declares a leak whose two supporting numbers are stale | The section at `soft-delete-background-paths.test.ts:142-144` asserts *"`routes/attachments.ts` contains the word `deleted` **ZERO** times, while the same grep finds it **6** times in `routes/tickets.ts`"*. I measured **6 occurrences across 5 lines** in `attachments.ts` and **13** in `tickets.ts` | **holds** |
 | `F2` (exec 3, IMPORTANT) | that a recorded survivor measurement's stated warrant is false — the second witness read a stale `dist` | The docblock claims *"that test imports `../../src/replica/replica-data-source.js`, not the package name, so nothing resolved through a stale `dist`"*. I opened both halves: `packages/app-core/test/replica/replica-data-source.test.ts:30` **does** import the relative path — and `apps/server/test/dual-client/rig.ts:32` imports **`'@gisik-nokma/app-core'`**, the **package name**, in the half the same sentence cites as *"21 passed"* | **holds** |
 
-**Twenty-nine checks across all five lanes. Twenty-nine held. My refutation count is zero.**
+
+| `F8` (exec 3, LOW) | that `check:db-tz` is the only one of the nine checkers with no automated invocation | `check:db-tz` occurs **once in the whole repo** — its own definition at `package.json:14` — and **is absent from `ci.yml`**, while all eight others (`check-env`, `check-runbook`, `check-citations`, `check-help`, `check-tasks`, `check-migrations`, `check-case-ids`, `check-no-silent-skips`) appear in the workflow | **holds** |
+| `F3` (exec 3, IMPORTANT) | that their own lane's §17 group cites an artefact the owner has ruled is not the prototype | `test-cases/17-open-work.md:58` cites `` `design-system/interactive/desktop.dc.html` ``, and I re-verified that file is the **camelCased copy** — `viewBox` occurs **0** times in it and `sc-camel-view-box` **24** — while the owner's ruling is that the prototype is the exported zip | **holds** |
+
+**Thirty-one checks across all five lanes. Thirty-one held. My refutation count is zero.**
+
+> **`F3` is a lane auditing its own output, and it is worth naming as such.** exec 3 reports that a block
+> **its own lane wrote** cites the wrong artefact — *"every citation in it is off[set]"* — against an owner
+> ruling that landed after the block was written. **Reviewing your own shipped work is the part of this
+> exercise a lane is best placed to do and least inclined to**, and it is the one I did least of: I found six
+> errors in my own report, but all six were mechanical (a wrong outcome stated, a lost line, a claim about a
+> browser, a broken pattern, an unpinned unit, two stale counts) — **not one was a finding of mine that
+> should not have been filed.** exec 1 withdrew a seventh-panel claim when an ancestor rule refuted it;
+> exec 3 filed against its own §17 group; I have nothing of that kind to show, and that is a gap in my
+> work rather than a virtue in it.
 
 > **Two notes on my own measurement of `F1`, because the unit is the whole story.** The judge's round-1
 > verification of the same sentence recorded `grep -c deleted` → **5** for `attachments.ts`; I measured **6**
