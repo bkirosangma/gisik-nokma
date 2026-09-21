@@ -15,3 +15,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E2-45 | done | 856eddc9 | app-nav.test.tsx 17.141–17.143 (E2-45) |
 | T-E5-25 | done | 3f359c75 | 13.1157 session-expired write (sheet/board/bulk) + adapter; 13.1158 guard (mutation-witnessed) |
 | T-E5-31 | done | a3234e8c | 13.1159 app-nav signed-out arm (RED 2 / GREEN 33) |
+| T-E5-32 | done | 093526c9 | 13.1160 sign-in?next= on all five read arms (RED 4 / GREEN 634) |
