@@ -836,6 +836,10 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
     expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
     expect(onCreate).not.toHaveBeenCalled();
+  });
+});
+
+/**
  * Case `13.1139` — E4-13 — the Title field wears the product's own field
  * treatment instead of painting as raw user-agent chrome.
  *

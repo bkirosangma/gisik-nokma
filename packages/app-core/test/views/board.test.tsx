@@ -1140,6 +1140,10 @@ describe('13.1177 the board card draws the due label, and the late tone (ruling 
     render(<Board board={errandBoard([boardCardSeed()])} onOpenTicket={() => {}} today={TODAY} />);
     const card = screen.getByTestId(`ticket-card-${TICKET}`);
     expect(card.querySelector('.gn-board-card__due')).toBeNull();
+  });
+});
+
+/**
  * V1 (round-2 ruling, IMPORTANT, 2026-09-21) — the empty state's instruction and
  * its control are ONE decision.
  *

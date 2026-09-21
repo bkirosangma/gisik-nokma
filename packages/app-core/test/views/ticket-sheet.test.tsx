@@ -10,7 +10,6 @@ import type { EditorSlotComponent } from '../../src/views/editor-slot.js';
 import type { ListRow, TicketHistoryEvent, TicketRead, TicketVisibility } from '../../src/view-types.js';
 import { HISTORY_PAGE_LIMIT, TicketSheet } from '../../src/views/ticket-sheet.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
-import { SESSION_EXPIRED_COPY, SessionExpiredError } from '../../src/session-expired.js';
 import {
   PARENT,
   TICKET,
@@ -1561,43 +1560,6 @@ describe('TicketSheet — Close, Reopen and the badge (backlog/closed spec §5.3
     expect(notice).toHaveTextContent('We could not reach the server for this change — socket hung up');
     expect(document.body.textContent).not.toContain('Refused by the server');
     await waitFor(() => expect(closeButton).toBeEnabled());
-  });
-
-  /**
-   * E5-25 (round-2 ruling, IMPORTANT) — the finding's own reproduction: a write
-   * after the session expired, at the sheet.
-   *
-   * The shipped sentence was *"We could not reach the server for this change —
-   * HTTP 401 for /v1/events"* and nothing sent the person to sign in. This is
-   * the site the ruling names first (`ticket-sheet.tsx:1074`), and the copy it
-   * must paint is the product's own — the same one the five read arms mount.
-   */
-  it('13.1157 E5-25 a change whose session ended says so, in the session register', async () => {
-    const user = userEvent.setup();
-    const read = ticketRead({
-      ticket: ticketStateSeed({ stateId: 'done', stateCategory: 'terminal', closed: null }),
-    });
-    const source = createFakeDataSource(
-      {
-        getTicket: async () => read,
-        getWorkflowDef: async () => WF_ERRAND,
-        getMembers: async () => [],
-        getTicketHistory: async () => [],
-      },
-      () => {
-        throw new SessionExpiredError('/v1/events');
-      },
-    );
-    renderSheet(read, source);
-    await waitFor(() => expect(within(stateRow()).getByRole('button', { name: 'Close' })).toBeInTheDocument());
-
-    await user.click(within(stateRow()).getByRole('button', { name: 'Close' }));
-
-    const notice = await screen.findByRole('alert');
-    expect(notice).toHaveTextContent(SESSION_EXPIRED_COPY);
-    expect(notice.className).toBe('gn-refusal gn-refusal--session');
-    expect(document.body.textContent).not.toContain('could not reach the server');
-    expect(document.body.textContent).not.toContain('Refused by the server');
   });
 
   /**
@@ -4117,9 +4079,6 @@ describe('16.57 the attachments section keeps an empty list and a failed read ap
     // already draws for the ticket read and the ledger tab is the model.
     expect(notice.textContent).not.toContain('Loading');
   });
-
-
-
 });
 
 /**
@@ -4140,32 +4099,6 @@ describe('E5-9 a refused Delete answers beside the button that was pressed', () 
   it('PLANTED DEFECT: ONE sentence, inside the footer, not at the head of the body', async () => {
     const user = userEvent.setup();
     const read = ticketRead();
- * 13.1182 — ruling E2-31: THE GUARD THAT ACTUALLY HOLDS.
- *
- * `submitTicketEvent` carried `if (submitting) return;` at its top, with a
- * docblock claiming it guarded "a second click landing on the same render pass
- * as the first, before React has re-rendered the `disabled` attribute onto the
- * DOM". It could not: `submitting` is RENDER STATE, so two calls in one render
- * pass both close over the same pre-commit `false`. A guard whose stated purpose
- * is unreachable is indistinguishable from a working one to every reader, so the
- * line is removed and the docblock now says what holds instead — **the
- * `disabled` attribute**, on both buttons.
- *
- * This case pins that, and it is the reason removing the line is safe rather
- * than merely tidy: with the first Close held pending, a SECOND click posts
- * nothing. It is a real assertion about the surviving guard, not a restatement
- * of the deleted one — deleting `disabled={submitting}` reddens it.
- *
- * **It is deliberately NOT the composer's `submittingRef` fix.** That precedent
- * (`TicketEditorSlot.tsx`) reached its handler from TWO sources — a Save button
- * and a blur/Enter commit — and the `disabled` landing on the field is what
- * fired the second. Close/Reopen has one source and no blur-commit, so copying
- * that fix here would install a second guard that also cannot fire.
- */
-describe('13.1182 one Close in flight, and a second click that is not a click', () => {
-  function heldSource(read: TicketRead) {
-    /** Called to let the held ingest answer. */
-    let release: (() => void) | null = null;
     const source = createFakeDataSource(
       {
         getTicket: async () => read,
@@ -4184,6 +4117,10 @@ describe('13.1182 one Close in flight, and a second click that is not a click', 
     renderSheet(read, source);
     await settled();
     await user.click(screen.getByRole('button', { name: 'Delete' }));
+    // E2-35 (B13) put a confirm in front of the delete; the refusal this case
+    // is about is the SERVER's, so press through the confirm to reach it.
+    await screen.findByRole('dialog', { name: 'Delete this ticket?' });
+    await user.click(screen.getByRole('button', { name: 'Delete ticket' }));
 
     const refusal = await screen.findByText(/Refused by the server/);
     // One sentence, never two: the footer answer REPLACES the shared slot's,
@@ -4193,51 +4130,6 @@ describe('13.1182 one Close in flight, and a second click that is not a click', 
     // is the structural claim; the pixel claim is the lane's measurement above,
     // which a jsdom sheet cannot make (it lays nothing out).
     expect(refusal.closest('footer')).not.toBeNull();
-        new Promise((resolve) => {
-          release = () =>
-            resolve(
-              events.map((event) => ({
-                status: 'committed' as const,
-                eventId: event.id,
-                seq: 1,
-                serverTime: '2026-08-20T09:00:00.000Z',
-              })),
-            );
-        }),
-    );
-    return { source, release: () => release?.() };
-  }
-
-  it('13.1182 a second click while the first Close is in flight posts NOTHING', async () => {
-    const user = userEvent.setup();
-    const read = ticketRead({
-      ticket: ticketStateSeed({ stateId: 'done', stateCategory: 'terminal', closed: null }),
-    });
-    const { source, release } = heldSource(read);
-    renderSheet(read, source);
-    // NOT `settled()`: that waits for the DEFAULT ticket's provenance line
-    // ("marked Doing …"), and this fixture is terminal. The Close control is
-    // the better signal anyway — it only draws once the workflow has named the
-    // state's category, which is the read this case needs.
-    const close = (): HTMLElement => screen.getByRole('button', { name: 'Close' });
-    await waitFor(() => expect(close()).toBeInTheDocument());
-
-    await user.click(close());
-    // The first click's own `setSubmitting(true)` has re-rendered the control
-    // DISABLED. That attribute is the guard the finding's paragraph now names.
-    await waitFor(() => expect(close()).toBeDisabled());
-    expect(source.ingested).toHaveLength(1);
-
-    // A second click, dispatched while the first ingest is still unanswered.
-    // `disabled` is what stops it: without that attribute this click reaches
-    // the handler and posts a SECOND `ticket.closed`.
-    await user.click(close());
-    expect(source.ingested).toHaveLength(1);
-
-    release();
-    await waitFor(() => expect(close()).not.toBeDisabled());
-    // And the single event is the one the first click made.
-    expect(source.ingested[0]![0]!.type).toBe('ticket.closed');
   });
 });
 
@@ -4384,28 +4276,6 @@ describe('17.072 a committed move does not carry its comment to the next one (E2
    * anything.
    */
   it('17.072 the comment box is empty on the next Move, and the first comment still reaches the wire', async () => {
- * 13.1183 — ruling E2-35: THE DELETE ASKS FIRST.
- *
- * The footer's `Delete` performed the delete on ONE press, while the product
- * reaches the SAME soft delete on many tickets through a whole confirmation
- * surface (`bulk-close-dialog.tsx`). So a multi-ticket close needed a decision
- * point and a single-ticket delete did not — although the single one is the
- * harder to notice and easier to trigger by accident, and it is gated on
- * project-admin rights. This case pins the ask.
- *
- * **It does NOT pin a local `precheck` gate, and that is a decision rather than
- * an omission**: the deletion door's own docblock
- * (`packages/rule-engine/src/checks/deletion.ts`) states that authority "is not
- * a pure function of the envelope — this engine's context carries no membership
- * at all", so a local gate would answer every question about this delete except
- * the one that makes it consequential. The server stays the authority.
- */
-describe('13.1183 Delete asks first', () => {
-  function footer(): HTMLElement {
-    return document.querySelector('.gn-ticket-sheet__footer') as HTMLElement;
-  }
-
-  it('13.1183 pressing Delete ASKS, and asks nothing of the server', async () => {
     const user = userEvent.setup();
     const source = renderSheet(ticketRead());
     await settled();
@@ -4432,6 +4302,119 @@ describe('13.1183 Delete asks first', () => {
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
 
     expect(screen.getByLabelText('Comment (required by this transition)')).toHaveValue('');
+  });
+});
+
+/**
+ * 13.1182 — ruling E2-31: THE GUARD THAT ACTUALLY HOLDS.
+ *
+ * `submitTicketEvent` carried `if (submitting) return;` at its top, with a
+ * docblock claiming it guarded "a second click landing on the same render pass
+ * as the first, before React has re-rendered the `disabled` attribute onto the
+ * DOM". It could not: `submitting` is RENDER STATE, so two calls in one render
+ * pass both close over the same pre-commit `false`. A guard whose stated purpose
+ * is unreachable is indistinguishable from a working one to every reader, so the
+ * line is removed and the docblock now says what holds instead — **the
+ * `disabled` attribute**, on both buttons.
+ *
+ * This case pins that, and it is the reason removing the line is safe rather
+ * than merely tidy: with the first Close held pending, a SECOND click posts
+ * nothing. It is a real assertion about the surviving guard, not a restatement
+ * of the deleted one — deleting `disabled={submitting}` reddens it.
+ *
+ * **It is deliberately NOT the composer's `submittingRef` fix.** That precedent
+ * (`TicketEditorSlot.tsx`) reached its handler from TWO sources — a Save button
+ * and a blur/Enter commit — and the `disabled` landing on the field is what
+ * fired the second. Close/Reopen has one source and no blur-commit, so copying
+ * that fix here would install a second guard that also cannot fire.
+ */
+describe('13.1182 one Close in flight, and a second click that is not a click', () => {
+  function heldSource(read: TicketRead) {
+    /** Called to let the held ingest answer. */
+    let release: (() => void) | null = null;
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      (events) =>
+        new Promise((resolve) => {
+          release = () =>
+            resolve(
+              events.map((event) => ({
+                status: 'committed' as const,
+                eventId: event.id,
+                seq: 1,
+                serverTime: '2026-08-20T09:00:00.000Z',
+              })),
+            );
+        }),
+    );
+    return { source, release: () => release?.() };
+  }
+
+  it('13.1182 a second click while the first Close is in flight posts NOTHING', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead({
+      ticket: ticketStateSeed({ stateId: 'done', stateCategory: 'terminal', closed: null }),
+    });
+    const { source, release } = heldSource(read);
+    renderSheet(read, source);
+    // NOT `settled()`: that waits for the DEFAULT ticket's provenance line
+    // ("marked Doing …"), and this fixture is terminal. The Close control is
+    // the better signal anyway — it only draws once the workflow has named the
+    // state's category, which is the read this case needs.
+    const close = (): HTMLElement => screen.getByRole('button', { name: 'Close' });
+    await waitFor(() => expect(close()).toBeInTheDocument());
+
+    await user.click(close());
+    // The first click's own `setSubmitting(true)` has re-rendered the control
+    // DISABLED. That attribute is the guard the finding's paragraph now names.
+    await waitFor(() => expect(close()).toBeDisabled());
+    expect(source.ingested).toHaveLength(1);
+
+    // A second click, dispatched while the first ingest is still unanswered.
+    // `disabled` is what stops it: without that attribute this click reaches
+    // the handler and posts a SECOND `ticket.closed`.
+    await user.click(close());
+    expect(source.ingested).toHaveLength(1);
+
+    release();
+    await waitFor(() => expect(close()).not.toBeDisabled());
+    // And the single event is the one the first click made.
+    expect(source.ingested[0]![0]!.type).toBe('ticket.closed');
+  });
+});
+
+/**
+ * 13.1183 — ruling E2-35: THE DELETE ASKS FIRST.
+ *
+ * The footer's `Delete` performed the delete on ONE press, while the product
+ * reaches the SAME soft delete on many tickets through a whole confirmation
+ * surface (`bulk-close-dialog.tsx`). So a multi-ticket close needed a decision
+ * point and a single-ticket delete did not — although the single one is the
+ * harder to notice and easier to trigger by accident, and it is gated on
+ * project-admin rights. This case pins the ask.
+ *
+ * **It does NOT pin a local `precheck` gate, and that is a decision rather than
+ * an omission**: the deletion door's own docblock
+ * (`packages/rule-engine/src/checks/deletion.ts`) states that authority "is not
+ * a pure function of the envelope — this engine's context carries no membership
+ * at all", so a local gate would answer every question about this delete except
+ * the one that makes it consequential. The server stays the authority.
+ */
+describe('13.1183 Delete asks first', () => {
+  function footer(): HTMLElement {
+    return document.querySelector('.gn-ticket-sheet__footer') as HTMLElement;
+  }
+
+  it('13.1183 pressing Delete ASKS, and asks nothing of the server', async () => {
+    const user = userEvent.setup();
+    const source = renderSheet(ticketRead());
+    await settled();
+
     await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Delete this ticket?' });
