@@ -1584,6 +1584,38 @@ export function TicketSheet({
    * traversal lives here to loop.
    */
   const epicCrumb = ticketRead.epic;
+  /**
+   * E4-1 / E5-3 — THE EPIC CRUMB IS OMITTED WHEN IT IS THE PARENT, because a
+   * crumb list is a PATH or it is nothing.
+   *
+   * The server's ancestry walk (`apps/server/src/routes/tickets.ts`) starts at
+   * `state.parentId` and returns the first ancestor whose type is an epic — so
+   * when the ticket's DIRECT PARENT is an epic, `epic.id === parent.id`. The
+   * bar then rendered the same ancestor twice under two independent null
+   * checks, and nothing compared their ids:
+   *
+   *     Convenience Corner › Shop operations › Open questions › Open questions › CCSO-6
+   *
+   * Two link crumbs, one ticket, and a depth the hierarchy does not have. That
+   * is the argument this file already makes three lines up in the other
+   * direction — *"a breadcrumb that skips a level states a hierarchy the
+   * product does not have"* — and the owner's own ruling quoted above is a
+   * chain of DISTINCT layers. It is not cosmetic for a screen-reader user, who
+   * hears two identical links and cannot tell one ancestor from two.
+   *
+   * **Blast radius, measured by the reviewer:** `23 of 26` tickets in the
+   * seeded project have an epic as their direct parent, so this is the ordinary
+   * shape rather than an edge. The prototype never shows the doubled form (its
+   * fixtures' `parentId` and `epicId` sets are disjoint), so it gives no
+   * authority for it.
+   *
+   * The comparison is on `id` ACROSS both `ParentRef` arms — a `restricted`
+   * ancestor carries an id and no title, and two restricted refs to one ticket
+   * are the same node for the same reason. **The EPIC crumb is the one dropped
+   * and the PARENT crumb is kept**: the parent is the nearer, and it is the one
+   * whose testid a reader of this file would look for.
+   */
+  const epicCrumbIsTheParent = epicCrumb !== null && parent !== null && epicCrumb.id === parent.id;
   const ancestorCrumb = (
     // `NonNullable`, because BOTH call sites have already answered the null
     // case — a missing ancestor is an omitted crumb, not a rendered one — and
@@ -1820,8 +1852,18 @@ export function TicketSheet({
                   only when there is one, the parent only when there is one.
                   Each is preceded by its own separator, so a chain with no
                   ancestors at all renders exactly the two crumbs the project
-                  and the ticket need. */}
-              {epicCrumb === null ? null : (
+                  and the ticket need.
+
+                  ⚠ AND THE GRANDPARENT ONLY WHEN IT IS NOT THE PARENT
+                  (E4-1/E5-3): the authority's own conditionals do not cover
+                  that case because ITS fixtures never produce it, but the
+                  server's ancestry walk does — see `epicCrumbIsTheParent` above
+                  for the mechanism, the 23-of-26 blast radius, and why the EPIC
+                  is the crumb dropped rather than the parent. With the
+                  comparison removed the bar reads
+                  `… › Open questions › Open questions › CCSO-6`: one ancestor,
+                  named twice, stating a depth the hierarchy does not have. */}
+              {epicCrumb === null || epicCrumbIsTheParent ? null : (
                 <>
                   <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
                     ›

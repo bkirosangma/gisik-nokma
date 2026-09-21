@@ -3038,6 +3038,57 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
   });
 
   /**
+   * E4-1 / E5-3 — THE SAME ANCESTOR IS NAMED ONCE WHEN IT IS BOTH THE EPIC AND
+   * THE PARENT.
+   *
+   * The server's ancestry walk starts at `state.parentId` and returns the first
+   * ancestor whose type is an epic, so when the ticket's DIRECT PARENT is an
+   * epic, `epic.id === parent.id` (`apps/server/src/routes/tickets.ts`). The bar
+   * rendered both under two independent null checks and nothing compared their
+   * ids, so the painted crumbs read:
+   *
+   *     Convenience Corner › Shop operations › Open questions › Open questions › CCSO-6
+   *
+   * — one ancestor, named twice, a depth the hierarchy does not have. **The
+   * blast radius is the ordinary case, not an edge: 23 of the 26 tickets in the
+   * seeded project have an epic as their direct parent** (the reviewer's own
+   * count, and they painted one and said so). The prototype never shows this
+   * shape, so it gives no authority for it.
+   *
+   * ⚠ NO EXISTING FIXTURE COULD SEE THIS: `ticketRead()`'s default carries a
+   * parent and no epic, and every case that sets an `epic` sets a DISTINCT id
+   * (`EPIC`), so the equal-id shape was never rendered by any case in this file.
+   * This fixture is the first, and it is the shape the seed produces 23 times.
+   */
+  it('E4-1: when the direct parent IS the epic, the ancestor is named ONCE', async () => {
+    // The one-hop shape: the epic IS the parent, same id, and the title the
+    // server sends for both is the same row's title.
+    const read = ticketRead({ epic: { kind: 'ticket', id: PARENT, title: 'Registrations' } });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+
+    // THE PROPERTY, asserted apart from the list: the ancestor appears once.
+    // Reverting the comparison makes this read `2` while the list assertion
+    // above it still looks plausible on a casual read.
+    expect(crumbTexts().filter((text) => text === 'Registrations')).toHaveLength(1);
+    // The surviving crumb is the PARENT's — the nearer one, and the one a
+    // reader of this sheet looks for — so the epic crumb is the one dropped.
+    expect(screen.queryByTestId('sheet-crumb-epic')).toBeNull();
+    expect(screen.getByTestId('sheet-crumb-parent')).toBeInTheDocument();
+    // And the bar is then IDENTICAL to the no-epic bar, which is the point: a
+    // one-hop ticket has one ancestor and the path states one.
+    expect(crumbTexts()).toEqual([
+      'Convenience Corner',
+      'Shop operations',
+      'Registrations',
+      'CCSO-1183',
+    ]);
+  });
+
+  /**
    * 16.63 — the GRANDPARENT crumb, which is the whole of what the owner's
    * *"grandparent"* asked for and which the old three-crumb bar had nowhere to
    * put.
