@@ -159,7 +159,8 @@ evidence-gate.ts`, `auth/auth.ts:150-360` and `apps/server/src/app.ts:477-612` (
 (the set, its exclusions and the predicate), `stream/routes.ts:262-267`, `test/helpers/stream.ts` (used),
 `deploy/do/app.yaml:1-10`, `:119`, `routes/search.ts:143-215` (the FTS query shape and the hit's columns), `http/rate-limit.ts:96-125`
 (`rateLimitKeyFor`, rightmost XFF entry — sound), `attachments/sniff.ts` (behaviour measured, Appendix U),
-`domain/src/ist-day.ts:27-47`, `domain/src/events/membership.ts:39-42`, `:68-72`, `rule-engine/src/checks/fields.ts:25-60`,
+`domain/src/{parse-event,ids,prefix,submit,registry}.ts` (whole, code lines), `routes/{events,auth-methods,
+preferences,notification-preferences}.ts` (whole), `domain/src/ist-day.ts:27-47`, `domain/src/events/membership.ts:39-42`, `:68-72`, `rule-engine/src/checks/fields.ts:25-60`,
 `:116-138`, `routes/attention.ts:255-266`, `apps/web/app/privacy/page.tsx:140-170`, `apps/web/app/mcp/authorize/page.tsx:148-192`,
 `routes/my-invitations.ts:105-190` (address binding), `domain/src/preferences.ts:20-140` (bounds),
 `sync/snapshot-refresh.ts:185-192` and `visibility/visible-events-for.ts:14` (grep: both carry deleted tickets by
@@ -1553,6 +1554,11 @@ what was looked at and found sound, not only what was found wrong.
   `start: 'backlog'` lands in `state_id = backlog / open`; assigned and given a due date it appears in My Work
   (`open` group), the list, attention (due-soon) and search, and is withheld from the board alone — the parked
   state the backlog spec draws off the columns. Its focus-born sibling appears everywhere.
+- **A guest's live stream carries nothing for a ticket they are not named on, and the backfill arrives when they
+  are** (Appendix AE; 1 file / 1 test passed): subscribed as a guest, `ticket.created` + `comment.added` +
+  `ticket.transitioned` on an unnamed ticket produced **0 frames** and no title/comment bytes; a `visibility.set`
+  naming the guest then delivered the ticket's whole history in order (`created, comment.added, transitioned,
+  visibility.set`). The stream half of the guest read sweep (Appendix Q), through `visible-events-for.ts`.
 - **The ingest pipeline's order is what the docblocks say.** `ingest-service.ts:164-360`: workspace lock →
   entity lock → entity↔workspace guard → permission gate (through the transaction's `client`, `:235-245`) →
   contest coherence → engine → server gates → append → refresh-on-publish → projections → COMMIT. Read at the
@@ -5762,6 +5768,142 @@ describe('exec6 probe: mutual owner demotion race', () => {
       out.push(`round ${round}: owners before ${owners0}; A→demote peer ${ra.status}${ra.rule ? ` (${ra.rule})` : ''}; B→demote owner ${rb.status}${rb.rule ? ` (${rb.rule})` : ''}; owners after ${owners}`);
     }
     out.push(`totals over 8 rounds: ${JSON.stringify(totals)}`);
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix AE — a guest's live stream (positive finding, §5)
+
+File path in the tree: `apps/server/test/zz-exec6-probe-guest-stream.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-guest-stream.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A plus a free `127.0.0.1:3061`.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: what does a GUEST's live stream carry for a ticket they are NOT named on, and what arrives when they are named?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+import { openStream } from './helpers/stream.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'guest' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: ownerId, projectAdmin: true }, ownerId, ownerToken)).status).toBe('committed');
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 probe: a guest live stream', () => {
+  it('records which frames a guest receives', async () => {
+    const out: string[] = [];
+    await app.listen({ port: 3061, host: '127.0.0.1' });
+    const stream = await openStream(3061, { authorization: `Bearer ${peerToken}` });
+    stream.subscribe(WS, 0);
+    await stream.next((f) => (f as { type?: string }).type === 'caught-up', 5000);
+    const before = stream.frames.length;
+    const T = newUlid();
+    expect((await post(WS, { kind: 'ticket', id: T }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title: 'GUEST-MUST-NOT-SEE' }, ownerId, ownerToken)).status).toBe('committed');
+    expect((await post(WS, { kind: 'ticket', id: T }, 'comment.added', { body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'SECRET-COMMENT' }] }] } }, ownerId, ownerToken)).status).toBe('committed');
+    expect((await post(WS, { kind: 'ticket', id: T }, 'ticket.transitioned', { to: 'doing' }, ownerId, ownerToken)).status).toBe('committed');
+    // Give the hub a moment to drain, then a control frame the guest CAN see: name them.
+    await new Promise((r) => setTimeout(r, 300));
+    const unnamedFrames = stream.frames.slice(before).length;
+    const leakBefore = stream.raw.some((r) => r.includes('GUEST-MUST-NOT-SEE') || r.includes('SECRET-COMMENT'));
+    expect((await post(WS, { kind: 'ticket', id: T }, 'visibility.set', { ticketId: T, mode: 'explicit', userIds: [ownerId, peerId] }, ownerId, ownerToken)).status).toBe('committed');
+    await stream.next((f) => JSON.stringify(f).includes(T), 5000);
+    await new Promise((r) => setTimeout(r, 300));
+    const after = stream.frames.slice(before).map((f) => { const j = f as Record<string, unknown>; const ev = (j['envelope'] ?? {}) as Record<string, unknown>; return `${String(j['type'])}${ev['type'] ? ':' + String(ev['type']) : ''}`; });
+    out.push(`frames while NOT named: ${unnamedFrames} (title/comment leaked: ${leakBefore})`);
+    out.push(`frames after visibility.set names the guest: ${after.join(', ')}`);
+    out.push(`title present in the stream now: ${stream.raw.some((r) => r.includes('GUEST-MUST-NOT-SEE'))}; comment present: ${stream.raw.some((r) => r.includes('SECRET-COMMENT'))}`);
+    await stream.close();
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
   });
