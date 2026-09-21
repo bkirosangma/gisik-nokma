@@ -169,8 +169,8 @@ design), `scripts/check-env-example.mjs:1-60` (+ two mutations), `scripts/check-
 `packages/sync-client/src/replica/replica.ts` (grep for `workflow.defined` / `foldTicketToWorkflowVersion`
 only — it refreshes on publish at `:285`, `:420`). `scripts/` — `check-case-ids.mjs` (header + regexes),
 `check-no-silent-skips.mjs` (whole), `check-skipif-coverage.mjs` (whole), `check-db-timezone.mjs` (whole),
-`check-migration-order.mjs:1-60`, `check-case-citations.mjs:1-40` — **6 of 9 read; `check-env-example`,
-`check-runbook-commands`, `check-task-ledger` run only** (all 9 were run green by exec 3; I re-ran `case-ids`,
+`check-migration-order.mjs:1-60`, `check-case-citations.mjs:1-40` — **8 of 9 read (`check-task-ledger` header only); `check-env-example` and `check-runbook-commands`
+mutation-tested** (all 9 were run green by exec 3; I re-ran `case-ids`,
 `case-citations`, `no-silent-skips` (with mutations), `db-timezone` against both live DBs).
 
 **Measured by probe** (Appendices A–AA — 27, every one a run that passed 1 file / 1 test with its `console.log`
@@ -1552,6 +1552,10 @@ what was looked at and found sound, not only what was found wrong.
   `EXIT=0` (the header states the contract as *"every configuration variable app code reads must be documented"*,
   one direction, so the pass is by design). File restored byte-identical (`cmp`). My first run of this pair reported
   `EXIT=0` for both because the status was read after a `| tail` — the pipe's, not the checker's — and was re-run.
+- **`check-runbook-commands.mjs` reddens on both ghost shapes it claims to catch.** Appending a runbook line naming
+  a `pnpm … run ops:sweep-orphans-ghost` → `EXIT=1`, *"no such script in apps/server/package.json"*; a
+  `node scripts/does-not-exist.mjs …` → `EXIT=1`, *"no such file"*; its self-test plants 13 defects before the real
+  sweep (33 references, 21 distinct, all resolve at `a7b6292b`). File restored byte-identical.
 - **`check:db-tz` passes on both live databases** (`Asia/Kolkata` on 54329 and 54330).
 - **Rate limits cover the credential and write doors** (`/api/auth/*`, `/v1/events`, `/v1/sync`,
   `/v1/sync/bootstrap`, `/v1/attachments`, the invite mint, the three MCP device doors — `app.ts:505-600`).
