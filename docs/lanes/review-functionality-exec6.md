@@ -550,3 +550,676 @@ and then compounded by an unattended job.
 ---
 
 ## 9. NOTES FOR PHASE 2 (refutation candidates, not filed here)
+
+---
+
+## 10. APPENDICES — the probes, verbatim
+
+**None of these files is committed.** Each was written into the worktree, run once (the run count is stated in the finding), copied here, and deleted; `git status --porcelain` on this branch shows only this report. They are evidence embedded in the report so the judge can reproduce the measurement, not tests added to the product.
+
+### Appendix A — probe for E6-2 — writes against an already soft-deleted ticket
+
+Place the file at `zz-exec6-probe-deleted-writes.test.ts` (path shown relative to the repo root below), run from
+`apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-deleted-writes.test.ts --no-file-parallelism
+```
+File path in the tree: `apps/server/test/zz-exec6-probe-deleted-writes.test.ts`. Needs the shared test Postgres on `54329` and the server's dependency closure built (`pnpm --filter '@gisik-nokma/server^...' run build`). `rtk proxy` only because rtk's output filter swallowed the `console.log` lines on the first run; plain `pnpm exec vitest run …` produces the same run.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: what does the ingest door answer for write claims aimed at a ticket
+// that is ALREADY soft-deleted, and what lands in `notifications`?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+  LIVE = newUlid();
+  DELETED = newUlid();
+  for (const [id, title] of [[LIVE, 'live'], [DELETED, 'to be deleted']] as const) {
+    expect((await post(WS, { kind: 'ticket', id }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title }, ownerId, ownerToken)).status).toBe('committed');
+  }
+  expect((await post(WS, { kind: 'ticket', id: DELETED }, 'ticket.deleted', {}, ownerId, ownerToken)).status).toBe('committed');
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 probe: writes aimed at an already soft-deleted ticket', () => {
+  it('records what the door answers, per event type', async () => {
+    // Control: the ticket is gone from the detail door.
+    const detail = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${DELETED}`, headers: auth(ownerToken) });
+    const liveDetail = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${LIVE}`, headers: auth(ownerToken) });
+    console.log(`PROBE detail(deleted)=${detail.statusCode} detail(live)=${liveDetail.statusCode}`);
+
+    const answers: Record<string, string> = {};
+    const attempts: Array<[string, unknown]> = [
+      ['ticket.assigned', { assigneeId: peerId }],
+      ['comment.added', { body: doc('a comment on a deleted ticket') }],
+      ['ticket.transitioned', { to: 'doing' }],
+      ['ticket.field_set', { fieldId: 'title', value: 'renamed while deleted' }],
+      ['ticket.collaborator_added', { userId: peerId }],
+      ['ticket.closed', {}],
+      ['ticket.ranked', { rank: 'a1' }],
+      ['visibility.set', { ticketId: DELETED, mode: 'explicit', userIds: [peerId] }],
+    ];
+    for (const [type, payload] of attempts) {
+      const r = await post(WS, { kind: 'ticket', id: DELETED }, type, payload, ownerId, ownerToken);
+      answers[type] = `${r.status}${r.rule ? ` (${r.rule}: ${r.reason})` : ''}`;
+    }
+    console.log('PROBE answers:\n' + Object.entries(answers).map(([k, v]) => `  ${k.padEnd(28)} -> ${v}`).join('\n'));
+    const live: Record<string, string> = {};
+    for (const [type, payload] of attempts) {
+      const pl = type === 'visibility.set' ? { ...(payload as object), ticketId: LIVE } : payload;
+      const r = await post(WS, { kind: 'ticket', id: LIVE }, type, pl, ownerId, ownerToken);
+      live[type] = `${r.status}${r.rule ? ` (${r.rule}: ${r.reason})` : ''}`;
+    }
+    console.log('PROBE LIVE control answers:\n' + Object.entries(live).map(([k, v]) => `  ${k.padEnd(28)} -> ${v}`).join('\n'));
+    // Positive control for the deleted flag itself: a second delete must be refused.
+    const again = await post(WS, { kind: 'ticket', id: DELETED }, 'ticket.deleted', {}, ownerId, ownerToken);
+    console.log(`PROBE second ticket.deleted -> ${again.status} (${again.rule ?? ''})`);
+    // The thread door for the deleted ticket (case 16.72 says it refuses):
+    const thread = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${DELETED}/comments`, headers: auth(ownerToken) });
+    console.log(`PROBE comments read(deleted)=${thread.statusCode}`);
+
+    const notif = await db.pool.query<{ kind: string; user_id: string; payload: unknown }>(
+      'SELECT kind, user_id, payload FROM notifications WHERE workspace_id = $1 ORDER BY created_at',
+      [WS],
+    );
+    console.log(`PROBE notifications rows for peer: ${notif.rows.filter((r) => r.user_id === peerId).length}`);
+    for (const row of notif.rows) console.log(`PROBE   ${row.kind} -> ${row.user_id === peerId ? 'peer' : 'owner'} ${JSON.stringify(row.payload)}`);
+
+    // What does the peer's inbox door serve?
+    const inbox = await app.inject({ method: 'GET', url: `/v1/me/notifications?workspaceId=${WS}`, headers: auth(peerToken) });
+    console.log(`PROBE inbox(peer)=${inbox.statusCode} body=${inbox.body.slice(0, 600)}`);
+
+    // And the peer's detail read of the ticket the notification points at:
+    const peerDetail = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${DELETED}`, headers: auth(peerToken) });
+    console.log(`PROBE peer detail(deleted)=${peerDetail.statusCode}`);
+
+    const head = await db.pool.query<{ state_id: string; deleted_at: string | null; assignee_id: string | null }>(
+      'SELECT state_id, deleted_at, assignee_id FROM proj_tickets WHERE ticket_id = $1',
+      [DELETED],
+    );
+    console.log(`PROBE proj_tickets row after writes: ${JSON.stringify(head.rows[0])}`);
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix B — probe for E6-3 — custom-type re-rank versus existing tickets
+
+Place the file at `zz-exec6-probe-rerank.test.ts` (path shown relative to the repo root below), run from
+`packages/rule-engine`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-rerank.test.ts --no-file-parallelism
+```
+File path in the tree: `packages/rule-engine/test/zz-exec6-probe-rerank.test.ts`. Pure in-memory; imports `../src/*.js` relatively.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: after a custom type is re-ranked, does the ledger hold a hierarchy the
+// engine itself refuses to produce?
+import { describe, expect, it } from 'vitest';
+import type { EventEnvelope, TicketTypeDef } from '@gisik-nokma/domain';
+import { makeEnvelope } from '@gisik-nokma/domain';
+import { buildMemoryContext } from '../src/memory-context.js';
+import { evaluateEvent } from '../src/evaluate.js';
+import { EPIC, PROJECT, TASK, WF, WS, created, typeDefined } from '../src/checks/test-support.js';
+
+const FEATURE2: TicketTypeDef = { id: 'feature', name: 'Feature', icon: 'flag', rank: 2, workflowId: 'wf-basic', fields: [] };
+const FEATURE3: TicketTypeDef = { ...FEATURE2, rank: 3 };
+const FEATURE4: TicketTypeDef = { ...FEATURE2, rank: 4 };
+const F = '01J9GTKF000000000000000000';
+const T = '01J9GTKT000000000000000000';
+
+function reparent(ticketId: string, newParentId: string | null): EventEnvelope {
+  return makeEnvelope({ type: 'ticket.reparented', entity: { kind: 'ticket', id: ticketId }, workspaceId: WS, payload: { newParentId } });
+}
+
+describe('exec6 probe: custom-type re-rank versus existing tickets', () => {
+  it('records the engine answers', async () => {
+    const history = [typeDefined(EPIC), typeDefined(FEATURE2), typeDefined(TASK), created(F, 'feature', null), created(T, 'task', F)];
+    const out: string[] = [];
+    const say = (k: string, v: { refused: boolean; rule?: string; reason?: string }) =>
+      out.push(`${k.padEnd(58)} -> ${v.refused ? `REFUSED ${v.rule}: ${v.reason}` : 'ACCEPTED'}`);
+
+    // 1. The re-rank itself, with a feature (rank 2) already a parent of a task (rank 3).
+    say('re-rank feature 2→3 while a task sits under a feature', await evaluateEvent(typeDefined(FEATURE3), buildMemoryContext([WF], history)));
+    say('re-rank feature 2→4 (deepest) while a root feature exists', await evaluateEvent(typeDefined(FEATURE4), buildMemoryContext([WF], history)));
+
+    // 2. After the re-rank to 3 lands: does the engine still allow the placement it now holds?
+    const after3 = [...history, typeDefined(FEATURE3)];
+    say('after 2→3: reparent task T under feature F (its current parent)', await evaluateEvent(reparent(T, F), buildMemoryContext([WF], after3)));
+    say('after 2→3: create a new task under F', await evaluateEvent(created('01J9GTKN000000000000000000', 'task', F), buildMemoryContext([WF], after3)));
+
+    // 3. After the re-rank to 4: the root feature F must "sit under a parent" per the editor copy.
+    const after4 = [...history, typeDefined(FEATURE4)];
+    say('after 2→4: reparent root feature F to null (its current position)', await evaluateEvent(reparent(F, null), buildMemoryContext([WF], after4)));
+    say('after 2→4: create a new root feature', await evaluateEvent(created('01J9GTKM000000000000000000', 'feature', null, PROJECT), buildMemoryContext([WF], after4)));
+
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix C — probe for E6-4 — deleted children and deleted parents
+
+Place the file at `zz-exec6-probe-children.test.ts` (path shown relative to the repo root below), run from
+`apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-children.test.ts --no-file-parallelism
+```
+File path in the tree: `apps/server/test/zz-exec6-probe-children.test.ts`. Same prerequisites as Appendix A.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: does a soft-deleted open child block its parent's close, and can a live
+// child be created under a soft-deleted parent?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 probe: deleted children and deleted parents', () => {
+  it('records the door answers', async () => {
+    const out: string[] = [];
+    const say = (k: string, r: { status: string; rule?: string; reason?: string }) =>
+      out.push(`${k.padEnd(62)} -> ${r.status}${r.rule ? ` (${r.rule}: ${r.reason})` : ''}`);
+    const mk = (id: string, typeId: string, parentId: string | null, title: string) =>
+      post(WS, { kind: 'ticket', id }, 'ticket.created', { typeId, projectId: PRJ, parentId, title }, ownerId, ownerToken);
+    const mv = (id: string, to: string) => post(WS, { kind: 'ticket', id }, 'ticket.transitioned', { to }, ownerId, ownerToken);
+
+    // A. Parent P (story) with one child C (task). Delete C, then try to close P.
+    const P = newUlid(); const C = newUlid();
+    say('create P (story, root)', await mk(P, 'story', null, 'P'));
+    say('create C (task) under P', await mk(C, 'task', P, 'C'));
+    say('P: todo -> doing', await mv(P, 'doing'));
+    say('delete C', await post(WS, { kind: 'ticket', id: C }, 'ticket.deleted', {}, ownerId, ownerToken));
+    const cnt = await db.pool.query<{ open: string }>(
+      `SELECT count(*)::text AS open FROM proj_tickets WHERE parent_id = $1 AND deleted_at IS NULL AND state_category <> 'terminal'`, [P]);
+    out.push(`  proj_tickets live open children of P (what a view counts): ${cnt.rows[0]!.open}`);
+    say('P: doing -> done  (C deleted, C was open)', await mv(P, 'done'));
+    // Control: a live open child blocks too (so the refusal wording is the same one)
+    const P2 = newUlid(); const C2 = newUlid();
+    say('control: create P2, C2 under P2, P2 -> doing', await mk(P2, 'story', null, 'P2'));
+    await mk(C2, 'task', P2, 'C2'); await mv(P2, 'doing');
+    say('control: P2 doing -> done with LIVE open child', await mv(P2, 'done'));
+    // Control 2: after the child is DONE, the parent closes
+    say('control: C2 -> doing', await mv(C2, 'doing'));
+    say('control: C2 -> done', await mv(C2, 'done'));
+    say('control: P2 doing -> done with child done', await mv(P2, 'done'));
+
+    // What does the board/detail door tell the owner about P's children?
+    const detail = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${P}`, headers: auth(ownerToken) });
+    const d = detail.json<Record<string, unknown>>();
+    out.push(`  GET ticket P -> ${detail.statusCode}; keys mentioning child/rollup: ${Object.keys(d).filter((k) => /child|rollup|open/i.test(k)).join(',') || '(none)'}; body excerpt: ${detail.body.slice(0, 300)}`);
+
+    // B. Delete a parent, then create a live child under it.
+    const DP = newUlid(); const LC = newUlid();
+    say('create DP (story, root)', await mk(DP, 'story', null, 'DP'));
+    say('delete DP', await post(WS, { kind: 'ticket', id: DP }, 'ticket.deleted', {}, ownerId, ownerToken));
+    say('create LC (task) under DELETED DP', await mk(LC, 'task', DP, 'LC'));
+    say('reparent live C2 under DELETED DP', await post(WS, { kind: 'ticket', id: C2 }, 'ticket.reparented', { newParentId: DP }, ownerId, ownerToken));
+    const lcDetail = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${LC}`, headers: auth(ownerToken) });
+    out.push(`  GET ticket LC (live child of deleted parent) -> ${lcDetail.statusCode}; body excerpt: ${lcDetail.body.slice(0, 500)}`);
+    const list = await app.inject({ method: 'GET', url: `/v1/projects/${PRJ}/tickets`, headers: auth(ownerToken) });
+    out.push(`  GET list -> ${list.statusCode}; LC present: ${list.body.includes(LC)}; DP present: ${list.body.includes(DP)}`);
+    const lb = list.json<Record<string, unknown>>();
+    out.push(`  list keys: ${Object.keys(lb).join(',')}`);
+    const cards = (lb['cards'] ?? lb['tickets'] ?? lb['items'] ?? []) as Array<Record<string, unknown>>;
+    out.push(`  list cards: ${cards.length}; card ids: ${cards.map((c) => c['ticketId'] ?? c['id']).join(',')}`);
+    out.push(`  DP is a card: ${cards.some((c) => (c['ticketId'] ?? c['id']) === DP)}; C (deleted child) is a card: ${cards.some((c) => (c['ticketId'] ?? c['id']) === C)}`);
+    for (const m of list.body.matchAll(new RegExp(`.{0,80}${DP}.{0,40}`, 'g'))) out.push(`  DP context: ${m[0]}`);
+    const pd = detail.json<Record<string, unknown>>();
+    out.push(`  P rollup: ${JSON.stringify(pd['rollup'])}`);
+    const lcd = lcDetail.json<Record<string, unknown>>();
+    out.push(`  LC keys: ${Object.keys(lcd).join(',')}; parents/crumb: ${JSON.stringify(lcd['parents'] ?? lcd['ancestry'] ?? lcd['crumb'] ?? null)?.slice(0, 300)}`);
+    const board = await app.inject({ method: 'GET', url: `/v1/projects/${PRJ}/board`, headers: auth(ownerToken) });
+    out.push(`  GET board -> ${board.statusCode}; LC present: ${board.body.includes(LC)}; DP present: ${board.body.includes(DP)}`);
+
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix D — probe for E6-5 — outbox overtake after a transient failure
+
+Place the file at `zz-exec6-probe-overtake.test.ts` (path shown relative to the repo root below), run from
+`packages/sync-client`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-overtake.test.ts --no-file-parallelism
+```
+File path in the tree: `packages/sync-client/test/zz-exec6-probe-overtake.test.ts`. The header (fixtures, helpers) is copied verbatim from `test/outbox.test.ts`; only the final `describe` is new. Uses the in-memory better-sqlite3 storage.
+
+```ts
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  newSubmittedEvent,
+  newUlid,
+  type EventEnvelope,
+  type LedgerEvent,
+  type SubmittedEvent,
+} from '@gisik-nokma/domain';
+import { createBetterSqliteStorage } from '../src/storage/better-sqlite3.js';
+import type { SyncStorage } from '../src/storage/storage.js';
+import { createReplica, type BootstrapResponse, type Replica } from '../src/replica/replica.js';
+import { backoffMs, createOutbox, type Outbox } from '../src/outbox/outbox.js';
+
+/**
+ * Plan 10 Task 10 — the outbox. Cases 12.144–12.153.
+ *
+ * The range is a fact about the moment it was written. `grep -cE
+ * "^[[:space:]]*it\(" test/outbox.test.ts` prints the number of `it`
+ * declarations here; one sits inside a two-zone loop (12.152) and therefore
+ * runs twice, so the runner's own count is one higher than the id count.
+ *
+ * ## The property the whole file is built around
+ *
+ * **A queued claim is never settled fact.** Nothing in `outbox.ts` writes to
+ * `tickets`, `snapshots` or `events`; a claim in transit moves `pendingFor` and
+ * `pendingCreatedTickets` and nothing else. 12.150 is the case that fails if
+ * that ever stops being true.
+ */
+
+const WS = newUlid();
+const OTHER_WS = newUlid();
+const PROJECT = newUlid();
+const USER_A = newUlid();
+const WF = newUlid();
+const TYPE_TASK = newUlid();
+
+const SERVER_TIME = '2026-08-20T00:00:00.000Z';
+const CLIENT_TIME = '2026-08-19T23:59:00.000Z';
+
+const wf = {
+  id: WF,
+  version: 1,
+  name: 'W',
+  initialStateId: 'todo',
+  states: [
+    { id: 'todo', name: 'To do', category: 'open' },
+    { id: 'done', name: 'Done', category: 'terminal' },
+  ],
+  transitions: [
+    { from: '*', to: 'done', rules: [] },
+    { from: '*', to: 'todo', rules: [] },
+  ],
+};
+
+const taskType = { id: TYPE_TASK, name: 'Task', icon: 'check', rank: 3, workflowId: WF, fields: [] };
+
+let seqCounter = 0;
+let streamCounter = 0;
+
+function committed(entity: EventEnvelope['entity'], type: string, payload: unknown, seq?: number): LedgerEvent {
+  seqCounter += 1;
+  streamCounter += 1;
+  return {
+    ...newSubmittedEvent({
+      workspaceId: WS,
+      entity,
+      type,
+      payload,
+      actorId: USER_A,
+      origin: 'server',
+      now: () => new Date(CLIENT_TIME),
+    }),
+    serverTime: SERVER_TIME,
+    seq: seq ?? seqCounter,
+    workspaceSeq: streamCounter,
+  };
+}
+
+function bootstrapOf(): BootstrapResponse {
+  return {
+    workspaceId: WS,
+    me: { userId: USER_A, workspaceRole: 'member', projectIds: [PROJECT] },
+    streamSeq: 0,
+    definitions: [
+      committed({ kind: 'workflow', id: WF }, 'workflow.defined', wf, 1),
+      committed({ kind: 'ticket-type', id: TYPE_TASK }, 'ticket-type.defined', taskType, 1),
+    ],
+    tickets: [],
+  };
+}
+
+type Fixture = { storage: SyncStorage; replica: Replica; outbox: Outbox };
+
+async function fixture(): Promise<Fixture> {
+  seqCounter = 0;
+  streamCounter = 0;
+  const storage = createBetterSqliteStorage();
+  const replica = await createReplica({ storage });
+  await replica.loadBootstrap(bootstrapOf());
+  return { storage, replica, outbox: createOutbox({ storage, replica }) };
+}
+
+/** A brand-new root ticket, born offline. PAYLOAD spells the parent `parentId` and the type `typeId`. */
+function createTicket(ticketId = newUlid(), title = 'Offline born'): SubmittedEvent {
+  return newSubmittedEvent({
+    workspaceId: WS,
+    entity: { kind: 'ticket', id: ticketId },
+    type: 'ticket.created',
+    payload: { typeId: TYPE_TASK, projectId: PROJECT, parentId: null, title },
+    actorId: USER_A,
+    origin: 'mobile',
+  });
+}
+
+/**
+ * 12.21 — order preservation is asserted at 12.144 (outbox.test.ts:116), the committed/contested/failed result-application clauses at 12.145 (:138), 12.146 (:164) and 12.147 (:198) respectively, and the exponential backoff (doubling from 1s, capped at 60s) at 12.153 (:438) — no single test proves this row; each clause lives in its own named case.
+ */
+describe('exec6 probe: can a later claim overtake a backing-off earlier one?', () => {
+  it('records what nextBatch offers after a transient failure', async () => {
+    const { storage, outbox } = await fixture();
+    const create = createTicket();
+    const rename = newSubmittedEvent({ workspaceId: WS, entity: create.entity, type: 'ticket.field_set', payload: { fieldId: 'title', value: 'first rename' }, actorId: USER_A, origin: 'mobile' });
+    expect(await outbox.enqueue(create)).toEqual({ queued: true, eventId: create.id });
+    expect(await outbox.enqueue(rename)).toEqual({ queued: true, eventId: rename.id });
+    const t0 = new Date('2026-09-21T10:00:00.000Z');
+    const batch1 = (await outbox.nextBatch(50, () => t0)).map((i) => i.eventId);
+    // Transient failure on that batch (e.g. the transport threw): both back off.
+    await outbox.recordFailure(batch1, 'network', () => t0);
+    // The user keeps working: a second rename on the SAME ticket is enqueued after the failure.
+    const rename2 = newSubmittedEvent({ workspaceId: WS, entity: create.entity, type: 'ticket.field_set', payload: { fieldId: 'title', value: 'second rename' }, actorId: USER_A, origin: 'mobile' });
+    expect(await outbox.enqueue(rename2)).toEqual({ queued: true, eventId: rename2.id });
+    // A flush 500 ms later (before backoffMs(1) = 2 s has elapsed):
+    const t1 = new Date(t0.getTime() + 500);
+    const batch2 = (await outbox.nextBatch(50, () => t1)).map((i) => i.eventId);
+    const name = (id: string) => (id === create.id ? 'CREATE' : id === rename.id ? 'RENAME-1' : id === rename2.id ? 'RENAME-2' : id);
+    console.log(`PROBE batch1 (t0)        = [${batch1.map(name).join(', ')}]`);
+    console.log(`PROBE batch2 (t0+500ms)  = [${batch2.map(name).join(', ')}]   <- offered to the server BEFORE the ticket.created it depends on`);
+    const t2 = new Date(t0.getTime() + 2500);
+    const batch3 = (await outbox.nextBatch(50, () => t2)).map((i) => i.eventId);
+    console.log(`PROBE batch3 (t0+2.5s)   = [${batch3.map(name).join(', ')}]`);
+    await storage.close();
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix E — dev-database read for E6-7 (read-only transaction)
+
+Place the file at `/private/tmp/claude-501/-Users-kiro-my-projects-gisik-nokma-exec6/babb00bd-cec9-4b69-82e3-2463a1a044c1/scratchpad/devdb.mjs` (path shown relative to the repo root below), run from
+`apps/server`:
+
+```
+cp <this file> apps/server/zz-devdb.mjs && cd apps/server && node zz-devdb.mjs && rm zz-devdb.mjs
+```
+Reads the OWNER's dev database on `54330` inside `BEGIN READ ONLY … ROLLBACK`; writes nothing. Output at 10:1x IST 2026-09-21: `pgmigrations rows: 32`; `last 3: 1790000000000_proj-ticket-comments @ 2026-09-21T02:50:18.602Z | 1789900000000_proj-projects-prefix @ 2026-09-20T10:10:31.511Z | 1789800000000_proj-tickets-deleted @ 2026-09-20T10:10:31.511Z`; `events: { n: 169, latest: 2026-09-21T03:30:06.282Z }`.
+
+```ts
+import pg from 'pg';
+const c = new pg.Client({ connectionString: 'postgres://gisik:gisik@localhost:54330/gisik_nokma' });
+await c.connect();
+await c.query('BEGIN READ ONLY');
+const n = await c.query('SELECT count(*)::int AS n FROM pgmigrations');
+const last = await c.query('SELECT name, run_on FROM pgmigrations ORDER BY id DESC LIMIT 3');
+const tables = await c.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name LIKE 'proj_%' ORDER BY 1");
+const ev = await c.query('SELECT count(*)::int AS n, max(server_time) AS latest FROM events');
+console.log('pgmigrations rows:', n.rows[0].n);
+console.log('last 3:', last.rows.map(r => `${r.name} @ ${new Date(r.run_on).toISOString()}`).join(' | '));
+console.log('proj_ tables:', tables.rows.map(r => r.table_name).join(','));
+console.log('events:', ev.rows[0]);
+await c.query('ROLLBACK');
+await c.end();
+```
+
+### Appendix F — probe for E6-8 — republish promotion versus the parent-terminal invariant
+
+Place the file at `zz-exec6-probe-promote.test.ts` (path shown relative to the repo root below), run from
+`packages/rule-engine`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-promote.test.ts --no-file-parallelism
+```
+File path in the tree: `packages/rule-engine/test/zz-exec6-probe-promote.test.ts`. Pure in-memory; relative imports.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: can a republish put a parent with open children into a terminal state,
+// and does `ticket.closed` then accept that parent?
+import { describe, expect, it } from 'vitest';
+import type { EventEnvelope, PublishedWorkflowDef } from '@gisik-nokma/domain';
+import { makeEnvelope } from '@gisik-nokma/domain';
+import { buildMemoryContext } from '../src/memory-context.js';
+import { evaluateEvent } from '../src/evaluate.js';
+import { EPIC, STORY, TASK, WF, WS, created, typeDefined } from '../src/checks/test-support.js';
+
+const P = '01J9GTKP000000000000000000';
+const C = '01J9GTKC000000000000000000';
+
+function ev(type: string, entity: EventEnvelope['entity'], payload: unknown): EventEnvelope {
+  return makeEnvelope({ type, entity, workspaceId: WS, payload });
+}
+const move = (id: string, to: string) => ev('ticket.transitioned', { kind: 'ticket', id }, { to });
+const publish = (def: PublishedWorkflowDef) => ev('workflow.defined', { kind: 'workflow', id: def.id }, def);
+
+// v2a: 'doing' KEPT but promoted active -> terminal.
+const V2_PROMOTED: PublishedWorkflowDef = {
+  ...WF,
+  version: 2,
+  states: WF.states.map((s) => (s.id === 'doing' ? { ...s, category: 'terminal' as const } : s)),
+};
+// v2b: 'doing' DROPPED and mapped onto terminal 'done'.
+const V2_MAPPED: PublishedWorkflowDef = {
+  ...WF,
+  version: 2,
+  states: WF.states.filter((s) => s.id !== 'doing'),
+  transitions: WF.transitions.filter((t) => t.from !== 'doing' && t.to !== 'doing'),
+  stateMapping: { doing: 'done' },
+};
+
+describe('exec6 probe: republish promotion versus the parent-terminal invariant (case 4.23)', () => {
+  it('records the engine answers', async () => {
+    const out: string[] = [];
+    const say = (k: string, v: { refused: boolean; rule?: string; reason?: string }) =>
+      out.push(`${k.padEnd(66)} -> ${v.refused ? `REFUSED ${v.rule}: ${v.reason}` : 'ACCEPTED'}`);
+    const base = [typeDefined(EPIC), typeDefined(STORY), typeDefined(TASK), created(P, 'story', null), created(C, 'task', P), move(P, 'doing')];
+
+    // Control: the invariant holds on the transition path.
+    say('control: P (child C open) doing -> done by transition', await evaluateEvent(move(P, 'done'), buildMemoryContext([WF], base)));
+
+    // Door 1: kept state promoted to terminal.
+    say('publish v2a: "doing" kept, active -> terminal (P sits in it, C open)', await evaluateEvent(publish(V2_PROMOTED), buildMemoryContext([WF], base)));
+    const afterPromote = [...base, publish(V2_PROMOTED)];
+    const ctxA = buildMemoryContext([WF], afterPromote);
+    const pA = await ctxA.getEntityState('ticket', P);
+    out.push(`  after v2a: P.stateId=${pA?.kind === 'ticket' ? pA.stateId : '?'} stateCategory=${pA?.kind === 'ticket' ? pA.stateCategory : '?'}; C open: ${(await ctxA.getChildrenStates(P)).map((c) => c.stateCategory).join(',')}`);
+    say('after v2a: ticket.closed on P (terminal, child C still open)', await evaluateEvent(ev('ticket.closed', { kind: 'ticket', id: P }, {}), ctxA));
+
+    // Door 2: dropped state mapped onto a terminal one.
+    say('publish v2b: "doing" dropped, mapped -> "done" (P sits in it, C open)', await evaluateEvent(publish(V2_MAPPED), buildMemoryContext([WF], base)));
+    const ctxB = buildMemoryContext([WF], [...base, publish(V2_MAPPED)]);
+    const pB = await ctxB.getEntityState('ticket', P);
+    out.push(`  after v2b: P.stateId=${pB?.kind === 'ticket' ? pB.stateId : '?'} stateCategory=${pB?.kind === 'ticket' ? pB.stateCategory : '?'}`);
+    say('after v2b: ticket.closed on P (terminal, child C still open)', await evaluateEvent(ev('ticket.closed', { kind: 'ticket', id: P }, {}), ctxB));
+
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
