@@ -184,7 +184,9 @@ reads as OFF by its docblock's own rule), `visibility/rollup.ts` (whole; `proj_r
 claim is about; `comment.added` is the only comment type in the vocabulary, so no edit door bypasses it),
 `attachments/sniff.ts` (whole: content-sniffed allowlist, no SVG/HTML, `nosniff` and `inline` only for images at
 `routes/attachments.ts:566-573`), `notifications/transport.ts` (whole), `notifications/store.ts:100-142` (keyset paging),
-`auth/routes.ts` (whole), `mcp-server/src/{config,
+`auth/routes.ts` (whole), `sync/reconcile-route.ts` (whole) and `sync/sync-service.ts:1-140` (the per-event
+state machine: a stored id is answered `committed` from the ledger row without comparing the resubmitted body to
+it — self-inflicted divergence only, since the id space is the client's own ULIDs; not filed), `mcp-server/src/{config,
 device-login,lazy-session,main,login-prompt}.ts` (whole), `app-core/src/online/stream.ts:95-160`, `:273-324` (frame
 parsing and cursor advance), `sync-client/src/replica/replica.ts:1050-1103`, `:1254-1290` (purge, scope-revoked,
 reach-granted arms), **the five route modules previously grep-only, code lines whole** — `routes/{attention,board,
@@ -263,8 +265,7 @@ size: 6 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ 
   index}.ts` (of the 16 files in `projections/`, three read whole — `contested`, `proj-visibility`, `workflows` —
   and three in part — `tickets`, `proj-memberships`, `ticket-types`; `rollups.ts` at the two cited lines only); `read/{restricted-parents,
   workspace-counts,ticket-comments,workflow-defs,ticket-numbers,live-ticket,state-provenance,assigned-provenance,
-  membership-roster,list-cards}.ts` beyond a grep; `sync/{sync-service,reconcile-route}.ts` beyond the cited
-  lines; `seed/*`; `http/{security-headers,hsts,rate-limit}.ts` beyond a grep; `auth/*` other than `auth.ts`, `routes.ts`, `social-providers.ts` and `synthetic-address.ts` (whose guard hides a synthetic
+  membership-roster,list-cards}.ts` beyond a grep; `sync/sync-service.ts:140-439`; `seed/*`; `http/{security-headers,hsts,rate-limit}.ts` beyond a grep; `auth/*` other than `auth.ts`, `routes.ts`, `social-providers.ts` and `synthetic-address.ts` (whose guard hides a synthetic
   address in rosters and is not consulted by the magic-link door — safe only because `.invalid` never resolves;
   noted, not filed); `tools/sweep-notifications.ts`; `visibility/visible-events-for.ts` as code (exercised by Appendix AE, not read); `attachments/*` other than `sniff.ts`; `notifications/*` beyond the cited ranges; `alerts/`, `workspaces/`.
 - **No browser, no pixel, no `apps/web` beyond `members/page.tsx:720-856`; `apps/mobile` and `apps/desktop`
