@@ -1898,6 +1898,90 @@ round-1 §2d.)
 
 ---
 
+# R2.13 — NEW FINDING, BATCH 6
+
+---
+
+### E2-39 (r2) — IMPORTANT · A failed roster read becomes "nobody is in this workspace", and the workflow builder's own adapter calls that "the very lie"
+
+**WHAT.** `packages/app-core/src/workflow-builder/ui/workflow-builder-screen.tsx:71-80` loads the builder's
+environment with two reads and a **blanket** catch on one of them:
+```
+Promise.all([
+  props.gateway.listMembers(props.workspaceId).catch(() => [] as WorkspaceMember[]),   // :72
+  props.gateway.listTicketTypes(props.workspaceId),
+])
+  .then(([members, ticketTypes]) => { if (!cancelled) setData({ members, ticketTypes }); })
+  .catch(() => { if (!cancelled) setLoadFailed(true); });                              // :78-80
+```
+`listMembers` therefore **never rejects**, so the outer `.catch` at `:78` is reachable only by
+`listTicketTypes` — and the screen's own failure sentence, *"Could not load workspace people and types —
+reload to try again."* (`:86-91`), is unreachable for the members half. The empty array then flows into
+`BuilderEnvironment.members` (`:101`), which the rule editors and rule summaries read.
+
+**WHY it is wrong — and the product's own text, in two files, is the measurement.**
+
+- `apps/web/src/authoring/data-source-gateway.ts:118-121`: *"`WorkflowBuilderScreen` does NOT:
+  `listMembers(...).catch(() => [])` is blanket, so a 500, a dropped connection or an unparseable roster
+  body becomes the empty roster — **the very lie the paragraph directly above says this adapter declined
+  to invent**, told by the caller instead, into rule summaries and `require-different-user` editors."*
+  The same file's vocabulary (`:104`) names the value: `` `listMembers` -> `[]`, "nobody is in this
+  workspace" ``.
+- `apps/web/src/authoring/builder-wiring.tsx:62-69` corroborates from the other side: the screens
+  *"are NOT built for it"*, and the sibling hook narrows on the refusal type precisely so a 500 is not
+  read as a role.
+
+**The half that IS justified, stated so the finding is not over-broad.** `:67-70` explains the arm the
+catch was written for: *"A guest may not call `GET /v1/workspaces/:id/members` … that refusal is not a
+load failure, it is an empty roster."* That is a real fact and a defensible choice **for the 404**. The
+defect is that the catch is not narrowed to it, in a screen that already has the arm that would handle
+the rest.
+
+**Consequence for a person.** A workflow admin authoring a rule whose roster read fails (a 500, or a
+dropped connection) meets a builder that mounts normally, with **no people offered in the
+`require-different-user` and `restrict-to` editors** and rule summaries that name nobody. Nothing on the
+screen says the read failed. ⚠ **Measured by reading, not driven:** I read the catch, the two consumers
+above and the editors' prop path; I did **not** render the builder with a failing gateway to see the
+empty picker, so I claim the mechanism and not the painted screen.
+
+**WHAT WOULD HAVE BEEN BETTER.** Narrow the catch to the guest refusal on the members read, and let
+anything else reach `loadFailed` — the sentence is already built and already says "reload to try again".
+The docblocks record why the narrowing is a *contract move* rather than a one-line catch
+(`AuthoringReadRefused` is declared under `apps/`, and `app-core` depends on nothing there), which is a
+reason it has not been done, not a reason it is right.
+
+**Classification, stated plainly.** This is a **recorded, owned, unfixed** gap
+(`data-source-gateway.ts:126-127`: *"RECORDED in the coordination doc (Plan 8 Task 13 fix round,
+2026-09-03) rather than annexed here"*). It is **not** "the product behaving as ruled": no ruling says the
+lie is acceptable, and the recording calls it a lie. I am filing it because it is user-facing, measured at
+a line, and the same class as `E2-23` — the two connect, which round-2 §3 says weighs a reason more.
+
+**MEASUREMENT.** Opened: `workflow-builder-screen.tsx:58-101` (the state, the effect, both catches, the
+unreachable failure sentence, and `members: data.members` into the environment);
+`apps/web/src/authoring/data-source-gateway.ts:104,111-130`; `apps/web/src/authoring/builder-wiring.tsx:56-87`.
+
+**Source:** new area (the workflow builder, which my round-1 §6 named as unreached). Found by sweeping all
+**59 `catch` sites** in the shipping client for handlers that never set state or speak
+(`apps/web/app`, `apps/web/src`, `packages/app-core/src`, `packages/editor/src`, `packages/ui/src`).
+**18 matched, and all 18 are accounted for here rather than the interesting one alone:**
+
+| what the 18 are | count | members |
+|---|---|---|
+| prose my pattern matched as if it were a catch **site** | **3** | `account/page.tsx:99`, `builder-wiring.tsx:65`, `data-source-gateway.ts:118` |
+| deliberate `localStorage` / `try` guards | **8** | `layout.tsx:26,34`; `use-last-project.ts:223,342,348`; `use-last-workspace.ts:133,153,161` |
+| classes I had **already filed** | **2** | `account/page.tsx:223` → `E2-24`; `inbox/page.tsx:278` → `E2-26` |
+| **not yet examined** | **5** | `claims/dates.ts:154`; `online/stream.ts:86`; `provenance.ts:76`; `replica-data-source.ts:1492`; `attachment-paste.ts:98` |
+
+**And the discovery came from the three comments in the first row** — they pointed at
+`workflow-builder-screen.tsx:72` and named it a lie, which is why this finding cites two docblocks *and*
+the line they describe. **Severity: Important.**
+
+---
+
+*Batch 6 filed. Running total of round-2 new findings: `E2-20`–`E2-39` (20) — 10 Important, 10 Minor.*
+
+---
+
 # R2.11 — CANDIDATES I EXAMINED AND DID **NOT** FILE, WITH THE REASON
 
 A candidate I checked and rejected is worth recording: it costs the judge nothing, it shows the boundary
