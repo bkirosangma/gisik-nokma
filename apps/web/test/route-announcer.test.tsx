@@ -36,7 +36,7 @@ beforeEach(() => {
 });
 
 /**
- * P18 — a client-side navigation used to announce nothing at all.
+ * P18 (case 13.1050) — a client-side navigation used to announce nothing at all.
  *
  * The judge's line corrected the finding's third leg: the App Router DOES mount
  * an announcer. `next/dist/client/components/app-router-announcer.js` reads

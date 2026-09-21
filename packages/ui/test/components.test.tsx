@@ -167,7 +167,7 @@ describe('Sheet', () => {
 });
 
 /**
- * P8 — `Dialog` and `Sheet` both declare `aria-modal="true"`, which tells
+ * P8 (case 13.1052) — `Dialog` and `Sheet` both declare `aria-modal="true"`, which tells
  * assistive tech that everything outside them is inert. Neither moved focus into
  * itself, trapped it, or restored it on close, so the claim was asserted and not
  * kept. The gap is not inert in the product either: `board.tsx:385-393` refuses a
@@ -369,7 +369,7 @@ describe('SegmentedControl (13.288)', () => {
 });
 
 /**
- * P9 — `SegmentedControl` declared full ARIA tab semantics (`role="tablist"`,
+ * P9 (case 13.1051) — `SegmentedControl` declared full ARIA tab semantics (`role="tablist"`,
  * `role="tab"`, `aria-selected`) and implemented none of the tab keyboard model:
  * `grep -n "onKeyDown\|Arrow\|tabIndex\|aria-controls\|tabpanel"` on
  * `segmented-control.tsx` returned nothing, so a screen reader announced "tab, 1
@@ -882,7 +882,7 @@ describe('Select panel/option styling', () => {
 });
 
 /**
- * E4-21 — independently the same defect as P23 (rules §3: the two found it
+ * E4-21 (case 10.91) — independently the same defect as P23 (rules §3: the two found it
  * separately and both score in full), so the two cases are written against the
  * same corrected behaviour from different angles rather than duplicated: this
  * one owns the STYLESHEET half — that a ring exists at all, and that it carries

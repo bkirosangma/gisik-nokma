@@ -91,7 +91,7 @@ describe('Select — non-searchable single-select', () => {
 
 describe('Select — non-searchable focus restoration', () => {
   /**
-   * E4-17 — both keyboard close paths of the non-searchable `Select` used to end
+   * E4-17 (case 10.90) — both keyboard close paths of the non-searchable `Select` used to end
    * with `document.activeElement === body`: Enter opens the listbox and DOM-focuses
    * an option row inside a `document.body` portal, so when the panel unmounts the
    * focused node is removed with it and the browser drops focus to the document
@@ -146,7 +146,7 @@ describe('Select — non-searchable focus restoration', () => {
 });
 
 /**
- * P23 — the same defect E4-21 fixes, found independently by a second reviewer
+ * P23 (case 10.92) — the same defect E4-21 fixes, found independently by a second reviewer
  * and scored in full on its own (rules §3). The two cases read it from opposite
  * ends so neither is a restatement of the other: E4-21 owns the stylesheet half
  * in `components.test.tsx` (that the ring exists, its offset, and that the class
