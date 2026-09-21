@@ -334,6 +334,14 @@ does) or lift `memberLabel` into app-core; make `queryUsers` match on the resolv
 `{aria: "", text: "?"}` ×2. `[SOURCE]` lines above opened; `visibility-editor.tsx:410` opened as the positive control
 (`actorLabel(member.id, member.name)`).
 
+**Defence / correction of one clause (15:08 IST, phase 2).** exec 4 painted the assignee listbox (*"third option `""`
+184×13 — holds"*) and the @mention popup with `@` typed: the nameless member is **excluded** (*"1 person matches"*,
+Kiro only), not shown blank. So the mention site's outcome is the harsher of the two this finding allowed for
+(*"can never be @mentioned by typing, and if listed is a blank row"*): they are never listed at all. The source
+claim stands (`queryUsers` maps `name: member.name` and filters on it); the "if listed" clause is withdrawn as
+unreached in practice — the editor's popup drops the empty name before it draws. Three painted sites remain
+(picker, Filters ×2) plus the mention exclusion.
+
 **SEVERITY: Important** (claimed). A control that offers a choice the person cannot identify, on the two surfaces
 that assign and narrow work, for the population the product creates by default.
 
@@ -835,6 +843,11 @@ its contract), `ticket-sheet.tsx:2624`, `transition-dialog.tsx:382`, `create-tic
 `[BROWSER]` the pair was observed open together; **the Escape itself was not pressed with both open** — the browser
 became unusable before I returned to it (§6.1). `grep -n Escape packages/app-core/test/views/ticket-sheet.test.tsx`
 → only `16.86` (the title field); no case presses Escape with the Move dialog open.
+
+**Defence / corroboration (15:08 IST, phase 2).** The clause this finding marked unverified — the rendered outcome — has
+now been painted by another lane on its own signed-in stack: exec 4's `review-refutations-exec4.md` §1 records
+*"focus on the dialog's Cancel, one real Escape → both `[role=dialog]`s gone, `?ticket=` left the URL — holds."*
+Attribution: that painting is theirs; the mechanism above is what this finding adds, and the two now agree.
 
 **SEVERITY: Important** (claimed). A cancel that discards more than the person cancelled, on every ticket move.
 

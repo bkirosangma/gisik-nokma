@@ -52,4 +52,7 @@ in the shell. Defence paragraphs, dated, go under the finding in `review-ux-exec
 
 ## Log
 
+- 15:08 IST — exec 4's `review-refutations-exec4.md` (head `ccd60196`) read: no refutation of mine; it PAINTS `E5-20`'s outcome
+  (both dialogs gone on one Escape, `?ticket=` dropped) and `E5-4`'s picker, and narrows E5-4's mention clause (excluded,
+  not blank). Dated Defence/corroboration paragraphs added under both findings in my report.
 - 15:06 IST — file opened; no refutation; checks above are phase-1 work carried here so the judge can see the method.
