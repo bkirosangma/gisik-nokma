@@ -1252,11 +1252,11 @@ board -> 200; due dates served: 2026-02-30, 2026-13-45, 0000-00-00, 2026-09-22
 ```
 
 **WHY it is wrong.** The door refuses the *shape* and accepts the *impossibility*. The attention read compares
-day strings lexicographically (`attention.ts:258` `if (due.date > horizon) continue;`), so `0000-00-00` is due-soon
+day strings lexicographically (`attention.ts:261` `if (due.date > horizon) continue;`), so `0000-00-00` is due-soon
 forever, `2026-13-45` is never due, and `2026-02-30` is due "within 7 days" of a day that does not exist; the
 notifications sweep's due-soon digest works over the same column with the same comparison, so the same three
 sentences reach the inbox and the mail. The product already distinguishes shape from existence for instants —
-`envelope.ts:96` `isRealCalendarDatetime` refuses a `clientTime` on a day that does not exist — and `ist-day.ts:47`
+`envelope.ts:64` `isRealCalendarDatetime` refuses a `clientTime` on a day that does not exist — and `ist-day.ts:47`
 reuses it for instants, while the day schema beside it does not.
 
 **WHAT WOULD HAVE BEEN BETTER.** One refinement on `IST_DAY_REGEX`'s users — parse the three fields, rebuild the
@@ -1264,7 +1264,7 @@ string, compare (the same trick `isRealCalendarDatetime` uses) — so `2026-02-3
 door already has. Two lines in `ist-day.ts`, shared by the two checks and the two filter bounds.
 
 **MEASUREMENT.** Appendix W, run from `apps/server`. Lines opened: `ist-day.ts:27`, `:37-47`; `ticket-types.ts:179-181`;
-`fields.ts:39-42`, `:135-138`; `attention.ts:255-266`; `envelope.ts:96`.
+`fields.ts:39-42`, `:135-138`; `attention.ts:255-266`; `notifications/sweep.ts:188`; `envelope.ts:64`.
 
 **SEVERITY: Minor.** Data quality with a user-visible sentence; no loss, no leak, and the client picker presumably
 never sends one — the API and MCP doors do.
