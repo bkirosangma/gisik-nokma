@@ -9,7 +9,7 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E4-5 | done | fa9448d2 | 13.995 h1 named from the visible workspace name via aria-labelledby (web suite 624 passed) |
 | T-E4-5 | needs-owner | fa9448d2 | E4-5's own remedy (plain h1 + adjacent Rename button) would REVERSE the owner's 2026-09-19 shape ruling recorded at test-cases/13-neomorphism-and-workspace-screens.md:2125 and enforced by 13.969 arms 1+3. Not taken; aria-labelledby closes the measured defect with all three 13.969 arms green. Owner to confirm the shape stands. |
 | T-P12 | done | 0e99bedf | 13.1057 every route declares a title (sweep + runtime); server half measured in next build output |
-| T-P19 | done | 5ada8ba9 | 13.1051 the view rail adopts SegmentedControl and is named "Project view" (web suite 631 passed) |
+| T-P19 | done | 5ada8ba9 | 13.1058 the view rail adopts SegmentedControl and is named "Project view" (web suite 631 passed) |
 | T-P21 | done | 0e0ce247 | 9.259 description composer named by its <dt> via labelledBy through the shared contract; contract mutation-witnessed |
 | T-P22 | done | 63519f7a | 13.1052 both menus named; new role="menu" source sweep + two runtime arms |
 | T-P31 | done | 1bcfbc94 | 13.1053 both nav landmarks named; product-wide <nav> sweep + two runtime arms; 13.685 moved with its reason written in |

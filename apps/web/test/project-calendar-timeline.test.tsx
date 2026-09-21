@@ -189,7 +189,7 @@ async function openTab(name: 'Calendar' | 'Timeline' | 'List') {
  * name. The scope above is unchanged because it is still correct, not because
  * the reason for it still applies — and the day this file needs the name, the
  * query is `getByRole('tablist', { name: 'Project view' })`, which case
- * `13.1051` already exercises.
+ * `13.1058` already exercises.
  */
 async function viewTabs(): Promise<HTMLElement[]> {
   // BY ROLE, not by text, since Round 19b: `AppNav` now offers its own
@@ -233,7 +233,7 @@ describe('the project page mounts four views over one list read', () => {
   });
 
   /**
-   * 13.1051 — exec1 P19 — **the view rail is a NAMED tablist.**
+   * 13.1058 — exec1 P19 — **the view rail is a NAMED tablist.**
    *
    * The rail declared `role="tablist"` with no `aria-label` and no
    * `aria-labelledby`, so a screen reader met an unnamed set of five tabs on the
@@ -250,7 +250,7 @@ describe('the project page mounts four views over one list read', () => {
    * rather than fixing this one instance and leaving the next to be forgotten.
    * A page that hand-rolled the markup again would fail this case.
    */
-  it('13.1051 the view rail is a named tablist, reached by role and name', async () => {
+  it('13.1058 the view rail is a named tablist, reached by role and name', async () => {
     render(
       <Providers services={servedList([row()])}>
         <ProjectPage />

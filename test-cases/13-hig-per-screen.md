@@ -313,9 +313,9 @@ those keeps a server layout for the generic title meanwhile.
 `apps/web/src/page-title.ts` carries no `'use client'` on purpose: a directive there would turn the
 helper into a client reference and break the server half, which is now every route's half.
 
-## The project view rail is a NAMED tablist (exec1 P19, 2026-09-21) — case `13.1051`
+## The project view rail is a NAMED tablist (exec1 P19, 2026-09-21) — case `13.1058`
 
-- **13.1051** ✅ The project page's view rail — Backlog, Board, List, Calendar, Timeline — is reached by
+- **13.1058** ✅ The project page's view rail — Backlog, Board, List, Calendar, Timeline — is reached by
   ROLE AND NAME (`getByRole('tablist', { name: 'Project view' })`), and the named element is the rail the
   five tabs live in, not a second tablist elsewhere on the page. The case queries by name on purpose: the
   remedy was to adopt the SHARED `SegmentedControl`, whose `'aria-label'` prop is **required**, so an
