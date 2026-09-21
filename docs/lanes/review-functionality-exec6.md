@@ -1224,7 +1224,7 @@ OTHER DOORS, same byte (Appendix V):
   500  GET /v1/sync/bootstrap/ticket?ticketId=
   — and the doors that refine or hash first: 400 PUT /v1/me/preferences (noNul) · 400 GET /v1/search?q= (noNul) ·
     404 GET|POST /v1/invites/:token[/accept] (token hashed) · 404 POST /v1/me/invitations/:id/accept (looked up by id, not found) ·
-    404 POST /v1/mcp/device/token (hashed) · 404 …/migrate stateMap key (the type lookup 404s first)
+    404 POST /v1/mcp/device/token (hashed) · 404 …/migrate stateMap key (the probe's fresh `toWorkflowId` 404s at `builder-reads.ts:883` before the map is read — the key itself was not tested)
 ```
 
 Underlying Postgres answers, measured directly (Appendix T's header): `SELECT $1::text` with the byte →
