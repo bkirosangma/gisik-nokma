@@ -1176,6 +1176,8 @@ BATCH [good comment, NUL comment, good comment] -> HTTP 500; events stored: 0 of
 SYNC  NUL comment on /v1/sync                 -> HTTP 500
 READ  312 malformed-query requests over 13 doors -> {"200":190,"400":96,"404":22,"500":4}; the four 500s:
       /v1/projects/:PRJ/tickets?cursor=%00 · ?parentId=%00 · /v1/me/notifications?…&cursor=%00 · …/ticket-types/task/population?workflowId=%00
+UPLOAD POST /v1/attachments with ticketId 'a\u0000b' (multipart field) -> HTTP 500   (Appendix U; the same door refuses
+      an empty file, text declared as PNG and HTML with 415, and stores a NUL or traversal FILENAME under its id with 201)
 ```
 
 Underlying Postgres answers, measured directly (Appendix T's header): `SELECT $1::text` with the byte →
@@ -1201,15 +1203,16 @@ exactly the `22P05` explanation, and applies it to filters, search terms and pre
 3. **A per-event `invalid` exists for exactly this and is not used.** `parseEvent` answers `invalid`
    (`ingest-service.ts:400-407`) for a malformed envelope; the payload schemas could refuse the byte there with
    `noNul`, which is the mechanism the product already chose for the same byte elsewhere.
-4. **The read doors 500 on a query string.** `cursor`, `parentId` and `workflowId` are passed to Postgres as-is;
-   the same byte in `q` or `filter` is a 400, because those go through `searchTermSchema`/`filterSpecSchema`.
+4. **The read doors 500 on a query string, and the upload door on a form field.** `cursor`, `parentId` and
+   `workflowId` are passed to Postgres as-is, and so is the multipart `ticketId` on `POST /v1/attachments`; the
+   same byte in `q` or `filter` is a 400, because those go through `searchTermSchema`/`filterSpecSchema`.
 
 **WHAT WOULD HAVE BEEN BETTER.** `noNul` on the three ticket payload strings (and on `plainTextToDoc`'s input in
 the MCP server, `write-tools.ts:163`, which is one way an agent hands the byte over), so the door answers
 `invalid` per event and the batch's other claims are judged; and a `hasNoNul` check on the three raw query
 parameters, answering 400 like their siblings. Neither is more than the refinement the domain already exports.
 
-**MEASUREMENT.** Appendix T, run from `apps/server`. Lines opened: `filter-spec.ts:45-51`; `ticket-events.ts:45-48`,
+**MEASUREMENT.** Appendices T and U, run from `apps/server`. Lines opened: `filter-spec.ts:45-51`; `ticket-events.ts:45-48`,
 `:98-103`, `:108`; `ingest-service.ts:361-386`, `:396-412`; `app.ts:50-52`, `:388`; `list.ts:558-559`;
 `notifications.ts:71`; `builder-reads.ts:726`; the `pg` probe in Appendix T's header (`22021` / `22P05`).
 
@@ -1249,6 +1252,10 @@ what was looked at and found sound, not only what was found wrong.
   `type` are each refused or `invalid` per event with the rule named; `'polluted' in {}` stays `false`.
   *Observation, not filed:* there is no upper bound on a title's length or an explicit audience's size beyond the
   1 MB body limit — a 200 KB title rides on every board, list and search response in the project.
+- **The upload door refuses what it should and stores by id, not by name** (Appendix U): an empty file, text
+  declared as PNG and an HTML file are 415 by content sniffing; a filename with a NUL, a 5,000-character filename
+  and `../../etc/passwd.png` are accepted and stored under the attachment's ULID (the name is data, not a path);
+  a missing `ticketId` or file is a 400 with the reason. The one blemish is E6-18's fifth site.
 - **The ingest pipeline's order is what the docblocks say.** `ingest-service.ts:164-360`: workspace lock →
   entity lock → entity↔workspace guard → permission gate (through the transaction's `client`, `:235-245`) →
   contest coherence → engine → server gates → append → refresh-on-publish → projections → COMMIT. Read at the
@@ -4073,6 +4080,162 @@ describe('exec6 sweep: malformed query parameters on every parameterised read do
     // The sync door with the NUL claim:
     const sync = await app.inject({ method: 'POST', url: '/v1/sync', headers: auth(ownerToken), payload: { events: [mk(2, 'a\u0000b')] } });
     out.push(`SYNC NUL comment -> HTTP ${sync.statusCode} ${sync.body.slice(0, 120)}`);
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix U — probe for E6-18 (upload door) and the upload-door sweep (§5)
+
+File path in the tree: `apps/server/test/zz-exec6-probe-upload.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-upload.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A (the test app's default `LocalDiskStore` over a temp directory). Output: control
+PNG → 201; filename with NUL → 201; 5,000-char filename → 201; `../../etc/passwd.png` → 201 (stored under the
+attachment id); empty file / text-as-PNG / HTML → 415 `unsupported-media-type`; **`ticketId` with NUL → 500**;
+missing `ticketId` / missing file → 400 with the reason; two files → 201; 10 KB `ticketId` → 400.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: do hostile inputs at POST /v1/attachments answer 500?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52]);
+type Part = { name: string; value?: string; filename?: string; contentType?: string; data?: Buffer };
+function multipartBody(parts: Part[]) {
+  const boundary = 'gisik-test-boundary'; const chunks: Buffer[] = [];
+  for (const part of parts) {
+    chunks.push(Buffer.from(`--${boundary}\r\n`));
+    if (part.filename !== undefined) {
+      const quoted = part.filename.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      chunks.push(Buffer.from(`Content-Disposition: form-data; name="${part.name}"; filename="${quoted}"\r\nContent-Type: ${part.contentType ?? 'application/octet-stream'}\r\n\r\n`));
+      chunks.push(part.data ?? Buffer.alloc(0));
+    } else chunks.push(Buffer.from(`Content-Disposition: form-data; name="${part.name}"\r\n\r\n${part.value ?? ''}`));
+    chunks.push(Buffer.from('\r\n'));
+  }
+  chunks.push(Buffer.from(`--${boundary}--\r\n`));
+  return { payload: Buffer.concat(chunks), headers: { 'content-type': `multipart/form-data; boundary=${boundary}` } };
+}
+describe('exec6 sweep: hostile inputs at the upload door', () => {
+  it('records status per input', async () => {
+    const out: string[] = [];
+    const T = newUlid();
+    expect((await post(WS, { kind: 'ticket', id: T }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title: 'attach' }, ownerId, ownerToken)).status).toBe('committed');
+    const cases: Array<[string, Part[]]> = [
+      ['control: png', [{ name: 'ticketId', value: T }, { name: 'file', filename: 'a.png', contentType: 'image/png', data: PNG }]],
+      ['filename with NUL', [{ name: 'ticketId', value: T }, { name: 'file', filename: 'a\u0000b.png', contentType: 'image/png', data: PNG }]],
+      ['filename 5000 chars', [{ name: 'ticketId', value: T }, { name: 'file', filename: 'a'.repeat(5000) + '.png', contentType: 'image/png', data: PNG }]],
+      ['filename ../../etc/passwd', [{ name: 'ticketId', value: T }, { name: 'file', filename: '../../etc/passwd.png', contentType: 'image/png', data: PNG }]],
+      ['empty file', [{ name: 'ticketId', value: T }, { name: 'file', filename: 'e.png', contentType: 'image/png', data: Buffer.alloc(0) }]],
+      ['declared png, bytes are text', [{ name: 'ticketId', value: T }, { name: 'file', filename: 'x.png', contentType: 'image/png', data: Buffer.from('hello world this is text') }]],
+      ['declared html', [{ name: 'ticketId', value: T }, { name: 'file', filename: 'x.html', contentType: 'text/html', data: Buffer.from('<script>1</script>') }]],
+      ['ticketId with NUL', [{ name: 'ticketId', value: 'a\u0000b' }, { name: 'file', filename: 'a.png', contentType: 'image/png', data: PNG }]],
+      ['ticketId missing', [{ name: 'file', filename: 'a.png', contentType: 'image/png', data: PNG }]],
+      ['file missing', [{ name: 'ticketId', value: T }]],
+      ['two files', [{ name: 'ticketId', value: T }, { name: 'file', filename: 'a.png', contentType: 'image/png', data: PNG }, { name: 'file', filename: 'b.png', contentType: 'image/png', data: PNG }]],
+      ['ticketId 10 KB', [{ name: 'ticketId', value: 'x'.repeat(10_000) }, { name: 'file', filename: 'a.png', contentType: 'image/png', data: PNG }]],
+    ];
+    for (const [label, parts] of cases) {
+      const { payload, headers } = multipartBody(parts);
+      const res = await app.inject({ method: 'POST', url: '/v1/attachments', payload, headers: { ...headers, ...auth(ownerToken) } });
+      out.push(`${label.padEnd(30)} -> ${res.statusCode} ${res.body.slice(0, 110)}`);
+    }
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
   });
