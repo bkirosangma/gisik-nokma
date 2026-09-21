@@ -15,3 +15,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E3-19 | done | 0970a58c98b4ed93d7417a8f6b7afbab39454f06 | parent-terminal-symmetric.test.ts (8) + precheck.test.ts gate 5 (5) |
 | T-E6-10 | done | 2437eb174844fef73953a28a18a41a58c6ce012a | builder-reads.test.ts 7.266 (RED [1,1] → GREEN [2,0]) |
 | T-E6-3 | done | 58d51ed67ffc2d7b2d2a6a0fdd5857cb03b9c444 | decision recorded (occupancy doctrine binds): ticket-types.test.tsx 10.120 RED→GREEN; ticket-type-rerank.test.ts 5.80 witness |
+| T-E6-8 | done | 35bba9569e9933d0048b5a53e6ddd1a2beacb627 | close-with-open-children.test.ts (6) + sweep.test.ts 13.1167 + precheck.test.ts (3) |
