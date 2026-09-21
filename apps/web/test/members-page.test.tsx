@@ -8,6 +8,7 @@ import MembersPage, { COPY_IT_NOW } from '../app/w/[workspaceId]/members/page.js
 import { Providers } from '../src/providers.js';
 import { clearWorkspaceNameCache } from '../src/use-workspace-name.js';
 import { stubServices, type GatewayStubs } from './helpers/stub-services.js';
+import { shellRefusalCopy } from '../src/shell-refusal.js';
 
 /**
  * The roster, the invite mint, the pending list, and the role gate (Plan 6
@@ -405,7 +406,12 @@ describe('3.135 the minted link is shown once, and the list never carries one', 
     // happened, not merely that this case forgot to trigger it — and the
     // URL survives it standing right beside that refusal.
     await waitFor(() => expect(listCalls).toBe(2));
-    await waitFor(() => expect(screen.getByText(/cannot be shown yet/)).toBeInTheDocument());
+    // The sentence every read refusal carries is `shellRefusalCopy`'s — E5-30
+    // (B09) replaced "cannot be shown yet" product-wide and exported the copy so
+    // a spec asserts what renders rather than re-typing it.
+    await waitFor(() =>
+      expect(screen.getByText(shellRefusalCopy('The invitations for this workspace'))).toBeInTheDocument(),
+    );
     expect(screen.getByText(url)).toBeInTheDocument();
     expect(screen.getByText(COPY_IT_NOW)).toBeInTheDocument();
   });
