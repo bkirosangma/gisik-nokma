@@ -22,3 +22,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-P2 | done | eb7bba1cae6f205908c9500104897bd59c743ab8 | components.test.tsx (13.1059); ui 410/410; Features.md rationale added; not painted |
 | T-E4-31 | done | e4dd9c211f8d4820ec46dbbe4ce25008fe202675 | tokens.test.ts (13.1060); accent stepped both themes (#2d5488/#97bdf2); ui 410, web 639, app-core 1722 |
 | T-I2 | done | 056260d11d5bfd97783bc9d589654b82ce9c53e6 | roster provenance stamp; typecheck 17/17; no product test (DONE WHEN says none needed) |
+| T-P24 | done | 232403d9adbe0eba95abb6dd34395f8f262436c0 | tokens.test.ts (13.1061) sweep 3/3; ui 413, web 639; dangerText option refuted (1.06:1) |
