@@ -1478,3 +1478,163 @@ so the person is not left without information — they are left with a contradic
 ---
 
 *Batch 2 filed. Running total of round-2 new findings: `E2-20`–`E2-28` (9) — 4 Important, 5 Minor.*
+
+---
+
+# R2.8 — NEW FINDINGS, BATCH 3
+
+---
+
+### E2-29 (r2) — IMPORTANT · A dropped connection during a Move produces nothing at all, and the Move control has no in-flight state
+
+**WHAT.** Two halves, both measured, in `packages/app-core/src/views/ticket-sheet.tsx`.
+
+**(i) No transport surface, and the code says so itself.** `submitTransition` (`:711-745`) ends
+`const results = await dataSource.ingest([...]);` (`:731`) with **no `try`/`catch`**; the call site is
+`:2634` `onSubmit={(submission) => void submitTransition(submission)}` — a `void`, so a rejection is
+discarded. The sheet's own transport sentence is then unreachable by construction: it renders only at
+`:1975` `{transportError !== null && !moveOpen ? …}`, and the dialog that replaces it is handed the literal
+`:2644` `transportError={null}`. The docblock at `:2637-2643` states the position plainly:
+> *"`submitTransition` above stays unguarded … a rejected `ingest` here is an **unhandled promise
+> rejection**, not a state this component tracks, so there is nothing to pass but `null`."*
+
+**(ii) No in-flight latch either.** `submitTransition` holds no `submitting` state and no ref — unlike its
+sibling `submitTicketEvent` (`:1025-1030`, `setSubmitting(true)` + `finally`), and unlike
+`TicketEditorSlot`'s synchronously-set `submittingRef`. `TransitionDialog`'s own Move button is
+`disabled={blocked}` only.
+
+**WHY it is wrong.** Move is the product's primary transition action, and a dropped connection on it is
+**invisible**: no sentence, no state change, and the button still enabled — so the person cannot tell
+"still sending" from "already failed" from "already succeeded", and their natural response is to press
+again. Every sibling on this sheet discloses a silence — close, reopen and delete through
+`submitTicketEvent`'s `finally`; a description through `submitDescription`; a comment through
+`submitComment` — which makes this an omission in an otherwise complete pattern rather than a design.
+The docblock's own words ("unhandled promise rejection") are a record of the shortcut, not a ruling on it:
+no ruling covers this, and the file is explicit that Ruling 27's scope is a *fabricated* refusal, which
+this never was.
+
+**WHAT WOULD HAVE BEEN BETTER.** Wrap the `await` in the same `try`/`catch`/`finally` shape
+`submitTicketEvent` uses, set `transportError`, and **pass it to the dialog** (which already accepts the
+prop) instead of the literal `null` — the dialog is the surface in view, so it should be the one that
+speaks. ⚠ **Not measured:** whether a genuine double press files two `ticket.transitioned` events. The
+second would be adjudicated by the engine against the state the first left; I did **not** trace that, so I
+allege only the absence of a latch, not a duplicate.
+
+**MEASUREMENT.** Opened: `ticket-sheet.tsx:711-745` (the whole function), `:1975`, `:2624-2647` (the dialog
+mount, the `void`, and `transportError={null}`), `:1014-1030` (the sibling that does it properly).
+
+**Source:** carried candidate (round-1 §2e). **Severity: Important** — agree with the sweep.
+
+---
+
+### E2-30 (r2) — IMPORTANT · The only way back from a soft delete is a 15-second toast
+
+**WHAT.** Every view excludes a soft-deleted ticket (`deleted_at IS NULL`; the partial index
+`proj_tickets_live_idx` exists to serve exactly that predicate). The inverse event exists and is gated and
+wired — but it has **exactly one producer in the entire client**: the Undo button inside the delete toast.
+Measured: 515 non-test source files walked, **31 `ticket.restored` hits, and every one except
+`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:832` is server, domain, projection or comment prose.**
+That line is inside `restoreDeletedTicket`, whose only caller is the toast's `undo.onUndo` (`:2952-2955`).
+
+And the toast lapses on its own: `page.tsx:2948` mounts `<Toast` **without a `durationMs`**, so it takes
+`TOAST_DEFAULT_DURATION_MS = 15_000` (`packages/ui/src/components/toast.tsx:33,39`). Meanwhile the message
+it shows is `<title> deleted · its history is retained` (`:2890`) — **true of the ledger and misleading
+about what the person can do**, because the retained history has no screen: no deleted view, no filter
+axis, no search arm.
+
+**WHY it is wrong.** A deletion is an act this product treats as consequential enough to gate on
+project-admin rights (`check-permission.ts:1116-1124`) — and then leaves its inverse on a quarter-minute
+timer with no other route. The gate protects the doing and not the undoing, which is backwards: a person
+who deletes by mistake at 20 seconds has no recourse inside the product at all, while the server is
+perfectly able to put the ticket back. The toast's own pause-on-hover/focus
+(`toast.tsx:122,131,142`) helps only someone already looking at it.
+
+**WHAT WOULD HAVE BEEN BETTER.** Keep the toast — it is the right shape for a quick reversal — and add a
+durable path: a "Deleted" filter or section on the List, or a re-issue affordance keyed on the ticket.
+Neither needs anything the server does not already do. The sentence should then name where the durable
+route is instead of promising a history that cannot be reached from any screen.
+
+**MEASUREMENT.** Opened: `page.tsx:826-852` (`restoreDeletedTicket`), `:2888-2892` (the message and
+`undoFor`), `:2948-2957` (the `Toast`, and the absence of `durationMs`); `toast.tsx:33,39,122,131,142`;
+`apps/server/migrations/1789800000000_proj-tickets-deleted.sql` for the `deleted_at IS NULL` predicate and
+its partial index.
+
+**Source:** carried candidate (round-1 §2e). **Severity: Important.**
+
+---
+
+### E2-31 (r2) — MINOR · A re-entrancy guard whose stated purpose cannot happen, in a file that fixed the same guard properly 200 lines away
+
+**WHAT.** `packages/app-core/src/views/ticket-sheet.tsx:1029` — `if (submitting) return;` at the top of
+`submitTicketEvent`. Its docblock (`:1018-1023`) gives its purpose:
+
+> *"The early `if (submitting) return` guards against a second click landing on **the same render pass as
+> the first, before React has re-rendered the `disabled` attribute onto the DOM** … (…) belt-and-braces
+> for a synchronous double-invoke, not the primary defence — the `disabled` attribute is)."*
+
+**WHY it is wrong.** `submitting` is React **render state**. Two calls in one render pass both close over
+the same pre-commit `false`, so the guard **cannot** observe the case it names — that is precisely the
+failure mode render state is blind to. The repository measured this and wrote it down at
+`packages/editor/src/components/TicketEditorSlot.tsx:128-136`: *"`submitting` is render state … it is
+useless as a re-entrancy guard, because two clicks in one React batch both read the same pre-commit `false`
+and both get through — **MEASURED, two `comment.added` events for one comment**"* — and the fix there is a
+ref set **synchronously** inside the handler, before the first `await`.
+
+**Nothing is broken today**: `disabled={submitting}` holds for genuine clicks, so this line is inert rather
+than harmful. What makes it worth one point is its shape — **a guard whose stated purpose is unreachable is
+indistinguishable from a working one to every future reader**, and this repository treats that class as its
+most-catalogued failure. It is the same defect as the one the composer measured and fixed, left in place
+because nothing re-checks a guard that never fires.
+
+**WHAT WOULD HAVE BEEN BETTER.** Either delete the line and let the docblock say what actually holds
+(`disabled` is the guard), or make it real with a `submittingRef` mirroring `submitTitle`'s own
+synchronous ref in the same file.
+
+**MEASUREMENT.** Opened: `ticket-sheet.tsx:1014-1030` (the claim and the line);
+`packages/editor/src/components/TicketEditorSlot.tsx:128-136` (the measured precedent and the fix).
+
+**Source:** carried candidate (round-1 §2e). **Severity: Minor** — no live defect, which is exactly why it
+would otherwise never be found.
+
+---
+
+### E2-32 (r2) — MINOR · A committed move does not clear the comment, so the next move submits the previous move's words
+
+**WHAT.** `packages/app-core/src/views/transition-dialog.tsx:226` holds
+`const [comment, setComment] = useState('')`. Neither reset effect touches it: `:329-333` clears
+`evidenceAttachmentId`/`uploadError` on a destination change, and `:352-358` does the same on close. The
+dialog is mounted for the sheet's whole life (`ticket-sheet.tsx:2624`, `open={moveOpen}`), so after a
+committed move — which only calls `setMoveOpen(false)` (`:735`) — the comment is still in state. On the
+next Move, `:376` `if (needsComment) submission.comment = comment.trim();` puts it on the wire: **a comment
+written about move A is recorded as the comment for move B.**
+
+**WHY it is wrong — and precisely how far the argument goes.** The persistence is deliberate and stated at
+`:347-350`:
+
+> *"**The comment and the field values still persist across a reopen — pre-existing behaviour, left alone
+> deliberately:** typing into a dialog and losing it to a stray Cancel is a real cost, and unlike an
+> attachment id **it is visible in the reopened dialog.**"*
+
+The stated reason is about **Cancel**, and the code does not distinguish Cancel from Commit — the same
+`!open` effect serves both. The mitigating fact is real: unlike the evidence id, the text **is** visible, so
+a careful person will notice they did not write it for this move. What survives is narrower and worth one
+point: text the person wrote for a different action **silently satisfies `require-comment`** for this one,
+and the file itself names that shape — *"Invisible state the user cannot see, silently satisfying a rule"*
+(`:343-344`) — as the thing it went to the trouble of fixing one state field over.
+
+**WHAT WOULD HAVE BEEN BETTER.** Clear `comment`/`fieldValues` on a **committed** submit (the parent can
+signal it, or key the dialog per committed move) while keeping preserve-on-Cancel, which is what the
+docblock actually defends.
+
+**MEASUREMENT.** Opened: `transition-dialog.tsx:222-228` (the state), `:329-333` and `:352-358` (both
+resets, neither touching `comment`), `:336-351` (the docblock, including its own "invisible state" phrase),
+`:372-378` (the submit that carries it); `ticket-sheet.tsx:731-738` (`setMoveOpen(false)` and no clearing)
+and `:2624` (the dialog's mount).
+
+**Source:** carried candidate (round-1 §2d). **Severity: Minor.** The sweep rated it Important; I lower it
+because the stale text is on screen before the press, so the person can correct it — the defect is that
+they are not told to look.
+
+---
+
+*Batch 3 filed. Running total of round-2 new findings: `E2-20`–`E2-32` (13) — 6 Important, 7 Minor.*
