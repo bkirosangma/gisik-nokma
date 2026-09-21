@@ -3572,25 +3572,34 @@ stripped: **35**, every member a semantic role — `surface`, `text`, `border`, 
 3. **Correct parse** — from `export const TOKEN_ROLES = [` to the closing `]` at column 0, comments stripped,
    string literals collected only at depth 1 — gives **35**, matching the claim.
 
-### 54.3 Two more §3 counts I started and did NOT measure — named, not implied.
+### 54.3 Two more §3 counts — both since MEASURED, both clean, and both cost me a wrong number first.
 
-- **§3:350**, *"the NINE replica tables — eight until ruling P36 added `snapshot_provenance`"*: **not measured.**
-  My search for the DDL returned **zero** files under `packages/app-core/src/**/*.ts` containing `CREATE TABLE`,
-  which means my path assumption is wrong rather than the claim — the replica DDL lives somewhere I did not look.
-  A zero from a search that never reached the artifact is not evidence, and I am not filing it as anything.
-- **§3:21**, *"CI pipeline (skeleton) … a single job installs via pnpm"*: **not measured, and the one number I did
-  produce is meaningless.** `.github/workflows/ci.yml` shows job-like keys including `scope`, `check-env`,
-  `check-runbook`, `check-citations`, `check-help`, `check-tasks`, `check-migrations`, `build`, `typecheck`,
-  `server-tests`, `other-tests`, `e2e`, `viewport` and `gate` — but my pattern matched at two-space indent and so
-  also swept up `pull_request` and `push`, which are children of `on:`, not jobs. **The bullet is titled
-  "(skeleton)" and may be a deliberately historical description of the initial pipeline**, which would make the
-  present-tense reading mine, not the catalogue's — and I have not read the bullet in full to decide. Recorded as
-  open rather than filed.
+- **§3:350**, *"the NINE replica tables — eight until ruling P36 added `snapshot_provenance`"*: **NINE exactly. Verified clean.**
+  My first search returned **zero** files, because I looked under `packages/app-core/` — the local replica DDL is
+  `packages/sync-client/src/storage/schema.ts`, a package my concern never opened. **A zero from a search that
+  never reached the artifact is not evidence**, and this one was my path, not the claim. Corrected search: the file
+  carries **nine `CREATE TABLE` statements** — `events`, `snapshots`, `snapshot_provenance`, `tickets`,
+  `workflows`, `ticket_types`, `contests`, `outbox`, `meta` — at lines 33, 42, 65, 71, 75, 78, 79, 85 and 91.
+  Nine minus `snapshot_provenance` is the eight the claim names, so the bullet's own arithmetic holds. **A second
+  instrument was wrong here too:** my table-name regex reported **10** by capturing `IF` as a name, because
+  **line 51 is a docblock sentence that mentions `` `CREATE TABLE IF NOT EXISTS` `` in prose.** A prose mention
+  of a DDL keyword is not DDL — the fifth wrong number I produced in §3 against four clean claims.
+- **§3:21**, *"CI pipeline (skeleton) … a single job installs via pnpm"*: **Verified clean on reading the bullet in
+  full — and my suspicion was the defect, not the bullet.** `ci.yml` today carries fourteen jobs (`scope`,
+  `check-env`, `check-runbook`, `check-citations`, `check-help`, `check-tasks`, `check-migrations`, `build`,
+  `typecheck`, `server-tests`, `other-tests`, `e2e`, `viewport`, `gate`), so "a single job" is false of the file
+  **today** — but the bullet says in its own words that it is a snapshot: *"Scoped to what Plans 1–2 landed … the
+  e2e job (Plans 4/6), and the interim-plumbing gate (Plan 10) land with their owning plans; **Plan 11's own
+  catalogue task owns the full pipeline under §13**."* **The bullet discloses its own scope and points at the
+  section that supersedes it.** My first count of "16 jobs" was also wrong: the pattern matched at two-space
+  indent and swept up `pull_request` and `push`, which are children of `on:`, not jobs. **Fifth and sixth wrong
+  numbers, against the fifth clean claim.**
 
 ### 54.4 Where §3 stands.
 
-**Checked: 2 claims of 68 countable bullets, both exact.** No finding in §3 so far — and that is the honest
+**Checked: 4 claims of 68 countable bullets, all four exact.** No finding in §3 so far — and that is the honest
 result: §3's bullets, unlike §4's and §6's, are densely tied to named modules and their counts match what the
-code holds. **The remaining 66 candidate bullets in §3, and the whole of §1, §2, §7, §8 and §10, stay unopened
-or unchecked**, and §3's own `177`/`35` results now carry the same weight as any other verified-clean claim in
-§20.
+code holds. **The remaining 64 candidate bullets in §3, and the whole of §1, §2, §7, §8 and §10, stay unopened
+or unchecked**, and §3's own four results now carry the same weight as any other verified-clean claim in §20. **The
+instrument record is the point of this section:** six wrong numbers against five clean claims, in a section whose
+bullets are densely tied to named modules — the opposite of §4 and §6, where the counts were the defect.
