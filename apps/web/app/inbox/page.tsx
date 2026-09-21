@@ -102,6 +102,33 @@ export const BULK_REFUSED_COPY =
 export const BULK_UNREACHED_COPY =
   'Those notifications were not marked read — the server could not be reached. What is on screen has been reloaded.';
 
+/**
+ * THE SINGLE ROW'S OWN PAIR, and the same split the bulk pair keeps (E5-10,
+ * 2026-09-21).
+ *
+ * Separate sentences rather than the bulk pair reused: those say *"Those
+ * notifications"*, and a plural said about one row is a second false statement
+ * laid on top of the missing one. The row's failure is otherwise identical — the
+ * optimistic flip has to be reverted by the truth either way, and NOTHING SAID is
+ * the state this pair exists to end.
+ */
+export const ROW_REFUSED_COPY =
+  'That notification was not marked read — the server refused it. What is on screen has been reloaded.';
+/** The row's transport arm: nobody adjudicated, so it must not read as a refusal. */
+export const ROW_UNREACHED_COPY =
+  'That notification was not marked read — the server could not be reached. What is on screen has been reloaded.';
+
+/**
+ * The UNDO's own sentence (E5-10, 2026-09-21).
+ *
+ * The Undo had the same silent catch as the row, and it is the worse of the two:
+ * the reader has just been TOLD those notifications are unread again, by a toast
+ * that then disappears — so a failed undo leaves the screen contradicting a
+ * sentence the page has already withdrawn. It says which way the truth now lies.
+ */
+export const UNDO_FAILED_COPY =
+  'That could not be undone — the notifications are still marked read. What is on screen has been reloaded.';
+
 export const CANNOT_OPEN_COPY =
   'That ticket cannot be opened from here — it may have been removed, or it is no longer visible to you. The message itself is yours and stays.';
 
@@ -180,6 +207,13 @@ export default function InboxPage() {
    * by mistake, and dismissing the toast drops the ids with it.
    */
   const [undoable, setUndoable] = useState<{ changed: string[] } | null>(null);
+  /**
+   * The undo's own failure slot (E5-10, 2026-09-21). Separate from `bulkFailure`
+   * because the two are said in different places: the bulk and row failures sit
+   * above the list, next to the rows they are about, while the undo's belongs
+   * beside the toast — where the sentence it contradicts was just shown.
+   */
+  const [undoFailure, setUndoFailure] = useState<string | null>(null);
   /**
    * The NEXT page's failure, held apart from `error` on purpose. `error` means
    * "this page cannot be shown"; this means "this page is shown and there is
@@ -267,6 +301,7 @@ export default function InboxPage() {
    * leaving a row drawn as read that the server never marked.
    */
   function markRead(id: string): void {
+    setBulkFailure(null);
     setPage((current) =>
       current === null
         ? current
@@ -275,7 +310,23 @@ export default function InboxPage() {
             notifications: current.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
           },
     );
-    void gateway.markRead(id).catch(() => loadFirstPage());
+    // ⚠ **THIS CATCH USED TO RELOAD AND SAY NOTHING (E5-10, 2026-09-21)** — the
+    // exact first-version defect the BULK arm's docblock above records, still
+    // standing here sixty lines down: a reader over the bound saw a click do
+    // nothing and the list snap back, with no sentence anywhere.
+    //
+    // **The split is by KIND here, not by status, and that is the row's own
+    // fact rather than a simplification of the bulk pair's.** The bulk route's
+    // 400 is its bound — a number only a bulk request can exceed, which is why
+    // THAT arm splits on the status. A single-row read has no such bound: the
+    // only status this route answers is the 404 documented at the top of this
+    // function, and a 404 IS the server adjudicating ("not yours" and "does not
+    // exist" are one frozen body). So an `HttpError` of any status means a
+    // server judged it, and anything else never reached one.
+    void gateway.markRead(id).catch((cause: unknown) => {
+      setBulkFailure(cause instanceof HttpError ? ROW_REFUSED_COPY : ROW_UNREACHED_COPY);
+      loadFirstPage();
+    });
   }
 
   /**
@@ -345,6 +396,9 @@ export default function InboxPage() {
     if (undoable === null) return;
     const ids = undoable.changed;
     setUndoable(null);
+    // A new attempt clears the last one's sentence, the same rule `markAllRead`
+    // keeps for `bulkFailure`.
+    setUndoFailure(null);
     const undone = new Set(ids);
     setPage((current) =>
       current === null
@@ -354,7 +408,14 @@ export default function InboxPage() {
             notifications: current.notifications.map((n) => (undone.has(n.id) ? { ...n, read: false } : n)),
           },
     );
-    void gateway.setRead(ids, false).catch(() => loadFirstPage());
+    // **And this catch said nothing either (E5-10, 2026-09-21)** — the worse of
+    // the two, because the reader has just been told by the toast that these
+    // notifications are unread again, and a failed undo leaves the screen
+    // contradicting a sentence the page has already withdrawn.
+    void gateway.setRead(ids, false).catch(() => {
+      setUndoFailure(UNDO_FAILED_COPY);
+      loadFirstPage();
+    });
   }
 
   /**
@@ -507,6 +568,17 @@ export default function InboxPage() {
         undo={{ onUndo: undoMarkAllRead }}
         onDismiss={() => setUndoable(null)}
       />
+      {/*
+        The undo's failure, BESIDE the toast (E5-10, 2026-09-21). It is rendered
+        out here rather than inside the toast's own message because the toast is
+        gone by the time this appears — the Undo closed it — and a sentence about
+        an undo that failed has to outlive the control that failed.
+      */}
+      {undoFailure !== null ? (
+        <p role="status" className="gn-inbox__undo-failure" data-testid="inbox-undo-failure">
+          {undoFailure}
+        </p>
+      ) : null}
     </main>
   );
 }
