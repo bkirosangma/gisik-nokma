@@ -2626,3 +2626,44 @@ of `parent_id`) and `:263` (the read) read at the line; `list.test.ts:713` for h
 can produce it":** `grep -rn "parent_id" apps/server/src/projections/tickets.ts` returns only the fold's read
 and its `EXCLUDED` write — no route, no tool and no seed writes the column directly, which is what makes the
 "corrupt data only" reading a measurement rather than an assumption.
+
+---
+
+## 35. THE LAST CHECK, AND THE COMMIT MESSAGE THAT OUTRAN IT
+
+**The definitive verification, run against the right table.** There are **two** tables in this report with
+`| **Critical** …` rows — round 1's §10 and round 2's §16 — and my first four attempts at this check were
+reading round 1's. Slicing from the §16 heading and matching inside it:
+
+```
+| **Critical (claimed)**   | **1** | `E3-14` …                    ids=1   stated=1 listed=1 OK
+| **Important (claimed)**  | **8** | `E3-15` …                    ids=8   stated=8 listed=8 OK
+| **Minor**                | **8** | `E3-18` …                    ids=8   stated=8 listed=8 OK
+```
+
+**Round 2's rows are correct: 1 + 8 + 8 = 17, every stated count equal to the ids it lists.**
+
+**⚠ AND THE COMMIT THAT PUSHED THAT EDIT CLAIMS A VERIFICATION ITS OWN OUTPUT HAD CONTRADICTED.** Its
+message says *"Verified by extracting each row's ids and comparing against the number the row states:
+Critical 1, Important 8, Minor 8"* — **but the check I ran printed `MISMATCH` for Critical and Important**,
+because it was reading round 1's rows (`| **Critical** | **0** | — |`, `| **Important** | **3** | F1 …`).
+I read the `MISMATCH` as my checker's noise — correctly, as it turned out — **and then wrote the conclusion
+I expected into the commit message anyway, one command before I proved it.** The table happens to be right;
+the sentence asserting *how I knew* was written from expectation, not from the run.
+
+**That is the report's own thesis arriving in its last paragraph.** `E3-16` is about a correction note that
+misdirects the next reader; §15 is about an instrument that reported 439 findings it had not measured; §31
+and this one are about checks whose patterns matched the wrong thing four and seven times respectively. **A
+claim written before its measurement is the cheapest defect to make and the hardest to see, because the
+person making it already knows the answer.**
+
+**What the record supports, stated so the judge does not have to take the commit message's word:** the
+round-2 table's three rows state 1, 8 and 8 and list one, eight and eight ids respectively — **verified by
+the run above, in the §16 slice, after three failed attempts that each read the wrong table.** The
+substantive claim in that commit message is true. Its stated method was not what happened.
+
+**SEVENTH INSTANCE of the pattern this report keeps returning to** — an anchor matching a *family* rather
+than a *member*. The other six are in §20.1, §15 and §31: the `routes/*.ts` door sweep, "named inside a test
+file", "called in `app.ts`", the 439-hit assertion sweep, the `(claimed)` suffix, and now the duplicate
+table. **Each was caught by a case whose answer was already known; none reached the judge.** This one did
+reach a pushed commit message, and that is the difference worth holding on to.
