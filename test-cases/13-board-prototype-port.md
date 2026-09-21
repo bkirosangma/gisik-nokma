@@ -2005,3 +2005,38 @@ content-sized. The prototype's segment carries `padding:0 16px`.
   from a sha256-compared backup. Package suites: ui 423, web 647.
 
 **No `Features.md` bullet.** This corrects an existing control's metrics; it adds no affordance.
+
+## The editor's formatting strip takes the product's fill, not an outline (lane ds1, 2026-09-21, batch B10) — case `13.1154`
+
+**The finding, round 2 `E4-8`, IMPORTANT → scored MINOR.** In the sheet (style `neo`, light),
+`button.ticket-editor__tool` painted `border: 1px solid rgb(32,43,73)` (the label ink),
+`background: transparent`, `box-shadow: none`, and the strip `div.ticket-editor__toolbar` carried the same
+outline on three sides — while every neighbouring control in the same sheet (`.gn-button--ghost`,
+`.gn-segmented__item`, `.gn-select__trigger`, `.gn-field__input`) is border-less fill. Six outlined boxes
+and an outlined rule over a soft-fill sheet. The judge scored it below the claimed severity because **the
+defect itself is style consistency** — what was IMPORTANT was that the two recorded reasons for it rest on
+a false premise.
+
+### ⚠ The premise, corrected and asserted
+
+`editor.css`'s own docblock said the fill *"is NOT transcribed, and it cannot be"* for two reasons.
+**(1)** *"`packages/editor` does not depend on `packages/ui`, so no token from `tokens.ts` is
+reachable"* — a PACKAGE-DEPENDENCY fact where the question is a DOCUMENT one: `apps/web/app/layout.tsx:3-4`
+imports `ui.css` AND `editor.css` into one document, and custom properties cascade from the document.
+**(2)** *"this file forbids colour of every kind"* — **a `var(--gn-…)` reference is not a colour
+literal**, and the header's third prohibition is a bare colour *keyword*, which is why neither rule writes
+`transparent`. **Checked against the scanner rather than assumed:** `packages/ui/test/helpers/colour-scan.ts`
+matches a hex (`#[0-9a-fA-F]{3,8}`) in a CSS value or a string, and the functions
+`rgb|rgba|hsl|hsla|oklch|oklab|color-mix(`; a token reference matches neither.
+
+### The case
+
+- ✅ **13.1154 — both rules declare a fill and no outline, neither writes a literal or a keyword, and the
+  token-less context degrades to today's paint.** `packages/editor/test/editor-toolbar.test.tsx`. The
+  third assertion is not decoration: `src/webview/entry.tsx` loads this file **without** `ui.css`, so
+  `var(--gn-…)` resolves to `initial` there — `transparent` for `background`, `none` for `box-shadow` —
+  which is exactly what these controls paint today, so the mobile webview regresses by nothing. It also
+  pins the shape: **no fallback value**, since `var(--gn-x, <fallback>)` would change the webview's paint
+  and would need a colour token the header cannot express. **Not painted** — the computed values above are
+  the finding's own. `editor.css` was reverted to `HEAD` for the RED run and restored from a
+  sha256-compared backup. Package suites: editor 191, ui 423, web 647.

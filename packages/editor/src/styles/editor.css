@@ -115,14 +115,34 @@
    (`design-system/interactive/desktop.dc.html:1166-1173`: `display:flex;gap:6px;
    flex-wrap:wrap`, `padding:6px 8px`, buttons at `min-height:32px;min-width:34px`).
 
-   ⚠ THE FILL IS NOT TRANSCRIBED, and it cannot be: the prototype paints the
-   strip with `var(--fill4)` and each button with `var(--cardBg)` +
-   `var(--cardShadow)`, and THIS FILE'S HEADER (above) forbids colour of every
-   kind here — `packages/editor` does not depend on `packages/ui`, so no token
-   from `tokens.ts` is reachable. The strip is therefore drawn the way every
-   other control in this file is drawn: an edge in `currentColor`, which
-   inherits the surrounding text colour and is already contrast-proven. The
-   radius stays, so the strip still reads as sharing the field's top edge. */
+   **⚠ THE FILL IS TRANSCRIBED AFTER ALL (E4-8, 2026-09-21), BECAUSE THE TWO
+   REASONS THIS BLOCK GAVE FOR NOT DOING SO BOTH FAILED ON INSPECTION.**
+
+   The first said *"`packages/editor` does not depend on `packages/ui`, so no
+   token from `tokens.ts` is reachable."* That is a PACKAGE-DEPENDENCY fact and
+   the question is a DOCUMENT one: `apps/web/app/layout.tsx:3-4` imports
+   `ui.css` AND `editor.css` into one document, and custom properties cascade
+   from the document — so every `--gn-*` role is reachable HERE, at runtime, in
+   the shell this product actually serves. (The one context that loads this file
+   WITHOUT `ui.css` is the mobile webview, `src/webview/entry.tsx`; there a
+   `var(--gn-…)` resolves to `initial`, which is `transparent` / `none` — exactly
+   what these controls paint there today, so nothing regresses.)
+
+   The second was this file's own header forbidding colour of every kind. **A
+   `var(--gn-…)` REFERENCE IS NOT A COLOUR LITERAL**, and the sentence is
+   written down here because the header's third prohibition — a bare colour
+   *keyword* — is what decides the shape of the fix: `background: var(--gn-fill-tertiary)`
+   and NOT `background: transparent` as a fallback. **Checked against the
+   scanner rather than assumed:** `packages/ui/test/helpers/colour-scan.ts`
+   matches a hex (`#[0-9a-fA-F]{3,8}`) in a CSS value or a string, and the
+   functions `rgb|rgba|hsl|hsla|oklch|oklab|color-mix(`; a token reference
+   matches neither.
+
+   What the strip and its buttons looked like before: hard `1px solid
+   currentColor` outlines on both, while every neighbouring control in the
+   neumorphic sheet — `.gn-button--ghost`, `.gn-segmented__item`,
+   `.gn-select__trigger`, `.gn-field__input` — is border-less fill. Six outlined
+   boxes and an outlined rule over a soft-fill sheet. */
 .ticket-editor__toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -130,17 +150,18 @@
   gap: 6px;
   margin-top: 1rem;
   padding: 0.375rem 0.5rem;
-  border: 1px solid currentColor;
-  border-bottom: none;
+  border: none;
   border-radius: 6px 6px 0 0;
+  background: var(--gn-fill-quaternary);
 }
 .ticket-editor__tool {
   min-height: 32px;
   min-width: 34px;
   padding: 0 10px;
-  border: 1px solid currentColor;
+  border: none;
   border-radius: 6px;
-  background: none;
+  background: var(--gn-fill-tertiary);
+  box-shadow: var(--gn-shadow-raised);
   color: inherit;
   font: inherit;
   font-size: 0.8125rem;

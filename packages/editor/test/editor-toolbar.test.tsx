@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { Editor } from '@tiptap/core';
@@ -250,5 +253,74 @@ describe('the editor toolbar (16.85)', () => {
     expect(readOnly.view.container.querySelector('.ticket-editor__toolbar')).toBeNull();
     expect(readOnly.view.container.querySelector('.ticket-editor__hint')).toBeNull();
     readOnly.view.unmount();
+  });
+});
+
+/**
+ * Case `13.1154` — E4-8 — the formatting strip and its buttons take the
+ * product's fill treatment instead of hard `1px solid currentColor` outlines.
+ *
+ * In the sheet (style `neo`, light), `button.ticket-editor__tool` painted
+ * `border: 1px solid rgb(32,43,73)` (the label ink), `background: transparent`,
+ * `box-shadow: none`, and the strip carried the same outline on three sides —
+ * while every neighbouring control in the same sheet (`.gn-button--ghost`,
+ * `.gn-segmented__item`, `.gn-select__trigger`, `.gn-field__input`) is
+ * border-less fill. Six outlined boxes and an outlined rule over a soft-fill
+ * sheet.
+ *
+ * **The two recorded reasons for leaving it that way both failed on
+ * inspection, and the second is the one that decides the shape of this fix.**
+ * (1) *"`packages/editor` does not depend on `packages/ui`, so no token is
+ * reachable"* — a PACKAGE-DEPENDENCY fact where the question is a DOCUMENT one:
+ * `layout.tsx` imports both stylesheets, and custom properties cascade.
+ * (2) *"this file forbids colour of every kind"* — **a `var(--gn-…)` reference
+ * is not a colour literal**, and the header's third prohibition is a bare
+ * colour *keyword*, which is why neither rule writes `transparent`. Both are
+ * asserted below, because both are one edit away from being undone by someone
+ * who reads the header and not this case.
+ */
+describe('13.1154 the editor strip takes the product\'s fill, not an outline', () => {
+  const TEST_DIR = dirname(fileURLToPath(import.meta.url));
+  const EDITOR_CSS = readFileSync(resolve(TEST_DIR, '../src/styles/editor.css'), 'utf8');
+  const body = (selector: string): string => {
+    const m = new RegExp(`^${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'm').exec(
+      EDITOR_CSS.replace(/\/\*[\s\S]*?\*\//g, ''),
+    );
+    if (m?.[1] === undefined) throw new Error(`no rule for ${selector}`);
+    return m[1];
+  };
+
+  it('13.1154 both rules declare a fill and no outline', () => {
+    expect(body('.ticket-editor__tool')).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
+    expect(body('.ticket-editor__tool')).toMatch(/box-shadow:\s*var\(--gn-shadow-raised\)/);
+    expect(body('.ticket-editor__toolbar')).toMatch(/background:\s*var\(--gn-fill-quaternary\)/);
+    for (const selector of ['.ticket-editor__tool', '.ticket-editor__toolbar']) {
+      expect(body(selector), `${selector} still draws an edge`).not.toMatch(/currentColor/);
+      expect(body(selector), `${selector} still draws a border`).not.toMatch(/border[^:]*:\s*1px/);
+    }
+  });
+
+  it('13.1154 neither rule writes a colour LITERAL or a bare keyword', () => {
+    // The half that keeps the fix inside this file's contract: the header bans
+    // a hex, a colour function AND a bare colour keyword. `var(--gn-…)` is none
+    // of the three — which is the whole reason the fill is expressible here.
+    const KEYWORDS = /\b(transparent|white|black|red|grey|gray|currentcolor)\b/i;
+    for (const selector of ['.ticket-editor__tool', '.ticket-editor__toolbar']) {
+      const rule = body(selector);
+      expect(rule, `${selector} carries a colour literal`).not.toMatch(/#[0-9a-f]{3,8}|rgb\(|rgba\(|hsl\(/i);
+      expect(rule, `${selector} carries a bare colour keyword`).not.toMatch(KEYWORDS);
+    }
+  });
+
+  it('13.1154 the token-less context degrades to what these controls paint today', () => {
+    // NOT decoration: `src/webview/entry.tsx` loads this file WITHOUT `ui.css`,
+    // so `var(--gn-…)` resolves to `initial` there — `transparent` for
+    // `background`, `none` for `box-shadow`. That is exactly the paint these
+    // controls have today, so the mobile webview regresses by nothing. Asserted
+    // by reading the declaration, since nothing here can run a webview.
+    const tool = body('.ticket-editor__tool');
+    expect(tool, 'a fallback value was added — it would change the webview paint').not.toMatch(
+      /var\(--gn-[a-z-]+,\s*[^)]+\)/,
+    );
   });
 });
