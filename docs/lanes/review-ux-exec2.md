@@ -2290,11 +2290,25 @@ Round 2 took me into **the workflow builder** (`E2-20`–`E2-22`), **`/account`*
 **`/inbox`** (`E2-26`), **the offline/degraded components and both other shells** (`E2-25`), and the
 shared **`Dialog`/`Select`/`Toast` primitives (`E2-27`, `E2-31`, `E2-34`, `E2-33`)**.
 
-**Sources of the new findings, counted:** **all 19 trace to a lead carried from round 1's two sweeps** —
-the ~40 candidates at §2d and §2e, which the round-1 ruling left *"Carried, NOT raised"* — and **every
-measurement in them is mine and new**, made at `a7b6292b`. Each cites a line I opened.
+**Sources of the 24 new findings, recounted at this push** (the earlier text here said 19; the paragraph
+is corrected rather than left to drift):
 
-**Still not reached, and it is a shorter list than round 1's:** `apps/mobile` and `apps/desktop` beyond the
+| source | count | members |
+|---|---|---|
+| a lead **carried from round 1's two sweeps** (the ~40 at §2d/§2e, which the round-1 ruling left *"Carried, NOT raised"*) | **19** | `E2-20`–`E2-38` |
+| **work first done in round 2**, in three kinds: `E2-39` from a sweep I had not run before (all 59 `catch` sites); `E2-40` from tracing a lane-5 finding to the rule engine's own read site; `E2-41`–`E2-43` from `apps/mobile` and `apps/desktop`, both named unreached in my round-1 §6 | **5** | `E2-39`, `E2-40`, `E2-41`, `E2-42`, `E2-43` |
+
+**Every measurement in all 24 is mine and new**, made at `a7b6292b`, and each cites a line I opened.
+
+**Gained since that paragraph was written, in the same round.** `apps/mobile` and `apps/desktop` **are no
+longer unreached**: I read both shells in full — mobile's `board-screen.tsx` (72 lines) and
+`ticket-screen.tsx` (130), desktop's `app.tsx` (163) — which produced `E2-41`, `E2-42` and `E2-43`. The
+only parts of those apps I have still not read are their storage adapters
+(`storage/op-sqlite-storage.ts`, `storage/tauri-sql-storage.ts`), the RN editor bridge, the mobile help
+screen (330 lines) and the desktop theme module — all named below.
+
+**Still not reached, and it is a shorter list than round 1's:** mobile's `help-screen.tsx`,
+`editor-web-view.tsx`, the two storage adapters and desktop's `theme.ts` and storage adapter; `packages/ui`'s
 three files `E2-25` needed; `/members` and `/settings` as screens; `packages/ui`'s eleven other
 components; the 13.x case catalogue id by id; and **no browser has been opened** — every finding here is a
 code reading, and each one says where that limits it.
