@@ -57,12 +57,40 @@ import { useCurrentUser } from './providers.js';
  * button: they are destinations, and a middle-click or a copy-link on a real
  * anchor is behaviour people expect from nav items. They are anchors WITH
  * `role="menuitem"`, which is the documented pattern for a menu of links.
+ *
+ * ## Sign out closes the menu only when the server said so (E2-45)
+ *
+ * The shipped control ran `close(false)` FIRST and then a single-callback
+ * `.then` — so the menu closed before the request was sent, and a sign-out that
+ * failed (offline, a dropped connection, a proxy's 5xx) pushed nothing, said
+ * nothing, and left the session live while the menu closing read as success.
+ * The manual sells this exact control as what protects a person on somebody
+ * else's machine (*"That matters if you have signed in on somebody else's
+ * laptop"*, `docs/manual.md:112-114`), so silence here is the one outcome that
+ * sentence promises cannot happen.
+ *
+ * **Two arms, because the transport has two failure shapes and they are not the
+ * same path.** `@better-fetch/fetch` REJECTS when `fetch` itself throws — a
+ * dropped connection, an offline browser — so a second callback is the only
+ * thing that can see it. A non-2xx ANSWER does not reject: it resolves
+ * `{ data: null, error: { status, … } }`, so `.then` runs and the `error` field
+ * has to be READ. The first arm alone would have left the 5xx path navigating
+ * to `/sign-in` on the strength of an answer nobody looked at.
+ *
+ * The two failures get two sentences for the same reason the product's own
+ * refusal panels do (`gn-refusal--server` vs `gn-refusal--transport`): "the
+ * server refused" is a claim about a server that a dropped connection never
+ * reached. Both say the thing the person came for — the session is still open —
+ * and neither closes the menu, because the closing WAS the confirmation.
  */
 export function AccountMenu() {
   const router = useRouter();
   const pathname = usePathname();
   const user = useCurrentUser();
   const [open, setOpen] = useState(false);
+  // `null` = no failure. Two kinds rather than a boolean so the sentence can
+  // differ, which is the whole point of splitting the arms.
+  const [signOutFailure, setSignOutFailure] = useState<'refused' | 'unreached' | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const menuId = useId();
@@ -187,14 +215,46 @@ export function AccountMenu() {
             className="gn-nav__menu-item gn-nav__menu-item--signout"
             aria-label={`Sign out ${user.name}`}
             onClick={() => {
-              close(false);
-              void authClient.signOut().then(() => {
-                router.push('/sign-in');
-              });
+              setSignOutFailure(null);
+              void authClient.signOut().then(
+                (result) => {
+                  // A non-2xx answer RESOLVES here — see the docblock. The
+                  // session is only gone when the answer says it is.
+                  if (result.error !== null && result.error !== undefined) {
+                    setSignOutFailure('refused');
+                    return;
+                  }
+                  close(false);
+                  router.push('/sign-in');
+                },
+                () => {
+                  setSignOutFailure('unreached');
+                },
+              );
             }}
           >
             Sign out
           </button>
+          {/* The failure is said INSIDE the menu, next to the control that
+              raised it and while focus is still in it — the menu staying open is
+              the other half of "this did not happen". `role="alert"` rather than
+              colour alone, like every other refusal in the product: the person
+              who cannot see the menu just stay open is told too. The class pair
+              is the product's own refusal recipe rather than a second one
+              invented for this surface. */}
+          {signOutFailure !== null ? (
+            <p
+              role="alert"
+              className={`gn-refusal gn-nav__menu-refusal ${
+                signOutFailure === 'refused' ? 'gn-refusal--server' : 'gn-refusal--transport'
+              }`}
+              data-testid="account-menu-signout-refusal"
+            >
+              {signOutFailure === 'refused'
+                ? 'The server refused the sign-out — you are still signed in on this device. Try again.'
+                : 'We could not reach the server — you are still signed in on this device. Try again.'}
+            </p>
+          ) : null}
         </div>
       ) : null}
     </div>

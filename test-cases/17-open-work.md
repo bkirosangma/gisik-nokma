@@ -32,6 +32,7 @@ never saw.
 | **release batch B01** (exec6, `rel/b01-server-doors-security-and-refusa`) | **`17.081`–`17.100`** — allocated 2026-09-21 21:0x (cycle 46) |
 | **release batch B02** (exec2, `rel/b02-account-page-workflow-builder-dr`) | **`17.101`–`17.120`** — allocated 2026-09-21 21:0x (cycle 46) |
 | **release batch B07** (exec4, `rel/b07-soft-delete-integrity-engine-rep`) | **`17.121`–`17.140`** — allocated 2026-09-21 21:0x (cycle 46) |
+| **release batch B11** (ds5, `rel/b11-session-expiry-and-dead-controls`) | **`17.141`–`17.160`** — **used PROVISIONALLY, 2026-09-21 21:5x: the row above is the last allocated one and B11 had NO row when it started, so this block was taken from the tip at `origin/main` `0f06cc04` (`17.140` was the highest id in the table) rather than waited on. NOT controller-allocated — the controller is asked to ratify or reallocate it, and the ids are unmerged and renumberable until then.** Minted so far: **`17.141`–`17.143`** |
 
 **⚠ 2026-09-21 (cycle 46): blocks are now per RELEASE BATCH (the branch that lands), not per lane session** — a lane runs several batches in one worktree tonight, and a block that follows the session would be shared by two branches landing in either order. **A batch that empties its block asks the controller for the next twenty; a later batch in the same lane gets its own row.** The rule this file already states applies unchanged: mint only from your own row, never from the tip, never from a neighbour's. (ds5 measured the alternative tonight in §10/§13, where three batches minting from "next free N" collided: `10.90` and `13.1050`–`13.1056` were minted twice.)
 
@@ -146,3 +147,37 @@ a peer rather than by the author of the check.
 `origin/main` has not moved is *true when written* and *false within two minutes*; the `git log
 origin/main..HEAD` check the handoff itself prescribes is **structurally blind to being BEHIND**, so
 nothing in this lane's own machinery could have caught it.
+
+## Sign out that failed and read as success — cases `17.141`–`17.143` (E2-45, 2026-09-21)
+
+**Why these cases are in §17.** Their subject is the nav's account menu, whose cases are §13
+(`13.416`–`13.423`, in `13-neomorphism-and-workspace-screens.md`), but §13's blocks are spent and its tip
+is shared across live lanes with no block held here; §17's table above carries this batch's allocation,
+so the cases are minted from it.
+
+**The defect.** `apps/web/src/account-menu.tsx:189-194` ran `close(false)` FIRST and then
+`void authClient.signOut().then(() => { router.push('/sign-in'); })` — one callback, no rejection arm, and
+the menu closed before the request was even sent. A sign-out that failed offlined, dropped its connection
+or met a 5xx pushed nothing, rendered nothing, and **left the session live while the only visible change —
+the menu closing — read as success.** `docs/manual.md:112-114` sells this exact control as what protects a
+person on somebody else's machine (*"That matters if you have signed in on somebody else's laptop"*), so
+silence here is the one outcome that sentence promises cannot happen.
+
+**Two arms, because the transport fails two ways and they are different code paths.** `@better-fetch/fetch`
+REJECTS when `fetch` itself throws (offline, a dropped connection) — only a second callback sees that — and
+RESOLVES `{ data: null, error: { status, … } }` on a non-2xx ANSWER, so the `error` field has to be read.
+The finding named both in one breath; the judge's note records that the 5xx member is the resolving arm
+rather than the rejecting one, which is why the fix has two.
+
+- **17.141** ✅ A sign-out the server REFUSED keeps the menu open, says the session is still signed in, and
+  pushes nothing. — (`apps/web/test/app-nav.test.tsx`)
+- **17.142** ✅ A sign-out that never reached a server says THAT instead — its own sentence, not the
+  refusal's ("the server refused" is a claim about a server the request never reached) — and likewise
+  keeps the menu open and pushes nothing. — (`apps/web/test/app-nav.test.tsx`)
+- **17.143** ✅ **The positive control**, minted as its own case rather than folded in: a sign-out that
+  SUCCEEDED still closes the menu and pushes `/sign-in`, and renders no refusal. Without it the two cases
+  above would also pass on a control that never closes the menu and never navigates. —
+  (`apps/web/test/app-nav.test.tsx`)
+
+**What the fix does NOT claim.** The menu's refusal is a non-`menuitem` row inside `role="menu"`, which
+already carried one (its name/email header) before this change; the shape is unchanged, not newly correct.
