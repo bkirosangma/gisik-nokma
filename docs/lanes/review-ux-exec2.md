@@ -1954,6 +1954,25 @@ reproduction. (b) needs a second prompt mounted while one is live, which `E2-34`
 **Source:** carried candidate (round-1 §2d, four separate leads folded into one finding because they are
 one defect). **Severity: Important.**
 
+> **DEFENCE — phase 2, 2026-09-21 15:30 IST, self-filed: a bound on (a) that the reachability paragraph above
+> gets wrong.** The paragraph says (a) *"is reachable on every ticket creation where the type read has not answered
+> by first paint."* The **swap** is — the dialog mounts under `createRegion` before `ticketTypes.data` arrives
+> (`page.tsx:1721-1745` gates on `ticketTypes.error`, the session and `list.rows`, not on `ticketTypes.data`,
+> opened) — but the **consequence** I drew from it (*"the control draws the placeholder … while `typeId` is non-empty
+> and Create is enabled"*) requires the seeded id to be absent from the real list, and on a product-founded workspace
+> it never is. `BUILTIN_TYPE_LADDER` (`page.tsx:133-136`) carries the seeds' own ids — `'epic'`, `'story'`,
+> `'task'`, `'sub-task'` (`packages/domain/src/ticket-types.ts:138-143`) — and every workspace materialises those same
+> ids at founding: `builtinTicketTypeDefs` keeps `id: seed.id` (`:151-159`), called from
+> `apps/server/src/workspaces/bootstrap-workspace.ts:87`. The only type event is `ticket-type.defined`; nothing
+> retires one. So after the swap `typeId === 'epic'` is still a member of `options`, the `Select` resolves its label,
+> and no placeholder is drawn. The mirror arm (*"a genuinely empty list at mount"*) is likewise unreachable: the
+> ladder is never empty and a founded workspace's list is never empty. **(a)'s person-visible consequence is
+> withdrawn**; what survives of (a) is the structural fact — no re-seed, an emptiness gate instead of a membership
+> gate — with no effect a person can meet today. **(b) and (c) are unchanged**: their inputs (`reopenPrompt`, set per
+> attempt at `create-ticket-flow.tsx:195`, and `current`, reloaded by the sheet's read) can change under a mounted
+> dialog, which is the CONCURRENT class, and the paragraph above already says neither was driven. Severity is the
+> judge's; if (b)+(c) alone read as Minor, that is the honest weight of what is left.
+
 ---
 
 ### E2-34 (r2) — MINOR · Two `aria-modal` dialogs open at once, and one Escape press closes both
