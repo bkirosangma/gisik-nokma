@@ -1578,3 +1578,33 @@ background**, so nothing measured the pair at all.
   the finding's own.
 
 **No `Features.md` bullet.** This corrects an existing heading's ink; it adds no affordance.
+
+## The dedicated settings routes stop painting the section word twice (lane ds1, 2026-09-21, batch B10) — T-P36
+
+> **Case id PENDING ALLOCATION** — B10's section-13 block (`13.1137`–`13.1156`) is fully used and the ask is
+> recorded in `docs/lanes/release-2026-09-22-progress.md`. **No id was minted outside the block**, so this
+> entry's marker is the task id. (A first pass DID mint `13.1157`; it was caught by reading the test back
+> before committing and replaced with this marker in the same working tree.)
+
+**The finding, round 2 `P36`, MINOR, `r2 NEW` phase 2 (half weight).** `/w/<id>/settings/workflows` renders
+`<h1 class="gn-page-title">Workflows</h1>` and then mounts `WorkflowListScreen`, whose header is
+`<h2 class="workflow-list__title">Workflows</h2>`; `/settings/ticket-types` does the same with
+`Ticket types`. Measured: `H1 "Workflows"` (34 px), `H2 "Workflows"` (16 px), the h2's top **6.4 px** below
+the h1's bottom, and the a11y tree lists `heading "Workflows"` twice in a row with nothing between them to
+say what changed.
+
+### The case
+
+- ✅ **T-P36 — neither route paints the section word as its `h1`, and the screens keep their own `h2`.**
+  `apps/web/test/authoring-routes.test.tsx`. **The screens are right and the routes were the duplicate, and
+  that is the half worth pinning:** both screens mount in **two** places —
+  `apps/web/app/settings/page.tsx:351,373` and the two dedicated routes — and in the `/settings` shell the
+  `h1` is already `Settings` with the screen's `h2` naming the section. So the export's own shape is
+  `Settings` over the section title, the shell has always drawn it, and the fix is the two route headings.
+  **The second assertion is the tempting wrong fix, refused:** deleting the screen's `h2` would satisfy the
+  first and leave the `/settings` shell with a section that has no heading at all. RED: `1 failed |
+  12 passed (13)` (`/tmp/ds1-P36-red.log`) — the loop stops at the first route, so one failure is both
+  routes' evidence — with both routes reverted to `HEAD`, then restored from sha256-compared backups. Web
+  suite 654; `pnpm turbo run typecheck` 17/17.
+
+**No `Features.md` bullet.** This corrects an existing page's heading; it adds no affordance.

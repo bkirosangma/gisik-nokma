@@ -452,3 +452,57 @@ describe('13.1152 the type editor and the builder use the shared Button', () => 
     }
   });
 });
+
+/**
+ * Case `T-P36` — P36 — the two dedicated settings routes stop painting the
+ * same word as the page's `h1` and, 6.4px under it, as the screen's `h2`.
+ *
+ * `/w/<id>/settings/workflows` rendered `<h1 class="gn-page-title">Workflows</h1>`
+ * and then mounted `WorkflowListScreen`, whose header is
+ * `<h2 class="workflow-list__title">Workflows</h2>`; `/settings/ticket-types` did
+ * the same with `Ticket types`. Measured: `H1 "Workflows"` (34px), `H2
+ * "Workflows"` (16px), the h2's top 6.4px below the h1's bottom — and the a11y
+ * tree lists `heading "Workflows"` twice in a row with nothing between them to
+ * say what changed.
+ *
+ * **The screens are RIGHT and the routes were the duplicate, and that is what
+ * this case pins.** Both screens mount in TWO places —
+ * `apps/web/app/settings/page.tsx:351,373` and the two dedicated routes — and in
+ * the `/settings` shell the h1 is already `Settings` with the screen's h2 naming
+ * the section. So the export's own shape is `Settings` over the section title,
+ * the shell has always drawn it, and the fix is the two route headings rather
+ * than a screen that would then be wrong in the shell.
+ */
+describe('T-P36 the dedicated settings routes name the page, not the section', () => {
+  it('T-P36 neither route paints the section word as its h1', () => {
+    for (const [route, sectionWord] of [
+      ['workflows', 'Workflows'],
+      ['ticket-types', 'Ticket types'],
+    ] as const) {
+      const source = readFileSync(
+        resolve(TEST_DIR, `../app/w/[workspaceId]/settings/${route}/page.tsx`),
+        'utf8',
+      );
+      const h1 = /<h1 className="gn-page-title">([^<]*)<\/h1>/.exec(source);
+      expect(h1, `${route}/page.tsx has no gn-page-title h1`).not.toBeNull();
+      expect(h1?.[1], `${route}: the h1 repeats the screen's own section heading`).not.toBe(
+        sectionWord,
+      );
+      expect(h1?.[1]).toBe('Settings');
+    }
+  });
+
+  it('T-P36 the screens still carry their own h2 — the fix is not their removal', () => {
+    // The other direction, and the tempting wrong fix: deleting the screen's h2
+    // would satisfy the assertion above and leave the `/settings` shell with a
+    // section that has no heading at all.
+    const css = readFileSync(resolve(TEST_DIR, '../../../packages/ui/src/ui.css'), 'utf8');
+    expect(css).toMatch(/\.workflow-list__title/);
+    expect(css).toMatch(/\.ticket-type-list__title/);
+    const screen = readFileSync(
+      resolve(TEST_DIR, '../../../packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx'),
+      'utf8',
+    );
+    expect(screen).toMatch(/<h2 className="workflow-list__title">Workflows<\/h2>/);
+  });
+});
