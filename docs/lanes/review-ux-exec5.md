@@ -950,11 +950,11 @@ with no re-entrancy guard) as Critical; this is the same shape one dialog over, 
 engine (a repeated same-state move is refused where the workflow declares no self-edge, `3.71`).
 
 **WHAT WOULD HAVE BEEN BETTER.** Wrap `submitTransition` in the same `try`/`catch`/`finally` as `submitTicketEvent`,
-feed the dialog's `transportError` prop (it already renders it, `transition-dialog.tsx:485-489`), and disable Move
+feed the dialog's `transportError` prop (it already renders it, `transition-dialog.tsx:491-495`), and disable Move
 while in flight.
 
 **MEASUREMENT.** `[SOURCE]` `ticket-sheet.tsx:711-745`, `:1025-1077`, `:2637-2644`; `transition-dialog.tsx:360-379`,
-`:515`, `:485-489`. Not driven (§6.1); the reproduction is the E5-13/E5-15 technique: wrap `fetch` to throw on
+`:515`, `:491-495`. Not driven (§6.1); the reproduction is the E5-13/E5-15 technique: wrap `fetch` to throw on
 `POST /v1/events`, press Move, observe the dialog.
 
 **SEVERITY: Important** (claimed). A press that does nothing and says nothing, on the sheet's primary action, beside
