@@ -2854,6 +2854,19 @@ factories, returning `{ok:false, error}` instead of letting the rejection escape
   (bootstrap replay) — same RED→GREEN discipline as 12.402, the second of the four awaits. —
   (`apps/desktop/src/init-replica.test.ts`)
 
+## Ruling E5-26 — the signed-out screen names no Settings form the app lacks (2026-09-21, B14)
+
+*The desktop shell's only first-run sentence sent a person to "paste your token in Settings" — a
+screen `apps/desktop` does not have (`grep -rni settings apps/desktop/src/app.tsx` found only this
+sentence) — for a token nothing issues (`grep -rn "gisik.token|gisik.workspaceId" apps/web` → 0 hits;
+`/mcp/tokens` never shows a token to copy). Fixed by replacing it with a plain, verifiable statement:
+`copy.ts`'s `SIGNED_OUT_HINT`.*
+
+- 12.407 ✅ `SIGNED_OUT_HINT` states plainly that sign-in is not available and names neither a
+  Settings screen nor a plan section the reader cannot open from here — RED confirmed against the
+  pre-fix sentence (contained "Settings" and a plan reference), GREEN after. —
+  (`apps/desktop/src/copy.test.ts`)
+
 ## Ruling E2-48 — the phone shell's own init catches its rejection too (2026-09-21, B14)
 
 *The sibling of E2-43 on desktop: `App`'s init IIFE ran the same architecture

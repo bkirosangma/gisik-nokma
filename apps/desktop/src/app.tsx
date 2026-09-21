@@ -14,6 +14,7 @@ import {
 } from '@gisik-nokma/app-core';
 import { createTauriSqlStorage } from './storage/tauri-sql-storage.js';
 import { initReplica } from './init-replica.js';
+import { SIGNED_OUT_HINT } from './copy.js';
 
 // Dev configuration; Plan 11 owns real endpoints. Session/workspace selection
 // follows Plan 6's session handling once it lands (Open questions) — until
@@ -108,7 +109,7 @@ export function App() {
   if (workspaceId === '' || token === '') {
     return (
       <div className="app-shell">
-        <p className="app-signin-hint">Sign in on the web app, then paste your token in Settings (interim flow — see plan Open questions).</p>
+        <p className="app-signin-hint">{SIGNED_OUT_HINT}</p>
         {helpToggle}
         {showHelp ? <HelpBrowser /> : null}
       </div>
