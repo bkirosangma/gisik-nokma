@@ -189,7 +189,19 @@ the one checker `F8` found has no automated invocation anywhere, so nothing woul
 | `I4` (exec 1, MINOR) | that a citation **resolves** and still misleads | `tap-targets.ts:43-45` quotes *"Dense in-list controls get 24, standalone controls get 44 — the same call `/help`'s table-of-contents links got"* and cites **`ui.css:1606-1616`**. Those sixteen lines are a **`border-left` marker ruling** — `"WHAT LEFT, AND WHY IT IS NOT A REVERSAL"` — and say nothing about 24 or 44. The sentence actually lives at **`ui.css:1662`** | **holds** |
 | `P17` (exec 1, MINOR) | that `/my-work`'s heading outline skips level 2 | `my-work/page.tsx:51` renders `<h1 className="gn-page-title">My Work</h1>` and `my-work.tsx` renders its four section headings (`:75`, `:86`, `:97`, `:116`) as `<h3 className="gn-my-work__heading">` — **h1 straight to h3** | **holds** |
 
-**Forty-one checks across all five lanes. Forty-one held. My refutation count is zero.**
+
+| `E6-11` (exec 6, MINOR) | that the list serves a soft-deleted epic's title as a group header while the detail door withholds it | `list.ts:384-452` `epicAncestors` — the recursive walk filters `${visible}` at every hop (`:422`, `:428`) and the file contains **no `deleted_at` predicate at all** (the word `deleted` appears three times, all in comments). Its own comment at `:406-410` states the tradeoff: *"Filtering the walk means a deleted epic's children silently lose their epic chip … a deleted epic's TITLE still travels on its live [children]"* | **holds** — the consequence is real and the comment names the reason without removing it |
+| `P10` (exec 1, MINOR) | that the accessible-name ratchet counts an **attribute** while its failure message claims a property of assistive tech | `accessible-names.ts:50` is `const count = (attr) => all.filter((el) => el.hasAttribute(attr)).length;` with `:52` `ariaLabel: count('aria-label')` — **elements carrying the attribute**. And `viewport.spec.ts:720-721` asserts with the message *"…LOST ${attr}: … Something that identified an element to assistive tech is gone."* | **holds** |
+
+**Forty-three checks across all five lanes. Forty-three held. My refutation count is zero.**
+
+> **`P10` and my own `E2-1` are the same disease at different sites, and that is why I checked it rather
+> than skimming it.** The ratchet counts `aria-label` **attributes** and its failure message claims a
+> property of **assistive technology** — a measurement handed a stronger meaning than its unit supports. My
+> `E2-1` is the same shape one layer out: the help corpus is *generated from* its source and the gate reports
+> that as health. **A count and a claim must share a unit, and the failure is silent in both cases** because
+> the number is right. exec 1 found the shell's instance; I found the corpus's; neither is derivable from
+> the other, which is what makes two lanes worth having.
 
 > **`I4` is the finding I would most have wanted to write myself, and it is one I did not.** Its class is
 > *"a citation that resolves is not a citation that is right"* — a rule this repository has recorded, and one
