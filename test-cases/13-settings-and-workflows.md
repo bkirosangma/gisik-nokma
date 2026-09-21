@@ -1456,3 +1456,33 @@ the next reader of the finding does not reach for it.
   backup. **The two ratios are computed, not painted.** Package suites: ui 413, web 639, all green.
 
 **No `Features.md` bullet.** This corrects an existing notice's paint; it adds no affordance.
+
+## The settings sidebar's section links port the prototype's four metrics (lane ds1, 2026-09-21, batch B10) — case `13.1064`
+
+**The finding, round 2 `E4-25`, MINOR.** `nav.gn-settings__sidebar a` ×3 (`Ticket types` with
+`aria-current="page"`, `Workflows`, `Workspace`) measured **232×39**, `display: block`,
+`padding: 8px 11.2px`, `min-height: auto`. The prototype's item (`desktop.dc.html:3145`) carries
+`min-height:44px; padding:0 14px; font-size:15px; font-weight:500`, **and `globals.css`'s own docblock
+named all four as deliberately NOT ported** — *"tap-target and type-scale questions rather than token
+ones … outside this task's named scope"*. That position did not survive being measured: 44 here is a
+POINTER floor (WCAG 2.5.5), these three links are the sidebar's only controls for changing section, and
+a scope argument can defer a metric but cannot make 39 equal 44. The deferral is what made the number
+invisible. The judge's own note adds the instrument context: `DENSE_IN_LIST` holds four entries and none
+is the settings sidebar, and the stack suite's tap route list is seven routes with no bare `/settings`.
+
+### The case
+
+- ✅ **13.1064 — all four declarations are present, the two halves that hold the row at 44 arrive
+  TOGETHER, and four single-declaration mutation plants are each caught in the same path.**
+  `apps/web/test/settings-shell-tokens.test.ts`. `padding: 0 14px` is asserted with `min-height` on
+  purpose: the prototype's item carries **no vertical padding at all** and takes its height from
+  `min-height`, so porting either alone leaves the row able to drift off 44 again the moment the font
+  does — and `min-height` without the padding leaves 8px of vertical padding under the floor. The
+  witness uses this file's own `withRule`, which replaces the **first** match through the same `ruleFor`
+  the case reads, so each plant traverses the measurement's path rather than being appended past it; each
+  plant drops **exactly one** declaration, so a plant that reddened nothing would mean that declaration
+  is not what the case is reading. **Not painted** — the 232×39 above is the finding's own measurement.
+  `globals.css` was reverted to `HEAD` for the RED run and restored from a sha256-compared backup.
+  Package suites: web 642.
+
+**No `Features.md` bullet.** This corrects an existing control's metrics; it adds no affordance.

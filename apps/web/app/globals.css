@@ -1260,15 +1260,27 @@ input, textarea, select { font-family: inherit; }
       `:3145`'s active state is its base style plus exactly those two
       declarations — that emphasis was ours as well.
 
-   THE ITEM'S OTHER METRICS AT `:3145` ARE STILL NOT PORTED — `min-height:44px`,
-   `padding:0 14px`, `font-size:15px`, `font-weight:500` against this file's
-   `padding: 0.5rem 0.7rem` and its inherited size and weight. Those are
-   tap-target and type-scale questions rather than token ones, they are outside
-   this task's named scope, and they are recorded here so the difference reads
-   as a decision rather than an oversight. `.gn-help__nav-link[aria-current=
-   'location']` (`packages/ui/src/ui.css:3633`) is this rule's nearest neighbour
-   — the same accent pair, with a `font-weight:600` that this one does not
-   carry, because `:3145`'s active state has none. */
+   **THE ITEM'S OTHER METRICS AT `:3145` ARE NOW PORTED (E4-25, 2026-09-21)** —
+   `min-height:44px`, `padding:0 14px`, `font-size:15px`, `font-weight:500`.
+   They used to be listed here as deliberately NOT ported, on the ground that
+   they were *"tap-target and type-scale questions rather than token ones"* and
+   outside that task's scope; **that position did not survive being measured.**
+   The three section links rendered **232×39**, `padding: 8px 11.2px`,
+   `min-height: auto` — 39 against the prototype's own 44 — and 44 here is a
+   POINTER floor (WCAG 2.5.5), not a keyboard one: these three links are the
+   sidebar's only controls for changing section, and a scope argument can defer
+   a metric but it cannot make 39 equal 44. The deferral is what made the
+   number invisible.
+
+   `padding: 0 14px` is NOT a typo for a two-axis padding: the prototype's item
+   carries no VERTICAL padding at all and takes its height from `min-height`,
+   which is why both halves are ported together — porting either alone leaves
+   the row able to drift off 44 again the moment the font does.
+
+   `.gn-help__nav-link[aria-current='location']` (`packages/ui/src/ui.css:3633`)
+   is this rule's nearest neighbour — the same accent pair, with a
+   `font-weight:600` that this one does not carry, because `:3145`'s active
+   state has none and now neither does its base. */
 .gn-settings { display: flex; flex-wrap: wrap; gap: 1.25rem; margin-top: 0.8rem; align-items: flex-start; }
 .gn-settings__sidebar {
   display: flex;
@@ -1282,8 +1294,13 @@ input, textarea, select { font-family: inherit; }
 }
 .gn-settings__sidebar a,
 .gn-settings__sidebar-item--disabled {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem; /* 44px — the prototype's own, and the 2.5.5 pointer floor */
+  padding: 0 0.875rem; /* 0 14px — no vertical padding; the height is min-height's */
   border-radius: var(--gn-radius-control);
-  padding: 0.5rem 0.7rem;
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 500;
   text-decoration: none;
   color: var(--gn-text);
 }
