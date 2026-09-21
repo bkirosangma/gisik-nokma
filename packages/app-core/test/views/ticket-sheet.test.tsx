@@ -3060,6 +3060,44 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
    * (`EPIC`), so the equal-id shape was never rendered by any case in this file.
    * This fixture is the first, and it is the shape the seed produces 23 times.
    */
+  /**
+   * E5-3 — THE SAME SHAPE WITH BOTH REFS `restricted`.
+   *
+   * The case above covers the visible pair. This is the arm the id comparison
+   * has to reach WITHOUT a title to compare: the server's walk answers
+   * `{kind:'restricted', id}` both for the parent branch and for the epic hop
+   * when the ticket is one the viewer may not see (or one the ledger records as
+   * deleted), so a viewer can be sent two restricted refs to ONE ticket. **An
+   * implementation that compared TITLES, or that special-cased `kind`, would
+   * pass the visible case and draw `Restricted parent` twice here** — which is
+   * the same defect, on the screen of the person least able to notice it is the
+   * same ticket, because a restricted crumb carries no title to compare by eye.
+   *
+   * `16.65` owns the property that a restricted ancestor is NAMED rather than
+   * dropped; this case is its one-hop companion, and it asserts BOTH halves:
+   * named once, and the surviving crumb is the parent's.
+   */
+  it('E5-3: two restricted refs to the SAME ticket draw one crumb, not two', async () => {
+    const read = ticketRead({
+      parent: { kind: 'restricted', id: PARENT },
+      epic: { kind: 'restricted', id: PARENT },
+    });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+
+    // NAMED, not dropped — the vanish `invariant 5` forbids.
+    expect(crumbTexts()).toContain('Restricted parent');
+    // …and named ONCE. `filter` on the text rather than a set size, because the
+    // crumb text is a constant here and a set would collapse the duplicate the
+    // case exists to find.
+    expect(crumbTexts().filter((text) => text === 'Restricted parent')).toHaveLength(1);
+    expect(screen.queryByTestId('sheet-crumb-epic')).toBeNull();
+    expect(screen.getByTestId('sheet-crumb-parent')).toBeInTheDocument();
+  });
+
   it('E4-1: when the direct parent IS the epic, the ancestor is named ONCE', async () => {
     // The one-hop shape: the epic IS the parent, same id, and the title the
     // server sends for both is the same row's title.

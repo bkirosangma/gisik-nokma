@@ -249,6 +249,74 @@ describe('16.70 the grandparent is the nearest PROPER ancestor of EPIC rank', ()
     expect(danglingRead.json().epic).toBeNull();
   });
 
+  /**
+   * E5-3 / E4-1 — THE ONE-HOP SHAPE: WHEN THE DIRECT PARENT **IS** THE EPIC,
+   * THE TWO REFS NAME THE SAME TICKET.
+   *
+   * The walk above resolves through an intermediate parent and reports the epic
+   * two hops up. This case is the shape it does NOT cover, and the one the
+   * seeded project is made of: **23 of the 26 tickets have an epic as their
+   * direct parent**, so `cursor = state.parentId` is already epic-rank on the
+   * FIRST iteration and the walk returns `{kind:'ticket', id: cursor}` — the
+   * same row the parent branch reports.
+   *
+   * **THIS CASE PINS A CONTRACT THE CLIENT DEPENDS ON, and that is why it is
+   * here rather than in the sheet's suite.** `ticket-sheet.tsx` now compares
+   * the two ids and drops the epic crumb when they agree, because the server
+   * sends both. If a future change has the route NULL the epic when it equals
+   * the parent — the other remedy the finding offered — this case reddens and
+   * the client comparison has to be revisited in the same change rather than
+   * quietly becoming dead code that still looks load-bearing.
+   *
+   * The dossier's own authority gives no guidance: the prototype never draws
+   * this shape, because every `parentId` and every `epicId` in its fixtures come
+   * from disjoint sets.
+   */
+  it('E5-3 the direct parent IS the epic: both refs name the same ticket', async () => {
+    const ws = newUlid();
+    const prj = newUlid();
+    const { userId, headers } = await signedIn();
+    await seedMember(db.pool, ws, userId, 'member', [{ projectId: prj }]);
+    await seedProject(db.pool, ws, prj, 'Shop operations', undefined, 'SO');
+    await seedType(ws, 'epic', 1);
+    await seedType(ws, 'task', 3);
+
+    const epicId = newUlid();
+    const taskId = newUlid();
+    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: epicId, typeId: 'epic' });
+    await seedTicket(db.pool, {
+      workspaceId: ws, projectId: prj, ticketId: taskId, typeId: 'task', parentId: epicId,
+    });
+
+    const read = await get(`/v1/workspaces/${ws}/tickets/${taskId}`, headers);
+    expect(read.statusCode).toBe(200);
+    expect(read.json().epic).toEqual({ kind: 'ticket', id: epicId, title: `Ticket ${epicId}` });
+    expect(read.json().parent).toMatchObject({ kind: 'ticket', id: epicId });
+
+    // THE PROPERTY, stated apart from the two refs it holds of: they are the
+    // SAME TICKET. This is the fact the sheet compares, and stating it here is
+    // what makes the client's one-line guard a consequence of the wire rather
+    // than a guess about it.
+    expect(read.json().epic.id).toBe(read.json().parent.id);
+
+    // CONTROL — the two-hop shape does NOT satisfy that, so the assertion above
+    // is not passing merely because `epic` and `parent` are always equal. One
+    // more ticket under a story is enough, and it is built here rather than
+    // inherited from the case above so the two cannot drift apart.
+    const storyId = newUlid();
+    const deepTask = newUlid();
+    await seedTicket(db.pool, {
+      workspaceId: ws, projectId: prj, ticketId: storyId, typeId: 'task', parentId: epicId,
+    });
+    await seedTicket(db.pool, {
+      workspaceId: ws, projectId: prj, ticketId: deepTask, typeId: 'task', parentId: storyId,
+    });
+    const deepRead = await get(`/v1/workspaces/${ws}/tickets/${deepTask}`, headers);
+    expect(deepRead.json().epic.id).toBe(epicId);
+    expect(deepRead.json().parent.id).toBe(storyId);
+    expect(deepRead.json().epic.id).not.toBe(deepRead.json().parent.id);
+  });
+
   it('a grandparent the viewer may NOT see is restricted — existence and id, no title', async () => {
     const ws = newUlid();
     const prj = newUlid();
