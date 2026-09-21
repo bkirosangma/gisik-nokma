@@ -16,3 +16,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E6-2 | done | f6231926363f3245f98cd5a154fa8b43dcfa2417 | live-ticket.test.ts E6-2 x23 (mutation-witnessed) + soft-deleted-writes.test.ts x13 through POST /v1/events (case 17.121) |
 | T-E6-4 | done | 35c414f1910b69843641df43764a283e54e3243b | deleted-hierarchy.test.ts E6-4 x6 + soft-deleted-hierarchy.test.ts x4 through POST /v1/events (cases 17.122-17.123) |
 | T-F2-fn | done | ccc22a4a93433fdd468621e4cb370f6fb81c5d1a | prose-only: false warrant withdrawn in soft-delete-background-paths.test.ts (c), Features.md, 16.90(c); citations re-pointed by content |
+| T-F4-fn | done | 39167c28d48b5a16e21e8d8d35c323e5e7e926f7 | my-work.test.ts F4 x1 (mutation-witnessed: 1 failed / 24 passed) (case 17.124) |
