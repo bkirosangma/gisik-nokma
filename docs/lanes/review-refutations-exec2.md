@@ -97,7 +97,26 @@ does not rest on reading a line.
 
 | `F6` (exec 3) | that a published count does not reproduce from the command printed beside it | **I ran their command**: `git grep -n LIVE_TICKET_WHERE -- apps/server/src` → 41 rows, classified by hand. Executable splices **9** (file says 8), array members **5** (after removing 6 import statements), uses **14** (file says 13), files **10** (file says 9) | **holds — reproduced, not just read** (full table above) |
 
-**Twenty-three checks across all five lanes. Twenty-three held. My refutation count is zero.**
+
+### Continuing into exec 1's remaining findings — two more, one of them the class I care about most
+
+| target | the clause I tried to falsify | what I opened | outcome |
+|---|---|---|---|
+| `P16` (exec 1, IMPORTANT) | that a styling case asserts the absence of a declaration through a scanner that **cannot fail** | `neo-card-radius.test.ts:34-36` is exactly the quoted scanner — `css.split('\n').find((line) => selectorPattern.test(line) && line.includes('{'))` — so it returns **the single line** where the selector and `{` appear; and the third case (`:51-57`) does `expect(rule).toBeDefined()` then `expect(rule?.includes('border-radius')).toBe(false)`. With the selector on its own line the string is `".gn-sign-in {"`, which **never** contains `border-radius`, whatever the rule declares | **holds** |
+| `P20` (exec 1, MINOR) | that the calendar's month grid carries no table or grid semantics | `calendar-view.tsx` contains **0** occurrences each of `role="grid"`, `role="table"`, `role="row"`, `role="gridcell"`, `role="columnheader"`; the weekday head at `:396-398` is `<div>` + seven `<span>`s | **holds** |
+
+**Twenty-five checks across all five lanes. Twenty-five held. My refutation count is zero.**
+
+> **`P16` deserves the sentence, because it is the failure class this whole report is organised around.**
+> The case *reads* as a guard — it asserts the absence of a declaration and prints the rule in its failure
+> message — and it **cannot fail** when the thing it guards returns, because the value it inspects is one
+> line of a rule whose declarations live on the next. **A mutation that sets `border-radius` in
+> `.gn-sign-in` leaves it green.** exec 1 found it by reproducing the scanner and running it on a rule that
+> sets the very thing the case forbids, which is the only way to catch this shape — and it is the one class
+> of defect I would most want the other lanes to be good at, since my own report is built on the same
+> assumption (that a green check means the property holds). I checked it rather than trusting it because
+> getting it wrong in *their* favour costs me nothing and getting it right in mine is worth three points;
+> it holds.
 
 > **`P23` is worth a sentence to the judge, because it is the one I tried hardest to break.** Its author
 > flagged it as the finding they would most expect to be wrong, opened every step, and checked that the
