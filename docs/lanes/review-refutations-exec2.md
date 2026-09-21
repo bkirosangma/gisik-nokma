@@ -488,7 +488,7 @@ own 9.95), `E2-48`, `E2-49`, `E2-51`, `E2-53`, `E2-54`; round-1 `V3`, `V7`, `V9`
 **The method, stated so the judge can weigh it:** for each finding, one question — *does a shipped shell mount
 this component, with a wiring that can produce the state the finding describes, and does the line I quoted say
 what I said it says?* — answered by opening the mount, the source it is handed, and the quoted range. Eight
-findings failed some part of that test; nineteen passed. The eight are named above with the commit that records
+findings failed some part of that test; twenty-one passed (counted from the list above, not from memory: 18 round-2 ids + 3 round-1). The eight are named above with the commit that records
 each, so the ledger can score them as the judge sees fit — I have not withdrawn any finding outright (phase 2 has
 no free withdrawal), but where a finding does not hold I have said so in its own body rather than leaving a peer
 to find it.
