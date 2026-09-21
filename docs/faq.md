@@ -140,8 +140,9 @@ No, and this is a nasty one. The invitation shows as **accepted** and **they sta
 warns you and nothing warns them. A wrong answer delivered as a right one.
 
 **Where do I change somebody's role, or take them off?**
-Nowhere on screen. The People page lists the people you can see and shows each person's role, but that
-role is read-only — no remove, no change role. So you can let people in and see what they are, and you
+Changing a role is on screen; taking somebody off is not. The People page lists the people you can see
+and shows each person's role, and if you are an admin every row except an owner's carries a **Role**
+picker. There is still no remove, so you can let people in and change what they are, and you
 still cannot put them out. Combined with
 the promotion problem above, a workspace's people list can drift out of step with reality with no way
 to fix it from the interface.
@@ -215,7 +216,8 @@ ever look at the built-in due date. So it will put a day on a calendar and it wi
 Worth knowing about. Not a substitute for a due date.
 
 **Can I rename a job?**
-No control was found for it.
+Yes. Open the job and type into the title at the top of the sheet. **Enter** or clicking away saves it;
+**Escape** abandons the change.
 
 **Can I delete a job I created by mistake?**
 No delete button or delete action was found anywhere. If your stages have a "won't do" or "cancelled"
@@ -635,9 +637,10 @@ work. It is an easy and reasonable thing to misread.
 No. There is no email of any kind beyond sign-in.
 
 **How do I know I've got something new?**
-A number badge on the Inbox link. It refreshes about once a minute. If a refresh fails it keeps the
-last number rather than resetting to nothing, and it shows nothing at all before the first answer
-comes back — an absence, not a zero.
+A dot on the Inbox link. It says only *that* you have something new, never how many — the count is in
+the link's name for a screen reader. It refreshes about once a minute. If a refresh fails it keeps
+showing the dot rather than clearing it, and it shows nothing at all before the first answer comes
+back — an absence, not a zero.
 
 **How do I mark something read?**
 Click the row. If the marking fails it reloads to show you the truth rather than leaving a fake "read"

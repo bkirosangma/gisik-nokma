@@ -620,7 +620,7 @@ export const HELP_CONTENT: HelpContent = [
                 },
                 {
                   "kind": "text",
-                  "text": " — with a small number badge on it when you have unread messages."
+                  "text": " — with a small dot on it when you have unread messages."
                 }
               ]
             ]
@@ -1560,11 +1560,23 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "You can see, and you cannot change."
+                    "text": "You can see, and an admin can change a role — but nobody can be removed."
                   },
                   {
                     "kind": "text",
-                    "text": " The People page lists the people you can see in this workspace, and names each person's role. That role is read-only: there is no \"remove\", and no \"change role\"."
+                    "text": " The People page lists the people you can see in this workspace, and names each person's role. An admin gets a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Role"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " picker on every row except an owner's; changing it submits there and then. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "There is still no \"remove\"."
                   }
                 ]
               },
@@ -1573,7 +1585,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Combined with the re-invitation problem above, this means a workspace's people list can drift out of step with reality and give you no way on screen to fix it. If somebody's role has to change, or somebody has to be removed, it has to be done another way."
+                    "text": "This paragraph is kept, rather than deleted, so a reader who remembers the role as unchangeable finds the correction where they last saw it. Combined with the re-invitation problem above, a workspace's people list can still drift out of step with reality: a role can be fixed on screen now, but somebody still has to be removed another way."
                   }
                 ]
               },
@@ -1918,7 +1930,27 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "You cannot rename a job."
+                      "text": "You can rename a job now."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. Open the job and type into the title at the top of the sheet: "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Enter"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " or clicking away saves it, "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Escape"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " abandons the change."
                     }
                   ],
                   [
@@ -4676,11 +4708,19 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "The unread badge"
+                    "text": "The unread dot"
                   },
                   {
                     "kind": "text",
-                    "text": " on the Inbox link refreshes about once a minute. If a refresh fails it keeps the last number rather than resetting to nothing, and it shows nothing at all before the first answer comes back — an absence, not a zero."
+                    "text": " on the Inbox link refreshes about once a minute. It says only "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "that"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " you have unread messages, never how many — the count is in the link's name, which is what a screen reader reads out and which keeps the signal from being carried by colour alone. If a refresh fails it keeps showing the dot rather than clearing it, and it shows nothing at all before the first answer comes back — an absence, not a zero."
                   }
                 ]
               },
@@ -4971,19 +5011,19 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "the-gap-you-cannot-read-the-setting-back",
-            "title": "The gap: you cannot read the setting back",
+            "id": "reading-the-setting-back",
+            "title": "Reading the setting back",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "You can set who sees a job. You cannot see what it is currently set to."
+                    "text": "You can set who sees a job, and the screen reads it back to you."
                   },
                   {
                     "kind": "text",
-                    "text": " On the one screen whose entire subject is who can see what, the current audience is shown as unavailable rather than guessed."
+                    "text": " This section is kept, rather than deleted, so a reader who remembers it as a gap finds the correction where they last saw it. On the screen whose entire subject is who can see what, the current audience is shown as a sentence — the mode, or the names when it is set to particular people — rather than as a guess."
                   }
                 ]
               },
@@ -4992,15 +5032,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Guessing would be much worse. It is still a real hole in a feature about sharing. "
-                  },
-                  {
-                    "kind": "bold",
-                    "text": "Keep your own note of what you set"
-                  },
-                  {
-                    "kind": "text",
-                    "text": ", at least until this is fixed, because the screen will not remind you."
+                    "text": "Guessing would be much worse, and there is one thing the screen still will not do: when it is set to particular people and their names have not arrived, it says so rather than filling the space with a partial answer wearing the shape of a complete one."
                   }
                 ]
               }
@@ -7445,7 +7477,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Nowhere on screen. The People page lists the people you can see and shows each person's role, but that role is read-only — no remove, no change role. So you can let people in and see what they are, and you still cannot put them out. Combined with the promotion problem above, a workspace's people list can drift out of step with reality with no way to fix it from the interface."
+                    "text": "Changing a role is on screen; taking somebody off is not. The People page lists the people you can see and shows each person's role, and if you are an admin every row except an owner's carries a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Role"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " picker. There is still no remove, so you can let people in and change what they are, and you still cannot put them out. Combined with the promotion problem above, a workspace's people list can drift out of step with reality with no way to fix it from the interface."
                   }
                 ]
               }
@@ -7703,7 +7743,23 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "No control was found for it."
+                    "text": "Yes. Open the job and type into the title at the top of the sheet. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Enter"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " or clicking away saves it; "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Escape"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " abandons the change."
                   }
                 ]
               }
@@ -9395,7 +9451,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "A number badge on the Inbox link. It refreshes about once a minute. If a refresh fails it keeps the last number rather than resetting to nothing, and it shows nothing at all before the first answer comes back — an absence, not a zero."
+                    "text": "A dot on the Inbox link. It says only "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "that"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " you have something new, never how many — the count is in the link's name for a screen reader. It refreshes about once a minute. If a refresh fails it keeps showing the dot rather than clearing it, and it shows nothing at all before the first answer comes back — an absence, not a zero."
                   }
                 ]
               }

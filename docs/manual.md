@@ -121,7 +121,7 @@ There is a small bar across the top of nearly every screen. It has three things 
 
 - **Workspaces** — the list of every workspace you are in.
 - **My Work** — the jobs assigned to you. This only appears once you are inside a workspace.
-- **Inbox** — with a small number badge on it when you have unread messages.
+- **Inbox** — with a small dot on it when you have unread messages.
 
 Plus your name and a **Sign out** button on the right.
 
@@ -296,12 +296,14 @@ withdraw it and send a fresh one.
 
 ### Seeing and changing what people are
 
-**You can see, and you cannot change.** The People page lists the people you can see in this workspace,
-and names each person's role. That role is read-only: there is no "remove", and no "change role".
+**You can see, and an admin can change a role — but nobody can be removed.** The People page lists the
+people you can see in this workspace, and names each person's role. An admin gets a **Role** picker on
+every row except an owner's; changing it submits there and then. **There is still no "remove".**
 
-Combined with the re-invitation problem above, this means a workspace's people list can drift out of
-step with reality and give you no way on screen to fix it. If somebody's role has to change, or
-somebody has to be removed, it has to be done another way.
+This paragraph is kept, rather than deleted, so a reader who remembers the role as unchangeable finds
+the correction where they last saw it. Combined with the re-invitation problem above, a workspace's
+people list can still drift out of step with reality: a role can be fixed on screen now, but somebody
+still has to be removed another way.
 
 If somebody *is* removed by some other route, it takes effect immediately — on their very next action.
 If they are only taken off one project, they lose that project and keep everything else. Their saved
@@ -368,7 +370,9 @@ This is the honest list. Each one is an absence, not a hidden button.
   dropped into the description box is refused rather than quietly lost. **The one upload the website
   does take is a Move's** — a move carrying the "require evidence" rule puts a file box on the Move
   dialog and stays blocked until the server has stored the file (§7).
-- **You cannot rename a job.**
+- **You can rename a job now.** It is kept here, rather than deleted, so a reader who remembers it as an
+  absence finds the correction where they last saw it. Open the job and type into the title at the top
+  of the sheet: **Enter** or clicking away saves it, **Escape** abandons the change.
 - **You cannot delete a job.** If your stages include a "won't do" or "cancelled" stage, moving it
   there is the nearest thing available.
 - **You cannot move a job to a different project.**
@@ -911,9 +915,11 @@ is only ever one on screen. And a single press carries at most **100** notificat
 whole press is refused and tells you so, rather than marking some of them and leaving you to work out
 which ones went.
 
-**The unread badge** on the Inbox link refreshes about once a minute. If a refresh fails it keeps the
-last number rather than resetting to nothing, and it shows nothing at all before the first answer
-comes back — an absence, not a zero.
+**The unread dot** on the Inbox link refreshes about once a minute. It says only *that* you have unread
+messages, never how many — the count is in the link's name, which is what a screen reader reads out and
+which keeps the signal from being carried by colour alone. If a refresh fails it keeps showing the dot
+rather than clearing it, and it shows nothing at all before the first answer comes back — an absence,
+not a zero.
 
 **If your Inbox is empty** it says so properly, and the sentence doubles as an explanation of what the
 Inbox is for: *"Nothing in your inbox. You will be told here when someone assigns you a ticket,
@@ -987,13 +993,16 @@ That is the right choice — silently adding you would file a claim in your name
 but it means you have to actually read the warning. You cannot apply an empty list; the button stays
 off.
 
-### The gap: you cannot read the setting back
+### Reading the setting back
 
-**You can set who sees a job. You cannot see what it is currently set to.** On the one screen whose
-entire subject is who can see what, the current audience is shown as unavailable rather than guessed.
+**You can set who sees a job, and the screen reads it back to you.** This section is kept, rather than
+deleted, so a reader who remembers it as a gap finds the correction where they last saw it. On the
+screen whose entire subject is who can see what, the current audience is shown as a sentence — the
+mode, or the names when it is set to particular people — rather than as a guess.
 
-Guessing would be much worse. It is still a real hole in a feature about sharing. **Keep your own note
-of what you set**, at least until this is fixed, because the screen will not remind you.
+Guessing would be much worse, and there is one thing the screen still will not do: when it is set to
+particular people and their names have not arrived, it says so rather than filling the space with a
+partial answer wearing the shape of a complete one.
 
 ### What hidden looks like from the other side
 
