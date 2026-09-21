@@ -22,7 +22,7 @@ a measurement it lacks is added, and where that happens the finding says so.
 
 ## 0. THE ONE-LINE ANSWER
 
-**No Critical claimed. Twenty findings — thirteen Important, seven Minor — every one measured through a door the
+**No Critical claimed. Twenty-one findings — fourteen Important, seven Minor — every one measured through a door the
 product ships, and the two I would put first are on the security surface:** a cookie plus a foreign `Origin` is
 refused on `POST /v1/events` and served the victim's whole visible ledger on `/v1/stream` (E6-15), and an MCP
 token can approve its own successor, so revoking it does not revoke it (E6-16).
@@ -32,7 +32,8 @@ writes on a soft-deleted ticket, one of them manufacturing a notification into a
 blocking its parent's close while the board shows zero (E6-4); a type re-rank and a workflow republish that leave
 hierarchies the engine then refuses to reproduce (E6-3, E6-8); a bulk migration refused part-way while the client
 is told nothing moved (E6-10); an offline edit turned into a false contest against the user's own ticket (E6-5);
-an invite form offering channels the door refuses (E6-9); an assignment to a name that is not a person (E6-17); one byte (U+0000) that 500s nineteen doors, misreports a
+an invite form offering channels the door refuses (E6-9); an assignment to a name that is not a person (E6-17); a member who cannot leave a workspace while the
+product's own CSRF note assumes they can (E6-21); one byte (U+0000) that 500s nineteen doors, misreports a
 batch and poisons the offline queue while the product's own guard for it sits unused (E6-18).
 
 The second shape is **a record that describes a world the product has left**: the in-app help denying `Delete`
@@ -1302,6 +1303,56 @@ use it for the five name fields, so the refusal reads the same sentence everywhe
 **SEVERITY: Minor.** A recorded rule applied to some of its subjects; the consequence is a blank label, reachable
 from the API and MCP doors.
 
+### E6-21 — IMPORTANT — A member or guest cannot leave a workspace: the gate refuses a self-revocation, no route or control offers it, the export's privacy copy promises it, and the product's own CSRF exclusion of the invite-accept door rests on "a workspace they can leave"
+
+**WHAT.** Through `POST /v1/events`, each role revoking its **own** membership (Appendix Y; 1 file / 1 test passed):
+
+```
+MEMBER revokes their own membership  -> refused (permission.role: Only a workspace owner or admin can manage workspace membership.)
+GUEST  revokes their own membership  -> refused (same)
+ADMIN  revokes their own membership  -> committed          ← an admin can leave, because an admin can revoke anyone
+control: OWNER revokes the member    -> committed
+DELETE /v1/me/workspaces/:ws -> 404     DELETE /v1/workspaces/:ws/members/:me -> 404     (no such doors)
+```
+
+`check-permission.ts:641-643` asks only `isWorkspaceAdmin` for `membership.revoked`; there is no self arm.
+`grep -rln 'Leave workspace|leaveWorkspace'` over `apps/web/app`, `packages/app-core/src`, `apps/mobile/src` →
+nothing; `grep -n leav docs/manual.md docs/faq.md` → comments and defaults only; no case in
+`06-auth-visibility.md`, `13-second-wave-roles-and-navigation.md` or `16-remaining-doors.md` mentions leaving.
+
+**WHY it is wrong.**
+
+1. **The export promises it, in the privacy text.** `Gisik Nokma - Desktop.dc.html` (sha `3d142d46`) `:2133`, under
+   *"Your choices"*: *"You can export a workspace's tickets and history at any time, revoke any MCP token, and
+   leave a workspace."* (Mobile export carries the same sentence.) The product's `apps/web/app/privacy/page.tsx`
+   has `[CONTACT EMAIL]` placeholders where that section would be and makes no such promise — so this is the
+   common brief's **category 3**: diverges, and the search for a ruling (the three catalogue files above,
+   `Features.md`, the two review rulings) found none.
+2. **The product's own security reasoning depends on it.** `http/http-origin.ts:133-139` excludes
+   `POST /v1/invites/:token/accept` from the CSRF-protected set because a forced acceptance puts the victim in
+   *"a workspace they can leave"* — and exec 3's round-2 E3-14 measures that door and its `/v1/me/invitations/…`
+   sibling as forgeable. Measured here: a member **cannot** leave. The recorded mitigation for a forced join is
+   an act the product refuses to the person it was meant for; the two findings are connected, and this one
+   makes that one's consequence permanent from the victim's side (only an admin of the attacker's workspace
+   can remove them).
+3. **Membership is a claim the person did not necessarily make.** An invitation acceptance is theirs; a
+   `membership.granted` filed by an admin (the roster's "Add" path, or the founding sequence's seeds) is not,
+   and the ledger's model is that a person may undo their own standing — a guest's explicit lists, an
+   assignee's assignment — everywhere except here.
+
+**WHAT WOULD HAVE BEEN BETTER.** One arm in `checkRolePermission`: `membership.revoked` with
+`payload.userId === sessionUserId` is allowed for any role **unless** the actor is the sole owner (the
+`last-owner` guard already refuses that case in the engine, `checks/membership.ts`), reported as its own rule
+so the sentence can say *"You have left <workspace>"*. A `Leave` control on the workspace home and the account
+page is the UX lane's half; the door is this lane's.
+
+**MEASUREMENT.** Appendix Y, run from `apps/server`. Lines opened: `check-permission.ts:72` (`NOT_A_MEMBER_REASON`),
+`:641-643`; `http-origin.ts:133-139`; export `:2133`; `privacy/page.tsx:150-158`; the three greps above.
+
+**SEVERITY: Important.** A person can be put into a workspace by an admin (or, per E3-14, by a forged request)
+and cannot take themselves out; the product's privacy copy in the prototype promises they can, and its own
+security note assumes they can.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
@@ -1446,9 +1497,9 @@ the table.
 | severity | count | members |
 |---|---|---|
 | Critical | **0** | — |
-| Important | **13** | E6-1, E6-2, E6-3, E6-4, E6-5, E6-8, E6-9, E6-10, E6-12, E6-13, E6-15, E6-16, E6-18 |
+| Important | **14** | E6-1, E6-2, E6-3, E6-4, E6-5, E6-8, E6-9, E6-10, E6-12, E6-13, E6-15, E6-16, E6-18, E6-21 |
 | Minor | **7** | E6-6, E6-7, E6-11, E6-14, E6-17, E6-19, E6-20 |
-| **total** | **20** | E6-1 … E6-20, no gaps in the numbering |
+| **total** | **21** | E6-1 … E6-21, no gaps in the numbering |
 | unverified (0-point) items | 3 | the migrate route's stale pre-flight read under concurrency (§6), the online path's non-idempotent manual retry (§6), 6.123's "no bound on live credentials" half (E6-12) — each marked *unverified* where it appears and not counted above |
 
 Every Important finding above rests on a probe in Appendices A–K or on a printed line; the three Minors rest on
@@ -4719,6 +4770,138 @@ describe('exec6 probe: whitespace-only names', () => {
     out.push(`GET workflows -> ${wfs.statusCode}; a workflow whose name is a single space is listed: ${wfs.body.includes('"name":" "')}`);
     const types = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/ticket-types`, headers: auth(ownerToken) });
     out.push(`GET ticket-types -> ${types.statusCode}; a type whose name is a single space is listed: ${types.body.includes('"name":" "')}`);
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix Y — probe for E6-21 — leaving a workspace
+
+File path in the tree: `apps/server/test/zz-exec6-probe-leave.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-leave.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: can a member (or admin, or guest) revoke their OWN membership — leave a workspace?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  (globalThis as unknown as { __otp: unknown }).__otp = built.otp;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 probe: leaving a workspace', () => {
+  it('records the door answer for a self-revocation by each role', async () => {
+    const out: string[] = [];
+    const say = (k: string, r: { status: string; rule?: string; reason?: string }) => out.push(`${k.padEnd(46)} -> ${r.status}${r.rule ? ` (${r.rule}: ${String(r.reason).slice(0, 90)})` : ''}`);
+    // peer is a member (beforeAll). A guest and an admin too.
+    const guest = await signInWithPhone(app, (globalThis as unknown as { __otp: never }).__otp, '+919000000605');
+    const admin = await signInWithPhone(app, (globalThis as unknown as { __otp: never }).__otp, '+919000000606');
+    expect((await post(WS, { kind: 'membership', id: membershipId(WS, guest.userId) }, 'membership.granted', { userId: guest.userId, role: 'guest' }, ownerId, ownerToken)).status).toBe('committed');
+    expect((await post(WS, { kind: 'membership', id: membershipId(WS, admin.userId) }, 'membership.granted', { userId: admin.userId, role: 'admin' }, ownerId, ownerToken)).status).toBe('committed');
+    say('MEMBER revokes their own membership', await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.revoked', { userId: peerId }, peerId, peerToken));
+    say('GUEST revokes their own membership', await post(WS, { kind: 'membership', id: membershipId(WS, guest.userId) }, 'membership.revoked', { userId: guest.userId }, guest.userId, guest.token));
+    say('ADMIN revokes their own membership', await post(WS, { kind: 'membership', id: membershipId(WS, admin.userId) }, 'membership.revoked', { userId: admin.userId }, admin.userId, admin.token));
+    say('control: OWNER revokes the member', await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.revoked', { userId: peerId }, ownerId, ownerToken));
+    // Any other door? /v1/me/workspaces lists; is there a DELETE?
+    const del = await app.inject({ method: 'DELETE', url: `/v1/me/workspaces/${WS}`, headers: auth(guest.token) });
+    out.push(`DELETE /v1/me/workspaces/:ws -> ${del.statusCode}`);
+    const del2 = await app.inject({ method: 'DELETE', url: `/v1/workspaces/${WS}/members/${guest.userId}`, headers: auth(guest.token) });
+    out.push(`DELETE /v1/workspaces/:ws/members/:me -> ${del2.statusCode}`);
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
   });
