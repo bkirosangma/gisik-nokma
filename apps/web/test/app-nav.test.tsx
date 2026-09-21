@@ -1150,13 +1150,72 @@ describe('pending-13.4xx AppNav is mounted on every page that must always show i
         <AppNav />
       </Providers>,
     );
-    expect(screen.getByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Help' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: 'Account' })).toBeInTheDocument();
+    // ⚠ THE SHAPE CHANGED ON 2026-09-21 (E5-31) and this case changed WITH it
+    // rather than being relaxed: `Workspaces` and `Account` are no longer in
+    // the signed-out bar at all. They were dead controls — both bounce to
+    // `/sign-in`, and Account's bounce repaints the page E5-13 describes — and
+    // what replaced them is the door in. See the E5-31 case below for the
+    // assertions that now own this arm.
+    expect(screen.queryByRole('link', { name: 'Workspaces' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Account' })).not.toBeInTheDocument();
     // The one item that SHOULD disappear signed out — proving this case would
     // notice the opposite defect (everything rendering regardless of session).
     expect(screen.queryByRole('button', { name: /Sign out/ })).not.toBeInTheDocument();
     mockSessionUser = { id: 'u_kiro', name: 'Kiro' };
+  });
+
+  /**
+   * E5-31 (round-2 ruling, IMPORTANT) — the signed-out bar offers the door IN,
+   * and withholds what a visitor cannot use.
+   *
+   * Signed out on `/help` — the route `app-nav.tsx` itself calls *"the route
+   * most likely to be wanted by someone who cannot get in"* — the bar painted
+   * `Workspaces`, `Help`, `Account`, an unlabelled inbox icon and the scope
+   * note *"No workspace selected — pick one to reach its board, members and
+   * settings."*, and **no Sign in**. Pressing Workspaces signed out landed on
+   * `/sign-in` by a 401 bounce with no `next=`, so the destination was thrown
+   * away; Account repainted the page E5-13's second reproduction describes; the
+   * scope note told the person to pick something the bar was not offering. The
+   * legal pages' bar already had the right arm (`legal-nav.tsx:96-99`).
+   */
+  it('13.1159 E5-31 signed out, the bar offers Sign in (with next) and withholds the dead controls', () => {
+    currentPath = '/help';
+    mockSessionUser = null;
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+
+    // The door IN, remembering where they were headed.
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/sign-in?next=%2Fhelp',
+    );
+    expect(screen.getByRole('link', { name: 'Help' })).toHaveAttribute('href', '/help');
+    // Every control the finding names as dead for this visitor:
+    expect(screen.queryByRole('link', { name: 'Workspaces' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Account' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Inbox/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/No workspace selected/)).not.toBeInTheDocument();
+    // The control that keeps this from passing on a bar that renders nothing
+    // at all signed out.
+    expect(screen.getByRole('link', { name: 'Help' })).toBeInTheDocument();
+
+    // The positive control for the same claim, in the same case: signed IN, all
+    // four of those come back.
+    mockSessionUser = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
+    cleanup();
+    currentPath = '/workspaces';
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+    expect(screen.getByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Inbox/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument();
   });
 
   /**

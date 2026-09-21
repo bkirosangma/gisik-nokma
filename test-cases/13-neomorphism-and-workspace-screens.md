@@ -2326,3 +2326,22 @@ invent an eleventh rule.
   `401` on the shell's one `DataSource` pushes `/sign-in` exactly once and **re-throws** (a guard that
   swallowed it would leave the calling view rendering a success it never had). —
   (`apps/web/test/session-expired-writes.test.tsx`)
+
+## A signed-out bar that offered four dead controls and no door in — case `13.1159` (E5-31, 2026-09-21)
+
+**Ids from B11's §13 block `13.1157`–`13.1166`** (controller, 2026-09-21 22:0x; see the E5-25 section
+above for where the allocation is recorded). `13.1159` is minted here.
+
+**The defect.** Signed out on `/help` — the route `app-nav.tsx`'s own docblock calls *"the route most
+likely to be wanted by someone who cannot get in"* — the bar painted `Workspaces`, `Help`, `Account`, an
+unlabelled inbox icon and the scope note *"No workspace selected — pick one to reach its board, members
+and settings."* — **and no Sign in.** Pressing Workspaces signed out landed on `/sign-in` by a 401 bounce
+with no `next=`, so the destination was thrown away; pressing Account repainted the page E5-13's second
+reproduction describes; the inbox icon pointed at a session-gated route; and the note instructed a person
+to pick something the bar was not offering. The legal pages' bar had the right arm all along
+(`legal-nav.tsx:96-99`).
+
+- **13.1159** ✅ Signed out, the bar offers **Help + Sign in** (the sign-in link carrying
+  `next=<where they were>`), and withholds `Workspaces`, `Account`, the inbox icon and the scope note —
+  with the signed-in arm re-asserted in the same case as the positive control, so a bar that rendered
+  nothing signed out cannot pass it. — (`apps/web/test/app-nav.test.tsx`)
