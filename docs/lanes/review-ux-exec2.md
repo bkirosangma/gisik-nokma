@@ -2381,6 +2381,26 @@ under my own id.
    sentence was true of the *render* and false of the *write*, and I tested it against the path I happened
    to have open. A docblock's claim needs checking against every path that consumes the thing it
    describes, not the one in the paragraph beside it.
+### AND THE ABSENCE CLAIMS, SEARCHED FOR THEIR COUNTEREXAMPLE
+
+An absence claim is the cheapest thing to refute — one line ends it — so after the citation audit I ran the
+specific counterexample search on all seven of mine rather than trusting the reads that produced them. Each
+scan covered the **whole range the claim is about**, looking for the very syntax that would falsify it.
+
+| finding | the absence claimed | the search, over the claim's own range | counterexamples |
+|---|---|---|---|
+| `E2-20` | no rejection handler on the `Promise.all` | `.catch(` \| `catch {` \| a second `.then` argument, over `ticket-type-list-screen.tsx:173-199` | **0** |
+| `E2-21` | same, editor screen | the same pattern over `ticket-type-editor-screen.tsx:185-200` | **0** |
+| `E2-24(a)` | the *revert* load has no handler | the same pattern over `account/page.tsx:215-232` | **1 — and it is the finding.** The single hit is `:223` `void notificationPreferences.save(next).catch(…)`, the save the finding is *about*; the unguarded `load()` at `:228` inside that handler is what the finding names. |
+| `E2-25` | five components mounted nowhere | JSX render (`<Name` + space `/` `>`), 966 files, tests included | **0 in production** — every render is in a test (13/6/6/2/1) |
+| `E2-29` | no in-flight latch | `submitting` \| `submittingRef` \| `setSubmitting` \| `useState` \| `useRef`, over `ticket-sheet.tsx:711-746` | **0**, and one call site at `:2634` |
+| `E2-31` | the guard is render state, not a ref | `useRef` \| `Ref.current`, over `submitTicketEvent` `ticket-sheet.tsx:1025-1076` | **0** |
+| `E2-43` | the init IIFE has no catch | `.catch(` \| `catch {` \| a second argument, over `apps/desktop/src/app.tsx:42-90` | **0** |
+
+**Six zeros and one hit that confirms the finding rather than contradicting it.** Two of these (`E2-25`,
+`E2-29`) are written into their findings as "HARDENED AFTER FILING" so the judge can see the claim was
+attacked before submission rather than merely asserted; the rest are recorded here because repeating the
+scan inside five more findings would have doubled the report for one sentence each.
 **Thirty-two of thirty-two is not a claim that the report has no errors.** It is a claim that the specific
 failure mode §3 prices most harshly — a citation that says something other than what the finding says — was
 searched for deliberately and not found in the primary citations.
