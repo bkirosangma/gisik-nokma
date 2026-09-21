@@ -3801,3 +3801,30 @@ Two further things in the same file are worth naming as **better than my finding
 evidence: `:867-870`'s options carry the comment *"No `owner`. The door refuses it and a picker offering
 it would lie"* — the "asks before it offers" rule, applied to a `Select`; and `:868`'s comment records *why*
 the option is absent rather than leaving the omission to be inferred.
+
+---
+
+# R2.25 — THE CATALOGUE'S JUDGEMENT HALF, REACHED ONE MORE WAY: ARE THE ✅ CASES **WITNESSED**?
+
+My §R2.17c/d stated the catalogue's open half precisely: the **citations** were swept mechanically (474, none
+dead), and the **judgements** were not. The brief asks three things of every id — *does it still hold, is it
+**witnessed**, and is it still true of the product* — and **the middle one is checkable without a suite**:
+a ✅ case names its witness file, and the witness either asserts what the case says it asserts or it does
+not. **A case whose witness does not assert its claim is worse than no case**, because it reports coverage
+that does not exist. I checked three, chosen from `13-settings-and-workflows.md` where the witnesses are
+test files I could open.
+
+| case | its claim | the witness I opened | verdict |
+|---|---|---|---|
+| **13.942** | the version argument reaches the query — *"the case asserts the **argument** the query receives (`('ws','wf-flow', 2)`)"* | `apps/web/test/data-source-gateway.test.ts:126-127` — `getWorkflow('ws','wf-flow', 2)` **and** `getWorkflowDef).toHaveBeenCalledWith('ws','wf-flow', 2)` | **holds, exactly as stated.** ⚠ The neighbouring arm at `:88`/`:94` passes **two** arguments and asserts **`undefined`** — which is the *omitting* shape, and it is present as its own case. **So the file carries the positive AND the through-passing control**, which is the strongest form the claim could take. |
+| **13.943** | a workflow answering nothing says *"No published versions to show."* rather than loading for ever | `workflow-history-screen.tsx:120` renders the sentence; `history.test.tsx:143` `findByText('No published versions to show.')` | **holds.** ⚠ And the case is honest about its own edge: it records in its own text that *"the `load-error` branch — a rejection rather than a null — stays uncovered; said here rather than implied."* **A case that states its uncovered arm is doing the thing this review is asking the product to do.** |
+| **13.944** | the action's **destination** — `push` receives `…/workflows/<id>/history` | `apps/web/test/authoring-routes.test.tsx` (present; renders the shipped list page and imports the builder path as the negative) | **holds** — and the case's own mutation record is the reason it exists: pointing `onHistory` at the builder path left **548 `apps/web` tests green**. |
+
+**Three of three witnessed, and every one of the three names its own negative or its own uncovered arm.**
+⚠ **This is a sample of three, chosen because their witnesses are openable — and I am stating the sample
+size rather than the impression.** It does not make the catalogue verified: 2606 ids remain unjudged and my
+reach is now **six ids by reading** (`17.005`, `5.8`, `5.13`, `5.21`, `13.941`, plus these three), which is
+**0.2 %**. What it does establish is narrower and worth having: **the ✅ markers in this file are not
+decorative — the three I opened each had a witness that asserts the specific thing the case claims, and two
+of the three carry a control that would redden if the claim reversed.** That is a different statement from
+*"the catalogue holds"*, and it is the one I can make.
