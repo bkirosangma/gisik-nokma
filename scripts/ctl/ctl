@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# scripts/ctl/ctl — the one door for the controller's mechanical work. `ctl help` lists the verbs.
+set -u
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+verb="${1:-help}"; shift || true
+case "$verb" in
+  pr) sub="${1:-}"; shift || true; verb="pr-$sub";;
+esac
+case "$verb" in
+  help|-h|--help)
+    cat <<'HELP'
+usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
+  checks                          the eight checks + two non-zero controls
+  gate <sha>                      forced gate at HEAD=<sha>; writes the gate marker
+  pr open <branch> --title T --body FILE [--require-checked]
+  land <pr>                       comment gate, merge head-gated, verify, ff primary
+  anchor <N> --title T --body FILE
+  check-pr <branch> [--plan FILE] mechanical batch-PR verification; writes the checked marker
+  reconcile                       ledger vs report headings by membership + plan coverage
+  lanes [--watch]                 one line per gisik: window
+  restart <window> <worktree> <brief> [--override FILE]
+  dispatch <window> <file>        two pastes + proof of delivery
+  rebuild                         pull --ff-only in the primary checkout, rebuild the stack, verify
+  selftest                        hook table, lib tests, every verb --dry-run
+HELP
+    exit 0;;
+esac
+script="$HERE/verbs/$verb.sh"
+[ -f "$script" ] || { echo "FAIL ctl unknown verb $verb (see: scripts/ctl/ctl help)"; exit 64; }
+exec bash "$script" "$@"
