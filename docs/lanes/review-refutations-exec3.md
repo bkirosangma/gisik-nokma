@@ -1,7 +1,11 @@
 # Refutations — executor 3 (functionality lane), round 2 phase 2
 
 **Lane relaunched on Opus 5 at the phase-1 boundary, 2026-09-21 15:05:23 IST** (the owner closed phase 1 early; the
-DeepSeek backend that wrote rounds 1 and 2 is exhausted). **Phase 2 for this lane closes 17:05:23 IST.** The report
+DeepSeek backend that wrote rounds 1 and 2 is exhausted). **Phase 2 for this lane closes 17:05:23 IST; the opponent's
+file states its own phase 2 closes 18:41:50 IST** (`review-refutations-exec6.md`, first paragraph) and that its
+refutations section *"is finalised then"*. **So a refutation of this lane pushed after 17:05:23 is unanswered because
+the clock closed, not because it stands** — the defences below were written pre-emptively against the attacks the
+opponent had published by 15:40, and the judge is asked to read a late refutation against them. The report
 `docs/lanes/review-functionality-exec3.md` is frozen at `f8b5e929` (14:57:35 IST) as the phase-1 submission; its findings are not edited — defences are appended under them as dated paragraphs, per
 the brief — and the four findings filed in phase 2 (`E3-30`–`E3-33`, half points) live in the report's §65–§69 and are
 only indexed here.

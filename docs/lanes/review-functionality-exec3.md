@@ -4333,9 +4333,10 @@ whole instrument.
 `sync-route.test.ts:345-361`; `git log --format='%h %ad' -- apps/server/src/sync/sync-routes.ts | tail -1` →
 `999d4860 2026-09-04`; `git log -S'NOT CLOSED, because it does not exist yet' -- …/check-permission.ts | tail -1`
 → `fc904f4a 2026-08-31`; `git log --since=2026-08-31T23:59 --format=%h -- …/check-permission.ts | wc -l` → 13 (16 in all). **Not run:** the sync test
-(it needs the test Postgres); the witness is cited from its assertion, opened at the line. **Control:** the same
-docblock's first bullet (`POST /v1/events` → `ingestClientBatch`) is true — `routes/events.ts` is the door `E3-14`'s
-control row exercised.
+(it needs the test Postgres); the witness is cited from its assertion, opened at the line. **Control:** the falsifier is
+the grep the docblock's own reader would run — `grep -rn "'/v1/sync'" apps/server/src` → `sync-routes.ts:491` — and the
+same grep for the door the docblock calls CLOSED, `"'/v1/events'"`, → `routes/events.ts` (so the instrument finds the
+door it should and the docblock's first bullet is true while its third is not).
 
 **SEVERITY: Important (claimed), scored at half.** A security gate's own enumeration of its doors is wrong about
 one of three, in the direction that sends a reader to build a closure that exists.
@@ -4446,9 +4447,14 @@ drop the test citation, which now proves the opposite.
 `check-role-permission.test.ts:940-956`, `:1024`, `:1070`, `:1189` (the three `ticket.assigned` ingests, each on a
 `visibleTicket`); `git log -S'used to file \`ticket.assigned\` against a bare' -- …/check-role-permission.test.ts` →
 `dd7bfcfd`; `git log -S'THE UNDERLYING GAP IS NOT FIXED HERE' -- …/projections/tickets.ts` → `6cb631d0`. **Not run:**
-the test file (shared Postgres); the refusal is read from the gate's two lines and the test's own comment. **Control:**
-the same docblock's sentence about `evaluateEvent` having no case for the three types is true (`grep -c
-"ticket.assigned" packages/rule-engine/src/evaluate.ts` → 0).
+the test file (shared Postgres); the refusal is read from the gate's two lines and the test's own comment. **The
+range was read, not quoted:** `check-permission.ts:1023-1050` — the only returns before the `canSee` call are for a
+non-ticket entity (`:1027-1029`) and for `ticket.created` (`:1031-1039`); `ticket.assigned` and both collaborator events
+are ticket-entity types (`E3-29`'s registry list) and fall through to `:1048`. `checkPermission` (`:1265-1304`) has no
+`null` return before its last line — every earlier step either refuses or falls through. **Control, same path:** the
+docblock's other sentence — `evaluateEvent` has no case for the three types — is true, `grep -c "ticket.assigned"
+packages/rule-engine/src/evaluate.ts` → 0, and the grep can see a case that exists: `grep -n "ticket.reparented"` on the
+same file → `:38 case 'ticket.reparented':`.
 
 **SEVERITY: Minor (claimed), scored at half.** An open-gap declaration whose cited witness now witnesses the closure; the
 residual (internal door) is real and narrower than the sentence.
