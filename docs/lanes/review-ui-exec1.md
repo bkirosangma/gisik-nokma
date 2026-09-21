@@ -874,7 +874,21 @@ Two of my own instruments disagreed while I was writing this: a selector extract
 
 **And the input-labelling sweep took three iterations to say anything true.** The first version matched `<input` in docblocks (12 of 60 "sites" were prose). The second — comment-stripped — still flagged 9, including `sign-in/page.tsx`'s two inputs, which I opened and found **wrapped in a `<label>` two lines above**. The heuristic was `/<label\b/ && !/<\/label>/` over a look-back window, so **any input in a form with an earlier labelled field was convicted by its sibling's closing tag.** The correct test is which comes *last* — the last `<label` before the input, versus the last `</label>` — and with that, **3 stragglers remained** (48 inputs, 32 label-wrapped). Opened, all three were false positives too: `select.tsx:391` is a prop object passing `'aria-label'`, `select.tsx:481` spreads `inputProps` from `useComboBox`, and `ticket-list.tsx:832` is a `TableColumn` object literal whose own docblock gives the accessible-name reason.
 
-**The honest summary of this section: four instruments I wrote produced confident wrong answers, and every one was caught by a control rather than by reading the result harder.** They failed in **three different directions**, which is why "check the result" is not a remedy:
+### A fifth, and the reason to distrust a `0` that arrived from a shell
+
+**P26's `.workflow-list` row first measured ZERO selector blocks** for a family that has **19**. The command built its `grep -E` pattern by interpolating a shell variable into a string whose alternation ended in `$)` — **so the shell mangled the pattern and it matched nothing, cleanly, with no error.** Re-measured by hand it is 19. **What caught it was running the same shape against a class whose answer I already knew**, `.gn-board-card__move` → 4; the 0 was therefore a lie rather than a finding. **That is the cheapest control there is and the one I reached for last.**
+
+### A sixth, at the very end, which nearly filed a finding against a citation convention I did not recognise
+
+Chasing P26 I read the delta document's baseline — `desktop.dc.html@6d7b67c0a52c` — as a **sha256**, could not find it on disk, found `PROVENANCE.md` recording `2cda054b` for the same file, and had the finding written in my head: *the baseline is unverifiable and is not the artefact the owner ruled is the authority.*
+
+**It is a git BLOB sha, and one command settles it:** `git cat-file -t 6d7b67c0a52c` → **`blob`**, and `git rev-parse HEAD:design-system/interactive/desktop.dc.html` → **`6d7b67c0a52cb31aca3001b3fa6eb30c4268e9e4`**. The same bytes, two hashing conventions. **And because that blob is unchanged at HEAD, the repo's copy has not moved since the document was written** — so its baseline is not merely verifiable, it is still current.
+
+**The lesson is not "check your hashes". It is that I inferred a defect from a convention I did not recognise, and the wrong reading was the one that made the document look worse.** That is the direction **five of the six** share: my instruments failed toward *finding* something, not toward missing it. **A reviewer's errors are not symmetric, and mine run one way.**
+
+**And the positive half belongs here too:** the delta document cites its baseline by **git blob sha**, which is strictly *more* checkable than the sha256 the round-2 brief asks lanes to use — `git rev-parse` resolves it, and a sha256 of a working-tree file resolves to nothing. **The document is better cited than the instruction reviewing it.**
+
+**The honest summary of this section: SIX instruments I wrote produced confident wrong answers, and every one was caught by a control rather than by reading the result harder.** They failed in **three different directions**, which is why "check the result" is not a remedy:
 
 | instrument | what it would have produced | direction |
 |---|---|---|
@@ -882,5 +896,7 @@ Two of my own instruments disagreed while I was writing this: a selector extract
 | label-nesting heuristic (sibling `</label>`) | 9 unlabelled inputs — a **false Important** | manufactured a **finding** |
 | `<Link>` blindness | one unstyled control **missed entirely**, and the report's count wrong | manufactured a **clean bill** |
 | `.next` build artefacts counted as source | P12 apparently falsified — a **true finding deleted** | manufactured **the opposite of itself** |
+| shell-mangled `grep -E` pattern (P26's `.workflow-list`) | 0 rules for a family that has 19 — a **false open row** | manufactured a **finding** |
+| a **git blob sha** read as a sha256 (the delta doc's baseline) | *"unverifiable, and not the authority"* — a **false finding against a document that is better cited than the brief reviewing it** | manufactured a **finding** |
 
-**A control is not a formality you run at the end — in this lane it was the only thing standing between four confident reports and the truth.** And note which controls worked: not one of them was a re-reading. Three were a **second instrument on the same path**, and one was asking whether the file I had measured was **in the repository at all**.
+**A control is not a formality you run at the end — in this lane it was the only thing standing between six confident reports and the truth.** And note which controls worked: not one of them was a re-reading. Three were a **second instrument on the same path**, and one was asking whether the file I had measured was **in the repository at all**.
