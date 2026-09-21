@@ -1600,3 +1600,71 @@ fallback this field exists to serve.
   unchanged in COUNT (the same controls, renamed only for the nameless population), so the ratchet's
   number should not move — but that is a prediction, not a measurement, and the owner of that sweep is
   whoever next runs it.
+
+## The shell's nav on a phone: five rows in, one row out (lane ds1, 2026-09-21, batch B10) — cases `13.913`–`13.914`
+
+**The finding, round 2 `E4-11`, IMPORTANT.** On the board at `emulate 390x844`, `.gn-nav` measured
+**390×310** — the destination links wrapped to five 44-px rows, 37 % of the viewport. Measured at scroll
+0, the first group title sat at y=755, the first column header at y=802 and the first card at **y=1105**
+on an 844-px-tall phone: **no ticket was on screen when the board opened.** The bar's own docblock had
+recorded the growth and called it an *"understatement"*; `docs/pre-launch-checklist.md` Item 7 explained
+where the wrap came from — a 10-px horizontal overflow caused by the signed-in name, fixed with
+`flex-wrap: wrap` **and a negative control**, not a width guess — and never ruled that the bar may take
+five rows. The prototype's only phone screen puts navigation in a bottom tab bar; the reviewer's remedy
+allowed either that or a single disclosure, and the disclosure is what this change takes.
+
+**Ids `13.913`–`13.914`, recounted REPO-WIDE at this tip — and the first recount was wrong, which is
+worth recording rather than tidying.** The first pass asked this FILE for its highest real id (`13.965`)
+and took the next two numbers. That universe was the file in hand, not the catalogue: `13.966` and
+`13.967` were already in use in `test-cases/13-second-wave-board-actions.md`, and `node
+scripts/check-case-ids.mjs` refused the tree with the duplicate named at both lines. **The sweep this
+file's id blocks are supposed to be recounted against is `test-cases/*.md`, and a per-file recount is
+not a smaller version of it — it is a different question.** Repo-wide over all 25 files, the free ids in
+the `13.9xx` band are `13.913`–`13.917` and `13.996`–`13.997`; a contiguous pair from the first run was
+taken, which is the block convention this file already uses. `13.999` is deliberately not treated as
+free: it is the file's own documented truncation trap (`13.9999` reads out as an id to a bare
+`grep '13\.[0-9][0-9][0-9]'`).
+
+### The mechanism, and the shape it was chosen for
+
+The wrapper is a `<div>`, **not a `<details>`**, and the reason is the wide-width arm: above 40rem
+`.gn-nav__more` is `display: contents`, so the links lay out as DIRECT flex children of `.gn-nav__links`
+exactly as they did before the wrapper existed — the desktop bar is unchanged rather than merely similar.
+A closed `<details>` hides its own content through internal slotting no stylesheet can undo, so the open
+state is a `data-open` attribute instead. **The consequence is the point: the links are never
+conditionally rendered.** They are always in the document, so a closed bar is a visual state and not a
+missing link — a `{moreOpen && …}` implementation would have satisfied every assertion about the OPEN
+state while silently deleting three routes from the phone's accessibility tree.
+
+**Not measured, said rather than implied: the phone bar's height after this change was NOT painted, and
+neither Features.md nor the stylesheet's docblock asserts a new number.** What is asserted is the
+mechanism the height depends on.
+
+### The cases
+
+- ✅ **13.913 — the phone breakpoint hides the wrapper, and the wide arm does not.** This is a SOURCE
+  scan, not a rendered one, and deliberately: the gate has no browser (`apps/web/e2e-*` is Playwright,
+  not in `pnpm test`), and the property at issue is which declarations a rule carries, on which the
+  stylesheet *is* the authority. `apps/web/test/nav-phone-disclosure.test.ts`. **Two controls, and
+  neither is decoration.** *(a)* The extractor is run over a rule PLANTED INSIDE A COMMENT and must not
+  read it as a rule — because this stylesheet's docblocks quote the selectors they explain, and because
+  it writes brace characters inside comments, which unbalances a brace counter that has not stripped
+  them. **That failure was measured, not imagined:** the first version of this scan lost `.gn-nav__more`'s
+  own wide rule to exactly that and reported a missing rule as a finding. The control reads both ways —
+  the same extractor over the unstripped text DOES return the comment as a rule. *(b)* The mutation
+  witness reverts the phone arm to the wide arm's `display: contents` and requires the SAME function the
+  assertion uses to flip, asserting the planted text matched before it concludes anything, so a plant
+  that silently matched nothing cannot read as a survivor. `globals.css` holds FOUR
+  `@media (max-width: 40rem)` blocks, so "the 40rem block" is not a thing that exists — the block is
+  selected by containing `.gn-nav__more`, which is why asking for the first one answers about
+  `.gn-workspace-list`.
+- ✅ **13.914 — the toggle is wired to the panel, and the links are in the document in BOTH states.**
+  `apps/web/test/app-nav.test.tsx`. jsdom evaluates no media query, so the stylesheet test above can
+  prove the breakpoint hides the wrapper but not that the button which unhides it is wired to it; this
+  case covers the half the scan cannot reach. The toggle starts `aria-expanded="false"` with
+  `aria-controls="gn-nav-more"`, flips both the attribute and the panel's `data-open` on click and back
+  (it is a toggle, not a one-way reveal), and `My Work` / `Members` / `Settings` are queried in the
+  CLOSED state as well as the open one. **The negative control is a signed-out global route with no
+  remembered workspace**, where every child of the wrapper is gated away and the toggle must not render —
+  it fails both if the toggle becomes unconditional and if the gate is tightened to
+  `workspaceName !== null` (the name is unresolved there, but the three id-only links are not).

@@ -1763,19 +1763,26 @@ input, textarea, select { font-family: inherit; }
    (69.6px, which is what the browser reports).
 
    WHERE IT IS AN UNDERSTATEMENT, said plainly rather than left as a surprise:
-   `.gn-nav__links` wraps, so the bar grows on narrow viewports — measured at
-   190px on a signed-in workspace route at 500px wide, where the destination
-   links, the scope note and sign-out take three rows. One number cannot cover
-   that, because the height depends on how many links the ROUTE contributes and
+   `.gn-nav__links` wraps, so between 40rem and 60rem the bar can grow past
+   this value — the height depends on how many links the ROUTE contributes and
    on the signed-in name's width, neither of which CSS can see; a media query
-   would only trade one wrong value for another. The consequences are bounded
-   and both were checked: `.gn-help__sidebar` is `position: static` below 48rem
-   so it cannot collide at all, and the `scroll-margin-top` consumers land a
-   fragment ~86px down, which is correct at every width where the bar does not
-   wrap and short of it on a wrapped phone bar — the heading is then reachable
-   by a short scroll rather than lost. Making this exact needs the bar's height
-   measured at runtime into the variable, which is a script, and this is a
-   stylesheet.
+   would only trade one wrong value for another. The note that stood here
+   measured "190px on a signed-in workspace route at 500px wide, three rows";
+   E4-11 changed that range rather than the rule. Below 40rem the
+   workspace-scoped links move behind one disclosure (`.gn-nav__more` further
+   down this file), so they cannot wrap there, and the scope note is the one
+   child left outside it — which the two never have to share a bar: the note
+   renders only when NO workspace is remembered, and every scoped link renders
+   only when one is. What is NOT claimed here is a new number: the phone bar's
+   height after E4-11 was not painted, and a docblock is the last place a
+   measurement should be invented. The consequences are bounded and both were
+   checked: `.gn-help__sidebar` is `position: static` below 48rem so it cannot
+   collide at all, and the `scroll-margin-top` consumers land a fragment ~86px
+   down, which is correct at every width where the bar does not wrap and short
+   of it on a wrapped bar between 40rem and 60rem — the heading is then
+   reachable by a short scroll rather than lost. Making this exact needs the
+   bar's height measured at runtime into the variable, which is a script, and
+   this is a stylesheet.
 
    DELIBERATELY NOT A `--gn-` TOKEN. `packages/ui/test/tokens.test.ts` asserts
    that every `var(--gn-…)` written in `ui.css` names a role declared in
@@ -1800,6 +1807,44 @@ input, textarea, select { font-family: inherit; }
 }
 .gn-nav__links { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; flex: 1 1 auto; min-width: 0; }
 .gn-nav__spacer { flex: 1; }
+
+/* PHONE: THE WORKSPACE LINKS COLLAPSE INTO ONE DISCLOSURE (E4-11).
+
+   At 390 px this bar measured **390×310** — the links wrapped to five 44-px
+   rows, 37 % of an 844-px viewport, and the board's first card sat 1105 px
+   down, so NO TICKET WAS ON SCREEN when the board opened. The wrap itself is
+   not the defect and is not reverted here: `flex-wrap: wrap` is what stops a
+   long signed-in name overflowing the row by 10 px (Item 7 of
+   `docs/pre-launch-checklist.md`, verified causally with a negative control).
+   What that item never said — and what the `--app-nav-offset` docblock above
+   says explicitly it is NOT — is that the bar may take five rows.
+
+   So below 40rem the workspace-scoped links move behind `.gn-nav__more-toggle`
+   and the row holds `Workspaces`, the toggle and `.gn-nav__corner`'s inbox and
+   account on ONE line at the published 4.35rem.
+
+   WHY A `<div>` AND NOT `<details>`. The wide-width arm has to be
+   `display: contents`, so the links lay out as DIRECT children of
+   `.gn-nav__links` exactly as they did before this rule existed — the desktop
+   bar is unchanged, not merely close. A closed `<details>` hides its own
+   content through internal slotting that no stylesheet can undo, so the open
+   state is a `data-open` attribute instead: the links are always in the
+   document, always one Tab away, and always in the accessibility tree. */
+.gn-nav__more { display: contents; }
+.gn-nav__more-toggle { display: none; }
+
+@media (max-width: 40rem) {
+  .gn-nav__more-toggle { display: inline-flex; align-items: center; }
+  .gn-nav__more { display: none; }
+  .gn-nav__more[data-open="true"] {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    flex-basis: 100%;
+    min-width: 0;
+  }
+}
 /* Never shrinks and never wraps — the other half of the split above. Its
    rendered width is fixed (the inbox icon + the avatar), so unlike
    `.gn-nav__links` it does not need `min-width: 0` to be safe: there is no

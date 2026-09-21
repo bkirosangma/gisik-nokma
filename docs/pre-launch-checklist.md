@@ -211,6 +211,15 @@ width guess — and every other flex row of this shape in the two stylesheets al
 five routes from 10 to 0; a **negative control** — an irrelevant declaration on the same selector — left
 all five at 10. Without that control the "after" reading measures page settling, not the rule.
 
+> **What this item did NOT rule, corrected 2026-09-21 (round-2 finding E4-11).** `flex-wrap: wrap` was
+> chosen to remove a 10-px HORIZONTAL overflow; it was never a ruling that the bar may take several
+> ROWS. On a 390-px phone the bar went on to measure **390×310** — five 44-px rows, 37 % of the
+> viewport, with the board's first card 1105 px below the fold, so no ticket was on screen when the
+> board opened. The wrap is still correct and is still what keeps a long signed-in name from
+> overflowing; below 40rem the workspace-scoped links now sit behind one disclosure instead, so the
+> destination group is a single row. See `.gn-nav__more` in `apps/web/app/globals.css`, and
+> `apps/web/test/nav-phone-disclosure.test.ts` for the scan that holds it.
+
 **The three breakpoints, all confirmed firing.** The checklist previously mentioned only `max-width: 40rem`;
 there are two thresholds, and the three viewports discriminate all three states:
 
