@@ -812,7 +812,15 @@ rows = re.findall(r'^- `([IP]\d+)`', md, re.M)                    # each summary
 assert Counter(sev for _, sev in ids)['MINOR'] == count_of_rows_under('**MINOR —')
 ```
 
-**✅ RUN AT THE END OF ROUND 2, AND IT PASSES.** Two cross-checks over the whole report: (1) each finding's own heading severity against the list it is placed under — **26 findings, heading and placement agree for every one**; and (2) the three bucket sizes against their headers — **1 / 12 / 13, matching**. A third sweep over the citations found **160 distinct `file:line` references, 159 resolving inside their file and none beyond EOF**, the one remainder being the breadcrumb dispatch in `gisik-nokma-lanes/` which is outside the repository and is named with its directory. **Every number in this section was produced by a command, not recalled.**
+**✅ RUN AT THE END OF ROUND 2, AND EVERY CHECK PASSES.** Four cross-checks over the whole report at 31 findings:
+- **Each finding's own heading severity against the list it is placed under** — **31 findings, no mismatch**. This is the check that would have caught the error found and fixed earlier this round, where three IMPORTANT findings sat in the MINOR list under stale headers while every total still agreed.
+- **Bucket membership against the headers** — **1 / 15 / 15, matching**; and **no finding lacks a summary row**.
+- **The citation sweep** — **202 distinct `file:line` references, all 202 resolving inside their file and none beyond EOF.** The one file the sweep cannot resolve is the breadcrumb dispatch in `gisik-nokma-lanes/`, which is outside the repository and is named with its directory.
+- **Nothing was lost to the freeze** — comparing this report's headings against `origin/main`'s landed copy: **all 18 landed findings are still present**, and the count is now 31.
+
+**⚠ AND ONE LIMITATION OF MY OWN SWEEP, FOUND BY OPENING WHAT IT FLAGGED.** It reported `members/page.tsx:419-421` and `:518` as beyond EOF, because its fallback searched for the **basename** `page.tsx` and resolved a 383-line namesake. **`members/page.tsx` is unique in this repository** (`find` → 1), the real file is **1002 lines**, and both cited ranges hold exactly what the findings say. **The instrument was wrong and the citations were right** — which is the fourth time this round that a measurement's premise, not its arithmetic, was the fault.
+
+**Every number in this section was produced by a command, not recalled.**
 
 **⚠ AND THE ERROR HAS A CAUSE WORTH NAMING, because it recurred FIVE times in this round.** Every occurrence came from the same habit: **adding a summary row by anchoring on an existing row's text** — `s.replace("- `P10` …", "- `P25` …\n- `P10` …")` — which puts the new row wherever that anchor happens to live. Twice the anchor was in the wrong list and three times the header was stale, and **the totals agreed every single time.** **The fix is not care, it is construction: §8 is now REBUILT from each finding's own heading** — read the severity off `### P25 — **MINOR** —`, group, emit — so a row cannot land anywhere but under its own severity. **The habit was the defect; the rebuild removes the opportunity for it.**
 
