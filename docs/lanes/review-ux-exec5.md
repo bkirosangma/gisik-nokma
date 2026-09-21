@@ -591,8 +591,10 @@ previously muted `mention` and `contest`, this body un-mutes both.
 sessions: 401`) and the page paints *"Your account — This is you, across every workspace"*, the Notifications
 section with **five toggles `checked: true, disabled: false`**, a *"Your workspaces"* heading over nothing, and
 *"No signed-in devices to show."* — for a visitor who is nobody. Only the newest section says the truth:
-*"Connected assistants — Sign in to see and revoke…"*. A visitor who flips a toggle sends the same guessed PUT (it
-gets a 401 and reverts silently — `exec2-E2-24`'s arm).
+*"Connected assistants — Sign in to see and revoke…"*. A visitor who flips a toggle sends the same guessed PUT — measured: one click → `[false, true, true, true, true]`,
+**still so 2.5 s later**; two requests fired (`PUT /v1/me/notification-preferences`, then the revert `GET`), the PUT answers
+`401` (confirmed with a direct `fetch`, so nothing was written), the revert `load()` at `:228` also fails and is
+unhandled, and no `role="alert"` appears — the flip **stands** on a page for nobody (`exec2-E2-24`'s arm, painted).
 
 **WHY.** The page's own comment (`:74-80`) says the literal *"merely renders every kind as on for this visit, without
 asserting that fact about the account"* — and then `toggleKind` asserts it to the server. The sessions section
