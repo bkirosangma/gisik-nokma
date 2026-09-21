@@ -558,9 +558,12 @@ GET /v1/me/work -> 200 … "contested":[{"ticketId":<the ticket>,"title":"first 
 The gate refuses the unknown ticket as *invisible* (`check-permission.ts:1048` runs before the engine, and
 `can-see.ts` answers unknown and invisible identically by design); `sync-service.ts:416-417` turns **every**
 refusal of a ticket-entity event on the sync door into a `claim.contested`; the outbox records the contest and
-clears the row (case 12.146). Net effect on the user's own screen: their second rename reverts, and **My Work shows
-an unresolved contest on their own ticket saying it is not visible to them**, filed two seconds before the ticket
-existed and false from the moment it did.
+clears the row (case 12.146). Net effect on the user's own screen: their second rename reverts — **measured on the
+outbox** (Appendix S; 1 file / 1 test passed): `pendingFor` reads the edited title while the claim is queued and
+reverts to the pre-edit title the moment the answer is `refused` **or** `contested` (`"renamed offline"` →
+`"Offline born"`; `"renamed again"` → `"Offline born"`, the contest recorded locally as `resolved: 0`) — and
+**My Work shows an unresolved contest on their own ticket saying it is not visible to them**, filed two seconds
+before the ticket existed and false from the moment it did.
 
 **WHY it is wrong.** The product states the ordering property and breaks it at the one boundary that matters.
 Case 12.144 (`12-offline-sync-apps.md:905-907`): *"enqueue order is preserved … because a batch that lost the
@@ -585,8 +588,8 @@ the envelope and nothing else; `rule-engine/src/contests.ts:39-49` (`evaluateCla
 instead of minting a false contest.
 And 12.144 should enqueue after a `recordFailure` and assert the batch is empty until the head is due.
 
-**MEASUREMENT.** Appendix D (outbox, `packages/sync-client`, relative imports) and Appendix G (server doors,
-`apps/server`, shared test Postgres). Lines opened: `outbox.ts:333`, `:412`; `sync-engine.ts:845`, `:870`, `:897`,
+**MEASUREMENT.** Appendix D (outbox, `packages/sync-client`, relative imports), Appendix G (server doors,
+`apps/server`, shared test Postgres) and Appendix S (overlay, `packages/sync-client`). Lines opened: `outbox.ts:333`, `:412`; `sync-engine.ts:845`, `:870`, `:897`,
 `:907`; `replica-data-source.ts:1404-1405`; `local-context.ts:126`; `check-permission.ts:1048`;
 `sync-service.ts:416-417`; `outbox.test.ts:119`, `:167`, `:201`, `:226`; `12-offline-sync-apps.md:905-907`.
 
@@ -3693,6 +3696,165 @@ describe('exec6 probe: the stream and the bootstrap after a delete', () => {
     const row = b.tickets.find((t) => t.ticketId === T);
     out.push(`peer bootstrap -> ${boot.statusCode}; carries the deleted ticket: ${row !== undefined}; keys: ${row ? Object.keys(row).join(',') : '-'}; snapshot excerpt: ${JSON.stringify(row?.snapshot).slice(0, 200)}; events on it: ${(row as { events?: Array<{ type: string }> } | undefined)?.events?.map((e) => e.type).join(',')}`);
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix S — probe for E6-5 (overlay half) — what the pending overlay shows after a refused or contested answer
+
+File path in the tree: `packages/sync-client/test/zz-exec6-probe-overlay.test.ts`; run from `packages/sync-client`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-overlay.test.ts --no-file-parallelism
+```
+Header copied from `test/outbox.test.ts` as in Appendix D. Output: `before any answer: pending title = "renamed
+offline"` · `after REFUSED rename: pending title = "Offline born"; pendingEventIds = [CREATE]` · `after enqueue
+rename2: pending title = "renamed again"` · `after CONTESTED rename2: pending title = "Offline born"; local
+contests = [{"rule":"permission.visibility",…,"resolved":0}]`.
+
+```ts
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  newSubmittedEvent,
+  newUlid,
+  type EventEnvelope,
+  type LedgerEvent,
+  type SubmittedEvent,
+} from '@gisik-nokma/domain';
+import { createBetterSqliteStorage } from '../src/storage/better-sqlite3.js';
+import type { SyncStorage } from '../src/storage/storage.js';
+import { createReplica, type BootstrapResponse, type Replica } from '../src/replica/replica.js';
+import { backoffMs, createOutbox, type Outbox } from '../src/outbox/outbox.js';
+
+/**
+ * Plan 10 Task 10 — the outbox. Cases 12.144–12.153.
+ *
+ * The range is a fact about the moment it was written. `grep -cE
+ * "^[[:space:]]*it\(" test/outbox.test.ts` prints the number of `it`
+ * declarations here; one sits inside a two-zone loop (12.152) and therefore
+ * runs twice, so the runner's own count is one higher than the id count.
+ *
+ * ## The property the whole file is built around
+ *
+ * **A queued claim is never settled fact.** Nothing in `outbox.ts` writes to
+ * `tickets`, `snapshots` or `events`; a claim in transit moves `pendingFor` and
+ * `pendingCreatedTickets` and nothing else. 12.150 is the case that fails if
+ * that ever stops being true.
+ */
+
+const WS = newUlid();
+const OTHER_WS = newUlid();
+const PROJECT = newUlid();
+const USER_A = newUlid();
+const WF = newUlid();
+const TYPE_TASK = newUlid();
+
+const SERVER_TIME = '2026-08-20T00:00:00.000Z';
+const CLIENT_TIME = '2026-08-19T23:59:00.000Z';
+
+const wf = {
+  id: WF,
+  version: 1,
+  name: 'W',
+  initialStateId: 'todo',
+  states: [
+    { id: 'todo', name: 'To do', category: 'open' },
+    { id: 'done', name: 'Done', category: 'terminal' },
+  ],
+  transitions: [
+    { from: '*', to: 'done', rules: [] },
+    { from: '*', to: 'todo', rules: [] },
+  ],
+};
+
+const taskType = { id: TYPE_TASK, name: 'Task', icon: 'check', rank: 3, workflowId: WF, fields: [] };
+
+let seqCounter = 0;
+let streamCounter = 0;
+
+function committed(entity: EventEnvelope['entity'], type: string, payload: unknown, seq?: number): LedgerEvent {
+  seqCounter += 1;
+  streamCounter += 1;
+  return {
+    ...newSubmittedEvent({
+      workspaceId: WS,
+      entity,
+      type,
+      payload,
+      actorId: USER_A,
+      origin: 'server',
+      now: () => new Date(CLIENT_TIME),
+    }),
+    serverTime: SERVER_TIME,
+    seq: seq ?? seqCounter,
+    workspaceSeq: streamCounter,
+  };
+}
+
+function bootstrapOf(): BootstrapResponse {
+  return {
+    workspaceId: WS,
+    me: { userId: USER_A, workspaceRole: 'member', projectIds: [PROJECT] },
+    streamSeq: 0,
+    definitions: [
+      committed({ kind: 'workflow', id: WF }, 'workflow.defined', wf, 1),
+      committed({ kind: 'ticket-type', id: TYPE_TASK }, 'ticket-type.defined', taskType, 1),
+    ],
+    tickets: [],
+  };
+}
+
+type Fixture = { storage: SyncStorage; replica: Replica; outbox: Outbox };
+
+async function fixture(): Promise<Fixture> {
+  seqCounter = 0;
+  streamCounter = 0;
+  const storage = createBetterSqliteStorage();
+  const replica = await createReplica({ storage });
+  await replica.loadBootstrap(bootstrapOf());
+  return { storage, replica, outbox: createOutbox({ storage, replica }) };
+}
+
+/** A brand-new root ticket, born offline. PAYLOAD spells the parent `parentId` and the type `typeId`. */
+function createTicket(ticketId = newUlid(), title = 'Offline born'): SubmittedEvent {
+  return newSubmittedEvent({
+    workspaceId: WS,
+    entity: { kind: 'ticket', id: ticketId },
+    type: 'ticket.created',
+    payload: { typeId: TYPE_TASK, projectId: PROJECT, parentId: null, title },
+    actorId: USER_A,
+    origin: 'mobile',
+  });
+}
+
+/**
+ * 12.21 — order preservation is asserted at 12.144 (outbox.test.ts:116), the committed/contested/failed result-application clauses at 12.145 (:138), 12.146 (:164) and 12.147 (:198) respectively, and the exponential backoff (doubling from 1s, capped at 60s) at 12.153 (:438) — no single test proves this row; each clause lives in its own named case.
+ */
+describe('exec6 probe: what the overlay shows after the server refuses or contests a queued claim', () => {
+  it('records pendingFor before and after each server answer', async () => {
+    const { storage, outbox } = await fixture();
+    const create = createTicket();
+    expect(await outbox.enqueue(create)).toEqual({ queued: true, eventId: create.id });
+    const rename = newSubmittedEvent({ workspaceId: WS, entity: create.entity, type: 'ticket.field_set', payload: { fieldId: 'title', value: 'renamed offline' }, actorId: USER_A, origin: 'mobile' });
+    expect(await outbox.enqueue(rename)).toEqual({ queued: true, eventId: rename.id });
+    const t = (id: string) => (id === create.id ? 'CREATE' : id === rename.id ? 'RENAME' : id);
+    const before = await outbox.pendingFor(create.entity.id);
+    console.log(`PROBE before any answer: pending title = ${JSON.stringify(before?.pending.fields['title']?.value)}; pendingEventIds = [${before?.pendingEventIds.map(t).join(', ')}]`);
+    // The server refuses the rename (terminal answer, 12.147):
+    await outbox.applyResult(rename.id, { status: 'refused', eventId: rename.id, rule: 'permission.visibility', reason: 'This ticket is not visible to you.' } as never);
+    const afterRefuse = await outbox.pendingFor(create.entity.id);
+    console.log(`PROBE after REFUSED rename: pending title = ${JSON.stringify(afterRefuse?.pending.fields['title']?.value)}; pendingEventIds = [${afterRefuse?.pendingEventIds.map(t).join(', ')}]; failedItems = ${(await outbox.failedItems(WS)).map((i) => `${t(i.eventId)}:${i.lastError ?? ''}`).join(' | ')}`);
+    // A second rename, then the server CONTESTS it (the /v1/sync answer, 12.146):
+    const rename2 = newSubmittedEvent({ workspaceId: WS, entity: create.entity, type: 'ticket.field_set', payload: { fieldId: 'title', value: 'renamed again' }, actorId: USER_A, origin: 'mobile' });
+    expect(await outbox.enqueue(rename2)).toEqual({ queued: true, eventId: rename2.id });
+    const mid = await outbox.pendingFor(create.entity.id);
+    console.log(`PROBE after enqueue rename2: pending title = ${JSON.stringify(mid?.pending.fields['title']?.value)}`);
+    await outbox.applyResult(rename2.id, { status: 'contested', eventId: rename2.id, rule: 'permission.visibility', reason: 'This ticket is not visible to you.', contestEventId: newUlid() } as never);
+    const afterContest = await outbox.pendingFor(create.entity.id);
+    const contests = await storage.all('SELECT rule, reason, resolved FROM contests', []);
+    console.log(`PROBE after CONTESTED rename2: pending title = ${JSON.stringify(afterContest?.pending.fields['title']?.value)}; local contests = ${JSON.stringify(contests)}`);
+    await storage.close();
     expect(true).toBe(true);
   });
 });
