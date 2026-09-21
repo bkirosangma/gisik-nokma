@@ -213,6 +213,15 @@ the gate would have stayed 33/33.*
   `aria-selected`, and the signed-out sweep sees none of it.* *(Both counts read 13 and 4 until
   2026-09-20 and were stale: recounted against `e2e-stack/accessible-names-baseline.json`'s own
   recorded values and re-measured on the live stack, which agree at 14 and 5.)*
+  **`/p/:projectId`'s `ariaLabel` floor moved `66 → 65` on 2026-09-22** (`rel/browser-findings`), and the
+  movement is attributed rather than absorbed: the sweep was run twice through the same predicate — on the
+  deployed stack at 390 (64, the number the release run reddened at) and on the branch's own tree (65) — and
+  every element of both counts is named in `Features.md`'s ratchet bullet and in the commit. Four instances
+  left with the two EPIC cards the owner ruled off the board (`0cc3520d`), two arrived with `Main` (P31) and
+  `Project view` (P19), and the branch's project-item name is the last. **The recorded `role` stays at 14
+  while the same run measures 15** — a rise is the direction this floor does not check, and it is recorded
+  rather than passed over. The count is also **data-bound (two per drawn card)**, which is the thing to know
+  before reading any future move on this key as a loss.
   **⚠ WHICH PAGE THIS CASE MEASURES WAS WRONG UNTIL 2026-09-20, and the repair is what gives the
   numbers their meaning.** `/p/:projectId` resolved its project as the FIRST project link on
   `/w/<id>` — a POSITION, not a project. The live dev database holds a second project (`gggg`,
