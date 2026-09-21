@@ -192,8 +192,9 @@ handed me its copy constants by name (`BULK_REFUSED_COPY`, `BULK_UNREACHED_COPY`
 | E5-39 | Min | workflow version history | copy (no when, no who) | source | — |
 | E5-40 | Imp | Backlog tab under the toggle | EMPTY (withheld painted as absent) | source ("RECORDED, NOT FIXED") | — |
 | E5-41 | **Crit** | workflow builder draft | work lost on navigation (no guard, no persistence) | source | — |
+| E5-42 | Imp | List/Backlog/Calendar/Timeline refusal arms | ERROR (a preference failure painted as a data failure) | source | — |
 
-**Edge classes reached, by finding:** EMPTY (E5-4, 37, 40) · ERROR (E5-10, 13, 15, 18, 19, 25, 27, 28, 30, 33) ·
+**Edge classes reached, by finding:** EMPTY (E5-4, 37, 40) · ERROR (E5-10, 13, 15, 18, 19, 25, 27, 28, 30, 33, 42) ·
 PERMISSION-REFUSED (E5-9, 31) · OFFLINE/REPLICA-DEGRADED (**not reached** — web is online-only; phone/desktop read at two
 screens) · SOFT-DELETED (E5-34 for projects; tickets **not reached** by me — `exec4-E4-23` holds it, §6.6) · CONCURRENT (E5-20, 27) · NARROW
 VIEWPORT (signed-out only: E5-31, 33) · FIRST-RUN (E5-6, 16, 18, 23, 26, 31, 32, 36) · SERVER-REFUSES-WHILE-CLIENT-BELIEVES
@@ -1485,6 +1486,40 @@ design the manual's sentence adequately conveys; I read that sentence as promisi
 
 ---
 
+### E5-42 — IMPORTANT · A failed preferences read — or a failed save of "which columns to show" that the person just triggered — paints "The ticket list cannot be shown yet. HTTP … for /v1/me/preferences" over intact rows, on four of five tabs; the page's own comment names the hazard and fixed one consumer `[SOURCE]` — ERROR (a preference failure reported as a data failure)
+
+**WHAT.** `ticket-list.tsx:1225` `error: list.error ?? preferences.error` — `useTicketList` folds the preferences
+hook's error (`use-preferences.ts:74-110`: set on a failed `getPreferences` AND on a failed `putPreferences`) into
+the same field as the ticket read's. The project page then refuses on that field FIRST on every tab but the Board:
+Backlog `page.tsx:2523` `list.error !== null ? <ShellRefusal what="The backlog" message={list.error} />`, List
+`:2652` (*"The ticket list"*), Calendar `:2329` (*"The calendar"*), Timeline `:2393` (*"The timeline"*) — each before
+checking `list.rows`, which is intact. `setPrefs` (`ticket-list.tsx:1206-1213`) is what the List's column chooser
+calls, so the person's own click can produce it.
+
+**WHY.** The page names the hazard in its own words at `:1751-1757`: *"`list.error` is `list.error ??
+preferences.error` … so an ordinary preferences 500 — or a `setPrefs` PUT the user triggered themselves — sets it
+while the rows sit there intact. Keyed on the error alone, this told a user that the tickets … 'cannot be shown',
+and offered a PREFERENCES failure as the reason, while the very same page could have listed them. **Two false
+sentences at once** … Witnessed at 3.158."* That fix was applied to the parent picker (*"Keyed on the rows"*) and
+the four tab arms were left keyed on the folded error. So a person on the List who un-ticks a column while the
+preferences route is down loses the whole List, the Backlog, the Calendar and the Timeline behind a sentence about
+a path they never asked for — until the next successful preferences call, since `use-preferences.ts` clears `error`
+only on a later success. The shell refusal's *"cannot be shown yet"* (E5-30) then also names the wrong thing.
+
+**WHAT WOULD HAVE BEEN BETTER.** Keep `preferences.error` separate from `list.error` (a `prefsError` field), render it
+beside the column chooser as *"Your column choice was not saved — …"*, and key the four tab arms on `list.error`
+alone — the same correction the parent-picker comment already made.
+
+**MEASUREMENT.** `[SOURCE]` `ticket-list.tsx:1200-1227`; `use-preferences.ts:74-110`; `page.tsx:1745-1760`,
+`:2329`, `:2393`, `:2523`, `:2652`. Not driven (a session is needed to toggle a column; the mechanism is one `??`
+and four `!== null` checks, all opened). The reproduction for the judge: on the List tab, wrap `fetch` to answer
+`500` for `PUT /v1/me/preferences`, un-tick a column.
+
+**SEVERITY: Important** (claimed). Four tabs of data hidden behind a false cause, from a click on a cosmetic control,
+with the fix already written twenty lines up for a sibling consumer.
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -1553,16 +1588,16 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**41 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 41). By claimed severity, read from the
-heading text: **Critical 2 · Important 24 · Minor 15** (2 + 24 + 15 = 41).
+**42 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 42). By claimed severity, read from the
+heading text: **Critical 2 · Important 25 · Minor 15** (2 + 25 + 15 = 42).
 
 - **Critical (2):** E5-13, E5-41
-- **Important (24):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28, E5-31, E5-32, E5-37, E5-40
+- **Important (25):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28, E5-31, E5-32, E5-37, E5-40, E5-42
 - **Minor (15):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30, E5-33, E5-34, E5-35, E5-36, E5-38, E5-39
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33, E5-38 = 23 of 41. **Reproduced with an injected failure, zero server writes:** E5-13,
-E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34, E5-35, E5-36, E5-37, E5-39, E5-40, E5-41.
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33, E5-38 = 23 of 42. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34, E5-35, E5-36, E5-37, E5-39, E5-40, E5-41, E5-42.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
 sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever), E5-20 (stacked dialogs and
@@ -1809,5 +1844,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 41 findings — Critical 2 · Important 24 · Minor 15 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 42 findings — Critical 2 · Important 25 · Minor 15 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
