@@ -51,6 +51,10 @@ E6-8, E6-9, E6-11: all "hold") read; E3-25, E3-26, E3-27 re-measured below.
   measures three sibling reads — the ones `apps/mobile` and `apps/desktop` actually call — with no rule at all
   (Appendix AF, five reads before/after, positive control). A case that says the rule is applied is not a record
   that it is missing, and the commit that wrote the two gates says "a filter at every view-serving read".
+- **E6-25** — "comments in a deploy file are not the product." Answer: filed Minor for exactly that reason; the
+  class (a record declaring a closed gap open) is the one the judge priced in round 1 (E3-1) and exec 3 re-files
+  six times this round (E3-22 … E3-27); two of the six sentences are security claims an operator acts on, and every
+  "landed" claim is dated by `git log -S` / `blame`, not inferred.
 
 ## Refutations
 
