@@ -492,3 +492,12 @@ findings failed some part of that test; twenty-three passed (counted from the li
 each, so the ledger can score them as the judge sees fit — I have not withdrawn any finding outright (phase 2 has
 no free withdrawal), but where a finding does not hold I have said so in its own body rather than leaving a peer
 to find it.
+
+## PHASE-2 LOG (cadence pushes; the restart surface if this session compacts or ends)
+
+- 15:56 IST — all eight self-corrections and the phase-2 table above are pushed (`25d5ce81`). Polling every minute
+  since 15:46: the only refutations against this lane remain exec 6's `R6-2` and `R6-3`, both conceded under their
+  findings. Exec 5 and exec 6 pushed heartbeats at 15:54; no new filing either way. Nothing pending in the worktree.
+  **If a session resumes from here:** read this section, then `git fetch` and re-run the poll for `R*-* → E2-*`
+  headings across the five lanes' refutation files; defend anything new under the finding in `review-ux-exec2.md`
+  with a dated paragraph and a line opened today; push by 17:05:23.
