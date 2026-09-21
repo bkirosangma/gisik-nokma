@@ -1450,7 +1450,7 @@ over `workflow-builder/*.ts`, `workflow-builder/ui/*.tsx` and `apps/web/src/auth
 the route `/w/[workspaceId]/settings/workflows/[workflowId]` (`page.tsx:92-98`), so every nav-bar link, the settings
 sidebar's other tabs, the browser's back button and a tab close unmount it and the draft is gone. Nothing on screen
 says the draft is unsaved: the export's *"Draft · last saved 11:58"* line is *"NOT here … Named as an absence, not
-built"* (`workflow-builder-screen.tsx:110-115`). The only way work survives is Publish — which E5-28 shows can also
+built"* (`workflow-builder-screen.tsx:114-117`). The only way work survives is Publish — which E5-28 shows can also
 strand.
 
 **WHY.** `docs/manual.md:1085-1087`: *"**Your layout is not saved.** The positions you drag the boxes into are for
@@ -1458,15 +1458,17 @@ this session only. Come back tomorrow and it will have laid itself out again. Kn
 spend twenty minutes tidying."* — scoped to positions, and *"for this session"* reads as *until you close the tab*.
 The states, transitions and rules a person spends those twenty minutes on are lost by one click on *Ticket types*
 in the sidebar beside the canvas, and the manual's own warning implies they are not. Every other draft in the product
-is protected somewhere: the sheet's title keeps its draft beside a refusal (`ticket-sheet.tsx:1160-1163`), the
-New-ticket draft survives its close (`exec2-E2-37`), the editor refuses to discard silently (`editor-slot.tsx`). The
+is protected somewhere: the sheet's title keeps its draft beside a refusal (`ticket-sheet.tsx:1159-1162` *"the draft STAYS on screen beside
+the answer"*), the New-ticket draft survives its close (`exec2-E2-37`), and the read-only editor fallback composes
+*"by having no control to type into rather than by offering one that silently discards what is typed"*
+(`editor-slot.tsx:125-127`). The
 builder — the product's longest single act of authoring — has none of that.
 
 **WHAT WOULD HAVE BEEN BETTER.** A `beforeunload`/route-leave guard while the draft differs from `initialDraft`, an
 *"Unsaved draft"* marker where the export drew its status line, and (cheapest of all) the draft in
 `sessionStorage` keyed by workflow id, which the manual's "for this session" already promises for positions.
 
-**MEASUREMENT.** `[SOURCE]` `workflow-builder-screen.tsx:61`, `:106-115`; `draft-store.ts:109` (`createDraftStore`,
+**MEASUREMENT.** `[SOURCE]` `workflow-builder-screen.tsx:61`, `:114-117`; `draft-store.ts:109` (`createDraftStore`,
 in-memory); the three greps above (0 hits); `settings/workflows/[workflowId]/page.tsx:92-98`;
 `docs/manual.md:1085-1087`. Not driven — authoring needs a session; the mechanism is one `useState` and the absence
 of any guard, both opened.
