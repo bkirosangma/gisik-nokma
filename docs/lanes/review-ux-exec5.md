@@ -191,6 +191,7 @@ handed me its copy constants by name (`BULK_REFUSED_COPY`, `BULK_UNREACHED_COPY`
 | E5-38 | Min | `/privacy` at sign-in | copy (category 2, argued) | browser (2nd) + source | — |
 | E5-39 | Min | workflow version history | copy (no when, no who) | source | — |
 | E5-40 | Imp | Backlog tab under the toggle | EMPTY (withheld painted as absent) | source ("RECORDED, NOT FIXED") | — |
+| E5-41 | **Crit** | workflow builder draft | work lost on navigation (no guard, no persistence) | source | — |
 
 **Edge classes reached, by finding:** EMPTY (E5-4, 37, 40) · ERROR (E5-10, 13, 15, 18, 19, 25, 27, 28, 30, 33) ·
 PERMISSION-REFUSED (E5-9, 31) · OFFLINE/REPLICA-DEGRADED (**not reached** — web is online-only; phone/desktop read at two
@@ -1441,6 +1442,41 @@ sends them to create tickets that "land here".
 
 ---
 
+### E5-41 — CRITICAL · An unpublished workflow draft — every state, arrow and rule — is discarded by any navigation, silently: no unsaved marker, no leave guard, no persistence; the manual warns only that box POSITIONS are "for this session only" `[SOURCE]`
+
+**WHAT.** `workflow-builder-screen.tsx:61` `const [store] = useState(() => createDraftStore(props.initialDraft))` —
+the draft lives in the mounted screen's React state and nowhere else: `grep -n 'localStorage\|sessionStorage\|persist\|beforeunload'`
+over `workflow-builder/*.ts`, `workflow-builder/ui/*.tsx` and `apps/web/src/authoring/*.tsx` → **0**. The screen is
+the route `/w/[workspaceId]/settings/workflows/[workflowId]` (`page.tsx:92-98`), so every nav-bar link, the settings
+sidebar's other tabs, the browser's back button and a tab close unmount it and the draft is gone. Nothing on screen
+says the draft is unsaved: the export's *"Draft · last saved 11:58"* line is *"NOT here … Named as an absence, not
+built"* (`workflow-builder-screen.tsx:110-115`). The only way work survives is Publish — which E5-28 shows can also
+strand.
+
+**WHY.** `docs/manual.md:1085-1087`: *"**Your layout is not saved.** The positions you drag the boxes into are for
+this session only. Come back tomorrow and it will have laid itself out again. Known, deliberate for now — do not
+spend twenty minutes tidying."* — scoped to positions, and *"for this session"* reads as *until you close the tab*.
+The states, transitions and rules a person spends those twenty minutes on are lost by one click on *Ticket types*
+in the sidebar beside the canvas, and the manual's own warning implies they are not. Every other draft in the product
+is protected somewhere: the sheet's title keeps its draft beside a refusal (`ticket-sheet.tsx:1160-1163`), the
+New-ticket draft survives its close (`exec2-E2-37`), the editor refuses to discard silently (`editor-slot.tsx`). The
+builder — the product's longest single act of authoring — has none of that.
+
+**WHAT WOULD HAVE BEEN BETTER.** A `beforeunload`/route-leave guard while the draft differs from `initialDraft`, an
+*"Unsaved draft"* marker where the export drew its status line, and (cheapest of all) the draft in
+`sessionStorage` keyed by workflow id, which the manual's "for this session" already promises for positions.
+
+**MEASUREMENT.** `[SOURCE]` `workflow-builder-screen.tsx:61`, `:106-115`; `draft-store.ts:109` (`createDraftStore`,
+in-memory); the three greps above (0 hits); `settings/workflows/[workflowId]/page.tsx:92-98`;
+`docs/manual.md:1085-1087`. Not driven — authoring needs a session; the mechanism is one `useState` and the absence
+of any guard, both opened.
+
+**SEVERITY: Critical** (claimed). My scale's first clause — a person loses work they typed — and the largest unit of
+work a person makes in this product. Important if the judge holds that "drafts are memory until Publish" is a
+design the manual's sentence adequately conveys; I read that sentence as promising the opposite.
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -1509,16 +1545,16 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**40 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 40). By claimed severity, read from the
-heading text: **Critical 1 · Important 24 · Minor 15** (1 + 24 + 15 = 40).
+**41 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 41). By claimed severity, read from the
+heading text: **Critical 2 · Important 24 · Minor 15** (2 + 24 + 15 = 41).
 
-- **Critical (1):** E5-13
+- **Critical (2):** E5-13, E5-41
 - **Important (24):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28, E5-31, E5-32, E5-37, E5-40
 - **Minor (15):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30, E5-33, E5-34, E5-35, E5-36, E5-38, E5-39
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33, E5-38 = 23 of 40. **Reproduced with an injected failure, zero server writes:** E5-13,
-E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34, E5-35, E5-36, E5-37, E5-39, E5-40.
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33, E5-38 = 23 of 41. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34, E5-35, E5-36, E5-37, E5-39, E5-40, E5-41.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
 sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever), E5-20 (stacked dialogs and
@@ -1743,5 +1779,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 40 findings — Critical 1 · Important 24 · Minor 15 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 41 findings — Critical 2 · Important 24 · Minor 15 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
