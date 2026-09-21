@@ -5,6 +5,7 @@ import { act, render, screen, within } from '@testing-library/react';
 // verbatimModuleSyntax / no-esModuleInterop base config.
 import { userEvent } from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
+import { useState } from 'react';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
@@ -281,6 +282,106 @@ describe('SegmentedControl (13.288)', () => {
     expect(phoneTab).not.toHaveClass('gn-segmented__item--on');
     await userEvent.click(phoneTab);
     expect(onChange).toHaveBeenCalledWith('phone');
+  });
+});
+
+/**
+ * P9 — `SegmentedControl` declared full ARIA tab semantics (`role="tablist"`,
+ * `role="tab"`, `aria-selected`) and implemented none of the tab keyboard model:
+ * `grep -n "onKeyDown\|Arrow\|tabIndex\|aria-controls\|tabpanel"` on
+ * `segmented-control.tsx` returned nothing, so a screen reader announced "tab, 1
+ * of 3" and then no arrow key did anything. The reviewer's painted measurement
+ * confirmed it with real key events: ArrowRight left `activeElement` on the same
+ * tab, and every tab was its own Tab stop, which is the opposite of the pattern.
+ *
+ * The remedy here is the keyboard half: a roving `tabindex` (one stop for the
+ * whole tablist, arrows within it) and Left/Right/Home/End. The `aria-controls` /
+ * `tabpanel` half is NOT added, and that is a deliberate limit rather than an
+ * oversight — `SegmentedControl` is a generic component with no idea what, if
+ * anything, it is switching between, and the two alternatives the finding offers
+ * are both wrong for part of its seven render sites: `aria-pressed` on a group of
+ * buttons would misdescribe the sheet's *Details* / *History* and the help
+ * browser's sections, which really do switch a panel in place. What CAN be fixed
+ * without a caller's cooperation is the contract that makes the announced roles
+ * usable, and that is what these cases assert.
+ */
+describe('P9 — SegmentedControl implements the tab keyboard model it declares', () => {
+  const OPTIONS = [
+    { value: 'phone', label: 'Phone' },
+    { value: 'email', label: 'Email link' },
+    { value: 'passkey', label: 'Passkey' },
+  ];
+
+  /** A genuinely controlled harness: the roving tabindex follows the selection, so
+   *  a `vi.fn()` that never rounds the value back would freeze the whole model. */
+  function Harness({ initial }: { initial: string }) {
+    const [value, setValue] = useState(initial);
+    return (
+      <SegmentedControl
+        aria-label="Sign-in method"
+        value={value}
+        onChange={setValue}
+        options={OPTIONS}
+      />
+    );
+  }
+
+  const tabsOf = () => within(screen.getByRole('tablist', { name: 'Sign-in method' })).getAllByRole('tab');
+
+  it('P9: the tablist is ONE tab stop, on the selected tab', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial="email" />);
+    const tabs = tabsOf();
+    expect(tabs.map((tab) => tab.getAttribute('tabindex'))).toEqual(['-1', '0', '-1']);
+
+    // And that is what Tab actually lands on — the roving index is a claim about
+    // the keyboard, so it is read off the keyboard.
+    await user.tab();
+    expect(tabs[1]).toHaveFocus();
+  });
+
+  it('P9: ArrowRight moves focus to the next tab and selects it', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial="phone" />);
+    const tabs = tabsOf();
+    await user.tab();
+    // Control, first: focus is demonstrably on the first tab, so the assertion
+    // below reads a move rather than a component that never had focus.
+    expect(tabs[0]).toHaveFocus();
+
+    await user.keyboard('{ArrowRight}');
+    expect(tabs[1]).toHaveFocus();
+    expect(tabs[1]).toHaveAttribute('aria-selected', 'true');
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'false');
+    expect(tabs.map((tab) => tab.getAttribute('tabindex'))).toEqual(['-1', '0', '-1']);
+  });
+
+  it('P9: ArrowLeft from the first tab wraps to the last', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial="phone" />);
+    const tabs = tabsOf();
+    await user.tab();
+    expect(tabs[0]).toHaveFocus();
+
+    await user.keyboard('{ArrowLeft}');
+    expect(tabs[2]).toHaveFocus();
+    expect(tabs[2]).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('P9: Home and End jump to the first and last tab', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial="email" />);
+    const tabs = tabsOf();
+    await user.tab();
+    expect(tabs[1]).toHaveFocus();
+
+    await user.keyboard('{End}');
+    expect(tabs[2]).toHaveFocus();
+    expect(tabs[2]).toHaveAttribute('aria-selected', 'true');
+
+    await user.keyboard('{Home}');
+    expect(tabs[0]).toHaveFocus();
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
   });
 });
 

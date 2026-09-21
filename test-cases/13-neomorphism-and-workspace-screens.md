@@ -1766,7 +1766,8 @@ superseded by Round 24 — not renumbered, not reused.
 
   *Id note: `13.1047`–`13.1049` were skipped deliberately — they are reserved and unused in executor 1's
   allocated block `13.1034`–`13.1049` (`13-deployment-dogfooding.md:140-142`,
-  `13-owner-requests-and-backlog.md:2185`). The next free id in this space is `13.1051`.*
+  `13-owner-requests-and-backlog.md:2185`). `13.1051` was then minted later in the same batch (P9, in
+  `13-hig-per-screen.md`), so the next free id in this space is `13.1052`.*
 
 **Five existing cases in `inbox-nav-link.test.tsx` were re-aimed, not weakened.** 11.152, 11.155, 11.156,
 11.169 and the load-window case all asserted the count through `UnreadBadge`'s `role="img"`, which the
