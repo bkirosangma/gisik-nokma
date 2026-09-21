@@ -271,7 +271,7 @@ curl -s http://localhost:3041/v1/me/workspaces      # → {"error":"unauthentica
 
 **WHAT.** On Calendar and Timeline (and any view with a chip in the tray), `button.gn-project__filter-chip-remove` with `aria-label="Remove filter — Closed: hidden"`.
 
-**MEASUREMENT (painted, 1512).** `getBoundingClientRect` → **8.1×13**; `getComputedStyle` → `padding: 0`, `line-height: 13px`, `font-size: 13px`, `min-width/min-height: auto`. The chip itself (`span.gn-project__filter-chip`, 147×26) is a `<span>` with no handler, so nothing larger removes the filter. Source: `packages/ui/src/ui.css:4981-4990` — `border: none; background: none; padding: 0; margin: 0; font: inherit; line-height: 1` — no size; the chip's `font-size: 0.8125rem` (`:4972`) is what the × inherits.
+**MEASUREMENT (painted, 1512).** `getBoundingClientRect` → **8.1×13**; `getComputedStyle` → `padding: 0`, `line-height: 13px`, `font-size: 13px`, `min-width/min-height: auto`. The chip itself (`span.gn-project__filter-chip`, 147×26) is a `<span>` with no handler. **The one larger equivalent is the Filters panel's own toggle** (`button.gn-filters__choice "Closed"`, 90×35, behind the *Filters* button) — so under WCAG 2.5.8's *Equivalent* exception the letter of the criterion is arguably met; the product's own 44/24 rule has no such exception, and a person who sees a × next to a chip reaches for the ×. Source: `packages/ui/src/ui.css:4981-4990` — `border: none; background: none; padding: 0; margin: 0; font: inherit; line-height: 1` — no size; the chip's `font-size: 0.8125rem` (`:4972`) is what the × inherits.
 
 **WHY IT IS WRONG.** 8×13 is a third of WCAG 2.5.8's 24-px minimum and the smallest interactive target I measured anywhere in the product. It is not in `DENSE_IN_LIST`, so by the product's rule it is judged at 44. No sweep has ever seen it: the calendar and timeline views are not routes, and the tap pass runs on `/my-work` only (E4-12).
 
@@ -298,9 +298,9 @@ curl -s http://localhost:3041/v1/me/workspaces      # → {"error":"unauthentica
 ---
 
 
-### E4-17 — **IMPORTANT** — Every keyboard interaction with the shared `Select` ends with focus dropped to `<body>`
+### E4-17 — **IMPORTANT** — Both keyboard close paths of the shared `Select` that I drove — Escape, and Enter to pick — end with focus dropped to `<body>`
 
-**WHAT.** Open the ticket sheet, Tab to *Assignee*, press Enter (the listbox opens, focus on the selected option), press Escape — or press Enter to pick — and `document.activeElement` is `body`. The keyboard user is thrown out of the sheet to the top of the document.
+**WHAT.** Open the ticket sheet, focus *Assignee*, press Enter (the listbox opens, focus on the selected option), press Escape — or press Enter to pick — and `document.activeElement` is `body`. The keyboard user is thrown out of the sheet to the top of the document. (Tab-away from an open listbox was not driven; the two paths above are the ones a person uses.)
 
 **MEASUREMENT (painted, real key events via CDP `press_key`, 1512).** Sequence 1: `trigger.focus()` → `activeElement = button.gn-select__trigger`; **Enter** → `[role=listbox]` present, `activeElement = li.gn-select__option "Unassigned"`; **Escape** → listbox gone, sheet still open, **`activeElement = BODY`**. Sequence 2: focus trigger, **Enter**, **Enter** (re-picks the already-selected *Unassigned*, so nothing is written) → listbox gone, **`activeElement = BODY`**. Control in the same session: the account menu (`.gn-nav__menu`, `role=menu`) moves focus to its first `menuitem` on open — so focus management is possible in this codebase and this component lacks it. Source: `packages/ui/src/select/select.tsx:187-190` wires `useOverlay({ isOpen, onClose, shouldCloseOnBlur, isDismissable })` and `:199-212` portals `SelectPanel` to `document.body`; `grep -n FocusScope packages/ui/src/select/select.tsx` → **0** (the package depends on `@react-aria/focus`, `packages/ui/node_modules/@react-aria/focus` is present, and `FocusScope restoreFocus` is the React Aria primitive that returns focus to the trigger; React Aria's own `Popover` wraps its content in it).
 
