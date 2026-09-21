@@ -2665,7 +2665,16 @@ small:**
    edge-class entry; and the `06-auth-visibility.md` / `07-api-realtime-search.md` recorded-not-fixed
    entries sampled. **⚠ What is NOT reached is the HALF THAT NEEDS JUDGEMENT: whether each of the 474 cited
    lines still says what its case claims, and whether the 2606 ✅/❌/🟡 markers still describe the product.**
-   That is 2606 judgements and I am not claiming any of them.
+   That is 2606 judgements, and what follows is the SAMPLE SIZE behind anything I say about it.
+  **I sampled one file by reading: `05-tickets-hierarchy.md` (77 ids, 92 lines), chosen because the ticket
+  flows are my lane.** Verdict: **the ✅ cases hold**, and the three I could check against the product
+  without running a suite did — `5.8`'s refusal names the offending type (*"This is a ${parentTypeDef.name} —
+  nothing smaller can sit under it"*, `ticket-sheet.tsx:1344`), `5.13`'s parent-terminal invariant is
+  `transition.ts:132-142` (checked independently while verifying a peer finding), and `5.21`'s *"refused
+  toward the offered reopen"* matches `create-ticket-flow.tsx:229-241`. ⚠ **And that file is largely NOT my
+  lane** — it is `parseEvent`, rank rules, projections and folds, which is the functionality lane's subject.
+  **So the honest statement is: one file read, its checkable claims holding, and no finding.** Everything else
+  about the catalogue's judgement half is unclaimed.
 2. ⚠ **CORRECTED — `packages/editor` is now COMPLETE, and the line above was wrong twice.** It named
    `src/index.ts`, `attachments/attachment-claims.ts` and *"the two `webview` files beyond `bridge.ts`,
    `entry.tsx` and `create-editor-bridge.ts`"* as unread. **The webview directory has exactly three files**
