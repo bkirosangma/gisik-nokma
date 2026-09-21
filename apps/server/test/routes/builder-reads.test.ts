@@ -1942,7 +1942,9 @@ describe('7.266 POST …/migrate — the pre-flight asks the permission gate\'s 
     // ticket's: `ORDER BY ticket_id` must reach the ticket the admin can see
     // first for the defect to have been a PARTIAL migration (measured: the
     // unsorted form failed 1 run in 4).
-    [visibleId, hiddenId] = [newUlid(), newUlid()].sort();
+    const minted = [newUlid(), newUlid()] as const;
+    visibleId = minted[0] < minted[1] ? minted[0] : minted[1];
+    hiddenId = minted[0] < minted[1] ? minted[1] : minted[0];
     const ws = { workspaceId, actorId: owner.userId };
     await applyCommitted(db.pool, [
       makeCommitted({ ...ws, entity: { kind: 'workspace', id: workspaceId }, type: 'workspace.created', payload: { name: 'Split audit' } }),
