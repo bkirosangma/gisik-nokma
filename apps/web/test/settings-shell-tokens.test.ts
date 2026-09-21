@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { ruleFor } from './helpers/css-rule-scan.js';
 
 /**
  * Cases 13.907–13.909 — `isSettingsShell`'s two token nits, and the one
@@ -49,16 +50,6 @@ const UI_CSS_PATH = resolve(TEST_DIR, '../../../packages/ui/src/ui.css');
  * `neo-card-radius.test.ts` truncates every rule in this family, whose
  * declarations each sit on their own line.
  */
-function ruleFor(css: string, selectorPattern: RegExp): string | undefined {
-  const lines = css.split('\n');
-  const startIndex = lines.findIndex((line) => selectorPattern.test(line));
-  if (startIndex === -1) return undefined;
-  const openIndex = lines.findIndex((line, i) => i >= startIndex && line.includes('{'));
-  if (openIndex === -1) return undefined;
-  const closeIndex = lines.findIndex((line, i) => i >= openIndex && line.includes('}'));
-  if (closeIndex === -1) return undefined;
-  return lines.slice(startIndex, closeIndex + 1).join('\n');
-}
 
 /**
  * `property → value` for one rule body, comments dropped by CONTEXT rather than

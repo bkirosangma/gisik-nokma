@@ -26,7 +26,7 @@ Case ids are unchanged and are never renumbered by the split.
   skipped ones; the first version's `assertions.length > 0 &&` guard let this print "ok" and exit 0, which
   is exactly the silently-empty-suite case the script exists to catch. Fixed by dropping that guard; all
   four probes now behave correctly. No shipped file in this repo uses `.skipIf(` yet — this case is ahead
-  of its first real trigger, which Plan 11 Tasks 11/12 will provide. `scripts/check-no-silent-skips.mjs`
+  of its first real trigger, which Plan 11 Tasks 11/12 will provide. **⚠ BOTH HALVES OF THAT LAST SENTENCE WENT STALE, AND E6-6 (2026-09-21) FIXED THE SECOND.** Plan 11 LANDED: two files carry the guard today (`apps/server/test/ops/pg-dump.test.ts`, `…/restore-drill.test.ts`), both inside the covered prefix. And **the guard had no positive control on its own universe** — every rule was applied to `report.testResults ?? []`, so an empty or mis-shaped report printed `ok (0 skipIf-guarded file(s) checked, none fully skipped)` with **EXIT=0**. **Reproduced before the fix, against the script as it stood at HEAD, on `echo '{}' > /tmp/ds3-e66-empty.json`: `old EXIT=0`, `ok (0 …)`** — a run that examined nothing and a run that examined everything and found nothing wrong were the same output. It now REFUSES that report and names both guarded files the tree holds. **⚠ ONE CORRECTION TO THE BRIEFED REMEDY, AND IT IS THE REASON FOR THE SHAPE OF THE FIX.** The remedy asks the check to refuse when "the report mentions fewer of them than exist". Measured: `ci.yml` calls this script once per `server-tests` shard with THAT SHARD'S report, the two guarded files can land in different shards, so the shortfall sentence is true of three healthy shards out of four — a check that cannot pass on a good tree is the mirror of one that cannot fail, and the literal remedy would have reddened CI on a clean branch. It refuses on the report being EMPTY (the report's own `testResults` length) and STATES the shortfall with the missing paths named; making the shortfall refusable needs the union of the four shard reports in a job of its own, which is a recorded gap rather than a silent one. `.runIf(` is also recognised now as the same guard inverted, which the script's own comment had named as a known gap. **The self-test is new** (six cases, four planted, including the empty report and a report naming one of two guarded files), and four runs are on record — `/tmp/ds3-e66-old.log` (old, EXIT=0, the finding), `/tmp/ds3-e66-red-empty.json`-driven `/tmp/ds3-e66-red-empty.log` (new, EXIT=1), `/tmp/ds3-e66-red-skip.log` (a fully-skipped guarded file still fails, EXIT=1), and `/tmp/ds3-e66-green.log` (a shard-shaped report, EXIT=0, with the shortfall stated). `scripts/check-no-silent-skips.mjs`
 - 🧪 **13.4 — a `.skipIf(` guard landing outside the one job that checks for silent skips fails the
   gate instead of shipping unguarded.** `check-skipif-coverage.mjs` — found missing by the same opus
   review, since `check-no-silent-skips.mjs` only runs inside `server-tests`, leaving all 8 other packages
@@ -80,7 +80,14 @@ Case ids are unchanged and are never renumbered by the split.
   the trap the plan's own suggested falsifiability demo (pointing at "the dev compose Postgres has not
   been altered yet") would have fallen into, independently confirmed by a cross-lane review as a real bug
   in the plan text, not this file. The corrected demo (a database explicitly forced to `UTC`, overriding
-  the cluster default) is what actually falsifies the check. `scripts/check-db-timezone.mjs`
+  the cluster default) is what actually falsifies the check. `scripts/check-db-timezone.mjs`. **Its
+  absence from CI is a decision and is recorded as one** (F8, 2026-09-21, same change set): it is the one
+  of the nine `scripts/check-*.mjs` no workflow invokes, because it needs `DATABASE_URL` and asserts a
+  property of a PROVISIONED database — no CI job carries one it should point at, and the `server-tests`
+  service only approximates IST through a `TZ` its own comment calls best-effort, so a step there would
+  go red on a CI-only difference. The record lives beside the other checkers in `.github/workflows/ci.yml`'s
+  `check-env` job and in the script's docblock; the runbook's "Time" section names the occasions it is
+  for. No new case id: this extends 13.8, which already owns this script.
 
 ## Seed plumbing (Task 7)
 - 13.41 ✅ `seedUlid` is a valid, `ULID_REGEX`-matching id — `seed-ulid.test.ts`
