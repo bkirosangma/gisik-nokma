@@ -3407,3 +3407,87 @@ sections I did reach gave **three findings** (`E3-11`, `E3-12`, `E3-27`, `E3-28`
 of them) against a much larger count of claims that hold exactly. **The yield is concentrated in sections whose
 bullets state counts and enumerations with nothing in code to check them against** — and the seven unopened
 sections are where anything of that shape would still be hiding.
+
+## 52. Round 2 — the ✅ set, walked for the first time (1,077 rows), and the four instruments it broke
+
+§51 named the largest honestly-stated gap in this report: **the `test-cases/` ✅ set — 2,601 ids I had asked
+nothing.** This section asks the strongest countable question the catalogue's own rules make of it. The marker
+`✅` means "covered", and the workspace rule makes that claim **greppable**: *"Cross-reference tests by ID. Test
+names or comments should include the case ID so grep finds both directions."* So every ✅ row owes two falsifiable
+things — a cited artifact that exists, and an id findable from the test side. Both are countable. I ran five
+instruments. **Four were broken, and this section records all four with the control that killed each, because the
+broken ones are the same defect class as everything else in this report.**
+
+Universe: all 26 files in `test-cases/`, parsed at the case-line level. Marker totals at `7783de7b`:
+**✅ 1077 · ❌ 32 · 🚫 17 · 🟡 6 · 🧪 4** (1,136 case lines).
+
+### 52.1 Check 1 — does every ✅ row cite a file that exists? **1077/1077. Verified clean.**
+
+**First run reported 256 "missing" paths. That number was an artifact of my rule, not a defect in the catalogue.**
+I demanded a repo-root-relative path; the catalogue legitimately abbreviates relative to a sibling package's own
+directory — `6.32` cites `` `test/routes/invites.test.ts` `` for a file that is at
+`apps/server/test/routes/invites.test.ts`, and `11.61` cites bare basenames like `calendar-view.test.tsx`.
+Every one of the 256 resolved once I resolved by **full path OR basename against the real tree** (1,169 distinct
+basenames over 1,323 files). Control in the same pipeline: `proj-memberships.test.ts` → 1 match;
+`zzz-no-such-file-e3.test.ts` → 0 matches. **The corrected check is clean: 0 of 1,077 check-rows cite an
+artifact that does not exist anywhere in the tree.** This is new coverage — nobody has walked the ✅ set.
+
+### 52.2 Check 2 — is the id greppable? **My instrument was measuring digits, and the ❌ set is what proved it.**
+
+Predicate: the id's digits appear, with a `(?<![\d.])…(?!\d)` boundary, anywhere outside `test-cases/`.
+Result: **✅ 100.0% — and ❌ 93.8%.** A predicate that scores the *uncovered* set at 93.8% has no separation and
+cannot be measuring coverage. It was counting version numbers, timeouts, sizes and percentages.
+
+### 52.3 Check 3 — the strong predicate **inverts**. ✅ 16.8% vs ❌ 50.0%, separation **−33.2 points**.
+
+Predicate: the id appears as `case N` (or `#N`). The ❌ set scores **higher than the ✅ set**. Why: in this repo
+`case N` is overwhelmingly how **prose discusses gaps and open work**, not how tests back-reference — the
+catalogue, the plans and `Features.md` all write "case 6.124"-style sentences about things *not* built. So the
+mandated cross-reference is, in this spelling, **anti-correlated with coverage**. Also a failed instrument.
+
+### 52.4 Check 4 — restricted to real test files, the predicate SEPARATES. This one is evidence.
+
+Corpus restricted to `*.test.ts(x)` / `*.spec.ts(x)` — 426 files — and the id taken bare with a boundary.
+Control in the same Counter: `6.88` → 1 hit, `6.9999` → 0 hits.
+
+| marker | n | id present in some test file |
+|---|---|---|
+| ✅ | 1077 | **1075 / 1077 — 99.8%** |
+| 🟡 | 6 | 3 / 6 — 50.0% |
+| ❌ | 32 | 12 / 32 — 37.5% |
+| 🚫 | 17 | 4 / 17 — 23.5% |
+| 🧪 | 4 | 0 / 4 — 0.0% |
+
+**The ordering is monotone in the marker's own semantics** — ✅ > 🟡 > ❌ > 🚫 > 🧪 — which is what makes 99.8%
+credible rather than vacuous: **it is credible because the control set scored 37.5%, not 94%.** The catalogue's
+markers are not decorative.
+
+### 52.5 The two ✅ rows that fail check 4 — read in full, and they are NOT defects.
+
+`13.352` (line 241) and `13.270` (line 453) carry no id in any test file. **I nearly filed both as truncated
+rows, and that was my error twice over.** Their evidence is not a unit test and each says so: `13.352` is backed
+by a `git diff` over files the task "touches neither" — a negative claim no test could carry — and continues
+onto two further lines citing `` `apps/web/app/privacy/page.tsx` ``, `` `apps/web/app/terms/page.tsx` `` and
+`` `apps/web/src/back-button.tsx` ``; `13.270` continues onto its next line citing
+`` `apps/web/e2e-stack/helpers/sign-in.ts` `` and a *"RUN after the rebuild"* note. **Both are ✅, both are
+backed, neither is a unit test.** No finding.
+
+### 52.6 Check 5 — "truncated rows": 376/1136 = 33%. **A pure artifact of markdown line wrapping.**
+
+Predicate: a case line whose text ends without terminal punctuation. **The cross-document control kills it: the
+same predicate fires on 127 of 470 `Features.md` bullets — 27% — a document with no truncation at all.** It is
+measuring multi-line bullets, which are the catalogue's normal form. And it is the instrument that produced
+52.5's false positive: **I read one physical line of a wrapped bullet and concluded the sentence had been cut
+off.** The rule this round has been *a control must traverse the same path as the measurement*; the check that
+caught me was reading the continuation lines, not the predicate.
+
+### 52.7 What the section amounts to.
+
+**No finding. The ✅ set holds** — 1,077 rows, every one citing an artifact that exists, and its ids separating
+cleanly from the uncovered set once the corpus is restricted to test files. **Four of my five instruments failed
+and each failure is recorded with its control**, because the failure mode is the report's own thesis: a check
+whose control is not run cannot fail, and three of these four printed a confident, wrong number — 256, 100.0%,
+and 376 — that a reader would have taken for a result. **Coverage this closes:** the ✅ set was §51's largest
+named gap; it is now walked at check-1 and check-4 depth. **What remains unasked:** `test-cases/README.md`'s own
+legend and the 🟡/🧪/🚫 rows (27 rows total) were counted but not read, and the ❌ set remains enumerated in my
+concern's file only.
