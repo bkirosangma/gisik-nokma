@@ -189,6 +189,14 @@ export const HTTP_ORIGIN_PROTECTED_ROUTES: ReadonlySet<string> = new Set([
   // whoever was mid-approval. A sibling PATH rather than a `deny` flag on
   // approve — see the route's own note for why that shape is refused.
   '/v1/mcp/device/deny',
+  // E3-14 — three UNRECORDED omissions found by the same measurement (the
+  // assembled route table, probed with a cookie-carrying forged-Origin
+  // request at every non-GET route) that first found the three above. Unlike
+  // the invite TOKEN accept and `PUT /v1/me/preferences` — excluded above by
+  // a recorded ruling this task does not revisit — nothing excludes these:
+  '/v1/me/notification-preferences',
+  '/v1/me/invitations/:inviteId/accept', // membership-granting, cookie-authenticated
+  '/v1/me/invitations/:inviteId/decline',
 ]);
 
 /**

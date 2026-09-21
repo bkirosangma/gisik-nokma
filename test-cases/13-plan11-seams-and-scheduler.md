@@ -599,4 +599,9 @@ reconciled, never overwritten.
   13.194's recorded decision (scope limited to restore scratch databases, never production, no DDL-capable
   credential). Sentence fragments, not paragraphs — a paragraph breaks on rewrapping and teaches people to
   delete the test, while a single word like "scratch" would survive the decision being reversed
+- 13.197 ✅ E3-14 — three cookie-authenticatable mutations unrecorded in `HTTP_ORIGIN_PROTECTED_ROUTES`
+  are now in it and covered by 13.116–13.119's parameterised rows: `PUT /v1/me/notification-preferences`,
+  `POST /v1/me/invitations/:inviteId/accept` (membership-granting) and its `/decline` sibling. Distinct
+  from the invite TOKEN accept and `PUT /v1/me/preferences`, both still deliberately outside the set by a
+  recorded ruling this case does not revisit (`http-origin.ts`'s own docblock)
 

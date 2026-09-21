@@ -2644,7 +2644,11 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   switch. Three routes (`/v1/workspaces`, the ticket-type migrate route, mark-notification-read) were
   found missing from an initial "exhaustive" protected-route list by forging a request at every
   non-GET route in the assembled table, not by re-reading the list; the suite now asserts set-equality
-  between the protected-route table and the production list so that drift reddens. **Not covered:**
+  between the protected-route table and the production list so that drift reddens. **Three more** were
+  found the same way and added later (E3-14): `PUT /v1/me/notification-preferences`,
+  `POST /v1/me/invitations/:inviteId/accept` (membership-granting) and its `/decline` sibling — distinct
+  from the invite TOKEN accept and `PUT /v1/me/preferences`, both still deliberately outside the set by a
+  recorded ruling. Case 13.197. **Not covered:**
   `rateLimitKeyFor` has no standalone unit test, only indirect HTTP-integration coverage; whether
   `apps/web`'s proxy actually forwards `Origin` on same-origin requests is undemonstrated in this repo.
   `apps/server/src/http/http-origin.ts`, `apps/server/src/http/rate-limit.ts`, `apps/server/src/app.ts`
