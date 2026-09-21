@@ -360,6 +360,13 @@ the field's requirement (*"This move needs a comment"*) and not as a refusal.
 `'review note'`: `{moveDisabled: false, text: "… instant check — require-comment: … and none was provided. …"}`.
 `[SOURCE]` `transition-dialog.tsx:127-143`, `:281-296`, `:360-364`, `:477-481`; `ticket-sheet.tsx:673-692`.
 
+**On case `3.72`** (`test-cases/03-foundation-ledger.md:79`): it pins that *"when the server has answered, its words
+render VERBATIM in an `alert` while a disagreeing preview is left standing"* — a preview beside a SERVER verdict. This
+finding is the preview beside an ENABLED CONTROL before any server answer, which the same file's docblock calls a
+defect for `require-evidence`. `3.72` also asserts the pre-check is asked *"about the state the user CHOSE"* — and
+only that; nothing asserts it is re-asked when the comment changes. So `3.72` witnesses the effect's dependency list
+and thereby witnesses this defect as a property.
+
 **SEVERITY: Important** (claimed). The product tells a person something untrue about itself beside the control it
 contradicts — the file's own words for the sibling defect.
 
@@ -658,7 +665,7 @@ only.
 ### E5-18 — MINOR · The invite landing page offers Join or nothing: no Decline, no inviter, no expiry; the export draws all three `[SOURCE]` — category 3, wire-limited
 
 **WHAT.** `/invite/[token]` (`page.tsx:87-126`): *"You are invited to join **<ws>** as <role>."* + `Join <ws>`. The
-export (`EXPORT:1761-1786`): inviter name, workspace, role, member count, *"Invitation expires · In 4 days"*, a
+export (`EXPORT:1761-1789`; Decline `:1788`, Accept `:1789`): inviter name, workspace, role, member count, *"Invitation expires · In 4 days"*, a
 *"What a member can do"* tray, and a Decline/Accept pair. `Decline` exists in the product only on `/workspaces`
 (`workspaces/page.tsx:448-466`, `:553`) for invitations matched to the signed-in email.
 
@@ -668,9 +675,30 @@ of the export's rows are a wire gap; Decline is not (the decline door exists, `m
 `docs/design/prototype-delta-2026-09-18.md`'s invite entry records the absences and issues no ruling.
 
 **WHAT WOULD HAVE BEEN BETTER.** A Decline beside Join (the door exists), and expiry on the wire (the server holds
-`expires_at`, `routes/invites.ts:514`).
+`expires_at`, `routes/invites.ts:514-515`, `i.invited_by, i.invited_at, t.expires_at`).
 
-**MEASUREMENT.** `[SOURCE]` lines above; `EXPORT:1761-1786`. Not driven — I hold no live invitation token.
+**MEASUREMENT.** `[SOURCE]` lines above; `EXPORT:1761-1789`. Not driven — I hold no live invitation token.
+
+**SEVERITY: Minor** (claimed).
+
+---
+
+### E5-19 — MINOR · "Save name" says nothing on success, and a refusal without a message is reported as success `[SOURCE]`
+
+**WHAT.** `account/page.tsx:210-213` `saveName`: `return { error: result.error?.message ?? null }`.
+`profile-section.tsx:24-30` `save`: shows `error` when non-null and **nothing otherwise** — no "Saved", no
+confirmation, the button just stops saying it is saving. So three outcomes paint identically: saved; refused with a
+body that carried no `message`; and (if the client resolves rather than throws on transport failure) never sent.
+
+**WHY.** The product's rule elsewhere is that a success is narrated (the delete toast, the Move dialog closing, the
+minted-invite card). Here the only signal is silence, and silence is also the failure arm for a message-less error.
+
+**WHAT WOULD HAVE BEEN BETTER.** A `role="status"` *"Name saved"* on `error === null`, and `error.message ?? 'The
+server refused this change and did not say why.'` rather than `?? null`.
+
+**MEASUREMENT.** `[SOURCE]` lines above opened. **Unverified half:** whether better-auth's `updateUser` can return an
+`error` with no `message` (its client types make `message` optional) — I did not drive a refusal against the owner's
+account. The success-silence half needs no measurement beyond the component: it renders no success arm.
 
 **SEVERITY: Minor** (claimed).
 
@@ -678,22 +706,175 @@ of the export's rows are a wire gap; Decline is not (the decline door exists, `m
 
 ## 3. THE PROTOTYPE — classified
 
-(filled in)
+Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
+brief's three categories.
+
+| # | surface | export | product | class | where |
+|---|---|---|---|---|---|
+| 1 | Board card meta (key · subtasks · blocker · source · due, red when late) | `:357-379`, `:2493-2503` | title + `who · when` fold; meta div empty | **3 — no ruling** (WIRE GAP is a record) | E5-2 |
+| 2 | Board card `who · when` fold | static `card__prov` line | clickable fold to provenance | 2 — ruled, `docs/hig-reconciliation-audit.md:481` | — |
+| 3 | Board drag + arrows | drag `:372`, arrows `:378-381` | drag + arrows | 1 — matches (the HELP diverges) | E5-1 |
+| 4 | Sheet crumb chain | `epicId` and `parentId` distinct fields, `:3404-3425` | `epic` = nearest proper ancestor; duplicates when parent is epic | **3 — no ruling** | E5-3 |
+| 5 | Sheet title as `<input>` in a fixed column | `:1115`, panel `min(660px,100%)` `:3398` | same structure; clips at 435 px | 1 — matches (shared defect: a 63-char title clips in both; observation only) | — |
+| 6 | Sheet Priority (segmented) / Due (`<input type=date>`) | `:1193-1202` | read-only rows | **3 — "unbuilt door", no ruling** | E5-6 |
+| 7 | Sheet Type read-only | `:1204` | read-only | 1 | E5-16 note |
+| 8 | Sheet History rows as sentences | `:3733-3737` | raw event type + actor + two clocks | **3 — no ruling on the sentence** | E5-8 |
+| 9 | Sheet footer Delete, no confirm, undo toast | `:1371`, `:3794-3799` | same (no confirm; undo toast in host) | 1 — matches; "offered to everyone" is 2 — ruled at `ticket-sheet.tsx:1192-1200` | E5-9 argues the ruling's premise |
+| 10 | Sheet `‹ Previous / Next ›` footer nav | `:1372-1374` | removed | 2 — ruled (owner 2026-09-20, `ticket-sheet.tsx:2590-2600`) | — |
+| 11 | Move dialog | picker + comment per edge | same, plus instant check | 1 in shape | E5-7 is behaviour, not shape |
+| 12 | New ticket default type | `"Defect"` (2nd) `:2216` | `typeOptions[0]` = Epic | **3 — no ruling** | E5-16 |
+| 13 | New ticket fields (Description/Priority/Column/Assignee/Due) | overlay labels | Title/Type/Parent | 3 — recorded gap; folded into E5-16 note, E5-6 | — |
+| 14 | Filters sheet person rows | `:1367-1417` (spec metrics) | same shape | 1 (blank rows are data-path) | E5-4, E5-5 |
+| 15 | Invite form Channel | `:753-755` | same three | 1 | E5-11 note |
+| 16 | Invite form Project access (named select) | `:765-775` | comma-separated ids text box | **3 — no ruling** | E5-11 |
+| 17 | Invite landing (inviter, expiry, tray, Decline/Accept) | `:1761-1789` | one sentence + Join | **3 — recorded, unruled; wire-limited** | E5-18 |
+| 18 | `/mcp/authorize` shows code vs product types code | `:1828-1836` | person types the assistant's code; Deny present | 3 by the delta doc; product's direction is the standard device flow — **not filed** | — |
+| 19 | Founding lands on the list + toast | `:2741-2752` | `/my-work` | 2 — ruled (`exec2-F5`, controller §4 #4); remedy not yet in tree at `a7b6292b` (`grep -in 'first-run\|new project' my-work.tsx` → 0) — **not filed**, it is F5's remedy | — |
+| 20 | Epic band count | `:2904-2927` | counts membership on screen | 2 — ruled (controller §4 #5); the ordered "record the ruling beside `ticket-list.tsx:656-664`" not yet done — **not filed** | — |
+
+**Category-3 members, counted: 8** (rows 1, 4, 6, 8, 12, 16, 17 filed; 13 folded). **Category-2 argued: 1** (row 9,
+E5-9). **Category 1 with a shared defect, noted not filed: 1** (row 5).
 
 ---
 
 ## 4. CASE IDS — held / witnessed / still true
 
-(filled in)
+Recount: `node scripts/check-case-ids.mjs` → `2606 unique ids, 25 files, highest 17.006` (brief said 2601). I did not
+verify 2606 ids; I verified the ones my findings touch, and asked of each the brief's three questions.
+
+| id | file | holds? | witnessed? | still TRUE of the product? | note |
+|---|---|---|---|---|---|
+| `3.72` | 03 | ✅ | ✅ | ✅ — and it witnesses E5-7's defect as a property: the pre-check is asked "about the state the user CHOSE" and nothing re-asks on comment | see E5-7 |
+| `16.63` `16.64` `16.65` | 16 | ✅ | ✅ | ✅ | the crumb chain; none covers parent-is-epic (E5-3) |
+| `16.70` | 16 | ✅ | ✅ | ✅ | "TWO HOPS (task → story → epic)" — the one-hop case is the hole E5-3 fills |
+| `16.23`–`16.30` (Door G) | 16 | ✅ | ✅ | ✅ | the READ half; the editors are "an unbuilt door" (E5-6) |
+| `5.19` | 05 | ✅ | ✅ | ✅ | the endpoint serves unsummarised; nothing pins the ROW text (E5-8) |
+| `11.147` | 11 | ✅ | ✅ | ✅ — it pins the silent reload that the bulk path's docblock calls the defect | E5-10: the case witnesses a property the file elsewhere disowns |
+| `11.201`–`11.205` | 11 | ✅ | ✅ | ✅ | none covers the failed-read path (E5-13) |
+| `13.428` | 13 | ✅ | ✅ | ✅ | Settings link present — exec 2's control; reused as mine for the nav |
+| `15.*` (help) | 15 | — | — | ⚠ | `12 cases, 5 planted` per exec 2's recount; the help corpus's Board section (E5-1) is not among the planted defects — `check:help` cannot see it |
+
+**Cases that assert a property the product has quietly stopped having:** none found among those I opened. **Cases that
+witness a defect as a property:** `3.72` (E5-7) and `11.147` (E5-10) — both true of the code and both pinning the
+behaviour a sibling docblock calls wrong.
+
+**Not verified id by id:** `test-cases/13-*.md` (11 files, ~1.2 MB) — the same boundary exec 2 stated, and I did not
+close it.
 
 ---
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-(filled in)
+**19 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 19). By claimed severity, read from the
+heading text: **Critical 0 · Important 14 · Minor 5** (14 + 5 = 19).
+
+- **Important (14):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-13, E5-15, E5-16
+- **Minor (5):** E5-12, E5-14, E5-17, E5-18, E5-19
+
+**Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17 = 16 of 19. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-15. **Source-only:** E5-10, E5-18, E5-19.
+
+**Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
+sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever). **Adjacent to a §2d
+candidate with a different measurement:** E5-9 (Delete: not "no confirmation" — which matches the export — but the
+refusal's geometry).
+
+**Observations recorded, deliberately not scored (0 either way):** the sheet title clipping (shared with the export);
+the Channel select naming three undelivered channels (matches the export); the three identical `/mcp/tokens` rows
+(data-dependent); the New-ticket Title input's missing accessible name (UI lane); ruling #4 and #5 remedies not yet in
+the tree (F5/F7's remedies, not new defects).
 
 ---
 
 ## 6. COVERAGE — what I read, what I did NOT reach, and why
 
-(filled in last)
+### 6.1 Walked in the browser (owner's dev stack `:3001`, signed in as owner, read-only; container built 08:20 IST)
+
+`/workspaces` · `/w/…/p/…` Board tab (cards, drag attribute, arrows, Filters sheet, New-ticket dialog opened and
+closed) · the ticket sheet for `CCSO-3` (crumbs, title, Move dialog driven to the comment step and cancelled, History
+tab, footer geometry, inputs enumerated, wire read for the ticket and the roster) · `/inbox` (empty) ·
+`/w/…/members` · `/account` (with the injected failed preferences read and captured PUT) · `/settings` (Ticket types
+tab; with the injected 500 on ticket-types) · `/mcp/tokens` · `/mcp/authorize`.
+
+**Not walked in the browser:** Backlog, List, Calendar, Timeline tabs (opened the page; did not drive them) ·
+`/w/[workspaceId]` home · `/my-work` · `/help` · `/invite/[token]` (no live token) · `/sign-in` (signed in already; did
+not sign out of the owner's session) · `/settings` Workflows and Workspace tabs · the workflow builder · the
+ticket-type editor · the comment composer (V7 already covers its refusal path) · attachments upload · the subtask chain
+end-to-end (no writes) · the delete/undo round trip (no writes) · **NARROW VIEWPORT** — `resize_window` reported success
+but the page stayed at 1512 px (macOS full-screen window); the repo's `apps/web/e2e-viewport/responsive.spec.ts`
+measures 390/768/1512 and I did not run it.
+
+### 6.2 Read in source
+
+`board.tsx` (card view `:1000-1063`, drag `:940-1000`, drop `:640-665`, `:875-885`) · `ticket-sheet.tsx` (`:654-700`,
+`:673-692`, `:960-972`, `:1150-1265`, `:1490-1560`, `:1600-1700`, `:1740-1800`, `:1920-1995`, `:2325-2345`,
+`:2590-2625`) — roughly 20% of 3,800 lines, **chosen by what the browser showed**, not read linearly ·
+`transition-dialog.tsx` (`:120-145`, `:262-300`, `:355-370`, `:455-500`) · `new-ticket-dialog.tsx` (`:85-120`) ·
+`history-list.tsx` (full) · `provenance.ts` (`:1-35`) · `view-types.ts` (`BoardCard`, `TicketRead.epic`,
+`TicketHistoryEvent`, `RosterMember`) · `online/http.ts` (`:1-80`) · `submit.ts` (full) · `inbox/page.tsx`
+(`:213-380`) · `account/page.tsx` (`:70-100`, `:196-232`) · `account/{sessions-section,sessions-client,
+notification-preferences-gateway}.ts(x)` · `apps/web/src/account/{profile-section,workspaces-section}.tsx` ·
+`members/page.tsx` (`:630-680`, `:700-745`, `:830-890`) · `workspaces/page.tsx` (`:255-270`, `:440-470`, `:550-555`)
+· `invite/[token]/page.tsx` (`:75-127`) · `mcp/tokens/page.tsx` (full) · `settings/page.tsx` (`:40-130`) ·
+`mcp-tokens-screen.tsx` (grep) · `workflow-builder/ticket-types/ticket-type-list-screen.tsx` (`:160-260`, `:336`,
+`:360-380`) · `ticket-type-editor-screen.tsx` (`:186-197`, `:334-344`) · `workflow-builder/ui/{workflow-list-screen,
+workflow-builder-screen}.tsx` (load arms) · `docs/manual.md` (Board `:660-672`, dates `:20-25`, `:355`, `:383-401`,
+Filters `:784-830`, History `:408-419`, invitations `:205-240`) · `docs/faq.md` (`:138-150`, `:197-215`, `:300-312`)
+· `docs/design/prototype-delta-2026-09-18.md` (board, members, invite, account entries) ·
+`docs/hig-reconciliation-audit.md` (`:478-486`, `:571-576`) · `test-cases/16-remaining-doors.md` (`:263-300`,
+`:1073-1092`) · `test-cases/03-foundation-ledger.md:79` · `test-cases/11-calendar-notifications.md` (`:94-162`,
+`:295-312`).
+
+### 6.3 NOT reached, named
+
+1. **`apps/mobile` and `apps/desktop`** — untouched, same as exec 2. The manual's phone/web contrasts are verified on
+   the web half only.
+2. **The workflow builder as a person meets it** (canvas, inspector, publish, state-mapping dialog, history screen) —
+   read only its load arms as positive controls for E5-15. exec 2's §2e candidates there (`publish-controls.tsx:65/117`,
+   `state-mapping-dialog`, `workflow-rebind-dialog`) remain unverified by me.
+3. **The comment thread, attachments door, subtask chain, close/reopen and delete/undo as END-TO-END FLOWS** — each
+   needs a write against the owner's database. I read the code at the seams (E5-7, E5-9) and did not drive them.
+4. **Permissions as a member or guest** — I held only the owner's session. Every refusal path was reproduced by
+   injecting a failure client-side (E5-13, E5-15) or read from source; none was observed as a real 403/422.
+5. **`/help` at paint**, `/sign-in`, `/privacy`, `/terms`, `/w/[workspaceId]` home, `/my-work` — not opened.
+6. **Backlog / List / Calendar / Timeline** — not driven; the List's due column was read in source only.
+7. **`test-cases/13-*.md`** — not verified id by id.
+8. **exec 2's remaining §2e candidates** (~30) beyond the three I verified — not opened.
+9. **`check:help` / `scripts/help-content.mjs`** — not run; E5-1's corpus rows are read from `docs/manual.md`/`faq.md`
+   directly, which is what the generator consumes.
+10. **Offline / replica-degraded** — the web client is online-only (`BoardCard.pending` docblock); the edge class is
+    mobile/desktop's and I did not reach them.
+11. **Concurrent / interleaved** — not attempted (needs two sessions writing).
+
+### 6.4 How the graph and the search tools were used
+
+`graphify-out/GRAPH_REPORT.md`: community hub index and god nodes (§1.10). The inbox community (144) named
+`BULK_REFUSED_COPY`/`BULK_UNREACHED_COPY`/`CANNOT_OPEN_COPY` before I opened `inbox/page.tsx`, which sent me to the
+bulk path's docblock and so to E5-10. The account community (79) named `useAuthMethods`/`AccountPage`; the
+ticket-type editor community (84) named `FieldsEditor`/`parseOptions`. I did **not** run `/graphify query` or
+`mcp__semble__search`: every question I had was located faster by the browser (which element, which class) followed
+by one `grep -n` for the class or string — the graph's code layer is a leaf structure for UX surfaces (its ten god
+nodes are all test/infra symbols), so its BFS would have pointed at test helpers. Tokens saved by the graph: the
+community index (~60 lines) in place of `ls -R` over 1,269 files; the report's own 357 KB was not read.
+
+### 6.5 Stale figures I was handed, recounted
+
+| claim | measured | command |
+|---|---|---|
+| *"2601 ids across 25 files"* | **2606** | `node scripts/check-case-ids.mjs` |
+| *"`onClick` → `sc-camel-on-click` (160 attributes)"* | not recounted (exec 2 measured 161; I never cited the repo copy) | — |
+| my own §5 first count (13/6) | **14/5** | `grep -c '^### E5-'` + the heading text |
+
+### 6.6 Held for phase 2 (refutations) — noted, not filed
+
+- exec 2's `V8` ("Opening any parent ticket raises a false alert") — I opened a parent-less child only; **not** tested.
+- exec 2's `F9` reachability (comment box on a refused post) — not tested.
+- Nothing I measured contradicts a landed exec 2 finding. **I have no refutation to file at this time**; if I find one
+  in the remaining window it goes to `docs/lanes/review-refutations-exec5.md`.
+
+---
+
+*executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
+origin/exec5/review-ux`). 19 findings — Critical 0 · Important 14 · Minor 5 — members named in §5. No PR opened, no
+file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
