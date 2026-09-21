@@ -4395,11 +4395,58 @@ in the code that readers open first.
 | | claimed | members | scoring |
 |---|---|---|---|
 | Important | **2** | `E3-30` (6.83 ❌ measured since 09-02) · `E3-32` (the forgery gate's status list says `/v1/sync` does not exist) | half (rules §2) |
-| Minor | **2** | `E3-31` (6.57 conditions on a refused door) · `E3-33` (`proj-projects.ts:29`) | half |
+| Minor | **3** | `E3-31` (6.57 conditions on a refused door) · `E3-33` (`proj-projects.ts:29`) · `E3-34` (`projections/tickets.ts:480-499`, a gap declared open whose cited witness now witnesses the closure) | half |
 | corrections to this report in phase 2 | **2** | §64 (§30.1 classified 18 of 20; §27's 2 + 3 = 5) · the `E3-14` defence's own admission (the frozen text never cited `http-origin.ts:128-146`) | — |
 | defences | **5** | `E3-14` (§14.7.1) · `E3-15` (§14.7.2) · the documentary class, `E3-18`, `E3-8` (§67) | — |
 
 **Whole-report state at this stamp:** round 1 `E3-1`–`E3-8` (8, none withdrawn) · round 2 `E3-9`–`E3-29` (21, frozen at
-`f8b5e929`) · phase 2 `E3-30`–`E3-33` (4, half). Ids contiguous `E3-1` … `E3-33`, no gaps. Refutations filed against
+`f8b5e929`) · phase 2 `E3-30`–`E3-34` (5, half). Ids contiguous `E3-1` … `E3-34`, no gaps. Refutations filed against
 other lanes: **0** (fourteen attacks and three examinations, all recorded with their measurement in
 `review-refutations-exec3.md`).
+
+## 72. `E3-34` (phase 2, HALF) — **MINOR (claimed)** — `projections/tickets.ts:480-499` says *"nothing refuses a `ticket.assigned` … for a ticket that does not exist"* and cites a test that *"ingests two … against tickets that were never created, and they are committed"*; the test it cites was rewritten the same day because the gate now refuses exactly that, and its own comment says so (15:41 IST)
+
+**WHAT.** `apps/server/src/projections/tickets.ts:480-499` (docblock of the assignment fold's skip):
+*"the server commits them today: `test/permissions/check-role-permission.test.ts` ingests two `ticket.assigned` events
+against tickets that were never created, and they are committed, not refused."* … *"THE UNDERLYING GAP IS NOT FIXED
+HERE … nothing refuses a `ticket.assigned` (or either collaborator event) for a ticket that does not exist, so the
+ledger can hold an assignment of nothing to somebody. That is a refusal no plan document owns — recorded as a finding
+for the controller."*
+
+**WHY it is wrong — the claim and its cited evidence are both false at every client door, since the day the sentence
+landed.**
+
+- `apps/server/src/visibility/can-see.ts:227-234` — `canSee` calls `getResolvedVisibility`, which answers `null` for a
+  ticket with no `proj_visibility` row (`:140-142`), and `canSee` then returns `false`.
+  `permissions/check-permission.ts:1048-1050` — every ticket-entity event, `ticket.assigned` and both collaborator
+  events included, is refused `permission.visibility` / `TICKET_NOT_VISIBLE_REASON` when `canSee` is false. Both client
+  doors run this gate (`ingestClientBatch`: `routes/events.ts`; `sync-service.ts:370`).
+- **The test the docblock cites says so itself.** `test/permissions/check-role-permission.test.ts:942-948`: *"Needed since
+  Plan 4 Task 9: the gate now refuses a ticket-entity event whose ticket the actor cannot see, and `canSee` answers
+  false for a ticket with no `proj_visibility` row exactly as it does for an invisible one. **The cases below used to
+  file `ticket.assigned` against a bare `newUlid()`, which the visibility check now refuses**"* — the two ingests the
+  docblock names as committed were rewritten to create a visible ticket first (`visibleTicket()`, `:955`).
+- Dates: the docblock landed in `6cb631d0` (2026-09-01, #59); the gate and the test's rewrite landed in `dd7bfcfd`
+  (2026-09-01, #57) — the same day. `projections/tickets.ts` has been committed 4 times after that day, last
+  `18d7e391` (2026-09-20), with the paragraph intact.
+
+**What remains true, stated so the finding is not wider than the measurement:** the *engine* still has no existence
+check for these three types (`evaluateEvent` has no case for them — the docblock's first sentence, and exec 6's E6-17
+measured the pass-through), so the internal `ingestBatch` door — which the server uses only for its own appends —
+could still write one. The sentence *"nothing refuses"* is false for the product's doors and true for a door no client
+reaches; the cited evidence is false outright.
+
+**WHAT WOULD HAVE BEEN BETTER.** *"the permission gate refuses this at both client doors since Plan 4 Task 9 (`canSee`
+is false for a missing row); the engine has no existence check, so the internal door could still write one"* — and
+drop the test citation, which now proves the opposite.
+
+**MEASUREMENT.** Lines opened: `projections/tickets.ts:478-500`; `can-see.ts:129-142`, `:227-234`; `check-permission.ts:1040-1050`;
+`check-role-permission.test.ts:940-956`, `:1024`, `:1070`, `:1189` (the three `ticket.assigned` ingests, each on a
+`visibleTicket`); `git log -S'used to file \`ticket.assigned\` against a bare' -- …/check-role-permission.test.ts` →
+`dd7bfcfd`; `git log -S'THE UNDERLYING GAP IS NOT FIXED HERE' -- …/projections/tickets.ts` → `6cb631d0`. **Not run:**
+the test file (shared Postgres); the refusal is read from the gate's two lines and the test's own comment. **Control:**
+the same docblock's sentence about `evaluateEvent` having no case for the three types is true (`grep -c
+"ticket.assigned" packages/rule-engine/src/evaluate.ts` → 0).
+
+**SEVERITY: Minor (claimed), scored at half.** An open-gap declaration whose cited witness now witnesses the closure; the
+residual (internal door) is real and narrower than the sentence.
