@@ -299,6 +299,65 @@ path). Lines opened: `ticket-type.ts:50-64`; `hierarchy.ts:108`/`:228` (`type.ra
 around all of them and a user-facing refusal that describes the state it is refusing to restore. Filed at
 Important rather than Critical because it needs an admin act and nothing is lost.
 
+### E6-4 — IMPORTANT — A soft-deleted open child blocks its parent's close with a refusal about a child no view can show; and new children can be created under, or moved to, a soft-deleted parent
+
+**WHAT.** Measured through `POST /v1/events` (probe in Appendix C; 1 file / 1 test passed, with controls):
+
+```
+create P (story, root) / create C (task) under P / P: todo -> doing      -> committed ×3
+delete C                                                                  -> committed
+proj_tickets live open children of P (what a view counts):               0
+P: doing -> done  (C deleted, C was open)  -> REFUSED parent-terminal-with-open-children:
+                     "This ticket cannot enter "Done" while 1 of its child tickets is still open."
+control: P2 -> done with a LIVE open child  -> the same refusal        (so the sentence is the ordinary one)
+control: P2 -> done after its child is done -> committed               (so the door can accept)
+create DP (story, root) / delete DP                                       -> committed
+create LC (task) under DELETED DP                                         -> committed
+reparent live C2 under DELETED DP                                         -> committed
+GET list  -> 200: LC is a card, DP is not; GET board -> 200: LC present
+```
+
+**WHY it is wrong.** Two doors, one cause. `packages/rule-engine/src/transition.ts:134` counts
+`children.filter((child) => child.stateCategory !== 'terminal')` over `ctx.getChildrenStates`, and the server's
+reader behind it — `apps/server/src/projections/tickets.ts:263`, `SELECT * FROM proj_tickets WHERE … parent_id =
+$2` — serves deleted rows **by documented design**: its docblock (`:214-235`) explains why the engine's by-id read
+must not filter (the undo would refuse its own ticket) and then says, at `:232-234`: *"If a caller needs 'live
+tickets only', that is the caller's predicate to add (`read/visible-where.ts`'s `LIVE_TICKET_WHERE`), never this
+function's."* **The caller never added it.** The row it receives carries the flag — `tickets.ts` maps
+`deleted: row.deleted_at === null … ? null : { actorId, at }` into `TicketState` — so one more conjunct in the
+filter at `transition.ts:134` is the whole fix; instead the engine refuses with a count (*"1 of its child
+tickets"*) that every view — the rollup (`visibility/rollup.ts:263`, `t.deleted_at IS NULL`), the board, the list
+— reports as **0**. The user's only way out is to know that a deleted child exists, find it (no view lists it) and
+restore it, close it, and delete it again.
+
+The same reader is what `hierarchy.ts:123` (`getTicketState(ctx, p.parentId)`) and `:249` (`newParentId`) resolve
+a parent through, so a **live** child is placed under a parent that *"stops appearing in views"*. The read side
+already had to invent an answer for this (`routes/tickets.ts:419-431`: a deleted parent answers `restricted`,
+*"there is a parent here whose name you do not get"*), which is an honest answer for a child that was orphaned by
+its parent's deletion and a strange one for a child the actor just created there.
+
+**Not a ruled divergence.** The recorded reason for the unfiltered reader is `ticket.restored`
+(`projections/tickets.ts:216-222`), and that reason does not reach `getChildrenStates` — the restore check never
+reads children. The docblock's hand-off sentence is the closest thing to a ruling and it rules the *opposite*
+way: the predicate is the caller's to add. Cases `5.x` on the parent-terminal invariant (`05-tickets-hierarchy.md`)
+do not mention deletion (`grep -n -i delet test-cases/05-tickets-hierarchy.md` → no case-line hits), and the
+soft-delete suites (`test/read/soft-delete*.test.ts`) never transition a parent.
+
+**WHAT WOULD HAVE BEEN BETTER.** In `transition.ts:134`, `child.stateCategory !== 'terminal' &&
+(child.deleted ?? null) === null` — a deleted child is not open work, which is the sentence the refusal is
+about. In `hierarchy.ts:123`/`:249`, refuse a deleted parent with a rule of its own (*"That ticket is deleted;
+restore it or pick another parent"*) — the check already refuses an unknown one. Both are one-line and both
+are covered by fixtures the harness can express (Appendix B shows the shape).
+
+**MEASUREMENT.** Appendix C; run from `apps/server` (`pnpm exec vitest run
+test/zz-exec6-probe-children.test.ts --no-file-parallelism`, `rtk proxy` for raw output). Lines opened:
+`transition.ts:134`; `projections/tickets.ts:214-235`, `:263`; `hierarchy.ts:123`, `:249`;
+`routes/tickets.ts:419-431`; `visibility/rollup.ts:258-266`.
+
+**SEVERITY: Important.** A user-facing dead end (a refusal citing a count the product shows as zero, with no
+listed way to find the blocker), reachable from the ordinary path: delete a child, then finish the parent. Not
+Critical: no data lost, workaround exists for someone who knows the cause.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
