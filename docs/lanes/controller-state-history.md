@@ -4,6 +4,37 @@
 
 ---
 
+## 🔄 MONDAY 2026-09-21 ~09:5x IST — **CYCLE 37: REVIEW ROUND 2 IS LIVE — SIX LANES, THREE PAIRS, ONE JUDGE. T0 = 09:41:50 IST.** `main` is **`a7b6292b`** (#630); **zero open PRs**; ledger 307 done / 1 todo.
+
+### 1. 📌 THE OWNER'S ORDERS THIS CYCLE, IN ORDER
+1. *"rebuild the dev stack."* — done, cycle 36 §8(a). 2. *"check the restart script and instructions. the restart takes too long."* — done, cycle 36 §8(b); rotation approved and landed as **#630 → `a7b6292b`** (three live files cut to card/top block; three `*-history.md` files carry the rest byte-for-byte, sha256-proven with a control). 3. *"hope the graphify is up to date. do so if not."* — it was behind by the night's merges; the code layer was rebuilt (AST over 1,161 code files → 10,670 nodes / 19,406 edges, +167/+385 vs Sep 20). **The semantic re-pass was SKIPPED on the owner's word** (Q2: *"skip"*): the cache was empty and a full pass would read 14.2 MB of docs, mostly handoff history. 4. **The competition** (§0 of `docs/lanes/review-round2-rules.md` quotes it verbatim), with the owner's answers to the controller's eight questions: land the rotation first (yes); semantic graphify (skip); machine capacity (3b — but see §3); points severity-weighted C5/I3/M1 at the judge's severity, invalid −3× claimed; refutation transfers points and penalises, failed refutation costs the refuter; DeepSeek's landed findings are their base and Opus re-finds score 0 without a new measurement; the loser is ended, its branch kept, the winner is the standing executor; **6 h / 3 h**. Two rule amendments from the owner: **no first-commit-wins** (unfair to lanes that started later) and **category-2 divergences score if the reviewer argues the ruling is mistaken**, connected evidence weighing more. 5. *"make sure they make full use of graphify to save as much tokens as possible."* — rules §6; `graphify-out/` copied into all six worktrees (sha `38e42c17…` identical in all seven copies). 6. *"make sure you self restart if the session budget runs out. it likely will."* — §4.
+
+### 2. THE BUDGET ESTIMATE THE OWNER ASKED FOR (Q8), measured from transcripts
+Weekly calibration: Mon 09-14 → Thu 09-18 Anthropic-family spend was **993 M weighted tokens** (in + out + 1.25×cache-write + 0.10×cache-read) when the owner said the limit was *"almost over"*, so **one week ≈ 1,000–1,050 M weighted**. The DeepSeek round-1 reviewers ran **52 min each** (00:03–00:55) at 19.5 / 17.2 / 5.1 M weighted — **~20 M per lane-hour**. Estimate for 6 h × 3 Opus + 3 h × 3 Opus + judging: **~525 M ≈ 50% of the week (range 37–70%)**; fan-out is the variable. Weekly meter read 0% at 07:55 (reset this morning).
+
+### 3. THE DISPATCH — and one deviation from 3b, stated
+| lane | pane | backend (measured) | branch | started |
+|---|---|---|---|---|
+| exec 4 · UI | `gisik:4` | `opus-5` on the status line; no `backend deepseek` stderr line | `exec4/review-ui` @ `a7b6292b` | 09:41 |
+| exec 5 · UX | `gisik:5` | `opus-5` | `exec5/review-ux` @ `a7b6292b` | 09:41 |
+| exec 6 · functionality | `gisik:6` | `opus-5` | `exec6/review-functionality` @ `a7b6292b` | 09:41 |
+| exec 1 · UI | `gisik:1` | `deepseek-flash[1m]` | `exec1/review-ui-r2` (ack: *"Read the rules in full and cut exec1/review-ui-r2 from origin/main = a7b6292b"*) | 09:42 |
+| exec 2 · UX | `gisik:2` | `deepseek-flash[1m]` | `exec2/review-ux-r2` (it computed its base: *"2×5 + 11×3 + 6×1 = 49 points"*) | 09:42 |
+| exec 3 · functionality | `gisik:3` | `deepseek-flash[1m]` | `exec3/review-functionality-r2` (ack) | 09:42 |
+**The deviation:** the owner chose 3b (Opus reviews while DeepSeek holds, then all six refute) and then noted *"deepseek reviewer ran for a short amount time"*. **All six run phase 1 concurrently** so the DeepSeek lanes get the same six hours; the OOM risk 3b was meant to avoid is carried by the rules instead (§4: no full turbo gate, one package's suite at a time, `--no-file-parallelism`, never `| head`). Swap at T0: 1,258 MB free of 4,096; **re-read `sysctl vm.swapusage` on every check and, if free swap falls under ~300 MB, tell the owner before anything else.** The Opus lanes were launched through `launch-exec{4,5,6}-2026-09-21-review-r2.sh` → `exec-claude.sh` with `GISIK_EXECUTOR_BACKEND=anthropic` exported per process (the session env stays `deepseek` for lanes 1–3). Each prompt is ~25 KB: lane override + round-1 common brief + the rules + the role addendum (derived from the round-1 role brief, its *"your own work"* section replaced by *"the round-1 lane's blind spots are your target"*). The DeepSeek lanes received the relook order as a paste (text, pause, CR) into their live sessions — they keep what they read in round 1.
+
+### 4. SELF-RESTART, as the owner ordered — what is armed and what was fixed
+- **Session-limit (5-hour / weekly) errors:** `com.kiro.claude-limit-resumer` is loaded (45-min sweep + a one-shot at reset + 2 min; Claude Code also natively auto-resumes an interactive session at reset). ⚠ **Its live-pane path used `tmux send-keys "continue" Enter`, which copy mode swallows** — patched 2026-09-21 to two `paste-buffer` pastes (`limit-resumer.py: tmux_inject_continue`), `import time` added, dry-run path kept side-effect free; load-tested. The registry (`limit-resumer-registry/`) is fed by SessionStart hooks, so lanes 4–6 registered themselves at launch.
+- **Context fill:** `ctl-self-restart.sh` (fixed 30 s wait → 2 s poll, cycle 36); **the restart card is the handoff**, so a restarted controller is productive within two minutes.
+- **The nudger is ON for six targets** (`IDLE_NUDGER_TARGETS` in the plist; installed + bootstrapped in the same action as the dispatch, rc=0). It cannot tell a finished lane from a stalled one — a lane that has pushed its report and said so may be nudged; the nudge text tells it to say so rather than spin.
+
+### 5. WHAT THE JUDGE DOES AT EACH BOUNDARY
+**15:41:50** — collect: `git ls-remote` every lane branch, record the sha, read each report FROM THE BRANCH (never a worktree), count findings by claimed severity; anything not pushed is not submitted. Tell all six lanes phase 2 is open (paste). **18:41:50** — collect refutations the same way; tell the lanes to stop. **Then judge:** every finding and every refutation gets a row in `docs/lanes/review-scores.tsv` with the line the judge opened; totals per lane; per pair the winner; the loser's session ended and worktree retired (branch kept); everything lands in ONE PR with the seven checks and the forced gate at the landing tree, and the anchor. ⚠ **The judge verifies by opening the line and running the reproduction — never by re-reading the finding's own citation.** Family is not evidence.
+
+---
+
+---
+
 ## 🔄 MONDAY 2026-09-21 ~08:1x IST — **CYCLE 36: THE SEAT IS BACK ON OPUS, THE HOLD STANDS, AND THE TWO CRONS THAT CONTRADICTED IT ARE DELETED. NOTHING WAS DISPATCHED — THE OWNER'S CALL IS STILL THE ONLY THING THAT MOVES THIS PIPELINE.** `main` is **`e2769d60`** (#628); **zero open PRs**; ledger re-measured by `check:tasks` at this PR's head (numbers in its body).
 
 ### 1. THE SEAT — measured, not assumed
