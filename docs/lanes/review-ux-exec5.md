@@ -718,6 +718,38 @@ account. The success-silence half needs no measurement beyond the component: it 
 
 ---
 
+### E5-20 — IMPORTANT · One Escape in the Move dialog closes the ticket sheet under it — the `Sheet`'s own guard says a child must `preventDefault()`, and its sibling `Dialog` does not `[SOURCE]` `[BROWSER: the stacked pair observed]` (verifies exec 2 §2e's "two `aria-modal` dialogs … one Escape closing both", unmeasured there)
+
+**WHAT.** With `CCSO-3` open, `Move…` mounts `TransitionDialog` (`ticket-sheet.tsx:2624`) → `Dialog`
+(`transition-dialog.tsx:382`); the DOM then holds **two** `role="dialog"` elements (`[BROWSER]` `dialogs: 2`,
+`aria-modal="true"` on the Move dialog). `packages/ui/src/components/dialog.tsx:6-13`: a document-level `keydown`
+that calls `onClose()` on `Escape` **with no `preventDefault()`**. `packages/ui/src/components/sheet.tsx:56-90`: a
+document-level `keydown` that closes the sheet on `Escape` unless `event.defaultPrevented` — and its docblock is
+explicit: *"A child that handles Escape must call `preventDefault()` for this guard to see it."* The Sheet's listener
+was registered first (the sheet mounted first), so on one Escape it runs first, sees `defaultPrevented === false`,
+and closes the sheet; then the dialog's listener closes the dialog. The person who meant to cancel a move is dumped
+back on the board.
+
+**WHY.** The fix round that added the guard fixed the ONE child it was looking at — the title field
+(`ticket-sheet.tsx:1831-1845`, `preventDefault` "IS LOAD-BEARING", case `16.86` *"does not close the sheet"*) — and
+not the `Dialog` component in the same package, which is the child every Move, Reopen and Bulk-close goes through.
+The same stacking exists on the board: in the `needs-reopen` arm `create-ticket-flow.tsx:250-253` opens
+`ReopenDialog` without closing `NewTicketDialog` (`:359-372`), so both `Dialog`s are open and one Escape cancels the
+reopen prompt AND dismisses the New-ticket dialog.
+
+**WHAT WOULD HAVE BEEN BETTER.** `Dialog`'s handler calls `event.preventDefault()` after `onClose()` — one line — so
+the Sheet's guard sees it; or the Sheet listens on its own root instead of `document`.
+
+**MEASUREMENT.** `[SOURCE]` `dialog.tsx:6-13` (opened: no `preventDefault`), `sheet.tsx:56-90` (opened: the guard and
+its contract), `ticket-sheet.tsx:2624`, `transition-dialog.tsx:382`, `create-ticket-flow.tsx:246-256`, `:359-372`.
+`[BROWSER]` the pair was observed open together; **the Escape itself was not pressed with both open** — the browser
+became unusable before I returned to it (§6.1). `grep -n Escape packages/app-core/test/views/ticket-sheet.test.tsx`
+→ only `16.86` (the title field); no case presses Escape with the Move dialog open.
+
+**SEVERITY: Important** (claimed). A cancel that discards more than the person cancelled, on every ticket move.
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -779,18 +811,19 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**19 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 19). By claimed severity, read from the
-heading text: **Critical 0 · Important 14 · Minor 5** (14 + 5 = 19).
+**20 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 20). By claimed severity, read from the
+heading text: **Critical 0 · Important 15 · Minor 5** (15 + 5 = 20).
 
-- **Important (14):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-13, E5-15, E5-16
+- **Important (15):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-13, E5-15, E5-16, E5-20
 - **Minor (5):** E5-12, E5-14, E5-17, E5-18, E5-19
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17 = 16 of 19. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed) = 17 of 20. **Reproduced with an injected failure, zero server writes:** E5-13,
 E5-15. **Source-only:** E5-10, E5-18, E5-19.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
-sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever). **Adjacent to a §2d
+sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever), E5-20 (stacked dialogs and
+Escape — the source mechanism, with the pair observed). **Adjacent to a §2d
 candidate with a different measurement:** E5-9 (Delete: not "no confirmation" — which matches the export — but the
 refusal's geometry).
 
@@ -897,5 +930,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 19 findings — Critical 0 · Important 14 · Minor 5 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 20 findings — Critical 0 · Important 15 · Minor 5 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
