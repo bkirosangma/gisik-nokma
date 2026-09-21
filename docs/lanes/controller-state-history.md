@@ -4,6 +4,38 @@
 
 ---
 
+## 🔄 MONDAY 2026-09-21 ~15:0x IST — **CYCLE 38: PHASE 1 AT 5h20m — AN OUTAGE, A BACKEND THAT NEVER COMPACTS, AND THE OWNER'S ORDER TO MOVE LANES 1–3 TO OPUS AT THE BOUNDARY.** `main` is **`30fc083b`** (#631); **zero open PRs**.
+
+### 1. THE FINDINGS PER LANE, from the pushed branches (heading counts; the lanes' own severity labels; not yet judged)
+| pair | lane | 10:58 | 11:50 | 12:23 | 13:26 | withdrawn |
+|---|---|---|---|---|---|---|
+| UI | exec 1 · DeepSeek | 26 | 27 | 29 | 30 | 2 |
+| UI | exec 4 · Opus | 22 | 30 | 31 | 31 | 0 |
+| UX | exec 2 · DeepSeek | 45 | 52 | 52 | 52 | 1 |
+| UX | exec 5 · Opus | 29 | 34 | 38 | 40 | 0 |
+| FUNC | exec 3 · DeepSeek | 21 | 25 | 25 | 26 | 0 |
+| FUNC | exec 6 · Opus | 14 | 18 | 23 | 24 | 0 |
+Discovery slowed to ~5/hour after 12:00; exec 2 and exec 6 opened refutation files in phase 1. Coverage sections were read from every branch at 12:3x — exec 4 painted the signed-in app at four widths (round 1's #1 gap); exec 5 walked the running stack on `:3001` signed in read-only until its browser died at ~10:30; exec 6 went line-by-line into the four packages exec 3 said it did not reach; exec 3 is total on soft-delete/migrations/routes/checkers and nowhere else.
+
+### 2. THREE INCIDENTS, each handled without relaunching a working lane
+1. **Network outage 13:32–13:46 IST** (DNS/API unreachable; IP fine; the net-resumer logged `offline`). Five lanes died mid-turn on `API Error: Can't reach the API server` and sat idle. A one-line resume was pasted to all six at 13:48; all resumed; five pushed within two minutes. Cost: ~16 minutes of phase 1, nothing lost. **The watcher now collapses repeated outage errors** instead of one event per minute.
+2. **exec 4 declared itself finished at 12:5x and held for the boundary.** Rather than prod one lane, the same reminder went to all six at 13:55: holding earns nothing, coverage is the tiebreaker, spend the time on your own not-reached list.
+3. ⛔ **DEEPSEEK DOES NOT AUTO-COMPACT.** exec 2 hit `API Error: 400 This model's maximum context length is 1048576 tokens. However, you requested 1048793` at 14:39 — **zero compaction records in its transcript** (the Opus lanes' transcripts carry `compactMetadata: trigger auto, 969038 → 11393`). A manual `/compact` on exec 2 **also failed** (the summarize request was itself 1,050,093 tokens). Manual `/compact` on exec 1 (86%) and exec 3 (77%) **worked** (→ 11% / 7%). **exec 2 was relaunched at 14:44 from its pushed branch** (`REVIEW-R2-RESUME-EXEC2-2026-09-21.md` + `launch-exec2-2026-09-21-review-r2-resume.sh`); its one uncommitted file was committed and pushed by the new session at 14:45. Rule pasted to 1 and 3: `/compact` yourself at 80%. **This is the first time this project has measured why a DeepSeek lane goes silent at ~6 hours.**
+
+### 3. 📌 THE OWNER'S ORDER, 14:5x: *"replace exec 1, 2, and 3 with opus for phase 2. deepseek balance is about to run out. $.7 left."*
+Executed as a boundary script rather than by hand, so a successor can run it: **`gisik-nokma-lanes/phase2-boundary-2026-09-21.sh <scratchpad>`** — (a) `git fetch` and append `PHASE1_CLOSE` + the six branch shas to `T0.txt`; (b) paste PHASE 2 OPEN to `gisik:4–6`; (c) kill and relaunch `gisik:1–3` through `launch-exec{1,2,3}-2026-09-21-phase2-opus.sh` (`GISIK_EXECUTOR_BACKEND=anthropic` exported per launcher; prompt = `REVIEW-R2-PHASE2-OPUS-EXECn-2026-09-21.md` + common brief + rules + the round-1 role brief). The phase-2 brief tells the Opus session it **inherits the lane** — branch, report (frozen at the recorded sha), score, opponent — and that withdrawals now cost. A one-shot cron fires the script at 15:42; the recurring check re-runs it if `T0.txt` lacks `PHASE1_CLOSE`. Execs 1–3 were told to push every 10 minutes until the boundary in case the balance ends first; a DeepSeek death before 15:41:50 is NOT relaunched on DeepSeek — the branch is the submission and the Opus relaunch comes early.
+⚠ **What this changes about the comparison:** phase 2 is Opus defending Opus-authored reports against Opus defending DeepSeek-authored reports. The model comparison is about **phase-1 authorship**; the kill applies to the losing lane. Recorded here so the result is not misread later.
+
+### 4. BUDGET, measured against the estimate
+The Opus lanes' status lines read **weekly 6%** at 4h13m (13:5x). Cycle 37 §2 estimated ~50% for the whole round; the DeepSeek reviewers' 20 M-per-lane-hour over-predicted Opus by roughly 3×. Expect the round to finish well under 20% of the week.
+
+### 5. FOR THE JUDGE, at 18:41:50
+Paste PHASE 2 CLOSED to all six; record `PHASE2_CLOSE` shas; read every report and refutation file **from its recorded sha**; one ledger row per finding and per refutation with the line the judge opened; per-pair totals; the loser ended (branch kept); everything in ONE PR with the seven checks and the forced gate at the landing tree. ⚠ **A finding is scored at the sha recorded at `PHASE1_CLOSE`; a refutation or defence at `PHASE2_CLOSE`.** Later pushes are not submitted.
+
+---
+
+---
+
 ## 🔄 MONDAY 2026-09-21 ~09:5x IST — **CYCLE 37: REVIEW ROUND 2 IS LIVE — SIX LANES, THREE PAIRS, ONE JUDGE. T0 = 09:41:50 IST.** `main` is **`a7b6292b`** (#630); **zero open PRs**; ledger 307 done / 1 todo.
 
 ### 1. 📌 THE OWNER'S ORDERS THIS CYCLE, IN ORDER
