@@ -181,6 +181,37 @@ export function NewTicketDialog({
     if (typeOptions.some((option) => option.id === typeId)) return;
     setTypeId(defaultRootTypeFor(typeOptions)?.id ?? '');
   }, [typeOptions, typeId]);
+  /**
+   * ⚠ A CLOSED DIALOG HOLDS NOTHING (E2-37, 2026-09-21).
+   *
+   * The flow mounts this component for its whole life and toggles `open`, so a
+   * Cancel and a successful create both only flipped the prop — none of the four
+   * `useState` values was ever reset, and reopening offered the LAST ticket's
+   * title with `Create` already enabled and a type already chosen. One press
+   * files a duplicate of a ticket the person has already filed.
+   *
+   * The rule is "empty on OPEN" rather than "clear on close", and the difference
+   * is the flow's reopen offer (E2-34): the offer REPLACES this dialog with
+   * `open={false}` and hands it back when it closes, so a clear-on-close would
+   * discard a draft the person was mid-way through for a detour that never
+   * touched it — while an empty-on-open leaves that draft alone, because `open`
+   * never went true in between.
+   *
+   * ⚠ The cost, stated rather than left to be discovered: a Cancel followed by a
+   * reopen abandons the typed title. That is the point of the rule — the draft
+   * that survives a close is the stale draft, and its visibility in a text input
+   * is the only reason the previous behaviour was merely Minor. `typeOptions` is
+   * deliberately NOT a dependency: the ladder's own identity change is E2-33a's
+   * re-seed above, which keeps a type the list still offers.
+   */
+  useEffect(() => {
+    if (!open) return;
+    setTitle('');
+    setTypeId(defaultRootTypeFor(typeOptions)?.id ?? '');
+    setParentId('');
+    setStartInFocus(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
   const [parentId, setParentId] = useState('');
   // Checked by default (spec §5.4), PER CHOSEN PARENT — Ruling 40 (coordinator,
   // fix round 1, 2026-09-17): the Parent picker's own `onChange` below resets

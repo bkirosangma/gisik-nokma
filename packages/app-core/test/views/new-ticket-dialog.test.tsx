@@ -606,6 +606,53 @@ describe('V10 the Create control cannot file two tickets from two presses', () =
  * served-types map both drop it), so any "deepest" rule would have to invent a
  * rank — or a new prop — to decide a product question this task does not own.
  */
+/**
+ * E2-37 — THE DRAFT SURVIVED ITS OWN CLOSE.
+ *
+ * This file contains zero `useEffect` for most of its life, so none of the four
+ * `useState` values was ever reset. The dialog is MOUNTED for the flow's whole
+ * life (`create-ticket-flow.tsx` renders it always, with `open` toggling), and
+ * a successful create and a Cancel both only set `open` to false — so reopening
+ * offered the LAST ticket's title, with `Create` enabled and a type already
+ * chosen. One press files a duplicate of a ticket the person already filed.
+ *
+ * ⚠ The mitigation is real and is priced in: the stale title is VISIBLE in a
+ * text input, so a person who looks before typing notices. That is why the
+ * finding is Minor and why the rule chosen here is "a CLOSED dialog holds
+ * nothing" rather than a subtler memory of what was once typed — the visible
+ * draft is the whole reason the last one is safe to discard.
+ */
+describe('E2-37 a reopened New-ticket dialog is EMPTY', () => {
+  const TYPES = [{ id: 'task', name: 'Task', rank: 3 }];
+  const props = { typeOptions: TYPES, parentCandidates: [], onClose: () => undefined };
+
+  it('PLANTED DEFECT: reopening offers no title, and Create is disabled again', () => {
+    const onCreate = vi.fn();
+    const { rerender } = render(<NewTicketDialog open {...props} onCreate={onCreate} />);
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
+    expect(screen.getByLabelText('Title')).toHaveValue('Order the tent');
+
+    rerender(<NewTicketDialog open={false} {...props} onCreate={onCreate} />);
+    rerender(<NewTicketDialog open {...props} onCreate={onCreate} />);
+
+    expect(screen.getByLabelText('Title')).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+  });
+
+  it('a SUCCESSFUL create leaves no draft behind either — the same close, whichever way it ended', () => {
+    const onCreate = vi.fn();
+    const { rerender } = render(<NewTicketDialog open {...props} onCreate={onCreate} />);
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    expect(onCreate).toHaveBeenCalledTimes(1);
+
+    // The flow closes the dialog on `committed` — the very next thing it does.
+    rerender(<NewTicketDialog open={false} {...props} onCreate={onCreate} />);
+    rerender(<NewTicketDialog open {...props} onCreate={onCreate} />);
+    expect(screen.getByLabelText('Title')).toHaveValue('');
+  });
+});
+
 describe('3.188 (E5-16) the Type picker does not start at the top of the hierarchy', () => {
   // The BUILT-IN ladder, in its own order and with its own ranks — Epic is
   // FIRST and rank 1, which is the whole defect. Nothing here is sorted or
