@@ -162,22 +162,39 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  *
  * **Named owner: whoever next picks up the contested-claim surface.**
  *
- * #### (c) `packages/app-core/src/replica/replica-data-source.ts:947` and `:980` — the OFFLINE source's two gates
+ * #### (c) `packages/app-core/src/replica/replica-data-source.ts` — the OFFLINE source's two gates
  *
  * The client has **two** implementations of `DataSource`, and Arm 1 walks only
  * the ONLINE one. The replica — Plan 10's local store, which is what a user sees
- * offline — applies the same rule in TypeScript in two places, each with a
- * docblock naming `LIVE_TICKET_WHERE` as the rule it is carrying:
- * `:947` (`if ((state.deleted ?? null) !== null) continue;`, the ticket
- * enumeration) and `:980` (`(state.deleted ?? null) === null`, the same boundary
- * read beside `closed`).
+ * offline — applied the rule in TypeScript in two places when this was
+ * written, each with a docblock naming `LIVE_TICKET_WHERE` as the rule it is
+ * carrying — cited by CONTENT, because this paragraph carried `:947` and
+ * `:980` and both came to rest on other lines (`getMyWork`'s refusal and a
+ * `stateNameOf` binding — resolving, and neither a gate; round-1 F5): the
+ * `if ((state.deleted ?? null) !== null) continue;` in `getTickets`' ticket
+ * enumeration, and the `(state.deleted ?? null) === null` conjunct beside
+ * `closed` in `getBoard`'s filter. ⚠ "Two places" counted the GATES, not the
+ * reads: three sibling reads had no gate at all (`listTicketSummaries`,
+ * `myWork`, `searchOfflineCopy` — round-2 E6-24, fixed in release batch B07
+ * and pinned by case 12.399), so the file now carries the rule at four reads.
  *
- * **BOTH MEASURED SURVIVORS**: with each conjunct removed in turn, app-core's
- * replica suite reads **27 passed / 0 failed** and `apps/server`'s
- * `test/dual-client` reads **21 passed / 0 failed** — and the mutation reached
- * the artifact, checked rather than assumed: that test imports
- * `../../src/replica/replica-data-source.js`, not the package name, so nothing
- * resolved through a stale `dist`.
+ * **BOTH MEASURED SURVIVORS, on ONE valid witness**: with each conjunct removed
+ * in turn, app-core's replica suite read **27 passed / 0 failed**. That suite
+ * imports `../../src/replica/replica-data-source.js` by RELATIVE PATH
+ * (`packages/app-core/test/replica/replica-data-source.test.ts`), so the
+ * mutation reached what it measured. ⚠ **This paragraph ALSO published
+ * `apps/server`'s `test/dual-client` reading 21 passed / 0 failed under the
+ * same warrant, and the warrant was false of it** (round-1 F2): `test/dual-client/
+ * rig.ts` imports `@gisik-nokma/app-core` by PACKAGE NAME, which resolves
+ * through `dist`, and nothing rebuilt `dist` between the mutation and that
+ * run — the built copy still carried both gates, so the 21/0 half could not
+ * have failed and measured nothing. Re-measured 2026-09-21: no file under
+ * `apps/server/test` imports `packages/app-core` by a relative path (`grep -rnE
+ * "^\s*import .*from '[^']*packages/app-core" apps/server/test/` → 0, with
+ * `grep -rln "from '@gisik-nokma/app-core'" apps/server/test/` → 3 files as the
+ * control). The 27/0 half is the measurement, and it is sufficient; the 21/0
+ * reading is withdrawn as evidence rather than deleted, because a number that
+ * was published and later found unwarranted is a fact about this record.
  *
  * ⚠ **The pre-existing I2 note in `test-cases/16-remaining-doors.md` already
  * named these two as unconstrained, at `:888`/`:921` — line numbers that have
