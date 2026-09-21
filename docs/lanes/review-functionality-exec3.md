@@ -50,7 +50,7 @@ table**, a closed loop, and passes green beside the gap.
 
 **Eight Important, eight Minor, and eight round-1 findings re-validated with none withdrawn** — and one of
 the seventeen was revised **down** by me before a judge could (§34). Every count is measured and every
-command is printed beside it. **§23, §36, §38, §39 and §40 record nine attacks on other lanes' findings — all nine failed**, and two of them changed something here: `E6-6` showed a claim in this report to be false, and `E6-11` bounds §7.1's scope, and one of them (`E6-6`) showed a claim in this report to be wrong,
+command is printed beside it. **§23, §36, §38, §39, §40 and §41 record ten attacks on other lanes' findings — all ten failed**, one of them across concerns, and two of them changed something here: `E6-6` showed a claim in this report to be false, and `E6-11` bounds §7.1's scope, and one of them (`E6-6`) showed a claim in this report to be wrong,
 and §15, §20.1, §31 and §35 record six times my own sweep's universe or pattern was the defect rather than
 the subject. **Two of this report's own citations were wrong and are
 corrected in §17** — the same defect `E3-13` files against another lane, shipped by the lane that filed it.
@@ -2887,3 +2887,40 @@ door. **That is a harder finding to write than a missing guard, and it is the ki
 **TALLY: NINE ATTACKS, NINE FAILURES.** Eight recorded above (§23, §36, §38, §39) and this one. **Two of the
 nine changed something here** — `E6-6` corrected a false claim of mine (§14.4) and `E6-11` bounded §7.1's
 scope.
+
+---
+
+## 41. A TENTH ATTACK, ACROSS CONCERNS — `E5-6` (the UX lane) holds
+
+Attacked because it rests on a **functional** claim rather than a visual one — *a due date can be set nowhere* —
+and a functional claim is the kind I can actually test rather than take a rendering lane's word for.
+
+**Its greps, re-run and then widened** (a narrow pattern is how this kind of finding fails):
+
+```
+grep -rn 'type="date"' apps/web packages/app-core/src/views          -> 1 hit, and it is the DOCBLOCK at
+                                                                        ticket-sheet.tsx:1239 describing the
+                                                                        prototype's own <input type="date">
+
+WIDER PATTERN — type=.?["']date["'] | dateInput | DatePicker | date-picker | input type=.date
+   over apps/web, packages/app-core/src, packages/ui/src, excluding tests:
+     app/w/[workspaceId]/p/[projectId]/page.tsx:1434  const dateInputs = useMemo<TicketDatesInput[]>( … )
+                                              :2333, :2397  tickets={dateInputs}
+     packages/app-core/src/views/ticket-sheet.tsx:1239   (the same prototype docblock)
+     packages/app-core/src/claims/claim-labels.ts:79     prose about datesNarrowing feeding dateInputs
+
+docs/manual.md:23  "… you cannot set a due date anywhere."
+```
+
+**The wider pattern finds no setter.** `dateInputs` is data handed TO the Calendar view (`TicketDatesInput[]`,
+fed by `datesNarrowing`) — the dates a range filter selects on, not a control that writes one — and the only
+`type="date"` in the tree is the sentence in a docblock describing the export. **So the write path exists
+(`ticket.field_set` carries `dueDate`) and no surface in the product uses it**, which is exactly what the
+manual says and what the finding claims. **Nothing to refute.**
+
+**TALLY: TEN ATTACKS, TEN FAILURES** — nine on my own concern's lane and one across it. **Two of the ten changed
+something here** (`E6-6` corrected a false claim of mine; `E6-11` bounded §7.1). **The cross-concern one is
+worth noting for what it says about the exercise**: the rules allow a lane to refute across concerns, and the
+only cross-concern findings I could test were the ones whose claim was about the PRODUCT — a due date that
+cannot be set, a crumb that repeats a level — rather than about how something looks. **A rendering finding is
+not automatically out of my reach; it is out of my reach exactly when its claim is visual.**
