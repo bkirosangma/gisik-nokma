@@ -17,3 +17,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E4-1 | done | c781f9dc | 17.024 / E4-1 — epic crumb omitted when it is the parent; RED PASS (0) FAIL (1), suite 1753 |
 | T-E4-30 | done | e81616af | 17.025 / E4-30 — link crumb ink var(--gn-text-accent); RED 2 failed, suite 1757, ui 378 |
 | T-E5-3 | done | a7f169f3 | 17.026 / E5-3 — one-hop contract (server) + restricted arm (client); server 1728, app-core 1758 |
+| T-P3 | done | 4f7209aa | 17.027 / P3 — parent crumb carries the parent key (wire + render); app-core 1761, server 1729, web 622 |
