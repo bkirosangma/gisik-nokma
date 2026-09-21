@@ -3420,6 +3420,16 @@ depends on.
 the controller directed. **Severity: Minor** — nothing is broken by an unused export; what is wrong is a
 public symbol with an unclosed gap whose owner is named as a caller that does not exist, inside a sweep that
 counted its neighbours and not it.
+
+> **DEFENCE — phase 2, 2026-09-21 15:36 IST, self-filed: one supporting sentence is false; the claim is not.** The
+> sentence *"The one apparent hit, `ticket-sheet.tsx:897`, is the docblock text above"* does not survive re-measurement:
+> `grep -n transitionRequiresEvidence packages/app-core/src/views/ticket-sheet.tsx` returns **nothing**, and `:895-899`
+> (opened) names `EvidencePicker` and the two `compose*` exports, not this symbol. The hit I remembered was from a
+> different needle, and I wrote it into this finding as if it were this one's. The measurement that carries the
+> finding is unchanged and re-run at `a59ce9b9`: the symbol's only non-test, non-`dist` mentions in `apps/` and
+> `packages/` are its declaration (`require-evidence.ts:61`) and the barrel export (`packages/editor/src/index.ts:66`)
+> — **zero production callers**, with no apparent hit to explain away at all. The false sentence is withdrawn; the
+> finding stands on the two lines that remain.
 ### E2-48 (r2) — IMPORTANT · The phone shell's startup has no rejection handler either — the sibling of `E2-43`, and the symptom here is an empty board with no error
 
 **WHAT.** `apps/mobile/src/app.tsx:28-60`:
