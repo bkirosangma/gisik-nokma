@@ -762,3 +762,45 @@ describe("11.217 a bar's date span is a linked DESCRIPTION, not folded into its 
     expect(marker).not.toHaveAttribute('aria-describedby');
   });
 });
+
+/**
+ * P20 (batch B15, case `11.219`) — the APG calendar-grid pattern's four
+ * roles, added to the structure that already exists: `grid` on the
+ * container, `row` on the weekday head and on each week, `columnheader` (with
+ * `aria-label` on the full weekday name) and `gridcell`. Without them the
+ * grid and week columns carried no table/grid semantics at all — a screen
+ * reader had no way to associate a day cell with the weekday column it sits
+ * under. `docs/lanes/review-ui-exec1.md:567`.
+ */
+describe('11.219 the month grid carries the APG calendar-grid roles, not position alone', () => {
+  it('grid on the container, row on the weekday head, columnheader with the full weekday name on each label', () => {
+    renderCalendar([]);
+    const grid = document.querySelector('.gn-calendar__grid');
+    expect(grid).toHaveAttribute('role', 'grid');
+    const head = document.querySelector('.gn-calendar__weekday-head');
+    expect(head).toHaveAttribute('role', 'row');
+    const headers = within(head as HTMLElement).getAllByRole('columnheader');
+    expect(headers.map((h) => h.textContent)).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+    expect(headers.map((h) => h.getAttribute('aria-label'))).toEqual([
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ]);
+  });
+
+  it('row on each week, gridcell on each day — proven present on a real cell, not just counted', () => {
+    renderCalendar([]);
+    const week = document.querySelector('[data-week="2026-08-17"]');
+    expect(week).toHaveAttribute('role', 'row');
+    const cell = document.querySelector('[data-day="2026-08-23"]');
+    expect(cell).toHaveAttribute('role', 'gridcell');
+    // A count alone would pass on the wrong seven divs (`.gn-calendar__items`
+    // sits inside the same `[role="row"]` section) — scoped to `.gn-calendar__days`.
+    const days = document.querySelector('[data-week="2026-08-17"] .gn-calendar__days');
+    expect(within(days as HTMLElement).getAllByRole('gridcell')).toHaveLength(7);
+  });
+});

@@ -133,6 +133,22 @@ const MONTH_NAMES = [
  */
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
+/**
+ * P20: the full name behind each abbreviated weekday-head label, for the
+ * `columnheader`'s `aria-label` — a three-letter abbreviation read aloud by a
+ * screen reader is easy to mishear ("Tue" as "Toe"), and the full word costs
+ * nothing the visible header still shows the short form.
+ */
+const WEEKDAY_FULL_NAMES: Record<(typeof WEEKDAY_LABELS)[number], string> = {
+  Mon: 'Monday',
+  Tue: 'Tuesday',
+  Wed: 'Wednesday',
+  Thu: 'Thursday',
+  Fri: 'Friday',
+  Sat: 'Saturday',
+  Sun: 'Sunday',
+};
+
 function monthLabel(month: CalendarMonth): string {
   const name = MONTH_NAMES[month.month - 1];
   // Refused rather than coerced, the way `monthGridWeeks` refuses its bounds:
@@ -394,10 +410,18 @@ export function CalendarView(props: CalendarViewProps) {
         own single-grid vocabulary, the same shape `.gn-list__section-title`
         and `.gn-timeline__weeks` already declare for the identical reason.
       */}
-      <div className="gn-calendar__grid">
-        <div className="gn-calendar__weekday-head">
+      {/*
+        P20: the APG calendar-grid pattern's four roles, added as attributes
+        to the structure already here — `grid` on this wrapper, `row` on the
+        weekday head and on each week, `columnheader`/`gridcell` on the
+        labels and the day cells. No markup was reshaped for this: the grid
+        already groups grid → weekday-head → week → days → day, exactly the
+        shape the pattern asks for.
+      */}
+      <div className="gn-calendar__grid" role="grid" aria-label="Calendar">
+        <div className="gn-calendar__weekday-head" role="row">
           {WEEKDAY_LABELS.map((label) => (
-            <span key={label} className="gn-calendar__weekday">
+            <span key={label} className="gn-calendar__weekday" role="columnheader" aria-label={WEEKDAY_FULL_NAMES[label]}>
               {label}
             </span>
           ))}
@@ -408,7 +432,12 @@ export function CalendarView(props: CalendarViewProps) {
           const visibleItems = expanded ? week.items : week.items.slice(0, MAX_VISIBLE_PER_WEEK);
           const folded = week.items.length - visibleItems.length;
           return (
-            <section key={week.days[0]} className="gn-calendar__week" data-week={week.days[0]}>
+            <section
+              key={week.days[0]}
+              className="gn-calendar__week"
+              data-week={week.days[0]}
+              role="row"
+            >
               <div className="gn-calendar__days">
                 {week.days.map((day) => {
                   const isToday = day === props.today;
@@ -426,6 +455,7 @@ export function CalendarView(props: CalendarViewProps) {
                       className={['gn-calendar__day', outside ? 'gn-calendar__day--outside' : '']
                         .filter(Boolean)
                         .join(' ')}
+                      role="gridcell"
                       data-day={day}
                       data-today={isToday ? 'true' : undefined}
                       data-outside={outside ? 'true' : undefined}
