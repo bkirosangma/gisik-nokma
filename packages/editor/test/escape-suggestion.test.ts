@@ -50,11 +50,23 @@ const MARK_TRIGGERS: Trigger[] = [
   { typed: 'x _it_', label: 'italic _', formatted: (e) => e.getHTML().includes('<em') },
   { typed: 'x ~~st~~', label: 'strike', formatted: (e) => e.getHTML().includes('<s') },
   { typed: 'x `co`', label: 'inline code', formatted: (e) => e.getHTML().includes('<code') },
+  // E2-46 — the TYPED markdown link, which `markdownLinks: true` (owner ruling
+  // "both", 2026-09-20) made an input-rule trigger. It belongs in this table
+  // because the escape mechanic's coverage is defined as "every trigger that
+  // fires an input rule", and this one does. ⚠ Its `typed` string carries NO
+  // TRAILING TEXT, and that is load-bearing rather than tidy — see 9.257, which
+  // measures what happens when there is some. Every other row here is in the
+  // same condition, which is what makes this table a uniform measurement.
+  {
+    typed: 'see [the doc](https://gst.gov.in)',
+    label: 'typed markdown link',
+    formatted: (e) => e.getHTML().includes('<a '),
+  },
 ];
 
 describe('escape suggestion — every reserved sequence, planted-defect style', () => {
   /**
-   * 9.88 — every reserved autoformat sequence (13 block triggers, 6 mark triggers, 19 total, table-driven) applies its formatting AND surfaces the escape suggestion, and accepting via `undoInputRule` reverses the formatting and leaves the literal typed characters.
+   * 9.88 — every reserved autoformat sequence (13 block triggers, 7 mark triggers, 20 total, table-driven) applies its formatting AND surfaces the escape suggestion, and accepting via `undoInputRule` reverses the formatting and leaves the literal typed characters.
    */
   it.each([...BLOCK_TRIGGERS, ...MARK_TRIGGERS])(
     '$label: formatting applies, the suggestion appears, accepting yields literal text',
@@ -148,6 +160,51 @@ describe('escape suggestion — every reserved sequence, planted-defect style', 
   });
 
   /**
+   * 9.257 / E2-46 — THE TYPED LINK IS COVERED BY THE ESCAPE MECHANIC, and the
+   * "asymmetry" the code and two catalogues recorded was the PROBE, not the
+   * trigger.
+   *
+   * What was recorded (`src/schema/extensions.ts`, `test/schema.test.ts` 9.95,
+   * `test-cases/16-remaining-doors.md`): *"a typed link fires an input rule but
+   * offers no escape suggestion where `**due soon**` does"*, with the cause
+   * explicitly left unestablished and an owner named for whoever came next.
+   * The two probes were not run under the same conditions: the link probe typed
+   * `'see [the doc](https://gst.gov.in) now'` — text AFTER the trigger — while
+   * the bold probe it was compared against typed `'x **b**'` with nothing after.
+   * **Continuing to type dismisses the suggestion**, which is 9.92's whole
+   * subject and the spec's own words (`escape-suggestion.ts`'s `apply`: "dismiss
+   * by continuing to type or clicking elsewhere"). So the link probe measured a
+   * dismissed chip and the bold probe a live one.
+   *
+   * This case is a 2x2, not a single reading: BOTH triggers, each under BOTH
+   * conditions. The bold row is the control — it shows the same fall-off without
+   * any link involved — so a green result here cannot be explained by "links are
+   * special". Reverse the fix and this case fails on the link-at-end row, which
+   * is the row the table above now carries.
+   */
+  it('9.257 — the typed link is offered the escape suggestion, and continuing to type dismisses it exactly as it does for bold', () => {
+    const LINK = 'see [the doc](https://gst.gov.in)';
+    const BOLD = 'x **b**';
+    const read = (typed: string): ReturnType<typeof getEscapeSuggestion> => {
+      const editor = createTestEditor();
+      typeText(editor, typed);
+      const suggestion = getEscapeSuggestion(editor.state);
+      editor.destroy();
+      return suggestion;
+    };
+
+    // The trigger is offered the suggestion — the claim the code denied.
+    expect(read(LINK)).toEqual({ literal: LINK });
+    // The control: same condition, the trigger everyone agreed was covered.
+    expect(read(BOLD)).toEqual({ literal: BOLD });
+
+    // And continuing to type dismisses it for BOTH — so the two conditions, not
+    // the two triggers, are what the recorded comparison actually differed by.
+    expect(read(`${LINK} now`)).toBeNull();
+    expect(read(`${BOLD} tail`)).toBeNull();
+  });
+
+  /**
    * 9.93 — Escape with no active suggestion is not consumed — `handleKeyDown` returns `false`, leaving the key free for whatever else wants it.
    */
   it('Escape without an active suggestion is not consumed', () => {
@@ -169,9 +226,11 @@ describe('non-triggers stay literal with no suggestion', () => {
    * `markdownLinks` was false. The owner reversed that option on 2026-09-20, so typing
    * a markdown link now CREATES the link, and the arm could only have been kept by
    * asserting the old behaviour as the current one. What replaced it is in
-   * `schema.test.ts`, which pins what the typed link now does — **including the escape
-   * suggestion it measurably does NOT offer, which is recorded there as a finding with
-   * an owner rather than silently absorbed here.**
+   * `schema.test.ts`, which pins what the typed link now does, **and in this file's
+   * own trigger table plus 9.257**, which pin that the typed link IS offered the
+   * escape suggestion. (This sentence previously claimed the opposite — that the
+   * suggestion is "measurably NOT offered". E2-46 measured it and that is false;
+   * 9.257 is the 2x2 that separates the trigger from the probe's conditions.)
    */
   it.each([
     { typed: 'a | b | c', literal: 'a | b | c' },

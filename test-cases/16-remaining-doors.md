@@ -1165,5 +1165,10 @@ using, and `docker compose` is forbidden in this topology. Owner: whoever next r
 - ⚠ **`plainTextDoc`'s name now under-describes it** (it parses). Kept deliberately — the reversal's record belongs on
   the symbol the decision was written about, and a rename detaches them — with the accurate spelling `markdownToDoc`
   named in its docblock. **Owner: whoever next renames the seed's doc layer.**
-- ⚠ **The link rule offers no escape suggestion where the bold rule does** — measured in `9.95`, cause NOT established,
-  recorded with a named owner in `packages/editor/src/schema/extensions.ts` rather than guessed at here.
+- ✅ **CLOSED 2026-09-21 by E2-46 — the link rule DOES offer an escape suggestion, exactly as the bold rule does, and this
+  bullet used to say the opposite.** The recorded measurement (`9.95`) compared two probes that were not run under the same
+  conditions: the link probe typed `see [the doc](https://gst.gov.in) now` — text AFTER the trigger — while the bold probe
+  typed `x **b**` with nothing after, and continuing to type dismisses the suggestion by design (case `9.92`). The link chip
+  was dismissed, not absent. Case `9.257` is the 2x2 that separates the trigger from the probe's conditions, and the typed
+  link is now a row in `9.88`'s trigger table. No production behaviour changed — the mechanism was always generic; the record
+  was the defect. Recorded in `packages/editor/src/schema/extensions.ts` and `packages/editor/test/schema.test.ts` (`9.95`).

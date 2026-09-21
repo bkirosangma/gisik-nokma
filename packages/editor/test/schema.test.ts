@@ -351,13 +351,23 @@ describe('behavioural options that spec §2 constrains', () => {
    * character through `handleTextInput`, which is where input rules — and only input
    * rules — fire.
    *
-   * ⚠ AND IT RECORDS AN ASYMMETRY RATHER THAN ABSORBING IT: typing this link does NOT
-   * offer the escape suggestion that `**due soon**` offers, even though both fire an
-   * input rule and both are formatting the escape mechanic exists to let a user keep
-   * literal. Measured, not inferred — a probe typed both and read
-   * `getEscapeSuggestion` on each. **The cause is NOT established here, and this
-   * comment says so rather than guessing at one.** Owner: whoever next touches
-   * `extensions/escape-suggestion.ts`'s trigger coverage.
+   * ⚠ IT ONCE RECORDED AN ASYMMETRY HERE — "typing this link does NOT offer the
+   * escape suggestion that `**due soon**` offers" — with the cause left
+   * unestablished and an owner named. **E2-46 measured that claim and it is
+   * FALSE.** The two probes were not run under the same conditions: this case
+   * types `'see [the doc](https://gst.gov.in) now'` — text AFTER the trigger —
+   * while the bold probe it was compared against typed `'x **b**'` with nothing
+   * after. Continuing to type DISMISSES the suggestion (case 9.92, and
+   * `escape-suggestion.ts`'s own `apply`: "dismiss by continuing to type or
+   * clicking elsewhere"), so the link probe read a dismissed chip and the bold
+   * probe a live one. The typed link is covered, and
+   * `test/escape-suggestion.test.ts` now carries it as a trigger-table row plus
+   * the 2x2 in 9.96 that separates the trigger from the probe's conditions.
+   *
+   * This case's own subject is unchanged — it is about the TYPING path turning
+   * `[text](url)` into a link, and its trailing ` now` is load-bearing for the
+   * "the prose around it is untouched" assertion below. Only the asymmetry
+   * paragraph was false, and only it has changed.
    */
   it('turns a TYPED [text](url) into a link, with its text intact', () => {
     const editor = createTestEditor(undefined, emptyDoc());
