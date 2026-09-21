@@ -3997,3 +3997,37 @@ badge spelling in a `Features.md` count (§54.1), a JS-shaped test pattern over 
 without type arguments (§62.1), and a prose mention of a DDL keyword counted as DDL (§54.3). **That root is the
 same one every finding in `§16` names, and finding it in my own instruments ten times is the strongest evidence
 this report offers that the defect class is real and not a stylistic complaint.**
+
+## 63. Round 2 — §3 at fifteen, and the bullet that had already corrected its own count
+
+### 63.1 `Features.md:53` — the List view's pure model, six named functions
+
+*"`TicketList` + `useTicketList(source, workspaceId, projectId, currentUserId, filter?)`, with the pure model
+beside it (`countRows`, `groupRows`, `nestRows`, `visibleNodes`, `recentlyAssignedRows`, `columnLabel`)"* — **all
+six are exported from `packages/app-core/src/views/list-model.ts`**, one file, as the bullet implies by naming
+them together. **Verified clean.** The bullet's second claim — *"five groupings proven to rearrange the same rows
+with the same counts"* — I did **not** check: it is a claim about five distinct test arrangements, and counting
+`groupings` in the source would tell me how many exist, not that five of them have been *proven* to rearrange
+identically. **Recorded as read, not verified**, rather than counted and called measured.
+
+### 63.2 `Features.md:86` — the bullet that had already removed its own count
+
+*"**Passwordless sign-in — only the methods that can work, and nothing password-shaped** — magic link
+unconditionally; phone OTP (two steps …) only where an SMS channel exists; Google and Apple only where configured;
+**passkey by an explicit button** …"*, followed immediately by: *"**The title of this bullet used to say 'all four
+methods', and each round since has remove[d]** …"*.
+
+**This is the third kind of hygiene this report has now recorded in `Features.md`, and the best of the three.**
+§3:20 **refused to state a count** and justified the refusal (§55); §3:83 and §3:74 **corrected their own earlier
+numbers in place** with the withdrawal kept visible (§59); and this one **deleted the count from the title
+entirely** and left the history of why. **Three different remedies for the defect `E3-29` names, all three in the
+same file that contains `E3-29`** — and `E3-29`'s own bullet at §5:397 is the one that did none of them. **The
+catalogue is not unaware of the problem. That is precisely what makes §5:397 a finding rather than a house style.**
+**Verified clean**, and no count is asserted here to check.
+
+### 63.3 §3 at fifteen
+
+**Fifteen countable claims checked in §3, fifteen exact.** No finding in §3. Fifty-three of its 68 candidate
+countable bullets remain unchecked. **Ten wrong numbers of my own against fifteen clean claims** — and §63.1 is
+the first place in this report where I have written *"read, not verified"* **instead of** finding a countable proxy
+and treating it as the claim, which is the substitution that produced most of the ten.
