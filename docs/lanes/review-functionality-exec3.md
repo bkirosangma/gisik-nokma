@@ -729,3 +729,246 @@ Stated so a reader with limited budget knows where to aim it.
 
 *No fix was made. No branch for a fix exists. `git status --porcelain` on `exec3/review-functionality` is
 empty apart from this file.*
+
+---
+---
+
+# ROUND 2 — the relook
+
+**Branch:** `exec3/review-functionality-r2`, cut from `origin/main` `a7b6292b78c50208e8055c9f8639b1e8dcf4caa0`.
+**Everything above is round 1, unchanged, and stands as my base score.** This section adds round-2
+findings, re-validates the round-1 ones at the new base, and restates the coverage boundary.
+
+## 13. THE LEDGER IDS — my round-1 findings, mapped
+
+The rules number findings `E<lane>-<n>`. My round-1 report used prose ids `F1`–`F8`; the mapping is
+one-to-one and is given here so the judge's ledger can cite either. **New round-2 findings continue from
+`E3-9`.**
+
+| ledger id | round-1 id | what it is | re-validated at `a7b6292b`? |
+|---|---|---|---|
+| `E3-1` | F1 | stale open-gap declaration in the delete-rule enumeration | **YES** |
+| `E3-2` | F2 | false warrant on the (c) survivor measurement | **YES** |
+| `E3-3` | F3 | my own lane's prototype citations (off by one; wrong artifact) | **YES** |
+| `E3-4` | F4 | `my-work.ts:364` survivor | **YES** |
+| `E3-5` | F5 | replica `:996`/`:1029` survivors | **YES** |
+| `E3-6` | F6 | unreproducible 13/9 count | **YES** |
+| `E3-7` | F7 | my own §17 block table | **YES** |
+| `E3-8` | F8 | `check:db-tz` unwired | **YES** |
+
+### 13.1 How they were re-validated, and the strongest fact about that
+
+**`apps/` and `packages/` are byte-identical between the two bases.** Measured:
+`git diff --stat e4baa425 a7b6292b -- apps/ packages/` returns **nothing**. The only file main gained
+between my base and the r2 base is (per §13.2) outside my findings, and the prototype copy is unchanged
+too (`design-system/interactive/desktop.dc.html` still `2cda054b4320ebb6`). So every code-grounded finding
+above re-validates *by construction* — and I still re-ran each measurement rather than reasoning from
+that, because "the trees are identical" is exactly the claim that would make a stale re-validation
+invisible:
+
+```
+grep -c "deleted" apps/server/src/routes/attachments.ts   → 5      (E3-1 holds; claim says ZERO)
+grep -c "deleted" apps/server/src/routes/tickets.ts       → 13     (E3-1 holds; claim says 6)
+grep -n "ZERO times" soft-delete-background-paths.test.ts → :143   (E3-1 holds; section unamended)
+grep -n "from '@gisik-nokma/app-core'" dual-client/rig.ts → :32    (E3-2 holds; package-name import)
+grep -rn '\${LIVE_TICKET_WHERE}' apps/server/src          → 9 executable, 10th is a docblock (E3-6 holds)
+grep -rn 'LIVE_TICKET_WHERE,' apps/server/src             → 5 array members (E3-6 holds)
+grep -c "check-db-timezone\|check:db-tz" .github/workflows/ci.yml → 0   (E3-8 holds)
+grep -c "^| \*\*exec" test-cases/17-open-work.md          → 1      (E3-7 holds; one lane row)
+shasum -a 256 design-system/interactive/desktop.dc.html   → 2cda054b4320ebb6 (E3-3 holds)
+```
+
+**No round-1 finding is withdrawn.** I stand behind all eight. ⚠ *One of them is weaker than the others
+and I say so rather than let the ledger discover it:* **`E3-8`** (`check:db-tz` unwired) was filed as
+"Low / observation" precisely because CI may have no provisioned database to point it at, and I could not
+determine intent from the tree. It is honest, it is bounded, and it is the one I would least defend.
+
+---
+
+## 14. ROUND-2 FINDINGS
+
+## 14.1 — `E3-9` (r2) — MINOR — A "thirteen fields" claim is false: the envelope schema has **eleven**
+
+**WHAT.** `packages/domain/src/ledger-event.ts:16-18` — the docblock explaining why
+`ledgerEventSchema` is derived from `eventEnvelopeSchema` rather than restating it — reads:
+
+> It is `eventEnvelopeSchema` intersected with the cursor rather than a second spelling of the envelope,
+> so **the thirteen fields have exactly one definition** and this schema inherits the membership
+> coherence check with them.
+
+**WHY it is wrong.** `eventEnvelopeSchema` has **eleven** fields, measured at runtime (§14.3 gives the
+probe). The sentence is about the ENVELOPE's fields and the number is not the envelope's.
+
+**WHERE THE THIRTEEN COMES FROM, measured rather than guessed — and this is what makes it a finding
+rather than a typo.** The `events` TABLE has exactly **thirteen columns**:
+
+```
+id, workspace_id, entity_kind, entity_id, type, version, payload,
+actor_id, origin, client_time, server_time, seq, workspace_seq
+```
+
+(`apps/server/migrations/1787841717635_events-and-snapshots.sql`, `CREATE TABLE events` — 13 column
+lines, counted). A neighbouring file in the same subsystem says the same thing about the same number:
+`apps/server/test/helpers/ledger.ts:11` — *"The plan text spelled the **thirteen-column** `INSERT INTO
+events` out again here."* **So 13 is the ledger table's column count**, and the envelope's `entity` field
+becomes TWO columns (`entity_kind`, `entity_id`) while the table adds `workspace_seq` — 11 + 1 + 1 = 13.
+The number was carried from the row shape into a sentence about the schema. **Both numbers are right
+about their own subject; the sentence joined them.**
+
+**WHAT WOULD HAVE BEEN BETTER.** *"the eleven fields have exactly one definition"*, or — better, and the
+form this repo prefers elsewhere — name the thing instead of counting it: *"so the envelope's fields have
+exactly one definition"*. The count adds nothing the sentence needs, and it is the kind of number that
+cannot self-correct: nothing in the tree re-derives it, and the file has no test that reads it.
+
+**SEVERITY: Minor.** Prose only; no behaviour depends on it, and the schema itself is correct and
+inherits exactly what the sentence claims. It is filed because it is a **count in load-bearing prose that
+no instrument checks** — the same class as `E3-6`, in a package where my round-1 report recorded **zero**
+findings (§2), which is the part I most wanted to re-check.
+
+**MEASUREMENT.** Runtime probe, `packages/domain`, this sha — see §14.3. Plus the sweep that shows the
+claim is unique: `grep -rn "thirteen fields"` over `packages apps docs test-cases` returns exactly two
+hits, `src` and its built `dist/*.d.ts` copy — so this is one sentence, not a propagated belief.
+
+---
+
+## 14.2 — `E3-10` (r2) — MINOR — The arithmetic of a stated correctness invariant is stale by two in **both** numbers
+
+**WHAT.** `apps/server/src/sync/sync-routes.ts:31-33` states a load-bearing invariant and its arithmetic:
+
+> **This list plus `TICKET_EVENT_TYPES` must equal the registry's whole `entityKind: 'ticket'` set**, or
+> "snapshot + tail ≡ full replay" is false for any ticket whose stream carries the missing type below its
+> snapshot seq. The registry binds **SIXTEEN** types to that kind (`vocabulary.ts`);
+> `TICKET_EVENT_TYPES` is **thirteen** of them, and the three it omits — `visibility.set`,
+> `claim.contested`, `claim.contested_resolved` — are exactly the three below that are not also folded.
+
+**WHY it is wrong.** Measured at `a7b6292b`:
+
+| | claimed | **measured** |
+|---|---|---|
+| registry types bound to `entityKind: 'ticket'` | SIXTEEN | **18** |
+| `TICKET_EVENT_TYPES` entries | thirteen | **15** |
+| types omitted by `TICKET_EVENT_TYPES` | three (named) | **three — correct, and the three named are the right three** |
+
+**THE INVARIANT ITSELF STILL HOLDS, and I checked rather than assuming** — this is the important half,
+because the numbers being wrong does not make the coverage wrong. Set arithmetic over the two lists
+against the registry:
+
+```
+registry ticket-kind distinct types          = 18
+TICKET_EVENT_TYPES (15) ∪ BOOTSTRAP_BACKFILL_TYPES (5) = 18
+ticket-kind types in NEITHER list            = 0     ← the invariant holds
+```
+
+So `visibility.set`, `claim.contested` and `claim.contested_resolved` are covered by
+`BOOTSTRAP_BACKFILL_TYPES`, and no type is missing. **The defect is the arithmetic a reader would use to
+verify the invariant, not the invariant.**
+
+**WHY THIS ONE MATTERS MORE THAN ITS SIZE, and the docblock says so itself.** Six lines below, the same
+comment records that this exact pair has already drifted once: *"**FIFTEEN and twelve until Task 3 of the
+second wave (2026-09-18)** … because BOTH numbers moved together when Task 1 registered `ticket.ranked`: a
+reader who trusted the old pair would compute the wrong total for the list below and **conclude a type
+was missing**."* The sentence was corrected to 16/13 then — and has drifted to 18/15 now, **for the same
+documented reason, in the same direction**. A reader who takes "thirteen" and counts the fifteen names
+under it concludes the registry has grown two types that neither list carries, and goes hunting for a
+hole that is not there. **This is the second drift of a sentence whose own text is about drifting.**
+
+**WHAT WOULD HAVE BEEN BETTER.** Either re-state the numbers in the same commit as any registration that
+moves them — which the 2026-09-18 note shows the project already knows how to do — or stop counting:
+the invariant is *"this list plus `TICKET_EVENT_TYPES` equals the registry's ticket kind set"*, and the
+counts are decoration. **The durable fix is a check**, and the comment already names what blocks it
+(*"the membership rule above is held by this comment and by arithmetic done once, NOT by a check"*, with
+the reason: 12.94's hardcoded literals must be able to shrink independently). I did **not** find a test
+that asserts the union, so the absence the comment names is real — see §14.4 for the sweep.
+
+**SEVERITY: Minor.** No behaviour changes; the invariant holds. Filed because the number is the
+instrument a reader uses on a correctness property, and it is wrong by two in a way that inverts the
+conclusion.
+
+**MEASUREMENT.** §14.3. The registry set is derived by parsing `vocabulary.ts`'s 34
+`domainRegistry.register(` blocks for their `type` and `entityKind`, then taking the distinct types whose
+kind is `'ticket'` — the registry exposes no enumerator (`registry.ts` has only `register`/`get`/
+`hasType`), so the registrations ARE the list. `TICKET_EVENT_TYPES` and `BOOTSTRAP_BACKFILL_TYPES` are
+read verbatim from their declarations.
+
+---
+
+## 14.3 THE PROBE — one file, run once, deleted in the same command
+
+Both counts above come from a probe I wrote, ran, and **removed in the same shell invocation**, verified
+absent afterwards (`git status --porcelain` empty). No file of mine lives in the tree; the probe is
+reproduced here in full so the judge can re-run it.
+
+```ts
+// packages/domain/test/zz-e3-probe.test.ts   (created, run, deleted — never committed)
+import { describe, expect, it } from 'vitest';
+import { eventEnvelopeSchema } from '../src/envelope.js';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function keysOf(s: any): string[] {
+  const d = s?._def ?? {};
+  if (d.typeName === 'ZodEffects') return keysOf(d.schema);
+  if (d.typeName === 'ZodIntersection') return [...keysOf(d.left), ...keysOf(d.right)];
+  if (d.shape) return Object.keys(typeof d.shape === 'function' ? d.shape() : d.shape);
+  return [];
+}
+
+describe('E3 probe — envelope field count', () => {
+  it('reports the real key count', () => {
+    const keys = keysOf(eventEnvelopeSchema);
+    console.log('PROBE count =', keys.length, '::', keys.join(','));
+    expect(keys.length).toBeGreaterThan(0);
+  });
+});
+```
+
+**Output:** `PROBE count = 11 :: id,workspaceId,entity,type,version,payload,actorId,origin,clientTime,serverTime,seq`
+
+⚠ **AND THE FIRST VERSION OF THIS PROBE FAILED, WHICH IS WORTH RECORDING.** It called
+`Object.keys(schema.shape)` and threw, because `.superRefine()` returns a `ZodEffects` and a `ZodEffects`
+has no `.shape` — the walk has to unwrap `_def.schema` first. A probe that throws proves nothing about
+the thing it was probing for. I fixed the walk and re-ran rather than reporting the throw as a finding
+about the schema.
+
+---
+
+## 14.4 WHAT I CHECKED AND COULD **NOT** FALSIFY (round 2) — recorded so nobody re-spends here
+
+- **The union invariant has no test.** `grep -rn "TICKET_EVENT_TYPES\|BOOTSTRAP_BACKFILL_TYPES"` over all
+  `*.test.ts` finds 8 files, and the closest is `apps/server/test/sync/bootstrap.test.ts:430`, which
+  says its literals are *"hardcoded here (not imported from `BOOTSTRAP_BACKFILL_TYPES`)"* — deliberately,
+  so the check cannot inherit a derived list. **So the comment's own admission is accurate: the rule is
+  held by prose and by arithmetic done once, not by a gate.** That is a real robustness observation and I
+  am **not** filing it as a finding: the comment names it, names the reason, and names an owner
+  (*"whoever registers the next ticket-entity event type"*). A finding has to be something the product
+  does not already record and reason about.
+- **The event-type dispatch's `default: { refused: false }`** (`packages/rule-engine/src/evaluate.ts`):
+  16 of 33 registered types are checked; 18 pass through. **Not a defect** — the docblock states the
+  design, ingest owns envelope validation, and the authority half runs at `checkPermission`. I could not
+  construct a type whose pass-through admits something it should refuse.
+- **`.skipIf` / `.skip` / `.todo` / `.fails`:** 6 `.skipIf(` occurrences, all in `apps/server`, all inside
+  the two suites `check-skipif-coverage` and `check-no-silent-skips` are built to police; **zero**
+  `.skip(`, `.todo(`, `.fails(` in the whole test tree. Nothing is hidden that way.
+- **`packages/domain` (548 tests) and `packages/rule-engine` (345 tests) run green** at this sha.
+- **`iconLink` is the only optional field of `DriveReference`** — `attachment-kinds.ts:2` and `:68`, and
+  the guard at `:72-83` treats it as such. **Holds.**
+- **The permission door set is uniform**: 54 registrations, 49 with `requireSession`, 5 public by design,
+  and **no route uses a weaker guard** (re-measured at this base — see `E3-7`'s note in §7.3).
+
+## 14.5 HOW I USED THE GRAPH (§6 order), and what it saved
+
+- **`graphify-out/GRAPH_REPORT.md`** first: read the Summary, **God Nodes** (`:690`) and **Surprising
+  Connections** (`:702`) before opening any file. The god nodes are `createTestDatabase()`,
+  `TestDatabase`, `Queryable`, `buildProjectionRegistry()`, `testEnvelope()`, `signInWithPhone()`,
+  `stubServices()` — i.e. **the corpus's hubs are test infrastructure, not product code**, which told me
+  cheaply that a "what depends on what" question would return the harness rather than the product, and
+  that reading product files directly was the better use of the next hour.
+- ⚠ **The graph is STALE against my base, and I state it rather than relying on it silently:**
+  `GRAPH_REPORT.md:12-15` says *"Built from commit: `e2769d60`"*, while my base is `a7b6292b`. The report
+  also claims 10,970 nodes / 19,700 edges against the launch prompt's 10,670 / 19,406 — **two different
+  readings of the same file**, so I used the graph for **orientation only** and took every number I
+  filed from a measurement I ran. §6's own warning applies: *the graph locates; it does not verify.*
+- **No `/graphify query` was run**: the two findings above came from following a docblock's own
+  cross-references (`ledger-event.ts` → `envelope.ts` → the `events` migration; `sync-routes.ts` →
+  `vocabulary.ts` + `ticket-state.ts`), which is cheaper than a BFS for a question that already has a
+  pointer. Where the graph would have paid — *"what else reads this constant?"* — `grep` was cheaper
+  still, and I used it with a positive control on every sweep.
