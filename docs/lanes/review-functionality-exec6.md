@@ -1375,7 +1375,9 @@ nothing; `grep -n leav docs/manual.md docs/faq.md` → comments and defaults onl
    `membership.granted` filed by an admin through `POST /v1/events` (the door E6-12's probe used) is not. And
    the product lets a person undo comparable standing elsewhere: an assignee may unassign themselves
    (`ticket.assigned` with `assigneeId: null` is gated by `canSee` alone, `check-permission.ts:1048`) — but a
-   member may not un-member themselves.
+   member may not un-member themselves. The same holds one level down, read at the line: `project.member_removed`
+   asks only `hasProjectAdminRights` (`check-permission.ts:683-687`), so a plain member cannot leave a project
+   either (not measured; the gate has no self arm to reach).
 
 **WHAT WOULD HAVE BEEN BETTER.** One arm in `checkRolePermission`: `membership.revoked` with
 `payload.userId === sessionUserId` is allowed for any role **unless** the actor is the sole owner (the
