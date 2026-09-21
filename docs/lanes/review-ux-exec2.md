@@ -247,6 +247,31 @@ asserts `expect(screen.getByRole('link', { name: 'Settings' })).toBeInTheDocumen
 whose own name is *"THE JITTER. Owner: 'the nav bar item jitters on changing pages.'"*. So the Settings
 link is not merely present in the source; it is rendered by a suite the gate collects.
 
+**PAINTED CONFIRMATION, added after filing, from the browser I had said I did not have.** I did not open
+the app during round 1 or most of round 2; my report said so in three places. Late in phase 2 I found that
+a browser *is* available to this lane, and the first thing worth doing with it was the page my largest
+finding is about. **Navigated read-only to `/help` on the owner's running dev stack** (`localhost:3001`),
+which serves the primary checkout at `e2769d60` — **code-identical to this report's base `a7b6292b`**,
+measured earlier as *zero* non-doc changes between them, which is what makes the observation a reading of
+the reviewed tree rather than of a neighbour. Nothing was created, changed or submitted through it.
+
+**One screen, one moment, both halves of row (a):**
+
+- `nav.gn-nav` renders links whose text and hrefs are exactly
+  `[Workspaces → /workspaces, **Help → /help**, Account → /account, "" → /inbox]`, and
+  `document.querySelector('nav.gn-nav a[href="/help"]')` is non-null;
+- the page body, on that same screen, contains the sentence *"Plus your name and a Sign out button on the
+  right. **That is the entire menu. There is no settings link, no search box, and no help link.**"*
+  (`manualRenderedOnThisPage: true`, `manualSaysNoHelpLink: true`);
+- and the bar has **no avatar button** (`hasAvatarButton: false`) and prints no name, because signed out
+  there is no `AccountMenu` — so row (b)'s *"your name and a Sign out button on the right"* is painted as
+  absent too.
+
+**So the manual's §2 denial renders on the same page as the help link it denies.** I had argued this from
+`app-nav.tsx:333-342`; the painted page is the same claim without the reader having to open a file, and it
+is the strongest form the finding can take — a person reading §2 while looking at the bar can see the
+sentence is false. It also sharpens the remedy: this is not a subtle staleness, it is a contradiction
+visible in one viewport.
 **SEVERITY: Important.** I considered Critical and declined: nothing is destroyed, no wrong write is
 made, and the person can discover the truth by looking at the bar. What is wrong is that the product's
 own help misdescribes the product — repeatedly, and in the direction that makes it look less capable
@@ -1015,8 +1040,14 @@ arms), the ticket sheet's parent indicator, subtask section, comment mount and v
 7. **The workflow builder and the ticket-type editor** (`packages/app-core/src/workflow-builder/**`,
    36 files) — not walked.
 8. **`test-cases/13-*.md`** — not verified id by id (see §5).
-9. **No running browser.** I did not open the app. `:3001` serves executor 1's worktree, not this one,
-   and I did not bind `:3021`. **Every finding above is a code reading**, not an observation. Where a
+9. **A browser — CORRECTED, because the original of this paragraph was wrong and said I had none.** It
+   read: *"**No running browser.** I did not open the app."* A browser **is** available to this lane, and
+   late in phase 2 I used it: read-only, against `localhost:3001` (`e2769d60`, code-identical to this
+   report's base). What remains true is the **bound**: the browser has **no session**, and the dev stack's
+   sign-in needs a credential this lane does not hold, so I could measure only the **signed-out** surfaces
+   — which is exactly one page, `/help`, and it was enough to paint the contradiction `E2-1` (row (a) and
+   row (b)) is about. **Every other finding in this report is still a code reading**; I did not bind
+   `:3021` and I ran no mobile or desktop shell. Where a
    reading could not settle a question I have said so at the site: **F9's reachability** (reasoned, not
    driven) and **F1 row (e)** (dependent on a runtime editor mount). The prototype half of F7 was
    written as inherited and **was then opened directly** (`Gisik Nokma - Desktop.dc.html:2904/2920/2923/2927`)
@@ -1245,7 +1276,8 @@ myself**. Status at this push:
 (`aria-modal="true"`, no focus trap) overlaps **exec 1's `P8`, which this judge already ruled on** —
 *"`aria-modal="true"` at `dialog.tsx:20` and `sheet.tsx:103`; attribute-level `inert` sweep → empty"*
 (`review-compiled-controller.md:86`). Round-2 §3 gives **0** to a re-finding that adds nothing, and the
-added measurement I would need (a keyboard-tab reproduction) needs a browser I do not have. I am verifying
+added measurement I would need (a keyboard-tab reproduction) needs a browser I do not have **signed in** —
+this lane has a browser but no session (see §6, item 9). I am verifying
 the *distinct* halves rather than re-raising the same claim, and I will say which I filed and which I did
 not.
 
@@ -2298,7 +2330,8 @@ extended the check to the ones I could falsify by reading. **Every one holds.**
 | `E4-3` (lane 4) | every board card's `who · when` toggle is under the floor **and no rule admits it** | `ui.css:990-998` = `.gn-board-card__provenance { font: inherit; font-size: 0.78rem; border: none; background: none; color: …; cursor: pointer; padding: 0.2rem 0 0; text-align: left; }` — **no min size** | **holds** |
 
 **Nine peer findings checked across all three lanes; nine hold.** Their painted measurements I cannot
-reproduce (no browser here), but every *source* clause they rest on — the one thing I can test — is exact,
+reproduce (no **signed-in** browser here), but every *source* clause they rest on — the one thing I can
+test — is exact,
 including two where I went looking for the falsifying CSS rule and found the rule says what they say it
 says.
 ⚠ **And one I nearly filed and did not.** `E5-17`'s *title* suggested the revoke surface was unreachable, and I had a falsifying measurement ready: `McpTokensScreen` **is** mounted on `/account`
@@ -2593,7 +2626,7 @@ supplier, and the guard is doing its job rather than failing at one. **Not filed
 focus move, no trap and no focus return — I read all 24 lines. **But the round-1 judge already ruled it**
 (`review-compiled-controller.md:86`: *"`aria-modal="true"` at `dialog.tsx:20` … attribute-level `inert`
 sweep → empty"*), and round-2 §3 gives **0** to a re-finding that adds nothing. The added measurement I
-would need is a keyboard-tab reproduction, which needs a browser I do not have. **Not filed** — and I say
+would need is a keyboard-tab reproduction, which needs a browser I do not have **signed in**. **Not filed** — and I say
 so rather than filing it quietly for points. The two *distinct* halves I could measure are `E2-34`.
 
 ### ❌ The sweep's narrow-viewport gap (`M3`) — **the coverage exists, in the other suite**
@@ -2699,7 +2732,8 @@ screen (330 lines) and the desktop theme module — all named below.
 **Still not reached, and it is a shorter list than round 1's:** mobile's `help-screen.tsx`,
 `editor-web-view.tsx`, the two storage adapters and desktop's `theme.ts` and storage adapter; `packages/ui`'s
 three files `E2-25` needed; `/members` and `/settings` as screens; `packages/ui`'s eleven other
-components; the 13.x case catalogue id by id; and **no browser has been opened** — every finding here is a
+components; the 13.x case catalogue id by id; and — **corrected**: a browser IS available to this lane and
+was used once, read-only, on `/help` (see §6 item 9 and `E2-1`) — **every finding here except that one is a
 code reading, and each one says where that limits it.
 
 **How the graph was used (§6), stated for the judge.** Before opening anything I read
