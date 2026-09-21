@@ -516,7 +516,7 @@ none is noted for the judge without a claim.
 
 ---
 
-### E5-13 — IMPORTANT · After a failed preferences read, `/account` paints all five notifications ON and one toggle PUTs a whole document built from that guess — silently overwriting whatever the person had muted `[BROWSER, reproduced with zero server writes]` `[SOURCE]` (verifies exec 2 §2e's "two account sections with no error prop", and goes further)
+### E5-13 — CRITICAL · After a failed preferences read, `/account` paints all five notifications ON and one toggle PUTs a whole document built from that guess — silently overwriting whatever the person had muted `[BROWSER, reproduced with zero server writes]` `[SOURCE]` (verifies exec 2 §2e's "two account sections with no error prop", and goes further)
 
 **WHAT.** `account/page.tsx:81` `notificationPreferences.load().then(setPrefs, () => setPrefs({ mutedKinds: [] }))`.
 `toggleKind` (`:215-232`) builds `next` from `prefs.mutedKinds` and `save(next)` PUTs the WHOLE document — the
@@ -550,9 +550,10 @@ sessions (`:91`).
 `[SOURCE]` `account/page.tsx:74-81`, `:91`, `:180`, `:215-232`; `passkeys-section.tsx:96-97`; `notification-preferences-gateway.ts:18-22`;
 `sessions-section.tsx:56-63`.
 
-**SEVERITY: Important** (claimed). A person's stored settings are overwritten by a default the product itself says it
-is not asserting. I considered Critical (data loss) and held at Important because the loss is a preference document,
-re-settable in five clicks once noticed — but it will not be noticed.
+**SEVERITY: Critical** (claimed). A person's stored settings are overwritten by a default the product itself says it
+is not asserting, silently, with no way to notice. On my scale that is data loss caused by a failed read — the same
+class as the accepted `exec2-V2` (a failed re-read destroys an invitation URL). The loss is a preference document,
+re-settable once noticed; it will not be noticed, because nothing on the page says the read failed.
 
 ---
 
@@ -770,10 +771,10 @@ posted comment.
 
 **WHY.** exec 2's `F1(e)` showed the web HALF of that manual sentence is false (the web has a composer) and said
 *"I verified the web half only."* The phone half is false in the other direction: the button is there and what it
-files can never be committed as the person who typed it — for an assigned ticket it is a claim in another member's
-name, which is the one thing `provenance.ts`'s honesty contract and `IDENTITY_SPOOF_REASON` exist to refuse. The
-words typed are lost at the first sync that has a session, and the manual's `:1203-1213` caveats ("Treat both as
-early") do not mention that a phone comment is filed as somebody else.
+files can never be committed — the actor on the event is not the session's, and `IDENTITY_SPOOF_REASON` exists to
+refuse exactly that, so the refusal is guaranteed by construction. The words typed sit in a local queue that will be
+refused at the first sync that has a session, and the app reports nothing at either moment. The manual's
+`:1203-1213` caveats ("Treat both as early") do not mention that a phone comment cannot be posted.
 
 **WHAT WOULD HAVE BEEN BETTER.** Until the phone has a session, withhold the Comment control with a sentence
 (the New-ticket rule: asks before it offers) rather than accept into a queue that will be refused; and correct the
@@ -782,9 +783,8 @@ manual sentence to say the web has the thread and the phone does not yet post on
 **MEASUREMENT.** `[SOURCE]` `ticket-screen.tsx:36-57`, `:54`, `:126`; `check-permission.ts:542-545`;
 `sync-service.ts:318-324`; `docs/manual.md:363-366`, `:1203-1216`. Not driven: no phone, no mobile session.
 
-**SEVERITY: Important** (claimed). A person loses the words they typed (Critical on my scale) — held at Important
-because the manual already flags the phone app as untested and early; the finding is that it flags the wrong
-danger.
+**SEVERITY: Important** (claimed). The manual already flags the phone app as untested and early; the finding is that
+it flags the wrong danger and sends people to the phone for the one thing the phone cannot do.
 
 ---
 
@@ -900,9 +900,10 @@ close it.
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
 **23 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 23). By claimed severity, read from the
-heading text: **Critical 0 · Important 16 · Minor 7** (16 + 7 = 23).
+heading text: **Critical 1 · Important 15 · Minor 7** (1 + 15 + 7 = 23).
 
-- **Important (16):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-13, E5-15, E5-16, E5-20, E5-21
+- **Critical (1):** E5-13
+- **Important (15):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21
 - **Minor (7):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
@@ -1029,11 +1030,14 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 
 - exec 2's `V8` ("Opening any parent ticket raises a false alert") — I opened a parent-less child only; **not** tested.
 - exec 2's `F9` reachability (comment box on a refused post) — not tested.
+- exec 2's `V1` (empty board invites a create; no web caller wires `onCreateTicket`) — **checked and it HOLDS**:
+  `grep -c onCreateTicket apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` → 0 at `a7b6292b`, and my painted
+  empty columns showed the `+` glyph with *"No tickets in this column."* and no button. Not a refutation.
 - Nothing I measured contradicts a landed exec 2 finding. **I have no refutation to file at this time**; if I find one
   in the remaining window it goes to `docs/lanes/review-refutations-exec5.md`.
 
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 23 findings — Critical 0 · Important 16 · Minor 7 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 23 findings — Critical 1 · Important 15 · Minor 7 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
