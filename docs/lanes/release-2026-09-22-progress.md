@@ -54,3 +54,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E4-6 | done | abc431e2 | picker labels name||email||id; app-core views 550 tests green |
 | B17 | claimed | 2026-09-21 20:15 | /Users/kiro/my_projects/gisik-nokma-ds3 |
 | T-E6-7 | done | ad7aac74 | convention recorded + pinned by BOTH runners (check:migrations self-test and 13.903); /tmp/ds3-e6-7-tooling-red.log -> /tmp/ds3-e6-7-tooling-green.log; finding's "1e11" corrected to the measured 1e8 |
+| T-F8-fn | done | baa2f8b1 | prose-only: the exclusion is recorded in ci.yml check-env + the script docblock; comments-only proven by a stripped diff; finding's "eight" universe corrected (check-help is not one of the nine) |
