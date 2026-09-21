@@ -2838,3 +2838,19 @@ to guess from.*
   the workspace/entity/type/payload/origin pass through unchanged. —
   (`apps/mobile/src/screens/ticket-comment.test.ts`)
 
+## Ruling E2-43 — the desktop shell's own init catches its rejection now (2026-09-21, B14)
+
+*`App`'s init IIFE built the whole replica stack inside `void (async () => {...})()` with no `catch`,
+and `ds === null` gated the render forever, so any rejection in the four awaits (storage, replica,
+outbox/transport/engine, data source) left the shell on "Opening local replica…" with nothing on
+screen. Fixed by splitting the pipeline into `init-replica.ts`'s `initReplica`, injected with the real
+factories, returning `{ok:false, error}` instead of letting the rejection escape.*
+
+- 12.402 ✅ `initReplica` reports the failure instead of rejecting when the storage adapter fails to
+  open — RED confirmed against the pre-fix function (an unhandled rejection), GREEN after. `App`
+  renders the message as `<p role="alert">` in place of "Opening local replica…". —
+  (`apps/desktop/src/init-replica.test.ts`)
+- 12.403 ✅ `initReplica` reports the failure instead of rejecting when the replica fails to build
+  (bootstrap replay) — same RED→GREEN discipline as 12.402, the second of the four awaits. —
+  (`apps/desktop/src/init-replica.test.ts`)
+
