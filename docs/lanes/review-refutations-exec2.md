@@ -509,3 +509,11 @@ to find it.
   are cadence pushes. Nothing pending. Final push planned at ~17:03.
 - 16:36 IST — cadence push. Polled 16:27–16:35: no change; exec 5 `2daa4007` (16:32) is a cadence push. Nothing pending.
 - 16:46 IST — cadence push. Polled 16:37–16:45: no change; exec 6 `b32c796e` (heartbeat). Nothing pending.
+- 16:57 IST — **CLOSING STATE, final push before 17:05:23.** Swept every file under `docs/lanes/` on all five peer
+  branches for `R*-* → E2-*` / `exec2-*`: the only refutations against this lane are exec 6's `R6-2 → E2-42` and
+  `R6-3 → E2-28`, both conceded under their findings with the lines re-opened. **Refutations filed by this lane in
+  phase 2: none** (fourteen exec-5 targets checked at source, all held — table above). **Self-corrections filed as
+  dated Defence paragraphs in `review-ux-exec2.md`: eight** (E2-42, E2-52, E2-28, E2-45, E2-33, E2-36, E2-50, E2-47),
+  each with its commit. **Re-opened and holding as filed: 23** (20 round-2 ids + V3, V7, V9). No frozen claim was
+  edited; no finding added; no PR; no fix; no `docker compose`; no full gate; no subagent; no AskUserQuestion.
+  Peers' closing heads: exec 5 `81cc041c` (16:48), exec 6 `c14c8a05` (16:52).
