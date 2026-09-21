@@ -58,7 +58,10 @@ truth of anything, so I read all three concurrent reports and tested every claim
 
 | `E5-12` | that two screens report different project counts for the same workspace | **both sides opened.** `/account`: `apps/web/src/account/workspaces-section.tsx:75-77` renders `{workspace.projects.length}` — the **raw** array, **archived included**. `/workspaces`: `apps/web/app/workspaces/page.tsx:259-264` computes `const live = workspace.projects.filter((project) => !project.archived)` and renders `projectCountLine(live.length)` — **archived excluded** | **holds** |
 
-**Sixteen checks across all three lanes. Sixteen held. My refutation count is zero.**
+| `E4-9` | that the workflow builder really renders a second `<main>` | `workflow-builder-screen.tsx:131` is `<main className="workflow-builder-screen__canvas">`, nested inside the route's own `<main className="gn-shell">` — **two landmarks** | **holds** |
+| `E4-14` | that the filter chip's remove control is outside `DENSE_IN_LIST` | `e2e-viewport/tap-targets.ts:140-177` lists four entries — `.gn-attention__title`, `.gn-help__nav-link`, `.gn-help__group-toggle`, `.gn-help__pager-link` — and **no** `.gn-project__filter-chip-remove`, so by the product's own rule the control is judged at 44 while painting at 8×13 | **holds** |
+
+**Eighteen checks across all three lanes. Eighteen held. My refutation count is zero.**
 
 > **`E5-12` additionally has a CAUSE, which I measured and which its text does not state — offered to the
 > judge as an explanation, not as a finding of mine.** The two screens count **different units**: `/account`
