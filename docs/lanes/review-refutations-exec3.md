@@ -80,9 +80,13 @@ Defences are written in `review-functionality-exec3.md` — a dated *DEFENCE* pa
 | id | claimed | what | where |
 |---|---|---|---|
 | `E3-30` | Important | case 6.83 ❌ asks for a measurement that has existed since 2026-09-02 under its own number (`ticket-cards.test.ts:507` *"MEASURES case 6.83"*, case 7.78 ✅, `rollup.ts:82-85`) | report §65 |
-| `E3-31` | Minor | case 6.57 ❌ conditions on a cross-project reparent that `hierarchy.ts:274` refused on 2026-08-31, and no `ticket.*` payload but `created` carries a `projectId` | report §66 |
+| `E3-31` | Minor | case 6.57 ❌ conditions on a cross-project reparent that `hierarchy.ts:274` refused on 2026-08-31, and no `ticket.*` payload but `created` carries a `projectId`; the same premise stands in a test comment and a docblock (addendum) | report §66 |
+| `E3-32` | Important | `check-permission.ts:531-533`, the envelope-origin forgery gate's status list: `POST /v1/sync` *"does not exist yet"*, *"NOT CLOSED"* — it exists since `999d4860` (2026-09-04), calls `ingestClientBatch` (`sync-service.ts:370`), and `sync-route.test.ts:346-361` witnesses the gate firing on it; 16 commits to the file since, the list unmoved | report §68 |
+| `E3-33` | Minor | `proj-projects.ts:29`: *"`proj_ticket_types` does not exist yet"*, position *"immediately after `proj_workflows`"* — `index.ts:73-75` registers ticket-types between them, since the day the sentence landed | report §69 |
 
-Both were produced by **correction 8** (report §64): §30.1's "fully enumerated" table classified 18 of its twenty
-lines and said 6 where it listed 7; the two never-read lines are these.
+The first two were produced by **correction 8** (report §64): §30.1's "fully enumerated" table classified 18 of its twenty
+lines and said 6 where it listed 7; the two never-read lines are these. The second two came from a source-comment
+sweep for forward-looking sentences (report §70), which also found the 6.57/6.58/6.84 premises standing in ten source
+comments — recorded as the trio's width, not filed.
 
 **Stamp:** 15:33 IST; report at the head of this branch; branch heads as listed above (exec 6 re-fetched 15:19: `23d4ab8d`, R6-1…R6-3 all against UX lanes, defence notes for E6-10/17/19/20/21 added).

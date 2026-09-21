@@ -4389,3 +4389,16 @@ it is **not measured here** and it is left out rather than counted. **These ten 
 that the trio be rulable as one mechanism (§27). They are the trio's true width — three catalogue lines, one column
 comment, ten source comments — and the reason a fix to the three case lines alone would leave the premise alive
 in the code that readers open first.
+
+## 71. PHASE-2 COUNT — members named (15:36 IST)
+
+| | claimed | members | scoring |
+|---|---|---|---|
+| Important | **2** | `E3-30` (6.83 ❌ measured since 09-02) · `E3-32` (the forgery gate's status list says `/v1/sync` does not exist) | half (rules §2) |
+| Minor | **2** | `E3-31` (6.57 conditions on a refused door) · `E3-33` (`proj-projects.ts:29`) | half |
+| corrections to this report in phase 2 | **2** | §64 (§30.1 classified 18 of 20; §27's 2 + 3 = 5) · the `E3-14` defence's own admission (the frozen text never cited `http-origin.ts:128-146`) | — |
+| defences | **5** | `E3-14` (§14.7.1) · `E3-15` (§14.7.2) · the documentary class, `E3-18`, `E3-8` (§67) | — |
+
+**Whole-report state at this stamp:** round 1 `E3-1`–`E3-8` (8, none withdrawn) · round 2 `E3-9`–`E3-29` (21, frozen at
+`f8b5e929`) · phase 2 `E3-30`–`E3-33` (4, half). Ids contiguous `E3-1` … `E3-33`, no gaps. Refutations filed against
+other lanes: **0** (sixteen attacks, all recorded with their measurement in `review-refutations-exec3.md`).
