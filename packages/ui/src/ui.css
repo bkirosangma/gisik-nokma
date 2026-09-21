@@ -1892,6 +1892,33 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-ticket-sheet__field { display: grid; grid-template-columns: 8rem 1fr; gap: 0.6rem; padding: 0.35rem 0; }
 .gn-ticket-sheet__field dt { color: var(--gn-text-muted); }
 .gn-ticket-sheet__field dd { margin: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+
+/* PHONE: THE LABEL COLUMN COLLAPSES, OR THE DESCRIPTION RUNS OFF THE SHEET
+   (E4-7).
+
+   The row is a two-column grid with a fixed `8rem` label column. At 390 px the
+   sheet body is 366.6 wide, so the value column gets 224 — and the description
+   editor (`div.tiptap.ProseMirror`) measured **224×3195** inside a `dd` spanning
+   `x 178.6 → 402.7` while the sheet ends at `x 390`. The words were cut at the
+   right edge mid-glyph (*"as o"*, *"the"*, *"screens"*, *"look"*), and the
+   toolbar reported the same `right=403`.
+
+   `1fr` alone is not enough: a grid item's `min-width` is `auto`, so the column
+   is floored at its content's min-content width and the editor's own long lines
+   would push it back out. `min-width: 0` is what lets it actually shrink.
+
+   `Full screen` GOES below the same width: the pill expands the sheet to the
+   viewport, which at 390 px it already fills, so the control has no effect to
+   offer — and it is one more thing in the header the description needs.
+
+   ⚠ NOT PAINTED. The rules were not measured on a running server; what is
+   asserted is that the breakpoint declares them (case 13.1057). The pre-fix
+   numbers above are the finding's, taken from its own report. */
+@media (max-width: 40rem) {
+  .gn-ticket-sheet__field { grid-template-columns: 1fr; }
+  .gn-ticket-sheet__field dd { min-width: 0; }
+  .gn-sheet__full { display: none; }
+}
 .gn-ticket-sheet__claim { color: var(--gn-text-muted); font-size: 0.8rem; }
 /* Three states of the History tab, three renderings. `__history-error` is NOT
    `__refusal`: getTicketHistory answers, so a rejection is a failure that may

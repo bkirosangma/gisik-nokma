@@ -1517,3 +1517,74 @@ describe('13.1055 the filter chip remove control meets the 24-px in-list floor',
     expect(body).toMatch(/line-height:\s*1;/);
   });
 });
+
+/**
+ * Case `13.1057` — E4-7 — at phone width the ticket sheet's label column
+ * collapses, so the description stops running off the sheet.
+ *
+ * The row is a two-column grid with a fixed `8rem` label column. At 390 px the
+ * sheet body is 366.6 wide, so the value column got 224 — and the description
+ * editor measured **224×3195** inside a `dd` spanning `x 178.6 → 402.7` while
+ * the sheet ends at `x 390`. Words were cut mid-glyph at the right edge.
+ *
+ * **`1fr` is asserted TOGETHER WITH `min-width: 0`, and that pair is the whole
+ * point.** A grid item's `min-width` is `auto`, so the column is floored at its
+ * content's min-content width; `grid-template-columns: 1fr` alone would leave
+ * the editor pushing the column back out and the fix would look applied while
+ * changing nothing. **Not painted**: the rules were not measured on a running
+ * server, and `apps/web/e2e-*` is Playwright, which is not in `pnpm test` —
+ * what this scan proves is that the breakpoint declares them.
+ */
+describe('13.1057 the ticket sheet collapses its label column at phone width', () => {
+  /**
+   * The `@media` blocks whose header contains `query`, braces matched. Local to
+   * this case because `components.test.tsx`'s `rule()` reads top-level
+   * declarations only — and `ui.css` carries the phone rules in more than one
+   * 40rem block, so "the 40rem block" is not a thing that exists.
+   */
+  const mediaBlocksContaining = (query: string, needle: string): string[] => {
+    const noComments = UI_CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    const blocks: string[] = [];
+    let i = 0;
+    for (;;) {
+      const start = noComments.indexOf(`@media ${query} {`, i);
+      if (start === -1) return blocks.filter((b) => b.includes(needle));
+      let depth = 0;
+      let end = noComments.length - 1;
+      for (let j = noComments.indexOf('{', start); j < noComments.length; j += 1) {
+        if (noComments[j] === '{') depth += 1;
+        else if (noComments[j] === '}') {
+          depth -= 1;
+          if (depth === 0) {
+            end = j;
+            break;
+          }
+        }
+      }
+      blocks.push(noComments.slice(start, end + 1));
+      i = end + 1;
+    }
+  };
+
+  it('13.1057 the 40rem block that carries the collapse exists', () => {
+    // POSITIVE CONTROL for both assertions below: without it they would fail
+    // against `undefined` rather than redden on the declaration.
+    expect(
+      mediaBlocksContaining('(max-width: 40rem)', '.gn-ticket-sheet__field').length,
+      'no 40rem block names .gn-ticket-sheet__field',
+    ).toBeGreaterThan(0);
+  });
+
+  it('13.1057 the label column becomes one column AND the value can shrink', () => {
+    const phone = mediaBlocksContaining('(max-width: 40rem)', '.gn-ticket-sheet__field')[0] as string;
+    expect(phone).toMatch(/\.gn-ticket-sheet__field\s*\{\s*grid-template-columns:\s*1fr;/);
+    expect(phone).toMatch(/\.gn-ticket-sheet__field dd\s*\{\s*min-width:\s*0;/);
+  });
+
+  it('13.1057 Full screen is withdrawn below the same width', () => {
+    const phone = mediaBlocksContaining('(max-width: 40rem)', '.gn-ticket-sheet__field')[0] as string;
+    // Same block as the collapse, deliberately: two breakpoints for one
+    // screen's phone treatment is how they drift apart.
+    expect(phone).toMatch(/\.gn-sheet__full\s*\{\s*display:\s*none;/);
+  });
+});

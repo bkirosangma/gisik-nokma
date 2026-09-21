@@ -1762,3 +1762,32 @@ baseline — it needs a live stack on `:3001`, which another lane owns. **Owner:
 44, which reddens loudly.
 
 **No `Features.md` bullet.** This corrects an existing control's target size; it adds no affordance.
+
+## At phone width the ticket sheet's label column collapses (lane ds1, 2026-09-21, batch B10) — case `13.1057`
+
+**The finding, round 2 `E4-7`, IMPORTANT.** With the sheet open on `CCSO-6` at `emulate 390x844`, the
+description editor (`div.tiptap.ProseMirror`) measured **224×3195**; its container `dd` spanned
+`x 178.6 → 402.7` while the sheet ends at `x 390` and the sheet body is `366.6` wide. Words were cut at
+the right edge mid-glyph (*"as o"*, *"the"*, *"screens"*, *"look"*), and the toolbar
+(`div.ticket-editor__toolbar`) reported the same `right=403`. The cause is the only rule for that class:
+`ui.css` `.gn-ticket-sheet__field { display: grid; grid-template-columns: 8rem 1fr }` — a fixed 8-rem
+label column with **no narrow-width override** (the file's four other `@media (max-width…)` blocks name
+it nowhere).
+
+### The case
+
+- ✅ **13.1057 — below 40rem the row is one column, the value can shrink, and Full screen is withdrawn.**
+  `packages/ui/test/components.test.tsx`. **`grid-template-columns: 1fr` is asserted together with
+  `min-width: 0` on the `dd`, and that pair is the point:** a grid item's `min-width` is `auto`, so the
+  column is floored at its content's min-content width and `1fr` alone would leave the editor pushing the
+  column back out — the fix would look applied while changing nothing. `.gn-sheet__full` is withdrawn in
+  the same block rather than a second breakpoint, because two breakpoints for one screen's phone
+  treatment is how they drift apart, and the pill expands a sheet that at 390 px already fills the
+  viewport. **Not painted**: the rules were not measured on a running server — `apps/web/e2e-*` is
+  Playwright and is not in `pnpm test` — so what this scan proves is that the breakpoint declares them;
+  the pre-fix numbers above are the finding's own, and the rule carries the same caveat. `ui.css` was
+  reverted to `HEAD` for the RED run and restored from a sha256-compared backup. The block is selected by
+  *containing* `.gn-ticket-sheet__field`, because `ui.css` carries more than one 40rem block.
+
+**No `Features.md` bullet.** This corrects an existing screen's layout at a width it already served; it
+adds no affordance.
