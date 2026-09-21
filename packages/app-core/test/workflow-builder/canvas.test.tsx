@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { render, screen, within } from '@testing-library/react';
 // Named import, not the default: `@testing-library/user-event` ships no
 // default export that survives `verbatimModuleSyntax` — same fix already
@@ -357,5 +360,40 @@ describe('WorkflowCanvas', () => {
     }
     expect(screen.getAllByTestId(/^transition-label-/)).toHaveLength(realTransitionCount);
     expect(screen.queryByTestId(`transition-label-${realTransitionCount}`)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 10.93 (E4-20, batch B15) — `fitView` never shrinks the canvas below 1:1.
+ *
+ * NOT a rendered-DOM assertion: React Flow's `fitView` computes its zoom from
+ * real `getBoundingClientRect()` measurements, which jsdom reports as all
+ * zeros (no layout engine) — the same reason `Features.md`'s case `13.911`
+ * states its own sibling canvas-height fix "cannot be a jsdom test". A
+ * rendered `.react-flow__viewport` transform in this environment would prove
+ * nothing about the real 0.745/0.52 shrink `docs/lanes/review-ui-exec4.md:346`
+ * measured in a browser — a real fitView run never happens here to produce
+ * one. The instrument is therefore the same shape `builder-css-binding.test.tsx`
+ * and `clock-free.test.ts` already use for a property jsdom cannot observe: a
+ * source-level read, proven to catch its own removal below.
+ */
+describe('10.93 the canvas never shrinks a control below its own declared size', () => {
+  const SRC_PATH = join(
+    dirname(fileURLToPath(import.meta.url)),
+    '../../src/workflow-builder/ui/workflow-canvas.tsx',
+  );
+
+  it('passes fitViewOptions={{ minZoom: 1 }} to ReactFlow, floor-checked against the JSX it configures', () => {
+    const src = readFileSync(SRC_PATH, 'utf8');
+    // Anchored to the SAME `<ReactFlow` element the prop must land on, not a
+    // bare substring search: a `minZoom: 1` sitting in a comment or an
+    // unrelated object literal would pass a substring check and prove
+    // nothing about what React Flow actually receives. The tag's own closing
+    // `>` sits alone on its own line (`onPaneClick`'s `() =>` arrow is NOT
+    // preceded by a bare newline+whitespace, so it does not match first).
+    const opening = /<ReactFlow\b[\s\S]*?\n\s*>/.exec(src)?.[0];
+    expect(opening, 'no <ReactFlow ...> opening tag found').toBeDefined();
+    expect(opening).toMatch(/fitViewOptions=\{\{\s*minZoom:\s*1\s*\}\}/);
+    expect(opening).toMatch(/\bfitView\b/);
   });
 });

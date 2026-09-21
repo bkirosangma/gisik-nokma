@@ -13,6 +13,7 @@ Mirrors `Features.md` §10. Status: `❌` not covered · `✅` covered · `🟡`
 - 10.8 ✅ Click node/edge to select; inspectors follow the selection — `canvas.test.tsx`, `inspectors.test.tsx`
 - 10.9 ✅ Auto-layout layers by distance from the start state; orphans parked; never crashes on a dangling start — `layout.test.ts`
 - 10.10 ✅ Add state from the header — `screens.test.tsx` adds a state from the header button
+- 10.93 ✅ E4-20 (batch B15): `fitView` never shrinks the canvas below 1:1 — `fitViewOptions={{ minZoom: 1 }}` floors the fit, so an overflowing graph is panned into rather than shrunk, and no on-screen control (the 44px Blocked checkbox included) paints smaller than its own declared size. Source-level assertion, not a rendered one — jsdom's zero layout can't discriminate a real fitView shrink from none, the same reason case `13.911` gives for its own sibling canvas-height fix — `canvas.test.tsx`
 
 ## Rules
 - 10.11 ✅ restrict-to: assignee/role/member pickers write the rule; dead keys omitted — `rule-editors.test.tsx`
