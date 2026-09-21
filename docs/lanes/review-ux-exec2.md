@@ -3586,6 +3586,30 @@ branch whose prop is undefined.
 statement about the workspace's membership shown to every phone user who mentions anyone**, and it is the
 class this lane's brief calls the product's most expensive recurring shape.
 
+> **DEFENCE — phase 2, 2026-09-21 15:20 IST, self-filed before any refutation.** Re-opening this finding as its own
+> critic found **one false sentence, and it is the one the severity leans on.** The finding says the status node
+> *"is not a hidden announcement"* and that *"everyone who opens a mention on the phone reads the false sentence"*.
+> **That is false.** `packages/editor/src/styles/editor.css:50-62` (opened) styles `.mention-popup__status` as
+> screen-reader-only — `position:absolute; width:1px; height:1px; margin:-1px; overflow:hidden; clip-path:inset(50%)`
+> — under a comment that says so in words: *"The result count, for screen readers only."* That rule is inlined
+> verbatim into the phone's editor page (`apps/mobile/src/editor/editor-html.generated.ts`, one hit for
+> `.mention-popup__status`, opened). And `mention-popup.ts:27-28`, inside the very range this finding cites
+> (`:26-35`), says *"user-facing copy that only a screen reader ever receives"*. I quoted the range and did not read
+> its second line — the failure my own record names most often.
+>
+> **What a sighted person meets instead, measured:** on `@`, `onStart` (`mention-popup.ts:153-173`) appends a
+> `.mention-popup` container — `min-width: 10rem; border: 1px solid currentColor` (`editor.css:40-45`) — holding a
+> listbox with zero options; it stays empty for as long as the mention is open, because the host's reply is
+> always `users: []` (links 1–4 above, all re-opened today: `entry.tsx:55`, `editor-web-view.tsx:80-85`,
+> `ticket-screen.tsx:124`). Enter/arrows are declined while it is empty (`:190-196`), so the box neither fills nor
+> responds. **What a screen-reader user meets:** the polite announcement *"No people match"* (`:32`, `:100`).
+>
+> **What survives, stated narrower:** the phone's `@` trigger is **offered and can never succeed** — the host is
+> never asked, so no member can be mentioned from the phone — and the product answers the two audiences
+> differently: an empty box that never fills for sighted users, and a false statement about membership for
+> screen-reader users. The mechanism, the five links and the remedy are unchanged. The sentence *"shown to every
+> phone user"* in the severity paragraph is withdrawn as false; the severity of what remains is the judge's.
+
 ### E2-53 (r2) — MINOR · The mobile editor host has no refusal vocabulary at all: three doors, and silence is the answer at every one
 
 **WHAT.** `apps/mobile/src/editor/editor-web-view.tsx` hosts the phone's only document editor. **It contains
