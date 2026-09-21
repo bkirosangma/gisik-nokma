@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from 'react';
-import { docToPlainText } from '@gisik-nokma/domain';
 import { formatDateTime } from '../provenance.js';
+import { renderCommentBody } from './comment-body.js';
 
 /**
  * The comment thread — the prototype's `Comments · {count}` block
@@ -16,21 +16,23 @@ import { formatDateTime } from '../provenance.js';
  * here means *this comment's document names this attachment*, which is the only
  * attribution the product can make.
  *
- * **WHY THAT ARM IS NOT OPTIONAL — measured, not argued.** This component
- * renders the body through `docToPlainText`, and that renderer drops an
- * `image` node entirely: `render`'s fallthrough takes `candidate.content`,
- * which an image node does not have, so it returns `''`
- * (`packages/domain/src/doc-text.ts:71-75` — `children` is `''` and the node is
- * not a `BLOCK_NODE_TYPES` member, so the ternary returns it unchanged). A
- * comment whose only trace of its file were the chip row would therefore render
- * as a comment with no file at all if the row were dropped — an absence drawn as
- * a fact. The chips are the ONLY place an embedded image is reachable from this
- * screen.
+ * **WHY THAT ARM IS NOT OPTIONAL — measured, not argued.** The body renderer
+ * drops an `image` node entirely, and it is dropped in BOTH of the two
+ * renderers this surface has had. `docToPlainText` (`packages/domain/src/
+ * doc-text.ts`) returns `''` for it: `render`'s fallthrough takes
+ * `candidate.content`, which an image node does not have, and the node is not a
+ * `BLOCK_NODE_TYPES` member, so the ternary returns it unchanged. F3 replaced
+ * the thread's renderer with `renderCommentBody` (`./comment-body.tsx`) for
+ * every OTHER reason, and that file drops an image node deliberately and says
+ * so — the declared decision that a comment's files are CHIPS. A comment whose
+ * only trace of its file were the chip row would therefore render as a comment
+ * with no file at all if the row were dropped — an absence drawn as a fact. The
+ * chips are the ONLY place an embedded image is reachable from this screen.
  *
- * ⚠ **This citation read `doc-text.ts:44-50`, and it RESOLVED — at the end of
- * `BLOCK_NODE_TYPES`, which is not the code it describes.** The range was
- * corrected by reading the lines; a citation that resolves is not a citation
- * that is right, which is the failure this repo has recorded most often.
+ * ⚠ **This paragraph used to cite `doc-text.ts:71-75` for the drop, and F3
+ * moved the renderer out from under it.** The claim is still true and the code
+ * it described is no longer what runs here, which is how a citation goes stale
+ * without going wrong. Both are named above.
  *
  * ## The two absences, kept apart
  *
@@ -66,7 +68,7 @@ export type TicketComment = {
   /** The `comment.added` event's id — a comment's only identity. */
   commentId: string;
   authorId: string;
-  /** The structured document the editor wrote; rendered by `docToPlainText`. */
+  /** The structured document the editor wrote; rendered by `renderCommentBody`. */
   body: unknown;
   /** The envelope's `serverTime`, ISO 8601. */
   recordedAt: string;
@@ -115,7 +117,10 @@ function CommentItem({
   nameOf: (actorId: string) => string;
 }): ReactElement {
   const name = nameOf(comment.authorId);
-  const text = docToPlainText(comment.body);
+  // F3 — the body is rendered as the DOCUMENT the composer wrote, not as its
+  // plain text. `docToPlainText` still serves the search projection and the
+  // notifications; it is a display of last resort and never was this one.
+  const text = renderCommentBody(comment.body);
   return (
     <li className="gn-comment" data-testid={`comment-${comment.commentId}`}>
       <span className="gn-comment__avatar" aria-hidden="true">
@@ -126,7 +131,7 @@ function CommentItem({
           <strong className="gn-comment__name">{name}</strong>
           <span className="gn-comment__time">{formatDateTime(comment.recordedAt)}</span>
         </p>
-        <p className="gn-comment__body">{text}</p>
+        <div className="gn-comment__body">{text}</div>
         {comment.files.length > 0 ? (
           <div className="gn-comment__files">
             {comment.files.map((file) => (

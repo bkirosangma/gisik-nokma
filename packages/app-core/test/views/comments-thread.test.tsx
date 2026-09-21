@@ -96,8 +96,10 @@ describe('CommentsThread', () => {
     expect(screen.getByText('Kiro')).toBeInTheDocument();
     expect(screen.getAllByText('K', { selector: '.gn-comment__avatar' })).toHaveLength(1);
     expect(screen.getByText('AM', { selector: '.gn-comment__avatar' })).toBeInTheDocument();
-    // `docToPlainText` renders both paragraphs, so the body is the document and
-    // not a stringified one.
+    // Both paragraphs render as ELEMENTS, so the body is the document and not a
+    // stringified one. (This comment named `docToPlainText` until F3 replaced
+    // the thread's renderer with `renderCommentBody`; the assertion it explains
+    // did not change, and the sentence describing it did.)
     expect(screen.getByText(/The shared bucket is the defect\./)).toBeInTheDocument();
     expect(screen.getByText(/Confirmed\./)).toBeInTheDocument();
     // The instant goes through the product's ONE renderer, which names the
@@ -182,5 +184,52 @@ describe('CommentsThread', () => {
     );
     expect(screen.getByRole('button', { name: 'Post' })).toBeInTheDocument();
     expect(screen.getByText('Posting records an event citing you.')).toBeInTheDocument();
+  });
+
+  /**
+   * F3 — THE THREAD RENDERS THE COMPOSER'S MARKS, through the new projection.
+   *
+   * The cases in `comment-body.test.tsx` prove the projection; this proves the
+   * thread USES it, which is the part a person meets and the part that was
+   * wrong. Before F3 this body rendered through `docToPlainText`, so the
+   * anchor did not exist and the destination was unrecoverable from anywhere on
+   * the surface — the finding's worst row.
+   *
+   * ⚠ THE §16 CASE ID FOR THIS ARM IS OWED: exec 2's block is fully spent and
+   * `test-cases/16-remaining-doors.md` forbids minting from the tip. See the
+   * header of `comment-body.test.tsx` for the full record.
+   */
+  it('renders a comment’s link as an anchor — the destination survives the round trip', () => {
+    const linked: TicketComment = {
+      commentId: '01COMMENTLINKED',
+      authorId: 'user_kiro',
+      body: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'text', text: 'See ' },
+              {
+                type: 'text',
+                text: 'the doc',
+                marks: [{ type: 'link', attrs: { href: 'https://gst.gov.in' } }],
+              },
+              { type: 'text', text: ' for the rates.' },
+            ],
+          },
+        ],
+      },
+      recordedAt: '2026-09-20T16:26:57.306Z',
+      files: [],
+    };
+    render(<CommentsThread comments={[linked]} nameOf={nameOf} />);
+
+    const body = screen.getByTestId(`comment-${linked.commentId}`);
+    const anchor = within(body).getByRole('link', { name: 'the doc' });
+    expect(anchor).toHaveAttribute('href', 'https://gst.gov.in');
+    // The sentence around it is intact, so the link was lifted out of the text
+    // rather than the text being rebuilt around it.
+    expect(body.textContent).toContain('See the doc for the rates.');
   });
 });

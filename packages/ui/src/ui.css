@@ -5935,6 +5935,29 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* F3 — the body is a DOCUMENT now, so the blocks it can contain need the two
+   declarations the plain-text renderer made unnecessary. `white-space:
+   pre-wrap` above is KEPT: a newline the author typed inside a paragraph still
+   means a newline, and that was true before this change and stays true after. */
+.gn-comment__body > * { margin: 0; }
+.gn-comment__body > * + * { margin-top: 0.4rem; }
+.gn-comment__list { padding-left: 1.3rem; }
+.gn-comment__list > li + li { margin-top: 0.15rem; }
+.gn-comment__quote {
+  margin: 0;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--gn-border);
+  color: var(--gn-text-muted);
+}
+.gn-comment__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--gn-surface-sunken);
+  border-radius: var(--gn-radius-control);
+  padding: 0.35rem 0.5rem;
+  overflow-x: auto;
+}
+.gn-comment__body a { color: var(--gn-text-accent); overflow-wrap: anywhere; }
+.gn-comment__mention { color: var(--gn-text-accent); font-weight: 600; }
 .gn-comment__files { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.2rem; }
 .gn-comment__file {
   display: inline-flex;
