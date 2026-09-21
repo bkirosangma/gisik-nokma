@@ -483,6 +483,54 @@ Appendix E. Lines opened: `check-migration-order.mjs:1-45`; `apps/server/package
 **SEVERITY: Minor.** Loud when it fails (refusal or boot abort), but a recurring, undocumented trap on the path
 the plans themselves document.
 
+### E6-8 — IMPORTANT — A workflow republish can put a parent with open children into a terminal state, and `ticket.closed` (and the auto-close sweep) then accept it — the state the transition path refuses
+
+**WHAT.** Case 4.23 (`04-workflow-engine.md:41`): *"A parent cannot enter a terminal state while any child is
+non-terminal."* `transition.ts:131-142` enforces it. Two republish doors walk around it, measured in the engine's
+memory context (Appendix F; 1 file / 1 test passed):
+
+```
+control: P (child C open) doing -> done by transition               -> REFUSED parent-terminal-with-open-children …
+publish v2a: "doing" KEPT, category active -> terminal (P in it, C open) -> ACCEPTED
+  after v2a: P.stateId=doing stateCategory=terminal; C open: open
+after v2a: ticket.closed on P (terminal, child C still open)        -> ACCEPTED
+publish v2b: "doing" DROPPED, stateMapping doing -> "done" (P in it, C open) -> ACCEPTED
+  after v2b: P.stateId=done stateCategory=terminal
+after v2b: ticket.closed on P (terminal, child C still open)        -> ACCEPTED
+```
+
+**WHY it is wrong.** `workflow-defined.ts:162-171` (Ruling 56(a), case 13.611) refuses the *demotion* of a kept
+terminal state because *closed ⇒ terminal* must hold; it does not look at *promotion* (`active`/`open` →
+`terminal`), and the mapping loop (`:141-160`) refuses a dropped **terminal** state mapped to non-terminal but
+accepts a dropped **open** state mapped to terminal. Both leave a parent whose children are open sitting in a
+terminal category — a state no `ticket.transitioned` can produce — and `checks/close.ts:39` asks only
+`stateCategory !== 'terminal'`, never about children, so the parent can be closed over its open work. The
+server's auto-close sweep does exactly that unattended: `auto-close/sweep.ts:176-199` selects
+`state_category = 'terminal'` rows older than the workspace's threshold and appends `ticket.closed` — no
+children check there either. The result is a *closed* parent with *open* children, which the product's own
+create path treats as impossible (`hierarchy.ts` refuses adding work to a terminal parent, and the
+`reopened-for-child` cause exists precisely so a terminal parent that gains live work is reopened).
+
+**Not a ruled divergence.** Ruling 56(a) is quoted in full at `13-owner-requests-and-backlog.md:1428-1450`; its
+subject is the `closed_at IS NOT NULL` beside a non-terminal category. Promotion is the mirror and is not
+mentioned. `grep -nEi 'promot|non-terminal.*terminal|re-?categor' test-cases/04-workflow-engine.md
+test-cases/10-workflow-builder.md test-cases/03-foundation-ledger.md` finds only 4.23 and the builder's category
+picker (10.2, 10.84).
+
+**WHAT WOULD HAVE BEEN BETTER.** Same shape as 56(a)'s fix: in `workflow-defined.ts`, when a kept state is
+promoted to `terminal` or a dropped state is mapped onto a terminal one, refuse if any ticket currently in that
+state has a non-terminal child (the context has `getChildrenStates`; the memory context already folds tickets on
+publish, so the count is available) — or, cheaper, have `checks/close.ts` and the sweep refuse a parent with
+open children, which closes the last door regardless of how the state was reached.
+
+**MEASUREMENT.** Appendix F, run from `packages/rule-engine` (`pnpm exec vitest run
+test/zz-exec6-probe-promote.test.ts --no-file-parallelism`, relative imports). Lines opened:
+`transition.ts:131-142`; `workflow-defined.ts:141-171`; `close.ts:39`; `auto-close/sweep.ts:176-199`;
+`04-workflow-engine.md:41`; `13-owner-requests-and-backlog.md:1428-1450`.
+
+**SEVERITY: Important.** An invariant with a dedicated refusal and a dedicated case, bypassed by an admin act
+and then compounded by an unattended job.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
