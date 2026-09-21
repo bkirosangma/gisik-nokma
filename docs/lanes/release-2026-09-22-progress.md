@@ -4,3 +4,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 
 | id | status | when / sha | note |
 |---|---|---|---|
+| B09 | claimed | 2026-09-21 19:57 | /Users/kiro/my_projects/gisik-nokma-ds5 |
