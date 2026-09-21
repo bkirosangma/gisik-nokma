@@ -1196,6 +1196,10 @@ what was looked at and found sound, not only what was found wrong.
 - **Invites match the export's `github.md` on role and project scope.** `inviteRoleSchema` refuses `owner`
   (`invites.ts:64-67`), `inviteSentPayload` refuses `projectIds` on a guest (`:120-127`), and acceptance grants no
   project rows to a guest (`acceptance.ts:189-191`). *Channel* does not match — E6-9.
+- **`closed ⇒ terminal` holds at the direct rebind door too.** `checks/workflow-rebind.ts:147-148` refuses a
+  `ticket.workflow_rebound` that would move a closed ticket to a non-terminal state — so Ruling 56's invariant is
+  not only the migrate route's pre-flight (E6-10) but the engine's, and a hand-built `POST /v1/events` cannot
+  walk around it. Read at the line.
 - **The evidence gate binds the attachment to the ticket** (`gates/evidence-gate.ts`, `SELECT 1 FROM attachments
   WHERE id = $1 AND ticket_id = $2`) and refuses a drive reference as evidence by rule.
 - **OTP and device-code doors are bounded.** better-auth's phone plugin caps verification at 3 attempts per code
