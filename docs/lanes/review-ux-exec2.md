@@ -2419,6 +2419,36 @@ against a real workspace. I claim the code path and the attribution semantics, n
 > (Important); if the judge scores the finding as frozen — title included — the ×3 penalty is the rule's and I do
 > not argue it. What I argue is that the record shows the false half was found and named by this lane, in phase 1,
 > before any peer filed against it. Sibling: exec 5's `E5-21`, independently measured, same door.
+>
+> **DEFENCE, CORRECTED — 15:18 IST, after reading exec 6's `R6-2 → E2-42` (their file at `213a25ad`, filed 15:16).**
+> R6-2 is **right**, and the paragraph above repeats the error it found: I named `/v1/events`' gate
+> (`checkRolePermission`, `IDENTITY_SPOOF_REASON`) as the door the phone meets. **It is not.** The phone's transport
+> pushes to **`/v1/sync`** (`packages/sync-client/src/net/http-transport.ts:157`, opened), and that door answers
+> `invalid: actor-mismatch` — *"A synced claim must belong to the signed-in user."* — at
+> `apps/server/src/sync/sync-service.ts:321-327` (opened) before any permission gate runs. So the outbox's `last_error`
+> I quoted above would read `actor-mismatch: A synced claim must belong to the signed-in user.`, not
+> `identity-spoof: …` (`outbox.ts:410-412` formats an `invalid` as `${code}: ${message}`). I cited the
+> `/v1/events` lines because the phase-1 correction did, and I opened them without asking whether the phone's path
+> passed through them — the exact failure my own record names. **And "the door refuses, every time" is false**: R6-1's
+> probe (run against the real server, `/v1/sync`, three shapes) shows a comment by the assignee on their own ticket
+> **commits** (`actorId = assigneeId = session user`), and that attribution is correct. I did not run a probe; theirs
+> is the measurement of record.
+>
+> One thing R6-1 left unmeasured, which I opened because it decides whether the phone ever speaks: is the `'me'` shape
+> (or another person's id) refused **locally** before it is queued, which would fire `setError` at
+> `ticket-screen.tsx:55`? **No.** `newSubmittedEvent` validates nothing (`packages/domain/src/submit.ts:9-30`,
+> opened — it copies `actorId` through); the outbox's `enqueue` runs only the rule engine (`outbox.ts:307-315`
+> `evaluateEvent(probe, ctx)` — no envelope parse, no actor check), so both non-self shapes queue, throw
+> `OfflineAcceptError`, and are swallowed at `:54`. The `malformed-envelope` and `actor-mismatch` answers arrive
+> later inside the un-awaited flush.
+>
+> **What survives of E2-42, stated for the last time and narrower than before:** on the phone, a comment on a ticket
+> **not assigned to the person typing it** — someone else's, or unassigned — is offered, accepted with silence,
+> and never posts; the ticket screen never says so; the only trace is a `{n} needs attention` count on the board.
+> A comment on the person's own assigned ticket posts correctly. The title's *"recorded as the ASSIGNEE's words"* is
+> false in both directions, as R6-2 says. Exec 5 withdrew its `E5-21` and refiled the same surviving core as `E5-44`;
+> I am not withdrawing (phase 2 has no free withdrawal) — the judge has the finding as frozen, this concession, and
+> exec 6's probe, and the severity of what survives is theirs to set.
 
 ---
 
