@@ -13,7 +13,7 @@ import {
 import { PARENT_TERMINAL_RULE, precheckEvent } from '../precheck.js';
 import { makeSubmittedFactory } from '../submit.js';
 import type { TicketRead } from '../view-types.js';
-import { NewTicketDialog, type NewTicketDraft } from './new-ticket-dialog.js';
+import { NewTicketDialog, type NewTicketDraft, type TypeOption } from './new-ticket-dialog.js';
 import { ReopenDialog, type RefusalOrigin } from './reopen-dialog.js';
 
 export type CreateTicketFlowProps = {
@@ -23,7 +23,8 @@ export type CreateTicketFlowProps = {
   workspaceId: string;
   projectId: string;
   currentUserId: string;
-  typeOptions: Array<{ id: string; name: string }>;
+  /** See `NewTicketDialogProps.typeOptions` — this flow only passes it through. */
+  typeOptions: readonly TypeOption[];
   /** See `NewTicketDialogProps.parentCandidates` — this flow only passes it through. */
   parentCandidates: Array<{ id: string; title: string; inFocus: boolean }>;
   /** See `NewTicketDialogProps.parentCandidatesUnavailable`. */

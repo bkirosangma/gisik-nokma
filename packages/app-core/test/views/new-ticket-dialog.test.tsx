@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 // by board.test.tsx, ticket-list.test.tsx and reopen-flow.test.tsx.
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { NewTicketDialog } from '../../src/views/new-ticket-dialog.js';
+import { NewTicketDialog, defaultRootTypeFor } from '../../src/views/new-ticket-dialog.js';
 
 /**
  * Both pickers in this dialog are the shared searchable `Select`, whose trigger is a real
@@ -66,7 +66,7 @@ async function openPicker(
  * shown, narrowly, and every offered option is real.
  */
 describe('12.388 a narrowed parent picker names its narrowing', () => {
-  const TYPES = [{ id: 'task', name: 'Task' }];
+  const TYPES = [{ id: 'task', name: 'Task', rank: 3 }];
   const CANDIDATES = [
     { id: '01J9TICKET00000000000000EP', title: 'Rewire the shop sign', inFocus: false },
   ];
@@ -128,9 +128,13 @@ describe('12.388 a narrowed parent picker names its narrowing', () => {
 });
 
 describe('3.157 the dialog never submits a parent it has stopped showing', () => {
+  // Ranks as the workspace's own ladder carries them (E5-16): `NewTicketDialog`
+  // no longer takes `typeOptions[0]` as its default, and this block's
+  // assertions all expect `typeId: 'task'` — so the fixture has to say which of
+  // these two is the everyday type rather than leaving it to list order.
   const TYPES = [
-    { id: 'epic', name: 'Epic' },
-    { id: 'task', name: 'Task' },
+    { id: 'epic', name: 'Epic', rank: 1 },
+    { id: 'task', name: 'Task', rank: 3 },
   ];
   // `inFocus: false`: this describe block is about the WITHHELD-parent
   // invariant, not the checkbox, so the candidate stays one that never shows
@@ -206,9 +210,15 @@ describe('3.157 the dialog never submits a parent it has stopped showing', () =>
 
     // ...and the draft agrees with it. Printed whole rather than asserted field by
     // field, so a failure shows which parent went out instead of only that one did.
+    //
+    // `typeId` is the dialog's own default and NOT this case's subject — it read
+    // `'epic'` while the default was `typeOptions[0]`, which is the E5-16 defect
+    // itself, and the fixture's ranks now make it the everyday type. The case
+    // below is about the PARENT; that value is carried so the printout stays
+    // whole.
     expect(onCreate).toHaveBeenCalledWith({
       title: 'Order the tent',
-      typeId: 'epic',
+      typeId: 'task',
       parentId: null,
       start: 'backlog',
     });
@@ -226,7 +236,7 @@ describe('3.157 the dialog never submits a parent it has stopped showing', () =>
     expect(within(await openPicker(user, 'Parent')).getAllByRole('option')).toHaveLength(2);
     expect(onCreate).toHaveBeenCalledWith({
       title: 'Order the tent',
-      typeId: 'epic',
+      typeId: 'task',
       parentId: '01J9TICKET00000000000000EP',
       start: 'backlog',
     });
@@ -253,7 +263,7 @@ describe('3.157 the dialog never submits a parent it has stopped showing', () =>
  * and the `''` → `null` translation at the submit boundary is what the payload carries.
  */
 describe('3.164–3.165 the parent picker offers project root as a real, selectable option', () => {
-  const TYPES = [{ id: 'task', name: 'Task' }];
+  const TYPES = [{ id: 'task', name: 'Task', rank: 3 }];
   const CANDIDATES = [
     { id: '01J9TICKET00000000000000EP', title: 'Rewire the shop sign', inFocus: false },
   ];
@@ -337,7 +347,7 @@ describe('3.164–3.165 the parent picker offers project root as a real, selecta
  * whether it was ever shown at all.
  */
 describe('13.591 new tickets are born in the backlog; a child of an in-focus parent may start there', () => {
-  const TYPES = [{ id: 'task', name: 'Task' }];
+  const TYPES = [{ id: 'task', name: 'Task', rank: 3 }];
   const CANDIDATES = [
     { id: 'parent_focus', title: 'In-focus parent', inFocus: true },
     { id: 'parent_backlog', title: 'Backlog parent', inFocus: false },
@@ -504,7 +514,7 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
  * creation control.
  */
 describe('V10 the Create control cannot file two tickets from two presses', () => {
-  const TYPES = [{ id: 'task', name: 'Task' }];
+  const TYPES = [{ id: 'task', name: 'Task', rank: 3 }];
 
   function slowDialog(): { onCreate: ReturnType<typeof vi.fn>; release: () => void } {
     let release: () => void = () => undefined;
@@ -572,5 +582,113 @@ describe('V10 the Create control cannot file two tickets from two presses', () =
       screen.getByRole('button', { name: 'Create' }).click();
     });
     expect(onCreate).toHaveBeenCalledTimes(2);
+  });
+});
+
+/**
+ * E5-16 — THE TYPE PICKER STARTED AT THE TOP OF THE HIERARCHY.
+ *
+ * `useState(typeOptions[0]?.id ?? '')` seeded the dialog with the FIRST entry
+ * of a rank-ordered ladder — `epic`, rank 1 — so a person who typed a title and
+ * pressed Create filed an EPIC. The dev project's own distribution is Epic 3 ·
+ * Errand 24 · Story/Task/Sub-task 0, so the default was the least likely choice
+ * eight times in nine — and on the web the mistake is one-way: the sheet's
+ * `Type` row is read-only (`ticket-sheet.tsx`), so an accidental Epic has to be
+ * deleted and re-filed, and an Epic is structurally different besides (it heads
+ * a hierarchy and appears in the Backlog as a group band).
+ *
+ * The picker now starts EMPTY and `Create` stays disabled until a type is
+ * chosen — the pattern the Move dialog already uses for its destination
+ * (`Choose a state`). Neither of the finding's two remedies is free here and
+ * this one is the honest half: "the deepest-legal or most-used type" is not
+ * computable from what this component is handed, because `typeOptions` carries
+ * `{ id, name }` and no rank at all (`page.tsx`'s `BUILTIN_TYPE_LADDER` and its
+ * served-types map both drop it), so any "deepest" rule would have to invent a
+ * rank — or a new prop — to decide a product question this task does not own.
+ */
+describe('3.181 (E5-16) the Type picker does not start at the top of the hierarchy', () => {
+  // The BUILT-IN ladder, in its own order and with its own ranks — Epic is
+  // FIRST and rank 1, which is the whole defect. Nothing here is sorted or
+  // reversed to manufacture it, and `sub-task` is present at rank 4 because it
+  // is the entry the root-rank rule must EXCLUDE (a type at `DEEPEST_RANK` or
+  // below cannot sit at project root).
+  const LADDER = [
+    { id: 'epic', name: 'Epic', rank: 1 },
+    { id: 'story', name: 'Story', rank: 2 },
+    { id: 'task', name: 'Task', rank: 3 },
+    { id: 'sub-task', name: 'Sub-task', rank: 4 },
+  ];
+
+  /**
+   * The rule on its own, where the ladder is the only input — the shape
+   * `subtaskTypeFor` already established for the other creation control.
+   */
+  it('picks the deepest type that may sit at project root, and never ranks 1 or 4', () => {
+    expect(defaultRootTypeFor(LADDER)?.id).toBe('task');
+    // …not the TOP of the hierarchy, which is what `typeOptions[0]` named.
+    expect(defaultRootTypeFor(LADDER)?.id).not.toBe('epic');
+    // …and not a rank the root rule refuses outright (rank >= DEEPEST_RANK
+    // needs a parent), even when it is the deepest on offer.
+    expect(defaultRootTypeFor([
+      { id: 'epic', name: 'Epic', rank: 1 },
+      { id: 'sub-task', name: 'Sub-task', rank: 4 },
+    ])?.id).toBe('epic');
+    // A workspace whose every type needs a parent has NO root-legal type, and
+    // the honest answer is none — the caller then starts empty.
+    expect(defaultRootTypeFor([{ id: 'sub-task', name: 'Sub-task', rank: 4 }])).toBeNull();
+    // Ties are broken by id, so the answer does not depend on the order the
+    // server happened to return the ladder in.
+    expect(
+      defaultRootTypeFor([
+        { id: 'errand', name: 'Errand', rank: 3 },
+        { id: 'chore', name: 'Chore', rank: 3 },
+      ])?.id,
+    ).toBe('chore');
+  });
+
+  it('PLANTED DEFECT: the control paints the everyday type, not rank 1, and the draft carries it', () => {
+    const onCreate = vi.fn();
+    render(
+      <NewTicketDialog
+        open
+        typeOptions={LADDER}
+        parentCandidates={[]}
+        onCreate={onCreate}
+        onClose={() => undefined}
+      />,
+    );
+
+    // Asserted on the value the browser PAINTS — the finding's own measurement,
+    // and the thing a person reads before pressing Create. It was `Epic`.
+    expect(screen.getByLabelText('Type')).toHaveValue('Task');
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    expect(onCreate).toHaveBeenCalledWith({
+      title: 'Order the tent',
+      typeId: 'task',
+      parentId: null,
+      start: 'backlog',
+    });
+  });
+
+  it('a ladder with no root-legal type starts empty rather than picking one that needs a parent', () => {
+    const onCreate = vi.fn();
+    render(
+      <NewTicketDialog
+        open
+        typeOptions={[{ id: 'sub-task', name: 'Sub-task', rank: 4 }]}
+        parentCandidates={[]}
+        onCreate={onCreate}
+        onClose={() => undefined}
+      />,
+    );
+    // The control says it is empty, and Create refuses — rather than filing a
+    // Sub-task at project root, which the hierarchy rule would refuse anyway.
+    expect(screen.getByLabelText('Type')).toHaveValue('');
+    expect(screen.getByLabelText('Type')).toHaveAttribute('placeholder', 'Choose a type');
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
+    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+    expect(onCreate).not.toHaveBeenCalled();
   });
 });

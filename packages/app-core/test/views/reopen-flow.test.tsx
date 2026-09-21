@@ -210,7 +210,7 @@ function renderFlow(
       workspaceId={WS}
       projectId="01J9GPRJ000000000000000000"
       currentUserId="user_kiro"
-      typeOptions={[{ id: 'task', name: 'Task' }]}
+      typeOptions={[{ id: 'task', name: 'Task', rank: 3 }]}
       parentCandidates={extra.parentCandidates ?? [{ id: PARENT, title: 'Registrations', inFocus: false }]}
       onCreated={onCreated}
     />,

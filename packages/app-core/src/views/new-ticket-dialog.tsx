@@ -1,5 +1,47 @@
 import { useRef, useState } from 'react';
+import { DEEPEST_RANK } from '@gisik-nokma/domain';
 import { Button, Dialog, Select } from '@gisik-nokma/ui';
+
+/**
+ * A ticket type as this dialog is handed it: the label to paint, and the RANK
+ * the root-creation rule turns on.
+ *
+ * `rank` is required, and that is the point rather than tidiness. The default
+ * below cannot be derived from an id and a name — the previous default was
+ * `typeOptions[0]`, which named the TOP of the hierarchy because the ladder
+ * arrives rank-ascending — so a caller that does not say what rank each type
+ * sits at leaves this dialog with no honest way to choose one. An optional
+ * `rank` would compile at every call site and silently restore that defect
+ * wherever it was omitted.
+ */
+export type TypeOption = { id: string; name: string; rank: number };
+
+/**
+ * The type a ROOT-LEVEL new ticket starts on: the deepest one that may sit at
+ * project root at all.
+ *
+ * `DEEPEST_RANK` is the hierarchy rule's own floor (`packages/domain/src/ticket-types.ts`):
+ * a type at that rank or below needs a parent, so offering one as the default
+ * for a ticket with no parent would pre-select an answer the engine refuses.
+ * Among the legal ones the DEEPEST is chosen, because rank is depth in the
+ * hierarchy and a root ticket is the broadest kind of work the workspace files
+ * — the same "nearest kind of work" reasoning `subtaskTypeFor` uses from the
+ * other direction (there the ladder is consulted downward from a parent; here
+ * upward from the root).
+ *
+ * Ties are broken by `id`, so the answer does not depend on the order the
+ * server happened to return the ladder in. `null` when NOTHING is legal: a
+ * workspace whose every type needs a parent has no root-legal default, and the
+ * honest answer is then an empty picker rather than a type the door will
+ * refuse.
+ */
+export function defaultRootTypeFor(ladder: readonly TypeOption[]): TypeOption | null {
+  const legal = ladder.filter((type) => type.rank < DEEPEST_RANK);
+  if (legal.length === 0) return null;
+  return legal.reduce((best, type) =>
+    type.rank > best.rank || (type.rank === best.rank && type.id < best.id) ? type : best,
+  );
+}
 
 export type NewTicketDraft = {
   title: string;
@@ -23,7 +65,7 @@ export type NewTicketDraft = {
 
 export type NewTicketDialogProps = {
   open: boolean;
-  typeOptions: Array<{ id: string; name: string }>;
+  typeOptions: readonly TypeOption[];
   /**
    * `inFocus` (backlog/closed spec §5.4, 2026-09-17): whether THIS candidate,
    * if chosen as parent, would show the "Start in focus" checkbox below — a
@@ -101,7 +143,21 @@ export function NewTicketDialog({
   onClose,
 }: NewTicketDialogProps) {
   const [title, setTitle] = useState('');
-  const [typeId, setTypeId] = useState(typeOptions[0]?.id ?? '');
+  /**
+   * NOT `typeOptions[0]`, which is what this was until 2026-09-21 (E5-16).
+   * The ladder arrives RANK-ASCENDING, so `[0]` was the top of the hierarchy —
+   * `epic`, rank 1 — and a person who typed a title and pressed Create filed an
+   * Epic. In the dev project's own distribution (Epic 3 · Errand 24 ·
+   * Story/Task/Sub-task 0) that was the least likely choice eight times in
+   * nine, and on the web the mistake is ONE-WAY: the sheet's `Type` row is
+   * read-only, so an accidental Epic has to be deleted and re-filed. An Epic is
+   * structurally different besides — it heads a hierarchy and appears in the
+   * Backlog as a group band rather than as a ticket.
+   *
+   * The empty string is now reachable only when the caller hands over a ladder
+   * with NO root-legal type at all; see `defaultRootTypeFor`.
+   */
+  const [typeId, setTypeId] = useState(defaultRootTypeFor(typeOptions)?.id ?? '');
   const [parentId, setParentId] = useState('');
   // Checked by default (spec §5.4), PER CHOSEN PARENT — Ruling 40 (coordinator,
   // fix round 1, 2026-09-17): the Parent picker's own `onChange` below resets
@@ -210,6 +266,11 @@ export function NewTicketDialog({
           value={typeId === '' ? null : typeId}
           onChange={setTypeId}
           searchable
+          // The empty start has to SAY it is empty. The shared Select's own
+          // default is the bare `Select…`; this names the thing being chosen,
+          // the way the Move dialog's destination names its own (`Choose a
+          // state`), so a disabled Create beside it has a readable reason.
+          placeholder="Choose a type"
           aria-label="Type"
         />
       </label>
