@@ -1466,7 +1466,7 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
   `comment`: `grep -c "setComment('')"` → 0), `E2-35` (delete asks nothing: `ticket-sheet.tsx:2612-2621`), `E2-37`
   (`new-ticket-dialog.tsx` has zero `useEffect` and no `setTitle('')`), `E2-38` (`page.tsx` has 0 occurrences of
   `archived` — and E5-34 is what the bar does on that page), `E2-39` (`workflow-builder-screen.tsx:72`
-  `listMembers().catch(() => [])`), `E2-40` (`require-field` read from `input.ticket.fields`, not the payload). **No
+  `listMembers().catch(() => [])`), `E2-40` (`rule-engine/src/rules/require-field.ts:9` reads `input.ticket.fields[rule.field]`, never the payload — opened). **No
   falsifying measurement found in any of them.**
 - Nothing I measured contradicts a landed exec 2 finding. **I have no refutation to file at this time**; if I find one
   in the remaining window it goes to `docs/lanes/review-refutations-exec5.md`.
