@@ -158,7 +158,10 @@ the markdown matches the product.
 **WHAT WOULD HAVE BEEN BETTER.** The Delete PR's change set should have included the help — the workspace rule
 that `Features.md` moves in the same change set applies with more force to the user-facing manual, since
 `Features.md:73` *was* updated in that PR. Concretely: replace `manual.md:372` with the three facts a user needs
-(who may delete — project admin; what happens — hidden from views, history kept; how to undo — `Restore`), rewrite
+(who may delete — project admin; what happens — hidden from views, history kept; how to undo — the 15 s `Undo` on
+the toast, after which the Delete PR's own list says *"there is no UI that emits `ticket.restored`, so a soft delete
+becomes permanent in practice"*, `executor-state-history.md:687-691` — a sentence a user needs more than any other
+on this page), rewrite
 `faq.md:220-222` to answer *yes* and point at the undo, and drop the `faq.md:982` "unknown" bullet. The
 prototype's own `faq-delete` entry (export `Gisik Nokma - Desktop.dc.html`, sha `3d142d46`) is the model:
 *"The ticket stops appearing in views. Its history is retained, because other events cite it."*
