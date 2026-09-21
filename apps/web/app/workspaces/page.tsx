@@ -165,8 +165,17 @@ function ChipRow({
     // ONE chip, and no number anywhere in it. Printing `0` would be the claim
     // "nothing here you can see", which is exactly what the server declined to
     // say by omitting the key. `archivedCount` is deliberately not read on
-    // this branch either, for the same reason: a guest gets no numbers at all,
-    // not a subset of them.
+    // this branch either, for the same reason.
+    //
+    // ⚠ SCOPED 2026-09-21 (F6). This read "a guest gets no numbers at all, not a
+    // subset of them", and the same CARD falsifies it further down: a guest's
+    // project line renders the owner-ruled restriction sentence
+    // (`workspace-viewer.ts`'s `projectLine`, "1 project · name restricted"),
+    // which names a number — `workspace-viewer.ts` says so itself, at the line
+    // that records the same correction. So the claim is narrowed to what THIS
+    // branch governs: **no count CHIPS — a guest gets no ticket, member or
+    // archived numbers** — and the restriction sentence is the deliberate
+    // exception rather than an oversight.
     return (
       <div className="gn-workspace-card__chips">
         <Chip tone="restricted">Restricted</Chip>
