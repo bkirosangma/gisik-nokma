@@ -1664,6 +1664,10 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
   the finding that survived is the refusal's geometry (E5-9).**
 - **"`/mcp/authorize` has no deny path"** (`prototype-delta` entry) — stale: `Deny` is painted (`[BROWSER]`). **Not a
   finding.**
+- **`/my-work` while the attention read is pending** (`my-work/page.tsx`, the `attention.data !== null ? … : null`
+  arm) — no strip renders, which `docs/manual.md:873` defines as *"nothing needs attention"*; the `exec2-V4` shape
+  (loading painted as empty), but the `Loading…` of My Work sits directly beneath it for the same window. **Observation,
+  not scored.**
 - **The workflow builder's read-only banner and the Workspace settings form's member arm** — both withhold with a
   sentence (`read-only-banner.tsx:35-39`, `workspace-settings-form.tsx:442`). **The pattern done right; not findings.**
 
