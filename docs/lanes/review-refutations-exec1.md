@@ -18,7 +18,7 @@
 
 ## 0. Refutations filed
 
-**None at 15:33 IST.** Every finding of exec 4's that I could reach at source held, and every painted number of theirs I re-painted reproduced (§1a) — the table in §1 names the line I opened for each. Two of them (`E4-1`, `E4-30`) are about code I wrote, and both are right; §3 says so plainly. This section is revisited against each lane's later pushes until 17:05.
+**None at 15:33 IST.** Every finding of exec 4's that I could reach at source held, and every painted number of theirs I re-painted reproduced, `E4-7`'s to the decimal (§1a) — the table in §1 names the line I opened for each. Two of them (`E4-1`, `E4-30`) are about code I wrote, and both are right; §3 says so plainly. This section is revisited against each lane's later pushes until 17:05.
 
 ## 1. Exec 4's findings, checked at source — the line I opened, and the verdict
 
@@ -69,10 +69,12 @@ The opponent's report is painted (`:3041`); I cannot re-paint, so each check bel
 | `E4-27` | *Publish* 84×36 with a 1-px border and 6-px radius | `button.publish-controls__publish` **83.7×36.4**, `border: 1px solid rgb(51,98,159)`, `radius 6px` | **reproduces** |
 | `E4-28` | calendar: no roles, day cells are `div`s, dates in `title` | `.gn-calendar [role]` → **0**; first `.gn-calendar__day` is a `DIV` with text `31` and no `aria-label`; an item `<button>` carries `title="starts 18 Aug — Kiro's claim · needed by 5 Oct — Kiro's claim"` and no `aria-label` | **reproduces** |
 | `E4-35` | *All* 31 wide | `/inbox` tabs: **All 30.6×44**, Unread 63.7×44, Mentions 77.5×44, each `padding: 1px 6px`; tablist `aria-label="Filter notifications"` | **reproduces** |
+| `E4-7` | at 390: `grid-template-columns: 128px 224.094px`, editor 224×3195, `dd` `x 178.6 → 402.7` past a sheet ending at 390, title 162×28, *Full screen* 114×44, close 24×21, five crumbs one per line | `emulate 390x844x2,mobile,touch`, sheet open on `CCSO-6` (15:37 IST): `innerWidth` 390, sheet `l 23.4 → r 390` (366.6 wide), field `grid-template-columns: 128px 224.094px`, `dd` **`l 178.6 → r 402.7`** (224.1 wide, 3411 tall), editor **224.1×3195.5**, toolbar `r 402.7`, title **162×28**, full **113.8×44**, close **23.6×21.2**, crumb tops `14 / 38 / 62 / 86 / 110` (five lines); `.gn-sheet__body.scrollWidth` 379 against a 366.6 box | **reproduces to the decimal** |
+| `E4-11` | `.gn-nav` 390×310 at 390 | same emulation: `.gn-nav` **390×309.6** | **reproduces** |
 | `E4-10` | four class-less gallery buttons | not re-painted: `/settings/workflows/new` not visited; source holds (§1) | — |
 | §4 row *calendar nav 31×36* | 31×36, border none | `.gn-calendar__nav` × 2: **30.8×36**, `border: 0px none` | reproduces |
 
-**Not opened at source** (no reason to doubt them; time went to the paints above): `E4-7`, `E4-16`, `E4-20`, `E4-22`, `E4-26`, `E4-29`. **Thirty of thirty-six checked at source or at paint; thirty hold.** Where a check found a slip, it is in a mechanism or count sentence, never in the measured claim, and I do not file a refutation on a slip — rules §3 prices a rejected refutation at the target's points, and a judge who opens the line will find the finding standing.
+**Not opened at source or paint** (no reason to doubt them; time went to the paints above): `E4-16`, `E4-20`, `E4-22`, `E4-26`, `E4-29`. **Thirty-two of thirty-six checked at source or at paint; thirty-two hold.** (`E4-7` and `E4-11` were not opened at source; their painted numbers reproduce.) Where a check found a slip, it is in a mechanism or count sentence, never in the measured claim, and I do not file a refutation on a slip — rules §3 prices a rejected refutation at the target's points, and a judge who opens the line will find the finding standing.
 
 ## 2. Findings of other lanes on surfaces I built — checked because I know what they were meant to do
 
@@ -115,3 +117,4 @@ Defence paragraphs are dated and sit under the finding in `review-ui-exec1.md`; 
 - 15:22 — I1 narrowed and re-measured; P1's fourth-stylesheet condition closed.
 - 15:23–15:32 — `:3041` driven by me: `/privacy` signed out (P31's legal pair, P12, P13), then signed in (P1 ×3, P35, P21, P19, P8; §1a's re-paints of exec 4; P36 found and filed at half points).
 - 15:33 — heads re-read (`exec4` `872758a3`: two mechanism slips I noted corrected in its report, dated; `exec6` `2ee7cc03`: `R6-3 → E2-28`; `exec2` `d370d830`; `exec3` `c5524156`; `exec5` `858d824c`). No lane has filed a refutation of an exec-1 finding as of this line.
+- 15:37 — `E4-7` and `E4-11` re-painted at 390×844 (mobile emulation); both reproduce. Emulation reset.
