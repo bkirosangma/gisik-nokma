@@ -1216,23 +1216,77 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "about-the-projects-box",
-            "title": "About the \"Projects\" box",
+            "id": "about-the-project-access-box",
+            "title": "About the \"Project access\" box",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "It asks for a comma-separated list of identifiers — long strings of letters and numbers that you would have to go and find from somewhere. "
+                    "text": "It is a dropdown, and it offers "
                   },
                   {
                     "kind": "bold",
-                    "text": "In practice this box is not usable by a person."
+                    "text": "All projects in this workspace"
                   },
                   {
                     "kind": "text",
-                    "text": " Leave it empty."
+                    "text": " plus one *"
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "Only "
+                  },
+                  {
+                    "kind": "text",
+                    "text": "<project name>*** entry for each project you can see. Pick a name; the product works out the identifier behind it."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "⚠ IT USED TO ASK YOU TO TYPE IDENTIFIERS, and this paragraph said so."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Until 2026-09-21 the box was labelled "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Projects (comma-separated ids, optional)\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and wanted long strings of letters and numbers that you would have to go and find from somewhere — the manual's own verdict was "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"In practice this box is not usable by a person.\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " It is kept here, rather than deleted, so a reader who remembers it as an unusable box finds the correction where they last saw it."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Leave it on "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "All projects in this workspace"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " unless the invitation really is for one project only."
                   }
                 ]
               },
@@ -7352,15 +7406,40 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "what-do-i-put-in-the-projects-box-on-the-invite-form",
-            "title": "What do I put in the \"Projects\" box on the invite form?",
+            "id": "what-do-i-put-in-the-project-access-box-on-the-invite-form",
+            "title": "What do I put in the \"Project access\" box on the invite form?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "bold",
+                    "text": "All projects in this workspace"
+                  },
+                  {
                     "kind": "text",
-                    "text": "Nothing. It asks for a comma-separated list of identifiers — long strings of letters and numbers you would have to go and find. It is not usable by a person as it stands. Leave it empty."
+                    "text": ", unless the invitation is genuinely for one project only — in which case pick the project by NAME from the same dropdown. It is a list of names; you never type an identifier."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "⚠ It used to ask you to type identifiers, and this answer said to leave it empty."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Until 2026-09-21 the box was labelled "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Projects (comma-separated ids, optional)\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and wanted long strings of letters and numbers you would have to go and find. The old answer is kept here so a reader who remembers it finds the correction where they last saw it."
                   }
                 ]
               }

@@ -233,11 +233,18 @@ by any of them.** It makes a link, shows it to you once, and you send it however
 So treat "Channel" as a note to yourself about how you intend to reach the person, and plan on sending
 the link by hand.
 
-### About the "Projects" box
+### About the "Project access" box
 
-It asks for a comma-separated list of identifiers — long strings of letters and numbers that you would
-have to go and find from somewhere. **In practice this box is not usable by a person.** Leave it
-empty.
+It is a dropdown, and it offers **All projects in this workspace** plus one **Only *<project name>***
+entry for each project you can see. Pick a name; the product works out the identifier behind it.
+
+**⚠ IT USED TO ASK YOU TO TYPE IDENTIFIERS, and this paragraph said so.** Until 2026-09-21 the box
+was labelled *"Projects (comma-separated ids, optional)"* and wanted long strings of letters and
+numbers that you would have to go and find from somewhere — the manual's own verdict was *"In practice
+this box is not usable by a person."* It is kept here, rather than deleted, so a reader who remembers
+it as an unusable box finds the correction where they last saw it.
+
+Leave it on **All projects in this workspace** unless the invitation really is for one project only.
 
 It is correctly hidden when you pick **guest**, and if you try to invite a guest *and* name projects
 it refuses and tells you to share individual jobs with them instead.

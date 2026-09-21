@@ -10,6 +10,7 @@ import { AppNav } from '../../../../src/app-nav.js';
 import { ShellRefusal } from '../../../../src/shell-refusal.js';
 import { useAppServices, useCurrentUser } from '../../../../src/providers.js';
 import { useWorkspaceName } from '../../../../src/use-workspace-name.js';
+import { useWorkspaceProjects } from '../../../../src/use-workspace-projects.js';
 
 /**
  * The minted link's copy. Pinned by Plan 6 Task 15b item 2 and exported so the
@@ -734,31 +735,72 @@ function memberSummary(members: readonly RosterMember[], workspaceName: string |
  *   as `[]`, because an empty array the admin never asked for is refused as if
  *   they had.
  *
+ * ⚠ **AND THE SAME RULE NOW APPLIES TO THE PROJECT FIELD'S *SHAPE* (ruling
+ * E5-11, 2026-09-21).** It was a text box labelled *"Projects (comma-separated
+ * ids, optional)"*: a person had to transcribe project ULIDs from somewhere
+ * else, and the manual said so in as many words — *"In practice this box is not
+ * usable by a person."* The paragraph above already named the defect and had
+ * been applied to two of the three choices the form offers; the third was the
+ * one whose only honest input was an identifier no screen shows. It is now the
+ * export's `<select>` of project NAMES (`desktop.dc.html:768-772`), fed from
+ * `useWorkspaceProjects` — the same `GET /v1/me/workspaces` read the workspace
+ * name beside it already makes.
+ *
  * Everything else the door refuses reaches the screen in the door's own words,
  * unparaphrased, out of the 422's `IngestResult`.
  */
 function MintForm({ workspaceId, onMinted }: { workspaceId: string; onMinted: () => void }) {
   const { invitesAdmin } = useAppServices();
+  /**
+   * RULING E5-11 (2026-09-21) — THE PROJECTS READ, and it is the SAME read the
+   * nav and the workspace name already make. `useWorkspaceProjects` narrows
+   * `GET /v1/me/workspaces` one level further to the `projects` array nested in
+   * the workspace row, so nothing new is served and no second request is made.
+   *
+   * `null` means NOT KNOWN — pending, refused, or signed out — and it is NOT
+   * `[]`, which would be the claim "this workspace has no projects". The select
+   * below renders the one option that is true either way, so an unanswered read
+   * omits choices rather than inventing them; that is the same omission-not-id
+   * rule the hook's own docblock states.
+   */
+  const projects = useWorkspaceProjects(workspaceId);
   const [address, setAddress] = useState('');
   const [channel, setChannel] = useState('email');
   const [role, setRole] = useState('member');
-  const [projectIds, setProjectIds] = useState('');
+  /**
+   * `'all'` — the export's own first option — or ONE project's id.
+   *
+   * ⚠ **THIS REPLACED A COMMA-SEPARATED TEXT BOX OF PROJECT ULIDS.** The field
+   * read *"Projects (comma-separated ids, optional)"* and asked a person to
+   * transcribe 26-character identifiers from somewhere else; the manual's own
+   * verdict was *"In practice this box is not usable by a person."* The export
+   * draws a `<select>` of project NAMES (`desktop.dc.html:768-772`), and this
+   * form's own docblock already sets the rule it was breaking — "offering a
+   * choice the door will reject is a form that lies about what it can do" — for
+   * `owner` and for the guest arm. A box whose only honest input is an
+   * identifier no screen shows is the same lie in a quieter voice.
+   *
+   * ONE project, not several, because that is what the export's control is: a
+   * single `<select>` whose options are "All projects in this workspace" and one
+   * `Only <name>` per project. The door still takes an ARRAY (`projectIds`), so
+   * the submission below wraps the single choice — the wire shape is unchanged.
+   */
+  const [projectScope, setProjectScope] = useState('all');
   const [minted, setMinted] = useState<MintedInvite | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
 
   const submit = (event: FormEvent): void => {
     event.preventDefault();
     setRefusal(null);
-    const named = projectIds
-      .split(',')
-      .map((id) => id.trim())
-      .filter((id) => id !== '');
     void invitesAdmin
       .mintInvite(workspaceId, {
         address,
         channel,
         role,
-        ...(role === 'guest' || named.length === 0 ? {} : { projectIds: named }),
+        // The key is OMITTED for `all` and for a guest, never sent as `[]`:
+        // the schema refuses `projectIds` on a guest invitation, and an empty
+        // array the admin never asked for is refused as if they had.
+        ...(role === 'guest' || projectScope === 'all' ? {} : { projectIds: [projectScope] }),
       })
       .then(
         (result) => {
@@ -873,13 +915,30 @@ function MintForm({ workspaceId, onMinted }: { workspaceId: string; onMinted: ()
 
       {role === 'guest' ? null : (
         <>
-          <label className="gn-field" htmlFor="gn-invite-projects">
-            <span className="gn-field__label">Projects (comma-separated ids, optional)</span>
-            <input
-              id="gn-invite-projects"
-              className="gn-field__input"
-              value={projectIds}
-              onChange={(event) => setProjectIds(event.target.value)}
+          <label className="gn-field">
+            <span className="gn-field__label">Project access</span>
+            {/*
+              The export's own option set, in its own order
+              (`desktop.dc.html:768-772`): "All projects in this workspace"
+              FIRST, then one `Only <name>` per project, in SERVED order.
+
+              ARCHIVED PROJECTS ARE INCLUDED, deliberately. `useWorkspaceProjects`
+              returns the served rows and decides neither filtering nor order
+              (its own docblock); the door accepts an archived project's id, so
+              hiding it would withhold a choice that would have succeeded — the
+              mirror of the lie this change removes.
+            */}
+            <Select
+              options={[
+                { value: 'all', label: 'All projects in this workspace' },
+                ...(projects ?? []).map((project) => ({
+                  value: project.id,
+                  label: `Only ${project.name}`,
+                })),
+              ]}
+              value={projectScope}
+              onChange={setProjectScope}
+              aria-label="Project access"
             />
           </label>
         </>

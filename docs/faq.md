@@ -121,9 +121,15 @@ Absolutely. That link appears once, on that screen, at that moment. It is not in
 is nowhere else. Close the tab and you have to withdraw the invitation and start over. **Paste it into
 your email before you do anything else.**
 
-**What do I put in the "Projects" box on the invite form?**
-Nothing. It asks for a comma-separated list of identifiers — long strings of letters and numbers you
-would have to go and find. It is not usable by a person as it stands. Leave it empty.
+**What do I put in the "Project access" box on the invite form?**
+**All projects in this workspace**, unless the invitation is genuinely for one project only — in which
+case pick the project by NAME from the same dropdown. It is a list of names; you never type an
+identifier.
+
+**⚠ It used to ask you to type identifiers, and this answer said to leave it empty.** Until 2026-09-21
+the box was labelled *"Projects (comma-separated ids, optional)"* and wanted long strings of letters
+and numbers you would have to go and find. The old answer is kept here so a reader who remembers it
+finds the correction where they last saw it.
 
 **Is an admin the same as "sees everything"?**
 No, and this surprises everybody. **Admin is a "can change things" role, not a "can see things"
