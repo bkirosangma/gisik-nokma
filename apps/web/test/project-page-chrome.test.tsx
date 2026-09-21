@@ -185,7 +185,13 @@ describe('E2-38 the project page names the project’s own state', () => {
       </Providers>,
     );
 
-    const chip = await screen.findByText('Archived', { selector: '.gn-chip' });
+    // Scoped to the PAGE'S OWN line, not `screen.findByText('Archived')`: since
+    // E5-34 the nav's own project item also badges an archived route (its job,
+    // one surface up), so an unscoped query matches two chips and throws on
+    // ambiguity rather than failing cleanly.
+    const chip = await screen.findByText('Archived', {
+      selector: '.gn-project__archived .gn-chip',
+    });
     expect(chip).toBeInTheDocument();
     // Inside the page's own state line rather than inside the heading: the
     // heading is the project's NAME, and a state read as part of it would make

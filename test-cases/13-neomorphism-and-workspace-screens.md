@@ -2482,3 +2482,20 @@ them and the ROLE can.
   not the member's sentence, and the form the sentence names really is on screen); a member with the
   SAME empty list keeps the member's sentence. —
   (`apps/web/test/workspace-home.test.tsx`)
+
+## The bar named a different project on an archived project's own page — case `13.1166` (E5-34, 2026-09-21)
+
+**Ids from B11's §13 block `13.1157`–`13.1166`** (controller, 2026-09-21 22:0x; see the E5-25 section
+above). **This is the block's last id.**
+
+**The defect.** `last-project-nav.tsx:114-127` takes the route's project id from `useParams` and matches it
+against **live rows only** (`live = projects.filter(p => !p.archived)`), falling back to `live[0]`. On an
+archived project's own route the match missed, so the item showed the FIRST LIVE project's name, that
+project's `href`, and **no `aria-current`** — the docblock that calls the item "a function of the ROUTE" is
+true only for live routes, and the one route it is about is the project you are standing on.
+
+- **13.1166** ✅ Standing on an archived project's page, the item names and links **that** project — badged
+  with the same `Chip` and the same `", archived"` name the workspace home's card uses — and not the first
+  live one; the DROPDOWN stays live-only, because it offers somewhere to go. A live project's own route is
+  the control in the same case: named, unbadged. —
+  (`apps/web/test/last-project-nav.test.tsx`)
