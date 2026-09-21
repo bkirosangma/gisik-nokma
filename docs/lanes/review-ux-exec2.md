@@ -54,7 +54,7 @@ failure mode of this session; it was caught only because a finding count I re-ru
 back **43** instead of 26. Restored from `ef219034` (verified clean before use) and redone with **function**
 replacements, which do not interpret dollar-patterns. The diff is now exactly the two intended edits.
 **A final automated audit of both artifacts, re-run after every repair, and clean on every section.**
-Counts measured against the sections rather than remembered: **30 round-2 findings, 18 Important / 12
+Counts measured against the sections rather than remembered: **31 round-2 findings, 18 Important / 13
 Minor, 0 Critical, every one with a severity line, headings in ascending numeric order with no duplicates;
 43 refutation targets and 43 rows with no duplicates.** Both files' citations resolve — **90 distinct paths
 in the report and 22 in the refutations file, none missing, every line number inside its file.**
