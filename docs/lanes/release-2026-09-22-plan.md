@@ -101,6 +101,9 @@ Batches run in this order, best value per hour first. **One driver takes the nex
 | **B17** | ANY | sonnet | deepseek | 12 | 4.8 (8) | 33–132 | Instruments that cannot fail or never run |
 | **B18** | ANY | haiku | deepseek | 37 | 5.5 (9.2) | 160–201 | Prose drift sweep — docblocks, catalogue markers, counts |
 
+
+**Topology (owner, 2026-09-21 18:4x):** at most **three DeepSeek lanes and three Claude lanes under one controller**. DeepSeek lanes take whole-DeepSeek batches in §3 order (B03, B04, B05 first, then B06, B08, B09, B10, B11, B13, B14, B15, B17, B18); Claude lanes take the Claude batches in order (B01, B02, B07, B12, B16); **when every Claude-assigned task is done, the Claude lanes take DeepSeek-assigned batches** in the same order, never the reverse. One batch per session; a lane that finishes claims the next unclaimed batch of its kind in the progress file. Until `scripts/ctl/ctl` is live, lanes run in PUSH-ONLY mode: they push after every task, commit the PR body to `docs/lanes/pr-bodies/<batch>.md`, and the controller opens and lands the PR through the verbs.
+
 Totals: committed 27 h (60 tasks) · through the cut 40.8 h (79 tasks) · whole plan 105.1 h batched, 175.3 h solo, 231 tasks.
 
 ## §4 — THE REVIEWER PASS (write the answers into every PR body)
