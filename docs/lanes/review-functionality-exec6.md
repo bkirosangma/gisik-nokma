@@ -141,7 +141,7 @@ answered by a probe (Appendices A–H).
 deletion,context-helpers}.ts`, `rules/{require-different-user,restrict-to,require-evidence,require-comment,
 require-field}.ts` (14 of 28 files). `packages/domain/src/` — `vocabulary.ts` (registrations), `validate-workflow.ts`,
 `workflow.ts:151-191`, `rank.ts`, `clock-skew.ts`, `events/{invites,workspace-settings,visibility,ticket-events}.ts`
-(schemas), `filter-spec.ts:115-170`, `ticket-types.ts:98-160` (10 of 41). `packages/sync-client/src/` —
+(schemas), `filter-spec.ts:115-169`, `ticket-types.ts:98-160` (10 of 41). `packages/sync-client/src/` —
 `outbox/outbox.ts` (whole), `engine/sync-engine.ts:844-972` (flush), `precheck/local-context.ts:120-160`,
 `net/http-transport.ts` (skimmed), `storage/*` (not opened) — 3 of 13. `packages/mcp-server/src/` —
 `tools/{write-tools,read-tools}.ts`, `token-cache.ts`, `http-client.ts`/`session.ts` (grep only) — 4 of 12.
@@ -152,7 +152,7 @@ functions and the membership branches; ~400 of 1,342 lines), `visibility/can-see
 {tickets,proj-memberships,ticket-types}.ts` (the readers and `apply`), `routes/{list,builder-reads,invites,
 attachments,tickets,notifications,mcp-device}.ts` (the routes named in findings; not every handler),
 `read/{visible-where,restricted-parents}.ts`, `notifications/{fanout,sweep,store}.ts` (grep + the cited blocks),
-`auto-close/sweep.ts:176-206`, `sync/{sync-service,reconcile-route}.ts`, `stream/hub.ts:213-420`, `gates/
+`auto-close/sweep.ts:176-206`, `sync/{sync-service,reconcile-route}.ts`, `stream/hub.ts:213-388`, `gates/
 evidence-gate.ts`, `auth/auth.ts:150-360` and `app.ts:477-612` (rate limits), `mcp/token-store.ts:1-80`,
 `tools/sweep-orphans.ts:100-125`, `tools/verify-projections.ts` (whole), `attachments/sniff.ts:36-50`,
 `sync/contest-coherence.ts` (whole), `read/ancestry.ts` (whole), `http/http-origin.ts:128-172`, `:255-265`
@@ -803,7 +803,7 @@ POST /v1/workspaces/:ws/invites  channel=email    -> 201 {"inviteId":…,"url":"
 **WHY it is wrong.** An admin who picks `sms` or `whatsapp` — the two options that describe a phone number —
 gets a 422 whose message names a value the form does not offer, so a phone invitation cannot be minted from the
 shipped page at all. The same file states the rule it breaks, three hundred lines up, about the *role* select:
-`page.tsx:728-729` *"offering a choice the door will reject is a form that lies about what it can do."* It has
+`members/page.tsx:728-729` *"offering a choice the door will reject is a form that lies about what it can do."* It has
 been this way since the options first shipped — `7b45099e` (2026-09-02) added `whatsapp` to the page while
 `INVITE_CHANNELS` was already `['email', 'phone']` at that commit (`git show 7b45099e:packages/domain/src/events/invites.ts:70`)
 — and `452335ed` (2026-09-14, *"Migrate members page's Channel and Role selects to the shared Select"*) carried the
