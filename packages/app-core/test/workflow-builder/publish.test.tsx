@@ -112,6 +112,12 @@ describe('PublishControls gating', () => {
     const button = screen.getByRole('button', { name: 'Publish' });
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('title', 'Fix the issues below first.');
+    // And ATTACHED, not only hoverable: a disabled button is out of the focus
+    // order, so the `title` above reaches a mouse user who hovers and nobody
+    // else. `aria-describedby` must resolve to a node carrying the sentence.
+    const describedBy = button.getAttribute('aria-describedby');
+    expect(describedBy).not.toBeNull();
+    expect(document.getElementById(describedBy!)?.textContent).toBe('Fix the issues below first.');
   });
 
   it('renders nothing at all for a session that cannot author', () => {

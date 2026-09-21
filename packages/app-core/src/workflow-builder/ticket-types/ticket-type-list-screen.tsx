@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { BUILTIN_TICKET_TYPE_SEEDS, type PublishedWorkflowDef, type TicketTypeDef } from '@gisik-nokma/domain';
 import { Button, Card } from '@gisik-nokma/ui';
 import { buildTicketTypeDefinedEvent } from '../events.js';
@@ -6,6 +6,24 @@ import type { WorkflowAuthoringGateway } from '../gateway.js';
 import { canAuthorRole, type BuilderSession } from '../ui/builder-context.js';
 import { ReadOnlyBanner } from '../ui/read-only-banner.js';
 import { TypeIcon } from './icons.js';
+
+/**
+ * Visually hidden, inline — the recipe `apps/web/src/route-announcer.tsx`
+ * carries, reused rather than re-invented. This product has no `sr-only`-style
+ * utility to reuse: the one it had was cut as YAGNI when `aria-label` replaced
+ * the mechanism it was written for.
+ */
+const VISUALLY_HIDDEN = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  margin: -1,
+  padding: 0,
+  border: 0,
+  overflow: 'hidden',
+  clipPath: 'inset(50%)',
+  whiteSpace: 'nowrap',
+} as const;
 
 /**
  * `/settings?tab=ticket-types` and `/w/[workspaceId]/settings/ticket-types` —
@@ -174,6 +192,8 @@ export function TicketTypeListScreen(props: {
   // the exact tie the two-event swap exists to prevent. Every arrow is disabled
   // while a swap is in flight.
   const [reorderPending, setReorderPending] = useState(false);
+  /** Per-mount prefix for the reorder reasons' ids — see the buttons' note. */
+  const reorderReasonId = useId();
   const { gateway, workspaceId } = props;
   useEffect(() => {
     let cancelled = false;
@@ -367,6 +387,20 @@ export function TicketTypeListScreen(props: {
                     type="button"
                     className="ticket-type-list__move"
                     aria-label={`Move ${type.name} up`}
+                    /*
+                      WHY A BLOCKED MOVE IS DISABLED, made reachable. These two
+                      controls explain themselves through `title` on a DISABLED
+                      button — out of the focus order, so the sentence reached
+                      only a mouse user who hovered. `aria-describedby` attaches
+                      the same words to the control wherever it is reached; the
+                      `title` stays for the hovering reader. The id carries the
+                      TYPE's id because this component renders one control pair
+                      per row and a shared id would point every row at the
+                      first row's sentence.
+                    */
+                    aria-describedby={
+                      moveBlocker(index, -1) === null ? undefined : `${reorderReasonId}-up-${type.id}`
+                    }
                     title={moveBlocker(index, -1) ?? `Move ${type.name} up`}
                     disabled={moveBlocker(index, -1) !== null}
                     onClick={() => {
@@ -374,11 +408,19 @@ export function TicketTypeListScreen(props: {
                     }}
                   >
                     <span aria-hidden="true">↑</span>
+                    {moveBlocker(index, -1) !== null && (
+                      <span id={`${reorderReasonId}-up-${type.id}`} style={VISUALLY_HIDDEN}>
+                        {moveBlocker(index, -1)}
+                      </span>
+                    )}
                   </button>
                   <button
                     type="button"
                     className="ticket-type-list__move"
                     aria-label={`Move ${type.name} down`}
+                    aria-describedby={
+                      moveBlocker(index, 1) === null ? undefined : `${reorderReasonId}-down-${type.id}`
+                    }
                     title={moveBlocker(index, 1) ?? `Move ${type.name} down`}
                     disabled={moveBlocker(index, 1) !== null}
                     onClick={() => {
@@ -386,6 +428,11 @@ export function TicketTypeListScreen(props: {
                     }}
                   >
                     <span aria-hidden="true">↓</span>
+                    {moveBlocker(index, 1) !== null && (
+                      <span id={`${reorderReasonId}-down-${type.id}`} style={VISUALLY_HIDDEN}>
+                        {moveBlocker(index, 1)}
+                      </span>
+                    )}
                   </button>
                 </span>
               ) : null}
