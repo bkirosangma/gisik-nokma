@@ -24,3 +24,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-I2 | done | 056260d11d5bfd97783bc9d589654b82ce9c53e6 | roster provenance stamp; typecheck 17/17; no product test (DONE WHEN says none needed) |
 | T-P24 | done | 232403d9adbe0eba95abb6dd34395f8f262436c0 | tokens.test.ts (13.1061) sweep 3/3; ui 413, web 639; dangerText option refuted (1.06:1) |
 | T-E4-15 | done | 96f943c8980461fd8caead688f61dfc80656f464 | components.test.tsx (13.1062); ui 416, web 639; P35's ask is a subset and is satisfied here |
+| T-E4-2 | done | 0c515a8a37b8b129325e39412b7118c0afe33a6b | components.test.tsx (13.1063); ui 420, web 639; sheet-opening sweep half NOT done (recorded) |
