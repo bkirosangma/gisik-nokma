@@ -52,7 +52,7 @@ in the shell. Defence paragraphs, dated, go under the finding in `review-ux-exec
 
 ## Log
 
-- 16:32 IST — cadence push. Since 16:18: six pushes (exec 1 `b128286d`; exec 6 `e0cac297`; exec 3 `707bf5e8`,
+- 16:32 IST — cadence push. Since 16:18: five pushes (exec 1 `b128286d`; exec 6 `e0cac297`; exec 3 `707bf5e8`,
   `9a8e57f3`; exec 2 `4f2793d3`), each diffed on its added/removed lines — no `E5-` in any of them (exec 6's hunk
   carried an `E5-` only in unchanged context; its change is a heartbeat timestamp). `filed` counts unchanged
   (exec 6: 3; others 0). No new refutation against this lane; none filed by this lane. Standing unchanged.
