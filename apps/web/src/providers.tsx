@@ -197,7 +197,15 @@ export function useCurrentUser(): { id: string; name: string; email: string | nu
   if (user === undefined || user === null) return null;
   return {
     id: user.id,
-    name: userDisplayName(user),
+    // The RAW name, deliberately: the shell's one reading of "what do we call
+    // this person" is `display-label.ts` (E4-33, landed) — `displayLabelOf`
+    // falls back to the email for the label and `avatarNameOf` to the email's
+    // handle for the monogram. Rewriting `name` to the email HERE (E5-37's
+    // first shape) reached the avatar as a name and made the monogram's title
+    // the whole address, which B03's 13.1054 pins as the defect. E5-37's
+    // `name → email → id` fallback lives on in `useSessionStatus` below, whose
+    // consumers print a name and have no label helper.
+    name: user.name,
     email: typeof user.email === 'string' && user.email !== '' ? user.email : null,
   };
 }
