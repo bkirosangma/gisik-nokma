@@ -39,7 +39,7 @@ ruled is not the prototype and are off by one against the one that is (F3). The 
 **confirmations of gaps the project already records and owns** (F4, F5) — reported because I reproduced
 them independently, not because they are news.
 
-### Round 2 — eleven new findings, and the one that matters
+### Round 2 — seventeen new findings, and the one that matters
 
 **`E3-14` (Critical, claimed) is a hole in this product's CSRF control, measured against a real
 authenticated session (§24).** `HTTP_ORIGIN_PROTECTED_ROUTES` holds 11 patterns and **five
@@ -48,12 +48,12 @@ cookie-authenticated mutating routes are not in it**, including `POST /v1/me/inv
 survived: the guard written to catch exactly this compares the protected set against **the suite's own
 table**, a closed loop, and passes green beside the gap.
 
-**Four Important, six Minor, and eight round-1 findings re-validated with none withdrawn.** Every count
-is measured and every command is printed beside it. **§23 records five attacks on other lanes' findings —
-all five failed**, and §15 and §20.1 record three times my own sweep's universe was too narrow and once
-my own instrument was the defect rather than the code. **Two of this report's own citations were wrong and
-are corrected in §17** — the same defect `E3-13` files against another lane, shipped by the lane that
-filed it.
+**Eight Important, eight Minor, and eight round-1 findings re-validated with none withdrawn** — and one of
+the seventeen was revised **down** by me before a judge could (§34). Every count is measured and every
+command is printed beside it. **§23 and §36 record six attacks on other lanes' findings — all six failed**,
+and §15, §20.1, §31 and §35 record six times my own sweep's universe or pattern was the defect rather than
+the subject. **Two of this report's own citations were wrong and are
+corrected in §17** — the same defect `E3-13` files against another lane, shipped by the lane that filed it.
 
 **And one dispatched premise is stale and should not be acted on.** The dispatch says *"eleven sites carry
 [the soft-delete predicate] and ten were UNCONSTRAINED."* At `e4baa425` **every one of the 18 sites is
@@ -1388,7 +1388,7 @@ I read the patterns against the tree rather than trusting the empty result.
 | **Corrections to this report's own claims** | **5** | §17.1 (three `Features.md` lines) · §17.2 (my §7.2 `tickets.ts` citation) · §14.4 (**`check-no-silent-skips` does not refuse an empty universe** — exec6's `E6-6` was right and I was wrong) |
 
 **Round-2 total: 17 new findings** (1 Critical claimed, 8 Important claimed, 8 Minor) — **including one revised DOWN by me before a judge could, §34**, plus 8 round-1
-findings re-validated, 12 verified-clean claims (§20), and 5 corrections to this report's own claims.
+findings re-validated, 15 verified-clean claims (§20), and 5 corrections to this report's own claims.
 
 **Nine of the fifteen are measured by RUNNING something** — `E3-14` by injection at the assembled app with
 a real session (§24), `E3-15` by the guard's own run, `E3-18` by a replica reproduction, `E3-19` by three
@@ -2673,11 +2673,13 @@ round-2 table's three rows state 1, 8 and 8 and list one, eight and eight ids re
 the run above, in the §16 slice, after three failed attempts that each read the wrong table.** The
 substantive claim in that commit message is true. Its stated method was not what happened.
 
-**SEVENTH INSTANCE of the pattern this report keeps returning to** — an anchor matching a *family* rather
-than a *member*. The other six are in §20.1, §15 and §31: the `routes/*.ts` door sweep, "named inside a test
-file", "called in `app.ts`", the 439-hit assertion sweep, the `(claimed)` suffix, and now the duplicate
-table. **Each was caught by a case whose answer was already known; none reached the judge.** This one did
-reach a pushed commit message, and that is the difference worth holding on to.
+**SIXTH INSTANCE of the pattern this report keeps returning to** — an anchor matching a *family* rather
+than a *member*. The other five are in §20.1, §15 and §31: the `routes/*.ts` door sweep, "named inside a test
+file", "called in `app.ts`", the 439-hit assertion sweep, and the `(claimed)` suffix. ⚠ **This sentence read
+"SEVENTH INSTANCE … the other six", and the arithmetic did not close: six instances are documented, not
+seven, and §31's "fifth time" was right when it was written and is right now.** Found by the count sweep in
+§37, not by re-reading. **Each was caught by a case whose answer was already known; none reached the judge.**
+This one did reach a pushed commit message, and that is the difference worth holding on to.
 
 ---
 
@@ -2731,3 +2733,43 @@ falsify has named a line that said what it claimed.
 **MEASUREMENT.** Probe at `packages/rule-engine/test/zz-e3-probe-promote.test.ts`, created, run and deleted in
 the same shell invocation (`git status --porcelain` empty). `evaluateEvent` and `buildMemoryContext` imported
 by **relative path** so nothing resolved through a stale `dist`. `Tests 1 passed`.
+
+---
+
+## 37. A SYSTEMATIC SWEEP OF THIS REPORT'S OWN COUNTS — five stale in one command
+
+§31 and §35 each found an inconsistency by hand, one turn apart, both of the same shape: **two records of
+one fact, one updated and the other not.** Twice is a pattern, so I stopped finding them by accident and
+swept for them instead.
+
+**The sweep.** `grep -noE "\b(one|two|…|seventeen|[0-9]+) (new findings|findings|attacks|instances|
+verified-clean claims|verified-clean rows|corrections|round-1 findings)\b"` over this file — every
+self-referential count, in one pass. **It found five stale ones, four of them in the two places a judge
+reads first:**
+
+| where | said | measured |
+|---|---|---|
+| §0, the round-2 headline | *"eleven new findings"* | **seventeen** |
+| §0, the same paragraph | *"Four Important, six Minor"* | **eight Important, eight Minor** |
+| §0, the same paragraph | *"§23 records five attacks … all five failed"* | **six** — §36 is the sixth |
+| §16, the total line | *"12 verified-clean claims (§20)"* | **15** — rows 13, 14 and 15 were added after that line was written |
+| §35 | *"SEVENTH INSTANCE … the other six"* | **six instances, five others** — the arithmetic did not close even on its own terms |
+
+**All five are corrected in place, and the third and fifth carry a note saying what they read before.**
+
+**WHY THIS ONE IS WORTH MORE THAN THE FINDINGS IT SITS BESIDE.** Every one of these is a count **I** wrote,
+in a report whose entire argument is that counts go stale because nothing re-derives them — `E3-17` is a
+docblock whose total its own bullets contradict; `E3-11` and `E3-12` are `Features.md` counts that drifted
+when the feature next to them landed; `E3-9` and `E3-10` are the same in source prose. **And I reproduced
+the mechanism four times inside the document that tabulates it**, in the two sections a judge reads first,
+while the report's own §16 had already been corrected six times for exactly this. **The distance between
+knowing the rule and applying it to yourself is the whole of it**, and the only reason these are fixed
+rather than shipped is that the sweep was mechanical: a pattern over the artifact, run at the end, after
+the author had stopped being able to see it.
+
+**And one honest note on the method that found them.** This is the same shape as the checks in §31 and §35
+— a grep over my own prose — and those two were *wrong* on their first four and three attempts
+respectively. **This one's raw output was read before anything was believed**, which is the only reason it
+is a finding rather than a seventh instance of the pattern it reports: the counts above were each confirmed
+by opening the section they sit in. **A sweep that reports a stale count is making a claim about the sweep
+until the count is opened.**
