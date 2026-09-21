@@ -1000,6 +1000,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P26` ⚠ r2 — the prototype-delta document is stale in BOTH halves: **every numbered queue row is closed** and **two of five per-screen gap claims no longer describe the product**
 - `P30` ⚠ r2 — the mobile editor webview is two generated links behind and both links are unguarded
 - `P31` ⚠ r2 — the top bar is an UNNAMED `navigation` landmark beside a named one on at least seven routes
+- `P34` ⚠ r2 — FOUR of the project page's five views sit outside the tap-target ratchet's population, because the ratchet visits routes and the views are tabs
 
 **MINOR — 19**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
@@ -1021,7 +1022,6 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P29` ⚠ r2 — the mock suite says every stub carries its server `file:line`; two of ten carry the file only, and they are the two whose contracts drifted
 - `P32` ⚠ r2 — why a control is disabled is put in `title` ON the disabled button, where a keyboard or screen-reader user cannot reach it
 - `P33` ⚠ r2 — the export draws a timestamp on every inbox row; the product draws none, and no client in the chain reads `createdAt`
-- `P34` ⚠ r2 — FOUR of the project page's five views sit outside the tap-target ratchet's population, because the ratchet visits routes and the views are tabs
 
 **Total 38.** `raised` and `sum by severity` agree by enumeration above.
 
@@ -1062,7 +1062,7 @@ assert Counter(sev for _, sev in ids)['MINOR'] == count_of_rows_under('**MINOR �
 
 **Every number in this section was produced by a command, not recalled.**
 
-**⚠ AND THE ERROR HAS A CAUSE WORTH NAMING, because it recurred FIVE times in this round.** Every occurrence came from the same habit: **adding a summary row by anchoring on an existing row's text** — `s.replace("- `P10` …", "- `P25` …\n- `P10` …")` — which puts the new row wherever that anchor happens to live. Twice the anchor was in the wrong list and three times the header was stale, and **the totals agreed every single time.** **The fix is not care, it is construction: §8 is now REBUILT from each finding's own heading** — read the severity off `### P25 — **MINOR** —`, group, emit — so a row cannot land anywhere but under its own severity. **The habit was the defect; the rebuild removes the opportunity for it.**
+**⚠ AND THE ERROR HAS A CAUSE WORTH NAMING, because it recurred SIX times in this round — and the sixth happened while this section was being written, after the push, and the check caught it.** Adding `P34` (IMPORTANT) I anchored its summary row on `P33`'s text — **and `P33` sits in the MINOR list**, so an Important finding landed under Minor. **The membership check reddened on the next run (`IMPORTANT headings=18 bucket=17`), the row was moved, and the same check then agreed at 1/18/19.** It was pushed before it was caught, which is the part worth keeping: **the check is the thing that made a pushed error visible, and it is four lines long.** Every occurrence came from the same habit: **adding a summary row by anchoring on an existing row's text** — `s.replace("- `P10` …", "- `P25` …\n- `P10` …")` — which puts the new row wherever that anchor happens to live. Twice the anchor was in the wrong list and three times the header was stale, and **the totals agreed every single time.** **The fix is not care, it is construction: §8 is now REBUILT from each finding's own heading** — read the severity off `### P25 — **MINOR** —`, group, emit — so a row cannot land anywhere but under its own severity. **The habit was the defect; the rebuild removes the opportunity for it.**
 
 **Compare MEMBERSHIP, not size.** The report's §8 now groups by each finding's *own heading*, so the two cannot disagree, and the check above is the one the judge can run.
 
