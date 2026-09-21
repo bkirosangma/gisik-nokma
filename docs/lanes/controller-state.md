@@ -1,3 +1,47 @@
+# ▣ RESTART CARD — the ONLY mandatory read at wake. Rewritten at every anchor, in the anchor's own commit. Last rewritten **2026-09-21 ~08:4x IST** at `origin/main` **`e2769d60`** by the cycle-36 controller.
+
+> **Why this card exists (owner, 2026-09-21: *"the restart takes too long"*).** The brief used to order *"read `controller-state.md` in full"* plus all three executor handoffs — measured at **3.16 MB / ~34,000 lines ≈ 790k tokens** before a controller's first word. **A restarting controller reads THIS CARD and the NEWEST cycle entry below it, prints a one-line awake report to the owner, and re-measures §1. Nothing else is mandatory.** Older cycles are history: open one by heading (`grep -n "CYCLE 3[0-9]" docs/lanes/controller-state.md`) only when the card or the newest cycle points you at it. The executor handoffs are read **TOP BLOCK only, and only when you are about to merge or dispatch that lane.**
+> ⚠ **The card is a reading that expires.** Every number in §1 is re-measured before it is repeated; if the card and the newest cycle disagree, the newest cycle wins and the card is stale — fix the card in the next anchor. **A controller that writes an anchor without rewriting this card has left the restart surface stale in the conservative direction, which is the direction nobody audits.**
+
+## §1 LIVE ANCHORS — re-measure each before repeating it
+| anchor | value at last rewrite | re-measure with |
+|---|---|---|
+| `origin/main` | `e2769d60` (#628) | `git fetch && git rev-parse origin/main` |
+| open PRs | **0** | `gh pr list --state open --json number,headRefOid,mergeable` + a `--state merged --limit 2` control on the same path |
+| ledger | 307 done / 1 todo | `pnpm check:tasks` under Node 22 |
+| controller seat | `gisik:0`, **Claude API, `opus-5[1m]`** (owner 2026-09-21) — set **per-launcher**, `ctl-start.sh` / `ctl-self-restart.sh` | pane status line; `/tmp/ctl-self-restart.log` |
+| executors' backend | `deepseek-flash[1m]`; session env `GISIK_EXECUTOR_BACKEND=deepseek` **is theirs — do not harmonise** | `tmux show-environment -t gisik GISIK_EXECUTOR_BACKEND` |
+| exec 1 | `gisik:1` · `…/gisik-nokma-exec` · `exec1/review-ui @ 14d868475e2c` · **IDLE, HELD** (ack 12:55 AM) | `git ls-remote origin refs/heads/exec1/review-ui`; capture the pane |
+| exec 2 | `gisik:2` · `…/gisik-nokma-exec2` · `exec2/review-ux @ 2eddb291773a` · **IDLE, HELD** | same shape |
+| exec 3 | `gisik:3` · `…/gisik-nokma-exec3` · `exec3/review-functionality @ 5e039f45652b` · **IDLE, HELD** | same shape |
+| idle nudger | **OFF** (`launchctl bootout`, plist kept at `~/.claude/scripts/com.kiro.claude-idle-nudger.plist`) | `launchctl list \| grep nudger` |
+| cron | **none on disk** (`.claude/scheduled_tasks.json` = `{"tasks": []}`); a session-only hold-mode cron may exist in a live session | `CronList` |
+| PR watcher | a harness `Monitor` on the open-PR set, 30-min lease — **dies with the session; re-arm first** | — |
+| dev stack | **owner's**, served from the PRIMARY checkout as BUILT images (`gisik-nokma-dev-{server,web}-1`, :3000/:3001), last rebuilt **08:20 IST at `e2769d60`** | `docker ps`; `docker inspect --format '{{.Image}}'` |
+| primary checkout | `/Users/kiro/my_projects/gisik-nokma` on `main` at `e2769d60`, clean | `git -C … status --porcelain; git rev-parse HEAD` |
+| controller worktree | `/Users/kiro/my_projects/gisik-nokma-ctl` — detach to `origin/main` before each use | `git -C … checkout --detach origin/main` |
+
+## §2 THE HOLD — what is in force right now
+The three-reviewer exercise is **COMPLETE and LANDED** (#625 → `9e68735e`; ruling in `docs/lanes/review-compiled-controller.md`, all 45 criticisms ruled). **It produced FINDINGS, not tasks. Which findings become tasks, in what order, on which lane, is the OWNER's call** (cycle 35 §3). Until the owner says: **no dispatch, no relaunch, no redirect of any lane; no fix branch; do not re-land exec 1's post-freeze `14d86847` (cycle 35 §8); the nudger stays off — restore it in the same action that dispatches the next work.**
+
+## §3 AWAITING THE OWNER
+1. **What the 45 rulings become.** 2. **exec 1's `14d86847`** (19 findings) — re-land and re-rule, or keep the landed 18. 3. **The CI runner never starts** (`steps: []` since 2026-09-06) — account/infrastructure. 4. **The auto-merge clause *"an independent CI run green"*** — exec 1's `I1` asks that the forced-gate substitution be written where the authorization lives; surfaced, not ruled. 5. **Coverage boundary:** `packages/{rule-engine,mcp-server,sync-client,domain}`, `apps/{mobile,desktop}`, several signed-in routes — **unreviewed, not clean.** 6. **Restart-surface rotation** (cycle 36 §8): move cycles ≤35 and the executor handoffs' history into `*-history.md` files — proposed, not done.
+
+## §4 STANDING RULES THAT SURVIVE EVERY CYCLE — one line each, with where the reasoning lives
+- **Never commit or push to `main`.** Branch from `origin/main`, PR `--base main`; the controller is the only merger; no executor merges its own PR. (`CLAUDE.md`; 2026-09-18 topology block)
+- **The merge bar:** seven checks `rc=0` under Node 22 at the frozen head **with a control that returns non-zero**; the forced gate **at the landing tree, never transferred**, read for `EXIT=0` + `Tasks: 33 successful, 33 total` + `NODE=v22.*` (the `NODE=` line is on the wrapper's console, NOT in the log); tree identity; full-tree drop check with a control; merge verified **by API and reachability, never by exit status** (`--delete-branch` exits 1 while a worktree holds the branch). (cycle 35 §4; override)
+- **Gate under load reads red on `Hook timed out` — re-gate on a quiet box before believing it.** `gate.sh` hardcodes `--force`: batch docs-only changes into ONE gate. (override, "four instruments that lied")
+- **The dev stack is the owner's:** built images from the primary checkout; `build` is safe; `up/down/restart` only when the owner asks; a rebuild is `git pull --ff-only` there + `pnpm dev:stack:rebuild`, then **verify the artifact** (image ids changed; a merged class present in `/app/apps/web/.next` with a control; `GOOGLE_CLIENT_ID` and `/v1/auth/methods` read inside the container). (cycle 21; cycle 36 §8)
+- **Reaching a lane: two `paste-buffer` pastes** (text, pause, `\r`), never `send-keys`; `load-buffer` takes a PATH, not a redirect; proof of delivery is the lane acting, read from the transcript, not the input box. (brief; cycle 35 §8)
+- **Never `AskUserQuestion` in this topology** — a watchdog's pasted Enter selects the first option and reads as an owner ruling. Put questions in the reply text. (override)
+- **Every measurement names its tree and its Node**; a count is evidence only once its unit is pinned; a control traverses the same path in the same invocation; sha-bearing evidence goes through `/usr/bin/git` (the `rtk` proxy drops hunks). (memory set; cycle 35 §5)
+- **Never pipe a test run into `head`**; reap orphaned vitest workers at `ppid=1` only. (`CLAUDE.md`)
+
+## §5 WHERE THINGS ARE
+Briefs and launchers: `/Users/kiro/my_projects/gisik-nokma-lanes/` — `dispatch-controller-serial.md` + `.ctl-prompt-restart-2026-09-19.md` (the controller's brief + live override), `dispatch-executor-serial.md`, `exec-claude.sh` (backend wrapper — **launch through it, never bare `claude`**), `ctl-start.sh`, `ctl-self-restart.sh` (detached kill-and-relaunch; logs to `/tmp/ctl-self-restart.log`), `launch-exec{1,2,3}-*.sh`. Gate reference copy: `docs/lanes/gate-lock/` (copy to a scratchpad; `GATE_REPO=<worktree> bash gate.sh <log>`). Handoffs: `docs/lanes/executor-state.md` (exec 1, **1.44 MB — top block only**), `executor-2-state.md`, `executor-3-state.md`. Review deliverables: `docs/lanes/review-{ui-exec1,ux-exec2,functionality-exec3,compiled-controller}.md`. Ledger: `docs/lanes/task-ledger.tsv` (`pnpm check:tasks`).
+
+---
+
 # Cross-lane controller — live state
 
 ## ⚙ FRIDAY 2026-09-18 ~08:3x IST — **TOPOLOGY CHANGE, owner-ordered: `owner/workspace-edits` IS RETIRED AND DELETED, ALL PRs NOW TARGET `main`, AND THERE ARE TWO EXECUTORS RUNNING IN PARALLEL.** **READ THIS BEFORE TRUSTING ANY EARLIER ENTRY'S TOPOLOGY.** `main` is `afbd361d`; zero open PRs.
@@ -30,6 +74,51 @@
 Six checks raw 0 at the frozen head; the forced gate run by the **controller only** (never either executor) with the Node named from inside the run; reviewer recorded in the PR body **before** it opens; handoff committed before the freeze; `gh pr merge --merge`; tree identity; the full-tree drop check with no path filter; API reachability; owner told to `git pull`; the executor relaunched at the fixed point; this file anchored. **`--delete-branch` still exits 1 while a worktree holds the branch — verify the merge by API, never by exit status** (it happened on both merges of the previous cycle).
 
 **Landing 4 (#437 → `4d6aca41`) and the anchor (#438 → `afbd361d`) both merged this cycle**, each with its gate re-run at its own tree: 33/33, `Cached: 0`, Node v22.22.2, `WRAPPER_EXIT=0`.
+
+## 🔄 MONDAY 2026-09-21 ~08:1x IST — **CYCLE 36: THE SEAT IS BACK ON OPUS, THE HOLD STANDS, AND THE TWO CRONS THAT CONTRADICTED IT ARE DELETED. NOTHING WAS DISPATCHED — THE OWNER'S CALL IS STILL THE ONLY THING THAT MOVES THIS PIPELINE.** `main` is **`e2769d60`** (#628); **zero open PRs**; ledger re-measured by `check:tasks` at this PR's head (numbers in its body).
+
+### 1. THE SEAT — measured, not assumed
+- This session launched through `ctl-self-restart.sh` after **#628 merged at `2026-09-21T02:23:53Z` = 07:53 IST**: `/tmp/ctl-self-restart.log` records *"controller relaunched (attempt 1): pane 10849 -> 96489"* at **07:55:53** — the pane pid changed, which a no-op cannot fake. Pane `gisik:0`'s status line reads **`opus-5[1m]`** — that is the evidence for the backend; the 3000-line scrollback holds no `exec-claude.sh: backend deepseek` line, but an absence in a TUI's scrollback is weak and is not what this claim rests on. **The 09-21 override is in force: the loop and the rulings are this seat's.** Weekly usage read **0%** at wake — it resets Monday 06:30 IST, i.e. this morning.
+- **The executors did NOT move:** `tmux show-environment -t gisik GISIK_EXECUTOR_BACKEND` → `deepseek`; all three lane status lines read `deepseek-flash[1m]`.
+
+### 2. EVERY ANCHOR RE-MEASURED AT `e2769d60` — nothing has moved since cycle 35 §8
+| lane | branch tip on origin (`ls-remote`) | worktree HEAD | dirty | last turn in the pane |
+|---|---|---|---|---|
+| exec 1 `gisik:1` | `exec1/review-ui` @ `14d868475e2c` | same | 0 | hold ack, 12:55 AM · Ctx 42% |
+| exec 2 `gisik:2` | `exec2/review-ux` @ `2eddb291773a` | same | 0 | hold ack, 12:55 AM · Ctx 32% |
+| exec 3 `gisik:3` | `exec3/review-functionality` @ `5e039f45652b` | same | 0 | hold ack, 12:55 AM · Ctx 23% |
+
+exec 1's post-freeze `14d86847` is still on its branch and still **NOT re-landed** (§8 stands). **Zero open PRs, measured with a same-path control**: the identical `gh pr list … --jq` over `--state merged --limit 2` returned two rows; over `--state open` it returned 0 bytes. Nudger: absent from `launchctl list`. Dev stack at wake: `gisik-nokma-dev-{server,web}-1` up 12 h on images `03e76e234432` / `b662a8101c20` (⚠ a bare `docker compose ps` in the repo root shows only the BASE project's `gisik-nokma-postgres-1` on `54329` — the dev stack is the `gisik-nokma-dev` project under `docker-compose.dev.yml`; read `docker ps -a`, not `compose ps`). The primary checkout was on `main` at `6db8b6b8`, **123 commits behind, 0 ahead, clean** at wake — fast-forwarded to `e2769d60` in §8 on the owner's rebuild order.
+
+### 3. ⛔ THE TWO CRONS WERE THE LIVE HAZARD, AND THEY ARE DELETED
+Both were live in this session — `CronList` listed them, and both had fired within the previous 25 minutes (`f456f920` at 07:31, `436dfb0a` at 07:45 IST).
+- **`f456f920` (`:09/:29/:49`), step 3: *"If a lane is IDLE and its work is merged with no open PR, dispatch its next task from the queue."*** With three idle lanes and zero PRs that is **exactly the action cycle 35 §3 forbids, ordered every twenty minutes.** The launch override's *"ignore any older text in the cron prompts"* binds only a controller that has read the override; it does not bind a successor that wakes ON the firing.
+- **`436dfb0a` (`:13/:38`), step 6: *"IF THE REPORTS ARE NOT YET ALL PRESENT … RESTART YOURSELF."*** That precondition is now permanently false, and the step names cycle 34 as the live state. `ctl-self-restart.sh` is invoked from nowhere else — a grep of `gisik-nokma-lanes/*.sh *.md` hits only its own file and a comment in `ctl-start.sh`; no LaunchAgent and no crontab references it — so deleting the cron closes the self-restart path. Its whole purpose, the overnight review pipeline, is complete.
+- **Replaced by ONE hold-mode cron, `0e606174` at `:23/:53`** — two firings an hour instead of five, on a seat that is billed against a weekly limit. It carries the hold (no dispatch, no relaunch, no re-landing of `14d86847`, no `docker compose up/down/restart`), verifies and merges **only an OWNER-opened PR** by the merge bar, and reports a lane that starts work while held rather than "fixing" it. Its full text is in this PR's body.
+- ⚠ **`CronCreate` NO LONGER PERSISTS TO DISK.** The two deletes were written through to `.claude/scheduled_tasks.json` (it now reads `{"tasks": []}`), but the new job is **session-only** — the tool says so and the registry file confirms it. **A successor controller therefore wakes with NO cron at all.** The watcher in §4 is the coverage; re-create the cron from the PR body if one is wanted.
+
+### 4. THE WATCHER — armed with a control, 08:06 IST
+A harness `Monitor` (30-minute lease, re-armed on expiry) polls `gh pr list --state open` every 60 s and **emits on change only** — new PR, head-sha change, state change — with a `POLL ERROR` line on a failed `gh` call so a broken instrument cannot read as "no change". The detection path was controlled BEFORE arming (§2's merged-list control). No `/tmp/pr-watch.sh` process is running and none is needed while the Monitor is live; ⚠ the Monitor dies with this session, so a successor re-arms it first.
+
+### 5. ⛔ NOTHING WAS DISPATCHED, AND THAT IS THE POINT
+Cycle 35 §3 and the override both hold: **the review produced findings, not tasks, and which findings become tasks is the owner's call.** No lane was relaunched, restarted or redirected; no fix branch exists; the nudger stays off until the same action that dispatches the next work.
+
+### 6. AWAITING THE OWNER — four items: three from cycle 35, one the lane raised
+1. **What the 45 rulings become** — which are executed, in what order, by which lane (cycle 35 §3). The compiled report says what *would* be done; it does not order it.
+2. **exec 1's `14d86847`** (19 findings: `P14` added, `P8` re-filed downward, `P11`/`P2`/`P12` narrowed, four citations repaired) — re-land and re-rule, or leave the landed 18-finding generation as the deliverable (§8).
+3. **The CI runner** — every job `steps: []`, no green since `2026-09-06T09:05:54Z`; an account/infrastructure action the controller cannot take (§6).
+4. **The auto-merge authorization's *"an independent CI run green"* clause.** exec 1 (finding `I1`) asks that, if the local forced gate is the intended substitute, the substitution be **written down where the authorization lives**. §6 records the fact; the amendment is the owner's — the controller surfaces it and does not rule it.
+Plus the coverage boundary from cycle 35: `packages/{rule-engine,mcp-server,sync-client,domain}`, `apps/{mobile,desktop}` and several signed-in routes are **unreviewed, not clean** — whether the exercise is extended is also the owner's call, and not derivable from the compiled report. (Cycle 35 §7's `git pull` is no longer outstanding — §8.)
+
+### 7. MACHINERY AT THIS ANCHOR
+Seven checks under Node 22 and the forced gate ran **at this entry's own head, never transferred** — the numbers are in the body of this branch's PR (`gh pr list --state all --head ctl/cycle36-hold-anchor`). **Two of the seven checkers were controlled** (a disposable worktree at the same commit, script `cmp`-identical: `check:tasks` over a ledger with one garbage row → `rc=1`; `check-case-ids` with one id duplicated across files → `rc=1`); a first "control" that ran `check-case-ids` from another cwd returned `rc=0` and proved nothing — the scripts resolve `REPO_ROOT` from `import.meta.url`, so cwd is not the lever. Merge verified by API and reachability, not exit status; full-tree drop check with a control. No lane was touched.
+
+### 8. 📌 TWO OWNER ORDERS ARRIVED MID-CYCLE (~08:1x IST) — both done, and the second changes how this file is read
+**(a) *"rebuild the dev stack."*** Procedure as cycle 21: the primary checkout fast-forwarded `6db8b6b8 → e2769d60` (`--ff-only`, clean before and after), then `pnpm dev:stack:rebuild` from it (the real `.env` lives only there). **`REBUILD_EXIT=0` in 172 s (08:17:30 → 08:20:22)** — not the 841 s on record; base layers were cached. **The artifact, verified:** image ids changed (`web b662a8101c20 → a1ccf907462f`, `server 03e76e234432 → 776c88a147dc`) and both containers run the new ids; inside the server container `GOOGLE_CLIENT_ID` len **72** and `/v1/auth/methods` → `{"google":true,…}`; `/healthz` 200; `:3001` answers 307; the served bundle carries `gn-visibility__standing-mode` (a959289d) and `gn-ticket-sheet__crumb` (277b5d22) in **3 files each**, negative control `0`, positive control `3`.
+**(b) *"check the restart script and instructions. the restart takes too long."*** Measured: the SCRIPT is not the cost — `ctl-self-restart.sh` had the new pane up **34 s** after its "starting" line (07:55:19 → 07:55:53), preceded by a 60 s delay the previous controller passed to let itself reply. **The cost is the INSTRUCTION *"read in full"*: `controller-state.md` 1,068,000 B / 8,736 lines + `executor-state.md` 1,442,748 B / 17,546 lines + `executor-2-state.md` 569,226 B + `executor-3-state.md` 19,583 B ≈ 3.16 MB ≈ 790k tokens** before a first word — and this controller, relaunched 07:55, first reported to the owner at ~08:2x. **Three changes, made:** (1) **the ▣ RESTART CARD at the top of this file is now the only mandatory read** (card + newest cycle; handoffs top-block-only and only for a lane about to be merged or dispatched); (2) the live override (`.ctl-prompt-restart-2026-09-19.md`) carries a dated **RESTART PROTOCOL** block saying so, plus *"print a one-line awake report within two minutes, then measure"*; (3) the script's fixed `sleep 30` is a **2 s poll** (up to 30 s) for the pane-pid change + status line — `bash -n` clean, one more `sleep` token than before, all of them named. **One change PROPOSED, not made** (§3 item 6 of the card): rotate cycles ≤35 into `docs/lanes/controller-history.md` and the executor handoffs' history into `executor-*-history.md`, leaving each live file at its card / top block. It is a file move that changes what every "cycle N §M" reference points at, so it is the owner's to approve.
+
+---
+
 
 ## 🔄 MONDAY 2026-09-21 ~00:5x IST — **CYCLE 35: THE EXERCISE IS COMPLETE AND ITS DELIVERABLE IS LANDED. THE REVIEW PRODUCED FINDINGS, NOT TASKS — NO LANE HAS BEEN GIVEN NEXT WORK, AND THAT IS THE OWNER'S CALL.** `main` is **`9e68735e`**; **zero open PRs**; ledger **307 done / 1 todo**.
 
