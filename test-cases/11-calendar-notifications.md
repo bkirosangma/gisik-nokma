@@ -317,6 +317,10 @@ matching `notifications.test.ts`'s own argument against a hand-written `HttpClie
 - **11.210** ✅ A refused save reverts the optimistic flip once the reload settles — `load()` is called a second time (the `.catch()`'s reload firing, not the DOM settling on its own) and the row is drawn from that reloaded answer, so the optimistic mute does not stick — the same mechanism `/inbox`'s own `markRead` catch uses (case 11.147) — (`apps/web/test/account-page.test.tsx`)
 - **11.215** ✅ RULING E5-13, CRITICAL — a failed preferences read on `/account` disables every Notifications row and states the refusal, and a click while disabled never reaches `notificationPreferences.save()` — before this ruling the failed read guessed `{ mutedKinds: [] }` and one toggle would PUT it as the whole document, silently overwriting whatever was actually stored — (`apps/web/test/account-page.test.tsx`)
 - **11.216** ✅ `NotificationsSection`'s own half of E5-13: an `error` prop renders a `role="alert"` refusal and disables every checkbox, independent of the caller — (`packages/app-core/test/account/notifications-section.test.tsx`)
+- **11.217** ✅ RULING E2-24(a)'s component half — a `saveError` prop states a refused-save outcome as its own `role="alert"` WITHOUT disabling the rows, distinct from `error` (11.216, a read failure): the data is still current once a successful revert settles — (`packages/app-core/test/account/notifications-section.test.tsx`)
+- **11.218** ✅ RULING E2-24(a)'s page half — a refused save on `/account` states the outcome ("Your change could not be saved. It has been reverted.") rather than only reverting the optimistic flip silently, which is all 11.210 had ever asserted before this ruling — (`apps/web/test/account-page.test.tsx`)
+- **11.219** ✅ RULING E2-24(a)'s compounding-failure case — a refused save whose REVERT read also fails falls back to the disabled `prefsError` state (11.215's own treatment) rather than leaving the optimistic, wrong flip standing with no trace at all, which is what the revert `.load()`'s missing rejection handler used to do — (`apps/web/test/account-page.test.tsx`)
+- **11.220** ✅ RULING E2-24(b) — a revoke refusal on `/account` renders verbatim in a `role="alert"` (the same one-prop shape `PasskeysSection`'s add/remove `error` already carries) and the session list is NOT re-read, since the revoke never actually succeeded — before this ruling the result was read and discarded entirely, so the session simply failed to leave the list with nothing on screen to say why — (`packages/app-core/test/account/sessions-section.test.tsx`, `apps/web/test/account-page.test.tsx`)
 
 ## Permanently unused id ranges
 
@@ -345,8 +349,10 @@ to backfill — see `test-cases/README.md`'s §9 precedent (Plan 7, 9.1–9.34) 
 
 - **11.196** ✅ The reporting scope guard's ONE exclusion, compensated: the in-app help content may say "burndown"/"velocity" — because the FAQ entry that raises them answers *"There are none, and that is a deliberate decision"* — and the case asserts the exclusion is not vacuous, that every hit is prose rather than code, and that the denial is still there — (`packages/app-core/test/reporting-scope-guard.test.ts`)
 
-**New cases continue from 11.217.** (11.215–11.216 minted 2026-09-21/22, ruling E5-13 — the
-notification-preferences failed-read fix, at the page and component levels respectively.)  
+**New cases continue from 11.221.** (11.215–11.216 minted 2026-09-21/22, ruling E5-13 — the
+notification-preferences failed-read fix, at the page and component levels respectively. 11.217–11.220
+minted 2026-09-21/22, ruling E2-24 — the save-refusal and revoke-refusal fixes across Notifications
+and Sessions.)  
 *(11.210 was IN USE, at the Notification preferences section above (account/help-screens plan, Task 5's
 server half 11.197–11.200, Task 6's client half 11.201–11.210 — the last two, 11.209–11.210, added on
 2026-09-15 coordinator review to close a coverage gap in `toggleKind`'s optimistic-flip-then-revert

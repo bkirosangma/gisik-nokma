@@ -316,6 +316,80 @@ describe('AccountPage — Notifications', () => {
     await user.click(mentionRow);
     expect(save).not.toHaveBeenCalled();
   });
+
+  /**
+   * 11.218 — RULING E2-24(a). Before this ruling a refused save reverted the
+   * optimistic flip with NO rendered outcome at all (case 11.210 above only
+   * ever asserted the revert itself, never that anything on screen said the
+   * save had been refused). This is the message half of the same fix.
+   */
+  it('11.218 a refused save states the outcome, not just the silent revert', async () => {
+    const user = userEvent.setup();
+    render(
+      <Providers
+        services={stubServices(
+          { getMyWorkspaces: async () => [] },
+          {
+            notificationPreferences: {
+              load: async () => ({ mutedKinds: [] }),
+              save: async () => {
+                throw new Error('save refused');
+              },
+            },
+          },
+        )}
+      >
+        <AccountPage />
+      </Providers>,
+    );
+    const mentionRow = await screen.findByLabelText(/mentioned/i);
+    await user.click(mentionRow);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your change could not be saved. It has been reverted.',
+    );
+  });
+
+  /**
+   * 11.219 — the compounding-failure half of the same ruling: a refused
+   * save whose REVERT read also fails. Before this ruling the revert's
+   * `.load()` had no rejection handler at all, so this case left the
+   * optimistic (wrong) flip standing with no trace whatsoever — worse than
+   * 11.218's case, where at least the revert itself succeeds.
+   */
+  it('11.219 a refused save whose revert-read also fails falls back to the disabled refusal state, rather than leaving a silent wrong flip standing', async () => {
+    const user = userEvent.setup();
+    let loadCalls = 0;
+    render(
+      <Providers
+        services={stubServices(
+          { getMyWorkspaces: async () => [] },
+          {
+            notificationPreferences: {
+              load: async () => {
+                loadCalls += 1;
+                if (loadCalls === 1) return { mutedKinds: [] };
+                throw new Error('revert read also failed');
+              },
+              save: async () => {
+                throw new Error('save refused');
+              },
+            },
+          },
+        )}
+      >
+        <AccountPage />
+      </Providers>,
+    );
+    const mentionRow = await screen.findByLabelText(/mentioned/i);
+    await user.click(mentionRow);
+    // The stronger refusal wins: the component cannot tell what the true
+    // state is any more, so it earns the same disabled treatment 11.215
+    // gives a failed INITIAL read, not merely the softer save-refusal note.
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('Your preferences could not be loaded'),
+    );
+    expect(screen.getByLabelText(/mentioned/i)).toBeDisabled();
+  });
 });
 
 describe('AccountPage — Your workspaces', () => {
@@ -400,6 +474,36 @@ describe('AccountPage — Sessions', () => {
     expect(screen.getByText('Unknown device')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(revokeSession).toHaveBeenCalledWith({ token: 'other-token' });
+  });
+
+  /**
+   * RULING E2-24(b) — before this ruling `revokeSession`'s `{ error }` was
+   * read and discarded (`await sessionsClient.revoke(token);`): a refusal
+   * left the list simply failing to shrink, with nothing on screen to say
+   * why. The re-read count is compared as a DELTA around the click, not an
+   * absolute total — `listSessions`, unlike `listUserPasskeys`, is not
+   * reset between cases in this file, so an absolute count would silently
+   * include every earlier case's calls. `revokeSession`'s own `if
+   * (result.error === null) sessionsClient.list()…` must not fire on a
+   * refusal, or the session would appear to remain purely by coincidence of
+   * a re-list rather than because the refusal was actually honoured.
+   */
+  it('a revoke refusal renders verbatim and the list is NOT re-read', async () => {
+    listSessions.mockResolvedValue({
+      data: [
+        { token: 'current-token', createdAt: new Date('2026-09-01T00:00:00Z'), updatedAt: new Date('2026-09-14T00:00:00Z'), userAgent: null },
+        { token: 'other-token', createdAt: new Date('2026-09-05T00:00:00Z'), updatedAt: new Date('2026-09-10T00:00:00Z'), userAgent: null },
+      ],
+      error: null,
+    });
+    revokeSession.mockResolvedValue({ error: { message: 'Session not found' } });
+    const user = userEvent.setup();
+    mount();
+    await screen.findByRole('button', { name: 'Sign out' });
+    const callsBeforeRevoke = listSessions.mock.calls.length;
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Session not found');
+    expect(listSessions.mock.calls.length).toBe(callsBeforeRevoke);
   });
 
   it('renders "Last active" through the FULL pipeline — mocked Date, adapter\'s toISOString, then formatDateTime', async () => {

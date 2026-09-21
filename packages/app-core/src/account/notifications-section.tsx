@@ -21,6 +21,17 @@ export type NotificationsSectionProps = {
    * was actually stored.
    */
   error?: string | null;
+  /**
+   * Set when the last SAVE (not read) was refused — distinct from `error`.
+   * Ruling E2-24(a): a refused save reverted the optimistic flip with no
+   * rendered outcome at all; the only trace was the switch silently
+   * snapping back. Rendered as its own refusal WITHOUT disabling the rows
+   * (unlike `error`): the data is still current once the revert settles,
+   * only the last attempted change did not stick. Mutually exclusive with
+   * `error` in practice — `toggleKind` cannot run while `prefs` is unset,
+   * so a read failure and a save refusal are never both live at once.
+   */
+  saveError?: string | null;
 };
 
 /**
@@ -50,6 +61,7 @@ export function NotificationsSection({
   mutedKinds,
   onToggle,
   error = null,
+  saveError = null,
 }: NotificationsSectionProps) {
   return (
     <section className="gn-account__section gn-account__notifications">
@@ -57,6 +69,10 @@ export function NotificationsSection({
       {error !== null ? (
         <p role="alert" className="gn-refusal gn-refusal--server">
           {error}
+        </p>
+      ) : saveError !== null ? (
+        <p role="alert" className="gn-refusal gn-refusal--server">
+          {saveError}
         </p>
       ) : null}
       {NOTIFICATION_KINDS.map((kind) => (

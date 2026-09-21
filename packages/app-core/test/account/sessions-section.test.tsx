@@ -78,4 +78,25 @@ describe('SessionsSection', () => {
     expect(screen.getByText('Last active 10 Sep 2026, 05:30 IST')).toBeInTheDocument();
     expect(screen.queryByText(/2026-09-10T00:00:00Z/)).not.toBeInTheDocument();
   });
+
+  /**
+   * RULING E2-24(b) — a "Sign out" refusal used to be read and discarded
+   * entirely by the page (`await sessionsClient.revoke(token);`, the result
+   * never inspected): the list simply failed to shrink, with nothing on
+   * screen to say a refusal even happened. The component's own half of the
+   * fix is this `error` prop, the same one-prop shape `PasskeysSection`'s
+   * add/remove refusal already carries.
+   */
+  it('a revoke refusal renders verbatim in a role="alert"', () => {
+    render(<SessionsSection sessions={SESSIONS} onRevoke={vi.fn()} error="Session not found" />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Session not found');
+  });
+
+  it('renders no alert at all when there is no refusal', () => {
+    // The negative half — matching PasskeysSection's own precedent — without
+    // which the case above is satisfied by a component that renders a
+    // `role="alert"` unconditionally and merely happens to be empty.
+    render(<SessionsSection sessions={SESSIONS} onRevoke={vi.fn()} />);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
 });

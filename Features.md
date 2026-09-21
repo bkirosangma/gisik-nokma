@@ -174,7 +174,7 @@ The invitation banner's restyle (flat `--gn-tint-warning` wash, no shadow, no ac
   guessed document as the whole record, silently un-muting whatever the person had actually stored. It
   no longer does: `prefs` stays unset on a failed read, the section renders every row **disabled** with
   a stated refusal ("Your preferences could not be loaded"), and `toggleKind`'s own guard (it already
-  refused to act while `prefs` is unset) now means a click on this path cannot save. **Sign-in and devices, Sessions half (Task 7):** every active session
+  refused to act while `prefs` is unset) now means a click on this path cannot save. **RULING E2-24(a) (closed):** a refused SAVE (as opposed to a failed read) reverted the optimistic flip with no rendered outcome at all — the only trace was the switch silently snapping back, and if the REVERT read itself also failed there was no trace whatsoever, since that `.load()` call carried no rejection handler either. Both closed: the revert's `.load()` now falls back to the same `prefsError` state a failed initial read uses (the component genuinely does not know the true value any more, so it earns the same disabled treatment), and the section takes a new `saveError` prop — distinct from `error`, rendered as its own refusal WITHOUT disabling anything, since the data is still current once a successful revert settles. **Sign-in and devices, Sessions half (Task 7):** every active session
   `authClient.listSessions()` answers (better-auth's core session route, no plugin needed — confirmed
   against the installed `better-auth@1.7.2` client's generated types, which differ from the plan's own
   guess: `createdAt`/`updatedAt` come back as `Date` instances, not strings, because the client revives
@@ -189,9 +189,7 @@ The invitation banner's restyle (flat `--gn-tint-warning` wash, no shadow, no ac
   package's `formatDateTime`), the same clock rule every other date on this shell follows, never a raw
   ISO slice. **Named absence, on the same silent-omission footing as Your workspaces and Notifications
   above:** a failed `list()` collapses to the same empty render an honestly-empty answer produces.
-  **A second named absence:** a refused revoke's `error` is read and discarded — unlike Profile's save
-  refusal, no `role="alert"` (or any other signal) tells a caller "Sign out" was refused; the session
-  simply fails to leave the list. **Sign-in and devices, Passkeys half (Task 8):** the credentials
+  **RULING E2-24(b) (closed):** a refused revoke's `error` used to be read and discarded — unlike Profile's save refusal, nothing told a caller "Sign out" was refused; the session simply failed to leave the list. `SessionsSection` now takes the same `error` prop `PasskeysSection`'s add/remove refusal already carries, rendered as a `role="alert"`, and the page only re-reads the list when the revoke actually succeeded (mirroring `addPasskey`/`removePasskey`'s own `if (result.error === null) …` shape) rather than unconditionally. **Sign-in and devices, Passkeys half (Task 8):** the credentials
   `authClient.passkey.listUserPasskeys()` answers, each row carrying a delete control whose ACCESSIBLE
   name is its own passkey's (`Delete passkey {name}`, so three credentials are three distinguishable
   controls rather than three announcements of "Delete"), a named empty state ("You have no passkeys

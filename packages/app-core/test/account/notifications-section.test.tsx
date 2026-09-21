@@ -63,4 +63,27 @@ describe('NotificationsSection', () => {
       expect(box).toBeDisabled();
     }
   });
+
+  /**
+   * 11.217 — RULING E2-24(a)'s component half. Distinct from `error`
+   * (11.216, a READ failure that disables every row): a refused SAVE is
+   * stated as its own refusal WITHOUT disabling anything, because the data
+   * is still current once the optimistic flip has reverted — only the last
+   * attempted change did not stick.
+   */
+  it('11.217 a save refusal states the outcome without disabling the rows, unlike a read failure', () => {
+    render(
+      <NotificationsSection
+        mutedKinds={[]}
+        onToggle={vi.fn()}
+        saveError="Your change could not be saved. It has been reverted."
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Your change could not be saved. It has been reverted.',
+    );
+    for (const box of screen.getAllByRole('checkbox')) {
+      expect(box).not.toBeDisabled();
+    }
+  });
 });

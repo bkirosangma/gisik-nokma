@@ -34,7 +34,9 @@ export default function AccountPage() {
   const [workspaces, setWorkspaces] = useState<WorkspaceRef[] | null>(null);
   const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
   const [prefsError, setPrefsError] = useState<string | null>(null);
+  const [prefsSaveError, setPrefsSaveError] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [passkeys, setPasskeys] = useState<PasskeySummary[] | null>(null);
   const [passkeyError, setPasskeyError] = useState<string | null>(null);
   const [passkeysListFailed, setPasskeysListFailed] = useState(false);
@@ -101,8 +103,14 @@ export default function AccountPage() {
       // confirms it — re-listing is what proves a session is actually gone,
       // the same distrust `toggleKind`'s own `.catch()` has for a state this
       // component did not itself confirm.
-      await sessionsClient.revoke(token);
-      sessionsClient.list().then(setSessions);
+      //
+      // RULING E2-24(b): the result used to be read and discarded — a
+      // refusal left the list simply failing to shrink, with nothing on
+      // screen to say why. Same `{ error }`-then-conditionally-reload shape
+      // `addPasskey`/`removePasskey` below already use.
+      const result = await sessionsClient.revoke(token);
+      setSessionError(result.error);
+      if (result.error === null) sessionsClient.list().then(setSessions);
     },
     [sessionsClient],
   );
@@ -232,12 +240,29 @@ export default function AccountPage() {
         mutedKinds: muted ? prefs.mutedKinds.filter((k) => k !== kind) : [...prefs.mutedKinds, kind],
       };
       setPrefs(next); // optimistic
+      // Cleared on every fresh attempt, not left from a PRIOR refused one —
+      // a stale "could not be saved" message sitting on screen through a
+      // now-successful toggle would misdescribe the row it is next to.
+      setPrefsSaveError(null);
       void notificationPreferences.save(next).catch(() => {
+        // RULING E2-24(a): a refused save used to revert with no rendered
+        // outcome at all — the only trace was the switch silently snapping
+        // back. Stated here, distinct from `prefsError` (a READ failure).
+        setPrefsSaveError('Your change could not be saved. It has been reverted.');
         // Revert to the true stored state on a failed save, rather than
         // leaving the optimistic flip standing for a change the server never
         // recorded — the same distrust `apps/web/app/inbox/page.tsx`'s
-        // `markRead` catch has for its own optimistic flip.
-        notificationPreferences.load().then(setPrefs);
+        // `markRead` catch has for its own optimistic flip. The revert read
+        // ITSELF now has a rejection handler too: previously, a revert that
+        // also failed left the optimistic (wrong) flip standing silently,
+        // with no trace at all. Falling back to `prefsError` here — the
+        // same state a failed INITIAL read uses — is not an approximation:
+        // a double failure leaves this component in exactly that epistemic
+        // state, not knowing the true value, so it earns the same disabled
+        // treatment.
+        notificationPreferences
+          .load()
+          .then(setPrefs, () => setPrefsError('Your preferences could not be loaded'));
       });
     },
     [prefs, notificationPreferences],
@@ -280,11 +305,16 @@ export default function AccountPage() {
             mutedKinds={prefs?.mutedKinds ?? []}
             onToggle={toggleKind}
             error={prefsError}
+            saveError={prefsSaveError}
           />
         ) : null}
         {workspaces !== null ? <WorkspacesSection workspaces={workspaces} /> : null}
         {sessions !== null ? (
-          <SessionsSection sessions={sessions} onRevoke={(token) => void revokeSession(token)} />
+          <SessionsSection
+            sessions={sessions}
+            onRevoke={(token) => void revokeSession(token)}
+            error={sessionError}
+          />
         ) : null}
         {passkeys !== null || passkeysListFailed ? (
           <PasskeysSection
