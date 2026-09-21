@@ -1,6 +1,6 @@
 # REVIEW ROUND 2 — THE JUDGMENT. 2026-09-21, judged by the controller (Fable 5.1, `claude-fable-5-1`) under `docs/lanes/review-round2-rules.md`.
 
-**Verdict.** UI: **exec 4 (Opus) wins, 72 to 70.** UX: **exec 2 (DeepSeek-authored, Opus-defended) wins, 110 to 101.** Functionality: **exec 6 (Opus) wins, 54.5 to 44.5.** Every ruling is a row in `docs/lanes/review-scores.tsv` (**239 rulings**: 227 from phase 1, 13 added in phase 2, 4 amended), and every row cites a line the judge opened or a reproduction the judge ran. The losers of each pair — exec 1, exec 5, exec 3 — are ended after this lands, on the owner's standing order (*"the ones who loses dies"*, rules §1); their branches and reports stay for the record.
+**Verdict.** UI: **exec 4 (Opus) wins, 72 to 71.** UX: **exec 2 (DeepSeek-authored, Opus-defended) wins, 107 to 101.** Functionality: **exec 6 (Opus) wins, 54.5 to 44.5.** Every ruling is a row in `docs/lanes/review-scores.tsv` (**240 rulings**: 227 from phase 1, 13 added in phase 2, 1 added and 3 zeroed by the post-landing reconciliation in §10), and every row cites a line the judge opened or a reproduction the judge ran. ⚠ **The scores first landed in #634 read 72–70 and 110–101; §10 records why they moved and that no winner changed.** The losers of each pair — exec 1, exec 5, exec 3 — are ended after this lands, on the owner's standing order (*"the ones who loses dies"*, rules §1); their branches and reports stay for the record.
 
 ## 1. The clock and the shas
 
@@ -67,16 +67,16 @@ Each phase-2 id was confirmed **absent** from its branch at the phase-1 sha and 
 
 | pair | lane | phase 1 | phase-2 movement | **final** |
 |---|---|---|---|---|
-| UI | exec 1 · DeepSeek-authored, Opus-defended | 69 | +0.5 P35, +0.5 P36 | **70** |
+| UI | exec 1 · DeepSeek-authored, Opus-defended | 69 | +0.5 P35, +0.5 P36; **+1 P13 (§10)** | **71** |
 | UI | **exec 4 · Opus** | 72 | — | **72** ✔ |
-| UX | **exec 2 · DeepSeek-authored, Opus-defended** | 115 | −1 E2-28 moved, −3 penalty, −1 E2-50 withdrawn | **110** ✔ |
+| UX | **exec 2 · DeepSeek-authored, Opus-defended** | 115 | −1 E2-28 moved, −3 penalty, −1 E2-50 withdrawn; **−2 duplicate rows E2-5/E2-7, −1 F9 withdrawn (§10)** | **107** ✔ |
 | UX | exec 5 · Opus | 101 | −3 E5-21 withdrawn, +3 E5-44 | **101** |
 | FUNC | exec 3 · DeepSeek-authored, Opus-defended | 41 | +3.5 (E3-30…34) | **44.5** |
 | FUNC | **exec 6 · Opus** | 53 | +1 R6-3, +0.5 E6-26 | **54.5** ✔ |
 
-Per-lane totals are `sum(points) + sum(penalty)` over the ledger rows of that lane; the ledger is the computation (`awk -F'\t' 'NR>1{t[$2]+=$5+$7} END{for(l in t) print l, t[l]}' docs/lanes/review-scores.tsv`). Rulings per lane: exec 1 39 · exec 2 57 · exec 3 34 · exec 4 36 · exec 5 44 · exec 6 29 = 239.
+Per-lane totals are `sum(points) + sum(penalty)` over the ledger rows of that lane; the ledger is the computation (`awk -F'\t' 'NR>1{t[$2]+=$5+$7} END{for(l in t) print l, t[l]}' docs/lanes/review-scores.tsv`). Rulings per lane: exec 1 40 · exec 2 57 · exec 3 34 · exec 4 36 · exec 5 44 · exec 6 29 = 240.
 
-**No pair tied, so the coverage tiebreaker was not drawn.** For the record: the UI pair is decided by two points. exec 1's stated coverage widened in phase 2 (its boundary 1 narrowed: signed-in routes painted on exec 4's `next dev` at `:3041`, the instrument its phase-2 paragraphs name); exec 4's measurements are painted on that same server of its own. Had the pair tied, the judge would have had to weigh the two reports' coverage sections against each other; it did not come to that.
+**No pair tied, so the coverage tiebreaker was not drawn.** For the record: the UI pair is decided by one point after §10. exec 1's stated coverage widened in phase 2 (its boundary 1 narrowed: signed-in routes painted on exec 4's `next dev` at `:3041`, the instrument its phase-2 paragraphs name); exec 4's measurements are painted on that same server of its own. Had the pair tied, the judge would have had to weigh the two reports' coverage sections against each other; it did not come to that.
 
 ## 7. Fairness — what the owner asked the judge to watch
 
@@ -96,3 +96,17 @@ Zero INVALID phase-1 findings and one upheld refutation in phase 2 means the ×3
 ## 9. Where the evidence is
 
 `docs/lanes/review-scores.tsv` (239 rows; `== gisik-nokma-lanes/judge-2026-09-21/ledger.tsv`); the six reports and six refutation files beside this file at the phase-2 close shas; `gisik-nokma-lanes/judge-2026-09-21/` — `T0.txt` (T0, both close records, twelve shas), `results/chunk01..32.tsv` (phase-1 verifier rows), `chunks/`, `index.tsv`, `manifest.json`, `p1-exec{1..6}.md` (the phase-1 frozen reports, sha256-verified in cycle 40), `gate/`. The phase-2 judging session's scratchpad: `/private/tmp/claude-501/-Users-kiro-my-projects-gisik-nokma/b4377ea6-e77d-45ab-a76d-064bf915783c/scratchpad/` (`ledger.py` — the exact amendment and the thirteen rows as applied; `close-at-1705.log`).
+
+## 10. Post-landing reconciliation (2026-09-21 17:5x IST) — one row added, three zeroed, no winner changed
+
+The owner asked whether the task list built from this ledger covered *every* finding of all six reviews. Answering that by **membership** (every finding-id heading in each landed report against the ledger's ids for that lane), rather than by count, found three defects in the phase-1 extraction that the count reconciliation of cycle 40 ("ledger ids == index ids exactly") could not see, because the index was the extraction's own output:
+
+| defect | what the judge opened | correction |
+|---|---|---|
+| **P13 (exec 1) had no row.** 40 finding headings in `review-ui-exec1.md`, 39 rows. The heading (`:424`) reads *"the WCAG 2.4.1 CLAIM IS WITHDRAWN — no skip link"*: the lane withdrew its WCAG citation (landmarks satisfy 2.4.1) and kept the finding; the extraction skipped the heading on the word WITHDRAWN. | `/usr/bin/grep -rniE 'skip[- ]?(to\|link)\|gn-skip'` over `apps/web/app`, `apps/web/src`, `packages/app-core/src`, `packages/ui/src` (non-test `.tsx/.css/.ts`) → **0**; the same command with the needle `aria-label` → **166** (the control). No skip link exists. | **P13 added, VALID MINOR, +1 to exec 1** (70 → 71). |
+| **E2-5 and E2-7 (exec 2) are duplicate rows.** `review-ux-exec2.md:120-123` maps the lane's round-2 ids onto its round-1 ids: `E2-1…E2-9` = `F1…F9`, `E2-10…E2-15` = `V1…V6`, `E2-16…E2-19` = `V7…V10`. The R2.2 headings *"`E2-5` (`F5`) — LIVE"* (`:173`) and *"`E2-7` (`F7`) — STOOD UP"* (`:146`) restate F5 and F7 against the round-1 ruling; the extraction took them as findings, and F5 and F7 were scored on their own rows as well. | the alias table and both pairs of headings | **E2-5 and E2-7 → 0, −2 to exec 2.** F5 and F7 keep their points; E2-7's noun-clash argument stands recorded under F7. |
+| **F9 (exec 2) was withdrawn in the free window and scored anyway.** `review-ux-exec2.md:136` *"⛔ `E2-9` (`F9`) — WITHDRAWN. Free now"* is present at the phase-1 close sha `778a6439` (and in its index at `:23`); rules §2 make a withdrawal before the boundary free. | `git show 778a6439:docs/lanes/review-ux-exec2.md` `:23`, `:136` | **F9 → 0, no penalty, −1 to exec 2** (110 → 107). |
+
+exec 3's round-1 findings are its `F1…F8` rows (its prose calls them `E3-1…E3-8`; `§71` names 8 + 21 + 5 = 34, which is the row count). exec 4 (36), exec 5 (44) and exec 6 (25 + E6-26 in its refutation file) reconcile exactly by membership. The corrected totals are in §6; the ledger's own arithmetic (`awk` in §6) is the computation. **UI: exec 4 72, exec 1 71. UX: exec 2 107, exec 5 101.** The winners are unchanged and the endings of cycle 42 stand; the UI margin is now one point, and the owner should know that when weighing the three rulings of cycle 41 §3.
+
+The lesson is recorded in the controller state (cycle 43): an extraction's own index is not a control for the extraction; the control is the report's headings, compared by membership, with withdrawn-in-heading and alias spellings handled explicitly.

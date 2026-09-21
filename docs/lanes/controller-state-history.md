@@ -4,6 +4,28 @@
 
 ---
 
+## 🔄 MONDAY 2026-09-21 ~17:2x IST — **CYCLE 42: #634 MERGED (`fc8b32ab`); THE THREE LOSERS ARE ENDED; THREE LANES STAND, HELD.** `main` is **`fc8b32ab`**; zero open PRs.
+
+### 1. THE ENDINGS — the owner's order (*"the ones who loses dies"*), executed after the verdict was on `main`
+Each ending was gated on three measurements in the same script (`end-losers.sh`, scratchpad): worktree `git status --porcelain` empty, `HEAD` equal to the recorded close sha, and `git ls-remote` of the branch equal to it — so nothing unpushed died with the session. All three passed.
+| lane | window killed | worktree removed | branch kept at |
+|---|---|---|---|
+| exec 1 (UI, 70) | `gisik:1` 17:20:52 | `gisik-nokma-exec` | `exec1/review-ui-r2` `b7c57b6d` |
+| exec 3 (FUNC, 44.5) | `gisik:3` 17:21:05 | `gisik-nokma-exec3` | `exec3/review-functionality-r2` `58d88d6b` |
+| exec 5 (UX, 101) | `gisik:5` 17:21:18 | `gisik-nokma-exec5` | `exec5/review-ux` `67a33066` |
+After: `tmux list-windows -t gisik` → `0:main 2:exec2 4:exec4 6:exec6`; `git worktree list` no longer names the three. exec 4's `next dev` on `:3041` (pid 99771) is still listening — the winner's, left alone.
+
+### 2. THE LANDING, VERIFIED
+#634 merged at 11:50:15Z by `/tmp/ctl-merge.sh 634 7552d2f7` (head equal to the gated sha). `mergeCommit` `fc8b32ab` = `origin/main`; `7552d2f7` is an ancestor; `git diff --stat 7552d2f7 origin/main` empty (tree identity); `git diff --stat d3772072 origin/main` → 16 files, +18288/−78 (the drop check's control, non-empty). Gate at `7552d2f7`: `EXIT=0`, 33/33, 0 cached, 2m10s, `NODE=v22.22.2`, no engine or timeout lines, 0 orphans — logs in `judge-2026-09-21/gate/gate-7552d2f7.*`. **A forced gate on a quiet box takes ~2 minutes here (2m22s at #633, 2m10s at #634); the 841 s figure in the override is the DOCKER rebuild, not the gate.**
+
+### 3. WHAT STANDS AND WHAT DOES NOT
+Standing executors: exec 4 (UI, `gisik:4`, `…-exec4`), exec 2 (UX, `gisik:2`, `…-exec2`), exec 6 (functionality, `gisik:6`, `…-exec6`) — all IDLE AND HELD, all Opus, contexts 83 % / 35 % / 56 % at 17:00 (exec 4 is near the restart line; restart it at the fixed point when it is next dispatched, not now). Nudger plist still lists six targets. `ctl/round2-judgment` is merged; this cycle's branch is `ctl/cycle42-endings`.
+
+### 4. AWAITING THE OWNER
+1. **What the 239 rulings become** — the only thing that unblocks a dispatch. 2. **The three rulings in cycle 41 §3** (now in the history file) that the rules did not spell out — overrulable in a word; the ledger rows name them. 3. The CI runner (`steps=0` since 2026-09-06) and the auto-merge clause's *"independent CI run green"* — unchanged since cycle 35. 4. exec 4 at 83 % context.
+
+---
+
 ## 🔄 MONDAY 2026-09-21 ~17:2x IST — **CYCLE 41: PHASE 2 CLOSED AT 17:06:57; THE REFUTATIONS AND THE PHASE-2 FINDINGS ARE JUDGED; 239 RULINGS; THE VERDICT IS UI → EXEC 4, UX → EXEC 2, FUNCTIONALITY → EXEC 6.** `main` is **`d3772072`**; branch **`ctl/round2-judgment`** is the landing PR of the whole round.
 
 ### 1. WHAT THIS CYCLE DID, IN ORDER
