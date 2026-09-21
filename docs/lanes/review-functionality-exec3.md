@@ -4420,7 +4420,9 @@ landed.**
   ticket with no `proj_visibility` row (`:140-142`), and `canSee` then returns `false`.
   `permissions/check-permission.ts:1048-1050` — every ticket-entity event, `ticket.assigned` and both collaborator
   events included, is refused `permission.visibility` / `TICKET_NOT_VISIBLE_REASON` when `canSee` is false. Both client
-  doors run this gate (`ingestClientBatch`: `routes/events.ts`; `sync-service.ts:370`).
+  doors run this gate: `ingestClientBatch` (`routes/events.ts:101`; `sync-service.ts:370`) is `ingestAll(…, { gate:
+  checkPermission })` (`ingest-service.ts:458`), and `checkPermission` ends in `return checkVisibilityPermission(…)`
+  (`check-permission.ts:1304`).
 - **The test the docblock cites says so itself.** `test/permissions/check-role-permission.test.ts:942-948`: *"Needed since
   Plan 4 Task 9: the gate now refuses a ticket-entity event whose ticket the actor cannot see, and `canSee` answers
   false for a ticket with no `proj_visibility` row exactly as it does for an invisible one. **The cases below used to
