@@ -2806,13 +2806,16 @@ the read into a sibling `.ts` (`board-read.ts`, `ticket-read.ts` — same reason
 async function catches the rejection and returns `{ok:false, error}` instead of letting it escape
 unheard.*
 
-*⚠ RENUMBERED 2026-09-21 22:1x: this block originally minted `12.398`/`12.399`. The controller
-measured both as independently re-minted on other release branches (`12.398` on B01 and B07,
-`12.399` on B07 and B16) before any of them had reached `origin/main` — main's numbering never
-moves once landed, so the later-reconciled branch renumbers. Recomputed as the max over
-`origin/main` and every `origin/rel/*` head (+1), verified `union == sum` with
-`node scripts/check-case-ids.mjs`: `12.398`→`12.409`, `12.399`→`12.410`. B14's own later mints in
-this file (`12.400`–`12.408`) did not collide and are unchanged.*
+*⚠ RENUMBERED 2026-09-21 22:1x: this block originally minted `12.398`/`12.399`. Both independently
+collided with a real declared case on another release branch before any of them had reached
+`origin/main` — `12.398` with B01's own `**12.398**` line, `12.399` with B07's own `**12.399**` line
+— main's numbering never moves once landed, so the later-reconciled branch renumbers. (B07's own
+text at the time names `12.398` as B01's, not its own claim; B16's text names `12.399` historically,
+not as its own claim either — checked against the LINE, not a same-page mention, after an earlier
+sweep over-read both as live claims and was corrected.) Recomputed as the max over `origin/main` and
+every `origin/rel/*` head (+1), verified `union == sum` with `node scripts/check-case-ids.mjs`:
+`12.398`→`12.409`, `12.399`→`12.410`. B14's own later mints in this file (`12.400`–`12.408`) did not
+collide and are unchanged.*
 
 - 12.409 ✅ `loadBoard` (`board-read.ts`) resolves `{ok:false, error}` instead of rejecting when
   `listTicketSummaries` throws (the empty-query path) — RED confirmed against the pre-fix function
