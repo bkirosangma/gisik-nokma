@@ -1,5 +1,14 @@
 /**
- * The unread count, on the inbox's own entry point.
+ * The unread count, as a numbered badge.
+ *
+ * ⚠ CORRECTED 2026-09-21 (E2-25): this read "on the inbox's own entry point",
+ * which is false — nothing mounts this component. The nav's inbox link draws a
+ * DOT and puts the number in its accessible name (`inbox-nav-link.tsx:126-131`),
+ * and `/inbox` itself paints no count either; measured across `apps/` and
+ * `packages/`, this component has zero production renders. It is kept exported
+ * and unreferenced, which the repo's own rule for controls (`ticket-sheet.tsx`)
+ * says a component carried "in case" is not. Mounting it or deleting it is a
+ * product decision, recorded by E2-25 and NOT taken here.
  *
  * ## Hidden when there is nothing to say
  *
