@@ -104,6 +104,9 @@ Recounted, not adopted: `node scripts/check-case-ids.mjs` → **2606 unique ids,
 
 ### 1.7 The comparison surface
 
+(The three owner-written notes in the export — `help-topics-pane.md`, `workspaces-gap.md`, `github.md` — were read in
+full; §6.4c says what each yielded.)
+
 The export, staged read-only at `/Users/kiro/my_projects/gisik-nokma-lanes/prototype-2026-09-20/`:
 `Gisik Nokma - Desktop.dc.html` (sha256 `3d142d46…`), `Gisik Nokma - Mobile.dc.html` (`14ca5b8d…`),
 `help-topics-pane.md` (`a60f8bc5…`), `workspaces-gap.md` (`1ae709c4…`), `github.md` (`18d4820f…`).
@@ -183,11 +186,12 @@ handed me its copy constants by name (`BULK_REFUSED_COPY`, `BULK_UNREACHED_COPY`
 | E5-33 | Min | `/sign-in` | ERROR (copy) | browser (2nd, 390 px) + source | — |
 | E5-34 | Min | nav project item on an archived project | SOFT-DELETED (project) | source | extends `exec2-E2-38` |
 | E5-35 | Min | inbox rows | copy (no time, no ticket) — prototype cat. 3 | source | — |
+| E5-36 | Min | `/workspaces` card, zero projects | FIRST-RUN | source (owner's `workspaces-gap.md` item 12) | — |
 
 **Edge classes reached, by finding:** EMPTY (E5-4) · ERROR (E5-10, 13, 15, 18, 19, 25, 27, 28, 30, 33) ·
 PERMISSION-REFUSED (E5-9, 31) · OFFLINE/REPLICA-DEGRADED (**not reached** — web is online-only; phone/desktop read at two
 screens) · SOFT-DELETED (E5-34 for projects; tickets **not reached** by me — `exec4-E4-23` holds it, §6.6) · CONCURRENT (E5-20, 27) · NARROW
-VIEWPORT (signed-out only: E5-31, 33) · FIRST-RUN (E5-6, 16, 18, 23, 26, 31, 32) · SERVER-REFUSES-WHILE-CLIENT-BELIEVES
+VIEWPORT (signed-out only: E5-31, 33) · FIRST-RUN (E5-6, 16, 18, 23, 26, 31, 32, 36) · SERVER-REFUSES-WHILE-CLIENT-BELIEVES
 (E5-7 inverted, 13, 21).
 
 Export cited throughout as `EXPORT` = `/Users/kiro/my_projects/gisik-nokma-lanes/prototype-2026-09-20/Gisik Nokma - Desktop.dc.html`
@@ -1259,6 +1263,33 @@ painted: the owner's inbox is empty (`[BROWSER]` `EMPTY_INBOX_COPY`) and I mint 
 
 ---
 
+### E5-36 — MINOR · A workspace with no projects has no empty-project sentence on its `/workspaces` card — the owner's own gap list names this (`workspaces-gap.md` item 12) and it is still open `[SOURCE]` — FIRST-RUN
+
+**WHAT.** `apps/web/src/workspace-viewer.ts:127-130` `projectCountLine(0)` → `null`; `:169-173` `projectLine([])` →
+`null`. `workspaces/page.tsx:264`, `:267` feed those into the card, which renders the meta line only when
+`meta !== null` and the project line only when `projects !== null` (`:296-298`, `:313-315`). So a founder's fresh
+workspace card is avatar, name, chips, *"You're an owner here."* — and nothing about projects, no *"No projects
+yet"*, no pointer. The export's card meta reads `"N members · M projects"` (`EXPORT:2734`, cited in the delta doc),
+which for a new workspace at least says `0 projects`.
+
+**WHY.** The owner's own note in the export — `workspaces-gap.md`, *"Also absent, found by comparing against the
+prototype: … 12. No empty-project case on a card"* — is the spec for this card, and items 1–11 of that list have
+since been built (member count, monogram, chips, invitation banner, Help/Account nav, per-project counts, the
+workspace home, archive treatment, guest withholding, the role sentence). Item 12 is handled by omission. The
+card is the founder's first door after `exec2-F5`'s `/my-work` landing, and it opens onto E5-23's *"No projects you
+can open are active here."* — three screens in a row that a brand-new owner meets, none of which says "create your
+first project" until the form itself.
+
+**WHAT WOULD HAVE BEEN BETTER.** `projectCountLine(0)` → *"No projects yet"* for a non-guest viewer (guests keep
+the withheld arm), matching the manual's convention of saying an absence rather than omitting it.
+
+**MEASUREMENT.** `[SOURCE]` lines above opened; `workspaces-gap.md:18-28` (the owner's list) opened. Not painted — the
+dev workspace has a live project.
+
+**SEVERITY: Minor** (claimed).
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -1323,16 +1354,16 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**35 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 35). By claimed severity, read from the
-heading text: **Critical 1 · Important 22 · Minor 12** (1 + 22 + 12 = 35).
+**36 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 36). By claimed severity, read from the
+heading text: **Critical 1 · Important 22 · Minor 13** (1 + 22 + 13 = 36).
 
 - **Critical (1):** E5-13
 - **Important (22):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28, E5-31, E5-32
-- **Minor (12):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30, E5-33, E5-34, E5-35
+- **Minor (13):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30, E5-33, E5-34, E5-35, E5-36
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33 = 22 of 35. **Reproduced with an injected failure, zero server writes:** E5-13,
-E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34, E5-35.
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33 = 22 of 36. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34, E5-35, E5-36.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
 sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever), E5-20 (stacked dialogs and
@@ -1445,6 +1476,16 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
   **9 product sites in 7 files** (plus one e2e helper string, not a product sentence), all listed in E5-25; each
   opened; all nine paint an `HttpError` 401 as transport.
 
+### 6.4c The owner's three notes in the export, read in full
+
+- `help-topics-pane.md` (310 lines): an implementation spec for the grouped, collapsible Topics pane on `/help`.
+  **Implemented** — the pane painted at 390 px signed out (`TOPICS · Getting started 4 · Workspaces and people 2 …`).
+- `workspaces-gap.md` (38 lines): the owner's twelve-item gap list for `/workspaces`. Items 1–11 are built at
+  `a7b6292b`; item 12 (*"No empty-project case on a card"*) is E5-36.
+- `github.md` (42 lines): the prototype's sync log — what each screen was built from. It records the invite
+  channel list as `email/sms/whatsapp` "corrected to the door's own rules"; `exec6-E6-9` shows the door says
+  `email|phone`, i.e. the note copied the form. Nothing else in it contradicts a measurement here.
+
 ### 6.4b Hypotheses opened and KILLED by reading — recorded so the judge can see the method, not just the hits
 
 - **"An epic band titled by a ULID under a Filters-sheet narrowing"** — `labels.epicTitle` (`page.tsx:1179-1200`)
@@ -1505,5 +1546,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 35 findings — Critical 1 · Important 22 · Minor 12 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 36 findings — Critical 1 · Important 22 · Minor 13 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
