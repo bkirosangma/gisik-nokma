@@ -23,14 +23,15 @@ a measurement it lacks is added, and where that happens the finding says so.
 
 ## 0. THE ONE-LINE ANSWER
 
-**No Critical claimed. Twenty-three findings — fourteen Important, nine Minor — every one measured through a door the
+**No Critical claimed. Twenty-four findings — fifteen Important, nine Minor — every one measured through a door the
 product ships, and the two I would put first are on the security surface:** a cookie plus a foreign `Origin` is
 refused on `POST /v1/events` and served the victim's whole visible ledger on `/v1/stream` (E6-15), and an MCP
 token can approve its own successor, so revoking it does not revoke it (E6-16).
 
 Behind those, the recurring shape is **a door that accepts what every read surface says cannot be happening**:
 writes on a soft-deleted ticket, one of them manufacturing a notification into a 404 (E6-2); a deleted open child
-blocking its parent's close while the board shows zero (E6-4); a type re-rank and a workflow republish that leave
+blocking its parent's close while the board shows zero (E6-4); a deleted ticket that stays a row on the phone's
+board and the desktop's list because the replica's filter sits on the two reads those shells never call (E6-24); a type re-rank and a workflow republish that leave
 hierarchies the engine then refuses to reproduce (E6-3, E6-8); a bulk migration refused part-way while the client
 is told nothing moved (E6-10); an offline edit turned into a false contest against the user's own ticket (E6-5);
 an invite form offering channels the door refuses (E6-9); an assignment to a name that is not a person (E6-17); a member who cannot leave a workspace while the
@@ -1766,9 +1767,9 @@ rests on; **unverified** means I did not measure it and say why.
 | **bulk rebind** (`…/migrate`) | zero tickets → `migrated, count 0` (read at `:1041`, `:1054`) | pre-flight refusals append nothing (7.45) | **gate refusal mid-batch, client told "refused", server moved k — E6-10** | n/a | selection includes deleted rows (`:935-940`, no predicate) — noted, not filed: they must move with the type for restore to work | pre-flight reads without a lock; a ticket transitioned between pre-flight and its event is rebound to the state its *old* state mapped to — **unverified**, read at `:976-978` (`toStateIdFor` reads the pre-flight row's `state_id`), not measured | n/a | — | E6-10 |
 | **rule engine** | unknown ticket → `ticket.unknown`; unknown workflow → `unknownWorkflow` | malformed payload → `malformedPayload` with the zod detail | authority is not the engine's (by design, `evaluate.ts:52-55`, the comment on the delete pair) | the replica runs the same `evaluateEvent` (`outbox.ts:311-315`) | **reads `deleted` in one file only — E6-2, E6-4** | n/a (pure) | n/a | first `workflow.defined` must be v1 (`workflow-defined.ts:53-59`) | **type re-rank / republish promotion leave states the engine then refuses — E6-3, E6-8** |
 | **notifications** | inbox `[]`, `nextCursor: null` | — | fanout suppresses a letter the assignee cannot see (`fanout.ts:122`) | — | **assignment on a deleted ticket manufactures a letter into a 404 — E6-2**; delivered letters stay by ruling (item 1) | dedupe key per event (`assignment:<eventId>`) | n/a | — | — |
-| **list / board / search / detail** | `groups: []` | 404 for unknown-or-invisible (one answer, `can-see.ts:220-226` docblock, `:227-234` body) | `restricted` parent/epic (`routes/tickets.ts:419-441`) | replica gates in TS (exec 3 F5) | detail/search/crumb withhold; **list header shows a deleted epic's title — E6-11** | — | UI lane | — | — |
+| **list / board / search / detail** | `groups: []` | 404 for unknown-or-invisible (one answer, `can-see.ts:220-226` docblock, `:227-234` body) | `restricted` parent/epic (`routes/tickets.ts:419-441`) | replica gates in TS on `getTickets`/`getBoard` only — **the phone board, desktop list and phone search read past them — E6-24** | detail/search/crumb withhold; **list header shows a deleted epic's title — E6-11** | — | UI lane | — | — |
 | **invites** | — | `422` with the domain's message | `admins-only` mint; `owner` not invitable | — | — | 6.130 (revoke during accept) recorded ❌, **unverified** here | UI lane | founding | **form offers `sms`/`whatsapp`, door refuses both — E6-9** |
-| **outbox / sync engine** | `nextBatch` → `[]` | transient → backoff (12.148); terminal → `failed` (12.147) | refusal → `failed`, dropped from overlay (`local-context.ts:126`) | **head-of-line not blocked — E6-5** | replica TS gate (exec 3 F5) | one drain at a time (`sync-engine.ts:845`) | n/a | bootstrap once (12.156) | E6-5 |
+| **outbox / sync engine** | `nextBatch` → `[]` | transient → backoff (12.148); terminal → `failed` (12.147) | refusal → `failed`, dropped from overlay (`local-context.ts:126`) | **head-of-line not blocked — E6-5** | replica TS gate on two of five reads (E6-24; exec 3 F5 on the two) | one drain at a time (`sync-engine.ts:845`) | n/a | bootstrap once (12.156) | E6-5 |
 | **MCP tools** | `list_tickets` pages; `search` capped at 50, stated in the tool text | refused/invalid → thrown with rule and reason (`write-tools.ts:28-36`) | server's answer relayed verbatim | n/a | **`assign_ticket` on a deleted id → `committed` while `get_ticket` → not found — E6-2** | no read-before-write | n/a | device-code login (`device-login.ts`) | E6-2 |
 | **online client (`POST /v1/events` from the web)** | — | HTTP error surfaces as `ShellRefusal`/error copy (UX lane) | mapper refuses to default (§5) | **no retry and no idempotent resubmit on a lost response** (`online/http.ts`, `online-data-source.ts:480-488` — `grep` for `retry` and for `duplicate-event-id` → nothing): a user's manual retry mints a new id, so a comment can land twice — **unverified** end-to-end, read only | — | — | UI lane | — | mapper throws `MappingError` on a non-index-aligned answer (`mappers.ts:906-911`) |
 | **checkers** | **`check-no-silent-skips` prints `ok` on an empty report — E6-6** | `check-migration-order` refuses below-base | n/a | n/a | n/a | n/a | n/a | **`check:migrations` vs. a future-dated prefix — E6-7** | CI has run nothing since 2026-09-06, so every "CI-wired" claim describes a dead wire (recorded by the controller) |
@@ -1810,8 +1811,8 @@ the table.
 | **total** | **24** | E6-1 … E6-24, no gaps in the numbering |
 | unverified (0-point) items | 3 | the migrate route's stale pre-flight read under concurrency (§6), the online path's non-idempotent manual retry (§6), 6.123's "no bound on live credentials" half (E6-12) — each marked *unverified* where it appears and not counted above |
 
-Every Important finding above rests on a probe in Appendices A–K or on a printed line; the three Minors rest on
-commands the judge can re-run in under a minute each.
+Every Important finding above rests on a probe in an appendix (A–N, R–V, Y, AF) or on a printed line; the Minors
+rest on commands the judge can re-run in under a minute each, or on a probe of their own (J, O, W, X, AA).
 
 ---
 
