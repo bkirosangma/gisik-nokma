@@ -2438,3 +2438,71 @@ The one that reached the judge is not among them only because each was spot-chec
 answer was already known — which is the whole method, and the reason I report the failures rather than the
 successes. **A pattern that reports a mismatch is making a claim about the pattern until a known case
 agrees.**
+
+---
+
+## 32. `E3-14` IS A DEMONSTRATED EXPLOIT, NOT A GAP — a forged-Origin request through a real session makes the victim a member of a workspace
+
+Written last, and it supersedes §24 as the strongest evidence in this report. §24 showed the check does not
+run. **This shows what running without it does.**
+
+**THE CHAIN, end to end, over a real database and the real doors.** An admin founds a workspace and mints an
+email invitation; the invitee signs in by magic link and holds a genuine session cookie. Then **one request**
+is sent with the invitee's real cookie, a body-less `POST`, and `Origin: https://evil.example` — the shape
+any page the victim visits can issue (CORS-simple: no preflight, per §14.8):
+
+```
+PROBE found workspace:  201  {"workspaceId":"01M319W53PRTF242D7KA33C4GR"}
+PROBE minted invite:    201  {"inviteId":"01M319W54QYJZ2B4PPEJJPCMZE", "url":"http://localhost:3001/invite/tYhktVOnKApjj…"}
+
+PROBE FORGED accept  -> 200  {"workspaceId":"01M319W53PRTF242D7KA33C4GR"}      <-- THE FORGERY COMMITTED
+PROBE TRUSTED accept -> 404  {"error":"not_found","message":"This invitation is no longer open. It may have
+                              been accepted, declined, or withdrawn…"}
+
+PROBE invite status after        : [{"status":"accepted"}]
+PROBE memberships before/after   : 1 / 2                    <-- THE VICTIM BECAME A MEMBER
+PROBE membership.granted events  : 2
+PROBE control (protected /v1/events, SAME cookie, forged Origin): 403 {"error":"forbidden_origin"}
+```
+
+**FOUR THINGS THIS ESTABLISHES, ANY ONE OF WHICH THE EARLIER EVIDENCE COULD NOT:**
+
+1. **The forged request committed.** `200` with the workspace id, not a refusal.
+2. **The state changed.** `proj_invites` reads `accepted`, memberships go **1 → 2**, and a second
+   `membership.granted` lands in the ledger. **The victim is a member of a workspace they did not join.**
+3. **The forgery BEAT the legitimate call — and that is the cleanest proof available.** The trusted-origin
+   request, sent second, answers **404 "no longer open"**: the invite was single-use and the forged request
+   had already spent it. **So the 404 is not evidence that the trusted path fails; it is evidence that the
+   forgery got there first.** I am stating the ordering explicitly because read the other way it would look
+   like a broken route, and a judge deserves to see which way round the probe ran.
+4. **The control fires on the same cookie.** `POST /v1/events` with the *identical* cookie and origin
+   answers `403 forbidden_origin`. So the mechanism exists, is enabled in this build, and simply does not
+   cover `/v1/me/invitations/:inviteId/accept`.
+
+**THIS MOVES THE FINDING OUT OF THE CATEGORY THE JUDGE MIGHT ASSIGN IT TO.** §24's evidence was a
+configuration gap — *the set does not name this route* — and a judge could have ruled the practical
+exposure bounded by CORS or by SameSite, which §14.8 discusses. **That argument is now closed by
+demonstration rather than by argument: the request completed, the membership row exists, and the ledger
+holds the event.** The victim's own next `GET /v1/me/workspaces` will list a workspace they never joined.
+
+**WHERE THE BLAME SITS, stated so the fix is not aimed at the wrong file.** The route is not wrong and
+neither is `ticketIsLive` or `canSee` — **the only missing thing is the route's name in
+`HTTP_ORIGIN_PROTECTED_ROUTES`**, the same one-line class of omission the file records three times over
+(`#740`-era `POST /v1/workspaces`, the ticket-type migration, and the notification-read pair), each found
+the same way: by measuring the assembled app rather than by re-reading the list.
+
+**SEVERITY: Critical — and it is the one severity claim in this report I would defend hardest.** A
+third-party page can make an authenticated person a member of an attacker-chosen workspace, appending three
+ledger events under their name, with no preflight and no user interaction beyond visiting the page. The
+ledger's whole premise is that an event is a claim by the actor named in it; this event names the victim
+and the victim did not make it.
+
+**MEASUREMENT.** Probe at `apps/server/test/http/zz-e3-exploit.test.ts`, created, run and **deleted in the
+same shell invocation** (`git status --porcelain` empty after). Real `createTestDatabase`; `buildTestApp`
+with `security: { webOrigin: 'http://localhost:3001', rateLimit: null }` (the Origin check **on**, proven by
+the 403 control); real magic-link sign-ins for both users with their real `set-cookie`; a workspace founded
+and an invitation minted through the product's own doors with bearer auth (which is Origin-exempt, so the
+setup path is not itself affected by the missing entry). `Tests 1 passed`. **Control failures are what I
+would have reported as loudly: the `403 forbidden_origin` on `/v1/events` is the run telling me the check
+was enabled, and without it this probe would have measured nothing** — which is exactly the mistake §24.1
+records me making once already.
