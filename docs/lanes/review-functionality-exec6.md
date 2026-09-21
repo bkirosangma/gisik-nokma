@@ -1494,6 +1494,12 @@ what was looked at and found sound, not only what was found wrong.
   5 / 9 / 4 comments **before** it and **0 after** it in every run, the rest refused `permission.role`. This is
   the property `ingest-service.ts:235-245` claims for reading the role through the transaction's `client`
   under the workspace lock, exercised rather than read.
+- **Two owners demoting each other concurrently cannot empty the owner set** (Appendix AD; 8 rounds in 1 run,
+  1 file / 1 test passed): each round starts with two owners and fires both `membership.granted … role: member`
+  at once; every round exactly one commits and the other is refused `permission.role` (the loser is a member by
+  the time its transaction takes the workspace lock), owners after = 1 in 8/8. The workspace lock plus the
+  in-transaction role read (`ingest-service.ts:171-174`, `:235-245`) is what makes the last-owner guard hold
+  under interleaving, not only in sequence.
 - **The ingest pipeline's order is what the docblocks say.** `ingest-service.ts:164-360`: workspace lock →
   entity lock → entity↔workspace guard → permission gate (through the transaction's `client`, `:235-245`) →
   contest coherence → engine → server gates → append → refresh-on-publish → projections → COMMIT. Read at the
@@ -5562,6 +5568,139 @@ describe('exec6 probe: revocation racing a burst of claims', () => {
     const after = rows.rows.filter((r) => r.type === 'comment.added' && r.workspace_seq > revSeq).length;
     const before = rows.rows.filter((r) => r.type === 'comment.added' && r.workspace_seq < revSeq).length;
     out.push(`ledger: revocation at workspace_seq ${revSeq}; comments committed BEFORE it: ${before}; comments committed AFTER it: ${after}   ← must be 0`);
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix AD — the mutual owner-demotion race (positive finding, §5)
+
+File path in the tree: `apps/server/test/zz-exec6-probe-owners.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-owners.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A (the peer is granted `owner` in `beforeAll` for this file).
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question (CONCURRENT): two owners demoting each other at the same instant — can the workspace end with zero owners?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'owner' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 probe: mutual owner demotion race', () => {
+  it('records how many demotions commit and how many owners remain', async () => {
+    const out: string[] = [];
+    const demote = (target: string, actorId: string, token: string) => app.inject({ method: 'POST', url: '/v1/events', headers: auth(token), payload: { events: [{ id: newUlid(), workspaceId: WS, entity: { kind: 'membership', id: membershipId(WS, target) }, type: 'membership.granted', version: 1, payload: { userId: target, role: 'member' }, actorId, origin: 'web', clientTime: new Date().toISOString() }] } });
+    const totals = { bothCommitted: 0, oneCommitted: 0, noneCommitted: 0 };
+    for (let round = 0; round < 8; round += 1) {
+      // Reset: both are owners.
+      for (const [u, a, t] of [[ownerId, peerId, peerToken], [peerId, ownerId, ownerToken]] as const) {
+        await app.inject({ method: 'POST', url: '/v1/events', headers: auth(t), payload: { events: [{ id: newUlid(), workspaceId: WS, entity: { kind: 'membership', id: membershipId(WS, u) }, type: 'membership.granted', version: 1, payload: { userId: u, role: 'owner' }, actorId: a, origin: 'web', clientTime: new Date().toISOString() }] } });
+      }
+      const owners0 = (await db.pool.query<{ n: string }>("SELECT count(*)::text AS n FROM proj_memberships WHERE workspace_id = $1 AND scope_kind = 'workspace' AND role = 'owner'", [WS])).rows[0]!.n;
+      const [a, b] = await Promise.all([demote(peerId, ownerId, ownerToken), demote(ownerId, peerId, peerToken)]);
+      const ra = a.json<{ results: Array<{ status: string; rule?: string }> }>().results[0]!;
+      const rb = b.json<{ results: Array<{ status: string; rule?: string }> }>().results[0]!;
+      const owners = (await db.pool.query<{ n: string }>("SELECT count(*)::text AS n FROM proj_memberships WHERE workspace_id = $1 AND scope_kind = 'workspace' AND role = 'owner'", [WS])).rows[0]!.n;
+      const n = [ra, rb].filter((r) => r.status === 'committed').length;
+      if (n === 2) totals.bothCommitted += 1; else if (n === 1) totals.oneCommitted += 1; else totals.noneCommitted += 1;
+      out.push(`round ${round}: owners before ${owners0}; A→demote peer ${ra.status}${ra.rule ? ` (${ra.rule})` : ''}; B→demote owner ${rb.status}${rb.rule ? ` (${rb.rule})` : ''}; owners after ${owners}`);
+    }
+    out.push(`totals over 8 rounds: ${JSON.stringify(totals)}`);
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
   });
