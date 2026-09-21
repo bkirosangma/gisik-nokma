@@ -55,3 +55,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | B15 | claimed | 2026-09-21 23:24 | /Users/kiro/my_projects/gisik-nokma-exec6 |
 | T-E4-16 | done | 251d634e | 18 passed (contrast override CSS-rule read); app-core suite 98 files/1732 tests |
 | T-E4-28 | done | 7833a945 | 5 new (11.216-11.218): aria-label day cells, aria-describedby bars; app-core 98/1737, ui 8/396 |
+| T-E4-20 | done | 1c7122bd | canvas.test.tsx 10.93 source-scan; height-floor deferred (Playwright, off-gate); app-core 98/1738 |
