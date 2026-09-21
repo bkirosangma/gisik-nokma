@@ -12,3 +12,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-P19 | done | 5ada8ba9 | 13.1051 the view rail adopts SegmentedControl and is named "Project view" (web suite 631 passed) |
 | T-P21 | done | 0e0ce247 | 9.259 description composer named by its <dt> via labelledBy through the shared contract; contract mutation-witnessed |
 | T-P22 | done | 63519f7a | 13.1052 both menus named; new role="menu" source sweep + two runtime arms |
+| T-P31 | done | 1bcfbc94 | 13.1053 both nav landmarks named; product-wide <nav> sweep + two runtime arms; 13.685 moved with its reason written in |
