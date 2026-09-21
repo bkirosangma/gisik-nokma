@@ -615,23 +615,26 @@ reconciled, never overwritten.
   from both hand-maintained lists: 13.116 stayed green, this case reddened), GREEN at head.
   `app.printRoutes({ commonPrefix: false })` was tried first and rejected — MEASURED, it silently drops
   `/api/auth/*` from its tree (a `find-my-way` internal-node quirk under that option)
-**Case ids below jump to `13.1100`, not continuing from `13.198`: `13.101–13.200` is Lane E's block and
-`13.201–13.240` is Lane C's (both allocations recorded in `test-cases/13-deployment-dogfooding.md`), and
-both were already minted with unrelated cases by the time this task ran — `13.201–13.203` is the
-scheduler-generalisation errand, found by `check-case-ids.mjs` flagging a duplicate. This task has no
-assigned block, so it takes `13.1100`, confirmed unused anywhere in `test-cases/` by grep.**
+**Case ids below sit in release batch B01's §13 block `13.1077`–`13.1086` (the per-batch table in
+`test-cases/13-hig-per-screen.md`, allocated by the controller 2026-09-21), not continuing from `13.198`:
+`13.101–13.200` is Lane E's block and `13.201–13.240` is Lane C's (both recorded in
+`test-cases/13-deployment-dogfooding.md`), both already minted with unrelated cases by the time this task
+ran — `13.201–13.203` is the scheduler-generalisation errand, found by `check-case-ids.mjs` flagging a
+duplicate. These four were first minted as `13.1100`–`13.1103` from a next-free reading, before the batch
+table existed; the controller renumbered them line-precisely into B01's block before landing, because
+`13.1100`–`13.1103` fall inside B06's block `13.1097`–`13.1106`. Ids already on `main` never move.**
 
-- 13.1100 ✅ E6-15 — a cookie-carrying `GET /v1/stream` handshake with a FORGED HTTP-Origin is refused
+- 13.1077 ✅ E6-15 — a cookie-carrying `GET /v1/stream` handshake with a FORGED HTTP-Origin is refused
   403 `forbidden_origin`, the same refusal a mutating door gets. `GET /v1/stream` is a WebSocket upgrade,
   exempt from the same-origin policy that makes every other read in this server safe to leave unchecked
   (13.117's table is mutating routes only) — without this, a foreign page opens the socket under the
   victim's ambient cookie and receives their live event stream. RED reproduced by temporarily reverting
   `httpOriginRefused`'s stream branch: `expected 403 to be 401` (the request reached `requireSession`,
   which answered for the wrong reason). GREEN at head
-- 13.1101 ✅ the same handshake with NO HTTP-Origin header at all is also refused — require, not just
+- 13.1078 ✅ the same handshake with NO HTTP-Origin header at all is also refused — require, not just
   validate, matching 13.118's rule for the mutating doors
-- 13.1102 ✅ the correctly-configured `WEB_ORIGIN` is let through to the socket route, so a same-origin
+- 13.1079 ✅ the correctly-configured `WEB_ORIGIN` is let through to the socket route, so a same-origin
   client's real handshake still reaches it — the recorder sees exactly one admitted request
-- 13.1103 ✅ the control: a BEARER handshake (no cookie) is untouched by this check regardless of Origin,
+- 13.1080 ✅ the control: a BEARER handshake (no cookie) is untouched by this check regardless of Origin,
   same as every other route in this file — there is no ambient credential to forge
 

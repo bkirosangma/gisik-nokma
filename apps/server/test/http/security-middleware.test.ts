@@ -596,14 +596,15 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
    */
   describe('the /v1/stream WebSocket upgrade (E6-15)', () => {
     /**
-     * Case ids jump to `13.1100` rather than continuing from `13.198`: this
-     * file's own catalogue (`test-cases/13-deployment-dogfooding.md`) records
-     * `13.101–13.200` as Lane E's block and `13.201–13.240` as Lane C's — both
-     * already minted with unrelated cases (`grep`-confirmed) — and this task
-     * has no assigned block. `13.1100` is unused anywhere in `test-cases/`.
+     * Case ids `13.1077`–`13.1080` sit in release batch B01's §13 block
+     * (`13.1077`–`13.1086`, the per-batch table in `test-cases/13-hig-per-screen.md`),
+     * not continuing from `13.198`: `13.101–13.200` is Lane E's block and
+     * `13.201–13.240` is Lane C's, both already minted with unrelated cases.
+     * First minted as `13.1100`–`13.1103` from a next-free reading; renumbered
+     * by the controller before landing because those fall inside B06's block.
      */
     /**
-     * 13.1100 — a cookie-carrying GET /v1/stream handshake with a FORGED HTTP-Origin is refused 403 forbidden_origin, same as a mutating door.
+     * 13.1077 — a cookie-carrying GET /v1/stream handshake with a FORGED HTTP-Origin is refused 403 forbidden_origin, same as a mutating door.
      */
     it('a cookie-carrying handshake with a FORGED HTTP-Origin is refused 403 forbidden_origin', async () => {
       const { app, recorder } = build(HTTP_ORIGIN_ON);
@@ -619,7 +620,7 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
     });
 
     /**
-     * 13.1101 — a cookie-carrying GET /v1/stream handshake with NO HTTP-Origin at all is refused too — require, not just validate.
+     * 13.1078 — a cookie-carrying GET /v1/stream handshake with NO HTTP-Origin at all is refused too — require, not just validate.
      */
     it('a cookie-carrying handshake with NO HTTP-Origin at all is refused', async () => {
       const { app } = build(HTTP_ORIGIN_ON);
@@ -630,7 +631,7 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
     });
 
     /**
-     * 13.1102 — the configured WEB_ORIGIN is let through, so a same-origin client's real handshake still reaches the socket route.
+     * 13.1079 — the configured WEB_ORIGIN is let through, so a same-origin client's real handshake still reaches the socket route.
      */
     it('the configured WEB_ORIGIN is let through to the socket route', async () => {
       const { app, recorder } = build(HTTP_ORIGIN_ON);
@@ -640,7 +641,7 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
     });
 
     /**
-     * 13.1103 — the control: a BEARER handshake (no cookie) is untouched by this check regardless of Origin, matching every other route in this file — there is no ambient credential to forge.
+     * 13.1080 — the control: a BEARER handshake (no cookie) is untouched by this check regardless of Origin, matching every other route in this file — there is no ambient credential to forge.
      */
     it('a BEARER handshake with no cookie is untouched, even with a foreign Origin', async () => {
       const { app, recorder } = build(HTTP_ORIGIN_ON);
