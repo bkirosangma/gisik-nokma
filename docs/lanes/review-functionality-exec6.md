@@ -538,8 +538,12 @@ claimant's own work.
 stream: `nextBatch` should return nothing while the earliest queued row is not yet due — `ORDER BY position` first,
 then compare the head's `next_attempt_at` (or `MIN(next_attempt_at)` over queued rows) against `now`. Independently,
 the sync door should not contest a claim whose target ticket **does not exist** — `contest()` files a contest on a
-ticket id the ledger has never seen, which is the *"existence claim with no evidence"* shape the brief names — a
-plain `refused` there would let the outbox keep the row `failed` and visible instead of minting a false contest.
+ticket id the ledger has never seen, which is the *"existence claim with no evidence"* shape the brief names. Nothing
+on the contest's own path asks: `contest-coherence.ts:18-35` binds the embedded claim's workspace, kind and id to
+the envelope and nothing else; `rule-engine/src/contests.ts:14-24` (`evaluateClaimContested`) checks only
+`origin === 'server'`; the entity↔workspace guard passes a head that does not exist. A plain `refused` there
+(or a `contest()` that first asks `getTicketStateFromDb`) would let the outbox keep the row `failed` and visible
+instead of minting a false contest.
 And 12.144 should enqueue after a `recordFailure` and assert the batch is empty until the head is due.
 
 **MEASUREMENT.** Appendix D (outbox, `packages/sync-client`, relative imports) and Appendix G (server doors,
