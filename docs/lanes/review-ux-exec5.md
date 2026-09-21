@@ -1025,6 +1025,33 @@ for every removed state, occupied or not."*
 
 ---
 
+### E5-30 — MINOR · The shared read-refusal panel on five routes says "… cannot be shown **yet**", appends the transport's raw string, and names no action; the workflow screens' sibling sentence names one `[SOURCE]`
+
+**WHAT.** `apps/web/src/shell-refusal.tsx` (`ShellRefusal`, the last function in the file): `<p role="status">
+<span>{what} cannot be shown yet.</span>{message}</p>`. `message` is the page's `error` string — `LiveQueryResult.error`,
+the stringified cause — so a 500 reads *"Your inbox cannot be shown yet. HTTP 500 for /v1/me/notifications"*
+(`inbox/page.tsx:446`), *"My Work cannot be shown yet. HTTP 500 for /v1/me/work"* (`my-work/page.tsx:71`), and the
+same on `/workspaces` (`:81`), the attention strip (`:65`), the roster (`members/page.tsx:397`) and the workflow
+draft (`workflows/[workflowId]/page.tsx:90`).
+
+**WHY.** *"yet"* promises a later; for a 500 or a `MappingError` nothing later is coming, and the component's own
+docblock (`:23`) says of the spinner it replaced that *"'the answer is coming'; it is not."* The appended string is
+the wire's (`HttpError.message`), not a person's sentence. And the panel names no way forward, where the product's
+own sibling arms do: `workflow-list-screen.tsx:200` *"Could not load workflows — reload to try again."*,
+`workflow-builder-screen.tsx:89-91` *"… — reload to try again."* `role="status"` (polite) for a read that failed
+outright is the UI lane's to weigh; the copy is mine.
+
+**WHAT WOULD HAVE BEEN BETTER.** *"{what} could not be loaded — reload to try again."* with the wire string as a
+secondary line, and the 401 arm already routed elsewhere (`expired-session.tsx`) left as is.
+
+**MEASUREMENT.** `[SOURCE]` `shell-refusal.tsx` render opened; the six call sites above (`grep -rn '<ShellRefusal'
+apps/web/app` → 6 mounts on 5 routes; the docblock counts the panel's reach as every refusing read); sibling
+sentences at `workflow-list-screen.tsx:200`, `workflow-builder-screen.tsx:89-91`.
+
+**SEVERITY: Minor** (claimed).
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -1086,16 +1113,16 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**29 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 29). By claimed severity, read from the
-heading text: **Critical 1 · Important 20 · Minor 8** (1 + 20 + 8 = 29).
+**30 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 30). By claimed severity, read from the
+heading text: **Critical 1 · Important 20 · Minor 9** (1 + 20 + 9 = 30).
 
 - **Critical (1):** E5-13
 - **Important (20):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28
-- **Minor (8):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29
+- **Minor (9):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24 = 19 of 29. **Reproduced with an injected failure, zero server writes:** E5-13,
-E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29.
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24 = 19 of 30. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
 sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever), E5-20 (stacked dialogs and
@@ -1239,5 +1266,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 29 findings — Critical 1 · Important 20 · Minor 8 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 30 findings — Critical 1 · Important 20 · Minor 9 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
