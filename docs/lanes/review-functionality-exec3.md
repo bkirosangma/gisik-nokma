@@ -1241,3 +1241,55 @@ is the reason `E3-14` survived three waves of the same defect being found by han
 
 **MEASUREMENT.** The guard's body read at `:256-259`; the run above returns `1 passed | 72 skipped`; the
 probe in `E3-14` is the falsifier on the other side. Both from this sha.
+
+---
+
+## 14.8 `E3-14`, REFINED — which of the five are reachable by a browser, and why two of them are the sharp ones
+
+Added after filing `E3-14`, because the five routes are not equally exposed and the difference is
+mechanical rather than a matter of taste. **This refines `E3-14`; it does not replace it.**
+
+**The bound: CORS preflight.** A cross-origin `PUT` carrying `Content-Type: application/json` is not a
+CORS "simple request", so the browser sends an `OPTIONS` preflight first and refuses to send the real
+request unless the response allows the origin. `webOrigin` is the product's own origin, so a forged
+`PUT` from a sibling page does not go out. **That does not make the two `PUT`s harmless** — the same
+file widened `MUTATING_METHODS` to include `PUT`/`PATCH`/`DELETE` precisely because it judged this class
+to need the check, and a route that is only accidentally safe is one `Content-Type` change from being
+unsafe — but it does mean **a browser is not the vector for them today, and I am not claiming it is.**
+
+**The two invitation POSTs are a different shape, MEASURED at the registration:**
+
+```ts
+app.post<{ Params: { inviteId: string } }>(
+  '/v1/me/invitations/:inviteId/accept',
+  { preHandler: requireSession },        // ← no `schema`, no body, no content-type requirement
+  async (request, reply) => {
+```
+
+and identically at `routes/invites.ts:427` for `/v1/invites/:token/accept`. **Both take every input from
+the URL and declare no body schema.** A `POST` with no body and no custom headers **is** a CORS simple
+request: no preflight, no `OPTIONS`, and the browser sends it with the victim's cookies attached. A plain
+HTML form is enough:
+
+```html
+<form method="POST" action="https://<api-host>/v1/me/invitations/<inviteId>/accept"></form>
+<script>document.forms[0].submit()</script>
+```
+
+**And `SameSite=Lax` is not a barrier for the case this control exists for**, in the project's own words
+quoted in `E3-14`: Lax is a site rule, the product and the API are same-site siblings of one registrable
+domain, so the cookie travels — which is exactly why the Origin check is the remaining defence and why
+its absence here is the finding. (Cross-*site* is a different case, and `Lax` does block that; the point
+is that this control is not about cross-site.)
+
+**So the sharpened claim is narrow and fully measured:** of the five, **`POST
+/v1/me/invitations/:inviteId/accept` and `POST /v1/me/invitations/:inviteId/decline` are reachable from a
+browser page with no preflight, carry `requireSession`, are absent from `HTTP_ORIGIN_PROTECTED_ROUTES`,
+and append ledger events** — the accept path appending three (`invite.accepted`, `membership.granted`,
+`project.member_added`). The two `PUT`s and `/v1/invites/:token/accept` are outside the control and
+should be in it, and I am **not** claiming a browser vector for them.
+
+⚠ **I checked for a body requirement rather than assuming none, and that check is what changed the
+claim.** My first draft said "five routes", read as five equally-exposed doors; both `POST`s declare
+`{ preHandler: requireSession }` and nothing else, which is what promotes them above the rest. The
+`PUT`s' options were read too, and they are the reason the paragraph above bounds them instead.
