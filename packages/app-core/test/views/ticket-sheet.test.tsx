@@ -2651,6 +2651,23 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
     return document.querySelector('.gn-ticket-sheet__footer') as HTMLElement;
   }
 
+  /**
+   * ⚠ AMENDED BY RULING E2-35 (2026-09-21) — the delete is now TWO presses.
+   *
+   * The footer's `Delete` used to perform the delete on one press. It opens a
+   * confirmation now (`Dialog`, `BulkCloseDialog`'s shape), so every arm below
+   * that was one click is two. The helper exists rather than four inlined pairs
+   * so the change of shape is stated once, and so no arm can accidentally assert
+   * against a dialog still standing open.
+   *
+   * The confirm is queried PAGE-WIDE, not `within(footer())`: the dialog renders
+   * outside the footer, which is the whole point of it.
+   */
+  async function pressDelete(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Delete ticket' }));
+  }
+
   it('16.84 draws Delete, and the ruled-out navigation is ABSENT', async () => {
     renderSheet(ticketRead());
     await settled();
@@ -2670,7 +2687,7 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
     const source = renderSheet(ticketRead(), undefined, { onClose, onDeleted });
     await settled();
 
-    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await pressDelete(user);
     await waitFor(() => expect(source.ingested).toHaveLength(1));
 
     const batch = source.ingested[0]!;
@@ -2695,7 +2712,7 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
     const source = renderSheet(ticketRead(), undefined, { onClose });
     await settled();
 
-    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await pressDelete(user);
     await waitFor(() => expect(source.ingested).toHaveLength(1));
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
@@ -2726,7 +2743,7 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
     renderSheet(read, source, { onClose, onDeleted });
     await settled();
 
-    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await pressDelete(user);
     await waitFor(() =>
       expect(
         screen.getByText(/Only a project admin can delete a ticket in this project\./),
@@ -2758,7 +2775,7 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
     renderSheet(read, source, { onClose, onDeleted });
     await settled();
 
-    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await pressDelete(user);
     await waitFor(() =>
       expect(screen.getByText(/The server did not answer this change\./)).toBeInTheDocument(),
     );
@@ -3535,5 +3552,85 @@ describe('13.1182 one Close in flight, and a second click that is not a click', 
     await waitFor(() => expect(close()).not.toBeDisabled());
     // And the single event is the one the first click made.
     expect(source.ingested[0]![0]!.type).toBe('ticket.closed');
+  });
+});
+
+/**
+ * 13.1183 — ruling E2-35: THE DELETE ASKS FIRST.
+ *
+ * The footer's `Delete` performed the delete on ONE press, while the product
+ * reaches the SAME soft delete on many tickets through a whole confirmation
+ * surface (`bulk-close-dialog.tsx`). So a multi-ticket close needed a decision
+ * point and a single-ticket delete did not — although the single one is the
+ * harder to notice and easier to trigger by accident, and it is gated on
+ * project-admin rights. This case pins the ask.
+ *
+ * **It does NOT pin a local `precheck` gate, and that is a decision rather than
+ * an omission**: the deletion door's own docblock
+ * (`packages/rule-engine/src/checks/deletion.ts`) states that authority "is not
+ * a pure function of the envelope — this engine's context carries no membership
+ * at all", so a local gate would answer every question about this delete except
+ * the one that makes it consequential. The server stays the authority.
+ */
+describe('13.1183 Delete asks first', () => {
+  function footer(): HTMLElement {
+    return document.querySelector('.gn-ticket-sheet__footer') as HTMLElement;
+  }
+
+  it('13.1183 pressing Delete ASKS, and asks nothing of the server', async () => {
+    const user = userEvent.setup();
+    const source = renderSheet(ticketRead());
+    await settled();
+
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Delete this ticket?' });
+    // It names the ticket and the consequence, INCLUDING the two ways back —
+    // "its history is retained" alone would be the misleading half E2-30
+    // corrected in the toast's own sentence.
+    expect(within(dialog).getByText(new RegExp(ticketRead().title))).toBeInTheDocument();
+    expect(dialog.textContent).toContain('the Board, the List, the Calendar and the Timeline');
+    expect(dialog.textContent).toContain('15 seconds');
+    // THE ASK IS NOT THE ACT.
+    expect(source.ingested).toHaveLength(0);
+
+    // And the confirm is NOT a second button called "Delete": the footer's is
+    // called that, and two identically-named buttons on one screen are
+    // ambiguous to a screen-reader user and unaddressable by role and name.
+    expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1);
+  });
+
+  it('13.1183 CONTROL — Cancel closes the ask and still posts nothing', async () => {
+    // Without this arm, a Cancel wired to the delete would pass the case above.
+    const user = userEvent.setup();
+    const source = renderSheet(ticketRead());
+    await settled();
+
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await screen.findByRole('dialog', { name: 'Delete this ticket?' });
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete this ticket?' })).toBeNull());
+    expect(source.ingested).toHaveLength(0);
+    // The sheet is still here — a Cancel that closed it would be a delete by
+    // another name.
+    expect(within(footer()).getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+  });
+
+  it('13.1183 the CONFIRM is what deletes — one ticket.deleted, this ticket, {}', async () => {
+    const user = userEvent.setup();
+    const source = renderSheet(ticketRead());
+    await settled();
+
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await screen.findByRole('dialog', { name: 'Delete this ticket?' });
+    await user.click(screen.getByRole('button', { name: 'Delete ticket' }));
+
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    const batch = source.ingested[0]!;
+    expect(batch).toHaveLength(1);
+    expect(batch[0]!.type).toBe('ticket.deleted');
+    expect(batch[0]!.entity).toEqual({ kind: 'ticket', id: TICKET });
+    expect(batch[0]!.payload).toEqual({});
   });
 });

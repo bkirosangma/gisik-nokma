@@ -5,7 +5,7 @@ import {
   type SubmittedEvent,
   type TicketTypeDef,
 } from '@gisik-nokma/domain';
-import { Button, Chip, SegmentedControl, Select, Sheet } from '@gisik-nokma/ui';
+import { Button, Chip, Dialog, SegmentedControl, Select, Sheet } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
@@ -514,6 +514,56 @@ export function TicketSheet({
    * dialog with its own submit and its own concerns, untouched here.
    */
   const [submitting, setSubmitting] = useState(false);
+  /**
+   * RULING E2-35 (2026-09-21) — WHETHER THE DELETE'S CONFIRMATION IS OPEN.
+   *
+   * Declared HERE, with the sheet's other state, and that placement is
+   * load-bearing rather than tidy: the sheet returns EARLY while its read is
+   * erroring or loading (`:635`, `:643`), so a `useState` declared beside the
+   * footer it opens would be a hook called after a conditional return. Measured
+   * — putting it there took **112 of 116 cases** red with *"React has detected a
+   * change in the order of Hooks called by TicketSheet"*.
+   *
+   * ## What the confirmation is for
+   *
+   * The footer's `Delete` performed the delete on ONE press. Its own docblock
+   * argues the control is offered to everyone and the SERVER decides — an
+   * argument about PERMISSION that says nothing about confirmation. Meanwhile
+   * the product reaches **the same soft delete** on many tickets through a whole
+   * confirmation surface (`bulk-close-dialog.tsx`: a dialog, per-row outcomes,
+   * its own failure copy, "confirm" five times). So a multi-ticket close needed
+   * a decision point and a single-ticket delete did not — although the single
+   * one is the harder to notice and easier to trigger by accident, and it is
+   * gated on project-admin rights, which is the product's own signal that the
+   * act is consequential. Two measured facts make the press costly: it removes
+   * the ticket from every view (`LIVE_TICKET_WHERE`), and its inverse used to
+   * expire with the toast alone (this batch's E2-30 added the page-level route).
+   *
+   * ## What this does NOT do, and why each omission is deliberate
+   *
+   * **The control is NOT hidden** — the docblock beside `deleteTicket` is right
+   * that a hidden control cannot explain itself, and the finding says so in as
+   * many words. This asks; it does not conceal.
+   *
+   * **The accept is NOT gated on a local `precheck`, though the finding offers
+   * that.** `precheck` runs the shared engine, and the deletion door's own
+   * docblock (`packages/rule-engine/src/checks/deletion.ts`) states what that
+   * engine cannot see: *"AUTHORIZATION is not here. 'Only a project admin can
+   * delete a ticket' is `checkVisibilityPermission`'s sixth check … because
+   * authority is resolved from membership and **is not a pure function of the
+   * envelope — this engine's context carries no membership at all**."* A local
+   * gate would therefore answer every question about this delete EXCEPT the one
+   * that makes it consequential, and would add a second refusal site whose
+   * wording could differ from the server's. The server stays the authority, and
+   * its refusal still renders verbatim in this sheet's own slot.
+   *
+   * **The dialog's own sentence names what a person can actually DO.** Two
+   * routes back, because that is what the product now has: the toast's Undo for
+   * the ruled 15 seconds (the host owns it) and the page strip this batch added.
+   * Saying "its history is retained" alone would be the same misleading half
+   * E2-30 corrected in the toast's own sentence.
+   */
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   /**
    * The new-subtask field (door F, 2026-09-19), and its own double-submit
    * latch and refusal slot — the same pair `submitting`/`editorError` keep for
@@ -2788,11 +2838,52 @@ export function TicketSheet({
           type="button"
           className="gn-ticket-sheet__delete"
           disabled={submitting}
-          onClick={() => void deleteTicket()}
+          onClick={() => setConfirmingDelete(true)}
         >
           Delete
         </button>
       </footer>
+
+      {/*
+        RULING E2-35 — the confirmation, in `BulkCloseDialog`'s shape: a `Dialog`
+        with a title, the consequence, and Cancel beside a primary confirm.
+        Rendered HERE, beside `TransitionDialog`'s own mount, so the sheet owns
+        both of its modal decisions from one place.
+
+        ⚠ THE CONFIRM IS NAMED **Delete ticket**, not "Delete". The footer's
+        control is called "Delete", and a second button with the same accessible
+        name on one screen is ambiguous to a screen-reader user and
+        unaddressable by role and name — the same collision this batch's E2-30
+        hit on the deleted-ticket strip's Undo.
+
+        ⚠ AND THE CONFIRM CARRIES NO `disabled`. It unmounts on its own click
+        (`setConfirmingDelete(false)` runs before the submit), so a disabled
+        state there is a term nobody can ever observe — which is exactly the
+        defect E2-31 removed one function up. The guard for the submit in flight
+        is the FOOTER's own `disabled={submitting}`, which is set before the
+        first await and blocks a second press from opening this dialog again.
+      */}
+      <Dialog
+        open={confirmingDelete}
+        title="Delete this ticket?"
+        onClose={() => setConfirmingDelete(false)}
+      >
+        <p>
+          {`${ticketRead.title} will stop appearing in the Board, the List, the Calendar and the Timeline. Nothing is erased — its history is kept — and you can put it back for 15 seconds from the message that follows, or from the message on the page until you delete another ticket.`}
+        </p>
+        <div>
+          <Button onClick={() => setConfirmingDelete(false)}>Cancel</Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setConfirmingDelete(false);
+              void deleteTicket();
+            }}
+          >
+            Delete ticket
+          </Button>
+        </div>
+      </Dialog>
 
       {workflow.data != null ? (
         <TransitionDialog

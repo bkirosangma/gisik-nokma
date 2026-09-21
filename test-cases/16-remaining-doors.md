@@ -603,6 +603,25 @@ plus a partial index → a filter at every view-serving SELECT.
   contains it, so WCAG 2.5.3 holds, and a page-wide `getByRole('button', {name: 'Undo'})` stays
   unambiguous. — (`apps/web/test/sheet-delete.test.tsx`)
 
+- **13.1183** ✅ **`Delete` ASKS FIRST (ruling E2-35, 2026-09-21).** The footer's control performed the
+  delete on ONE press, while the product reaches **the same soft delete** on many tickets through a whole
+  confirmation surface (`bulk-close-dialog.tsx`). It is now a `Dialog` in that shape: the ticket's title,
+  the consequence (it leaves the Board, the List, the Calendar and the Timeline; nothing is erased), and
+  **both** ways back — the toast's ruled 15 seconds and the page strip `13.1180` added. Three cases: the
+  press opens the ask and posts **nothing** (the ask is not the act); a CONTROL that Cancel closes it and
+  still posts nothing, with the sheet still standing (a Cancel wired to the delete would pass the first
+  arm otherwise); and the confirm posts exactly one `ticket.deleted` for this ticket with `{}`.
+  **Mutation-witnessed with two distinct signatures:** making the footer delete on the press again
+  reddens all three (`Tests 3 failed | 116 skipped`), and wiring Cancel to the delete reddens the Cancel
+  control ALONE (`Tests 1 failed | 2 passed | 116 skipped`). **The confirm is named `Delete ticket`, never
+  a second bare "Delete"** — the case asserts exactly one button called "Delete" exists, which is the
+  same collision `13.1180`'s Undo hit. **Two omissions are deliberate and stated in the code:** the
+  control is NOT hidden, and the accept is NOT gated on a local `precheck` — the deletion door's own
+  docblock (`packages/rule-engine/src/checks/deletion.ts`) says authority "is not a pure function of the
+  envelope — this engine's context carries no membership at all", so a local gate would answer every
+  question about this delete except the one that makes it consequential. The id is from **B13's allocated
+  §13 block (13.1177–13.1186)**. — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+
 ### The sheet's three missing surfaces — the toolbar, the editable title, the breadcrumb
 
 **Owner ruling, 2026-09-20: *"all 3 yes."*** Branch `exec/sheet-surfaces`, cut from `origin/main` =
