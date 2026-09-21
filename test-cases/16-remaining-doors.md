@@ -16,7 +16,7 @@ leaving it outside, so the section was opened.
 | **exec 1** | `16.1`–`16.30`, **then `16.32`–`16.40`** (taken 2026-09-19 late for `/v1/search`), **then `16.61`–`16.71`** (the `3b` allocation, **NARROWED 2026-09-21 — see the reallocation note below**), **then `16.81`–`16.99`** (taken 2026-09-20 for the sheet prototype parity) — of which **`16.96`–`16.99` are MINTED 2026-09-20 for the attachments leak** and **`16.91`–`16.95` are MINTED 2026-09-20 for the Add-subtask affordance**. ⚠ **THE BLOCK `16.81`–`16.99` IS NOW FULLY SPENT**; exec 1's next free ids are `16.63`–`16.71` (of which only `16.61`–`16.62` are minted) |
 | **exec 2** | **`16.41`–`16.60`** (`16.31` spent on the evidence upload; `16.32`–`16.40` reallocated to exec 1) — ⚠ **`16.88`–`16.90` were minted from exec 1's block by the soft-delete lane on 2026-09-20, and its merged handoff records `16.88`–`16.99` as THAT lane's block**, which overlaps exec 1's. **The controller corrected the spent set (exec 1's next free is `16.91` — ⚠ **a reading SUPERSEDED by the reallocation note below**); the OVERLAP is flagged to the owner, not resolved here.** It is why the attachments lane minted from the TOP of the shared block instead of `16.91`: `16.91` is inside both claims and is the one id that can collide, and `exec2/comment-thread` was live in the tree at the time — **then `16.72`–`16.80`** (**REALLOCATED to exec 2 on 2026-09-21 — see the reallocation note below**), of which **`16.72`–`16.75` are MINTED 2026-09-21 for the comment thread** and **`16.76`–`16.80` are MINTED 2026-09-21 for the markdown-editing item** (the seeds parsed + `markdownLinks` on) — ⚠ **so exec 2's block is now FULLY SPENT and its next free ids are NOT `16.81`–`16.99` (exec 1's, fully spent too): it must be reallocated by the controller before the next mint** |
 | **priority built-in** (`docs/superpowers/plans/2026-09-22-priority-builtin.md`, #672) | **`16.100`–`16.109`** — the sheet's Priority editor and Start row (Task 7 of that plan); allocated 2026-09-22 against the catalogue tip `16.99`. ⚠ `16.100` also appears in this file's own prose above and in `17-open-work.md` as a WIDTH example, not a case — a line-head declaration is the only claim |
-| **sheet prototype parity** (`docs/superpowers/specs/2026-09-22-sheet-prototype-parity-design.md`, branch `owner/sheet-prototype-parity`) | **`16.110`–`16.129`** — allocated 2026-09-22 by the owner-side session, directly after the priority block. **Minted by lane B (`rel/sheet-parity-b`, the comments block): `16.126` and `16.128`.** ⚠ **`16.127` WAS RESERVED AND HELD, AND IS NOW MINTED (2026-09-22, by the tail lane):** it is *the posting sentence is handed to the composer as its footer note, and the thread draws no second copy*, and it could not be written until the sheet's comment `EditorSlot` mount passed `footerNote` in `ticket-sheet.tsx` — the collision surface lane B was barred from. Its entry below is `✅`; the reservation is discharged rather than left standing. **Next free: `16.129`.** ⚠ **MINTED 2026-09-22 by the tail lane (`rel/sheet-parity-tail`, Tasks 3, 4, 6, 8 and the held half of 7): `16.110`–`16.112` (Task 3 — the chips line, the parent line, the third tab), with `16.113`–`16.117` (Task 4), `16.123`–`16.125` (Task 6) and `16.127` (the held half of Task 7, un-held once the sheet's comment mount could pass `footerNote`) landing in this same lane's later commits. So this row's ids are now SPENT and `16.129` is the only free one.** |
+| **sheet prototype parity** (`docs/superpowers/specs/2026-09-22-sheet-prototype-parity-design.md`, branch `owner/sheet-prototype-parity`) | **`16.110`–`16.129`** — allocated 2026-09-22 by the owner-side session, directly after the priority block. **Minted by lane B (`rel/sheet-parity-b`, the comments block): `16.126` and `16.128`.** ⚠ **`16.127` WAS RESERVED AND HELD, AND IS NOW MINTED (2026-09-22, by the tail lane):** it is *the posting sentence is handed to the composer as its footer note, and the thread draws no second copy*, and it could not be written until the sheet's comment `EditorSlot` mount passed `footerNote` in `ticket-sheet.tsx` — the collision surface lane B was barred from. Its entry below is `✅`; the reservation is discharged rather than left standing. **Next free: `16.129`.** ⚠ **MINTED 2026-09-22 by the tail lane (`rel/sheet-parity-tail`, Tasks 3, 4, 6, 8 and the held half of 7): `16.110`–`16.112` (Task 3 — the chips line, the parent line, the third tab), with `16.113`–`16.117` (Task 4), `16.123`–`16.125` (Task 6) and `16.127` (the held half of Task 7, un-held once the sheet's comment mount could pass `footerNote`) landing in this same lane's later commits. So this row's ids are now SPENT and `16.129` is the only free one.** ⚠ **AND `16.129` WAS TAKEN 2026-09-22 by the same tail lane**, as the witness for the grid's tint seam — minted when the constant it guards was measured unconstrained (`160/160` green under a mutation that ships a doubled band), and whose first run then caught a real off-by-one in the loop's tint index. **THE BLOCK IS NOW FULLY SPENT: `16.110`–`16.129` is exhausted and any further case needs a controller reallocation.** |
 
 **✅ ANSWERED 2026-09-21 21:0x — THE PROPERTIES WERE MINTED IN §17, NOT HERE, AND THIS NOTE IS KEPT AS THE RECORD OF WHY (lane ds3 / batch B08).** The controller allocated `17.021`–`17.040` to this lane and directed the mint into `test-cases/17-open-work.md`; F3 is `17.021` and V4 is `17.022`, and each entry names **the §16 door it belongs to** (the comment thread, case `16.74`) so a reader arriving from this file's comments-thread section can find them. **§16 was not touched to mint them.** Original request follows, because a note that is deleted rather than discharged is how the next lane concludes the rule was never applied:
 
@@ -1503,9 +1503,7 @@ have passed, because every pair it named is still in that relative order.
 **The tint is by CLASS, not by `:nth-child`.** `ticket-sheet.tsx` computes it (`fieldRowClass`), with
 `FIXED_FIELD_ROWS = 7` so the generic custom-field loop CONTINUES the alternation instead of restarting it
 at zero — which would put two tinted rows side by side at the seam. A `:nth-child` rule would count the
-wrapper `<div>`s rather than the rows and would agree with the class only by luck. **⚠ `FIXED_FIELD_ROWS` is
-a COUNT, so it is the thing to re-read when a fixed row is added:** `16.116` reads the DOM in order, so a
-row inserted above without that number moving reddens there rather than shipping a doubled band.
+wrapper `<div>`s rather than the rows and would agree with the class only by luck. ⚠ **`FIXED_FIELD_ROWS` IS A COUNT, and the sentence that stood here claimed `16.116` was its witness. THAT CLAIM WAS MEASURED FALSE AND IS CORRECTED RATHER THAN DELETED:** `16.116` renders the DEFAULT fixture, whose `state.fields` is `{title, dueDate}` and whose two entries are BOTH excluded — so the loop draws no rows, the constant is never read, and mutating it to `6` left **160 of 160 cases passing**. The witness is `16.129` (`16.129` below), added when that was measured, and whose first run then caught a REAL defect in this very index — see the section after the Task 6 entry.
 
 **⚠ ONE PLAN-TEXT CORRECTION, in the CSS.** The plan's `.gn-ticket-sheet__field dt` draft carried
 `min-height: 2.5rem; line-height: 2.5rem` BESIDE `padding: 0.75rem 0 0.75rem 0.75rem`. Those double-count
@@ -1646,3 +1644,59 @@ those two cases then asserted against this row's `flex`/`min-width`. **Fixed by 
 class** (`.gn-ticket-sheet__subtask-input`), which keeps both rules addressable — `.gn-field__input` still
 supplies the box. A third package's pinned case reading `ui.css` by selector is the trap the plan's Task 8
 sweep exists for, and it fired here rather than at the gate.
+
+## The tint seam: a case written to witness a constant, which then caught a real defect (tail lane, 2026-09-22) — case `16.129`
+
+**`16.129` — the tint alternation continues across the seam into the custom-field loop.** The last id taken from this
+lane's `16.110`–`16.129` block, which is now fully spent.
+
+**Why it exists: a count with no fixture that exercises it is a number, not a guarantee.** `Task 4` put the grid's
+alternating tint in a computed class (`fieldRowClass`) with a constant, `FIXED_FIELD_ROWS`, whose whole purpose is to
+carry the alternation PAST the seven fixed rows and into the generic custom-field loop. `16.116` was the only case
+reading the tint, and it renders the default fixture whose `state.fields` is `{title, dueDate}` — **both excluded by
+the loop's own list** — so the loop draws nothing and the constant is never read.
+
+**The measurement that established it, taken before the case was written:** mutating `FIXED_FIELD_ROWS = 7` to `6` —
+a value that ships a doubled tint band on any ticket carrying a custom field — left **160 of 160 cases PASSING.** The
+suite was green over the defect. The catalogue's own prose claimed `16.116` would catch exactly this; **that claim was
+false and is corrected in place rather than deleted.**
+
+**⚠ AND THE FIRST RUN OF THE NEW CASE FAILED — ON THE CODE, NOT ON THE TEST.** That is the part worth recording. The
+loop's tint index came from `Object.entries(state.fields).map(([id, claim], rowIndex) => …)` with the exclusions as an
+early `return null` INSIDE the map — and `Array.prototype.map` passes the index of the ORIGINAL array, so **every
+excluded entry consumed a position.** With `fields` of `{title, counterparty}` the loop's first rendered row carried
+`rowIndex === 1`, not 0, and `fieldRowClass(7 + 1)` returned an even index's class: an untinted row where the
+alternation requires a tinted one. Measured on the fixture before the fix:
+
+```
+field-state / priority / start / visibility = plain   ·   assignee / due / type = tinted   ·   counterparty = PLAIN
+```
+
+two plain rows in a row at the seam. **`title` is the field EVERY ticket has**, so this was the normal case rather
+than an edge one: any ticket with a custom field drew its first custom row on the wrong side, and every row after it
+with it. Fixed by making the exclusions a `.filter(...)` over a declared `OWN_ROW_FIELD_IDS` set, so the index counts
+RENDERED rows only.
+
+**It also explains a mutation result that had looked reassuring.** The constant mutations `6` and `8` both left the
+suite green BEFORE the fix — not because the constant was unconstrained, but because `6 + 1 = 7` and `8 + 1 = 9` are
+both ODD and were **compensating for the off-by-one one index over**. A mutation that passes can be evidence of a
+second defect rather than of a missing case.
+
+### The case
+
+- **16.129** ✅ The tint alternation continues across the seam. The fixture carries a CUSTOM field, so `rowIndex`
+  really runs, and **the CONTROL comes first**: `field-counterparty` is asserted present and the grid is asserted to
+  hold 8 rows — without a rendered loop row there is no seam to read, and every remaining assertion would be about the
+  fixed rows only, which is exactly how the constant went unconstrained. Then both directions: the grid alternates
+  end to end, AND the seam is named on the two elements by id — the last fixed row (`field-visibility`, index 6)
+  untinted, the first loop row (`field-counterparty`, index 7) tinted — so a mis-set constant reports the seam rather
+  than an opaque index. `packages/app-core/test/views/ticket-sheet.test.tsx`.
+
+**Mutations, run AFTER the fix (161 collected in each run).** `FIXED_FIELD_ROWS = 6` → kills `16.129` alone.
+`FIXED_FIELD_ROWS = 8` → kills `16.129` alone. **The constant is now pinned from both sides**, and each mutation
+reports the failure at `row 7` — the seam — rather than at a count.
+
+**⚠ NO RED WAS AVAILABLE FOR THIS CASE AND THAT IS STATED RATHER THAN GLOSSED.** The shipped behaviour was already
+correct once the index bug was fixed, so the case was written green and its value is established by MUTATION, not by
+a failing test. The RED it did produce was against the DEFECT — which is the stronger evidence of the two, and the
+one that would have been lost had the case been written to match what the code happened to do.

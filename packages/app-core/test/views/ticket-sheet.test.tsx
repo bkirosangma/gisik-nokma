@@ -3046,6 +3046,86 @@ describe('sheet prototype parity — the details body order and chrome', () => {
     // above the grid ENTIRELY. `closest('dl')` from the block is the measurement.
     expect(grid.contains(screen.getByTestId('field-description'))).toBe(false);
   });
+
+  /**
+   * `16.129` — THE TINT ALTERNATION CONTINUES ACROSS THE SEAM, and this case
+   * exists because **every other case in the file is green over the defect it
+   * catches.**
+   *
+   * ⚠ **THE HOLE, MEASURED.** The fixed rows take literal indices 0–6, and the
+   * generic custom-field loop takes `FIXED_FIELD_ROWS + rowIndex` — a constant
+   * whose whole purpose is to CONTINUE the alternation past the fixed rows
+   * instead of restarting it at zero, which would put two tinted rows side by
+   * side at the seam. `16.116` is the only case that reads the tint, and it
+   * renders the DEFAULT fixture whose `state.fields` is `{title, dueDate}` —
+   * **both excluded by the loop's own exclusion list** — so the loop renders
+   * nothing, `FIXED_FIELD_ROWS + rowIndex` never evaluates, and the constant is
+   * unconstrained. Verified by mutation before this case was written:
+   * `FIXED_FIELD_ROWS = 6` (a stale value that ships the doubled band) left
+   * **160 of 160 cases PASSING.** The suite was green over the defect.
+   *
+   * ⚠ **AND THE COMMENT THIS REPLACES CLAIMED OTHERWISE.** The catalogue and the
+   * constant's own docblock both said a stale constant "reddens `16.116`". It
+   * cannot: that case never renders a loop row. A witness is a fact about ONE
+   * fixture, and the fixture was the wrong one — which is the same shape as the
+   * `16.15` defect above (a property asserted through a fixture that cannot
+   * exercise it) one task later.
+   *
+   * So the fixture here carries a CUSTOM field, the loop really runs, and both
+   * directions are read: the grid alternates end to end, AND the specific seam —
+   * the last fixed row untinted, the first loop row tinted.
+   */
+  it('16.129 the tint alternation continues across the seam into the custom-field loop', async () => {
+    const read = ticketRead({
+      ticket: ticketStateSeed({
+        fields: {
+          title: {
+            value: 'File the GST return',
+            actorId: 'user_kiro',
+            clientTime: '2026-08-18T07:59:00.000Z',
+            serverTime: '2026-08-18T08:00:00.000Z',
+          },
+          // A field the loop does NOT exclude, so `rowIndex` really runs. Its
+          // name is arbitrary: what matters is that it is not one of the seven
+          // fixed rows' ids nor one of the loop's four exclusions.
+          counterparty: {
+            value: 'Anselma Marak',
+            actorId: 'user_kiro',
+            clientTime: '2026-08-18T08:04:00.000Z',
+            serverTime: '2026-08-18T08:05:00.000Z',
+          },
+        },
+      }),
+    });
+    renderSheet(read);
+    await settled();
+
+    const grid = screen.getByTestId('field-state').closest('dl') as HTMLElement;
+    const rows = [...grid.querySelectorAll('.gn-ticket-sheet__field')];
+    // The CONTROL for the whole case: without a rendered loop row there is no
+    // seam to read, and every assertion below would be about the fixed rows
+    // only — which is exactly how the constant went unconstrained.
+    expect(screen.getByTestId('field-counterparty')).toBeInTheDocument();
+    expect(rows).toHaveLength(8);
+
+    // (1) The grid alternates END TO END, loop rows included.
+    rows.forEach((row, index) => {
+      expect(row.classList.contains('gn-ticket-sheet__field--tinted'), `row ${index}`).toBe(
+        index % 2 === 1,
+      );
+    });
+    // (2) AND THE SEAM ITSELF, named rather than left to the loop above: the last
+    // FIXED row (Visibility, index 6) is untinted and the first LOOP row is
+    // tinted. This is the pair a stale `FIXED_FIELD_ROWS` collapses, and it is
+    // asserted on the two elements by id so a mis-set constant reports the seam
+    // rather than an opaque index.
+    expect(
+      screen.getByTestId('field-visibility').classList.contains('gn-ticket-sheet__field--tinted'),
+    ).toBe(false);
+    expect(
+      screen.getByTestId('field-counterparty').classList.contains('gn-ticket-sheet__field--tinted'),
+    ).toBe(true);
+  });
 });
 
 /**

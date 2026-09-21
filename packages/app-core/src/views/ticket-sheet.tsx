@@ -444,13 +444,41 @@ export type TicketSheetProps = {
  * continues the fixed rows' alternation instead of restarting at zero, which
  * would put two tinted rows side by side at the seam.
  *
- * ⚠ **IT IS A COUNT, so it is the thing to re-read when a fixed row is added or
- * removed.** `16.116` is the witness: it reads every `.gn-ticket-sheet__field` in
- * the grid in document order and asserts the tint on odd indices, so a row
- * inserted above without this number moving reddens there rather than shipping an
- * alternation with a doubled band.
+ * ⚠ **THIS DOCBLOCK CLAIMED `16.116` WAS THE WITNESS, AND IT IS NOT — the claim
+ * was measured false and is corrected rather than deleted.** `16.116` renders the
+ * DEFAULT fixture, whose `state.fields` is `{title, dueDate}` and whose two
+ * entries are BOTH in `OWN_ROW_FIELD_IDS` below — so the loop draws nothing and
+ * this constant is never read. Mutating it to `6`, which ships a doubled band on
+ * any ticket with a custom field, left **160 of 160 cases passing**.
+ *
+ * **The witness is `16.129`**, which carries a custom field so the loop really
+ * runs, and it pins the seam from both sides. It earned that role on its first
+ * run by failing: the loop's index was counting EXCLUDED entries, so the seam was
+ * misaligned for every real ticket — see the filter's own comment at the loop.
+ * The lesson is in the constant's history: a count with no fixture that exercises
+ * it is a number, not a guarantee.
  */
 const FIXED_FIELD_ROWS = 7;
+
+/**
+ * The field ids that have their OWN row on this sheet, so the generic loop must
+ * skip them — `title`, `description`, `dueDate`, `startDate` and `priority`.
+ *
+ * A `Set` rather than the chain of `||` comparisons it replaces, and the reason is
+ * the tint index rather than taste: the loop now FILTERS on these ids before
+ * mapping, so the index it passes to `fieldRowClass` counts RENDERED rows only.
+ * As an early `return null` the same list consumed a position for every skipped
+ * field, and since `title` is on every ticket the shift was the normal case, not
+ * an edge one. Keeping the ids in one declared place is also what makes the list
+ * checkable against the rows drawn above it.
+ */
+const OWN_ROW_FIELD_IDS: ReadonlySet<string> = new Set([
+  'title',
+  'description',
+  'dueDate',
+  'startDate',
+  'priority',
+]);
 
 /**
  * The class the alternating field grid puts on row `index` — tinted on every
@@ -3239,31 +3267,54 @@ export function TicketSheet({
                 />
               </dd>
             </div>
-            {Object.entries(state.fields).map(([fieldId, fieldClaim], rowIndex) => {
-              // Drawn above, unconditionally. A second pass here would mount a
-              // SECOND editor over one claim and make `field-description`
-              // ambiguous to `getByTestId` — two controls for one field.
-              //
-              // `dueDate`, `startDate` and `priority` join it for door G, and the
-              // reason is the same one rung less severe: all three are drawn as
-              // their OWN rows above, so a second pass would render **two rows
-              // for one claim**. Without this the sheet shows a `field-dueDate`
-              // beside the `field-due` this task adds, which is exactly the
-              // ambiguity the description line exists to prevent — and it would
-              // be INVISIBLE on any fixture whose ticket carries no such field.
-              // `startDate` is the third (spec 2026-09-22) and the newest: the
-              // rows above are `field-due`, `field-start` and `field-priority`.
-              if (
-                fieldId === 'title' ||
-                fieldId === 'description' ||
-                fieldId === 'dueDate' ||
-                fieldId === 'startDate' ||
-                fieldId === 'priority'
-              ) {
-                return null;
-              }
-              return (
-                <div key={fieldId} className={fieldRowClass(FIXED_FIELD_ROWS + rowIndex)} data-testid={`field-${fieldId}`}>
+            {Object.entries(state.fields)
+              /*
+                ⚠ THE EXCLUSIONS ARE A FILTER, AND THEY USED TO BE AN EARLY
+                `return null` INSIDE THE `map` — which was a real defect and not a
+                tidy-up. `Array.prototype.map` passes the index of the ORIGINAL
+                array, so an excluded entry still consumed a position: with
+                `fields` of `{title, counterparty}` the loop's first RENDERED row
+                carried `rowIndex === 1`, not 0, and `fieldRowClass(FIXED_FIELD_ROWS
+                + rowIndex)` therefore returned an EVEN index's class — an untinted
+                row where the alternation requires a tinted one.
+
+                **And `title` is the field EVERY ticket has**, so this was not an
+                edge case: any ticket carrying a custom field drew its first
+                custom row on the wrong side of the alternation, and every
+                subsequent one shifted with it. Measured on a live fixture: the
+                grid read `… type=tinted, visibility=plain, counterparty=plain`,
+                two plain rows in a row at the seam.
+
+                ⚠ **160 GREEN CASES COULD NOT SEE IT**, because the only tint case
+                rendered the default fixture whose two fields are both excluded —
+                so the loop drew nothing and this expression never ran. Case
+                `16.129` was written for the seam and caught it on its first run;
+                the mutation that had looked harmless (`FIXED_FIELD_ROWS = 6`)
+                was actually compensating for this bug one index over, which is
+                why the property needed a case with a loop row in it rather than
+                a different constant.
+
+                Drawn above, unconditionally. A second pass here would mount a
+                SECOND editor over one claim and make `field-description`
+                ambiguous to `getByTestId` — two controls for one field.
+
+                `dueDate`, `startDate` and `priority` join it for door G, and the
+                reason is the same one rung less severe: all three are drawn as
+                their OWN rows above, so a second pass would render **two rows for
+                one claim**. Without this the sheet shows a `field-dueDate` beside
+                the `field-due` this task adds, which is exactly the ambiguity the
+                description line exists to prevent — and it would be INVISIBLE on
+                any fixture whose ticket carries no such field. `startDate` is the
+                third (spec 2026-09-22) and the newest: the rows above are
+                `field-due`, `field-start` and `field-priority`.
+              */
+              .filter(([fieldId]) => !OWN_ROW_FIELD_IDS.has(fieldId))
+              .map(([fieldId, fieldClaim], rowIndex) => (
+                <div
+                  key={fieldId}
+                  className={fieldRowClass(FIXED_FIELD_ROWS + rowIndex)}
+                  data-testid={`field-${fieldId}`}
+                >
                   <dt>{fieldId}</dt>
                   <dd>
                     <span>{renderFieldValue(fieldClaim.value)}</span>
@@ -3272,8 +3323,7 @@ export function TicketSheet({
                     </span>
                   </dd>
                 </div>
-              );
-            })}
+              ))}
           </dl>
 
           {ticketRead.rollup !== null ? (
