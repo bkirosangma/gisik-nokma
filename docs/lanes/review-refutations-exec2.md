@@ -503,3 +503,5 @@ to find it.
   with a dated paragraph and a line opened today; push by 17:05:23.
 - 16:06 IST — cadence push. Polled 15:57–16:05: no new refutation heading against `E2-*` in any lane's file; exec 5
   (`9be964e9`) and exec 6 (`ca8dd6a8`) pushed heartbeats at 16:05. Nothing pending in the worktree.
+- 16:16 IST — cadence push. Polled 16:06–16:15: no change; exec 6 at `0ba581d4` (16:06) still carries three
+  refutation headings (R6-1/2/3), exec 5 at `9be964e9`. Nothing pending.
