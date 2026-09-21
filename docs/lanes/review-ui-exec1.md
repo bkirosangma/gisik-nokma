@@ -343,6 +343,34 @@ Under **§3** that is the shape a judge must look at hardest: *"the 'defect' is 
 
 **WHAT WOULD HAVE BEEN BETTER.** A visually-hidden-until-focused "Skip to content" link as the first focusable element in `layout.tsx`, targeting the `<main>`. That is the standard remedy, it is about ten lines, and it is the one element in this report that a keyboard user would notice immediately.
 
+### P15 — **IMPORTANT** ⚠ **r2 NEW** — The prototype copy in this repo is a BROKEN transform of the owner's export, and 71 source/test files cite it by line
+
+**WHAT.** `design-system/interactive/desktop.dc.html` is not a copy of the owner's export. It is the export put through an **attribute-camelCasing pass**, and the pass produced attribute names that are not valid in HTML or SVG. Its line numbers are also shifted by one against the authority. The owner has ruled the **export** is the comparison surface, and this repository's UI work cites the transformed copy.
+
+**MEASUREMENT** (both files named with their sha256, both read at this tree):
+
+| | repo copy `design-system/interactive/desktop.dc.html` | the export `Gisik Nokma - Desktop.dc.html` |
+|---|---|---|
+| sha256 (first 16) | `2cda054b4320ebb6` | `3d142d464a070b33` |
+| lines | **4050** | **4049** |
+| `sc-camel-view-box` | **24** | **0** |
+| `viewBox` (the valid SVG spelling) | **0** | **23** |
+| `sc-camel-on-click` | **161** | **0** |
+| `sc-camel-on-change` | **36** | **0** |
+| `sc-camel-col-span` | **1** | **0** |
+| `style-hover` (a NON-camelCase attribute — the control) | **3** | **3** |
+
+- **`viewBox` is case-sensitive in SVG, and the repo's copy contains the valid spelling ZERO times.** All 24 of its SVGs carry `sc-camel-view-box`, which renders nothing. `sc-camel-col-span` came from a `<td colspan>` — a table cell that no longer spans. So the repo's copy is not a worn copy of the prototype; **it is one whose icons do not draw.**
+- **The control is what makes this a transform rather than a corruption:** `style-hover` is present 3 times in **both** files. The pass touched only attribute names that were already camelCase, which is exactly what an automated camelCaser does.
+- `diff` between the two is **1,113 lines** with a **net −1** — so the files are mostly in-line rewrites, not insertions, and the offset stays a constant **−1** across every anchor sampled: `isSignIn` 120/119, `isWorkspaces` 180/179, `isMembers` 651/650, `isSettingsShell` 800/799, `sheetCrumbs` 1102/1101, `isLegal` 1720/1719, `isNotFound` 1844/1843.
+- **The population that cites it: 71 source/test files** (`grep -rln "desktop\.dc\.html"` over `packages apps`, restricted to `.ts`/`.tsx`/`.css`). 103 files when `docs/` and `test-cases/` are included.
+
+**WHY IT IS WRONG.** The owner's instruction for this exercise is explicit: compare against the export, *"do not cite the repo's copy as the prototype"*. Every `:NNN` citation in those 71 files therefore **resolves to different content** in the artefact the owner ruled is the authority — off by one line, consistently. A lane transcribing a styling value is reading the right value (I checked: the five values `members-styling.test.ts` pins — `min-width:820px`, `padding:13px 18px`, `font-size:17px`, `background:var(--fill4)`, `i % 2 ?` — appear the **same number of times in both files**), but a lane checking an **icon or a table** is reading a prototype whose SVG and colspan attributes are invalid, and a lane following a line number against the export lands on the wrong line.
+
+**⚠ AND MY OWN FIRST READING OF THIS WAS WRONG, which is why the numbers above are stated as a table.** My initial pass printed the same line number from both files and showed every one differing, and I wrote in my own working notes that the drift *"grows large by `:3077`"*. It does not: repo `:3077` is a zebra line and export `:3077` is `setRole:`, but the export's zebra is at **`3076`** — the offset is **1**, constant, and I had read my own output carelessly. The table replaced the impression.
+
+**WHAT WOULD HAVE BEEN BETTER.** One of: regenerate the repo copy from the export byte-for-byte and record the sha in `interactive/PROVENANCE.md` (which is that directory's own stated job — *"the owner export each file was unpacked from, its sha256, and the one command that reproduces it"*); or, if the camelCased copy exists for a reason, say so where it is cited and stop treating it as the prototype. Either way the fix is at the artefact, not in the 71 files.
+
 ---
 
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
@@ -392,7 +420,7 @@ Under **§3** that is the shape a judge must look at hardest: *"the 'defect' is 
 **CRITICAL — 1**
 - `I1` no browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate structurally cannot run one
 
-**IMPORTANT — 7**
+**IMPORTANT — 8**
 - `I2` the `e2e-stack` contrast roster records a defect fixed eight hours later, with no provenance
 - `I3` `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by its own docblock
 - `P1` seven interactive controls styled by no rule at all (raw UA chrome)
@@ -410,10 +438,11 @@ Under **§3** that is the shape a judge must look at hardest: *"the 'defect' is 
 - `P6` mobile: two of three screens have no styling while the third is themed
 - `P7` desktop's task list has no rules
 - `P8` `Dialog`/`Sheet` declare `aria-modal="true"`; the missing containment is recorded as a named follow-on whose remedy exists in-repo (counted here, not under IMPORTANT — see the note)
+- `P15` ⚠ r2 — the repo's prototype copy is a broken camelCase transform of the export, cited by line in 71 files
 - `P10` the accessible-name ratchet's unit is an attribute; its message claims a property of assistive tech
 - `P13` no skip link; a keyboard-only user Tabs the nav on every navigation (WCAG 2.4.1)
 
-**Total 18.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 19.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
