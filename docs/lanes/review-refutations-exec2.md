@@ -130,7 +130,23 @@ does not rest on reading a line.
 | `P24` (exec 1, IMPORTANT) | that a text colour is undeclared, so the contrast gate cannot see it | `ui.css:2736-2743` is the quoted rule **verbatim** (`background: var(--gn-surface-sunken); font-size: 0.8rem; color: var(--gn-danger);`), and `tokens.ts` contains **exactly one** row matching a `danger` foreground/background pair — `:1225` `{ fg: 'dangerText', bg: 'danger', minimum: 4.5 }`. So `dangerText on danger` is declared and `danger on surfaceSunken` is not | **holds** |
 | `P11` (exec 1, IMPORTANT) | that the open Select panel's rows match no arm of the tap-target selector | `tap-targets.ts:267-280` is `a[href], button, input:not([type="hidden"]), select, textarea, summary, [role="button"], [role="link"], [role="tab"], [role="checkbox"], [role="switch"], [tabindex]:not([tabindex="-1"])` — **no `[role="option"]`, no `[role="listbox"]`** | **holds** |
 
-**Thirty-four checks across all five lanes. Thirty-four held. My refutation count is zero.**
+
+| `I1` (exec 1, **CRITICAL**) | that no browser-based UI instrument has executed anywhere since 2026-09-06 | `gh api …/actions/runs?per_page=15` → **15 of the 15 most recent runs are `failure`**, every `main` run among them. And the job breakdown of the latest `main` run (`35560484912`) is the sharper fact: **`scope` fails first, so `build`, `typecheck`, `server-tests`, `e2e` and `viewport` are all `skipped`** — the instruments do not fail, they never start | **holds, with a mechanism worth adding** |
+
+**Thirty-five checks across all five lanes. Thirty-five held. My refutation count is zero.**
+
+> **What I can add to `I1`, offered to the judge rather than filed as my own finding.** Its claim is that
+> no browser-based instrument has *executed*; the job table says why. The failure is in `scope`, the first
+> job, and every job that `needs:` it is **skipped** — so the red pipeline is not nine broken suites, it is
+> **one failing gate and eight jobs that never begin.** That distinction matters for anyone deciding what to
+> fix: repairing `scope` would un-skip `build`, `typecheck`, `server-tests`, `e2e` and `viewport` in one
+> change, and *then* whatever is genuinely broken in them would become visible for the first time since
+> 2026-09-06. **I also observed four jobs failing independently** — `check-migrations`, `check-help`,
+> `check-runbook` and `check-citations` — which the `scope` cascade does not explain, so it is not one cause.
+>
+> ⚠ **The boundary on this:** I read the run list and the job conclusions through `gh api`; I did **not** read
+> the failing steps, because the steps call returned empty and running the logs is not this lane's work. So I
+> state what the conclusions say and do not speculate about the cause inside `scope`.
 
 > **`P11` is the one that names my own blind spot, and it does so in the brief's words:** *"a sweep that
 > cannot see a class is a sweep that reports zero offenders."* I ran seven sweeps today — the catch sites,
