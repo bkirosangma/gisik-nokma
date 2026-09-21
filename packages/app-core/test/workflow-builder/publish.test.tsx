@@ -602,7 +602,7 @@ describe('PublishControls — server results rendered honestly', () => {
  */
 describe('PublishControls — the transport arm and the mapping a refusal keeps (E5-28)', () => {
   /**
-   * 10.90 — a submit that never reaches the server says so, and RE-ENABLES
+   * 10.130 — a submit that never reaches the server says so, and RE-ENABLES
    * Publish.
    *
    * Both halves are asserted, and the second is the one that fails under the
@@ -611,7 +611,7 @@ describe('PublishControls — the transport arm and the mapping a refusal keeps 
    * stuck. `toBeEnabled` is the check that the phase actually LEFT
    * `submitting`.
    */
-  it('10.90 — a dropped connection gets the transport banner, in its own words, and Publish comes back', async () => {
+  it('10.130 — a dropped connection gets the transport banner, in its own words, and Publish comes back', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(kanban));
     setup(store, { submitError: true });
@@ -631,7 +631,7 @@ describe('PublishControls — the transport arm and the mapping a refusal keeps 
   });
 
   /**
-   * 10.91 — a REFUSAL KEEPS THE MAPPING, and reopens the dialog on it.
+   * 10.131 — a REFUSAL KEEPS THE MAPPING, and reopens the dialog on it.
    *
    * The person's whole job on this surface is a deliberate multi-step act —
    * map every dropped state, confirm — and the refusal used to throw away the
@@ -640,7 +640,7 @@ describe('PublishControls — the transport arm and the mapping a refusal keeps 
    * the claim: the claim is that the destination they chose is still the one
    * that goes to the server.
    */
-  it('10.91 — a refusal keeps the mapping, reopens the dialog pre-filled, and resubmits what was chosen', async () => {
+  it('10.131 — a refusal keeps the mapping, reopens the dialog pre-filled, and resubmits what was chosen', async () => {
     const user = userEvent.setup();
     const workflowId = newUlid();
     const store = draftDroppingReview(workflowId);
@@ -679,7 +679,7 @@ describe('PublishControls — the transport arm and the mapping a refusal keeps 
   });
 
   /**
-   * 10.92 — a status this client does not name is its OWN arm, not a silent
+   * 10.132 — a status this client does not name is its OWN arm, not a silent
    * fall-through.
    *
    * The removed `switch` had no `default` and no path after it that set a
@@ -689,7 +689,7 @@ describe('PublishControls — the transport arm and the mapping a refusal keeps 
    * different route, and neither the transport arm nor the refusal arm is true
    * of it: the door answered, and nobody refused.
    */
-  it('10.92 — a result status this build does not recognise says so, and does not leave Publish stuck', async () => {
+  it('10.132 — a result status this build does not recognise says so, and does not leave Publish stuck', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(kanban));
     setup(store, {
