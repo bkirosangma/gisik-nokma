@@ -353,4 +353,4 @@ ctl-scripts	12	done	642	6809f0db	ctl restart and ctl dispatch — relaunch throu
 ctl-scripts	13	done	642	6809f0db	ctl rebuild — pull --ff-only in the primary checkout, rebuild the stack, verify the running artifact; branch ctl/ctl-scripts
 ctl-scripts	14	done	642	6809f0db	ctl selftest wired as pnpm check:ctl — the eighth check; branch ctl/ctl-scripts
 ctl-scripts	15	done	642	6809f0db	README and the wiring (card, plan, briefs, check:ctl in the merge bar); branch ctl/ctl-scripts
-ctl-scripts	16	in-flight	-	-	first live use (checks → pr open → gate → land), hook installed, refusal demonstrated, anchor 45; branch ctl/ctl-scripts
+ctl-scripts	16	done	649	54f391f4	first live use (checks → pr open → gate → land), hook installed, refusal demonstrated, anchor 45; branch ctl/ctl-scripts
