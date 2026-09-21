@@ -13,6 +13,19 @@ finding's points move to the refuter and its author takes a ×3 penalty; **rejec
 finding's points.** Filing a refutation I could not measure would have moved the ledger without moving the
 truth of anything, so I read all three concurrent reports and tested every claim I could falsify by reading.
 
+## PATHS — the table uses bare filenames, so here they are in full
+
+`view-types.ts` = `packages/app-core/src/view-types.ts` · `board.tsx` = `packages/app-core/src/views/board.tsx` ·
+`ticket-sheet.tsx` = `packages/app-core/src/views/ticket-sheet.tsx` · `transition-dialog.tsx` =
+`packages/app-core/src/views/transition-dialog.tsx` · `create-ticket-flow.tsx` =
+`packages/app-core/src/views/create-ticket-flow.tsx` · `account/page.tsx` = `apps/web/app/account/page.tsx` ·
+`w/[workspaceId]/page.tsx` = `apps/web/app/w/[workspaceId]/page.tsx` · `ui.css` = `packages/ui/src/ui.css` ·
+`TicketEditor.tsx` = `packages/editor/src/components/TicketEditor.tsx` · `sweep.ts` =
+`apps/server/src/notifications/sweep.ts` · `fanout.ts` = `apps/server/src/notifications/fanout.ts` ·
+`store.ts` = `apps/server/src/notifications/store.ts` · `notification-preferences-gateway.ts` =
+`packages/app-core/src/account/notification-preferences-gateway.ts` · `ticket-dates-input.ts` =
+`apps/web/src/ticket-dates-input.ts`.
+
 ## THE CHECKS, WITH THE LINE I OPENED
 
 | target | the clause I tried to falsify | what I opened | outcome |
