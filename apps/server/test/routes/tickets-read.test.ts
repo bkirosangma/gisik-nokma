@@ -462,7 +462,10 @@ describe('a served row discloses no ticket the viewer may not see, beyond the on
     // existence of a ticket that is neither visible nor the parent — outside the
     // one leak spec §6 authorizes. This is the fixture that reaches it: a child
     // in project R, under a parent in project Q, inheriting a Q grandparent's
-    // authored mode. Nothing refuses a cross-project parent today (case 6.57).
+    // authored mode. NO DOOR CAN MAKE THIS ROW: `hierarchy.cross-project`
+    // refuses a parent in another project at both doors that set one
+    // (`hierarchy.ts:125` for `ticket.created`, `:274` for `ticket.reparented`),
+    // so this fixture seeds the projections directly (case 6.57).
     //
     // Mutation: put `resolved_from` back into `toTicketView` and this reddens
     // naming the grandparent's id.
