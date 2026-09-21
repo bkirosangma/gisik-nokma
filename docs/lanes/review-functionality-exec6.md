@@ -156,7 +156,10 @@ evidence-gate.ts`, `auth/auth.ts:150-360` and `app.ts:477-612` (rate limits), `m
 `tools/sweep-orphans.ts:100-125`, `tools/verify-projections.ts` (whole), `attachments/sniff.ts:36-50`,
 `sync/contest-coherence.ts` (whole), `read/ancestry.ts` (whole), `http/http-origin.ts:128-172`, `:255-265`
 (the set, its exclusions and the predicate), `stream/routes.ts:262-267`, `test/helpers/stream.ts` (used),
-`deploy/do/app.yaml:1-10`, `:119`, `routes/search.ts:143-215` (the FTS query shape and the hit's columns),
+`deploy/do/app.yaml:1-10`, `:119`, `routes/search.ts:143-215` (the FTS query shape and the hit's columns), `http/rate-limit.ts:96-125`
+(`rateLimitKeyFor`, rightmost XFF entry — sound), `attachments/sniff.ts` (behaviour measured, Appendix U),
+`domain/src/ist-day.ts:27-47`, `domain/src/events/membership.ts:39-42`, `:68-72`, `rule-engine/src/checks/fields.ts:25-60`,
+`:116-138`, `routes/attention.ts:255-266`, `apps/web/app/privacy/page.tsx:140-170`, `apps/web/app/mcp/authorize/page.tsx:148-192`,
 `routes/my-invitations.ts:105-190` (address binding), `domain/src/preferences.ts:20-140` (bounds),
 `sync/snapshot-refresh.ts:185-192` and `visibility/visible-events-for.ts:14` (grep: both carry deleted tickets by
 design), `scripts/check-env-example.mjs:1-60` (+ two mutations), `scripts/check-task-ledger.mjs:1-40` (+ run), `routes/tickets.ts:396-446`, `:548-560`,
@@ -169,9 +172,12 @@ only — it refreshes on publish at `:285`, `:420`). `scripts/` — `check-case-
 `check-runbook-commands`, `check-task-ledger` run only** (all 9 were run green by exec 3; I re-ran `case-ids`,
 `case-citations`, `no-silent-skips` (with mutations), `db-timezone` against both live DBs).
 
-**Measured by probe** (Appendices A–K, 11 runs, every one 1 file / 1 test passed with its `console.log` lines
-in the log): writes on a deleted ticket; type re-rank; deleted children/parents; outbox overtake; ghost ticket
-on both doors; invite channels; bulk rebind under an admin not on a project; deleted epic header; guest doors.
+**Measured by probe** (Appendices A–Y, 25 runs, every one 1 file / 1 test passed with its `console.log` lines
+in the log): writes on a deleted ticket; type re-rank; deleted children/parents; outbox overtake and overlay
+reversion; ghost ticket on both doors; invite channels; bulk rebind under an admin not on a project; deleted epic
+header; guest doors; the verifier after a re-bind; cross-site WebSocket; MCP token successor; non-member
+assignee; two full read-door sweeps (non-member, guest); the stream and bootstrap after a delete; U+0000 on 19
+doors and 11 hostile payload shapes; the upload door; impossible due dates; blank names; leaving a workspace.
 
 **Case ids:** every ✅ id in the eight core files is cited by name in a test (`check-case-citations` ratchet:
 0 uncited in each). By §1's counter (the status marker that follows the id — the first marker on the line), the
