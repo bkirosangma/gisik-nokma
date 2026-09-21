@@ -1430,6 +1430,13 @@ what was looked at and found sound, not only what was found wrong.
   doors 404, `population`/`counts-by-type`/`state-occupancy` are 404 for a plain member, and the ticket in the
   project they *are* on is served. With Appendices P and Q this is the stranger / guest / member-off-project
   triple; the owner's control read the marker in each.
+- **The ledger is append-only by trigger, and the trigger fires.** `1787841717635_events-and-snapshots.sql:29-41`
+  defines `events_append_only()` with `events_no_update_no_delete` (row) and `events_no_truncate` (statement);
+  `UPDATE`, `DELETE` and `TRUNCATE` on `events` each answered `P0001 events is append-only: <OP> refused`.
+  *Method, stated because the rule matters:* the three statements were issued inside `BEGIN … SAVEPOINT …
+  ROLLBACK` against the dev database on 54330; every one was refused by the trigger before it reached a row and
+  the transaction was rolled back, so nothing changed — but a strict reading of "54330 read-only" would have used
+  the test server, and I note that rather than let the measurement imply otherwise.
 - **The ingest pipeline's order is what the docblocks say.** `ingest-service.ts:164-360`: workspace lock →
   entity lock → entity↔workspace guard → permission gate (through the transaction's `client`, `:235-245`) →
   contest coherence → engine → server gates → append → refresh-on-publish → projections → COMMIT. Read at the
