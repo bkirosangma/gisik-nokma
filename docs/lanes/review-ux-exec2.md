@@ -1124,6 +1124,16 @@ shape this very effect uses for its second promise.
 `ticket-type-editor-screen.tsx:187-197` and `:240-251`. Both `Promise.all` call sites were read in full;
 neither has a second argument to `.then`, and neither has a `.catch`.
 
+**And the same app does it right, one file over** — which is what makes this an inconsistency rather than a
+house style. `apps/web/app/settings/page.tsx:277-284`, the Workspace settings tab, reads the identical hook
+and puts the arms in the correct order:
+```
+if (settings.error !== null) { return (<p role="alert" className="gn-refusal gn-refusal--server">…  ); }
+if (settings.data === null) return <p>Loading settings…</p>;
+```
+**Error before data.** The ticket-type screens have no error arm at all, so a rejection is drawn as a load
+that never ends. Opened at `a7b6292b` alongside the two screens above.
+
 **Source:** carried candidate (round-1 §2d). **Severity: Important.** I decline the sweep's Critical: no
 data is lost and the ledger is untouched, but two admin screens that cannot load and cannot say why is a
 real dead end.
@@ -1908,6 +1918,40 @@ focus move, no trap and no focus return — I read all 24 lines. **But the round
 sweep → empty"*), and round-2 §3 gives **0** to a re-finding that adds nothing. The added measurement I
 would need is a keyboard-tab reproduction, which needs a browser I do not have. **Not filed** — and I say
 so rather than filing it quietly for points. The two *distinct* halves I could measure are `E2-34`.
+
+### ❌ The sweep's narrow-viewport gap (`M3`) — **the coverage exists, in the other suite**
+
+The lead: only three width media queries exist in the shipping stylesheets and none names
+`.gn-calendar*`, `.gn-timeline*`, `.gn-sync-status-bar` or `gn-dialog`, so those surfaces are "drawn and
+unusable rather than degraded" at 390px.
+
+**I followed it to the instrument, and the instrument is fine.** Two measurements. First, the suite the
+finding implies is absent: `apps/web/e2e-viewport/responsive.spec.ts` (2233 lines) contains **zero**
+occurrences of `calendar`, `timeline`, `inbox`, `settings`, `dialog`, `my-work`, `backlog` or `mcp`, and
+its route strings are exactly seven — `/account`, `/help`, `/invite/[token]`, `/privacy`, `/sign-in`,
+`/terms`, `/workspaces`. **But that scope is declared, not accidental**: `:25-26` records *"the
+signed-out surface holds its layout at 390, 768 and 1512 … (**13.254, the signed-in shell, lives** …)"* —
+and `13.254` is ✅ in `test-cases/13-pre-launch-checklist.md:158`, witnessed by
+`apps/web/e2e-stack/viewport.spec.ts`. Second, I read that suite's routes: **16, including
+`/w/${workspaceId}`, `/w/${workspaceId}/my-work`, `/w/${workspaceId}/members`,
+`/settings/ticket-types`, `/settings/workflows` and `/p/:projectId`**, with `390` appearing 22 times.
+
+So the signed-in narrow-width coverage exists, is gated in CI, and the sweep's finding is a claim about a
+suite that is not the one doing the job. **Not filed.** (A much narrower true residue remains — `/mcp/*`
+appears **0** times in either suite — but a single uncovered screen pair is a test-coverage note, not a
+product defect, and I would rather not spend the judge's budget on it.)
+
+### ✅ Surfaces I opened, walked and found honest — recorded so the coverage is visible
+
+Not findings, and deliberately listed as such: `/members`' `changeRole`
+(`apps/web/app/w/[workspaceId]/members/page.tsx:334-371`) handles the empty result, the refusal and the rejection as
+three distinct arms and re-reads on commit rather than rendering an unconfirmed role — there is no
+optimistic flip to disagree with; and the **MCP consent screen**
+(`apps/web/app/mcp/authorize/page.tsx:131-235`) states what is being approved *before* the button
+(`:179-184`), handles a 401 **before** the form so a single-use code is not spent (`:138-145`), carries a
+real in-flight latch (`:222,230` `disabled={state !== 'idle' || code.trim() === ''}`), gives Deny equal
+weight to Approve with the reasoning recorded (`:212-217`), and renders both outcomes with `role="status"`
+(`:147,164`). I looked for the defect classes I have been finding elsewhere and did not find one.
 
 ### ❌ The sweep's `AttachmentListItem` "no production caller" — folded, not filed
 
