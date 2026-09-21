@@ -487,8 +487,12 @@ function SignInForm() {
           </p>
         ) : null}
       </Card>
+      {/* E5-38 — "the draft" rather than "the". Both documents carry bracketed
+          placeholders (case 13.251 counts them) and each now opens with a draft
+          notice; a line that binds a person's agreement without saying so would
+          be the one place on the page that oversells. */}
       <p className="gn-sign-in__legal">
-        By continuing you agree to the <Link href="/terms">Terms</Link> and{' '}
+        By continuing you agree to the draft <Link href="/terms">Terms</Link> and{' '}
         <Link href="/privacy">Privacy notice</Link>.
       </p>
     </main>
