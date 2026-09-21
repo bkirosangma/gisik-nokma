@@ -297,6 +297,21 @@ Round 1's stated #1 boundary was *"NO signed-in route was measured at paint"*, b
 
 ---
 
+
+### E4-19 — **IMPORTANT** — The History tab's headline is the raw event-type slug — `ticket.field_set` three times in a row with nothing saying which field — where the prototype writes a sentence and the wire carries the payload the sentence needs
+
+**WHAT.** Sheet → *History*, `CCSO-6`: six rows whose headlines read `ticket.created`, `ticket.field_set`, `ticket.field_set`, `ticket.field_set`, `ticket.transitioned`, `visibility.set`, each followed by `Kiro` · `from web` and the two clocks.
+
+**MEASUREMENT (painted).** `document.querySelectorAll('.gn-history__event')` → 6; `.gn-history__type` texts tallied → `{ticket.created:1, ticket.field_set:3, ticket.transitioned:1, visibility.set:1}`; one full row: `<span class="gn-history__type">ticket.field_set</span><span class="gn-history__actor">Kiro</span><span class="gn-history__origin">from web</span><dl class="gn-history__clocks">…</dl>` — no field name, no value, no target state. Source: `packages/app-core/src/views/history-list.tsx:45` renders `{event.type}` verbatim; `packages/app-core/src/view-types.ts:539-549` shows the event **does** carry `payload: unknown` and `version`, neither of which the row reads. `ui.css:2115` gives the slug `font-weight: 600` — it is styled as the headline.
+
+**PROTOTYPE.** `Gisik Nokma - Desktop.dc.html:1337-1343` draws each history row as a 17-px sentence plus a 12-px meta line; its data (`:3733-3737`) is *"Created as <type>"*, *"Assigned to <person>"*, *"State set to <state>"*, meta *"8 Sep · 11:12 · mac-01"*. **Category 3: diverges with no ruling found.** The component's docblock (`history-list.tsx:1-27`) rules on the CLOCKS (both shown, IST, labelled) and the ACTOR (never anonymous) and says nothing about the label; `grep -rn "raw event type\|gn-history__type" docs Features.md test-cases` finds only the plan's transcription of the same markup (`2026-08-20-06-web-client.md:5864`).
+
+**WHY IT IS WRONG.** *"The history view IS the ledger"* (`:2`) — and this ledger cannot be read: three identical `ticket.field_set` lines tell a person nothing about what was set. The two-clock discipline the docblock defends is undermined by a headline that is an identifier. It is the same class as E4-4's `description` and E4-6's ULID: an internal name painted as a label.
+
+**WHAT WOULD HAVE BEEN BETTER.** A small `describeEvent(type, payload)` — `field_set` → *"Set <field> to <value>"*, `transitioned` → *"Moved to <state>"*, `visibility.set` → *"Visibility: <mode>"* — with the slug kept as a `title`/secondary line for the reader who wants the wire name. The prototype's sentences are the spec for the shape.
+
+---
+
 ## 4. MATCHES AND RULED DIVERGENCES CHECKED
 
 _(so §3 is not a list of defects)_
