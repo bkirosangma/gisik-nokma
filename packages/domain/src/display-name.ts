@@ -32,8 +32,24 @@ import { z } from 'zod';
  * because `workflow.ts` and `ticket-types.ts` are the core definition schemas
  * the event vocabulary is built ON; a core module importing from `events/`
  * would invert that.
+ *
+ * ONE issue per failure, and the `value.length === 0 ||` guard is what makes
+ * that so. Zod runs a `.refine` on a string whose `.min(1)` already failed
+ * (the inner result is dirty, not aborted), so the original spelling reported
+ * an EMPTY name twice — `too_small` and the blank sentence. The workspace and
+ * project doors never showed it (their tests ask `toContainEqual`), but the
+ * ticket-type editor lists every issue of `ticketTypeDefSchema` and maps
+ * `too_small` on a string to "<Field> is required" (case E4-29): with this
+ * schema on the type's name, an empty form listed three items — "Name is
+ * required", the blank sentence about the same field, "Workflow is required"
+ * — measured on the merged tree, 2026-09-21. So the blank sentence is reserved
+ * for the case `.min(1)` cannot see, a non-empty name of only whitespace, and
+ * an empty name is `too_small` alone, as it always was.
  */
 export const displayName = z
   .string()
   .min(1)
-  .refine((value) => value.trim() !== '', 'must not be blank — a name of only spaces names nothing');
+  .refine(
+    (value) => value.length === 0 || value.trim() !== '',
+    'must not be blank — a name of only spaces names nothing',
+  );
