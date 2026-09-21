@@ -184,8 +184,13 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  * `myWork`, `searchOfflineCopy` — round-2 E6-24, fixed in release batch B07
  * and pinned by case 12.399), so the file now carries the rule at four reads.
  *
- * **BOTH MEASURED SURVIVORS, on ONE valid witness**: with each conjunct removed
- * in turn, app-core's replica suite read **27 passed / 0 failed**. That suite
+ * **BOTH MEASURED SURVIVORS when this was written, on ONE valid witness — and
+ * WITNESSED since 2026-09-21 (round-1 F5, release batch B07, case 17.125)**:
+ * `packages/app-core/test/replica/replica-deleted-reads.test.ts` now holds the
+ * deleted-ticket fixture this arm asked for, and the same two mutations each
+ * redden exactly their own case there (`Tests 1 failed | 5 passed (6)`, twice).
+ * Then: with each conjunct removed in turn, app-core's replica suite read
+ * **27 passed / 0 failed**. That suite
  * imports `../../src/replica/replica-data-source.js` by RELATIVE PATH
  * (`packages/app-core/test/replica/replica-data-source.test.ts`), so the
  * mutation reached what it measured. ⚠ **This paragraph ALSO published
@@ -207,7 +212,9 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  * since rot. It was right about them and its citations had drifted**, which is
  * why this file cites by what the line READS rather than by where it sat.
  *
- * **Named owner: whoever next picks up Plan 10's replica reads.**
+ * **The owner line this paragraph carried ("whoever next picks up Plan 10's
+ * replica reads") is discharged by case 17.125; kept as a sentence about the
+ * record rather than as an open assignment.**
  *
  * **A case recording ALL THREE gaps is minted in `test-cases/` (16.90).**
  *

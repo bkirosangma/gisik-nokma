@@ -171,3 +171,29 @@ describe('E6-24 — the three view-serving replica reads the Delete commit did n
     expect(await read()).toEqual(['live']);
   });
 });
+
+describe('F5 — the two replica gates the Delete commit DID write, witnessed for the first time', () => {
+  /**
+   * Round-1 F5 measured both of these as survivors: mutating either gate left
+   * the replica suite 27 passed / 0 failed, because no replica test held a
+   * deleted ticket. The same world as E6-24 above, asked at the two reads that
+   * always carried the rule — so the next edit to either line cannot pass
+   * without answering the question.
+   */
+  it('F5: getTickets drops a soft-deleted ticket — the `if ((state.deleted ?? null) !== null) continue;` in the ticket enumeration', async () => {
+    const w = await world();
+    const read = async () => names(w, (await w.ds.query.getTickets(PROJECT, {}, 'flat')).rows.map((r) => r.ticketId));
+    expect(await read()).toEqual(['DOOMED', 'live']);
+    await deleteDoomed(w);
+    expect(await read()).toEqual(['live']);
+  });
+
+  it('F5: getBoard drops it — the `(state.deleted ?? null) === null` conjunct beside `closed` in the board filter', async () => {
+    const w = await world();
+    const read = async () =>
+      names(w, (await w.ds.query.getBoard(PROJECT)).groups.flatMap((g) => g.columns.flatMap((c) => c.cards.map((k) => k.ticketId))));
+    expect(await read()).toEqual(['DOOMED', 'live']);
+    await deleteDoomed(w);
+    expect(await read()).toEqual(['live']);
+  });
+});

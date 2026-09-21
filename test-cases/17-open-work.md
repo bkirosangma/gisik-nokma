@@ -26,7 +26,7 @@ never saw.
 | lane | block |
 |---|---|
 | **exec 3** | **`17.001`–`17.020`** (taken 2026-09-21 for the sheet's `Visibility` section styling) — **minted: `17.001`–`17.006`** |
-| **exec 4 / release batch B07** | **`17.121`–`17.140`** (controller allocation 2026-09-21 21:0x, for B07's soft-delete door cases — the batch's replica case is `12.399` in §12) — **minted: `17.121`–`17.124`** |
+| **exec 4 / release batch B07** | **`17.121`–`17.140`** (controller allocation 2026-09-21 21:0x, for B07's soft-delete door cases — the batch's replica case is `12.399` in §12) — **minted: `17.121`–`17.125`** |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** A block is a longer-lived reading than a "next free
 N", but it still expires when the controller reallocates. **Re-read it before minting, and if your own
@@ -213,3 +213,15 @@ in §12 because that section owns the replica.*
   last in its file because a deleted ticket is absent from every group the cases above count. —
   (`apps/server/test/routes/my-work.test.ts`, "F4: the deleted ticket keeps its row and loses its title; the
   live sibling keeps both")
+- **17.125** ✅ **The replica's two soft-delete gates — `getTickets`' `if ((state.deleted ?? null) !== null)
+  continue;` and `getBoard`'s `(state.deleted ?? null) === null` conjunct — are witnessed by a deleted-ticket
+  fixture, and each mutation the finding ran now reddens exactly its own case** (round-1 F5). The same world
+  as `12.399` (two tasks in `doing`, assigned to the viewer, one then deleted, the fold proven before any
+  read), asked at the two reads the Delete commit did write. GREEN on first run (the gates are correct);
+  RED by mutation, one at a time, each restored from a copy: `if (false) continue;` → `Tests 1 failed | 5
+  passed (6)` at the `getTickets` case; the board conjunct → `true,` → `Tests 1 failed | 5 passed (6)` at the
+  `getBoard` case. The other publications of the survivor (the `soft-delete-background-paths.test.ts`
+  docblock's (c), Features.md's invariant row, 16.90(c)) are updated in the same change set: cited by
+  content, witnessed, owner line discharged; 16.90's marker flips 🟡 → ✅ with this case, its third part. —
+  (`packages/app-core/test/replica/replica-deleted-reads.test.ts`, "F5: getTickets drops a soft-deleted
+  ticket…", "F5: getBoard drops it…")
