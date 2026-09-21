@@ -869,7 +869,7 @@ describe('13.1139 the Title field is a .gn-field__input, not raw UA chrome', () 
     render(
       <NewTicketDialog
         open
-        typeOptions={[{ id: 'task', name: 'Task' }]}
+        typeOptions={[{ id: 'task', name: 'Task', rank: 3 }]}
         parentCandidates={[]}
         onCreate={vi.fn()}
         onClose={() => undefined}
