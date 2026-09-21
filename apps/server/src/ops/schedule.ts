@@ -9,10 +9,31 @@ import type { ErrorAlerter } from '../alerts/error-alerter.js';
  * purpose: the container's `TZ` is Asia/Kolkata so log timestamps read against
  * the product's clock, and a schedule that drifted with the process locale
  * would be a different backup window on a differently-configured host.
+ *
+ * Refuses an out-of-range hour or minute as well as a malformed shape (E6-23,
+ * below). No `BACKUP_TIME_UTC` key was added to `config.ts`'s schema for it,
+ * although the finding suggested one: the backup daemon reads its schedule
+ * values straight off the environment on purpose and never calls
+ * `loadConfig` (`backup-daemon-main.ts` says why), and `startScheduler`
+ * computes every job's first `delayMs()` before arming any timer, so this
+ * throw already ends the worker at boot, exit 1, with the value named — a
+ * schema key would put the same rule in a second place the daemon does not
+ * read.
  */
 export function msUntilNextUtc(timeHHMM: string, from: Date, dayOfWeek?: number): number {
+  // The SHAPE and the RANGE are refused by the same sentence (E6-23). The
+  // regex alone admitted `25:00`, `23:60` and `99:99`, and `setUTCHours` does
+  // not refuse an out-of-range hour or minute — it ROLLS OVER, so `25:00`
+  // scheduled the nightly dump at 01:00 the next day and `99:99` landed it
+  // four days out at 04:39, while a daemon that started cleanly looked
+  // correctly configured. Measured 2026-09-21 against the built module. The
+  // bound is `< 24` and `< 60`: `24:00` is not a time of day either (it is
+  // `00:00` tomorrow, which is what an operator who typed it would have to
+  // learn from the schedule rather than from this sentence).
   const match = timeHHMM.match(/^(\d{2}):(\d{2})$/);
-  if (!match) throw new Error(`backup time must be HH:MM (UTC), got '${timeHHMM}'`);
+  if (!match || Number(match[1]) >= 24 || Number(match[2]) >= 60) {
+    throw new Error(`backup time must be HH:MM (UTC), got '${timeHHMM}'`);
+  }
   // REFUSED RATHER THAN CLAMPED, and refused BEFORE the loop below runs.
   // `getUTCDay()` only ever returns 0-6, so the loop's `next.getUTCDay() !==
   // dayOfWeek` clause is permanently true for 7, -1, or the `NaN` that

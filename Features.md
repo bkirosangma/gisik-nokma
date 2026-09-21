@@ -2466,7 +2466,9 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   before the exit code existed and a truncated archive at a normal-looking dated key is what a restore
   drill reaching for "the latest dump" would pick up. Its connection password travels in `PGPASSWORD`,
   never in argv, where any process on the host could read it. `msUntilNextUtc` computes the delay to the
-  next `HH:MM` UTC, optionally constrained to a day-of-week, and `startBackupDaemon` runs both jobs on
+  next `HH:MM` UTC, optionally constrained to a day-of-week — refusing, by name, a value that is the wrong
+  shape (`9pm`) AND one that is the right shape but no time of day (`25:00`, `23:60`, `99:99`), which
+  `setUTCHours` used to roll over silently (E6-23; cases 13.1200–13.1201) — and `startBackupDaemon` runs both jobs on
   that clock, writing **every** failure to stderr as structured JSON *itself* and then handing it to an
   `ErrorAlerter`, and re-arming rather than dying, because a backup that fails silently is a lie about
   being backed up. The stderr line lives in the daemon and not in the alerter on purpose: every alerter
