@@ -318,7 +318,7 @@ what the prototype draws there.
 - **16.27** ✅ Priority renders the claim as the **SELECTED segment**, with its claim line. **AMENDED 2026-09-22** — it read *"it is a CONVENTION, so the claimed case arrives by the ticket carrying the field"*, and the retitle is the amendment: priority is a built-in, so the claimed case is the ORDINARY one, and the value renders through the control rather than as loose text. All three segments' `aria-selected` states are asserted, not only `P1`'s, so a control that marked every segment selected — or none — cannot pass.
 - **16.28** ✅ **No second row for a field that now has its own** — `dueDate` is skipped by the generic field loop, so one claim is not drawn twice. **AMENDED BY E5-6:** the "one node, not two" assertion read `getAllByText('30 Aug 2026')` with a length of 1; the day is no longer loose text on this sheet, so the same property is now asserted on the nodes the row draws — ONE date control, and NO second rendering of the day as text. **AMENDED 2026-09-22:** `startDate` joins the exclusion, asserted as `queryByTestId('field-startDate')` being null, and `field-priority` is asserted to appear exactly ONCE via `getAllByTestId` — an absence assertion would pass for a sheet that drew no priority row at all.
 - **16.29** ✅ Priority, Due and Start are **EDITORS**; **Type is the one row read-only**. **AMENDED TWICE:** by E5-6 (2026-09-21) this stopped pinning a uniform read-only absence and started pinning a split, and spec 2026-09-22 took the other half of the prototype's own shape — priority's segmented control and the Start row. Each editor is asserted POSITIVELY (its own control is present) so the case cannot pass by a control silently disappearing, and Type's read-only-ness is asserted as an absence the way `16.22` does for F's chip.
-- **16.30** ✅ They are drawn in the prototype's **order** — Assignee, Priority, Due, Type — compared by document position, not by markup index. **EXTENDED 2026-09-22:** Start joins the rows between Due and Type, which is where the spec places it and where its twin is.
+- **16.30** ✅ They are drawn in the prototype's **order** — Assignee, Priority, Due, Type — compared by document position, not by markup index. **EXTENDED 2026-09-22:** Start joins the rows between Due and Type, which is where the spec places it and where its twin is. ⚠ **This case is now the RELATIVE order of four rows inside a larger grid**, and it still holds: the full order — Description above the grid, then `State · Assignee · Priority · Due · Start · Type · Visibility`, then Subtasks and Comments — is `16.113`'s, one case owning the whole sequence rather than this one growing a clause per row added elsewhere. Neither case subsumes the other: this one reddens if two of ITS four swap, `16.113` reddens if a row moves around them.
 - **16.100** ✅ Clicking a segment other than the selected one submits exactly ONE `ticket.field_set` carrying `{ fieldId: 'priority', value }`. The payload is asserted with `toEqual`, never `toMatchObject`, so a row that re-spelled the fieldId or wrapped the level in an object is a different claim about the ledger. — `packages/app-core/test/views/ticket-sheet.test.tsx`
 - **16.101** ✅ CONTROL — clicking the segment ALREADY selected submits nothing. The ledger is append-only, so a commit that changed nothing would record a claim nobody made; and there is nothing to clear to, which is why priority has no clearing gesture at all while its twin Due does. — `packages/app-core/test/views/ticket-sheet.test.tsx`
 - **16.102** ✅ A REFUSED priority prints the server's own sentence beside the row and leaves the PREVIOUS segment selected — a control that adopted the refused level would be showing a value nobody recorded. — `packages/app-core/test/views/ticket-sheet.test.tsx`
@@ -1460,3 +1460,93 @@ would have been visible rather than scored as a kill.)
   `13.726` fail with it, because both read the sentence page-wide and now find two nodes. That is the
   measurement behind the *"a move, not a second copy"* paragraph above — the pre-existing cases CAN see the
   duplication, and `16.110`'s third arm catches it at the count rather than at a `getByText`.
+
+## Sheet prototype parity, Task 4 — the description above the grid, the State row, the deleted title row, the tinted rows (tail lane, 2026-09-22) — cases `16.113`–`16.117`
+
+**Task 4 of the same plan, the next commit of the same lane.** The Details body is re-seated into the
+prototype's order and the grid is redrawn: a full-width description block ABOVE the grid, a `State` row
+carrying the state line, every second row tinted, and the sheet-side mount of `VisibilityEditor` into the
+`field-visibility` row — Task 5's leftover, which the plan's own Task 5 header assigns to this task because
+the sheet file is this lane's to touch.
+
+**⚠ THE PLAN'S OWN `ids` ARRAY WAS STALE AND THE CASE IS BUILT FROM THE FILE.** The plan's `16.113` draft
+listed `field-description · field-state · field-assignee · field-priority · field-due · field-type ·
+field-visibility · sheet-subtasks · sheet-comments`. **`field-start` is absent from it**, and the reason is
+sequencing rather than an oversight: the Start row was added by the PRIORITY BUILT-IN lane, whose Task 7
+landed on this branch after the plan text was written, and it sits between Due and Type there. A case built
+from the plan's array would have asserted an order that SKIPS a row the sheet really draws — and it would
+have passed, because every pair it named is still in that relative order.
+
+**The tint is by CLASS, not by `:nth-child`.** `ticket-sheet.tsx` computes it (`fieldRowClass`), with
+`FIXED_FIELD_ROWS = 7` so the generic custom-field loop CONTINUES the alternation instead of restarting it
+at zero — which would put two tinted rows side by side at the seam. A `:nth-child` rule would count the
+wrapper `<div>`s rather than the rows and would agree with the class only by luck. **⚠ `FIXED_FIELD_ROWS` is
+a COUNT, so it is the thing to re-read when a fixed row is added:** `16.116` reads the DOM in order, so a
+row inserted above without that number moving reddens there rather than shipping a doubled band.
+
+**⚠ ONE PLAN-TEXT CORRECTION, in the CSS.** The plan's `.gn-ticket-sheet__field dt` draft carried
+`min-height: 2.5rem; line-height: 2.5rem` BESIDE `padding: 0.75rem 0 0.75rem 0.75rem`. Those double-count
+the row height — 2.5rem of line box plus 1.5rem of padding is roughly 64px against the prototype's ~48px
+row — and a fixed `line-height` misaligns a two-line label inside a `flex-start` box. The padding alone
+gives the row its height, so those two declarations are the one part of the plan's CSS this change does not
+carry. **The pinned `13.1142` phone block is untouched and still declares both of its own clauses** — a
+third package's gate reads that rule by regex, and it is why the label collapse was overridden in place
+rather than rewritten.
+
+### The case
+
+- **16.113** ✅ The Details sections stand in the prototype order — Description, State, Assignee, Priority,
+  Due, **Start**, Type, Visibility, Subtasks, Comments — asserted PAIRWISE by `compareDocumentPosition`
+  rather than by index into markup, which a whitespace or wrapper change would move. Includes
+  `field-start`, which the plan's draft array omitted; see the note above.
+  `packages/app-core/test/views/ticket-sheet.test.tsx`.
+- **16.114** ✅ The State row holds the state chip, its provenance sentence and the `Move…` button, and
+  carries **no `select` and no `combobox`**. The prototype's State row IS a `<select>` that sets a state
+  directly, and that is the half of it this build refuses: a transition is rule-driven (`require-comment`,
+  `require-evidence`, `require-field`), so a select would bypass the rules. **Both spellings are asserted
+  absent**, because `combobox` and `select` are not the same query and a control could satisfy one.
+- **16.115** ✅ The title is edited in the header and draws NO generic field row — the deletion of the
+  duplicate `title` row's own case, with the header control asserted present as the positive control so a
+  build that dropped the title altogether cannot pass.
+- **16.116** ✅ Every second row of the grid is tinted, by class. **The count is asserted first**
+  (`length >= 6`), because the alternation check is a `forEach` and a grid that rendered NO rows would pass
+  it by running zero times — a check that cannot fail.
+- **16.117** ✅ The description block precedes the grid and keeps its caption as the editor's name (the `id`
+  the mounted `EditorSlot`'s `labelledBy` points at, so the words a sighted reader sees and the name a
+  screen reader announces are the SAME NODE). **Its CONTROL is a separate arm**: the block is NOT inside the
+  `<dl>`, read as `grid.contains(block) === false` — the direction the order assertion cannot see, since a
+  block moved to the TOP of the `<dl>` would also precede `field-state` while no longer being full-width.
+  `packages/app-core/test/views/ticket-sheet.test.tsx`.
+
+**⚠ THREE PRE-EXISTING CASES WERE FORCED, and only one of them is inside the plan's own account of this
+task.** Two assert the deleted `title` row, and they are case `3.73` in `test-cases/03-foundation-ledger.md`
+(the file's own amendment records both arms):
+
+1. `renders the state with its provenance line and each field with its claim` asserted
+   `getByTestId('field-title')`. Rewritten to assert the title in the HEADER — keeping the property (the
+   title is on the sheet) rather than leaving a bare absence query that a build which lost the title would
+   pass.
+2. `PLANTED DEFECT: every field carries a claim line` looped `['title', 'due']`. Now `['due']`, the one row
+   left that carries a `set by …` line on this fixture, with the reason written at the site.
+3. `16.63`'s scoping change landed in Task 3's commit and is recorded there.
+
+**Mutations — THREE, all run, all killed, and ONE of my draft claims was wrong in a way worth keeping.**
+(156 collected in every run, so a mutation that failed to parse would have been visible rather than scored
+as a kill.)
+
+- **M3 — `fieldId === 'title'` removed from the loop's exclusion list. KILLS `16.115` ONLY (1 failed /
+  155 passed).** ⚠ **I predicted this would also redden `16.113`'s order, and it does not** — the reason is
+  structural and worth stating, because it is the reason `16.113` is written as a pairwise walk over a
+  NAMED list rather than as a walk over everything in the grid: the stale `field-title` row renders at the
+  END of the loop, so every pair `16.113` names is still in that relative order. **A case that collected the
+  grid's children and compared that list would have caught it; a case that names its ids does not**, and
+  that is the trade this one takes deliberately — `16.115` is the arm that owns this defect.
+- **M4 — `fieldRowClass` returning the untinted class for every index. KILLS `16.116` ONLY (1 failed /
+  155 passed).**
+- **M5 — the description block moved INSIDE the `<dl>`. KILLS BOTH arms of `16.117` (2 failed / 154
+  passed).** ⚠ **I predicted only the CONTROL would redden, and the order assertion reddens too** — because
+  the assertion is `block.compareDocumentPosition(grid)`, and a block placed inside the grid FOLLOWS the
+  `<dl>` element it is measured against. **So the two arms are not redundant, and the reason I gave for the
+  control was the weaker one:** it catches the case where the block is the grid's FIRST CHILD — a position
+  where the order assertion alone would be ambiguous — and the order assertion catches the inside-anywhere
+  case on its own.

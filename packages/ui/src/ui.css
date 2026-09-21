@@ -2036,7 +2036,14 @@ button.gn-ticket-sheet__crumb--link {
   cursor: pointer;
 }
 .gn-ticket-sheet__delete:disabled { opacity: 0.4; cursor: not-allowed; }
-.gn-ticket-sheet__state { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }
+/* ⚠ `align-self`, `text-align` and `justify-content` are here because this block
+   MOVED into the grid's `field-state` `<dd>` on 2026-09-22 (spec decision 1). That
+   cell is right-aligned — `align-items: flex-end; text-align: right` on
+   `.gn-ticket-sheet__field dd` — which is right for the short values the other
+   rows hold and wrong for this one: the state line is a chip, a provenance
+   sentence and up to three controls, so pinned right it would sit in a
+   shrink-to-fit box against the edge, wrapping from the right. */
+.gn-ticket-sheet__state { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; align-self: stretch; text-align: left; justify-content: flex-start; }
 .gn-ticket-sheet__provenance { color: var(--gn-text-muted); font-size: 0.85rem; }
 .gn-ticket-sheet__parent { margin: 0.6rem 0; color: var(--gn-text-muted); }
 /* The header's chips line (spec 2026-09-22 decision 2, `desktop.dc.html:1128-1133`)
@@ -2102,9 +2109,43 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    Body text, with the family's paragraph reset. */
 .gn-ticket-sheet__absent { margin: 0; }
 .gn-ticket-sheet__fields { margin: 0.8rem 0 0; }
-.gn-ticket-sheet__field { display: grid; grid-template-columns: 8rem 1fr; gap: 0.6rem; padding: 0.35rem 0; }
-.gn-ticket-sheet__field dt { color: var(--gn-text-muted); }
-.gn-ticket-sheet__field dd { margin: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+/* THE FIELD GRID, at the prototype's metrics (spec 2026-09-22 decision 12,
+   `desktop.dc.html:3755-3756`): a label column that may grow to 9.375rem, a value
+   column allowed to SHRINK (`minmax(0, 1fr)` — `0` rather than `auto`, for the
+   reason the phone block below records at length: an `auto` floor IS the content's
+   min-content width, which is how the description editor pushed its column back
+   out), the value right-aligned, and every SECOND row on `--gn-fill-quaternary`.
+
+   ⚠ THE TINT IS APPLIED BY CLASS, NOT BY `:nth-child`, and the class is computed in
+   `ticket-sheet.tsx` (`fieldRowClass`). A `:nth-child` rule would count the WRAPPER
+   `<div>`s rather than the rows; that happens to agree today and would stop
+   agreeing the moment a row rendered a conditional sibling, and the case that
+   witnesses the alternation (`16.116`) reads the DOM in order — so the two would
+   disagree silently, which is the shape this file's comments exist to prevent.
+
+   ⚠ AND THE PLAN'S `dt` BLOCK WAS NOT TRANSCRIBED VERBATIM. Its draft carried
+   `min-height: 2.5rem; line-height: 2.5rem` BESIDE `padding: 0.75rem 0 0.75rem
+   0.75rem`, which double-counts the row height (2.5rem of line box PLUS 1.5rem of
+   padding is ~64px against the prototype's ~48px row) and would centre a two-line
+   label oddly inside a `flex-start` box. The padding alone gives the row its
+   height, so those two declarations are the one part of the plan's CSS this change
+   does not carry. */
+.gn-ticket-sheet__field { display: grid; grid-template-columns: minmax(6rem, 9.375rem) minmax(0, 1fr); gap: 0; padding: 0; }
+.gn-ticket-sheet__field dt { color: var(--gn-text-muted); font-size: 0.9375rem; padding: 0.75rem 0 0.75rem 0.75rem; display: flex; align-items: flex-start; }
+.gn-ticket-sheet__field dd { margin: 0; padding: 0.75rem 0.75rem 0.75rem 0; display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-end; text-align: right; min-width: 0; }
+.gn-ticket-sheet__field--tinted dt { background: var(--gn-fill-quaternary); border-radius: 0.5rem 0 0 0.5rem; }
+.gn-ticket-sheet__field--tinted dd { background: var(--gn-fill-quaternary); border-radius: 0 0.5rem 0.5rem 0; }
+/* The shared eyebrow the sheet's section headings wear (spec 2026-09-22 decision
+   11; the prototype's `SUBTASKS` / `COMMENTS` captions). `text-transform` is PAINT
+   and not content — the words are unchanged, so every `getByText` on them still
+   matches. `.gn-comments__heading` already declared exactly these five
+   declarations; this rule is the NAME being made shared, not a look being
+   changed. */
+.gn-ticket-sheet__caption { margin: 0; font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); text-transform: uppercase; letter-spacing: 0.6px; }
+/* The description block — FULL WIDTH and ABOVE the grid, not a row inside it
+   (spec 2026-09-22 decision 1): the prototype draws the editor across the whole
+   panel, and its own label is the caption the composer is NAMED BY. */
+.gn-ticket-sheet__description { display: flex; flex-direction: column; gap: 0.5rem; margin: 0 0 0.75rem; }
 
 /* PHONE: THE LABEL COLUMN COLLAPSES, OR THE DESCRIPTION RUNS OFF THE SHEET
    (E4-7).
@@ -2129,7 +2170,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    numbers above are the finding's, taken from its own report. */
 @media (max-width: 40rem) {
   .gn-ticket-sheet__field { grid-template-columns: 1fr; }
-  .gn-ticket-sheet__field dd { min-width: 0; }
+  .gn-ticket-sheet__field dd { min-width: 0; align-items: flex-start; text-align: left; }
+  .gn-ticket-sheet__field dt { padding: 0.5rem 0.75rem 0 0.75rem; }
   .gn-sheet__full { display: none; }
 }
 .gn-ticket-sheet__claim { color: var(--gn-text-muted); font-size: 0.8rem; }

@@ -436,6 +436,40 @@ export type TicketSheetProps = {
  *
  * `HistoryTab` (below) applies the SAME three-way distinction to the ledger tab.
  */
+
+/**
+ * How many field rows the sheet draws BEFORE the generic custom-field loop — the
+ * fixed rows `State · Assignee · Priority · Due · Start · Type · Visibility`, in
+ * that order (spec 2026-09-22, decision 12). It exists so the loop's tint index
+ * continues the fixed rows' alternation instead of restarting at zero, which
+ * would put two tinted rows side by side at the seam.
+ *
+ * ⚠ **IT IS A COUNT, so it is the thing to re-read when a fixed row is added or
+ * removed.** `16.116` is the witness: it reads every `.gn-ticket-sheet__field` in
+ * the grid in document order and asserts the tint on odd indices, so a row
+ * inserted above without this number moving reddens there rather than shipping an
+ * alternation with a doubled band.
+ */
+const FIXED_FIELD_ROWS = 7;
+
+/**
+ * The class the alternating field grid puts on row `index` — tinted on every
+ * SECOND row, from the prototype's `rowLabelB`/`rowValueB` pair
+ * (`desktop.dc.html:3755-3756`).
+ *
+ * A function over an index rather than a `:nth-child` rule, and the reason is
+ * measured rather than stylistic: the grid is a `<dl>` of `<div>` wrappers, so
+ * `:nth-child` would count the WRAPPERS — which happens to agree today and would
+ * silently stop agreeing the moment a row renders a conditional sibling. The
+ * index is passed in by the site that knows the order, and `16.116` reads the
+ * result rather than the rule.
+ */
+function fieldRowClass(index: number): string {
+  return index % 2 === 1
+    ? 'gn-ticket-sheet__field gn-ticket-sheet__field--tinted'
+    : 'gn-ticket-sheet__field';
+}
+
 export function TicketSheet({
   dataSource,
   cache,
@@ -2854,70 +2888,393 @@ export function TicketSheet({
 
       {tab === 'details' ? (
         <div className="gn-ticket-sheet__details">
-          <div className="gn-ticket-sheet__state">
-            <Chip tone={state.stateCategory}>{currentStateName}</Chip>
-            <span className="gn-ticket-sheet__provenance">
-              {formatStateProvenance(currentStateName, ticketRead.stateProvenance)}
-            </span>
-            {/* ⚠ THE `Closed by … on …` BADGE WAS HERE AND IS NOT ANY MORE. It
-                moved UP into the chips line (`sheet-chips`, above the tabs) on
-                2026-09-22, which is where the prototype draws it
-                (`desktop.dc.html:1130`). It was MOVED rather than copied: the
-                span that drew it here was deleted in the same change, so the
-                sentence is on the page exactly once and the case that reads it
-                (`16.110`) asserts that count. */}
+          <section
+            className="gn-ticket-sheet__description"
+            aria-labelledby="gn-ticket-sheet-description-label"
+            data-testid="field-description"
+          >
+            {/* The field id was leaking into the UI: `:2454` renders
+                `{fieldId}` for custom fields, and this row copied that shape
+                instead of writing a caption, so the sheet read "description"
+                beside "Assignee", "Priority", "Due" and "Type" (exec4 E4-4).
+                Title case, matching those siblings. */}
+            {/* The caption, and the `id` the composer below is NAMED BY
+                (exec1 P21). The `id` is load-bearing, not decorative: it is
+                what `EditorSlot`'s `labelledBy` points at, so the words a
+                sighted reader sees here and the name a screen reader
+                announces are the SAME NODE and cannot drift. An `id` that
+                nothing references would be a leftover — if this mount ever
+                stops passing `labelledBy`, delete it in the same change. */}
+          <h3 id="gn-ticket-sheet-description-label" className="gn-ticket-sheet__caption">Description</h3>
+              {/*
+                ⚠ BOTH BRANCHES ARE LIVE AND NEITHER IS DEAD CODE — do not
+                collapse them. `editorSlot` is the app's real Tiptap composer;
+                `PlainTextEditorSlot` is this package's read-only default,
+                which renders the document and offers no control to type into.
+                A build that has not wired an editor is not a broken build, and
+                the fallback is the correct behaviour for it — what was wrong
+                was that the editor was never available. THIS CHANGE IS THE ONE
+                THAT MAKES THE FIRST BRANCH REACHABLE FROM `apps/web`.
+
+                `submit` is what makes a mounted editor usable at all:
+                `TicketEditorSlot` disables its control and NAMES the gap when
+                it is absent ("there is nowhere to send the words"). It is
+                passed unconditionally because the read-only fallback ignores
+                every capability prop on purpose.
+              */}
+              <EditorSlot
+                mode="description"
+                // The composer is NAMED BY the `<dt>` above rather than given
+                // its own copy of the words (exec1 P21) — the same mechanism
+                // the ticket sheet's tablist fix used, and the reason this row
+                // does not also pass a `label` to contradict it.
+                labelledBy="gn-ticket-sheet-description-label"
+                doc={descriptionClaim?.value}
+                readOnly={!canEditDescription}
+                workspaceId={workspaceId}
+                ticketId={ticketId}
+                placeholder="No description yet"
+                submit={submitDescription}
+                queryUsers={queryUsers}
+                onError={reportEditorError}
+              />
+              <span className="gn-ticket-sheet__claim">{descriptionClaimLine}</span>
+          </section>
+          <dl className="gn-ticket-sheet__fields">
+            <div className={fieldRowClass(0)} data-testid="field-state">
+              <dt>State</dt>
+              <dd>
+                <div className="gn-ticket-sheet__state">
+                  <Chip tone={state.stateCategory}>{currentStateName}</Chip>
+                  <span className="gn-ticket-sheet__provenance">
+                    {formatStateProvenance(currentStateName, ticketRead.stateProvenance)}
+                  </span>
+                  {/* ⚠ THE `Closed by … on …` BADGE WAS HERE AND IS NOT ANY MORE. It
+                      moved UP into the chips line (`sheet-chips`, above the tabs) on
+                      2026-09-22, which is where the prototype draws it
+                      (`desktop.dc.html:1130`). It was MOVED rather than copied: the
+                      span that drew it here was deleted in the same change, so the
+                      sentence is on the page exactly once and the case that reads it
+                      (`16.110`) asserts that count. */}
+                  {/*
+                    Spec §5.3: Close only from a terminal, not-yet-closed state;
+                    Reopen only once closed. The two buttons never both show, but
+                    NOT because "closed implies terminal forever" — that claim is
+                    false (final whole-branch review Finding 5, 2026-09-17: a
+                    rebind or a republish fold can move a closed ticket's `stateId`
+                    into a non-terminal state while `closed` rides along, since
+                    `foldTicketToWorkflowVersion` spreads `...state` and neither
+                    event touches `stateId`). What actually holds is smaller and
+                    true today: Close's own condition
+                    (`stateCategory === 'terminal' && closed === null`) and
+                    Reopen's (`closed !== null`) are mutually exclusive on `closed`
+                    alone, so exactly one — or neither, on a still-open,
+                    non-terminal ticket — can ever be true at once. The closed ⇒
+                    terminal invariant this comment used to (wrongly) lean on is
+                    the RULE ENGINE's to hold, not this component's: fix wave B,
+                    Ruling 53, adds it at the rebind check and the republish
+                    validator.
+                  */}
+                  {state.stateCategory === 'terminal' && closed === null ? (
+                    <Button onClick={() => void closeOrReopen('ticket.closed')} disabled={submitting}>
+                      Close
+                    </Button>
+                  ) : null}
+                  {closed !== null ? (
+                    <Button onClick={() => void closeOrReopen('ticket.reopened')} disabled={submitting}>
+                      Reopen
+                    </Button>
+                  ) : null}
+                  {/*
+                    Opening Move… clears any standing Close/Reopen refusal AND
+                    transport error first (Ruling 33 adds the second clear): a
+                    `close-requires-terminal` reason, or a "could not reach the
+                    server" notice, left over from a prior Close/Reopen click would
+                    otherwise carry into — or reappear behind — the Move dialog,
+                    naming a fact that has nothing to do with the move being
+                    attempted.
+                  */}
+                  <Button
+                    onClick={() => {
+                      setServerRefusal(null);
+                      setTransportError(null);
+                      setMoveOpen(true);
+                    }}
+                    disabled={closed !== null}
+                  >
+                    Move…
+                  </Button>
+                  {closed !== null ? (
+                    <span className="gn-sheet__closed-note">Closed — reopen it first</span>
+                  ) : null}
+                </div>
+              </dd>
+            </div>
+            <div className={fieldRowClass(1)} data-testid="field-assignee">
+              <dt>Assignee</dt>
+              <dd>
+                {assigneeRow.control}
+                {/* The SAME `gn-ticket-sheet__claim` span every field row below
+                    carries — an edited field that does not say who set it is the
+                    one row on this sheet that cannot be trusted. */}
+                <span className="gn-ticket-sheet__claim">{assigneeRow.claim}</span>
+              </dd>
+            </div>
+            {/* Door G — PRIORITY, DUE, START and TYPE, drawn ALWAYS and in the
+                prototype's own order (Assignee, Priority, Due, Type, Visibility
+                — `desktop.dc.html:1183-1205`), with Start beside Due since the
+                two are the same kind of fact (spec 2026-09-22). Every one that
+                the prototype makes an editor is an editor here; Type is the one
+                row that is read-only on both, argued in the derivations above. */}
+            <div className={fieldRowClass(2)} data-testid="field-priority">
+              <dt>Priority</dt>
+              <dd>
+                {/* The prototype's segmented control (`desktop.dc.html:1192-1198`)
+                    on the SHARED `SegmentedControl`. Priority is a built-in that
+                    is ALWAYS present (spec 2026-09-22), so there is no clear
+                    affordance: clicking the selected segment does nothing,
+                    because there is nothing to clear to.
+
+                    `value` is the claim, or the empty string when this read
+                    carries none — a value matching NO option, which is the
+                    component's documented fallback (nothing selected, first tab
+                    still focusable). It is NOT `DEFAULT_PRIORITY`: preselecting
+                    P2 here would print a level with no claim line beside it,
+                    which is the reader-side default the spec rejected. The
+                    sentence below says why nothing is selected in that case. */}
+                <SegmentedControl
+                  options={PRIORITIES.map((level) => ({ value: level, label: level }))}
+                  value={priorityValue ?? ('' as Priority)}
+                  onChange={(next) => {
+                    if (!prioritySaving && next !== priorityValue) void submitPriority(next);
+                  }}
+                  aria-label="Priority"
+                />
+                {priorityClaim === undefined ? (
+                  <span className="gn-ticket-sheet__refusal">
+                    This ticket carries no priority claim — the server’s projection has not been
+                    rebuilt since priority became built-in.
+                  </span>
+                ) : (
+                  <span className="gn-ticket-sheet__claim">{`set by ${nameOf(priorityClaim.actorId)} on ${formatDate(priorityClaim.serverTime)}`}</span>
+                )}
+              </dd>
+            </div>
+            <div className={fieldRowClass(3)} data-testid="field-due">
+              <dt>Due</dt>
+              <dd>
+                {/*
+                  THE EDITOR (ruling E5-6, 2026-09-21), transcribed from the
+                  export's own row (`desktop.dc.html:1200-1203`): an
+                  `<input type="date">` followed by a note line. `value` is the
+                  draft OR the claimed day, never a second piece of state — the
+                  same `titleDraft` shape one row up — and it is the ISO day
+                  (`2026-08-30`), never `formatDate`'s label, because that is
+                  what a `type="date"` input holds and what the event carries.
+                  `onBlur` commits, `Enter` commits, `Escape` abandons the
+                  draft without closing the sheet; there is no Save button
+                  because the export has none.
+
+                  ⚠ **WHAT THIS REPLACED, AND WHY THE OLD ASSERTION MOVED.** The
+                  row used to render `formatDate(due.date)` — *"30 Aug 2026"* —
+                  as read-only text. Case 16.24 pinned that spelling as one of
+                  its "both halves"; the export's row has no such span, so the
+                  case was amended rather than left asserting a rendering this
+                  door replaces. The CLAIM line below is unchanged and still
+                  carries the attribution the old sentence carried.
+                */}
+                <input
+                  className="gn-field__input gn-ticket-sheet__due-input"
+                  type="date"
+                  aria-label="Due date"
+                  value={dueDraft ?? dueDate?.date ?? ''}
+                  disabled={dueSaving}
+                  onChange={(event) => setDueDraft(event.target.value)}
+                  onBlur={() => {
+                    if (dueDraft !== null) void submitDueDate(dueDraft);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      if (dueDraft !== null) void submitDueDate(dueDraft);
+                      return;
+                    }
+                    if (event.key === 'Escape') {
+                      // `preventDefault` is LOAD-BEARING here for the reason
+                      // the title field's own Escape branch records: `Sheet`
+                      // registers a DOCUMENT-level Escape that closes it, so an
+                      // unconsumed Escape would close the sheet and make
+                      // "abandon the draft" true of an input being unmounted.
+                      event.preventDefault();
+                      setDueDraft(null);
+                    }
+                  }}
+                />
+                {/* The prototype's own sentence for this absence
+                    (`desktop.dc.html:1203`, via `sheetDueNote`'s
+                    `: "No date claimed"` arm), transcribed rather than
+                    re-worded: an unclaimed date is not an empty one. It is the
+                    NOTE LINE the export puts under the same input. */}
+                {dueDate === null ? (
+                  <span className="gn-ticket-sheet__absent">No date claimed</span>
+                ) : (
+                  /* The SAME wording every other field row on this sheet uses
+                     (`set by … on …`), because one surface with two
+                     provenance phrasings is the drift this file's claim-line
+                     comment exists to prevent. The ABSENT copy stays the
+                     prototype's ("No date claimed") — that sentence is about
+                     the DATE, and the claim line is about the ACTOR. */
+                  <span className="gn-ticket-sheet__claim">{`set by ${nameOf(dueDate.actorId)} on ${formatDate(dueDate.serverTime)}`}</span>
+                )}
+              </dd>
+            </div>
+            {/* START — a built-in that has been on every ticket since Plan 3 and
+                that this sheet never drew (spec 2026-09-22). It sits between Due
+                and Type, and it is Due's TWIN in every respect the spec names:
+                the same `<input type="date">`, the same commit on blur and on
+                Enter, the same Escape that abandons the draft without closing
+                the sheet, the same `null`-for-empty payload, and the same
+                absent copy — `No date claimed`, which is the PROTOTYPE's own
+                sentence for either date and not a second wording invented for
+                this row. `submitStartDate` says why the two are copies rather
+                than one shared hook. */}
+            <div className={fieldRowClass(4)} data-testid="field-start">
+              <dt>Start</dt>
+              <dd>
+                <input
+                  className="gn-field__input gn-ticket-sheet__start-input"
+                  type="date"
+                  aria-label="Start date"
+                  value={startDraft ?? startDate?.date ?? ''}
+                  disabled={startSaving}
+                  onChange={(event) => setStartDraft(event.target.value)}
+                  onBlur={() => {
+                    if (startDraft !== null) void submitStartDate(startDraft);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      if (startDraft !== null) void submitStartDate(startDraft);
+                      return;
+                    }
+                    if (event.key === 'Escape') {
+                      // Load-bearing for the reason the Due row's own branch
+                      // records: `Sheet` registers a DOCUMENT-level Escape, so
+                      // an unconsumed one would close the sheet and make
+                      // "abandon the draft" true of an input being unmounted.
+                      event.preventDefault();
+                      setStartDraft(null);
+                    }
+                  }}
+                />
+                {startDate === null ? (
+                  <span className="gn-ticket-sheet__absent">No date claimed</span>
+                ) : (
+                  <span className="gn-ticket-sheet__claim">{`set by ${nameOf(startDate.actorId)} on ${formatDate(startDate.serverTime)}`}</span>
+                )}
+              </dd>
+            </div>
+            <div className={fieldRowClass(5)} data-testid="field-type">
+              <dt>Type</dt>
+              <dd>
+                {/* The NAME from the workspace ladder, or the id when the
+                    ladder does not hold it — never an invented label. No claim
+                    line: a type is not a claim, it is fixed at creation. */}
+                <span>{ticketTypeName}</span>
+              </dd>
+            </div>
             {/*
-              Spec §5.3: Close only from a terminal, not-yet-closed state;
-              Reopen only once closed. The two buttons never both show, but
-              NOT because "closed implies terminal forever" — that claim is
-              false (final whole-branch review Finding 5, 2026-09-17: a
-              rebind or a republish fold can move a closed ticket's `stateId`
-              into a non-terminal state while `closed` rides along, since
-              `foldTicketToWorkflowVersion` spreads `...state` and neither
-              event touches `stateId`). What actually holds is smaller and
-              true today: Close's own condition
-              (`stateCategory === 'terminal' && closed === null`) and
-              Reopen's (`closed !== null`) are mutually exclusive on `closed`
-              alone, so exactly one — or neither, on a still-open,
-              non-terminal ticket — can ever be true at once. The closed ⇒
-              terminal invariant this comment used to (wrongly) lean on is
-              the RULE ENGINE's to hold, not this component's: fix wave B,
-              Ruling 53, adds it at the rebind check and the republish
-              validator.
+              THE DESCRIPTION IS A ROW WHETHER OR NOT ANYBODY HAS EVER CLAIMED
+              ONE — and that is the half the dispatch did not name, found by
+              measuring the reducer rather than the sheet.
+
+              `ticket.created` writes `fields: { title: claim(p.title, env) }`
+              and NOTHING else (`packages/domain/src/ticket-state.ts:160`), and
+              no other path writes a description except an explicit
+              `ticket.field_set` (`create-ticket-flow.tsx:209` submits
+              `ticket.created` alone). So on a ticket nobody has described there
+              is no `description` key at all — and this row used to live INSIDE
+              the `Object.entries(state.fields)` loop below. The editor it mounts
+              had nowhere to mount, and the owner saw no description and no way
+              to add one. **Flipping `readOnly` alone would have changed almost
+              nothing**: it would have enabled editing for the few tickets that
+              already carry a claim, which is precisely the shape of a fix that
+              passes its own test and does not do the thing.
+
+              Lifted out on the ASSIGNEE row's precedent, eleven lines up: a row
+              the sheet draws unconditionally, whose claim line states what is
+              actually known. The loop below now skips `description`, so the row
+              is drawn once.
             */}
-            {state.stateCategory === 'terminal' && closed === null ? (
-              <Button onClick={() => void closeOrReopen('ticket.closed')} disabled={submitting}>
-                Close
-              </Button>
-            ) : null}
-            {closed !== null ? (
-              <Button onClick={() => void closeOrReopen('ticket.reopened')} disabled={submitting}>
-                Reopen
-              </Button>
-            ) : null}
-            {/*
-              Opening Move… clears any standing Close/Reopen refusal AND
-              transport error first (Ruling 33 adds the second clear): a
-              `close-requires-terminal` reason, or a "could not reach the
-              server" notice, left over from a prior Close/Reopen click would
-              otherwise carry into — or reappear behind — the Move dialog,
-              naming a fact that has nothing to do with the move being
-              attempted.
-            */}
-            <Button
-              onClick={() => {
-                setServerRefusal(null);
-                setTransportError(null);
-                setMoveOpen(true);
-              }}
-              disabled={closed !== null}
-            >
-              Move…
-            </Button>
-            {closed !== null ? (
-              <span className="gn-sheet__closed-note">Closed — reopen it first</span>
-            ) : null}
-          </div>
+            <div className={fieldRowClass(6)} data-testid="field-visibility">
+              <dt>Visibility</dt>
+              <dd>
+                {/*
+                  Spec §6's audience section. **⚠ CORRECTED 2026-09-20.** This read: "It
+                  is mounted here and it is DARK against the shipped server: this
+                  component returns its refusal branch above whenever `getTicket`
+                  rejects, and `getTicket` refuses today (`mapTicketRead`, one of the six
+                  serving gaps). So nobody reaches this line in production until that
+                  read is served — which is why the editor's own behaviour is proven in
+                  `test/views/visibility-editor.test.tsx`, driving the component
+                  directly, rather than through a fabricated successful read here."
+                  Ruling P25 clause 1 (`c86c4b5c`, 2026-09-06) served that read, so a
+                  person DOES reach this line and the section is not dark. Whether this
+                  mount should now be proven HERE rather than only in the editor's own
+                  suite is a test-design decision this correction does not take: *owner,
+                  whoever next touches either file.*
+                */}
+                <VisibilityEditor
+                  dataSource={dataSource}
+                  workspaceId={workspaceId}
+                  ticketId={ticketId}
+                  currentUserId={currentUserId}
+                  members={members.data ?? []}
+                  current={standingVisibility}
+                  canEdit={canSetVisibility}
+                  onChanged={() => {
+                    read.reload();
+                    history.reload();
+                  }}
+                />
+              </dd>
+            </div>
+            {Object.entries(state.fields).map(([fieldId, fieldClaim], rowIndex) => {
+              // Drawn above, unconditionally. A second pass here would mount a
+              // SECOND editor over one claim and make `field-description`
+              // ambiguous to `getByTestId` — two controls for one field.
+              //
+              // `dueDate`, `startDate` and `priority` join it for door G, and the
+              // reason is the same one rung less severe: all three are drawn as
+              // their OWN rows above, so a second pass would render **two rows
+              // for one claim**. Without this the sheet shows a `field-dueDate`
+              // beside the `field-due` this task adds, which is exactly the
+              // ambiguity the description line exists to prevent — and it would
+              // be INVISIBLE on any fixture whose ticket carries no such field.
+              // `startDate` is the third (spec 2026-09-22) and the newest: the
+              // rows above are `field-due`, `field-start` and `field-priority`.
+              if (
+                fieldId === 'title' ||
+                fieldId === 'description' ||
+                fieldId === 'dueDate' ||
+                fieldId === 'startDate' ||
+                fieldId === 'priority'
+              ) {
+                return null;
+              }
+              return (
+                <div key={fieldId} className={fieldRowClass(FIXED_FIELD_ROWS + rowIndex)} data-testid={`field-${fieldId}`}>
+                  <dt>{fieldId}</dt>
+                  <dd>
+                    <span>{renderFieldValue(fieldClaim.value)}</span>
+                    <span className="gn-ticket-sheet__claim">
+                      {`set by ${nameOf(fieldClaim.actorId)} on ${formatDate(fieldClaim.serverTime)}`}
+                    </span>
+                  </dd>
+                </div>
+              );
+            })}
+          </dl>
 
           {ticketRead.rollup !== null ? (
             <p className="gn-ticket-sheet__progress">{formatRollup(ticketRead.rollup)}</p>
@@ -3086,318 +3443,6 @@ export function TicketSheet({
               </p>
             )}
           </section>
-
-          <dl className="gn-ticket-sheet__fields">
-            <div className="gn-ticket-sheet__field" data-testid="field-assignee">
-              <dt>Assignee</dt>
-              <dd>
-                {assigneeRow.control}
-                {/* The SAME `gn-ticket-sheet__claim` span every field row below
-                    carries — an edited field that does not say who set it is the
-                    one row on this sheet that cannot be trusted. */}
-                <span className="gn-ticket-sheet__claim">{assigneeRow.claim}</span>
-              </dd>
-            </div>
-            {/* Door G — PRIORITY, DUE, START and TYPE, drawn ALWAYS and in the
-                prototype's own order (Assignee, Priority, Due, Type, Visibility
-                — `desktop.dc.html:1183-1205`), with Start beside Due since the
-                two are the same kind of fact (spec 2026-09-22). Every one that
-                the prototype makes an editor is an editor here; Type is the one
-                row that is read-only on both, argued in the derivations above. */}
-            <div className="gn-ticket-sheet__field" data-testid="field-priority">
-              <dt>Priority</dt>
-              <dd>
-                {/* The prototype's segmented control (`desktop.dc.html:1192-1198`)
-                    on the SHARED `SegmentedControl`. Priority is a built-in that
-                    is ALWAYS present (spec 2026-09-22), so there is no clear
-                    affordance: clicking the selected segment does nothing,
-                    because there is nothing to clear to.
-
-                    `value` is the claim, or the empty string when this read
-                    carries none — a value matching NO option, which is the
-                    component's documented fallback (nothing selected, first tab
-                    still focusable). It is NOT `DEFAULT_PRIORITY`: preselecting
-                    P2 here would print a level with no claim line beside it,
-                    which is the reader-side default the spec rejected. The
-                    sentence below says why nothing is selected in that case. */}
-                <SegmentedControl
-                  options={PRIORITIES.map((level) => ({ value: level, label: level }))}
-                  value={priorityValue ?? ('' as Priority)}
-                  onChange={(next) => {
-                    if (!prioritySaving && next !== priorityValue) void submitPriority(next);
-                  }}
-                  aria-label="Priority"
-                />
-                {priorityClaim === undefined ? (
-                  <span className="gn-ticket-sheet__refusal">
-                    This ticket carries no priority claim — the server’s projection has not been
-                    rebuilt since priority became built-in.
-                  </span>
-                ) : (
-                  <span className="gn-ticket-sheet__claim">{`set by ${nameOf(priorityClaim.actorId)} on ${formatDate(priorityClaim.serverTime)}`}</span>
-                )}
-              </dd>
-            </div>
-            <div className="gn-ticket-sheet__field" data-testid="field-due">
-              <dt>Due</dt>
-              <dd>
-                {/*
-                  THE EDITOR (ruling E5-6, 2026-09-21), transcribed from the
-                  export's own row (`desktop.dc.html:1200-1203`): an
-                  `<input type="date">` followed by a note line. `value` is the
-                  draft OR the claimed day, never a second piece of state — the
-                  same `titleDraft` shape one row up — and it is the ISO day
-                  (`2026-08-30`), never `formatDate`'s label, because that is
-                  what a `type="date"` input holds and what the event carries.
-                  `onBlur` commits, `Enter` commits, `Escape` abandons the
-                  draft without closing the sheet; there is no Save button
-                  because the export has none.
-
-                  ⚠ **WHAT THIS REPLACED, AND WHY THE OLD ASSERTION MOVED.** The
-                  row used to render `formatDate(due.date)` — *"30 Aug 2026"* —
-                  as read-only text. Case 16.24 pinned that spelling as one of
-                  its "both halves"; the export's row has no such span, so the
-                  case was amended rather than left asserting a rendering this
-                  door replaces. The CLAIM line below is unchanged and still
-                  carries the attribution the old sentence carried.
-                */}
-                <input
-                  className="gn-field__input gn-ticket-sheet__due-input"
-                  type="date"
-                  aria-label="Due date"
-                  value={dueDraft ?? dueDate?.date ?? ''}
-                  disabled={dueSaving}
-                  onChange={(event) => setDueDraft(event.target.value)}
-                  onBlur={() => {
-                    if (dueDraft !== null) void submitDueDate(dueDraft);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      if (dueDraft !== null) void submitDueDate(dueDraft);
-                      return;
-                    }
-                    if (event.key === 'Escape') {
-                      // `preventDefault` is LOAD-BEARING here for the reason
-                      // the title field's own Escape branch records: `Sheet`
-                      // registers a DOCUMENT-level Escape that closes it, so an
-                      // unconsumed Escape would close the sheet and make
-                      // "abandon the draft" true of an input being unmounted.
-                      event.preventDefault();
-                      setDueDraft(null);
-                    }
-                  }}
-                />
-                {/* The prototype's own sentence for this absence
-                    (`desktop.dc.html:1203`, via `sheetDueNote`'s
-                    `: "No date claimed"` arm), transcribed rather than
-                    re-worded: an unclaimed date is not an empty one. It is the
-                    NOTE LINE the export puts under the same input. */}
-                {dueDate === null ? (
-                  <span className="gn-ticket-sheet__absent">No date claimed</span>
-                ) : (
-                  /* The SAME wording every other field row on this sheet uses
-                     (`set by … on …`), because one surface with two
-                     provenance phrasings is the drift this file's claim-line
-                     comment exists to prevent. The ABSENT copy stays the
-                     prototype's ("No date claimed") — that sentence is about
-                     the DATE, and the claim line is about the ACTOR. */
-                  <span className="gn-ticket-sheet__claim">{`set by ${nameOf(dueDate.actorId)} on ${formatDate(dueDate.serverTime)}`}</span>
-                )}
-              </dd>
-            </div>
-            {/* START — a built-in that has been on every ticket since Plan 3 and
-                that this sheet never drew (spec 2026-09-22). It sits between Due
-                and Type, and it is Due's TWIN in every respect the spec names:
-                the same `<input type="date">`, the same commit on blur and on
-                Enter, the same Escape that abandons the draft without closing
-                the sheet, the same `null`-for-empty payload, and the same
-                absent copy — `No date claimed`, which is the PROTOTYPE's own
-                sentence for either date and not a second wording invented for
-                this row. `submitStartDate` says why the two are copies rather
-                than one shared hook. */}
-            <div className="gn-ticket-sheet__field" data-testid="field-start">
-              <dt>Start</dt>
-              <dd>
-                <input
-                  className="gn-field__input gn-ticket-sheet__start-input"
-                  type="date"
-                  aria-label="Start date"
-                  value={startDraft ?? startDate?.date ?? ''}
-                  disabled={startSaving}
-                  onChange={(event) => setStartDraft(event.target.value)}
-                  onBlur={() => {
-                    if (startDraft !== null) void submitStartDate(startDraft);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      if (startDraft !== null) void submitStartDate(startDraft);
-                      return;
-                    }
-                    if (event.key === 'Escape') {
-                      // Load-bearing for the reason the Due row's own branch
-                      // records: `Sheet` registers a DOCUMENT-level Escape, so
-                      // an unconsumed one would close the sheet and make
-                      // "abandon the draft" true of an input being unmounted.
-                      event.preventDefault();
-                      setStartDraft(null);
-                    }
-                  }}
-                />
-                {startDate === null ? (
-                  <span className="gn-ticket-sheet__absent">No date claimed</span>
-                ) : (
-                  <span className="gn-ticket-sheet__claim">{`set by ${nameOf(startDate.actorId)} on ${formatDate(startDate.serverTime)}`}</span>
-                )}
-              </dd>
-            </div>
-            <div className="gn-ticket-sheet__field" data-testid="field-type">
-              <dt>Type</dt>
-              <dd>
-                {/* The NAME from the workspace ladder, or the id when the
-                    ladder does not hold it — never an invented label. No claim
-                    line: a type is not a claim, it is fixed at creation. */}
-                <span>{ticketTypeName}</span>
-              </dd>
-            </div>
-            {/*
-              THE DESCRIPTION IS A ROW WHETHER OR NOT ANYBODY HAS EVER CLAIMED
-              ONE — and that is the half the dispatch did not name, found by
-              measuring the reducer rather than the sheet.
-
-              `ticket.created` writes `fields: { title: claim(p.title, env) }`
-              and NOTHING else (`packages/domain/src/ticket-state.ts:160`), and
-              no other path writes a description except an explicit
-              `ticket.field_set` (`create-ticket-flow.tsx:209` submits
-              `ticket.created` alone). So on a ticket nobody has described there
-              is no `description` key at all — and this row used to live INSIDE
-              the `Object.entries(state.fields)` loop below. The editor it mounts
-              had nowhere to mount, and the owner saw no description and no way
-              to add one. **Flipping `readOnly` alone would have changed almost
-              nothing**: it would have enabled editing for the few tickets that
-              already carry a claim, which is precisely the shape of a fix that
-              passes its own test and does not do the thing.
-
-              Lifted out on the ASSIGNEE row's precedent, eleven lines up: a row
-              the sheet draws unconditionally, whose claim line states what is
-              actually known. The loop below now skips `description`, so the row
-              is drawn once.
-            */}
-            <div className="gn-ticket-sheet__field" data-testid="field-description">
-              {/* The field id was leaking into the UI: `:2454` renders
-                  `{fieldId}` for custom fields, and this row copied that shape
-                  instead of writing a caption, so the sheet read "description"
-                  beside "Assignee", "Priority", "Due" and "Type" (exec4 E4-4).
-                  Title case, matching those siblings. */}
-              {/* The caption, and the `id` the composer below is NAMED BY
-                  (exec1 P21). The `id` is load-bearing, not decorative: it is
-                  what `EditorSlot`'s `labelledBy` points at, so the words a
-                  sighted reader sees here and the name a screen reader
-                  announces are the SAME NODE and cannot drift. An `id` that
-                  nothing references would be a leftover — if this mount ever
-                  stops passing `labelledBy`, delete it in the same change. */}
-              <dt id="gn-ticket-sheet-description-label">Description</dt>
-              <dd>
-                {/*
-                  ⚠ BOTH BRANCHES ARE LIVE AND NEITHER IS DEAD CODE — do not
-                  collapse them. `editorSlot` is the app's real Tiptap composer;
-                  `PlainTextEditorSlot` is this package's read-only default,
-                  which renders the document and offers no control to type into.
-                  A build that has not wired an editor is not a broken build, and
-                  the fallback is the correct behaviour for it — what was wrong
-                  was that the editor was never available. THIS CHANGE IS THE ONE
-                  THAT MAKES THE FIRST BRANCH REACHABLE FROM `apps/web`.
-
-                  `submit` is what makes a mounted editor usable at all:
-                  `TicketEditorSlot` disables its control and NAMES the gap when
-                  it is absent ("there is nowhere to send the words"). It is
-                  passed unconditionally because the read-only fallback ignores
-                  every capability prop on purpose.
-                */}
-                <EditorSlot
-                  mode="description"
-                  // The composer is NAMED BY the `<dt>` above rather than given
-                  // its own copy of the words (exec1 P21) — the same mechanism
-                  // the ticket sheet's tablist fix used, and the reason this row
-                  // does not also pass a `label` to contradict it.
-                  labelledBy="gn-ticket-sheet-description-label"
-                  doc={descriptionClaim?.value}
-                  readOnly={!canEditDescription}
-                  workspaceId={workspaceId}
-                  ticketId={ticketId}
-                  placeholder="No description yet"
-                  submit={submitDescription}
-                  queryUsers={queryUsers}
-                  onError={reportEditorError}
-                />
-                <span className="gn-ticket-sheet__claim">{descriptionClaimLine}</span>
-              </dd>
-            </div>
-            {Object.entries(state.fields).map(([fieldId, fieldClaim]) => {
-              // Drawn above, unconditionally. A second pass here would mount a
-              // SECOND editor over one claim and make `field-description`
-              // ambiguous to `getByTestId` — two controls for one field.
-              //
-              // `dueDate`, `startDate` and `priority` join it for door G, and the
-              // reason is the same one rung less severe: all three are drawn as
-              // their OWN rows above, so a second pass would render **two rows
-              // for one claim**. Without this the sheet shows a `field-dueDate`
-              // beside the `field-due` this task adds, which is exactly the
-              // ambiguity the description line exists to prevent — and it would
-              // be INVISIBLE on any fixture whose ticket carries no such field.
-              // `startDate` is the third (spec 2026-09-22) and the newest: the
-              // rows above are `field-due`, `field-start` and `field-priority`.
-              if (
-                fieldId === 'description' ||
-                fieldId === 'dueDate' ||
-                fieldId === 'startDate' ||
-                fieldId === 'priority'
-              ) {
-                return null;
-              }
-              return (
-                <div key={fieldId} className="gn-ticket-sheet__field" data-testid={`field-${fieldId}`}>
-                  <dt>{fieldId}</dt>
-                  <dd>
-                    <span>{renderFieldValue(fieldClaim.value)}</span>
-                    <span className="gn-ticket-sheet__claim">
-                      {`set by ${nameOf(fieldClaim.actorId)} on ${formatDate(fieldClaim.serverTime)}`}
-                    </span>
-                  </dd>
-                </div>
-              );
-            })}
-          </dl>
-
-          {/*
-            Spec §6's audience section. **⚠ CORRECTED 2026-09-20.** This read: "It
-            is mounted here and it is DARK against the shipped server: this
-            component returns its refusal branch above whenever `getTicket`
-            rejects, and `getTicket` refuses today (`mapTicketRead`, one of the six
-            serving gaps). So nobody reaches this line in production until that
-            read is served — which is why the editor's own behaviour is proven in
-            `test/views/visibility-editor.test.tsx`, driving the component
-            directly, rather than through a fabricated successful read here."
-            Ruling P25 clause 1 (`c86c4b5c`, 2026-09-06) served that read, so a
-            person DOES reach this line and the section is not dark. Whether this
-            mount should now be proven HERE rather than only in the editor's own
-            suite is a test-design decision this correction does not take: *owner,
-            whoever next touches either file.*
-          */}
-          <VisibilityEditor
-            dataSource={dataSource}
-            workspaceId={workspaceId}
-            ticketId={ticketId}
-            currentUserId={currentUserId}
-            members={members.data ?? []}
-            current={standingVisibility}
-            canEdit={canSetVisibility}
-            onChanged={() => {
-              read.reload();
-              history.reload();
-            }}
-          />
 
           {/*
             THE COMMENT THREAD AND ITS BOX — the block at

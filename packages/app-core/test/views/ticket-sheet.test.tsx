@@ -162,11 +162,19 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
   it('renders the state with its provenance line and each field with its claim', async () => {
     renderSheet(ticketRead());
     await settled();
-    // The title is the sheet's own label AND a field claim, so it is asserted
-    // in both places rather than by a bare text match that finds two nodes.
+    // The title is the sheet's own label, so it is asserted where it is edited
+    // rather than by a bare text match that finds two nodes.
     expect(screen.getByRole('dialog', { name: 'File the GST return' })).toBeInTheDocument();
-    const titleRow = screen.getByTestId('field-title');
-    expect(within(titleRow).getByText('File the GST return')).toBeInTheDocument();
+    // ⚠ A `field-title` ROW WAS ASSERTED HERE UNTIL 2026-09-22 AND IT IS DELETED
+    // (spec `2026-09-22-sheet-prototype-parity-design.md` decision 4). The generic
+    // field loop below drew a SECOND, read-only title row beside the header
+    // control, because its exclusion list named `description`, `dueDate` and
+    // `priority` but not `title` — so the sheet printed the title twice, one copy
+    // of it a control nobody could type into. **The title is still on the sheet**,
+    // in the header, and this is the positive control for that: a bare
+    // `queryByTestId('field-title')` alone would pass for a build that dropped the
+    // title altogether.
+    expect(screen.getByLabelText('Ticket title')).toHaveValue('File the GST return');
     const dueDateRow = screen.getByTestId('field-due');
     expect(within(dueDateRow).getByText('set by Kiro on 18 Aug 2026')).toBeInTheDocument();
     // The due DAY CLAIM renders as claimed — as the editor's own VALUE since
@@ -204,7 +212,15 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     // `type` is deliberately NOT in this list and is not an omission: a ticket's
     // type is fixed at creation and is not a CLAIM, so its row carries no claim
     // line. Adding it here would assert the opposite of what the sheet means.
-    for (const fieldId of ['title', 'due']) {
+    // ⚠ `'title'` WAS IN THIS LIST UNTIL 2026-09-22 and its row is deleted (spec
+    // decision 4) — the title is edited in the header, and the generic loop's
+    // exclusion list now names it. On THIS fixture `due` is the only row left that
+    // carries a `set by …` claim: the assignee is unassigned (its row says so in
+    // its own words rather than with a claim line), the description has no claim,
+    // and the custom-field loop draws nothing because this ticket has no custom
+    // fields. A list that named a row the sheet no longer draws would be an
+    // assertion about a string the case itself invented.
+    for (const fieldId of ['due']) {
       const row = screen.getByTestId(`field-${fieldId}`);
       expect(row.querySelector('.gn-ticket-sheet__claim')?.textContent, fieldId).toMatch(
         /^set by .+ on \d{1,2} \w{3} \d{4}$/,
@@ -2882,6 +2898,119 @@ describe('sheet prototype parity — the header, the parent line and the tabs', 
     const tablist = screen.getByRole('tablist', { name: 'Ticket sections' });
     expect(chips.compareDocumentPosition(parent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(parent.compareDocumentPosition(tablist) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+/**
+ * TASK 4 of `docs/superpowers/plans/2026-09-22-sheet-prototype-parity.md` — the
+ * description above the grid, the State row, the deleted generic `title` row, the
+ * alternating tinted rows, and the sheet-side mount of `VisibilityEditor` into the
+ * `field-visibility` row (Task 5's leftover).
+ *
+ * ⚠ **THE PLAN'S OWN `ids` ARRAY WAS STALE AND IS CORRECTED HERE.** It read
+ * `field-description · field-state · field-assignee · field-priority · field-due ·
+ * field-type · field-visibility · sheet-subtasks · sheet-comments`. **`field-start`
+ * is missing from it**, and the reason is a sequencing fact rather than an
+ * oversight in the plan's own frame: the Start row was added by the PRIORITY
+ * BUILT-IN lane (its Task 7), which landed on this branch after the plan text was
+ * written, and it sits between Due and Type there. A case built from the plan's
+ * array would have asserted an order that skips a row the sheet really draws.
+ */
+describe('sheet prototype parity — the details body order and chrome', () => {
+  it('16.113 the Details sections stand in the prototype order', async () => {
+    renderSheet(ticketRead());
+    await settled();
+    // `field-start` IS here, and the plan's array did not have it — see the
+    // describe's own note. Read off the SHIPPED file rather than the plan text.
+    const ids = [
+      'field-description',
+      'field-state',
+      'field-assignee',
+      'field-priority',
+      'field-due',
+      'field-start',
+      'field-type',
+      'field-visibility',
+      'sheet-subtasks',
+      'sheet-comments',
+    ];
+    const nodes = ids.map((id) => screen.getByTestId(id));
+    for (let i = 1; i < nodes.length; i += 1) {
+      expect(
+        nodes[i - 1]!.compareDocumentPosition(nodes[i]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+        `${ids[i - 1]} before ${ids[i]}`,
+      ).toBeTruthy();
+    }
+  });
+
+  it('16.114 the State row holds the state chip, its provenance and the Move… button — no select', async () => {
+    renderSheet(ticketRead());
+    await settled();
+    const row = screen.getByTestId('field-state');
+    expect(within(row).getByText('Doing')).toBeInTheDocument();
+    expect(within(row).getByText(PROVENANCE_LINE)).toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: 'Move…' })).toBeInTheDocument();
+    // The prototype's State row is a `<select>` that sets a state directly, and
+    // that is the half of it this build REFUSES: a transition is rule-driven
+    // (`require-comment`, `require-evidence`, `require-field`), so a select would
+    // bypass the rules. Both spellings of "a control that picks a state" are
+    // asserted absent, because `combobox` and `select` are not the same query.
+    expect(row.querySelector('select')).toBeNull();
+    expect(within(row).queryByRole('combobox')).toBeNull();
+  });
+
+  it('16.115 the title is edited in the header and draws NO generic field row', async () => {
+    renderSheet(ticketRead());
+    await settled();
+    // The generic loop drew a second, read-only `title` row because its exclusion
+    // list named `description`, `dueDate` and `priority` but not `title`. The
+    // title is edited in the header (`titleSlot`), so the row was a duplicate of
+    // the header control — nothing is lost by deleting it.
+    expect(screen.queryByTestId('field-title')).toBeNull();
+    // The positive control: the title really is still on the sheet, in the header,
+    // so "no field-title" cannot pass for a build that dropped the title.
+    expect(screen.getByLabelText('Ticket title')).toHaveValue('File the GST return');
+  });
+
+  it('16.116 every second row of the grid is tinted, by class', async () => {
+    renderSheet(ticketRead());
+    await settled();
+    const rows = [
+      ...(screen.getByTestId('field-state').parentElement as HTMLElement).querySelectorAll(
+        '.gn-ticket-sheet__field',
+      ),
+    ];
+    // The count is asserted first: the loop below is a `forEach`, and a grid that
+    // rendered NO rows would pass it by running zero times.
+    expect(rows.length).toBeGreaterThanOrEqual(6);
+    rows.forEach((row, index) => {
+      expect(row.classList.contains('gn-ticket-sheet__field--tinted'), `row ${index}`).toBe(
+        index % 2 === 1,
+      );
+    });
+  });
+
+  it('16.117 the description block precedes the grid and keeps its caption as the editor’s name', async () => {
+    renderSheet(ticketRead());
+    await settled();
+    const block = screen.getByTestId('field-description');
+    const grid = screen.getByTestId('field-state').closest('dl')!;
+    expect(block.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The `id` is load-bearing rather than decorative: it is what the mounted
+    // `EditorSlot`'s `labelledBy` points at, so the words a sighted reader sees and
+    // the name a screen reader announces are the SAME NODE. It survives the move
+    // out of the `<dl>` into its own section.
+    expect(block.querySelector('#gn-ticket-sheet-description-label')).not.toBeNull();
+  });
+
+  it('16.117 CONTROL — the description block is NOT inside the grid', async () => {
+    renderSheet(ticketRead());
+    await settled();
+    const grid = screen.getByTestId('field-state').closest('dl')!;
+    // The direction 16.117's order assertion cannot see: a block moved to the top
+    // of the `<dl>` would also precede `field-state`, and the prototype puts it
+    // above the grid ENTIRELY. `closest('dl')` from the block is the measurement.
+    expect(grid.contains(screen.getByTestId('field-description'))).toBe(false);
   });
 });
 
