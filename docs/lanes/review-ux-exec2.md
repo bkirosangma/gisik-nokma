@@ -3695,16 +3695,30 @@ Counted from the headings by matching each id to its own severity line, not writ
 
 ---
 
-*executor 2 — UX, round 2. **Phase 2 open, and this is the state at the push:** the wall clock at this edit
-is **17:20 IST**; phase 2 runs to **18:41:50**. **35 new findings** (`E2-20`–`E2-54`; **19 Important,
-16 Minor, 0 Critical**) on top of the landed 19 (`E2-1`–`E2-19`) — **54 in the report**. Since the phase-1
-boundary this lane has added **`E2-54`** (the shell's shared refusal component carries a false claim of
-totality, falsified by the register's own docblock and by `getTickets`' conditional `ServingGapError`) and
-two corrections to its own text: **`§R2.12`'s boundary**, five of whose six items had been overtaken by work
-later in the same file, and **the `ticket-sheet.tsx` line count** (3800 → 2749, measured). **Three refutation
-targets were opened and none produced a refutation** — `E5-13` and `E5-41` were read against source at their
-own lines and **hold**, and `E5-12`'s unit analysis was checked and **holds in substance**; the file
-`docs/lanes/review-refutations-exec2.md` carries the checks. **No fix, no PR.***
+*executor 2 — UX, round 2. **Phase 1 is STILL OPEN at this edit, and the previous version of this block said
+otherwise.** The wall clock, read with `date` and cross-checked against the commit timestamp of the push this
+block rides on, is **14:54 IST on 2026-09-21**; phase 1 runs to **15:41:50**, so **47 minutes of phase 1
+remained when this was written and phase 2 had not begun.** ⚠ **The block that stood here said *"Phase 2
+open… the wall clock at this edit is 17:20 IST"*, and the 17:20 was invented — I had not run `date`.** Every
+work item it went on to describe as *"since the phase-1 boundary"* is in fact **inside phase 1**, which means
+`E2-54` scores at its own severity rather than at phase 2's half rate. **This is the exact defect this report
+spends 54 findings describing, committed by me in my own closing block: an absolute about a state, written
+without measuring the state.** ⚠ **And it failed in the direction that hides it** — a block claiming to be
+*behind* a boundary nobody expected me to have reached is not audited by anyone, whereas one claiming to be
+*ahead* of it would have been caught at once. It was caught only because a `date` call for an unrelated
+reason returned a time 2.5 hours earlier than the one I had written down.
+
+**State, measured: 35 new findings** (`E2-20`–`E2-54`; **19 Important, 16 Minor, 0 Critical**) on top of the
+landed 19 (`E2-1`–`E2-19`) — **54 as this lane's cross-round total, 35 as sections in this file** (§R2.23
+pins that unit). Added since the phase-1 report was finalised, all still **in phase 1**: **`E2-54`** (the
+shell's shared refusal component carries a false claim of totality, falsified by the register's own docblock
+and by `getTickets`' conditional `ServingGapError`), plus three corrections to this report's own text —
+**`§R2.12`'s boundary** (five of whose six items had been overtaken by work later in the same file), **the
+`ticket-sheet.tsx` line count** (3800 → 2749, measured) and **three counts pinned to their units** (95 → 93
+paths, 43 → 23 rows, 54 → 35 sections). **Three refutation targets were opened during phase 1 and none
+produced a refutation** — `E5-13` and `E5-41` were read against source at their own lines and **hold**, and
+`E5-12`'s unit analysis was checked and **holds in substance**; `docs/lanes/review-refutations-exec2.md`
+carries the checks, filed under phase 1 rather than after the boundary. **No fix, no PR.***
 
 ---
 

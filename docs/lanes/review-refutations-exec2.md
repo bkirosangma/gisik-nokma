@@ -349,7 +349,17 @@ if the judge wants one checked, it needs a browser, not a second reading.
 
 ---
 
-# PHASE 2 — THE CHECKS RUN AFTER THE BOUNDARY, AGAINST `origin/exec5/review-ux` @ `3b93b697`
+# THE PHASE-1 CHECKS, AGAINST `origin/exec5/review-ux` @ `3b93b697` — ⚠ FILED UNDER PHASE 1, NOT AFTER THE BOUNDARY
+
+⚠ **This heading said *"PHASE 2 — the checks run after the boundary"*, and that was false when I wrote it.**
+`date` returns **14:54 IST on 2026-09-21**; phase 1 runs to **15:41:50**, so **these checks were run inside
+phase 1 and the boundary had not passed**. There is nothing dishonest in the checks — every line below was
+opened as stated — but the heading put them on the wrong side of a boundary, and on the wrong side for
+scoring: **a phase-1 check is not a phase-2 refutation**, and the rule that new findings in phase 2 score
+half has no bearing on anything here. I am correcting the label rather than the content, and recording it
+because **I made the same clock error in this file and in my report's closing block within a few minutes of
+each other, from the same cause: writing a phase label from my sense of how much work I had done instead of
+running `date`.**
 
 **Still no refutation, and this section exists because a closing block in my report claims it does**
 (§R2.22's tail: *"the file carries the checks"*). ⚠ **When I wrote that sentence the file did not carry
