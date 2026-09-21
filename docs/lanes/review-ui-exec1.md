@@ -346,7 +346,13 @@ Under **§3** that is the shape a judge must look at hardest: *"the 'defect' is 
 - **My first attempt at this reported 9 more hits and was wrong** — all nine were `apps/web/.next/types/app/*/page.ts`, Next's generated type files from a build I had just run, and `.next` is gitignored (`git check-ignore` → `.gitignore:18`). **The control that caught it was a `git check-ignore` on one of the hits**, not the grep. Recorded in §10.
 - `<title>` tags in source: **none**.
 
-**WHY IT IS WRONG.** WCAG 2.4.2 *Page Titled* is Level A and asks that pages have titles describing topic or purpose. One title for a 25-route product means the title distinguishes nothing: a screen-reader user moving between routes gets no announcement of where they have arrived, and a browser history of twenty entries is twenty identical strings. This is not a stylistic preference — it is the one Level A criterion in this lane that fails product-wide.
+**WHY IT IS WRONG — and the argument is the W3C's own, not mine.** WCAG 2.2 §2.4.2 *Page Titled* is **Level A**: *"Web pages have titles that describe topic or purpose."*
+
+**⚠ ROUND 1 ARGUED THIS FROM UNIQUENESS, AND THE UNDERSTANDING DOC EXPLICITLY DISCLAIMS THAT — so the argument is replaced rather than kept.** I fetched `https://www.w3.org/WAI/WCAG22/Understanding/page-titled.html` and read it: it *"does not impose a uniqueness requirement"*, frames distinguishing as a benefit (*"Page titles help users identify and distinguish different pages"*) rather than a mandate, and sets the goal as *"Each web page has a meaningful title."* **A refuter quoting that would have taken this finding and its ×3.** The criterion's actual emphasis is orientation — *"Titles identify the current location without requiring users to read or interpret page content"* — and, decisively for this product:
+
+> **"for web applications (single page applications) where the view changes dynamically, the title should also be changed dynamically to reflect the content or topic of the current view."**
+
+**Gisik Nokma is exactly that: a single-page application whose view changes dynamically, and whose title never changes at all.** `layout.tsx:8` sets `{ title: 'Gisik Nokma' }`, no source file declares `generateMetadata`, and `<title>` appears in no source file — so `/sign-in`, `/inbox`, `/help`, a board, a ticket sheet, `/settings` and the 404 all carry the same string. The title names the *product* and never the *view*, which is the one thing the Understanding document says to do here.
 
 **WHAT WOULD HAVE BEEN BETTER.** A `title` per route — `Settings · Gisik Nokma`, `Shop operations · Gisik Nokma` — set through Next's own `metadata`/`generateMetadata` on the route modules that already exist. The client-rendered routes (`'use client'`) would need `generateMetadata` in a small server wrapper or a `document.title` effect; either is a handful of lines per route, and the workspace/project ones already resolve their names via `use-workspace-name`/`use-project-name`.
 
@@ -529,7 +535,7 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 - `P16` ⚠ r2 — `neo-card-radius.test.ts` asserts a declaration is ABSENT through a truncating scanner, so it cannot fail
 - `P17` ⚠ r2 — `/my-work`'s outline skips level 2, and nothing measures heading level or order
 - `P10` the accessible-name ratchet's unit is an attribute; its message claims a property of assistive tech
-- `P13` no skip link; a keyboard-only user Tabs the nav on every navigation (WCAG 2.4.1)
+- `P13` no skip link; a keyboard-only user Tabs the nav on every navigation (**the 2.4.1 claim is withdrawn in the body** — a landmark is a sufficient technique and `<main>` is on every route, so this is a keyboard-convenience finding, not a conformance one)
 
 **Total 21.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
