@@ -2179,8 +2179,29 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    write this class name followed by a brace in a comment** — the scan reads raw
    text, comments included, so reproducing the pattern here reintroduces it.
    (That is not hypothetical: this comment did exactly that on its first
-   draft, and the re-measurement caught it.) */
-.gn-ticket-sheet__priority { align-self: start; }
+   draft, and the re-measurement caught it.)
+
+   ## Why BOTH declarations, and which one does the work
+
+   The plan text prescribed `display: inline-flex` here. **On this element that
+   declaration cannot shrink the track**, because the track is a flex ITEM — a
+   direct child of `.gn-ticket-sheet__field dd`, which this file declares
+   `display: flex; flex-direction: column` at `:2108` — and a flex item's
+   inline-level `display` is BLOCKIFIED to its block-level equivalent (CSS
+   Display 3 §2.7), leaving the default `align-self: stretch` in force. That is
+   why the prototype's declaration does not transfer: in the prototype the
+   control sits in a block container, where `inline-flex` shrink-wraps it.
+
+   ⚠ **That reasoning is from the spec and this file's own two declarations, NOT
+   from a measurement — nothing in this repo can measure it.** jsdom computes no
+   layout, and the browser suites run against `main`, not against this branch.
+   So the rule carries BOTH declarations and depends on neither reading being
+   right: `align-self: start` does the work while `dd` is a flex column (and is
+   the same remedy, on the same axis, as the due input's rule above), and
+   `display: inline-flex` takes over the day `dd` is not a flex container. Today
+   it is inert — labelled here so a reader does not think it is load-bearing.
+   **Do not delete either one as redundant.** */
+.gn-ticket-sheet__priority { align-self: start; display: inline-flex; }
 /* Three states of the History tab, three renderings. `__history-error` is NOT
    `__refusal`: getTicketHistory answers, so a rejection is a failure that may
    retry, not a permanent serving gap. */
