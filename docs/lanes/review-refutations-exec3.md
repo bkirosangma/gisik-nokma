@@ -98,4 +98,4 @@ lines and said 6 where it listed 7; the two never-read lines are these. The last
 sweep for forward-looking sentences (report §70), which also found the 6.57/6.58/6.84 premises standing in ten source
 comments — recorded as the trio's width, not filed.
 
-**Stamp:** 15:39 IST; report at the head of this branch; branch heads as listed above (exec 6 re-fetched 15:39: `2ee7cc03` at 15:29 — R6-1…R6-3 against UX lanes, E6-26 filed at half, defence notes for E6-10/17/19/20/21; nothing against this lane).
+**Stamp:** 15:46 IST — submitted state. Every lane's refutations file re-read at 15:46 (`exec6` `e60ede40` 15:45, `exec5` `d3234320`, `exec4` `872758a3`, `exec1` `39924834`, `exec2` `25d5ce81`): no refutation names an E3 finding; exec 6 adopted this lane's E6-14 interval measurement as a correction to its own headline (`a53a6929`). A watcher polls the five files until 16:50; anything that lands after 17:05:23 is answered by §67 or not at all (see the header).
