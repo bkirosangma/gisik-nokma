@@ -177,7 +177,10 @@ the resolver's identity is not checked, which 12.204 records as *"attributed to 
 `read/{ticket-cards,visible-projects}.ts` (whole), `domain/src/prefix.ts:100-180` with `13.1024` (a derived project
 prefix MOVES when a later project enters the same letters — the key is display-only, `routes/tickets.ts:551-555`,
 and the move is the case's own sentence — not filed), `checks/hierarchy.ts:125`, `:274` (cross-project reparent
-refused), `auth/auth.ts:318-345` (plugin defaults), `mcp-server/src/{config,
+refused), `auth/auth.ts:318-345` (plugin defaults), `auth/social-providers.ts` (whole: a half-configured provider
+reads as OFF by its docblock's own rule), `visibility/rollup.ts` (whole; `proj_rollups` has no product reader —
+`getRollup` is called from tests only — and `rollup.ts:79-96` records why the cards do not read it; not filed),
+`projections/workflows.ts` (whole), `mcp-server/src/{config,
 device-login,lazy-session,main,login-prompt}.ts` (whole), `app-core/src/online/stream.ts:95-160`, `:273-324` (frame
 parsing and cursor advance), `sync-client/src/replica/replica.ts:1050-1103`, `:1254-1290` (purge, scope-revoked,
 reach-granted arms), **the five route modules previously grep-only, code lines whole** — `routes/{attention,board,
@@ -253,8 +256,7 @@ size: 6 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ 
   than the three named; `read/` other than the two named; `sync/{sync-service,reconcile-route}.ts` beyond the cited
   lines; `seed/*`; `http/{security-headers,hsts,rate-limit}.ts` beyond a grep; `auth/*` other than `auth.ts` and `synthetic-address.ts` (whose guard hides a synthetic
   address in rosters and is not consulted by the magic-link door — safe only because `.invalid` never resolves;
-  noted, not filed); `tools/sweep-notifications.ts`; `visibility/{rollup,visible-events-for}.ts` as code (rollup opened at `:258-266`,
-  `:68-108`; visible-events-for exercised by Appendix AE, not read); `alerts/`, `workspaces/`.
+  noted, not filed); `tools/sweep-notifications.ts`; `visibility/visible-events-for.ts` as code (exercised by Appendix AE, not read); `alerts/`, `workspaces/`.
 - **No browser, no pixel, no `apps/web` beyond `members/page.tsx:720-856`; `apps/mobile` and `apps/desktop`
   opened only at their `ds.query.*` call sites and the lines that render the result (E6-24).**
 - `apps/server/src/routes/`: every route module has now been both *called* (Appendices P/Q/Z hit all 23 read
