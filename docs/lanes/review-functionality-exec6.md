@@ -1480,6 +1480,14 @@ what was looked at and found sound, not only what was found wrong.
   ROLLBACK` against the dev database on 54330; every one was refused by the trigger before it reached a row and
   the transaction was rolled back, so nothing changed — but a strict reading of "54330 read-only" would have used
   the test server, and I note that rather than let the measurement imply otherwise.
+- **The provenance guards hold on both write doors** (Appendix AB; 1 file / 1 test passed, eight envelopes × two
+  doors): a forged `origin: 'server'` → `permission.role` refusal on `/v1/events` and a recorded **contest** on
+  `/v1/sync` (the attempt is in the ledger with the envelope embedded); a foreign or random `actorId` →
+  `permission.role` / `actor-mismatch`; a client-filed `claim.contested` → `contest.server-only` /
+  `reserved-type`; a `clientTime` of `2026-02-30` → `malformed-envelope: must be a real calendar datetime` (the
+  instant check E6-19 wishes the day check had); client-supplied `serverTime`/`seq`/`workspaceSeq` are accepted and
+  **overwritten** by the spread at `ingest-service.ts:176-177` (`{ ...submitted, serverTime, seq, workspaceSeq }`,
+  server values last); a `clientTime` a year in the future commits (skew is advisory, `clock-skew.ts`).
 - **The ingest pipeline's order is what the docblocks say.** `ingest-service.ts:164-360`: workspace lock →
   entity lock → entity↔workspace guard → permission gate (through the transaction's `client`, `:235-245`) →
   contest coherence → engine → server gates → append → refresh-on-publish → projections → COMMIT. Read at the
@@ -5273,6 +5281,141 @@ describe('exec6 probe: an external (non-member) person on an explicit list', () 
     expect((await post(WS, { kind: 'membership', id: membershipId(WS, ext.userId) }, 'membership.granted', { userId: ext.userId, role: 'guest' }, ownerId, ownerToken)).status).toBe('committed');
     const after = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${T}`, headers: { authorization: `Bearer ${ext.token}` } });
     out.push(`control: same person as a GUEST, GET detail -> ${after.statusCode}`);
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix AB — the provenance-guard sweep (positive finding, §5)
+
+File path in the tree: `apps/server/test/zz-exec6-probe-prov.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-prov.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: do the provenance guards hold on both write doors — forged origin, foreign actorId, client-filed contest, forged serverTime/seq?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 sweep: provenance guards on both write doors', () => {
+  it('records the answers', async () => {
+    const out: string[] = [];
+    const T = newUlid();
+    expect((await post(WS, { kind: 'ticket', id: T }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title: 'prov' }, ownerId, ownerToken)).status).toBe('committed');
+    const base = () => ({ id: newUlid(), workspaceId: WS, entity: { kind: 'ticket', id: T }, type: 'comment.added', version: 1, payload: { body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'x' }] }] } }, actorId: ownerId, origin: 'web', clientTime: new Date().toISOString() });
+    const cases: Array<[string, Record<string, unknown>]> = [
+      ['origin: server (forged)', { ...base(), origin: 'server' }],
+      ['actorId: the PEER (foreign actor, owner session)', { ...base(), actorId: peerId }],
+      ['actorId: random ULID', { ...base(), actorId: newUlid() }],
+      ['claim.contested filed by a client', { ...base(), type: 'claim.contested', payload: { originalEvent: base(), rule: 'x', reason: 'y' } }],
+      ['serverTime + seq supplied by the client', { ...base(), serverTime: '2020-01-01T00:00:00.000Z', seq: 1, workspaceSeq: 1 }],
+      ['clientTime a year in the future', { ...base(), clientTime: '2027-09-21T00:00:00.000Z' }],
+      ['clientTime not a real instant (Feb 30)', { ...base(), clientTime: '2026-02-30T00:00:00.000Z' }],
+      ['control: honest comment', base()],
+    ];
+    for (const door of ['/v1/events', '/v1/sync']) for (const [label, ev] of cases) {
+      const res = await app.inject({ method: 'POST', url: door, headers: auth(ownerToken), payload: { events: [ev] } });
+      let line = `${res.statusCode}`;
+      try { const r = res.json<{ results?: Array<Record<string, unknown>> }>().results?.[0]; if (r) line += ` ${r['status']}${r['rule'] || r['code'] ? ` (${r['rule'] ?? r['code']}: ${String(r['reason'] ?? r['message']).slice(0, 70)})` : ''}`; else line += ' ' + res.body.slice(0, 90); } catch { line += ' ' + res.body.slice(0, 90); }
+      out.push(`${door.padEnd(11)} ${label.padEnd(48)} -> ${line}`);
+    }
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
   });
