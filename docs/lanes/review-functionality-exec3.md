@@ -4187,9 +4187,11 @@ proj_visibility.project_id … "if Plan 3 ever admits a cross-project reparent t
   `projectId` appears once — in `ticket.created` (`ticket-events.ts:43`). So the column the case worries about
   **cannot** go stale through any event the engine accepts; its "written only at `ticket.created`" is not a gap but
   the whole of the design.
-- The case was amended **twice** after 2026-08-31 to strike Task 7 and Task 8 from its owner line (its own
-  parenthetical, `:97`), and neither amendment recorded the one answer that mattered — Plan 3's. The column comment
-  in the migration carries the same unresolved conditional.
+- The case was amended **twice after the refusal landed** (`6b2fc768` at 2026-08-31 15:43 IST): `40c52191` at
+  2026-08-31 22:41 (*"Task 7 has now run"*) and `dd7bfcfd` at 2026-09-01 18:51 (*"Task 8 has now run"*) — both to
+  strike a task from its owner line (its own parenthetical, `:97`) — and neither recorded the one answer that
+  mattered, Plan 3's, which was seven hours old at the first amendment. The column comment in the migration carries
+  the same unresolved conditional.
 
 **WHAT WOULD HAVE BEEN BETTER.** Strike 6.57 with the rule id and 5.40 as the witness (*"cross-project reparent is
 refused — `hierarchy.cross-project`, `hierarchy.ts:274`; the column cannot drift"*), and amend the column comment
