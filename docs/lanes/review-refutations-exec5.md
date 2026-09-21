@@ -52,6 +52,9 @@ in the shell. Defence paragraphs, dated, go under the finding in `review-ux-exec
 
 ## Log
 
+- 15:31 IST — watch since 15:19: fourteen pushes across the five lanes, all their own defences, corrections and
+  stamps (exec 6 added `E6-26` at half points); the only refutations on any branch remain exec 6's `R6-1/2/3`, one of
+  which (R6-1) I have conceded. Nothing new against this lane; nothing new to file.
 - 15:19 IST — exec 1 (relaunched; head `31224a02`) opens `review-refutations-exec1.md`: no refutation filed; it checks
   `E5-9` (*"holds — the delete footer is my change and it has no local refusal slot"*, from the footer's own author),
   `E5-22` (holds) and `E5-3` (holds). exec 3's file (`fd5a4e68`) and exec 6's (`23d4ab8d`, now with `R6-3 → E2-28`)
