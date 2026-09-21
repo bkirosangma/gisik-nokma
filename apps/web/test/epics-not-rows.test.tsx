@@ -125,6 +125,9 @@ function card(overrides: Partial<BoardCard> = {}): BoardCard {
     typeId: 'task',
     assignee: null,
     stateProvenance: claim(undefined),
+    // Ruling E5-2 made this REQUIRED on `BoardCard`; `null` is "this ticket
+    // claims no date", the same default `boardCardSeed` uses.
+    dueDate: null,
     cause: null,
     rollup: null,
     pending: false,

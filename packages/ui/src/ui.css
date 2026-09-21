@@ -987,6 +987,26 @@ button.gn-ticket-sheet__crumb--link {
 }
 .gn-board-card__meta { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.4rem; flex-wrap: wrap; }
 .gn-board-card__progress { color: var(--gn-text-muted); font-size: 0.8rem; }
+/* Ruling E5-2 (2026-09-21) — the card's DUE LABEL: the export's meta line
+   (`EXPORT:2493-2504`, `bits.push(di.label)` coloured
+   `di.late ? "var(--danger)" : "var(--label2)"`), which the product's card
+   drew none of while the sheet, the List, `my-work`, the Calendar and the
+   Timeline all carried the date — and the Board is the DEFAULT tab.
+
+   The `late` arm is not a second colour and nothing else: `font-weight` moves
+   too, so "this date has passed" is legible to a reader who cannot tell the
+   two inks apart. (The export conveys it by colour alone.) That is the same
+   reasoning `.gn-ticket-sheet__delete` records for its own 600.
+
+   `--gn-danger` as INK — not `--gn-danger-text`, which is the ink ON a danger
+   ground (`tokens.ts`: `dangerText` pairs with `danger`, minimum 4.5) and is
+   the inverse of what a label on a card needs. The ground here is the card's,
+   `--gn-surface-raised` via `.gn-card`, and this pair is already measured in
+   this file: `.gn-ticket-sheet__delete` cites `--gn-danger` on that same
+   ground clearing 4.5 in all six style×theme combinations, worst 5.0392. A
+   small label needs 4.5, and the pair is the same one.  */
+.gn-board-card__due { color: var(--gn-text-muted); font-size: 0.8rem; }
+.gn-board-card__due--late { color: var(--gn-danger); font-weight: 600; }
 .gn-board-card__provenance {
   font: inherit;
   font-size: 0.78rem;

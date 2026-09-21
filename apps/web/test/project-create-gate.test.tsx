@@ -110,6 +110,9 @@ const BOARD: BoardView = {
               typeId: 'task',
               assignee: null,
               stateProvenance: PROVENANCE,
+              // Ruling E5-2 made this REQUIRED on `BoardCard`; `null` is "this
+              // ticket claims no date", the same default `boardCardSeed` uses.
+              dueDate: null,
               cause: null,
               rollup: null,
               pending: false,

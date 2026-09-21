@@ -76,6 +76,9 @@ export function boardCardSeed(overrides: Partial<BoardCard> = {}): BoardCard {
     stateProvenance: claim(),
     cause: null,
     rollup: null,
+    // Ruling E5-2 — `null` is "nobody is claiming a date", the same default
+    // `listRowSeed` below uses. A case that wants a date passes one.
+    dueDate: null,
     pending: false,
     ...overrides,
   };

@@ -2462,6 +2462,15 @@ function ProjectBoard() {
                   */
                   epicsHidden={boardNarrowing.epicsDropped > 0}
                   /*
+                    RULING E5-2 — the board's one relation to the present. The
+                    SAME `today` the Calendar and Timeline tabs are handed two
+                    blocks up: one `istToday()` per render, so the three views
+                    cannot disagree about which day it is. `Board` draws the
+                    late tone from it and draws nothing extra without it (its
+                    own `BoardProps.today` docblock).
+                  */
+                  today={today}
+                  /*
                     THE MOVE ARROWS' CAPABILITY (board-prototype-port Task
                     13). Gated on `session.kind === 'signed-in'`, the SAME
                     precedent `createRegion` above already sets for

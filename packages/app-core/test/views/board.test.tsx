@@ -13,6 +13,7 @@ import { isUlid, type IngestResult } from '@gisik-nokma/domain';
 import type { BoardCard, BoardGroup, BoardView } from '../../src/view-types.js';
 import { Board, EMPTY_BOARD_COPY, EMPTY_COLUMN_COPY, useBoard } from '../../src/views/board.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
+import { formatDate } from '../../src/provenance.js';
 import { TICKET, WS, boardCardSeed, claim } from '../helpers/seed.js';
 
 /**
@@ -1043,5 +1044,74 @@ describe('Board — entity-keyed data-testid hooks (Plan 11 T13)', () => {
     expect(gstCard).not.toBe(licenceCard);
     expect(within(gstCard).getByText('File the GST return')).toBeInTheDocument();
     expect(within(licenceCard).getByText('Renew the trade licence')).toBeInTheDocument();
+  });
+});
+
+/**
+ * 13.1177 — ruling E5-2 (`review-ux-exec5`). The Board drew NO due date at all:
+ * `BoardCard` carried none while `TicketCard.dueDate` was already on every
+ * card the board is projected from and `ListRow` read it, so a ticket a week
+ * overdue was indistinguishable from an undated one on the project's DEFAULT
+ * tab. The export draws the label in the card's meta line and colours it
+ * `di.late ? "var(--danger)" : "var(--label2)"`. Both halves are asserted
+ * here — plus the FOUR control arms the late tone needs, because a tone that
+ * is always on and a tone that is never on both satisfy a one-armed
+ * assertion:
+ *
+ *   - a FUTURE date draws the label in the ordinary tone;
+ *   - a date due TODAY is not late (the comparison is `<`, not `<=`);
+ *   - with NO `today` the label draws in the ordinary tone — the prop's own
+ *     absence path, and the reason the tone is injected rather than read from
+ *     a device clock;
+ *   - a card claiming NO date draws no label at all, which is what stops the
+ *     first case passing on a span that is simply always rendered.
+ *
+ * `formatDate` is the expectation rather than a literal because the label's
+ * contract IS the product's one date formatter (`provenance.ts`) — the same
+ * one the List's due cell renders through. A hard-coded `'14 Sep 2026'` would
+ * pin the spelling and miss a formatter that changed under both views at once.
+ */
+describe('13.1177 the board card draws the due label, and the late tone (ruling E5-2)', () => {
+  const TODAY = '2026-09-21';
+  const DUE = '2026-09-14';
+
+  const cardDue = (date: string) => boardCardSeed({ dueDate: { date, claim: claim() } });
+
+  it('13.1177 draws a claimed due date in the card', () => {
+    render(<Board board={errandBoard([cardDue(DUE)])} onOpenTicket={() => {}} today={TODAY} />);
+    expect(screen.getByText(formatDate(DUE)).className).toContain('gn-board-card__due');
+  });
+
+  it('13.1177 a date that has passed carries the late tone', () => {
+    render(<Board board={errandBoard([cardDue(DUE)])} onOpenTicket={() => {}} today={TODAY} />);
+    expect(screen.getByText(formatDate(DUE)).className).toContain('gn-board-card__due--late');
+  });
+
+  it('13.1177 CONTROL — the same label for a FUTURE date is drawn without the late tone', () => {
+    const future = '2026-09-30';
+    render(<Board board={errandBoard([cardDue(future)])} onOpenTicket={() => {}} today={TODAY} />);
+    const label = screen.getByText(formatDate(future));
+    expect(label.className).toContain('gn-board-card__due');
+    expect(label.className).not.toContain('--late');
+  });
+
+  it('13.1177 CONTROL — a ticket due TODAY is not late', () => {
+    render(<Board board={errandBoard([cardDue(TODAY)])} onOpenTicket={() => {}} today={TODAY} />);
+    const label = screen.getByText(formatDate(TODAY));
+    expect(label.className).toContain('gn-board-card__due');
+    expect(label.className).not.toContain('--late');
+  });
+
+  it('13.1177 CONTROL — with no today the label still draws, in the ordinary tone', () => {
+    render(<Board board={errandBoard([cardDue(DUE)])} onOpenTicket={() => {}} />);
+    const label = screen.getByText(formatDate(DUE));
+    expect(label.className).toContain('gn-board-card__due');
+    expect(label.className).not.toContain('--late');
+  });
+
+  it('13.1177 CONTROL — a card claiming no date draws no due label', () => {
+    render(<Board board={errandBoard([boardCardSeed()])} onOpenTicket={() => {}} today={TODAY} />);
+    const card = screen.getByTestId(`ticket-card-${TICKET}`);
+    expect(card.querySelector('.gn-board-card__due')).toBeNull();
   });
 });

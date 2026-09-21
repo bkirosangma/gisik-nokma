@@ -17,7 +17,7 @@ import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
-import { actorLabel, formatStateProvenance } from '../provenance.js';
+import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js';
 import { makeSubmittedFactory } from '../submit.js';
 import type {
   BoardCard as BoardCardData,
@@ -116,6 +116,31 @@ export type BoardProps = {
    * behind them.
    */
   moves?: BoardMoveCapability;
+  /**
+   * TODAY, as an IST day string (`YYYY-MM-DD`), for the one thing on this
+   * board that is a relation to the present rather than a claim about the
+   * ticket: whether a card's due date has PASSED (ruling E5-2, 2026-09-21).
+   *
+   * OPTIONAL, the SAME precedent `onCreateTicket`, `isNarrowed` and
+   * `epicsHidden` set above — and here the absence has a precise meaning
+   * rather than merely a conservative one: **no clock, no late tone.** A mount
+   * that passes nothing draws the due label in the ordinary tone, which is
+   * what the List already does and for the reason its own CSS records
+   * (`packages/ui/src/ui.css`, `.gn-list__due`): a danger tone with no clock
+   * behind it would paint every past date the same colour as every future one.
+   * Narrower than the truth, never wrong about it — the same direction the
+   * replica's missing `cause` argues for.
+   *
+   * **WHY A PROP AND NOT A `new Date()` HERE.** The neighbouring date views do
+   * not read a clock either: `calendar-view.tsx` and `timeline-view.tsx` are
+   * HANDED `today` by the shell, and the surfaces that decide which day a claim
+   * belongs to are held clock-free by `CLOCK_FREE_ROOTS`
+   * (`test/helpers/clock-scan.ts`). A card's lateness is that same question one
+   * surface over, so it joins the clock `apps/web`'s project page already owns
+   * — one `istToday()` per render — rather than growing a second one that could
+   * disagree with the Calendar and Timeline tabs about which day it is.
+   */
+  today?: string;
 };
 
 /**
@@ -319,7 +344,7 @@ type MoveRegistry = Map<string, (toStateId: string) => void>;
  * workflow or several. A grouping that drops a card is a filter wearing a
  * grouping's name, and the ticket it dropped is gone with nothing saying so.
  */
-export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHidden, moves }: BoardProps) {
+export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHidden, moves, today }: BoardProps) {
   /**
    * The shared drop registry (`MoveRegistry`'s own docblock above) —
    * created HERE, unconditionally, before any early return, because React's
@@ -549,6 +574,7 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
             moves={moves}
             moveRegistry={moveRegistryRef}
             bulkCloseFor={openBulkClose}
+            today={today}
           />
         ) : (
           <BoardGroupSection
@@ -560,6 +586,7 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
             arrows={null}
             onDropCard={null}
             bulkCloseFor={null}
+            today={today}
           />
         );
       })}
@@ -607,6 +634,7 @@ function BoardGroupSection({
   arrows,
   onDropCard,
   bulkCloseFor,
+  today,
 }: {
   group: BoardGroup;
   groupCount: number;
@@ -636,6 +664,8 @@ function BoardGroupSection({
    * hands back an event and a `stateId`.
    */
   bulkCloseFor: ((column: BoardColumn) => void) | null;
+  /** `Board`'s own `today`, threaded through unchanged — see its prop docblock. */
+  today?: string;
 }) {
   return (
     <section className="gn-board__group">
@@ -709,6 +739,7 @@ function BoardGroupSection({
                   stateName={column.name}
                   onOpen={() => onOpenTicket(card.ticketId)}
                   arrows={arrows === null ? null : arrows(card, column.stateId)}
+                  today={today}
                 />
               ))}
             </ul>
@@ -796,6 +827,7 @@ function BoardGroupWithMoves({
   moves,
   moveRegistry,
   bulkCloseFor,
+  today,
 }: {
   group: BoardGroup;
   groupCount: number;
@@ -804,8 +836,10 @@ function BoardGroupWithMoves({
   moves: BoardMoveCapability;
   /** Board-prototype-port Task 14 — see `MoveRegistry`'s own docblock. Owned by `Board`, threaded through unchanged. */
   moveRegistry: MutableRefObject<MoveRegistry>;
-  /** Second wave Task 10 — `Board`'s own opener, threaded through unchanged; see `BoardGroupSection`'s prop. */
+  /** Second Wave Task 10 — `Board`'s own opener, threaded through unchanged; see `BoardGroupSection`'s prop. */
   bulkCloseFor: (column: BoardColumn) => void;
+  /** Ruling E5-2 — `Board`'s own `today`, threaded through unchanged; see its prop docblock. */
+  today?: string;
 }) {
   const workflowKey = `${group.workflowId}@${group.workflowVersion}`;
   const workflow = useLiveQuery(moves.dataSource, moves.workspaceId, workflowKey, () =>
@@ -879,6 +913,7 @@ function BoardGroupWithMoves({
       }
       onDropCard={handleDrop}
       bulkCloseFor={bulkCloseFor}
+      today={today}
     />
   );
 }
@@ -963,11 +998,14 @@ function BoardCardSlot({
   stateName,
   onOpen,
   arrows,
+  today,
 }: {
   card: BoardCardData;
   stateName: string;
   onOpen: () => void;
   arrows: ReactNode;
+  /** Ruling E5-2 — `Board`'s own `today`, threaded through unchanged; see its prop docblock. */
+  today?: string;
 }) {
   const draggedRef = useRef(false);
   return (
@@ -994,7 +1032,7 @@ function BoardCardSlot({
         onOpen();
       }}
     >
-      <BoardCardView card={card} stateName={stateName} onOpen={onOpen} arrows={arrows} />
+      <BoardCardView card={card} stateName={stateName} onOpen={onOpen} arrows={arrows} today={today} />
     </li>
   );
 }
@@ -1024,13 +1062,40 @@ function BoardCardView({
   stateName,
   onOpen,
   arrows,
+  today,
 }: {
   card: BoardCardData;
   stateName: string;
   onOpen: () => void;
   arrows: ReactNode;
+  today?: string;
 }) {
   const [unfolded, setUnfolded] = useState(false);
+  /**
+   * Ruling E5-2 — the DUE LABEL, which this card drew none of until 2026-09-21
+   * while the sheet, the List, `my-work`, the Calendar and the Timeline all
+   * carried the date, and the Board is the project's DEFAULT tab. The export
+   * draws it in the card's meta line and colours it
+   * `di.late ? "var(--danger)" : "var(--label2)"`; both halves are reproduced
+   * here rather than only the date, because a date nobody can see has passed is
+   * the fact the ruling is about.
+   *
+   * `late` is a plain STRING comparison of two IST day strings — the same
+   * comparison `filter/list-filter.ts` uses for its `dueBefore`/`dueAfter` axes,
+   * and the reason no clock or zone arithmetic appears here: `YYYY-MM-DD` sorts
+   * lexicographically in calendar order, so `due < today` needs neither a
+   * `Date` nor a timezone. A ticket due TODAY is not late, which is what `<`
+   * rather than `<=` says.
+   *
+   * With no `today` the label still draws, in the ordinary tone — see the
+   * `today` prop's docblock on `BoardProps` for why the absence is honest.
+   *
+   * The ATTRIBUTION is a `title`, not a second line: the export's meta line is
+   * one bit and a board card is the densest surface in the product, so the
+   * claimant rides along the way `Chip`'s own `title` does immediately above.
+   * The visible text is the date alone, exactly as the export draws it.
+   */
+  const late = card.dueDate !== null && today !== undefined && card.dueDate.date < today;
   return (
     <Card className={card.pending ? 'gn-board-card gn-board-card--pending' : 'gn-board-card'}>
       <button type="button" className="gn-board-card__title" onClick={onOpen}>
@@ -1048,6 +1113,14 @@ function BoardCardView({
         ) : null}
         {card.rollup !== null ? (
           <span className="gn-board-card__progress">{formatRollup(card.rollup)}</span>
+        ) : null}
+        {card.dueDate !== null ? (
+          <span
+            className={late ? 'gn-board-card__due gn-board-card__due--late' : 'gn-board-card__due'}
+            title={`${actorLabel(card.dueDate.claim.actorId, card.dueDate.claim.actorName)}'s claim`}
+          >
+            {formatDate(card.dueDate.date)}
+          </span>
         ) : null}
       </div>
       <button
