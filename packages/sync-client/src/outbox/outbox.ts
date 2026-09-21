@@ -28,16 +28,29 @@ import { buildLocalEngineContext, buildPendingOverlay, type LocalContextDeps } f
  *   bullet said 2, and was re-signed at 2 by the change set that repriced the
  *   fixture below** — the exact defect the next bullet congratulates itself for
  *   catching, committed inside the paragraph that celebrates it. Re-run the
- *   stated command before trusting either number.
+ *   stated command before trusting either number. TWO of the three are code
+ *   uses — `sync-service.ts` and `rig.ts`; `sync-routes.ts`'s single mention is
+ *   a docblock line quoting the response shape, so a move would reword it rather
+ *   than break it.
  * - **`packages/sync-client`: 6 files** — this one, `engine/sync-engine.ts`,
  *   `net/http-transport.ts`, `index.ts`, `test/sync-engine.test.ts`, and
  *   `replica/sync-item.ts`. **This bullet said 5 and enumerated 5, and the
  *   enumeration was what made it checkable**: the stated command returns six,
  *   because `sync-item.ts` gained a docblock line naming this very record in
  *   the same commit that wrote the count. FIVE of the six are code uses; the
- *   sixth is prose. So the move's cost by the stated measure is **8 files**,
- *   not the seven the closing line used to claim — and five-plus-two if only
- *   code is counted.
+ *   sixth is prose.
+ *
+ * **The total is deliberately NOT restated, because the total is the number that
+ * drifted.** This paragraph used to close by adding the two bullets into one
+ * cost, and the sum was wrong: it said **eight** where its own three and six
+ * come to **nine** by the stated command. That is the whole argument for
+ * leaving it out — each package count above is checkable against the command,
+ * and a reader who wants a sum adds two numbers; a sum written here is a reading
+ * that expires the next time any file mentions either name. The paragraph's
+ * other derived claim, *"five-plus-two if only code is counted"*, measured TRUE
+ * (five of the six sync-client files and two of the three server ones carry a
+ * code use) and is left out for the same reason: the split is stated per bullet
+ * above, where the command settles it.
  * - **`packages/domain`: nothing missing.** `IngestErrorCode` — the base of
  *   `SyncInvalidCode` — is already there (`ingest-result.ts:3`), and
  *   `ingest-result.ts` already declares an `{status:'invalid'; eventId: string
