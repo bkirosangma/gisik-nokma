@@ -1362,13 +1362,37 @@ export function TicketSheet({
    *
    * `rollup === null` is a real fact (no children at all, `ticket-cards.ts`'s
    * own reading), so it is not treated as an unknown to be excused.
+   *
+   * ⚠ **AND "UNREAD" IS NOT "EMPTY" — V8, 2026-09-21.** `subtaskRows` used to be
+   * `subtasks.data ?? []`, which reads an in-flight or failed read as a list of
+   * zero — and `useLiveQuery` resets `data` to `null` on every KEY change, which
+   * this one does the moment the ticket read lands (the key carries the project
+   * id; see its own comment). So on EVERY ordinary parent-ticket load, for the
+   * whole second round trip, `subtaskRows.length` was 0 while `subtaskExpected`
+   * was the server's real child count — and the section rendered a
+   * `role="alert"` telling the person the list was *"not shown rather than shown
+   * short"* about a list nobody had read yet. The reconciliation is now gated on
+   * the read having ANSWERED, which is strictly narrower and keeps the property
+   * this section exists for: a short list is still never drawn silently.
+   *
+   * ⚠ **A FAILED read is lumped in with a pending one here, and that is named
+   * rather than hidden:** `subtasks.error` is not consulted below, so a child
+   * read that REJECTS (past `LIST_ROW_CAP`, or a dropped connection) renders
+   * neither the alert, nor the empty sentence, nor a failure sentence — the
+   * section draws nothing at all. The empty sentence it used to draw in that
+   * case was a false claim about the ticket, so this is smaller, but it is still
+   * an absence: **owner — whoever next touches this section**, and the three-arm
+   * treatment `HistoryTab` already uses (error tested BEFORE `data === null`) is
+   * the model.
    */
+  const subtasksUnread = subtasks.data === null;
   const subtaskRows = subtasks.data ?? [];
   const subtaskExpected =
     ticketRead.rollup === null
       ? 0
       : ticketRead.rollup.totalChildren - ticketRead.rollup.restrictedCount;
-  const subtasksIncomplete = ticketRead.rollup !== null && subtaskRows.length !== subtaskExpected;
+  const subtasksIncomplete =
+    !subtasksUnread && ticketRead.rollup !== null && subtaskRows.length !== subtaskExpected;
 
   /**
    * The chip's two inputs, bound ONCE and outside the JSX.
@@ -2301,7 +2325,14 @@ export function TicketSheet({
                 {ticketRead.rollup === null ? '' : ` · ${formatRollup(ticketRead.rollup)}`}
               </p>
             </div>
-            {subtasksIncomplete ? (
+            {/*
+              Nothing at all while the child read is in flight — not the alert,
+              and not the empty sentence either. Both are claims about a list
+              nobody has read yet; the alert is the louder one and the one V8
+              measured, and the empty arm was the same false claim one notch
+              quieter. What renders is decided by the ANSWER, never by `null`.
+            */}
+            {subtasksUnread ? null : subtasksIncomplete ? (
               // THE RECONCILIATION, rendered rather than swallowed. A short list
               // here is the one failure this section could hide, so it is said
               // in the server's own numbers instead of drawn.

@@ -1793,6 +1793,51 @@ describe('F — the subtasks section', () => {
     expect(within(section).getByTestId('subtask-tkt-s2').textContent).toBe('Book the venue · Done');
   });
 
+  /**
+   * 17.041 (V8) — THE FALSE ALERT EVERY PARENT TICKET RAISED ON ITS ORDINARY
+   * LOAD.
+   *
+   * `subtaskRows` was `subtasks.data ?? []`, so the in-flight window read as an
+   * EMPTY list — and `useLiveQuery` resets `data` to `null` on every KEY change,
+   * which the subtasks key does the moment the ticket read lands
+   * (`${ticketId}:subtasks:${projectId}`). So for the whole second round trip
+   * `subtaskRows.length` was 0 while `subtaskExpected` was the server's real
+   * child count, `subtasksIncomplete` was true, and the section rendered a
+   * `role="alert"` telling the person the list was *"not shown rather than shown
+   * short"* — about a list that was merely still being read.
+   *
+   * The child read is held open here rather than raced: a slow promise makes the
+   * window deterministic and lets the case assert BOTH ends of it.
+   */
+  it('PLANTED DEFECT: no false "not shown rather than shown short" alert while the child read is in flight', async () => {
+    const read = ticketRead({ rollup: { totalChildren: 1, terminalChildren: 0, restrictedCount: 0 } });
+    let release: () => void = () => undefined;
+    const source = createFakeDataSource({
+      getTicket: async () => read,
+      getWorkflowDef: async () => WF_ERRAND,
+      getMembers: async () => [],
+      getTicketHistory: async () => [],
+      getTickets: () =>
+        new Promise((resolve) => {
+          release = () =>
+            resolve({ projectId: 'prj_f', rows: [child({ ticketId: 'tkt-s1', title: 'Order the brochures' })] });
+        }),
+    });
+    renderSheet(read, source);
+    await settled();
+
+    // The ticket read has landed (the sheet is painted) and the child read has
+    // not. NEITHER arm may be drawn: the alert would be a lie about a list
+    // nobody has read yet, and the empty arm would be the same lie quieter.
+    expect(screen.queryByTestId('sheet-subtasks-incomplete')).toBeNull();
+    expect(screen.queryByTestId('sheet-subtasks-empty')).toBeNull();
+
+    await act(async () => {
+      release();
+    });
+    expect(await screen.findByTestId('subtask-tkt-s1')).toBeInTheDocument();
+  });
+
   it('16.16 says what a subtask IS when there are none', async () => {
     // `rollup: null` is the server's own spelling for "no children at all"
     // (`ticket-cards.ts`), so this is the genuine empty case and not a read that
