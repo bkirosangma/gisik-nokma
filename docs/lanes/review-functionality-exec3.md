@@ -1912,3 +1912,73 @@ the mechanism and the read, but not that byte-identity) and `E6-4`'s *"`search_p
 rebuild"*-adjacent claim about which reader serves the parent-terminal walk (I verified
 `transition.ts:132-142` reads `getChildrenStates` and that the server's reader is unfiltered, which is the
 mechanism, but I did not run their probe).
+
+---
+
+## 24. `E3-14`, RE-MEASURED WITH A REAL SESSION — and one objection I raised against myself and closed
+
+Written last, because it is the strongest evidence `E3-14` has and because it closes a way the finding
+could have been wrong.
+
+### 24.1 The objection, which I raised against my own Critical
+
+`apps/server/test/helpers/session.ts:29-33` says, in passing:
+
+> Bearer and not cookie, and that is not arbitrary. **A cookie-carrying POST must also send a trusted
+> `Origin` or better-auth's CSRF check answers 403** (see `sign-in-flows.test.ts`); a bearer request
+> sends no cookie and is exempt.
+
+**My original probe used an INVALID cookie** (`better-auth.session_token=whatever`), so its 401s came from
+`requireSession` rejecting a session that never existed. **If better-auth's CSRF check only fires for a
+VALID session, my probe would have been measuring a state a real attacker is not in — and `E3-14` would
+have been invalid, at −15.** That is the sharpest objection available to the finding and I went looking
+for it rather than hoping nobody would.
+
+**AND MY FIRST RERUN WAS INVALID — recorded because it is the same class as `E3-18`'s first version.**
+I rebuilt the probe over a real database with a real signed-in session, and got `403` on nothing: the
+in-set controls returned **400** and **404**, not `403 forbidden_origin`. **The controls failing is what
+told me the run proved nothing** — `buildTestApp`'s default carries no `security`, so the Origin check
+was never enabled and *every* route was equally unchecked. A run whose control does not fire is not a
+weaker version of a valid run; it is a measurement of something else.
+
+### 24.2 The valid run, with controls that fire
+
+`buildTestApp(db, { security: { webOrigin: 'http://localhost:3001', rateLimit: null } })` — the Origin
+check **on** — over a real `createTestDatabase`, with a session obtained over the wire (OTP send →
+read the code out of the dev sender → verify) and its **real `set-cookie`** attached:
+
+```
+CTRL POST /v1/events                 inSet=true  | forged=403 forbidden_origin | noOrigin=403 | trusted=400
+CTRL DELETE /v1/me/mcp-tokens/:id    inSet=true  | forged=403 forbidden_origin | noOrigin=403 | trusted=404
+PUT  /v1/me/preferences              inSet=false | forged=400 invalid_query    | noOrigin=400 | trusted=400
+PUT  /v1/me/notification-preferences inSet=false | forged=400                  | noOrigin=400 | trusted=400
+POST /v1/me/invitations/:id/accept   inSet=false | forged=404 not_found        | noOrigin=404 | trusted=404
+POST /v1/me/invitations/:id/decline  inSet=false | forged=404 not_found        | noOrigin=404 | trusted=404
+POST /v1/invites/:token/accept       inSet=false | forged=404 not_found        | noOrigin=404 | trusted=404
+```
+
+**Four things this establishes, each of which the original probe could not:**
+
+1. **The controls fire.** Both in-set routes answer `403 forbidden_origin` with a REAL session — so the
+   probe can distinguish protected from unprotected, on this exact build.
+2. **`noOrigin` is also 403 on the in-set routes** — the check is *require*, not merely *validate*, and
+   that behaviour is present in this run, so the absence below is the SET's and not the harness's.
+3. **`trusted` passes the gate and reaches the handler** (400/404, i.e. the route's own answer) — so a
+   403 is a refusal BY the origin check and not a route that refuses everything.
+4. **The five routes answer their handlers under a forged Origin, with a valid session.** They are not
+   protected; the request is authenticated and it lands.
+
+**AND THE OBJECTION IS CLOSED BY MEASUREMENT, NOT BY ARGUMENT:** if better-auth's CSRF check covered these
+paths, a VALID session with a forged Origin would have been refused. It was not. Better-auth's check is
+scoped to the vendor mount it owns (`/api/auth/*`), which is why the helper's note is true of sign-in and
+**not** of the product routes `E3-14` names.
+
+**This does not change the finding's severity or its scope** — §14.8's bound still holds, and the two
+CORS-simple invitation POSTs remain the sharp ones. **What it changes is how much of the finding rests on
+inference:** the wire-level claim was already measured; the authenticated-path claim now is too, and the
+one mechanism that could have made it moot is measured away.
+
+**MEASUREMENT.** Probe created at `apps/server/test/http/zz-e3-probe-cookie2.test.ts`, run, and **deleted
+in the same shell invocation** (`git status --porcelain` empty). `Tests 1 passed`. The invalid first rerun
+is `zz-e3-probe-cookie.test.ts`, run and deleted the same way, and is recorded above rather than
+discarded.
