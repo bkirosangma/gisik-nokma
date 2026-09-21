@@ -1232,17 +1232,48 @@ function ProjectBoard() {
    * thing allowed to make this decision; an ISO slice would ring yesterday's
    * cell for five and a half hours every night.
    */
-  const today = istToday();
-  /*
-   * RECORDED, NOT FIXED: `today` is computed once per RENDER and never
-   * re-derived on its own, so a tab left open across IST midnight keeps
-   * yesterday's ring until something else re-renders this page. The day
-   * COMPUTATION is right — 11.164 pins it at the instant the UTC and IST
-   * spellings disagree — and this is only about when it is recomputed.
-   * Deliberately not fixed here: the fix is a timer, and a timer is a
-   * re-render mechanism that needs its own case, its own cleanup and its own
-   * argument about cadence. OWNER: whoever next opens this page's date wiring.
+  const [today, setToday] = useState(() => istToday());
+  /**
+   * RULING E5-43 (2026-09-21) — `today` is now RE-DERIVED, and this replaces the
+   * "RECORDED, NOT FIXED" note that stood here. That note was accurate about the
+   * defect it named: the day was computed once per RENDER and never on its own,
+   * so a tab left open across IST midnight kept yesterday's ring until something
+   * else re-rendered this page. The day COMPUTATION was always right — 11.164
+   * pins it at the instant the UTC and IST spellings disagree — and the note
+   * deferred only WHEN it is recomputed, to "whoever next opens this page's date
+   * wiring". This is that change.
+   *
+   * ## Why an EVENT and not a tick
+   *
+   * The finding allows either. This takes the event because it needs no cadence
+   * argument: a tick must answer "how often is often enough", and every answer
+   * is wrong in one direction — a minute is 1440 wake-ups a day to move one
+   * value, an hour leaves a ring stale for up to an hour after midnight. A
+   * visibility or focus event instead fires exactly when the page is ABOUT to be
+   * looked at again, which is the only moment the ring's staleness can be seen,
+   * and a background tab's ring is not being looked at. It is also what the
+   * finding names first.
+   *
+   * ## Why state rather than a `let`
+   *
+   * A re-derivation only reaches the two views through a render, so the day has
+   * to be state. Setting the SAME day is free — React bails out on an identical
+   * value — so a person switching tabs ten times across a quiet afternoon costs
+   * ten comparisons and no render.
+   *
+   * Both listeners are removed on cleanup; neither is registered on the server,
+   * because this file is a client component (`'use client'` at the top) and the
+   * effect never runs there.
    */
+  useEffect(() => {
+    const refresh = (): void => setToday(istToday());
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
 
   /**
    * The roster resolved into the two things the views need from it, and BOTH are

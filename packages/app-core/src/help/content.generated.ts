@@ -6637,6 +6637,19 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "bold",
+                    "text": "A page you left open catches up when you come back to it."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " If you leave the Calendar or the Timeline sitting in a tab over India's midnight, their \"today\" ring moves to the new day the moment you return to that tab or bring the window forward — you do not have to reload the page. Until you look at it again it still shows the day it was drawn on, which you were not there to see."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
                     "kind": "text",
                     "text": "There is a footnote naming the time zone at the bottom of a job's history. That is the only place in the product that acknowledges it."
                   }

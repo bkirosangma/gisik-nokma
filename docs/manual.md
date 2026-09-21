@@ -1360,6 +1360,11 @@ The reasoning is that everyone reading the same record sees the same day for the
 defensible. But if you are running a business in Manchester, "due today" is going to mean something
 odd, and you should know it before it surprises you.
 
+**A page you left open catches up when you come back to it.** If you leave the Calendar or the
+Timeline sitting in a tab over India's midnight, their "today" ring moves to the new day the moment
+you return to that tab or bring the window forward — you do not have to reload the page. Until you
+look at it again it still shows the day it was drawn on, which you were not there to see.
+
 There is a footnote naming the time zone at the bottom of a job's history. That is the only place in
 the product that acknowledges it.
 
