@@ -23,3 +23,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-F4-ux | done | b638f9b6 | 17.063 (visibility-editor.test.tsx) — the read-only sentence names owner+admin; the arm stays dead, recorded with an owner |
 | T-V3 | done | caab221a | 17.064/17.065 (visibility-editor.test.tsx) — a rejected write says so, Apply returns; transportError slot |
 | T-E5-18 | done | 49b64116 | 17.066-17.069 (invites.test.ts, invite-page.test.tsx) — expiry carried+rendered, dead arm links out; DECLINE recorded as owed |
+| T-E5-30 | done | 3bd8f18b | 17.070 (page-refusals.test.tsx) — the panel names the action, wire string on its own line; 29 assertions swept |
