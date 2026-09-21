@@ -14,3 +14,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-F5-ux | done | 28875a98 | founding lands on /w/<id>; founding.test 10 tests green |
 | T-F8-ux | done | c0ab3ff9 | prose-only: stale self-test counts removed from 15.13 |
 | T-E2-25 | done | eefcef71 | comment-only: 3 stale/false records corrected; mount-or-delete left to owner |
+| T-E2-27 | done | c65d27ea | app-core skew-and-status 13 tests green; unknown arm returns queue sentence |
