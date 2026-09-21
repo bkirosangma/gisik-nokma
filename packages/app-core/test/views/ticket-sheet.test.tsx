@@ -496,10 +496,22 @@ describe('TicketSheet — the transition round-trip', () => {
       },
       // The shape the dialog's own ordering creates on a refusal: the field
       // claim the rule needs commits, and the move that needed it is turned away.
+      //
+      // ⚠ A committed `IngestResult` carries `seq` and `serverTime`, and this
+      // fake omitted both until the batch gate caught it. The suite could never
+      // have: vitest transpiles without typechecking, so the omission was
+      // invisible here and red at `tsconfig.typecheck.json`, which INCLUDES
+      // tests — the config `pnpm --filter @gisik-nokma/app-core typecheck` uses.
+      // The values mirror `helpers/fake-data-source.ts`'s own default.
       (events) =>
-        events.map((event) =>
+        events.map((event, at) =>
           event.type === 'ticket.field_set'
-            ? { status: 'committed' as const, eventId: event.id }
+            ? {
+                status: 'committed' as const,
+                eventId: event.id,
+                seq: at + 1,
+                serverTime: '2026-08-20T09:00:00.000Z',
+              }
             : {
                 status: 'refused' as const,
                 eventId: event.id,
