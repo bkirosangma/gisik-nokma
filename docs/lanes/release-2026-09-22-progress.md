@@ -8,3 +8,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E3-14 | done | a7796c41 | security-middleware.test.ts PROTECTED table (13.116 + it.each) |
 | T-E3-15 | done | 9c6655ec | security-middleware.test.ts 13.198 (onRoute seam) |
 | T-E3-32 | done | deab2aa0 | check-permission.test.ts 12.398 (docblock content assertion) |
+| T-E6-15 | done | 871065c3 | security-middleware.test.ts 13.1100-13.1103 (stream origin check) |
