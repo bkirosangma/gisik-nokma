@@ -3854,3 +3854,31 @@ depth · §1, §2, §7 and §10 opened with claims checked as recorded in §54�
   were made and all ten failed; two of them changed this report (`E6-6` corrected a false claim of mine, `E6-11`
   bounded §7.1). **That record stands as the honest result of the attempt**, and it is why
   `docs/lanes/review-refutations-exec3.md` does not exist.
+
+## 59. Round 2 — two more §3 claims verified clean, and the sentence that made me check the right thing
+
+### 59.1 `Features.md:83` — *"its refusal register — now EMPTY … and ZERO since 2026-09-19"*, *"the test pins the emptiness"*
+
+`SERVING_GAPS` in `packages/app-core/src/online/mappers.ts:2445` is `Readonly<Record<string, readonly Absence[]>>`
+whose body, **after comment-stripping, is the empty string** — genuinely empty, not emptied-looking. Its own
+comment is the record rather than a placeholder: *"EMPTY SINCE 2026-09-19, and the emptiness is the record.
+`search` was the last entry … **An entry claiming a method refuses ALWAYS is false the moment it maps** — so it is
+deleted rather than emptied."* And the test the bullet says pins it exists and says the same thing
+(`packages/app-core/test/online/mappers.test.ts:941`, owning case 3.39). **Verified clean**, and this is the file
+`E3-*`'s sibling `§52` work already touched — the register being *empty* is what makes `matchedIn`'s derivation
+the correct remedy rather than a workaround.
+
+### 59.2 `Features.md:74` — *"a **sixteenth** read method fails `tsc` with TS2322"*, *"in two arms, mutation-witnessed 14 times"*
+
+**My first reading said 16 members and therefore a mismatch.** `DataSourceQuery` (`packages/app-core/src/data-source.ts:140`) does carry **16** members — but **`putPreferences(workspaceId: string, preferences: UserPreferences): Promise<void>` is a WRITE**, and the other fifteen are the `get*` and `search` reads the invariant is about. **A sixteenth *read* method is the next one added, which is exactly what the sentence claims.** The bullet is right and my count was answering a different question — the fourth time this round my universe, not the claim, was wrong.
+
+**The "mutation-witnessed 14 times" half I did NOT verify**, and I say so rather than let it ride on the half I did: it is a record of a process run on 2026-09-20 whose witness I cannot re-derive from the tree, and the bullet's own `#591` sentence (*"un-filtering a site left the whole suite green"*) is the kind of claim that needs the mutation re-run, not re-read. **Not carried as clean; not filed as a defect either.**
+
+### 59.3 §3 at the close of round 2
+
+**Seven countable claims checked, all seven exact** — `177` task headings (§54.1), `35` `TOKEN_ROLES` (§54.2),
+`nine` replica tables (§54.3), the CI bullet's self-disclosed scope (§54.3), the package list (§55), the
+`sixteenth` read method (§59.2) and the **empty** register (§59.1). **§3 produced no finding.** The two findings
+this report holds against `Features.md` — `E3-29` and `E3-26` — are in **§5** and **§10**, and the counts §3's
+bullets state are the ones the code agrees with. **Sixty-one of §3's 68 candidate countable bullets remain
+unchecked**, and that number is stated rather than dressed as coverage.
