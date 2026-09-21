@@ -3931,7 +3931,19 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    unstyled `.app-shell` — `app-shell` has no CSS anywhere in the repo — so the
    shell spans the whole window, which is what the reference draws. The
    sidebar's own horizontal padding is what keeps it off the window edge; the
-   web shell's `.gn-shell` padding adds to it there. */
+   web shell's `.gn-shell` padding adds to it there.
+
+   NAMED ABSENCE (ruling P7, 2026-09-21): `apps/desktop/src/app.tsx`'s task
+   list (`.ticket-list`, `.ticket-list__row`, `.ticket-list__title`,
+   `.ticket-list__state`, `apps/desktop/src/app.tsx:151-155`) has NO selector
+   block anywhere — not here, not in `apps/web/app/globals.css`, not in
+   `packages/editor/src/webview/editor.css` (checked, all three, zero hits;
+   `.gn-help__toggle` as the positive control, 5 hits in this file). This app
+   loads only `ui.css`, so an unstyled class here renders with the browser's
+   default `ul`/`li` box model — no theme, no spacing. Owner: whoever next
+   gives the desktop shell a real task list (Plan 6's Board view lands here,
+   per `app.tsx`'s own comment) — a four-selector stopgap now would be a
+   second thing to un-style later rather than a real fix. */
 .gn-help {
   display: flex;
   flex-wrap: wrap;
