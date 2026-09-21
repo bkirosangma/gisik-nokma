@@ -340,7 +340,7 @@ its parent's deletion and a strange one for a child the actor just created there
 (`projections/tickets.ts:216-222`), and that reason does not reach `getChildrenStates` — the restore check never
 reads children. The docblock's hand-off sentence is the closest thing to a ruling and it rules the *opposite*
 way: the predicate is the caller's to add. Cases `5.x` on the parent-terminal invariant (`05-tickets-hierarchy.md`)
-do not mention deletion (`grep -n -i delet test-cases/05-tickets-hierarchy.md` → no case-line hits), and the
+do not mention soft deletion (`grep -n -i delet test-cases/05-tickets-hierarchy.md` → 6 lines, every one a SQL `DELETE` of a row or the deletion of a code line in a mutation, none a `ticket.deleted`), and the
 soft-delete suites (`test/read/soft-delete*.test.ts`) never transition a parent.
 
 **WHAT WOULD HAVE BEEN BETTER.** In `transition.ts:134`, `child.stateCategory !== 'terminal' &&
