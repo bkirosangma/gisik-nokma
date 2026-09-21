@@ -9,7 +9,7 @@
 
 ## 0. THE ONE-LINE ANSWER
 
-_(written last — see §6)_
+**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Nineteen of the twenty-two findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a 21-px close glyph, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), and the phone-width shell (a 310-px nav). Text contrast, by contrast, is clean everywhere I measured — 26 route×theme passes, one third-party watermark failing — because a contrast instrument existed and was run at least once.
 
 ---
 
@@ -44,7 +44,7 @@ Counted at `a7b6292b` with `/usr/bin/find`, excluding `node_modules`, `.next`, `
 
 ## 2. COVERAGE — including the boundary
 
-_(written last — see §6)_
+Stated in full in §6, after the findings, so the boundary is written against what was actually done rather than what was planned.
 
 ---
 
@@ -392,4 +392,52 @@ _(so §3 is not a list of defects — each row is a measurement I took that came
 
 ## 6. COVERAGE STATEMENT, GRAPHIFY USE, AND THE COUNT BY SEVERITY
 
-_(written last)_
+### 6.1 What was reviewed, and how
+
+**Painted, on this tree (`a7b6292b`, `next dev -p 3041`, signed in as the e2e seed owner), Chrome via chrome-devtools MCP:**
+
+| width · theme | routes / states measured (each: my tap/name/UA-chrome/tiny-text/heading/landmark sweep with the product's own selector list, plus the composited text-contrast sweep) |
+|---|---|
+| **1512×900 · light · neo** | `/sign-in`, `/workspaces`, `/w/:id`, the board and its **List, Backlog, Calendar, Timeline** views, the **ticket sheet open** (Details and History tabs), the **New-ticket dialog**, the **Filters panel**, the **Move dialog**, the **Assignee listbox open** (real Enter/Escape keys), the **account menu open**, `/inbox` (empty), `/account`, `/settings`, `/members`, `/my-work`, `/settings/ticket-types` (list, `new`, `errand`), `/settings/workflows` (list, `new`, builder, history), `/help`, `/mcp/tokens` |
+| **390×844 · light · neo** (`emulate …,mobile,touch`) | the board, the sheet open (with screenshot), `/inbox`, `/account`, `/my-work`, `/members`, `/settings`, ticket-types list/`new`/`errand`, workflows list/`new`/builder/history, `/help`, `/mcp/tokens` |
+| **768×1024 · light · neo** | the sheet open on the board, `/workspaces`, `/w/:id`, `/members`, the builder, `errand`, `/account` |
+| **1512 · dark** (`emulate colorScheme: dark`) | the sheet open, `/workspaces`, `/w/:id`, `/my-work`, `/members`, `/settings`, `errand`, the builder, `/account`, `/inbox`, `/help`, `/mcp/tokens`, and the four board views |
+
+Screenshots taken: `board-1512`, `board-390`, `sheet-390-description` (in the worktree's git-excluded `.exec4-scratch/`, not committed; the numbers in the findings are from `getBoundingClientRect`/`getComputedStyle`, the screenshots are the human check).
+
+**Read in source, driven by the paint (ranges opened, not whole files):** `ticket-sheet.tsx` (`:1500-1570`, `:1740-1800`, `:1660-1675`, `:2395-2460`), `board.tsx` (`:961-1060`), `visibility-editor.tsx` (`:236-246`, `:396-415`), `history-list.tsx` (`:1-50`), `new-ticket-dialog.tsx` (`:124-134`), `provenance.ts` (`:1-34`), `view-types.ts` (`:3`, `:60`, `:535-549`), `routes/tickets.ts` (`:600-672`), `sheet.tsx` (`:111`), `switch.tsx`, `select.tsx` (`:185-215`, `:240-254`), `TicketEditor.tsx` (`:85-125`), `editor.css` (`:1-20`, `:105-165`), `template-gallery.tsx`, `workflow-builder-screen.tsx` (`:20-45`, `:131`), `workflow-canvas.tsx` (`:45-62`), `state-node.tsx` (`:40-60`), `w/[workspaceId]/page.tsx` (`:742-815`), `next.config.ts` (`:9`, `:91-94`), `globals.css` (`:80-106`, `:1150-1168`, `:1720-1815`, `:1925-1990`), `ui.css` (the blocks each finding cites), the three sweep modules (`tap-targets.ts` in full, `type-scale.ts` `:60-90`, `accessible-names.ts` `:48-90`), `e2e-stack/viewport.spec.ts` (`:1-120`, `:160-260`, `:425-720`), the three baseline JSONs, `board-screen.tsx`, `apps/desktop/src/app.tsx` (`:140-165`), `index.html`. The class-less-tag regex pass covered all 123 non-test `.tsx` files under `packages/` and `apps/web/`.
+
+**Prototype comparisons made (all against the staged export, shas in the header):** sheet crumbs (`:3404-3425`), sheet close (`:1121`), sheet width (`:3398`), description field (`:1165-1173`, `:1580`), descTools/cmtTools (`:3669-3680`), history rows (`:1337-1343`, `:3733-3737`), calendar nav (`:483-486`), timeline nav (`:509-511`), builder canvas/crumb (`:1012-1028`), New-ticket title (`:1580`); the mobile export's tab bar (`:1194-1203`) and header (`:99-114`). The three spec `.md` files were opened and none bears on a finding here.
+
+**Case ids opened by hand:** `13.420`, `13.423`, `13.445`, `13.446`, `13.461`, `13.523`, `13.351`, `16.63`, `16.64`, `16.83`, `11.121`, `15.31`, the tap-target section of `13-pre-launch-checklist.md` (`:555-640`) and its parent record (`docs/pre-launch-checklist.md:586-600`). **Every one still holds and is witnessed** as far as I checked; the finding about them is the negative space — no case sets `parent.id === epic.id` (E4-1), no case names `Select`'s focus return (E4-17), no baseline key exists for any tap-target route but `/my-work` (E4-12).
+
+### 6.2 NOT REACHED — the honest boundary, as a list
+
+1. **Seven of the nine edge classes at paint.** I measured EMPTY (the inbox, the whole-board empty columns) and NARROW VIEWPORT thoroughly. **ERROR, PERMISSION-REFUSED, OFFLINE / REPLICA-DEGRADED, SOFT-DELETED, CONCURRENT, FIRST-RUN and SERVER-REFUSES-WHILE-CLIENT-BELIEVES were not painted**: each needs a second role, a killed server, a deleted ticket or a contested claim, and producing any of them writes to the owner's dev database, which I would not do from a review lane. Their renderers (`shell-refusal.tsx`, `sync-status-bar.tsx`, `contest-banner.tsx`, `expired-session.tsx`, the sheet's refusal arms) were **not read**.
+2. **Overlays not opened:** the bulk-close dialog, the reopen dialog, the workflow-rebind dialog, the state-mapping dialog, the transition dialog's field/evidence arms, the evidence picker, upload chips, the image-wrap menu, the mention popup, the saved-filters menu, the InfoTip, the Toast. `packages/ui`'s `avatar`, `card`, `chip`, `info-tip`, `table`, `toast`, `tokens.ts` were **not read**.
+3. **The classic (non-neo) style axis** was not measured — the seed owner's preference is `neo` and switching it writes a preference. Every painted number here is `data-style="neo"`.
+4. **Signed-out routes** beyond `/sign-in` (`/help` I did paint signed-in; `/privacy`, `/terms`, the 404, `/invite/<token>`, `/mcp/authorize`) were not re-measured — round 1 ran the signed-out suite (31 passed) and its port `:3021` is not mine.
+5. **`apps/mobile` and `apps/desktop`** were not rendered (no simulator, no Tauri build); one source finding each (E4-22; the desktop list is round 1's P7).
+6. **The 41 `app-core` non-view components** were reached only where a painted route mounted them (builder, type editor, help, inbox shell, account sections); `calendar-view.tsx`, `timeline-view.tsx`, the inspectors and rule editors were **not read**, only painted.
+7. **Case ids:** of my stated subset (~700 across the six UI files plus `3.1–3.144`), **14 were opened**. The rest were not. `check:citations` was not run.
+8. **200 % zoom / `prefers-reduced-motion` / high-contrast / RTL** — not measured.
+9. **The `.gn-*` families that were never in a campaign** — I did not enumerate the campaign rosters and diff them; the timeline nav (E4-15) and the editor strip (E4-8) were found by paint, not by roster.
+
+### 6.3 Graphify — how it was used, and what it gave
+
+The owner ordered graph-first. I did: `graphify-out/GRAPH_REPORT.md` header, hubs, god nodes and the 610-entry community index were read before any file; `graphify explain "SegmentedControl"` was run. **Result: the code layer holds import / contains / re-export edges only** — `SegmentedControl` has three edges, all module-level, and no edge to any of its seven JSX render sites; of 610 communities, one is UI-named (`ticket-list.tsx`) and the ten god nodes are all server/test infrastructure. For a rendering-and-accessibility concern the graph located nothing I could not get from `find` in one command, so I stopped using it after those two calls and say so rather than pad the section. `mcp__semble__search` was not used either: the paint told me which file to open, and the file told me the line. Token spend went to the browser instead, which is where this concern's evidence lives.
+
+### 6.4 The count by severity — members named
+
+| claimed severity | count | members |
+|---|---|---|
+| **Critical** | **0** | — |
+| **Important** | **16** | E4-1 · E4-2 · E4-3 · E4-4 · E4-5 · E4-7 · E4-8 · E4-9 · E4-11 · E4-12 · E4-13 · E4-14 · E4-17 · E4-18 · E4-19 · E4-21 |
+| **Minor** | **6** | E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 |
+| **total** | **22** | `16 + 6 = 22`; ids `E4-1` … `E4-22` with no gaps |
+
+**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20. Category 2 argued against the record: E4-6, E4-8, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility or instrument: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22.
+
+**Overlap with round 1, stated:** E4-10 and E4-15 are new members of P1's class found by widening the population (class-less tags; classes whose rule forgot the border) and painted; E4-12 widens P11's scope from one component to the suite's population; E4-2 carries a painted reproduction of P8's focus finding as corroboration only. Nothing else overlaps.
+
+**Report complete at the time of the last push recorded in `git log origin/exec4/review-ui`; the phase-2 refutation file will be a separate commit after T0+6h.**
