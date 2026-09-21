@@ -1116,7 +1116,10 @@ describe('the gate at the client door — refusals before the rule engine', () =
   });
 
   /**
-   * E6-21 — a member can leave a workspace, through the real client door.
+   * 6.150 — E6-21 — a member can leave a workspace, through the real client
+   * door. (Case id in `test-cases/06-auth-visibility.md`, not a bare in-file
+   * marker — see that file's own note on why this file carries none of the
+   * gate's older cases.)
    * Before this fix, `membership.revoked` gated EVERY submission (including
    * one's own) on `isWorkspaceAdmin`, so a plain member's own leave-claim was
    * refused `WORKSPACE_MEMBERSHIP_REASON` — the same refusal aimed at someone

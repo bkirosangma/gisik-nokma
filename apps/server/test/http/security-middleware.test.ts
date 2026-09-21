@@ -232,7 +232,7 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
       '/v1/me/mcp-tokens/:id',
       'DELETE',
     ],
-    // E3-14 — three cookie-authenticatable mutations found by the same
+    // 13.197 — E3-14 — three cookie-authenticatable mutations found by the same
     // measurement (injecting a forged-Origin request at every non-GET route)
     // that were unrecorded omissions from the set, distinct from the invite
     // TOKEN accept and `PUT /v1/me/preferences`, which stay excluded by a
