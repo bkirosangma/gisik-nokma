@@ -51,6 +51,15 @@ const AVAILABLE_COLUMNS: ListColumnId[] = ['status', 'assignee', 'dueDate', 'typ
  * spells on the section title itself (`list-model.ts`: "No epic",
  * "Unassigned") — naming the absence twice on one band would read as two facts.
  *
+ * **`priority` is a FIFTH word and NOT one of the prototype's seven** (spec
+ * 2026-09-22): the prototype's grouping table (`desktop.dc.html:2902-2913`)
+ * branches on epic / workflow / type / status / assignee and has no priority
+ * case at all, so there is no prototype wording to transcribe. `'priority'` is
+ * chosen the way `type: 'type'` already reads — the meta names what KIND of
+ * thing the title is, and the title is the level itself ("P1"). The alternative
+ * reading, that the title is already the whole fact and the word adds nothing,
+ * would leave `exclude`-typed entries sparse and the band unreadable.
+ *
  * `flat` has no entry because it has no band: `groupRows` answers one section
  * whose rows are the whole set, and `TicketList` has never rendered a heading
  * for it.
@@ -60,6 +69,7 @@ const GROUP_META: Record<Exclude<Grouping, 'flat'>, string> = {
   status: 'state',
   assignee: 'assignee',
   type: 'type',
+  priority: 'priority',
 };
 
 /**

@@ -14,6 +14,10 @@ const card: BoardCard = {
   // reason the sibling `boardCardSeed` uses it: this ticket claims no date,
   // and the board predicate has no due axis to narrow by anyway (13.434).
   dueDate: null,
+  // ALWAYS present (spec 2026-09-22): the type requires it, so this fixture
+  // carries the birth default the reducer writes, attributed to the same actor
+  // as the state provenance above.
+  priority: { value: 'P2', claim: { actorId: 'u1', actorName: 'Ada', clientTime: '', serverTime: '' } },
 };
 const column: BoardColumn = {
   stateId: 's-doing', name: 'Doing', category: 'active', blocked: false, cards: [card],

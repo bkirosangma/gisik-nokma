@@ -79,6 +79,10 @@ export function boardCardSeed(overrides: Partial<BoardCard> = {}): BoardCard {
     // Ruling E5-2 — `null` is "nobody is claiming a date", the same default
     // `listRowSeed` below uses. A case that wants a date passes one.
     dueDate: null,
+    // Spec 2026-09-22: every card carries a priority; the seed's is the birth
+    // default, attributed to the same seeded claimant every other provenance
+    // here names. A case that wants another level passes one.
+    priority: { value: 'P2', claim: claim() },
     pending: false,
     ...overrides,
   };
@@ -99,6 +103,9 @@ export function listRowSeed(overrides: Partial<ListRow> = {}): ListRow {
     assignee: null,
     assignedProvenance: null,
     dueDate: null,
+    // Spec 2026-09-22: same as `boardCardSeed` above — every row carries a
+    // priority and the seed's is the birth default.
+    priority: { value: 'P2', claim: claim() },
     fields: {},
     rollup: null,
     hasRestrictedParent: false,

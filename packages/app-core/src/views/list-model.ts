@@ -83,7 +83,9 @@ export function recentlyAssignedRows(rows: ListRow[], currentUserId: string): Li
  * narrowing into a closure over a parameter, so the switch is non-exhaustive,
  * the arrow can fall through to `undefined`, and the file does not compile
  * under `strict`. Narrowing into a `const` before the closure is what makes
- * the four-case switch exhaustive — the same four cases, one binding earlier.
+ * the switch exhaustive — the same cases, one binding earlier. (`priority`
+ * joined the switch in Task 5 of the 2026-09-22 priority plan, which is why the
+ * count in this sentence is no longer four; the shape is unchanged.)
  */
 export function groupRows(rows: ListRow[], grouping: Grouping, labels: GroupLabels): ListSection[] {
   if (grouping === 'flat') return [{ key: 'all', label: 'All tickets', rows: [...rows] }];
@@ -102,6 +104,11 @@ export function groupRows(rows: ListRow[], grouping: Grouping, labels: GroupLabe
           : [`assignee:${row.assignee.id}`, actorLabel(row.assignee.id, row.assignee.name)];
       case 'type':
         return [`type:${row.typeId}`, labels.typeName(row.typeId)];
+      case 'priority':
+        // The label is the level itself (spec 2026-09-22): there is no name to
+        // resolve, and `GroupLabels` carries none for it — the ladder is three
+        // closed tokens, not a roster this view could be handed a name from.
+        return [`priority:${row.priority.value}`, row.priority.value];
     }
   };
   const sections = new Map<string, ListSection>();
@@ -173,6 +180,7 @@ const BUILTIN_COLUMN_LABELS: Record<Exclude<ListColumnId, `field:${string}`>, st
   dueDate: 'Due date',
   type: 'Type',
   progress: 'Progress',
+  priority: 'Priority',
 };
 
 export function columnLabel(id: ListColumnId): string {

@@ -286,3 +286,20 @@ section follow the controller's rule, so the next free id after B16 is one past 
   longer defined, since built-ins are answered before the type is resolved — refuses `null` as
   `field.priority-required`, and refuses anything else (`'P4'`, a number) as a type mismatch naming the
   three levels. — `packages/rule-engine/test/fields.test.ts`
+- **3.968** ✅ `toServerFilterSpec` maps one `priorities` level to the wire's SINGULAR `priority` — the
+  same plural/singular disagreement every other id axis has — throws `UnexpressibleFilterError` naming the
+  key and the count on two levels rather than silently narrowing to the first, and treats an empty list as
+  "the caller named nothing". — `packages/app-core/test/online/mappers.test.ts`
+- **3.969** ✅ The priority claim crosses the wire as a CLAIM, on both card sites: the board card carries
+  value plus provenance with `actorName` resolved through the roster, and the list row carries the same
+  claim with `actorName: null` (that mapper is handed no roster — the lossless absence `mapProvenance`
+  documents). A card with NO `priority` and a card whose level is off the ladder each THROW naming the path
+  and the three levels, rather than defaulting to P2. — `packages/app-core/test/online/mappers.test.ts`
+- **3.970** ✅ The replica carries the birth claim on the list row AND the board card, read off the same
+  folded state so the two cannot disagree: `P2`, attributed to the creating actor with both clocks and a
+  `null` actorName. — `packages/app-core/test/replica/replica-data-source.test.ts`
+- **3.971** ✅ A replica state whose reducer predates the field makes the read THROW with "no priority
+  claim", never a defaulted P2. The stale state is manufactured by stripping the claim out of the stored
+  row (asserted, then asserted again after the write) — the older reducer no longer exists to produce one —
+  and the read is asserted WORKING on the same row before the strip, so the control cannot be masked by
+  the subject. — `packages/app-core/test/replica/replica-data-source.test.ts`

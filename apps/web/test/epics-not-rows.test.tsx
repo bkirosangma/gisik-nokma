@@ -108,6 +108,20 @@ function row(overrides: Partial<ListRow> = {}): ListRow {
     assignee: null,
     assignedProvenance: null,
     dueDate: null,
+    // REQUIRED since spec 2026-09-22. Built from the four provenance fields
+    // directly rather than through `claim(...)`: that helper's shape carries its
+    // own `value` key (it is the `fields`-entry factory), and `PriorityView`
+    // nests the claim under `claim` — reusing it here would put a stray `value`
+    // inside the provenance and read as if it meant something.
+    priority: {
+      value: 'P2',
+      claim: {
+        actorId: 'user_kiro',
+        actorName: 'Kiro',
+        clientTime: '2026-09-01T10:00:00.000Z',
+        serverTime: '2026-09-01T10:00:01.000Z',
+      },
+    },
     fields: { title: claim('Restock the cold shelf') },
     rollup: null,
     hasRestrictedParent: false,
@@ -128,6 +142,16 @@ function card(overrides: Partial<BoardCard> = {}): BoardCard {
     // Ruling E5-2 made this REQUIRED on `BoardCard`; `null` is "this ticket
     // claims no date", the same default `boardCardSeed` uses.
     dueDate: null,
+    // REQUIRED since spec 2026-09-22; see the same member on `row()` above.
+    priority: {
+      value: 'P2',
+      claim: {
+        actorId: 'user_kiro',
+        actorName: 'Kiro',
+        clientTime: '2026-09-01T10:00:00.000Z',
+        serverTime: '2026-09-01T10:00:01.000Z',
+      },
+    },
     cause: null,
     rollup: null,
     pending: false,

@@ -64,6 +64,16 @@ function serverCard(overrides: Partial<TicketCard> = {}): TicketCard {
     collaboratorIds: [],
     title: 'File the GST return',
     dueDate: { state: 'never-claimed' },
+    // REQUIRED on the wire (spec 2026-09-22) and read unconditionally by both
+    // card mappers; `P2` is the birth default `assembleTicketCards` serves for a
+    // ticket nobody has re-prioritised. The `3.968`/`3.969` cases below are the
+    // ones about priority itself.
+    priority: {
+      value: 'P2',
+      actorId: ANSELMA,
+      clientTime: '2026-08-19T09:58:12.000Z',
+      serverTime: '2026-08-19T10:00:00.000Z',
+    },
     fields: {},
     stateProvenance: {
       actorId: ANSELMA,
@@ -664,11 +674,31 @@ describe('3.38 preferences — ruling P24 both ways', () => {
   it('3.38 refuses a stored grouping or column id nothing renders, rather than casting it through', () => {
     expect(() =>
       mapPreferences({ savedFilters: [], listColumns: {}, grouping: { p: 'by-vibes' } }),
-    ).toThrow(/preferences\.grouping\.p: expected one of epic\/status\/assignee\/type\/flat/);
+    ).toThrow(
+      /preferences\.grouping\.p: expected one of epic\/status\/assignee\/type\/priority\/flat/,
+    );
     expect(() =>
       mapPreferences({ savedFilters: [], listColumns: { p: ['statuz'] }, grouping: {} }),
     ).toThrow(/preferences\.listColumns\.p\[0\]/);
-    // Controls, same run: the closed member and the open `field:` arm both pass.
+    // Controls, same run: the closed member and the open `field:` arm both pass
+    // — and since spec 2026-09-22 the closed list carries a SIXTH member and a
+    // SEVENTH column. `priority` is asserted positively here rather than left to
+    // the refusal above, because a stored preference is the one path where a
+    // grouping the client can still render would otherwise be refused on
+    // re-open: the enumeration in that message and the list in `GROUPINGS` are
+    // two spellings of one fact, and this arm is the one that reddens if only
+    // the refusal is updated.
+    expect(
+      mapPreferences({
+        savedFilters: [],
+        listColumns: { p: ['status', 'field:amount', 'priority'] },
+        grouping: { p: 'priority' },
+      }).projects['p'],
+    ).toEqual({
+      columns: { origin: 'stored', value: ['status', 'field:amount', 'priority'] },
+      grouping: { origin: 'stored', value: 'priority' },
+    });
+    // Control, same run: the closed member and the open `field:` arm both pass.
     expect(
       mapPreferences({
         savedFilters: [],
@@ -928,6 +958,136 @@ describe('3.38 toServerFilterSpec — the plural/singular disagreement, made lou
     // Absent contributes no key — the same "caller named nothing" rule every
     // other optional axis follows here.
     expect(toServerFilterSpec({})).toEqual({});
+  });
+
+  /**
+   * 3.968 — the `priorities` axis (spec 2026-09-22) is the SAME
+   * plural/singular disagreement every other id axis here has, and it is
+   * asserted on the same three arms as `assigneeIds` above: one value maps,
+   * two THROW, an empty list is not a filter. The wire's `filterSpecSchema`
+   * carries ONE `priority`, so narrowing two levels to the first would answer a
+   * different question under the user's own label.
+   */
+  it('3.968 priorities: one level becomes the wire\'s singular `priority`; two THROW; empty contributes nothing', () => {
+    expect(toServerFilterSpec({ priorities: ['P1'] })).toEqual({ priority: 'P1' });
+    expect(toServerFilterSpec({ priorities: ['P3'] })).toEqual({ priority: 'P3' });
+    expect(() => toServerFilterSpec({ priorities: ['P1', 'P2'] })).toThrow(UnexpressibleFilterError);
+    expect(() => toServerFilterSpec({ priorities: ['P1', 'P2'] })).toThrow(
+      /filter key priorities .* one priority and this filter names 2/s,
+    );
+    expect(toServerFilterSpec({ priorities: [] })).toEqual({});
+  });
+});
+
+/**
+ * 3.969 — the priority claim crosses the wire as a CLAIM (spec 2026-09-22), on
+ * BOTH card sites, and its absence or an off-ladder value is a refusal rather
+ * than a silent P2.
+ *
+ * ⚠ **THE PLAN TEXT'S SIGNATURE FOR THIS CASE IS WRONG AND THE DIFFERENCE IS
+ * LOAD-BEARING.** It wrote `mapListPage(listPageFixtureWith(...), roster)` with
+ * `actorName: 'Anselma Marak'`. The shipped `mapListPage(raw)` takes NO roster —
+ * it builds an EMPTY one (`mappers.ts:1764`) — so a list row's `actorName` is
+ * always `null`, which `mapProvenance`'s docblock calls the lossless absence
+ * (`provenance.ts`'s `actorLabel` renders the raw id for a null name). Written
+ * as the plan has it, the assertion could never pass. The roster-resolving half
+ * is therefore asserted on the BOARD mapper, which does take one, and the list
+ * mapper is asserted for what it actually does.
+ */
+describe('3.969 the priority claim crosses the wire as a claim; absence and an off-ladder value are refusals', () => {
+  const roster = new Map([[ANSELMA, 'Anselma Marak']]);
+  const boardOf = (card: TicketCard): BoardResponse => ({
+    projectId: '01J9GPRJ000000000000000000',
+    workspaceId: '01J9GWS0000000000000000000',
+    columns: [
+      {
+        workflowId: 'wf-errand',
+        workflowName: 'Errand',
+        workflowVersion: 2,
+        stateId: 'doing',
+        name: 'Doing',
+        category: 'active',
+        blocked: false,
+        cards: [card],
+      },
+    ],
+  });
+  /**
+   * `ListResponse.groups[].cards` is `ListCard[]`, not `TicketCard[]` — the wire
+   * adds the five list-only facts — so the list fixture is built on the same
+   * base and widened the way `serverListCard` (inside the 3.42 describe) does.
+   * Spelled again here rather than hoisted: that one is scoped to its own
+   * describe, and hoisting it would edit a landed case's surroundings for this
+   * one's convenience.
+   */
+  const listCardOf = (overrides: Partial<ListCard> = {}): ListCard => ({
+    ...serverCard(),
+    typeRank: 3,
+    epicId: '01J9GTKE000000000000000000',
+    stateName: 'Doing',
+    assignedProvenance: {
+      actorId: BIREN,
+      clientTime: '2026-08-19T09:59:00.000Z',
+      serverTime: '2026-08-19T10:01:00.000Z',
+    },
+    hasRestrictedParent: false,
+    ...overrides,
+  });
+  const listOf = (card: ListCard): ListResponse => ({
+    projectId: '01J9GPRJ000000000000000000',
+    groupBy: 'flat',
+    groups: [{ key: 'all', label: 'All tickets', cards: [card] }],
+    nextCursor: null,
+  });
+
+  it('the board card carries value and provenance, with the actorName resolved through the roster', () => {
+    const view = mapBoardView(
+      boardOf(
+        serverCard({ priority: { value: 'P1', actorId: ANSELMA, clientTime: 'c', serverTime: 's' } }),
+      ),
+      roster,
+    );
+    expect(view.groups[0]?.columns[0]?.cards[0]?.priority).toEqual({
+      value: 'P1',
+      claim: { actorId: ANSELMA, actorName: 'Anselma Marak', clientTime: 'c', serverTime: 's' },
+    });
+  });
+
+  it('the list row carries the same claim, with `actorName` null — that mapper is handed no roster', () => {
+    const page = mapListPage(
+      listOf(
+        listCardOf({
+          priority: { value: 'P3', actorId: ANSELMA, clientTime: 'c', serverTime: 's' },
+        }),
+      ),
+    );
+    expect(page.rows[0]?.priority).toEqual({
+      value: 'P3',
+      claim: { actorId: ANSELMA, actorName: null, clientTime: 'c', serverTime: 's' },
+    });
+  });
+
+  it('a card with NO priority THROWS naming the path — never a silent P2', () => {
+    const { priority: _dropped, ...without } = listCardOf();
+    // The cast is what makes the hazard reachable: the fixtures are typed as the
+    // server's own response, so only a deliberate widening can hand the mapper a
+    // body the server would not send. That is the point — this case is about the
+    // mapper's behaviour on a stale projection, not about a legal wire body.
+    expect(() => mapListPage(listOf(without as ListCard))).toThrow(/cards\[0\]\.priority/);
+  });
+
+  it('a card whose priority is off the ladder THROWS naming the three levels', () => {
+    expect(() =>
+      mapListPage(
+        listOf(
+          listCardOf({
+            // The cast is load-bearing and deliberate: `P7` is not a `Priority`,
+            // and reaching the mapper's own guard is the property under test.
+            priority: { value: 'P7' as 'P1', actorId: ANSELMA, clientTime: 'c', serverTime: 's' },
+          }),
+        ),
+      ),
+    ).toThrow(/one of P1\/P2\/P3/);
   });
 });
 

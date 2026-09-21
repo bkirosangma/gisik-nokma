@@ -18,7 +18,18 @@ const row: ListRow = {
   stateProvenance: provenance,
   assignee: { id: 'u1', name: 'Ada' }, assignedProvenance: provenance,
   dueDate: { date: '2026-09-20', claim: provenance },
-  fields: { title: claim('Ship the board'), amount: claim(4200), priority: claim('high') },
+  // ALWAYS present (spec 2026-09-22), so the fixture carries a real claim. `P2`
+  // is the birth default the reducer writes, attributed here to the same actor
+  // every other claim in this fixture names.
+  priority: { value: 'P2', claim: provenance },
+  // ⚠ `severity`, NOT `priority`. This fixture used to call the custom field
+  // `priority` (`claim('high')`), and that id is a BUILT-IN from 2026-09-22 on:
+  // `ticketTypeDefSchema` now refuses a ticket type declaring one ("shadows a
+  // built-in field"), so a fixture modelling a custom `priority` models a world
+  // the product no longer admits. `fields['priority']` is the BUILT-IN's own
+  // slot, holding the birth claim above. The `fields`-axis cases below are about
+  // a CUSTOM field, so they take an id that is still custom.
+  fields: { title: claim('Ship the board'), amount: claim(4200), severity: claim('high') },
   rollup: null, hasRestrictedParent: false, pending: false, closed: null,
   // REQUIRED on the row (spec §8.1, second wave 2026-09-18). `null` and not a
   // key: this fixture is the "every axis populated" row, and rank is the one
@@ -41,7 +52,8 @@ const equivalent: TicketState = {
     title: claim('Ship the board'),
     dueDate: claim({ date: '2026-09-20' }),
     amount: claim(4200),
-    priority: claim('high'),
+    // `severity`, not `priority` — see the same rename on `row.fields` above.
+    severity: claim('high'),
   },
   transitions: [],
   // No `closed` key at all — `TicketState.closed?` predates the flag on 441
@@ -76,9 +88,9 @@ describe('13.542 matchesListRow agrees with matchesFilter on every axis it serve
     ['dueBefore, too early', { dueBefore: '2026-09-19' }],
     ['dueAfter inclusive, on the day', { dueAfter: '2026-09-20' }],
     ['dueAfter, too late', { dueAfter: '2026-09-21' }],
-    ['field clause, string match', { fields: { priority: 'high' } }],
+    ['field clause, string match', { fields: { severity: 'high' } }],
     ['field clause, number rendered as text', { fields: { amount: '4200' } }],
-    ['field clause, mismatch', { fields: { priority: 'low' } }],
+    ['field clause, mismatch', { fields: { severity: 'low' } }],
     ['field clause, unknown field', { fields: { nope: 'x' } }],
     ['excluded assignee', { exclude: { assigneeIds: ['u1'] } }],
     ['excluded other assignee', { exclude: { assigneeIds: ['u2'] } }],

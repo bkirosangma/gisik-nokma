@@ -1,4 +1,26 @@
-import type { FieldClaim, StateCategory, TicketState, VisibilityMode } from '@gisik-nokma/domain';
+import type { FieldClaim, Priority, StateCategory, TicketState, VisibilityMode } from '@gisik-nokma/domain';
+
+/**
+ * The three levels, re-exported from their ONE origin (spec 2026-09-22): no
+ * file in this package spells `P1`/`P2`/`P3` for itself. The views and the
+ * filters import the vocabulary from here, which is a re-export of
+ * `@gisik-nokma/domain`'s `PRIORITIES`, never a second list.
+ */
+export type { Priority };
+
+/**
+ * A ticket's priority as every client view holds it: the value plus the claim
+ * that put it there, in `dueDate`'s own nested shape so the two cannot drift
+ * into two ideas of what a claim is.
+ *
+ * **ALWAYS PRESENT, and never nullable** — unlike `BoardCard.dueDate` there is
+ * no never-claimed and no cleared state to represent (spec 2026-09-22: priority
+ * "is always there", born at P2). A reader that finds no claim THROWS rather
+ * than substituting the default, because `applyTicketEvent` writes the claim on
+ * every `ticket.created`: an absence means a projection or replica that predates
+ * the field, which is a defect to surface and not a blank to fill.
+ */
+export type PriorityView = { value: Priority; claim: ClaimProvenance };
 
 export type Actor = { id: string; name: string };
 /**
@@ -246,6 +268,8 @@ export type BoardCard = {
    * due label was built and the key left as a recorded gap.
    */
   dueDate: { date: string; claim: ClaimProvenance } | null;
+  /** ALWAYS present (spec 2026-09-22): the mapper and the replica THROW rather than default. */
+  priority: PriorityView;
   /** True only between submit and the server's answer (web is online-only). */
   pending: boolean;
 };
@@ -291,7 +315,7 @@ export type BoardGroup = {
 export type BoardView = { projectId: string; groups: BoardGroup[] };
 
 /**
- * The six id-shaped axes of a filter — every one a list, and an absent or
+ * The SEVEN id-shaped axes of a filter — every one a list, and an absent or
  * empty list narrows nothing. Declared ONCE and used twice (exclude-mode
  * spec §1, 2026-09-17): spread into `FilterSpec` as its include half, and as
  * the type of its `exclude` half — so the two halves cannot drift into two
@@ -303,6 +327,13 @@ export type IdAxes = {
   typeIds?: string[];
   stateIds?: string[];
   stateCategories?: StateCategory[];
+  /**
+   * The priority levels (spec 2026-09-22). An ID-SHAPED axis like the five
+   * above and for the same reason: it is a set of closed tokens, so it gets an
+   * include half and an exclude half from `IdAxes` rather than a boolean of its
+   * own — `closed` is the counter-example that has no such halves.
+   */
+  priorities?: Priority[];
   projectIds?: string[];
 };
 
@@ -332,9 +363,16 @@ export type FilterSpec = IdAxes & {
   exclude?: IdAxes;
 };
 
-export type Grouping = 'epic' | 'status' | 'assignee' | 'type' | 'flat';
+export type Grouping = 'epic' | 'status' | 'assignee' | 'type' | 'priority' | 'flat';
 
-export type ListColumnId = 'status' | 'assignee' | 'dueDate' | 'type' | 'progress' | `field:${string}`;
+export type ListColumnId =
+  | 'status'
+  | 'assignee'
+  | 'dueDate'
+  | 'type'
+  | 'progress'
+  | 'priority'
+  | `field:${string}`;
 
 export type ListRow = {
   ticketId: string;
@@ -351,6 +389,8 @@ export type ListRow = {
   assignee: Actor | null;
   assignedProvenance: ClaimProvenance | null;
   dueDate: { date: string; claim: ClaimProvenance } | null;
+  /** ALWAYS present (spec 2026-09-22): the mapper and the replica THROW rather than default. */
+  priority: PriorityView;
   fields: Record<string, FieldClaim>;
   rollup: RollupToViewer | null;
   hasRestrictedParent: boolean;
