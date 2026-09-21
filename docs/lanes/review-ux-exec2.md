@@ -2240,6 +2240,33 @@ than filing a weak refutation to look active.**
 | `E6-1` (the help says a job cannot be deleted) | `docs/manual.md:372` says exactly that (*"**You cannot delete a job.**"*), against the shipped `Delete` at `ticket-sheet.tsx:2612-2621` | **holds** — same corpus and same section as my `E2-1`, different row |
 | `E5-8` (the History tab prints raw event names) | `history-list.tsx:45` `{event.type}` — I read that file in full in round 1 and did not file it | **holds, and I will not file it** — see `E2-35`'s note; filing it now could not be separated from copying |
 
+### The check, extended at the phase-2 boundary — three lanes, seven findings, seven true
+
+The other lanes filed hard at the boundary (exec 4 went 0 → 17, exec 5 9 → 19, exec 6 3 → 11), so I
+extended the check to the ones I could falsify by reading. **Every one holds.**
+
+| finding | the claim I tested | what I opened | outcome |
+|---|---|---|---|
+| `E4-4` (lane 4) | the editor has `role="textbox"` and **no accessible name** | `TicketEditor.tsx:119` `<EditorContent editor={editor} className="ticket-editor__content" />` — no `aria-label`, no `role`; and the sheet's row is `<dt>description</dt>` then `<dd><EditorSlot …/></dd>` (`ticket-sheet.tsx:2404-2435`), where a `<dt>` names nothing for ARIA | **holds** |
+| `E4-5` (lane 4) | the workspace home's `<h1>` is a button, so the level-1 heading is named "Rename …" | `w/[workspaceId]/page.tsx:797-810` — the `<h1>` contains `<button aria-label={`Rename ${workspace.name}`}>`, and an `aria-label` overrides the button's text, so the heading computes to "Rename Convenience Corner" | **holds** |
+| `E5-13` (lane 5) | a failed preferences read paints all five ON and one toggle PUTs the guess | `account/page.tsx:81` and `:215-232`: `toggleKind` builds the next document from `prefs.mutedKinds` and `save(next)` PUTs the whole document (`notification-preferences-gateway.ts:18-22`) | **holds** |
+| `E5-17` (lane 5) | `/mcp/tokens` paints with no app nav and nothing links to it | `app/mcp/tokens/page.tsx` (34 lines) imports no `AppNav`; a repo-wide grep for `/mcp/tokens` returns **35 hits, every client one a comment** except the `returnTo` at `mcp-tokens-screen.tsx:212` | **holds** |
+| `E6-2` (lane 6) | the assignment fanout does not filter soft-deleted tickets, and the inbox read filters nothing | `sweep.ts:176-177` carries the quoted rule and `:187` `AND ${LIVE_TICKET_WHERE}`; `fanout.ts:102-104` mentions `deleted_at` **only in a comment** explaining why it deliberately does not filter; `store.ts:127-132` is `SELECT … FROM notifications WHERE ${where}` with no join and no deleted predicate | **holds** |
+| `E5-3` / `E4-1` (both lanes, independently) | the sheet renders the same ancestor twice when the direct parent is the epic | `view-types.ts:529` *"The walk starts at `parentId`"*; `ticket-sheet.tsx:1772-1787` renders both crumbs with no `epic.id !== parent.id` guard | **holds** |
+| `E5-2` (lane 5) | the board card carries no key, no due date, no lateness | `view-types.ts:204-214` `BoardCard` = `{ticketId, title, typeId, assignee, stateProvenance, cause, rollup, pending}`; `board.tsx:1035-1062` draws title, avatar, pending/cause chips, rollup, provenance | **holds** |
+
+⚠ **And one I nearly filed and did not.** `E5-17`'s *title* suggested the revoke surface was unreachable, and I had a falsifying measurement ready: `McpTokensScreen` **is** mounted on `/account`
+(`account/page.tsx:16` and `:305` `<McpTokensScreen heading="h2" variant="account" />`), which the account menu links to. **Then I read the finding, and it does not make that claim** — it is scoped to the *route's* chrome and names `/account` as the shelled sibling. My measurement addressed something the finding never said. **A refutation built from a title is a refutation of nothing**, and it would have cost me the finding's points.
+
+### Why I will file no further findings in phase 2, stated as arithmetic rather than as fatigue
+
+Round-2 §2 scores **new findings in phase 2 at half**, and §3 prices an invalid one at **three times its
+claimed severity** — the penalty is not halved with the credit. So an Important filed now earns **1.5** if
+upheld and costs **9** if not: it is worth filing only above **~86 %** confidence. I have two candidates
+left that I judge true but not certain — the Calendar/Timeline collaborator axis matching nothing
+(`ticket-dates-input.ts:42,56-57`, conditional on the axis being wired to those tabs at all, which I did
+not establish) and the `caught-up` callback whose missing consequence I could not pin down. **Both sit
+below that bar, so neither is filed**, and the candidates are named here so the boundary is visible.
 **What this costs me, stated plainly:** the pairing's refutation phase will find me filing nothing, and a
 judge may read that as passivity. The alternative — filing a refutation I could not measure, to move the
 ledger — is exactly what §3 prices at the full value of the target, and the same three reports show that
