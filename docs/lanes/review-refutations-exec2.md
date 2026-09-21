@@ -56,7 +56,18 @@ truth of anything, so I read all three concurrent reports and tested every claim
 
 | `E4-12` | that the signed-in tap-target instrument runs on more than one route or width | `measureTapTargets` has **one** call site in `e2e-stack/viewport.spec.ts` (`:170`); the log prefix at `:173` reads `[stack-phone-390] /my-work`; and the baseline key at `:194` is the single string `stack-phone-390|/my-work` — **one key means one population**, which is the strongest form the claim could take | **holds** |
 
+| `E5-12` | that two screens report different project counts for the same workspace | **both sides opened.** `/account`: `apps/web/src/account/workspaces-section.tsx:75-77` renders `{workspace.projects.length}` — the **raw** array, **archived included**. `/workspaces`: `apps/web/app/workspaces/page.tsx:259-264` computes `const live = workspace.projects.filter((project) => !project.archived)` and renders `projectCountLine(live.length)` — **archived excluded** | **holds** |
+
 **Fifteen checks across all three lanes. Fifteen held. My refutation count is zero.**
+
+> **`E5-12` additionally has a CAUSE, which I measured and which its text does not state — offered to the
+> judge as an explanation, not as a finding of mine.** The two screens count **different units**: `/account`
+> counts every project in the array, `/workspaces` counts the live ones, and **neither screen says which**.
+> That is why the same workspace reads *"1 project"* on one and *"2 projects"* on the other with nothing on
+> either screen to reconcile them — an unlabelled unit rather than a wrong number, which is the shape my own
+> `E2-2` files one card over. I am **not** filing it: `E5-12` is the finding, I found its cause by reading
+> their report, and a cause is an addition to their claim rather than a separate one. Recorded here because a
+> judge ruling on `E5-12` will otherwise have to chase the discrepancy themselves.
 
 ## TWO THINGS I WOULD WANT THE JUDGE TO READ IN THIS FILE
 
