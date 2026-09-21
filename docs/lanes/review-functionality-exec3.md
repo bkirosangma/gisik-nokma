@@ -1769,6 +1769,7 @@ check is re-runnable rather than a verdict.
 | 12 | the auto-close sweep's `entered.server_time` bound is an IST day boundary, not a UTC one | `istDayBounds` feeding `auto-close/sweep.ts` | **the same probe**: `bounds('2026-08-20')` → `[2026-08-19T18:30:00Z, 2026-08-20T18:30:00Z)` — IST midnight, as the docblock says ✓ |
 | 13 | the hub's slow-consumer close is SAFE — the ledger is the durable buffer, so a dropped socket must not lose events | the server's close codes vs the client's `onclose` | **both halves correct**: `stream/hub.ts:147` closes `1013 slow-consumer` and `routes.ts:411`/`:421` close `1011`; `stream.ts:327-332` ignores the code and retries with backoff from `lastSeq`, which is advanced on every `event` and `caught-up` frame (`:323-324`), so a reconnecting client resumes from its cursor. **No fatal code exists for it to spin on** — `routes.ts:156` records that the `1008 unauthorized` fallback is deliberately *not* written ✓ |
 | 14 | a revoke that arrives mid-stream must not be retried through | `stream.ts:220`, `:325` | **handled and documented**: `scope-revoked` calls `shutDown()` — *"`scope-revoked` ENDS this subscription — no reconnect"* ✓ |
+| 15 | the upload path makes exactly ONE size decision about the file bytes, so a size guard cannot be silently shadowed by the parser's own | `limits.fileSize` anywhere in the server source | **holds, and is guarded more sharply than the claim**: `routes/attachments.ts:297` sets `limits: { fileSize: Number.MAX_SAFE_INTEGER, fieldSize: 256, parts: 8 }` — deliberately, because `@fastify/multipart` reads `options.limits?.fileSize \|\| <default>`, so a route with NO key would inherit a *hidden* second ceiling. With it pinned to MAX_SAFE_INTEGER the only decision is `readAtMost` at `:393`, and `read-limited.ts:33-46` records the falsifiability argument for why there is exactly one ✓ |
 
 **Suite baselines re-measured at this sha: `packages/domain` 548 passed / 0 failed; `packages/rule-engine`
 345 passed / 0 failed.** All 8 CI-wired checkers green (§7.4, re-run).
@@ -1844,6 +1845,16 @@ second clause is true of the guard and **false of the relation**, because the re
 the other door — and it is reachable through the very edge shape this product documents as the archetype
 of a guard-voiding edge (`from: '*'`, `Features.md` §4's `rule-bypassable`): a wildcard edge INTO an open
 state is exactly what makes `done → todo` legal here.
+
+> ⚠ **AND THIS SENTENCE NAMED A REACHABILITY CONDITION THAT IS TOO NARROW — corrected at §36, after
+> executor 6's `E6-8` was independently confirmed.** The wildcard edge is how MY probe reaches the state,
+> not what the state requires: a workflow **republish** that promotes a kept state's category to
+> `terminal` reaches it with no wildcard at all (measured, `{refused:false}`), and so does a republish
+> dropping an open state onto a terminal one. **So the precondition is not "a workflow with an edge out
+> of a terminal state" but "any workflow whose categories can change under live tickets"**, which is an
+> ordinary authoring act. **The narrower bound was mine and it understated the finding; §36 is where the
+> competing lane's confirmation loosened it.** Left in place rather than rewritten, so a reader can see
+> which claim the probe supports and which one it does not.
 
 **WHAT WOULD HAVE BEEN BETTER.** The invariant is symmetric, so the guard should be: refuse a move **out
 of** a terminal state into a non-terminal one while the ticket's PARENT is terminal, with its own rule id
