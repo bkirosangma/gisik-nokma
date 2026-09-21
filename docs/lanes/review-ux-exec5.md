@@ -1285,10 +1285,10 @@ brief's three categories.
 | 17 | Invite landing (inviter, expiry, tray, Decline/Accept) | `:1761-1789` | one sentence + Join | **3 — recorded, unruled; wire-limited** | E5-18 |
 | 18 | `/mcp/authorize` shows code vs product types code | `:1828-1836` | person types the assistant's code; Deny present | 3 by the delta doc; product's direction is the standard device flow — **not filed** | — |
 | 19 | Founding lands on the list + toast | `:2741-2752` | `/my-work` | 2 — ruled (`exec2-F5`, controller §4 #4); remedy not yet in tree at `a7b6292b` (`grep -in 'first-run\|new project' my-work.tsx` → 0) — **not filed**, it is F5's remedy | — |
-| 21 | Inbox row time + per-row read toggle | `:606-640` (`n.time`, `n.toggleRead`) | no time, mark-read on open | **3 — recorded as "render-only", no ruling** | E5-35 |
 | 20 | Epic band count | `:2904-2927` | counts membership on screen | 2 — ruled (controller §4 #5); the ordered "record the ruling beside `ticket-list.tsx:656-664`" not yet done — **not filed** | — |
+| 21 | Inbox row time + per-row read toggle | `:606-640` (`n.time`, `n.toggleRead`) | no time, mark-read on open | **3 — recorded as "render-only", no ruling** | E5-35 |
 
-**Category-3 members, counted: 8** (rows 1, 4, 6, 8, 12, 16, 17 filed; 13 folded). **Category-2 argued: 1** (row 9,
+**Category-3 members, counted: 9** (rows 1, 4, 6, 8, 12, 16, 17, 21 filed; 13 folded). **Category-2 argued: 1** (row 9,
 E5-9). **Category 1 with a shared defect, noted not filed: 1** (row 5).
 
 ---
