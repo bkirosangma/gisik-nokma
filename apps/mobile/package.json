@@ -9,7 +9,7 @@
     "ios": "expo run:ios",
     "generate:editor-html": "node scripts/generate-editor-html.mjs",
     "build": "node scripts/check-dev-credentials.mjs && tsc -p tsconfig.json",
-    "test": "vitest run",
+    "test": "node scripts/generate-editor-html.mjs --check && vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

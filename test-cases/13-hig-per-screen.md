@@ -871,3 +871,34 @@ nobody ships and then defend it.
 > repo would have reminded anyone to write these three rows. Recorded rather than fixed: widening it is
 > a change to a shared instrument, not part of Task 4.
 
+## Ruling E4-22 — the board row carries an accessible name (2026-09-21, B14, block `13.1187`–`13.1196`)
+
+*`board-screen.tsx`'s row (`TouchableOpacity`) had no `accessibilityRole` or `accessibilityLabel`, so
+VoiceOver/TalkBack read it as unstructured text rather than as a button naming the ticket. Fixed by
+extracting `boardRowAccessibilityLabel` (`board-row-a11y.ts`, a sibling `.ts` — `apps/mobile/src`'s
+`.tsx` files stay thin and untested at this layer) and wiring
+`accessibilityRole="button"`/`accessibilityLabel={boardRowAccessibilityLabel(item)}` onto the row.*
+
+- 13.1187 ✅ `boardRowAccessibilityLabel` names the ticket's title and state, comma-separated, the
+  same pair the row's visible text shows — RED confirmed against a pre-fix stub that returned `''`
+  (no accessible name at all), GREEN after. —
+  (`apps/mobile/src/screens/board-row-a11y.test.ts`)
+
+## Ruling P28 — every pressable under apps/mobile/src carries a role (2026-09-21, B14, block `13.1187`–`13.1196`)
+
+*The finding's own measurement claimed "all six pressables in the app, each opened" — PARTIAL per the
+judge. Opened and counted here, correctly this time: `board-screen.tsx`'s row (1, fixed by E4-22) and
+`help-screen.tsx`'s tab `Pressable` (1, already carried `accessibilityRole="button"`). `app.tsx`,
+`ticket-screen.tsx` and `editor-web-view.tsx` have no `TouchableOpacity`/`Pressable`/
+`TouchableHighlight`/`TouchableWithoutFeedback` at all. Total: **2**, not six. `pressable-a11y-sweep.ts`
+makes this census a standing test rather than a one-time count — per PRESSABLE, not per file: a
+per-file aggregate first draft scored the real pre-fix `board-screen.tsx` `ok: true` (four sibling
+`<Text accessibilityRole="text">` attributes covered for the `TouchableOpacity`'s zero), verified
+against the actual pre-fix history before being replaced with the per-tag version shipped here.*
+
+- 13.1188 ✅ Every real pressable under `apps/mobile/src` carries a role, and the census is exactly
+  `2` — plus a negative control (a bare pressable with no role → `ok:false`), a positive control (one
+  that carries the role → `ok:true`), and the specific regression a sibling `<Text
+  accessibilityRole>` must not mask. —
+  (`apps/mobile/src/screens/pressable-a11y-sweep.test.ts`)
+

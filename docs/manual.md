@@ -385,7 +385,9 @@ This is the honest list. Each one is an absence, not a hidden button.
   remembers it as an absence finds the correction where they last saw it. The job sheet carries a
   comment thread, with a box at the end of it reading *"Add a comment — @ to mention someone"*. A move
   carrying the "require a comment" rule still puts its own box on the Move dialog (§7) and records what
-  you type on the move.
+  you type on the move. **The phone app cannot leave one, for now** — commenting from the phone needs a
+  signed-in identity the phone shell does not have yet, so the control is withheld there rather than
+  shipped in a shape that always fails silently (E5-44).
 - **You can attach a file to a job now.** It is kept here, rather than deleted, so a reader who
   remembers it as an absence finds the correction where they last saw it. The job sheet lists the job's
   files, and the comment box takes one too. The **description** box is still the exception: a file

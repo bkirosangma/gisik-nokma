@@ -253,3 +253,19 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-P29 | done | ca2bf401 | smoke.spec: all ten stubs cite a line; seven drifted citations corrected |
 | T-P32 | done | 1d9db468 | three disabled controls attach their reason via aria-describedby (2 mutations killed) |
 | T-P33 | done | d1512158 | inbox row time: the omission is CLOSED by E5-35; toggle half still holds |
+| B14 | claimed | 2026-09-21 22:03 | /Users/kiro/my_projects/gisik-nokma-exec4 |
+| T-E2-41 | done | 54a2c5c6 | board-read.test.ts (12.398, 12.399), ticket-read.test.ts (12.400) |
+| T-E2-42 | done | fc3f03e3 | ticket-comment.test.ts (12.401) |
+| T-E2-43 | done | 450d9918 | init-replica.test.ts (12.402, 12.403) |
+| T-E2-48 | done | a5c3ec53 | init-replica.test.ts (12.404, 12.405) |
+| T-E2-52 | done | 8a31207e | mention-query.test.ts (12.406) |
+| T-E5-26 | done | 610bb9d0 | copy.test.ts (12.407) |
+| T-E5-44 | done | 65bc5cfe | ticket-comment.test.ts (12.408) |
+| E2-41-renumber | done | 6b225ba6 | 12.398/12.399 -> 12.409/12.410 (collision with B01/B07/B16) |
+| T-E2-49 | done | 81f68561 | register-push.test.ts (12.411) |
+| T-E2-53 | done | 823dfc31 | editor-refusals.test.ts (12.412) |
+| T-E4-22 | done | 51ba5a47 | board-row-a11y.test.ts (13.1187) |
+| T-P28 | done | a45c5e95 | pressable-a11y-sweep.test.ts (13.1188) |
+| T-P30 | done | 41869c7d | generate-editor-html.test.ts (12.413, 12.414, 12.415) |
+| T-P6 | done | 1d06ea64 | prose-only, no case (rule 5) |
+| T-P7 | done | 21c868b6 | prose-only, no case (rule 5) |

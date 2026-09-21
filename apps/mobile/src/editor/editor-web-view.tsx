@@ -1,7 +1,14 @@
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import type { EditorToHostMessage, HostToEditorMessage } from '@gisik-nokma/editor/webview-bridge';
 import { parseRawEditorMessage, serializeHostMessage } from './editor-bridge.js';
+import {
+  EDITOR_LOAD_FAILURE_MESSAGE,
+  EDITOR_PARSE_FAILURE_MESSAGE,
+  EDITOR_READY_TIMEOUT_MESSAGE,
+  EDITOR_READY_TIMEOUT_MS,
+  readyTimedOut,
+} from './editor-refusals.js';
 
 type LoadDocMessage = Extract<HostToEditorMessage, { kind: 'loadDoc' }>;
 type ChangeMessage = Extract<EditorToHostMessage, { kind: 'change' }>;
@@ -39,6 +46,12 @@ export type EditorWebViewProps = {
    */
   onRequestUpload?(): void;
   onMentionQuery?(query: string): Promise<MentionResult[]>;
+  /**
+   * E2-53: the host's three refusal doors — a frame that failed to parse, the
+   * `WebView` itself failing to load, and `ready` never arriving — all report
+   * through this one callback rather than staying silent.
+   */
+  onEditorError?(message: string): void;
 };
 
 /**
@@ -53,19 +66,39 @@ export type EditorWebViewProps = {
  */
 export function EditorWebView(props: EditorWebViewProps) {
   const ref = useRef<WebView>(null);
-  const { initialDoc, editable = true, html, onChange, onSubmit, onRequestUpload, onMentionQuery } = props;
+  const { initialDoc, editable = true, html, onChange, onSubmit, onRequestUpload, onMentionQuery, onEditorError } = props;
   const source = useMemo(() => ({ html }), [html]);
+  const readyReceivedRef = useRef(false);
 
   const send = useCallback((message: HostToEditorMessage): void => {
     ref.current?.postMessage(serializeHostMessage(message));
   }, []);
 
+  // Door (c): `ready` never arriving used to wait forever with nothing on
+  // screen. `readyTimedOut` is the pure decision; this effect is the one
+  // impure place it fires from.
+  useEffect(() => {
+    readyReceivedRef.current = false;
+    const startedAt = Date.now();
+    const timer = setTimeout(() => {
+      if (readyTimedOut({ readyReceived: readyReceivedRef.current, elapsedMs: Date.now() - startedAt, timeoutMs: EDITOR_READY_TIMEOUT_MS })) {
+        onEditorError?.(EDITOR_READY_TIMEOUT_MESSAGE);
+      }
+    }, EDITOR_READY_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [html, onEditorError]);
+
   const onMessage = useCallback(
     (event: WebViewMessageEvent): void => {
       const message = parseRawEditorMessage(event.nativeEvent.data);
-      if (message === null) return;
+      // Door (a): a frame that failed to parse used to be dropped silently.
+      if (message === null) {
+        onEditorError?.(EDITOR_PARSE_FAILURE_MESSAGE);
+        return;
+      }
       switch (message.kind) {
         case 'ready':
+          readyReceivedRef.current = true;
           send({ bridge: 1, kind: 'loadDoc', doc: initialDoc, editable });
           break;
         case 'change':
@@ -86,8 +119,20 @@ export function EditorWebView(props: EditorWebViewProps) {
         }
       }
     },
-    [editable, initialDoc, onChange, onMentionQuery, onRequestUpload, onSubmit, send],
+    [editable, initialDoc, onChange, onEditorError, onMentionQuery, onRequestUpload, onSubmit, send],
   );
 
-  return <WebView ref={ref} originWhitelist={['about:*']} source={source} onMessage={onMessage} javaScriptEnabled />;
+  return (
+    <WebView
+      ref={ref}
+      originWhitelist={['about:*']}
+      source={source}
+      onMessage={onMessage}
+      javaScriptEnabled
+      // Door (b): the WebView itself failing to load used to render a blank
+      // rectangle with nothing telling the person why.
+      onError={() => onEditorError?.(EDITOR_LOAD_FAILURE_MESSAGE)}
+      onHttpError={() => onEditorError?.(EDITOR_LOAD_FAILURE_MESSAGE)}
+    />
+  );
 }

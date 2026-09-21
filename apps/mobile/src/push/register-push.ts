@@ -28,11 +28,22 @@ export async function registerPushToken(opts: {
   } catch {
     return { registered: false, reason: 'no-token' };
   }
-  const res = await doFetch(`${opts.baseUrl}/v1/push/registrations`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${opts.token}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ platform: 'expo', token: expoToken }),
-  });
+  let res: Response;
+  try {
+    res = await doFetch(`${opts.baseUrl}/v1/push/registrations`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${opts.token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ platform: 'expo', token: expoToken }),
+    });
+  } catch {
+    // A dropped connection is a different fact from a 404: the 404 arm below
+    // means "the route is not registered yet", answered BY the server. This
+    // arm means the request never got an answer at all — offline, a dropped
+    // socket — so it is a third value, never coerced into either of the
+    // other two (Ruling 27/33's standing rule: a refusal and a dropped
+    // connection are never the same word).
+    return { registered: false, reason: 'unreachable' };
+  }
   if (res.status === 404) return { registered: false, reason: 'transport-unavailable' };
   if (!res.ok) return { registered: false, reason: `http-${res.status}` };
   return { registered: true };

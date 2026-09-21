@@ -9,6 +9,7 @@ import { BoardScreen } from './screens/board-screen.js';
 import { HelpScreen } from './screens/help-screen.js';
 import { TicketScreen } from './screens/ticket-screen.js';
 import { registerPushToken } from './push/register-push.js';
+import { initReplica } from './init-replica.js';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? 'http://localhost:3000';
 // Interim session plumbing until Plan 6's session handling is the reference
@@ -23,21 +24,30 @@ export function App() {
   const [status, setStatus] = useState<SyncStatus>('offline');
   const [queued, setQueued] = useState(0);
   const [failed, setFailed] = useState(0);
+  const [initError, setInitError] = useState<string | null>(null);
   const workspaceId = useMemo(() => WORKSPACE, []);
 
   useEffect(() => {
     if (workspaceId === '' || TOKEN === '') return;
     let stop: (() => void) | undefined;
     void (async () => {
-      const storage = await createOpSqliteStorage();
-      const replica = await createReplica({ storage });
-      const outbox = createOutbox({ storage, replica });
-      const engine = createSyncEngine({
-        replica,
-        outbox,
-        transport: createHttpTransport({ baseUrl: API_BASE, token: TOKEN }),
-      });
-      const dataSource = createReplicaDataSource({ workspaceId, replica, outbox, engine, storage });
+      const result = await initReplica(
+        { apiBase: API_BASE, token: TOKEN, workspaceId },
+        {
+          createStorage: createOpSqliteStorage,
+          createReplicaFn: createReplica,
+          createOutboxFn: createOutbox,
+          createHttpTransportFn: createHttpTransport,
+          createSyncEngineFn: createSyncEngine,
+          createReplicaDataSourceFn: createReplicaDataSource,
+        },
+      );
+      if (!result.ok) {
+        setInitError(result.error);
+        return;
+      }
+      const { dataSource, engine } = result;
+      setInitError(null);
       setDs(dataSource);
       const refreshQueue = (): void => {
         void dataSource.query.syncStatus(workspaceId).then((s) => {
@@ -77,7 +87,16 @@ export function App() {
             ),
           })}
         >
-          {() => <BoardScreen ds={ds} workspaceId={workspaceId} status={status} queued={queued} failed={failed} />}
+          {() => (
+            <BoardScreen
+              ds={ds}
+              workspaceId={workspaceId}
+              status={status}
+              queued={queued}
+              failed={failed}
+              initError={initError}
+            />
+          )}
         </Stack.Screen>
         {/*
           Registered BEFORE Ticket and reachable from the Board's header, and
@@ -88,7 +107,14 @@ export function App() {
         */}
         <Stack.Screen name="Help" component={HelpScreen} options={{ title: 'Manual & FAQ' }} />
         <Stack.Screen name="Ticket">
-          {({ route }) => <TicketScreen ds={ds} ticketId={(route.params as { ticketId: string }).ticketId} />}
+          {({ route }) => (
+            <TicketScreen
+              ds={ds}
+              ticketId={(route.params as { ticketId: string }).ticketId}
+              apiBase={API_BASE}
+              token={TOKEN}
+            />
+          )}
         </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>
