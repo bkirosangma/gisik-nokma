@@ -1344,14 +1344,16 @@ I read the patterns against the tree rather than trusting the empty result.
 | severity | count | members |
 |---|---|---|
 | **Critical (claimed)** | **1** | `E3-14` — five cookie-authenticated mutating routes outside `HTTP_ORIGIN_PROTECTED_ROUTES` |
-| **Important (claimed)** | **1** | `E3-15` — the set-equality drift guard compares the set to its own table, so it cannot see the class it was written for |
+| **Important (claimed)** | **2** | `E3-15` — the set-equality drift guard compares the set to its own table, so it cannot see the class it was written for · `E3-16` — the roster-cut citation, drifted twice, with a correction note that now misdirects the fix |
 | **Minor** | **3** | `E3-9` (envelope "thirteen fields" vs 11) · `E3-10` (registry "SIXTEEN/thirteen" vs 18/15) · `E3-11` (`Features.md` "84 JSON fixtures" vs 86) |
 | **Minor** | **2** | `E3-12` (`Features.md` "eleven checks" vs 12) · `E3-13` (citation resolves to the wrong line) |
 | **Round-1 findings, re-validated and standing** | **8** | `E3-1` … `E3-8` (§13) — **none withdrawn** |
 | **Instrument defects in my own method** | **1** | §15 — the 439-hit sweep, not filed as findings |
+| **Corrections to this report's own citations** | **4** | §17.1 (three `Features.md` lines) · §17.2 (my §7.2 `tickets.ts` citation) |
 
-**Round-2 total: 7 new findings** (1 Critical claimed, 1 Important claimed, 5 Minor), plus 8 round-1
-findings re-validated. **A count is only evidence once its members are named — hence the table.**
+**Round-2 total: 8 new findings** (1 Critical claimed, 2 Important claimed, 5 Minor), plus 8 round-1
+findings re-validated and 4 corrections to this report's own citations. **A count is only evidence once
+its members are named — hence the table.**
 
 ### 16.1 What changed about my coverage boundary since round 1
 
