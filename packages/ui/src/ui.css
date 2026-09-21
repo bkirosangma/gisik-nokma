@@ -2483,7 +2483,23 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   border-radius: 6px;
   padding: 0.5rem 0.75rem;
 }
-.advisories-panel__title { margin: 0 0 0.4rem; font-size: 0.85rem; color: var(--gn-warning); }
+/* E4-32 (2026-09-21). The title used to OVERRIDE the panel's own
+   `--gn-text-muted` with `color: var(--gn-warning)`, which put 13.6px warning
+   ink on the panel's `--gn-surface-sunken` ground: **3.71:1 in `hig` and
+   `minimal` light** (rgb(178,80,0) on rgb(228,216,204)), below the 4.5 that
+   12.8px-and-under text owes — and `warning` is a foreground NO `CONTRAST_PAIRS`
+   row names on any background, so nothing measured the pair. `neo` light passed
+   and all three darks passed, which is how a single-style failure stayed
+   invisible.
+
+   The tone is NOT lost by dropping the override, and the panel's own rule is
+   the evidence: `.advisories-panel` already carries `border-left: 3px dashed
+   var(--gn-warning)` and sets `color: var(--gn-text-muted)` for its body. The
+   title now inherits that — a pair that IS declared and enforced
+   (`{ fg: 'textMuted', bg: 'surfaceSunken' }`) — and the warning reads from the
+   dashed edge, at 3:1 as a non-text boundary rather than at 4.5 as text it
+   could not meet. */
+.advisories-panel__title { margin: 0 0 0.4rem; font-size: 0.85rem; }
 .advisories-panel__footer { margin: 0.4rem 0 0; font-size: 0.75rem; }
 
 .system-rules-panel {

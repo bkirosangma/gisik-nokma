@@ -1550,3 +1550,31 @@ shell.
 **One third of the remedy is NOT done, named rather than implied:** the finding also asks for the builder
 route in the stack suite's overflow loop — a Playwright change needing a live stack on `:3001`, the same
 deferral recorded under `13.1141`, `13.1148` and `13.1151`. **Owner: whoever widens that loop.**
+
+## The builder's advisories title stops overriding its panel's ink with `warning` (lane ds1, 2026-09-21, batch B10) — case `13.1146` (second arm)
+
+**The finding, round 2 `E4-32`, MINOR** (the verifier would have raised it to IMPORTANT; no upward
+re-grading by policy). `h3.advisories-panel__title` (*"Worth a look — none of these block publishing"*)
+painted `color: var(--gn-warning)` on the panel's `--gn-surface-sunken` ground at `font-size: 0.85rem` —
+**13.6px**, far below the large-text exemption — measuring **3.71:1** in `hig` and `minimal` light
+(rgb(178,80,0) on rgb(228,216,204). `neo` light passed and all three darks passed, which is how a
+one-style failure stayed invisible. **And `warning` is a foreground no `CONTRAST_PAIRS` row names on any
+background**, so nothing measured the pair at all.
+
+### The case
+
+- ✅ **13.1146 (second arm) — the title declares no ink of its own, the panel it inherits from is a
+  DECLARED pair on sunken, and the warning tone survives on the panel's edge.** Recorded as a **second arm
+  of `13.1146` rather than a new case id, and the reason is in the arm itself**: the sweep that case
+  carries looks for a `color` and a `background` **in the same rule**, and this pair is painted by a rule
+  and its child — **the instrument is narrower than the finding**, so the finding gets its own assertion
+  instead of being folded into a sweep that would pass over it. The fix drops the title's override, so it
+  inherits `.advisories-panel`'s own `color: var(--gn-text-muted)` — a pair that **is** declared and
+  enforced (`{ fg: 'textMuted', bg: 'surfaceSunken' }`, asserted so a future palette edit cannot move the
+  failure rather than remove it) — while the warning reads from the panel's existing
+  `border-left: 3px dashed var(--gn-warning)`, at 3:1 as a non-text boundary rather than at 4.5 as text it
+  could not meet. `ui.css` was reverted to `HEAD` for the RED run and restored from a sha256-compared
+  backup. Package suites: ui 426, web 652. **The three ratios are computed, not painted** — the 3.71 is
+  the finding's own.
+
+**No `Features.md` bullet.** This corrects an existing heading's ink; it adds no affordance.

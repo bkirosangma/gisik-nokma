@@ -2219,3 +2219,61 @@ describe('13.1146 token colours on surfaceSunken are declared pairs', () => {
     expect(body, 'the danger-toned TEXT came back').not.toMatch(/color:\s*var\(--gn-danger\)/);
   });
 });
+
+/**
+ * Case `13.1146`, second arm — E4-32 — the advisories title does not override
+ * its panel's ink with `warning`.
+ *
+ * `.advisories-panel` sets `background: var(--gn-surface-sunken)` **and**
+ * `color: var(--gn-text-muted)`; `.advisories-panel__title` used to override the
+ * second with `color: var(--gn-warning)`, which put **13.6px warning ink on that
+ * sunken ground at 3.71:1** in `hig`/`minimal` light (rgb(178,80,0) on
+ * rgb(228,216,204)) — below the 4.5 that text of that size owes. `neo` light
+ * passed and all three darks passed, which is how a one-style failure stayed
+ * invisible; and `warning` is a foreground **no `CONTRAST_PAIRS` row names on
+ * any background**, so nothing measured the pair.
+ *
+ * **This arm exists because the sweep above CANNOT see it, and that limit is
+ * the point of writing it here:** that sweep looks for a `color` and a
+ * `background` in the SAME rule, and this pair is painted by a rule and its
+ * CHILD. The instrument is narrower than the finding, so the finding gets its
+ * own assertion rather than being folded into a sweep that would pass over it.
+ * The tone is not lost by the fix — the panel's own `border-left: 3px dashed
+ * var(--gn-warning)` carries it, at 3:1 as a non-text boundary.
+ */
+describe('13.1146 (second arm) the advisories title inherits a declared ink', () => {
+  // Read HERE, not reused from the describe above: `UI_CSS_TEXT` is scoped to
+  // that block, and a module-scope read would be a second copy of the same
+  // path — the failure mode `check-case-citations` and this file's own
+  // "one origin" rule both exist to prevent.
+  const UI = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8').replace(
+    /\/\*[\s\S]*?\*\//g,
+    '',
+  );
+  const bodyOf = (selector: string): string => {
+    const m = new RegExp(`^${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'm').exec(UI);
+    if (m?.[1] === undefined) throw new Error(`no rule for ${selector}`);
+    return m[1];
+  };
+
+  it('13.1146 the title declares no ink of its own, so it inherits the panel\'s', () => {
+    expect(bodyOf('.advisories-panel__title')).not.toMatch(/color:/);
+  });
+
+  it('13.1146 the panel it inherits from is a DECLARED pair on sunken', () => {
+    const panel = bodyOf('.advisories-panel');
+    expect(panel).toMatch(/background:\s*var\(--gn-surface-sunken\)/);
+    // The ink the title now inherits, and it must be one the roster holds on
+    // this surface — otherwise the fix moves the failure rather than removing
+    // it.
+    expect(panel).toMatch(/color:\s*var\(--gn-text-muted\)/);
+    expect(
+      CONTRAST_PAIRS.some((pair) => pair.fg === 'textMuted' && pair.bg === 'surfaceSunken'),
+      'textMuted/surfaceSunken is not a declared pair — the inherited ink is unchecked',
+    ).toBe(true);
+  });
+
+  it('13.1146 the warning tone survives on the panel\'s edge, not its text', () => {
+    expect(bodyOf('.advisories-panel')).toMatch(/border-left:\s*3px dashed var\(--gn-warning\)/);
+  });
+});
