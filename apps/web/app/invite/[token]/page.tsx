@@ -4,6 +4,9 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Button, Card } from '@gisik-nokma/ui';
+// Imported rather than the literal re-spelled — `packages/domain/` owns the zone,
+// the same reason `/workspaces` imports it for its own `lapses …` line.
+import { IST_TIME_ZONE } from '@gisik-nokma/domain';
 import { InviteAcceptanceError, type InviteSummary } from '@gisik-nokma/app-core/online';
 import { useAppServices, useSessionStatus } from '../../../src/providers.js';
 
@@ -44,6 +47,23 @@ import { useAppServices, useSessionStatus } from '../../../src/providers.js';
  * is a POST, the body survives, and `InviteAcceptanceError.serverMessage`
  * carries the door's own words to the screen unparaphrased.
  */
+/**
+ * A day, in the workspace's own zone — the SAME shape `/workspaces` uses for a
+ * waiting invitation's `lapses …` (`workspaces/page.tsx:352`), rather than a
+ * second date vocabulary on a second page. `an unknown date` for an unparseable
+ * instant rather than `Invalid Date`, which is not a day anybody set.
+ */
+function onDay(iso: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return 'on an unknown date';
+  return at.toLocaleDateString('en-IN', {
+    timeZone: IST_TIME_ZONE,
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 export default function InvitePage() {
   const router = useRouter();
   const params = useParams<{ token: string }>();
@@ -119,15 +139,45 @@ export default function InvitePage() {
             </Button>
           </>
         ) : invite === null ? (
-          <p className="gn-invite__dead">
-            This invitation link does not open anything. It may have been used, withdrawn, or
-            lapsed — ask whoever invited you for a new one.
-          </p>
+          <>
+            <p className="gn-invite__dead">
+              This invitation link does not open anything. It may have been used, withdrawn, or
+              lapsed — ask whoever invited you for a new one.
+            </p>
+            {/*
+              AND IT OFFERS SOMEWHERE TO GO (E5-18, 2026-09-21). The arm was one
+              `<p>` in a Card with no link at all: a person who followed a dead
+              link, possibly while signed out, was given a sentence and no next
+              step. `/workspaces` is where their own waiting invitations live —
+              including the one this link was for, if they signed in under the
+              address it was sent to — so it is the honest destination rather than
+              a generic home link.
+            */}
+            <p>
+              <Link href="/workspaces">See your workspaces</Link>
+              {' '}— any invitation waiting for you is there.
+            </p>
+          </>
         ) : (
           <>
             <p>
               You are invited to join <strong>{invite.workspaceName}</strong> as {invite.role}.
             </p>
+            {/*
+              WHEN THIS LINK STOPS WORKING (E5-18, 2026-09-21). The door has served
+              this since 2026-09-19 — it is the presented TOKEN's own window — and
+              the client dropped it for two days, so a person deciding whether to
+              act now could not see the deadline. `/workspaces` renders the same
+              fact for a waiting invitation (`Invited … · lapses …`), and this is
+              the same sentence shape rather than a second vocabulary.
+              `null` draws NOTHING: the shipped door always sends one, and a day
+              this page made up would be a deadline nobody set.
+            */}
+            {invite.expiresAt === null ? null : (
+              <p className="gn-invite__expiry" data-testid="invite-expiry">
+                {`This link lapses ${onDay(invite.expiresAt)}.`}
+              </p>
+            )}
             {session.kind === 'loading' ? (
               <p role="status">Checking whether you are signed in…</p>
             ) : session.kind === 'signed-out' ? (

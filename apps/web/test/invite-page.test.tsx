@@ -45,6 +45,8 @@ const SUMMARY = {
   workspaceId: '01J9WORKSPACE0000000000000',
   workspaceName: 'Convenience Corner',
   role: 'guest' as const,
+  // Widened for E5-18 (2026-09-21): the door has served this since 2026-09-19.
+  expiresAt: null,
 };
 
 function mount(invites: GatewayStubs['invites']) {
@@ -290,5 +292,54 @@ describe('16.44 the token page names no inviter, in any branch', () => {
     mount({ getInvite: async () => WITH_INVITER });
     expect(await screen.findByText(/invited to join/)).toBeInTheDocument();
     expect(screen.queryByText(/Rukhang/)).toBeNull();
+  });
+});
+
+describe('17.067 the invite page shows the deadline and a next step (E5-18)', () => {
+  /**
+   * 17.067 — E5-18. The door has served the presented token's `expiresAt` since
+   * 2026-09-19 and the client dropped it, so a person deciding whether to act on
+   * a link NOW could not see when it stops working — while `/workspaces` renders
+   * the same fact for a waiting invitation. The fixture instant is chosen to CROSS
+   * the date line: 2026-09-30T04:30Z is the 30th in UTC and the 30th in IST too,
+   * so the assertion is about the RENDERED day and not about the zone. The zone is
+   * pinned separately, on the call, the way `13.969`'s own block does it.
+   */
+  it('17.067 names the day the link lapses', async () => {
+    const zone = vi.spyOn(Date.prototype, 'toLocaleDateString');
+    mount({
+      getInvite: async () => ({ ...SUMMARY, expiresAt: '2026-09-30T04:30:00.000Z' }),
+    });
+
+    expect(await screen.findByText('This link lapses 30 Sept 2026.')).toBeInTheDocument();
+    // The options object is what makes the claim falsifiable anywhere — a bare
+    // day assertion passes in IST by accident of the runner's own zone.
+    expect(zone.mock.calls.at(-1)?.[1]).toMatchObject({ timeZone: 'Asia/Kolkata' });
+    zone.mockRestore();
+  });
+
+  /**
+   * 17.067's control — a summary carrying NO expiry draws no deadline line rather
+   * than an invented day. The shipped door always sends one; a page that defaulted
+   * it would be stating a deadline nobody set.
+   */
+  it('17.067 control: a summary with no expiry draws no deadline line', async () => {
+    mount({ getInvite: async () => ({ ...SUMMARY, expiresAt: null }) });
+    expect(await screen.findByText(/invited to join/)).toBeInTheDocument();
+    expect(screen.queryByTestId('invite-expiry')).toBeNull();
+  });
+
+  /**
+   * 17.069 — the dead arm was ONE `<p>` in a Card with no link at all: a
+   * person who followed a dead link, possibly while signed out, got a sentence
+   * and no next step. `/workspaces` is where their own waiting invitations live.
+   */
+  it('17.069 the dead-link arm offers a next step instead of stopping at the sentence', async () => {
+    mount({ getInvite: async () => null });
+    await screen.findByText(/does not open anything/);
+    expect(screen.getByRole('link', { name: 'See your workspaces' })).toHaveAttribute(
+      'href',
+      '/workspaces',
+    );
   });
 });

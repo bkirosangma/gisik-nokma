@@ -26,7 +26,7 @@ never saw.
 | lane | block |
 |---|---|
 | **exec 3** | **`17.001`–`17.020`** (taken 2026-09-21 for the sheet's `Visibility` section styling) — **minted: `17.001`–`17.006`** |
-| **release batch B09** (lane ds5) | **`17.061`–`17.080`** (allocated by the controller 2026-09-21 21:0x, recorded in the cycle-46 anchor PR on `main`) — **minted: `17.061`–`17.065`** |
+| **release batch B09** (lane ds5) | **`17.061`–`17.080`** (allocated by the controller 2026-09-21 21:0x, recorded in the cycle-46 anchor PR on `main`) — **minted: `17.061`–`17.069`** |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** A block is a longer-lived reading than a "next free
 N", but it still expires when the controller reallocates. **Re-read it before minting, and if your own
@@ -234,3 +234,37 @@ about to lose access) and this is neither.
 `writeUnreachedCopy` at all and the spec imports it — the run would have died on the import, which is the
 "a mutation that cannot parse runs zero tests" shape. The first attempt at that mutation did not parse
 either (a `perl` template ate the quoting around `.ticket.`), and it was discarded rather than counted.
+
+## The invite page names the deadline and offers a next step — cases `17.066`–`17.069` (E5-18, 2026-09-21)
+
+**Two of this finding's three parts are closed; the third is recorded with its reason rather than built.**
+
+**(a) The expiry was on the wire and dropped.** The door has served `expiresAt` — the presented
+TOKEN's own window, the value `openableInvite` matched on — as a fourth field on `GET /v1/invites/:token`
+since 2026-09-19 (`apps/server/src/routes/invites.ts:417`, the `isInvite` expiry ruling), and
+`createHttpInviteGateway` read three fields and threw it away. So the page could not say when the link
+lapses while `/workspaces` renders the same fact for a waiting invitation (*"Invited … · lapses …"*).
+
+- **17.066** ✅ The mapper carries the token's expiry, and answers `null` — never an invented day — for a
+  body that sent none. — (`packages/app-core/test/online/invites.test.ts`)
+- **17.067** ✅ The page NAMES the day it lapses, in the workspace's zone, through the same `onDay` shape
+  `/workspaces` uses rather than a second date vocabulary; a summary with NO expiry draws no line at all
+  (the control arm, in the same case).
+  — (`apps/web/test/invite-page.test.tsx`)
+
+**(b) The dead arm offered nothing.** It was ONE `<p>` in a Card with no link: a person who followed a
+dead link, possibly while signed out, got a sentence and no next step.
+
+- **17.069** ✅ The dead-link arm links to `/workspaces` — where their own waiting invitations live,
+  including the one this link was for if they signed in under the address it was sent to — rather than a
+  generic home link. — (`apps/web/test/invite-page.test.tsx`)
+
+**(c) ⚠ DECLINE IS NOT BUILT, AND THE DOOR THE FINDING NAMES DOES NOT FIT THIS PAGE.** The decline that
+exists is `MyInvitationsGateway.decline(inviteId)` (`packages/app-core/src/online/my-invitations.ts:50`),
+served by `apps/server/src/routes/my-invitations.ts` — and **it is keyed by `inviteId`, matched to the
+SIGNED-IN person's own address**, which is why `/workspaces` can offer it and this page cannot: a token
+page holds a bearer TOKEN and, on a signed-out arrival, no session at all. Declining from here would need
+a new door (decline-by-token), which is a route and a ruling rather than a control, and it would have to
+answer what a decline means for a person who never signed in. **Owner: whoever next takes the invite
+surface.** The finding's own words — *"A Decline beside Join (the door exists)"* — are true of the
+PRODUCT and not of this page, and that distinction is the reason this part is recorded rather than built.
