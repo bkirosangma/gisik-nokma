@@ -5,7 +5,7 @@ import { evaluateEvent } from '../src/evaluate.js';
 import { EPIC, PROJECT, TASK, WF, WS, created, typeDefined } from '../src/checks/test-support.js';
 
 /**
- * 5.80 — E6-3 (release 2026-09-22, B12): what a custom type's re-rank does to
+ * 5.76 — E6-3 (release 2026-09-22, B12): what a custom type's re-rank does to
  * the tickets already placed under the old rank, PINNED AS A DECISION.
  *
  * The rank invariants — a child's type outranks its parent's, a type at or
@@ -42,7 +42,7 @@ const reparent = (ticketId: string, newParentId: string | null): EventEnvelope =
 /** A root feature F (rank 2) with a task T (rank 3) under it — legal under the ladder as defined. */
 const placed = [typeDefined(EPIC), typeDefined(FEATURE2), typeDefined(TASK), created(F, 'feature', null), created(T, 'task', F)];
 
-describe('5.80 a custom re-rank is accepted whatever sits where; the write doors judge new placements against the new ladder', () => {
+describe('5.76 a custom re-rank is accepted whatever sits where; the write doors judge new placements against the new ladder', () => {
   it('re-ranking Feature 2 → 3 is accepted with a task already under a feature (the placement the new rank forbids)', async () => {
     const ctx = buildMemoryContext([WF], placed);
     expect(await ctx.getEntityState('ticket', T)).toMatchObject({ parentId: F, typeId: 'task' });

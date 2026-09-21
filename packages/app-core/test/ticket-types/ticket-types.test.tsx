@@ -820,7 +820,7 @@ describe('TicketTypeEditorScreen — built-ins and refusals', () => {
    * rank invariants are write-time invariants and occupancy is never an
    * engine input (owner, 2026-08-26), so the engine ACCEPTS the re-rank and
    * the ledger then holds placements the write doors refuse to reproduce
-   * (`packages/rule-engine/test/ticket-type-rerank.test.ts`, 5.80). The
+   * (`packages/rule-engine/test/ticket-type-rerank.test.ts`, 5.76). The
    * editor says so at the moment the rank is changed, so the admin decides
    * with the consequence in front of them; the note is absent while the rank
    * still reads the saved value, and absent on a new type, which has nothing

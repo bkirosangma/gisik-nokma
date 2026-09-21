@@ -28,7 +28,7 @@ import { ACCEPT, builtinRankRefusal, refuse } from './refusals.js';
  * and the ledger then holds a placement the write doors refuse to reproduce
  * — a task moved out from under such a feature cannot be moved back, and a
  * feature re-ranked to the deepest rank keeps its place at the root while a
- * new one may not (measured in `test/ticket-type-rerank.test.ts`, case 5.80).
+ * new one may not (measured in `test/ticket-type-rerank.test.ts`, case 5.76).
  *
  * That is the product's position, not a gap left for later, and the reason is
  * the owner's (2026-08-26, Plan 2 open question 6, restated at
