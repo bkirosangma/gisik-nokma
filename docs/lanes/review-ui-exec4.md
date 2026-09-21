@@ -122,6 +122,8 @@ Round 1's stated #1 boundary was *"NO signed-in route was measured at paint"*, b
 
 **MEASUREMENT (painted, `:3041`, 1512).** `document.querySelector('h1').outerHTML` → the markup above (one child node, `BUTTON`). Verbose a11y snapshot (`take_snapshot verbose`) line 40: **`heading "Rename Convenience Corner" level="1"`**, line 41: `button "Rename Convenience Corner"`. The non-verbose snapshot omits the heading entirely and shows only the button. The button measures `316×41` (font 34px, `padding: 0`, `min-height: 0`) — under the 44 floor for a standalone control on a route whose tap targets are never asserted (the stack baseline file `apps/web/e2e-stack/tap-target-baseline.json` holds one key, `stack-phone-390|/my-work`).
 
+**THE RECORDED REASON, and why it does not cover this.** `apps/web/app/w/[workspaceId]/page.tsx:742-761` explains the button-in-h1: *"this page's heading must survive … The accessible name still carries the WORKSPACE (`Rename {name}`)"*, quoting the owner's *"have the rename be there right on the header. THE CLICK TO RENAME."* The owner ruled click-to-rename on the header; nothing rules that the heading's exposed NAME becomes the action, and the docblock's own goal (the heading survives) is what the aria-label defeats. It applies to admins/owners only (`:798-812`: non-admins get plain text), and while renaming the `<h1>` is replaced by the form (`:763`), so the page has no level-1 heading at all.
+
 **WHY IT IS WRONG.** Headings are the primary navigation structure for screen-reader users; the level-1 heading is supposed to name the page. Here it names an action. Sighted users read *Convenience Corner*; the accessible name is *Rename Convenience Corner* — WCAG 2.5.3 is technically satisfied (the visible text is contained) but the heading's purpose is inverted. No other route does this: `/workspaces` → `H1 "Workspaces — Kiro"`, the board → `H1 "Shop operations"` (plain text).
 
 **WHAT WOULD HAVE BEEN BETTER.** `<h1>Convenience Corner</h1>` with an adjacent icon button *Rename Convenience Corner* (the shape `/w/<id>`'s own `Archive Shop operations` button uses), or keep the click-to-rename and put the accessible name on the heading: `<h1 aria-label="Convenience Corner">` is not it (that hides the button's purpose) — the two roles need two elements.
@@ -139,6 +141,85 @@ Round 1's stated #1 boundary was *"NO signed-in route was measured at paint"*, b
 **WHAT WOULD HAVE BEEN BETTER.** Pass `RosterMember[]` and label `name || email || id` in the picker only, leaving `actorLabel` untouched for provenance. Severity Minor because it needs a member with no display name, which the seed has and a real workspace may not.
 
 ---
+
+---
+
+
+### E4-7 — **IMPORTANT** — At phone width the ticket sheet's description is clipped: the field row keeps its 8-rem label column, the editor gets 224 px of a 367-px sheet, and its text paints past the sheet's right edge
+
+**WHAT.** `emulate 390x844`, sheet open on `CCSO-6`. The description editor (`div.tiptap.ProseMirror`) measures **224×3195**; its container `dd` spans `x 178.6 → 402.7` while the sheet ends at `x 390` and the sheet body is `366.6` wide. Words are cut at the right edge — the screenshot (`.exec4-scratch/sheet-390-description.jpeg`, taken from `:3041`) shows *"as o"*, *"the"*, *"screens"*, *"look"* truncated mid-glyph. The toolbar (`div.ticket-editor__toolbar`) also reports `right=403`.
+
+**MEASUREMENT.** `getComputedStyle(field)` → `display: grid; grid-template-columns: 128px 224.094px` — `packages/ui/src/ui.css:1868`: `.gn-ticket-sheet__field { display: grid; grid-template-columns: 8rem 1fr; … }` with **no narrow-width override** (the file's four `@media (max-width…)` blocks are at `:2728`, `:3017`, `:4452`, `:4612`; none names `.gn-ticket-sheet__field`). The `dl` itself is `display: block`. `document.documentElement.scrollWidth` = 390 and the sheet's `scrollWidth` = 367, so the overflow is **clipped, not scrollable**. Same paint, the header: `input.gn-ticket-sheet__title-input` is **162×28** (title reads *"HSN codes for tl"*), `button.gn-sheet__full` **114×44** and `.gn-sheet__close` **24×21** share the row (`.gn-sheet__header`, `ui.css:526-532`, `flex; space-between; gap: 1rem`, no wrap), and the five crumbs stack **one per line** because `.gn-sheet__heading` (`:606-612`) gets what is left.
+
+**PROTOTYPE.** The desktop prototype's sheet is `min(660px,100%)` (`Desktop.dc.html:3398`) and is never drawn at 390; the mobile prototype (`Gisik Nokma - Mobile.dc.html`, sha `14ca5b8d…`) draws the ticket as a full-width screen with its own header and no side-by-side label column. **Category 3: diverges with no ruling found** — `grep -n "390\|phone\|narrow" packages/ui/src/ui.css` near the ticket-sheet block (`:1800-1900`) returns nothing about the field grid; the only recorded narrow-width fact for the sheet is its `94vw` width (`:400`).
+
+**WHY IT IS WRONG.** The description is the ticket's content. At the one width the product's own viewport suite calls "phone", the content is unreadable without a workaround, and the header spends 114 px on *Full screen* — a control whose effect on a 367-px sheet is 23 px — while the title gets 162.
+
+**WHAT WOULD HAVE BEEN BETTER.** `@media (max-width: 40rem) { .gn-ticket-sheet__field { grid-template-columns: 1fr; } }` (the breakpoint `ui.css:2728` already uses), `min-width: 0` on the `dd`, and hide `.gn-sheet__full` below the same width. One painted case at 390 asserting `dd.right <= sheet.right`.
+
+---
+
+### E4-8 — **IMPORTANT** — The editor's formatting strip is the one control family in the neumorphic sheet drawn with hard 1-px outlines, and the two recorded reasons that leave it that way rest on a false premise
+
+**WHAT.** In the sheet (style `neo`, light), `button.ticket-editor__tool` paints `border: 1px solid rgb(32,43,73)` (the label ink), `background: transparent`, `box-shadow: none`; the strip `div.ticket-editor__toolbar` has the same outline on three sides. Every neighbouring control — `.gn-button--ghost`, `.gn-segmented__item`, `.gn-select__trigger`, `.gn-field__input` — is border-less fill (the borders→fills campaign). The screenshot above shows it: six outlined boxes and an outlined rule over a soft-fill sheet.
+
+**MEASUREMENT.** `getComputedStyle` on `.ticket-editor__tool` (painted values above). Source: `packages/editor/src/styles/editor.css:137-149` (`border: 1px solid currentColor; background: none`), `:126-136` (the strip). The docblock at `:114-125` records why: *"THE FILL IS NOT TRANSCRIBED, and it cannot be: … THIS FILE'S HEADER forbids colour of every kind here — `packages/editor` does not depend on `packages/ui`, so no token from `tokens.ts` is reachable."* The other side, `packages/ui/src/ui.css:5866-5871`: *"WHAT THIS BLOCK DELIBERATELY DOES NOT STYLE: the composer's own chrome … `packages/ui` styling another package's internals is the duplication this repo refuses."*
+
+**PROTOTYPE.** `Desktop.dc.html:3669-3680` (`descTools`, and `cmtTools` identically): `border:none; background:var(--cardBg); box-shadow:var(--cardShadow)`, strip `background:var(--fill4)` (`:1165`). **Category 2 — the divergence is recorded — and this is the argument that the record is mistaken, not a preference:** (1) *"no token is reachable"* is false as CSS: a custom property cascades from the document, not from a package graph. `var(--gn-fill-tertiary, transparent)` in `editor.css` is neither a hex, a colour function nor a colour keyword (the three forms the header forbids), and it resolves in every host that loads `ui.css` — `apps/web/app/layout.tsx:4` imports `editor.css` beside it. (2) The only host without tokens is the mobile webview: `apps/mobile/src/editor/editor-html.generated.ts` contains **0** `--gn-` strings (`grep -c`), and there the fallback value is what paints — which is exactly today's result, so nothing regresses. (3) Two boundaries each refusing produces a hole neither owns; the record in each file is a *reason a shortcut was taken*, which the brief distinguishes from a ruling.
+
+**WHY IT IS WRONG.** The owner treated *"grey OS buttons in a neumorphic page"* as a defect worth a commit and a case (`16.83`); hard-outlined toolbar boxes in the same sheet are the same class, on the control a person uses to write.
+
+**WHAT WOULD HAVE BEEN BETTER.** In `editor.css`: `background: var(--gn-fill-tertiary, transparent); box-shadow: var(--gn-shadow-control, none); border: none` on `.ticket-editor__tool`, the strip on `var(--gn-fill-quaternary, transparent)` — with the header amended to say a `var()` reference with a fallback is permitted. The colour-scan (`packages/ui/test/helpers/colour-scan.ts`) already passes such a line by construction.
+
+---
+
+### E4-9 — **IMPORTANT** — The workflow builder renders TWO `<main>` landmarks, and at 390 px its name field is 403 px wide, so the page overflows the phone viewport to 415
+
+**WHAT.** `/w/<id>/settings/workflows/<workflowId>` at `emulate 390x844`.
+
+**MEASUREMENT (painted).** `document.querySelectorAll('main')` → **2**: `main.gn-shell` (parent `body`) and `main.workflow-builder-screen__canvas` (parent `div.workflow-builder-screen__layout`, `nested: true`). Source: `packages/app-core/src/workflow-builder/ui/workflow-builder-screen.tsx:131` `<main className="workflow-builder-screen__canvas">`, inside the app shell's `<main>` (`apps/web/app/layout.tsx`). `window.innerWidth` → **415** on a 390 emulation (every other route in this pass reads 390) and `document.documentElement.scrollWidth` → 415; the widest element is `input.workflow-builder-screen__name` at **403 px** — its rule (`packages/ui/src/ui.css:2968-2979`) sets `font-size: 2.125rem` and no `width`/`max-width`/`min-width: 0`, so the input's intrinsic `size=20` width at 34 px wins. `h1` count → **0** on the builder and **0** on `…/history` (the builder's h1 gap is recorded at `ui.css:2952-2959` as pre-existing with an owner — I list it as known, not as a finding). The crumb link `a "Settings › Workflows"` is `display: inline`, **126×15**, alone in `nav.gn-builder-crumb` (parent text == own text, so the sweep's inline-in-prose exemption does not apply) — judged at 44 by the product's rule.
+
+**WHY IT IS WRONG.** HTML permits one visible `main` per document; a screen reader's landmark list offers "main" twice and the inner one is a canvas. The 415-px layout viewport means the phone shows the page zoomed out or side-scrolling — the `.gn-nav` overflow that the stack suite's docblock (`e2e-stack/viewport.spec.ts:47-54`) calls the bug this instrument exists to catch, on a route the instrument's overflow assertion does not visit.
+
+**WHAT WOULD HAVE BEEN BETTER.** `<section aria-label="Canvas">` (or `role="region"`) for the canvas; `width: 100%; min-width: 0; box-sizing: border-box` on `.workflow-builder-screen__name`; and the builder route in the stack suite's overflow loop.
+
+---
+
+### E4-10 — **MINOR** — The workflow template gallery's four buttons paint as raw user-agent chrome — a population round 1's sweep could not see, because they carry no class at all
+
+**WHAT.** `/w/<id>/settings/workflows/new`: `button "Use this template — Simple kanban"`, `… — Errand with waits`, `… — Approval chain`, `button "Start blank"`.
+
+**MEASUREMENT (painted, 390 and unchanged in shape at 1512).** My sweep's UA-chrome detector (`borderTopStyle === 'outset'` or the UA's `rgb(239,239,239)` fill) flagged exactly these four on the route; sizes `143×29` ×3 and `95×29`. Source: `packages/app-core/src/workflow-builder/ui/template-gallery.tsx:13-19` and `:23-25` — `<button type="button" …>` with **no `className`**. Round 1's P1 population was *"each static `className` literal on a `<button|input|…>`"*, so a class-less button was never a candidate; the compiled ruling's own verification (`review-compiled-controller.md`, `exec1-P1`) re-ran the same class-keyed extractor. **Wider population, measured:** a regex over every `<button|a|input|select|textarea|summary …>` opening tag in non-test `.tsx` under `packages/` and `apps/web/` finds **78** class-less tags in 123 files — most are inputs inside labelled wrappers or docblock prose (the regex does not skip comments, and I say so) — and the painted pass over every route I visited flagged UA chrome on **these four only**.
+
+**WHY IT IS WRONG.** Same cause and same look as `16.83`'s grey OS buttons, on the first screen of the workflow-authoring flow. `globals.css:84`'s `button { font: inherit }` fixes the font and nothing else.
+
+**WHAT WOULD HAVE BEEN BETTER.** The shared `<Button>` (the file's own sibling `workflow-builder-screen.tsx:42` comment says why: *"The shared `Button`, not a bare `<button>`"*).
+
+---
+
+### E4-11 — **IMPORTANT** — At 390 px the signed-in shell's navigation bar is 310 px tall — 37 % of the viewport — where the only prototype drawn at that width puts navigation in a bottom tab bar
+
+**WHAT.** On the board at `emulate 390x844`, `.gn-nav` measures **390×310** (`getBoundingClientRect`); the links wrap to five rows (`Workspaces` y=13, `Convenience Corner` y=73, `Shop operations` y=133, `My Work`/`Members` y=193, `Settings` y=253, each 44 tall). The board's first column header sits at y≈790 — below the fold on an 844-px phone once the title, search, workflow select, switch, Filters, New ticket and the view tabs have taken their rows (screenshot `.exec4-scratch/board-390.jpeg`).
+
+**MEASUREMENT.** `apps/web/app/globals.css:1801` `.gn-nav__links { display: flex; flex-wrap: wrap; … }` with no narrow-width variant (the file's `@media (max-width: 60rem)` at `:1799` changes padding only). The file's own docblock (`:1766-1770`) records *"measured at 190px on a signed-in workspace route at 500px wide … three rows"* and calls a media query a trade of *"one wrong value for another"* — an author's note about the offset variable, not a ruling on the shell.
+
+**PROTOTYPE.** `Gisik Nokma - Mobile.dc.html` (sha `14ca5b8d…`) `:1194-1203`: `<nav style="display:flex;background:var(--barBg);padding:6px 0 10px;…">` of icon+label tab buttons, shown on every root screen (`showTabs`, `:1762`); the top of the screen is one line (`screenLabel`, `:114`). **Category 3: diverges with no ruling found** — `grep -rni "tab bar\|tabbar\|bottom bar\|bottom nav" docs Features.md test-cases design-system/MASTER.md` finds only `docs/hig-reconciliation-audit.md:248,280`, which rule on `apps/mobile` (React Native), not on the web shell at phone width; the pre-launch checklist's *"Mobile HIG adoption — DEFERRED"* (`docs/pre-launch-checklist.md:398`) is likewise scoped to `apps/mobile`.
+
+**WHY IT IS WRONG.** The web shell is the product's phone surface today (no device has ever run `apps/mobile` — `Features.md` marks it `⚙️`), the viewport suite measures at 390 on purpose, and on that surface the shell's own chrome consumes more of the screen than the content. This is the NARROW VIEWPORT edge class on every signed-in route.
+
+**WHAT WOULD HAVE BEEN BETTER.** Below 40rem: collapse the workspace-scoped links into the mobile prototype's bottom bar or a single disclosure, keep the brand/inbox/account row at one line. If the owner rules the wrapped bar is acceptable, record that ruling at `globals.css:1801` — today the only sentence there says the growth is an *"understatement"*.
+
+---
+
+### E4-12 — **IMPORTANT** — When the signed-in instrument runs, its tap-target population is ONE route at ONE width, and its text-contrast population is ZERO routes
+
+**WHAT.** Round 1's I1 established that no browser instrument has executed since 2026-09-06. This is the finding underneath it: even executed, the signed-in suite cannot see most of what this report measured.
+
+**MEASUREMENT (source, opened).** `grep -n "measureTapTargets(" apps/web/e2e-stack/*.spec.ts` → **one** call, `viewport.spec.ts:170`, inside the `/my-work` test; the seven-route loop (`:469-513`) calls `measureTypeScale` (`:533`) and `sweepAccessibleNames` (`:611`) only. `apps/web/e2e-stack/tap-target-baseline.json` holds **one key** (`stack-phone-390|/my-work: 6`). `measureContrast` is a module-private function of the signed-out spec (`apps/web/e2e-viewport/responsive.spec.ts:456`, not exported; `grep measureContrast apps/web/e2e-stack/` → 0). The stack suite's docblock at `:223` still says *"`/my-work` is the ONLY route in this file"* — true of the first test, false of the file since the loop was added. **Consequence, measured in this report:** the board's 24 `who · when` buttons at 21 px (E4-3), the sheet's 21-px close (E4-2), the 41-px h1 button (E4-5), the builder's 415-px overflow (E4-9) and the UA-chrome gallery (E4-10) are all on routes or in states no tap, contrast or overflow assertion visits.
+
+**WHY IT IS WRONG.** A ratchet whose population is one page reports "offenders=6" as if it were about the product. Round 1's P11 made this point for the Select panel; the true scope is wider — the population is the shape of the suite's route list, not of a component.
+
+**WHAT WOULD HAVE BEEN BETTER.** Run `measureTapTargets` inside the route loop (one line per route, with baselines recorded the way type-scale already does), lift `measureContrast` into a shared module the stack spec imports, and add the sheet-open and builder states.
 
 ---
 
