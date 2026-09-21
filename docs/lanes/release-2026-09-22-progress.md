@@ -60,3 +60,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E6-17 | done | 1a5967d042ab35baf8cded278f46ab226199340e | check-visibility-permission.test.ts 6.151 (planted defect, RED→GREEN) + 6.152 controls; server package, not domain (brief header discrepancy noted in commit) |
 | T-E6-19 | done | 3fdb357810fa0a98567df6f146084fb8256ca56f | ist-day.test.ts 3.961 + ticket-types.test.ts 5.77 + rule-engine fields.test.ts 5.78 (RED→GREEN); filter bounds left shape-only, reason in commit |
 | T-E6-20 | done | ba15105f3641100aaede255662a27ca27056b895 | workflow-schema.test.ts 4.55 + ticket-types.test.ts 5.79 (RED→GREEN); displayName exported once from display-name.ts |
+| T-E6-20 | done | 89c3af84f21b9c46e283dcd43090422a0b56102c | follow-up on the merged tree: displayName reports an empty name once (main E4-29 listed three items); app-core 1730/1730, server 1733, web 657, domain 553, rule-engine 346 |
