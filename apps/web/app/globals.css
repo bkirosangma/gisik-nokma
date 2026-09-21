@@ -17,6 +17,15 @@ html, body { margin: 0; padding: 0; }
   left: -9999px;
   top: 0;
   z-index: 60;
+  /* 44px is WCAG 2.5.5's floor for a standalone control, the one the viewport
+     suite's tap-target ratchet (13.287, apps/web/e2e-viewport/tap-targets.ts)
+     applies here. The padding alone rendered a 142×42 box — measured by that
+     suite against the release build on 2026-09-22 — so the height is pinned,
+     not left to the line box. The unfocused, off-screen box is what the probe
+     measures, so the floor sits on this rule and not on `:focus`. */
+  display: flex;
+  align-items: center;
+  min-height: 44px;
   padding: 0.6rem 1rem;
   border-radius: var(--gn-radius-control);
   background: var(--gn-surface-raised);
