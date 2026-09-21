@@ -2608,9 +2608,30 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
     expect(batch[0]!.actorId).toBe('user_kiro');
     expect(batch[0]!.origin).toBe('web');
 
-    // BOTH halves. The title, not an id: this product has no ticket KEY, and a
-    // ULID is not something a person reads back.
+    // BOTH halves. The name, not an id — and the name is `key ?? title`, the
+    // same expression the crumb above already uses, so what arrives here is
+    // THIS fixture's key. ⚠ The comment read "The title, not an id: this
+    // product has no ticket KEY" while `ticketRead()`'s own fixture had carried
+    // `CCSO-1183` all along; the fallback arm is the test below.
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(onDeleted).toHaveBeenCalledWith(TICKET, 'CCSO-1183');
+  });
+
+  it('16.84 the SAME handover carries the title when the read composed no key', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onDeleted = vi.fn();
+    // `key: null` is what a workspace without a prefix produces, and the toast
+    // must still name the ticket rather than print an id — the rule the crumb
+    // already follows (`16.66`), asserted here for the second consumer of the
+    // same expression so the two cannot drift apart.
+    const read = ticketRead({ key: null, title: 'File the GST return' });
+    renderSheet(read, undefined, { onClose, onDeleted });
+    await settled();
+
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(onDeleted).toHaveBeenCalledTimes(1));
+
     expect(onDeleted).toHaveBeenCalledWith(TICKET, 'File the GST return');
   });
 

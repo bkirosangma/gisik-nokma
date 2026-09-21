@@ -2919,15 +2919,22 @@ function ProjectBoard() {
             THE SOFT DELETE'S NARRATION. The sheet emits `ticket.deleted`, closes
             itself, and calls this on `committed` only — so a refused or
             unanswered delete leaves the sheet up with its own notice and this is
-            never called. What it hands back is the ticket's TITLE, not an id:
-            the prototype's toast says `"GN-1183 deleted · …"`, and this product
-            has no ticket key (a ULID is not something a person reads back). See
-            `TicketSheetProps.onDeleted` for the full reasoning; reversing it is
-            the one interpolation below.
+            never called. What it hands back is the ticket's human name — its
+            `key` when the workspace has a prefix, its title when it does not —
+            which is the same expression the sheet's own breadcrumb uses, and
+            never an id. ⚠ **This comment read "the ticket's TITLE ... this
+            product has no ticket key (a ULID is not something a person reads
+            back)", and the KEY had shipped thirteen minutes before it:**
+            `ac18f2bc` landed ticket keys on 2026-09-20 at 13:04:40 IST, and
+            this comment's own commit `18d7e391` is at 13:17:51. The
+            prototype's own toast — `"GN-1183 deleted · …"` — is what the
+            sentence now reproduces wherever a key exists. The reading was what
+            was wrong, not the interpolation. See
+            `TicketSheetProps.onDeleted`.
           */
-          onDeleted={(ticketId, title) => {
+          onDeleted={(ticketId, name) => {
             setDeleteNotice({
-              message: `${title} deleted · its history is retained`,
+              message: `${name} deleted · its history is retained`,
               undoFor: ticketId,
             });
             /*

@@ -548,9 +548,12 @@ plus a partial index → a filter at every view-serving SELECT.
   `exec/ticket-key` (`CCSO-1183`: a workspace prefix, a project prefix, and a per-project number), so
   **the toast's sentence is now reachable as the prototype wrote it** — the remaining work is one
   interpolation in the host, which reads the key off the same read that already carries the title.
-  Until then the sentence carries the ticket's TITLE, and that is a live departure rather than a
-  standing one. The parity list's note that the breadcrumb needs a ticket key is satisfied by the same
-  change.
+  **The interpolation LANDED 2026-09-21 (T-E6-14):** the sheet hands the host `key ?? title` — the same
+  expression its own breadcrumb crumb already uses — so the toast reads the KEY wherever the workspace
+  has a prefix and the title where it does not. `apps/web/test/sheet-delete.test.tsx` pins BOTH arms,
+  the key-named sentence and the no-key fallback beside it, so a host interpolating `${title}`
+  unconditionally reddens. **The departure is closed rather than live.** The parity list's note that
+  the breadcrumb needs a ticket key is satisfied by the same change.
   - **The stylesheet half, and the ground the control really has.** It has a rule of its own: `packages/ui/test/components.test.tsx` pins the rule's existence, its roles, its 44px floor and
   its `justify-content: space-between`; `packages/ui/test/tokens.test.ts` pins the CONTRAST PAIR.
   **`--gn-danger` as TEXT measures 4.4013 on `surface` in hig/minimal light — below AA, a shortfall this
