@@ -400,6 +400,22 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 
 **WHAT WOULD HAVE BEEN BETTER.** Use the multi-line scanner the five siblings share — or, better, put it in `test/helpers/` so there is one scanner rather than nine. `members-styling.test.ts:56-58` already records that no shared CSS-scan helper exists and that the shape is duplicated *"rather than imported"*, which is the condition that produced this asymmetry.
 
+### P17 — **MINOR** ⚠ **r2 NEW** — `/my-work`'s heading outline skips level 2, the product IMPROVED on the prototype to get there, and no instrument measures heading level or order
+
+**WHAT.** The My Work route renders an `<h1>` and the view it mounts renders its four section labels as `<h3>`. There is no `<h2>` anywhere in the path: the outline goes **h1 → h3**.
+
+**MEASUREMENT.**
+- `apps/web/app/w/[workspaceId]/my-work/page.tsx:51`: `<h1 className="gn-page-title">My Work</h1>` — the route's **only** heading (`grep -cE '<h[1-6]'` → 1 for h1, 0 for h2, 0 for h3).
+- `packages/app-core/src/views/my-work.tsx:75, 86, 97, 116`: four `<h3 className="gn-my-work__heading">` — *Assigned to me*, *My claims in transit*, *My contested claims*, *Shared with me*.
+- The route mounts `<MyWork>` at `:73` and passes nothing heading-related, so nothing supplies a level 2 between them.
+- **The prototype is not the authority for this, and that is what makes it interesting rather than a divergence.** In the export (`Gisik Nokma - Desktop.dc.html`, sha `3d142d46…`) the `isMyWork` block at `:553-605` draws `<h1 …>My work</h1>` and then **`<p style="font-size:17px;line-height:22px;font-weight:600;margin:0">Needs your attention</p>`** — its section labels are **styled paragraphs**, and `grep -cE '<h[2-6]'` over the block returns **0**. **So the product made those labels REAL HEADINGS, which is the correct improvement over the prototype, and chose the wrong level while doing it.**
+
+**WHY IT IS WRONG — and I am not going to overclaim WCAG a second time.** **WCAG 2.1 has no success criterion that forbids a heading-level skip**; this is an ARIA Authoring Practices / best-practice matter (*"heading levels should only increase by one"*), not a conformance failure. My round-1 P13 claimed a Level-A criterion the product probably satisfies, and I withdrew it; the same care applies here. What is true is narrower and still worth fixing: a person navigating by heading hears *level 1, then level 3*, which asserts a level of structure that does not exist, and the four sections read as subsections of something unnamed.
+
+**AND NOTHING MEASURES THIS — which is the second half of the finding and the reason it is filed at all.** I swept the two e2e suites and `packages/ui/test` for any assertion about heading level or order and found none. **Control: `getByRole('heading')` is used 21 times across the unit suites** (`calendar-view.test.tsx` 10, `timeline-view.test.tsx` 4, `ticket-types.test.tsx` 4, `bulk-close-dialog.test.tsx` 2, `help-browser.test.tsx` 1) — so the greps traverse, and every one of those uses is a **name lookup**, not a level or order check. **So the product's entire heading outline is unmeasured**, exactly as its tap targets on unswept surfaces are (P11) and its document titles are (P12).
+
+**WHAT WOULD HAVE BEEN BETTER.** `<h2>` for the four section labels, which is one character each, and — separately — an assertion somewhere that walks a route's headings and fails on a skip. The second is the one that keeps the first from coming back: `type-scale.ts` and `accessible-names.ts` already establish the shape (a per-route sweep with a recorded baseline), and a heading sweep is the same instrument over a different property.
+
 ---
 
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
@@ -458,7 +474,7 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 - `P11` the `Select` panel is outside every sweep's population, for two independent reasons
 - `P12` every screen in the product has the same document title (WCAG 2.4.2, Level A)
 
-**MINOR — 10**
+**MINOR — 11**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
 - `I5` my own handoff carries two contradicting position blocks; the pointer that found it is itself stale
 - `P3` the parent crumb cannot show the parent's key; the prototype's does; no ruling found
@@ -469,10 +485,11 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 - `P8` `Dialog`/`Sheet` declare `aria-modal="true"`; the missing containment is recorded as a named follow-on whose remedy exists in-repo (counted here, not under IMPORTANT — see the note)
 - `P15` ⚠ r2 — the repo's prototype copy is a broken camelCase transform of the export, cited by line in 71 files
 - `P16` ⚠ r2 — `neo-card-radius.test.ts` asserts a declaration is ABSENT through a truncating scanner, so it cannot fail
+- `P17` ⚠ r2 — `/my-work`'s outline skips level 2, and nothing measures heading level or order
 - `P10` the accessible-name ratchet's unit is an attribute; its message claims a property of assistive tech
 - `P13` no skip link; a keyboard-only user Tabs the nav on every navigation (WCAG 2.4.1)
 
-**Total 20.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 21.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
