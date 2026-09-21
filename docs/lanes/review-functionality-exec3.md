@@ -1293,3 +1293,100 @@ should be in it, and I am **not** claiming a browser vector for them.
 claim.** My first draft said "five routes", read as five equally-exposed doors; both `POST`s declare
 `{ preHandler: requireSession }` and nothing else, which is what promotes them above the rest. The
 `PUT`s' options were read too, and they are the reason the paragraph above bounds them instead.
+
+---
+
+## 15. AN INSTRUMENT I BUILT THAT REPORTED WITHOUT MEASURING — recorded so its number is not believed
+
+Filed here rather than in the findings, because it is a defect in **my own method** and the number it
+produced is the kind that gets quoted.
+
+**What I ran.** A node script that walks every `*.test.ts(x)` under `apps/server/test`,
+`packages/rule-engine/test` and `packages/domain/test`, matches `it('…', async () => { … })` with a
+regex, and reports any body over 40 characters containing no `expect(` — the "assertion that cannot
+fail" costume.
+
+**What it reported: 439 hits.** A number that size should have been the tell, and was: **I spot-checked
+one before filing anything.** `apps/server/test/alerts/error-alerter.test.ts`, flagged at what my script
+called line 105, is:
+
+```ts
+it('POSTs a Slack-compatible text payload, with a bounded deadline', async () => {
+  …
+  expect(calls.map((call) => call.url)).toEqual(['https://hooks.example/T/B']);
+  expect(calls[0]?.init?.method).toBe('POST');
+  expect(calls[0]?.init?.headers).toEqual({ 'content-type': 'application/json' });
+  …
+```
+
+**Five assertions, all present. My detector was the defect.** Its regex could not survive a nested
+`describe`, a helper function defined above the test, or an `it` whose body contains braces at other
+depths — so it matched the wrong span and reported the file as assertion-free.
+
+**Why this is written down rather than deleted.** It is the third instance in this lane of the same
+shape — a well-formed pattern returning a plausible number that answers a different question than the
+one asked (`E3-6`'s universe, §14.4's "is the script named in a test", and now this). **439 findings
+would have been a spectacular score and every one of them would have been invalid**, at ×3 each. The
+spot-check is the only reason they were not filed, and the rule it demonstrates is the one this repo
+keeps paying for: **a sweep's output is a claim about the sweep until something independent confirms
+it.** The independent thing here was opening one of the lines it named.
+
+**Net: costume D yields zero findings.** Costumes A and B (tautological `expect(true).toBe(true)`,
+`expect([].length).toBe(0)`) returned **zero hits** on the same walk, and those zeros *were* confirmed —
+I read the patterns against the tree rather than trusting the empty result.
+
+---
+
+## 16. ROUND-2 SEVERITY COUNT — with the members named
+
+| severity | count | members |
+|---|---|---|
+| **Critical (claimed)** | **1** | `E3-14` — five cookie-authenticated mutating routes outside `HTTP_ORIGIN_PROTECTED_ROUTES` |
+| **Important (claimed)** | **1** | `E3-15` — the set-equality drift guard compares the set to its own table, so it cannot see the class it was written for |
+| **Minor** | **3** | `E3-9` (envelope "thirteen fields" vs 11) · `E3-10` (registry "SIXTEEN/thirteen" vs 18/15) · `E3-11` (`Features.md` "84 JSON fixtures" vs 86) |
+| **Minor** | **2** | `E3-12` (`Features.md` "eleven checks" vs 12) · `E3-13` (citation resolves to the wrong line) |
+| **Round-1 findings, re-validated and standing** | **8** | `E3-1` … `E3-8` (§13) — **none withdrawn** |
+| **Instrument defects in my own method** | **1** | §15 — the 439-hit sweep, not filed as findings |
+
+**Round-2 total: 7 new findings** (1 Critical claimed, 1 Important claimed, 5 Minor), plus 8 round-1
+findings re-validated. **A count is only evidence once its members are named — hence the table.**
+
+### 16.1 What changed about my coverage boundary since round 1
+
+Round 1's §2 named four packages as not reached, and said *"I have no findings in those three packages,
+and that is not the same as saying they are clean."* **Round 2 spent its budget there, and the sentence
+was right to be careful:**
+
+| package | round 1 | round 2 |
+|---|---|---|
+| `packages/domain` | zero findings, not reviewed | **reviewed**: envelope + registry + vocabulary + validate/advise + attachment kinds; `E3-9`, `E3-11`, `E3-12` come from here. 548 tests green. |
+| `packages/rule-engine` | zero findings, not reviewed | **reviewed**: `engine.ts`, `evaluate.ts`, `refusal-rules.ts`, `checks/membership.ts`, the dispatch's coverage over all 33 registered types, the refusal-rule vocabulary; 345 tests green. **No finding.** |
+| `packages/mcp-server` | not reviewed | **reviewed**: the whole single write path; it correctly reads `results[]` and throws the server's verbatim refusal rather than reporting a 200 as success. **No finding — and this is the product's most expensive shape, done right.** |
+| `packages/sync-client` | not reviewed | **partially**: `replica-data-source.ts` gates (round 1), `outbox.ts`'s unguarded `evaluateEvent` (named by the project itself, so not filed), the `precheck` context. **No new finding.** |
+| `apps/server`, route internals | doors only | **`http-origin.ts` in depth** → `E3-14`, `E3-15`; `check-permission.ts`'s whole dispatch; `security-middleware.test.ts`'s guard. |
+| `Features.md` | not reviewed | **reviewed** for §4 (the engine) → `E3-11`, `E3-12`. Its other sections are **not** reviewed — see below. |
+
+**Still NOT reached, named rather than implied:**
+
+- **`Features.md` outside §4.** It has 14 sections and I audited one. **Its counts are unchecked by any
+  instrument** (`E3-11`/`E3-12` are two instances found in a section of ~18 lines), so a lane with budget
+  should walk the rest — §7 (API/realtime/search, ~900 lines) and §12 (offline sync) are the largest and
+  are the most within this lane's concern.
+- **`apps/web`, `packages/ui`, `packages/editor`** — outside this lane's concern; not opened in either round.
+- **The `test-cases/` catalogue in this concern.** I did not re-walk the 2,606 ids case by case; I relied
+  on `check:case-citations` (green) for the ✅-cited property, which is a weaker claim than "still true of
+  the product" and I am not making the stronger one.
+- **No browser or pixel measurement** in either round. Nothing in this report rests on one.
+- **The rate-limit buckets and the remaining `security-middleware.test.ts` surface** — I read the CSRF
+  half closely and the rate-limit half only enough to see it is a separate mechanism.
+
+### 16.2 The one thing I am least sure of, round 2
+
+**`E3-14`'s severity rather than its validity.** The measurement is unambiguous — the Origin check does
+not run for five routes, and the three controls prove the probe can tell refused from admitted. What I
+cannot measure from here is **how much of the exposure a browser actually delivers for each route**, and
+§14.8 bounds it as far as I could: the two body-less invitation POSTs are CORS-simple and reachable; the
+two `PUT`s preflight; `/v1/invites/:token/accept` I did not classify. **If the judge wants one number,
+the sharp set is two routes, and the accept path appends three ledger events.** I claimed Critical on the
+strength of that route because a permanent, attributed, append-only membership event made by a person who
+did not make it is the harm this control exists to prevent.
