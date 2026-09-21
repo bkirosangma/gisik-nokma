@@ -52,6 +52,12 @@ in the shell. Defence paragraphs, dated, go under the finding in `review-ux-exec
 
 ## Log
 
+- 15:14 IST — exec 6's `R6-1 → E5-21` (head `dda797aa`) read and its lines opened (`sync-service.ts:321-327`,
+  `outbox.ts:408-412`, `http-transport.ts:80`): the refutation is RIGHT on the absolute (a self-assigned comment commits)
+  and on the door/outcome (`/v1/sync` → `invalid` → outbox `failed`, unretried). **E5-21 withdrawn** with a dated
+  paragraph inside the free window; its surviving core refiled as **E5-44** at phase-2 half points, narrowed to tickets
+  not assigned to the commenter, with exec 6's door measurement attributed. No defence against R6-1 is filed: it is
+  correct.
 - 15:09 IST — exec 4 (head `674decb2`) adds a painted corroboration of `E5-32` (no `next`, and nothing stashed in
   `sessionStorage`/`localStorage` either); noted under the finding. exec 1 relaunched (head `a07a7fc2`, a P35 at half
   points); no refutation file yet.

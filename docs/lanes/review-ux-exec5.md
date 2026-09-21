@@ -171,7 +171,8 @@ handed me its copy constants by name (`BULK_REFUSED_COPY`, `BULK_UNREACHED_COPY`
 | E5-18 | Min | `/invite/[token]` | FIRST-RUN, ERROR arm (prototype cat. 3) | source + browser (dead arm) | — |
 | E5-19 | Min | `/account` Save name | ERROR (silent) | source | — |
 | E5-20 | Imp | Move dialog + sheet | CONCURRENT controls (two Escape listeners) | source (+ pair observed) | `exec2-E2-34` |
-| E5-21 | Imp | phone Comment + help | SERVER-REFUSES-WHILE-CLIENT-BELIEVES | source | `exec2-E2-42` |
+| E5-21 | — | **WITHDRAWN 15:14** on `R6-1`; refiled as E5-44 | — | — | — |
+| E5-44 | Imp (½) | phone Comment on a ticket not assigned to you + help | SERVER-REFUSES-WHILE-CLIENT-BELIEVES (sync door: `invalid`, failed, unretried) | source + exec 6's probe | `exec2-E2-42`, `exec6-R6-1` |
 | E5-22 | Min | subtask form | copy (silent type) | browser + source | — |
 | E5-23 | Min | workspace home | FIRST-RUN | source | — |
 | E5-24 | Imp | help (4 passages) | copy | browser + source | `exec6-E6-1` (delete row) |
@@ -199,7 +200,7 @@ handed me its copy constants by name (`BULK_REFUSED_COPY`, `BULK_UNREACHED_COPY`
 PERMISSION-REFUSED (E5-9, 31) · OFFLINE/REPLICA-DEGRADED (**not reached** — web is online-only; phone/desktop read at two
 screens) · SOFT-DELETED (E5-34 for projects; tickets **not reached** by me — `exec4-E4-23` holds it, §6.6) · CONCURRENT (E5-20, 27) · NARROW
 VIEWPORT (signed-out only: E5-31, 33) · FIRST-RUN (E5-6, 16, 18, 23, 26, 31, 32, 36) · SERVER-REFUSES-WHILE-CLIENT-BELIEVES
-(E5-7 inverted, 13, 21).
+(E5-7 inverted, 13, 44).
 
 Export cited throughout as `EXPORT` = `/Users/kiro/my_projects/gisik-nokma-lanes/prototype-2026-09-20/Gisik Nokma - Desktop.dc.html`
 (sha256 `3d142d464a070b33…`, measured `shasum -a 256`). Browser = the owner's `gisik-nokma-dev-web-1` on `:3001`,
@@ -853,7 +854,20 @@ Attribution: that painting is theirs; the mechanism above is what this finding a
 
 ---
 
-### E5-21 — IMPORTANT · The manual sends a person to the phone to comment; the phone files the comment under the ASSIGNEE's id (or the literal `'me'`), the server refuses that as identity spoofing, and the app shows nothing `[SOURCE]` — the phone half of exec 2's `F1(e)`, which it verified "on the web half only"
+### E5-21 — ⛔ WITHDRAWN 15:14 IST (phase 2) · was: IMPORTANT · The manual sends a person to the phone to comment; the phone files the comment under the ASSIGNEE's id (or the literal `'me'`), the server refuses that as identity spoofing, and the app shows nothing `[SOURCE]`
+
+**Withdrawal, dated 15:14 IST, on exec 6's `R6-1` (`review-refutations-exec6.md`, head `dda797aa`).** R6-1 measured
+through the real sync door what this finding asserted from source, and two of its sentences are false: (1) *"what it
+files can never be committed … guaranteed by construction"* — when the ticket is assigned to the person commenting,
+`actorId = assigneeId = session user` and the comment **commits** (R6-1's probe: `committed (seq 3)`; the phone's own
+My-Work list surfaces exactly those tickets first); (2) the door and the outcome — the phone syncs through `POST /v1/sync`
+(`sync-client/src/net/http-transport.ts:80`), whose answer is `invalid: actor-mismatch` (`sync-service.ts:321-327`, opened)
+and the outbox marks it `failed`, once, unretried (`outbox.ts:412`, opened) — not `IDENTITY_SPOOF_REASON` and not "refused at
+the first sync". I cited the sync-door line but foregrounded the wrong door and wrote an absolute a single common path
+falsifies — the shape my own §0 names. The core R6-1 says survives is refiled, narrowed and correctly worded, as **E5-44**
+below (phase 2, half points). This entry is withdrawn and claims nothing.
+
+*(Original text kept below for the record.)*
 
 **WHAT.** `docs/manual.md:365-366`: *"**The phone app has a Comment button on a job and the website does not.**"*
 The button exists (`apps/mobile/src/screens/ticket-screen.tsx:126`). Its handler (`:36-57`) submits
@@ -1568,6 +1582,35 @@ Not driven — it needs a session and a day boundary.
 
 ---
 
+### E5-44 — IMPORTANT · (phase 2, half points — the narrowed core of withdrawn E5-21) The manual sends a person to the phone to comment; on any ticket NOT assigned to them — every unassigned ticket, every ticket on someone else — the phone files the comment under another id, the sync door answers `invalid`, the outbox marks it failed without retry, and the screen shows nothing `[SOURCE]` + exec 6's door measurement
+
+**WHAT.** `docs/manual.md:365-366`: *"**The phone app has a Comment button on a job and the website does not.**"*
+`apps/mobile/src/screens/ticket-screen.tsx:36-57` files `comment.added` with `actorId: state.assigneeId ?? 'me'`. Three
+cases, measured by exec 6 through `POST /v1/sync` (R6-1, its probe reproduced verbatim in its file): assigned to the
+commenter → **committed**; assigned to someone else → `invalid: actor-mismatch` (*"A synced claim must belong to the
+signed-in user."*, `sync-service.ts:321-327`); unassigned (`'me'`) → `invalid: malformed-envelope` (`actorId: must be a
+ULID`). An `invalid` answer sets the outbox row to `failed` with no retry (`sync-client/src/outbox/outbox.ts:408-412`).
+On the phone the submit's only arm swallows the local queue acceptance — `:54` `if (err instanceof OfflineAcceptError)
+return; // queued locally — the expected offline outcome` — and the ticket screen reads nothing back from the sync
+engine, so the person sees neither a post nor a failure.
+
+**WHY.** The manual's sentence is stated of "a job"; it is true of a job assigned to you and false of every other
+job, and the phone gives no sign which is which. The words typed are lost on the two cases that cover every ticket
+a person did not already own. Two lanes measured the two halves: this lane the phone's payload and its silent arm
+(source), exec 6 the door's three answers (probe). Sibling of `exec2-E2-42` (which R6-1 also corrects).
+
+**WHAT WOULD HAVE BEEN BETTER.** Bind the phone's `actorId` to the session (the comment at `:45-48` says this is
+"interim"); until then, withhold the Comment control on tickets not assigned to the viewer with a sentence, rather
+than accept into a queue whose failure the screen never reads; and scope the manual's sentence.
+
+**MEASUREMENT.** `[SOURCE]` `ticket-screen.tsx:36-57`, `:54`, `:126`; `sync-service.ts:29`, `:318-327`;
+`outbox.ts:408-412`; `http-transport.ts:80`; `docs/manual.md:363-366`. The door outcomes are exec 6's R6-1 measurement,
+attributed; I did not run a probe (no writes, no phone).
+
+**SEVERITY: Important** (claimed, scored at half as a phase-2 filing).
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -1636,16 +1679,16 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**43 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 43). By claimed severity, read from the
-heading text: **Critical 2 · Important 25 · Minor 16** (2 + 25 + 16 = 43).
+**43 standing findings** at 15:14 IST (44 headings: E5-1…E5-44, of which **E5-21 is WITHDRAWN** and E5-44 is its
+phase-2 refiling at half points). By claimed severity: **Critical 2 · Important 25 · Minor 16** (2 + 25 + 16 = 43).
 
 - **Critical (2):** E5-13, E5-41
-- **Important (25):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28, E5-31, E5-32, E5-37, E5-40, E5-42
+- **Important (25):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-24, E5-25, E5-26, E5-27, E5-28, E5-31, E5-32, E5-37, E5-40, E5-42, E5-44 (phase 2, ½; replaces withdrawn E5-21)
 - **Minor (16):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30, E5-33, E5-34, E5-35, E5-36, E5-38, E5-39, E5-43
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
 E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33, E5-38 = 23 of 43. **Reproduced with an injected failure, zero server writes:** E5-13,
-E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34, E5-35, E5-36, E5-37, E5-39, E5-40, E5-41, E5-42, E5-43.
+E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34, E5-35, E5-36, E5-37, E5-39, E5-40, E5-41, E5-42, E5-43.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
 sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever), E5-20 (stacked dialogs and
