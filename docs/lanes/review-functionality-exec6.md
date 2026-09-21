@@ -171,7 +171,13 @@ read the phone and desktop shells call, + Appendix AF) and `sync-client/src/repl
 (whole; the whole-ledger-in-memory ceiling is recorded as case 13.34, UTC scheduling is explicit — nothing filed),
 `tools/sweep-user-preferences.ts` (whole), `gates/evidence-gate.ts` (whole: the evidence id IS verified server-side
 against `attachments` — the engine rule's string check is not the last word), `read/{compile-filter,fts}.ts` (whole:
-every filter value parameterised, `likePattern` escapes `\ % _`), `mcp-server/src/{config,
+every filter value parameterised, `likePattern` escapes `\ % _`), `projections/{contested,proj-visibility}.ts` (whole:
+resolution is refused for an unknown, wrong-ticket or already-resolved contest at `rule-engine/src/contests.ts:60-75`;
+the resolver's identity is not checked, which 12.204 records as *"attributed to whoever discarded"* — not filed),
+`read/{ticket-cards,visible-projects}.ts` (whole), `domain/src/prefix.ts:100-180` with `13.1024` (a derived project
+prefix MOVES when a later project enters the same letters — the key is display-only, `routes/tickets.ts:551-555`,
+and the move is the case's own sentence — not filed), `checks/hierarchy.ts:125`, `:274` (cross-project reparent
+refused), `auth/auth.ts:318-345` (plugin defaults), `mcp-server/src/{config,
 device-login,lazy-session,main,login-prompt}.ts` (whole), `app-core/src/online/stream.ts:95-160`, `:273-324` (frame
 parsing and cursor advance), `sync-client/src/replica/replica.ts:1050-1103`, `:1254-1290` (purge, scope-revoked,
 reach-granted arms), **the five route modules previously grep-only, code lines whole** — `routes/{attention,board,
