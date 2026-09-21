@@ -3,17 +3,35 @@
  *
  * `status` is a bare `string` rather than the four-member union the component
  * takes, because this is also the function a host calls with a status it read
- * from `query.syncStatus` — an unrecognised value falls through to the live
- * sentence rather than throwing, which is the honest failure here: the queue
- * depth is still true even when the connection word is not one this build
- * knows.
+ * from `query.syncStatus` — and the mobile shell declares it that way
+ * (`apps/mobile/src/screens/board-screen.tsx:11`, `status: string;`), so a code
+ * this build does not know is a shape a caller already admits rather than one
+ * invented here.
+ *
+ * ## An unrecognised value gets the QUEUE sentence, never a liveness claim (E2-27)
+ *
+ * This used to fall through to `'Live'`, and the paragraph that defended it read:
+ * *"an unrecognised value falls through to the live sentence rather than
+ * throwing, which is the honest failure here: the queue depth is still true even
+ * when the connection word is not one this build knows."* The premise is right
+ * about the QUEUE and was false about what the arm RETURNED — `'Live'` is a claim
+ * about the connection, not about the queue, and it is the most optimistic of
+ * the four. Every other arm refuses to invent a policy for a code it does not
+ * know; that one invented the only policy whose failure is not recoverable,
+ * because a person told they are live does not go and check.
+ *
+ * So `live` is an explicit arm now, and the fallthrough returns the queue
+ * sentence — the half that stays true whatever the connection word is.
  */
 export function syncStatusLabel(status: string, queued: number): string {
   const claims = queued === 1 ? '1 claim waiting to send' : `${queued} claims waiting to send`;
   if (status === 'offline') return queued === 0 ? 'Offline' : `Offline — ${claims}`;
   if (status === 'catching-up') return 'Catching up…';
   if (status === 'connecting') return 'Connecting…';
-  return queued === 0 ? 'Live' : claims;
+  if (status === 'live') return queued === 0 ? 'Live' : claims;
+  // Unrecognised. The queue depth is a fact this client holds; the connection
+  // word is not, so only the first is said.
+  return claims;
 }
 
 /**

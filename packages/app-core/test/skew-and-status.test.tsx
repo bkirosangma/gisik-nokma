@@ -87,6 +87,22 @@ describe('sync status bar', () => {
     expect(container.querySelector('.gn-sync-status-bar__failed')).toBeNull();
     expect(container.querySelector('[data-status="live"]')).not.toBeNull();
   });
+
+  it('E2-27 — an UNRECOGNISED status never claims liveness', () => {
+    // `status` is a bare `string` on purpose: the mobile shell declares
+    // `status: string;` (`board-screen.tsx:11`) and passes `query.syncStatus`
+    // through verbatim, so a code this build does not know is a shape the shell
+    // already admits. Every other arm refuses to invent a policy for it; this one
+    // used to invent the most optimistic one. A person told they are live does
+    // not go and check.
+    expect(syncStatusLabel('suspended', 0)).not.toBe('Live');
+    expect(syncStatusLabel('suspended', 0)).toBe('0 claims waiting to send');
+    // The queue half IS still true whatever the connection word is, so the
+    // unknown arm keeps it — including when the queue is not empty.
+    expect(syncStatusLabel('suspended', 3)).toBe('3 claims waiting to send');
+    // The known arms still say what they said.
+    expect(syncStatusLabel('live', 0)).toBe('Live');
+  });
 });
 
 describe('the stream error surface (Ruling P34)', () => {
