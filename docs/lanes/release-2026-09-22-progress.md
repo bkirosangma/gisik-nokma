@@ -15,3 +15,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E6-13 | done | 6f5d5780e747ef47c82f46e32d2dda8ca7260f2f | verify-projections.test.ts E6-13 x2 (case 3.960; both re-bind orders, RED drift + RED throw → GREEN) |
 | T-E6-22 | done | 1ffb32df94bdd9c6687cea11cacfcff5ac1e8a59 | prose only: canSee docblock + Features.md canSee bullet record the divergence and the inert door |
 | T-E6-23 | done | 58197f25ba7a1b9e7145ddebee43cda2c76ee81e | schedule.test.ts 13.1200 (planted defect, RED→GREEN) + 13.1201 control |
+| T-E6-5 | done | 226645af1bf35e6180851131d27e4f7673404d3e | outbox.test.ts E6-5/12.960 (RED overtake → GREEN due-prefix) + 12.961 control; server half (contest on unknown ticket) needs-owner — see case 12.960 |
