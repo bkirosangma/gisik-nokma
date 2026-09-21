@@ -11,7 +11,7 @@
 
 **Counts, measured from the sections below rather than written from memory.** 19 landed findings from
 round 1 (`E2-1`–`E2-19`; all 19 ACCEPTED, base 49 points) · **35 new** (`E2-20`–`E2-54`; **19 Important,
-16 Minor, 0 Critical**) · **54 in the report** · **90 root-relative cited paths, 0 missing** (universe stated
+16 Minor, 0 Critical**) · **54 in the report** · **93 root-relative cited paths, 0 missing** (universe stated
 because a bare-filename citation is the convention in parts of this file, so a resolver that treats every
 backticked token as a path reports false misses — measured, and the first version of this measurement did
 exactly that) · every line number inside its file · every finding carries a severity line.
@@ -58,8 +58,16 @@ replacements, which do not interpret dollar-patterns. The diff is now exactly th
 **A final automated audit of both artifacts, re-run after every repair, and clean on every section.**
 Counts measured against the sections rather than remembered: **35 round-2 findings, 19 Important / 16
 Minor, 0 Critical, every one with a severity line, headings in ascending numeric order with no duplicates;
-43 refutation targets and 43 rows with no duplicates.** Both files' citations resolve — **90 root-relative
-distinct paths in the report and 22 in the refutations file, none missing**, every line number inside its
+**and the refutations file re-measured with its units pinned: 23 check rows each beginning with a target id,
+naming 29 distinct peer findings, and 0 `R2-n` refutation ids — because it files no refutation and says so in
+its own heading.** ⚠ **The number this line carried was *"43 refutation targets and 43 rows"*, and like the
+95 above I cannot reproduce it**: no count of that file yields 43 under any unit I can define — nor does it
+reconcile with the batch commits that wrote *"43 checks"* and *"44 checks, 44 held"* at different pushes.
+**A count and its unit have to be written together or the count is not evidence**, and the two that were
+written here (`95` paths, `43` rows) are the two I could not re-derive. **The rule I am taking from this
+round: measure citations and cross-file counts LAST, in the pushed state, because every earlier push
+invalidates them.** Both files' citations resolve — **93 root-relative
+distinct paths in the report and 23 in the refutations file, none missing**, every line number inside its
 file. ⚠ **The number this line carried before was 95, and I cannot reproduce it**: it was produced by an
 earlier script whose universe I did not record, and the same method applied to the refutations file returns
 the same 22 it always claimed — so the two numbers were not the same measurement. **A count whose method is
