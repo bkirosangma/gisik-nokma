@@ -1771,8 +1771,17 @@ listener owned by the topmost dialog would also do it, and would keep hidden sta
 `packages/ui/src/components/dialog.tsx:1-24` (the listener, the scrim's own `onClick={onClose}`, and
 `aria-modal="true"`).
 
-**Source:** carried candidate (round-1 §2d). **Severity: Minor** — the loss is one keypress's worth of
-typed draft, and both surfaces are visible at once so the person can see what happened.
+**Corroborated after filing, and extended by a peer.** Lane 5's `E5-20` reports the same mechanism —
+`packages/ui/src/components/dialog.tsx:6-13` installs a document-level `keydown` that calls `onClose()` on
+Escape **with no `preventDefault()`**, so `sheet.tsx:56-90`'s guard (which exists precisely to let a child
+keep an Escape it handled) cannot see it — on the **Move dialog over the ticket sheet**, where one Escape
+closes both and dumps the person back on the board. It credits my §2e carried candidate and adds the
+measurement I lacked (`[BROWSER]` `dialogs: 2`, `aria-modal="true"` on the Move dialog). **The two findings
+are complementary rather than duplicates:** mine is the board's `New-ticket` + `Reopen` pair
+(`create-ticket-flow.tsx:250-253`, `:359-370`), where the loss is a typed draft; theirs adds the `Sheet`
+case, where the loss is the sheet itself. Both mechanisms are the same missing `preventDefault()` in one
+shared primitive, which is why I kept this at Minor for its own scope — the sheet-closing case belongs to
+their finding and is the more expensive one.
 
 ---
 
