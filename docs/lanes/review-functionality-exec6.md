@@ -784,7 +784,7 @@ declares a closed security-relevant leak … a named owner pointing at finished 
 pre-authorised work"*. 6.51 names an owner (Plan 4 Task 9) for a door that has been closed for twenty days, and
 calls `visibility.set` the one that "matters most" — the reader who picks it up will build a refusal that exists.
 6.77's whole sentence, including *"deliberately not closed"* and *"a product decision no plan in this series has
-taken"*, is contradicted by a ruling whose closure the code and its test both record (`check-visibility-permission.test.ts:330-340`; the struck-through entry in `check-permission.ts`), while the catalogue line was left standing — the catalogue is the one artifact of the three that was not moved. And the catalogue's own checker cannot
+taken"*, is contradicted by a ruling whose closure the code and its test both record (`check-visibility-permission.test.ts:330-340`; the struck-through entry at `check-permission.ts:434-438`, *"~~…nothing anywhere asks who may rename a workspace.~~ **The owner ruled on…**"*), while the catalogue line was left standing — the catalogue is the one artifact of the three that was not moved. And the catalogue's own checker cannot
 see any of this: `check-case-citations.mjs` walks ✅ ids only (its docblock: *"a checked ('checkmark') case id
 must appear literally"*), so a ❌ line is never asked whether it is still open.
 
