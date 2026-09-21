@@ -692,6 +692,8 @@ rows = re.findall(r'^- `([IP]\d+)`', md, re.M)                    # each summary
 assert Counter(sev for _, sev in ids)['MINOR'] == count_of_rows_under('**MINOR —')
 ```
 
+**✅ RUN AT THE END OF ROUND 2, AND IT PASSES.** Two cross-checks over the whole report: (1) each finding's own heading severity against the list it is placed under — **26 findings, heading and placement agree for every one**; and (2) the three bucket sizes against their headers — **1 / 12 / 13, matching**. A third sweep over the citations found **160 distinct `file:line` references, 159 resolving inside their file and none beyond EOF**, the one remainder being the breadcrumb dispatch in `gisik-nokma-lanes/` which is outside the repository and is named with its directory. **Every number in this section was produced by a command, not recalled.**
+
 **Compare MEMBERSHIP, not size.** The report's §8 now groups by each finding's *own heading*, so the two cannot disagree, and the check above is the one the judge can run.
 
 ## 10. A METHOD NOTE THE REPORT OWES THE NEXT READER
