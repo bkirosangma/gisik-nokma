@@ -52,6 +52,16 @@ in the shell. Defence paragraphs, dated, go under the finding in `review-ux-exec
 
 ## Log
 
+- **17:00 IST — PHASE-2 CLOSING STATE** (phase 2 ends 17:05:23; any later commit on this branch only re-runs the
+  watch). Since 16:48: exec 3 `4b0f0033`, exec 1 `0d8217c1`, exec 6 `c14c8a05`, exec 2 `84ce91d6` — the one
+  `E5-` addition (exec 6's closing state) restates `R6-1 → E5-21` and describes my withdrawal/refiling
+  accurately; nothing else names an E5 id. **Filed by this lane: none** — no candidate in the table above
+  produced a falsifying line. **Filed against this lane: `R6-1 → E5-21` only**, conceded at 15:14 (E5-21
+  withdrawn, its narrowed core refiled as E5-44 at phase-2 half points). Corroborations recorded under my
+  findings from exec 1 (E5-9/22/3), exec 2 (fourteen checks + the E5-44 precision note) and exec 4 (E5-20,
+  E5-32, E5-4 painted). Report `review-ux-exec5.md` frozen at `1641161d`; post-freeze edits are the dated
+  Defence/corroboration paragraphs, the E5-21 withdrawal and E5-44. Standing, recounted from the `### E5-`
+  headings at 16:59: **43 findings — Critical 2 (E5-13, E5-41) · Important 25 · Minor 16**; 1 withdrawn.
 - 16:48 IST — cadence push. Since 16:32: 6 pushes (exec 1 `082734fa`; exec 6 `b32c796e`; exec 2 `a189be67`; exec 3 `08b00160`; exec 4 `fe35c41b`; exec 2 `471a657c`), each diffed on its
   added/removed lines — no `E5-` in any; `filed` unchanged everywhere (exec 6: 3; others 0; exec 4's file still
   4 E5 lines, all corroborations). Watch re-armed at 16:41, running past the 17:05:23 close. No new refutation
