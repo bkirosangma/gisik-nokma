@@ -902,6 +902,8 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 
 **SEVERITY: MINOR.** Real, bounded, and with three remedies already in the repository's idiom — but it costs a user one unexplained refusal, not a task.
 
+
+**Painted (phase 2, 2026-09-21 15:41 IST), by me — site 2.** Instrument as P1's third defence paragraph; `/w/<id>/settings/ticket-types` signed in as the owner: `button[title]` → **10**, **all 10 `disabled`**, e.g. *Move Epic up* `title="This type is already first."`, *Move Epic down* `title="Built-in types keep their rank."`; `aria-describedby` **null** on every one; calling `.focus()` on the first leaves `document.activeElement` on **BODY** — the control cannot take focus, so the sentence in its `title` is reachable by hover alone. (Exec 5's `E5-14` reports the same ten arrows from the UX side.)
 ---
 
 ### P33 — **MINOR** ⚠ **r2 NEW** — The export draws a timestamp on every inbox row; the product draws none, and no client in the chain reads the field it would need
