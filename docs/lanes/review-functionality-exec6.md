@@ -362,7 +362,7 @@ Critical: no data lost, workaround exists for someone who knows the cause.
 
 **WHAT.** `packages/sync-client/src/outbox/outbox.ts:333` selects the next batch as
 `WHERE status = 'queued' AND next_attempt_at <= ? ORDER BY position LIMIT ?`. `recordFailure` (transient — a
-transport throw, a short answer, a misaligned answer; `sync-engine.ts:860-880`) pushes `next_attempt_at` of the
+transport throw, a short answer, a misaligned answer; `sync-engine.ts:870`, `:897`, `:907`) pushes `next_attempt_at` of the
 **failed batch** out by `backoffMs(attempts)` (2 s on the first failure). A claim enqueued *after* the failure
 carries the schema's epoch default and is due immediately. So the next flush — and the product flushes on every
 enqueue, `replica-data-source.ts:1405` `void engine.flush()` — offers the newer claim **alone**, ahead of the
@@ -400,7 +400,7 @@ assert the batch is empty until the head is due.
 
 **MEASUREMENT.** Appendix D, run from `packages/sync-client` (`pnpm exec vitest run
 test/zz-exec6-probe-overtake.test.ts --no-file-parallelism`; imports `../src/*.js` relatively). Lines opened:
-`outbox.ts:333`, `:412`; `sync-engine.ts:845`, `:860-880`; `replica-data-source.ts:1404-1405`;
+`outbox.ts:333`, `:412`; `sync-engine.ts:845`, `:870`, `:897`, `:907`; `replica-data-source.ts:1404-1405`;
 `local-context.ts:126`; `fields.ts:116`; `outbox.test.ts:119`, `:201`, `:226`; `12-offline-sync-apps.md:905-907`.
 
 **SEVERITY: Important.** A user's edit reverts on their own screen with a nonsensical reason after a transient
