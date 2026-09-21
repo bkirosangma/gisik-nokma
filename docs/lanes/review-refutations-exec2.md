@@ -105,7 +105,22 @@ does not rest on reading a line.
 | `P16` (exec 1, IMPORTANT) | that a styling case asserts the absence of a declaration through a scanner that **cannot fail** | `neo-card-radius.test.ts:34-36` is exactly the quoted scanner — `css.split('\n').find((line) => selectorPattern.test(line) && line.includes('{'))` — so it returns **the single line** where the selector and `{` appear; and the third case (`:51-57`) does `expect(rule).toBeDefined()` then `expect(rule?.includes('border-radius')).toBe(false)`. With the selector on its own line the string is `".gn-sign-in {"`, which **never** contains `border-radius`, whatever the rule declares | **holds** |
 | `P20` (exec 1, MINOR) | that the calendar's month grid carries no table or grid semantics | `calendar-view.tsx` contains **0** occurrences each of `role="grid"`, `role="table"`, `role="row"`, `role="gridcell"`, `role="columnheader"`; the weekday head at `:396-398` is `<div>` + seven `<span>`s | **holds** |
 
-**Twenty-five checks across all five lanes. Twenty-five held. My refutation count is zero.**
+
+### Two more from exec 1, one of them in my own strongest vein
+
+| target | the clause I tried to falsify | what I opened | outcome |
+|---|---|---|---|
+| `P2` (exec 1, IMPORTANT) | that the board's whole-board empty state has **no styling at all** | In all of `ui.css` the only two lines naming `gn-board__empty` / `gn-board--empty` are **comments** — `:835` (*"a different granularity from `.gn-board__empty-*` above"*) and `:4980` (*"`.gn-board__empty-create`, 37 more"*). **Zero selector blocks.** I took care to separate comment hits from rule hits, because a grep that cannot tell them apart is the silent-empty failure | **holds** |
+| `I3` (exec 1, IMPORTANT) | that `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified **by its own docblock** | `tap-targets.ts:71-76` states the rule — clause **(a)** the CSS makes the 24px call, AND clause **(b)** *"a sweep actually visits the route it renders on"*. `:82` lists `.gn-my-work__title` among the deliberately excluded and says its rule is *"byte-similar to `.gn-attention__title`"*, which **is** a member (`:142`) — so (a) holds. And **(b) holds on a measurement I had already taken independently**: `e2e-stack/viewport.spec.ts:170` measures tap targets on `/my-work` | **holds** — the exclusion rests on a clause that is satisfied |
+
+**Twenty-seven checks across all five lanes. Twenty-seven held. My refutation count is zero.**
+
+> ⚠ **`I3` is the one where I had independent evidence and did not have to take their word.** My own
+> reachability work had already opened `e2e-stack/viewport.spec.ts:170` and established that the signed-in
+> tap-target instrument measures on `/my-work` — which is clause (b) of exec 1's argument. **Arriving at a
+> peer's finding from a measurement taken for a different purpose is the strongest position a referee can
+> be in**, and it is the one place in this file where I did not have to trust their citation to agree with
+> their conclusion.
 
 > **`P16` deserves the sentence, because it is the failure class this whole report is organised around.**
 > The case *reads* as a guard — it asserts the absence of a declaration and prints the rule in its failure
