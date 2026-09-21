@@ -8,7 +8,8 @@ set -- "${CTL_ARGS[@]:1}"
 while [ $# -gt 0 ]; do case "$1" in --plan) plan="$2"; shift 2;; --body) body="$2"; shift 2;; *) ctl_fail check-pr "unknown arg $1";; esac; done
 [ -n "$branch" ] || ctl_fail check-pr "usage: ctl check-pr <branch> [--plan FILE] [--body FILE]"
 cd "$CTL_REPO" || exit 1
-[ "$(/usr/bin/git branch --show-current)" = "$branch" ] || ctl_fail check-pr "checked-out branch is not $branch"
+# HEAD names the checked-out commit whatever the branch (a detached worktree has none); any other name must be the current branch.
+[ "$branch" = HEAD ] || [ "$(/usr/bin/git branch --show-current)" = "$branch" ] || ctl_fail check-pr "checked-out branch is not $branch"
 [ -z "$(/usr/bin/git status --porcelain)" ] || ctl_fail check-pr "tree is dirty"
 /usr/bin/git fetch -q origin
 log="$(ctl_log check-pr)"

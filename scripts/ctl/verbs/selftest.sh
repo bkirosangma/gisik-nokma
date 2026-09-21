@@ -14,7 +14,8 @@ step "gate --dry-run"        "'$HERE/ctl' gate \$(/usr/bin/git -C '$repo' rev-pa
 step "pr open --dry-run refuses main" "! '$HERE/ctl' pr open main --title t --body '$HERE/README.md' --repo '$repo' --dry-run"
 step "land refuses a merged PR" "'$HERE/ctl' land 638 --repo '$repo' --dry-run; [ \$? -eq 1 ]"
 step "anchor --dry-run"      "'$HERE/ctl' anchor 0 --title t --body '$HERE/README.md' --repo '$repo' --dry-run"
-step "check-pr --dry-run"    "'$HERE/ctl' check-pr \$(/usr/bin/git -C '$repo' branch --show-current) --repo '$repo' --dry-run || /usr/bin/git -C '$repo' status --porcelain | grep -q ."
+# A detached checkout (the gate scripts and CI) has no branch name; check-pr then takes HEAD.
+step "check-pr --dry-run"    "b=\$(/usr/bin/git -C '$repo' branch --show-current); '$HERE/ctl' check-pr \"\${b:-HEAD}\" --repo '$repo' --dry-run || /usr/bin/git -C '$repo' status --porcelain | grep -q ."
 step "reconcile --dry-run"   "'$HERE/ctl' reconcile --repo '$repo' --dry-run"
 step "lanes"                 "'$HERE/ctl' lanes"
 step "dispatch --dry-run refuses a missing file" "! '$HERE/ctl' dispatch 2 /nonexistent --dry-run"
