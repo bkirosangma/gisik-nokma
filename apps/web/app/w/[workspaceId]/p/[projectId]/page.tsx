@@ -3222,7 +3222,7 @@ function ProjectBoard() {
             // same one-slot rule the toast above keeps. Said plainly on the
             // strip's own sentence, so nobody is told a ticket is still
             // reachable when it has been superseded.
-            setDurableUndo({ ticketId, title });
+            setDurableUndo({ ticketId, title: name });
             /*
               ⚠ BOTH READS ARE RE-ASKED HERE, and the deletion's correction must
               not depend on the stream. **Found by independent review

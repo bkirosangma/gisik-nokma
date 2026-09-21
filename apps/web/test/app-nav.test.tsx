@@ -1345,3 +1345,79 @@ describe('pending-13.4xx AppNav is mounted on every page that must always show i
     );
   });
 });
+
+/**
+ * Case `13.1138` — E4-11 — THE PHONE DISCLOSURE'S WIRING, witnessed at the component because
+ * the CSS arm cannot be: jsdom evaluates no media query, so a stylesheet test
+ * can prove the breakpoint hides the wrapper but not that the button which
+ * unhides it is wired to it.
+ *
+ * What matters here is the ONE property the shape was chosen for: **the links
+ * are never conditionally rendered.** A closed bar is a visual state, not a
+ * missing link, so the scoped routes stay in the document — and therefore in
+ * the accessibility tree and one Tab away — at every width. A `{moreOpen && …}`
+ * implementation would have passed every assertion below about the open state
+ * and silently deleted three routes from the phone's accessibility tree; the
+ * "BOTH states" case is what refuses that.
+ */
+describe('E4-11 — the workspace links sit behind one disclosure', () => {
+  beforeEach(() => {
+    currentPath = '/w/ws_1/my-work';
+    mockSessionUser = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
+  });
+
+  const renderOnAPhoneRoute = () =>
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav workspaceId="ws_1" />
+      </Providers>,
+    );
+
+  it('starts closed, and says so in the accessibility tree rather than only in CSS', () => {
+    renderOnAPhoneRoute();
+    const toggle = screen.getByRole('button', { name: 'Menu' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-controls', 'gn-nav-more');
+    expect(document.getElementById('gn-nav-more')).toHaveAttribute('data-open', 'false');
+  });
+
+  it('13.1138 opens, and the scoped links are in the document in BOTH states', async () => {
+    renderOnAPhoneRoute();
+    const scoped = ['My Work', 'Members', 'Settings'];
+    for (const name of scoped) {
+      expect(screen.getByRole('link', { name }), `${name} left the CLOSED document`).toBeInTheDocument();
+    }
+
+    await userEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    expect(screen.getByRole('button', { name: 'Menu' })).toHaveAttribute('aria-expanded', 'true');
+    expect(document.getElementById('gn-nav-more')).toHaveAttribute('data-open', 'true');
+    for (const name of scoped) {
+      expect(screen.getByRole('link', { name }), `${name} left the OPEN document`).toBeInTheDocument();
+    }
+
+    // And back — the control is a toggle, not a one-way reveal.
+    await userEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    expect(screen.getByRole('button', { name: 'Menu' })).toHaveAttribute('aria-expanded', 'false');
+    expect(document.getElementById('gn-nav-more')).toHaveAttribute('data-open', 'false');
+  });
+
+  it('renders NO toggle when there is nothing behind it to disclose', () => {
+    // Signed out on a global route with no remembered workspace: every child of
+    // `.gn-nav__more` is gated on `!noWorkspace`, so the toggle would open an
+    // empty panel. This is the negative control for the gate above — it fails
+    // if the toggle is rendered unconditionally, and it fails if the gate is
+    // tightened to `workspaceName !== null` instead (the name is unresolved
+    // here, but the three id-only links are not).
+    currentPath = '/help';
+    mockSessionUser = null;
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+    expect(screen.queryByRole('button', { name: 'Menu' })).not.toBeInTheDocument();
+    // The bar is still the bar: the always-items render, so this is the gate
+    // answering "no" rather than the component failing to mount.
+    expect(screen.getByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
+  });
+});
