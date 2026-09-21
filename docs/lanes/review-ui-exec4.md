@@ -9,7 +9,7 @@
 
 ## 0. THE ONE-LINE ANSWER
 
-**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Twenty-nine of the thirty-two findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast is clean everywhere I measured in the shipped `neo` style — 26 route×theme passes, one third-party watermark failing — and switching the style axis to `hig`/`minimal` client-side found two AA failures of my own (E4-31, a ghost button on a sunken row at 3.99:1 that case 13.360's two assertions do not reach; E4-32) beside the one exec 1 computed (P24), which I painted and confirmed for them.
+**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Thirty-one of the thirty-four findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast is clean everywhere I measured in the shipped `neo` style — 26 route×theme passes, one third-party watermark failing — and switching the style axis to `hig`/`minimal` client-side found two AA failures of my own (E4-31, a ghost button on a sunken row at 3.99:1 that case 13.360's two assertions do not reach; E4-32) beside the one exec 1 computed (P24), which I painted and confirmed for them.
 
 ---
 
@@ -503,6 +503,27 @@ curl -s http://localhost:3041/v1/me/workspaces      # → {"error":"unauthentica
 
 ---
 
+
+### E4-33 — **MINOR** — For a person with no display name — the product's default email sign-up — the shell's own labels degrade to dangling punctuation: `Workspaces — `, `Account menu for `, and a `?` avatar with an empty `title`
+
+**MEASUREMENT (painted as the seeded guest `accountant@e2e.gisik-nokma.local`, `name = ''`, on `:3041`).** `/workspaces` `h1.gn-page-title` → `textContent === "Workspaces — "` (`apps/web/app/workspaces/page.tsx:51`: `` Workspaces{user !== null ? ` — ${user.name}` : ''} ``); `button.gn-nav__avatar-button` → `aria-label === "Account menu for "` (`apps/web/src/account-menu.tsx:142`: `` `Account menu for ${user.name}` ``), visible glyph `?` (`packages/ui/src/components/avatar.tsx:19` returns `'?'` for an empty name), `title=""`, `aria-label=""` on the avatar span. The signed-in owner paints `Workspaces — Kiro` / `Account menu for Kiro` / `KI` on the same elements. The cause is the one the members page already documents (`members/page.tsx:635-638`, quoted by exec 5's E5-4): magic-link sign-up creates `name: ''`, and the sign-in form asks for no name.
+
+**WHY IT IS WRONG.** These are the two labels every signed-in screen carries, and they are the person's own. A heading that ends in an em dash and nothing, and a menu button whose accessible name ends in "for", tell a screen-reader user the product does not know who they are — on the default sign-up path. Not a picker (exec 5's E5-4) and not provenance (E4-6): the shell.
+
+**WHAT WOULD HAVE BEEN BETTER.** One `displayLabel(user) = name || email` for the shell (`account-menu.tsx`, `workspaces/page.tsx`), and `initialsOf` on the email's local part when the name is empty.
+
+---
+
+### E4-34 — **MINOR** — A guest who *"can look, not touch"* is offered five rows whose accessible name is `Edit <type>`
+
+**MEASUREMENT (painted as the guest, `/settings/ticket-types` and `/settings?workspaceId=…`).** `p.read-only-banner` *"You can look, not touch — only a workspace owner or admin can change workflows and ticket types."* directly above five `button.ticket-type-list__row` whose accessible names are `Edit Epic`, `Edit Story`, `Edit Errand`, `Edit Task`, `Edit Sub-task`. Source: `ticket-type-list-screen.tsx:386-391` — `` aria-label={`Edit ${type.name}`} `` with no `canAuthor` branch, while the same file gates the reorder arrows on `canAuthor` (`:205`, `:355-359`). The row opens the editor read-only for this viewer (no Save is rendered there for a non-author, `ticket-type-editor-screen.tsx:134`).
+
+**WHY IT IS WRONG.** The name is the promise; the banner has just withdrawn it. A screen-reader user hears "Edit Epic, button" and then the editor offers nothing to edit.
+
+**WHAT WOULD HAVE BEEN BETTER.** `` aria-label={`${canAuthor ? 'Edit' : 'Open'} ${type.name}`} `` — the branch the file already computes.
+
+---
+
 ## 4. MATCHES AND RULED DIVERGENCES CHECKED
 
 _(so §3 is not a list of defects — each row is a measurement I took that came back clean or ruled)_
@@ -582,7 +603,7 @@ Screenshots taken and **committed** under `docs/lanes/exec4-paint/`: `board-1512
    |---|---|---|
    | EMPTY | yes | inbox (empty), the board's empty columns, My Work's four empty sections — all draw a sentence; no finding |
    | ERROR | yes, by URL | bad project → `The board cannot be shown yet. HTTP 404 for /v1/projects/…/board` (`p.gn-shell__refusal`; the word *yet* on a 404 is a small overclaim I note and do not file); bad workspace → *"This is not one of your workspaces…"*; bad ticket → **E4-23** |
-   | PERMISSION-REFUSED | partly | the bad-workspace and bad-invite sentences above; a real second role (guest/member) was **not** taken — it needs an invitation or a role change, which writes to the owner's DB |
+   | PERMISSION-REFUSED | **yes, as a real second role** (after the first freeze, on the controller's instruction): signed in as the seeded **guest** `accountant@e2e…` through `:3001`'s form + Mailpit, painted on `:3041` | `/workspaces` card *Restricted · You're a guest here · 1 project · name restricted*; `/w/:id` *Only an owner or an admin can create a project…*; `/members` *No members are listed here* + the admin-only sentence; `/settings/*` and the builder carry `p.read-only-banner` *"You can look, not touch"*; the sheet renders **no crumb bar at all** for a guest (the project name is restricted, so the *"drawn whole or not at all"* rule at `ticket-sheet.tsx:1752-1757` omits the nav — recorded, category 2), `Restricted parent — exists, but you can't see it`, provenance by raw ULID (`provenance.ts` contract, category 2), and the visibility editor's *Change who can see this* radios + Apply **plus a `p.gn-visibility__lockout` "You are about to lose access…" sentence on open, before any change** — the last two are exec 2's F4 territory (*"show the control and let the door refuse"*) and are recorded here, not filed. E4-33 and E4-34 came from this pass. |
    | OFFLINE / REPLICA-DEGRADED | yes (`emulate networkConditions: Offline`) | a client-side navigation while offline falls through to Chrome's `ERR_INTERNET_DISCONNECTED` page; no in-app indication. **Ruled**: `docs/manual.md:1215` *"The browser version is online-only. It has no offline queue at all"* — category 2, not filed. The replica apps were not run. |
    | SOFT-DELETED | by mechanism | the server answers a deleted ticket's detail route with the same `404` (`routes/tickets.ts:377`), so it paints E4-23's endless `Loading…`; I did not delete a ticket to paint it directly |
    | CONCURRENT / INTERLEAVED | no | needs a second writer; `contest-banner.tsx` and the sheet's contest arms were **not read** |
@@ -610,10 +631,10 @@ The owner ordered graph-first. I did: `graphify-out/GRAPH_REPORT.md` header, hub
 |---|---|---|
 | **Critical** | **0** | — |
 | **Important** | **19** | E4-1 · E4-3 · E4-4 · E4-5 · E4-7 · E4-8 · E4-9 · E4-11 · E4-12 · E4-13 · E4-14 · E4-17 · E4-18 · E4-19 · E4-21 · E4-23 · E4-28 · E4-30 · E4-31 |
-| **Minor** | **13** | E4-2 · E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 · E4-24 · E4-25 · E4-26 · E4-27 · E4-29 · E4-32 |
-| **total** | **32** | `19 + 13 = 32`; ids `E4-1` … `E4-32` with no gaps |
+| **Minor** | **15** | E4-2 · E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 · E4-24 · E4-25 · E4-26 · E4-27 · E4-29 · E4-32 · E4-33 · E4-34 |
+| **total** | **34** | `19 + 15 = 34`; ids `E4-1` … `E4-34` with no gaps |
 
-**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20, E4-24, E4-27, E4-29, E4-30. Category 2 argued against the record: E4-6, E4-8, E4-25, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23, E4-28, E4-31, E4-32. Matches the prototype, fails the product's own later rule: E4-26.
+**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20, E4-24, E4-27, E4-29, E4-30. Category 2 argued against the record: E4-6, E4-8, E4-25, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23, E4-28, E4-31, E4-32, E4-33, E4-34. Matches the prototype, fails the product's own later rule: E4-26.
 
 **Overlap with round 1, stated:** E4-10 and E4-15 are new members of P1's class found by widening the population (class-less tags; classes whose rule forgot the border) and painted; E4-12 widens P11's scope from one component to the suite's population; E4-2 carries a painted reproduction of P8's focus finding as corroboration only. Nothing else overlaps.
 
