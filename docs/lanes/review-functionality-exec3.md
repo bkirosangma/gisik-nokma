@@ -23,12 +23,36 @@ the mutation**, never by `git diff` alone. Every restore printed `RESTORED ident
 
 ## 0. THE ONE-LINE ANSWER
 
+> **⚠ A NOTE ON READING THIS FILE, added at phase-1 close.** §0–§12 are **round 1**, written at
+> `e4baa425` and landed in `#625`. **`# ROUND 2 — the relook`** begins at §13 and is the current
+> submission; **§16 is the round-2 severity table** with every member named, and **§24 is the strongest
+> evidence for the Critical**. A reader with limited budget should read §16, then `E3-14` (§14.7) and its
+> re-measurement (§24), then `E3-19` (§21).
+
+### Round 1
+
 **I found no Critical defect in the engine or the wire.** The three Important findings are all *claims
 about the code* rather than the code: one stale open-gap declaration (F1), one recorded measurement whose
 stated warrant is false (F2), and my own lane's prototype citations, which name an artifact the owner has
 ruled is not the prototype and are off by one against the one that is (F3). The two Medium findings are
 **confirmations of gaps the project already records and owns** (F4, F5) — reported because I reproduced
 them independently, not because they are news.
+
+### Round 2 — eleven new findings, and the one that matters
+
+**`E3-14` (Critical, claimed) is a hole in this product's CSRF control, measured against a real
+authenticated session (§24).** `HTTP_ORIGIN_PROTECTED_ROUTES` holds 11 patterns and **five
+cookie-authenticated mutating routes are not in it**, including `POST /v1/me/invitations/:inviteId/accept`
+— which appends three ledger events and makes the victim a member of a workspace. **`E3-15`** is why it
+survived: the guard written to catch exactly this compares the protected set against **the suite's own
+table**, a closed loop, and passes green beside the gap.
+
+**Four Important, six Minor, and eight round-1 findings re-validated with none withdrawn.** Every count
+is measured and every command is printed beside it. **§23 records five attacks on other lanes' findings —
+all five failed**, and §15 and §20.1 record three times my own sweep's universe was too narrow and once
+my own instrument was the defect rather than the code. **Two of this report's own citations were wrong and
+are corrected in §17** — the same defect `E3-13` files against another lane, shipped by the lane that
+filed it.
 
 **And one dispatched premise is stale and should not be acted on.** The dispatch says *"eleven sites carry
 [the soft-delete predicate] and ten were UNCONSTRAINED."* At `e4baa425` **every one of the 18 sites is
