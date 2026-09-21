@@ -463,6 +463,24 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 
 **WHAT WOULD HAVE BEEN BETTER.** `<h2>` for the four section labels, which is one character each, and — separately — an assertion somewhere that walks a route's headings and fails on a skip. The second is the one that keeps the first from coming back: `type-scale.ts` and `accessible-names.ts` already establish the shape (a per-route sweep with a recorded baseline), and a heading sweep is the same instrument over a different property.
 
+### P18 — **IMPORTANT** ⚠ **r2 NEW** — A client-side navigation announces nothing: no title change, no focus move, no live region
+
+**WHAT.** This is a single-page application whose route changes are, to assistive technology, **completely silent**. Three independent signals are all absent, and they are absent together.
+
+**MEASUREMENT — three checks, each with its own control.**
+1. **Focus does not move.** `grep -rlE "usePathname|useRouter"` over `apps/web/src`, `apps/web/app` and `packages/app-core/src` (excluding tests) → **40 files** use the routing hooks. Of those, the ones that also touch focus number **three**, and every one is a local widget rather than a navigation: `last-project-nav.tsx` (2, a menu), `account-menu.tsx` (3, a menu), and `p/[projectId]/page.tsx` (2, the filters sheet). **The shell itself — `app/layout.tsx`, `providers.tsx`, `app-nav.tsx` — moves focus on nothing**, so after a client-side navigation focus stays on the nav link that was just activated.
+2. **Nothing announces.** `grep -rnE "aria-live|role=\"status\"|RouteAnnouncer|announce"` over the shell (`layout.tsx`, `providers.tsx`, `app-nav.tsx`) → **no matches**, and the same sweep over `settings/page.tsx` returns nothing too, so the empty result is not a path problem. Product-wide, `aria-live` appears in **two components**: `packages/ui/src/select/select.tsx` (the max-selected message) and `packages/editor/src/components/UploadChips.tsx`. **Nothing announces a route.**
+3. **The framework does not supply one either, and that is version-specific.** `node_modules/next/dist/client/route-announcer.js` **does not exist**: Next's **App Router ships no route announcer**, unlike the Pages Router, which had one. So this is not a component someone forgot to mount — the mechanism is not present in the stack at all.
+4. **And the title does not change — that is P12, and it is the third leg.** Measured there: one static `metadata.title` in `layout.tsx:8`, no `generateMetadata` in any source file, no `<title>` in any source file.
+
+**WHY IT IS WRONG — and why the three legs together are the point rather than three small things.** A screen-reader user who activates a link in `AppNav` gets: no title change (P12), no focus move (this finding), and no announcement (this finding). **The document they are on has changed and nothing tells them.** They cannot tell whether the navigation happened, and their next Tab continues from the nav — which is the known SPA failure that a route announcer or a focus-into-`<main>` exists to prevent.
+
+**⚠ WCAG, STATED CAREFULLY — I have withdrawn one overclaimed criterion already this round (P13) and am not claiming a new one here.** WCAG 2.2 has **no success criterion that says a client-side route change must be announced**; the closest are 2.4.3 *Focus Order* and 4.1.3 *Status Messages*, and whether either is breached here is an interpretation I am not going to assert. What I will assert is measured and narrow: **the three signals are all absent, and P12's failure — which IS a criterion (§2.4.2, Level A) — is not mitigated by anything else, because nothing else exists.**
+
+**The connection is the argument the rules ask for.** §3 says a reason *"that connects to other findings or to measured consequences weighs more"*. This one has both: it connects to **P12** (the same silence, from the other end) and to **P11** (the same class of gap — a property of the product that no instrument measures; neither a title change, a focus move, nor a live region is asserted anywhere, and the accessible-name ratchet counts `aria-label`/`role`/`aria-selected`/`aria-describedby` and nothing about announcement).
+
+**WHAT WOULD HAVE BEEN BETTER.** A route announcer is the small, standard remedy: on pathname change, set a visually-hidden live region to the new page's heading, or move focus to the `<main>`. In the App Router that is a ~15-line client component in `layout.tsx`. **It also fixes half of P12 incidentally** if it is fed the page name — which is why the two are filed separately and read together.
+
 ---
 
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
@@ -513,7 +531,7 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 **CRITICAL — 1**
 - `I1` no browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate structurally cannot run one
 
-**IMPORTANT — 9**
+**IMPORTANT — 10**
 - `I2` the `e2e-stack` contrast roster records a defect fixed eight hours later, with no provenance
 - `I3` `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by its own docblock
 - `P1` seven interactive controls styled by no rule at all (raw UA chrome)
@@ -534,10 +552,11 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 - `P15` ⚠ r2 — the repo's prototype copy is a broken camelCase transform of the export, cited by line in 71 files
 - `P16` ⚠ r2 — `neo-card-radius.test.ts` asserts a declaration is ABSENT through a truncating scanner, so it cannot fail
 - `P17` ⚠ r2 — `/my-work`'s outline skips level 2, and nothing measures heading level or order
+- `P18` ⚠ r2 — a client-side navigation announces nothing: no title change, no focus move, no live region
 - `P10` the accessible-name ratchet's unit is an attribute; its message claims a property of assistive tech
 - `P13` no skip link; a keyboard-only user Tabs the nav on every navigation (**the 2.4.1 claim is withdrawn in the body** — a landmark is a sufficient technique and `<main>` is on every route, so this is a keyboard-convenience finding, not a conformance one)
 
-**Total 21.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 22.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
