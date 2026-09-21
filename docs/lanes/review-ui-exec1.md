@@ -12,7 +12,7 @@
 | **I1** | CRITICAL, 14 days | **CRITICAL, re-measured at 15 days** | a day passed and a Critical carries 15 points of downside; re-ran the three commands. Unchanged. |
 | **P1** | IMPORTANT, seven controls | **IMPORTANT, SIX controls** ⚠ **r2 CORRECTION** | the `<Link>`-widened sweep's seventh member (`gn-nav__signin`) is **styled by `.gn-nav a`** — a DESCENDANT rule from an ancestor, which a sweep testing an element's own classes cannot see. Withdrawn; the other six re-checked against every `a`/`button` descendant selector in the three stylesheets and standing. |
 | **P15** | — | **MINOR — filed IMPORTANT, corrected DOWN in the same round** | filed as *"the repo's prototype copy is a broken camelCase transform whose icons do not draw"*. **The mechanism is false**: `support.js:365-370`/`:422-423` show `sc-camel-*` is the prototype runtime's own reversible encoding, so the copy renders. What survives is Minor and measured — a constant **one-line offset** against the export, with **71 files citing the copy by line**. **The round-2 brief hands all six lanes the same false inference.** |
-| **P16–P26** | — | **11 NEW findings** | the truncating-scanner negative assertion (P16, Important); the heading-level skip (P17, Minor); navigation announces nothing (P18, Important); the unnamed `tablist` (P19, Important); the calendar's missing grid semantics (P20, Minor); the description editor's unnamed content area (P21, Important); two unnamed `role="menu"` elements, one with a named twin (P22, Important); the searchable Select's removed focus outline (P23, Important); an undeclared painted pair at 3.84:1 (P24, Important); three citations to a deleted component (P25, Minor); **the prototype-delta queue, re-derived row by row — 7 of 11 have shipped** (P26, Important). |
+| **P16–P27** | — | **12 NEW findings** | the truncating-scanner negative assertion (P16, Important); the heading-level skip (P17, Minor); navigation announces nothing (P18, Important); the unnamed `tablist` (P19, Important); the calendar's missing grid semantics (P20, Minor); the description editor's unnamed content area (P21, Important); two unnamed `role="menu"` elements, one with a named twin (P22, Important); the searchable Select's removed focus outline (P23, Important); an undeclared painted pair at 3.84:1 (P24, Important); three citations to a deleted component (P25, Minor); **the prototype-delta queue, re-derived row by row — 7 of 11 have shipped** (P26, Important); WCAG 1.4.10's 320px, untested because the suite's narrowest width is 390 (P27, Minor). |
 | **§5** | — | **3 new clean-check rows** | every `<button>` named; every direct `.gn-button` sets `type`; the three style axes. |
 
 **Findings the round-1 report carried are otherwise unchanged and still stand**, re-checked for validity under §3 before anything new was added.
@@ -675,6 +675,21 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 
 **WHAT WOULD HAVE BEEN BETTER.** Mark a closed row in place — `✅ closed by #447` is a two-word edit to a line the closing commit already had open, and it is the "correct the sentence rather than delete it" discipline this document uses everywhere else. And name the string to find rather than a bare `:NNN`: *"asserts `surfaceSunken` is `#ede4db`"* survives a 200-line drift; `:1939` does not.
 
+### P27 — **MINOR** ⚠ **r2 NEW** — The viewport suite's narrowest width is 390px; WCAG 1.4.10 Reflow specifies 320px, which `320` appears nowhere in either suite to test
+
+**WHAT.** WCAG 2.2 §1.4.10 *Reflow* is **Level AA** and names a number: content must reflow to **320 CSS px** without two-dimensional scrolling. **The narrowest width this product is ever measured at is 390px.** `grep -rc "320"` over `apps/web/e2e-viewport/*.ts` and `apps/web/e2e-stack/*.spec.ts` returns **no non-zero count** — the value does not appear.
+
+**MEASUREMENT.**
+- **The width list**, read from `apps/web/e2e-viewport/viewports.ts:122-137`: `phone-390` **390**, `tablet-768` **768**, `desktop-1512` **1512**. Three widths, and the narrowest is 390 — **70px above the criterion's number**.
+- **The product appears to SATISFY it, and I checked the two ways it could fail.** Sweeping all three stylesheets for widths that would defeat reflow at 320px: **`min-width` above 320px → exactly one**, `.gn-members__table { min-width: 820px }` in `globals.css`; **fixed `width` above 320px → zero**.
+- **And that one is handled, verified rather than taken on trust.** `members/page.tsx:419-421` claims *"`overflow: auto` on the card is what carries the table's `min-width` on a phone"* — **that is a claim, so I checked it**: `.gn-members` at `globals.css:1457` carries `overflow: auto`. The claim is true, and a data table is in any case the classic **two-dimensional-layout exemption** the criterion itself carves out.
+
+**WHY IT IS STILL A FINDING.** Because the gap is a **specific number the criterion names and the suite stops just short of.** This is not "reflow is untested" — 390px tests a phone. It is that **1.4.10's own figure is 320, and nothing in this repository has ever rendered the product there**, so a rule that broke between 390 and 320 would ship unseen. The 70px matters because the two widths are not interchangeable: a card with `min-width: 22rem` (352px) passes at 390 and fails at 320, and the sweep above would have caught such a value **only because I ran it** — no instrument does.
+
+**⚠ AND THE PRODUCT'S POSTURE IS GOOD, WHICH IS WHY THIS IS MINOR AND NOT IMPORTANT.** No fixed width above 320px exists anywhere; the single wide element scrolls in its own container, is a table, and its handling is documented at the rule. **So this is a guard that is missing from a surface that looks correct, not a defect that is present.** Contrast with P23: there the product removed a focus indicator; here it does nothing wrong and nothing checks.
+
+**WHAT WOULD HAVE BEEN BETTER.** A fourth entry in `VIEWPORTS` — `phone-320` at 320×568 — costs one object literal and puts the criterion's own number under the three sweeps that already run per viewport (tap targets, label text, accessible names, contrast), all of which assert per-width baselines. **The existing suite would then measure 1.4.10 rather than approach it.**
+
 ---
 
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
@@ -749,7 +764,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P24` ⚠ r2 — a painted text colour measures 3.84:1 at 12.8px and is UNDECLARED, so the gate cannot see it
 - `P26` ⚠ r2 — the prototype-delta queue reads 11 rows outstanding and **every numbered row is closed**, plus all three `held` rows checked, including its own row 0
 
-**MINOR — 14**
+**MINOR — 15**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
 - `I5` my own handoff carries two contradicting position blocks; the pointer that found it is itself stale
 - `P3` the parent crumb cannot show the parent's key; the prototype's does; no ruling found
@@ -764,8 +779,9 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P17` ⚠ r2 — `/my-work`'s outline skips level 2, and nothing measures heading level or order
 - `P20` ⚠ r2 — the month grid and week columns carry no grid/table semantics, so day↔weekday is lost to AT
 - `P25` ⚠ r2 — three live files cite the docblock of a deleted component, one of them an instrument
+- `P27` ⚠ r2 — the viewport suite's narrowest width is 390px; WCAG 1.4.10 names 320px and nothing tests it
 
-**Total 30.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 31.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
