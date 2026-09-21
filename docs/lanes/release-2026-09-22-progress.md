@@ -8,3 +8,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E5-1 | done | c4175172 | prose-only: manual.md:664,666-668 + faq.md:307; check:help green |
 | T-E5-24 | done | a1b06370 | prose-only: manual.md rows a/b/d/e + faq.md; row c (delete) is T-E6-1 |
 | T-E6-1 | done | b36951f5 | app-core test/help 3 files/33 tests green; check:help green |
+| T-F1-ux | done | e33b7b8a | prose-only: manual nav/theme/card/comments/attachments/settings + faq; 11 sites |
