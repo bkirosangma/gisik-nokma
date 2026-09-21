@@ -18,7 +18,7 @@
 
 ## 0. Refutations filed
 
-**None at 15:20 IST.** Every finding of exec 4's that I could reach at source held — the table in §1 names the line I opened for each. Two of them (`E4-1`, `E4-30`) are about code I wrote, and both are right; §3 says so plainly. This section is revisited against each lane's later pushes until 17:05.
+**None at 15:18 IST.** Every finding of exec 4's that I could reach at source held — the table in §1 names the line I opened for each. Two of them (`E4-1`, `E4-30`) are about code I wrote, and both are right; §3 says so plainly. This section is revisited against each lane's later pushes until 17:05.
 
 ## 1. Exec 4's findings, checked at source — the line I opened, and the verdict
 
