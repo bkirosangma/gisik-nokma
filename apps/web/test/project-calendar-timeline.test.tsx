@@ -820,13 +820,17 @@ describe('the nav item follows the route it is on', () => {
       </Providers>,
     );
 
+    // The item's accessible name is the project's PLUS the qualifier that keeps
+    // it apart from a project card's door on the same page (`rel/browser-findings`,
+    // 2026-09-22 — see `last-project-nav.tsx`); the visible text is still the bare
+    // name. Both arms carry it, so the negative below keeps its power.
     await waitFor(() =>
-      expect(screen.getByRole('link', { name: 'Alpha' })).toHaveAttribute(
+      expect(screen.getByRole('link', { name: 'Alpha, projects menu' })).toHaveAttribute(
         'href',
         '/w/ws_1/p/p_1',
       ),
     );
-    expect(screen.queryByRole('link', { name: 'Omega' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Omega, projects menu' })).toBeNull();
   });
 });
 

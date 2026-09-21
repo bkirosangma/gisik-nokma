@@ -28,6 +28,7 @@ session would be shared by two branches landing in either order.
 | **B14** (`rel/b14-minimal-shells-phone-and-desktop`) | **`13.1187`–`13.1196`** |
 | **B16** (`rel/b16-outbox-ordering-projection-verif`) | **`13.1197`–`13.1206`** |
 | **B15** (`rel/b15-calendar-timeline-and-canvas-for`) | **`13.1207`–`13.1216`** — self-allocated by the B15 driver (exec6, 2026-09-21 23:3x); absent from the controller's 22:0x table, next free block after B16's `13.1206` |
+| **`rel/browser-findings`** (the release FIX lane, deepseek ds1) | **`13.1217`–`13.1226`** — self-allocated 2026-09-22 by the lane that fixes the five browser-suite release findings; absent from the controller's 22:0x table, next free block after B15's `13.1216`. Minted: `13.1217`. |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** Re-read it before minting, and if your own
 allocation changes, change it HERE in the same action. **When your block is empty, STOP AND ASK.** Do
@@ -902,3 +903,34 @@ against the actual pre-fix history before being replaced with the per-tag versio
   accessibilityRole>` must not mask. —
   (`apps/mobile/src/screens/pressable-a11y-sweep.test.ts`)
 
+## The bar's project item and the card door do not share one name (`rel/browser-findings`, 2026-09-22) — case `13.1217`
+
+- **13.1217** ✅ On a workspace home, **exactly one** link answers to the project's own name, and it is the
+  project card's door: `screen.getAllByRole('link', { name: 'Shop operations' })` equals `[door]` over the
+  finished page, with the door's `href` pinned to its own project. The bar's "last open project" item is
+  asserted to be RENDERED and to answer to `Shop operations, projects menu`, so the uniqueness above cannot
+  be satisfied by the item's absence. (`apps/web/test/workspace-home.test.tsx`; the item's own eleven cases
+  live in `apps/web/test/last-project-nav.test.tsx`.)
+
+**The finding, and the mechanism it did NOT have.** The release lane's browser run failed in
+`e2e-stack/helpers/board.ts:166` with `found no single project link named "Shop operations" … Projects
+rendered: ["Shop operations","Shop operations26 tickets3 blocked"]`, and the dispatch read that as ONE card
+holding two links (a title link, plus a card-level link whose name was the concatenated text). **Measured on
+the deployed stack at 1280×720, 2026-09-22: the card holds ONE link.** The two are
+`a.gn-nav__project` (148×44 — the bar's item, `aria-label` absent, named by its text) and
+`a.gn-project-card__door` (363×63 — the card, `aria-label="Shop operations"`). Both point at
+`/w/0TZSS5W6ATCTF2YBPMWGGP9JF5/p/0XB92YA4CGEBF9S285AH4SDXR1`, and
+`getByRole('link', { name: 'Shop operations', exact: true }).count()` reads **2** at desktop and **1** at
+390 (where the bar's item is behind the phone nav and out of the accessible tree) — so no jsdom case could
+have seen it either, since the item renders on every width there.
+
+**Why the qualifier is on the bar's side.** The card door's name is the project's: it is the row's identity,
+what every `within(card)` query in `workspace-home.test.tsx` and the stack suite's exact-name query address.
+The bar's item is a second, contextual door, so it is the one that says which it is. The rejected
+alternative is measured rather than argued: renaming the card makes the exact-name query match the BAR's
+item, whose project is `routeProject ?? rememberedLive ?? live[0]` — a POSITION, which is the silent
+wrong-board pick `helpers/board.ts`'s own docblock exists to remove.
+
+**One direction of this change is not covered by a test and is named rather than left implicit:** the bar
+item's name is not anything the accessible-name ratchet (`13.287`) can judge — it counts `aria-label`
+ATTRIBUTES, and this element had none before and has one now, so the count RISES there rather than falling.
