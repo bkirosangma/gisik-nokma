@@ -611,8 +611,8 @@ a page test that submits each offered option and asserts the door's answer — t
 already has.
 
 **MEASUREMENT.** Appendix H, run from `apps/server`. Lines opened: `members/page.tsx:728-729`, `:847-856`;
-`invites.ts:70`, `:73-75`; `routes/invites.ts:296-345` (the mint route: body schema `channel: { type: 'string' }`
-at `:312`, the 422 at `:345`); `members-page.test.tsx:66`, `:244`, `:263`; export `:754`, mobile `:1524`,
+`invites.ts:70`, `:73-75`; `routes/invites.ts:296-352` (the mint route: body schema `channel: { type: 'string' }`
+at `:312`, the 422 at `:352`); `members-page.test.tsx:66`, `:244`, `:263`; export `:754`, mobile `:1524`,
 `github.md:12`.
 
 **SEVERITY: Important.** A shipped admin action is unreachable for phone-only invitees from the page built to do
