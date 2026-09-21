@@ -895,7 +895,7 @@ after re-bind: verify-projections: DRIFT DETECTED
   missing from live: {"ticket_id":<T>, … "type_id":"feature", "workflow_id":<WF2>, …}     ← the rebuild's answer
 ```
 
-The live table is right by the owner's rule (`projections/tickets.ts:45-47`: *"the owner's own 'a re-binding
+The live table is right by the owner's rule (`projections/tickets.ts:46-47`: *"the owner's own 'a re-binding
 affects new tickets only' (2026-08-26)"*); the verifier's shadow rebuild resolves the ticket's type **as of now**
 (`getTicketTypeLadderFromDb` takes no sequence number; `tickets.ts:37-40`) and so puts the old ticket on the new
 workflow, then reports the correct live row as drift.
@@ -925,8 +925,8 @@ expected"* rather than `DRIFT DETECTED`, so the clean line means what the runboo
 afternoon; leaving it UNASSIGNED with the trigger shipped is the choice this finding argues against.
 
 **MEASUREMENT.** Appendix L, run from `apps/server` (imports `../src/tools/verify-projections.js` and
-`../src/projections/index.js` relatively). Lines opened: `verify-projections.ts:19-56` (projection-outer
-rebuild, `EXCEPT` both ways); `ledger/event-store.ts:135-156` (replay order, documented); `projections/tickets.ts:37-53`;
+`../src/projections/index.js` relatively). Lines opened: `verify-projections.ts:34-68` (projection-outer
+rebuild, `EXCEPT` both ways); `ledger/event-store.ts:146-156` (replay order, documented); `projections/tickets.ts:37-53`;
 `docs/plan-3-chain-b-handoff.md:213-222`; `docs/runbook.md:149-150`, `:174-175`; `seed-cc.test.ts:429-432`;
 `ticket-type-editor-screen.tsx:354-361`; `git log --diff-filter=A` for the two editor files → `9b70ab99`.
 
