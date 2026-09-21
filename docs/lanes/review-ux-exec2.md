@@ -53,14 +53,23 @@ pre-match text was spliced back in, repeatedly. **It did not error**, which is w
 failure mode of this session; it was caught only because a finding count I re-run after every edit came
 back **43** instead of 26. Restored from `ef219034` (verified clean before use) and redone with **function**
 replacements, which do not interpret dollar-patterns. The diff is now exactly the two intended edits.
-**A final automated audit of both artifacts, run after every correction above** — because re-measuring is
-what caught all five of my errors today, and none of them was caught by reading. Counts measured against the
-sections rather than remembered: **26 new findings, 16 Important / 10 Minor, 22 refutation rows, and every
-number stated in prose equal to the number measured.** Both files cited paths resolve (77 in the report, 17
-in the refutations file, 0 missing) and every line number is inside its file. No stale phase or clock claim
-remains. **All four sections clean**, which is the first time an audit of my own work has come back entirely
-OK this round — and it is OK because the five earlier failures were fixed, not because the earlier audits
-were too lenient.
+**A final automated audit of both artifacts, re-run at the end of phase 1 and clean on every section.**
+Counts measured against the sections rather than remembered: **26 round-2 findings, 16 Important / 10
+Minor, 0 Critical, every one with a severity line; 43 refutation targets and 43 rows, no duplicates, and the
+stated count equal to the measured one.** Both files' citations resolve — **79 distinct paths in the report
+and 22 in the refutations file, none missing, every line number inside its file.** No duplicated finding
+headings, and the closing line intact after the rebuild described below.
+
+⚠ **One section reported FAIL and the failure was my audit's regex, not the file** — I checked for the clock
+sentence with a pattern that did not allow for its bold markers. That is the **fourth time today my own
+instrument produced a false reading** (a mount search that could not match end-of-line, a count pattern that
+excluded hyphens, a string replacement that expanded a dollar-pattern, and now this), and it is the reason
+every section of this audit names what it measured rather than reporting a verdict alone.
+
+Five errors of mine were found and corrected in place across the round, **all five by re-measuring and none
+by reading**: `E2-42`'s stated outcome, `E2-34`'s lost severity line, a claim about a browser I did have, a
+search pattern that nearly withdrew two valid findings, and `E2-30`'s unpinned unit. A sixth — a
+`String.replace` corruption that tripled this file — is disclosed in the report and the commit log.
 **The one boundary I could not close, stated as a fact rather than an excuse.** This lane has a browser but
 **no session**, and the dev stack's sign-in needs a credential I was not issued. Roughly thirty of the fifty
 peer findings rest on `[BROWSER]` evidence I can read but not reproduce, and obtaining a session would mean
