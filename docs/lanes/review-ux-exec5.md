@@ -187,8 +187,9 @@ handed me its copy constants by name (`BULK_REFUSED_COPY`, `BULK_UNREACHED_COPY`
 | E5-34 | Min | nav project item on an archived project | SOFT-DELETED (project) | source | extends `exec2-E2-38` |
 | E5-35 | Min | inbox rows | copy (no time, no ticket) — prototype cat. 3 | source | — |
 | E5-36 | Min | `/workspaces` card, zero projects | FIRST-RUN | source (owner's `workspaces-gap.md` item 12) | — |
+| E5-37 | Imp | the shell's own-identity sites (heading, menu, monogram, two accessible names) | EMPTY (the person's own name) | source (two docblocks, one "confirmed in the database") | sibling of E5-4 |
 
-**Edge classes reached, by finding:** EMPTY (E5-4) · ERROR (E5-10, 13, 15, 18, 19, 25, 27, 28, 30, 33) ·
+**Edge classes reached, by finding:** EMPTY (E5-4, 37) · ERROR (E5-10, 13, 15, 18, 19, 25, 27, 28, 30, 33) ·
 PERMISSION-REFUSED (E5-9, 31) · OFFLINE/REPLICA-DEGRADED (**not reached** — web is online-only; phone/desktop read at two
 screens) · SOFT-DELETED (E5-34 for projects; tickets **not reached** by me — `exec4-E4-23` holds it, §6.6) · CONCURRENT (E5-20, 27) · NARROW
 VIEWPORT (signed-out only: E5-31, 33) · FIRST-RUN (E5-6, 16, 18, 23, 26, 31, 32, 36) · SERVER-REFUSES-WHILE-CLIENT-BELIEVES
@@ -1290,6 +1291,40 @@ dev workspace has a live project.
 
 ---
 
+### E5-37 — IMPORTANT · For every email sign-up the shell does not know who you are: "Workspaces — ", an empty menu header, a "?" monogram, and the accessible names "Account menu for " and "Sign out " — the shared hook's `??` never fires on `''`, a defect the consent page found by driving the flow, recorded "for its owner", and patched only locally `[SOURCE]`
+
+**WHAT.** `apps/web/src/providers.tsx:176` `name: user.name ?? user.id` (and the same shape in `useSessionStatus`,
+per the consent page). `??` catches `null`/`undefined` only; the members page records the population —
+*"better-auth's magic-link plugin creates a user with `name: name || ""` … **an email sign-up has `name === ''`**"*
+(`members/page.tsx:635-638`) — and the consent page confirms it from the other side: `mcp/authorize/page.tsx:47-56`
+*"FOUND BY DRIVING THE REAL FLOW … rendered 'It now acts as , with exactly your permissions' — naming nobody … A
+magic-link account has name `''` — an EMPTY STRING, confirmed in the database — so the fallback never fires … That is
+a latent defect in the shared hook, recorded for its owner rather than changed here."* It then patched itself alone
+(`:64-66` `actingAs`). The other consumers still render the empty string: `workspaces/page.tsx:51`
+`<h1>Workspaces{user !== null ? \` — ${user.name}\` : ''}</h1>` → **"Workspaces — "**; `account-menu.tsx:142`
+`aria-label={\`Account menu for ${user.name}\`}` → **"Account menu for "**; `:145` `<Avatar name={user.name}>` → the
+`?` monogram; `:150` an empty `.gn-nav__menu-name`; `:188` `aria-label={\`Sign out ${user.name}\`}` → **"Sign out "**.
+
+**WHY.** This is E5-4's population — the product's default sign-in path — met at the one place that is supposed to
+say who is signed in. The members page fixed the same defect for OTHER people's names and wrote the rule (*"an
+accessible name that identifies nobody"*); the consent page found it for the person's OWN name, wrote it down, and
+left the hook because *"every other surface reading a name would move with it"* — which is exactly the reason to
+fix it at the hook. The accessible-name floor is ratcheted on the string `Sign out {name}` (`account-menu.tsx:179-183`)
+and counts the attribute, not its content, so `"Sign out "` passes it.
+
+**WHAT WOULD HAVE BEEN BETTER.** `name → email → id` at the hook — the `memberLabel` order the members page already
+uses — so every consumer moves together; or at least `user.name?.trim() || user.email || user.id`.
+
+**MEASUREMENT.** `[SOURCE]` `providers.tsx:170-179`; `mcp/authorize/page.tsx:44-66`; `members/page.tsx:635-638`;
+`workspaces/page.tsx:51`; `account-menu.tsx:142`, `:145`, `:150`, `:188`. Not painted: the owner's account carries a
+name (`[BROWSER]` earlier: `Workspaces — Kiro`, `Account menu for Kiro`), and I hold no email-sign-up session; the
+empty-name population is established by two independent docblocks, one of which says *"confirmed in the database"*.
+
+**SEVERITY: Important** (claimed). The shell tells the default kind of person nothing about who they are, and the
+defect was found, recorded and left in the shared hook.
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -1354,16 +1389,16 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**36 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 36). By claimed severity, read from the
-heading text: **Critical 1 · Important 22 · Minor 13** (1 + 22 + 13 = 36).
+**37 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 37). By claimed severity, read from the
+heading text: **Critical 1 · Important 23 · Minor 13** (1 + 23 + 13 = 37).
 
 - **Critical (1):** E5-13
-- **Important (22):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28, E5-31, E5-32
+- **Important (23):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28, E5-31, E5-32, E5-37
 - **Minor (13):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30, E5-33, E5-34, E5-35, E5-36
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33 = 22 of 36. **Reproduced with an injected failure, zero server writes:** E5-13,
-E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34, E5-35, E5-36.
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33 = 22 of 37. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34, E5-35, E5-36, E5-37.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
 sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever), E5-20 (stacked dialogs and
@@ -1546,5 +1581,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 36 findings — Critical 1 · Important 22 · Minor 13 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 37 findings — Critical 1 · Important 23 · Minor 13 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
