@@ -15,3 +15,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-V4 | done | 976f87be | 17.022 / V4 — three-way comments split (failed outranks pending); RED PASS (9) FAIL (1), suite 1752. Also minted 17.021 for T-F3-ux and discharged the §16 note |
 | T-V7 | done | 6dd30946 | 17.023 / V7 — explicit success signal (submit: Promise<boolean>); RED PASS (1) FAIL (1), editor 192, app-core 1752, web 622 |
 | T-E4-1 | done | c781f9dc | 17.024 / E4-1 — epic crumb omitted when it is the parent; RED PASS (0) FAIL (1), suite 1753 |
+| T-E4-30 | done | e81616af | 17.025 / E4-30 — link crumb ink var(--gn-text-accent); RED 2 failed, suite 1757, ui 378 |
