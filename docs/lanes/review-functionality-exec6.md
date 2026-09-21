@@ -370,7 +370,7 @@ tickets"*) that every view — the rollup (`visibility/rollup.ts:263`, `t.delete
 — reports as **0**. The user's only way out is to know that a deleted child exists, find it (no view lists it) and
 restore it, close it, and delete it again — and the Delete PR's own list records that after the 15 s undo toast
 **"there is no UI that emits `ticket.restored`, so a soft delete becomes permanent in practice"**
-(`executor-state-history.md:686-690`, item 6), so from the product's UI the parent can never be finished.
+(`executor-state-history.md:687-691`, item 6), so from the product's UI the parent can never be finished.
 
 The same reader is what `hierarchy.ts:123` (`getTicketState(ctx, p.parentId)`) and `:249` (`newParentId`) resolve
 a parent through, so a **live** child is placed under a parent that *"stops appearing in views"*. The read side
