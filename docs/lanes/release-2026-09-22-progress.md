@@ -18,3 +18,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E4-30 | done | e81616af | 17.025 / E4-30 — link crumb ink var(--gn-text-accent); RED 2 failed, suite 1757, ui 378 |
 | T-E5-3 | done | a7f169f3 | 17.026 / E5-3 — one-hop contract (server) + restricted arm (client); server 1728, app-core 1758 |
 | T-P3 | done | 4f7209aa | 17.027 / P3 — parent crumb carries the parent key (wire + render); app-core 1761, server 1729, web 622 |
+| T-P4 | done | e14109b9 | 17.028 / P4 — the sentence corrected (SAME->same SHAPE); RED kills 1, app-core 1763, ui 378 |
