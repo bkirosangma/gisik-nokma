@@ -173,12 +173,13 @@ only — it refreshes on publish at `:285`, `:420`). `scripts/` — `check-case-
 `check-runbook-commands`, `check-task-ledger` run only** (all 9 were run green by exec 3; I re-ran `case-ids`,
 `case-citations`, `no-silent-skips` (with mutations), `db-timezone` against both live DBs).
 
-**Measured by probe** (Appendices A–Y, 25 runs, every one 1 file / 1 test passed with its `console.log` lines
-in the log): writes on a deleted ticket; type re-rank; deleted children/parents; outbox overtake and overlay
+**Measured by probe** (Appendices A–AA — 27, every one a run that passed 1 file / 1 test with its `console.log`
+lines in the log; where a first attempt was corrected — A, L, M, T, Z — the appendix says what was wrong): writes on a deleted ticket; type re-rank; deleted children/parents; outbox overtake and overlay
 reversion; ghost ticket on both doors; invite channels; bulk rebind under an admin not on a project; deleted epic
 header; guest doors; the verifier after a re-bind; cross-site WebSocket; MCP token successor; non-member
 assignee; three full read-door sweeps (non-member, guest, member off the project); the stream and bootstrap after a delete; U+0000 on 19
-doors and 11 hostile payload shapes; the upload door; impossible due dates; blank names; leaving a workspace.
+doors and 11 hostile payload shapes; the upload door; impossible due dates; blank names; leaving a workspace; an
+external person on an explicit list.
 
 **Case ids:** every ✅ id in the eight core files is cited by name in a test (`check-case-citations` ratchet:
 0 uncited in each). By §1's counter (the status marker that follows the id — the first marker on the line), the
