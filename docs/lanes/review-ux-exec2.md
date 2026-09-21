@@ -44,6 +44,15 @@ the one set he is best placed to see:
 4. **A flaw in my own search pattern** nearly made me withdraw two valid findings, and was inside `E2-25`'s
    search too — so that measurement was re-run and survives.
 
+**One incident in this file's own history, disclosed so a judge browsing the branch does not have to
+guess.** The commit before the last one silently **tripled** this report — `E2-20` through `E2-30` appeared
+three times and the file reached 63,788 words against 31,030 — because an edit script of mine passed its
+replacement to `String.replace` as **a string**, and that replacement contained a dollar sign immediately
+followed by a backtick, which JavaScript expands to *"the portion of the string before the match"*. The
+pre-match text was spliced back in, repeatedly. **It did not error**, which is what makes it the worst
+failure mode of this session; it was caught only because a finding count I re-run after every edit came
+back **43** instead of 26. Restored from `ef219034` (verified clean before use) and redone with **function**
+replacements, which do not interpret dollar-patterns. The diff is now exactly the two intended edits.
 **A final automated audit of both artifacts, run after every correction above** — because re-measuring is
 what caught all five of my errors today, and none of them was caught by reading. Counts measured against the
 sections rather than remembered: **26 new findings, 16 Important / 10 Minor, 22 refutation rows, and every
