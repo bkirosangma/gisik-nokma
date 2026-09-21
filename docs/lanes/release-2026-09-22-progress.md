@@ -13,3 +13,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E5-8 | done | f5e0878a | 3.183-3.184 / E5-8 — census over the domain lists; found attachment.added + claim.contested_resolved; RED PASS (3) FAIL (3), suite 1734 |
 | T-F3-ux | done | aaee94cb | F3 — renderCommentBody; RED PASS (6) FAIL (1), GREEN PASS (21), suite 1749, ui 378. BLOCKED: §16 case id OWED — exec 2 block fully spent, reallocation needed |
 | T-V4 | done | 976f87be | 17.022 / V4 — three-way comments split (failed outranks pending); RED PASS (9) FAIL (1), suite 1752. Also minted 17.021 for T-F3-ux and discharged the §16 note |
+| T-V7 | done | 6dd30946 | 17.023 / V7 — explicit success signal (submit: Promise<boolean>); RED PASS (1) FAIL (1), editor 192, app-core 1752, web 622 |
