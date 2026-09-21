@@ -68,14 +68,17 @@ Managed PostgreSQL + Spaces, all BLR1, serving `pm.artsourced.in` /
    nearest probe region, alerting the owner's email.
 8. First deploy runs migrations on boot (the entrypoint). Then, from a
    checkout with `DATABASE_URL` pointed at the managed DB: sign in once in
-   the product, run the seed scripts per the runbook once Task 11 lands them.
+   the product, run the seed scripts per the runbook — they have LANDED
+   (`seed:cc` and `seed:dev`, `apps/server/src/seed/cli-seed-*.ts`); this
+   read "once Task 11 lands them".
 
 ## Three things this file does NOT fully resolve, left for whoever picks them up
 
 - **`DEPLOY_SHA` is deliberately absent from `app.yaml`, not set to a
-  placeholder.** `apps/server/src/config.ts` will read it as
-  `z.string().min(1).default('dev')` (forthcoming on Lane E's branch,
-  confirmed against their working tree, uncommitted as of this writing) and
+  placeholder.** `apps/server/src/config.ts` reads it as
+  `z.string().min(1).default('dev')` — it has LANDED; this read "forthcoming on
+  Lane E's branch, confirmed against their working tree, uncommitted as of this
+  writing" — and
   `/healthz` will serve it verbatim on both its 200 and 503 branches so an
   operator can tell which commit answered during an incident — the reason
   Ruling P33 exists. App Platform does not populate a commit sha into a
@@ -112,8 +115,9 @@ Managed PostgreSQL + Spaces, all BLR1, serving `pm.artsourced.in` /
   (`withoutSslParameters` in `apps/server/src/db.ts`) strips those six
   parameters from the connection string before building the pool whenever a
   CA is configured, so the caller's `ssl: { ca }` reaches the driver intact
-  instead — **until that lands on `main`, a `DATABASE_CA_CERT` set here has
-  no effect**, regardless of which PR merges first.
+  instead. **That has LANDED**, so a `DATABASE_CA_CERT` set here takes effect:
+  this read *"until that lands on `main`, a `DATABASE_CA_CERT` set here has no
+  effect"*, which stopped being true when `withoutSslParameters` landed.
 
 ## Why the database, not just the pool
 
