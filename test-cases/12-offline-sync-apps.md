@@ -2945,3 +2945,19 @@ standing rule that a refusal and a dropped connection are never the same word.*
   propagated unhandled), GREEN after. —
   (`apps/mobile/src/push/register-push.test.ts`)
 
+## Ruling E2-53 — the editor host's three silent doors now report (2026-09-21, B14)
+
+*`editor-web-view.tsx` had no refusal vocabulary at all: (a) a parse failure on an inbound frame was
+dropped with no reply, (b) the `WebView` itself failing to load rendered a blank rectangle with no
+`onError`/`onHttpError`, and (c) `ready` never arriving waited forever with no timeout. All three now
+call a new `onEditorError` prop; `editor-refusals.ts` holds the messages and the pure timeout decision
+`readyTimedOut`. Door (a) does not widen the bridge protocol (no `HostToEditorMessage` kind is shaped
+for a generic refusal, and that is a `packages/editor` change outside this task's package) — it
+reports through the same host-level surface as (b)/(c) instead.*
+
+- 12.412 ✅ `readyTimedOut` is false once `ready` has been received regardless of elapsed time, false
+  before the timeout elapses, and true once it has with no `ready` — RED confirmed against a pre-fix
+  stub that always returned `false` (no timeout existed at all), GREEN after. Also asserts the three
+  refusal messages are non-empty. —
+  (`apps/mobile/src/editor/editor-refusals.test.ts`)
+

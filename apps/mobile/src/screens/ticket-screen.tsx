@@ -138,6 +138,7 @@ export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: st
             onMentionQuery={(query) =>
               queryWorkspaceMembers({ apiBase, token, workspaceId: state?.workspaceId ?? '', query })
             }
+            onEditorError={setError}
           />
           {error !== null ? <Text accessibilityRole="alert">{error}</Text> : null}
           <Text accessibilityRole="text">
