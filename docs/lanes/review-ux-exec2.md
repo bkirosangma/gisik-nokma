@@ -1267,7 +1267,7 @@ neither has a second argument to `.then`, and neither has a `.catch`.
 
 **AND THE PRODUCT HAS ALREADY MET THIS EXACT FAILURE MODE, DOCUMENTED IT, AND GUARDED ONE SITE AGAINST IT —**
 **which is the strongest form this finding can take, and it came from completing the `/members` screen reach.**
-`apps/web/app/w/[state]/members/page.tsx:480-492` works through the identical hazard:
+`apps/web/app/w/[workspaceId]/members/page.tsx:480-492` works through the identical hazard:
 
 > *"This product removed `Owner` from the options, and the two halves do not compose: a `Select` whose `value`
 > matches no option renders its PLACEHOLDER (`packages/ui/src/select/select.tsx:255`, `selected ?
