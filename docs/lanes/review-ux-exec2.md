@@ -2134,6 +2134,63 @@ against a real workspace. I claim the code path and the attribution semantics, n
 
 ---
 
+### E2-43 (r2) — IMPORTANT · The desktop shell's own startup has no rejection handler, so a failure to initialize is drawn as "Opening local replica…" for ever
+
+**WHAT.** `apps/desktop/src/app.tsx:46-82` builds the whole app inside an unawaited async IIFE with **no
+catch**:
+```
+void (async () => {
+  const storage = await createTauriSqlStorage();        // :47
+  const replica = await createReplica({ storage });     // :48
+  const outbox  = createOutbox({ storage, replica });
+  const transport = createHttpTransport({ baseUrl: API_BASE, token });
+  const engine = createSyncEngine({ replica, outbox, transport });
+  const dataSource = createReplicaDataSource({ … });
+  if (disposed) return;
+  setDs(dataSource);                                    // :58
+  …
+})();
+```
+and the render gates on exactly that value: `:134`
+`{ds === null ? <p>Opening local replica…</p> : <TicketList … />}`. **`ds` is set only on success**, so any
+rejection in the four awaits leaves the app on a loading sentence for ever, with the rejection unhandled
+and nothing on screen.
+
+**WHY it is wrong.** It is the load-vs-error collapse at the widest possible scope: the shell cannot start,
+and the person is told it is starting. Every dependency in that block is an initialization step that can
+fail on a real machine — a Tauri SQL plugin that is unavailable, a storage handle that cannot be opened,
+`createReplica`'s own bootstrap in `packages/sync-client`. The desktop shell has **no error state at all**
+to draw, which is the same absence as `E2-41`'s two mobile reads, one layer further out.
+
+**And the sibling instance in the same file, so the fix is one habit and not one line.** `:146`
+`const refresh = (): void => void props.ds.query.listTicketSummaries(props.workspaceId).then(setTickets);`
+with `tickets` starting at `[]` (`:140`) — **a failed read renders as an empty ticket list**, the identical
+defect to `E2-41(a)` in the mobile board. `:61-64` is a third: `dataSource.query.syncStatus(workspaceId)
+.then(…)` with no handler, so `queued` and `failed` silently stay `0` and the status strip reports a
+healthy queue it never read.
+
+**WHAT WOULD HAVE BEEN BETTER.** A `catch` on the init IIFE writing into an error state the shell renders
+in place of "Opening local replica…", and a handler per read the way the mobile shell already needs one —
+the same fix, for the third and fourth time in the two shells.
+
+**MEASUREMENT.** Opened in full: `apps/desktop/src/app.tsx:26-137` (the state, the init IIFE and its four
+awaits, the gate at `:134`, the sync-status read at `:61-64`) and `:139-162` (`TicketList`, the read at
+`:146` and `tickets` at `:140`). The false comment at `:22-25` — which claims `SyncStatusBar` and
+`ContestBanner` "do not exist in `@gisik-nokma/app-core` yet" when both are exported from the barrel — is
+**already filed as part of `E2-25`** and is cited here only as corroboration that this file's comments have
+not tracked the barrel.
+
+**Severity: Important.** ⚠ Bounded: I did not run the desktop app, so I claim the code path and not a
+reproduction, and the interim nature of this shell (token pasted by hand, per `:98`) is real. What earns
+the severity is that "cannot start" and "starting" are the same sentence here, and the person has no way
+to tell them apart or to recover.
+
+---
+
+*Running total of round-2 new findings: `E2-20`–`E2-43` (24) — 14 Important, 10 Minor.*
+
+---
+
 # R2.11 — CANDIDATES I EXAMINED AND DID **NOT** FILE, WITH THE REASON
 
 A candidate I checked and rejected is worth recording: it costs the judge nothing, it shows the boundary
