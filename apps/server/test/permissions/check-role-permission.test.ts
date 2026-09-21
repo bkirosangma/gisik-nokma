@@ -252,6 +252,22 @@ describe('checkRolePermission — planted defects', () => {
     });
   });
 
+  /**
+   * E6-21 — at the PURE gate, isolated from the full ingest pipeline: any
+   * role may revoke their OWN membership. `WORKSPACE_MEMBERSHIP_REASON`
+   * previously refused this identically to a plain member trying to manage
+   * someone ELSE'S — see the ingest-level pair further down for the
+   * self-vs-other control and the real client-door round trip.
+   */
+  it.each(['guest', 'member', 'admin'] as const)('lets a %s revoke their own membership', (role) => {
+    const e = env({
+      type: 'membership.revoked',
+      entity: { kind: 'membership', id: membershipId(WS, ACTOR) },
+      payload: { userId: ACTOR },
+    });
+    expect(checkRolePermission(e, ctx(eff(role)))).toBeNull();
+  });
+
   // A project admin runs their project's roster, not the workspace's door.
   // Before the 2026-08-27 scope collapse a project-scoped `membership.granted`
   // let them do both through one event; now the two questions have two events,
@@ -1096,6 +1112,75 @@ describe('the gate at the client door — refusals before the rule engine', () =
       eventId: afterRevoke.id,
       rule: PERMISSION_ROLE_RULE,
       reason: NOT_A_MEMBER_REASON,
+    });
+  });
+
+  /**
+   * E6-21 — a member can leave a workspace, through the real client door.
+   * Before this fix, `membership.revoked` gated EVERY submission (including
+   * one's own) on `isWorkspaceAdmin`, so a plain member's own leave-claim was
+   * refused `WORKSPACE_MEMBERSHIP_REASON` — the same refusal aimed at someone
+   * trying to manage a DIFFERENT person's membership. Two documents already
+   * assumed leaving was possible: `http-origin.ts` excludes the invite-accept
+   * door from the CSRF set because acceptance lands "in a workspace they can
+   * leave", and the export's privacy copy promises the same.
+   */
+  it('lets a member leave the workspace by revoking their own membership', async () => {
+    const ingest = ingestService();
+    const { workspaceId, owner } = await foundedWorkspace(ingest);
+    const member = await grantMember(ingest, workspaceId, owner, 'member');
+
+    const leave = submitted({
+      workspaceId,
+      entity: { kind: 'membership', id: membershipId(workspaceId, member) },
+      type: 'membership.revoked',
+      payload: { userId: member },
+      actorId: member,
+    });
+    expectCommitted(await ingest.ingestClientBatch([leave], member));
+
+    // After leaving, the same person is a non-member — the ledger-driven
+    // read 6.46 above already proves for an OWNER-initiated revoke, and this
+    // shows the self-initiated one has the identical effect.
+    const workflowId = newUlid();
+    const afterLeave = submitted({
+      workspaceId,
+      entity: { kind: 'workflow', id: workflowId },
+      type: 'workflow.defined',
+      payload: { ...SIMPLE_KANBAN_TEMPLATE, id: workflowId, version: 1 },
+      actorId: member,
+    });
+    expect((await ingest.ingestClientBatch([afterLeave], member))[0]).toEqual({
+      status: 'refused',
+      eventId: afterLeave.id,
+      rule: PERMISSION_ROLE_RULE,
+      reason: NOT_A_MEMBER_REASON,
+    });
+  });
+
+  /**
+   * The control for the case above: a plain member still cannot revoke
+   * SOMEONE ELSE'S membership — the fix is scoped to SELF-revocation, not a
+   * blanket bypass of `WORKSPACE_MEMBERSHIP_REASON` for the event type.
+   */
+  it('still refuses a member revoking someone else — the fix does not widen past self', async () => {
+    const ingest = ingestService();
+    const { workspaceId, owner } = await foundedWorkspace(ingest);
+    const member = await grantMember(ingest, workspaceId, owner, 'member');
+    const other = await grantMember(ingest, workspaceId, owner, 'member');
+
+    const revokeOther = submitted({
+      workspaceId,
+      entity: { kind: 'membership', id: membershipId(workspaceId, other) },
+      type: 'membership.revoked',
+      payload: { userId: other },
+      actorId: member,
+    });
+    expect((await ingest.ingestClientBatch([revokeOther], member))[0]).toEqual({
+      status: 'refused',
+      eventId: revokeOther.id,
+      rule: PERMISSION_ROLE_RULE,
+      reason: WORKSPACE_MEMBERSHIP_REASON,
     });
   });
 
