@@ -1835,6 +1835,29 @@ describe('F — the subtasks section', () => {
     expect(screen.queryByText('Somebody else’s')).toBeNull();
   });
 
+  it('E5-22 the subtask form NAMES the type the child will take', async () => {
+    // An EPIC parent, which is the case the finding is about: the ladder here is
+    // epic(1), task(3), sub-task(4), so `legal` for an epic is `task` and
+    // `sub-task` — rule 1 takes the built-in `task`, and the Story rank that
+    // would sit between them is skipped. On the DEFAULT fixture (a `task`) the
+    // legal set is `sub-task` alone, which proves nothing about the rule.
+    const read = ticketRead({ ticket: ticketStateSeed({ typeId: 'epic' }), rollup: null });
+    const source = sheetSource(read, [], []);
+    renderSheet(read, source);
+    await settled();
+    // The type is `subtaskTypeFor`'s choice and the render used to say nothing
+    // about it.
+    const target = await screen.findByTestId('sheet-subtask-target');
+    expect(target.textContent).toBe('Adds a Task.');
+    // And the sentence names the SAME type the submission carries — asserted
+    // against the event rather than against a retyped literal, so the two cannot
+    // drift apart.
+    await userEvent.type(screen.getByTestId('sheet-subtask-title'), 'Book the venue');
+    await userEvent.click(screen.getByTestId('sheet-subtask-add'));
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    expect(source.ingested[0]![0]!.payload).toMatchObject({ typeId: 'task' });
+  });
+
   it('16.20 Add subtask sends ticket.created with THIS ticket as parent, the title AS TYPED, and start focus', async () => {
     const read = ticketRead({ rollup: null });
     const source = sheetSource(read, [], []);

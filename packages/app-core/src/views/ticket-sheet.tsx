@@ -2328,6 +2328,17 @@ export function TicketSheet({
                   void addSubtask();
                 }}
               >
+                {/*
+                  E5-22 — WHAT the button will file. The child's type is chosen
+                  by `subtaskTypeFor` and was in hand and unsaid: rule 1 takes the
+                  built-in `task` whenever it is legal, so under an Epic (rank 1)
+                  the child is a Task and the Story rank between them is SKIPPED —
+                  and nothing on screen named it. `subtaskType.name` was read
+                  nowhere in the render before this line.
+                */}
+                <p className="gn-ticket-sheet__subtask-target" data-testid="sheet-subtask-target">
+                  {`Adds a ${subtaskType.name}.`}
+                </p>
                 <label className="gn-field" htmlFor="gn-new-subtask-title">
                   <span className="gn-field__label">New subtask title</span>
                   <input
