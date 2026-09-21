@@ -1241,6 +1241,14 @@ what was looked at and found sound, not only what was found wrong.
   (`/v1/workspaces/:ws/tickets`, board, list, search, attention, my-work, detail, bootstrap — bootstrap also
   carries every workflow and type definition, which is case 6.94's recorded gap, not a new one) and `members`
   answers 404 to a guest.
+- **Eleven hostile payload shapes at `POST /v1/events`, no 500** (a sibling of Appendix T's sweep, run once, 1
+  passed; not appended — the shapes are listed here): a 200 KB title, a 200 KB field value, a comment body nested
+  3,000 deep and a 5,000-member `visibility.set` list all **commit**; `__proto__` as a JSON key is refused by the
+  body parser (400 `FST_ERR_CTP_INVALID_JSON_BODY`); `__proto__`/`constructor` as a `fieldId` are `field.unknown`;
+  a 10 KB rank key, a self-parent, a 2,000-state workflow with a mismatched id and a 500-field type with a missing
+  `type` are each refused or `invalid` per event with the rule named; `'polluted' in {}` stays `false`.
+  *Observation, not filed:* there is no upper bound on a title's length or an explicit audience's size beyond the
+  1 MB body limit — a 200 KB title rides on every board, list and search response in the project.
 - **The ingest pipeline's order is what the docblocks say.** `ingest-service.ts:164-360`: workspace lock →
   entity lock → entity↔workspace guard → permission gate (through the transaction's `client`, `:235-245`) →
   contest coherence → engine → server gates → append → refresh-on-publish → projections → COMMIT. Read at the
