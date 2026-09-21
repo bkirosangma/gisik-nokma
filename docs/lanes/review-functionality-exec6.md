@@ -1519,7 +1519,9 @@ myWork.assigned                                            DOOMED, live    DOOME
 searchOfflineCopy    (mobile board-screen)                 DOOMED, live    DOOMED, live
 ```
 
-The two reads that drop the deleted ticket are the two `apps/mobile` and `apps/desktop` never call:
+The replica `DataSource` is constructed in exactly two product files — `apps/mobile/src/app.tsx:40` and
+`apps/desktop/src/app.tsx:56` (`grep -rn "createReplicaDataSource(" apps packages` outside tests and `dist`) — so
+its callers are those two shells. The two reads that drop the deleted ticket are the two they never call:
 `grep -rn "getBoard\|getTickets" apps/mobile/src apps/desktop/src` → **0** lines (control on the same path:
 `listTicketSummaries` → 5). Every `ds.query.*` call in the two shells, enumerated:
 `apps/mobile/src/screens/board-screen.tsx:26` and `:28` (`listTicketSummaries`, `searchOfflineCopy`),
@@ -1571,7 +1573,12 @@ app — the deployed product — reads through the online mappers, which the ser
 are the phone and desktop replicas. Not Minor: on the phone there is no other list, and a deleted ticket that
 stays a row there is the pre-feature behaviour under the feature's name. `myWork` is included for completeness
 and carries no product caller (`grep -rn "\.myWork(" apps packages/app-core/src` outside tests → none); the
-severity rests on `listTicketSummaries` and `searchOfflineCopy`.
+severity rests on `listTicketSummaries` and `searchOfflineCopy`. **The bound, stated:** both shells are minimal by
+their own account — `apps/desktop/src/app.tsx:120-123`: *"Until [Plan 6's Board/List/ticket views] land, the shell
+renders the sync status strip and a minimal ticket list driven by `ds.query.listTicketSummaries`"* — so the two
+filtered reads are the ones those views will call when they mount on the replica, and the unfiltered one is the
+list a user of either shell sees today. If the judge weighs the shells as pre-release, Minor is the honest
+floor; the defect and its one-line fix stand either way.
 
 ---
 
