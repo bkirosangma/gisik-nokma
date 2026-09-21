@@ -366,6 +366,14 @@ the manual appears as a literal in `apps/`+`packages/` would have caught rows (a
 the day each broke. The repo already has this pattern elsewhere (`check-runbook-commands.mjs` verifies
 every command the runbook names).
 
+**AND THE GATE'S OWN STATE PROVES THE POINT BETTER THAN MY RUN DOES — measured 2026-09-21.** The paragraph
+below shows `check:help` **passing here** (EXIT 0 over the whole corpus). In CI the same check is
+**failing** — and six of the seven checkers pass on this tree while their CI jobs are red. So the gate is
+green locally and red remotely **on code-identical trees**, and **neither state tells a reader whether the
+corpus is true of the product.** A green run says the generated copy matches its source; a red run says
+something about the CI environment. **The property this finding is about — is the manual true? — is not in
+either answer**, which states the defect more sharply than my round-1 wording did. Full measurement and its
+boundary: `docs/lanes/review-refutations-exec2.md`, *"What the red gate actually means"*.
 **THE MEASUREMENT.** `node scripts/help-content.mjs --check > /tmp/ux-help-check.log 2>&1; echo EXIT=$?`
 → `EXIT=0`; tail of the log quoted above. The gate is real and passes; that is the point.
 
