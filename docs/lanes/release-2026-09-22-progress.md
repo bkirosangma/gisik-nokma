@@ -12,3 +12,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-P9 | done | 303720e458759f5361298022f392db5ccebbf298 | components.test.tsx P9 x4 |
 | T-P8 | done | cf7ee59ab84197edd42fe884ef168ae5126348de | components.test.tsx P8 x4 |
 | B16 | claimed | 2026-09-21 21:18 | /Users/kiro/my_projects/gisik-nokma-exec6 |
+| T-E6-13 | done | 6f5d5780e747ef47c82f46e32d2dda8ca7260f2f | verify-projections.test.ts E6-13 x2 (case 3.960; both re-bind orders, RED drift + RED throw → GREEN) |
