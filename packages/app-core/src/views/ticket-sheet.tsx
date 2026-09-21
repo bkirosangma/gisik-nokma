@@ -846,7 +846,7 @@ export function TicketSheet({
    * user nothing**: `TicketEditorSlot` clears the composer only in `comment`
    * mode, so a refused description save leaves their words on screen.
    */
-  const submitDescription = async (submission: EditorSlotSubmission): Promise<void> => {
+  const submitDescription = async (submission: EditorSlotSubmission): Promise<boolean> => {
     const event = make({
       workspaceId,
       entity: { kind: 'ticket', id: ticketId },
@@ -858,7 +858,7 @@ export function TicketSheet({
     if (result === undefined) {
       setServerRefusal(null);
       setTransportError('The server did not answer this change.');
-      return;
+      return false;
     }
     if (result.status === 'committed') {
       setServerRefusal(null);
@@ -872,10 +872,13 @@ export function TicketSheet({
       setEditorError(null);
       read.reload();
       history.reload();
-      return;
+      return true;
     }
     if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
     else setServerRefusal({ rule: result.code, reason: result.message });
+    // V7 — NOT ACCEPTED, and the composer must keep the words. Reached by a
+    // `refused`, by an `invalid`, and by any status this build does not name.
+    return false;
   };
 
   /**
@@ -887,11 +890,16 @@ export function TicketSheet({
    * ticket read would be a request that cannot have a different answer. What a
    * comment DOES join is the thread and the ledger tab, and both are reloaded.
    *
-   * The composer clears itself on success without help from here:
-   * `TicketEditorSlot.handleSubmit` clears in `comment` mode only, which is the
-   * half of its contract this mode exists for.
+   * The composer clears itself on success without help from here, and **V7 is
+   * why "success" is now a SIGNAL rather than the absence of a throw**:
+   * `TicketEditorSlot.handleSubmit` clears in `comment` mode only, and it clears
+   * on this function's own `true`. It used to clear on the promise RESOLVING,
+   * and a refusal resolves — this function records the server's answer in
+   * `serverRefusal` and returns normally — so a refused comment wiped the
+   * composer and cost the author the words they had just written, which is the
+   * outcome the slot's own docblock promises cannot happen.
    */
-  const submitComment = async (submission: EditorSlotSubmission): Promise<void> => {
+  const submitComment = async (submission: EditorSlotSubmission): Promise<boolean> => {
     const event = make({
       workspaceId,
       entity: { kind: 'ticket', id: ticketId },
@@ -903,7 +911,7 @@ export function TicketSheet({
     if (result === undefined) {
       setServerRefusal(null);
       setTransportError('The server did not answer this change.');
-      return;
+      return false;
     }
     if (result.status === 'committed') {
       setServerRefusal(null);
@@ -911,10 +919,13 @@ export function TicketSheet({
       setEditorError(null);
       comments.reload();
       history.reload();
-      return;
+      return true;
     }
     if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
     else setServerRefusal({ rule: result.code, reason: result.message });
+    // V7 — NOT ACCEPTED, and the composer must keep the words. Reached by a
+    // `refused`, by an `invalid`, and by any status this build does not name.
+    return false;
   };
 
   /**

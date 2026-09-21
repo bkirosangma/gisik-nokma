@@ -109,7 +109,28 @@ export type EditorSlotProps = {
   queryUsers?: (query: string) => Promise<Array<{ userId: string; name: string }>>;
   uploadAttachment?: (file: File) => Promise<EditorSlotUpload>;
   emitAttachmentAdded?: (uploaded: EditorSlotUpload) => Promise<void>;
-  submit?: (submission: EditorSlotSubmission) => Promise<void>;
+  /**
+   * V7 — THE SUBMISSION'S OUTCOME, and it is NOT `void`.
+   *
+   * A composer that clears itself on "the promise resolved" is clearing on
+   * *no exception*, and **no exception is not acceptance**. The server has
+   * three answers to a claim — committed, refused, invalid — plus the two ways
+   * it can fail to answer (a silence, and a dropped connection), and four of
+   * those five must leave the person's words on screen. `Promise<void>` could
+   * not say which had happened, so `TicketEditorSlot` cleared on all five and a
+   * refused comment cost the author what they had written.
+   *
+   * `true` means THE SERVER ACCEPTED THE CLAIM. Anything else — a refusal, an
+   * invalid answer, a silence, a rejection — means the caller must not treat
+   * the words as sent.
+   *
+   * **Deliberately not `Promise<void>` with an optional `false` read as "not
+   * accepted":** a fail-open default would restore exactly this defect for any
+   * caller that did not opt in, which is the half-witnessed contract this
+   * repository keeps re-finding. The cost is that every producer must say which
+   * happened, and that is the point.
+   */
+  submit?: (submission: EditorSlotSubmission) => Promise<boolean>;
   onDone?: () => void;
   onError?: (err: unknown) => void;
 };
