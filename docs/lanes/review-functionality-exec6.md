@@ -1353,7 +1353,7 @@ DELETE /v1/me/workspaces/:ws -> 404     DELETE /v1/workspaces/:ws/members/:me ->
 
 `check-permission.ts:641-643` asks only `isWorkspaceAdmin` for `membership.revoked`; there is no self arm.
 `grep -rln 'Leave workspace|leaveWorkspace'` over `apps/web/app`, `packages/app-core/src`, `apps/mobile/src` →
-nothing; `grep -n leav docs/manual.md docs/faq.md` → comments and defaults only; `grep -ciE 'leave (a|the|this) workspace|leave workspace' Features.md` → 0 (a bare `leave` matches 71 unrelated lines); no case in
+nothing; `grep -n leav docs/manual.md docs/faq.md` → comments and defaults only; `grep -iE 'leave (a|the|this) workspace' Features.md` → one line, about the last-owner guard (*"leave the workspace with ZERO owners"*), not about leaving; no case in
 `06-auth-visibility.md`, `13-second-wave-roles-and-navigation.md` or `16-remaining-doors.md` mentions leaving.
 
 **WHY it is wrong.**
