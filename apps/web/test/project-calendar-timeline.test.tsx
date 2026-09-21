@@ -176,10 +176,20 @@ async function openTab(name: 'Calendar' | 'Timeline' | 'List') {
  * and then, in Phase 2 Wave A, migrating onto the shared `Select` component
  * from `@gisik-nokma/ui` (whose trigger renders `role="button"`, not a
  * tablist, so this remains a non-issue either way it's shaped). The scope
- * is kept anyway rather than loosened back to a bare query: the view-tabs
- * tablist itself still carries no `aria-label` to disambiguate by name if a
- * future control ever adds a second tablist here again, and scoping by the
+ * is kept anyway rather than loosened back to a bare query: scoping by the
  * DOM container costs nothing today.
+ *
+ * ⚠ **THE SENTENCE THAT USED TO CLOSE THAT PARAGRAPH IS NOW FALSE, and it is
+ * replaced rather than deleted.** It read *"the view-tabs tablist itself still
+ * carries no `aria-label` to disambiguate by name if a future control ever adds
+ * a second tablist here again"* — true when written, and **it expired on
+ * 2026-09-21 (exec1 P19)**, when the rail moved onto the shared
+ * `SegmentedControl`, whose `aria-label` is REQUIRED: the rail now carries
+ * `"Project view"` and a second tablist on this page could be told from it by
+ * name. The scope above is unchanged because it is still correct, not because
+ * the reason for it still applies — and the day this file needs the name, the
+ * query is `getByRole('tablist', { name: 'Project view' })`, which case
+ * `13.1051` already exercises.
  */
 async function viewTabs(): Promise<HTMLElement[]> {
   // BY ROLE, not by text, since Round 19b: `AppNav` now offers its own
@@ -220,6 +230,44 @@ describe('the project page mounts four views over one list read', () => {
       'false',
       'true',
     ]);
+  });
+
+  /**
+   * 13.1051 — exec1 P19 — **the view rail is a NAMED tablist.**
+   *
+   * The rail declared `role="tablist"` with no `aria-label` and no
+   * `aria-labelledby`, so a screen reader met an unnamed set of five tabs on the
+   * product's primary view switcher. A tablist's name is what a reader uses to
+   * tell one such group from another, and the repo had already fixed the
+   * identical defect on the ticket sheet's tablist
+   * (`packages/app-core/src/views/ticket-sheet.tsx:1904`) — the page was the
+   * one that kept its own hand-rolled markup.
+   *
+   * **The remedy was to adopt the SHARED component rather than add the
+   * attribute**, which is why this case queries by ROLE AND NAME: the real
+   * argument for `SegmentedControl` is that its `'aria-label': string` prop is
+   * REQUIRED, so the type system makes an unnamed tablist unrepresentable here
+   * rather than fixing this one instance and leaving the next to be forgotten.
+   * A page that hand-rolled the markup again would fail this case.
+   */
+  it('13.1051 the view rail is a named tablist, reached by role and name', async () => {
+    render(
+      <Providers services={servedList([row()])}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByRole('tab', { name: 'Board' });
+
+    // POSITIVE CONTROL: the tablist exists at all, so a green below cannot be
+    // "there was no rail on this page".
+    expect(screen.getByRole('tablist')).toBeInTheDocument();
+
+    // THE WITNESS. Before the fix this threw with
+    // `Unable to find an accessible element with the role "tablist" and name "Project view"`.
+    const rail = screen.getByRole('tablist', { name: 'Project view' });
+    // ...and it is the rail the tabs live in, not a second named tablist
+    // somewhere else on the page.
+    expect(within(rail).getAllByRole('tab')).toHaveLength(5);
   });
 
   /**

@@ -36,7 +36,7 @@ import {
   type TicketDatesInput,
 } from '@gisik-nokma/app-core';
 import { TicketEditorSlot, uploadAttachmentHttp } from '@gisik-nokma/editor';
-import { Avatar, Switch, Toast } from '@gisik-nokma/ui';
+import { Avatar, SegmentedControl, Switch, Toast, type SegmentedOption } from '@gisik-nokma/ui';
 import { AppNav } from '../../../../../src/app-nav.js';
 import { startTargetFor } from '../../../../../src/backlog-start.js';
 import { BacklogStartButton } from '../../../../../src/backlog-start-button.js';
@@ -152,6 +152,32 @@ export const BUILTIN_LADDER_NOTICE =
  */
 export const BACKLOG_EMPTY_COPY = 'Nothing in the backlog — new tickets land here.';
 export const BACKLOG_EMPTY_EPICS_COPY = 'Nothing in the backlog — epics appear in the List.';
+
+/**
+ * The view rail's five choices, in the rail's own order.
+ *
+ * **`'backlog'` is FIRST** (Task 10, backlog/closed spec §5.4): Backlog precedes
+ * the board in a ticket's LIFECYCLE (spec §1.3 — every ticket is born there),
+ * even though `view`'s own default stays `'board'`. **The rail's ORDER and the
+ * page's DEFAULT SELECTION are independent facts**, and only the first moved.
+ *
+ * The LABELS are a `Record` over the tab union, not a second list, for this
+ * file's standing reason (see `TAB_NOUN` below): a `Record<K, V>` requires every
+ * member of `K`, so a sixth tab added to `PROJECT_TABS` without words fails
+ * `typecheck` rather than rendering an unlabelled segment. That property was
+ * what the hand-written `as const` tuple array this replaced did NOT have.
+ */
+const PROJECT_VIEW_LABELS: Record<ProjectTab, string> = {
+  backlog: 'Backlog',
+  board: 'Board',
+  list: 'List',
+  calendar: 'Calendar',
+  timeline: 'Timeline',
+};
+
+const PROJECT_VIEW_OPTIONS: ReadonlyArray<SegmentedOption<ProjectTab>> = (
+  ['backlog', 'board', 'list', 'calendar', 'timeline'] as const
+).map((tab) => ({ value: tab, label: PROJECT_VIEW_LABELS[tab] }));
 
 function ProjectBoard() {
   const router = useRouter();
@@ -2034,57 +2060,53 @@ function ProjectBoard() {
             </div>
 
             {/*
-              The segmented control (`ui.css`'s shared `.gn-segmented` /
-              `.gn-segmented__item` / `.gn-segmented__item--on`), replacing the
-              page-local `.gn-view-tabs`. Same roles, same handlers — a restyle,
-              not a rebuild: `role="tablist"`/`role="tab"`/`aria-selected` are
-              unchanged, and each button still drives `setView` directly.
+              THE SHARED CONTROL ITSELF, not the shared control's CLASSES — and
+              that distinction is the whole of exec1 P19.
 
-              One boolean per tab feeds BOTH `aria-selected` and the `--on`
-              modifier class, rather than two `view === 'x'` comparisons that would
-              have to be kept in agreement by hand.
+              This markup used to be a page-local `<div className="gn-segmented"
+              role="tablist">` with five hand-written `<button role="tab">`
+              children: the same classes and the same roles as the shared
+              component, and **no accessible name**, because nothing required
+              one. `SegmentedControlProps['aria-label']` is a REQUIRED prop, so
+              adopting the component makes an unnamed tablist unrepresentable
+              here rather than correcting one instance and leaving the next to
+              be forgotten — which is the argument the reviewer made for this
+              remedy over adding the attribute.
 
-              `.gn-view-tabs` NO LONGER EXISTS ANYWHERE IN THE PRODUCT as of this
-              commit (Task 4, coordinator Ruling 7) — `globals.css`'s own dead
-              rules (`:1244`, `:1391-1392`) and the docblock sentence claiming
-              they "survive… only on the project page" are both removed there;
-              that claim stopped being true the moment THIS page moved onto
-              `.gn-segmented` (Task 2), and a stale rule is one thing but a
-              comment misstating the file it sits in is the thing this repo
-              punishes hardest.
+              **What did NOT change:** the rendered DOM. `SegmentedControl`
+              draws `.gn-segmented` / `.gn-segmented__item` /
+              `.gn-segmented__item--on`, `role="tablist"` / `role="tab"` and
+              `aria-selected`, with the same one-boolean-per-tab derivation —
+              so every case scoped to `.gn-segmented` and every `role="tab"`
+              query sees exactly what it saw before, plus the name.
 
-              `['backlog', 'Backlog']` (Task 10, backlog/closed spec §5.4) is
-              FIRST — Backlog precedes the board in a ticket's LIFECYCLE
-              (spec §1.3: every ticket is born there), even though `view`'s
-              own default stays `'board'` (declared above) — the rail's
-              ORDER and the page's DEFAULT SELECTION are independent facts,
-              and this task changes only the first.
+              `.gn-view-tabs` NO LONGER EXISTS ANYWHERE IN THE PRODUCT as of
+              Task 4 (coordinator Ruling 7) — `globals.css`'s dead rules
+              (`:1244`, `:1391-1392`) and the docblock sentence claiming they
+              "survive… only on the project page" are removed there. This note
+              is kept because the reasons it records are not all stale: the
+              class rename it describes is what made `.gn-segmented` the
+              selector `project-calendar-timeline.test.tsx` scopes by, and a
+              future reader looking for `.gn-view-tabs` should find out here
+              that it is gone rather than by searching.
+
+              The rail's ORDER — Backlog first — now lives with the options
+              themselves (`PROJECT_VIEW_OPTIONS`), not in this JSX.
             */}
-            <div className="gn-segmented" role="tablist">
-              {(
-                [
-                  ['backlog', 'Backlog'],
-                  ['board', 'Board'],
-                  ['list', 'List'],
-                  ['calendar', 'Calendar'],
-                  ['timeline', 'Timeline'],
-                ] as const
-              ).map(([tab, label]) => {
-                const selected = view === tab;
-                return (
-                  <button
-                    key={tab}
-                    role="tab"
-                    type="button"
-                    aria-selected={selected}
-                    className={`gn-segmented__item${selected ? ' gn-segmented__item--on' : ''}`}
-                    onClick={() => setView(tab)}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
+            <SegmentedControl
+              // exec1 P19: the rail carried `role="tablist"` and NO accessible
+              // name, on the product's primary view switcher. THIS prop is the
+              // fix, and the reason the page no longer hand-rolls the markup:
+              // `SegmentedControlProps['aria-label']` is REQUIRED, so an unnamed
+              // tablist is unrepresentable here rather than merely corrected
+              // once. The repo had already applied the same fix to the ticket
+              // sheet's tablist, which is what made this page's version a
+              // standing outlier.
+              aria-label="Project view"
+              options={PROJECT_VIEW_OPTIONS}
+              value={view}
+              onChange={setView}
+            />
 
             {/*
               THE DISCLOSURE STRIP (Step 3/4, the shared mechanism Task 8's

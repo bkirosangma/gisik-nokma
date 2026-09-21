@@ -247,6 +247,38 @@ measured, and expected**: the effect runs after hydration, so a browser reading 
 post-hydration is **OWED** and is not claimed. jsdom witnesses the mechanism (the mounted component
 sets `document.title`); the sweep witnesses DECLARATION on every route, never execution.
 
+## The project view rail is a NAMED tablist (exec1 P19, 2026-09-21) — case `13.1051`
+
+- **13.1051** ✅ The project page's view rail — Backlog, Board, List, Calendar, Timeline — is reached by
+  ROLE AND NAME (`getByRole('tablist', { name: 'Project view' })`), and the named element is the rail the
+  five tabs live in, not a second tablist elsewhere on the page. The case queries by name on purpose: the
+  remedy was to adopt the SHARED `SegmentedControl`, whose `'aria-label'` prop is **required**, so an
+  unnamed tablist is unrepresentable at this mount rather than merely corrected once — a page that
+  hand-rolled the markup again would fail this case. (`apps/web/test/project-calendar-timeline.test.tsx`)
+
+**The finding.** The rail declared `role="tablist"` with no `aria-label` and no `aria-labelledby`, so a
+screen reader met an unnamed set of five tabs on the product's primary view switcher — while the repo had
+**already fixed the identical defect on the ticket sheet's tablist**
+(`packages/app-core/src/views/ticket-sheet.tsx:1904`). Two real `role="tablist"` elements existed in the
+product, comments excluded, and this was the one still unnamed.
+
+**What did NOT change: the rendered DOM.** `SegmentedControl` draws the same `.gn-segmented` /
+`.gn-segmented__item` / `.gn-segmented__item--on` classes, the same `tablist` / `tab` roles and the same
+`aria-selected`, with the same one-boolean-per-tab derivation — so every case scoped to `.gn-segmented`
+and every `role="tab"` query sees exactly what it saw before, plus the name. The suite moved
+`630 → 631 passed` (the new case) with no existing case touched.
+
+**A stale sentence in a docblock this task did not otherwise edit, replaced rather than deleted:**
+`project-calendar-timeline.test.tsx`'s `viewTabs()` scoping note ended *"the view-tabs tablist itself
+still carries no `aria-label` to disambiguate by name"* — true when written, expired by this change, and
+now says so with the name it does carry.
+
+**The rail's order** (Backlog first — spec §1.3, tickets are born there — while `view`'s DEFAULT stays
+`'board'`) moved out of the JSX and onto `PROJECT_VIEW_OPTIONS`, whose labels are a
+`Record<ProjectTab, string>`: a `Record` requires every member of the union, so a sixth tab added to
+`PROJECT_TABS` without words fails `typecheck` rather than rendering an unlabelled segment — a property
+the hand-written `as const` tuple array this replaced did not have.
+
 ## Task 1 of the HIG per-screen plan (2026-09-08) — the four shared pieces every screen reuses
 
 - **13.288** ✅ `SegmentedControl` renders `role=tablist` (named by a required `aria-label`), one
