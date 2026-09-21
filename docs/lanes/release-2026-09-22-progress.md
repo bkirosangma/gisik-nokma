@@ -25,3 +25,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E5-18 | done | 49b64116 | 17.066-17.069 (invites.test.ts, invite-page.test.tsx) — expiry carried+rendered, dead arm links out; DECLINE recorded as owed |
 | T-E5-30 | done | 3bd8f18b | 17.070 (page-refusals.test.tsx) — the panel names the action, wire string on its own line; 29 assertions swept |
 | T-E2-26 | done | da551cd4 | 17.071 (inbox-bulk.test.tsx) — the row speaks in the row-s vocabulary; the bulk reuse suggested by the finding is refused with its reason |
+| T-E2-32 | done | 05d02da9 | 17.072 (ticket-sheet.test.tsx) — a committed move remounts the dialog; preserve-on-Cancel kept |
