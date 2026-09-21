@@ -1247,11 +1247,13 @@ verify 2606 ids; I verified the ones my findings touch, and asked of each the br
 | `11.147` | 11 | ✅ | ✅ | ✅ — it pins the silent reload that the bulk path's docblock calls the defect | E5-10: the case witnesses a property the file elsewhere disowns |
 | `11.201`–`11.205` | 11 | ✅ | ✅ | ✅ | none covers the failed-read path (E5-13) |
 | `13.428` | 13 | ✅ | ✅ | ✅ | Settings link present — exec 2's control; reused as mine for the nav |
+| `13.451` | 13 | ✅ | ✅ | ✅ — *"Picking a Collaborator … does not narrow the board … but the scope note names 'collaborator' as not applied"* | E5-5: the case pins the after-the-press disclosure as the property; nothing asks whether the control should be offered |
+| `13.468` | 13 | ✅ | ✅ | ✅ | the workflow picker's default; no case pins the New-ticket TYPE default (E5-16) |
 | `15.*` (help) | 15 | — | — | ⚠ | `12 cases, 5 planted` per exec 2's recount; the help corpus's Board section (E5-1) is not among the planted defects — `check:help` cannot see it |
 
 **Cases that assert a property the product has quietly stopped having:** none found among those I opened. **Cases that
-witness a defect as a property:** `3.72` (E5-7) and `11.147` (E5-10) — both true of the code and both pinning the
-behaviour a sibling docblock calls wrong.
+witness a defect as a property:** `3.72` (E5-7), `11.147` (E5-10) and `13.451` (E5-5) — all true of the code, the first
+two pinning behaviour a sibling docblock calls wrong, the third pinning a disclosure the brief's own rule calls late.
 
 **Not verified id by id:** `test-cases/13-*.md` (11 files, ~1.2 MB) — the same boundary exec 2 stated, and I did not
 close it.
