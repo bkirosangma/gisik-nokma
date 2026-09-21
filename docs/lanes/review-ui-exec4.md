@@ -9,7 +9,7 @@
 
 ## 0. THE ONE-LINE ANSWER
 
-**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Twenty-three of the twenty-six findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a 21-px close glyph, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast, by contrast, is clean everywhere I measured — 26 route×theme passes, one third-party watermark failing — because a contrast instrument existed and was run at least once.
+**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Twenty-four of the twenty-seven findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a 21-px close glyph, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast, by contrast, is clean everywhere I measured — 26 route×theme passes, one third-party watermark failing — because a contrast instrument existed and was run at least once.
 
 ---
 
@@ -426,6 +426,19 @@ curl -s http://localhost:3041/v1/me/workspaces      # → {"error":"unauthentica
 
 ---
 
+
+### E4-27 — **MINOR** — The ticket-type editor's *Save ticket type* is a page-local `<button>` at 36 px with a 1-px border and a 6-px radius, beside a shared `Button` that is 44 px, border-less and control-radiused — and the prototype's is 44
+
+**MEASUREMENT (painted, `/settings/ticket-types/errand` and `/new`, 390 and 768 — padding-driven).** `button.ticket-type-editor__save "Save ticket type"` **146×36**. Source: `packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx:135-140` renders a bare `<button className="ticket-type-editor__save">`; `ui.css:2745-2754` gives it `border: 1px solid var(--gn-accent); border-radius: 6px; padding: 0.35rem 0.9rem` and no `min-height`. The shared `.gn-button` (`ui.css:61-68`) is `min-height: 2.75rem` (44) with `border-radius: var(--gn-radius-control)` — the very control the sibling builder screen was moved onto (`workflow-builder-screen.tsx:42`: *"The shared `Button`, not a bare `<button>`"*). No docblock above `:2745` records why this one stayed page-local.
+
+**PROTOTYPE.** `Desktop.dc.html:877` (`isTypeEditor`): `min-height:44px;padding:0 18px;border:none;border-radius:var(--ctlR);background:var(--accent)`. **Category 3: diverges with no ruling found.**
+
+**WHY IT IS WRONG.** A primary action 8 px under the product's standalone floor, drawn in a border-and-6px idiom the borders→fills campaign removed everywhere else, on a route no sweep visits (`/settings/ticket-types/<id>` is not in the stack list; only the list route is).
+
+**WHAT WOULD HAVE BEEN BETTER.** `<Button variant="primary">`, which is one import and deletes the rule.
+
+---
+
 ## 4. MATCHES AND RULED DIVERGENCES CHECKED
 
 _(so §3 is not a list of defects — each row is a measurement I took that came back clean or ruled)_
@@ -527,10 +540,10 @@ The owner ordered graph-first. I did: `graphify-out/GRAPH_REPORT.md` header, hub
 |---|---|---|
 | **Critical** | **0** | — |
 | **Important** | **17** | E4-1 · E4-2 · E4-3 · E4-4 · E4-5 · E4-7 · E4-8 · E4-9 · E4-11 · E4-12 · E4-13 · E4-14 · E4-17 · E4-18 · E4-19 · E4-21 · E4-23 |
-| **Minor** | **9** | E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 · E4-24 · E4-25 · E4-26 |
-| **total** | **26** | `17 + 9 = 26`; ids `E4-1` … `E4-26` with no gaps |
+| **Minor** | **10** | E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 · E4-24 · E4-25 · E4-26 · E4-27 |
+| **total** | **27** | `17 + 10 = 27`; ids `E4-1` … `E4-27` with no gaps |
 
-**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20, E4-24. Category 2 argued against the record: E4-6, E4-8, E4-25, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23. Matches the prototype, fails the product's own later rule: E4-26.
+**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20, E4-24, E4-27. Category 2 argued against the record: E4-6, E4-8, E4-25, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23. Matches the prototype, fails the product's own later rule: E4-26.
 
 **Overlap with round 1, stated:** E4-10 and E4-15 are new members of P1's class found by widening the population (class-less tags; classes whose rule forgot the border) and painted; E4-12 widens P11's scope from one component to the suite's population; E4-2 carries a painted reproduction of P8's focus finding as corroboration only. Nothing else overlaps.
 
