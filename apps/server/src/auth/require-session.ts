@@ -17,6 +17,20 @@ declare module 'fastify' {
      * a route that reads `currentUserId` registers `requireSession`.
      */
     currentUserId: string;
+    /**
+     * WHICH branch of `requireSession` resolved `currentUserId` — `'session'`
+     * for a real better-auth session (cookie or its own bearer token),
+     * `'mcp-token'` for the personal-access-token fallback. Written only by
+     * `requireSession`, same as `currentUserId` above.
+     *
+     * E6-16 — added so a route can refuse an action an MCP token should not
+     * be able to take on its own authority, without a second credential
+     * check re-deriving what this preHandler already determined. `mcp-device.ts`'s
+     * approve/deny handlers are the first callers: an assistant holding a
+     * token must not be able to approve (or deny) the device code that would
+     * mint its own successor.
+     */
+    authKind: 'session' | 'mcp-token';
   }
 }
 
@@ -87,6 +101,7 @@ export function makeRequireSession(auth: Auth, db: Queryable, now: () => Date = 
     const session = await auth.api.getSession({ headers: fromNodeHeaders(request.headers) });
     if (session) {
       request.currentUserId = session.user.id;
+      request.authKind = 'session';
       return;
     }
 
@@ -95,6 +110,7 @@ export function makeRequireSession(auth: Auth, db: Queryable, now: () => Date = 
       const userId = await resolveMcpToken(db, header.slice('Bearer '.length), now());
       if (userId !== null) {
         request.currentUserId = userId;
+        request.authKind = 'mcp-token';
         return;
       }
     }
