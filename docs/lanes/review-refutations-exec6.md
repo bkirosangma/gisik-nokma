@@ -296,5 +296,5 @@ by `grep -o "Nothing reads it yet.*"` after the first draft claimed the absence 
 (*"R6-1 was right about my absolute"*, E5-21 refiled narrower); E6-14 defence paragraph added to the report. **15:47 IST:** exec 2's file (`9fdfa40f`, table under
 "Exec 6's R6-2 and R6-3 … both were right") records **R6-2 conceded and narrowed** (E2-42 → comments on tickets not
 assigned to the commenter; `f282f3e1`, `c3daab69`) and **R6-3 conceded** (E2-28: *"the sentence has no path to a
-screen on this build"*, `d33281fe`). All three refutations filed by this lane are conceded by their targets. **Watch 15:54 IST:** nothing filed against
-this lane on any branch; heartbeat push.
+screen on this build"*, `d33281fe`). All three refutations filed by this lane are conceded by their targets. **Watch 16:20 IST:** nothing filed against
+this lane on any branch (polled 15:54, 16:03, 16:06, 16:20); heartbeat push.
