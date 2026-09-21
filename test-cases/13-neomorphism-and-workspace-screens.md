@@ -1737,7 +1737,14 @@ superseded by Round 24 — not renumbered, not reused.
   ratchets an accessible-name floor on that string which `e2e-stack/passkey-registration.spec.ts` also
   addresses the control by. — (`apps/web/test/app-nav.test.tsx`)
 - **13.419** ✅ The menu heads with the signed-in name and email, the identity the replaced control used
-  to carry. — (`apps/web/test/app-nav.test.tsx`)
+  to carry. **RULING E5-37 (closed), same case's own contract extended, no new id (§13's numeric space
+  is contested across concurrent batches tonight — controller allocation, 2026-09-21 21:0x — so this
+  ruling holds none there):** `useCurrentUser`'s `name: user.name ?? user.id` never caught an EMPTY
+  string, and better-auth's magic-link population creates every email sign-up with `name: ''`. Two new
+  arms on the SAME describe block: the trigger's accessible name and the menu header both fall back to
+  the EMAIL for a `name === ''` user, and both fall back further to the raw id when even the email is
+  empty — the same `name → email → id` order `members/page.tsx`'s `memberLabel` already uses. —
+  (`apps/web/test/app-nav.test.tsx`, `apps/web/src/providers.tsx`)
 - **13.420** ✅ Escape closes the menu AND returns focus to the trigger. The focus half is the
   load-bearing one: closing without it strands focus at the document root, so a keyboard user who opens
   the menu and changes their mind must tab from the top of the page. A case asserting only that the menu

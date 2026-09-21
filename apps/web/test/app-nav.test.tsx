@@ -842,6 +842,47 @@ describe('Round 24 the account menu', () => {
     await userEvent.keyboard('{ArrowUp}');
     expect(screen.getByRole('menuitem', { name: 'Sign out Kiro' })).toHaveFocus();
   });
+
+  /**
+   * RULING E5-37 — `name: user.name ?? user.id` never caught an EMPTY
+   * string (`??` only catches `null`/`undefined`), and better-auth's
+   * magic-link population creates every email sign-up with `name: ''`. The
+   * shell then had no idea who was signed in: an empty accessible name on
+   * this trigger, an empty menu header, a "?" monogram. Every one of those
+   * surfaces reads `useCurrentUser`'s `name`, so fixing that one hook fixes
+   * all of them — this case is the trigger and the menu header together,
+   * the two the finding's own transcript quoted verbatim ("Account menu
+   * for ", an empty header line).
+   */
+  it('E5-37 an email sign-up (name === "") falls back to the email, not a blank name', async () => {
+    currentPath = '/workspaces';
+    mockSessionUser = { id: 'u_no_name', name: '', email: 'anjali@example.com' };
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+    const trigger = await screen.findByRole('button', { name: 'Account menu for anjali@example.com' });
+    await userEvent.click(trigger);
+    expect(screen.getByRole('menu')).toHaveTextContent('anjali@example.com');
+  });
+
+  it('E5-37 falls all the way back to the id when even the email is empty', async () => {
+    // A shape the type admits ({ id, name, email? }) even if the product's
+    // own better-auth config would not produce it today — the id is the
+    // one thing this component can ALWAYS attribute a person by, so this is
+    // the floor the fallback chain must not fall through.
+    currentPath = '/workspaces';
+    mockSessionUser = { id: 'u_bare', name: '', email: '' };
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+    expect(
+      await screen.findByRole('button', { name: 'Account menu for u_bare' }),
+    ).toBeInTheDocument();
+  });
 });
 
 /**
