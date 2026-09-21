@@ -125,7 +125,20 @@ does not rest on reading a line.
 | `F8` (exec 3, LOW) | that `check:db-tz` is the only one of the nine checkers with no automated invocation | `check:db-tz` occurs **once in the whole repo** — its own definition at `package.json:14` — and **is absent from `ci.yml`**, while all eight others (`check-env`, `check-runbook`, `check-citations`, `check-help`, `check-tasks`, `check-migrations`, `check-case-ids`, `check-no-silent-skips`) appear in the workflow | **holds** |
 | `F3` (exec 3, IMPORTANT) | that their own lane's §17 group cites an artefact the owner has ruled is not the prototype | `test-cases/17-open-work.md:58` cites `` `design-system/interactive/desktop.dc.html` ``, and I re-verified that file is the **camelCased copy** — `viewBox` occurs **0** times in it and `sc-camel-view-box` **24** — while the owner's ruling is that the prototype is the exported zip | **holds** |
 
-**Thirty-one checks across all five lanes. Thirty-one held. My refutation count is zero.**
+
+| `P18` (exec 1, IMPORTANT) | that a client-side navigation announces nothing in the shell | `layout.tsx`, `providers.tsx` and `app-nav.tsx` each contain **0** occurrences of `aria-live`, `role="status"` or `role="alert"` — exactly the correction exec 1 made to its own first pass | **holds** |
+| `P24` (exec 1, IMPORTANT) | that a text colour is undeclared, so the contrast gate cannot see it | `ui.css:2736-2743` is the quoted rule **verbatim** (`background: var(--gn-surface-sunken); font-size: 0.8rem; color: var(--gn-danger);`), and `tokens.ts` contains **exactly one** row matching a `danger` foreground/background pair — `:1225` `{ fg: 'dangerText', bg: 'danger', minimum: 4.5 }`. So `dangerText on danger` is declared and `danger on surfaceSunken` is not | **holds** |
+| `P11` (exec 1, IMPORTANT) | that the open Select panel's rows match no arm of the tap-target selector | `tap-targets.ts:267-280` is `a[href], button, input:not([type="hidden"]), select, textarea, summary, [role="button"], [role="link"], [role="tab"], [role="checkbox"], [role="switch"], [tabindex]:not([tabindex="-1"])` — **no `[role="option"]`, no `[role="listbox"]`** | **holds** |
+
+**Thirty-four checks across all five lanes. Thirty-four held. My refutation count is zero.**
+
+> **`P11` is the one that names my own blind spot, and it does so in the brief's words:** *"a sweep that
+> cannot see a class is a sweep that reports zero offenders."* I ran seven sweeps today — the catch sites,
+> the `.then` calls, the collapse-to-empty handlers, the `disabled=` expressions, the copy absolutes, the
+> case-catalogue quotations, the rendered counts — and **every one of them is a selector like this one:
+> anchored to a syntax I chose.** The eight peer findings I could not falsify are disproportionately the
+> ones whose evidence is a *painted* measurement, which is to say the ones no selector of mine reaches.
+> exec 1 found the shape of that and filed it; I spent the day inside it.
 
 > **`F3` is a lane auditing its own output, and it is worth naming as such.** exec 3 reports that a block
 > **its own lane wrote** cites the wrong artefact — *"every citation in it is off[set]"* — against an owner
