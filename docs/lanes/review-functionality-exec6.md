@@ -186,7 +186,9 @@ claim is about; `comment.added` is the only comment type in the vocabulary, so n
 `routes/attachments.ts:566-573`), `notifications/transport.ts` (whole), `notifications/store.ts:100-142` (keyset paging),
 `auth/routes.ts` (whole), `sync/reconcile-route.ts` (whole) and `sync/sync-service.ts:1-140` (the per-event
 state machine: a stored id is answered `committed` from the ledger row without comparing the resubmitted body to
-it — self-inflicted divergence only, since the id space is the client's own ULIDs; not filed), `mcp-server/src/{config,
+it — self-inflicted divergence only, since the id space is the client's own ULIDs; not filed), `sync-client/src/storage/schema.ts` (whole:
+`CREATE TABLE IF NOT EXISTS` only and a `schema_version` written but never read — an upgrade path that does not
+exist yet for a v2 that does not exist yet; noted, not filed), `mcp-server/src/{config,
 device-login,lazy-session,main,login-prompt}.ts` (whole), `app-core/src/online/stream.ts:95-160`, `:273-324` (frame
 parsing and cursor advance), `sync-client/src/replica/replica.ts:1050-1103`, `:1254-1290` (purge, scope-revoked,
 reach-granted arms), **the five route modules previously grep-only, code lines whole** — `routes/{attention,board,
@@ -253,7 +255,7 @@ size: 6 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ 
 - `packages/domain`: 30 of 41 files, including `entity-state.ts`, `ticket-state.ts` outside the reducer's event
   cases (`:1-98`, `:200-496` — `foldTicketToWorkflowVersion` in particular, used by the probes and not read), `submit.ts`, `parse-event.ts`, `envelope.ts`, `ids.ts`, `prefix.ts` outside `:100-180`, `ist-day.ts`,
   `doc-*.ts`, `simple-kanban.ts`, `stream-frames.ts`, `read-models.ts`, `notification*.ts`, `preferences.ts`.
-- `packages/sync-client`: `replica/replica.ts` outside the ranges named in §2.2 (≈1,100 lines), `storage/*`, `engine/sync-engine.ts` outside the
+- `packages/sync-client`: `replica/replica.ts` outside the ranges named in §2.2 (≈1,100 lines), `storage/*` other than `schema.ts`, `engine/sync-engine.ts` outside the
   flush loop (bootstrap, subscribe, reconcile, `stall`).
 - `packages/mcp-server`: nothing left unread (`register.ts` skimmed; `session.ts`/`http-client.ts` grep only).
 - `packages/app-core/src/online/`: `mappers.ts` outside `:903-1001` (≈2,350 lines), `stream.ts` outside the two
@@ -1556,13 +1558,13 @@ search.
 
 **WHY it is wrong.** The Delete commit (`18d7e391`, 2026-09-20) states its own rule twice. Its message: *"a
 filter at every view-serving read"*. Its docblock on the replica list read
-(`replica-data-source.ts:872-886`): *"Mirrored from the server's own list read, which ANDs `LIVE_TICKET_WHERE`
+(`replica-data-source.ts:983-995`): *"Mirrored from the server's own list read, which ANDs `LIVE_TICKET_WHERE`
 … — this is the offline half of that one decision."* The offline half was applied at `:996` (`getTickets`)
 and `:1029` (`getBoard`) and at no other read in the same file: `listTicketSummaries` (`:796-809`) walks
 `replica.listTickets` — `SELECT ticket_id FROM tickets WHERE workspace_id = ?`
-(`sync-client/src/replica/replica.ts:1143`) — and `summarise` (`:780-794`) reads eight fields of the state
+(`sync-client/src/replica/replica.ts:1143`) — and `summarise` (`:780-794`) reads seven fields of the state
 and not `deleted`; `myWork` (`:1323-1329`) filters those summaries by `assigneeId` only; `searchOfflineCopy`
-(`:1332-1340`) takes `replica.searchLocal`, whose title scan is `SELECT ticket_id, state FROM tickets WHERE
+(`:1357-1366`) takes `replica.searchLocal`, whose title scan is `SELECT ticket_id, state FROM tickets WHERE
 workspace_id = ?` (`replica.ts:1189-1194`) with no flag read. The product's own sentence for the feature is
 the FAQ's *"The ticket stops appearing in views"* (quoted in the commit message), and the phone board is a
 view. Round 1's F5 (exec 3) measured that the two gates which DO exist are unwitnessed — mutating either
@@ -1598,7 +1600,7 @@ resolves to its `dist`, and the dist was checked with a code-only needle rather 
 `grep -c "SELECT ticket_id FROM tickets WHERE workspace_id = ? ORDER BY ticket_id"
 packages/sync-client/dist/replica/replica.js` → 1, the `searchLocal` needle → 2, and the dist's mtime is later
 than `replica.ts`'s — so the unfiltered statements the probe exercised are the ones the source shows). Lines opened:
-`replica-data-source.ts:780-809`, `:872-886`, `:996`, `:1029`, `:1323-1340`; `replica.ts:1132-1152`,
+`replica-data-source.ts:780-809`, `:983-996`, `:1027-1029`, `:1323-1366`; `replica.ts:1132-1152`,
 `:1186-1207`; `board-screen.tsx:15-40`, `:56-59`; `apps/desktop/src/app.tsx:140-153`; `git show 18d7e391 --
 packages/app-core/src/replica/replica-data-source.ts` (the whole diff: two hunks, both filters, nothing else);
 `executor-state-history.md:671-696`; `review-functionality-exec3.md:316-335` (F5).
