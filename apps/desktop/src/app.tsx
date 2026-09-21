@@ -19,10 +19,24 @@ import { createTauriSqlStorage } from './storage/tauri-sql-storage.js';
 // then the token and workspace arrive via localStorage set on the sign-in page.
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:3000';
 
-// DEVIATION beyond the plan text: SyncStatusBar and ContestBanner do not exist
+// DEVIATION, and its stated reason EXPIRED — corrected 2026-09-21 (E2-25)
+// rather than deleted, so the next reader finds the correction where the old
+// justification was. This read: "SyncStatusBar and ContestBanner do not exist
 // in @gisik-nokma/app-core yet (Plan 6 has not landed them) — the sync status
-// is rendered here as plain inline markup instead of a component that does
-// not exist.
+// is rendered here as plain inline markup instead of a component that does not
+// exist."
+//
+// Both components exist and are exported from the barrel
+// (`sync/sync-status-bar.tsx:68`, `contests/contest-banner.tsx:25`,
+// `index.ts:313` and `:310`), so desktop is not blocked from mounting them. It
+// still renders the sync status as inline markup, and that is now a real
+// deviation with a cost worth naming: **the wording here is a hand-copy of
+// app-core's, and nothing connects the two, so a wording change on either side
+// will not be caught.** Measured at the time of this correction: the five
+// offline/degraded components (`UnreadBadge`, `ClockSkewBadge`,
+// `SavedFiltersMenu`, `SyncStatusBar`, `ContestBanner`) have ZERO production
+// renders across `apps/` and `packages/` — only test files render them. Whether
+// to mount them or delete them is a product decision and is NOT taken here.
 export function App() {
   const [ds, setDs] = useState<ReplicaDataSource | null>(null);
   const [status, setStatus] = useState<SyncStatus>('offline');

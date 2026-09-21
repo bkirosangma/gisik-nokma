@@ -44,7 +44,7 @@ export default function NewWorkflowPage() {
   const [draft, setDraft] = useState<WorkflowDraft | null>(null);
 
   return (
-    <main className="gn-shell">
+    <main id="gn-main" className="gn-shell">
       <AppNav workspaceId={workspaceId} />
       <h1 className="gn-page-title">New workflow</h1>
       {wiring.kind !== 'ready' ? (

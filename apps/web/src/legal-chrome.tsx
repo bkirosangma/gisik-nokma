@@ -44,13 +44,25 @@ import type { ReactNode } from 'react';
  * bar and this row — and ARIA's own guidance is that multiple navigation
  * landmarks must be distinguishable. "On this page" says which is which.
  *
+ * ⚠ **A CORRECTION THAT ARRIVED ON 2026-09-21 (exec1 P31), because the
+ * paragraph below says something that stopped being true and the FIRST reason
+ * above is the one that caught it.** *"The top bar and this row"* — the top bar
+ * was `LegalNav`, and `LegalNav` carried NO accessible name at all until P31.
+ * So on these two routes there were two navigation landmarks and only ONE of
+ * them said what it was: the guidance the first reason cites was being met by
+ * half. Both halves are now named — `LegalNav` is `"Legal"` — and the ratchet's
+ * `ariaLabel` count for `/privacy` and `/terms` therefore RISES, 1 → 2. **A rise
+ * is the direction this gate does not check**, so it is recorded here and in the
+ * PR body rather than absorbed.
+ *
  * Second: `e2e-viewport`'s accessible-names ratchet records `ariaLabel: 1` for
  * `/privacy` and `/terms`, and that 1 was `BackButton`'s
  * (`accessible-names-baseline.json`). Removing that control removes the
  * attribute, which would have taken both routes to 0 — a FALL, which 13.285
- * exists to catch. This label keeps the count at 1 by trading one labelled
- * control for one labelled landmark. **That trade is exactly what the ratchet
- * cannot judge and does not claim to**: its docblock says "a restyle that swaps
+ * exists to catch. This label traded one labelled control for one labelled
+ * landmark and kept the count at 1 **as the baseline stood at the time**; the
+ * correction above is what moved it to 2. **That trade is exactly what the
+ * ratchet cannot judge and does not claim to**: its docblock says "a restyle that swaps
  * one accessible name for another of equal count is not this gate's business —
  * that is the copy rule, reviewed by a person". So the swap is recorded here,
  * in the PR body, and by a unit case asserting the label by string, rather than

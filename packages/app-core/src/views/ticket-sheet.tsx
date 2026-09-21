@@ -730,11 +730,31 @@ export function TicketSheet({
     });
     const results = await dataSource.ingest([...fieldEvents, transition]);
     const failed = results.find((result) => result.status !== 'committed');
+    /*
+      BOTH READS ARE RE-ASKED ON EVERY ANSWER, not only the happy one (E2-36).
+      The batch above is ordered `[...fieldEvents, transition]` so a
+      `require-field` rule sees what the dialog just collected (:708-710) — which
+      means a batch that is refused AT THE TRANSITION has usually already
+      committed its field claims. The refusal arms below set `serverRefusal` and
+      used to RETURN with no reload, so the sheet sat behind the refusal still
+      painted with the pre-move values while the server already held the new
+      ones.
+
+      ⚠ The staleness window is stated for what it is, because the finding's
+      first draft overstated it ("nothing re-read"). A committed
+      `ticket.field_set` moves the workspace stream, so with `/v1/stream` live
+      the sheet DOES re-read itself and the window is a beat. What does not
+      repair is the socket-absent or socket-slow case — the same case
+      `page.tsx`'s delete handler was fixed for on 2026-09-20 (see `onDeleted`'s
+      docblock: "with the `/v1/stream` socket absent the list still showed a row
+      the toast had just said was deleted"). One reload site for both answers
+      removes the question rather than narrowing the window.
+    */
+    read.reload();
+    history.reload();
     if (failed === undefined) {
       setServerRefusal(null);
       setMoveOpen(false);
-      read.reload();
-      history.reload();
       return;
     }
     // The authority's own words, carried without paraphrase. A refusal is a
@@ -897,6 +917,23 @@ export function TicketSheet({
    * neither does `EvidencePicker`, the other path that would emit one. Mobile
    * has no wiring for the event at all. So the code to make a claim existed and
    * was never reachable from a screen; this mount is where it becomes reachable.
+   *
+   * ⚠ **THE SWEEP NAMED THREE AND MISSED A FOURTH — E2-47, corrected here.** This
+   * paragraph is the record of what is wired and what is not, so an omission from
+   * it is the one kind of error it cannot afford: a reader who counted three
+   * unwired exports and stopped had no way to learn that
+   * `transitionRequiresEvidence` (`packages/editor/src/attachments/require-evidence.ts:61`,
+   * exported at `packages/editor/src/index.ts:66`) was a fourth. Re-measured
+   * 2026-09-21 over `apps/` and `packages/`, excluding `dist/` and tests: its
+   * mentions are its own declaration, the barrel line and one test file — **zero
+   * production callers**, where the control symbol `assembleTicketCards` returns
+   * 52. So the count is FOUR, and the fourth is named rather than deleted: its
+   * four cases (9.107–9.110) pin the real exact-versus-from-any precedence of
+   * `require-evidence` matching, and deleting the symbol would strike them and
+   * take that knowledge with it. The finding offered "export it or delete it";
+   * keeping it is the branch that loses nothing, and its docblock now carries the
+   * structural reason no caller can exist (see there) instead of the invitation
+   * the finding objected to.
    *
    * ⚠ **AND THE PAYLOAD IS COMPOSED A SECOND TIME HERE, which is a divergence
    * worth naming rather than hiding.** `composeUploadAttachmentAdded` does
@@ -2291,6 +2328,17 @@ export function TicketSheet({
                   void addSubtask();
                 }}
               >
+                {/*
+                  E5-22 — WHAT the button will file. The child's type is chosen
+                  by `subtaskTypeFor` and was in hand and unsaid: rule 1 takes the
+                  built-in `task` whenever it is legal, so under an Epic (rank 1)
+                  the child is a Task and the Story rank between them is SKIPPED —
+                  and nothing on screen named it. `subtaskType.name` was read
+                  nowhere in the render before this line.
+                */}
+                <p className="gn-ticket-sheet__subtask-target" data-testid="sheet-subtask-target">
+                  {`Adds a ${subtaskType.name}.`}
+                </p>
                 <label className="gn-field" htmlFor="gn-new-subtask-title">
                   <span className="gn-field__label">New subtask title</span>
                   <input
@@ -2402,7 +2450,19 @@ export function TicketSheet({
               is drawn once.
             */}
             <div className="gn-ticket-sheet__field" data-testid="field-description">
-              <dt>description</dt>
+              {/* The field id was leaking into the UI: `:2454` renders
+                  `{fieldId}` for custom fields, and this row copied that shape
+                  instead of writing a caption, so the sheet read "description"
+                  beside "Assignee", "Priority", "Due" and "Type" (exec4 E4-4).
+                  Title case, matching those siblings. */}
+              {/* The caption, and the `id` the composer below is NAMED BY
+                  (exec1 P21). The `id` is load-bearing, not decorative: it is
+                  what `EditorSlot`'s `labelledBy` points at, so the words a
+                  sighted reader sees here and the name a screen reader
+                  announces are the SAME NODE and cannot drift. An `id` that
+                  nothing references would be a leftover — if this mount ever
+                  stops passing `labelledBy`, delete it in the same change. */}
+              <dt id="gn-ticket-sheet-description-label">Description</dt>
               <dd>
                 {/*
                   ⚠ BOTH BRANCHES ARE LIVE AND NEITHER IS DEAD CODE — do not
@@ -2422,6 +2482,11 @@ export function TicketSheet({
                 */}
                 <EditorSlot
                   mode="description"
+                  // The composer is NAMED BY the `<dt>` above rather than given
+                  // its own copy of the words (exec1 P21) — the same mechanism
+                  // the ticket sheet's tablist fix used, and the reason this row
+                  // does not also pass a `label` to contradict it.
+                  labelledBy="gn-ticket-sheet-description-label"
                   doc={descriptionClaim?.value}
                   readOnly={!canEditDescription}
                   workspaceId={workspaceId}
@@ -2724,12 +2789,24 @@ function HistoryTab({
   }
   return (
     <>
-      <HistoryList events={result.data} nameOf={nameOf} />
+      {/*
+        THE NOTICE COMES BEFORE THE LIST (E2-55). It used to follow it, and both
+        help documents describe it by its location — "It stops at 200 entries,
+        saying so at the top" (`docs/manual.md`) — so the sentence sent a reader
+        looking for a disclosure that sat below the 200 rows it is a disclosure
+        about. The `>=`-over-`==` trade argued at `HISTORY_PAGE_LIMIT` above is
+        about the CLAIM's strength and stands; where the claim is placed is a
+        separate decision, and a notice a reader must scroll past every row to
+        meet does not do the job the trade was made for. One JSX move, and the
+        help is true as written. `.gn-ticket-sheet__history-partial`'s margin
+        moved to the bottom edge with it.
+      */}
       {result.data.length >= HISTORY_PAGE_LIMIT ? (
         <p className="gn-ticket-sheet__history-partial">
           {`Showing the first ${HISTORY_PAGE_LIMIT} entries — this ticket's history may go on past them.`}
         </p>
       ) : null}
+      <HistoryList events={result.data} nameOf={nameOf} />
     </>
   );
 }

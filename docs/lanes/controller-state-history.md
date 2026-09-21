@@ -4,6 +4,28 @@
 
 ---
 
+## 🔄 MONDAY 2026-09-21 ~18:5x IST — **CYCLE 45: EXECUTION IS LIVE — THREE DEEPSEEK LANES ON B03/B04/B05, THREE OPUS LANES BUILDING `scripts/ctl`; THE CONTROLLER HANDS THE LOOP TO SONNET.** `main` is **`61b46b69`** (#639; #640 in flight).
+
+### 1. WHAT HAPPENED SINCE CYCLE 44
+- Owner: rebuild the stack from main → done 18:14 at `21d734f0` (4 min, not 14; verified). Owner: *"script up everything scriptable … never with the llms"* → brainstormed (hard enforcement with an owner escape hatch; repo-owned `scripts/ctl/`), spec + plan committed on `ctl/ctl-scripts` (`e60072a9`, `7bd7e113`), **exec 2/4/6 relaunched on Opus at 18:31 building it in parallel** (briefs `gisik-nokma-lanes/CTL-SCRIPTS-*`), merged into the integration branch as they push (at `790cf91d`: every verb T1–T13 and the hook, self-test 32/32; T14 dispatched, T15 in progress).
+- Owner: *"deepseek execs are available again … see which can be done by deepseek"* → plan §2b/§2c: **212 of 231 tasks DeepSeek**, 7 Claude-sonnet, 10 Claude-opus (#639). Owner: *"maximum of 3 deepseek execs, and 3 claude execs, one controller; if all claude assigned tasks get done, assign claude execs for the deepseek assigned tasks"* → plan §3 (#640). **ds1/ds3/ds5 launched 18:41 on B03/B04/B05 in push-only mode** (worktrees `gisik-nokma-ds{1,3,5}`, briefs `RELEASE-DS*`), claims pushed, first tasks in progress.
+- Owner: *"switch yourself to an appropriate model … do not use overkill models"* → `ctl-start.sh`/`ctl-self-restart.sh` default `EXECUTOR_MODEL=sonnet`; the override gained a MODEL ECONOMY section; **this session ends with `ctl-self-restart.sh 3 sonnet`.**
+
+### 2. WHAT THE SONNET CONTROLLER DOES NEXT, IN ORDER
+1. Wake; print the awake line; **re-arm the two watchers** (§1 row); `ctl` is NOT installed yet — the old landing path (`/tmp/ctl-merge.sh <pr> <gated-sha>` after a gate) is still the one to use until Task 16.
+2. **Merge #640 if still open** (its gate log is `judge-2026-09-21/gate/gate-dfe19ce9.*` when green — read it; if absent, gate it).
+3. **Keep merging lane branches into `ctl/ctl-scripts`** (exec 6's T14 and exec 4's T15 are the last two) (`git checkout ctl/ctl-scripts && git merge --no-edit origin/ctl/ctl-scripts-execN && bash scripts/ctl/test/lib.test.sh && python3 scripts/ctl/hooks/ctl-scripts-only.py --self-test && git push`). Task 14 is already dispatched; when exec 6 prints `DONE exec6 T14` and exec 4 prints `DONE exec4`, merge both and go to step 4.
+4. **Task 16 is a RULING-FREE but consequential sequence — do it on Sonnet exactly as the plan writes it**: `ctl checks` → `ctl pr open` (from the integration branch, base main) → `ctl gate` → `ctl land` → install the hook (`bash scripts/ctl/hooks/install-hooks.sh`) → demonstrate the refusal (`gh pr merge 1` must be denied) → `ctl anchor 46`. If any verb FAILs, fix the verb on the integration branch (a lane can do it) — do not fall back to the raw form.
+5. Then the DeepSeek batches: when a `rel/*` lane prints `DONE Bnn`, `ctl check-pr <branch> --body docs/lanes/pr-bodies/<batch>.md` in that worktree → `ctl pr open … --require-checked` → `ctl gate` → `ctl land`; relaunch the lane on the next whole-DeepSeek batch in §3 order (B06, B08, …). Claude lanes, once the build is landed: B01 and B02 on **sonnet**, B07 on **opus** (launch through `exec-claude.sh` with `EXECUTOR_MODEL=<model>`, backend anthropic), then the topology rule.
+6. **Rulings are not Sonnet's**: any of the brief's seven triggers → write the question into the card and `bash gisik-nokma-lanes/ctl-self-restart.sh 3 opus`.
+
+### 3. INSTRUMENTS THIS CYCLE
+- **zsh does not word-split `$var` in `for … in $list` / `set -- $pair`** — the first DeepSeek launch created a worktree named with spaces and launched nothing; cleaned up, redone from a bash script file. Every multi-value loop goes in a `bash` script.
+- **A paste into a freshly created tmux window races the terminal's own query reply** (`req` + the command → `command not found`): ds1's launch died that way. Wait ≥ 2 s after `new-window` before pasting; the `ctl restart` verb must do the same (told to exec 4 via the plan review).
+- The gate is 2m03s–2m37s on this box across seven runs today; the rebuild is 4 min.
+
+---
+
 ## 🔄 MONDAY 2026-09-21 ~18:3x IST — **CYCLE 44: THE RELEASE PLAN IS ON MAIN (#637) — 231 TASKS, 18 BATCHES, A MODEL PER TASK, BRIEFS A HAIKU DRIVER CAN RUN; NOTHING SCHEDULED.** `main` is **`b0b2aa65`**; zero open PRs.
 
 ### 1. WHAT LANDED

@@ -50,6 +50,25 @@ check "check-pr: a batch-id subject whose diff leaves the bookkeeping paths fail
 ( cd "$cr" && echo four > docs/x.md && /usr/bin/git commit -q -am "oops: not a ruling id" )
 check "check-pr: a non-merge, non-bookkeeping commit without a ruling id still fails" 'out=$(checkpr); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "commit subject does not start with a ruling id in the plan: .oops"'
 check "check-pr: a B-prefixed word that is not a batch id is not bookkeeping" '( cd "$cr" && /usr/bin/git commit -q --allow-empty -m "Bugfix: not a batch id" ); out=$(checkpr); printf "%s" "$out" | grep -q "ruling id in the plan: .Bugfix"'
+# check-pr.py's log rule: a cited log is judged by the CLAIM its citing line makes — green must be green, red must be red,
+# an unclaimed (measurement) log need only exist. Fixture logs carry real vitest / turbo tails; the body cites them the
+# way the plan's §4 rows do (a TDD pair on one row, a build log, a browser reading).
+lg=$(mktemp -d)
+printf ' Test Files  1 passed (1)\n      Tests  19 passed (19)\n   Duration  1s\n' > "$lg/a-green.log"
+printf ' Test Files  1 failed (1)\n      Tests  1 failed | 18 passed (19)\n   Duration  1s\n' > "$lg/a-red.log"
+printf ' Tasks:    7 successful, 7 total\nCached:    0 cached, 7 total\n  Time:    9s\n' > "$lg/build.log"
+printf 'the anchor at byte 14060 precedes the first <nav\nmeasured in Chrome, no suite summary here\n' > "$lg/reading.log"
+cp "$lg/a-green.log" "$lg/pair-g.log"; cp "$lg/a-red.log" "$lg/pair-t.log"
+logbody() { printf '%s\n' "$@" > "$cr-logs.md"; ( cd "$cr" && python3 "$HERE/verbs/check-pr.py" "$cr" plan.md docs/lanes/release-2026-09-22-progress.md "$cr-logs.md" 2>&1 ); }
+check "check-pr logs: a green log cited as green passes" '! logbody "| T-X1 | case — \`$lg/a-red.log\` (\`1 failed | 18 passed (19)\`) | \`$lg/a-green.log\` · \`19 passed (19)\` |" | grep -q "cited as green is not green"'
+check "check-pr logs: the red half of a TDD pair, cited as red, passes" '! logbody "| T-X1 | case — \`$lg/a-red.log\` (\`1 failed | 18 passed (19)\`) | \`$lg/a-green.log\` · \`19 passed (19)\` |" | grep -q "cited as red is not red"'
+check "check-pr logs: an arrow pair with unnamed halves — first red, second green — passes" '! logbody "| T-X1 | case | 2 failed → 71 passed | \`$lg/pair-t.log\` · \`$lg/pair-g.log\` |" | grep -q "cited as"'
+check "check-pr logs: a red log cited as green FAILS, naming the path and the marker" 'cp "$lg/a-red.log" "$lg/suite.log"; logbody "- \`@gisik-nokma/web\` — \`$lg/suite.log\` · Test Files **64 passed (64)**" | grep -q "log cited as green is not green (vitest: Test Files 1 failed): $lg/suite.log"'
+check "check-pr logs: a green log cited as RED FAILS" 'cp "$lg/a-green.log" "$lg/probe.log"; logbody "witnessed by mutation, \`$lg/probe.log\`" | grep -q "log cited as red is not red (vitest: Test Files 1 passed): $lg/probe.log"'
+check "check-pr logs: a turbo build log cited as green passes" '! logbody "- \`pnpm turbo run build\` — exit 0 (\`$lg/build.log\`)" | grep -q "cited as"'
+check "check-pr logs: a measurement log with no summary, cited without a claim, passes" '! logbody "MEASURED — \`$lg/reading.log\`: the anchor precedes the first nav" | grep -q "$lg/reading.log"'
+check "check-pr logs: a cited log that does not exist still fails" 'logbody "see \`$lg/nope.log\`" | grep -q "names a log that does not exist: $lg/nope.log"'
+rm -rf "$lg" "$cr-logs.md"
 rm -rf "$cb" "$cr" "$cr-body.md" "$co"
 rm -rf "$bare" "$gr" "$other"
 # Pane delivery helpers against a fake tmux on PATH: it records every call, answers display-message with $FAKE_MODE,
