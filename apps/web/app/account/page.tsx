@@ -228,8 +228,15 @@ export default function AccountPage() {
   );
 
   const saveName = useCallback(async (name: string) => {
+    // RULING E5-19: `result.error?.message ?? null` collapsed TWO different
+    // facts to the same `null` — "no error at all" (a real success) and "an
+    // error object with no message" (better-auth's own client types make
+    // `message` optional). `ProfileSection` reads `error === null` as
+    // success, so a message-less refusal used to render as though it had
+    // worked. The two are told apart here.
     const result = await authClient.updateUser({ name });
-    return { error: result.error?.message ?? null };
+    if (result.error === null || result.error === undefined) return { error: null };
+    return { error: result.error.message ?? 'The server refused this change and did not say why.' };
   }, []);
 
   const toggleKind = useCallback(

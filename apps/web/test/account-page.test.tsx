@@ -185,6 +185,46 @@ describe('AccountPage — Profile', () => {
     await user.click(await screen.findByRole('button', { name: 'Save name' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Name cannot be empty');
   });
+
+  /**
+   * RULING E5-19 — "Save name" had no success arm at all: a save, a
+   * message-less refusal, and (in principle) a save that never sent all
+   * painted identically, the button simply stopping "Saving…". This case
+   * is the success half.
+   */
+  it('E5-19 a successful save states "Name saved", not silence', async () => {
+    updateUser.mockResolvedValue({ data: {}, error: null });
+    const user = userEvent.setup();
+    mount();
+    await user.click(await screen.findByRole('button', { name: 'Save name' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Name saved');
+  });
+
+  it('E5-19 a refusal with NO message states a fallback, rather than reading as success', async () => {
+    // better-auth's client types `error.message` as optional — this is the
+    // account-page half of the same shape `passkeys` already covers for
+    // add/remove. `error?.message ?? null` upstream would have collapsed
+    // THIS to the same `null` a real success returns.
+    updateUser.mockResolvedValue({ data: null, error: { status: 400, statusText: 'BAD_REQUEST' } });
+    const user = userEvent.setup();
+    mount();
+    await user.click(await screen.findByRole('button', { name: 'Save name' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The server refused this change and did not say why.',
+    );
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('E5-19 editing the name again clears a stale "Name saved"', async () => {
+    updateUser.mockResolvedValue({ data: {}, error: null });
+    const user = userEvent.setup();
+    mount();
+    const nameInput = await screen.findByLabelText('Name');
+    await user.click(screen.getByRole('button', { name: 'Save name' }));
+    await screen.findByRole('status');
+    await user.type(nameInput, '.');
+    expect(screen.queryByRole('status')).toBeNull();
+  });
 });
 
 function workspace(over: Partial<WorkspaceRef> = {}): WorkspaceRef {

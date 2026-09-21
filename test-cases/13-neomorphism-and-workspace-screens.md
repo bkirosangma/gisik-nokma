@@ -1213,6 +1213,15 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   `listFailed`; the page wires a rejected `listUserPasskeys()` through to the refusal; the negative
   control (no alert, no refusal, when there is no failure) is the pre-existing case above, unchanged —
   (`packages/app-core/test/account/passkeys-section.test.tsx`, `apps/web/test/account-page.test.tsx`).
+  **RULING E5-19 (closed), added to this same pending block:** "Save name" had no success arm at all —
+  a save, and (independently) a message-less refusal, both painted identically to a save that had simply
+  not been clicked yet, the button stopping "Saving…" with nothing else on screen. Two fixes: `saveName`
+  now tells "no error" apart from "an error object with no `message`" (`result.error?.message ?? null`
+  previously collapsed both to the same `null` a real success returns), falling back to a stated sentence
+  for the latter; and `ProfileSection` gained a `role="status"` "Name saved" on success, cleared the
+  moment the field is edited again so a stale confirmation cannot describe a value no longer on screen.
+  Three cases: the success message; the message-less-refusal fallback (asserted NOT to also render the
+  status role); and the edit-clears-the-confirmation arm — (`apps/web/test/account-page.test.tsx`).
   **Not yet ID-allocated**: this file's own header requires the next free block
   (after 13.399) to be requested from the controller before minting, and this task has no channel to
   request one — the same gap `apps/web/test/app-nav.test.tsx`'s own `pending-13.4xx` describe block

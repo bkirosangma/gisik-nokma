@@ -25,13 +25,25 @@ export function ProfileSection({ name, email, onSave }: ProfileSectionProps) {
   const [draft, setDraft] = useState(name);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // RULING E5-19: this component previously had no success arm at all —
+  // `save` painted an error when refused and, on success, nothing, so a
+  // save, a message-less refusal (`error?.message ?? null` upstream, its
+  // own half of this ruling) and a click that never actually sent
+  // (impossible today, but not ruled out by this component's own contract)
+  // all read identically: the button just stops saying "Saving…".
+  const [saved, setSaved] = useState(false);
 
   const save = async () => {
     setSaving(true);
     setError(null);
+    setSaved(false);
     const result = await onSave(draft);
     setSaving(false);
-    if (result.error !== null) setError(result.error);
+    if (result.error !== null) {
+      setError(result.error);
+    } else {
+      setSaved(true);
+    }
   };
 
   return (
@@ -42,7 +54,14 @@ export function ProfileSection({ name, email, onSave }: ProfileSectionProps) {
         <input
           type="text"
           value={draft}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            // A stale "Name saved" is a claim about the field's CURRENT
+            // value, and editing again makes that claim false — the same
+            // reason a fresh attempt below clears `error` before it knows
+            // the new outcome.
+            setSaved(false);
+          }}
           className="gn-field__input"
         />
       </label>
@@ -54,6 +73,8 @@ export function ProfileSection({ name, email, onSave }: ProfileSectionProps) {
         <p role="alert" className="gn-shell__refusal">
           {error}
         </p>
+      ) : saved ? (
+        <p role="status">Name saved</p>
       ) : null}
       <Button variant="primary" onClick={() => void save()} disabled={saving}>
         Save name

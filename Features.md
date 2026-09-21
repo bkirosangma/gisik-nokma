@@ -144,11 +144,17 @@ The invitation banner's restyle (flat `--gn-tint-warning` wash, no shadow, no ac
   this plan does not build (spec non-goal), and the established "disabled input" read-only pattern
   would put the value where `getByText`/a screen reader's read-everything pass can't see it. A save
   failure renders the door's own `error.message` verbatim in a `role="alert"` when the door sends one —
-  never a paraphrase. **Named absence:** `saveName` reads only `result.error?.message`; better-auth's
-  own client type also allows an error with no `message` (only `status`/`statusText`), and that shape
-  collapses to `{ error: null }` — the save silently fails with no alert at all. Untested and unfixed
-  in this task; the shipped `authClient.updateUser` refusal path always carries a `message` today, but
-  a future caller of this same `saveName` shape should not assume that holds. Only the current
+  never a paraphrase. **RULING E5-19 (closed) — two defects, both silence.** `saveName` used to read only
+  `result.error?.message`, and better-auth's own client type also allows an error with no `message`
+  (only `status`/`statusText`); that shape collapsed to `{ error: null }`, the identical value a REAL
+  success returns, so a message-less refusal read as success. `saveName` now tells the two apart:
+  `result.error === null` (no error object at all) is the only path that still returns `{ error: null }`;
+  an error object with no `message` falls back to a stated sentence, "The server refused this change and
+  did not say why." **The second defect was that success painted no arm at all** — `ProfileSection` had
+  no success state, so a real save and this now-corrected message-less refusal would otherwise still
+  have painted identically (the button just stopping "Saving…"). A `role="status"` "Name saved" now
+  renders on success, and editing the field again clears it — a stale "Name saved" is a claim about the
+  field's CURRENT value, which an unsaved edit makes false. Only the current
   session's user renders the section at all — no user, no Profile. **Your workspaces (Task 4):** every
   workspace the signed-in caller belongs to, from `dataSource.query.getMyWorkspaces()`, listed with two
   real fields only — `role` (served verbatim from `proj_memberships.role`, the same field `/workspaces`'
