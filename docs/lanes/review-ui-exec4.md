@@ -9,7 +9,7 @@
 
 ## 0. THE ONE-LINE ANSWER
 
-**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Twenty-one of the twenty-four findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a 21-px close glyph, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast, by contrast, is clean everywhere I measured — 26 route×theme passes, one third-party watermark failing — because a contrast instrument existed and was run at least once.
+**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Twenty-two of the twenty-five findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a 21-px close glyph, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast, by contrast, is clean everywhere I measured — 26 route×theme passes, one third-party watermark failing — because a contrast instrument existed and was run at least once.
 
 ---
 
@@ -404,6 +404,17 @@ curl -s http://localhost:3041/v1/me/workspaces      # → {"error":"unauthentica
 
 ---
 
+
+### E4-25 — **MINOR** — The Settings sidebar's three section links are 39 px tall; the prototype's are `min-height:44px`, the file says so, and calls it out of scope
+
+**MEASUREMENT (painted, `/settings?workspaceId=…`, 390 and — padding-driven, so — every width).** `nav.gn-settings__sidebar a` ×3 (`Ticket types` with `aria-current="page"`, `Workflows`, `Workspace`): **232×39**, `display: block`, `padding: 8px 11.2px`, `min-height: auto`. Source: `apps/web/app/globals.css:1283-1288` (`padding: 0.5rem 0.7rem`, no min-height). The docblock above it (`:1263-1266`): *"THE ITEM'S OTHER METRICS AT `:3145` ARE STILL NOT PORTED — `min-height:44px`, `padding:0 14px`, `font-size:15px`, `font-weight:500` … Those are tap-target and type-scale questions … outside this task's named scope, and they are recorded here so the difference reads as a decision rather than an oversight."*
+
+**PROTOTYPE.** `Desktop.dc.html:3144` (`settingsNav` item style): `display:flex;align-items:center;min-height:44px;padding:0 14px;…font-size:15px;font-weight:500`. **Category 2 — recorded — and the argument against the record:** "outside this task's scope" is a reason the port stopped, not a ruling that 39 is right; the product's own floor for a standalone control is 44 (`tap-targets.ts:23-45`), the sidebar is not in `DENSE_IN_LIST`, and the route (`/settings`, distinct from `/settings/ticket-types`) is in no sweep's route list — so nothing has since re-asked the question the docblock deferred.
+
+**WHAT WOULD HAVE BEEN BETTER.** The four declarations the docblock already names, on the rule it already annotates.
+
+---
+
 ## 4. MATCHES AND RULED DIVERGENCES CHECKED
 
 _(so §3 is not a list of defects — each row is a measurement I took that came back clean or ruled)_
@@ -505,10 +516,10 @@ The owner ordered graph-first. I did: `graphify-out/GRAPH_REPORT.md` header, hub
 |---|---|---|
 | **Critical** | **0** | — |
 | **Important** | **17** | E4-1 · E4-2 · E4-3 · E4-4 · E4-5 · E4-7 · E4-8 · E4-9 · E4-11 · E4-12 · E4-13 · E4-14 · E4-17 · E4-18 · E4-19 · E4-21 · E4-23 |
-| **Minor** | **7** | E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 · E4-24 |
-| **total** | **24** | `17 + 7 = 24`; ids `E4-1` … `E4-24` with no gaps |
+| **Minor** | **8** | E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 · E4-24 · E4-25 |
+| **total** | **25** | `17 + 8 = 25`; ids `E4-1` … `E4-25` with no gaps |
 
-**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20, E4-24. Category 2 argued against the record: E4-6, E4-8, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23.
+**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20, E4-24. Category 2 argued against the record: E4-6, E4-8, E4-25, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23.
 
 **Overlap with round 1, stated:** E4-10 and E4-15 are new members of P1's class found by widening the population (class-less tags; classes whose rule forgot the border) and painted; E4-12 widens P11's scope from one component to the suite's population; E4-2 carries a painted reproduction of P8's focus finding as corroboration only. Nothing else overlaps.
 
