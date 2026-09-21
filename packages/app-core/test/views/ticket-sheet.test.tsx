@@ -2785,12 +2785,25 @@ describe('G — Priority, Due and Type as rows', () => {
     expect(screen.getByTestId('field-priority')).toBeInTheDocument();
     expect(screen.getByTestId('field-due')).toBeInTheDocument();
     expect(screen.getByTestId('field-type')).toBeInTheDocument();
-    // Each says what is TRUE of the absence, in its own words: the date
-    // sentence is the prototype's own, transcribed.
-    expect(within(screen.getByTestId('field-due')).getByText('No date claimed')).toBeInTheDocument();
+    // ⚠ AMENDED 2026-09-22 (priority built-in, spec 2026-09-22). This read
+    // `getByText('No priority claimed')`, which was the CUSTOM-FIELD-CONVENTION
+    // absence: priority existed only when a type declared such a field. It is
+    // the fifth built-in now and the row is the prototype's segmented EDITOR, so
+    // what `bare()` produces is not "this ticket has no priority" — that state
+    // no longer exists — but "this READ carries no claim", which is a stale
+    // projection. Case `16.104` owns that sentence and the unselected control;
+    // this case keeps only the claim it was written for, that the row is DRAWN.
     expect(
-      within(screen.getByTestId('field-priority')).getByText('No priority claimed'),
+      within(screen.getByTestId('field-priority')).getByRole('tablist', { name: 'Priority' }),
     ).toBeInTheDocument();
+    // The START row joins them (spec 2026-09-22) — a built-in since Plan 3 that
+    // the sheet never drew, so this row is new rather than moved.
+    expect(screen.getByTestId('field-start')).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('field-start')).getByText('No date claimed'),
+    ).toBeInTheDocument();
+    // And the same for Due's own absence, the prototype's sentence.
+    expect(within(screen.getByTestId('field-due')).getByText('No date claimed')).toBeInTheDocument();
   });
 
   it('16.24 Due renders the claimed day AND its claim line — both halves', async () => {
@@ -2837,10 +2850,13 @@ describe('G — Priority, Due and Type as rows', () => {
     expect(within(screen.getByTestId('field-type')).getByText('task')).toBeInTheDocument();
   });
 
-  it('16.27 Priority renders the claim when the ticket carries one — it is a CONVENTION, not a built-in', async () => {
-    // Priority has no domain concept: it exists only because a type declared
-    // such a field. So the claimed case is reached by the ticket carrying the
-    // field, exactly as a custom field would.
+  it('16.27 Priority renders the claim as the SELECTED segment with its claim line — it is a BUILT-IN now', async () => {
+    // ⚠ AMENDED 2026-09-22 (spec 2026-09-22), and the retitle is the amendment.
+    // This read "it is a CONVENTION, not a built-in" and reached the claimed
+    // case by the ticket carrying a field the type happened to declare. Priority
+    // is the fifth built-in, so the claimed case is the ORDINARY one — every
+    // ticket has a claim from birth — and the value now renders as the selected
+    // segment of the prototype's control rather than as loose text.
     const read = ticketRead({
       ticket: ticketStateSeed({
         fields: {
@@ -2858,9 +2874,13 @@ describe('G — Priority, Due and Type as rows', () => {
     await settled();
 
     const row = screen.getByTestId('field-priority');
-    expect(within(row).getByText('P1')).toBeInTheDocument();
+    // THREE segments, and the claim's own level is the selected one. Asserting
+    // all three states and not just `P1`'s: a control that marked every segment
+    // selected, or none, would pass a one-sided assertion.
+    expect(within(row).getByRole('tab', { name: 'P1' })).toHaveAttribute('aria-selected', 'true');
+    expect(within(row).getByRole('tab', { name: 'P2' })).toHaveAttribute('aria-selected', 'false');
+    expect(within(row).getByRole('tab', { name: 'P3' })).toHaveAttribute('aria-selected', 'false');
     expect(within(row).getByText('set by Anselma Marak on 18 Aug 2026')).toBeInTheDocument();
-    expect(within(row).queryByText('No priority claimed')).toBeNull();
   });
 
   it('16.28 draws NO second row for a field that now has its own — the exclusion', async () => {
@@ -2872,6 +2892,15 @@ describe('G — Priority, Due and Type as rows', () => {
 
     expect(screen.getByTestId('field-due')).toBeInTheDocument();
     expect(screen.queryByTestId('field-dueDate')).toBeNull();
+    // `startDate` joins the exclusion for the same reason, one rung milder: the
+    // Start row this change adds draws its own `field-start`, and the generic
+    // loop would otherwise draw a SECOND row for the same claim.
+    expect(screen.queryByTestId('field-startDate')).toBeNull();
+    // And exactly ONE `field-priority`: the segmented editor is the only row for
+    // that claim. `getAllByTestId` rather than `queryByTestId(...)` being null,
+    // because the failure this guards against is a SECOND row — an absence
+    // assertion would pass for a sheet that drew none at all.
+    expect(screen.getAllByTestId('field-priority')).toHaveLength(1);
     // And one node, not two: the date appears exactly once on the sheet.
     //
     // ⚠ AMENDED BY RULING E5-6. This read `getAllByText('30 Aug 2026')` and
@@ -2884,36 +2913,156 @@ describe('G — Priority, Due and Type as rows', () => {
     expect(screen.queryByText('30 Aug 2026')).toBeNull();
   });
 
-  it('16.29 the rows are READ-ONLY except the one ruling E5-6 made an editor', async () => {
+  it('16.29 Priority, Due and Start are EDITORS; Type is read-only', async () => {
     // The prototype draws Priority as a segmented control with click handlers
     // and Due as an `<input type="date">` (`desktop.dc.html:1192-1205`); only
     // Type is read-only there.
     //
-    // ⚠ AMENDED BY RULING E5-6 (2026-09-21), and this is the amendment the
-    // case's own suite docblock asked for: it said 16.29 "asserts the READ-ONLY
-    // half so that making them editable later is a decision rather than a
-    // drift". The decision was taken — `apps/web` could read a due date in four
-    // places and set it in none — so **Due now HAS an editor and Priority does
-    // not**, and this case pins both halves of that split rather than the
-    // uniform absence it used to pin. The loop that used to run over all three
-    // rows would now fail on `field-due`, which is exactly the reddening the
-    // docblock wanted: it forced this to be a decision on the record.
+    // ⚠ AMENDED TWICE, and both amendments are the record of a decision taken
+    // rather than a drift. RULING E5-6 (2026-09-21) made DUE an editor here —
+    // `apps/web` could read a due date in four places and set it in none — so
+    // this case stopped pinning the uniform read-only absence and started
+    // pinning the split. SPEC 2026-09-22 (the priority built-in) took the other
+    // half of the prototype's own shape: PRIORITY is now an editor too, and the
+    // START row that change adds is Due's twin. **Type is the ONE row left
+    // read-only**, which is exactly what the prototype draws there.
+    //
+    // Each editor is asserted POSITIVELY — its own control is present — so the
+    // case cannot pass by a control silently disappearing, and the read-only
+    // half is asserted as an absence the way `16.22` does for F's chip, so
+    // "read-only" is a claim somebody checked.
     renderSheet(ticketRead());
     await settled();
 
-    // DUE — the editor, asserted POSITIVELY so the case cannot pass by the
-    // control silently disappearing.
     expect(screen.getByTestId('field-due').querySelector('input')).not.toBeNull();
+    expect(screen.getByTestId('field-start').querySelector('input')).not.toBeNull();
+    expect(within(screen.getByTestId('field-priority')).getAllByRole('tab')).toHaveLength(3);
 
-    // PRIORITY and TYPE — still read-only, asserted as an absence, the same way
-    // `16.22` does for F's chip. Without it, "read-only" is a claim nobody
-    // checked.
-    for (const id of ['field-priority', 'field-type']) {
-      const row = screen.getByTestId(id);
-      expect(row.querySelector('input'), id).toBeNull();
-      expect(row.querySelector('select'), id).toBeNull();
-      expect(row.querySelector('button'), id).toBeNull();
+    // TYPE — still read-only.
+    const typeRow = screen.getByTestId('field-type');
+    expect(typeRow.querySelector('input')).toBeNull();
+    expect(typeRow.querySelector('select')).toBeNull();
+    expect(typeRow.querySelector('button')).toBeNull();
+  });
+
+  /** A ticket whose birth claim is P2 — the ordinary shape, and the one this
+   *  change makes EVERY ticket carry. */
+  const withPriority = (value: 'P1' | 'P2' | 'P3'): TicketRead =>
+    ticketRead({
+      ticket: ticketStateSeed({
+        fields: {
+          ...ticketRead().ticket.fields,
+          priority: {
+            value,
+            actorId: 'user_kiro',
+            clientTime: '2026-08-18T08:06:00.000Z',
+            serverTime: '2026-08-18T08:07:00.000Z',
+          },
+        },
+      }),
+    });
+
+  it('16.100 clicking a different segment submits ONE ticket.field_set carrying that level', async () => {
+    const source = renderSheet(withPriority('P2'));
+    await settled();
+    fireEvent.click(within(screen.getByTestId('field-priority')).getByRole('tab', { name: 'P1' }));
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    expect(source.ingested[0]![0]!.type).toBe('ticket.field_set');
+    // `toEqual`, never `toMatchObject`: the envelope must carry EXACTLY this
+    // composition, so a row that re-spelled the fieldId or wrapped the level in
+    // an object would be a different claim about the ledger.
+    expect(source.ingested[0]![0]!.payload).toEqual({ fieldId: 'priority', value: 'P1' });
+  });
+
+  it('16.101 CONTROL — clicking the SELECTED segment submits nothing (there is nothing to clear to)', async () => {
+    // The prototype's control has no clear affordance and neither does this one
+    // (spec 2026-09-22: priority "is always there", with no clearing claim), so
+    // a click on the segment already selected is a no-op. The other segment is
+    // reached in the same run by `16.100`, which is what makes this zero mean
+    // "the guard" rather than "the control does nothing".
+    const source = renderSheet(withPriority('P2'));
+    await settled();
+    fireEvent.click(within(screen.getByTestId('field-priority')).getByRole('tab', { name: 'P2' }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(source.ingested).toHaveLength(0);
+  });
+
+  it('16.102 a REFUSED priority keeps the previous segment selected and prints the refusal beside the row', async () => {
+    const read = withPriority('P2');
+    const source = sheetSource(read);
+    source.ingest = async () => [
+      { status: 'refused', rule: 'field.type-mismatch', reason: '"Priority" needs one of P1, P2 or P3.' } as IngestResult,
+    ];
+    renderSheet(read, source);
+    await settled();
+    fireEvent.click(within(screen.getByTestId('field-priority')).getByRole('tab', { name: 'P3' }));
+    // A REGEX, not the sentence: the sheet renders one concatenated line —
+    // `Refused by the server — <rule>: <reason>` — so an exact-string matcher
+    // would be asking for an element whose whole text is the reason alone, and
+    // there is none. Unanchored, so it matches the reason inside the sentence.
+    expect(await screen.findByText(/needs one of P1, P2 or P3/)).toBeInTheDocument();
+    // The SELECTION did not move: the claim on the ledger is still P2, and a
+    // control that had adopted the refused level would be showing a value
+    // nobody recorded — the same rule the Due row's refusal arm keeps.
+    expect(
+      within(screen.getByTestId('field-priority')).getByRole('tab', { name: 'P2' }),
+    ).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('16.103 the Start row is a date editor like Due: a changed day submits field_set startDate', async () => {
+    const source = renderSheet(ticketRead());
+    await settled();
+    const input = screen.getByLabelText('Start date');
+    fireEvent.change(input, { target: { value: '2026-09-01' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    expect(source.ingested[0]![0]!.payload).toEqual({
+      fieldId: 'startDate',
+      value: { date: '2026-09-01' },
+    });
+  });
+
+  it('16.104 a ticket read with NO priority claim says the projection is stale — never "No priority claimed", never P2', async () => {
+    renderSheet(bare());
+    await settled();
+    const row = screen.getByTestId('field-priority');
+    // The sentence NAMES the cause, because the cause is actionable: every
+    // `ticket.created` writes a claim since 2026-09-22, so a read without one is
+    // a `proj_tickets` that was never rebuilt — not a ticket that "has no
+    // priority", which is a state this product no longer has.
+    expect(within(row).getByText(/carries no priority claim/)).toBeInTheDocument();
+    expect(within(row).queryByText('No priority claimed')).toBeNull();
+    // And NOTHING is selected. The alternative — preselecting P2, the birth
+    // default — would print a level with no claim line beside it, which is the
+    // reader-side default the spec rejected; this is the visible half of that
+    // rejection.
+    for (const tab of within(row).getAllByRole('tab')) {
+      expect(tab, tab.textContent ?? '').toHaveAttribute('aria-selected', 'false');
     }
+  });
+
+  it('16.105 the Start row shows its claim line when claimed', async () => {
+    renderSheet(
+      ticketRead({
+        ticket: ticketStateSeed({
+          fields: {
+            ...ticketRead().ticket.fields,
+            startDate: {
+              value: { date: '2026-08-20' },
+              actorId: 'user_anselma',
+              clientTime: '2026-08-18T08:04:00.000Z',
+              serverTime: '2026-08-18T08:05:00.000Z',
+            },
+          },
+        }),
+      }),
+    );
+    await settled();
+    const row = screen.getByTestId('field-start');
+    expect(within(row).getByLabelText('Start date')).toHaveValue('2026-08-20');
+    expect(within(row).getByText('set by Anselma Marak on 18 Aug 2026')).toBeInTheDocument();
   });
 
   /**

@@ -2142,6 +2142,18 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    flex COLUMN whose default `stretch` would run a date input the full width of
    the sheet. */
 .gn-ticket-sheet__due-input { align-self: start; }
+/* START'S TWIN of the rule above, and the same declaration for the same reason
+   (spec 2026-09-22). A separate class rather than a shared `.gn-ticket-sheet__
+   date-input`: the two rows are deliberately two rows, and a shared class would
+   be the first step toward the shared component `submitStartDate`'s docblock
+   declines to extract on two instances. */
+.gn-ticket-sheet__start-input { align-self: start; }
+/* The Priority row's segmented control (spec 2026-09-22), `inline-flex` to
+   match the prototype's own (`desktop.dc.html:1192`) — `.gn-ticket-sheet__field
+   dd` is a flex COLUMN whose default `stretch` would otherwise run the three
+   segments the full width of the sheet, which is the defect the due input's
+   `align-self` above exists to prevent on the other axis. */
+.gn-ticket-sheet__field .gn-segmented { display: inline-flex; }
 /* Three states of the History tab, three renderings. `__history-error` is NOT
    `__refusal`: getTicketHistory answers, so a rejection is a failure that may
    retry, not a permanent serving gap. */
