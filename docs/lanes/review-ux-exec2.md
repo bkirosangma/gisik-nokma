@@ -1540,6 +1540,43 @@ not a reproduction.
 
 **Source:** `apps/mobile` beyond the two screens `E2-41`/`E2-42` needed — reached by working my own coverage
 list as the controller directed. **Severity: Important.**
+### E2-49 (r2) — MINOR · Push registration's declared contract is not total: a transport failure escapes as a rejection its only caller voids
+
+**WHAT.** `apps/mobile/src/push/register-push.ts:9-38` declares
+`Promise<{ registered: boolean; reason?: string }>` and returns a discriminated outcome for four cases — a
+token failure (`:28-30`, `reason: 'no-token'`), a 404 (`:36`, `'transport-unavailable'`), any non-ok
+(`:37`, `` `http-${res.status}` ``) and success (`:38`). **The `fetch` at `:31` is not inside any `catch`**, so a
+transport failure — offline, a dropped socket — **rejects** instead of returning `{ registered: false,
+reason: … }`.
+
+**And its only caller voids it.** `apps/mobile/src/app.tsx:52`: `void registerPushToken({ baseUrl: API_BASE,
+token: TOKEN });` — a `void`, so the rejection is unhandled and the caller never learns.
+
+**WHY it is wrong, with the blast radius stated honestly rather than inflated.** The file's own docblock
+says it is *"written to degrade honestly — the app keeps working without push"*, and that is true: push is
+optional, the server has no `/v1/push/registrations` route yet (the file verified that), and nothing a person
+sees depends on this call. **What is wrong is narrower and real: the function's declared return type
+promises totality — every path answers `{registered, reason}` — and one path does not.** A caller written
+against the signature would have no reason to expect a rejection, and the one that exists does not handle
+one. That is the same shape as `E2-45` (a void'd promise on a control whose failure is silent) at a fraction
+of the consequence, and it is worth one line because a type that over-promises is what makes the next caller
+write the wrong thing.
+
+**WHAT WOULD HAVE BEEN BETTER.** Move the `fetch` inside the `try` at `:26-30`, or add a second `catch`
+returning `{ registered: false, reason: 'unreachable' }` — the vocabulary is already there in spirit (the
+404 arm is `'transport-unavailable'`, which is a *different* fact from a request that never got an answer,
+and conflating them would be the mistake Ruling 27/33 exists to prevent). ⚠ **And the reason must be a
+third value, not the 404 one** — this product has a standing rule that a refusal and a dropped connection are
+never the same word.
+
+**MEASUREMENT.** Opened: `apps/mobile/src/push/register-push.ts:1-39` (in full — the four return arms, the
+`try`/`catch` that covers only `getToken`, and the unguarded `doFetch` at `:31`);
+`apps/mobile/src/app.tsx:52` (the `void` call site). ⚠ **Checked and NOT a defect, so it is not filed:** the
+permission denial at `:21` throws, and that throw **is** caught by the `try` at `:26` — I read it expecting a
+second hole and there is not one.
+
+**Source:** `apps/mobile` beyond the files `E2-41`/`E2-42`/`E2-48` needed — reached by working my own
+coverage list as the controller directed. **Severity: Minor.**
 
 ---
 
