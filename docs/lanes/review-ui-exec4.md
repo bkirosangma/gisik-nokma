@@ -9,7 +9,7 @@
 
 ## 0. THE ONE-LINE ANSWER
 
-**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Twenty-seven of the thirty findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast, by contrast, is clean everywhere I measured in the shipped `neo` style — 26 route×theme passes, one third-party watermark failing — and the one real failure the round found (exec 1's P24, 3.84:1 in `hig`/`minimal`) I painted and confirmed for them rather than claimed.
+**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Twenty-nine of the thirty-two findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast is clean everywhere I measured in the shipped `neo` style — 26 route×theme passes, one third-party watermark failing — and switching the style axis to `hig`/`minimal` client-side found two AA failures of my own (E4-31, a ghost button on a sunken row at 3.99:1 that case 13.360's two assertions do not reach; E4-32) beside the one exec 1 computed (P24), which I painted and confirmed for them.
 
 ---
 
@@ -478,6 +478,29 @@ curl -s http://localhost:3041/v1/me/workspaces      # → {"error":"unauthentica
 
 ---
 
+
+### E4-31 — **IMPORTANT** — Ghost buttons placed on a sunken row paint at **3.99:1** (light) / **4.00:1** (dark) in `hig` and `minimal` — an accent-on-fill-over-sunken composite that case 13.360 does not measure, on three routes
+
+**WHAT.** `button.gn-button--ghost` inside `li.gn-mcp-tokens__row` (`/account` *Connected assistants* and `/mcp/tokens`: *Name the connection…*, *Revoke*), inside the sessions rows, and `button.gn-button--ghost.fields-editor__required` (*Optional* / *Required*) on the type editor.
+
+**MEASUREMENT (painted, 1512, `data-style` set client-side).** Light, `hig` and `minimal`: text `rgb(50,93,151)` on the composited `rgb(207,199,192)` → **3.99:1** at 16 px. Dark (`emulate colorScheme: dark`), `hig` and `minimal`: `rgb(139,177,230)` on `rgb(65,73,109)` → **4.00:1**. `neo`, both themes: no failure. The chain, opened: `button.gn-button--ghost` `background: rgba(39,58,99,0.11)` (`fillTertiary`) → `li.gn-mcp-tokens__row` `background: rgb(228,216,204)` (`surfaceSunken`) → `div.gn-card` `rgb(251,247,243)`. Why the gate is green: `packages/ui/src/tokens.ts:476-479` derives `textAccentLight` against *"the `hig`/`minimal` ghost-button composite 4.539 (the binding constraint)"* — `fillTertiary` over **`surface`** — and `packages/ui/test/tokens.test.ts:1089-1108` (case **13.360**, *"textAccent clears 4.5 against the fillTertiary-composited control background and surfaceSunken"*) asserts two things: accent on (fill over `surface`) and accent on bare `surfaceSunken`. **Neither is this paint**: the product composites the fill over `surfaceSunken`, and that third composite is 3.99. `grep -n "fg: 'textAccent'" tokens.ts` shows no declared row against a sunken-composited fill.
+
+**WHY IT IS WRONG.** WCAG 1.4.3 (AA) at 16 px, on *Revoke* — a security control — in two of the three styles, both themes. And it is the brief's exact shape: a case (13.360) whose title reads as if it covers the sunken placement, and whose two assertions cover the placements the product does *not* use for these buttons.
+
+**WHAT WOULD HAVE BEEN BETTER.** Add the third composite to 13.360 (`textAccent` on `fillTertiary` over `surfaceSunken`, all six style×theme) — it reddens today — then either lift the rows off `surfaceSunken`, use the `--primary` variant on sunken rows, or step `textAccent` down again in `hig`/`minimal`.
+
+---
+
+### E4-32 — **MINOR** — The builder's advisories heading paints `warning` on `surfaceSunken` at **3.71:1** (13.6 px) in `hig`/`minimal` light, and `warning` is a foreground no `CONTRAST_PAIRS` row names
+
+**MEASUREMENT (painted, builder route, 1512, light).** `h3.advisories-panel__title` (*"Worth a look — none of these block publishing"*): `color: rgb(178,80,0)` on `section.advisories-panel` `background: rgb(228,216,204)`, `font-size: 13.6px` → **3.71:1** in `hig` and `minimal`; `neo` light passes; dark passes in all three (the only dark failure on the route is React Flow's attribution, E4-16). Source: `ui.css:2279` `.advisories-panel__title { … color: var(--gn-warning); }` inside `.advisories-panel { background: var(--gn-surface-sunken) }` (`:2274`); `grep -n "fg: 'warning'" packages/ui/src/tokens.ts` → **0** — the role is never checked as text on any surface (only `warningText`-on-`warning` badges are).
+
+**WHY IT IS WRONG.** 1.4.3 at 13.6 px on a heading; same regime gap as exec 1's P24 (undeclared pair) on a different pair, found by painting rather than computing.
+
+**WHAT WOULD HAVE BEEN BETTER.** `color: var(--gn-text-muted)` with the warning tone carried by the panel's border/eyebrow, or a `{ fg: 'warning', bg: 'surfaceSunken' }` row and a darker `warning` in `hig`/`minimal`.
+
+---
+
 ## 4. MATCHES AND RULED DIVERGENCES CHECKED
 
 _(so §3 is not a list of defects — each row is a measurement I took that came back clean or ruled)_
@@ -538,7 +561,7 @@ _(so §3 is not a list of defects — each row is a measurement I took that came
 | **390×844 · light · neo** (`emulate …,mobile,touch`) | `/workspaces`, `/w/:id`, the board, the sheet open (with screenshot), `/inbox`, `/account`, `/my-work`, `/members`, `/settings`, ticket-types list/`new`/`errand`, workflows list/`new`/builder/history, `/help`, `/mcp/tokens` |
 | **320×568 · light · neo** | the sheet open on the board, `/workspaces`, `/w/:id`, `/members`, `/my-work`, `/account`, `/help`, `errand`, the builder — overflow/reflow only |
 | **768×1024 · light · neo** | the sheet open on the board, `/workspaces`, `/w/:id`, `/members`, the builder, `errand`, `/account` |
-| **500 · light · `hig` / `minimal` / `neo`** (attribute set client-side) | the sheet open on the board — contrast + UA-chrome only |
+| **1512 · light AND dark · `hig` / `minimal`** (`data-style` set client-side, nothing persisted) | 15 route/states (the board, the sheet open, `/workspaces`, `/w/:id`, `/my-work`, `/members`, `/settings`, ticket-types list + `errand`, workflows list + builder, `/account`, `/inbox`, `/help`, `/mcp/tokens`) — contrast + UA-chrome; dark re-run on `/account`, `errand`, the builder |
 | **1512 · dark** (`emulate colorScheme: dark`) | the sheet open, `/workspaces`, `/w/:id`, `/my-work`, `/members`, `/settings`, `errand`, the builder, `/account`, `/inbox`, `/help`, `/mcp/tokens`, and the four board views |
 
 Screenshots taken and **committed** under `docs/lanes/exec4-paint/`: `board-1512.jpeg`, `board-390.jpeg`, `sheet-390-description.jpeg` (JPEG q55–60, 260 KB total). The numbers in the findings are from `getBoundingClientRect`/`getComputedStyle`; the screenshots are the human check.
@@ -584,11 +607,11 @@ The owner ordered graph-first. I did: `graphify-out/GRAPH_REPORT.md` header, hub
 | claimed severity | count | members |
 |---|---|---|
 | **Critical** | **0** | — |
-| **Important** | **18** | E4-1 · E4-3 · E4-4 · E4-5 · E4-7 · E4-8 · E4-9 · E4-11 · E4-12 · E4-13 · E4-14 · E4-17 · E4-18 · E4-19 · E4-21 · E4-23 · E4-28 · E4-30 |
-| **Minor** | **12** | E4-2 · E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 · E4-24 · E4-25 · E4-26 · E4-27 · E4-29 |
-| **total** | **30** | `18 + 12 = 30`; ids `E4-1` … `E4-30` with no gaps |
+| **Important** | **19** | E4-1 · E4-3 · E4-4 · E4-5 · E4-7 · E4-8 · E4-9 · E4-11 · E4-12 · E4-13 · E4-14 · E4-17 · E4-18 · E4-19 · E4-21 · E4-23 · E4-28 · E4-30 · E4-31 |
+| **Minor** | **13** | E4-2 · E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 · E4-24 · E4-25 · E4-26 · E4-27 · E4-29 · E4-32 |
+| **total** | **32** | `19 + 13 = 32`; ids `E4-1` … `E4-32` with no gaps |
 
-**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20, E4-24, E4-27, E4-29, E4-30. Category 2 argued against the record: E4-6, E4-8, E4-25, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23, E4-28. Matches the prototype, fails the product's own later rule: E4-26.
+**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20, E4-24, E4-27, E4-29, E4-30. Category 2 argued against the record: E4-6, E4-8, E4-25, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23, E4-28, E4-31, E4-32. Matches the prototype, fails the product's own later rule: E4-26.
 
 **Overlap with round 1, stated:** E4-10 and E4-15 are new members of P1's class found by widening the population (class-less tags; classes whose rule forgot the border) and painted; E4-12 widens P11's scope from one component to the suite's population; E4-2 carries a painted reproduction of P8's focus finding as corroboration only. Nothing else overlaps.
 
