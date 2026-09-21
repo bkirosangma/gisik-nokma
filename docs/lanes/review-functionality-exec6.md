@@ -22,7 +22,7 @@ a measurement it lacks is added, and where that happens the finding says so.
 
 ## 0. THE ONE-LINE ANSWER
 
-**No Critical claimed.** Sixteen findings, twelve Important, every one measured through a door the product ships. The recurring
+**No Critical claimed.** Seventeen findings, twelve Important, every one measured through a door the product ships. The recurring
 shape is **a door that accepts what every read surface says cannot be happening**: writes on a soft-deleted ticket
 (E6-2), a deleted open child blocking its parent while the board shows zero (E6-4), a type re-rank and a workflow
 republish that leave hierarchies the engine then refuses to reproduce (E6-3, E6-8), a bulk migration refused
@@ -1086,6 +1086,44 @@ row so the token list can say *"approved by you, in the browser"* against *"appr
 with the contradiction printed on the consent page. Not Critical: it needs a token that is already abused, and
 the successor is visible in the list to a person who looks.
 
+### E6-17 — MINOR — `ticket.assigned` and `ticket.collaborator_added` accept any non-empty string as a person — a non-member, a fresh ULID, the word `nobody-here` — and the board renders it
+
+**WHAT.** Through `POST /v1/events` as the owner (Appendix O; 1 file / 1 test passed):
+
+```
+assign to a signed-up user who is NOT a workspace member     -> committed
+assign to a fresh ULID nobody owns                           -> committed
+assign to the string 'nobody-here'                           -> committed
+collaborator_added 'nobody-here'                             -> committed
+control: assign to the owner (a member)                      -> committed
+board -> 200; assigneeId values on cards: "assigneeId":"nobody-here"
+roster -> 200; contains 'nobody-here': false; contains stranger: false
+list filtered by assigneeId=nobody-here -> 200; contains T: true
+```
+
+**WHY it is wrong.** The payloads are `z.string().min(1)` (`domain/src/events/ticket-events.ts:59`, `:61`), the
+engine passes both types through (§E6-2's set difference), and the gate asks only whether the **actor** may act
+on the ticket (`check-permission.ts:1048`); nothing asks whether the **named** user is a person in this workspace
+— the roster is one `resolveEffectiveRole` away and the gate already holds `ctx.db`. The read side then serves
+the string: `mappers.ts:546` `name: roster.get(id) ?? id` renders `nobody-here` as an assignee name, the list's
+`assigneeId` filter matches it, and `groupBy=assignee` will make a group for it. The MCP `assign_ticket` tool
+forwards any `assigneeId: z.string().min(1)` (`write-tools.ts:172`), so an agent typo becomes a permanent,
+attributed claim naming nobody. The nearest recorded case, 7.27, is about a *member* who cannot see the ticket
+(read-side withholding); there is no case for a name that is not a person (`grep -rniE 'non-?member|not a
+member|any string' test-cases/{05,06,07,14,16}-*.md` → none about assignment).
+
+**WHAT WOULD HAVE BEEN BETTER.** One refusal in `checkVisibilityPermission` for the two types: resolve the named
+user's role in `env.workspaceId` and refuse `null` (*"That person is not in this workspace"*) — the same lookup
+`checkMembershipOwnerAuthority` already does for its target (`:1234`). `project.member_added` shares the gap
+(it checks the actor's project-admin rights only, `:683-687`), but its projection row is neutralised by
+`resolveEffectiveRole`'s early return; the assignment's is not.
+
+**MEASUREMENT.** Appendix O, run from `apps/server`. Lines opened: `ticket-events.ts:59`, `:61`;
+`check-permission.ts:683-687`, `:1048`, `:1234`; `mappers.ts:537-546`; `write-tools.ts:168-186`.
+
+**SEVERITY: Minor.** Data integrity, not security: the claim is inert for the named non-person, and a member
+can re-assign. Filed because the door answers "committed" to a question it never asked.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
@@ -1193,8 +1231,8 @@ the table.
 |---|---|---|
 | Critical | **0** | — |
 | Important | **12** | E6-1, E6-2, E6-3, E6-4, E6-5, E6-8, E6-9, E6-10, E6-12, E6-13, E6-15, E6-16 |
-| Minor | **4** | E6-6, E6-7, E6-11, E6-14 |
-| **total** | **16** | E6-1 … E6-16, no gaps in the numbering |
+| Minor | **5** | E6-6, E6-7, E6-11, E6-14, E6-17 |
+| **total** | **17** | E6-1 … E6-17, no gaps in the numbering |
 | unverified (0-point) items | 3 | the migrate route's stale pre-flight read under concurrency (§6), the online path's non-idempotent manual retry (§6), 6.123's "no bound on live credentials" half (E6-12) — each marked *unverified* where it appears and not counted above |
 
 Every Important finding above rests on a probe in Appendices A–K or on a printed line; the three Minors rest on
@@ -3027,6 +3065,140 @@ describe('exec6 probe: an MCP token approving a successor', () => {
     out.push(`after revocation: Bearer T1 -> ${afterT1}; Bearer T2 (the successor) -> ${afterT2}`);
     const left = await app.inject({ method: 'GET', url: '/v1/me/mcp-tokens', headers: auth(ownerToken) });
     out.push(`owner's token list now: ${left.json<{ tokens: unknown[] }>().tokens.length} token(s)`);
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix O — probe for E6-17 — assignee and collaborator who are not in the workspace
+
+File path in the tree: `apps/server/test/zz-exec6-probe-assignee.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-assignee.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: does the door accept an assignment / collaborator naming somebody who is not in the workspace, or not a person at all?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  (globalThis as unknown as { __otp: unknown }).__otp = built.otp;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 probe: assignee and collaborator who are not in the workspace', () => {
+  it('records the door answers and what the board shows', async () => {
+    const out: string[] = [];
+    const say = (k: string, r: { status: string; rule?: string; reason?: string }) => out.push(`${k.padEnd(60)} -> ${r.status}${r.rule ? ` (${r.rule}: ${r.reason})` : ''}`);
+    const stranger = await signInWithPhone(app, (globalThis as unknown as { __otp: never }).__otp, '+919000000603');
+    const T = newUlid();
+    expect((await post(WS, { kind: 'ticket', id: T }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title: 'assign me' }, ownerId, ownerToken)).status).toBe('committed');
+    say('assign to a signed-up user who is NOT a workspace member', await post(WS, { kind: 'ticket', id: T }, 'ticket.assigned', { assigneeId: stranger.userId }, ownerId, ownerToken));
+    say('assign to a fresh ULID nobody owns', await post(WS, { kind: 'ticket', id: T }, 'ticket.assigned', { assigneeId: newUlid() }, ownerId, ownerToken));
+    say("assign to the string 'nobody-here'", await post(WS, { kind: 'ticket', id: T }, 'ticket.assigned', { assigneeId: 'nobody-here' }, ownerId, ownerToken));
+    say("collaborator_added 'nobody-here'", await post(WS, { kind: 'ticket', id: T }, 'ticket.collaborator_added', { userId: 'nobody-here' }, ownerId, ownerToken));
+    say('control: assign to the owner (a member)', await post(WS, { kind: 'ticket', id: T }, 'ticket.assigned', { assigneeId: ownerId }, ownerId, ownerToken));
+    say("assign to 'nobody-here' again (so the board shows it)", await post(WS, { kind: 'ticket', id: T }, 'ticket.assigned', { assigneeId: 'nobody-here' }, ownerId, ownerToken));
+    const board = await app.inject({ method: 'GET', url: `/v1/projects/${PRJ}/board`, headers: auth(ownerToken) });
+    const m = board.body.match(/"assigneeId":"([^"]*)"/g) ?? [];
+    out.push(`board -> ${board.statusCode}; assigneeId values on cards: ${[...new Set(m)].join(', ')}`);
+    const roster = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/members`, headers: auth(ownerToken) });
+    out.push(`roster -> ${roster.statusCode}; contains 'nobody-here': ${roster.body.includes('nobody-here')}; contains stranger: ${roster.body.includes(stranger.userId)}`);
+    const filt = await app.inject({ method: 'GET', url: `/v1/projects/${PRJ}/tickets?filter=${encodeURIComponent(JSON.stringify({ assigneeId: 'nobody-here' }))}`, headers: auth(ownerToken) });
+    out.push(`list filtered by assigneeId=nobody-here -> ${filt.statusCode}; contains T: ${filt.body.includes(T)}`);
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
   });
