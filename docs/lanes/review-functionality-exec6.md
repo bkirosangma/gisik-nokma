@@ -23,7 +23,7 @@ a measurement it lacks is added, and where that happens the finding says so.
 
 ## 0. THE ONE-LINE ANSWER
 
-**No Critical claimed. Twenty-one findings — fourteen Important, seven Minor — every one measured through a door the
+**No Critical claimed. Twenty-two findings — fourteen Important, eight Minor — every one measured through a door the
 product ships, and the two I would put first are on the security surface:** a cookie plus a foreign `Origin` is
 refused on `POST /v1/events` and served the victim's whole visible ledger on `/v1/stream` (E6-15), and an MCP
 token can approve its own successor, so revoking it does not revoke it (E6-16).
@@ -268,6 +268,7 @@ the line I opened) · **SEVERITY** (Critical / Important / Minor). Where I could
 | E6-19 | Minor | `2026-02-30`, `2026-13-45`, `0000-00-00` are valid due dates; attention says "Needed by 0000-00-00" | App. W |
 | E6-20 | Minor | Ruling P15's blank-name refusal applied to half its subjects; a state named `" "` is a board column | App. X |
 | E6-21 | Important | A member or guest cannot leave a workspace; the export promises it; the CSRF exclusion assumes it | App. Y |
+| E6-22 | Minor | Export's "ticket-only access for someone outside the workspace": product has no such tier; naming accepted, inert | App. AA |
 
 ### E6-1 — IMPORTANT — The in-app help tells the user a job cannot be deleted; the product ships `Delete`
 
@@ -1388,6 +1389,44 @@ page is the UX lane's half; the door is this lane's.
 and cannot take themselves out; the product's privacy copy in the prototype promises they can, and its own
 security note assumes they can.
 
+### E6-22 — MINOR — The export advertises "ticket-only access" for someone outside the workspace; the product has no such tier — the door commits the naming and it confers nothing (category 3, no ruling found)
+
+**WHAT.** Export `Gisik Nokma - Desktop.dc.html` (sha `3d142d46`) `:1229`, the visibility sheet's helper text:
+*"Naming someone outside this workspace gives them ticket-only access — this ticket, nothing else"*; `:3771`
+the candidate suffix *"— outside this workspace"*; `github.md:15`: *"Seeded an external person … named on
+restricted GN-1164 but is not a workspace member, so ticket-only access … [is] visible on load."* Measured in the
+product (Appendix AA; 1 file / 1 test passed):
+
+```
+visibility.set explicit naming a NON-MEMBER (signed-up, no membership) -> committed
+proj_visibility.resolved_user_ids contains the non-member: true
+external GET detail -> 404 · my-work -> 404 · bootstrap/ticket -> 403 not_a_member · /v1/me/workspaces -> {"workspaces":[]}
+control: same person granted role GUEST, GET detail -> 200
+```
+
+**WHY.** The product's visibility model has three tiers — workspace, project, explicit — and every one of them
+sits **on top of membership**: `can-see.ts:95-97` returns `false` for a null workspace role before any list is
+consulted, and the product's own membership note (`github.md:12`, quoting `members/page.tsx`) says *"a guest reaches
+work through `visibility.set` explicit lists"* — the guest role *is* the ticket-only tier. The export adds a
+fourth, membership-less tier and draws it on the sheet and in the picker; the product's picker offers roster
+members only (`visibility-editor.tsx:95`, `:398-403`), so the feature is unreachable from the UI and, through the
+API or MCP, **accepted and inert**: the same "committed to a question it never asked" shape as E6-17, on the one
+field whose meaning is *who may see this*. **No ruling found**: `grep -rn 'outside this workspace|external
+person|ticket-only access|not a workspace member'` over `test-cases/*.md`, `Features.md` and the three round-1
+rulings → nothing.
+
+**WHAT WOULD HAVE BEEN BETTER.** Decide it once and record it: either the guest role is the answer (then
+`visibility.set` refuses a non-member id — *"invite them as a guest first"* — and the export's sheet copy is a
+known divergence), or the product grows the tier (a `canSee` arm for a null role with an explicit naming, plus
+a bootstrap/stream path for a person with no workspace). The measured state is neither.
+
+**MEASUREMENT.** Appendix AA, run from `apps/server`. Lines opened: `can-see.ts:94-117`; `visibility-editor.tsx:95`,
+`:398-403`; export `:1229`, `:3771`; `github.md:12`, `:15`.
+
+**SEVERITY: Minor.** Nothing leaks (the outsider sees nothing — a positive for the model), and the product's
+picker cannot produce the claim; the divergence is real and unruled, and the API accepts a naming that means
+nothing.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
@@ -1532,6 +1571,7 @@ not pixels — the three `.md` spec documents and the Invite screen's data model
 | `github.md:2-3` (faq-delete) — *"The ticket stops appearing in views. Its history is retained, because other events cite it"* | reads: yes (16.96); writes: **not refused — E6-2**; help: **denied — E6-1** | the prototype's own FAQ entry is the model the product's help should have followed | E6-1, E6-2 |
 | `github.md:8` — *"a global Account screen (profile, notification prefs, workspaces, devices)"*; `workspaces-gap.md:16` item 6 | server has `/v1/me/*` reads (preferences, notification-preferences, workspaces, mcp tokens) | not this lane's surface to classify (UX/UI) — the **routes exist**, noted so the UX lane's finding can cite them | — |
 | `workspaces-gap.md:9-14` — member counts, ticket chips, per-project counts on the workspace card | `read/workspace-counts.ts` serves `visibleProjectCounts` with `LIVE_TICKET_WHERE`; membership roster read exists | data exists server-side for items 1, 3, 7; whether the page consumes it is the UX lane's | — |
+| Desktop `:1229`, `:3771`; `github.md:15` — an external, non-member person with "ticket-only access" | `can-see.ts:95-97` refuses a null role before any list; the picker offers roster members only; the API accepts the naming and it confers nothing | **3 DIVERGES, NO RULING FOUND** (search in the finding) | **E6-22** |
 | `help-topics-pane.md` | entirely `help-browser.tsx` / CSS | UI lane | — |
 
 **What I did not compare:** every screen. The prototype draws no engine; the round-1 lane said the same and I
@@ -1546,8 +1586,8 @@ the table.
 |---|---|---|
 | Critical | **0** | — |
 | Important | **14** | E6-1, E6-2, E6-3, E6-4, E6-5, E6-8, E6-9, E6-10, E6-12, E6-13, E6-15, E6-16, E6-18, E6-21 |
-| Minor | **7** | E6-6, E6-7, E6-11, E6-14, E6-17, E6-19, E6-20 |
-| **total** | **21** | E6-1 … E6-21, no gaps in the numbering |
+| Minor | **8** | E6-6, E6-7, E6-11, E6-14, E6-17, E6-19, E6-20, E6-22 |
+| **total** | **22** | E6-1 … E6-22, no gaps in the numbering |
 | unverified (0-point) items | 3 | the migrate route's stale pre-flight read under concurrency (§6), the online path's non-idempotent manual retry (§6), 6.123's "no bound on live credentials" half (E6-12) — each marked *unverified* where it appears and not counted above |
 
 Every Important finding above rests on a probe in Appendices A–K or on a printed line; the three Minors rest on
@@ -5097,6 +5137,138 @@ describe('exec6 sweep: every read door, as a member not on the project', () => {
     // control: the owner sees the marker on the detail door
     const own = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${T}`, headers: auth(ownerToken) });
     out.push(`control owner GET detail -> ${own.statusCode} marker present: ${own.body.includes('MARKER-TITLE-7')}`);
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix AA — probe for E6-22 — an external (non-member) person on an explicit list
+
+File path in the tree: `apps/server/test/zz-exec6-probe-external.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-external.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: can a signed-up NON-MEMBER be named on a ticket's explicit list, and does that give them any access (the export's 'external person, ticket-only access')?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  (globalThis as unknown as { __otp: unknown }).__otp = built.otp;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 probe: an external (non-member) person on an explicit list', () => {
+  it('records the door and the read answers', async () => {
+    const out: string[] = [];
+    const ext = await signInWithPhone(app, (globalThis as unknown as { __otp: never }).__otp, '+919000000607');
+    const T = newUlid();
+    expect((await post(WS, { kind: 'ticket', id: T }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title: 'restricted, external named' }, ownerId, ownerToken)).status).toBe('committed');
+    const vs = await post(WS, { kind: 'ticket', id: T }, 'visibility.set', { ticketId: T, mode: 'explicit', userIds: [ownerId, ext.userId] }, ownerId, ownerToken);
+    out.push(`visibility.set explicit naming a NON-MEMBER -> ${vs.status}${vs.rule ? ` (${vs.rule}: ${vs.reason})` : ''}`);
+    const row = await db.pool.query<{ resolved_user_ids: string[] }>('SELECT resolved_user_ids FROM proj_visibility WHERE ticket_id = $1', [T]);
+    out.push(`proj_visibility.resolved_user_ids contains the non-member: ${row.rows[0]?.resolved_user_ids.includes(ext.userId)}`);
+    for (const [label, url] of [['detail', `/v1/workspaces/${WS}/tickets/${T}`], ['my-work', `/v1/me/work?workspaceId=${WS}`], ['bootstrap/ticket', `/v1/sync/bootstrap/ticket?workspaceId=${WS}&ticketId=${T}`], ['me/workspaces', '/v1/me/workspaces']]) {
+      const res = await app.inject({ method: 'GET', url, headers: { authorization: `Bearer ${ext.token}` } });
+      out.push(`external GET ${label.padEnd(16)} -> ${res.statusCode} ${res.body.slice(0, 80)}`);
+    }
+    // Control: make them a guest, then read again.
+    expect((await post(WS, { kind: 'membership', id: membershipId(WS, ext.userId) }, 'membership.granted', { userId: ext.userId, role: 'guest' }, ownerId, ownerToken)).status).toBe('committed');
+    const after = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${T}`, headers: { authorization: `Bearer ${ext.token}` } });
+    out.push(`control: same person as a GUEST, GET detail -> ${after.statusCode}`);
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
   });
