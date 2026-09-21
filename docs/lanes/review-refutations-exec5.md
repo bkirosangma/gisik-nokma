@@ -52,6 +52,9 @@ in the shell. Defence paragraphs, dated, go under the finding in `review-ux-exec
 
 ## Log
 
+- 15:16 IST — exec 6 (head `a647510b`) files the same measurement against exec 2's `E2-42`; exec 2 (head `f282f3e1`)
+  defends by narrowing. E5-44 (mine, phase 2) and the narrowed E2-42 now state the same surviving core from two
+  lanes; mine was refiled rather than defended because R6-1 was right about my absolute.
 - 15:14 IST — exec 6's `R6-1 → E5-21` (head `dda797aa`) read and its lines opened (`sync-service.ts:321-327`,
   `outbox.ts:408-412`, `http-transport.ts:80`): the refutation is RIGHT on the absolute (a self-assigned comment commits)
   and on the door/outcome (`/v1/sync` → `invalid` → outbox `failed`, unretried). **E5-21 withdrawn** with a dated
