@@ -190,8 +190,9 @@ handed me its copy constants by name (`BULK_REFUSED_COPY`, `BULK_UNREACHED_COPY`
 | E5-37 | Imp | the shell's own-identity sites (heading, menu, monogram, two accessible names) | EMPTY (the person's own name) | source (two docblocks, one "confirmed in the database") | sibling of E5-4 |
 | E5-38 | Min | `/privacy` at sign-in | copy (category 2, argued) | browser (2nd) + source | — |
 | E5-39 | Min | workflow version history | copy (no when, no who) | source | — |
+| E5-40 | Imp | Backlog tab under the toggle | EMPTY (withheld painted as absent) | source ("RECORDED, NOT FIXED") | — |
 
-**Edge classes reached, by finding:** EMPTY (E5-4, 37) · ERROR (E5-10, 13, 15, 18, 19, 25, 27, 28, 30, 33) ·
+**Edge classes reached, by finding:** EMPTY (E5-4, 37, 40) · ERROR (E5-10, 13, 15, 18, 19, 25, 27, 28, 30, 33) ·
 PERMISSION-REFUSED (E5-9, 31) · OFFLINE/REPLICA-DEGRADED (**not reached** — web is online-only; phone/desktop read at two
 screens) · SOFT-DELETED (E5-34 for projects; tickets **not reached** by me — `exec4-E4-23` holds it, §6.6) · CONCURRENT (E5-20, 27) · NARROW
 VIEWPORT (signed-out only: E5-31, 33) · FIRST-RUN (E5-6, 16, 18, 23, 26, 31, 32, 36) · SERVER-REFUSES-WHILE-CLIENT-BELIEVES
@@ -1401,6 +1402,36 @@ render *"published 16 Sep 2026 by Kiro"* per card through the one `formatDateTim
 
 ---
 
+### E5-40 — IMPORTANT · With "Only tickets in progress" on, the Backlog tab says "Nothing in the backlog — new tickets land here" over a backlog the toggle emptied; the scope note and the manual name three tabs of five, and the file records the defect as "RECORDED, NOT FIXED" `[SOURCE]` — EMPTY that lies
+
+**WHAT.** `page.tsx:342`: the toggle sets `stateCategories: ['active']` on the SERVER read, so backlog rows (category
+`open`) never reach `list.rows`. `:152` `BACKLOG_EMPTY_COPY = 'Nothing in the backlog — new tickets land here.'` is
+what the Backlog tab then renders. The scope note the toggle paints (`:2023-2027`): *"the list, calendar and
+timeline are asking only for tickets in progress — not started and done are both excluded. The board is not
+narrowed."* — three tabs named, the Backlog not among them. The file says it in its own words, `:940-948`:
+*"RECORDED, NOT FIXED: … With the toggle on, the Backlog tab reads 'Nothing in the backlog — new tickets land here.'
+over a project that may hold plenty; both `shown` and `total` read 0, so nothing here can tell the two apart …
+and nothing on the Backlog tab today says the toggle is why. Owner: whoever next revisits the toggle's own scope."*
+
+**WHY.** This is the brief's "a withheld thing and an absent thing must not look alike", on a tab whose whole
+content is the withheld set. The sibling arm was fixed the day before: `:929-937` *"THE RESIDUAL IS CLOSED (owner
+ruling, 2026-09-20)"* — a backlog holding only epics no longer reads *"new tickets land here"* over a backlog that
+holds one, and case `13.1044` asserts both arms — because *"a claim about the backlog SET that denied a member of
+it"* was judged a defect. The toggle arm is the same claim denying every member, left with an owner note. The
+manual repeats the three-tab scope (`docs/manual.md:763-770`) and never says the Backlog empties.
+
+**WHAT WOULD HAVE BEEN BETTER.** A third sentence for this arm, chosen where `activeOnly` is known —
+*"The backlog is hidden while 'Only tickets in progress' is on."* — and the scope note naming the Backlog.
+
+**MEASUREMENT.** `[SOURCE]` `page.tsx:152-153`, `:342`, `:925-948`, `:2023-2027`; `docs/manual.md:763-770`;
+`test-cases/13-board-prototype-port.md` (`13.1044`). Not driven: the toggle and the Backlog tab need the session the
+browser lost (§6.1); the mechanism is a server-side filter plus one constant, both opened.
+
+**SEVERITY: Important** (claimed). The product tells a person the backlog is empty when it is not, and the sentence
+sends them to create tickets that "land here".
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -1465,16 +1496,16 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**39 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 39). By claimed severity, read from the
-heading text: **Critical 1 · Important 23 · Minor 15** (1 + 23 + 15 = 39).
+**40 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 40). By claimed severity, read from the
+heading text: **Critical 1 · Important 24 · Minor 15** (1 + 24 + 15 = 40).
 
 - **Critical (1):** E5-13
-- **Important (23):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28, E5-31, E5-32, E5-37
+- **Important (24):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28, E5-31, E5-32, E5-37, E5-40
 - **Minor (15):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30, E5-33, E5-34, E5-35, E5-36, E5-38, E5-39
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33, E5-38 = 23 of 39. **Reproduced with an injected failure, zero server writes:** E5-13,
-E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34, E5-35, E5-36, E5-37, E5-39.
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33, E5-38 = 23 of 40. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34, E5-35, E5-36, E5-37, E5-39, E5-40.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
 sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever), E5-20 (stacked dialogs and
@@ -1562,7 +1593,8 @@ Filters `:784-830`, History `:408-419`, invitations `:205-240`) · `docs/faq.md`
 4. **Permissions as a member or guest** — I held only the owner's session. Every refusal path was reproduced by
    injecting a failure client-side (E5-13, E5-15) or read from source; none was observed as a real 403/422.
 5. **`/help` at paint**, `/sign-in`, `/privacy`, `/terms`, `/my-work` — not opened; `/w/[workspaceId]` home read in source only (`:660-680`, `:860-890`, `:950-1000`).
-6. **Backlog / List / Calendar / Timeline** — not driven; the List's due column was read in source only.
+6. **Backlog / List / Calendar / Timeline** — not driven; the List's due column, the Backlog arm (`page.tsx:925-960`,
+   E5-40) and the Calendar/Timeline empty sentences read in source only.
 7. **`test-cases/13-*.md`** — not verified id by id.
 8. **exec 2's remaining §2e candidates** (~30) beyond the three I verified — not opened.
 9. **`check:help` / `scripts/help-content.mjs`** — **run at 13:53**: `self-test passed (12 cases, 5 of them planted
@@ -1694,5 +1726,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 39 findings — Critical 1 · Important 23 · Minor 15 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 40 findings — Critical 1 · Important 24 · Minor 15 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
