@@ -2988,6 +2988,24 @@ eighth**.
 
 **Severity: Important**, with the Critical reading stated above.
 
+> **DEFENCE — phase 2, 2026-09-21 15:26 IST, self-filed before any refutation.** Re-opening the cause list *"offline,
+> a 5xx, a dropped connection"* against the client library found **one member false**. `authClient` is
+> `createAuthClient` from `better-auth@1.7.2` with no `throw` or `catchAllError` option (`apps/web/src/auth-client.ts:32-40`,
+> opened; `better-auth/dist/client/config.mjs` sets neither for `/sign-out`, `:68`). Under `@better-fetch/fetch@1.3.1`
+> (`dist/index.js`, opened): a **network-level failure** — offline, dropped connection — leaves `await fetch(…)` at `:628`
+> unguarded, so the promise **rejects** and the finding's account holds: `.then` never fires, nothing is pushed, the
+> session stays live, the closed menu is the only signal. But a **non-2xx answer** (a 5xx included) does not reject:
+> `:735-741` returns `{ data: null, error: { status, … } }` — the promise **resolves**, `.then` fires, and
+> `router.push('/sign-in')` runs on the strength of an answer the handler never read. So *"a 5xx"* belongs in the other
+> arm: on that path the product is not silent, it **navigates to Sign in as though the sign-out succeeded**, while the
+> server answered that it did not. Whether the server-side session survives a 5xx depends on where that route failed;
+> I did not measure it and do not claim it.
+>
+> **What this changes:** the finding's mechanism (one callback, no rejection arm, `close(false)` first) and its
+> offline/dropped-connection outcome are unchanged and re-verified at `account-menu.tsx:189-194`. The 5xx member is
+> withdrawn from the rejection list; the arm it actually takes is the SERVER-REFUSES-WHILE-CLIENT-BELIEVES class
+> and is stated here as a correction, not filed as a new finding. Severity claimed unchanged; the judge has both arms.
+
 ---
 
 # R2.11 — CANDIDATES I EXAMINED AND DID **NOT** FILE, WITH THE REASON
