@@ -2670,8 +2670,13 @@ small:**
    `AttachmentListItem`), `upload.ts`, the `drive/` pair, the `attachments/` pair, and the `webview` trio.
    **No defect beyond `E2-46`, `E2-47` and `E2-49`.** Recording the miscount rather than quietly shrinking
    the list is the point: a boundary nobody checks is a boundary that drifts.
-3. **`/members` and `/account` at screen level** — reached at component level and through their pages'
-   loaders, but not walked as screens.
+3. ⚠ **CORRECTED — `/members` AND `/account` ARE NOW REACHED AT SCREEN LEVEL TOO.** `/members`: the render's
+   role cell (`page.tsx:475-518`), which produced the `E2-33` strengthening above — the product documents the
+   *"a `Select` whose `value` matches no option renders its PLACEHOLDER"* hazard and guards it with
+   `isEditableRole`. `/account`: the card order and the four data-gated sections (`page.tsx:262-305`), which
+   **confirms `E2-24(b)` at its render site** — each section is gated on its own data being non-null, so a
+   **failed** read draws an empty or guessed section while a **loading** one draws nothing. No new finding; an
+   existing one confirmed where it renders.
 4. **The painted half of the peer corpus.** Roughly thirty peer findings rest on `[BROWSER]` evidence I can
    read and not reproduce; that boundary is stated in §6 and in the refutations file.
 ## R2.18 — THE LAST UNREAD SCREENS, AND WHY I STOPPED HUNTING
