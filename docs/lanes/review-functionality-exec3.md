@@ -1739,3 +1739,82 @@ second sweep was the app itself rather than a list about the app — `E3-14` com
 `HTTP_ORIGIN_PROTECTED_ROUTES` against the **assembled Fastify route table**, and `E3-18` compared the
 replica's answer against the **online route's answer**. Both found a gap that every list-vs-list
 comparison in the tree had been passing.
+
+---
+
+## 21. `E3-19` (r2) — **IMPORTANT (claimed)** — The parent-terminal invariant is enforced in ONE direction: a child can be moved out of terminal under a terminal parent, and the parent can then be CLOSED with an open child
+
+**WHAT.** `packages/rule-engine/src/transition.ts:130-142` guards the invariant the code itself states as
+*"parents cannot outrun children"*:
+
+```ts
+// Invariant above all workflows (spec invariant 3): parents cannot outrun
+// children. Runs before any authored rule; no definition can switch it off.
+if (toState.category === 'terminal') {
+  const children = await ctx.getChildrenStates(ticket.id);
+  const openCount = children.filter((child) => child.stateCategory !== 'terminal').length;
+  if (openCount > 0) { … parent-terminal-with-open-children … }
+}
+```
+
+**The guard is inside `if (toState.category === 'terminal')`.** It runs when a ticket **enters** a terminal
+state, and **not when a ticket leaves one**. So the same relation — parent terminal, child open — is
+refused when the PARENT tries to reach it and accepted when the CHILD creates it.
+
+**MEASURED — the whole sequence, at the engine, through `evaluateEvent`:**
+
+```
+create P (story, root) / create C (task) under P        -> accepted
+C: todo -> done                                          -> {"refused":false}
+P: todo -> done   (C terminal, so the invariant allows)  -> {"refused":false}
+P's state after                                          -> {"stateId":"done","category":"terminal"}
+
+C: done -> todo   <-- THE PROBE                          -> {"refused":false}
+C's state after                                          -> {"stateId":"todo","category":"open"}
+P's state                                                -> {"stateId":"done","category":"terminal"}
+close P           (child OPEN under it)                  -> {"refused":false}    <-- CLOSED WITH OPEN WORK
+control: close P2 (identical fixture, child still done)  -> {"refused":false}    (so the door is normal)
+```
+
+**Both ends are now inconsistent with the product's own invariant:** the ledger holds a terminal parent
+with an open child — the configuration `transition.ts` exists to make unreachable — and a subsequent
+`ticket.closed` is accepted, so the ticket carries the closed flag while its child is open. Every view
+that counts rollups renders the parent as finished; the child is an open card under it.
+
+**WHY IT IS WRONG, and the honest statement of the counter-argument.** A reader may say the invariant
+was only ever meant one way: *a parent may not ENTER terminal while children are open*. **I considered
+that and I am not claiming the code is careless — I am claiming the stated property is not the enforced
+one.** The comment says *"parents cannot outrun children"* and *"no definition can switch it off"*; the
+second clause is true of the guard and **false of the relation**, because the relation is reachable from
+the other door — and it is reachable through the very edge shape this product documents as the archetype
+of a guard-voiding edge (`from: '*'`, `Features.md` §4's `rule-bypassable`): a wildcard edge INTO an open
+state is exactly what makes `done → todo` legal here.
+
+**WHAT WOULD HAVE BEEN BETTER.** The invariant is symmetric, so the guard should be: refuse a move **out
+of** a terminal state into a non-terminal one while the ticket's PARENT is terminal, with its own rule id
+and a sentence naming the parent (*"Registrations is finished; reopen it before reopening this."*) — the
+`hierarchy.ts` refusals already resolve a parent's title for exactly this kind of sentence. Alternatively,
+if one-way really is the intent, the comment should say **"a parent may not ENTER terminal while children
+are open"** and drop *"cannot outrun children"*, because as written it promises the symmetric property and
+the guard delivers half of it. **And a case should pin the direction that IS guarded together with the one
+that is not** — the existing parent-terminal cases cover the first alone.
+
+**RELATION TO `E6-4` (executor 6's report), stated because a judge will see both.** They are **different
+doors into the same invariant** and neither subsumes the other: `E6-4` is about a **soft-deleted** child
+blocking the parent's close, and about creating under a deleted parent — the child is deleted, the parent
+cannot finish. **This is about a LIVE child moved out of terminal, and a parent that CAN finish.** The
+fixes are in different files (`transition.ts:134`'s filter vs. this one's missing branch), and a judge
+ruling one should not read as disposing of the other.
+
+**SEVERITY: Important (claimed).** A spec invariant the code declares workflow-independent is reachable
+around, through the ordinary transition door, producing a closed ticket with open children — the state
+every view renders inconsistently. Not Critical: no data is lost, the state is recoverable by moving the
+parent back, and it needs a workflow carrying an edge out of a terminal state (which `from: '*'` supplies,
+and which the product's own advisory tier warns about rather than forbids).
+
+**MEASUREMENT.** Two probes at `packages/rule-engine`, each created, run and **deleted in the same shell
+invocation** (`git status --porcelain` empty after both). They import `evaluateEvent` and
+`buildMemoryContext` from `../src/*.js` — **relative paths, so nothing resolves through a stale `dist`**,
+which is the trap `E3-2` records against another lane's measurement. All definitions travel as events
+(`workflow.defined`, `ticket-type.defined`), so the context needs no seed and no database. Both runs:
+`Tests 1 passed`.
