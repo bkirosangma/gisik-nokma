@@ -164,7 +164,20 @@ preferences,notification-preferences}.ts` (whole), `visibility/visible-tickets.t
 `ledger/{event-store,snapshot-store}.ts` (the exported functions and every SQL statement), `mcp-server/src/{config,
 device-login,lazy-session,main,login-prompt}.ts` (whole), `app-core/src/online/stream.ts:95-160`, `:273-324` (frame
 parsing and cursor advance), `sync-client/src/replica/replica.ts:1050-1103`, `:1254-1290` (purge, scope-revoked,
-reach-granted arms), `domain/src/ist-day.ts:27-47`, `domain/src/events/membership.ts:39-42`, `:68-72`, `rule-engine/src/checks/fields.ts:25-60`,
+reach-granted arms), **the five route modules previously grep-only, code lines whole** — `routes/{attention,board,
+my-work,ticket-history,workspaces}.ts` (every SQL statement and every `throw`; my-work's assigned/shared overlap is
+by design at `:192-195`; board's straggler columns; attention's three item kinds; history serves a deleted ticket's
+ledger through `canSee` alone, which is the ledger-is-history intent and not filed), `visibility/grant-backfill.ts`
+(code lines whole + the cap docblock `:151-185`: the 200-ticket truncation is RECORDED with owner unassigned and pinned
+by 12.291; `sync-engine.ts:596-640` handles ticket 201 by pull — not re-filed), `sync/{contests-route,snapshot-writer,
+snapshot-refresh,sync-routes}.ts` (code lines whole; the full `GET /v1/sync/bootstrap` is unpaginated by the plan's
+own `BootstrapResponse` shape and the product's stated no-pagination stance — not filed), `tools/sweep-invite-tokens.ts`
+(whole), `routes/invites.ts:197-262`, `:427-470`, `:560-640` (consume-before-append and its recorded crash
+window), `rule-engine/src/checks/fields.ts` (whole), `domain/src/ticket-state.ts:213-227`, `:337-350` (reopen keeps
+`stateId`, so snapshot provenance stays coherent), and a predicate-absence sweep — every file under `apps/server/src`
+that names `proj_tickets` and carries neither `LIVE_TICKET_WHERE` nor `deleted_at` (19 files, listed by the loop,
+each classified: engine/ingest/permission context readers deliberately unfiltered; read helpers whose callers filter;
+`ticket-history`, `attachments`, `contests-route` serving history through `canSee`), `domain/src/ist-day.ts:27-47`, `domain/src/events/membership.ts:39-42`, `:68-72`, `rule-engine/src/checks/fields.ts:25-60`,
 `:116-138`, `routes/attention.ts:255-266`, `apps/web/app/privacy/page.tsx:140-170`, `apps/web/app/mcp/authorize/page.tsx:148-192`,
 `routes/my-invitations.ts:105-190` (address binding), `domain/src/preferences.ts:20-140` (bounds),
 `sync/snapshot-refresh.ts:185-192` and `visibility/visible-events-for.ts:14` (grep: both carry deleted tickets by
@@ -220,19 +233,17 @@ size: 6 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ 
 - `packages/app-core/src/online/`: `mappers.ts` outside `:903-1001` (≈2,350 lines), `stream.ts`, `http.ts`
   (grep only), `founding.ts`, `invites.ts`, `my-invitations.ts`, `notification-preferences.ts`,
   `notifications.ts`; `replica/replica-data-source.ts` outside `:1388-1408`.
-- `apps/server/src`: 5 of 19 route modules not opened beyond a grep (listed in the bullet below; `mcp-tokens`,
-  `my-invitations` and `search` were read in part); projections other than the three named; `read/` other than the two named;
-  `sync/{contests-route,snapshot-writer,snapshot-refresh,sync-routes}.ts` (the last grep only);
-  `ops/*`; `seed/*`; `http/{security-headers,hsts,rate-limit}.ts` beyond a grep; `auth/*` other than `auth.ts` and `synthetic-address.ts` (whose guard hides a synthetic
+- `apps/server/src`: `mcp-tokens`, `my-invitations` and `search` route modules read in part only; projections other
+  than the three named; `read/` other than the two named; `sync/{sync-service,reconcile-route}.ts` beyond the cited
+  lines; `ops/{export-ledger,fetch-backup,object-sink,pg-dump}.ts`; `seed/*`; `http/{security-headers,hsts,rate-limit}.ts` beyond a grep; `auth/*` other than `auth.ts` and `synthetic-address.ts` (whose guard hides a synthetic
   address in rosters and is not consulted by the magic-link door — safe only because `.invalid` never resolves;
-  noted, not filed); `tools/{sweep-invite-tokens,sweep-notifications,
-  sweep-user-preferences}.ts`; `visibility/{grant-backfill,rollup,visible-events-for}.ts` as code (rollup opened at `:258-266`,
-  `:68-108`; the other two exercised by Appendix AE, not read); `alerts/`, `workspaces/`.
+  noted, not filed); `tools/{sweep-notifications,
+  sweep-user-preferences}.ts`; `visibility/{rollup,visible-events-for}.ts` as code (rollup opened at `:258-266`,
+  `:68-108`; visible-events-for exercised by Appendix AE, not read); `alerts/`, `workspaces/`.
 - **No browser, no pixel, no `apps/web` beyond `members/page.tsx:720-856`, no `apps/mobile`, no
   `apps/desktop`.**
-- `apps/server/src/routes/`: after the sweeps, every route module has been *called* (Appendices P/Q/Z hit all 23
-  read doors); `attention.ts`, `board.ts`, `my-work.ts`, `ticket-history.ts`, `workspaces.ts` were still not
-  **read** beyond a grep (the other four small ones were read whole).
+- `apps/server/src/routes/`: every route module has now been both *called* (Appendices P/Q/Z hit all 23 read
+  doors) and *read* — 16 whole (code lines), 3 in part (`mcp-tokens`, `my-invitations`, `search`).
 - **No full server suite run**, deliberately (rules §4); every measurement is a single probe file, so
   "the suite stays green with X mutated" is a sentence this report never says — exec 3 owns those.
 - **Migrations:** numbering and the dev DB's applied set (E6-7, Appendix E) only; no migration's SQL was read for
