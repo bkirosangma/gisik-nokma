@@ -4250,9 +4250,13 @@ finds a recorded reason for the omission that this lane's search missed, the fin
 ### 67.5 The claims exec 6 flagged in its §9 that are NOT findings — answered so the record is straight (15:25 IST)
 
 - *"§7.3, 54 registrations, 49 guarded, 5 public by design, at `e4baa425`"* — a positive-findings section, not a
-  scored finding; re-counting it at the current base is on this lane's list below and the result will be appended
-  here if reached. Executor 6's own §9 notes `mcp-device.ts` gained a session-gated `deny` since; that changes the
-  registration count, not any finding.
+  scored finding. **Re-counted at this branch's base (15:30 IST):** `grep -rnE "\b(app|instance)\.(get|post|put|patch|delete)\s*(<|\()"
+  apps/server/src --include='*.ts'` minus `/test/` → 55 lines, one a docblock (`stream/routes.ts:168`, *"a top-level
+  `app.get('/v1/stream' …`"*) → **54 registrations**; a window scan to each handler's `async (` → **49** carry
+  `requireSession`, **5** do not, and the five are §7.3's five (`app.ts:743`, `auth-methods.ts:95`,
+  `invites.ts:399`, `mcp-device.ts:64`, `:160`). My first scan said **48 / 6** because its 8-line window stopped
+  inside `notifications.ts:58`'s nine-line generic — read at the line, `:68` is `{ preHandler: requireSession }`.
+  §7.3 holds unchanged; `mcp-device.ts`'s four registrations (`:64`, `:82`, `:138`, `:160`) were four then too.
 - *"§2, every finding transfers to current `main` unchanged"* — §13.1 re-ran every round-1 measurement at `a7b6292b`
   rather than reasoning from the diff; the sentence is about the eight findings, each of which is listed with its
   re-run command.
