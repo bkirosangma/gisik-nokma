@@ -1004,7 +1004,12 @@ control POST /v1/events with cookie + foreign Origin  -> 403 {"error":"forbidden
 ```
 
 So the product's cross-site defence refuses a forged **write** and admits a forged **subscription** — and the
-subscription is the whole visible ledger of the victim (`visibleEventsFor`), title and all.
+subscription is the whole visible ledger of the victim (`visibleEventsFor`), title and all. **On the three
+rows:** the probe sets the `cookie` header directly, so all three measure the *server's* behaviour. A browser
+under `SameSite=Lax` sends the cookie to a same-site sibling (`evil.artsourced.in`) and withholds it from a
+cross-site page (`evil.example`), which is why the finding rests on the sibling row and on the product's own
+sentence about siblings; the `evil.example` and absent-Origin rows show only that the server makes no
+distinction the browser would have to make for it.
 
 **WHY it is wrong.** Three facts the code states and one it does not:
 
@@ -1152,9 +1157,8 @@ what was looked at and found sound, not only what was found wrong.
   not an oracle. The owner's control read the marker (200). *Observation, not filed:* three refusal vocabularies
   for one fact (`not_found`, `forbidden`, empty 200) is the same divergence class 16.96 records for
   `not_found`/`not-found`; nothing leaks through it.
-- **The same sweep as a GUEST named on one ticket and not on another: no leak on 25 doors** (same probe with the
-  peer as `guest` and a `visibility.set` explicit list; file identical to Appendix P but for those lines, run once,
-  1 passed). The unshared ticket's title and comment appear in no body; the 200s carry the shared ticket
+- **The same sweep as a GUEST named on one ticket and not on another: no leak on 25 doors** (Appendix Q — the Appendix P
+  probe with the peer as `guest`, not on the project, named on one ticket by `visibility.set`; run once, 1 passed). The unshared ticket's title and comment appear in no body; the 200s carry the shared ticket
   (`/v1/workspaces/:ws/tickets`, board, list, search, attention, my-work, detail, bootstrap — bootstrap also
   carries every workflow and type definition, which is case 6.94's recorded gap, not a new one) and `members`
   answers 404 to a guest.
@@ -3378,6 +3382,148 @@ describe('exec6 sweep: every read door, as a non-member', () => {
     ] as Array<[string, string]>) {
       const res = await app.inject({ method, url, headers: S, ...(method === 'POST' ? { payload: { workspaceId: GHOST, heldIds: [T] } } : {}) });
       out.push(`GHOST ${res.statusCode} ${method} ${url.replace(GHOST, ':GHOST').replace(T, ':T')}  ${res.body.slice(0, 60)}`);
+    }
+    // control: the owner sees the marker on the detail door
+    const own = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${T}`, headers: auth(ownerToken) });
+    out.push(`control owner GET detail -> ${own.statusCode} marker present: ${own.body.includes('MARKER-TITLE-7')}`);
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix Q — the guest read sweep (positive finding, §5)
+
+File path in the tree: `apps/server/test/zz-exec6-probe-guest-sweep.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-guest-sweep.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: does any read door show a GUEST (named on one ticket) the title or comment of a ticket they are NOT named on?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  (globalThis as unknown as { __otp: unknown }).__otp = built.otp;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'guest' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: ownerId, projectAdmin: true }, ownerId, ownerToken)).status).toBe('committed');
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 sweep: every read door, as a guest named on one ticket', () => {
+  it('records status and whether any workspace content leaks', async () => {
+    const out: string[] = [];
+    const S = auth(peerToken);
+    const SHARED = newUlid();
+    expect((await post(WS, { kind: 'ticket', id: SHARED }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title: 'shared-with-guest' }, ownerId, ownerToken)).status).toBe('committed');
+    expect((await post(WS, { kind: 'ticket', id: SHARED }, 'visibility.set', { ticketId: SHARED, mode: 'explicit', userIds: [ownerId, peerId] }, ownerId, ownerToken)).status).toBe('committed');
+    const T = newUlid();
+    expect((await post(WS, { kind: 'ticket', id: T }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title: 'MARKER-TITLE-7' }, ownerId, ownerToken)).status).toBe('committed');
+    expect((await post(WS, { kind: 'ticket', id: T }, 'comment.added', { body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'MARKER-COMMENT-7' }] }] } }, ownerId, ownerToken)).status).toBe('committed');
+    const wf = await db.pool.query<{ workflow_id: string }>("SELECT workflow_id FROM proj_ticket_types WHERE workspace_id = $1 AND type_id = 'task'", [WS]);
+    const WF1 = wf.rows[0]!.workflow_id;
+    const doors: Array<[string, string]> = [
+      ['GET', `/v1/workspaces/${WS}/tickets/${T}`], ['GET', `/v1/workspaces/${WS}/tickets/${T}/attachments`], ['GET', `/v1/workspaces/${WS}/tickets/${T}/comments`],
+      ['GET', `/v1/workspaces/${WS}/tickets/${T}/events`], ['GET', `/v1/tickets/${T}/history`], ['GET', `/v1/workspaces/${WS}/tickets`],
+      ['GET', `/v1/projects/${PRJ}/board`], ['GET', `/v1/projects/${PRJ}/tickets`], ['GET', `/v1/search?workspaceId=${WS}&q=MARKER`],
+      ['GET', `/v1/workspaces/${WS}/attention`], ['GET', `/v1/me/work?workspaceId=${WS}`], ['GET', `/v1/workspaces/${WS}/members`],
+      ['GET', `/v1/workspaces/${WS}/invites`], ['GET', `/v1/workspaces/${WS}/ticket-types`], ['GET', `/v1/workspaces/${WS}/ticket-types/task/population`],
+      ['GET', `/v1/workspaces/${WS}/ticket-counts-by-type`], ['GET', `/v1/workspaces/${WS}/workflows`], ['GET', `/v1/workspaces/${WS}/workflows/${WF1}`],
+      ['GET', `/v1/workspaces/${WS}/workflows/${WF1}/state-occupancy`], ['GET', `/v1/sync/bootstrap?workspaceId=${WS}`], ['GET', `/v1/sync/bootstrap/ticket?workspaceId=${WS}&ticketId=${T}`],
+      ['GET', `/v1/contests?workspaceId=${WS}`], ['POST', `/v1/sync/reconcile`], ['GET', `/v1/workspaces/${WS}/tickets/${SHARED}`], ['GET', `/v1/sync/bootstrap?workspaceId=${WS}`],
+    ];
+    for (const [method, url] of doors) {
+      const res = await app.inject({ method, url, headers: S, ...(method === 'POST' ? { payload: { workspaceId: WS, heldIds: [T] } } : {}) });
+      const leak = res.body.includes('MARKER-TITLE-7') || res.body.includes('MARKER-COMMENT-7') || res.body.includes('Exec6 probe');
+      out.push(`${res.statusCode} ${leak ? 'LEAK ' : 'ok   '} ${method} ${url.replace(WS, ':WS').replace(PRJ, ':PRJ').replace(T, ':T').replace(WF1, ':WF')}  ${res.body.slice(0, 60).replace(/\n/g, ' ')}`);
     }
     // control: the owner sees the marker on the detail door
     const own = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${T}`, headers: auth(ownerToken) });
