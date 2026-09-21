@@ -3313,3 +3313,31 @@ MISSING"* sentence); the counts taken with `grep -oE "getTicket([^s]|$)"` **afte
 returned 2 for a line containing only `getTickets`** — the prefix trap, controlled for. **Also recorded: my
 first attempt to print the contexts used an `awk` loop that re-matched the same offset and produced a 5 GB
 output before being killed; the measurement above is from the clean re-run, not from that one.**
+
+---
+
+## 49. REACHING §12 — offline sync, partially, and the two findings it produced
+
+§46 named §12 (offline sync, ~660 lines) as unreached. **Partially reached**: its countable and its
+formula-bearing claims checked; the narrative bullets read but not each verified. **This section produced
+`E3-28`**, which is the third finding the controller's not-reached instruction has yielded.
+
+| bullet | claim | measured |
+|---|---|---|
+| `:2054` | the offline-born ticket reaches **THREE** doors | **FALSE — filed as `E3-28`.** The code's registry has three OMITTING doors and `getTicket` is one of them; neither document names it, and the code's own comment says *"THE THIRD NAME WAS MISSING"* |
+| `:2030` | `backoffMs(attempts) = min(1000·2^attempts, 60_000)`, **and is not** `app-core`'s `backoffDelayMs` | **both exact**: `outbox.ts:163-165` is that formula verbatim; `stream.ts:29-33` is `Math.min(BACKOFF_INITIAL_MS · 2**attempt, BACKOFF_CAP_MS)` with `0.8 + random()*0.4` jitter, and `:21-22` are `500` and `30_000` ✓ — so the "two surfaces, two curves" claim is true down to all four constants |
+| `:2018` | the bootstrap half was MISSING and the sentence used to claim it; now folded | **holds as a `git`-shaped claim I did not re-run**: it names case 12.136 and a measured stream-vs-bootstrap pair. I read it and did not reproduce it — **recorded as unverified rather than counted as reached** |
+| `:2113` | three surfaces' BEM classes are tied to their rules by a test | **not checked** — a CSS-binding claim, which is the UI lane's ground |
+
+**SO §12 IS "PARTIALLY REACHED" AND I AM NOT ROUNDING IT UP.** Two claims checked at the line, one of which
+is false and filed; one recorded as read-but-unverified; one declined as another lane's ground. **The remaining
+~650 lines of that section are narrative** — the sync engine's history, what was missing and when — and the
+specific-number claims inside them are what a lane with more time should sweep next, because that is the shape
+that has now produced four findings in this round (`E3-27`, `E3-28`, and `E3-11`/`E3-12` in §4).
+
+**WHERE THE LIST STANDS AFTER THIS SECTION.** `Features.md`: **§4 fully; §6, §11, §14 and §12 partially**
+(nine, six, and four claims respectively, with two findings out of §6 and §12); **§9 (editor/documents/
+attachments) and §13 (deployment, ~525 lines) not opened at all**; the `test-cases/` ✅ set still unasked.
+**Of the fourteen sections, four have been audited to a stated depth and two not at all**, and the depth is
+stated per section rather than summarised — which is the only form in which the number is checkable by
+someone who was not here.
