@@ -900,6 +900,34 @@ least afford it, on every write surface, and withholds the one action that would
 
 ---
 
+### E5-26 — IMPORTANT · The desktop app's only first-run sentence sends a person to a Settings screen it does not have, for a token nothing issues — and the manual says the step is merely awkward `[SOURCE]` — FIRST-RUN
+
+**WHAT.** `apps/desktop/src/app.tsx:95-102`: with no stored token the whole app is one paragraph — *"Sign in on the
+web app, then paste your token in Settings (interim flow — see plan Open questions)."* — plus a help toggle. The
+token is read from `localStorage.getItem('gisik.token')` (`:40`) and the workspace from `'gisik.workspaceId'`
+(`:39`); the comment at `:17-19` says they *"arrive via localStorage set on the sign-in page."*
+`grep -rn "gisik.token\|gisik.workspaceId" apps/web/app apps/web/src` → **0** — no sign-in page sets them.
+`grep -rni settings apps/desktop/src/app.tsx` → only the hint itself — there is **no Settings screen** in the desktop
+app. And the web has no page that shows a token: `/mcp/tokens` says *"The connection itself is never shown — only a
+one-way hash of it is stored, so there is nothing here to copy"* (`[BROWSER]`, `mcp-tokens-screen.tsx:208-216`).
+
+**WHY.** `docs/manual.md:1209-1211` describes this as *"It tells you to sign in on the website, then copy something
+across and paste it into the app's settings by hand. That is described as a temporary arrangement. It is not
+something to ask a nervous colleague to do."* — awkward, but doable. It is not doable: there is nothing to copy, no
+screen to paste into, and the sentence cites a planning document (*"plan Open questions"*) a person cannot open.
+FIRST-RUN is one of the nine edge classes; the desktop's is a locked door with a note describing a key.
+
+**WHAT WOULD HAVE BEEN BETTER.** Until the desktop has a sign-in, say so plainly — *"The desktop app cannot sign in
+yet — use the website."* — and drop the plan reference; or ship the settings form the sentence promises.
+
+**MEASUREMENT.** `[SOURCE]` `app.tsx:14-19`, `:39-40`, `:95-102`; the two greps above (0 hits each);
+`docs/manual.md:1203-1213`.
+
+**SEVERITY: Important** (claimed) — no way forward on the surface, and the help describes a path that is not there.
+Minor if the judge weighs the manual's "treat both as early" as sufficient warning.
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -961,16 +989,16 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**25 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 25). By claimed severity, read from the
-heading text: **Critical 1 · Important 17 · Minor 7** (1 + 17 + 7 = 25).
+**26 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 26). By claimed severity, read from the
+heading text: **Critical 1 · Important 18 · Minor 7** (1 + 18 + 7 = 26).
 
 - **Critical (1):** E5-13
-- **Important (17):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25
+- **Important (18):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26
 - **Minor (7):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24 = 19 of 25. **Reproduced with an injected failure, zero server writes:** E5-13,
-E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25.
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24 = 19 of 26. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
 sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever), E5-20 (stacked dialogs and
@@ -1033,8 +1061,9 @@ Filters `:784-830`, History `:408-419`, invitations `:205-240`) · `docs/faq.md`
 
 ### 6.3 NOT reached, named
 
-1. **`apps/mobile` and `apps/desktop`** — desktop untouched; of mobile I read ONLY `screens/ticket-screen.tsx:30-130`
-   (E5-21). The board screen, the help screen, the editor web view and every offline arm are unread.
+1. **`apps/mobile` and `apps/desktop`** — of desktop I read only `app.tsx:14-135` (E5-26); of mobile only
+   `screens/ticket-screen.tsx:30-130` (E5-21) and `board-screen.tsx:40-60` (the status wording). The storage layers,
+   the help screens, the editor web view and every offline arm are unread.
 2. **The workflow builder as a person meets it** (canvas, inspector, publish, state-mapping dialog, history screen) —
    read only its load arms as positive controls for E5-15. exec 2's §2e candidates there (`publish-controls.tsx:65/117`,
    `state-mapping-dialog`, `workflow-rebind-dialog`) remain unverified by me.
@@ -1113,5 +1142,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 25 findings — Critical 1 · Important 17 · Minor 7 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 26 findings — Critical 1 · Important 18 · Minor 7 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
