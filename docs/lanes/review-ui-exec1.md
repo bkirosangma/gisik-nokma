@@ -640,9 +640,22 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 
 **WHAT WOULD HAVE BEEN BETTER.** Name the *reason* rather than the file — *"these pages are reached from the sign-in card's legal line, and the fallback link points at the same route, so a reader with no history still has a destination"* — which is what all three sentences actually mean and needs no file to resolve. Or keep a one-line tombstone in `legal-nav.tsx`'s own docblock recording that `BackButton` was removed and why, since that file *is* the chrome those pages now use.
 
-### P26 — **IMPORTANT** ⚠ **r2 NEW** — The prototype-delta queue reads eleven items outstanding; seven have shipped, including its own row 0
+### P26 — **IMPORTANT** ⚠ **r2 NEW** — The prototype-delta document is stale in BOTH of its halves: every numbered queue row is closed, and its per-screen gap claims no longer describe the product
 
-**WHAT.** `docs/design/prototype-delta-2026-09-18.md` is this project's prototype-provenance authority: 25 screens, a per-screen verdict, and an ordered queue of 11 items under *"**Row 0 is the one item that is not a screen and not optional** … it precedes everything else."* **EVERY numbered row is closed** — all nine I checked, eight fully and `isMcpTokens` on its badge — **and so is every one of the three `held` rows I then checked.** Twelve rows, all still presented as outstanding. The sweep reached that total by stages, and each stage is worth naming: I began with the seven rows whose product files I could name; a held row's own citation moved it to eight; checking the rest of the `held` group moved it to eleven; and finishing rows 6 and 9 moved it to twelve — which is every row in the table except `isWorkspaces`, the one `held` row I did not check.
+**WHAT.** `docs/design/prototype-delta-2026-09-18.md` is this project's prototype-provenance authority. **It has two halves and both are stale:** an ordered queue of 11 items, and 25 per-screen sections each asserting the *"Product gap (new prototype → product)"*. **The queue half is closed in full** — see the table below. **The per-screen half is stale too, in two of the five sections I checked**, and that check was prompted by the queue's result rather than planned.
+
+**⚠ THE PER-SCREEN HALF, MEASURED, WHICH I ONLY LOOKED AT BECAUSE THE QUEUE WAS STALE.**
+| section | the document says | today |
+|---|---|---|
+| `isSettingsShell` | *"the prototype's `settingsNav` is three entries … **the product carries two**"* | **STALE — it carries three.** `settings/page.tsx:180` is `<nav className="gn-settings__sidebar" aria-label="Settings sections">` with **Ticket types** (`:189`), **Workflows** (`:199`) and **Workspace** (`:214`). |
+| `isInbox` | prototype has a *"**Mark all read**"* button the product lacks | **STALE — it exists.** `inbox/page.tsx:300` defines `markAllRead()`, `:344` `undoMarkAllRead()`, and `:427` renders `<Button onClick={markAllRead}>{{`Mark ${n} read`}}</Button>`. **The product's own docblock at `:413` records the label difference deliberately** — *"THE LABEL IS 'Mark N read', NOT THE PROTOTYPE'S 'Mark all read'"* — which is the shape of a gap that was closed and recorded in the code and not in the document. |
+| `isInbox`'s citation | *"pad `0.5rem` (`ui.css:2375-2387`)"* | **DRIFTED** — that range now holds `.icon-picker` and `.fields-editor` rules, not inbox ones. The fourth drifted citation in this document. |
+| `isWorkspaces` | *"the card meta line is the project count alone"* | **HOLDS** — `workspaces/page.tsx:264` is `const meta = projectCountLine(live.length)`. |
+| `isTimelineView` | *"the product renders a custom-claim list the prototype has no arm for"* | **HOLDS** — `timeline-view.tsx:128` is `<ul className="gn-timeline__claims" data-custom-claims="">`. |
+
+**So: two of five stale, one citation drifted, two accurate — and three of the five checks were of claims the document frames as ITS OWN findings about the product.**
+
+**THE QUEUE HALF.** 25 screens, a per-screen verdict, and an ordered queue of 11 items under *"**Row 0 is the one item that is not a screen and not optional** … it precedes everything else."* **EVERY numbered row is closed** — all nine I checked, eight fully and `isMcpTokens` on its badge — **and so is every one of the three `held` rows I then checked.** Twelve rows, all still presented as outstanding. The sweep reached that total by stages, and each stage is worth naming: I began with the seven rows whose product files I could name; a held row's own citation moved it to eight; checking the rest of the `held` group moved it to eleven; and finishing rows 6 and 9 moved it to twelve — which is every row in the table except `isWorkspaces`, the one `held` row I did not check.
 
 **MEASUREMENT — each row re-derived, with the source of the answer named.**
 
@@ -764,7 +777,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P22` ⚠ r2 — two `role="menu"` elements have no accessible name; one has a named twin in the same bar
 - `P23` ⚠ r2 — the searchable Select removes its input's focus outline and replaces it with nothing (WCAG 2.4.7, Level AA)
 - `P24` ⚠ r2 — a painted text colour measures 3.84:1 at 12.8px and is UNDECLARED, so the gate cannot see it
-- `P26` ⚠ r2 — the prototype-delta queue reads 11 rows outstanding and **every numbered row is closed**, plus all three `held` rows checked, including its own row 0
+- `P26` ⚠ r2 — the prototype-delta document is stale in BOTH halves: **every numbered queue row is closed** and **two of five per-screen gap claims no longer describe the product**
 
 **MINOR — 15**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
