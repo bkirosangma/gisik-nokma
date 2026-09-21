@@ -2143,3 +2143,68 @@ case names. **Control on the same file and the same sweep:** case **6.71** (`:87
 about a test file and **holds** (0 viewer-class mentions); case **6.82** (`:115`) is stale in four stated
 particulars (`E3-20`). **Three lines checked at this depth in one file give one live, one partial and one
 stale — so the sweep is discriminating rather than matching a pattern.**
+
+---
+
+## 27. `E3-22` (r2) — **IMPORTANT (claimed)** — Case 6.58's stated reproduction of a cycle uses `ticket.reparented`, which `hierarchy.cycle` now refuses — so the sequence it prints can no longer be performed through any door
+
+**WHAT.** `test-cases/06-auth-visibility.md:98` — case **6.58**, still **❌**:
+
+> `proj_visibility` is order-independent **only while the parent graph is acyclic**, and **nothing on
+> this branch refuses a cycle**. `resolveOne` reads the parent's *stored* resolution, so once `parent_id`
+> closes a loop the invariant has several fixpoints and which one the table settles in depends on arrival
+> order. **Measured, not inferred**: `created(G) · visibility.set(G,'workspace') · created(A,G) ·
+> created(B,A) · ticket.reparented(A,B)` leaves **live** at `workspace`/G for both A and B and a **rebuild**
+> at `project`/`''` for both — two rows of drift that `verify-projections` would report against a table
+> nobody corrupted.
+
+**WHY it is wrong — two measured particulars, and the second is the sharp one:**
+
+**1. "Nothing on this branch refuses a cycle" is FALSE.** `packages/rule-engine/src/checks/hierarchy.ts`
+refuses it twice, on the door the case itself uses:
+
+```ts
+:237   if (p.newParentId === ticket.id) return refuse('hierarchy.cycle');   // self-parent
+:257-258   while (cursor !== null) { if (cursor.id === ticket.id) return refuse('hierarchy.cycle'); }
+```
+
+The rule id is real (`refusal-rules.ts`), and it is planted-defect-tested — `test/reparent.test.ts:96-131`
+and `:431` assert `hierarchy.cycle`, and the test's own comment at `:108` says *"The reason the cycle walk
+is not dead code"*. **`hierarchy.ts:157-159` states the property in the code's own words**: *"check is the
+thing that keeps the tree acyclic, so **a cycle already standing in it was never accepted here**."*
+
+**2. The case's REPRODUCTION can no longer be performed, and this is the part that makes it more than a
+stale adjective.** Its measured sequence ends in `ticket.reparented(A,B)` — that is the ONLY step that
+closes the loop, and it is precisely the event `:237`/`:257-258` now refuse. `ticket.created` cannot close
+a loop (a ticket being created has no descendants — the check's own ordering note says so at `:172`), so
+with the reparent door guarded **there is no door through which the case's five-event sequence completes.**
+An ❌ that publishes a reproduction which the product now refuses is worse than one that merely states a
+gap: a lane that tries to reproduce it will find the refusal and have to decide whether the case or the
+code is wrong, with the catalogue — the artifact they are told to trust — on the wrong side.
+
+**⚠ THE PARTIAL HALF, stated rather than flattened.** The case's *projection* observation is a separate
+claim and it survives: **the projection terminates on a cycle (it says "pinned") and `verify-projections`
+is what would report the drift — a legitimate defensive property against a table corrupted outside the
+doors**, which is the same shape as `E3-21`'s rollup half. **So the honest fix is a split, not a flip:**
+the acyclicity premise moves to ✅/struck naming `hierarchy.cycle`, and the "the projection terminates and
+verify-projections reports it" half stays ❌ with its fixture built by writing the corrupt rows directly
+rather than through an event the engine refuses.
+
+**THE TRIO, so the judge can rule them together.** This is the **third** stale ❌ line this report finds in
+`06-auth-visibility.md`, alongside **`E3-20`** (6.82, *"cannot ship"* / *"ABSENT from the type"*) and
+**`E3-21`** (6.84, *"no check compares them"*). **They share one mechanism and I have filed them
+separately because each has independent evidence and independent runtime consequence** — but a judge who
+would rather rule the mechanism once should read them as one and say so, and I would not object. **The
+mechanism is the one `E6-12` (executor 6) established and round 1's `E3-1` priced: `check-case-citations.mjs`
+walks ✅ ids only, so a ❌ line is never asked whether it is still open.**
+
+**SEVERITY: Important (claimed)** — same class, same file, and this instance adds a reproduction that no
+longer runs. Not Critical: nothing misbehaves at runtime and the drift it warns about needs a corrupt table.
+
+**MEASUREMENT.** Lines opened: `06-auth-visibility.md:98` (full text); `hierarchy.ts:237`, `:257-258` (both
+refusals), and its docblock at `:157-159`; `refusal-rules.ts` for the rule id; `reparent.test.ts:96-131`,
+`:431` for the planted-defect coverage. **Control on the same file and the same sweep:** at the same depth
+**6.71** holds (0 viewer-class mentions in `tickets-read.test.ts`) and **6.125** holds (`applyAll` at
+`seed.ts:84-87` still hand-lists four projections, and the file argues for keeping it that way) — **so four
+lines checked in one file give two live and three stale, which is a discriminating sweep and not a pattern
+match.**
