@@ -17,3 +17,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E5-31 | done | a3234e8c | 13.1159 app-nav signed-out arm (RED 2 / GREEN 33) |
 | T-E5-32 | done | 093526c9 | 13.1160 sign-in?next= on all five read arms (RED 4 / GREEN 634) |
 | T-E5-5 | done | 5c05e994 | 13.1161 Collaborators note (RED 1 / GREEN 635) |
+| T-V1 | done | ea000e4c | 13.1162 empty-board copy+glyph gating & shell wiring (RED 2 core / 1 web; 1728 + 636 green) |
