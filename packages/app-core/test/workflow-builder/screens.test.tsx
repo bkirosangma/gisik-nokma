@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
@@ -112,6 +112,91 @@ describe('WorkflowBuilderScreen', () => {
     );
     expect(await screen.findByRole('textbox', { name: 'Workflow name' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Add state' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * 10.90 — RULING E5-41, CRITICAL. Before this ruling the draft lived only in
+   * the mounted screen's React state (`useState(() => createDraftStore(...))`)
+   * and nowhere else, so any navigation away — the nav bar, the breadcrumb, the
+   * browser's back button — unmounted the screen and discarded every edited
+   * state, arrow and rule with no marker and no recovery. Simulated here the
+   * same way the real edit route re-mounts it: unmount, then render again with
+   * the SAME workspace and the SAME draft id (an edit route re-fetches the
+   * identical published def on every visit).
+   */
+  it('10.90 recovers an edited draft after the screen unmounts and remounts, from this same tab', async () => {
+    const workspaceId = newUlid();
+    const draft = draftFromTemplate(kanban);
+    const user = userEvent.setup();
+    const first = render(
+      <WorkflowBuilderScreen
+        workspaceId={workspaceId}
+        session={adminSession}
+        gateway={createFakeGateway()}
+        initialDraft={draft}
+      />,
+    );
+    const nameField = await screen.findByRole('textbox', { name: 'Workflow name' });
+    await user.clear(nameField);
+    await user.type(nameField, 'Renamed mid-session');
+    expect(nameField).toHaveValue('Renamed mid-session');
+    first.unmount();
+
+    render(
+      <WorkflowBuilderScreen
+        workspaceId={workspaceId}
+        session={adminSession}
+        gateway={createFakeGateway()}
+        initialDraft={draft}
+      />,
+    );
+    // Recovered from `sessionStorage`, not from `draft` (the server's
+    // last-published version, still named "Simple kanban") — a component that
+    // silently reverted to `initialDraft` on remount would pass every OTHER
+    // case in this file and fail only this assertion.
+    expect(await screen.findByRole('textbox', { name: 'Workflow name' })).toHaveValue(
+      'Renamed mid-session',
+    );
+  });
+
+  it('10.90 a published draft clears its own recovery slot, so a later visit does not resurrect a stale pre-publish version', async () => {
+    const workspaceId = newUlid();
+    const draft = draftFromTemplate(kanban);
+    const gateway = createFakeGateway();
+    const onPublished = vi.fn();
+    const user = userEvent.setup();
+    const first = render(
+      <WorkflowBuilderScreen
+        workspaceId={workspaceId}
+        session={adminSession}
+        gateway={gateway}
+        initialDraft={draft}
+        onPublished={onPublished}
+      />,
+    );
+    const nameField = await screen.findByRole('textbox', { name: 'Workflow name' });
+    await user.clear(nameField);
+    await user.type(nameField, 'Published name');
+    await user.click(await screen.findByRole('button', { name: 'Publish' }));
+    await waitFor(() => expect(onPublished).toHaveBeenCalled());
+    first.unmount();
+
+    render(
+      <WorkflowBuilderScreen
+        workspaceId={workspaceId}
+        session={adminSession}
+        gateway={gateway}
+        initialDraft={draft}
+      />,
+    );
+    // `draft` still carries the pre-publish name ("Simple kanban") — the
+    // route would in reality re-fetch the newly published def instead, but
+    // reusing `draft` here is what proves the recovery slot itself was
+    // cleared: if it were not, this remount would show "Published name" from
+    // a STALE sessionStorage entry rather than from a fresh server read.
+    expect(await screen.findByRole('textbox', { name: 'Workflow name' })).toHaveValue(
+      'Simple kanban',
+    );
   });
 });
 
