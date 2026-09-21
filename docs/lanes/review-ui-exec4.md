@@ -9,7 +9,7 @@
 
 ## 0. THE ONE-LINE ANSWER
 
-**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Twenty-four of the twenty-seven findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast, by contrast, is clean everywhere I measured — 26 route×theme passes, one third-party watermark failing — because a contrast instrument existed and was run at least once.
+**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Twenty-five of the twenty-eight findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast, by contrast, is clean everywhere I measured — 26 route×theme passes, one third-party watermark failing — because a contrast instrument existed and was run at least once.
 
 ---
 
@@ -439,6 +439,19 @@ curl -s http://localhost:3041/v1/me/workspaces      # → {"error":"unauthentica
 
 ---
 
+
+### E4-28 — **IMPORTANT** — The Calendar and the Timeline convey every date relationship by position alone: day cells and week columns are unlabelled `div`s, items and bars are buttons placed by CSS `grid-column`, and the dates themselves live only in `title`
+
+**MEASUREMENT (painted, 1512, Calendar and Timeline views).** Calendar: `.gn-calendar` is a `DIV` with no role; `table` → false, `[role=grid]` → false, zero `role` attributes inside; the first three day cells are `div.gn-calendar__day` whose entire text is `31`, `1`, `2` (no `aria-label`, no `<time>`); weekday heads are `span Mon / Tue / Wed`; an item is `<button>` with text *HSN digit count* and `title="starts 18 Aug — Kiro's claim · needed by 5 Oct — Kiro's claim"`. Timeline: `table` → false, zero roles; week heads `div W 21 Sep …`; a bar is `<button>` *HSN digit count* with the same `title`. Source: `calendar-view.tsx:420-431` (the day cell: `data-day`, `aria-current="date"` on today only), `:453-476` (items live in a **separate** `ul.gn-calendar__items` under each week and are positioned by `style={{ gridColumn }}` — not inside the day they belong to, so even DOM order does not associate them); `timeline-view.tsx:280-310` (`div.gn-timeline__weeks`, `div.gn-timeline__row`, `button.gn-timeline__bar` with `style={{ gridColumn: … }}`, dates in `title`, `:308`).
+
+**PROTOTYPE.** `Desktop.dc.html:496-520` draws the calendar as `div`s too; it is a drawing, not an accessibility authority, and gives no ruling on semantics. No ruling found (`grep -rn "role=\"grid\"\|aria-label.*day\|calendar.*screen reader" packages/app-core/src/calendar docs` → nothing).
+
+**WHY IT IS WRONG.** WCAG 1.3.1 (Info and Relationships, Level A): the relationship "this ticket is due on the 5th" exists only in pixel geometry. A screen-reader user hears `31 1 2 3 4 5 6 … HSN digit count, button` and cannot tell which day the pill sits under; the start/end dates are `title` text, which touch users never see and most screen readers do not read on a button that already has a name. The same failure on the Timeline: bars are announced with no week.
+
+**WHAT WOULD HAVE BEEN BETTER.** The cheapest honest fix is in the *name*, not the structure: `aria-label={`${title} — due ${date}`}` on each item/bar (the `title` text already exists), and `<time dateTime>` or an `aria-label` with the full date on each day cell. The structural fix — `role="grid"` with `columnheader`/`gridcell`, or a `<table>` — is what the ARIA calendar pattern asks for and is a larger change.
+
+---
+
 ## 4. MATCHES AND RULED DIVERGENCES CHECKED
 
 _(so §3 is not a list of defects — each row is a measurement I took that came back clean or ruled)_
@@ -540,11 +553,11 @@ The owner ordered graph-first. I did: `graphify-out/GRAPH_REPORT.md` header, hub
 | claimed severity | count | members |
 |---|---|---|
 | **Critical** | **0** | — |
-| **Important** | **16** | E4-1 · E4-3 · E4-4 · E4-5 · E4-7 · E4-8 · E4-9 · E4-11 · E4-12 · E4-13 · E4-14 · E4-17 · E4-18 · E4-19 · E4-21 · E4-23 |
+| **Important** | **17** | E4-1 · E4-3 · E4-4 · E4-5 · E4-7 · E4-8 · E4-9 · E4-11 · E4-12 · E4-13 · E4-14 · E4-17 · E4-18 · E4-19 · E4-21 · E4-23 · E4-28 |
 | **Minor** | **11** | E4-2 · E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 · E4-24 · E4-25 · E4-26 · E4-27 |
-| **total** | **27** | `16 + 11 = 27`; ids `E4-1` … `E4-27` with no gaps |
+| **total** | **28** | `17 + 11 = 28`; ids `E4-1` … `E4-28` with no gaps |
 
-**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20, E4-24, E4-27. Category 2 argued against the record: E4-6, E4-8, E4-25, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23. Matches the prototype, fails the product's own later rule: E4-26.
+**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20, E4-24, E4-27. Category 2 argued against the record: E4-6, E4-8, E4-25, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23, E4-28. Matches the prototype, fails the product's own later rule: E4-26.
 
 **Overlap with round 1, stated:** E4-10 and E4-15 are new members of P1's class found by widening the population (class-less tags; classes whose rule forgot the border) and painted; E4-12 widens P11's scope from one component to the suite's population; E4-2 carries a painted reproduction of P8's focus finding as corroboration only. Nothing else overlaps.
 
