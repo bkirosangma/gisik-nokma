@@ -264,6 +264,54 @@ describe('precheckEvent — instant named-reason previews from the same engine t
     });
   });
 
+  /**
+   * GATE 5 (E3-19, 2026-09-21). The engine now refuses a child LEAVING a
+   * terminal state under a terminal parent (`child-open-under-terminal-parent`),
+   * resolving the parent through `getEntityState` — which `contextFromCache`
+   * answers `null` for an uncached id, and which the engine reads as "no
+   * parent". Without the gate, a `done → doing` on a child whose parent this
+   * client has not seen answered `passed` for a move the server refuses.
+   * `WF_ERRAND` declares `done → doing`, so the move is structurally legal and
+   * nothing but the parent decides it.
+   */
+  describe('gate 5 — a move out of terminal rests on the parent being cached', () => {
+    const finishedChild = { stateId: 'done', stateCategory: 'terminal' as const, parentId: PARENT };
+
+    it('defers when the parent is not cached: an absent parent is not a non-terminal one', async () => {
+      const cache = readyCache(finishedChild);
+      expect(await precheckEvent(transitionTo('doing'), cache)).toEqual({
+        kind: 'not-evaluated',
+        why: 'missing-local-state',
+      });
+    });
+
+    it('previews the refusal, from the real engine, once the cached parent is terminal', async () => {
+      const cache = readyCache(finishedChild);
+      cache.upsertTicket(ticketStateSeed({ id: PARENT, stateId: 'done', stateCategory: 'terminal' }));
+      const result = await precheckEvent(transitionTo('doing'), cache);
+      expect(ruleOf(result)).toBe(REFUSAL_RULES.childOpenUnderTerminalParent);
+      expect(result.kind === 'refused' ? result.reason : result.kind).toBe(
+        '"File the GST return" is finished (Done); reopen it before moving this ticket back to "Doing".',
+      );
+    });
+
+    it('passes once the cached parent is NOT terminal — the fact the accept rests on is held', async () => {
+      const cache = readyCache(finishedChild);
+      cache.upsertTicket(ticketStateSeed({ id: PARENT, stateId: 'doing', stateCategory: 'active' }));
+      expect(await precheckEvent(transitionTo('doing'), cache)).toEqual({ kind: 'passed' });
+    });
+
+    it('CONTROL: a root ticket leaving terminal has no parent to wait for, and passes', async () => {
+      const cache = readyCache({ stateId: 'done', stateCategory: 'terminal', parentId: null });
+      expect(await precheckEvent(transitionTo('doing'), cache)).toEqual({ kind: 'passed' });
+    });
+
+    it('CONTROL: the gate is scoped to leaving terminal — an open child under an uncached parent still passes its own move', async () => {
+      const cache = readyCache({ stateId: 'todo', stateCategory: 'open', parentId: PARENT });
+      expect(await precheckEvent(transitionTo('doing'), cache)).toEqual({ kind: 'passed' });
+    });
+  });
+
   /** The seam Plan 10 reuses over its replica: the evaluator is injectable. */
   it('honours an injected evaluator in place of the shared engine', async () => {
     const result = await precheckEvent(transitionTo('done'), readyCache(), {
@@ -367,6 +415,44 @@ describe('13.583 precheckEvent mirrors checks/close.ts for ticket.closed / ticke
       readyCache({ stateId: 'done', stateCategory: 'terminal' }),
     );
     expect(result).toEqual({ kind: 'passed' });
+  });
+
+  /**
+   * E6-8 (2026-09-21): `checks/close.ts` now refuses a close over open
+   * children (`parent-terminal-with-open-children`), so this mirror gains the
+   * same question — and the same gate 3 the transition path has: the vouched
+   * child set decides, an unvouched one defers, and an ACCEPT is never
+   * manufactured from children this client has not seen.
+   */
+  it('a ticket.closed over a vouched OPEN child previews parent-terminal-with-open-children', async () => {
+    const cache = createClientStateCache();
+    cache.upsertTicket(ticketStateSeed({ id: TICKET, stateId: 'done', stateCategory: 'terminal' }));
+    cache.upsertWorkflowDef(WF_ERRAND);
+    cache.markChildrenComplete(TICKET, [
+      ticketStateSeed({ id: CHILD, parentId: TICKET, stateId: 'doing', stateCategory: 'active' }),
+    ]);
+    expect(await precheckEvent(closeTicket(), cache)).toEqual({
+      kind: 'refused',
+      rule: REFUSAL_RULES.parentTerminal,
+      reason: 'This ticket cannot be closed while 1 of its child tickets is still open.',
+    });
+  });
+
+  it('a ticket.closed for a terminal ticket whose child set is NOT vouched defers rather than passing', async () => {
+    const cache = createClientStateCache();
+    cache.upsertTicket(ticketStateSeed({ id: TICKET, stateId: 'done', stateCategory: 'terminal' }));
+    cache.upsertWorkflowDef(WF_ERRAND);
+    expect(await precheckEvent(closeTicket(), cache)).toEqual({ kind: 'not-evaluated', why: 'missing-local-state' });
+  });
+
+  it('a ticket.closed over a vouched set of only TERMINAL children still passes', async () => {
+    const cache = createClientStateCache();
+    cache.upsertTicket(ticketStateSeed({ id: TICKET, stateId: 'done', stateCategory: 'terminal' }));
+    cache.upsertWorkflowDef(WF_ERRAND);
+    cache.markChildrenComplete(TICKET, [
+      ticketStateSeed({ id: CHILD, parentId: TICKET, stateId: 'done', stateCategory: 'terminal' }),
+    ]);
+    expect(await precheckEvent(closeTicket(), cache)).toEqual({ kind: 'passed' });
   });
 
   it('a ticket.closed for an already-closed ticket previews already-closed', async () => {

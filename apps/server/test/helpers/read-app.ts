@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Pool } from 'pg';
 import { membershipId, newUlid, type LedgerEvent } from '@gisik-nokma/domain';
+import type { LogOtpSender } from '../../src/auth/otp-sender.js';
 import { buildTestApp } from './app.js';
 import type { TestDatabase } from './db.js';
 import { applyCommitted, makeCommitted } from './apply.js';
@@ -162,6 +163,14 @@ export type NeighbourWorkspace = {
 
 export type ReadWorld = {
   app: FastifyInstance;
+  /**
+   * The dev OTP sender behind `app`, so a case can sign in a person the eight
+   * roles do not cover (`signInWithPhone(read.app, read.otp, '+91…')`) and
+   * seed them a workspace of their own — the isolation a case needs when the
+   * shared world's counts must not move (E6-10's admin-on-one-project cell is
+   * the first). A NEW phone per call; a reused one signs the same user in.
+   */
+  otp: LogOtpSender;
   world: ReadScenario;
   sibling: SiblingProject;
   roleAxis: RoleAxis;
@@ -228,6 +237,7 @@ export async function buildReadTestApp(db: TestDatabase): Promise<ReadWorld> {
 
   return {
     app,
+    otp,
     world,
     sibling,
     roleAxis,

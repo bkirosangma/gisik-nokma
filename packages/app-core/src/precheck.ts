@@ -95,7 +95,7 @@ function notEvaluated(): PrecheckResult {
  * The caller defers, which is what it should do.
  *
  * The line the whole module is built to hold is between the last two: a
- * pre-check may never manufacture a `passed` out of ABSENCE. Four gates keep
+ * pre-check may never manufacture a `passed` out of ABSENCE. Five gates keep
  * it for `ticket.transitioned`'s accept path, and each names the absence it
  * closes — the `closed-ticket` refusal ahead of them (fired on a
  * `ticket.transitioned` whose ticket is closed, backlog/closed spec §2,
@@ -121,7 +121,13 @@ function notEvaluated(): PrecheckResult {
  *     holds no ticket-type definitions at all, so there is no accept for those
  *     two types left to derive from what it holds. What survives is the
  *     `hierarchy.parent-terminal` REFUSAL below, which reads only the cached,
- *     server-served `stateCategory` and nothing else.
+ *     server-served `stateCategory` and nothing else;
+ *  5. an ACCEPT that moves a ticket OUT of a terminal state must rest on its
+ *     parent being cached — the child's side of the parent-terminal invariant
+ *     (`transition.ts`, E3-19) reads the parent's category and refuses nothing
+ *     when the parent cannot be resolved, so an uncached parent reads as no
+ *     parent, and that is the same accept-from-absence gate 3 closes on the
+ *     other side of the relation.
  *
  * One refusal is downgraded rather than shown: a roles-bearing `restrict-to`
  * resolves against memberships only the server holds, and refusing there would
@@ -180,6 +186,7 @@ export async function precheckEvent(
   if (!verdict.refused) {
     if (!payload.success) return notEvaluated();
     if (acceptRestsOnUnseenChildren(ticket, def, payload.data, cache)) return notEvaluated();
+    if (acceptRestsOnUnseenParent(ticket, def, payload.data, cache)) return notEvaluated();
     return { kind: 'passed' };
   }
 
@@ -414,6 +421,22 @@ function precheckTicketClosed(submitted: SubmittedEvent, cache: ClientStateCache
       reason: `A ticket can only be closed from a terminal state; "${stateName}" is not one.`,
     };
   }
+  // E6-8 (2026-09-21): `checks/close.ts` refuses a close over open children
+  // — the parent-terminal invariant at its last door. Mirrored here with the
+  // same discipline gate 3 gives the transition path: `childrenOf` answers
+  // with the children this client has SEEN, so only a vouched-complete set
+  // may decide, and an unvouched one defers rather than announcing a close
+  // the server refuses. A refusal from a vouched open child reads only
+  // server-served `stateCategory`, which is this module's definition of one.
+  if (!cache.hasCompleteChildren(ticket.id)) return notEvaluated();
+  const openCount = cache.childrenOf(ticket.id).filter((child) => child.stateCategory !== 'terminal').length;
+  if (openCount > 0) {
+    return {
+      kind: 'refused',
+      rule: REFUSAL_RULES.parentTerminal,
+      reason: `This ticket cannot be closed while ${openCount} of its child tickets ${openCount === 1 ? 'is' : 'are'} still open.`,
+    };
+  }
   return { kind: 'passed' };
 }
 
@@ -542,8 +565,8 @@ function versionChainIsCached(cache: ClientStateCache, ticket: TicketState, late
  * pre-check would announce a move the server refuses. The engine consults the
  * child set ONLY when the destination is terminal, so the gate is scoped to
  * exactly that — every other accept is decided from state the cache holds
- * whole. A destination this definition does not declare is unknown territory
- * and gets the same treatment.
+ * whole, except the one gate 5 below covers. A destination this definition
+ * does not declare is unknown territory and gets the same treatment.
  */
 function acceptRestsOnUnseenChildren(
   ticket: TicketState,
@@ -559,6 +582,38 @@ function acceptRestsOnUnseenChildren(
   const toState = statesWithBacklog(def).find((state) => state.id === payload.to);
   if (toState !== undefined && toState.category !== 'terminal') return false;
   return !cache.hasCompleteChildren(ticket.id);
+}
+
+/**
+ * GATE 5. The child's side of the same invariant (`transition.ts`, E3-19): a
+ * ticket leaving a terminal state for a non-terminal one is refused while its
+ * PARENT is terminal, and the engine resolves that parent through
+ * `getEntityState`, which `contextFromCache` answers `null` for anything this
+ * client has not seen. The engine treats an unresolved parent as no parent —
+ * an absence is not a fact — so an uncached parent lets the move pass, and the
+ * pre-check would announce a move the server refuses. Scoped to exactly the
+ * move the engine asks the question on: a terminal origin, a non-terminal
+ * destination, and a `parentId` to resolve. `statesWithBacklog`, as in gate 3,
+ * because backlog is a legal, never-terminal destination that `def.states`
+ * alone does not declare. An origin or destination this definition does not
+ * declare is unknown territory and fails toward the gate, as in gate 3 —
+ * `ticket.stateId` is read where the engine reads the forward-folded id
+ * (`needsMembership` names the same drift), and a miss must not land on the
+ * `passed` side.
+ */
+function acceptRestsOnUnseenParent(
+  ticket: TicketState,
+  def: WorkflowDef,
+  payload: TicketTransitionedPayload,
+  cache: ClientStateCache,
+): boolean {
+  if (ticket.parentId === null) return false;
+  const states = statesWithBacklog(def);
+  const fromState = states.find((state) => state.id === ticket.stateId);
+  const toState = states.find((state) => state.id === payload.to);
+  if (fromState !== undefined && fromState.category !== 'terminal') return false;
+  if (toState !== undefined && toState.category === 'terminal') return false;
+  return cache.getTicket(ticket.parentId) === undefined;
 }
 
 /**

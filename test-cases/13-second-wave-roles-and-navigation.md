@@ -341,7 +341,27 @@ moves. Both cases are about that clause, so the pair is a specific kill rather t
   the seam the real window sits on. The wrapper commits a real transition and then hands the batch to the
   REAL service, so the refusal is the engine's own `close-requires-terminal`; the case then asserts
   `refused: 1` AND `closed_at IS NULL` AND **zero** `ticket.closed` events — the second and third
-  together being what a direct writer cannot fake.
+  together being what a direct writer cannot fake. *(Since E6-8 the engine's close check also reads the
+  parent's children, and the SELECT mirrors that predicate too — 13.1167 — so "any ticket the SELECT
+  returns is one the engine would accept" still holds, over three questions now rather than two.)*
+- ✅ **13.1167 — a parent promoted into terminal by a republish is not swept while a child is open** (E6-8,
+  release batch B12, from B12's §13 block `13.1167`–`13.1176`; `apps/server/test/auto-close/sweep.test.ts`).
+  A workflow republish that promotes a kept state to `terminal` puts a parent there over an open child
+  without a transition, and `workflow-defined.ts` accepts it on purpose (publish legality never reads
+  occupancy). The engine's `ticket.closed` asked only `stateCategory`, so the sweep — selecting on
+  `state_category = 'terminal'` and nothing about children — CLOSED the parent unattended over its open
+  work (RED: `candidates: 1, closed: 1`). Two halves now hold the line, and the case is the SQL half:
+  `checks/close.ts` refuses `parent-terminal-with-open-children` (4.55 pins it), and the sweep's SELECT
+  carries a `NOT EXISTS` over non-terminal children so the parent is not a CANDIDATE at all — asserted as
+  `candidates: 0, closed: 0, refused: 0` with `closed_at IS NULL` and zero `ticket.closed` rows, off a
+  world built the way production builds it (child created under the still-active parent, then the
+  republish; the terminal-parent/open-child precondition read off `proj_tickets`, not assumed). Positive
+  control in the same world: the child finishes (inside the window, so it is not itself a candidate) and
+  the next sweep closes the parent through the door under the system actor. Mutation, recorded: with the
+  `NOT EXISTS` removed the case reddens as `candidates: 1, refused: 1, closed: 0` — the engine alone
+  holds the ledger, and the SQL mirror is what keeps the nightly log free of refusals for a world that
+  did not move. The child's `deleted_at` is deliberately not consulted, matching the engine's
+  `getChildrenStates`; E6-4 is where both move together.
 - ✅ **13.731 — the auto-close job's interval is validated by `requirePositiveIntervalMs`, on the same
   scheduler as the other four.** One case in `apps/server/test/ops/backup-daemon-main.test.ts`, which is
   a **recorded placement deviation**: the plan named `test/auto-close/sweep.test.ts` as this task's test

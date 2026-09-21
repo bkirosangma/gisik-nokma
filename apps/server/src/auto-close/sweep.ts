@@ -195,6 +195,24 @@ export async function runAutoCloseSweep(deps: AutoCloseDeps): Promise<AutoCloseR
           -- deleted in, which is the state the person left it in, not one a
           -- background job moved it to.
           AND ${LIVE_TICKET_WHERE}
+          -- E6-8 (2026-09-21): a parent is not swept while any child is
+          -- non-terminal. A republish that promotes a kept state to terminal
+          -- puts a parent there over open children without a transition
+          -- (publish legality never reads occupancy), and the engine now
+          -- refuses to CLOSE it (checks/close.ts,
+          -- parent-terminal-with-open-children). This clause mirrors that
+          -- predicate so the parent is not a candidate at all — no envelope
+          -- built, and no nightly "refused" for a world that did not move,
+          -- which is the only reading the refusal log below is written for.
+          -- The child's deleted_at is deliberately NOT consulted, because
+          -- the engine's getChildrenStates does not consult it either
+          -- (engine-context.ts): the two must answer alike, and E6-4
+          -- (soft-deleted children) is the change that moves them together.
+          AND NOT EXISTS (
+                SELECT 1 FROM proj_tickets c
+                 WHERE c.parent_id = t.ticket_id
+                   AND c.state_category <> 'terminal'
+              )
           AND entered.server_time < $2
         ORDER BY t.ticket_id`,
       [workspaceId, cutoff],

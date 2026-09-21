@@ -14,6 +14,14 @@ export const REFUSAL_RULES = {
   illegalTransition: 'illegal-transition',
   strandedState: 'stranded-state',
   parentTerminal: 'parent-terminal-with-open-children',
+  /**
+   * The same invariant from the child's side (E3-19, 2026-09-21): a child
+   * LEAVING a terminal state for a non-terminal one while its parent is
+   * terminal. Its own id rather than `hierarchy.parent-terminal`, which the
+   * client reads as "offer the reopen" on child-PLACING claims only
+   * (`packages/app-core/src/flows/guarded-child-event.ts`).
+   */
+  childOpenUnderTerminalParent: 'child-open-under-terminal-parent',
   workflowStructure: 'workflow-structure',
   workflowVersion: 'workflow-version',
   workflowStateMapping: 'workflow-state-mapping',

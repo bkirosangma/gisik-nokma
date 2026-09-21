@@ -129,3 +129,8 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-F4-fn | done | 39167c28d48b5a16e21e8d8d35c323e5e7e926f7 | my-work.test.ts F4 x1 (mutation-witnessed: 1 failed / 24 passed) (case 17.124) |
 | T-F5-fn | done | 066f2491d799929b0659175d8d8dd610d7755d03 | replica-deleted-reads.test.ts F5 x2 (mutation-witnessed, one kill each); 16.90 flipped to ✅ (case 17.125) |
 | T-E6-11 | done | 76f6b6994862b28045dc72a3964210e4ac0f79e7 | list.test.ts E6-11 x1 through GET /v1/projects/:id/tickets?groupBy=epic (case 17.126); the restricted-epic LABEL stays the owner's recorded question |
+| B12 | claimed | 2026-09-21 21:17 | /Users/kiro/my_projects/gisik-nokma-exec2 |
+| T-E3-19 | done | 0970a58c98b4ed93d7417a8f6b7afbab39454f06 | parent-terminal-symmetric.test.ts (8) + precheck.test.ts gate 5 (5) |
+| T-E6-10 | done | 2437eb174844fef73953a28a18a41a58c6ce012a | builder-reads.test.ts 7.266 (RED [1,1] → GREEN [2,0]) |
+| T-E6-3 | done | 58d51ed67ffc2d7b2d2a6a0fdd5857cb03b9c444 | decision recorded (occupancy doctrine binds): ticket-types.test.tsx 10.120 RED→GREEN; ticket-type-rerank.test.ts 5.80 witness |
+| T-E6-8 | done | 35bba9569e9933d0048b5a53e6ddd1a2beacb627 | close-with-open-children.test.ts (6) + sweep.test.ts 13.1167 + precheck.test.ts (3) |
