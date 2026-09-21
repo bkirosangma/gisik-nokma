@@ -170,8 +170,9 @@ function monthKey(month: CalendarMonth): string {
  * it claims is not one of the week's seven.
  *
  * THAT SECOND CASE IS REACHABLE, and the plan's `days.indexOf(date) + 1` got
- * it wrong silently. `IST_DAY_REGEX` is a shape check, so `2026-02-30` is a
- * storable claim; the model places it by string comparison, which puts it in
+ * it wrong silently. `IST_DAY_REGEX` is a shape check, so `2026-02-30` was a
+ * storable claim until E6-19 (2026-09-21) and one committed before that
+ * stands; the model places it by string comparison, which puts it in
  * the row running 23 Feb – 1 Mar, where `indexOf` answers `-1` and the plan's
  * arithmetic produced `grid-column: 0 / 1` — a value CSS discards, dropping
  * the claim onto whatever cell the auto-placer reached next. A day nobody

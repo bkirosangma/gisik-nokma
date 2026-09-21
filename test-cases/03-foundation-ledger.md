@@ -197,3 +197,9 @@ section follow the controller's rule, so the next free id after B16 is one past 
   `getTicketTypeFromDb` are untouched. The live-path control (the row stays on the first workflow, "a
   re-binding affects new tickets only") is asserted in the same case and was green before and after.
   Each order runs in its own database. — `apps/server/test/verify-projections.test.ts`
+- **3.961** ✅ E6-19 — `isRealIstDay` is the one definition of a day the calendar has, and it agrees with
+  `istDayBounds` on every input: what one refuses (`2026-02-30`, `2026-13-45`, `0000-00-00`, `2026-00-10`,
+  `2026-04-31`, `2027-02-29`, `0099-01-01`) the other throws on; what one accepts (`2028-02-29`, month ends,
+  `0100-01-01`, `9999-12-31`, all 365 days of 2026) the other places. The wrong shape answers `false`
+  without throwing. Next free after `3.960` by the controller's 22:0x rule. —
+  `packages/domain/test/ist-day.test.ts`

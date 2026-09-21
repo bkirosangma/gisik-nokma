@@ -51,9 +51,11 @@ export type WeekDays = readonly [string, string, string, string, string, string,
  * Left as a disagreement rather than closed, and the choice is deliberate.
  * Making `dateMs` refuse pre-1000 years would invent a validity rule at a
  * rendering surface that the WRITE path does not have — `IST_DAY_REGEX` admits
- * `0099-01-01` and `dueDateValueSchema` checks nothing stronger — so the
- * product would store a claim it then refuses to place, with no migration and
- * nobody's decision behind it. A year-99 claim is placeable, lands far outside
+ * `0099-01-01`, and until E6-19 (2026-09-21) `dueDateValueSchema` checked
+ * nothing stronger; it now refuses what `istDayBounds` cannot place, which
+ * includes a year below `0100`, but the ledger is append-only and a claim
+ * committed before that stands — so the product would store a claim it then
+ * refuses to place, with no migration and nobody's decision behind it. A year-99 claim is placeable, lands far outside
  * any window, and is therefore absent from the timeline the same way any other
  * distant work is. `provenance.ts` already absorbs the domain's stricter
  * refusal in a `try`/`catch` and renders such a day verbatim.
@@ -136,8 +138,9 @@ export function monthGridWeeks(year: number, month: number): WeekDays[] {
  * Can this day be PLACED — i.e. does `dateMs` accept it?
  *
  * `IST_DAY_REGEX` admits days that no calendar has (`2026-02-30` rolls into
- * March) and the write path checks nothing stronger, so a stored claim can
- * carry one. A surface that does day
+ * March); the write path refuses them since E6-19 (2026-09-21), but a claim
+ * committed before that, or folded from an older client's outbox, can still
+ * carry one, so a stored claim can. A surface that does day
  * ARITHMETIC — the timeline, which turns a claim into a week index — must ask
  * before it computes, because `dateMs` throws and one such claim would
  * otherwise blank the whole view. Surfaces that only COMPARE day strings (the

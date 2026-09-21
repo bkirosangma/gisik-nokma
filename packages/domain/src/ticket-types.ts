@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { IST_DAY_REGEX } from './ist-day.js';
+import { IST_DAY_REGEX, isRealIstDay } from './ist-day.js';
 
 export const CUSTOM_FIELD_KINDS = ['text', 'number', 'date', 'select', 'person'] as const;
 export type CustomFieldKind = (typeof CUSTOM_FIELD_KINDS)[number];
@@ -177,7 +177,12 @@ export function builtinTicketTypeDefs(defaultWorkflowId: string): TicketTypeDef[
  * claim looks like.
  */
 export const dueDateValueSchema = z.object({
-  date: z.string().regex(IST_DAY_REGEX, 'a due date is a day in YYYY-MM-DD form'),
+  // Shape from the one origin, then existence from the one definition of a
+  // real day (E6-19): `2026-02-30` is the right shape and no day at all.
+  date: z
+    .string()
+    .regex(IST_DAY_REGEX, 'a due date is a day in YYYY-MM-DD form')
+    .refine(isRealIstDay, 'a due date is a day the calendar has'),
   note: z.string().optional(),
 });
 export type DueDateValue = z.infer<typeof dueDateValueSchema>;

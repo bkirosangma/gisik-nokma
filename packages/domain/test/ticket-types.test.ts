@@ -163,6 +163,23 @@ describe('dueDateValueSchema', () => {
   it('refuses a timestamp — a due date is a day, not a moment', () => {
     expect(() => dueDateValueSchema.parse({ date: '2026-08-30T10:00:00Z' })).toThrow();
   });
+
+  /**
+   * 5.77 — E6-19, planted defect: a due date that is the right SHAPE and no
+   * day at all is refused. Before the fix `IST_DAY_REGEX` was the whole check:
+   * `2026-02-30`, `2026-13-45` and `0000-00-00` committed through
+   * `POST /v1/events`, the board served them, and the attention strip said
+   * "Needed by 0000-00-00 — due within 7 days" (a STRING compare, so
+   * `0000-00-00` is due-soon forever and `2026-13-45` never). RED: `parse`
+   * returned the value. The leap-day control keeps the refinement from being a
+   * "February has 28 days" rule.
+   */
+  it('planted defect: refuses a day no calendar has — the right shape is not a day', () => {
+    for (const date of ['2026-02-30', '2026-13-45', '0000-00-00']) {
+      expect(() => dueDateValueSchema.parse({ date }), date).toThrow(/a day the calendar has/);
+    }
+    expect(dueDateValueSchema.parse({ date: '2028-02-29' })).toEqual({ date: '2028-02-29' });
+  });
 });
 
 /**
