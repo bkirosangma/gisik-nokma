@@ -429,6 +429,15 @@ is not part of this finding.
 **MEASUREMENT.** `[BROWSER]` JS: `{scrollContainer: "gn-sheet__body", scrollH: 4036, clientH: 756, footerPosition:
 "static", footerOffsetFromTabs: 3942.8}`. `[SOURCE]` `:1192-1200`, `:1961-1965`, `:2612-2621`, `:1925-1940` opened.
 
+**Scope, stated rather than implied.** The 3,943 px is **one ticket's** (`CCSO-3`, a long seeded description). I
+attempted the same measurement on a short ticket (`01M1YPTE…`, *"Order more till roll"*) and could not: the browser
+tab went `hidden` and stopped hydrating (§6.1). So the number is CCSO-3's; the structural claim is what holds
+generally — between the slot (under the tab bar) and the footer sit, on every ticket, the state row, the Subtasks
+section with its form, four field rows, the description editor with its toolbar, the visibility editor with four
+radios and a roster, the attachment list and the comment thread with its composer (`ticket-sheet.tsx:1994-2607`).
+Whether a minimal ticket's body exceeds 756 px I did **not** measure; the finding is *"on any ticket whose body
+scrolls, the refusal renders where the person is not"*, and CCSO-3 is one measured instance.
+
 **SEVERITY: Important** (claimed). A refusal after the press, out of view — the brief's named shape, on the
 destructive control.
 
@@ -623,7 +632,12 @@ the deepest legal type — `exec1-P5`'s ruling records that choice), or to no se
 is made — the pattern the Move dialog already uses (`Choose a state`).
 
 **MEASUREMENT.** `[BROWSER]` dialog inputs: `{label: "Type", role: "combobox", value: "Epic"}`; `[SOURCE]` lines
-above; `EXPORT:2216`, `:2274-2282`.
+above; `EXPORT:2216`, `:2274-2282`. **Both paths default to Epic:** the loaded path is the workspace's rank order
+(rank 1 = Epic on `/settings`); the loading fallback `BUILTIN_TYPE_LADDER` (`page.tsx:133`) maps
+`BUILTIN_TICKET_TYPE_SEEDS`, whose first entry is `{ id: 'epic', name: 'Epic', rank: 1 }`
+(`packages/domain/src/ticket-types.ts:139`). The combobox paints the NAME of `typeId` (`new-ticket-dialog.tsx:143`
+`value={typeId === '' ? null : typeId}`) and `:284` submits that `typeId` — so a painted `Epic` is the id that would
+be filed.
 
 **SEVERITY: Important** (claimed). A default that is usually wrong, on the product's most-used form, with no undo.
 
@@ -796,6 +810,13 @@ closed) · the ticket sheet for `CCSO-3` (crumbs, title, Move dialog driven to t
 tab, footer geometry, inputs enumerated, wire read for the ticket and the roster) · `/inbox` (empty) ·
 `/w/…/members` · `/account` (with the injected failed preferences read and captured PUT) · `/settings` (Ticket types
 tab; with the injected 500 on ticket-types) · `/mcp/tokens` · `/mcp/authorize`.
+
+**The browser stopped being usable at ~10:30 IST.** After the first tab was closed, every new MCP tab opened
+`document.visibilityState === "hidden"` behind another window on this box and Chrome deferred hydration indefinitely
+(`/v1/` requests: 0 after 57 s; renderer not pegged; `uptime` load 1.40; ~85 MB free). Three fresh tabs, a focus
+click and two reloads did not change it, so per the brief's own rule I stopped rather than kept retrying. Everything
+after that point is `[SOURCE]`. Consequences named where they land: E5-9's second measurement (§ scope note), the
+narrow-viewport and the injected-403 refusal walks (below).
 
 **Not walked in the browser:** Backlog, List, Calendar, Timeline tabs (opened the page; did not drive them) ·
 `/w/[workspaceId]` home · `/my-work` · `/help` · `/invite/[token]` (no live token) · `/sign-in` (signed in already; did
