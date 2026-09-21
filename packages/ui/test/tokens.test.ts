@@ -1066,8 +1066,8 @@ describe('textAccent — Round 2d (2026-09-09)', () => {
    * up as a diff here rather than passing unnoticed.
    */
   it('13.360 textAccent is pinned to its derived hexes', () => {
-    expect(primitives.textAccentLight).toBe('#325d97');
-    expect(primitives.textAccentDark).toBe('#8bb1e6');
+    expect(primitives.textAccentLight).toBe('#2d5488');
+    expect(primitives.textAccentDark).toBe('#97bdf2');
     expect(themes.light.textAccent).toBe('textAccentLight');
     expect(themes.dark.textAccent).toBe('textAccentDark');
   });
@@ -1082,9 +1082,27 @@ describe('textAccent — Round 2d (2026-09-09)', () => {
    * the composite/sunken safety margin the derivation bought beyond what the
    * declared rows require.
    *
+   * **AND THE THIRD COMPOSITE, case `13.1060`, added 2026-09-21 by round-2 finding E4-31: a
+   * ghost button over `fillTertiary` does not only sit on `surface`.** On
+   * `/account` and `/mcp/tokens` it sits on `surfaceSunken`, so the ground that
+   * has to be cleared is `fillTertiary` composited over `surfaceSunken` —
+   * `#CFC7C0` light, `#41496D` dark. **It measured 3.997 light and 3.973 dark
+   * in `hig`/`minimal`, below 4.5 in BOTH, and no case measured it** — which is
+   * the whole of the finding: `textAccent` was derived against six grounds and
+   * a seventh was being painted. Both primitives were stepped for it (see their
+   * docblocks), so this case is red before that step and green after.
+   *
+   * `neo` contributes no separate reading and that is a fact about the style
+   * axis, not an omission: `STYLE_COLOR_OVERRIDES` maps `neo`'s
+   * `surfaceSunken` to `neoPaper`/`neoNavy` — its own `surface` — so the third
+   * composite IS the second one there. Asserted rather than assumed below.
+   *
    * Mutation: reverting either primitive to a value that only clears the two
    * declared rows (e.g. the intermediate `#33619c`/pre-composite pass this
-   * derivation actually went through) reddens this case alone.
+   * derivation actually went through) reddens this case alone. Reverting the
+   * 2026-09-21 step — `#2d5488`/`#97bdf2` back to `#325d97`/`#8bb1e6` — reddens
+   * the THIRD assertion alone, in `hig`/`minimal`, which is the pair that had
+   * no coverage.
    */
   it('13.360 textAccent clears 4.5 against the fillTertiary-composited control background and surfaceSunken', () => {
     const over = (src: string, dst: string): string => {
@@ -1106,6 +1124,27 @@ describe('textAccent — Round 2d (2026-09-09)', () => {
           contrastRatio(colorOf(theme, 'textAccent', style), colorOf(theme, 'surfaceSunken', style)),
           `${style}/${theme}: textAccent on surfaceSunken`,
         ).toBeGreaterThanOrEqual(4.5);
+        // E4-31 — the THIRD ground. A ghost button on a sunken row paints
+        // `fillTertiary` over `surfaceSunken`, not over `surface`.
+        const sunkenComposite = over(
+          colorOf(theme, 'fillTertiary', style),
+          colorOf(theme, 'surfaceSunken', style),
+        );
+        expect(
+          contrastRatio(colorOf(theme, 'textAccent', style), sunkenComposite),
+          `${style}/${theme}: textAccent on fillTertiary over surfaceSunken`,
+        ).toBeGreaterThanOrEqual(4.5);
+        if (style === 'neo') {
+          // The style axis, asserted rather than assumed: `neo` maps
+          // `surfaceSunken` to its own `surface`, so its third composite is
+          // its second one. If that override is ever removed this comparison
+          // fails and the third assertion above becomes a real, separate
+          // constraint for `neo` too — which is the day it needs its own step.
+          expect(
+            sunkenComposite,
+            'neo no longer maps surfaceSunken to surface — the third composite is a new constraint here',
+          ).toBe(composite);
+        }
       }
     }
   });
