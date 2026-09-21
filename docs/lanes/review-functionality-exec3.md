@@ -1102,3 +1102,142 @@ This repo has the rule already; `soft-delete-background-paths.test.ts` states it
 **MEASUREMENT.** The three commands above, each run from the repo root. Control on the same path: the
 same `grep -rn` for the quoted string returns **two** hits, one in the test and one in the citing file —
 so the sweep is not silent and the quote is unique to one line.
+
+---
+
+## 14.7 THE HEADLINE ROUND-2 FINDING — the HTTP-Origin control and the guard that cannot see its gaps
+
+## 14.7.1 — `E3-14` (r2) — **CRITICAL (claimed)** — FIVE cookie-authenticated mutating routes are outside `HTTP_ORIGIN_PROTECTED_ROUTES`, measured at the assembled app
+
+**WHAT.** `apps/server/src/http/http-origin.ts`'s `HTTP_ORIGIN_PROTECTED_ROUTES` holds **11** patterns. **Five
+cookie-authenticated mutating routes are not in it**, so the HTTP-Origin check — this product's CSRF
+defence — does not run for them:
+
+| route | guard | what it does |
+|---|---|---|
+| `PUT /v1/me/preferences` | `requireSession` | **writes a row** (`user_preferences`) |
+| `PUT /v1/me/notification-preferences` | `requireSession` | **writes a row** (`user_notification_preferences`) |
+| `POST /v1/me/invitations/:inviteId/accept` | `requireSession` | **APPENDS LEDGER EVENTS** (`invite.accepted`, `membership.granted`, `project.member_added`) |
+| `POST /v1/me/invitations/:inviteId/decline` | `requireSession` | **APPENDS** `invite.declined` |
+| `POST /v1/invites/:token/accept` | `requireSession` | **APPENDS** the acceptance chain |
+
+**WHY it is wrong — and the file states the criterion itself.** `http-origin.ts` explains at length why
+each entry is there. Its wording for the mcp-tokens entry is the test every route above passes and fails:
+
+> A cookie-authenticatable mutation that DESTROYS a credential. … without it, a page the victim visits can
+> revoke their assistant's access with their ambient cookie. **Denial of service rather than escalation,
+> which is why it is easy to leave out — and `SameSite=Lax` does not close it, because the product and
+> the API are same-site siblings of one registrable domain.**
+
+**`SameSite=Lax` is confirmed as the shipped policy and does not close these either:**
+`auth.ts:271` sets `defaultCookieAttributes: { sameSite: 'lax' }`, and `sign-in-flows.test.ts` pins it
+with a `toEqual` over the whole attribute list, describing Lax as *"the whole cross-site defence of a
+cookie-authenticated `POST /v1/events`"*. Lax is a SITE rule, not an origin rule: an attacker page served
+from any sibling of the registrable domain sends the cookie, and then **the HTTP-Origin check is the only
+thing left** — and for these five routes it is not running.
+
+**The severity is set by the third row.** `PUT /v1/me/preferences` being forgeable is a nuisance
+(a page can flip a victim's settings). `POST /v1/me/invitations/:inviteId/accept` being forgeable
+**appends three ledger events and makes the victim a member of a workspace** — an attributed, permanent,
+append-only state change that the victim did not make. The product's whole ledger model is that an event
+is a claim by the actor named in it; here the actor is the victim and the claim is not theirs.
+
+**WHAT WOULD HAVE BEEN BETTER.** Add the five patterns to the set. **And the durable fix is the one the
+file already describes but does not implement**: the omissions it records — three waves of them — were
+each found *"by printing the assembled app's whole route table and injecting a cookie-carrying
+forged-Origin request at EVERY non-GET route, rather than by re-reading the list that was already
+believed complete."* **That procedure is a measurement nobody re-runs.** It should be a test
+(`E3-15` is why the existing one is not it), so that the next mutating route added is refused by CI
+rather than by the next reviewer who happens to think of it.
+
+**MEASUREMENT — a probe at the assembled app, controls included.** Modelled exactly on
+`security-middleware.test.ts`'s own harness (`buildApp` + a recording `onRequest` hook; a request the
+recorder logs is one the security hooks admitted). Injected with `{ cookie: 'better-auth.session_token=…',
+origin: 'https://evil.example' }`:
+
+```
+CTRL DELETE /v1/me/mcp-tokens/:id            -> 403 forbidden_origin | inSet=true  | letThrough=false
+CTRL PUT    /v1/me/mcp-tokens/:id            -> 403 forbidden_origin | inSet=true  | letThrough=false
+CTRL POST   /v1/events                       -> 403 forbidden_origin | inSet=true  | letThrough=false
+PUT  /v1/me/preferences                      -> 401 unauthenticated  | inSet=false | letThrough=TRUE
+PUT  /v1/me/notification-preferences         -> 401 unauthenticated  | inSet=false | letThrough=TRUE
+POST /v1/me/invitations/:inviteId/accept     -> 401 unauthenticated  | inSet=false | letThrough=TRUE
+POST /v1/me/invitations/:inviteId/decline    -> 401 unauthenticated  | inSet=false | letThrough=TRUE
+POST /v1/invites/:token/accept               -> 401 unauthenticated  | inSet=false | letThrough=TRUE
+POST /v1/sync/reconcile                      -> 400 FST_ERR_VALIDATION| inSet=false | letThrough=TRUE
+POST /v1/mcp/device/code                     -> 400 FST_ERR_VALIDATION| inSet=false | letThrough=TRUE
+POST /v1/mcp/device/token                    -> 400 FST_ERR_VALIDATION| inSet=false | letThrough=TRUE
+```
+
+**The three controls are the point**: they show the probe CAN produce a 403 and that `letThrough=false`
+is what a protected route looks like. `letThrough=true` means the request reached `requireSession` (401)
+or the handler's own validation (400) — i.e. **every security hook before the route let it pass.** The
+`PUT`s and the two invitation writes all carry `requireSession` (verified at each registration), which is
+what makes them cookie-authenticatable.
+
+⚠ **Two of the eight are NOT claimed as defects, and the distinction is the criterion:** `POST
+/v1/mcp/device/code` and `POST /v1/mcp/device/token` are **unauthenticated by design** (RFC 8628 — the
+device flow exists to work before a session), so a cookie riding along is not an ambient credential doing
+the work, and `POST /v1/sync/reconcile` is the disclosure-shaped read the route's own docblock describes
+rather than a writer. **I am claiming the five writers and not the other three**, which is why the
+count in the heading is five and the table has eight rows.
+
+**PROBE, REPRODUCIBLE.** Created at `apps/server/test/http/zz-e3-probe.test.ts`, run, and **deleted in
+the same shell invocation** (`git status --porcelain` empty afterwards). It imports `buildApp`,
+`createAuth`, `createObjectStoreFromEnv`, `createPool` and `HTTP_ORIGIN_PROTECTED_ROUTES` exactly as
+`security-middleware.test.ts` does, builds with `{ webOrigin: 'http://localhost:3001', rateLimit: null }`,
+adds the recording `onRequest` hook, and `app.inject`s each row above. Its `console.log` lines are the
+table.
+
+---
+
+## 14.7.2 — `E3-15` (r2) — **IMPORTANT (claimed)** — The guard written to catch exactly this cannot catch it, and its own docblock says so
+
+**WHAT.** `apps/server/test/http/security-middleware.test.ts:256`, the test the file calls **the
+set-equality drift guard**:
+
+```ts
+it('every protected route has a row in this suite, and every row is a protected route', () => {
+  const inTable = new Set(PROTECTED.map(([, , pattern]) => pattern));
+  expect([...inTable].sort()).toEqual([...HTTP_ORIGIN_PROTECTED_ROUTES].sort());
+});
+```
+
+**WHY it cannot do its job.** It compares `HTTP_ORIGIN_PROTECTED_ROUTES` against **the suite's own
+`PROTECTED` table** — a closed loop of two hand-written lists. Its docblock states the two directions it
+covers: *"a missing row means an unprotected route with no test, and an extra row means a test asserting
+a protection that no longer ships."* **Both directions are between the set and the table.** A route that
+is in **neither** leaves the two sets equal and the test **green**.
+
+**And that is precisely the failure the same docblock records as the reason the guard exists:**
+
+> It exists because that gap actually happened: the first cut of this suite covered four routes while
+> `HTTP_ORIGIN_PROTECTED_ROUTES` was believed complete, and **three cookie-authenticatable mutations —
+> `POST /v1/workspaces`, the ticket-type migration, and marking a notification read — were outside
+> BOTH**… Re-reading a list you already believe is complete cannot find that; **only comparing it
+> against something independent can.** So the comparison is here, in code.
+
+**"Outside BOTH" is the case the guard was built for, and it is the one case the guard cannot see.** The
+comparison is not against something independent — it is between two artifacts of the same hand, which is
+the weaker of the two shapes available and is the opposite of what the paragraph promises.
+
+**MEASURED, both halves in the same run:** the guard **passes** — `pnpm exec vitest run
+test/http/security-middleware.test.ts -t "every protected route has a row"` → `Tests 1 passed | 72
+skipped` — while the five routes in `E3-14` are demonstrably outside the control. **A green test beside
+a live gap, where the test's own comment names that gap as its reason to exist.**
+
+**WHAT WOULD HAVE BEEN BETTER.** Compare against the app, not against a second list. Fastify exposes the
+assembled route table (`app.printRoutes()` / `onRoute`), and the file already contains the machinery: its
+own `Recorder` hook records `{ method, routeUrl }` for every request that reaches a route. **One
+`onRoute` hook over the built app, filtered to `MUTATING_METHODS`, asserted equal to the protected set
+plus an explicit, commented allow-list of the public doors** would make the next forgotten route a red
+test — which is the property the docblock claims and the one it does not have. The allow-list is the
+honest form: the three non-writers above are legitimately outside the check, and today that is expressed
+only by their absence from a list, which is indistinguishable from an oversight.
+
+**SEVERITY: Important (claimed).** The guard is green, the file believes it is protected against this
+class, and the class is present. It is not Critical on its own — it protects nothing by itself — but it
+is the reason `E3-14` survived three waves of the same defect being found by hand.
+
+**MEASUREMENT.** The guard's body read at `:256-259`; the run above returns `1 passed | 72 skipped`; the
+probe in `E3-14` is the falsifier on the other side. Both from this sha.
