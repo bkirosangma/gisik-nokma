@@ -535,15 +535,19 @@ previously muted `mention` and `contest`, this body un-mutes both.
 asserting that fact about the account"* — and then `toggleKind` asserts it to the server. The sessions section
 (`sessions-section.tsx:56-63`) hedges its empty sentence for the same collapsed read — *"this component cannot tell
 which"* — while a signed-in person always has at least the current session, so "No signed-in devices to show" on
-`/account` (`[BROWSER]`) can only be a failed read painted as an empty state. This is the brief's expensive shape
-inverted: the server ACCEPTS a claim the client invented.
+`/account` (`[BROWSER]`) can only be a failed read painted as an empty state. A third site does not even hedge:
+`account/page.tsx:180` `passkeyClient.list().then(setPasskeys, () => setPasskeys([]))` → `passkeys-section.tsx:96-97`
+*"You have no passkeys yet."* — *"yet"* asserts a fact about the account, over a read that answered nothing, to a
+person who (here) holds seventeen (`[BROWSER]` `/account` lists 17 `Delete passkey …` controls). This is the brief's
+expensive shape inverted: the server ACCEPTS a claim the client invented — and, for passkeys, the client asserts an
+absence the server never stated.
 
 **WHAT WOULD HAVE BEEN BETTER.** Hold `prefs = null` on a failed read and render the five rows disabled with *"Your
 preferences could not be loaded"*; make `toggleKind` refuse to save unless the last `load` succeeded; same for
 sessions (`:91`).
 
 **MEASUREMENT.** `[BROWSER]` JS transcript above (`cap` array: `[{GET, blocked:true}, {PUT, body:"{\"mutedKinds\":[\"assignment\"]}"}]`).
-`[SOURCE]` `account/page.tsx:74-81`, `:91`, `:215-232`; `notification-preferences-gateway.ts:18-22`;
+`[SOURCE]` `account/page.tsx:74-81`, `:91`, `:180`, `:215-232`; `passkeys-section.tsx:96-97`; `notification-preferences-gateway.ts:18-22`;
 `sessions-section.tsx:56-63`.
 
 **SEVERITY: Important** (claimed). A person's stored settings are overwritten by a default the product itself says it
@@ -727,7 +731,8 @@ that calls `onClose()` on `Escape` **with no `preventDefault()`**. `packages/ui/
 document-level `keydown` that closes the sheet on `Escape` unless `event.defaultPrevented` — and its docblock is
 explicit: *"A child that handles Escape must call `preventDefault()` for this guard to see it."* The Sheet's listener
 was registered first (the sheet mounted first), so on one Escape it runs first, sees `defaultPrevented === false`,
-and closes the sheet; then the dialog's listener closes the dialog. The person who meant to cancel a move is dumped
+and closes the sheet; then the dialog's listener closes the dialog. (The order does not matter: neither handler
+sets `defaultPrevented`, so both fire in either order.) The person who meant to cancel a move is dumped
 back on the board.
 
 **WHY.** The fix round that added the guard fixed the ONE child it was looking at — the title field
@@ -747,6 +752,39 @@ became unusable before I returned to it (§6.1). `grep -n Escape packages/app-co
 → only `16.86` (the title field); no case presses Escape with the Move dialog open.
 
 **SEVERITY: Important** (claimed). A cancel that discards more than the person cancelled, on every ticket move.
+
+---
+
+### E5-21 — IMPORTANT · The manual sends a person to the phone to comment; the phone files the comment under the ASSIGNEE's id (or the literal `'me'`), the server refuses that as identity spoofing, and the app shows nothing `[SOURCE]` — the phone half of exec 2's `F1(e)`, which it verified "on the web half only"
+
+**WHAT.** `docs/manual.md:365-366`: *"**The phone app has a Comment button on a job and the website does not.**"*
+The button exists (`apps/mobile/src/screens/ticket-screen.tsx:126`). Its handler (`:35-56`) submits
+`comment.added` with `actorId: state.assigneeId ?? 'me'` — the comment carries **the assignee's identity**, or a
+five-byte literal when nobody is assigned — under a comment that says so: *"Interim … the session user id is not
+wired up (no auth flow in this shell yet)."* The server refuses any event whose actor is not the session's:
+`check-permission.ts:542-545` `if (env.actorId !== ctx.sessionUserId) return refuse(IDENTITY_SPOOF_REASON)`, and the
+sync door independently: `sync-service.ts:321-324` `if (event.actorId !== userId) return { status: 'invalid' … }`.
+On the phone the submit's only failure arm swallows the expected outcome — `:53` `if (err instanceof
+OfflineAcceptError) return; // queued locally — the expected offline outcome` — so the person sees no error and no
+posted comment.
+
+**WHY.** exec 2's `F1(e)` showed the web HALF of that manual sentence is false (the web has a composer) and said
+*"I verified the web half only."* The phone half is false in the other direction: the button is there and what it
+files can never be committed as the person who typed it — for an assigned ticket it is a claim in another member's
+name, which is the one thing `provenance.ts`'s honesty contract and `IDENTITY_SPOOF_REASON` exist to refuse. The
+words typed are lost at the first sync that has a session, and the manual's `:1203-1213` caveats ("Treat both as
+early") do not mention that a phone comment is filed as somebody else.
+
+**WHAT WOULD HAVE BEEN BETTER.** Until the phone has a session, withhold the Comment control with a sentence
+(the New-ticket rule: asks before it offers) rather than accept into a queue that will be refused; and correct the
+manual sentence to say the web has the thread and the phone does not yet post one as you.
+
+**MEASUREMENT.** `[SOURCE]` `ticket-screen.tsx:35-56`, `:126`; `check-permission.ts:542-545`;
+`sync-service.ts:318-324`; `docs/manual.md:363-366`, `:1203-1216`. Not driven: no phone, no mobile session.
+
+**SEVERITY: Important** (claimed). A person loses the words they typed (Critical on my scale) — held at Important
+because the manual already flags the phone app as untested and early; the finding is that it flags the wrong
+danger.
 
 ---
 
@@ -811,15 +849,15 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**20 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 20). By claimed severity, read from the
-heading text: **Critical 0 · Important 15 · Minor 5** (15 + 5 = 20).
+**21 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 21). By claimed severity, read from the
+heading text: **Critical 0 · Important 16 · Minor 5** (16 + 5 = 21).
 
-- **Important (15):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-13, E5-15, E5-16, E5-20
+- **Important (16):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-13, E5-15, E5-16, E5-20, E5-21
 - **Minor (5):** E5-12, E5-14, E5-17, E5-18, E5-19
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed) = 17 of 20. **Reproduced with an injected failure, zero server writes:** E5-13,
-E5-15. **Source-only:** E5-10, E5-18, E5-19.
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed) = 17 of 21. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
 sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever), E5-20 (stacked dialogs and
@@ -882,8 +920,8 @@ Filters `:784-830`, History `:408-419`, invitations `:205-240`) · `docs/faq.md`
 
 ### 6.3 NOT reached, named
 
-1. **`apps/mobile` and `apps/desktop`** — untouched, same as exec 2. The manual's phone/web contrasts are verified on
-   the web half only.
+1. **`apps/mobile` and `apps/desktop`** — desktop untouched; of mobile I read ONLY `screens/ticket-screen.tsx:30-130`
+   (E5-21). The board screen, the help screen, the editor web view and every offline arm are unread.
 2. **The workflow builder as a person meets it** (canvas, inspector, publish, state-mapping dialog, history screen) —
    read only its load arms as positive controls for E5-15. exec 2's §2e candidates there (`publish-controls.tsx:65/117`,
    `state-mapping-dialog`, `workflow-rebind-dialog`) remain unverified by me.
@@ -930,5 +968,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 20 findings — Critical 0 · Important 15 · Minor 5 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 21 findings — Critical 0 · Important 16 · Minor 5 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
