@@ -10,3 +10,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E4-19 | done | 7d83f993 | 3.179-3.181 / E4-19 — History headline narrates; slug kept in .gn-history__slug; mutation kills 3 |
 | T-E5-27 | done | 4516e2bf | 3.182 / E5-27 — Move in-flight latch; RED PASS (0) FAIL (1), GREEN PASS (1) FAIL (0), suite 1725 |
 | T-E5-28 | done | a59bad07 | 10.90-10.92 / E5-28 — Publish transport+unknown arms, refusal keeps the mapping; RED PASS (0) FAIL (3), suite 1728 |
+| T-E5-8 | done | f5e0878a | 3.183-3.184 / E5-8 — census over the domain lists; found attachment.added + claim.contested_resolved; RED PASS (3) FAIL (3), suite 1734 |
