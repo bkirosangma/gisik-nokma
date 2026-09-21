@@ -4,6 +4,25 @@
 
 ---
 
+## 🔄 MONDAY 2026-09-21 ~17:5x IST — **CYCLE 43: THE LEDGER RECONCILED BY MEMBERSHIP — ONE ROW ADDED, THREE ZEROED, NO WINNER CHANGED; THE OWNER HAS THE TASK LIST AND HAS ORDERED NOTHING SCHEDULED.** `main` is **`94531f4d`**; zero open PRs at the anchor.
+
+### 1. WHAT HAPPENED
+The owner asked (17:4x) for the compiled rulings as tasks, ranked by impact/complexity/volume against a release at **2026-09-22 12:00 IST**, then for adjacent tasks batched into single shots, then whether the list covered *all six reviews*. Answering the last question by **membership** (every finding-id heading in each landed report vs the ledger's ids for that lane, exec 2's aliases normalised) found what cycle 40's count reconciliation could not — the index it compared against was the extraction's own output:
+- **P13 (exec 1) had no row**: its heading carries "WITHDRAWN" (the lane withdrew only its WCAG citation) and the extraction skipped it. Judge opened: skip-link grep → 0 over the four source roots, control `aria-label` → 166. **Added, Minor, +1 → exec 1 = 71.**
+- **E2-5 / E2-7 (exec 2) are aliases of F5 / F7** (`review-ux-exec2.md:120-123`), scored twice via the R2.2 headings. **Zeroed, −2.**
+- **F9 (exec 2) was withdrawn at the phase-1 sha** (`778a6439:…:136`, free window) and scored anyway. **Zeroed, −1 → exec 2 = 107.**
+Verdict after: UI **72–71**, UX **107–101**, FUNC 54.5–44.5. Winners unchanged; the endings of cycle 42 stand; the UI margin is one point and the owner has been told so together with the cycle-41 §3 rulings that are theirs to overrule. Landed as `review-scores.tsv` (240 rows) + judgment §10 in this cycle's PR.
+
+### 2. THE TASK LIST — DRAFT, NOT SCHEDULED
+231 valid rulings → **45 tasks** (script `tasks.py`, coverage asserted: every valid ruling in exactly one task) → **11 batches by adjacency** (one PR, one test run, one reviewer pass each; one commit per sub-task inside). Capacity stated to the owner: three lanes × ~8 h committed (+2–3 h stretch) before a 10:30 PR cut-off, 14-min stack rebuild, smoke by 11:30 → committed 6 batches / 19 tasks / 82 rulings incl. both Criticals and the three security holes; stretch 9 batches / 30 tasks. Assumptions stated: phone/desktop shells not in the release; "release" = rebuild the dev stack from `main`; three lanes. **Owner: *"do not schedule anything yet. i will review the tasks."*** The draft lives in the cycle-43 session's scratchpad; it lands in `docs/lanes/` only when the owner picks.
+
+### 3. INSTRUMENTS THIS CYCLE
+- **An extraction's own index is not a control for the extraction.** Compare the SOURCE's headings by membership; handle WITHDRAWN-in-heading (a withdrawn *claim* is not a withdrawn *finding*) and alias tables explicitly.
+- A control that returns 0 is not a control: the first P13 row said "non-zero" over a control that measured 0 (zsh again — an unsplit `$P`). Caught before commit by reading the number; the row now carries 0 vs 166 from a bash script.
+- `grep` in this shell is aliased (ugrep via rtk) and zsh does not split unquoted variables; every measurement script goes through `bash` and `/usr/bin/grep`.
+
+---
+
 ## 🔄 MONDAY 2026-09-21 ~17:2x IST — **CYCLE 42: #634 MERGED (`fc8b32ab`); THE THREE LOSERS ARE ENDED; THREE LANES STAND, HELD.** `main` is **`fc8b32ab`**; zero open PRs.
 
 ### 1. THE ENDINGS — the owner's order (*"the ones who loses dies"*), executed after the verdict was on `main`
