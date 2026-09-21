@@ -1344,24 +1344,26 @@ I read the patterns against the tree rather than trusting the empty result.
 | severity | count | members |
 |---|---|---|
 | **Critical (claimed)** | **1** | `E3-14` — five cookie-authenticated mutating routes outside `HTTP_ORIGIN_PROTECTED_ROUTES` |
-| **Important (claimed)** | **3** | `E3-15` (drift guard compares the set to its own table) · `E3-16` (roster-cut citation drifted twice; the correction note now misdirects the fix) · `E3-18` (the replica invents an ancestor the online read reports as absent — **reproduced, §19**) |
+| **Important (claimed)** | **4** | `E3-15` (drift guard compares the set to its own table) · `E3-16` (roster-cut citation drifted twice; the correction note now misdirects the fix) · `E3-18` (the replica invents an ancestor the online read reports as absent — **reproduced, §19**) · `E3-19` (the parent-terminal invariant is one-directional; a parent can be closed with an open child — **reproduced, §21**) |
 | **Minor** | **6** | `E3-9` (envelope "thirteen fields" vs 11) · `E3-10` (registry "SIXTEEN/thirteen" vs 18/15) · `E3-11` (`Features.md` "84 fixtures" vs 86) · `E3-12` (`Features.md` "eleven checks" vs 12) · `E3-13` (citation resolves to the wrong line) · `E3-17` (outbox refactor total 8, its own bullets sum to 9) |
 | **Round-1 findings, re-validated and standing** | **8** | `E3-1` … `E3-8` (§13) — **none withdrawn** |
 | **Instrument defects in my own method** | **1** | §15 — the 439-hit sweep, not filed as findings |
 | **Corrections to this report's own citations** | **4** | §17.1 (three `Features.md` lines) · §17.2 (my §7.2 `tickets.ts` citation) |
 
-**Round-2 total: 10 new findings** (1 Critical claimed, 3 Important claimed, 6 Minor), plus 8 round-1
+**Round-2 total: 11 new findings** (1 Critical claimed, 4 Important claimed, 6 Minor), plus 8 round-1
 findings re-validated and 4 corrections to this report's own citations.
 
-**Six of the ten are measured by RUNNING something** — `E3-14` and `E3-15` by injection at the assembled
-app, `E3-18` by a replica reproduction, `E3-9` by a runtime schema probe, `E3-11` by three agreeing
-counts including the runner's own case count, `E3-17` by the docblock's own published command. **Four are
-measurements of text** (`E3-10`, `E3-12`, `E3-13`, `E3-16`), and each names the command and its control.
+**Seven of the eleven are measured by RUNNING something** — `E3-14` and `E3-15` by injection at the
+assembled app, `E3-18` by a replica reproduction, `E3-19` by two engine probes, `E3-9` by a runtime schema
+probe, `E3-11` by three agreeing counts including the runner's own case count, `E3-17` by the docblock's
+own published command. **Four are measurements of text** (`E3-10`, `E3-12`, `E3-13`, `E3-16`), and each
+names the command and its control.
 
 **A count is only evidence once its members are named — hence the table.** And this table has now been
-corrected three times in this round (7 → 8 → 10), which is the same drift it is tabulating: **a total
+corrected FOUR times in this round (7 → 8 → 10 → 11), which is the same drift it is tabulating: **a total
 nobody re-derives is the one that goes stale**, and the only reason this one did not stay stale is that
-each new finding forced it. That is `E3-17`'s mechanism, visible from inside.
+each new finding forced it. That is `E3-17`'s mechanism, visible from inside — and the one thing this
+table has that the docblocks do not is a reason to be re-derived.
 
 ### 16.1 What changed about my coverage boundary since round 1
 
