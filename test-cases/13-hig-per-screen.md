@@ -429,6 +429,34 @@ and the id-placement pass over the routes was written with an inverted self-clos
 on the five Suspense FALLBACK shells and on none of the real `<main>`s. Both are recorded because each
 looked green-ish for a moment.
 
+## The project page's loading arms announce themselves (exec2 V6, 2026-09-21) — case `13.1056`
+
+- **13.1056** ✅ Every `Loading…` arm on the project page carries `role="status"`, and there are **exactly
+  five** — the count is PINNED, because exactly one arm renders at a time and no single mount can see them
+  all, so a sweep is the only instrument that can assert them together; a sixth arm added bare reddens and
+  so does a removal. In the same sweep, none of the file's `role="status"` sites spells `aria-live` — the
+  arms MATCH the file's own three create-region waits rather than inventing a second shape for the same
+  job, and the site count is asserted as `arms.length + 3` so it says where it comes from. One runtime arm
+  in `project-calendar-timeline.test.tsx` reads the role off a RENDERED arm, with `getBoard` never
+  settling, scoped to the status whose text IS the loading words — a bare `getByRole('status')` would pass
+  against the create region's own with the arm still bare. (`apps/web/test/loading-status.test.tsx`)
+
+**The finding.** Five arms rendered a bare `<p>Loading…</p>` — calendar, timeline, list, board and backlog
+— **in a file that uses `role="status"` three times already**, in the create region (`:1759`, `:1768`,
+`:1810`). A screen reader got the words with no announcement on every view but the one whose waits the file
+had decided deserve a role. The reviewer's own instrument was a single grep for `Loading…`, which returned
+exactly those five lines with no role on any of them.
+
+**The measured count is five, re-measured rather than inherited:** a grep for `Loading…` over the file
+returns five live arms plus two DOCBLOCK mentions (`:99-100`), which is why the sweep strips comments
+before counting — a raw search would have counted prose as implementation.
+
+⚠ **One number in this case was wrong on the run that proved the fix**, and it is recorded rather than
+quietly corrected: the create-region assertion read `toBe(3)`, written against the PRE-fix file and left
+in place when the five arms joined it, so it failed `expected 8 to be 3`. It is now `arms.length + 3` — a
+count that says where it comes from, because one that has to be re-derived whenever the thing it counts
+grows is a count nobody maintains.
+
 ## Task 1 of the HIG per-screen plan (2026-09-08) — the four shared pieces every screen reuses
 
 - **13.288** ✅ `SegmentedControl` renders `role=tablist` (named by a required `aria-label`), one

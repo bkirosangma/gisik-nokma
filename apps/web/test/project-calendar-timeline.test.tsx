@@ -271,6 +271,53 @@ describe('the project page mounts four views over one list read', () => {
   });
 
   /**
+   * 13.1056 — exec2's V6 — **a loading arm ANNOUNCES itself.**
+   *
+   * Five arms on this page rendered a bare `<p>Loading…</p>` — calendar,
+   * timeline, list, board and backlog — **in a file that already uses
+   * `role="status"` three times** in its create region. A screen reader got the
+   * words with no announcement, on every view but the one whose waits the file
+   * had decided deserved a role.
+   *
+   * The five are asserted by a COUNT-PINNING sweep in `loading-status.test.tsx`,
+   * because exactly one renders at a time and no single mount can see them all.
+   * THIS is the arm that reads the role off a rendered arm, so an attribute
+   * written but never reaching the DOM reddens here.
+   *
+   * `getBoard` never settles, deliberately: the state under test is the one the
+   * page is in WHILE a tab's read is in flight, and a resolving read would race
+   * the assertion for the state it replaces.
+   */
+  it('13.1056 the board tab\'s loading arm renders with role="status"', async () => {
+    render(
+      <Providers
+        services={stubServices({
+          getBoard: () => new Promise(() => {}),
+          getMembers: async () => MEMBERS,
+          getTicketTypes: async () => [typeDef()],
+          getTickets: async (): Promise<TicketListView> => ({ projectId: 'p_1', rows: [row()] }),
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+
+    // POSITIVE CONTROL: the arm itself is on screen. Without this, a red below
+    // could mean "the board never entered its loading state", which is a
+    // different fault from "the loading state has no role".
+    expect(await screen.findByText('Loading…')).toBeInTheDocument();
+
+    // THE WITNESS. Scoped to the arms whose TEXT is the loading words rather
+    // than `getByRole('status')` alone: this page has other `status` regions in
+    // its create area, and a bare role query would pass against one of those
+    // with the arm still bare.
+    const announcing = (await screen.findAllByRole('status')).filter(
+      (el) => el.textContent === 'Loading…',
+    );
+    expect(announcing, 'the Loading… arm carries no role="status"').toHaveLength(1);
+  });
+
+  /**
    * 13.430 — the tab rail is the SHARED segmented control, not a page-local
    * lookalike. `viewTabs()` already scopes by `.gn-segmented` (Task 2 of the
    * board-prototype-port renamed the container from `.gn-view-tabs`), so a

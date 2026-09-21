@@ -2414,7 +2414,20 @@ function ProjectBoard() {
                   hideEpicRows
                 />
               ) : (
-                <p>Loading…</p>
+                /* exec1's V6, and the same `role` all five of this chain's arms
+                   now carry: each tab's read-in-flight state announces itself.
+                   This file had ALREADY decided its waits deserve one — the
+                   create region carries `role="status"` three times (`:1759`,
+                   `:1768`, `:1810`) — and these five were the ones that did not
+                   match it, so a screen reader got the words with no
+                   announcement on every view but the one. ⚠ **No `aria-live`**,
+                   matching those three rather than inventing a second shape for
+                   the same job: `role="status"` carries an implicit polite
+                   live region, and spelling both would be two sources for one
+                   behaviour. The five are asserted by a sweep that PINS the
+                   count, because exactly one arm renders at a time and no
+                   single mount can see them all. */
+                <p role="status">Loading…</p>
               )
             ) : view === 'timeline' ? (
               list.error !== null ? (
@@ -2452,7 +2465,7 @@ function ProjectBoard() {
                   hideEpicRows
                 />
               ) : (
-                <p>Loading…</p>
+                <p role="status">Loading…</p>
               )
             ) : view === 'board' ? (
               board.error !== null ? (
@@ -2539,7 +2552,7 @@ function ProjectBoard() {
                     : {})}
                 />
               ) : (
-                <p>Loading…</p>
+                <p role="status">Loading…</p>
               )
             ) : view === 'backlog' ? (
               // Task 10 (backlog/closed spec §5.4) — the Backlog tab. Same
@@ -2674,7 +2687,7 @@ function ProjectBoard() {
                   ) : null}
                 </>
               ) : (
-                <p>Loading…</p>
+                <p role="status">Loading…</p>
               )
             ) : list.error !== null ? (
               <ShellRefusal what="The ticket list" message={list.error} />
@@ -2793,7 +2806,7 @@ function ProjectBoard() {
                   : {})}
               />
             ) : (
-              <p>Loading…</p>
+              <p role="status">Loading…</p>
             )}
           </div>
         )}
