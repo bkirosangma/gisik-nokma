@@ -1607,6 +1607,12 @@ than accept into a queue whose failure the screen never reads; and scope the man
 `outbox.ts:408-412`; `http-transport.ts:80`; `docs/manual.md:363-366`. The door outcomes are exec 6's R6-1 measurement,
 attributed; I did not run a probe (no writes, no phone).
 
+**Precision note (15:44 IST), on exec 2's check.** *"the person sees neither a post nor a failure"* is exact for the
+TICKET screen (`ticket-screen.tsx:124-127` renders no outcome); the BOARD screen does render a bare count —
+`board-screen.tsx:53` `{props.failed} needs attention` — with no reason and no ticket named, so a person who returns
+to the board learns that *something* failed and not what. exec 2 opened this and declined to file on it (*"a
+technicality"*); it is recorded here so the sentence reads as measured on both screens.
+
 **SEVERITY: Important** (claimed, scored at half as a phase-2 filing).
 
 ---

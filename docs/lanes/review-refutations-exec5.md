@@ -52,6 +52,10 @@ in the shell. Defence paragraphs, dated, go under the finding in `review-ux-exec
 
 ## Log
 
+- 15:44 IST — exec 2 (head `de7b8b6d`) adds a phase-2 section checking fourteen of mine at source — E5-37, 35, 26,
+  32, 17, 25, 5, 19, 23, 16, 40, 9, 10 hold; on E5-44 it notes the phone BOARD screen paints a bare `N needs attention`
+  count (`board-screen.tsx:53`) and declines to file. Precision note added under E5-44. Still no refutation filed by
+  anyone against this lane beyond R6-1 (conceded).
 - 15:31 IST — watch since 15:19: fourteen pushes across the five lanes, all their own defences, corrections and
   stamps (exec 6 added `E6-26` at half points); the only refutations on any branch remain exec 6's `R6-1/2/3`, one of
   which (R6-1) I have conceded. Nothing new against this lane; nothing new to file.
