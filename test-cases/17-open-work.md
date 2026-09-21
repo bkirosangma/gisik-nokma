@@ -61,7 +61,7 @@ false.**
 the prototype's row, and it is neither the mode nor the roster.**
 
 ⛔ **§6's law, restated because it is the whole risk here: (b) KEEPS THE EXPLICIT AUDIENCE ROSTER CUT.**
-`apps/server/src/routes/tickets.ts:115-118` refuses to serve `own_user_ids` / `resolved_user_ids` —
+`apps/server/src/routes/tickets.ts` refuses to serve `own_user_ids` / `resolved_user_ids` —
 *"an explicit audience ROSTER, a disclosure no plan authorized."* **The prototype DRAWS that roster**
 (`design-system/interactive/desktop.dc.html`: a chip per viewer with a removable `×` at `:1214`–`:1224`,
 an *"Add someone who can see it…"* `<select>` over `viewerCandidates` at `:1225`–`:1229`, and a closing
@@ -116,16 +116,25 @@ fixed here; both are named in `docs/lanes/executor-3-state.md`.
 - **The `<dl>` placement and the binary toggle are NOT done, deliberately.** Both are structural
   divergences from the prototype and both are recorded in `docs/lanes/executor-3-state.md` § 2. **Owner:
   the controller, if either is ever wanted** — neither has a disclosure this dispatch names.
-- **A STALE `routes/tickets.ts:111-114` SURVIVES IN FOUR FILES THIS LANE DID NOT TOUCH, AND IS RECORDED
-  RATHER THAN FIXED.** At this head the roster-cut clause — *"an explicit audience ROSTER, a disclosure no
-  plan authorized"* — is at **`tickets.ts:115-118`**; `111-114` is the *"Reachable today, not
-  hypothetical"* paragraph above it. This lane corrected **every instance inside its own change set**
-  (`visibility-editor.tsx` ×2, `visibility-editor.test.tsx` ×1, `Features.md` ×1) so the change set does
-  not carry one sentence at two ranges. **The four it left alone are outside its scope and would push the
-  diff into unrelated files:** `packages/app-core/src/online/mappers.ts:1899`,
-  `packages/app-core/src/view-types.ts:391`, `test-cases/03-foundation-ledger.md` (×3) and
-  `docs/lanes/executor-state.md` (executor 1's handoff, which this lane must not edit). **Owner: whoever
-  next touches any of those four files** — it is a citation correction, no behaviour.
+- **THE STALE `routes/tickets.ts:111-114` IS CORRECTED AS OF 2026-09-21 — AND THIS NOTE WAS STALE IN THE
+  SAME WAY IT WAS WARNING ABOUT.** The roster-cut clause — *"an explicit audience ROSTER, a disclosure no
+  plan authorized"* — sits at **`tickets.ts:119-122`**. `:111-113` is the tail of the existence-disclosure
+  paragraph and `:114-117` is *"Reachable today, not hypothetical"*, so **`111-114` was wrong from the
+  start and `115-118` — the range this note named as the live one — was wrong too**: the clause had moved
+  again between this note and its reading. Neither range is replaced with a third. Every citation now
+  names the file and carries the quoted clause, so a reader greps the words instead of trusting a number
+  that has moved twice under this same sentence. Fixed here (task `T-E3-16`, batch B18): `mappers.ts`,
+  `view-types.ts`, `visibility-editor.tsx` ×2, `packages/ui/test/components.test.tsx`,
+  `visibility-editor.test.tsx` ×2, `Features.md`, `test-cases/03-foundation-ledger.md` ×2, and this file's
+  own line above — the last of those is why the earlier "four files this lane did not touch" is now empty
+  rather than four.  **Two corrections to this note's own bookkeeping, measured:** it said
+  `test-cases/03-foundation-ledger.md` held **three** occurrences — it held **two** (`:99`, `:172` at the
+  head before this change) — and it named `docs/lanes/executor-state.md`, which carries neither range; the
+  lane handoff that does is `docs/lanes/executor-3-state.md`. **Left alone deliberately: `docs/lanes/` —
+  four files still carry the old range** (`executor-3-state.md`, `executor-state-history.md`,
+  `review-compiled-controller.md`, `review-functionality-exec3.md`), and three of those are review reports
+  or lane history that quote what was written at the time. **Owner: the controller** — a lane that
+  rewrites another lane's report is a lane editing evidence.
 
 ## THE REVIEW PASS — recorded BEFORE the PR opened, and four of its findings were in THIS LANE'S OWN PROSE
 

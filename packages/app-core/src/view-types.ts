@@ -388,7 +388,7 @@ export type ResolvedVisibilityMode = Exclude<VisibilityMode, 'inherit'>;
  *
  * `proj_visibility` holds five columns of interest and this shape carries two.
  * `own_user_ids` / `resolved_user_ids` are CUT from the route by a standing
- * disclosure ruling — `routes/tickets.ts:111-114`: an explicit audience ROSTER
+ * disclosure ruling — `routes/tickets.ts`: an explicit audience ROSTER
  * is *"a disclosure no plan authorized"* — and the row carries no provenance at
  * all: who set the mode, and when, is on the LEDGER, not in this projection. So
  * the two members below are the two the wire actually has.

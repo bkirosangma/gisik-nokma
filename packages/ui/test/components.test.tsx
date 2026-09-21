@@ -1288,7 +1288,8 @@ describe('the Visibility section is styled to the prototype row (17.001–17.005
    * guest note (`:1230`) — are NOT transcribed: the owner's standing ruling on
    * `visibility` is **(a) BUILD, (b) KEEP THE RULING**, and (b) keeps the
    * explicit audience roster cut at the wire
-   * (`apps/server/src/routes/tickets.ts:115-118`).
+   * (`apps/server/src/routes/tickets.ts`, *"an explicit audience ROSTER, a
+   * disclosure no plan authorized"*).
    */
   it('17.001 the section has a rule AT ALL, and takes the prototype row’s own column geometry', () => {
     // This is the whole defect. Every other assertion in this describe is about

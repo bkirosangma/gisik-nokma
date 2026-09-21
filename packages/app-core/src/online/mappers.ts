@@ -1896,7 +1896,7 @@ function mapParentRef(raw: unknown, path: string): ParentRef {
  *
  * `proj_visibility`'s `own_user_ids` / `resolved_user_ids` are **derived
  * projection state**, and `toTicketView` cuts them at every call site
- * (`routes/tickets.ts:111-114`: *"an explicit audience ROSTER, a disclosure no
+ * (`routes/tickets.ts`: *"an explicit audience ROSTER, a disclosure no
  * plan authorized"*). That is why `TicketVisibility` has no roster member: the
  * absence is in the shape rather than papered over.
  *
