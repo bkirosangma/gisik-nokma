@@ -1881,3 +1881,34 @@ created, run and **deleted in the same shell invocation** (`git status --porcela
 importing `evaluateEvent` and `buildMemoryContext` by **relative path** so nothing resolves through a
 stale `dist`. `Tests 1 passed`. The refusal text above is `evaluateEvent`'s own, copied verbatim from the
 probe's output, not paraphrased.
+
+---
+
+## 23. REFUTATION RECONNAISSANCE — five other-lane findings attacked, none falsifiable
+
+Recorded here rather than only in phase 2, because **a refutation I could not make is worth publishing
+too**: it tells the judge the claims were attacked rather than accepted, and it stops a later lane
+re-spending the same hours. **None of these is filed as a refutation** — under §3 a rejected refutation
+loses the refuter the finding's points, so an unfounded one is worse than none.
+
+| target | the claim I attacked | what I measured | outcome |
+|---|---|---|---|
+| **E6-5** (exec 6, its own lane) | `outbox.nextBatch` lets a later claim overtake a backing-off one | `outbox.ts:333`'s SQL, read verbatim: `WHERE status='queued' AND next_attempt_at <= ? ORDER BY position LIMIT ?` — **no head-of-line guard**; and `sync-engine.ts:844`'s `if (flushing !== null) return flushing` dedupes only CONCURRENT drains, so a later drain does run | **premise holds — not refutable** |
+| **E6-1** (exec 6) | the help tells users a job cannot be deleted while `Delete` ships | all five citations resolve exactly (`manual.md:372`, `faq.md:220-221`, `faq.md:982`, `content.generated.ts:1927`/`7681`/`10693`, `ticket-sheet.tsx:1203`) | **not refutable on citations** |
+| **E6-1**, provenance angle | *maybe the FAQ/manual are preserved prototype text and staleness is known* | `docs/manual.md:6-7`: *"Where the product cannot do something yet, this manual says so plainly… **It will not send you hunting for a button that was never built.**"* — a claim about the CURRENT product, not a transcription | **not refutable — the manual's own promise makes the staleness a defect** |
+| **E6-2** (exec 6) | the notification read serves a deleted ticket's assignment | `notifications/store.ts:128-130`, read verbatim: `SELECT … FROM notifications WHERE ${where} ORDER BY id DESC LIMIT $n` — **joins nothing, filters nothing about the ticket** | **premise holds — not refutable** |
+| **E4-1 / E5-3** (exec 4 **and** exec 5, the same defect from two lanes) | the crumb renders the same ancestor twice when the direct parent is the epic | `tickets.ts:618` (`cursor = state.parentId`) and `:660-661` (returns `epic = {id: cursor}` on epic rank) ⇒ `epic.id === parent.id`; and **`:668-678` returns `parent` and `epic` independently with no comparison anywhere in the route** (`grep -nE "epic.*parent\|parent.*epic" tickets.ts` → only comments and the two separate assignments) | **premise holds — not refutable** |
+
+**What this reconnaissance is worth, stated plainly.** Five attacks, five failures. **That is a fact about
+the other lanes' rigour, not about mine** — every one of these findings names the line it rests on, and in
+each case the line said what the finding said it said. **The one thing I would have expected to find and
+did not is a citation defect**: after `E3-13` and `E3-16` I went looking for one in the competing reports
+and could not produce a single one, which is the strongest available evidence that their citations were
+opened rather than derived.
+
+**The two claims I would still like falsified, if a later lane has budget:**
+`E6-2`'s *"byte-identical answers to the same eight-event battery run against a live ticket"* (I verified
+the mechanism and the read, but not that byte-identity) and `E6-4`'s *"`search_path` alone fences the
+rebuild"*-adjacent claim about which reader serves the parent-terminal walk (I verified
+`transition.ts:132-142` reads `getChildrenStates` and that the server's reader is unfiltered, which is the
+mechanism, but I did not run their probe).
