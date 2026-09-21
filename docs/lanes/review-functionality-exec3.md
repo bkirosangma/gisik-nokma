@@ -50,7 +50,7 @@ table**, a closed loop, and passes green beside the gap.
 
 **Eight Important, eight Minor, and eight round-1 findings re-validated with none withdrawn** — and one of
 the seventeen was revised **down** by me before a judge could (§34). Every count is measured and every
-command is printed beside it. **§23, §36, §38 and §39 record eight attacks on other lanes' findings — all eight failed**, and two of them changed something here: `E6-6` showed a claim in this report to be false, and `E6-11` bounds §7.1's scope, and one of them (`E6-6`) showed a claim in this report to be wrong,
+command is printed beside it. **§23, §36, §38, §39 and §40 record nine attacks on other lanes' findings — all nine failed**, and two of them changed something here: `E6-6` showed a claim in this report to be false, and `E6-11` bounds §7.1's scope, and one of them (`E6-6`) showed a claim in this report to be wrong,
 and §15, §20.1, §31 and §35 record six times my own sweep's universe or pattern was the defect rather than
 the subject. **Two of this report's own citations were wrong and are
 corrected in §17** — the same defect `E3-13` files against another lane, shipped by the lane that filed it.
@@ -2854,3 +2854,36 @@ is settled" would be reading more than I measured.** Recorded here so that readi
 `E6-8`, `E6-9`, and now `E6-11` — **and two of the eight changed something in this report**: `E6-6` showed a
 claim of mine to be false (corrected, §14.4), and this one bounds §7.1's scope. **That ratio is the honest
 argument for attacking peers rather than re-reading oneself.**
+
+---
+
+## 40. A NINTH ATTACK — `E6-3` holds, and the code says it knows
+
+`E6-3` is that re-ranking a **custom** ticket type is accepted with tickets already placed where the new
+rank forbids, leaving the ledger holding hierarchies the engine then refuses to produce. Verified at the
+check itself:
+
+```
+packages/rule-engine/src/checks/ticket-type.ts:46-49   the seed is looked up BY ID against BUILTIN_TICKET_TYPE_SEEDS
+                                              :60-61   if (seed !== undefined && def.rank !== seed.rank) return refuse('type.builtin-rank', …)
+                                              :64      return ACCEPT;
+                                              :54-59   the code's own comment: re-ranking releases existing tickets —
+                                                       "re-ranking `sub-task` to 3 releases every sub-task from
+                                                        `hierarchy.deepest-rank-parent-required`" — and relies on the
+                                                        reparent cycle check as the backstop.
+```
+
+**It holds.** The only rank refusal is `type.builtin-rank`, guarded on a seed lookup; a custom type's re-rank
+reaches `ACCEPT`, and the file states the consequence in its own comment. **Nothing to refute.**
+
+**AND THE COMMENT IS THE INTERESTING PART, in the same way `E6-11`'s was.** The lane that wrote the check
+*knew* a re-rank releases tickets from the rank rule and *chose* the cycle check as the guard rather than
+refusing the re-rank — which is a defensible engineering decision, and it is why `E6-3`'s finding is about the
+*hierarchies left behind* rather than about the re-rank being unguarded. **Two of my nine attacks have now
+landed on a finding whose underlying behaviour the source explicitly describes**, and in both cases the source
+describes it as deliberate and the competing lane's finding is that the deliberation stops short of the next
+door. **That is a harder finding to write than a missing guard, and it is the kind this exercise is for.**
+
+**TALLY: NINE ATTACKS, NINE FAILURES.** Eight recorded above (§23, §36, §38, §39) and this one. **Two of the
+nine changed something here** — `E6-6` corrected a false claim of mine (§14.4) and `E6-11` bounded §7.1's
+scope.
