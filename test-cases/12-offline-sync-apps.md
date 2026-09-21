@@ -2796,3 +2796,28 @@ the native app learns the OS preference". The answer is `useColorScheme()` plus 
 > dark is NOT claimed here: that needs a device, and 12.396 asserts the declaration that makes it
 > possible rather than a rendered result.
 
+
+## The replica's view-serving reads and the soft delete (release plan B07, 2026-09-21 — ids `12.399` here; the batch's door cases are in §17's `17.121`–`17.140` block)
+
+*Round-2 finding E6-24 (`docs/lanes/review-functionality-exec6.md`, Appendix AF): the Delete commit put the
+replica's soft-delete filter on `getTickets` and `getBoard` — the two reads the phone and desktop shells
+never call — and on none of the three they do. Round-1 F5 had already measured that no replica test
+holds a deleted ticket, which is why three reads with no gate at all went unnoticed. `12.398` is B01's
+(minted on its branch the same night); this block starts after it.*
+
+- **12.399** ✅ **A soft-deleted ticket stops appearing in the three replica reads the shells actually
+  call** — `listTicketSummaries` (the phone's board screen, the desktop shell's list), `myWork.assigned`
+  (a filter over those summaries — fixed by the same line, and with NO product caller today, so it is
+  covered for completeness rather than claimed as user-facing) and `searchOfflineCopy` on BOTH of
+  `searchLocal`'s arms: the title scan and the comment-owner lookup, asked separately with a word only
+  the comments carry. One world, two tasks in `doing` assigned to the viewer, each with one comment;
+  every case reads before the delete (both tickets present — the control, inside the case) and after
+  it (`['live']` — an answer an empty world fails exactly as a leaking one does), and the fixture proves
+  the replica FOLDED the flag before any read is asked. The predicate sits on the data-source side of
+  the seam, not in `sync-client`'s `searchLocal`: the store keeps a deleted ticket on purpose (the parent
+  walk and `ticket.restored` need it), so the view predicate belongs to the door that serves the view —
+  where `getTickets` and `getBoard` already carry theirs. RED before the fix: `Tests 4 failed (4)`, each
+  at its after-delete assertion; GREEN after: `Tests 4 passed (4)`. —
+  (`packages/app-core/test/replica/replica-deleted-reads.test.ts`, "E6-24: listTicketSummaries drops a
+  soft-deleted ticket…", "E6-24: myWork.assigned drops it…", "E6-24: searchOfflineCopy drops it on the
+  TITLE arm…", "E6-24: searchOfflineCopy drops it on the COMMENT arm too…")
