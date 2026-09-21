@@ -259,8 +259,9 @@ size: 6 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ 
   `notification-preferences.ts`, `notifications.ts`; `replica/replica-data-source.ts` outside the five ranges
   in §2.2 (≈1,150 lines, the `DataSourceQuery` methods other than `getTickets`/`getBoard`/`getTicket` among them).
 - `apps/server/src`: `mcp-tokens`, `my-invitations` and `search` route modules read in part only; projections
-  `{rollups,proj-projects,proj-invites,search,ticket-comments,entity-heads,memberships-*}.ts` (six of the
-  registry's projections read whole; `rollups.ts` at the two cited lines only); `read/{restricted-parents,
+  `{rollups,proj-projects,proj-invites,search,ticket-comments,entity-heads,workspace-settings,rebuild,registry,
+  index}.ts` (of the 16 files in `projections/`, three read whole — `contested`, `proj-visibility`, `workflows` —
+  and three in part — `tickets`, `proj-memberships`, `ticket-types`; `rollups.ts` at the two cited lines only); `read/{restricted-parents,
   workspace-counts,ticket-comments,workflow-defs,ticket-numbers,live-ticket,state-provenance,assigned-provenance,
   membership-roster,list-cards}.ts` beyond a grep; `sync/{sync-service,reconcile-route}.ts` beyond the cited
   lines; `seed/*`; `http/{security-headers,hsts,rate-limit}.ts` beyond a grep; `auth/*` other than `auth.ts`, `routes.ts`, `social-providers.ts` and `synthetic-address.ts` (whose guard hides a synthetic
