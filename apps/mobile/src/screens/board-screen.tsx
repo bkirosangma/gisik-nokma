@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { syncStatusLabel, type ReplicaDataSource, type TicketSummary } from '@gisik-nokma/app-core';
+import { loadBoard } from './board-read.js';
 
 type Nav = { navigate(name: 'Ticket', params: { ticketId: string }): void };
 
@@ -16,26 +17,22 @@ export function BoardScreen(props: {
   const [tickets, setTickets] = useState<TicketSummary[]>([]);
   const [query, setQuery] = useState('');
   const [offlineCopy, setOfflineCopy] = useState(false);
+  const [readError, setReadError] = useState<string | null>(null);
   const { ds, workspaceId } = props;
 
   useEffect(() => {
     if (ds === null) return;
     const refresh = (): void => {
-      if (query === '') {
-        setOfflineCopy(false);
-        void ds.query.listTicketSummaries(workspaceId).then(setTickets);
-      } else {
-        void Promise.all([ds.query.searchOfflineCopy(workspaceId, query), ds.query.listTicketSummaries(workspaceId)]).then(
-          ([result, all]) => {
-            setOfflineCopy(result.offlineCopy); // always true on the replica — the label is the honesty
-            const byId = new Map(all.map((t) => [t.ticketId, t]));
-            const found = result.hits
-              .map((hit) => byId.get(hit.ticketId))
-              .filter((t): t is TicketSummary => t !== undefined);
-            setTickets(found);
-          },
-        );
-      }
+      if (query === '') setOfflineCopy(false);
+      void loadBoard(ds, workspaceId, query).then((result) => {
+        if (!result.ok) {
+          setReadError(result.error);
+          return;
+        }
+        setReadError(null);
+        if (query !== '') setOfflineCopy(result.offlineCopy); // always true on the replica — the label is the honesty
+        setTickets(result.tickets);
+      });
     };
     refresh();
     return ds.subscribe(workspaceId, 0, refresh);
@@ -53,6 +50,7 @@ export function BoardScreen(props: {
       {props.failed > 0 ? <Text accessibilityRole="text">{props.failed} needs attention</Text> : null}
       <TextInput placeholder="Search" value={query} onChangeText={setQuery} />
       {offlineCopy && query !== '' ? <Text>searching offline copy</Text> : null}
+      {readError !== null ? <Text accessibilityRole="alert">{readError}</Text> : null}
       <FlatList
         data={tickets}
         keyExtractor={(t) => t.ticketId}

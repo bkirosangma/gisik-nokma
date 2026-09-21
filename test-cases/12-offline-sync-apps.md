@@ -2796,3 +2796,28 @@ the native app learns the OS preference". The answer is `useColorScheme()` plus 
 > dark is NOT claimed here: that needs a device, and 12.396 asserts the declaration that makes it
 > possible rather than a rendered result.
 
+## Ruling E2-41 — a failed read is no longer drawn as a benign state (2026-09-21, B14)
+
+*Next free id at the top of this block: `12.401`. `board-screen.tsx` and `ticket-screen.tsx` called
+their replica reads with no rejection arm — a failed read left the board silently empty and the ticket
+screen on "Opening…" forever, the same word it shows while genuinely still loading. Fixed by splitting
+the read into a sibling `.ts` (`board-read.ts`, `ticket-read.ts` — same reason 12.394's family gives:
+`vitest.config.ts` runs node-only and a `.tsx` importing `react-native` fails to parse there) whose
+async function catches the rejection and returns `{ok:false, error}` instead of letting it escape
+unheard.*
+
+- 12.398 ✅ `loadBoard` (`board-read.ts`) resolves `{ok:false, error}` instead of rejecting when
+  `listTicketSummaries` throws (the empty-query path) — RED confirmed against the pre-fix function
+  (an unhandled rejection), GREEN after. `BoardScreen` renders the message as
+  `<Text accessibilityRole="alert">` where the board used to just stay empty. —
+  (`apps/mobile/src/screens/board-read.test.ts`)
+- 12.399 ✅ `loadBoard` resolves `{ok:false, error}` instead of rejecting when `searchOfflineCopy`
+  throws (the search path) — same RED→GREEN discipline as 12.398, the sibling read. —
+  (`apps/mobile/src/screens/board-read.test.ts`)
+- 12.400 ✅ `loadTicket` (`ticket-read.ts`) resolves `{ok:false, error}` instead of rejecting when
+  `getTicketWithPending` throws — RED confirmed (unhandled rejection) against the pre-fix function,
+  GREEN after. `TicketScreen` now has three states instead of two: `ds === null` ("Opening…", app not
+  ready yet), `readError !== null` (the alert), `ticket === null` ("Opening…", genuinely still
+  loading) — the first fix's "no answer yet" vs "the answer failed" distinction the ruling asked for. —
+  (`apps/mobile/src/screens/ticket-read.test.ts`)
+

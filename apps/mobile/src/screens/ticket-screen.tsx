@@ -10,6 +10,7 @@ import {
 import { IST_CLOCK_NOTE, newSubmittedEvent, plainTextToDoc, renderContestedClaimText } from '@gisik-nokma/domain';
 import { EDITOR_HTML } from '../editor/editor-html.generated.js';
 import { EditorWebView, type EditorWebViewProps } from '../editor/editor-web-view.js';
+import { loadTicket } from './ticket-read.js';
 
 type EditorDoc = Exclude<EditorWebViewProps['initialDoc'], null>;
 
@@ -20,15 +21,27 @@ export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: st
   const [ticket, setTicket] = useState<TicketWithPending>(null);
   const [draft, setDraft] = useState<EditorDoc>(plainTextToDoc('') as EditorDoc);
   const [error, setError] = useState<string | null>(null);
+  const [readError, setReadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (ds === null) return;
-    const refresh = (): void => void ds.query.getTicketWithPending(ticketId).then(setTicket);
+    const refresh = (): void => {
+      void loadTicket(ds, ticketId).then((result) => {
+        if (!result.ok) {
+          setReadError(result.error);
+          return;
+        }
+        setReadError(null);
+        setTicket(result.ticket);
+      });
+    };
     refresh();
     return ds.subscribe('', 0, refresh);
   }, [ds, ticketId]);
 
-  if (ds === null || ticket === null) return <Text>Opening…</Text>;
+  if (ds === null) return <Text>Opening…</Text>;
+  if (readError !== null) return <Text accessibilityRole="alert">{readError}</Text>;
+  if (ticket === null) return <Text>Opening…</Text>;
   const state = ticket.pending?.pending ?? ticket.confirmed;
   const openContests = ticket.contests.filter((c) => !c.resolved);
   const title = String((state?.fields.title?.value as string | undefined) ?? '');
