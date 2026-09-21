@@ -2577,3 +2577,52 @@ same shell invocation** (`git status --porcelain` empty). Same construction as �
 `createTestDatabase`, `buildTestApp` with the Origin check **on**, real magic-link sign-ins with real
 `set-cookie`, workspace founded and invitation minted through the product's own doors, `proj_invites.status`
 and `proj_memberships` read directly from Postgres before and after. `Tests 2 passed`.
+
+---
+
+## 34. `E3-18` BOUNDED — the divergence is real and reproduced; the input that triggers it is not reachable through any door
+
+Written after §33, as the same exercise on the next-strongest Important: **state the bound while I am still
+the one choosing the words.**
+
+**What I checked, and what it shows.** `E3-18` is that the online read and the offline replica answer a
+dangling `parent_id` differently — `null` versus `{ kind: 'restricted', id }`. The divergence reproduces
+(§19). **The question I had not asked is how a dangling `parent_id` comes to exist**, and the answer is
+narrower than the finding implies:
+
+```
+hierarchy.ts:124   if (!parent || parent.workspaceId !== env.workspaceId) return refuse('hierarchy.unknown-parent');
+hierarchy.ts:250   if (!newParent || newParent.workspaceId !== env.workspaceId) return refuse('hierarchy.unknown-parent');
+```
+
+**Both doors that can set a parent refuse an id with no row** — `ticket.created` and `ticket.reparented` —
+and `parent_id` is written nowhere else: `projections/tickets.ts:285` sets it from the fold
+(`parent_id = EXCLUDED.parent_id`), and the fold consumes the ledger, which only receives events through the
+gated ingest. **So a dangling `parent_id` is a row the engine never accepted** — reachable by direct SQL
+(which is how both tests build it: `list.test.ts:713` asserts *"the dangling parent was actually written"*),
+by pre-existing data from before the check existed, or by projection drift. **Not by any door.**
+
+**⚠ SO THE SEVERITY I FILED IS TOO HIGH, and I am saying so rather than making the judge say it.** I filed
+`E3-18` as **Important** on the strength of *"a client-visible divergence between two shipped
+implementations of one read"*. That is still true — the divergence is real, reproduced, and the replica's own
+comment claims a parity it does not have. **But its trigger is corrupt data, and a defect whose input no door
+can produce is a robustness defect, not a behavioural one.** On the evidence as it stands I would now rule it
+**Minor**, and I would rather write that here than defend Important against a referee who reads
+`hierarchy.ts:124` in ninety seconds.
+
+**WHAT KEEPS IT FROM BEING WORTHLESS, and this is the honest other side.** The project itself treats the
+dangling case as worth handling on the ONLINE side: `routes/tickets.ts:621-637` is a dedicated fix, with a
+named failure mode (*"asserting the existence of a ticket the system has no evidence for"*) and a test
+(`ticket-crumbs.test.ts:244-248`). **So the asymmetry is not "the replica handles an impossible input" — it
+is that one implementation was hardened against that input and the other was not**, by a change set that
+read the case as real. A reader who trusts the online read's hardening will expect the same of the replica.
+
+**SEVERITY: MINOR, revised down from Important.** The measurement stands, the reproduction stands, and the
+finding is not withdrawn — only its weight is corrected, before a judge does it.
+
+**MEASUREMENT.** `hierarchy.ts:124` and `:250` read at the line; `projections/tickets.ts:285` (the only write
+of `parent_id`) and `:263` (the read) read at the line; `list.test.ts:713` for how the fixtures produce one;
+`routes/tickets.ts:621-637` for the online hardening this is asymmetric with. **Control on the claim "no door
+can produce it":** `grep -rn "parent_id" apps/server/src/projections/tickets.ts` returns only the fold's read
+and its `EXCLUDED` write — no route, no tool and no seed writes the column directly, which is what makes the
+"corrupt data only" reading a measurement rather than an assumption.
