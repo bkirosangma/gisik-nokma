@@ -15,6 +15,22 @@ import {
 const STACK_ACCESSIBLE_BASELINE_PATH = fileURLToPath(
   new URL('./accessible-names-baseline.json', import.meta.url),
 );
+
+/**
+ * The signed-in tap-target ratchet's own baseline. **One key per ROUTE**, not
+ * one for the suite — E4-12, 2026-09-21.
+ *
+ * Before this the file called `measureTapTargets` ONCE, inside the `/my-work`
+ * test, and the baseline file held one key (`stack-phone-390|/my-work: 6`). The
+ * ratchet's whole population was therefore one route at one width, and its
+ * `offenders=6` read as a statement about the product rather than about a page.
+ * The route loop below now measures every route in its list, so the key is
+ * `route.key` — the same string shape the type-scale and accessible-name
+ * ratchets already use. **The floor itself still has ONE home**
+ * (`e2e-viewport/tap-targets.ts`, and `apps/web/test/tap-target-density.test.ts`
+ * fails if either spec ever grows a private comparison of its own).
+ */
+const STACK_TAP_BASELINE = fileURLToPath(new URL('./tap-target-baseline.json', import.meta.url));
 // The plain MODULE, never the spec: Playwright loads an imported spec's
 // `test()` registrations too, and importing `responsive.spec.ts` here made this
 // config try to run all six unauthed cases — six `project "" has no entry in
@@ -190,15 +206,14 @@ test('the signed-in shell does not scroll sideways at 390px', async ({ page }) =
   // a nav, a search box and a board can only mean the selector stopped matching.
   expect(taps.rawMatches, 'the tap-target selector matched NOTHING on the signed-in shell').toBeGreaterThan(5);
 
-  const TAP_BASELINE = fileURLToPath(new URL('./tap-target-baseline.json', import.meta.url));
   const tapKey = 'stack-phone-390|/my-work';
-  const allowed = readTapBaseline(TAP_BASELINE)[tapKey];
+  const allowed = readTapBaseline(STACK_TAP_BASELINE)[tapKey];
   if (allowed === undefined) {
     // A MISSING BASELINE FAILS rather than seeding itself — the same guard, and
     // for the same reason, as the unauthed suite: a first run that recorded
     // whatever is broken today would print a tick over zero enforcement.
     if (process.env['UPDATE_TAP_BASELINE'] === '1') {
-      recordTapBaseline(tapKey, taps.offenders.length, TAP_BASELINE);
+      recordTapBaseline(tapKey, taps.offenders.length, STACK_TAP_BASELINE);
     } else {
       expect(
         allowed,
@@ -770,6 +785,88 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
             `rise. Offenders: ${JSON.stringify(typeScale.offenders)}`,
         )
         .toBeLessThanOrEqual(allowed);
+    }
+
+    /* ── E4-12 (2026-09-21) — THE TAP-TARGET RATCHET, PER ROUTE. ──
+     *
+     * The finding was not that the ratchet was wrong; it was that its POPULATION
+     * was one route at one width. `measureTapTargets` was called once in this
+     * file — in the `/my-work` test above — so every number it printed was about
+     * `/my-work`, while the report it was read against measured the board, the
+     * sheet and the settings screens. This measures every route in the list
+     * above, one line each, which is the shape the type-scale ratchet already
+     * had.
+     *
+     * The `/my-work` test above keeps its own call and its floor-split log; the
+     * KEY is shared, so the two cannot disagree about the ratchet, and the floor
+     * still lives only in `e2e-viewport/tap-targets.ts`.
+     *
+     * **NOT RUN IN THE ENVIRONMENT THIS LANDED IN, and the consequence is named
+     * rather than left for the next reader.** Six of the seven keys below are
+     * new, a missing key FAILS by this file's own doctrine, and no stack was
+     * available to seed them — the only one listening on 3001 belonged to
+     * another checkout, and a measurement taken there is a measurement of a tree
+     * this branch is not. So a first run stops on the first new key and prints
+     * the re-record instruction. **That is a run required, not a number
+     * invented**: a baseline written from a tree nobody measured is the failure
+     * `recordTapBaseline` exists to refuse.
+     * ────────────────────────────────────────────────────────────────────*/
+    const taps = await measureTapTargets(page);
+    const smallestTap = taps.smallestExamined;
+    /* eslint-disable no-console */
+    console.log(
+      `[stack-phone-390] ${route.path} — tap targets: selector matched ${taps.rawMatches}, ` +
+        `examined ${taps.examined.length}, inline-in-prose exempt ${taps.inlineExempt.length}, ` +
+        `invisible skipped ${taps.invisibleSkipped}, smallest examined = ` +
+        `${smallestTap === null ? 'n/a' : `${smallestTap.w}x${smallestTap.h} (${smallestTap.selector})`}, ` +
+        `offenders=${taps.offenders.length}`,
+    );
+    /* eslint-enable no-console */
+
+    // The anti-broken-selector control BEFORE the ratchet, per route: `examined`
+    // may legitimately be small, but a zero match on a rendered signed-in page
+    // can only mean the selector stopped matching — and a sweep that matched
+    // nothing reports the best possible number.
+    expect(
+      taps.rawMatches,
+      `the tap-target selector matched NOTHING on ${route.path}. A rendered signed-in page ` +
+        `carries a nav and a search box at minimum, so a 0 here is about the instrument.`,
+    ).toBeGreaterThan(5);
+    // The stale-entry guard per route: a container that rendered while its
+    // control did not means the entry has stopped classifying anything, and the
+    // control it names is judged against the 44px floor again.
+    expect
+      .soft(
+        taps.brokenEntries,
+        `${route.path}: a DENSE_IN_LIST entry's container rendered but its control selector ` +
+          `matched nothing inside it. Fix the selector in e2e-viewport/tap-targets.ts, or remove ` +
+          `the entry.`,
+      )
+      .toEqual([]);
+
+    const tapBaseline = readTapBaseline(STACK_TAP_BASELINE);
+    const allowedTaps = tapBaseline[route.key];
+    if (allowedTaps === undefined) {
+      if (process.env['UPDATE_TAP_BASELINE'] === '1') {
+        recordTapBaseline(route.key, taps.offenders.length, STACK_TAP_BASELINE);
+      } else {
+        expect(
+          allowedTaps,
+          `no tap-target baseline for "${route.key}" in e2e-stack/tap-target-baseline.json, and ` +
+            `this suite refuses to invent one. Observed ${taps.offenders.length} offenders. ` +
+            `Re-run once with UPDATE_TAP_BASELINE=1 and COMMIT the file.`,
+        ).toBeDefined();
+      }
+    } else {
+      expect
+        .soft(
+          taps.offenders.length,
+          `interactive targets below their own floor on ${route.path} rose above the recorded ` +
+            `${allowedTaps} for ${route.key}: ${JSON.stringify(taps.offenders.slice(0, 8))}. The ` +
+            `floor is 24px for a control DENSE_IN_LIST classifies as in-list (WCAG 2.5.8) and ` +
+            `44px for every other control (WCAG 2.5.5); each offender carries the floor it missed.`,
+        )
+        .toBeLessThanOrEqual(allowedTaps);
     }
   }
 });

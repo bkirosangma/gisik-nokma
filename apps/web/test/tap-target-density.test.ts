@@ -198,4 +198,69 @@ describe('tap-target density — case 13.991', () => {
       ).not.toMatch(/[wh]\s*<\s*(24|44)\b/);
     }
   });
+
+  it('13.991 — the signed-in tap-target population is the ROUTE LIST, not one route', () => {
+    const stackName = 'e2e-stack/viewport.spec.ts';
+    const stackPath = SPEC_PATHS[stackName];
+    expect(stackPath, 'the stack spec left SPEC_PATHS').toBeDefined();
+    const source = readFileSync(stackPath as string, 'utf8');
+
+    /**
+     * E4-12 (2026-09-21). The finding this pins, in its own words: the signed-in
+     * instrument's "tap-target population is ONE route at ONE width". Measured
+     * at filing — `measureTapTargets` was called once in this file, inside its
+     * `/my-work` case, and `tap-target-baseline.json` held one key
+     * (`stack-phone-390|/my-work: 6`) — while the report those numbers were read
+     * against measured the board, the sheet and the settings screens, none of
+     * which the suite visited.
+     *
+     * ⚠ WHAT THIS CAN AND CANNOT SAY, because the division is the reason it
+     * lives here rather than only in the spec. It is a SOURCE-STRUCTURE
+     * assertion: it proves the call sits INSIDE the route loop and keys its
+     * baseline on `route.key`, so the population is the route list and a route
+     * joining that list joins the ratchet. It does NOT prove any route rendered
+     * — only a browser can say that, and the spec's per-route `rawMatches`
+     * control is what holds that half. A green here is not evidence for the
+     * other, which is this file's stated position on every case it carries.
+     */
+    const loopStart = source.indexOf('for (const route of routes) {');
+    expect(
+      loopStart,
+      'the route loop is gone from e2e-stack/viewport.spec.ts — every assertion below would be ' +
+        'vacuous, and the tap-target population would be whatever the remaining tests measure.',
+    ).toBeGreaterThan(-1);
+    // The test owning the loop ends at the first `});` at column 0 after it;
+    // everything inside the loop is indented further.
+    const loopEnd = source.indexOf('\n});', loopStart);
+    expect(loopEnd, 'the route loop has no enclosing test — the slice below would be the file').toBeGreaterThan(
+      loopStart,
+    );
+    const loopBody = source.slice(loopStart, loopEnd);
+
+    expect(
+      loopBody,
+      'the signed-in suite does not measure tap targets inside its route loop. That puts the ' +
+        "ratchet's population back to a single route, which is E4-12 — and it is invisible from " +
+        'the numbers, because one route reporting `offenders=6` reads like the product.',
+    ).toContain('measureTapTargets(');
+    expect(
+      loopBody,
+      'the loop measures tap targets but does not key its baseline on `route.key`, so every route ' +
+        'would assert one shared number instead of its own.',
+    ).toContain('readTapBaseline(');
+    expect(loopBody, 'the loop reads no tap-target baseline').toContain('route.key');
+
+    /**
+     * The anti-vacuity floor, and it is the half that matters on a source
+     * assertion: an EMPTIED route list makes every `toContain` above true while
+     * the loop measures nothing at all. Seven entries exist at this commit; five
+     * leaves room for a real removal while failing if the list is gutted.
+     */
+    const routeEntries = [...source.matchAll(/key: 'stack-phone-390\|/g)].length;
+    expect(
+      routeEntries,
+      'the route list has shrunk below five entries — the loop still calls the measurement, but ' +
+        'over a population too small for any count it produces to be about the product.',
+    ).toBeGreaterThanOrEqual(5);
+  });
 });
