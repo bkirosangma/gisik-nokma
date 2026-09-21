@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { ruleFor } from './helpers/css-rule-scan.js';
 
 /**
  * Case 13.409 (test-cases/13-deployment-dogfooding.md) — minted by the
@@ -40,9 +41,6 @@ const GLOBALS_CSS_PATH = resolve(TEST_DIR, '../app/globals.css');
 /** One CSS rule per line — see `workspace-restricted-spacing.test.ts`'s
  * identical helper for why every rule this file asserts on must stay
  * single-line in `globals.css`. */
-function ruleFor(css: string, selectorPattern: RegExp): string | undefined {
-  return css.split('\n').find((line) => selectorPattern.test(line) && line.includes('{'));
-}
 
 describe('ROUTED 3 — .gn-workspace-list__role--pinned exists and stays 0.8rem', () => {
   const css = readFileSync(GLOBALS_CSS_PATH, 'utf8');
