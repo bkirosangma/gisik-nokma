@@ -1192,8 +1192,15 @@ tab; with the injected 500 on ticket-types) · `/mcp/tokens` · `/mcp/authorize`
 `document.visibilityState === "hidden"` behind another window on this box and Chrome deferred hydration indefinitely
 (`/v1/` requests: 0 after 57 s; renderer not pegged; `uptime` load 1.40; ~85 MB free). Three fresh tabs, a focus
 click and two reloads did not change it, so per the brief's own rule I stopped rather than kept retrying. Everything
-after that point is `[SOURCE]`. Consequences named where they land: E5-9's second measurement (§ scope note), the
-narrow-viewport and the injected-403 refusal walks (below).
+after that point is `[SOURCE]`, except as follows. Consequences named where they land: E5-9's second measurement (§
+scope note) and the injected-403 refusal walks (below).
+
+**A second browser, for signed-out surfaces only (from ~11:20 IST).** The `chrome-devtools` MCP runs its own Chrome
+(no session cookie; I did not sign the owner's account in from it — that would write a session row into their
+stack). Its pages are visible and hydrate, and `emulate` gives a true 390×844 mobile viewport. Walked there,
+signed out, at 390 px: `/help`, `/account`, `/workspaces` (→ `/sign-in`), `/sign-in`. Findings from it: E5-31, and
+E5-13's second reproduction. **NARROW VIEWPORT is therefore reached for the signed-out shell only**; every
+signed-in surface at phone width remains unmeasured by me (exec 4's E4-7/E4-9/E4-11 cover some of it).
 
 **Not walked in the browser:** Backlog, List, Calendar, Timeline tabs (opened the page; did not drive them) ·
 `/w/[workspaceId]` home · `/my-work` · `/help` · `/invite/[token]` (no live token) · `/sign-in` (signed in already; did
@@ -1201,7 +1208,7 @@ not sign out of the owner's session) · `/settings` Workflows and Workspace tabs
 ticket-type editor · the comment composer (V7 already covers its refusal path) · attachments upload · the subtask chain
 end-to-end (no writes) · the delete/undo round trip (no writes) · **NARROW VIEWPORT** — `resize_window` reported success
 but the page stayed at 1512 px (macOS full-screen window); the repo's `apps/web/e2e-viewport/responsive.spec.ts`
-measures 390/768/1512 and I did not run it.
+measures 390/768/1512 and I did not run it; signed-out routes at 390 px were later reached in the second browser (above).
 
 ### 6.2 Read in source
 
