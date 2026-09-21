@@ -1260,6 +1260,19 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 - exec 2's `V1` (empty board invites a create; no web caller wires `onCreateTicket`) — **checked and it HOLDS**:
   `grep -c onCreateTicket apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` → 0 at `a7b6292b`, and my painted
   empty columns showed the `+` glyph with *"No tickets in this column."* and no button. Not a refutation.
+- exec 4's `E4-23` (a `404` ticket opens a sheet stuck on "Loading…") — **checked and it HOLDS**, and it is in MY edge
+  classes (SOFT-DELETED, ERROR): `online/http.ts` resolves a READ's 404 to `null`, `online-data-source.ts:272-274`
+  `getTicket` returns `null`, and `ticket-sheet.tsx:611-617` renders `Loading…` whenever `read.data === null &&
+  read.error === null`. So a deep link to a soft-deleted ticket (after the 15-s undo lapses) or to one the viewer may
+  not see is a spinner that never stops. **I missed it and learned of it from exec 4's pushed report; I am not filing
+  it**, on the same rule exec 2 applied to my E5-8 — filing after reading cannot be separated from copying.
+- Round-2 siblings noted for the judge, all concurrent and independently measured on both sides: E4-1/E5-3 (epic crumb),
+  E4-18/E5-4 (blank option), E4-19/E5-8 (history slug), E6-1/E5-24c (help says cannot delete), E2-20/E5-15,
+  E2-22/E5-28, E2-23·E2-24/E5-13 (theirs: refused save + failed revert; mine: failed read → guessed PUT, captured),
+  E2-26/E5-10, E2-29/E5-27, E2-34/E5-20, E2-40/E5-7 (theirs `require-field`, mine `require-comment`), E2-42/E5-21.
+- exec 6's `E6-9` (the invite door refuses `sms`/`whatsapp`, accepts `phone`) — measured through the real door; it
+  is the finding under the Channel control I recorded as "matches the export, not scored" (E5-11 note). **A match
+  with the drawing is not a defence when the door disagrees** — noted against my own §3 row 15.
 - Nothing I measured contradicts a landed exec 2 finding. **I have no refutation to file at this time**; if I find one
   in the remaining window it goes to `docs/lanes/review-refutations-exec5.md`.
 
