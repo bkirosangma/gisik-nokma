@@ -501,7 +501,7 @@ foreground rather than accept an empty log as a result.
 
 | prototype element | classification |
 |---|---|
-| The `Visibility` roster: a chip per viewer with a removable `×`, an *"Add someone who can see it…"* `<select>` over `viewerCandidates` | **DIVERGES AND THE DIVERGENCE IS RULED.** `apps/server/src/routes/tickets.ts:115-118` refuses to serve `own_user_ids` / `resolved_user_ids` — *"an explicit audience ROSTER, a disclosure no plan authorized"* — and the section is *not built*. Case `17.006` holds the absence as a **negative assertion with a positive control** (the same walk must find exactly `MEMBERS.length` names inside the editable people picker). **The divergence still serves the ruling.** |
+| The `Visibility` roster: a chip per viewer with a removable `×`, an *"Add someone who can see it…"* `<select>` over `viewerCandidates` | **DIVERGES AND THE DIVERGENCE IS RULED.** `apps/server/src/routes/tickets.ts:119-122` (corrected at phase-1 close; see §17.2) refuses to serve `own_user_ids` / `resolved_user_ids` — *"an explicit audience ROSTER, a disclosure no plan authorized"* — and the section is *not built*. Case `17.006` holds the absence as a **negative assertion with a positive control** (the same walk must find exactly `MEMBERS.length` names inside the editable people picker). **The divergence still serves the ruling.** |
 | The control is a **binary toggle**; the product's is a **4-mode radio group** | **DIVERGES WITH NO RULING FOUND — and it is recorded rather than fixed.** Named in `test-cases/17-open-work.md` and `docs/lanes/executor-3-state.md §2`, owner the controller. |
 | The row is a `<dt>/<dd>` pair **inside** the sheet's `<dl>`; the product mounts a standalone `<section>` **after** `</dl>` | **DIVERGES WITH NO RULING FOUND — recorded, owner the controller.** Same citations. |
 | The row's `12px/16px` secondary scale where the neighbouring eyebrow constant is `13px/18px` | **MATCHES** — and case `17.002` exists precisely so a later "harmonise the two" edit reddens. Verified reproducing in **both** prototype copies (§F3). |
@@ -979,7 +979,8 @@ about the schema.
 
 ## 14.6.1 — `E3-11` (r2) — MINOR — `Features.md` says the fixture suite holds **84**; it holds **86**
 
-**WHAT.** `Features.md:377`, the "Planted-defect fixture suite" bullet in §4:
+**WHAT.** `Features.md:384`, the "Planted-defect fixture suite" bullet in §4 — ⚠ **corrected from `:377` at
+phase-1 close; see §17 for why, and for what it says about this report's own citations**:
 
 > ⚙️ **Planted-defect fixture suite** — **84 JSON fixtures**, one per refusal path plus accepting twins,
 > run by an in-memory harness…
@@ -1020,7 +1021,8 @@ loader's own filter, and the runner's case count were each read separately, and 
 
 ## 14.6.2 — `E3-12` (r2) — MINOR — "eleven plain-language checks" — there are **twelve**, and the twelfth is the section's own neighbouring feature
 
-**WHAT.** `Features.md:378`, the "Structural validation" bullet:
+**WHAT.** `Features.md:377`, the "Structural validation" bullet — ⚠ **corrected from `:378` at phase-1
+close; see §17**:
 
 > ⚙️ **Structural validation** — `validateWorkflowDef`, pure and I/O-free so the future builder UI shares
 > it: **eleven plain-language checks** covering workflows that cannot finish, states that cannot be
@@ -1056,7 +1058,7 @@ conclusion as `E3-11`, and the same root: **`Features.md` counts have no instrum
 
 **MEASUREMENT.** `grep -nE "code: '[a-z0-9-]+'" packages/domain/src/validate-workflow.ts` → 12 lines,
 12 distinct codes, listed above. Positive control on the same path: `adviseWorkflowDef`'s two codes are
-found by the same pattern and **do** match their claim (`Features.md:379`, "Two codes", measured 2:
+found by the same pattern and **do** match their claim (`Features.md:378`, "Two codes", measured 2:
 `rdu-bypassable`, `rule-bypassable`) — so the pattern distinguishes a right count from a wrong one in the
 same file.
 
@@ -1390,3 +1392,113 @@ two `PUT`s preflight; `/v1/invites/:token/accept` I did not classify. **If the j
 the sharp set is two routes, and the accept path appends three ledger events.** I claimed Critical on the
 strength of that route because a permanent, attributed, append-only membership event made by a person who
 did not make it is the harm this control exists to prevent.
+
+---
+
+## 17. MY OWN CITATIONS, AUDITED AT PHASE-1 CLOSE — two corrections and one new finding
+
+Written last, because it is a correction of this lane's own work and belongs in the record either way.
+
+### 17.1 Three `Features.md` citations in this report were wrong, and how I got them wrong
+
+While sweeping `Features.md` for more claims I noticed a grep returning `Features.md:377` for a bullet I
+had cited at `:378`. **I checked my own citations and three of them were wrong:**
+
+| cited | actually | what is at the cited line |
+|---|---|---|
+| `Features.md:377` | **`:384`** | `:377` is the **Structural validation** bullet |
+| `Features.md:378` | **`:377`** | `:378` is the **Advisory tier** bullet |
+| `Features.md:379` | **`:378`** | `:379` is the **Universal Backlog** bullet |
+
+**Two of the three pointed a whole bullet away from the claim they carried.** All three are corrected at
+§14.6.1/§14.6.2 above.
+
+**The mechanism, because it is the same defect I filed against someone else in `E3-13`.** I read
+`Features.md` with `sed -n '374,395p'` — a **positional** read, eight lines down the page — and then
+wrote the line numbers by counting from `374` instead of grepping for them. The content I quoted was
+right; the number was arithmetic. **`grep -n` would have been one command and would have been right.**
+
+**And it is the second time in this lane.** `E3-13` files exactly this against `visible-where.ts:51`,
+whose citation resolves to a line that does not say what it claims — and the same round that filed it
+shipped three of its own. **A citation defect is not a thing you find once and stop making; it is a
+thing you sweep for, every round, over the files you just touched.**
+
+### 17.2 `E3-16` (r2) — **IMPORTANT (claimed)** — The roster-cut citation has drifted **twice**, and the files "corrected" to the new number are now stale in exactly the same way as the ones that were left alone
+
+**WHAT.** `apps/server/src/routes/tickets.ts` carries the visibility disclosure ruling. The clause that
+`Features.md` and every client comment quote is:
+
+> `own_user_ids` and `resolved_user_ids` are cut for a smaller reason: they are **an explicit audience
+> ROSTER, a disclosure no plan authorized**, and leaving them in would be a second decision made by the
+> shape of a `SELECT *` rather than by anyone.
+
+**That clause is at `tickets.ts:119-122`.** Measured — `grep -n "explicit audience ROSTER"
+apps/server/src/routes/tickets.ts` → **`120`**. **Thirteen citations across nine files point elsewhere**,
+in two different stale directions:
+
+**Ten citing `115-118`** (which is now the *"Reachable today, not hypothetical"* paragraph — a different
+subject, cross-project parents):
+
+```
+test-cases/17-open-work.md:56            docs/lanes/executor-3-state.md:44
+test-cases/17-open-work.md:113           packages/ui/test/components.test.tsx:968
+docs/lanes/review-compiled-controller.md:339
+packages/app-core/test/views/visibility-editor.test.tsx:410 and :481
+packages/app-core/src/views/visibility-editor.tsx:50 and :160
+docs/lanes/review-functionality-exec3.md:504        ← mine (§7.2), corrected below
+```
+
+**Three still citing `111-114`:**
+
+```
+packages/app-core/src/view-types.ts:391
+packages/app-core/src/online/mappers.ts:1899
+docs/lanes/executor-state-history.md:247
+```
+
+**WHY THIS IS A FINDING AND NOT A RECORDED GAP.** `test-cases/17-open-work.md:111-113` — **my own lane's
+note** — already records the `111-114` drift, and says the clause *"is at **`tickets.ts:115-118`**"*.
+So the drift was known and corrected once: **every instance inside that lane's change set was repointed
+to `115-118`, and four files outside it were deliberately left at `111-114`.** The tree has since grown
+four lines above the clause, so **`115-118` is now as wrong as `111-114` was**, and:
+
+1. **The corrected and the uncorrected files are now indistinguishable.** A reader who finds
+   `mappers.ts:1899`'s `111-114` and knows the correction note will "fix" it to `115-118` — the number
+   the note blesses — **and be wrong.** The note has become a machine for propagating the stale number.
+2. **The note's own diagnostic is inverted.** It says `111-114` is stale *because* `115-118` is the
+   clause; at this sha it is `115-118` that is the "Reachable today" paragraph, so the note now
+   describes the file the other way round.
+3. **The one source file this lane owns still carries it twice**
+   (`visibility-editor.tsx:50`, `:160`) — so the fix was applied to the *citation* and not to the file
+   the citation is about.
+
+**WHAT WOULD HAVE BEEN BETTER — and this is the part that generalises.** `test-cases/17-open-work.md:113`
+already reaches the right conclusion for the *previous* drift and does not act on it: *"the case for
+citing by what a line READS rather than by where it sat."* **Every one of the thirteen citations could
+drop its number and keep its quote** — `routes/tickets.ts`, *"an explicit audience ROSTER, a disclosure
+no plan authorized"* — and then no line number can drift, in either direction, ever again. The repo
+already made this choice once (`soft-delete-background-paths.test.ts:169-171`, quoted in `E3-13`).
+**A line number is a claim that decays; a quoted phrase is a claim that a grep can settle.**
+
+**SEVERITY: Important (claimed).** Individually each citation is trivial; the set is not. It spans
+**two source files in `packages/app-core`** that a reader consults to learn why a shipped field is cut,
+**four test files**, and **three lane/catalogue documents** — and the mechanism is a correction note
+that now misdirects the fix. It also made **my own §7.2 classification cite the wrong paragraph**, which
+is how I found it.
+
+**MEASUREMENT.** `grep -n "explicit audience ROSTER" apps/server/src/routes/tickets.ts` → `120`. The
+thirteen sites are the output of
+`grep -rn "tickets\.ts:11[1-8]\|routes/tickets\.ts:11[1-8]" --include=*.ts --include=*.tsx --include=*.md .`
+from the repo root, each one opened. **Control on the same path:** the same grep for the *paragraph*
+that `115-118` now names (`grep -n "Reachable today" apps/server/src/routes/tickets.ts` → `114`) confirms
+the two ranges have swapped subjects rather than one having vanished.
+
+### 17.3 The citation audit's own result, so the scope of §17 is checkable
+
+I extracted **every** `file:line` citation in this report (21 distinct, matching the four path prefixes)
+and checked each for existence and in-range. **All 21 resolved; none beyond EOF.** ⚠ **But that check is
+weak and I am saying so: the `Features.md` error in §17.1 was in-range and still wrong**, so a passing
+result there proves nothing about content. The three corrections in §17.1 and the one in §17.2 came from
+**content** checks — `sed -n "${line}p"` compared against a string I expected to find — which I ran over
+the citations my findings and classifications rest on, not over all 21. **The ones I did not
+content-check are listed here as unchecked rather than implied to be right.**
