@@ -2402,7 +2402,12 @@ export function TicketSheet({
               is drawn once.
             */}
             <div className="gn-ticket-sheet__field" data-testid="field-description">
-              <dt>description</dt>
+              {/* The field id was leaking into the UI: `:2454` renders
+                  `{fieldId}` for custom fields, and this row copied that shape
+                  instead of writing a caption, so the sheet read "description"
+                  beside "Assignee", "Priority", "Due" and "Type" (exec4 E4-4).
+                  Title case, matching those siblings. */}
+              <dt>Description</dt>
               <dd>
                 {/*
                   ⚠ BOTH BRANCHES ARE LIVE AND NEITHER IS DEAD CODE — do not

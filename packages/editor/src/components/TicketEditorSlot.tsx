@@ -200,6 +200,13 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
       <TicketEditor
         initialDoc={initialDoc}
         editable={!props.readOnly}
+        // The accessible name, off the one prop that already knows which
+        // writing surface this is. Deriving it here rather than taking it from
+        // the contract is deliberate: `mode` is already the shared declaration's
+        // discriminator, so a host cannot mount a description composer that
+        // calls itself a comment, and no new field has to travel through
+        // app-core to say what `mode` has said all along.
+        label={props.mode === 'comment' ? 'Comment' : 'Description'}
         placeholder={props.placeholder ?? (props.mode === 'comment' ? 'Write a comment…' : 'Describe this ticket…')}
         queryUsers={props.queryUsers ?? NO_MENTIONS}
         uploadAttachment={uploadOrRefuse}

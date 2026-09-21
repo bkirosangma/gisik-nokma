@@ -244,6 +244,36 @@ describe('9.61 — the real editor mounts in the real sheet, in the app that dep
     expect(within(row).getByText('no description yet')).toBeInTheDocument();
   });
 
+  /**
+   * 9.258 — E4-4 (exec4) — the composer is NAMED, in the app that mounts it, and
+   * the row's caption is a caption rather than the raw field id.
+   *
+   * The finding was measured on a painted sheet: two `role="textbox"` hosts, one
+   * description and one comment, both with an empty accessible name, so a screen
+   * reader announced "edit text, multiline" twice with nothing to tell them
+   * apart (WCAG 4.1.2, Level A). `9.257` proves the slot derives the name from
+   * `mode` in `packages/editor` alone; THIS is the arm that proves it survives
+   * the journey through app-core's `<EditorSlot>` boundary into the shipped app
+   * — the seam neither package can see from its own side.
+   *
+   * Queried by ROLE AND NAME, exactly as assistive tech reaches it, so the case
+   * keeps passing whichever mechanism supplies the name.
+   */
+  it('E4-4 the real composer answers to its name, and the row caption is "Description"', async () => {
+    renderWithRealEditor();
+    const row = await composerReady();
+
+    // The caption. This `<dt>` was the literal lowercase `description` — the
+    // field id leaking into the UI beside Title-cased siblings `Assignee`,
+    // `Priority`, `Due` and `Type`. `exact` on the negative so a sentence that
+    // merely CONTAINS the word ("no description yet", asserted above) is not
+    // swept up as a failure.
+    expect(within(row).getByText('Description')).toBeInTheDocument();
+    expect(within(row).queryByText('description', { exact: true })).toBeNull();
+
+    expect(within(row).getByRole('textbox', { name: 'Description' })).toBeInTheDocument();
+  });
+
   it('13.989 a typed description reaches the ledger as `ticket.field_set` for `description`', async () => {
     const { ingested } = renderWithRealEditor();
     const row = await composerReady();
