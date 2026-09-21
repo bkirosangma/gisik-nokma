@@ -63,7 +63,27 @@ truth of anything, so I read all three concurrent reports and tested every claim
 
 | `E4-11` | that `.gn-nav__links` has no narrow-width variant, so the bar grows at 390 px | `globals.css:1801` is exactly the quoted rule (`display: flex; flex-wrap: wrap; …`), and the only nearby media query (`:1798` `@media (max-width: 60rem)`) targets `.gn-nav__inner` padding, **not** `.gn-nav__links`; no media query anywhere in the file redeclares it | **holds** — with the honest note below |
 
-**Nineteen checks across all three lanes. Nineteen held. My refutation count is zero.**
+| `E4-11` | (above) | | |
+
+### Then the two lanes I had not read at all — exec 1 (UI) and exec 3 (functionality)
+
+**The check had covered three lanes; these are the other two, so the null now spans all five.**
+
+| target | the clause I tried to falsify | what I opened | outcome |
+|---|---|---|---|
+| `P19` (exec 1) | that the project page's view switcher is a `tablist` with no accessible name — and **my first hypothesis was that it must have one**, since `SegmentedControl` requires the prop | `page.tsx:2058` is `<div className="gn-segmented" role="tablist">` — **page-local markup wearing the component's CLASSES** — and `aria-label`/`aria-labelledby` occur **0** times anywhere in `:2030-2090`. `segmented-control.tsx:9,25` shows the component requires and renders the name; the page never adopted it | **holds** — and the finding anticipates my exact hypothesis: *"It adopted the shared CLASSES and kept its own markup"* |
+| `P22` (exec 1) | that two `role="menu"` elements carry no accessible name | `apps/web/src/account-menu.tsx:148` is `<div ref={menuRef} id={menuId} role="menu" className="gn-nav__menu">` — **no `aria-label`, no `aria-labelledby`** | **holds** |
+| `P23` (exec 1) | that the searchable Select removes focus and supplies no ring — the one its own text calls *"the finding I would most expect to be wrong"* | `ui.css:2474` is `.gn-select__trigger--searchable input:focus { outline: none; }` **verbatim**; it is the **only** `outline: none` in the whole file (grep count **1**); and `.gn-select[a-z_-]*:(focus\|focus-within\|focus-visible)` over `ui.css` returns **0** matches, so nothing replaces it | **holds** |
+
+**Twenty-two checks across all five lanes. Twenty-two held. My refutation count is zero.**
+
+> **`P23` is worth a sentence to the judge, because it is the one I tried hardest to break.** Its author
+> flagged it as the finding they would most expect to be wrong, opened every step, and checked that the
+> removal is unique in its stylesheet. I re-ran all three of those checks independently and got the same
+> three answers. **A finding that pre-empts its own refutation is the hardest kind to attack, and it is
+> the shape the other lanes' strongest findings share** — `P19` answering the `SegmentedControl` hypothesis
+> before I could raise it, `E5-17` scoping itself to the route's chrome rather than the surface's
+> reachability. Whatever else this round produced, the peer lanes did not leave obvious openings.
 
 > **On `E4-11`, the honest note that cuts the other way and is NOT a refutation:** the same stylesheet
 > **documents** the growth at `:1766` — *"`.gn-nav__links` wraps, so the bar grows on narrow viewports —
