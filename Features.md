@@ -2433,8 +2433,19 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   It is wired into `server-tests` only; `check-skipif-coverage.mjs` closes the gap that leaves open — it
   fails the (cheap, no-build) `check-env` job if any `.skipIf(` usage appears outside `apps/server/test/`,
   the one place the guard actually runs, converting an uncovered guard into a loud CI failure rather than
-  a silent one. Wired ahead of its first real trigger: no file in this repo uses `.skipIf(` yet; Plan 11
-  Tasks 11/12 will add one around the restore-drill suite. `scripts/check-no-silent-skips.mjs`,
+  a silent one. ⚠ **CORRECTED 2026-09-21 (E6-6): this sentence read "no file in this repo uses `.skipIf(`
+  yet; Plan 11 Tasks 11/12 will add one around the restore-drill suite", and Plan 11 landed** — two files
+  carry the guard today (`apps/server/test/ops/pg-dump.test.ts`, `…/restore-drill.test.ts`), both inside
+  the covered prefix. **⚠ And the guard could not fail on its own universe**: every rule was applied to
+  `report.testResults ?? []`, so an empty or mis-shaped report printed `ok (0 skipIf-guarded file(s)
+  checked, none fully skipped)` with EXIT=0 — a run that examined NOTHING and a run that examined
+  everything and found nothing wrong were the same output. An empty report now REFUSES and names the
+  guarded files the tree holds. **It refuses on the report being EMPTY rather than on the shortfall, and
+  that is measured, not cautious**: `ci.yml` calls the script once per `server-tests` shard with that
+  shard's own report, the two guarded files can land in different shards, and refusing the shortfall
+  would fail three healthy shards out of four — a check that cannot pass is the mirror of one that cannot
+  fail. The shortfall is stated in the output instead, and the union-of-shards form is a recorded gap.
+  `.runIf(` is recognised as the same guard inverted. `scripts/check-no-silent-skips.mjs`,
   `scripts/check-skipif-coverage.mjs`
 - ⚙️ **DigitalOcean deploy spec (file only, not applied)** — `deploy/do/app.yaml`: server, web and a
   backup worker on DigitalOcean App Platform (region `blr`), managed Postgres attached, object storage
