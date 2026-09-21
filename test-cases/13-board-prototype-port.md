@@ -1848,6 +1848,7 @@ mechanism is one line:** `apps/web/app/globals.css:84` sets `button { font: inhe
 `border`, no `background`, no `padding` — so an unstyled button keeps the UA's `outset` edge and grey fill.
 Painted by the finding on the members a browser could reach: `button.editor-slot__submit` "Save description"
 **136.4×29.2** and "Comment" **86.9×29.2**, each `border: 2px outset rgb(0,0,0)`,
+⚠ **and the token `"Comment"` is STALE: the comment composer's control reads `Post` since 2026-09-22** (sheet prototype parity Task 2, the prototype's own word at `desktop.dc.html:1330`). **The NUMBERS stay exactly as the finding painted them** — they are that finding's measurement of a UA-styled button and are labelled as such by `13.1143` — but a reader checking the label today would find a different word and conclude the record was about some other control.
 `background-color: rgb(239,239,239)`, `border-radius: 0px`, `padding: 1px 6px`; `button.add-rule-menu__trigger`
 "Add rule" **76.6×29.2** the same — beside a *Publish* button reading `1px solid rgb(51,98,159)`, the control
 in the same paint.
