@@ -677,6 +677,50 @@ button.gn-ticket-sheet__crumb--link {
   font: inherit;
   color: inherit;
 }
+
+/* ── P1: THE CONTROLS THAT NEVER JOINED THIS CONVENTION (2026-09-21).
+
+   Round 2's P1 swept every static `className` on a
+   `<button|input|select|textarea|summary|a>` in the product's stylesheets and
+   required that at least one of its class tokens match a selector block. Six
+   controls did not, and the reason they paint as raw UA chrome is one line
+   away: `apps/web/app/globals.css:84` sets `button { font: inherit }` — font
+   ONLY. No `border`, no `background`, no `padding`, so an unstyled button
+   keeps the UA's `outset` edge and its grey fill. Measured on the two of the
+   four buttons a browser reached: `button.editor-slot__submit` "Save
+   description" **136.4×29.2** and "Comment" **86.9×29.2**, each
+   `border: 2px outset rgb(0,0,0)`, `background-color: rgb(239,239,239)`,
+   `border-radius: 0px`, `padding: 1px 6px`; `button.add-rule-menu__trigger`
+   "Add rule" **76.6×29.2** the same — with the *Publish* button beside it
+   reading `1px solid rgb(51,98,159)` as the control in the same paint.
+
+   TWO OF P1's SIX ARE NOT FIXED HERE, and it is a measurement rather than an
+   omission. `gn-attachment__link` and `attachment-item__name` are `<a>`
+   elements: the UA gives an anchor **no** border, **no** background and
+   **no** padding, so this reset is a NO-OP on them — the reset's shape is a
+   *button*'s problem. Their colour comes from `globals.css:39`
+   (`a { color: var(--gn-text-accent) }`) and the underline that remains is the
+   link affordance, not UA chrome left behind. `attachment-item__name` is also
+   under an explicit contract in `packages/editor/src/styles/editor.css:218`
+   ("emitted deliberately and styled by nobody yet … a plain link") that
+   `test/attachment-list-item.test.tsx` asserts in both directions, so giving
+   it a box rule would falsify a deliberate record to fix nothing. Recorded
+   here rather than silently dropped.
+
+   `.editor-slot__submit` is NOT here either, and deliberately: this file's own
+   `.gn-comments` docblock below records that `packages/ui` styling another
+   package's internals is the duplication this repo refuses, so it and
+   `.evidence-picker__cancel` take the same reset in
+   `packages/editor/src/styles/editor.css`, where they live. */
+.gn-board__empty-create,
+.add-rule-menu__trigger {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
 /* An ancestor the viewer may NOT see — existence-without-title, NAMED rather
    than dropped. Dropping it would make a restricted chain read as a shorter
    one, which is the vanish `invariant 5` forbids and the reason the parent

@@ -1791,3 +1791,49 @@ it nowhere).
 
 **No `Features.md` bullet.** This corrects an existing screen's layout at a width it already served; it
 adds no affordance.
+
+## The controls that painted as raw UA chrome join the bare-control convention (lane ds1, 2026-09-21, batch B10) — case `13.1058`
+
+**The finding, round 2 `P1`, IMPORTANT** (filed as nine sites / seven controls, corrected to eight sites / six
+controls — the seventh, `gn-nav__signin`, was withdrawn because `.gn-nav a` reaches it from an ancestor).
+P1 swept every static `className` literal on a `<button|input|select|textarea|summary|a>` in the product and
+required that at least one of its class tokens match a selector block; six controls matched none. **The
+mechanism is one line:** `apps/web/app/globals.css:84` sets `button { font: inherit }` — font ONLY, no
+`border`, no `background`, no `padding` — so an unstyled button keeps the UA's `outset` edge and grey fill.
+Painted by the finding on the members a browser could reach: `button.editor-slot__submit` "Save description"
+**136.4×29.2** and "Comment" **86.9×29.2**, each `border: 2px outset rgb(0,0,0)`,
+`background-color: rgb(239,239,239)`, `border-radius: 0px`, `padding: 1px 6px`; `button.add-rule-menu__trigger`
+"Add rule" **76.6×29.2** the same — beside a *Publish* button reading `1px solid rgb(51,98,159)`, the control
+in the same paint.
+
+### ⚠ FOUR OF THE SIX ARE FIXED, AND THE OTHER TWO ARE A MEASUREMENT
+
+`gn-attachment__link` and `attachment-item__name` are **`<a>` elements**. The UA gives an anchor **no**
+border, **no** background and **no** padding, so a bare-control reset is a **no-op** on them — the reset's
+shape is a *button*'s problem. Their ink comes from `globals.css:39` and the underline that remains is the
+link affordance. `attachment-item__name` is additionally under an explicit both-directions contract at
+`packages/editor/src/styles/editor.css:218` ("emitted deliberately and styled by nobody yet … a plain link")
+asserted by `test/attachment-list-item.test.tsx`, so a box rule there would falsify a deliberate record to
+fix nothing the UA had wrong. **This is recorded in `ui.css` above the reset, in `editor.css` above its own,
+and in the test — not dropped.** The two stylesheets carry one grouped rule each, in the file that owns the
+package: `ui.css` for `.gn-board__empty-create` and `.add-rule-menu__trigger`, `editor.css` for
+`.editor-slot__submit` and `.evidence-picker__cancel` — the split `ui.css`'s own `.gn-comments` docblock
+requires ("`packages/ui` styling another package's internals is the duplication this repo refuses").
+`background: none`, not the reviewer's `transparent`, because `editor.css`'s header forbids a bare colour
+keyword — and the shorthand resets every background property anyway.
+
+### The case
+
+- ✅ **13.1058 — the extractor can tell both ways, all four buttons match a selector block, each declares
+  the reset in the file that owns it, and the editor's stays inside that file's no-colour rule.**
+  `packages/ui/test/bare-control-coverage.test.ts`. The control runs FIRST and in both directions: 600+
+  selector heads extracted, a class that genuinely has a rule reads as styled, an invented class reads as
+  unstyled — and the **boundary guard is asserted on its own**, `(?<![\w-])`/`(?![\w-])`, because without it
+  `gn-board__empty` would be satisfied by `gn-board__empty-create`, which is the exact "a name that looks
+  covered" defect this case exists for. "Some rule exists" is not enough either: the reset's own
+  declarations are asserted, since a class matching an unrelated selector would pass the coverage
+  assertion and leave the UA edge in place. **Not painted by this change** — the numbers above are the
+  finding's, and the case says so. `ui.css` and `editor.css` were each reverted to `HEAD` for the RED run
+  and restored from sha256-compared backups.
+
+**No `Features.md` bullet.** This corrects existing controls' paint; it adds no affordance.

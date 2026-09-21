@@ -255,3 +255,34 @@
 .evidence-picker__unavailable-item {
   font-size: 0.85rem;
 }
+
+/* ── P1: TWO CONTROLS THAT PAINTED AS RAW UA CHROME (2026-09-21).
+
+   Round 2's P1 found six controls in the product whose every class matched no
+   selector block. These two are the members that live in THIS package, and
+   they are here rather than in `packages/ui/src/ui.css` on that file's own
+   recorded rule: `.gn-comments`' docblock says `packages/ui` styling another
+   package's internals is the duplication this repo refuses.
+
+   The cause is one line in the app shell: `apps/web/app/globals.css:84` sets
+   `button { font: inherit }` — font ONLY, with no `border`, `background` or
+   `padding` — so an unstyled button keeps the UA's `outset` edge and its grey
+   fill. Measured on `button.editor-slot__submit` in the browser:
+   "Save description" **136.4×29.2** and "Comment" **86.9×29.2**, each
+   `border: 2px outset rgb(0,0,0)`, `background-color: rgb(239,239,239)`,
+   `border-radius: 0px`, `padding: 1px 6px`.
+
+   `background: none` and NOT `transparent`: the shorthand resets every
+   background property (colour included) to its initial value, so it does the
+   same job without writing a bare colour keyword, which this file's header
+   forbids. `color: inherit` and not a token: a token is unreachable from here
+   and `currentColor` is the substitute this file already uses everywhere. */
+.editor-slot__submit,
+.evidence-picker__cancel {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
