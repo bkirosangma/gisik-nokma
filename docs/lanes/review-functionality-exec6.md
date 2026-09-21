@@ -1659,9 +1659,9 @@ the function is at `db.ts:50` and the pool is built from it at `:148`. The READM
 operator reading the deploy directory today is told that the CA they set does nothing and that the rate limiter
 can be forged around — two "until it lands" sentences whose "it" landed within seven hours of their being
 written. (Sweep: `git grep -n -i "not yet on main\|not yet landed\|until .* lands"` over `apps packages deploy
-Features.md test-cases scripts` minus `dist` and tests → 10 lines: these two, E3-27's `Features.md:452`, four where "until … lands" is a runtime sentence about a frame
-or a roster (`Features.md:463`, `:2345`, `:2932`, `p/[projectId]/page.tsx:1330`, `13-second-wave-roles-and-navigation.md:609`
-— five, on re-reading), and two landing claims I did NOT verify: `scripts/check-skipif-coverage.mjs:14` and the
+Features.md test-cases scripts` minus `dist` and tests → 10 lines: these two, E3-27's `Features.md:452`, five where "until … lands" is a runtime sentence about a frame,
+a roster or a sweep (`Features.md:463`, `:2345`, `:2932`, `p/[projectId]/page.tsx:1330`,
+`13-second-wave-roles-and-navigation.md:609`), and two landing claims I did NOT verify: `scripts/check-skipif-coverage.mjs:14` and the
 case-block allocation note at `13-deployment-dogfooding.md:104`.)
 
 **WHAT WOULD HAVE BEEN BETTER.** The paragraph should say what `TRUST_PROXY=true` now means — the limiter
