@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useParams } from 'next/navigation';
 import { Button, Card, Select } from '@gisik-nokma/ui';
-import { membershipId } from '@gisik-nokma/domain';
+import { INVITE_CHANNELS, membershipId } from '@gisik-nokma/domain';
 import { formatDateTime, makeSubmittedFactory, type RosterMember } from '@gisik-nokma/app-core';
 import { InviteAdminError, type MintedInvite, type PendingInvite } from '@gisik-nokma/app-core/online';
 import { AppNav } from '../../../../src/app-nav.js';
@@ -22,6 +22,21 @@ import { useWorkspaceName } from '../../../../src/use-workspace-name.js';
  * can deliver.
  */
 export const COPY_IT_NOW = 'Copy it now — it is not stored and cannot be shown again';
+
+/**
+ * E6-9 — the mint form's Channel select used to offer `email`/`sms`/`whatsapp`
+ * while the door (`INVITE_CHANNELS`, `@gisik-nokma/domain`) accepts only
+ * `email`/`phone`: two offered channels were refused at the door, 422, and the
+ * one the door accepted (`phone`) was never offered at all. Built from
+ * `INVITE_CHANNELS` so the two can no longer drift — the door's own list is
+ * the single source, and a channel added there is offered here automatically.
+ * `sms`/`whatsapp` both reach a phone, so `phone` reads "Phone (SMS)" for the
+ * person filling the form rather than the wire value verbatim.
+ */
+export const CHANNEL_LABELS: Record<(typeof INVITE_CHANNELS)[number], string> = {
+  email: 'email',
+  phone: 'Phone (SMS)',
+};
 
 /**
  * `/w/[workspaceId]/members` — the roster, and for owners and admins the invite
@@ -845,11 +860,7 @@ function MintForm({ workspaceId, onMinted }: { workspaceId: string; onMinted: ()
       <label className="gn-field">
         <span className="gn-field__label">Channel</span>
         <Select
-          options={[
-            { value: 'email', label: 'email' },
-            { value: 'sms', label: 'sms' },
-            { value: 'whatsapp', label: 'whatsapp' },
-          ]}
+          options={INVITE_CHANNELS.map((value) => ({ value, label: CHANNEL_LABELS[value] }))}
           value={channel}
           onChange={setChannel}
           aria-label="Channel"

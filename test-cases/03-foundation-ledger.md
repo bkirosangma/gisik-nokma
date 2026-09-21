@@ -198,3 +198,16 @@ safe right now. `3.900`–`3.999` confirmed unused on every branch at mint time.
   reporting failure for all... a poison claim the offline outbox retries forever" (`outbox.ts:225`
   already documents `invalid`/`refused` as the two TERMINAL, non-retried statuses — this is what makes
   the fix actually stop the retry loop, not just relabel the crash). — `apps/server/test/ingest.test.ts`
+- **3.902** ✅ E6-9 — the members page's invite-mint Channel select renders exactly `['email', 'Phone
+  (SMS)']`, built from `INVITE_CHANNELS` (`@gisik-nokma/domain`) rather than a hand-written array that
+  had drifted to `['email', 'sms', 'whatsapp']` — two offered channels the door refused 422, and the one
+  the door accepted (`phone`) never offered at all. `sms`/`whatsapp` both reach a phone, hence the label.
+  RED reproduced by reverting the select to its hand-written array: 2 failed (this options-list
+  assertion, and the "Phone (SMS)" submission case below — `sms`/`whatsapp` never crash since they were
+  never removed from the rendered options in the reverted state, but "Phone (SMS)" cannot be found).
+  GREEN restored: 40 passed. — `apps/web/test/members-page.test.tsx`
+- **3.903** ✅ The assertion 3.133/3.134's sibling already has, applied to Channel: submitting each
+  OFFERED option (`it.each`) sends the door the WIRE VALUE it accepts (`email` or `phone`), not the
+  display label — proving the fix closes the gap in BOTH directions the finding named (channels offered
+  that the door refuses, and the channel the door accepts that was never offered), not just the
+  options-list half 3.902 covers. — `apps/web/test/members-page.test.tsx`

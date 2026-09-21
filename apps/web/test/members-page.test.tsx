@@ -280,6 +280,60 @@ describe('3.132 the mint form honours the two refusals the door would give', () 
 });
 
 /**
+ * E6-9 — the Channel select used to offer `email`/`sms`/`whatsapp` while the
+ * door (`INVITE_CHANNELS`, `@gisik-nokma/domain`) accepts only
+ * `email`/`phone`: two offered channels were refused at the door, 422, and
+ * `phone` — the one the door accepts — was never offered. Built from
+ * `INVITE_CHANNELS` (`CHANNEL_LABELS`, `page.tsx`) so the two cannot drift
+ * again; `sms`/`whatsapp` both reach a phone, so the option reads
+ * "Phone (SMS)" for the person filling the form.
+ */
+describe('3.902 the Channel select offers exactly what the door accepts (E6-9)', () => {
+  it('renders email and Phone (SMS) — never sms or whatsapp', async () => {
+    const user = userEvent.setup();
+    mount({ listPending: async () => [] });
+    const form = (await screen.findByRole('heading', { name: 'Invite somebody' })).closest('form');
+    expect(form).not.toBeNull();
+    await user.click(within(form!).getByRole('button', { name: /Channel/ }));
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'email',
+      'Phone (SMS)',
+    ]);
+  });
+
+  /**
+   * 3.903 — the assertion the role select already has (3.133/3.134's sibling):
+   * submitting each OFFERED option sends the door the WIRE VALUE it accepts,
+   * not the display label. `INVITE_CHANNELS` is `['email', 'phone']`, in that
+   * order, which is the order the picker renders them and the order this
+   * table submits them.
+   */
+  it.each([
+    ['email', 'email'],
+    ['Phone (SMS)', 'phone'],
+  ])('submitting "%s" sends channel: "%s" to the door', async (optionLabel, wireValue) => {
+    const bodies: unknown[] = [];
+    mount({
+      listPending: async () => [],
+      mintInvite: async (_workspaceId, request) => {
+        bodies.push(request);
+        return { inviteId: 'i_1', url: 'http://localhost:3001/invite/tok', expiresAt: 'later' };
+      },
+    });
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Address'), 'anselma@example.test');
+    const form = (await screen.findByRole('heading', { name: 'Invite somebody' })).closest('form');
+    expect(form).not.toBeNull();
+    await user.click(within(form!).getByRole('button', { name: /Channel/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: optionLabel }));
+    await user.click(screen.getByRole('button', { name: 'Send invitation' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect((bodies[0] as { channel: string }).channel).toBe(wireValue);
+  });
+});
+
+/**
  * 3.135 THE OTHER PLANTED DEFECT TASK 15b NAMES — the minted token is shown
  * ONCE and is absent from the pending list.
  *
