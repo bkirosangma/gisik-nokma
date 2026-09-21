@@ -171,7 +171,7 @@ read the phone and desktop shells call, + Appendix AF) and `sync-client/src/repl
 (whole; the whole-ledger-in-memory ceiling is recorded as case 13.34, UTC scheduling is explicit — nothing filed),
 `tools/sweep-user-preferences.ts` (whole), `gates/evidence-gate.ts` (whole: the evidence id IS verified server-side
 against `attachments` — the engine rule's string check is not the last word), `read/{compile-filter,fts}.ts` (whole:
-every filter value parameterised, `likePattern` escapes `\ % _`), `projections/{contested,proj-visibility,proj-invites}.ts` (whole:
+every filter value parameterised, `likePattern` escapes `\ % _`), `projections/{contested,proj-visibility,proj-invites,search}.ts` and `read/ticket-comments.ts` (whole:
 resolution is refused for an unknown, wrong-ticket or already-resolved contest at `rule-engine/src/contests.ts:60-75`;
 the resolver's identity is not checked, which 12.204 records as *"attributed to whoever discarded"* — not filed),
 `read/{ticket-cards,visible-projects}.ts` (whole), `domain/src/prefix.ts:100-180` with `13.1024` (a derived project
@@ -263,10 +263,10 @@ size: 6 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ 
   `notification-preferences.ts`, `notifications.ts`; `replica/replica-data-source.ts` outside the five ranges
   in §2.2 (≈1,150 lines, the `DataSourceQuery` methods other than `getTickets`/`getBoard`/`getTicket` among them).
 - `apps/server/src`: `mcp-tokens`, `my-invitations` and `search` route modules read in part only; projections
-  `{rollups,proj-projects,search,ticket-comments,entity-heads,workspace-settings,rebuild,registry,
-  index}.ts` (of the 16 files in `projections/`, four read whole — `contested`, `proj-visibility`, `proj-invites`, `workflows` —
+  `{rollups,proj-projects,ticket-comments,entity-heads,workspace-settings,rebuild,registry,
+  index}.ts` (of the 16 files in `projections/`, five read whole — `contested`, `proj-visibility`, `proj-invites`, `search`, `workflows` —
   and three in part — `tickets`, `proj-memberships`, `ticket-types`; `rollups.ts` at the two cited lines only); `read/{restricted-parents,
-  workspace-counts,ticket-comments,workflow-defs,ticket-numbers,live-ticket,state-provenance,assigned-provenance,
+  workspace-counts,workflow-defs,ticket-numbers,live-ticket,state-provenance,assigned-provenance,
   membership-roster,list-cards}.ts` beyond a grep; `sync/sync-service.ts:140-439`; `seed/*`; `http/{security-headers,hsts,rate-limit}.ts` beyond a grep; `auth/*` other than `auth.ts`, `routes.ts`, `social-providers.ts` and `synthetic-address.ts` (whose guard hides a synthetic
   address in rosters and is not consulted by the magic-link door — safe only because `.invalid` never resolves;
   noted, not filed); `tools/sweep-notifications.ts`; `visibility/visible-events-for.ts` as code (exercised by Appendix AE, not read); `attachments/*` other than `sniff.ts`; `notifications/*` beyond the cited ranges; `alerts/`, `workspaces/`.
