@@ -133,6 +133,161 @@ function phoneHidesTheWrapper(source: string): boolean {
   return (rule(phone, '.gn-nav__more') ?? '').includes('display: none');
 }
 
+/**
+ * ## THE CASCADE, NOT THE DECLARATION — because the declaration was green through the bug
+ *
+ * This file's first version asked whether `.gn-nav__more-toggle`'s own rule SAYS
+ * `display: none`, and it did: the toggle was nonetheless PAINTED on the desktop
+ * bar, because `.gn-nav a, .gn-nav button` (0,1,1) sets `display: inline-flex`
+ * and outranks the bare class (0,1,0) wherever either rule sits. **Source order
+ * only decides between EQUAL specificity**, so "is the rule there" and "does the
+ * rule win" are different questions, and only the second one is a statement about
+ * what the browser does. These three functions answer the second.
+ *
+ * WHAT THEY DO NOT DO, said rather than left to be discovered: the matcher
+ * supports descendant combinators over tag/class compounds and NOTHING else — no
+ * `:pseudo`, no `[attr]`, no `>`, `+`, `~`. An unsupported compound makes its
+ * whole selector NON-matching, which is the conservative reading for a resting
+ * state (`:hover` must not be credited with a `display`) and is why the colour
+ * rules in this family are invisible to it. That is a limitation of the
+ * instrument, not a claim about the stylesheet.
+ */
+type ElementModel = { path: { tag: string; classes: string[] }[] };
+
+/** The `<button class="gn-nav__more-toggle">` as the browser sees its ancestry. */
+const TOGGLE: ElementModel = {
+  path: [
+    { tag: 'main', classes: [] },
+    { tag: 'nav', classes: ['gn-nav'] },
+    { tag: 'div', classes: ['gn-nav__inner'] },
+    { tag: 'div', classes: ['gn-nav__links'] },
+    { tag: 'button', classes: ['gn-nav__more-toggle'] },
+  ],
+};
+
+type Compound = { tag: string | undefined; classes: string[] };
+
+/** `undefined` for anything the matcher does not support — see the limits above. */
+function parseCompound(part: string): Compound | undefined {
+  const match = /^([a-z]+)?((?:\.[A-Za-z0-9_-]+)*)$/.exec(part);
+  if (match === null) return undefined;
+  const classes = match[2] === '' || match[2] === undefined ? [] : match[2].slice(1).split('.');
+  return { tag: match[1], classes };
+}
+
+function compoundMatches(compound: Compound, element: { tag: string; classes: string[] }): boolean {
+  if (compound.tag !== undefined && compound.tag !== element.tag) return false;
+  return compound.classes.every((cls) => element.classes.includes(cls));
+}
+
+/**
+ * True when `selector` matches the model.
+ *
+ * **Descendant means ANY ancestor, not the immediate parent** — and getting this
+ * wrong is invisible in the direction that matters here: `.gn-nav
+ * .gn-nav__more-toggle`'s parent is `.gn-nav__links`, not `.gn-nav`, so a
+ * contiguous-suffix matcher finds NO selector at all and every reading comes back
+ * `undefined`. The last compound is the element itself; the rest walk up.
+ */
+function selectorMatches(selector: string, model: ElementModel): boolean {
+  const compounds = selector.trim().split(/\s+/).map(parseCompound);
+  if (compounds.some((compound) => compound === undefined)) return false;
+  const need = compounds as Compound[];
+  if (need.length === 0 || need.length > model.path.length) return false;
+  if (!compoundMatches(need[need.length - 1] as Compound, model.path[model.path.length - 1] as { tag: string; classes: string[] })) {
+    return false;
+  }
+  let at = model.path.length - 2;
+  for (let i = need.length - 2; i >= 0; i -= 1) {
+    let found = -1;
+    for (let j = at; j >= 0; j -= 1) {
+      if (compoundMatches(need[i] as Compound, model.path[j] as { tag: string; classes: string[] })) {
+        found = j;
+        break;
+      }
+    }
+    if (found === -1) return false;
+    at = found - 1;
+  }
+  return true;
+}
+
+/** [classes+attributes, elements] — ids are not used in this stylesheet's nav rules. */
+function specificityOf(selector: string): [number, number] {
+  const parts = selector.trim().split(/\s+/);
+  let classes = 0;
+  let elements = 0;
+  for (const part of parts) {
+    const match = /^([a-z]+)?((?:\.[A-Za-z0-9_-]+)*)$/.exec(part);
+    if (match === null) return [0, 0];
+    if (match[1] !== undefined && match[1] !== '') elements += 1;
+    classes += match[2] === '' || match[2] === undefined ? 0 : match[2].split('.').length - 1;
+  }
+  return [classes, elements];
+}
+
+/** Every `selector { body }` pair in a comment-stripped, media-free stylesheet. */
+function declarationRules(source: string): { selector: string; body: string }[] {
+  const out: { selector: string; body: string }[] = [];
+  let i = 0;
+  for (;;) {
+    const open = source.indexOf('{', i);
+    if (open === -1) return out;
+    const close = source.indexOf('}', open);
+    if (close === -1) return out;
+    out.push({ selector: source.slice(i, open).trim(), body: source.slice(open + 1, close) });
+    i = close + 1;
+  }
+}
+
+/**
+ * The VALUE of `property` on the model that actually wins — highest specificity,
+ * ties broken by source order, exactly as the cascade does it. Built from ONE
+ * code path for both widths, so the phone reading is the same instrument as the
+ * desktop one rather than a hand-assembled equivalent.
+ *
+ * `phone` is the 40rem block, APPENDED: that is where the file puts it relative
+ * to the rules it competes with at equal specificity, and a specificity-decided
+ * pair cannot be moved by the concatenation either way.
+ */
+function winner(source: string, model: ElementModel, property: string): string | undefined {
+  let best: { value: string; rank: [number, number]; order: number } | undefined;
+  declarationRules(source).forEach((candidate, order) => {
+    for (const selector of candidate.selector.split(',')) {
+      if (!selectorMatches(selector, model)) continue;
+      const match = new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([^;]+)`).exec(candidate.body);
+      if (match === null) continue;
+      const rank = specificityOf(selector);
+      const beats =
+        best === undefined ||
+        rank[0] > best.rank[0] ||
+        (rank[0] === best.rank[0] &&
+          (rank[1] > best.rank[1] || (rank[1] === best.rank[1] && order >= best.order)));
+      if (beats) best = { value: (match[1] as string).trim(), rank, order };
+    }
+  });
+  return best?.value;
+}
+
+/**
+ * The cascade a browser applies at 390 px: everything unconditional, then the
+ * 40rem block's CONTENTS.
+ *
+ * **The `@media … {` wrapper is stripped before appending, and that is not
+ * tidiness.** The splitter below is deliberately naive — it takes the first `}`
+ * as the end of a body, with no nesting — so a wrapper left in place makes the
+ * media's own opening brace the "rule", swallows the toggle's declaration as
+ * that rule's BODY, and the toggle rule is never seen as a rule at all. The
+ * reading then comes back `none`, which is the right answer for the WRONG reason
+ * and is indistinguishable from the assertion passing. Measured here: that is
+ * exactly what the first version of this function produced.
+ */
+function phoneContext(source: string): string {
+  const block = blockContaining(source, '(max-width: 40rem)', '.gn-nav__more') ?? '';
+  const open = block.indexOf('{');
+  return withoutMediaBlocks(source) + (open === -1 ? '' : block.slice(open + 1, -1));
+}
+
 describe('E4-11 — the phone breakpoint collapses the workspace links into one disclosure', () => {
   it('the scan reads declarations, not the docblock that names them', () => {
     // The control for `stripComments`, in BOTH directions — a control that can
@@ -153,10 +308,47 @@ describe('E4-11 — the phone breakpoint collapses the workspace links into one 
     expect(wide).toContain('display: contents');
   });
 
-  it('the toggle is painted nowhere above 40rem', () => {
-    const wide = rule(withoutMediaBlocks(css), '.gn-nav__more-toggle');
-    expect(wide, '.gn-nav__more-toggle has no unconditional rule').toBeDefined();
-    expect(wide).toContain('display: none');
+  /**
+   * **THE ASSERTION THIS FILE GOT WRONG, kept as a case rather than replaced.**
+   *
+   * The first version asked only whether the toggle's own rule SAYS `display:
+   * none`. It did, and the owner photographed the button on a desktop bar
+   * anyway, because `.gn-nav a, .gn-nav button` (0,1,1) outranks the bare class
+   * (0,1,0) — source order is not what decides that. So the case now reads the
+   * WINNING value on both sides of the breakpoint.
+   */
+  it('13.1218 the toggle LOSES the cascade above 40rem and WINS it below', () => {
+    // The declaration half is still pinned, now as a precondition rather than as
+    // the property: a rule that is not there cannot win, and this names which
+    // rule the reading below is about.
+    expect(
+      rule(withoutMediaBlocks(css), '.gn-nav .gn-nav__more-toggle'),
+      'no unconditional .gn-nav .gn-nav__more-toggle rule',
+    ).toContain('display: none');
+
+    expect(winner(withoutMediaBlocks(css), TOGGLE, 'display')).toBe('none');
+    expect(winner(phoneContext(css), TOGGLE, 'display')).toBe('inline-flex');
+  });
+
+  it('13.1218 CONTROL — the competitor really is in the reading, and the plant flips it', () => {
+    // THE COMPETITOR, witnessed on its own: the generic rule that beat the bare
+    // class is still in the stylesheet and still says `inline-flex`. Without
+    // this, a tree that had dropped `.gn-nav button` entirely would satisfy the
+    // assertion above for the wrong reason.
+    expect(rule(withoutMediaBlocks(css), '.gn-nav button')).toContain('display: inline-flex');
+
+    // MUTATION WITNESS — the PRE-FIX selector, planted, in the same path the
+    // assertion runs. Reverting BOTH rules to the bare class is the exact tree
+    // the owner photographed; the desktop reading must flip, and the phone one
+    // must NOT (which is why the defect was invisible at 390: the phone arm is
+    // later and wins its tie even when it is too weak to beat `.gn-nav button`
+    // on its own — the button looked right at phone by luck, and wrong here).
+    const mutant = css
+      .split('.gn-nav .gn-nav__more-toggle')
+      .join('.gn-nav__more-toggle');
+    expect(mutant, 'the plant matched nothing — the witness is inert').not.toBe(css);
+    expect(winner(withoutMediaBlocks(mutant), TOGGLE, 'display')).toBe('inline-flex');
+    expect(winner(phoneContext(mutant), TOGGLE, 'display')).toBe('inline-flex');
   });
 
   it('the 40rem block that carries the disclosure exists, and is the one read below', () => {

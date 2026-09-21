@@ -28,7 +28,7 @@ session would be shared by two branches landing in either order.
 | **B14** (`rel/b14-minimal-shells-phone-and-desktop`) | **`13.1187`–`13.1196`** |
 | **B16** (`rel/b16-outbox-ordering-projection-verif`) | **`13.1197`–`13.1206`** |
 | **B15** (`rel/b15-calendar-timeline-and-canvas-for`) | **`13.1207`–`13.1216`** — self-allocated by the B15 driver (exec6, 2026-09-21 23:3x); absent from the controller's 22:0x table, next free block after B16's `13.1206` |
-| **`rel/browser-findings`** (the release FIX lane, deepseek ds1) | **`13.1217`–`13.1226`** — self-allocated 2026-09-22 by the lane that fixes the five browser-suite release findings; absent from the controller's 22:0x table, next free block after B15's `13.1216`. Minted: `13.1217`. |
+| **`rel/browser-findings`** (the release FIX lane, deepseek ds1) | **`13.1217`–`13.1226`** — self-allocated 2026-09-22 by the lane that fixes the five browser-suite release findings; absent from the controller's 22:0x table, next free block after B15's `13.1216`. Minted: `13.1217`, `13.1218`. |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** Re-read it before minting, and if your own
 allocation changes, change it HERE in the same action. **When your block is empty, STOP AND ASK.** Do
@@ -934,3 +934,45 @@ wrong-board pick `helpers/board.ts`'s own docblock exists to remove.
 **One direction of this change is not covered by a test and is named rather than left implicit:** the bar
 item's name is not anything the accessible-name ratchet (`13.287`) can judge — it counts `aria-label`
 ATTRIBUTES, and this element had none before and has one now, so the count RISES there rather than falling.
+
+## The phone `Menu` toggle is not painted above 40rem (E4-11, `rel/browser-findings`, 2026-09-22) — case `13.1218`
+
+- **13.1218** ✅ The `Menu` toggle LOSES the cascade above 40rem and WINS it below, read as the WINNING
+  `display` rather than as a declaration. A matcher over tag/class compounds and descendant combinators
+  resolves the cascade over the unconditional rules (`none`) and over those PLUS the 40rem block's contents
+  (`inline-flex`); the competitor `.gn-nav button { display: inline-flex }` is asserted present in the same
+  case, and the mutation witness plants the PRE-FIX selector and requires the desktop reading to flip while
+  the phone one does not. (`apps/web/test/nav-phone-disclosure.test.ts`)
+
+**The defect, measured live on the deployed stack (`:3001`, main `9b7c38a9`) at 2026-09-22, signed in on
+`/w/0TZSS5W6ATCTF2YBPMWGGP9JF5`:**
+
+| viewport | present | computed `display` | box | ground | border | radius |
+|---|---|---|---|---|---|---|
+| 390 | yes | `flex` | 57×44 | `rgb(239,239,239)` | `outset 2px` | `0px` |
+| 1512 | **yes** | `flex` | **57×44** | `rgb(239,239,239)` | `outset 2px` | `0px` |
+| 1512 (fixed tree, `next dev` on `:3022`) | in DOM | **`none`** | **0×0** | transparent | none | 6px |
+
+The 1512 row is the owner's screenshot: the phone disclosure button painted on the desktop bar, as raw UA
+button chrome. Above 40rem `.gn-nav__more` is `display: contents` and the links it reveals are drawn
+directly, so the toggle is the only thing that should not be there.
+
+**The cause is specificity, not order.** `.gn-nav__more-toggle { display: none }` is (0,1,0);
+`.gn-nav a, .gn-nav button { display: inline-flex; … }` is (0,1,1) and wins wherever either rule sits —
+source order only decides between EQUAL specificity, which is why moving the rule later would not have
+fixed it. `.gn-nav .gn-nav__more-toggle` (0,2,0) is the fix, and the phone arm carries the same two classes
+so it still wins inside the media query (equal specificity, later in the file — which also means the PHONE
+arm was winning its tie before the fix, and the button looked right at 390 by luck, for exactly the defect
+the desktop arm shows).
+
+**The second half of the fix is at phone, where the button is meant to show.** It carried no `.gn-button`,
+so nothing gave it a ground, a radius or a hover: `background rgb(239,239,239)` and `border outset 2px` are
+the UA's own, and `cursor` was `default`. It now takes the same resting/hover treatment as the nav links it
+reveals (`background: transparent; border: none; cursor: pointer`, the shared radius and padding) — measured
+post-fix as `rgba(0,0,0,0)` / `none` / `6px` / `pointer`, 69×44.
+
+**⚠ THE CHECK THAT SHOULD HAVE CAUGHT IT WAS GREEN THROUGHOUT.** Case 13.1137's `'the toggle is painted
+nowhere above 40rem'` asserted that the rule's DECLARATION reads `display: none` — which it did, while the
+browser painted the button. A scan of declarations is not a scan of the WINNING declaration; the case now
+resolves the cascade, which is a strictly larger instrument over the same stylesheet. The old assertion is
+kept as a precondition inside it rather than deleted.
