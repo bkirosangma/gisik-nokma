@@ -16,3 +16,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | B10-ids | reserved | 2026-09-21 21:50 | case-id block 13.1054-13.1073 for batch B10 (verified free over all 25 catalogue files) |
 | T-E4-13 | done | bda4a02fa2910e8b126d288b1519cdbd91d44445 | new-ticket-dialog.test.tsx (13.1054); app-core 1722/1722 |
 | T-E4-14 | done | d94542ed2c1c1b7646cf23aecc0baeeed96b29b9 | components.test.tsx (13.1055); ui 399/399 |
+| T-E4-3 | done | 95b63f3cbe2932512d41094c83e67cc507e64bc4 | tap-target-density.test.ts (13.1056); ui 399/399, web 639/639; DENSE_IN_LIST clause (b) UNMET, recorded |
