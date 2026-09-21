@@ -665,17 +665,35 @@
    never a `role="button"` span — this repo's rule for a control — so the UA's
    border, background and font are reset here exactly as
    `button.gn-ticket-sheet__parent-chip` below resets them for the same reason.
-   `color: inherit` takes the nav's own `--gn-text-muted` on `--gn-surface-raised`
-   (`CONTRAST_PAIRS`), which is also what the prototype does: its `<a>` sits in a
-   nav declaring `color:var(--label2)` and sets no colour of its own (`:1101`,
-   `:1103`). Only the PLAIN-and-current crumb departs from it. */
+
+   ⚠ **`color` IS SET HERE, AND THIS RULE USED TO SAY IT MUST NOT BE
+   (E4-30).** The old docblock read: *"`color: inherit` takes the nav's own
+   `--gn-text-muted` … which is also what the prototype does: its `<a>` sits in
+   a nav declaring `color:var(--label2)` and sets no colour of its own
+   (`:1101`, `:1103`)"*. **The premise was true and the inference was false.**
+   The prototype's anchor does not set a colour of its own AND it is not
+   `var(--label2)`: the export carries `a{color:var(--accent);text-decoration:
+   none;…}` at **`:86`** — a TYPE selector, so it applies to every `<a>` in the
+   document and beats any inherited `color` from the nav. (Verified by opening
+   `:86`.) **A `<button>` inherits, an `<a>` does not** — which is exactly why
+   the product's ancestor crumbs were painted in the non-link ink while the
+   prototype's are not, and why a reader could not tell an ancestor crumb that
+   opens a ticket from the plain crumbs beside it: identical ink, no underline,
+   no weight change, `cursor: pointer` and the UA focus ring the only tells.
+
+   `var(--gn-text-accent)`, NOT `var(--gn-accent)`: `accent` is not text-safe
+   (see `.gn-button`'s note at `:89` and Round 2d), and `textAccent` is the role
+   the product resolves the prototype's `accent` to for TEXT — the same one
+   `.gn-button` and `.gn-board-card__move` already wear. The `--restricted` and
+   plain arms keep the nav's muted ink, so the three arms are now three inks
+   rather than two. */
 button.gn-ticket-sheet__crumb--link {
   border: none;
   background: transparent;
   padding: 0;
   cursor: pointer;
   font: inherit;
-  color: inherit;
+  color: var(--gn-text-accent);
 }
 /* An ancestor the viewer may NOT see — existence-without-title, NAMED rather
    than dropped. Dropping it would make a restricted chain read as a shorter
