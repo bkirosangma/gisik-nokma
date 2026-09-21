@@ -806,13 +806,95 @@ declared open with a named owner. Filed as one finding for three lines because t
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
 
+Each of these was a hypothesis I opened a file or ran a command to break. They are recorded so the judge can see
+what was looked at and found sound, not only what was found wrong.
+
+- **The ingest pipeline's order is what the docblocks say.** `ingest-service.ts:164-360`: workspace lock →
+  entity lock → entity↔workspace guard → permission gate (through the transaction's `client`, `:235-245`) →
+  contest coherence → engine → server gates → append → refresh-on-publish → projections → COMMIT. Read at the
+  line; every refusal path `ROLLBACK`s before append.
+- **The last-owner guard holds.** `checks/membership.ts` refuses demoting or revoking the sole owner
+  (`countWorkspaceOwners` excluding the subject), and `check-permission.ts:1190-1231` refuses a non-owner touching
+  an owner. Read; not mutated. *Observation, not a finding:* membership events do not bind `entity.id` to
+  `membershipId(env.workspaceId, payload.userId)` the way `visibility.set` binds `payload.ticketId` to `entity.id`
+  (`check-permission.ts:1041-1044`); the projection keys on the payload (`proj-memberships.ts:92-116`), so a
+  mismatched entity id pollutes only `proj_entity_heads` and the per-entity `seq`, and no read serves a
+  membership entity's stream. No user-visible consequence found, so not filed.
+- **`rankBetween` is correct.** 59,910 fuzzed cases (`before < result < after`, `isRankKey(result)`), 0 bad; 200
+  head-inserts between `a`..`b` grow the key to 35 characters (no cap — noted, not filed).
+- **The stream cannot miss events between bootstrap and subscribe.** `stream/hub.ts:213-284` drains
+  `visibleEventsFor(pool, user, ws, cursor)` — a fresh `workspace_seq > cursor` read of the ledger on every
+  drain, not an in-memory queue — so a client that subscribes at its bootstrap `streamSeq` is caught up from
+  the ledger. Read at the line.
+- **The mappers refuse to default** (confirming exec 3 §7.5 with a different check): the server's
+  `filterSpecSchema` keys (`assigneeId blocked closed collaboratorId due fields stateCategory stateId text
+  typeId`) and the keys `toClientFilterSpec` reads (`mappers.ts:942-1001`) are the same set; `blocked` and a
+  non-`eq` field op throw `ServingGapError` rather than being dropped.
+- **Invites match the export's `github.md` on role and project scope.** `inviteRoleSchema` refuses `owner`
+  (`invites.ts:64-67`), `inviteSentPayload` refuses `projectIds` on a guest (`:104-110`), and acceptance grants no
+  project rows to a guest (`acceptance.ts:182-190`). *Channel* does not match — E6-9.
+- **The evidence gate binds the attachment to the ticket** (`gates/evidence-gate.ts`, `SELECT 1 FROM attachments
+  WHERE id = $1 AND ticket_id = $2`) and refuses a drive reference as evidence by rule.
+- **OTP and device-code doors are bounded.** better-auth's phone plugin caps verification at 3 attempts per code
+  (`routes.mjs:505-514` in the installed 1.7.2), the sign-in path is IP-limited (`app.ts:496-515`), the MCP
+  user code is 8 symbols over a 28-symbol alphabet (`token-store.ts:18`, `:33-40`, ≈3.8×10¹¹), approve and deny
+  are session-gated and single-shot (`UPDATE … WHERE approved_user_id IS NULL`).
+- **The orphan sweep cannot delete a soft-deleted ticket's files.** `sweep-orphans.ts:100-109` keeps anything
+  with an `attachments` row or an `attachment.added` event, independent of the ticket's flag.
+- **Reconcile is only the audience question** (`reconcile-route.ts`); a deleted ticket is not "restricted", and
+  the replica learns deletion from the `ticket.deleted` frame instead — consistent with the TypeScript gate exec 3
+  measured (F5).
+- **The dev database is current.** All 32 migrations applied (`1790000000000` at 02:50Z today), on a database
+  holding 169 events — which is the "migration applied to a database that already holds data" property exec 3
+  §7.6 called unwitnessed in tests, witnessed on the owner's stack (Appendix E).
+- **`check:db-tz` passes on both live databases** (`Asia/Kolkata` on 54329 and 54330).
+- **Workspace settings are bounded** (`staleDays` 1–365, `dueSoonDays` 0–365, `autoCloseAfterDays` 1–365 or
+  null, `workspace-settings.ts`).
+
 ---
 
 ## 6. THE NINE EDGE CLASSES — walked per surface
 
+Surfaces are the ones this report opened. A cell says what the product does, with the finding or the line it
+rests on; **unverified** means I did not measure it and say why.
+
+| surface | EMPTY | ERROR | PERMISSION-REFUSED | OFFLINE / REPLICA-DEGRADED | SOFT-DELETED | CONCURRENT / INTERLEAVED | NARROW VIEWPORT | FIRST-RUN | SERVER REFUSES, CLIENT BELIEVES |
+|---|---|---|---|---|---|---|---|---|---|
+| **ingest door** (`/v1/events`) | empty batch → `[]` (`online-data-source.ts:481`) | refusal = ROLLBACK, standard shape (`ingest-service.ts:291-297`) | gate before engine, per ticket via `canSee` (`check-permission.ts:1048`) | n/a | **accepts 6/8 write types on a deleted ticket — E6-2** | workspace lock then entity lock, one global order (`:171-173`) | n/a | founding sequence bootstraps owner with `door = null` (`:425-447`) | n/a (it is the server) |
+| **sync door** (`/v1/sync`) | — | every ticket refusal becomes a contest (`sync-service.ts:416-417`) | permission refusal → contest | **overtake after backoff → false contest — E6-5** | same as ingest | per-event transactions; a mid-batch refusal keeps neighbours (`ingest-service.ts:311-320`) | n/a | bootstrap route | **the false contest is the client believing a refusal about its own ticket — E6-5** |
+| **bulk rebind** (`…/migrate`) | zero tickets → `migrated, count 0` (read at `:1041-1046`) | pre-flight refusals append nothing (7.45) | **gate refusal mid-batch, client told "refused", server moved k — E6-10** | n/a | selection includes deleted rows (`:930-936`, no predicate) — noted, not filed: they must move with the type for restore to work | pre-flight reads without a lock; a ticket transitioned between pre-flight and its event is rebound to the state its *old* state mapped to — **unverified**, read at `:960-962`, not measured | n/a | — | E6-10 |
+| **rule engine** | unknown ticket → `ticket.unknown`; unknown workflow → `unknownWorkflow` | malformed payload → `malformedPayload` with the zod detail | authority is not the engine's (by design, `evaluate.ts:52-55`) | the replica runs the same `evaluateEvent` (`outbox.ts:311-315`) | **reads `deleted` in one file only — E6-2, E6-4** | n/a (pure) | n/a | first `workflow.defined` must be v1 (`workflow-defined.ts:62-70`) | **type re-rank / republish promotion leave states the engine then refuses — E6-3, E6-8** |
+| **notifications** | inbox `[]`, `nextCursor: null` | — | fanout suppresses a letter the assignee cannot see (`fanout.ts:122`) | — | **assignment on a deleted ticket manufactures a letter into a 404 — E6-2**; delivered letters stay by ruling (item 1) | dedupe key per event (`assignment:<eventId>`) | n/a | — | — |
+| **list / board / search / detail** | `groups: []` | 404 for unknown-or-invisible (one answer, `can-see.ts:220-226`) | `restricted` parent/epic (`tickets.ts:419-441`) | replica gates in TS (exec 3 F5) | detail/search/crumb withhold; **list header shows a deleted epic's title — E6-11** | — | UI lane | — | — |
+| **invites** | — | `422` with the domain's message | `admins-only` mint; `owner` not invitable | — | — | 6.130 (revoke during accept) recorded ❌, **unverified** here | UI lane | founding | **form offers `sms`/`whatsapp`, door refuses both — E6-9** |
+| **outbox / sync engine** | `nextBatch` → `[]` | transient → backoff (12.148); terminal → `failed` (12.147) | refusal → `failed`, dropped from overlay (`local-context.ts:126`) | **head-of-line not blocked — E6-5** | replica TS gate (exec 3 F5) | one drain at a time (`sync-engine.ts:845`) | n/a | bootstrap once (12.156) | E6-5 |
+| **MCP tools** | `list_tickets` pages; `search` capped at 50, stated in the tool text | refused/invalid → thrown with rule and reason (`write-tools.ts:18-23`) | server's answer relayed verbatim | n/a | **`assign_ticket` on a deleted id → `committed` while `get_ticket` → not found — E6-2** | no read-before-write | n/a | device-code login (`device-login.ts`) | E6-2 |
+| **online client (`POST /v1/events` from the web)** | — | HTTP error surfaces as `ShellRefusal`/error copy (UX lane) | mapper refuses to default (§5) | **no retry and no idempotent resubmit on a lost response** (`online/http.ts`, `online-data-source.ts:480-488` — `grep retry|duplicate-event-id` → nothing): a user's manual retry mints a new id, so a comment can land twice — **unverified** end-to-end, read only | — | — | UI lane | — | mapper throws `MappingError` on a non-index-aligned answer (`mappers.ts:906-911`) |
+| **checkers** | **`check-no-silent-skips` prints `ok` on an empty report — E6-6** | `check-migration-order` refuses below-base | n/a | n/a | n/a | n/a | n/a | **`check:migrations` vs. a future-dated prefix — E6-7** | CI has run nothing since 2026-09-06, so every "CI-wired" claim describes a dead wire (recorded by the controller) |
+| **in-app help** | — | — | — | — | **denies Delete — E6-1** | — | UI lane | — | — |
+
 ---
 
 ## 7. THE PROTOTYPE, CLASSIFIED
+
+The export at `/Users/kiro/my_projects/gisik-nokma-lanes/prototype-2026-09-20/` (shas as the common brief lists
+them; I re-hashed all eight files and they match). This lane's meeting points with it are functional claims,
+not pixels — the three `.md` spec documents and the Invite screen's data model.
+
+| claim in the export | product | class | where |
+|---|---|---|---|
+| `github.md:12` — *"`owner` is NOT an invitable role (the mint refuses it)"* | `inviteRoleSchema` refuses `owner` (`invites.ts:64-67`) | **1 MATCHES** | §5 |
+| `github.md:12` — *"a guest gets no project association … 'cannot put a guest on a project; share tickets with visibility.set instead'"* | `inviteSentPayload` superRefine (`invites.ts:104-110`); `acceptance.ts:182-190` | **1 MATCHES** | §5 |
+| `github.md:12` — *"an invite carries `address`, `channel` (email/sms/whatsapp), `role`, optional `projectIds`"*; Desktop `:754` offers `email/sms/whatsapp` | door: `email|phone` (`invites.ts:70`); web form: `email/sms/whatsapp` | **3 DIVERGES, NO RULING FOUND** — search: `grep -rn whatsapp test-cases/*.md Features.md docs/lanes/review-*.md` → nothing | **E6-9** |
+| `github.md:4` — epics are the rank-1 type, children carry `epicId`, list groups by epic | `EPIC_RANK`, `epicAncestors`, `groupBy=epic` (`list.ts`) | 1 MATCHES on the mechanism; the deleted-epic header is **E6-11** (recorded residual) | E6-11 |
+| `github.md:2-3` (faq-delete) — *"The ticket stops appearing in views. Its history is retained, because other events cite it"* | reads: yes (16.96); writes: **not refused — E6-2**; help: **denied — E6-1** | the prototype's own FAQ entry is the model the product's help should have followed | E6-1, E6-2 |
+| `github.md:8` — *"a global Account screen (profile, notification prefs, workspaces, devices)"*; `workspaces-gap.md:16` item 6 | server has `/v1/me/*` reads (preferences, notification-preferences, workspaces, mcp tokens) | not this lane's surface to classify (UX/UI) — the **routes exist**, noted so the UX lane's finding can cite them | — |
+| `workspaces-gap.md:9-14` — member counts, ticket chips, per-project counts on the workspace card | `read/workspace-counts.ts` serves `visibleProjectCounts` with `LIVE_TICKET_WHERE`; membership roster read exists | data exists server-side for items 1, 3, 7; whether the page consumes it is the UX lane's | — |
+| `help-topics-pane.md` | entirely `help-browser.tsx` / CSS | UI lane | — |
+
+**What I did not compare:** every screen. The prototype draws no engine; the round-1 lane said the same and I
+found no reason to disagree. Where the prototype makes a *data-model* claim (invites, epics, delete), it is in
+the table.
 
 ---
 
