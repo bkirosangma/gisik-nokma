@@ -2416,3 +2416,30 @@ state and rendered its own trigger, so nothing outside could open it; it now tak
 the banner's button and the header's "New ticket" open the SAME dialog. `canCreate` gates the handler on
 the same two facts `createRegion` branches on — a signed-in person and types that did not refuse — so the
 two doors cannot disagree about when creation is available.
+
+## A dead click under a comment claiming completeness — case `13.1163` (V5, 2026-09-21)
+
+**Ids from B11's §13 block `13.1157`–`13.1166`** (controller, 2026-09-21 22:0x; see the E5-25 section
+above). `13.1163` is minted here.
+
+**The defect.** The My Work page turns a title button's ticket id into a route by looking it up in the
+view — the sheet lives at `/w/:ws/p/:projectId?ticket=…`, so the id alone cannot build the URL. Its
+resolver searched `assigned`, `inTransit` and `shared` under a comment reading *"Every section this
+component renders a title button for must be resolvable here, and that is now all four."* **Three arms.**
+The fourth is `contested`, whose rows carry no `projectId` at all (`ContestedClaim` has `ticketId`,
+`title`, `rule`, `reason`, `claim`), so the lookup could never place one: `find` answered `undefined`, the
+guard swallowed it, and the click did nothing — no navigation, no error, indistinguishable from a slow
+page. Same dead-click class as 3.162, one section over, and hidden by a comment asserting the opposite.
+
+- **13.1163** ✅ A contested claim's title button routes to the ticket's own project, **placed by asking
+  the server** (`ticketLocation.locate`, the same one-shot gateway the inbox uses) — the id is asserted as
+  having been asked for, so a guessed project cannot pass on a fixture coincidence; and a ticket the
+  server will NOT place gets a sentence and **no navigation**, with the sentence forbidden from guessing
+  between "gone" and "not yours" (the route answers one frozen 404 for both). —
+  (`apps/web/test/my-work-open-shared.test.tsx`)
+
+**How a fifth section is stopped from reintroducing it.** The page now names the three locally-resolvable
+sections and, in a `Record` keyed on the REMAINDER of `keyof MyWorkView`, says where the rest are
+resolved. A new member on that type fails the `Record` to compile, so whoever adds one must state how its
+title button resolves — the comment that claimed "all four" was the only thing holding that door before,
+and it was wrong.
