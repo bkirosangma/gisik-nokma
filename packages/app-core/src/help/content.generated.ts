@@ -3204,7 +3204,31 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Columns, one per stage, with cards in them. You do not drag cards — you open one and press Move (§7)."
+                    "text": "Columns, one per stage, with cards in them. There are three ways to move a job on: drag its card to a column, press the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "‹"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " or "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "›"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " arrow on the card, or open it and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Move…"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " (§7)."
                   }
                 ]
               },
@@ -3213,7 +3237,23 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "A card shows the title, who it is on, whether it is blocked, its progress, and a small \"who · when\" button. Press that button and it tells you who moved it and when: "
+                    "text": "A card shows the title, who it is on, whether it is blocked, its progress, the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "‹"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "›"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " arrows that carry it to the stages it may move to, and a small \"who · when\" button. Press that button and it tells you who moved it and when: "
                   },
                   {
                     "kind": "italic",
@@ -8006,7 +8046,23 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Open the job, press "
+                    "text": "Drag the card to a column, press the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "‹"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " or "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "›"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " arrow on the card, or open the job, press "
                   },
                   {
                     "kind": "bold",
@@ -8014,7 +8070,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", pick the stage, press Move. There is no dragging on the board."
+                    "text": ", pick the stage, press Move."
                   }
                 ]
               }

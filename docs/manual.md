@@ -661,11 +661,12 @@ was an epic, *"Nothing in the backlog — epics appear in the List."*
 
 ### Board
 
-Columns, one per stage, with cards in them. You do not drag cards — you open one and press Move (§7).
+Columns, one per stage, with cards in them. There are three ways to move a job on: drag its card to a
+column, press the **‹** or **›** arrow on the card, or open it and press **Move…** (§7).
 
-A card shows the title, who it is on, whether it is blocked, its progress, and a small "who · when"
-button. Press that button and it tells you who moved it and when: *"marked Doing by Anselma Marak on
-19 Aug 2026"*.
+A card shows the title, who it is on, whether it is blocked, its progress, the **‹** and **›** arrows
+that carry it to the stages it may move to, and a small "who · when" button. Press that button and it
+tells you who moved it and when: *"marked Doing by Anselma Marak on 19 Aug 2026"*.
 
 Columns are grouped by which set of stages they belong to, so if two job types use different
 arrangements you get two clearly separated groups rather than one confusing mess.

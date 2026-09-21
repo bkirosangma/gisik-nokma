@@ -304,7 +304,8 @@ refused straight away, naming the field. A genuine race between two people is co
 ## Stages and moves
 
 **How do I mark something done?**
-Open the job, press **Move…**, pick the stage, press Move. There is no dragging on the board.
+Drag the card to a column, press the **‹** or **›** arrow on the card, or open the job, press
+**Move…**, pick the stage, press Move.
 
 **Why does the picker only show some of the stages?**
 Because your workflow decides which moves are allowed. A job can only go where an arrow leads from
