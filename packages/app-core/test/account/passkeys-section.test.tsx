@@ -82,4 +82,34 @@ describe('PasskeysSection', () => {
     render(<PasskeysSection passkeys={[]} onAdd={vi.fn()} onRemove={vi.fn()} />);
     expect(screen.queryByRole('alert')).toBeNull();
   });
+
+  /**
+   * RULING E2-23 — a failed LIST read used to collapse to `[]`, and this
+   * component then asserted "You have no passkeys yet." over a read that
+   * never actually confirmed that. `listFailed` is the fourth state the
+   * finding's own remedy asked for: independent of `error` (an add/remove
+   * refusal), it states the read failure instead of the empty-state claim.
+   */
+  it('states a failed list read instead of asserting the named empty state, when listFailed is set', () => {
+    render(<PasskeysSection passkeys={[]} onAdd={vi.fn()} onRemove={vi.fn()} listFailed />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Your passkeys could not be loaded.');
+    expect(screen.queryByText('You have no passkeys yet.')).not.toBeInTheDocument();
+  });
+
+  it('listFailed does not suppress a real list — an unrelated add/remove refusal can still coexist with rows', () => {
+    // The negative control for the case above: `listFailed` governs only the
+    // empty-state assertion, not the rows themselves, so a caller that has
+    // real passkeys AND a currently-failing list poll (a stale prop update)
+    // still shows what it already knows rather than hiding it.
+    render(
+      <PasskeysSection
+        passkeys={[{ id: 'p1', name: 'MacBook Touch ID' }]}
+        onAdd={vi.fn()}
+        onRemove={vi.fn()}
+        listFailed
+      />,
+    );
+    expect(screen.getByText('MacBook Touch ID')).toBeInTheDocument();
+    expect(screen.queryByText('Your passkeys could not be loaded.')).not.toBeInTheDocument();
+  });
 });

@@ -7,6 +7,15 @@ export type PasskeysSectionProps = {
   onAdd: (name: string) => void;
   onRemove: (id: string) => void;
   error?: string | null;
+  /**
+   * Set when the caller's own read of the passkey LIST failed — distinct
+   * from `error`, which is an add/remove refusal. Ruling E2-23: a failed
+   * list read used to collapse to `[]`, and "You have no passkeys yet."
+   * then asserted a fact about the account nobody confirmed. Replaces ONLY
+   * the empty-state claim: a caller still holding a real, previously-read
+   * `passkeys` list keeps rendering it regardless of this flag.
+   */
+  listFailed?: boolean;
 };
 
 /**
@@ -82,7 +91,13 @@ export type PasskeysSectionProps = {
  * empty field means "let the server name it", which is a better answer than a
  * disabled button that gives no reason.
  */
-export function PasskeysSection({ passkeys, onAdd, onRemove, error = null }: PasskeysSectionProps) {
+export function PasskeysSection({
+  passkeys,
+  onAdd,
+  onRemove,
+  error = null,
+  listFailed = false,
+}: PasskeysSectionProps) {
   const [name, setName] = useState('');
 
   return (
@@ -93,7 +108,15 @@ export function PasskeysSection({ passkeys, onAdd, onRemove, error = null }: Pas
           {error}
         </p>
       ) : null}
-      {passkeys.length === 0 ? (
+      {passkeys.length === 0 && listFailed ? (
+        // `listFailed` only replaces the EMPTY-state claim — a caller that
+        // still holds a real, previously-read list keeps showing it even if
+        // a LATER poll failed, the same way a page does not un-render data
+        // it already has just because a refresh hiccuped.
+        <p role="alert" className="gn-refusal gn-refusal--server">
+          Your passkeys could not be loaded.
+        </p>
+      ) : passkeys.length === 0 ? (
         <p>You have no passkeys yet.</p>
       ) : (
         <ul className="gn-account__passkey-list">

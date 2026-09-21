@@ -216,8 +216,7 @@ The invitation banner's restyle (flat `--gn-tint-warning` wash, no shadow, no ac
   app-core-level equivalent, already used the same way by three other app-core views), and a refusal
   that carries NO message still surfaces, because `error?.message ?? null` would read a message-less
   refusal as success and a silent no-op after somebody touched a fingerprint sensor is
-  indistinguishable from the passkey having been saved. Only the passive list read keeps the
-  silent-omission treatment its three siblings have. **The passkey list is also the one mount-time
+  indistinguishable from the passkey having been saved. **RULING E2-23 (closed):** the passive list read no longer keeps the silent-omission treatment its three siblings have, either. A failed list read used to collapse to `[]`, and the named empty state above ("You have no passkeys yet.") then asserted a fact about the account nobody had confirmed — the same shape `sessions-section.tsx`'s sibling read still carries, hedged only by wording ("…to show"), never by a distinct state. `PasskeysSection` now takes a `listFailed` flag, independent of the add/remove `error` above: it states "Your passkeys could not be loaded." instead of the empty claim, but ONLY when there is nothing else to show — a caller still holding a real, previously-read list keeps rendering it even if a later poll fails. **The passkey list is also the one mount-time
   read on this page that is GATED** (on `user !== null`): it lands under `/api/auth/*`, charged to the
   shared `auth:` bucket, and sits behind better-auth's session middleware — measured as a real 401 in
   `apps/server/test/auth/sign-in-flows.test.ts`, not asserted in prose — so an anonymous `/account`

@@ -37,6 +37,7 @@ export default function AccountPage() {
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
   const [passkeys, setPasskeys] = useState<PasskeySummary[] | null>(null);
   const [passkeyError, setPasskeyError] = useState<string | null>(null);
+  const [passkeysListFailed, setPasskeysListFailed] = useState(false);
   const passkeyClient = useMemo(() => createPasskeyClient(), []);
   const sessionsClient = useMemo(
     // `?.session?.token`, not `?.session.token` — `session.data`'s own type
@@ -173,13 +174,22 @@ export default function AccountPage() {
 
   const reloadPasskeys = useCallback(() => {
     if (!signedIn) return;
-    // Same silent-omission treatment the three effects above give a failed
-    // read, and the same reason — except for one difference worth naming: a
-    // refused ADD or REMOVE below is NOT silent, because the person just
-    // performed a WebAuthn ceremony and a no-op after touching a fingerprint
-    // sensor is indistinguishable from success. Only the passive LIST read
-    // collapses to `[]`.
-    passkeyClient.list().then(setPasskeys, () => setPasskeys([]));
+    // RULING E2-23: a failed LIST read does NOT collapse to `[]` any more —
+    // `PasskeysSection` would then assert "You have no passkeys yet.", a
+    // claim about the account this read never confirmed (the sibling
+    // Sessions section already hedges the same shape with "…to show" rather
+    // than asserting none exist). `passkeys` is left as it was and
+    // `passkeysListFailed` carries the refusal instead. A refused ADD or
+    // REMOVE below is unrelated and still surfaces through `passkeyError`,
+    // because the person just performed a WebAuthn ceremony and a no-op
+    // after touching a fingerprint sensor is indistinguishable from success.
+    passkeyClient.list().then(
+      (list) => {
+        setPasskeys(list);
+        setPasskeysListFailed(false);
+      },
+      () => setPasskeysListFailed(true),
+    );
   }, [passkeyClient, signedIn]);
 
   useEffect(() => {
@@ -276,12 +286,13 @@ export default function AccountPage() {
         {sessions !== null ? (
           <SessionsSection sessions={sessions} onRevoke={(token) => void revokeSession(token)} />
         ) : null}
-        {passkeys !== null ? (
+        {passkeys !== null || passkeysListFailed ? (
           <PasskeysSection
-            passkeys={passkeys}
+            passkeys={passkeys ?? []}
             onAdd={(name) => void addPasskey(name)}
             onRemove={(id) => void removePasskey(id)}
             error={passkeyError}
+            listFailed={passkeysListFailed}
           />
         ) : null}
         {/* Connected assistants — MOVED HERE in Round 21 (owner: "lets move MCP

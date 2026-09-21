@@ -1202,6 +1202,17 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   sits inside this block's ✅ deliberately, not by oversight:** the behavioural half of this port is
   test-observed, the geometric half is screenshot-observed only, and flipping the block either way
   would misreport one of them. The mixed marker is the honest reading until a rendered sweep exists.
+  **RULING E2-23 (closed), added to this same pending block:** a failed passkey LIST read used to
+  collapse to `setPasskeys([])`, and `PasskeysSection` then asserted "You have no passkeys yet." over a
+  read that never confirmed that — the one silent-omission collapse on this page that fed a false
+  ASSERTION rather than an honestly-hedged one. `PasskeysSection` now takes a `listFailed` flag,
+  independent of the `error` prop above (an add/remove refusal): it renders "Your passkeys could not be
+  loaded." instead of the named empty state, but ONLY when there is nothing else to show — a caller
+  still holding a real, previously-read list keeps rendering it even if a later poll fails. Four cases:
+  the component states the refusal instead of the empty claim; a real list survives an unrelated later
+  `listFailed`; the page wires a rejected `listUserPasskeys()` through to the refusal; the negative
+  control (no alert, no refusal, when there is no failure) is the pre-existing case above, unchanged —
+  (`packages/app-core/test/account/passkeys-section.test.tsx`, `apps/web/test/account-page.test.tsx`).
   **Not yet ID-allocated**: this file's own header requires the next free block
   (after 13.399) to be requested from the controller before minting, and this task has no channel to
   request one — the same gap `apps/web/test/app-nav.test.tsx`'s own `pending-13.4xx` describe block

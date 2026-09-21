@@ -558,4 +558,19 @@ describe('AccountPage — Passkeys', () => {
     expect(screen.queryByLabelText('Passkey name')).toBeNull();
     expect(screen.queryByText('You have no passkeys yet.')).toBeNull();
   });
+
+  /**
+   * RULING E2-23 — a failed LIST read used to collapse to `setPasskeys([])`,
+   * and `PasskeysSection` then asserted "You have no passkeys yet." over a
+   * read that never actually confirmed that. The section now states the
+   * read failure instead, distinct from an add/remove `error`.
+   */
+  it('E2-23 a failed passkey list read states the refusal, not the named empty state', async () => {
+    listUserPasskeys.mockRejectedValue(new Error('network error'));
+    mount();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your passkeys could not be loaded.',
+    );
+    expect(screen.queryByText('You have no passkeys yet.')).not.toBeInTheDocument();
+  });
 });
