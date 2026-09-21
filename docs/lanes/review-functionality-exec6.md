@@ -22,7 +22,7 @@ a measurement it lacks is added, and where that happens the finding says so.
 
 ## 0. THE ONE-LINE ANSWER
 
-**No Critical.** Thirteen findings, ten Important, every one measured through a door the product ships. The recurring
+**No Critical.** Fourteen findings, ten Important, every one measured through a door the product ships. The recurring
 shape is **a door that accepts what every read surface says cannot be happening**: writes on a soft-deleted ticket
 (E6-2), a deleted open child blocking its parent while the board shows zero (E6-4), a type re-rank and a workflow
 republish that leave hierarchies the engine then refuses to reproduce (E6-3, E6-8), a bulk migration refused
@@ -937,6 +937,35 @@ rebuild, `EXCEPT` both ways); `ledger/event-store.ts:146-156` (replay order, doc
 **SEVERITY: Important.** A release-facing instrument that reports a failure on a correct database after an
 ordinary admin act, recorded without an owner while its trigger shipped.
 
+### E6-14 — MINOR — The delete toast's recorded reason for departing from the prototype ("this product has no ticket key") stopped being true thirteen minutes before it was written; the same file now reads the key for its own breadcrumb
+
+**WHAT.** `packages/app-core/src/views/ticket-sheet.tsx:296-306`, on `onDeleted`: *"The prototype toast says
+`"GN-1183 deleted · …"` — a ticket KEY. **This product has no ticket key**; its ids are ULIDs … The title is the
+only human name a ticket has here … a key is a migration"* — and the host renders `${title} deleted · its history
+is retained` (`p/[projectId]/page.tsx:2879-2890`, same reasoning repeated). Measured today: the detail door serves
+`key` (`routes/tickets.ts:548-555`, `ticketKey(identity.prefix, projectPrefix, number)`; my Appendix C run's
+detail body carries a `key` field), and **the same sheet uses it**: `ticket-sheet.tsx:1588` `const lastCrumb =
+ticketRead.key ?? ticketRead.title;`, with `:1794` noting *"#595 shipped the composition"*.
+
+**WHY it is wrong.** The departure from the prototype is recorded with a reason, and the reason is false —
+`ac18f2bc` (*"Ticket keys, the ledger half"*, 2026-09-20 13:04 IST) landed thirteen minutes before `18d7e391`
+(the Delete PR, 13:17 IST) wrote *"has no ticket key"*, and the crumb's key composition shipped in `#595` after
+that. So the product now has two human names for a ticket in one component and uses the prototype's one for the
+crumb and the other for the toast, while the docblock says the first does not exist. The prototype's toast
+(export `Gisik Nokma - Desktop.dc.html`, sha `3d142d46`) names the key. Category 2 with a reason that no longer
+holds; the docblock itself says *"Reversing this is one string in the host."*
+
+**WHAT WOULD HAVE BEEN BETTER.** Hand `onDeleted` the `key ?? title` the crumb already computes, and replace the
+docblock's paragraph with the one sentence that is true: a key exists when the workspace has a prefix, and the
+toast falls back to the title when it does not.
+
+**MEASUREMENT.** `sed -n '296,306p;1588p;1794p' packages/app-core/src/views/ticket-sheet.tsx`; `sed -n
+'548,555p' apps/server/src/routes/tickets.ts`; `git log -1 --format='%h %ci' ac18f2bc` / `18d7e391`; Appendix C's
+`GET ticket LC` line (`keys: …,key,epic`).
+
+**SEVERITY: Minor.** Copy and a stale docblock; the wrong sentence is the one that explains a prototype
+departure, which is the class the common brief asks this lane to read closely.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
@@ -1039,8 +1068,8 @@ the table.
 |---|---|---|
 | Critical | **0** | — |
 | Important | **10** | E6-1, E6-2, E6-3, E6-4, E6-5, E6-8, E6-9, E6-10, E6-12, E6-13 |
-| Minor | **3** | E6-6, E6-7, E6-11 |
-| **total** | **13** | E6-1 … E6-13, no gaps in the numbering |
+| Minor | **4** | E6-6, E6-7, E6-11, E6-14 |
+| **total** | **14** | E6-1 … E6-14, no gaps in the numbering |
 | unverified (0-point) items | 3 | the migrate route's stale pre-flight read under concurrency (§6), the online path's non-idempotent manual retry (§6), 6.123's "no bound on live credentials" half (E6-12) — each marked *unverified* where it appears and not counted above |
 
 Every Important finding above rests on a probe in Appendices A–K or on a printed line; the three Minors rest on
