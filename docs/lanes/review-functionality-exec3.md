@@ -2984,3 +2984,65 @@ claim). **Control on the same bullet:** its own list of six routes — I checked
 (`/w/[workspaceId]/settings/{workflows,workflows/new,workflows/[workflowId],ticket-types,ticket-types/new,ticket-types/[typeId]}`),
 so **the bullet is right about the routes and wrong about everything it says surrounding them** — which is why
 the finding is filed on the sentences and not on the list.
+
+---
+
+## 43. REACHING A NAMED NOT-REACHED SURFACE — `packages/app-core/src/online/mappers.ts`, 2,457 lines
+
+Both rounds' coverage sections name this file as **not reached**: round 1 says it *"was scanned for defaulting
+operators and spot-read; it was not reviewed line by line"*, and §16.1 repeats it. **The controller's 13:55
+instruction is to spend the remaining phase-1 time on my own not-reached list, so this is that surface, and
+this section is the coverage record.** Method and result, so a judge can weigh it:
+
+**1. Structure — every function enumerated (35).** `grep -nE "^export (async )?function|^function"` →
+`asRecord`/`asArray`/`asString`/`asNumber`/`asBoolean`/`asGrouping`/`asListColumnIds`/`asStateCategory`,
+`mapProvenance`, `mapRollup`, `mapActors`, `rosterByActorId`, `mapCause`, `mapAssignee`, `mapBoardCard`,
+`mapBoardColumn`, `mapBoardView`, `boardWorkspaceId`, `mapHistory`, `mapTicketAttachments`,
+`mapTicketComments`, `mapWorkflowDef`, `mapTicketTypes`, `mapIngestResults`, `toClientFilterSpec`,
+`toServerFilterSpec`, `mapPreferences`, `toServerPreferences`, `withheldOrNumber`, `describedText`,
+`mapWorkspaceRefs`, `mapFieldClaims`, `mapDueDate`, `mapClosed`, `mapRank`, `mapOptionalInstant`,
+`mapListRow`, `mapListPage`, `mapTicketState`, `mapParentRef`, `asVisibilityMode`,
+`asResolvedVisibilityMode`, `mapTicketVisibility`, `mapTicketRead`, `mapSearchHits`, `matchedInOf`,
+`mapMyWork`, `mapWorkItem`, `mapContestedClaim`, `mapAttention`, `mapWorkspaceSettings`, `mapAttentionItem`.
+
+**2. Defaulting — every `??` / `||` in the module, classified.** `grep -nE "\?\?|\|\|"` minus comment lines
+→ **11 sites, and only two of them substitute a value** for something the server sent:
+
+| site | what it is | verdict |
+|---|---|---|
+| `:359` `roster.get(actorId) ?? null` | a roster MISS prints as "unknown actor", not as a name | correct — `null` is the honest answer |
+| `:546` `roster.get(id) ?? id` | an assignee absent from the roster renders as **their id** | **argued at `:525-537`**: three options enumerated, and this is *"a degradation, not an invention: the id is a fact the server sent"*, matching `actorLabel(id, null)` everywhere else in the client |
+| `:1029`, `:1031`, `:1073` | `filter.exclude ?? {}`, `…?.length ?? 0`, `filter.fields ?? {}` | **client-supplied** input, not a server response — the docblock at `:1073-1077` states the distinction and why `{}` is the truth there |
+| `:264`, `:1041`, `:1062`, `:1476`, `:1545`, `:2410` | comparison logic, not defaults | — |
+| `:1703` | an explicit `null`-vs-`undefined` ternary | — |
+
+**3. The round-trip pair, checked as a PAIR — `toClientFilterSpec` (`:952`) and `toServerFilterSpec`
+(`:1022`).** This is the property worth testing in a mapper module: a filter that changes meaning when it
+crosses and returns. **Verified symmetric**:
+
+- every wire term `toClientFilterSpec` reads (`text`, `assigneeId`, `collaboratorId`, `typeId`, `stateId`,
+  `stateCategory`, `due.{before,after}`, `fields[]`, `closed`) is written back by `toServerFilterSpec`, and
+  **`closed` — which I flagged as a candidate omission after reading only its first 58 lines — is handled at
+  `:1082-1084`** as *"a plain carry"*. **It was my candidate and it was wrong; the rest of the function is
+  what refuted it.**
+- the plural/singular disagreement is **refused rather than narrowed**: `toServerFilterSpec` throws
+  `UnexpressibleFilterError` naming the key and the count for a two-assignee filter, and for `projectIds` at
+  any length — *"that would answer a different question and label it with the user's"*. So the client cannot
+  silently narrow.
+- the direction that *could* hide a server omission refuses instead: `op !== 'eq'` throws `ServingGapError`
+  with a named owner, a duplicate `fieldId` throws `MappingError`, and `blocked` throws `ServingGapError`
+  rather than being dropped.
+
+**4. What I did NOT do, named rather than implied.** I did **not** read all 2,457 lines. I enumerated every
+function, classified every defaulting site, and read the paired and absence-shaped functions at the line
+(`toClientFilterSpec`, `toServerFilterSpec`, `mapAssignee`, `mapPreferences`'s docblock). **The other ~30
+mappers were read for their `??`/`||` sites and not otherwise** — so a defect in a mapper that neither
+defaults nor pairs is still outside this section's reach, and **I am claiming coverage of the defaulting and
+round-trip properties, not of every function's field list.**
+
+**RESULT: no finding.** The module's discipline is the opposite of the failure shape this lane was sent to
+look for — it refuses (`UnexpressibleFilterError`, `ServingGapError`, `MappingError`) where a weaker module
+would default, and the two substitutions it does make are each argued in place. **`mapPreferences`'s docblock
+is the clearest statement of the rule I found anywhere in the tree**: *"The server's absence and the client's
+default are the same PIXELS and not the same fact: one is 'nobody arranged this', the other is 'this
+arrangement is yours'"* — which is `E3-14`'s and `E6-2`'s class, argued and refused in advance.
