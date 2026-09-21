@@ -3341,3 +3341,32 @@ attachments) and §13 (deployment, ~525 lines) not opened at all**; the `test-ca
 **Of the fourteen sections, four have been audited to a stated depth and two not at all**, and the depth is
 stated per section rather than summarised — which is the only form in which the number is checkable by
 someone who was not here.
+
+---
+
+## 50. REACHING §9 — the editor, documents and attachments: few claims, all checked, all true
+
+§46 named §9 as not opened. **Reached**, and the honest result is that the section is **mostly descriptive**:
+a sweep for countable claims over its ~290 lines returns **one**, and a sweep for absence claims returns
+**none**. What it does carry is three numeric constants, and all three hold:
+
+| claim | measured |
+|---|---|
+| `:1533` — the attachment ceiling is *"26,214,400 bytes — 25 MiB"* | **exact**: `routes/attachments.ts:19` `export const ATTACHMENT_MAX_BYTES = 26_214_400;` ✓ |
+| `:1517` — `describeLimit` *"changes units in its own message rather than reporting a misleading '0 MB'"* | **already verified at §20**: `read-limited.ts:15-20` switches to KB below a mebibyte, and its docblock says why the naive `maxBytes / 1048576` would have shipped *"larger than the 0 MB limit"* ✓ |
+| `:1500-1501` — an unnamed object survives `ORPHAN_OBJECT_RETENTION_MS` *"(30 days, matching the user-preferences sweep's constant)"* | **both halves exact**: `sweep-orphans.ts:28` is `30 * 24 * 60 * 60 * 1000`, and `sweep-user-preferences.ts:35` is the same expression under a different name — so "matching" is literally true rather than approximately ✓ |
+| `:1554` — *"the two doors to identical bytes for an unseen ticket and a nonexistent one"* | **verified in round 1** as cases `16.97`–`16.99`, whose refusals are asserted byte-identical on the raw payload and every header but `date` ✓ |
+
+**AND THE SECTION'S OWN MOST USEFUL SENTENCE IS A RECORDED CEILING, NOT A CLAIM TO CHECK.** `:1502-1505`
+names a known limit — *"`store.list()` is called unprefixed and materialises every object in memory before the
+loop starts, so peak memory scales with object COUNT"* — and links it to a class case 13.34 already named for
+`readLedger`. **That is a documented bound with a named precedent rather than an absence**, which is why there
+is nothing here to file: a section that says *"this scales with object count, here is the sibling that already
+says so"* has already done the work a reviewer would otherwise do.
+
+**WHERE THE LIST STANDS, FINAL FORM.** `Features.md`: **§4 fully; §6, §11, §12, §14 and §9 reached to a
+stated per-section depth**; **§13 (deployment, ~525 lines) is the ONE section never opened**, and it is the
+least of mine — a deployment section, whose claims are about CI wiring and compose rather than about the engine
+and the wire. **The `test-cases/` ✅ set remains unasked and is the largest honestly-stated gap in this
+report**: 2,601 ids, of which I have enumerated every ❌ line in my concern's file and asked the ✅ set
+nothing, which is `E6-12`'s finding in the direction nobody has walked.
