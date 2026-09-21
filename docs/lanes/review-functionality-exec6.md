@@ -572,6 +572,52 @@ test/zz-exec6-probe-promote.test.ts --no-file-parallelism`, relative imports). L
 **SEVERITY: Important.** An invariant with a dedicated refusal and a dedicated case, bypassed by an admin act
 and then compounded by an unattended job.
 
+### E6-9 — IMPORTANT — The members page's invite form offers three channels; the door refuses two of them, and the one it accepts is not offered
+
+**WHAT.** `apps/web/app/w/[workspaceId]/members/page.tsx:847-856` renders the mint form's Channel select with
+exactly `email`, `sms`, `whatsapp`. The domain schema the mint door parses the claim with —
+`packages/domain/src/events/invites.ts:70` `INVITE_CHANNELS = ['email', 'phone']`, `:73-75` *"requires channel
+'email' or 'phone'"* — refuses two of the three. Measured through the real mint door (Appendix H; 1 file / 1 test
+passed):
+
+```
+POST /v1/workspaces/:ws/invites  channel=email    -> 201 {"inviteId":…,"url":"http://localhost:3001/invite/…","expiresAt":…}
+                                 channel=sms      -> 422 {"status":"invalid","code":"invalid-payload","message":"payload for 'invite.sent' v1 is invalid at channel: requires channel 'email' or 'phone'"}
+                                 channel=whatsapp -> 422 (same)
+                                 channel=phone    -> 201            ← accepted, and absent from the form
+```
+
+**WHY it is wrong.** An admin who picks `sms` or `whatsapp` — the two options that describe a phone number —
+gets a 422 whose message names a value the form does not offer, so a phone invitation cannot be minted from the
+shipped page at all. The same file states the rule it breaks, three hundred lines up, about the *role* select:
+`page.tsx:728-729` *"offering a choice the door will reject is a form that lies about what it can do."* It has
+been this way since the options first shipped — `7b45099e` (2026-09-02) added `whatsapp` to the page while
+`INVITE_CHANNELS` was already `['email', 'phone']` at that commit (`git show 7b45099e:packages/domain/src/events/invites.ts:70`)
+— and `452335ed` (2026-09-14, *"Migrate members page's Channel and Role selects to the shared Select"*) carried the
+three values across. Nineteen days, because `apps/web/test/members-page.test.tsx` only ever posts
+`channel: 'email'` (`:66`, `:263`) and asserts the body's *keys* (`:244`), never a non-email value.
+
+**The prototype is not a defence.** The export's Invite screen offers the same three
+(`Gisik Nokma - Desktop.dc.html`, sha `3d142d46`, `:754` `<option value="email">email</option><option
+value="sms">sms</option><option value="whatsapp">whatsapp</option>`; Mobile `:1524`), and its `github.md:12`
+says the invite model was *"corrected … to the door's own rules"* and lists *"`channel` (email/sms/whatsapp)"* —
+but the door's rule is `email|phone`, so the prototype copied the **form**, not the door. Classified as the
+common brief's category 3 for the door (no ruling found: `grep -rn whatsapp test-cases/*.md Features.md
+docs/lanes/review-*.md` → nothing), and the product's own form/door disagreement is the defect underneath it.
+
+**WHAT WOULD HAVE BEEN BETTER.** One source: the select's options built from `INVITE_CHANNELS` (exported from
+the domain, already imported by the page's neighbours), with `phone` labelled for people (*"Phone (SMS)"*). And
+a page test that submits each offered option and asserts the door's answer — the assertion the role select
+already has.
+
+**MEASUREMENT.** Appendix H, run from `apps/server`. Lines opened: `members/page.tsx:728-729`, `:847-856`;
+`invites.ts:70`, `:73-75`; `routes/invites.ts:296-345` (the mint route: body schema `channel: { type: 'string' }`
+at `:312`, the 422 at `:345`); `members-page.test.tsx:66`, `:244`, `:263`; export `:754`, mobile `:1524`,
+`github.md:12`.
+
+**SEVERITY: Important.** A shipped admin action is unreachable for phone-only invitees from the page built to do
+it, with a refusal message that cannot be acted on, for nineteen days.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
@@ -1406,6 +1452,130 @@ describe('exec6 probe: the overtaken rename, end to end on /v1/sync', () => {
     console.log(`PROBE my-work -> ${mine.statusCode}; mentions contested: ${mine.body.includes('contested')}; excerpt: ${mine.body.slice(0, 400)}`);
     const att = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/attention`, headers: auth(ownerToken) });
     console.log(`PROBE attention -> ${att.statusCode}; mentions ghost: ${att.body.includes(ghost)}; excerpt: ${att.body.slice(0, 400)}`);
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix H — probe for E6-9 — the three form channels at the mint door
+
+File path in the tree: `apps/server/test/zz-exec6-probe-channels.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-channels.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: what does the mint door answer for each channel the members page offers?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 probe: the three channels the mint form offers, at the mint door', () => {
+  it('records the door answer per channel', async () => {
+    for (const channel of ['email', 'sms', 'whatsapp', 'phone']) {
+      const address = channel === 'email' ? `probe-${channel}@example.com` : '+919000000777';
+      const res = await app.inject({
+        method: 'POST',
+        url: `/v1/workspaces/${WS}/invites`,
+        headers: auth(ownerToken),
+        payload: { address, channel, role: 'member' },
+      });
+      console.log(`PROBE mint channel=${channel.padEnd(8)} -> HTTP ${res.statusCode} ${res.body.slice(0, 220)}`);
+    }
     expect(true).toBe(true);
   });
 });
