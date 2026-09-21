@@ -383,33 +383,31 @@ Under **§3** that is the shape a judge must look at hardest: *"the 'defect' is 
 
 **WHAT WOULD HAVE BEEN BETTER.** A visually-hidden-until-focused "Skip to content" link as the first focusable element in `layout.tsx`, targeting the `<main>`. That is the standard remedy, it is about ten lines, and it is the one element in this report that a keyboard user would notice immediately.
 
-### P15 — **IMPORTANT** ⚠ **r2 NEW** — The prototype copy in this repo is a BROKEN transform of the owner's export, and 71 source/test files cite it by line
+### P15 — **MINOR** ⚠ **r2 NEW, CORRECTED DOWNWARD IN THE SAME ROUND** — the repo's generated prototype copy is one line offset from the owner's export, and 71 files cite it by line
 
-**WHAT.** `design-system/interactive/desktop.dc.html` is not a copy of the owner's export. It is the export put through an **attribute-camelCasing pass**, and the pass produced attribute names that are not valid in HTML or SVG. Its line numbers are also shifted by one against the authority. The owner has ruled the **export** is the comparison surface, and this repository's UI work cites the transformed copy.
+**⚠ READ THIS FIRST: I FILED THIS AT IMPORTANT AND THE MECHANISM I GAVE WAS WRONG. THE CORRECTION IS NOW MOST OF THE FINDING.** My first version said the repo's copy is a *"broken transform"* whose *"icons do not draw"*, because it contains `sc-camel-view-box` 24 times and the valid SVG spelling `viewBox` **zero** times, and `viewBox` is case-sensitive in SVG. **That inference is false, and `support.js` says so in its own source.**
 
-**MEASUREMENT** (both files named with their sha256, both read at this tree):
+**THE MECHANISM I MISSED, READ AT THE LINE.** `design-system/interactive/support.js` is the prototype's runtime, and `sc-camel-*` is **its own reversible encoding**:
+- `:365` — `var CAMEL_ATTR_RE = /(\s)([a-z]+[A-Z][A-Za-z0-9]*)(\s*=)/g;`
+- `:366-370` — it **encodes**: a camelCase attribute name is rewritten to `CAMEL_ATTR` (`:297`, `"sc-camel-"`) plus its kebab-case form.
+- `:422-423` — it **decodes**: `if (key.startsWith(CAMEL_ATTR)) key = kebabToCamel(key.slice(CAMEL_ATTR.length));`
+- `:1885` — the encoded form is what `__dcAnnotatedTemplate` hands the **editor**, *"the editor decodes on serialize"*.
 
-| | repo copy `design-system/interactive/desktop.dc.html` | the export `Gisik Nokma - Desktop.dc.html` |
-|---|---|---|
-| sha256 (first 16) | `2cda054b4320ebb6` | `3d142d464a070b33` |
-| lines | **4050** | **4049** |
-| `sc-camel-view-box` | **24** | **0** |
-| `viewBox` (the valid SVG spelling) | **0** | **23** |
-| `sc-camel-on-click` | **161** | **0** |
-| `sc-camel-on-change` | **36** | **0** |
-| `sc-camel-col-span` | **1** | **0** |
-| `style-hover` (a NON-camelCase attribute — the control) | **3** | **3** |
+**So `sc-camel-view-box` is `viewBox` in the runtime's own transfer encoding, and the repo's copy renders correctly. The 24 SVGs are not broken.** Under §3 a finding whose stated mechanism is falsified is invalid — at Important that would have cost nine points — so the claim is withdrawn, not defended.
 
-- **`viewBox` is case-sensitive in SVG, and the repo's copy contains the valid spelling ZERO times.** All 24 of its SVGs carry `sc-camel-view-box`, which renders nothing. `sc-camel-col-span` came from a `<td colspan>` — a table cell that no longer spans. So the repo's copy is not a worn copy of the prototype; **it is one whose icons do not draw.**
-- **The control is what makes this a transform rather than a corruption:** `style-hover` is present 3 times in **both** files. The pass touched only attribute names that were already camelCase, which is exactly what an automated camelCaser does.
-- `diff` between the two is **1,113 lines** with a **net −1** — so the files are mostly in-line rewrites, not insertions, and the offset stays a constant **−1** across every anchor sampled: `isSignIn` 120/119, `isWorkspaces` 180/179, `isMembers` 651/650, `isSettingsShell` 800/799, `sheetCrumbs` 1102/1101, `isLegal` 1720/1719, `isNotFound` 1844/1843.
-- **The population that cites it: 71 source/test files** (`grep -rln "desktop\.dc\.html"` over `packages apps`, restricted to `.ts`/`.tsx`/`.css`). 103 files when `docs/` and `test-cases/` are included.
+**⚠ AND THE ROUND-2 BRIEF MAKES THE SAME FALSE INFERENCE, WHICH IS THE PART WORTH KEEPING.** It tells every lane: *"`viewBox` → `sc-camel-view-box`, which is not a valid SVG attribute. `viewBox` is case-sensitive in SVG. **So: do not cite the repo's copy as the prototype.**"* **The premise is the one I repeated, and it is false for the reason above.** The conclusion — compare against the export — still stands as the owner's ruling; **the reason given for it does not**, and a lane reasoning *from* the premise would report a broken-prototype defect that does not exist. **Six lanes were handed this.** Recorded rather than filed, because it is a defect in the briefing apparatus; it cost me a finding I had to withdraw.
 
-**WHY IT IS WRONG.** The owner's instruction for this exercise is explicit: compare against the export, *"do not cite the repo's copy as the prototype"*. Every `:NNN` citation in those 71 files therefore **resolves to different content** in the artefact the owner ruled is the authority — off by one line, consistently. A lane transcribing a styling value is reading the right value (I checked: the five values `members-styling.test.ts` pins — `min-width:820px`, `padding:13px 18px`, `font-size:17px`, `background:var(--fill4)`, `i % 2 ?` — appear the **same number of times in both files**), but a lane checking an **icon or a table** is reading a prototype whose SVG and colspan attributes are invalid, and a lane following a line number against the export lands on the wrong line.
+**WHAT SURVIVES, MEASURED.** The two files are not identical, and the difference is a **constant one-line offset**:
+- repo copy `design-system/interactive/desktop.dc.html` — **4050 lines**, sha256 `2cda054b4320ebb6…`
+- the export `Gisik Nokma - Desktop.dc.html` — **4049 lines**, sha256 `3d142d464a070b33…`
+- `diff` between them: **1,113 lines**, net **−1** — the changes are overwhelmingly the in-line `sc-camel-*` rewrites, which is why the line count barely moves.
+- **The offset is exactly −1 at every anchor sampled**, spanning 119 to 1843: `isSignIn` 120/119, `isWorkspaces` 180/179, `isMembers` 651/650, `sheetCrumbs` 1102/1101, `isLegal` 1720/1719, `isNotFound` 1844/1843, `openParent` 1240/1239, `isSettingsShell` 800/799.
+- **71 source/test files** cite the repo's copy by line (`grep -rln "desktop\.dc\.html"` over `packages apps`, `.ts`/`.tsx`/`.css`); 103 including `docs/` and `test-cases/`.
+- **The VALUES agree**, checked in the first version and still true: `min-width:820px`, `padding:13px 18px`, `font-size:17px`, `background:var(--fill4)` and `i % 2 ?` each appear the **same number of times in both files**.
 
-**⚠ AND MY OWN FIRST READING OF THIS WAS WRONG, which is why the numbers above are stated as a table.** My initial pass printed the same line number from both files and showed every one differing, and I wrote in my own working notes that the drift *"grows large by `:3077`"*. It does not: repo `:3077` is a zebra line and export `:3077` is `setRole:`, but the export's zebra is at **`3076`** — the offset is **1**, constant, and I had read my own output carelessly. The table replaced the impression.
+**WHY IT IS STILL A FINDING, NOW THAT THE DRAMATIC PART IS GONE.** The owner has ruled which artefact is the authority, and the two differ by exactly one line: **every `:NNN` in those 71 files resolves to the wrong line in the export** — consistently, and by an amount small enough that a reader checking one value would not notice, which is what makes it a hazard rather than a defence. One command fixes it: regenerate the copy from the export and record the new sha in `PROVENANCE.md`, whose stated job is *"the owner export each file was unpacked from, its sha256, and the one command that reproduces it"*.
 
-**WHAT WOULD HAVE BEEN BETTER.** One of: regenerate the repo copy from the export byte-for-byte and record the sha in `interactive/PROVENANCE.md` (which is that directory's own stated job — *"the owner export each file was unpacked from, its sha256, and the one command that reproduces it"*); or, if the camelCased copy exists for a reason, say so where it is cited and stop treating it as the prototype. Either way the fix is at the artefact, not in the 71 files.
+**⚠ AND MY FIRST READING OF THE OFFSET WAS WRONG TOO, WHICH IS WHY THIS SECTION IS NUMBERS RATHER THAN PROSE.** I printed the same line number from both files, saw every one differ, and wrote that the drift *"grows large by `:3077`"*. It does not — repo `:3077` is a zebra line and export `:3077` is `setRole:`, but the export's zebra sits at **`3076`**. The offset is 1, constant. **Two consecutive wrong readings of one artefact, both caught only by going back to the file.**
 
 ### P16 — **IMPORTANT** ⚠ **r2 NEW** — One styling case asserts the ABSENCE of a declaration through a scanner that truncates multi-line rules, so it cannot fail when the thing it guards returns
 
@@ -586,7 +584,7 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 **CRITICAL — 1**
 - `I1` no browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate structurally cannot run one
 
-**IMPORTANT — 11**
+**IMPORTANT — 10**
 - `I2` the `e2e-stack` contrast roster records a defect fixed eight hours later, with no provenance
 - `I3` `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by its own docblock
 - `P1` seven interactive controls styled by no rule at all (raw UA chrome)
@@ -594,8 +592,11 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 - `P9` `SegmentedControl` carries ARIA tab semantics with none of the tab keyboard model, in 7 places
 - `P11` the `Select` panel is outside every sweep's population, for two independent reasons
 - `P12` every screen in the product has the same document title (WCAG 2.4.2, Level A)
+- `P16` ⚠ r2 — `neo-card-radius.test.ts` asserts a declaration is ABSENT through a truncating scanner, so it cannot fail
+- `P18` ⚠ r2 — a client-side navigation announces nothing: no title change, no focus move, no live region
+- `P19` ⚠ r2 — the project page's view switcher is an unnamed `tablist`; the sheet's identical one was fixed
 
-**MINOR — 12**
+**MINOR — 13**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
 - `I5` my own handoff carries two contradicting position blocks; the pointer that found it is itself stale
 - `P3` the parent crumb cannot show the parent's key; the prototype's does; no ruling found
@@ -604,14 +605,11 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 - `P6` mobile: two of three screens have no styling while the third is themed
 - `P7` desktop's task list has no rules
 - `P8` `Dialog`/`Sheet` declare `aria-modal="true"`; the missing containment is recorded as a named follow-on whose remedy exists in-repo (counted here, not under IMPORTANT — see the note)
-- `P15` ⚠ r2 — the repo's prototype copy is a broken camelCase transform of the export, cited by line in 71 files
-- `P16` ⚠ r2 — `neo-card-radius.test.ts` asserts a declaration is ABSENT through a truncating scanner, so it cannot fail
-- `P17` ⚠ r2 — `/my-work`'s outline skips level 2, and nothing measures heading level or order
-- `P18` ⚠ r2 — a client-side navigation announces nothing: no title change, no focus move, no live region
-- `P19` ⚠ r2 — the project page's view switcher is an unnamed `tablist`; the sheet's identical one was fixed
-- `P20` ⚠ r2 — the month grid and week columns carry no grid/table semantics, so day↔weekday is lost to AT
 - `P10` the accessible-name ratchet's unit is an attribute; its message claims a property of assistive tech
 - `P13` no skip link; a keyboard-only user Tabs the nav on every navigation (**the 2.4.1 claim is withdrawn in the body** — a landmark is a sufficient technique and `<main>` is on every route, so this is a keyboard-convenience finding, not a conformance one)
+- `P15` ⚠ r2 — the repo's prototype copy is a broken camelCase transform of the export, cited by line in 71 files
+- `P17` ⚠ r2 — `/my-work`'s outline skips level 2, and nothing measures heading level or order
+- `P20` ⚠ r2 — the month grid and week columns carry no grid/table semantics, so day↔weekday is lost to AT
 
 **Total 24.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
@@ -625,6 +623,24 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 **Second:** I3's *consequence* (a slackened baseline) is an inference from `8e742d18`'s arithmetic, not a measurement. The two controls it moves are named; the number they leave behind is not measured. Marked unverified in place.
 
 ---
+
+## 9b. ⚠ MY OWN ARITHMETIC CHECK HAD A BLIND SPOT, AND IT HID A REAL ERROR
+
+**What happened.** Round 1 ended with a check that asserted `critical + important + minor == total`, and separately that the number of `### <id> —` headings and the number of `- \`<id>\`` summary rows both equalled the total. **Every one of those agreed, at 24, while the report was wrong.** Three findings headed **IMPORTANT** — `P16`, `P18`, `P19` — were sitting in the **MINOR** list, and the per-severity headers (`IMPORTANT — 11`, `MINOR — 12`) were stale from earlier edits.
+
+**Why the check could not see it.** It compared **aggregates to aggregates**: the headers summed to the total, the headings counted to the total, the rows counted to the total. **Nothing compared a row to its own bucket.** A misplaced row is invisible to every one of those four comparisons, because moving a row between two lists changes neither the total nor the heading count — and the stale headers were themselves the thing being summed, so they agreed with themselves.
+
+**It is the same shape as two findings already in this report** — P16's scanner, which asserts a declaration is absent by looking at a truncated rule, and I2's roster, which records a count without the run that produced it. **A check that measures the wrong unit passes.** Mine measured totals; the question was membership.
+
+**The check that does see it, and it is four lines:**
+
+```
+ids  = re.findall(r'^### ([IP]\d+) — \*\*([A-Z]+)', md, re.M)   # id -> its own heading severity
+rows = re.findall(r'^- `([IP]\d+)`', md, re.M)                    # each summary row, in order
+assert Counter(sev for _, sev in ids)['MINOR'] == count_of_rows_under('**MINOR —')
+```
+
+**Compare MEMBERSHIP, not size.** The report's §8 now groups by each finding's *own heading*, so the two cannot disagree, and the check above is the one the judge can run.
 
 ## 10. A METHOD NOTE THE REPORT OWES THE NEXT READER
 
