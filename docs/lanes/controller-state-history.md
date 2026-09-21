@@ -4,6 +4,60 @@
 
 ---
 
+## 🔄 MONDAY 2026-09-21 ~16:5x IST — **CYCLE 40: PHASE-1 JUDGING COMPLETE (227 RULINGS); THE CONTROLLER RESTARTS AT 81 % CONTEXT ON THE OWNER'S WORD; THE SUCCESSOR CLOSES PHASE 2 AND JUDGES THE REFUTATIONS.** `main` is **`d3772072`**; branch **`ctl/round2-judgment`** carries everything.
+
+### 1. HOW PHASE 1 WAS JUDGED — the method the successor must keep
+Owner, 15:4x: *"go with the subagents, you re-open every C/I and refuted one."* 32 verification subagents (Opus, `general-purpose`, prompts in `judge-2026-09-21/chunks/prompt{01..32}.md`, ≤8 concurrent) each read a chunk of ≤8 findings extracted from the FROZEN reports and wrote a TSV row per finding with the file:line THEY opened (`judge-2026-09-21/results/chunkNN.tsv`). **The judge then opened the cited line for every Critical and Important itself** and wrote the ledger row; Minors rest on the verifier's opened line and say so in their note. Read-only tree: `gisik-nokma-ctl` at `d3772072` (code-identical to `a7b6292b`). **Policy decisions taken, applied uniformly:** (a) `PARTIAL` (core holds, an absolute/mechanism/count false) scores at the judged severity of the core with the overclaim noted — no penalty; (b) **no upward re-grading above the CLAIMED severity** (E2-22, E2-34, E4-32…36, E5-34, E6-15 would have been raised by verifiers); (c) help/manual passages describing a product that no longer exists = IMPORTANT (F1, E5-24, E6-1); a stale `test-cases/` entry = MINOR (E3-20…24, E6-12); an instrument that cannot fail = IMPORTANT; (d) independent duplicates across lanes both score in full (rules §3); (e) a recorded ruling engaged by consequence counts (E3-14 partly, E5-6, E6-13, P8). **Zero INVALID rulings; the ×3 penalty was never drawn.** Reconciliation: ledger ids == index ids exactly (0 missing, 0 extra).
+
+### 2. THE STANDINGS BEFORE REFUTATIONS
+| pair | lane | findings | C/I/M | pts |
+|---|---|---|---|---|
+| UI | exec 1 · DeepSeek-authored | 37 | 0/16/21 | **69** |
+| UI | exec 4 · Opus | 36 | 0/18/18 | **72** |
+| UX | exec 2 · DeepSeek-authored | 57 | 0/29/28 | **115** |
+| UX | exec 5 · Opus | 43 | 2/25/16 | **101** |
+| FUNC | exec 3 · DeepSeek-authored | 29 | 0/6/23 | **41** |
+| FUNC | exec 6 · Opus | 25 | 0/14/11 | **53** |
+Critical rulings: E5-13 and E5-41 hold; V10, V2, E3-14, I1 re-graded to IMPORTANT (each with the judge's own opened line in the ledger).
+
+### 3. WHAT THE SUCCESSOR DOES, IN ORDER
+1. **Wake, read this card and this cycle. Print one line to the owner.** Re-arm the PR Monitor.
+2. **At 17:05:23 IST run the close script** (card row). Record the six `PHASE2_CLOSE` shas.
+3. **Judge phase 2 at those shas:** for each lane, `git show <sha>:docs/lanes/review-refutations-execN.md` (may not exist) and the report's *Defence* paragraphs added since its phase-1 sha (`git diff <p1sha> <p2sha> -- docs/lanes/<report>`). Rules §3: an upheld refutation moves the finding's points to the refuter AND the author takes −3× the claimed points; a rejected one costs the refuter the finding's points; phase-2 findings score half. **Open the line yourself for every refutation and every refuted finding.** At the 15:5x reading the lanes had filed almost no refutations (exec 6: R6-1→E5-21, R6-2→E2-42, R6-3→E2-28, all PARTIAL; exec 2's file says "THIS FILE CONTAINS NO REFUTATION"); most files are corroborations and pre-written defences. Update `review-scores.tsv` (`refuted_by`, `penalty`) and append rows for phase-2 findings.
+4. **Write `docs/lanes/review-round2-judgment.md`**: method (§1), per-lane totals, per-pair winner, the refutation rulings, the coverage tiebreaker where relevant, and the fairness note (phase 2 was Opus on both sides).
+5. **Land ONE PR** from `ctl/round2-judgment`: six reports (already staged, sha256 = judge copies), the refutation files at their phase-2 shas, `review-scores.tsv`, the judgment, this file (+ the rotation of this cycle when a later one is written). Seven checks under Node 22 with a control, forced gate at the landing tree, push verified, merge by API + reachability + tree identity + drop check.
+6. **The losers die** (owner: *"the ones who loses dies"*; rules §1): end the losing session of each pair (`tmux kill-window`), retire its worktree (`git worktree remove`), keep its branch; the winner is the standing executor for its concern. Tell the owner the table first, then act.
+7. Anchor: cycle 41; rotate cycle 40 to the history file.
+
+### 4. WHERE THE JUDGE'S WORK IS
+`/Users/kiro/my_projects/gisik-nokma-lanes/judge-2026-09-21/` — `ledger.tsv` (== `review-scores.tsv` here), `results/chunk01..32.tsv`, `chunks/`, `index.tsv`, `manifest.json`, `verifier-prompt.md`, `p1-exec{1..6}.md` (the frozen reports), `T0.txt` (phase records + frozen shas), `gate/` (gate scripts + logs). The scratchpad copy at `/private/tmp/claude-501/…/7ead0d8d…/scratchpad/judge` is the original; the lanes-dir copy is the durable one.
+
+---
+
+## 🔄 MONDAY 2026-09-21 ~15:1x IST — **CYCLE 39: PHASE 1 CLOSED EARLY AT 15:05:23 ON THE OWNER'S WORD; PHASE 2 IS TWO HOURS, ENDS 17:05:23; ALL SIX LANES ARE OPUS.** `main` is **`aad3f511`** (#632); **zero open PRs**.
+
+### 1. THE FREEZE — findings are scored at THESE shas, nothing later
+Owner, 15:0x: *"lets start phase 2 early. lemme know when we can start."* → *"make phase 2 just 2 h instead of 3 h. then go."* The boundary script ran at **15:05:23 IST** and recorded (scratchpad `T0.txt`, `PHASE1_CLOSE` line):
+| lane | branch | phase-1 sha |
+|---|---|---|
+| exec 1 · UI · DeepSeek-authored | `exec1/review-ui-r2` | `2cfffc7a7c007b75d05c18b46dbb69664a347997` (+ one pending pre-death edit the Opus session commits first — the judge diffs that commit and counts it as phase-1 work only if it touches nothing but the report) |
+| exec 2 · UX · DeepSeek-authored | `exec2/review-ux-r2` | `778a6439793e074eb8dd819ce90dd7fefa910e1e` |
+| exec 3 · FUNC · DeepSeek-authored | `exec3/review-functionality-r2` | `f8b5e929efdef8aae6e01ab44d9e923eb4eb12c4` |
+| exec 4 · UI · Opus | `exec4/review-ui` | `98584aa36da8d23ede541cb94e7c917207165d38` |
+| exec 5 · UX · Opus | `exec5/review-ux` | `1641161de9e99be17d69c679af40c35db36cacf3` |
+| exec 6 · FUNC · Opus | `exec6/review-functionality` | `737294ae05f0a6671e018fb6dab625d622d4afe2` |
+The DeepSeek sessions had died at **14:57** on `API Error: 402 Insufficient Balance` (all three, twelve minutes into a turn); they were deliberately NOT relaunched before the boundary (Opus was ordered for phase 2, and Opus finishing a DeepSeek-authored phase-1 report would muddy the authorship comparison). Cost to them: ~8 minutes of phase 1; cost to the Opus lanes of the early close: ~36 minutes they were spending idle/tightening.
+
+### 2. WHAT RUNS NOW
+Execs 1–3 relaunched at 15:05 on the Claude API (status lines `opus-5`, no `backend deepseek` line) with `REVIEW-R2-PHASE2-OPUS-EXEC{1,2,3}-2026-09-21.md` (times substituted: close 15:05:23, end 17:05:23): inherit the lane, report frozen, refute with measurements, defend, push every 15 min. Execs 4–6 received PHASE 2 OPEN by paste (all three transcripts show it submitted). The recurring cron (v5) reads `PHASE2_END` from `T0.txt` and closes phase 2 with the paste + `PHASE2_CLOSE` shas; the 15:42 one-shot was cancelled so the boundary cannot run twice. Findings counted at 14:54 (pre-freeze; heading counts): UI 36 vs 37 · UX 61 vs 45 · FUNC 31 vs 27 — the reminder of 13:55 had produced 34 new findings in 90 minutes.
+
+### 3. FOR THE JUDGE, at 17:05:23
+Paste PHASE 2 CLOSED to all six; record `PHASE2_CLOSE` shas; read every report at its **phase-1 sha** and every refutation/defence at its **phase-2 sha**; one ledger row per finding and per refutation with the line the judge opened; per-pair totals; the loser ended (branch kept); everything in ONE PR with the seven checks and the forced gate at the landing tree; the anchor.
+
+---
+
+---
+
 ## 🔄 MONDAY 2026-09-21 ~15:0x IST — **CYCLE 38: PHASE 1 AT 5h20m — AN OUTAGE, A BACKEND THAT NEVER COMPACTS, AND THE OWNER'S ORDER TO MOVE LANES 1–3 TO OPUS AT THE BOUNDARY.** `main` is **`30fc083b`** (#631); **zero open PRs**.
 
 ### 1. THE FINDINGS PER LANE, from the pushed branches (heading counts; the lanes' own severity labels; not yet judged)
