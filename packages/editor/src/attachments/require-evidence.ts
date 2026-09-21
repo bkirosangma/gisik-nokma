@@ -52,7 +52,39 @@ import type { WorkflowDef } from '@gisik-nokma/domain';
  * documents against the same engine code, and this file inherits it rather
  * than closing it: closing it means folding the state id here too, which is
  * this function's caller's business (whoever wires it to a ticket's live
- * state), not this lookup's. An unmatched `(from, to)` pair (no transition
+ * state), not this lookup's.
+ *
+ * ⚠ **NO SUCH CALLER CAN EXIST IN THIS REPOSITORY, MEASURED (E2-47, 2026-09-21).**
+ * The paragraph above used to end by handing the gap to "whoever wires it to a
+ * ticket's live state" and leaving it there, which is an invitation rather than a
+ * statement — the finding's objection, and a fair one while a caller looked
+ * merely absent rather than impossible. It is impossible, and what that rests on
+ * is two measured facts rather than a reading of the layering:
+ *
+ *   1. The only surface that decides the evidence prompt is the ticket sheet, in
+ *      `@gisik-nokma/app-core` — its own docblock says the engine is the
+ *      authority for that decision.
+ *   2. `@gisik-nokma/app-core` does NOT depend on `@gisik-nokma/editor`.
+ *      MEASURED 2026-09-21: `packages/app-core/package.json`'s `dependencies` are
+ *      `domain`, `rule-engine`, `sync-client`, `ui` and `xyflow`, and editor is
+ *      not among them. The sheet's docblock records the same constraint from the
+ *      other side at `views/editor-slot.tsx`, which re-declares the submission
+ *      union "for that same reason".
+ *
+ * So the function cannot be reached from the place that would call it, and the
+ * unclosed gap is unreachable by construction rather than by nobody having got to
+ * it yet. (What the layering RULE is — whether app-core is forbidden to take the
+ * dependency, or has simply never needed it — is not something this measurement
+ * settles, and it is not claimed here.)
+ *
+ * It is KEPT, not deleted, and both halves of that are worth stating: its four
+ * cases (9.107–9.110) pin the exact-versus-from-any precedence below, which is
+ * domain knowledge that would leave with the symbol, and the finding's remedy
+ * left the choice open ("export it or delete it"). If a caller is ever wanted,
+ * the honest home is `packages/domain`, beside the engine's own rule types — not
+ * here.
+ *
+ * An unmatched `(from, to)` pair (no transition
  * at all — the move itself is illegal) answers `false`: illegal moves are
  * the transition-legality gate's business, not this one's, and offering no
  * evidence prompt for a move that cannot happen anyway is the correct

@@ -4,6 +4,31 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
+
+/* The skip link (exec1 P13) — the product's first focusable element, hidden
+   until it is focused. It is pulled out of the flow with `position:absolute`
+   and clipped to a 1px box rather than given `display:none`, which would take
+   it out of the TAB ORDER and leave nothing for a keyboard user to reach: the
+   control would exist and be unfindable, the exact defect it is here to close.
+   On `:focus` it is placed back at the top-left, above the sticky nav's
+   `z-index:20`, so it is not buried under the bar it skips past. */
+.gn-skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 60;
+  padding: 0.6rem 1rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-raised);
+  color: var(--gn-text);
+  box-shadow: var(--gn-shadow-raised);
+}
+.gn-skip:focus {
+  left: 0.75rem;
+  top: 0.75rem;
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
 /* `font-family` is a token now, for the same reason `background` and `color`
    are: it had been a literal here and NOWHERE ELSE, so `apps/desktop` — which
    loads `ui.css` alone and never this file — rendered in the browser's default
@@ -2508,6 +2533,24 @@ input, textarea, select { font-family: inherit; }
 
 .gn-legal__flag-label {
   font-weight: 600;
+  color: var(--gn-text);
+}
+
+/* E5-38 — the reader-facing DRAFT NOTICE at the top of both legal pages. Quiet on
+   purpose, and deliberately NOT `.gn-legal__flag` above: that one is the single
+   place a legal page raises its voice, and it earns it for the unresolved
+   append-only-history question. This one just states a fact about the
+   placeholders, so it takes the muted tone of the footer and the sunken surface
+   without the warning rule. */
+.gn-legal__draft {
+  margin-top: 1rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.4rem;
+  background: var(--gn-surface-sunken);
+  color: var(--gn-text-muted);
+}
+
+.gn-legal__draft .gn-legal__flag-label {
   color: var(--gn-text);
 }
 

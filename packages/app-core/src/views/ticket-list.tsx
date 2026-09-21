@@ -666,7 +666,33 @@ export function TicketList({
               <h3 className="gn-list__section-title">
                 <span className="gn-list__section-name">{section.label}</span>
                 <span className="gn-list__section-meta">
-                  {`${groupMeta} · ${section.rows.length} ${section.rows.length === 1 ? 'ticket' : 'tickets'}`}
+                  {/*
+                    F7 — THE BAND SAYS WHICH MEMBERSHIP IT IS COUNTING.
+
+                    The finding's own remedy, second arm: "have the band say which
+                    membership it is counting (`epic · 4 rows (3 tickets)`)". Under
+                    the epic grouping this model counts the epic ROW too, while the
+                    prototype counts children only — so the same words "epic · N
+                    tickets" named two different numbers depending on which build
+                    you were reading.
+
+                    The unit word is the half of that arm this can honestly take:
+                    the epic axis says ROWS, the other three keep saying TICKETS.
+                    `section.rows.length - 1` was written first as the parenthesised
+                    ticket count and discarded — it is not reliably "the children".
+                    The `No epic` bucket holds an epic row AND a ticket that has no
+                    epic, so the subtraction would have printed a number that counts
+                    nothing, which is the failure the docblock above is about.
+                    Naming the unit needs no arithmetic and cannot be wrong.
+
+                    Only the EPIC axis changes. The other three agree with the
+                    prototype on both the number and the word, so their sentence is
+                    untouched — a unit clause on every axis would be noise about a
+                    divergence only one of them has.
+                  */}
+                  {grouping === 'epic'
+                    ? `${groupMeta} · ${section.rows.length} ${section.rows.length === 1 ? 'row' : 'rows'}`
+                    : `${groupMeta} · ${section.rows.length} ${section.rows.length === 1 ? 'ticket' : 'tickets'}`}
                 </span>
               </h3>
             )}

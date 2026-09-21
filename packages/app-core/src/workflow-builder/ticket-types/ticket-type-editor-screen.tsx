@@ -50,6 +50,55 @@ function freshDef(): TicketTypeDef {
   return { id: newUlid(), name: '', icon: 'flag', rank: 3, workflowId: '', fields: [] };
 }
 
+/**
+ * The FIELD a validation issue is about, in the reader's words (E4-29).
+ *
+ * The list under the editor printed `parsed.error.issues.map((issue) =>
+ * issue.message)` — Zod's own default straight to the screen. For an empty form
+ * that is `"String must contain at least 1 character(s)"` rendered TWICE, because
+ * `freshDef()` starts `name` and `workflowId` at `''`; it names neither field, so
+ * a reader is told twice that something is wrong and never what. `issue.path` was
+ * in hand the whole time and discarded.
+ */
+const FIELD_LABELS: Readonly<Record<string, string>> = {
+  id: 'Id',
+  name: 'Name',
+  icon: 'Icon',
+  rank: 'Rank',
+  workflowId: 'Workflow',
+  fields: 'Fields',
+};
+
+/**
+ * Which of those are STRINGS, which is what makes `too_small` mean "empty".
+ *
+ * Read off `ticketTypeDefSchema` (`packages/domain/src/ticket-types.ts:93-101`):
+ * `id`, `name`, `icon` and `workflowId` are `z.string().min(1)`, and `rank` is
+ * `z.number().int().min(1)`. Without this set, a rank below 1 would be reported as
+ * "Rank is required", which is a sentence about the wrong failure.
+ */
+const STRING_FIELDS: ReadonlySet<string> = new Set(['id', 'name', 'icon', 'workflowId']);
+
+/**
+ * One bad field, as one sentence naming it — for the ONE case that needs it.
+ *
+ * **The rewrite is deliberately narrow: the empty-field case, and nothing else.**
+ * A first draft prefixed every message with its label (`Fields: a select field
+ * needs options`), which broke an existing case and was wrong on the merits: the
+ * schema writes SOME of these messages itself, and a custom one is the
+ * authority's own words — the same rule this package applies to server refusals.
+ * Paraphrasing them to add a label would be the defect in the other direction. So
+ * only Zod's own default for an empty required string is replaced; every other
+ * message is carried VERBATIM, unreworded and unlabelled.
+ */
+function schemaIssueSentence(issue: { code: string; path: PropertyKey[]; message: string }): string {
+  const key = String(issue.path[0] ?? '');
+  if (issue.code === 'too_small' && STRING_FIELDS.has(key)) {
+    return `${FIELD_LABELS[key]} is required`;
+  }
+  return issue.message;
+}
+
 function divergenceCountLine(population: Population): string | null {
   if (population === 'failed') return 'ticket count unavailable';
   if (population === null) return 'counting tickets…';
@@ -221,7 +270,9 @@ export function TicketTypeEditorScreen(props: {
 
   const isBuiltin = BUILTIN_TICKET_TYPE_SEEDS.some((seed) => seed.id === def.id);
   const parsed = ticketTypeDefSchema.safeParse(def);
-  const schemaMessages = parsed.success ? [] : parsed.error.issues.map((issue) => issue.message);
+  const schemaMessages = parsed.success
+    ? []
+    : parsed.error.issues.map((issue) => schemaIssueSentence(issue));
   const heading = props.heading ?? 'h2';
   const untitledLabel = props.untitledLabel ?? 'Untitled type';
   const saveDisabled = !parsed.success || save.phase === 'saving';
