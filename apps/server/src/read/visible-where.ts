@@ -152,24 +152,32 @@ export function visibleTicketsWhere(eff: EffectiveRole, userId: string, params: 
  *    is visible as an absence from that grep rather than as a silently reused
  *    predicate nobody can audit.
  *    ⚠ **This sentence gave a COUNT ("eleven") and it is withdrawn: neither the
- *    author nor an independent reviewer could reproduce it.** Measured by the
- *    reviewer: 13 executable uses of the constant (8 `${LIVE_TICKET_WHERE}`
- *    + 5 `LIVE_TICKET_WHERE,` across 9 files) plus 1 hand-written predicate at
- *    `../visibility/rollup.ts:263` = **14 statements carry the rule**, and no
- *    reading of "hand-written" yields 11. The method is the thing that matters
+ *    author nor an independent reviewer could reproduce it.** Measured at this
+ *    tree, from the command this paragraph names, `grep -rn
+ *    "LIVE_TICKET_WHERE" apps/server/src/`: **9** executable
+ *    `${LIVE_TICKET_WHERE}` sites across 6 files — the tenth hit is THIS
+ *    docblock — plus **5** array members written `LIVE_TICKET_WHERE,` across 4
+ *    files, the rest of that grep's hits being 6 import lines and this docblock.
+ *    That is **14 uses of the constant, not the 13 recorded here**, and the
+ *    missing one is `read/live-ticket.ts`, which asks the same constant at a
+ *    route. **And no reading of "hand-written" yields 11.** The method is the
+ *    thing that matters
  *    and the method is the grep — a bare number here was a claim about a
  *    universe nobody had pinned.
  *    ⚠ **And "14" was itself INCOMPLETE, for exactly the reason this paragraph
  *    gives.** It was produced by sweeping for the CONSTANT plus one known
  *    longhand predicate. A SECOND sweep —
  *    `git grep -nE 'deleted_at +IS +NULL' -- apps/server/src` — finds **4
- *    written longhand**, so **17 SQL statements carry the rule** (13 + 4), plus
+ *    written longhand**, so **18 SQL statements carry the rule** (14 + 4), plus
  *    one TypeScript application at `../routes/my-work.ts:364` that no SQL sweep
  *    can see. Three of the four longhand sites were measured UNCONSTRAINED
  *    (89 tests green with each un-filtered) until cases 16.88–16.90 supplied
  *    fixtures. **A sweep is only as complete as its pattern: "the constant" is
  *    not "the rule".** The line cited above was `rollup.ts:261` and the
- *    predicate sits at `:263` — a citation that RESOLVED and was still wrong.
+ *    predicate sits in the child query's own conjunct
+ *    (`AND (t.deleted_at IS NULL OR t.ticket_id IS NULL)`, which a grep for
+ *    those words finds and a line number does not keep — it has moved since
+ *    this citation was written) — a citation that RESOLVED and was still wrong.
  *
  * AND it into every SELECT that serves a VIEW. Do NOT add it to
  * `../projections/tickets.ts`'s `getTicketStateFromDb` /
