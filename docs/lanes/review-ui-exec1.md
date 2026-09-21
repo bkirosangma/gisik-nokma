@@ -843,6 +843,10 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 **Painted (phase 2, 2026-09-21 15:27 IST), by me.** Same instrument as P1's third defence paragraph; sheet open on `CCSO-6`: `document.querySelectorAll('[contenteditable=true]')` → **2**, both `role="textbox"`, both `aria-label` **null**, both `aria-labelledby` **null**. Exec 4's `E4-4` paints the same and adds the composer, which is the second of the two here.
 
 **Painted (phase 2, 2026-09-21 15:27 IST), by me.** Same instrument; project page: `document.querySelector('[role=tablist]').getAttribute('aria-label')` → **null**, tabs *Backlog · Board · List · Calendar · Timeline*.
+
+**Painted (phase 2, 2026-09-21 15:41 IST), by me.** Instrument as P1's third defence paragraph; `/w/<id>/my-work` signed in: `h1,h2,h3,h4,h5,h6` in document order → **`H1 My Work` · `H3 Assigned to me` · `H3 My claims in transit` · `H3 My contested claims` · `H3 Shared with me`** — no `h2` anywhere on the route. Exec 4's `E4-24` paints the same outline and adds the board, the List and the builder.
+
+**Painted (phase 2, 2026-09-21 15:41 IST), by me.** Same instrument; project page, *Calendar* tab: `.gn-calendar [role]` → **0** elements; the first `.gn-calendar__day` is a `DIV` whose entire text is `31` with no `aria-label`; an item is a `<button>` whose only date text is `title="starts 18 Aug — Kiro's claim · needed by 5 Oct — Kiro's claim"` (no `aria-label`). Exec 4's `E4-28` paints the same and adds the Timeline.
 ---
 
 ### P31 — **IMPORTANT** ⚠ **r2 NEW** — The top bar renders as an UNNAMED `navigation` landmark beside a named one on at least seven routes
