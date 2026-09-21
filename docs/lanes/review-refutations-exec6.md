@@ -246,7 +246,7 @@ IS found, the online constructor IS found); lines opened: `bulk-close-dialog.tsx
 
 ## Phase-2 findings (half points, rules §2)
 
-### E6-26 — MINOR — `proj_rollups` is recomputed inside every ticket, workflow and reparent transaction, replayed by the release-gate verifier, and read by nothing in the product
+### E6-26 — MINOR — `proj_rollups` is recomputed inside every ticket, workflow and reparent transaction, replayed by the release-gate verifier, and read by nothing in the product — a state `Features.md` records as interim ("Nothing reads it yet") for a reason that has since expired
 
 **WHAT.** Measured at `a7b6292b`:
 
@@ -260,15 +260,24 @@ who verifies it: tools/verify-projections.ts replays the whole registry (index.t
 
 Every card's `rollup` and the detail route's rollup come from `visibility/rollup.ts` at read time — a fresh
 enumeration of `proj_visibility` joined to `proj_tickets` — and `rollup.ts:79-96` records why the cards do not read
-`proj_rollups` (the two tables do not enumerate the same children, case 6.83/7.78). Nothing records that, after
-that decision, the table has no reader at all.
+`proj_rollups` (the two tables do not enumerate the same children, case 6.83/7.78).
+
+**Correction, 16:10 IST, before anyone else found it:** the absence IS recorded. `Features.md:408` (blame `6cb631d0`,
+2026-09-01) says, verbatim: *"Nothing reads it yet: Plan 4's `RollupView` (`src/visibility/rollup.ts`) still ships
+without the open/active/terminal half, and its cases 6.82 and 6.83 remain open."* — an interim state with a
+reason. The reason has expired on all three counts: `rollup.ts` now carries the category half (`RollupView.terminal`
+and `.uncategorized`, `:126-132`, counted at `:276`); 6.83 is measured (case 7.78, `ticket-cards.test.ts:507`, exec 3's
+E3-30); 6.82's capability shipped (exec 3's E3-20). So the finding is narrower than its first sentence: not "an
+unrecorded dead table" but "an interim recorded on 2026-09-01 whose stated reason is gone, and whose 'yet' has
+become twenty days with no reader" — the same class as E6-25's sentences, in the catalogue rather than the deploy
+directory.
 
 **WHY it matters.** A table with no reader still costs: a `workflow.defined` recomputes one row per parent on that
 workflow inside the publish transaction (E6-8's door), every transition recomputes the parent, and the verifier —
 the restore drill's gate (E6-13) — can report `DRIFT DETECTED` on a table whose contents no route serves, which
-is the false-red shape E6-13 already documents for `proj_tickets`. `Features.md:408` describes the table's
-derivation and its load-bearing registration order and names no consumer, so the catalogue is not wrong, only
-silent; a reader of it would assume a consumer exists.
+is the false-red shape E6-13 already documents for `proj_tickets`. `Features.md:408` records the interim and a reason that no longer holds; a reader of it today is told the
+read half is still unbuilt when it was built at read time instead (`rollup.ts:79-96` chose the enumeration over
+the table), which is the decision the bullet should now state.
 
 **WHAT WOULD HAVE BEEN BETTER.** Either read it — `rollupFor` could take its category counts from it once the
 enumeration mismatch (6.83) is resolved — or drop the projection and its verifier row, and say in `Features.md:408`
@@ -276,7 +285,8 @@ which. A projection kept "in case" is the rule the repo states for controls and 
 
 **MEASUREMENT.** The four greps above with their controls; lines opened: `projections/rollups.ts:362-367`,
 `:372-420`; `visibility/rollup.ts:79-96`; `read/ticket-cards.ts:159`; `routes/tickets.ts:445-456`;
-`projections/index.ts:25`; `tools/verify-projections.ts:5-8`; `Features.md:408`.
+`projections/index.ts:25`; `tools/verify-projections.ts:5-8`; `Features.md:408` (the "Nothing reads it yet" sentence, found
+by `grep -o "Nothing reads it yet.*"` after the first draft claimed the absence was unrecorded — corrected above).
 
 **SEVERITY: Minor.** Cost and a false-red surface, no wrong answer to a person. Phase-2, half points.
 
