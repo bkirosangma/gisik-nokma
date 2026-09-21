@@ -9,7 +9,7 @@
 
 ## 0. THE ONE-LINE ANSWER
 
-**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Thirty-two of the thirty-five findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast is clean everywhere I measured in the shipped `neo` style — 26 route×theme passes, one third-party watermark failing — and switching the style axis to `hig`/`minimal` client-side found two AA failures of my own (E4-31, a ghost button on a sunken row at 3.99:1 that case 13.360's two assertions do not reach; E4-32) beside the one exec 1 computed (P24), which I painted and confirmed for them.
+**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Thirty-three of the thirty-six findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast is clean everywhere I measured in the shipped `neo` style — 26 route×theme passes, one third-party watermark failing — and switching the style axis to `hig`/`minimal` client-side found two AA failures of my own (E4-31, a ghost button on a sunken row at 3.99:1 that case 13.360's two assertions do not reach; E4-32) beside the one exec 1 computed (P24), which I painted and confirmed for them.
 
 ---
 
@@ -538,6 +538,17 @@ curl -s http://localhost:3041/v1/me/workspaces      # → {"error":"unauthentica
 
 ---
 
+
+### E4-36 — **MINOR** — The help search announces "nothing matches" but never "9 answers": the no-match arm is a `role="status"`, the count is a plain `<p>`
+
+**MEASUREMENT (painted, `/help`, 1512, owner).** Typed `invite` into the search (`aria-label="Search the manual and FAQ"`, via the input's value setter + `input` event): `div.gn-help__results` renders `p.gn-help__results-count "9 answers for “invite”"` and nine `li.gn-help__result`; `document.querySelectorAll('[role=status],[aria-live]')` → **none**. Source: `packages/app-core/src/help/help-browser.tsx:207-209` (`<p className="gn-help__results-count">` — no role) beside `:672` (`<p className="gn-help__none" role="status">` for the no-match arm). Second observation from the same state: `a.gn-help__result-title` paints **440×23** (`ui.css:4105`, no `line-height`/`min-height`; the sibling `.gn-help__nav-link` was raised to 24 for the in-list floor on 2026-09-08) — one pixel under the in-list 24, on a state the help sweep never sees because it only paints the page with no query (`grep help__result apps/web/e2e-viewport/*.ts apps/web/e2e-stack/*.ts` → 0).
+
+**WHY IT IS WRONG.** A screen-reader user typing a query hears the negative outcome and not the positive one — the asymmetry is the defect, and the fix is the attribute the sibling already carries. (The mention popup gets this right: `role="status"` *"1 person matches"*, §4.)
+
+**WHAT WOULD HAVE BEEN BETTER.** `role="status"` on `.gn-help__results-count`; `min-height: 1.5rem` on `.gn-help__result-title`.
+
+---
+
 ## 4. MATCHES AND RULED DIVERGENCES CHECKED
 
 _(so §3 is not a list of defects — each row is a measurement I took that came back clean or ruled)_
@@ -594,7 +605,7 @@ _(so §3 is not a list of defects — each row is a measurement I took that came
 
 | width · theme | routes / states measured (each: my tap/name/UA-chrome/tiny-text/heading/landmark sweep with the product's own selector list, plus the composited text-contrast sweep) |
 |---|---|
-| **1512×900 · light · neo** | `/sign-in`, `/workspaces`, `/w/:id`, the board and its **List, Backlog, Calendar, Timeline** views, the **ticket sheet open** (Details and History tabs; the epic `03HCQ…` with a `MutationObserver` from t=0), the **New-ticket dialog**, the **Filters panel**, the **Move dialog**, the **Assignee listbox open** (real Enter/Escape keys), the **account menu open**, the **InfoTip open** (`/settings?tab=workspace`), `/inbox` (empty), `/account`, `/settings` (+ `tab=workspace`), `/members`, `/my-work`, `/settings/ticket-types` (list, `new`, `errand`), `/settings/workflows` (list, `new`, builder, history), `/help`, `/mcp/tokens`, `/mcp/authorize`; the refusal states `?ticket=<never>` (held 61 s), `/p/<bogus>`, `/w/<bogus>`, `/invite/<bogus>`; and `networkConditions: Offline` on a client-side navigation |
+| **1512×900 · light · neo** | `/sign-in`, `/workspaces`, `/w/:id`, the board and its **List, Backlog, Calendar, Timeline** views, the **ticket sheet open** (Details and History tabs; the epic `03HCQ…` with a `MutationObserver` from t=0), the **New-ticket dialog**, the **Filters panel**, the **Move dialog**, the **Assignee listbox open** (real Enter/Escape keys), the **account menu open**, the **InfoTip open** (`/settings?tab=workspace`), `/inbox` (empty), `/account`, `/settings` (+ `tab=workspace`), `/members`, `/my-work`, `/settings/ticket-types` (list, `new`, `errand`), `/settings/workflows` (list, `new`, builder, history), `/help` (and its search with results), `/mcp/tokens`, `/mcp/authorize`; the refusal states `?ticket=<never>` (held 61 s), `/p/<bogus>`, `/w/<bogus>`, `/invite/<bogus>`; and `networkConditions: Offline` on a client-side navigation |
 | **390×844 · light · neo** (`emulate …,mobile,touch`) | `/workspaces`, `/w/:id`, the board, the sheet open (with screenshot), `/inbox`, `/account`, `/my-work`, `/members`, `/settings`, ticket-types list/`new`/`errand`, workflows list/`new`/builder/history, `/help`, `/mcp/tokens` |
 | **320×568 · light · neo** | the sheet open on the board, `/workspaces`, `/w/:id`, `/members`, `/my-work`, `/account`, `/help`, `errand`, the builder — overflow/reflow only |
 | **768×1024 · light · neo** | the sheet open on the board, `/workspaces`, `/w/:id`, `/members`, the builder, `errand`, `/account` |
@@ -646,10 +657,10 @@ The owner ordered graph-first. I did: `graphify-out/GRAPH_REPORT.md` header, hub
 |---|---|---|
 | **Critical** | **0** | — |
 | **Important** | **19** | E4-1 · E4-3 · E4-4 · E4-5 · E4-7 · E4-8 · E4-9 · E4-11 · E4-12 · E4-13 · E4-14 · E4-17 · E4-18 · E4-19 · E4-21 · E4-23 · E4-28 · E4-30 · E4-31 |
-| **Minor** | **16** | E4-2 · E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 · E4-24 · E4-25 · E4-26 · E4-27 · E4-29 · E4-32 · E4-33 · E4-34 · E4-35 |
-| **total** | **35** | `19 + 16 = 35`; ids `E4-1` … `E4-35` with no gaps |
+| **Minor** | **17** | E4-2 · E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 · E4-24 · E4-25 · E4-26 · E4-27 · E4-29 · E4-32 · E4-33 · E4-34 · E4-35 · E4-36 |
+| **total** | **36** | `19 + 17 = 36`; ids `E4-1` … `E4-36` with no gaps |
 
-**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20, E4-24, E4-27, E4-29, E4-30, E4-35. Category 2 argued against the record: E4-6, E4-8, E4-25, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23, E4-28, E4-31, E4-32, E4-33, E4-34. Matches the prototype, fails the product's own later rule: E4-26.
+**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20, E4-24, E4-27, E4-29, E4-30, E4-35. Category 2 argued against the record: E4-6, E4-8, E4-25, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23, E4-28, E4-31, E4-32, E4-33, E4-34, E4-36. Matches the prototype, fails the product's own later rule: E4-26.
 
 **Overlap with round 1, stated:** E4-10 and E4-15 are new members of P1's class found by widening the population (class-less tags; classes whose rule forgot the border) and painted; E4-12 widens P11's scope from one component to the suite's population; E4-2 carries a painted reproduction of P8's focus finding as corroboration only. Nothing else overlaps.
 
