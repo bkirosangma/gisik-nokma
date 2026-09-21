@@ -42,7 +42,7 @@ describe('workflowDefSchema', () => {
   });
 
   /**
-   * 4.55 — E6-20, planted defect: a workflow named `" "` and a state named
+   * 4.56 — E6-20, planted defect: a workflow named `" "` and a state named
    * `" "` or `"\t"` are refused with ruling P15's sentence — the one
    * `workspace.created`, `project.created` and the ticket title already read.
    * Before the fix both were `z.string().min(1)`: through `POST /v1/events` a
