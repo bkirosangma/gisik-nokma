@@ -352,6 +352,19 @@ the reviewed tree rather than of a neighbour. Nothing was created, changed or su
 is the strongest form the finding can take — a person reading §2 while looking at the bar can see the
 sentence is false. It also sharpens the remedy: this is not a subtle staleness, it is a contradiction
 visible in one viewport.
+**AND THE ADVICE THE MANUAL GIVES IS ITSELF A DEAD END — measured, and it strengthens why row (g) matters.**
+Row (g) does not merely misdescribe the product; it prescribes a workaround: *"Ask whoever set your workspace up for the
+addresses and **bookmark them**."* Reached by completing the `/settings` route universe, `app/settings/page.tsx:131-143`
+records what the bare address now does: *"Neither remaining section has a target — this shell remembers no 'current
+workspace' outside a route or query param … **So `/settings` with no `?workspaceId=` now offers nothing usable**,
+where MCP tokens used to be the one tab that worked there. That is a consequence of this round and not an oversight …
+It still resolves when typed, and what it says then is accurate."*
+
+**So a person who follows the manual literally gets a page that cannot show them any settings.** The route is not
+broken — it renders a sentence saying a workspace must be picked first and links to `/workspaces` — and the docblock is
+right that this is not an oversight. **What is wrong is the advice**: the manual tells the reader to bookmark an address
+that only works with a query parameter it never mentions, and it does so *because* it believes no link exists. Fixing
+row (g) fixes this by construction — a person who can see the Settings link never needs the workaround.
 **AND THE CORPUS IS NOT WEB-ONLY — its falsity ships on the phone too.** Reached by working my coverage
 list, `apps/mobile/src/screens/help-screen.tsx` (330 lines) renders **the same `HELP_CONTENT`** the web
 browser renders — `import { HELP_CONTENT, searchHelp, … } from '@gisik-nokma/app-core'` (`:13-19`), then its
