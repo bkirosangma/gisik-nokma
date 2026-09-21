@@ -61,7 +61,9 @@ printf '%s\n' "$*" >> "$FAKE_LOG"
 case "$1" in
   display-message) echo "${FAKE_MODE:-0}";;
   send-keys) case "$*" in *" Enter") n=$(cat "$FAKE_ENTERS" 2>/dev/null || echo 0); echo $((n+1)) > "$FAKE_ENTERS";; esac;;
-  capture-pane) n=$(cat "$FAKE_ENTERS" 2>/dev/null || echo 0)
+  capture-pane) esc=$(printf '\033')
+    if [ -n "${FAKE_PANE:-}" ]; then case " $* " in *" -e "*) cat "$FAKE_PANE";; *) sed "s/$esc\[[0-9;]*m//g" "$FAKE_PANE";; esac; exit 0; fi
+    n=$(cat "$FAKE_ENTERS" 2>/dev/null || echo 0)
     if [ "$n" -ge "${FAKE_NEEDS:-1}" ]; then printf '\033[38;5;241m\xe2\x9d\xaf \033[2m\033[39mPress up to edit queued messages\033[0m\n'
     else printf '\033[38;5;241m\xe2\x9d\xaf \033[39m[a brief line]\n  line 2 of the brief\n'; fi;;
 esac
@@ -76,6 +78,23 @@ check "submit: a single-line box empties on the first Enter → 1" '[ "$(fake 0 
 check "submit: a multi-line box absorbs the first Enter → 2" '[ "$(fake 0 2 "ctl_submit gisik:7")" = 2 ]'
 check "submit: a box that never empties → exit 1 after 3 Enters" '! fake 0 99 "ctl_submit gisik:7" >/dev/null && [ "$(cat "$fk/enters")" -eq 3 ]'
 check "submit: never pastes a CR" 'fake 0 2 "ctl_submit gisik:7" >/dev/null; ! grep -q paste-buffer "$fk/calls"'
+# ctl_delivered against fake panes (shapes from real captures): the proof must need NEW evidence, never old scrollback.
+pane() { local f="$fk/pane-$1.txt"; shift; printf '%b' "$*" > "$f"; echo "$f"; }
+p_idle=$(pane idle     '\033[38;5;16m  old response line\033[39m\n\033[38;5;241m\xe2\x9d\xaf \033[39m\n  status line\n')
+p_echo=$(pane echo     '\033[38;5;16m  old response line\033[39m\n  idle filler 59 — no action needed\n\xe2\x9c\xb3 Imagining… (6s · ↓ 107 tokens)\n\033[38;5;241m\xe2\x9d\xaf \033[39m\n  status line\n')
+p_busy0=$(pane busy0   '\033[38;5;16m  old response line\033[39m\n\xe2\x9c\xb3 Imagining… (48s · ↓ 1k tokens)\n\033[38;5;241m\xe2\x9d\xaf \033[39m\n  status line\n')
+p_queued=$(pane queued '\033[38;5;16m  old response line\033[39m\n\xe2\x9c\xb3 Imagining… (52s · ↓ 1k tokens)\n\033[38;5;241m\xe2\x9d\xaf \033[2m\033[39mPress up to edit queued messages\033[0m\n  status line\n')
+p_stale=$(pane stale   '\033[38;5;16m  idle filler 59 — no action needed\033[39m\n\xe2\x9c\xb3 Imagining… (9s · ↓ 2k tokens)\n\033[38;5;241m\xe2\x9d\xaf \033[39m\n  status line\n')
+delivered() { local before="$1" after="$2"; FAKE_LOG="$fk/calls" FAKE_PANE="$before" PATH="$fk:$PATH" bash -c ". '$HERE/lib.sh'; ctl_pane_above gisik:7" > "$fk/before.txt"; FAKE_LOG="$fk/calls" FAKE_PANE="$after" CTL_PROOF_TRIES=1 PATH="$fk:$PATH" bash -c ". '$HERE/lib.sh'; ctl_delivered gisik:7 'idle filler 59 — no action needed' '$fk/before.txt'"; }
+check "delivered: idle lane → echo of the last line + a spinner that was absent before" '[ "$(delivered "$p_idle" "$p_echo")" = "echoed above the prompt, new turn running" ]'
+check "delivered: busy lane → the queued-messages hint" '[ "$(delivered "$p_busy0" "$p_queued")" = "queued behind the lane'"'"'s running turn" ]'
+check "delivered: nothing changed → no proof, exit 1" '! delivered "$p_idle" "$p_idle" >/dev/null'
+check "delivered: a spinner that was ALREADY running is not new evidence" '! delivered "$p_busy0" "$p_stale" >/dev/null'
+check "delivered: an echo that was ALREADY in the scrollback is not new evidence" '! delivered "$p_stale" "$p_stale" >/dev/null'
+p_oldecho=$(pane oldecho '\033[38;5;16m  idle filler 59 — no action needed\033[39m\n\033[38;5;241m\xe2\x9d\xaf \033[39m\n  status line\n')
+check "delivered: a new spinner with an OLD echo (needle count unchanged) is not proof" '! delivered "$p_oldecho" "$p_stale" >/dev/null'
+p_boxfull=$(pane boxfull '\033[38;5;16m  old response line\033[39m\n  idle filler 59 — no action needed\n\xe2\x9c\xb3 Imagining… (6s · ↓ 107 tokens)\n\033[38;5;241m\xe2\x9d\xaf \033[39m[still typed here]\n  status line\n')
+check "delivered: real text still in the box is never proof, whatever the transcript shows" '! delivered "$p_idle" "$p_boxfull" >/dev/null'
 rm -rf "$fk"
 rm -rf "$tmp" "$wt"
 [ "$fails" -eq 0 ] && echo "lib.test.sh: ok" || { echo "lib.test.sh: $fails FAILED"; exit 1; }

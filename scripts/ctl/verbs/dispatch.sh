@@ -16,18 +16,11 @@ t="gisik:$win"
 if [ "$CTL_DRY_RUN" = 1 ]; then echo "DRY: paste $file into $t, then send-keys Enter until the box is empty (max 3; -X cancel first if in copy mode)"; ctl_ok dispatch "dry-run"; fi
 before="$(ctl_box_text "$t")"
 [ -z "$before" ] || ctl_fail dispatch "input box already holds real text: '${before:0:60}' — clear it first"
+snap="$(ctl_log dispatch).before"; ctl_pane_above "$t" > "$snap"
 b="ctl$$"
 tmux load-buffer -b "$b" "$file" && tmux paste-buffer -b "$b" -d -t "$t" || ctl_fail dispatch "text paste failed"
 sleep 1
 presses="$(ctl_submit "$t")" || ctl_fail dispatch "input box still holds text after 3 Enters: '$(ctl_box_text "$t" | cut -c1-60)' — not submitted"
-needle="$(head -1 "$file" | cut -c1-40)"
-proof=""
-for i in 1 2 3 4 5 6 7 8 9 10; do
-  pane="$(tmux capture-pane -p -S -80 -t "$t")"
-  above="$(printf '%s\n' "$pane" | awk '/❯/{last=NR} {l[NR]=$0} END{for(i=1;i<last;i++)print l[i]}')"
-  if printf '%s\n' "$above" | grep -qF "${needle:0:30}" && printf '%s\n' "$above" | grep -qE '… \(([0-9]+m )?[0-9]+s|⏺'; then proof="echoed above the prompt, turn running"; break; fi
-  if ctl_box_queued "$t"; then proof="queued behind the lane's running turn"; break; fi
-  sleep 1
-done
-[ -n "$proof" ] || ctl_fail dispatch "box emptied but no proof of delivery in 10 s: text not echoed above the prompt and no queued-messages hint"
+needle="$(grep -v '^[[:space:]]*$' "$file" | tail -1 | cut -c1-30)"
+proof="$(ctl_delivered "$t" "$needle" "$snap")" || ctl_fail dispatch "box emptied but no proof of delivery in 10 s: last line not echoed above the prompt with a new spinner, and no queued-messages hint"
 ctl_ok dispatch "$t received $(wc -c < "$file" | tr -d ' ') bytes (Enter ×$presses; $proof)"

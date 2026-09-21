@@ -88,3 +88,32 @@ ctl_submit() {
     try=$((try+1))
   done
 }
+
+# The transcript ABOVE the last ❯ prompt line of TARGET, plain text (last 300 lines of scrollback).
+ctl_pane_above() { tmux capture-pane -p -S -300 -t "$1" 2>/dev/null | awk '/❯/{last=NR} {l[NR]=$0} END{for(i=1;i<last;i++)print l[i]}'; }
+# Spinner lines are the one thing a pane shows only while a turn runs: "✳ Imagining… (6s · ↓ 107 tokens)".
+ctl_count_spinners() { grep -cE '… \(([0-9]+m )?[0-9]+s' || true; }
+
+# Positive proof that a submission was delivered to TARGET. BEFORE is the transcript-above-the-prompt captured BEFORE
+# the paste (ctl_pane_above > file); NEEDLE is the file's LAST non-empty line, cut to 30 chars — Claude Code collapses a
+# long paste to "[Pasted text #N +M lines]" placeholders in the box and echoes the message's TAIL above the prompt
+# (measured 2026-09-21: a 60-line paste's first line never appeared, lines 11–59 did). Prints which proof held:
+#   idle lane: the box holds no real text, the needle count above the prompt rose, and a spinner is present now that
+#              was absent before (spinner lines: 0 before, 1 after, measured);
+#   busy lane: the box holds no real text and shows the dim queued-messages hint.
+# Polls for up to 10 s; exit 1 with nothing printed when neither proof holds — old scrollback satisfies nothing here.
+ctl_delivered() {
+  local target="$1" needle="$2" before="$3" i above n0 s0
+  n0="$(grep -cF -- "$needle" "$before" || true)"; s0="$(ctl_count_spinners < "$before")"
+  for i in $(seq 1 "${CTL_PROOF_TRIES:-10}"); do
+    if [ -z "$(ctl_box_text "$target")" ]; then
+      above="$(ctl_pane_above "$target")"
+      if [ "$(printf '%s\n' "$above" | grep -cF -- "$needle" || true)" -gt "$n0" ] && [ "$(printf '%s\n' "$above" | ctl_count_spinners)" -gt "$s0" ]; then
+        echo "echoed above the prompt, new turn running"; return 0
+      fi
+      if ctl_box_queued "$target"; then echo "queued behind the lane's running turn"; return 0; fi
+    fi
+    sleep 1
+  done
+  return 1
+}
