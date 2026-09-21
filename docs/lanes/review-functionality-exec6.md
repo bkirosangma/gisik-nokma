@@ -329,7 +329,7 @@ the line I opened) · **SEVERITY** (Critical / Important / Minor). Where I could
 | E6-22 | Minor | Export's "ticket-only access for someone outside the workspace": product has no such tier; naming accepted, inert | App. AA |
 | E6-23 | Minor | `BACKUP_TIME_UTC=25:00`/`99:99` accepted and scheduled elsewhere (99:99 → +4 days); `9:00` throws | script in the finding |
 | E6-24 | Important | Phone board / desktop list / phone search keep a soft-deleted ticket; the replica filter sits on the two reads the shells never call | App. AF |
-| E6-25 | Minor | `deploy/do/app.yaml` says the forged-XFF rate-limit bypass is "open on main"; it closed the same day the sentence was written | five calls in the finding |
+| E6-25 | Minor | `deploy/do/{app.yaml,README.md}` say the forged-XFF bypass is "open on main" and `DATABASE_CA_CERT` "has no effect" until a fix lands; both landed the same morning | five calls + git in the finding |
 
 ### E6-1 — IMPORTANT — The in-app help tells the user a job cannot be deleted; the product ships `Delete`
 
@@ -1625,7 +1625,7 @@ floor; the defect and its one-line fix stand either way.
 
 ---
 
-### E6-25 — MINOR — The deploy spec tells the operator that a forged `X-Forwarded-For` still buys a private rate-limit bucket ("Plan 11 T2 (not yet on main)"); T2 landed the same day, and the file was edited twice since without the sentence moving
+### E6-25 — MINOR — The deploy directory tells the operator that a forged `X-Forwarded-For` still buys a private rate-limit bucket ("Plan 11 T2 (not yet on main)") and that `DATABASE_CA_CERT` "has no effect" until a fix lands; both fixes landed in one PR the same morning the sentences were written, and both files were edited since without the sentences moving
 
 **WHAT.** `deploy/do/app.yaml:95-101`, the comment above `TRUST_PROXY: "true"`, verbatim: *"…lets a caller pick
 its own rate-limit bucket via a forged leftmost X-Forwarded-For entry — Plan 11 T2 (not yet on main) fixes
@@ -1650,6 +1650,17 @@ of the later two. So the one file an operator reads before
 deploying declares a rate-limit bypass **open on main** that closed fifteen days ago. This is the class E6-12
 and exec 3's E3-22 … E3-27 record for `test-cases/` and `Features.md`, on the deploy spec, and for a
 security property rather than a feature count.
+
+**The second sentence, same directory, same morning, same fix.** `deploy/do/README.md:115-116`: *"until that lands on
+`main`, a `DATABASE_CA_CERT` set here has no effect"* — "that" being `withoutSslParameters` in `apps/server/src/db.ts`.
+`git log -S withoutSslParameters -- apps/server/src/db.ts` → one commit, `935f5d66` (#190, 14:02), the same PR;
+the function is at `db.ts:50` and the pool is built from it at `:148`. The README's two lines are `56cd0913`
+(07:50) by blame, and the file was edited again at 19:41 that day (`003dfdc8`) with the sentence intact. An
+operator reading the deploy directory today is told that the CA they set does nothing and that the rate limiter
+can be forged around — two "until it lands" sentences whose "it" landed within seven hours of their being
+written. (Sweep: `git grep -n -i "not yet on main\|not yet landed\|until .* lands"` over `apps packages deploy
+Features.md test-cases scripts` minus `dist` and tests → 10 lines; these two, E3-27's `Features.md:452`, and seven
+that read true or are allocation notes.)
 
 **WHAT WOULD HAVE BEEN BETTER.** The paragraph should say what `TRUST_PROXY=true` now means — the limiter
 keys on the rightmost entry, which the caller cannot write (`rate-limit.ts:89-99`) — and drop "not yet on
