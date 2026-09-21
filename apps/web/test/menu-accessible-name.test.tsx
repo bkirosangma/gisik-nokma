@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * **P22 — every `role="menu"` in the product carries a name. Case `13.1052`.**
+ * **P22 — every `role="menu"` in the product carries a name. Case `13.1059`.**
  *
  * The finding: two menus declared `role="menu"` with **no `aria-label` and no
  * `aria-labelledby`** — `apps/web/src/account-menu.tsx:148` and
@@ -69,7 +69,7 @@ function withoutComments(source: string): string {
 }
 
 describe('P22 every menu is named', () => {
-  it('13.1052 no product source declares role="menu" without an accessible name in the same tag', () => {
+  it('13.1059 no product source declares role="menu" without an accessible name in the same tag', () => {
     const offenders: string[] = [];
     let seen = 0;
 

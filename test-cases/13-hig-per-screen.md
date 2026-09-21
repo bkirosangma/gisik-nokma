@@ -345,9 +345,9 @@ now says so with the name it does carry.
 `PROJECT_TABS` without words fails `typecheck` rather than rendering an unlabelled segment — a property
 the hand-written `as const` tuple array this replaced did not have.
 
-## Every menu is named (exec1 P22, 2026-09-21) — case `13.1052`
+## Every menu is named (exec1 P22, 2026-09-21) — case `13.1059`
 
-- **13.1052** ✅ No product source declares `role="menu"` without an `aria-label` or `aria-labelledby` in
+- **13.1059** ✅ No product source declares `role="menu"` without an `aria-label` or `aria-labelledby` in
   the SAME OPENING TAG — swept over six source trees with comments stripped, taking each element's whole
   tag rather than its line so an attribute added on a continuation line counts and a multi-line tag is not
   missed. Positive control: the sweep found at least three menus, so a green cannot be "the regex matched

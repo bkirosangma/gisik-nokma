@@ -184,7 +184,7 @@ describe('TransitionInspector', () => {
 });
 
 /**
- * 13.1052 — exec1 P22 — **the builder's rule menu carries a NAME.**
+ * 13.1059 — exec1 P22 — **the builder's rule menu carries a NAME.**
  *
  * `role="menu"` requires an accessible name and this one had none, so a screen
  * reader announced "menu" with nothing about whose — while a third menu in the
@@ -199,7 +199,7 @@ describe('TransitionInspector', () => {
  * against an unnamed menu, which is the whole defect.
  */
 describe('AddRuleMenu', () => {
-  it('13.1052 the rule menu is named "Add rule", reached by role and name', async () => {
+  it('13.1059 the rule menu is named "Add rule", reached by role and name', async () => {
     const store = createDraftStore(draftFromTemplate(kanban));
     // The trigger's own text is `Add rule` too, so the assertions below are
     // distinguished by ROLE — a `button` named `Add rule` and a `menu` named

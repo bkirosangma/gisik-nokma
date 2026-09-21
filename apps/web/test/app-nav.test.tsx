@@ -784,7 +784,7 @@ describe('Round 24 the account menu', () => {
   });
 
   /**
-   * 13.1052 — exec1 P22 — **the menu carries a NAME, and it reaches the DOM.**
+   * 13.1059 — exec1 P22 — **the menu carries a NAME, and it reaches the DOM.**
    *
    * `role="menu"` requires an accessible name, and this one had none: a screen
    * reader announced "menu" with nothing about whose. A third menu in the same
@@ -816,7 +816,7 @@ describe('Round 24 the account menu', () => {
     expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
   });
 
-  it('13.1052 the account menu is named "Account", reached by role and name', async () => {
+  it('13.1059 the account menu is named "Account", reached by role and name', async () => {
     currentPath = '/workspaces';
     render(
       <Providers services={NO_NAV_SERVICES}>
