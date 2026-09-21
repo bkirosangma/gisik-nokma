@@ -244,6 +244,61 @@ one of them produces a user-visible notification into a dead link, and the docbl
 premise the door does not enforce. It is the *"client believes what the server declined"* shape run backwards:
 the server believes what its own reads decline.
 
+### E6-3 — IMPORTANT — Re-ranking a custom ticket type is accepted with tickets already placed where the new rank forbids, so the ledger holds hierarchies the engine itself then refuses to produce
+
+**WHAT.** `packages/rule-engine/src/checks/ticket-type.ts:29-34` is the whole of the `ticket-type.defined` check
+beyond payload shape: it refuses a **built-in** type whose rank differs from its seed (`type.builtin-rank`) and
+accepts everything else. Nothing asks whether tickets of a custom type already exist, nor where they sit. The
+editor exposes the door: `ticket-type-editor-screen.tsx:336-345` is a bare `<input type="number" min={1}>` for
+"Hierarchy rank", disabled only for built-ins. Measured with the engine's own memory context (probe in Appendix B;
+1 file / 1 test passed):
+
+```
+re-rank feature 2→3 while a task sits under a feature      -> ACCEPTED
+re-rank feature 2→4 (deepest) while a root feature exists  -> ACCEPTED
+after 2→3: reparent task T under feature F (its CURRENT parent)   -> REFUSED hierarchy.rank: "Task" cannot go under "Feature" …
+after 2→3: create a new task under F                       -> REFUSED hierarchy.rank …
+after 2→4: reparent root feature F to null (its CURRENT position) -> REFUSED hierarchy.deepest-rank-parent-required: "Feature" … always belongs to a parent ticket …
+after 2→4: create a new root feature                       -> REFUSED hierarchy.deepest-rank-parent-required …
+```
+
+**WHY it is wrong.** `child.rank > parent.rank` and `rank ≥ DEEPEST_RANK ⇒ has a parent` are invariants the
+engine enforces at **six** write sites (`hierarchy.ts` create ×2, reparent ×2 — read at the lines — and the
+refusal copy in `refusals.ts` says *"always belongs to a parent ticket"*, present tense, a claim about every
+ticket of the type). The type-definition door walks around all six: after a re-rank, the product holds a task
+under a feature it says a task cannot go under, and a root feature it says always has a parent. The user-facing
+dead end is concrete: drag `T` out of `F` and try to put it back — refused with a sentence that describes the
+placement it just came from. The editor's own copy (`rank.ts:16-18`, rendered at `:594` as
+`data-testid="rank-implications"`) makes the promise in the present tense as the admin types the new rank —
+*"tickets of this type always belong to something bigger"* — and nothing makes it true for the tickets that exist.
+
+**Not a ruled divergence.** Case `5.36` records *"custom types stay re-rankable"* — a decision that the **act** is
+allowed, which this finding does not contest. It says nothing about tickets already placed under the old rank, and
+case `5.9` shows the project knows a re-rank changes the legality of existing placements (*"reparenting under a
+descendant after a rank re-definition made the loop rank-legal"*) — it guarded the cycle that a re-rank could
+newly permit and not the placements a re-rank newly forbids. No case in `05-tickets-hierarchy.md` and no docblock
+in `ticket-type.ts` or `hierarchy.ts` mentions existing tickets at re-rank time (`grep -nEi 'existing|re-?rank'`
+over both → the two cases above only).
+
+**WHAT WOULD HAVE BEEN BETTER.** The check has the context it needs: `ctx.getChildrenStates` and
+`ctx.getEntityState` already serve the hierarchy checks. Refuse a custom re-rank when any ticket of the type is
+in a position the new rank forbids — a child whose parent's rank is now `≥` the new rank, a parent whose child's
+rank is now `≤` it, or a root ticket when the new rank is `≥ DEEPEST_RANK` — with the count in the refusal
+(*"12 features would need a parent first"*). That keeps `5.36` (re-rankable when nothing is placed against it)
+and makes the six write-site invariants true of the ledger rather than of the door. A cheaper honest alternative
+is to record the decision that they are write-time-only and say so in the editor copy.
+
+**MEASUREMENT.** Appendix B, run from `packages/rule-engine` with `pnpm exec vitest run
+test/zz-exec6-probe-rerank.test.ts --no-file-parallelism` (imports `../src/*.js` relatively — no `dist` in the
+path). Lines opened: `ticket-type.ts:29-34`; `hierarchy.ts` (`type.rank >= DEEPEST_RANK` ×2,
+`type.rank <= parentType.rank` ×2); `ticket-type-editor-screen.tsx:336-345`; `rank.ts:16-18`;
+`domain/src/ticket-types.ts:98` (`rank: z.number().int().min(1)` — no upper bound either) and `:136`
+(`DEEPEST_RANK = 4`); `test-cases/05-tickets-hierarchy.md:25` (5.9), `:52` (5.36).
+
+**SEVERITY: Important.** An invariant the product enforces loudly and in six places, with an admin-facing door
+around all of them and a user-facing refusal that describes the state it is refusing to restore. Filed at
+Important rather than Critical because it needs an admin act and nothing is lost.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
