@@ -3275,3 +3275,77 @@ describe('16.57 the attachments section keeps an empty list and a failed read ap
     expect(notice.textContent).not.toContain('Loading');
   });
 });
+
+describe('13.1112 the ticket read ANSWERS null (E4-23)', () => {
+  /**
+   * 13.1112 — E4-23. `useLiveQuery` reported `data` and `error` and nothing else, so
+   * "the read answered `null`" and "the read has not answered yet" were the SAME
+   * render: `data === null`. The sheet gated its whole body on `read.data === null`
+   * and drew `Loading…`.
+   *
+   * `null` is not a gap here — it is the transport's deliberate 404 affordance.
+   * Every `/v1` read door answers ONE frozen 404 body for "no such thing" and for
+   * "not yours" (`apps/server/src/routes/tickets.ts`, `READ_NOT_FOUND_BODY`), so a
+   * mistyped id, a soft-deleted ticket and a ticket this viewer may not see all
+   * arrive as `null`. The sheet therefore said "Loading…" for ever, on a screen the
+   * server had already answered.
+   *
+   * Asserted on the pair, because the two live in one branch: the absent sentence
+   * renders AND `Loading…` does not. A case asserting only the sentence passes on a
+   * sheet that draws both.
+   */
+  it('13.1112 a ticket the server answers 404 for says it is not here, not “Loading…”', async () => {
+    const source = createFakeDataSource({
+      getTicket: async () => null,
+      getWorkflowDef: async () => WF_ERRAND,
+      getMembers: async () => [],
+      getTicketHistory: async () => [],
+      getTickets: async (projectId: string) => ({ projectId, rows: [] }),
+      getTicketTypes: async () => [],
+    });
+    render(
+      <TicketSheet
+        dataSource={source}
+        workspaceId={WS}
+        ticketId={TICKET}
+        currentUserId="user_kiro"
+        onClose={vi.fn()}
+      />,
+    );
+
+    const absent = await screen.findByTestId('sheet-ticket-absent');
+    // The sentence names BOTH readings, because the one-body refusal is the whole
+    // reason the server will not say which.
+    expect(absent.textContent ?? '').toMatch(/deleted/i);
+    expect(absent.textContent ?? '').toMatch(/may not be able to see it/i);
+    expect(screen.queryByText('Loading…')).toBeNull();
+  });
+
+  /**
+   * 13.1113 — the control for the case above, which must not be satisfiable by a
+   * sheet that never draws `Loading…` at all. A read that has genuinely not answered
+   * yet still says so; if this reddens, the "not here" arm has swallowed the wait.
+   */
+  it('13.1113 a read still in flight still says “Loading…”, and the absent sentence is not drawn', async () => {
+    const source = createFakeDataSource({
+      getTicket: () => new Promise(() => {}),
+      getWorkflowDef: async () => WF_ERRAND,
+      getMembers: async () => [],
+      getTicketHistory: async () => [],
+      getTickets: async (projectId: string) => ({ projectId, rows: [] }),
+      getTicketTypes: async () => [],
+    });
+    render(
+      <TicketSheet
+        dataSource={source}
+        workspaceId={WS}
+        ticketId={TICKET}
+        currentUserId="user_kiro"
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByText('Loading…')).toBeInTheDocument();
+    expect(screen.queryByTestId('sheet-ticket-absent')).toBeNull();
+  });
+});
