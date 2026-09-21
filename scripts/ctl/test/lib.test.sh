@@ -39,13 +39,16 @@ cb=$(mktemp -d); /usr/bin/git init -q --bare "$cb"
 cr=$(mktemp -d); ( cd "$cr" && /usr/bin/git init -q . && /usr/bin/git symbolic-ref HEAD refs/heads/main && mkdir -p docs/lanes && printf '#### T-X1 — a task\n' > plan.md && printf '| T-X1 | done | abc | note |\n' > docs/lanes/release-2026-09-22-progress.md && echo one > docs/x.md && /usr/bin/git add -A && /usr/bin/git commit -q -m base && /usr/bin/git remote add origin "$cb" && /usr/bin/git push -q -u origin main && /usr/bin/git checkout -q -b feat && echo two > docs/x.md && /usr/bin/git commit -q -am "X1: change x" )
 co=$(mktemp -d); rm -rf "$co"; /usr/bin/git clone -q "$cb" "$co" && ( cd "$co" && /usr/bin/git checkout -q main && echo moved > moved.md && /usr/bin/git add moved.md && /usr/bin/git commit -q -m "main moved" && /usr/bin/git push -q origin main )
 ( cd "$cr" && /usr/bin/git fetch -q origin && /usr/bin/git merge -q --no-edit origin/main )
-printf 'no logs here\n' > "$cr/body.md"
-checkpr() { ( cd "$cr" && python3 "$HERE/verbs/check-pr.py" "$cr" plan.md docs/lanes/release-2026-09-22-progress.md "$cr/body.md" 2>&1 ); }
+printf 'no logs here\n' > "$cr-body.md"   # outside the repo, so a bookkeeping `git add -A` cannot sweep it in
+checkpr() { ( cd "$cr" && python3 "$HERE/verbs/check-pr.py" "$cr" plan.md docs/lanes/release-2026-09-22-progress.md "$cr-body.md" 2>&1 ); }
 check "check-pr: merge commit is on the branch" '[ "$(cd "$cr" && /usr/bin/git log --merges --format=%s origin/main..HEAD | grep -c Merge)" -eq 1 ]'
-check "check-pr: one task commit + the merge of origin/main passes" 'out=$(checkpr); [ $? -eq 0 ] && printf "%s" "$out" | grep -q "1 task commits, 1 files, 0 failures"'
+check "check-pr: one task commit + the merge of origin/main passes" 'out=$(checkpr); [ $? -eq 0 ] && printf "%s" "$out" | grep -q "1 task commits, 0 bookkeeping commits, 1 files, 0 failures"'
+( cd "$cr" && echo claim > docs/lanes/release-2026-09-22-progress.md.claim && /usr/bin/git add -A && /usr/bin/git commit -q -m "B05 claim: T-X1 (1 task)" && echo body > docs/lanes/body-note.md && /usr/bin/git add -A && /usr/bin/git commit -q -m "B05: the §4 PR body, with log paths" )
+check "check-pr: batch-id bookkeeping subjects pass and are not tasks" 'out=$(checkpr); [ $? -eq 0 ] && printf "%s" "$out" | grep -q "1 task commits, 2 bookkeeping commits, 3 files, 0 failures"'
 ( cd "$cr" && echo three > docs/x.md && /usr/bin/git commit -q -am "oops: not a ruling id" )
-check "check-pr: a non-merge commit without a ruling id still fails" 'out=$(checkpr); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "commit subject does not start with a ruling id in the plan: .oops"'
-rm -rf "$cb" "$cr" "$co"
+check "check-pr: a non-merge, non-bookkeeping commit without a ruling id still fails" 'out=$(checkpr); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "commit subject does not start with a ruling id in the plan: .oops"'
+check "check-pr: a B-prefixed word that is not a batch id is not bookkeeping" '( cd "$cr" && /usr/bin/git commit -q --allow-empty -m "Bugfix: not a batch id" ); out=$(checkpr); printf "%s" "$out" | grep -q "ruling id in the plan: .Bugfix"'
+rm -rf "$cb" "$cr" "$cr-body.md" "$co"
 rm -rf "$bare" "$gr" "$other"
 # Pane delivery helpers against a fake tmux on PATH: it records every call, answers display-message with $FAKE_MODE,
 # counts the Enters it receives, and its capture-pane shows a real multi-line box until $FAKE_NEEDS Enters have

@@ -12,8 +12,13 @@ files = [f for f in git('diff', '--name-only', 'origin/main...HEAD').split('\n')
 # A branch satisfies the gate's "contains origin/main" by MERGING origin/main (never rebasing: PR bodies and DONE reports
 # cite lane commits by sha), so the merge commit's subject is not a task and is not held to the ruling-id rule.
 subjects = [s for s in git('log', '--no-merges', '--format=%s', 'origin/main..HEAD').split('\n') if s]
-tasks = []
+# A push-only lane's protocol bookkeeping commits start with the batch id ("B05 claim: …", "B05: the §4 PR body, with
+# log paths", "B05 PR body: …"); they are not tasks and not failures (landing agent, measured on B05 f7894f12). No plan
+# task id begins with B, so the prefix cannot shadow a ruling id. Lane history is never rewritten (controller ruling).
+BOOKKEEPING = re.compile(r'^B\d\d\b')
+tasks, bookkeeping = [], []
 for s in subjects:
+    if BOOKKEEPING.match(s): bookkeeping.append(s); continue
     rid = ruling_id(s)
     if not rid or not any(ruling_of[t].startswith(rid) for t in ids):
         fails.append(f"commit subject does not start with a ruling id in the plan: {s!r}"); continue
@@ -37,5 +42,5 @@ if body and os.path.exists(body):
 else:
     fails.append("no PR body file given (--body FILE) — the reviewer pass needs the log paths")
 for f in fails: print("  -", f)
-print(f"check-pr.py: {len(tasks)} task commits, {len(files)} files, {len(fails)} failures")
+print(f"check-pr.py: {len(tasks)} task commits, {len(bookkeeping)} bookkeeping commits, {len(files)} files, {len(fails)} failures")
 sys.exit(1 if fails else 0)
