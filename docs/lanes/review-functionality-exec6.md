@@ -757,7 +757,7 @@ common brief's category 3 for the door (no ruling found: `grep -rn whatsapp test
 docs/lanes/review-*.md` → nothing), and the product's own form/door disagreement is the defect underneath it.
 
 **WHAT WOULD HAVE BEEN BETTER.** One source: the select's options built from `INVITE_CHANNELS` (exported from
-the domain, already imported by the page's neighbours), with `phone` labelled for people (*"Phone (SMS)"*). And
+`@gisik-nokma/domain`, `invites.ts:70`), with `phone` labelled for people (*"Phone (SMS)"*). And
 a page test that submits each offered option and asserts the door's answer — the assertion the role select
 already has.
 
