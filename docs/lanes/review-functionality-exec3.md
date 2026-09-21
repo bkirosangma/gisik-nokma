@@ -3399,14 +3399,18 @@ summary cannot be checked by someone who was not here:
 | **§12** (offline sync) | **two checked, one declined as another lane's ground** — produced `E3-28`; one claim recorded as read-but-UNVERIFIED |
 | **§13** (deployment) | **four checked** — all true; the remaining ~500 lines read, not verified |
 | **§14** (MCP server) | **three checked** — all true |
-| **§1, §2, §3, §5, §7, §8, §10** | **not opened** — seven sections |
+| **§3** (foundation & ledger) | **opened in round 2 (§54, §56)** — **five** countable claims checked, all five exact (§54.1–54.3) |
+| **§5** (tickets, hierarchy & rollups) | **opened in round 2 (§53)** — produced `E3-29` |
+| **§1, §2, §10** | **opened in round 2 (§56)** — §1 two claims and §2 one, all three exact; §10's one claim is `E3-26`, already filed, plus one count examined and NOT filed (§56.4) |
+| **§7** (API, realtime & search) | **opened, claims UNCHECKED** — 895 lines, 93 candidate countable bullets |
+| ~~**§8**~~ | **DOES NOT EXIST** — §8 was never created; documented with its reasoning at `test-cases/README.md:17` (§56.1). My first version of this row named it among the never-opened. It cannot be opened. |
 
 **SO "EVERY SECTION OPENED" IS TRUE AND "EVERY SECTION AUDITED" IS NOT, and the difference is the point of
-stating it this way.** Six sections were reached to a stated depth; seven were never opened at all; and the
+stating it this way.** **As of round 2's close, every real section has been opened:** §4 fully audited; §3, §5, §6, §9, §11, §12, §13, §14 to a stated depth; §1, §2 and §10 opened with their countable claims checked. **§7 is the one section opened whose claims are unchecked, and §8 does not exist.** and the
 sections I did reach gave **three findings** (`E3-11`, `E3-12`, `E3-27`, `E3-28` across four — §4, §6, §12 two
 of them) against a much larger count of claims that hold exactly. **The yield is concentrated in sections whose
-bullets state counts and enumerations with nothing in code to check them against** — and the seven unopened
-sections are where anything of that shape would still be hiding.
+bullets state counts and enumerations with nothing in code to check them against** — and **§7's 93 candidate
+bullets, plus 63 unchecked in §3, are where anything of that shape would still be hiding.**
 
 ## 52. Round 2 — the ✅ set, walked for the first time (1,077 rows), and the four instruments it broke
 
