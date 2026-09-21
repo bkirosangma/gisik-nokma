@@ -853,6 +853,24 @@ describe('TicketSheet — a truncated ledger says it is truncated', () => {
     expect(document.querySelectorAll('.gn-history__event')).toHaveLength(HISTORY_PAGE_LIMIT);
   });
 
+  it('E2-55: a FULL page puts the notice ABOVE the list it is about', async () => {
+    const read = ticketRead();
+    const user = userEvent.setup();
+    renderSheet(read, sheetSource(read, page(HISTORY_PAGE_LIMIT)));
+    await settled();
+    await user.click(screen.getByRole('tab', { name: 'History' }));
+    const partial = await screen.findByText(/may go on past them/);
+    const list = document.querySelector('.gn-history');
+    expect(list).not.toBeNull();
+    // `DOCUMENT_POSITION_FOLLOWING` in this probe means the list comes AFTER the
+    // notice in document order. The help tells the reader the cap "says so at the
+    // top"; with the notice below 200 rendered rows, that sentence sends them
+    // past the one thing it is telling them to look for.
+    expect(
+      partial.compareDocumentPosition(list as Node) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it('PLANTED DEFECT: a SHORT page says nothing of the kind — no invented "more"', async () => {
     const read = ticketRead();
     const user = userEvent.setup();

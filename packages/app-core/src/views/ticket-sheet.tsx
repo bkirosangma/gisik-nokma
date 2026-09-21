@@ -2724,12 +2724,24 @@ function HistoryTab({
   }
   return (
     <>
-      <HistoryList events={result.data} nameOf={nameOf} />
+      {/*
+        THE NOTICE COMES BEFORE THE LIST (E2-55). It used to follow it, and both
+        help documents describe it by its location — "It stops at 200 entries,
+        saying so at the top" (`docs/manual.md`) — so the sentence sent a reader
+        looking for a disclosure that sat below the 200 rows it is a disclosure
+        about. The `>=`-over-`==` trade argued at `HISTORY_PAGE_LIMIT` above is
+        about the CLAIM's strength and stands; where the claim is placed is a
+        separate decision, and a notice a reader must scroll past every row to
+        meet does not do the job the trade was made for. One JSX move, and the
+        help is true as written. `.gn-ticket-sheet__history-partial`'s margin
+        moved to the bottom edge with it.
+      */}
       {result.data.length >= HISTORY_PAGE_LIMIT ? (
         <p className="gn-ticket-sheet__history-partial">
           {`Showing the first ${HISTORY_PAGE_LIMIT} entries — this ticket's history may go on past them.`}
         </p>
       ) : null}
+      <HistoryList events={result.data} nameOf={nameOf} />
     </>
   );
 }
