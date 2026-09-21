@@ -10,7 +10,7 @@ import {
   VisibilityEditor,
   type VisibilityClaim,
 } from '../../src/views/visibility-editor.js';
-import type { Actor } from '../../src/view-types.js';
+import type { RosterMember } from '../../src/view-types.js';
 
 /**
  * These cases drive the component DIRECTLY rather than through `TicketSheet`,
@@ -45,11 +45,29 @@ const KIRO = '01J0000000000000000000000K';
 const ANSELMA = '01J0000000000000000000000A';
 const DIPU = '01J0000000000000000000000D';
 
-const MEMBERS: Actor[] = [
-  { id: KIRO, name: 'Kiro' },
-  { id: ANSELMA, name: 'Anselma Marak' },
-  { id: DIPU, name: 'Dipu' },
+/** The id from the finding: the dev seed's accountant, whose display name is `''`. */
+const NAMELESS = '01M1V035TASFV2G9WPWFV9QDVW';
+
+const MEMBERS: RosterMember[] = [
+  { id: KIRO, name: 'Kiro', role: 'owner' },
+  { id: ANSELMA, name: 'Anselma Marak', role: 'member' },
+  { id: DIPU, name: 'Dipu', role: 'member' },
+  // E4-6 — THE ROSTER SHAPE THE DEV SEED REALLY SHIPS: a display name that is an
+  // empty string, with an email to fall back on. The picker used to offer this
+  // person as a 26-character ULID.
+  { id: NAMELESS, name: '', email: 'accountant@e2e.gisik-nokma.local', role: 'guest' },
 ];
+
+/**
+ * What the PICKER draws for a member — `name || email || id` (`pickerLabel`).
+ *
+ * The walk below asks "does this member's label appear", and it needs the same
+ * answer the component gives: with a nameless member, testing `text.includes(
+ * member.name)` would be `text.includes('')`, which is TRUE of every element and
+ * would make the control below pass for the wrong reason.
+ */
+const labelOf = (member: RosterMember): string =>
+  member.name.trim() || member.email?.trim() || member.id;
 
 const TICKET_ID = '01J0000000000000000000000T';
 
@@ -604,8 +622,9 @@ describe('the standing line carries the prototype’s dot (17.004, 17.006)', () 
           .map((node) => node.textContent ?? '')
           .join('');
         for (const member of MEMBERS) {
-          if (member.name !== null && text.includes(member.name)) {
-            found.push(`${element.tagName.toLowerCase()}.${element.className}: ${member.name}`);
+          const label = labelOf(member);
+          if (text.includes(label)) {
+            found.push(`${element.tagName.toLowerCase()}.${element.className}: ${label}`);
           }
         }
       }
@@ -621,5 +640,19 @@ describe('the standing line carries the prototype’s dot (17.004, 17.006)', () 
     // its most-populated state, so neither scan is passing over an empty shell.
     expect(section?.querySelectorAll('.gn-visibility__person').length).toBe(MEMBERS.length);
     expect(section?.querySelectorAll('.gn-visibility__mode').length).toBeGreaterThan(0);
+
+    // E4-6 — AND THE NAMELESS MEMBER IS OFFERED BY EMAIL, NOT BY ULID. The picker
+    // rendered `actorLabel(id, name)`, whose fallback is the raw id — right for a
+    // CLAIM this screen attributes, wrong for a box a person ticks. The email is
+    // the better handle; the id is still better than a blank.
+    const pickerText = Array.from(section!.querySelectorAll('.gn-visibility__person'))
+      .map((el) => el.textContent)
+      .join('|');
+    expect(pickerText).toContain('accountant@e2e.gisik-nokma.local');
+    expect(pickerText).not.toContain(NAMELESS);
+    // The provenance paths are UNTOUCHED and still fall back to the id — the two
+    // jobs are kept different on purpose.
+    expect(typeof labelOf({ id: NAMELESS, name: '', role: 'guest' })).toBe('string');
+    expect(labelOf({ id: NAMELESS, name: '', role: 'guest' })).toBe(NAMELESS);
   });
 });

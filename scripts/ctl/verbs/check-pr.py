@@ -41,12 +41,52 @@ prog = open(os.path.join(repo, progress), encoding='utf-8').read() if os.path.ex
 for rid in tasks:
     if not re.search(r'^\| T-' + re.escape(rid) + r'\S* \| (done|skipped|blocked|needs-owner) \|', prog, re.M):
         fails.append(f"progress file has no line for {rid}")
+# A cited log is judged by the CLAIM its citing line makes about it — green must be green, red must be red, a log cited
+# without a claim need only exist. The plan's §4 body cites both halves of every TDD pair on one row ("1 failed → 18
+# passed | x-red.log · x-green.log"), turbo build logs, mutation probes and browser measurements; a rule that demanded a
+# green vitest summary of every path failed every real batch (B03: 7 conditions, B04: 15; controller ruling 2026-09-21).
+LOG_RE = re.compile(r'(/[\w./-]+\.log)')
+def log_state(path):
+    """What the log's last 30 lines say: ('green'|'red'|'none', detail)."""
+    tail = ''.join(open(path, errors='replace').readlines()[-30:])
+    m = re.search(r'Test Files\s+(?:(\d+) failed)?(?: \| )?(?:(\d+) passed)?', tail)
+    if m and 'Test Files' in tail:
+        return ('red', f"vitest: Test Files {m.group(1)} failed") if m.group(1) else ('green', f"vitest: Test Files {m.group(2)} passed")
+    t = re.search(r'Tasks:\s+(\d+) successful, (\d+) total', tail)
+    if t:
+        ok = t.group(1) == t.group(2) and 'error TS' not in tail
+        return ('green' if ok else 'red', f"turbo: Tasks {t.group(1)}/{t.group(2)}" + ('' if ok else ' or error TS'))
+    if 'help-content: ok' in tail: return ('green', 'help-content: ok')
+    if re.search(r'^> tsc\b', tail, re.M): return ('red', 'tsc: error TS') if 'error TS' in tail else ('green', 'tsc: no error TS')
+    return ('none', 'no summary in the last 30 lines')
+RED_NAME, GREEN_NAME = re.compile(r'(^|[-_.])(red|probe|mut\w*)([-_.]|$)'), re.compile(r'(^|[-_.])(green\d*|pass\w*|final\d*|g\d*)([-_.]|$)')
+RED_WORDS, GREEN_WORDS = re.compile(r'\b(red|RED|probe|mutation|witnessed)\b'), re.compile(r'\b(green|GREEN|passed|PASS|ok|exit 0|EXIT=0)\b')
+def claim(line, path, paths):
+    """RED | GREEN | None, from (1) the path's own name, (2) the summary adjacent to the path, (3) an arrow pair, (4) the line."""
+    name = os.path.basename(path)
+    if RED_NAME.search(name): return 'RED'
+    if GREEN_NAME.search(name): return 'GREEN'
+    i = line.index(path); after = line[i + len(path):]; before = line[:i]
+    for other in paths:
+        if other != path:
+            if other in after: after = after[:after.index(other)]
+            if other in before: before = before[before.rindex(other) + len(other):]
+    after = after.split(' | ')[0][:120]; before = before.split(' | ')[-1][-120:]
+    for seg in (after, before):
+        if re.search(r'\bfailed\b', seg): return 'RED'
+        if GREEN_WORDS.search(seg): return 'GREEN'
+    if len(paths) == 2 and re.search(r'failed\b.*→.*\bpassed|→\s*\d+ passed', line):
+        return 'RED' if paths.index(path) == 0 else 'GREEN'
+    if GREEN_WORDS.search(line) and not RED_WORDS.search(line) and 'failed' not in line: return 'GREEN'
+    return None
 if body and os.path.exists(body):
-    b = open(body, encoding='utf-8').read()
-    for lp in re.findall(r'(/[\w./-]+\.log)', b):
-        if not os.path.exists(lp): fails.append(f"PR body names a log that does not exist: {lp}"); continue
-        tail = ''.join(open(lp, errors='replace').readlines()[-30:])
-        if 'Test Files' not in tail or 'passed' not in tail: fails.append(f"log has no green summary in its last 30 lines: {lp}")
+    for line in open(body, encoding='utf-8').read().splitlines():
+        paths = LOG_RE.findall(line)
+        for lp in dict.fromkeys(paths):
+            if not os.path.exists(lp): fails.append(f"PR body names a log that does not exist: {lp}"); continue
+            c = claim(line, lp, paths); state, detail = log_state(lp)
+            if c == 'GREEN' and state != 'green': fails.append(f"log cited as green is not green ({detail}): {lp}")
+            elif c == 'RED' and state != 'red': fails.append(f"log cited as red is not red ({detail}): {lp}")
 else:
     fails.append("no PR body file given (--body FILE) — the reviewer pass needs the log paths")
 for f in fails: print("  -", f)

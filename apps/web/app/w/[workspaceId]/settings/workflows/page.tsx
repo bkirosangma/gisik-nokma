@@ -20,7 +20,7 @@ export default function WorkflowsPage() {
   const wiring = useBuilderWiring(workspaceId);
   const base = `/w/${workspaceId}/settings/workflows`;
   return (
-    <main className="gn-shell">
+    <main id="gn-main" className="gn-shell">
       <AppNav workspaceId={workspaceId} />
       <h1 className="gn-page-title">Workflows</h1>
       {wiring.kind !== 'ready' ? (

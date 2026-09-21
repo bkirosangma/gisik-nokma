@@ -122,10 +122,23 @@ export function restrictedLine(count: number): string | null {
  * sentence (`restrictedLine` above), which is why that sentence exists apart
  * from this one.
  *
- * Zero renders NOTHING, the same rule `restrictedLine` keeps.
+ * Zero SAYS SO rather than rendering nothing (E5-36, 2026-09-21). This used to
+ * return `null` on the strength of the `restrictedLine` rule above, and that
+ * rule's reason does not reach here: it is about a person with NOTHING WITHHELD
+ * being told about withholding, and this line carries no withholding at all.
+ * What `null` bought instead was a founder's fresh workspace card — avatar, name,
+ * chips, *"You're an owner here."* — with no mention of projects and no pointer to
+ * the **New project** form, which `docs/manual.md:174` already sends an owner to
+ * as the only control that makes a workspace usable. So the card now says the
+ * absence, which is the manual's own convention for one.
+ *
+ * A WITHHELD viewer still never sees this line: the one caller gates it on
+ * `!viewer.countsWithheld`, so `0` cannot reach a guest. The rule that mattered
+ * is kept where it was doing work — at the caller — rather than borrowed by a
+ * function whose subject has nothing to do with withholding.
  */
-export function projectCountLine(liveCount: number): string | null {
-  if (liveCount <= 0) return null;
+export function projectCountLine(liveCount: number): string {
+  if (liveCount <= 0) return 'No projects yet';
   return `${liveCount} ${liveCount === 1 ? 'project' : 'projects'}`;
 }
 

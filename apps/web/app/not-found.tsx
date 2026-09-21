@@ -1,4 +1,20 @@
 import Link from 'next/link';
+import { documentTitleFor } from '../src/page-title.js';
+
+/**
+ * exec1 P12 — the SERVER title, and `not-found.tsx` is not a route segment so
+ * there is no `layout.tsx` to put it in.
+ *
+ * It used `<DocumentTitle>` (the client component) because Next's docs name
+ * `layout`/`page` for `metadata` and say nothing about this file. **Measured
+ * rather than assumed:** the build accepts the export here and the rendered
+ * document carries exactly one `<title>`, so the clause that excluded it was
+ * about the documented cases and not about this one. If a future Next stops
+ * honouring it, the symptom is a 404 whose tab reads the product name — the
+ * same defect below, and the browser reading in `src/document-title.tsx`
+ * explains why the client fallback would not save it.
+ */
+export const metadata = { title: documentTitleFor('Page not found') };
 
 /**
  * The 404, written the way the rest of this product writes an absence.
@@ -74,7 +90,15 @@ import Link from 'next/link';
  */
 export default function NotFound() {
   return (
-    <main className="gn-shell gn-notfound">
+    <main id="gn-main" className="gn-shell gn-notfound">
+      {/* exec1 P12 names the 404 among the routes that all read "Gisik Nokma",
+          and it is the one route a reader reaches with no context at all — the
+          title is the only thing that says the page was not found before the
+          heading is read. The title is now `metadata` at the top of this file
+          rather than a `<DocumentTitle>` element: the client write loses a race
+          with React's head hydration (`src/document-title.tsx` carries the
+          Chrome trace), and the 404 is exactly the page a reader reaches with
+          nothing else to orient them. */}
       {/* The export's 72px rounded tile (`:1847`), glyph paths verbatim. The
           whole tile is `aria-hidden`: it repeats what the h1 says, so a screen
           reader announcing it would be reading the heading twice. That is also

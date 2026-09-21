@@ -520,7 +520,12 @@ test wrote, not that it shows the credential the CLI is holding.*
   which a route that 403'd everything would pass. — (`apps/server/test/mcp/mcp-tokens.test.ts`)
 - **14.96** ✅ Signed out, the screen offers a sign-in that lands back on `/mcp/tokens` and **asks the
   server nothing** — asserted on the recorded calls, because a signed-out page that still fired the
-  request would 401 and look identical. — (`apps/web/test/mcp-tokens-page.test.tsx`)
+  request would 401 and look identical. **The route also carries the app nav (E5-17, 2026-09-21):** it
+  rendered no `AppNav`, nothing in `apps/web/app` or `apps/web/src` linked to it, and this case's own
+  `?next=` behaviour sends a signed-out person BACK here after sign-in — so the one route a reader could
+  reach only by typing was also the only one with no bar and no way out. The route is KEPT rather than
+  redirected to `/account#connected-assistants`, per the page's own docblock ("the owner named
+  `/settings` as where the tab should live, not that this URL should stop resolving"). — (`apps/web/test/mcp-tokens-page.test.tsx`)
 - **14.97** ✅ The row names the approval date in the product's timezone and the page **never prints
   the id**; the empty state names the connect page. —
   (`apps/web/test/mcp-tokens-page.test.tsx`)

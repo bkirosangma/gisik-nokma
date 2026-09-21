@@ -229,7 +229,17 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
     pathname === target ? "page" : undefined;
 
   return (
-    <nav className="gn-nav">
+    <nav
+      className="gn-nav"
+      /* exec1 P31: this bar rendered `<nav className="gn-nav">` with NO
+         accessible name, and it co-renders with a SECOND, already-labelled
+         `<nav>` on several routes — so a screen-reader user opening the
+         landmark list met two `navigation` regions and only one of them said
+         what it was. "Main" is this bar's own name for itself: it is the
+         product's primary navigation, which is what the landmark list should
+         call it. */
+      aria-label="Main"
+    >
       {/* `.gn-nav` itself is now full-bleed (globals.css); this inner div is
           what mirrors `.gn-shell`'s max-width/centring, so the bar's content
           still lines up with the page content beneath it. */}

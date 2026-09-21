@@ -1123,8 +1123,9 @@ export async function checkVisibilityPermission(
    * `hasProjectAdminRights` — *"a project admin runs their project's people and
    * their tickets' visibility."* Deleting a ticket is that same class of act on
    * that same object: it takes the ticket out of every board, list, search,
-   * My Work and attention reading (the FAQ's own sentence:
-   * *"The ticket stops appearing in views"*).
+   * My Work and attention reading (the prototype's `faq-delete` entry, which is
+   * the attribution `vocabulary.ts` records beside `ticket.deleted`:
+   * *"The ticket stops appearing in views"*. The FAQ carried no such sentence.)
    *
    * ## Measured, not assumed: without this branch the event is ungated
    *

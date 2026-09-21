@@ -15,7 +15,7 @@ import { AppNav } from '../../src/app-nav.js';
  */
 export default function HelpPage() {
   return (
-    <main className="gn-shell">
+    <main id="gn-main" className="gn-shell">
       <AppNav />
       <HelpBrowser />
     </main>

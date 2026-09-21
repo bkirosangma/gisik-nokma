@@ -1,6 +1,7 @@
 import type { Notification } from '@gisik-nokma/domain';
 import type { UserNameFn } from '../claims/claim-labels.js';
-import { notificationBody, notificationHeadline } from './format.js';
+import { formatDateTime } from '../provenance.js';
+import { notificationBody, notificationHeadline, notificationTicketLabel } from './format.js';
 import { NotificationIcon } from './icons.js';
 
 /**
@@ -100,6 +101,23 @@ export function InboxView(props: InboxViewProps) {
                 <span className="gn-inbox__body" title={notificationBody(notification)}>
                   {notificationBody(notification)}
                 </span>
+                {/* E5-35 — WHICH TICKET, for the one row whose body is not
+                    already the title. A mention's body is the sender's excerpt,
+                    so without this the row never said where the words were
+                    written; `ticketTitle` was on the payload the whole time. */}
+                {notificationTicketLabel(notification) !== null ? (
+                  <span className="gn-inbox__ticket">{notificationTicketLabel(notification)}</span>
+                ) : null}
+                {/*
+                  E5-35 — WHEN. `Notification.createdAt` is on every row this
+                  component is handed and was rendered nowhere: `grep -n createdAt
+                  inbox-view.tsx format.ts` returned nothing, so a reader met five
+                  rows with no idea whether the newest was from an hour ago or
+                  from March. Through `formatDateTime`, the one renderer every
+                  other instant in this package goes through — the prototype draws
+                  `{{ n.time }}` here (`EXPORT:606-637`).
+                */}
+                <span className="gn-inbox__time">{formatDateTime(notification.createdAt)}</span>
               </span>
               {/* Decorative twin of `data-unread` — the row's unread state is
                   already carried by the attribute above and by the heavier

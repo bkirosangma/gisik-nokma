@@ -15,6 +15,14 @@
  * announcing its own unreliability is worse than useless to a reader, but
  * shipping it unmarked to the next engineer would be worse still.
  *
+ * ⚠ NARROWED BY E5-38 (round-2 ruling, 2026-09-21), exactly as
+ * `privacy/page.tsx` records it: the marker above still never reaches the render
+ * (case 13.252 asserts it, unchanged), and what the ruling added is the separate
+ * reader-facing draft line at the top of the page. The reason is the same on
+ * this file and it is stronger here — the sign-in page binds a person's
+ * agreement to THESE terms while they print `[ENTITY NAME]`, `[JURISDICTION]`,
+ * `[MINIMUM AGE]` and `[LIABILITY CAP]`.
+ *
  * ONE SECTION IS NOT BOILERPLATE and should survive review largely intact: "What
  * this product does not promise". Those statements are true of the shipped
  * build, they are the same ones the README and manual make, and they are the
@@ -25,6 +33,10 @@
 import Link from 'next/link';
 import { LegalTabs, LegalToc, sectionId, type LegalSection } from '../../src/legal-chrome.js';
 import { LegalNav } from '../../src/legal-nav.js';
+import { documentTitleFor } from '../../src/page-title.js';
+
+/** exec1 P12 — see `privacy/page.tsx` for why this SERVER route uses `metadata`. */
+export const metadata = { title: documentTitleFor('Terms') };
 
 /**
  * The page's sections, declared ONCE — the same shape as `privacy/page.tsx`,
@@ -180,13 +192,17 @@ const SECTIONS: readonly LegalSection[] = [
 
 export default function Terms() {
   return (
-    <main className="gn-shell gn-legal">
+    <main id="gn-main" className="gn-shell gn-legal">
       <LegalNav />
       <div className="gn-legal__column">
         <div className="gn-legal__head">
           <h1 className="gn-legal__title">Terms &amp; Conditions</h1>
           <LegalTabs active="terms" />
         </div>
+        <p className="gn-legal__draft">
+          <span className="gn-legal__flag-label">Draft notice.</span> The bracketed details below are
+          not yet filled in.
+        </p>
         <p className="gn-legal__meta">
           Last updated <strong>[DATE]</strong> · An agreement between you and{' '}
           <strong>[ENTITY NAME]</strong> · Governed by the laws of <strong>[JURISDICTION]</strong>

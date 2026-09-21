@@ -475,6 +475,28 @@ describe('sign-in — all four passwordless methods (spec §6)', () => {
   });
 
   /**
+   * E5-33 — an EMPTY press does not leave the page.
+   *
+   * The control was a bare `<Button onClick>` rather than a submit, and the input
+   * had no `required`, so pressing it with nothing typed called
+   * `magicLink({ email: '' })`, round-tripped the server, and painted
+   * better-call's own spelling into the card's `role="alert"`:
+   * `[body.email] Invalid email address`.
+   */
+  it('E5-33 the email field is required inside a real form, so an empty press is refused locally', async () => {
+    render(<SignInPage />);
+    const email = await screen.findByLabelText('Email');
+    expect(email).toBeRequired();
+    // `required` only bites on a real SUBMIT, so the form is half the assertion —
+    // a required input beside a non-submitting button would change nothing.
+    expect(email.closest('form')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Send magic link' })).toHaveAttribute(
+      'type',
+      'submit',
+    );
+  });
+
+  /**
    * The social callback, which is the half of 13.271 that reaches a PROVIDER
    * rather than an inbox — and it now needs the server to say Google is
    * available before the button it clicks exists at all.
