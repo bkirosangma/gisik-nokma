@@ -172,10 +172,11 @@ trap 'rm -f "$LOCK"' EXIT
 echo "LOCK ACQUIRED pid=$$ at $(date +%H:%M:%S)"
 
 # Holding the lock is not enough: non-server package tests may run UNLOCKED by
-# protocol, so a peer's pool can already be resident. Bounded at 10 minutes, and
+# protocol, so a peer's pool can already be resident. Bounded at 60 seconds, and
 # proceeding is LOUD — a silent wait is indistinguishable from a hang.
+# 60 s since 2026-09-21 (owner): with six lanes running suites the box never drains; the cap only delayed the gate by 10 min per landing. A `Hook timed out` red under contention is a re-run, not a defect.
 drained=0
-for _ in $(seq 1 40); do
+for _ in $(seq 1 4); do
   n=$(live_pools)
   [ "$n" -eq 0 ] && { drained=1; break; }
   echo "waiting for $n live vitest worker(s) to drain..."
@@ -184,7 +185,7 @@ done
 if [ "$drained" -eq 1 ]; then
   echo "POOLS DRAINED at $(date +%H:%M:%S) — starting"
 else
-  echo "WARNING: proceeding with $(live_pools) live vitest worker(s) after 10 min."
+  echo "WARNING: proceeding with $(live_pools) live vitest worker(s) after 60 s."
   echo "  This run shares the box. Treat a TIMEOUT below as contention, not a defect."
 fi
 
