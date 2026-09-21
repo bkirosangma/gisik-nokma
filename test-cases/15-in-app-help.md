@@ -39,9 +39,9 @@ to make it work.*
 *A generated artifact with no check against its source goes stale silently — users reading an old manual
 while `docs/manual.md` says something else, with no symptom until somebody follows an instruction that
 stopped being true. The parser also self-tests against planted defects before `--check` certifies
-anything: a parser reporting "224 entries" tells you it ran, not that it was right.*
+anything: a parser reporting a plausible entry count tells you it ran, not that it was right.*
 
-- **15.13** 🚫 The parser's own cases live in `scripts/help-content.mjs`'s self-test (10 cases, 4 of them planted defects) and run on every `pnpm check:help`, rather than as vitest cases — the same shape `check-runbook-commands.mjs` uses, and for the same reason: the gate must refuse to certify content when its own instrument is broken.
+- **15.13** 🚫 The parser's own cases live in `scripts/help-content.mjs`'s self-test — its own case count, with each planted defect named — and run on every `pnpm check:help`, rather than as vitest cases — the same shape `check-runbook-commands.mjs` uses, and for the same reason: the gate must refuse to certify content when its own instrument is broken. **Both sentences here named counts until F8 (2026-09-21)** — the self-test's case count and planted-defect count, and a quoted example of the entry count — and both had drifted from what the runner actually prints. **The numbers are gone rather than corrected**, and they are named here only by what they counted, not by their old values: a count written down beside no instrument goes stale again the next time a case or an entry is added, and a comment that quotes an old count to explain its removal leaves the stale literal in the file for the next sweep to find. The figure is printed by the runner on every `pnpm check:help`, which is where it stays true.
 
 ## The three surfaces
 

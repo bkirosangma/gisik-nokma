@@ -46,7 +46,7 @@ export default function MyWorkPage() {
   };
 
   return (
-    <main className="gn-shell">
+    <main id="gn-main" className="gn-shell">
       <AppNav workspaceId={workspaceId} />
       <h1 className="gn-page-title">My Work</h1>
       <div className="gn-shell__main">

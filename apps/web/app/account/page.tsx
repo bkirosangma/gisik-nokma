@@ -232,7 +232,7 @@ export default function AccountPage() {
   );
 
   return (
-    <main className="gn-shell gn-account">
+    <main id="gn-main" className="gn-shell gn-account">
       <AppNav />
       {/* `AppNav` stays OUTSIDE the column on purpose: the prototype centres a
           680px column of cards inside the content area, but the nav is a

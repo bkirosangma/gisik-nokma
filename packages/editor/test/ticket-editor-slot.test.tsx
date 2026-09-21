@@ -93,6 +93,7 @@ type AppCoreEditorSlotProps = {
   ticketId: string;
   placeholder?: string;
   autoFocus?: boolean;
+  labelledBy?: string;
   queryUsers?: (query: string) => Promise<Array<{ userId: string; name: string }>>;
   uploadAttachment?: (file: File) => Promise<AppCoreEditorSlotUpload>;
   emitAttachmentAdded?: (uploaded: AppCoreEditorSlotUpload) => Promise<void>;
@@ -493,6 +494,50 @@ describe('TicketEditorSlot', () => {
     const unfocused = await mountSlot(makeProps());
     expect(unfocused.editor.isFocused).toBe(false);
     unfocused.view.unmount();
+  });
+
+  /**
+   * 9.257 — E4-4 (exec4) — BOTH of the sheet's writing surfaces carry an
+   * accessible name, and the two names DIFFER.
+   *
+   * The defect was not "one unnamed textbox" but "two of them on one sheet with
+   * nothing to tell them apart": the judge's line is `TicketEditor.tsx:89-100`,
+   * a `useEditor` call with no `editorProps.attributes` at all, so both hosts
+   * took Tiptap's library default (`role=textbox`, no name) and a screen reader
+   * announced "edit text, multiline" twice (WCAG 4.1.2, Level A).
+   *
+   * **Both slots are mounted in ONE container on purpose** — mounting them
+   * separately would pass a fix that gave both the same name, which is the same
+   * failure one attribute later. The two `getByRole(…, { name })` calls are what
+   * pins the distinctness, and they are queried by ROLE AND NAME, so they keep
+   * passing whichever mechanism supplies the name (`aria-label` here;
+   * `aria-labelledby` for the description row, T-P21).
+   *
+   * `aria-multiline` is asserted on every host found by role, not on a count of
+   * its own: the two names above already prove there are two, so a third
+   * assertion that merely restated the count would be a number reported twice
+   * from one reading.
+   */
+  it('E4-4 both composers carry an accessible name — Description and Comment — and announce multiline', async () => {
+    const view = render(
+      <>
+        <TicketEditorSlot {...makeProps({ mode: 'description' })} />
+        <TicketEditorSlot {...makeProps({ mode: 'comment' })} />
+      </>,
+    );
+    await vi.waitFor(() => {
+      expect(view.container.querySelectorAll('.ticket-editor .ProseMirror')).toHaveLength(2);
+    });
+
+    const hosts = view.getAllByRole('textbox');
+    expect(hosts).toHaveLength(2);
+    // Distinctness, in document order: the description row renders first.
+    expect(view.getByRole('textbox', { name: 'Description' })).toBe(hosts[0]);
+    expect(view.getByRole('textbox', { name: 'Comment' })).toBe(hosts[1]);
+    for (const host of hosts) {
+      expect(host).toHaveAttribute('aria-multiline', 'true');
+    }
+    view.unmount();
   });
 });
 

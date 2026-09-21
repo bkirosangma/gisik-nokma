@@ -1719,6 +1719,15 @@ rather than folded in silently.
 - 12.215 ✅ the queue sentence is singular-aware and status-aware: `Live` · `3 claims waiting to
   send` · `Offline — 3 claims waiting to send` · `Offline — 1 claim waiting to send` ·
   `Catching up…`, and the rendered strip carries both the label and the "needs attention" count.
+  **An UNRECOGNISED status is never reported as `Live` (E2-27, 2026-09-21):** the function takes a bare
+  `string` on purpose — the mobile shell declares `status: string;` (`board-screen.tsx:11`) and passes a
+  wire value through verbatim — so a code this build does not know is a shape a caller already admits. Its
+  fallthrough used to return the liveness sentence, which is the one arm that invents the most optimistic
+  policy for a code it does not know, and the only failure that is not recoverable: a person told they are
+  live does not go and check. `live` is an explicit arm now and the fallthrough returns the queue sentence,
+  the half that stays true whatever the connection word is — `syncStatusLabel('suspended', 0)` is
+  `0 claims waiting to send`, not `Live`. *The pre-change source IS the mutant: before the fix that test
+  read `expected 'Live' not to be 'Live'`, `Tests 1 failed | 12 passed (13)`.*
 
 ### The classes and the stylesheet — `test/sync-ux-css-binding.test.tsx`
 

@@ -65,7 +65,17 @@ export function LegalNav() {
   const user = useCurrentUser();
 
   return (
-    <nav className="gn-nav">
+    <nav
+      className="gn-nav"
+      /* exec1 P31: unnamed, while the TOC below it IS labelled — so
+         `/privacy` and `/terms` offered two `navigation` landmarks and only one
+         of them said what it was. "Legal" is the reviewer's own word for this
+         bar and it is the house's: this component is `LegalNav`, its class
+         family is `.gn-legal*`, and the two routes it serves are the legal
+         pages. It is what tells a reader which of the two landmarks they are
+         in. */
+      aria-label="Legal"
+    >
       <div className="gn-nav__inner">
         {/* Both halves are `<span>`s, matching the export (`:1723` tile, `:1726` wordmark): it
             draws neither as a link. That is also what keeps this bar from

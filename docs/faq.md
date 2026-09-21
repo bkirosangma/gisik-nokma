@@ -102,10 +102,12 @@ to. It is recorded with a name on it and can be changed back, but it is untidy.
 Correct — "A workspace needs a name." Note that it does *not* trim spaces off a real name: type
 "  Marak Design  " and that is exactly what gets saved.
 
-**Where's the rest of the menu? I only see three links.**
-That is all there is: Workspaces, My Work (only inside a workspace), and Inbox. There are settings
-screens for stages and job types, and **nothing anywhere links to them** — they can only be reached by
-typing their address. See [Stages and moves](#stages-and-moves).
+**Where's the rest of the menu? I only see a few links.**
+The bar is short on purpose, and what it carries depends on where you are. Signed out it offers
+**Workspaces**, **Help** and **Account**; once a workspace is open, **My Work**, **Members** and
+**Settings** join them, with the workspace's name and your inbox and avatar at the right-hand end. The
+settings screens for stages and job types are behind **Settings**. See
+[Stages and moves](#stages-and-moves).
 
 ---
 
@@ -140,8 +142,9 @@ No, and this is a nasty one. The invitation shows as **accepted** and **they sta
 warns you and nothing warns them. A wrong answer delivered as a right one.
 
 **Where do I change somebody's role, or take them off?**
-Nowhere on screen. The People page lists the people you can see and shows each person's role, but that
-role is read-only — no remove, no change role. So you can let people in and see what they are, and you
+Changing a role is on screen; taking somebody off is not. The People page lists the people you can see
+and shows each person's role, and if you are an admin every row except an owner's carries a **Role**
+picker. There is still no remove, so you can let people in and change what they are, and you
 still cannot put them out. Combined with
 the promotion problem above, a workspace's people list can drift out of step with reality with no way
 to fix it from the interface.
@@ -215,11 +218,16 @@ ever look at the built-in due date. So it will put a day on a calendar and it wi
 Worth knowing about. Not a substitute for a due date.
 
 **Can I rename a job?**
-No control was found for it.
+Yes. Open the job and type into the title at the top of the sheet. **Enter** or clicking away saves it;
+**Escape** abandons the change.
 
 **Can I delete a job I created by mistake?**
-No delete button or delete action was found anywhere. If your stages have a "won't do" or "cancelled"
-stage, moving it there is the nearest thing. Otherwise, assume it stays.
+Yes, if you are a project admin. Open the job and press **Delete** in the sheet's footer. The job stops
+appearing in every view — boards, lists, search, My Work — and its history is kept, because other events
+cite it. A **"… deleted · its history is retained"** message follows with an **Undo** for about fifteen
+seconds, and that Undo is the product's only route back: once it goes, no control anywhere restores the
+job. If you would rather not lose it, a "won't do" or "cancelled" stage in your workflow remains the
+alternative.
 
 **Can I move a job to a different project?**
 No. Parents have to be in the same project, and no way to move a job across projects was found.
@@ -304,7 +312,8 @@ refused straight away, naming the field. A genuine race between two people is co
 ## Stages and moves
 
 **How do I mark something done?**
-Open the job, press **Move…**, pick the stage, press Move. There is no dragging on the board.
+Drag the card to a column, press the **‹** or **›** arrow on the card, or open the job, press
+**Move…**, pick the stage, press Move.
 
 **Why does the picker only show some of the stages?**
 Because your workflow decides which moves are allowed. A job can only go where an arrow leads from
@@ -370,10 +379,9 @@ ticket types", with no New workflow button and every box switched off. They can 
 for a non-admin to accidentally publish something.
 
 **Where are the settings screens?**
-Nothing links to them. Not in the top bar, not anywhere. The stage builder and the job-type editor can
-only be reached by typing their address into the browser. That is a real problem — these are the
-screens that make the product yours, and they are invisible. Ask whoever set your workspace up for the
-addresses and bookmark them.
+In the top bar: **Settings**. It appears once a workspace is open, and it opens that workspace's own
+screens — ticket types, workflows, and the workspace itself — where the stage builder and the job-type
+editor live. Nothing to bookmark.
 
 **Can I rename "Epic" and "Story" to something that makes sense to me?**
 Yes. An admin can rename all four built-in types, change their icons, and change which stage set they
@@ -634,9 +642,10 @@ work. It is an easy and reasonable thing to misread.
 No. There is no email of any kind beyond sign-in.
 
 **How do I know I've got something new?**
-A number badge on the Inbox link. It refreshes about once a minute. If a refresh fails it keeps the
-last number rather than resetting to nothing, and it shows nothing at all before the first answer
-comes back — an absence, not a zero.
+A dot on the Inbox link. It says only *that* you have something new, never how many — the count is in
+the link's name for a screen reader. It refreshes about once a minute. If a refresh fails it keeps
+showing the dot rather than clearing it, and it shows nothing at all before the first answer comes
+back — an absence, not a zero.
 
 **How do I mark something read?**
 Click the row. If the marking fails it reloads to show you the truth rather than leaving a fake "read"
@@ -979,8 +988,6 @@ That is a team that means it about not inventing facts, and it shows up everywhe
 Honest blanks. Nobody has an answer to these yet, and none of them is invented here.
 
 - **How long an emailed sign-in link stays valid.** Not written down anywhere.
-- **Whether a job can be deleted.** No delete control was found. Whether one exists somewhere is
-  unconfirmed.
 - **Whether a job can be moved to a different project.** No evidence either way.
 - **Whether a comment or description can be edited or deleted after posting.** The append-only design
   hints not; nothing confirms it.

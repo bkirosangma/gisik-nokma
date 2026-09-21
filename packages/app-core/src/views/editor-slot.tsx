@@ -102,6 +102,25 @@ export type EditorSlotProps = {
   ticketId: string;
   placeholder?: string;
   autoFocus?: boolean;
+  /**
+   * The `id` of a VISIBLE element whose words name this composer — exec1 P21.
+   *
+   * A host that renders a caption beside the field already HAS the words on
+   * screen, and pointing the control at them keeps ONE source: the caption a
+   * sighted reader sees and the name a screen reader announces cannot drift,
+   * because they are the same node. That is the mechanism the product reaches
+   * for where it has a caption to borrow, and `ticket-sheet.tsx`'s description
+   * row is the mount that does.
+   *
+   * **Optional, and the split with `mode`'s own label is deliberate rather than
+   * a fallback chain.** The COMMENT composer has no visible caption — it sits
+   * under a `Comments · N` heading that names the thread rather than the field —
+   * so nothing exists to point at and the words have to be supplied. Where
+   * BOTH are present on one host, `aria-labelledby` wins in the accessible-name
+   * computation, which is why the mount that passes this one does not also get
+   * a contrary label to disagree with.
+   */
+  labelledBy?: string;
   // Editor capabilities. All optional: the read-only default ignores every one
   // of them, and a read-only mount supplies none. The real editor requires them
   // for composing, and states the gap honestly when one is missing rather than

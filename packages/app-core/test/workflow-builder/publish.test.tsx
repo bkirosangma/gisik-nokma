@@ -273,7 +273,13 @@ describe('PublishControls — the state-mapping dialog', () => {
     expect(await screen.findByText('Every dropped state needs a destination')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Version 3 removes states that version 2 has. Publishing cannot see which tickets sit in which state, so every removed state needs a destination — occupied or not.',
+        // E5-29 — was: "... Publishing cannot see which tickets sit in which
+        // state, so every removed state needs a destination — occupied or not."
+        // The dialogs own rows print "3 tickets sit here today" (`countLine`,
+        // from `getStateOccupancy`), so the sentence denied the thing directly
+        // beneath it. The rule is unchanged; the sentence now says what the
+        // counts are for.
+        'Version 3 removes states that version 2 has. The counts below are for your information only — the rule needs a destination for every removed state, occupied or not.',
       ),
     ).toBeInTheDocument();
 
