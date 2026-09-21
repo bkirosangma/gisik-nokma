@@ -63,8 +63,6 @@ truth of anything, so I read all three concurrent reports and tested every claim
 
 | `E4-11` | that `.gn-nav__links` has no narrow-width variant, so the bar grows at 390 px | `globals.css:1801` is exactly the quoted rule (`display: flex; flex-wrap: wrap; …`), and the only nearby media query (`:1798` `@media (max-width: 60rem)`) targets `.gn-nav__inner` padding, **not** `.gn-nav__links`; no media query anywhere in the file redeclares it | **holds** — with the honest note below |
 
-| `E4-11` | (above) | | |
-
 ### Then the two lanes I had not read at all — exec 1 (UI) and exec 3 (functionality)
 
 **The check had covered three lanes; these are the other two, so the null now spans all five.**
