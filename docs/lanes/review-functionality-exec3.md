@@ -4183,7 +4183,7 @@ invariant rather than an open gap.
 `grep -n projectId packages/domain/src/events/ticket-events.ts` → one line. **Control:** `6.71` at `:87`, read at the
 same depth, holds (as §27 recorded).
 
-**ADDENDUM, 15:35 IST — the same false premise stands in two code comments, and one of them was false the day it was
+**ADDENDUM, 15:28 IST — the same false premise stands in two code comments, and one of them was false the day it was
 written.** `apps/server/test/routes/tickets-read.test.ts:465`: *"Nothing refuses a cross-project parent today (case
 6.57)."* — written in `dd7bfcfd` (2026-09-01, #57), **one day after** `6b2fc768` shipped `hierarchy.cross-project`;
 the fixture beneath it builds the cross-project child by writing projection rows directly, which is the only way it
